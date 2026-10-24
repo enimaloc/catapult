@@ -1,6 +1,5 @@
 package fr.enimaloc.catapult.service.twitch;
 
-import fr.enimaloc.catapult.service.debug.DebugContext;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
@@ -14,11 +13,14 @@ import fr.enimaloc.catapult.event.StreamOnlineEvent;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
+import fr.enimaloc.catapult.service.debug.DebugContext;
+import fr.enimaloc.catapult.service.debug.DebugRecording;
 import fr.enimaloc.catapult.service.notification.CatapultCategoryChangeStateService;
 import fr.enimaloc.catapult.service.notification.TwitchatEventDispatcher;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
@@ -60,6 +62,14 @@ public class TwitchEventSubService implements EventSubService {
     private final Map<UUID, ChannelState> channelStates = new ConcurrentHashMap<>();
     private final Set<UUID> channelStateWarnedUsers = ConcurrentHashMap.newKeySet();
     private final EventSubConnections connections;
+
+    private DebugRecording debug = DebugRecording.OFF;
+
+    /** Records this class's grouped calls and incoming messages for the members in debug mode. */
+    @Autowired(required = false)
+    public void setDebugRecording(DebugRecording debug) {
+        this.debug = debug == null ? DebugRecording.OFF : debug;
+    }
 
     public TwitchEventSubService(OAuthTokenRepository oAuthTokenRepository,
                                  UserAccountRepository userAccountRepository,
@@ -122,7 +132,11 @@ public class TwitchEventSubService implements EventSubService {
 
     // Package-private for testing
     void handleMessage(UserAccount user, OAuthToken token, String message, boolean reconnectSession) {
-        DebugContext.runAs(user.getId(), () -> dispatch(user, token, message, reconnectSession));
+        DebugContext.runAs(user.getId(), () -> {
+            debug.inbound(user.getId(), "twitch", "WS", EventSubConnections.WS_URI, message,
+                () -> DebugRecording.eventSubOperation(message));
+            dispatch(user, token, message, reconnectSession);
+        });
     }
 
     private void dispatch(UserAccount user, OAuthToken token, String message, boolean reconnectSession) {

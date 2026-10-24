@@ -1,14 +1,16 @@
 package fr.enimaloc.catapult.api.connect;
 
-import fr.enimaloc.catapult.service.debug.DebugContext;
 import fr.enimaloc.catapult.common.dto.connect.SteamStartResponse;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.event.SteamLinkedEvent;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.connections.ProviderConnectionsDto;
+import fr.enimaloc.catapult.service.debug.DebugContext;
+import fr.enimaloc.catapult.service.debug.DebugRecording;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
@@ -30,6 +32,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.security.SecureRandom;
 import java.util.Base64;
+import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -66,6 +69,14 @@ public class ApiSteamConnectController {
     private final ChannelEventPublisher channelEventPublisher;
     private final RestClient restClient;
 
+    private DebugRecording debug = DebugRecording.OFF;
+
+    /** Records this class's grouped calls and incoming messages for the members in debug mode. */
+    @Autowired(required = false)
+    public void setDebugRecording(DebugRecording debug) {
+        this.debug = debug == null ? DebugRecording.OFF : debug;
+    }
+
     @GetMapping("/start")
     public SteamStartResponse start(@AuthenticationPrincipal Jwt jwt) {
         UUID userId = UUID.fromString(jwt.getSubject());
@@ -97,7 +108,22 @@ public class ApiSteamConnectController {
             return closePopup("?error=nonce");
         }
         // Steam's redirect carries no JWT: the nonce is what says which member this is for
-        return DebugContext.callAs(userId, () -> link(userId, params));
+        return DebugContext.callAs(userId, () -> {
+            debug.inbound(userId, "steam", "GET", callbackUri(params), null, () -> "openid.callback");
+            return link(userId, params);
+        });
+    }
+
+    /** The callback URL as Steam sent the browser to it, for the members in debug mode. */
+    private URI callbackUri(Map<String, String> params) {
+        try {
+            UriComponentsBuilder uri = UriComponentsBuilder.fromUriString(apiBaseUrl + "/api/connect/steam/callback");
+            params.forEach(uri::queryParam);
+            return uri.build().encode().toUri();
+        } catch (RuntimeException e) {
+            log.warn("Could not rebuild the Steam callback URL for the debug recording: {}", e.toString());
+            return null;
+        }
     }
 
     private ResponseEntity<Void> link(UUID userId, Map<String, String> params) {

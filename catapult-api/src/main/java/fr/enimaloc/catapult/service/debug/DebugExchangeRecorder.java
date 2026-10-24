@@ -84,6 +84,17 @@ public class DebugExchangeRecorder {
      * @param filtered  true when {@code raw} is this member's share of a grouped call
      */
     public void record(UUID userId, Direction direction, RawExchange raw, String operation, boolean filtered) {
+        record(userId, direction, raw, operation, filtered, null);
+    }
+
+    /**
+     * Same as {@link #record(UUID, Direction, RawExchange, String, boolean)}, with the service named by the caller
+     * instead of derived from the URL (an incoming request reaches catapult's own host).
+     *
+     * @param service the service name, or null to derive it from {@code raw}'s URL
+     */
+    public void record(UUID userId, Direction direction, RawExchange raw, String operation, boolean filtered,
+                       String service) {
         if (userId == null || raw == null) {
             return;
         }
@@ -91,7 +102,7 @@ public class DebugExchangeRecorder {
             // Read on the caller's thread: that is where the current trace lives.
             String traceId = currentTraceId();
             executor.execute(() -> DebugContext.runAs(userId,
-                    () -> store(userId, direction, raw, operation, filtered, traceId)));
+                    () -> store(userId, direction, raw, operation, filtered, service, traceId)));
         } catch (RejectedExecutionException e) {
             onDropped();
         } catch (RuntimeException e) {
@@ -129,7 +140,7 @@ public class DebugExchangeRecorder {
     }
 
     private void store(UUID userId, Direction direction, RawExchange raw, String operation, boolean filtered,
-                       String traceId) {
+                       String service, String traceId) {
         DebugExchange saved;
         try {
             var mode = registry.modeOf(userId);
@@ -141,7 +152,7 @@ public class DebugExchangeRecorder {
             e.setUserId(userId);
             e.setOccurredAt(raw.at());
             e.setDirection(direction);
-            e.setService(cut(services.of(raw.uri()), SERVICE_MAX));
+            e.setService(cut(service != null ? service : services.of(raw.uri()), SERVICE_MAX));
             e.setOperation(cut(operation, OPERATION_MAX));
             e.setMethod(cut(raw.method() == null ? "?" : raw.method(), METHOD_MAX));
             e.setUrl(Objects.requireNonNullElse(mask(redactor.url(raw.uri(), reveal), userId), ""));
