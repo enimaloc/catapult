@@ -83,7 +83,7 @@ public class ApiAdminMembersController {
         Map<UUID, Boolean> liveStatus = found.getContent().stream()
                 .collect(Collectors.toMap(UserAccount::getId, streamStateService::isLive));
         boolean isMockProfile = Arrays.asList(environment.getActiveProfiles()).contains("mock");
-        Map<UUID, MemberDebugStateDto> debug = memberDebugService.activeStateDtos(
+        Map<UUID, MemberDebugStateDto> debug = memberDebugService.stateDtos(
                 found.getContent().stream().map(UserAccount::getId).toList());
         return new AdminMembersPage(found.getContent().stream().map(u -> toDto(u, debug.get(u.getId()))).toList(),
                 liveStatus, isMockProfile, found.getNumber(), found.getTotalPages(), found.getTotalElements());
@@ -98,7 +98,7 @@ public class ApiAdminMembersController {
         }
         List<UserAccount> found = userAccountRepository.searchMembers(UserAccountRepository.likePattern(query), query,
                 PageRequest.of(0, SEARCH_LIMIT));
-        Map<UUID, MemberDebugStateDto> debug = memberDebugService.activeStateDtos(
+        Map<UUID, MemberDebugStateDto> debug = memberDebugService.stateDtos(
                 found.stream().map(UserAccount::getId).toList());
         return found.stream().map(u -> toDto(u, debug.get(u.getId()))).toList();
     }

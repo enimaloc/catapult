@@ -128,17 +128,22 @@ class ApiAdminMembersControllerTest {
     @Test
     void membersPage_carriesTheDebugState() {
         UserAccount other = account("other", "tw-other");
+        UserAccount disabled = account("disabled", "tw-disabled");
         var state = new fr.enimaloc.catapult.common.dto.admin.MemberDebugStateDto(
                 true, false, java.time.Instant.parse("2026-10-01T10:00:00Z"), null, null, null, 3);
-        when(accounts.findMembersPage(any())).thenReturn(pageOf(List.of(member, other), 0, 2));
+        var off = new fr.enimaloc.catapult.common.dto.admin.MemberDebugStateDto(
+                false, false, java.time.Instant.parse("2026-09-01T10:00:00Z"), null,
+                java.time.Instant.parse("2026-09-02T10:00:00Z"), java.time.Instant.parse("2026-10-02T10:00:00Z"), 7);
+        when(accounts.findMembersPage(any())).thenReturn(pageOf(List.of(member, other, disabled), 0, 3));
         when(accounts.searchMembers(any(), any(), any())).thenReturn(List.of(member, other));
         when(environment.getActiveProfiles()).thenReturn(new String[0]);
-        when(debug.activeStateDtos(any())).thenReturn(java.util.Map.of(member.getId(), state));
+        when(debug.stateDtos(any())).thenReturn(java.util.Map.of(member.getId(), state, disabled.getId(), off));
 
         var page = controller.page(0, null);
 
         assertThat(page.members().get(0).debug()).isEqualTo(state);
         assertThat(page.members().get(1).debug()).isNull();
+        assertThat(page.members().get(2).debug()).isEqualTo(off);
         assertThat(controller.search("mem").get(0).debug()).isEqualTo(state);
     }
 
