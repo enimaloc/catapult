@@ -12,10 +12,13 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatValidationError;
 import fr.enimaloc.catapult.common.error.ErrorCode;
+import fr.enimaloc.catapult.service.notification.TwitchatValidationException;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -149,6 +152,26 @@ class ProblemAdviceTest {
     }
 
     @Test
+    void invalidTwitchatPayloadsListEveryError() throws Exception {
+        mvc.perform(get("/api/probe/twitchat"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.code").value("twitchat_invalid_payload"))
+                .andExpect(jsonPath("$.detail").value("1 invalid Twitchat payload field(s)"))
+                .andExpect(jsonPath("$.errors[0].index").value(2))
+                .andExpect(jsonPath("$.errors[0].field").value("message"))
+                .andExpect(jsonPath("$.errors[0].message").value("Required"));
+    }
+
+    @Test
+    void invalidTwitchatPayloadsOnAFrozenPathAreRethrown() {
+        assertThatThrownBy(() -> mvc.perform(get("/api/game/probe/twitchat")))
+                .isInstanceOf(ServletException.class)
+                .cause()
+                .isInstanceOf(TwitchatValidationException.class);
+    }
+
+    @Test
     void frozenPathsKeepTheDefaultResolvers() throws Exception {
         MvcResult rse = mvc.perform(get("/api/game/probe/rse"))
                 .andExpect(status().isConflict())
@@ -185,6 +208,11 @@ class ProblemAdviceTest {
         @GetMapping("/rse")
         String rse() {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Already resolved");
+        }
+
+        @GetMapping("/twitchat")
+        String twitchat() {
+            throw new TwitchatValidationException(List.of(new TwitchatValidationError(2, "message", "Required")));
         }
 
         @GetMapping("/problem")
