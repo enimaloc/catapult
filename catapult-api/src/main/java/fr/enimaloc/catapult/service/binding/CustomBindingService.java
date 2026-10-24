@@ -12,7 +12,6 @@ import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
-import fr.enimaloc.catapult.repository.binding.CustomBindingActivationRepository;
 import fr.enimaloc.catapult.repository.binding.CustomBindingRepository;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
@@ -20,6 +19,7 @@ import fr.enimaloc.catapult.service.twitch.ChannelUpdateOutcome;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -27,9 +27,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -61,14 +61,21 @@ public class CustomBindingService {
     public enum ActivationResult {
         /** Twitch accepted the category: the binding is now the active one. */
         APPLIED,
-        /** Nothing could be sent: no Twitch token, a refused one (the bot is then paused), or the bot is off. */
+        /** The bot is off or the account not active: Catapult does not touch the channel, nothing was sent. */
+        BOT_DISABLED,
+        /** The Twitch link is unusable: no Twitch token, or Twitch refused it (which pauses the bot). */
         TWITCH_UNAVAILABLE,
         /** Twitch failed or refused the update. */
         FAILED
     }
 
+    /** {@link #update}'s outcome: {@code reapplied} is how re-applying went when the binding is active, else null. */
+    public record UpdateResult(CustomBinding binding, ActivationResult reapplied) {}
+
+    private static final String UNIQUE_NAME_CONSTRAINT = "uq_custom_binding_user_name";
+
     private final CustomBindingRepository bindings;
-    private final CustomBindingActivationRepository activations;
+    private final CustomBindingActivations activations;
     private final TwitchService twitchService;
     private final ExperimentService experimentService;
     private final GameStateService gameStateService;
@@ -112,8 +119,11 @@ public class CustomBindingService {
         return saved;
     }
 
-    /** Saved only: an active binding's new category reaches Twitch on its next activation. */
-    public CustomBinding update(UserAccount user, UUID id, CustomBindingRequest request) {
+    /**
+     * Always saved; when it is the active one it is re-applied to Twitch at once, and stays active whatever Twitch
+     * answers ({@link UpdateResult#reapplied()} tells how it went).
+     */
+    public UpdateResult update(UserAccount user, UUID id, CustomBindingRequest request) {
         requireEnabled(user);
         CustomBinding binding = existing(user, id);
         String name = validName(request);
@@ -125,14 +135,17 @@ public class CustomBindingService {
                 });
         CustomBinding saved = save(fill(binding, name, request));
         channelEventPublisher.customBindingsUpdated(user.getId());
-        return saved;
+        boolean active = activations.active(user)
+                .filter(activation -> activation.getCustomBinding().getId().equals(saved.getId()))
+                .isPresent();
+        return new UpdateResult(saved, active ? applyToTwitch(user, saved) : null);
     }
 
     /** Deleting the active one deactivates it first, with the same effect as a deactivation. */
     public void delete(UserAccount user, UUID id) {
         requireEnabled(user);
         CustomBinding binding = existing(user, id);
-        activations.findById(user.getId())
+        activations.active(user)
                 .filter(activation -> activation.getCustomBinding().getId().equals(binding.getId()))
                 .ifPresent(activation -> doDeactivate(user));
         bindings.delete(binding);
@@ -157,18 +170,12 @@ public class CustomBindingService {
         if (binding.getUser() == null || !user.getId().equals(binding.getUser().getId())) {
             throw notFound();
         }
-        ChannelUpdateOutcome outcome = twitchService.updateChannelReporting(user, toGameBinding(user, binding));
-        ActivationResult result = switch (outcome) {
-            case APPLIED -> ActivationResult.APPLIED;
-            case SKIPPED -> ActivationResult.TWITCH_UNAVAILABLE;
-            case FAILED -> twitchUnusable(user) ? ActivationResult.TWITCH_UNAVAILABLE : ActivationResult.FAILED;
-        };
+        ActivationResult result = applyToTwitch(user, binding);
         if (result != ActivationResult.APPLIED) {
-            log.info("Custom binding {} not activated for user {}: Twitch update {}", binding.getId(), user.getId(), outcome);
+            log.info("Custom binding {} not activated for user {}: {}", binding.getId(), user.getId(), result);
             return result;
         }
-        activations.save(new CustomBindingActivation(user.getId(), binding, Instant.now()));
-        channelEventPublisher.customBindingChanged(user.getId(), binding.getId());
+        activations.record(user, binding);
         log.debug("Custom binding {} activated for user {}", binding.getId(), user.getId());
         return result;
     }
@@ -176,20 +183,18 @@ public class CustomBindingService {
     /** Ends the active binding, if any, as if the game open now had just been detected. */
     public void deactivate(UserAccount user) {
         requireEnabled(user);
-        if (activations.findById(user.getId()).isPresent()) {
+        if (activations.active(user).isPresent()) {
             doDeactivate(user);
         }
     }
 
     /** The active custom binding; none while the streamer is outside the experiment. */
     public Optional<CustomBindingActivation> active(UserAccount user) {
-        if (!enabled(user)) return Optional.empty();
-        return activations.findById(user.getId());
+        return activations.active(user);
     }
 
     private void doDeactivate(UserAccount user) {
-        activations.deleteById(user.getId());
-        channelEventPublisher.customBindingChanged(user.getId(), null);
+        activations.clear(user);
         Optional<DetectedGame> open = gameStateService.getLastKnownGame(user);
         if (streamStateService.isLive(user)) {
             open.ifPresentOrElse(game -> gameEventListener.applyDetectedGame(user, game),
@@ -204,6 +209,24 @@ public class CustomBindingService {
         if (applyDefaultOnStreamEnd) {
             twitchService.resetToDefault(user);
         }
+    }
+
+    /** {@code binding} sent to Twitch, the bot's state checked first so a paused bot is not taken for a Twitch problem. */
+    private ActivationResult applyToTwitch(UserAccount user, CustomBinding binding) {
+        if (!botActive(user)) return ActivationResult.BOT_DISABLED;
+        ChannelUpdateOutcome outcome = twitchService.updateChannelReporting(user, toGameBinding(user, binding));
+        return switch (outcome) {
+            case APPLIED -> ActivationResult.APPLIED;
+            // Only the bot's state skips a custom binding's update: it changed since the check above
+            case SKIPPED -> ActivationResult.BOT_DISABLED;
+            case FAILED -> twitchUnusable(user) ? ActivationResult.TWITCH_UNAVAILABLE : ActivationResult.FAILED;
+        };
+    }
+
+    private boolean botActive(UserAccount user) {
+        return userAccountRepository.findById(user.getId())
+                .map(account -> account.isBotEnabled() && account.getStatus() == UserAccount.Status.ACTIVE)
+                .orElse(false);
     }
 
     /** After a failed update: whether the cause is the Twitch link (no token, or one refused, which pauses the bot). */
@@ -240,8 +263,24 @@ public class CustomBindingService {
             return bindings.save(binding);
         } catch (DataIntegrityViolationException e) {
             // Two saves of the same name at once: the (user_id, lower(name)) index rejects the second
-            throw nameTaken();
+            if (isUniqueNameViolation(e)) throw nameTaken();
+            throw e;
         }
+    }
+
+    static boolean isUniqueNameViolation(Throwable e) {
+        for (Throwable cause = e; cause != null; cause = cause.getCause()) {
+            if (cause instanceof ConstraintViolationException violation
+                    && violation.getConstraintName() != null
+                    && violation.getConstraintName().toLowerCase(Locale.ROOT).contains(UNIQUE_NAME_CONSTRAINT)) {
+                return true;
+            }
+            if (cause.getMessage() != null
+                    && cause.getMessage().toLowerCase(Locale.ROOT).contains(UNIQUE_NAME_CONSTRAINT)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static CustomBinding fill(CustomBinding binding, String name, CustomBindingRequest request) {
