@@ -52,6 +52,7 @@ class ApiAdminMembersFlagsTest {
     @MockitoBean AdminMigrationService adminMigrationService;
     @MockitoBean UserFlagRepository userFlagRepository;
     @MockitoBean UserGroupRepository userGroupRepository;
+    @MockitoBean fr.enimaloc.catapult.service.debug.MemberDebugService memberDebugService;
 
     private static org.springframework.test.web.servlet.request.RequestPostProcessor adminJwt() {
         return jwt().jwt(j -> j.claim("twitchId", "123"))

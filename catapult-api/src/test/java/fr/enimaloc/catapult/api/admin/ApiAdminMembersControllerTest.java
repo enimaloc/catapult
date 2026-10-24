@@ -49,8 +49,10 @@ class ApiAdminMembersControllerTest {
     private final Environment environment = mock(Environment.class);
     private final UserFlagRepository flags = mock(UserFlagRepository.class);
     private final UserGroupRepository groups = mock(UserGroupRepository.class);
+    private final fr.enimaloc.catapult.service.debug.MemberDebugService debug =
+            mock(fr.enimaloc.catapult.service.debug.MemberDebugService.class);
     private final ApiAdminMembersController controller = new ApiAdminMembersController(
-            accounts, streamState, accountService, botToggle, migrations, environment, flags, groups);
+            accounts, streamState, accountService, botToggle, migrations, environment, flags, groups, debug);
 
     private UserAccount member;
 
@@ -115,12 +117,29 @@ class ApiAdminMembersControllerTest {
 
         assertThat(page.members()).containsExactly(new fr.enimaloc.catapult.common.dto.admin.AdminMemberDto(
                 member.getId(), member.getTwitchId(), member.getTwitchUsername(), "https://img/member", "7656",
-                false, member.isBotEnabled(), "ACTIVE", member.getCreatedAt()));
+                false, member.isBotEnabled(), "ACTIVE", member.getCreatedAt(), null));
         assertThat(page.liveStatus()).containsEntry(member.getId(), true);
         assertThat(page.isMockProfile()).isTrue();
         assertThat(page.number()).isZero();
         assertThat(page.totalPages()).isEqualTo(1);
         assertThat(page.totalElements()).isEqualTo(1);
+    }
+
+    @Test
+    void membersPage_carriesTheDebugState() {
+        UserAccount other = account("other", "tw-other");
+        var state = new fr.enimaloc.catapult.common.dto.admin.MemberDebugStateDto(
+                true, false, java.time.Instant.parse("2026-10-01T10:00:00Z"), null, null, null, 3);
+        when(accounts.findMembersPage(any())).thenReturn(pageOf(List.of(member, other), 0, 2));
+        when(accounts.searchMembers(any(), any(), any())).thenReturn(List.of(member, other));
+        when(environment.getActiveProfiles()).thenReturn(new String[0]);
+        when(debug.activeStateDtos(any())).thenReturn(java.util.Map.of(member.getId(), state));
+
+        var page = controller.page(0, null);
+
+        assertThat(page.members().get(0).debug()).isEqualTo(state);
+        assertThat(page.members().get(1).debug()).isNull();
+        assertThat(controller.search("mem").get(0).debug()).isEqualTo(state);
     }
 
     @Test

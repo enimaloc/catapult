@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.common.dto.admin.AdminMemberDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.MemberDebugStateDto;
 import fr.enimaloc.catapult.common.dto.admin.MigrateRequest;
 import fr.enimaloc.catapult.common.dto.admin.SetFlagRequest;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
@@ -18,6 +19,7 @@ import fr.enimaloc.catapult.service.account.AccountService;
 import fr.enimaloc.catapult.service.account.AdminMigrationService;
 import fr.enimaloc.catapult.service.account.BotToggleService;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
+import fr.enimaloc.catapult.service.debug.MemberDebugService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.env.Environment;
@@ -59,6 +61,7 @@ public class ApiAdminMembersController {
     private final Environment environment;
     private final UserFlagRepository userFlagRepository;
     private final UserGroupRepository userGroupRepository;
+    private final MemberDebugService memberDebugService;
 
     /** Members per page of the admin listing. */
     static final int PAGE_SIZE = 50;
@@ -80,7 +83,9 @@ public class ApiAdminMembersController {
         Map<UUID, Boolean> liveStatus = found.getContent().stream()
                 .collect(Collectors.toMap(UserAccount::getId, streamStateService::isLive));
         boolean isMockProfile = Arrays.asList(environment.getActiveProfiles()).contains("mock");
-        return new AdminMembersPage(found.getContent().stream().map(ApiAdminMembersController::toDto).toList(),
+        Map<UUID, MemberDebugStateDto> debug = memberDebugService.activeStateDtos(
+                found.getContent().stream().map(UserAccount::getId).toList());
+        return new AdminMembersPage(found.getContent().stream().map(u -> toDto(u, debug.get(u.getId()))).toList(),
                 liveStatus, isMockProfile, found.getNumber(), found.getTotalPages(), found.getTotalElements());
     }
 
@@ -91,14 +96,17 @@ public class ApiAdminMembersController {
         if (query.isEmpty()) {
             return List.of();
         }
-        return userAccountRepository.searchMembers(UserAccountRepository.likePattern(query), query,
-                PageRequest.of(0, SEARCH_LIMIT)).stream().map(ApiAdminMembersController::toDto).toList();
+        List<UserAccount> found = userAccountRepository.searchMembers(UserAccountRepository.likePattern(query), query,
+                PageRequest.of(0, SEARCH_LIMIT));
+        Map<UUID, MemberDebugStateDto> debug = memberDebugService.activeStateDtos(
+                found.stream().map(UserAccount::getId).toList());
+        return found.stream().map(u -> toDto(u, debug.get(u.getId()))).toList();
     }
 
-    static AdminMemberDto toDto(UserAccount user) {
+    static AdminMemberDto toDto(UserAccount user, MemberDebugStateDto debug) {
         return new AdminMemberDto(user.getId(), user.getTwitchId(), user.getTwitchUsername(), user.getProfileImageUrl(),
                 user.getSteamId(), user.isSystemAccount(), user.isBotEnabled(),
-                user.getStatus() == null ? null : user.getStatus().name(), user.getCreatedAt());
+                user.getStatus() == null ? null : user.getStatus().name(), user.getCreatedAt(), debug);
     }
 
     @PostMapping("/{id}/bot/toggle")

@@ -474,9 +474,9 @@ class IndexControllerTest {
         org.mockito.Mockito.when(apiService.currentUserId()).thenReturn(self);
         org.mockito.Mockito.when(apiService.adminMembers("", 0)).thenReturn(new fr.enimaloc.catapult.common.dto.admin.AdminMembersPage(List.of(
                 new fr.enimaloc.catapult.common.dto.admin.AdminMemberDto(self, "1", "enimaloc", "img", null, false, true, "ACTIVE",
-                        java.time.Instant.parse("2025-03-01T12:00:00Z")),
+                        java.time.Instant.parse("2025-03-01T12:00:00Z"), null),
                 new fr.enimaloc.catapult.common.dto.admin.AdminMemberDto(other, "2", "viewer", "img", "765", false, false, "ACTIVE",
-                        java.time.Instant.parse("2025-03-01T12:00:00Z"))),
+                        java.time.Instant.parse("2025-03-01T12:00:00Z"), null)),
                 java.util.Map.of(), false, 0, 1, 2));
         String key = fr.enimaloc.catapult.service.http.ApiClient.SESSION_JWT_KEY;
 

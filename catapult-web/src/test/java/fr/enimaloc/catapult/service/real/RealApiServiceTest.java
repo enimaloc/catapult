@@ -621,7 +621,7 @@ class RealApiServiceTest {
 
         UUID id = UUID.fromString("00000000-0000-0000-0000-000000000001");
         assertThat(page.members()).containsExactly(new fr.enimaloc.catapult.common.dto.admin.AdminMemberDto(
-                id, "1", "enimaloc", "img", "765", false, true, "ACTIVE", java.time.Instant.parse("2025-03-01T12:00:00Z")));
+                id, "1", "enimaloc", "img", "765", false, true, "ACTIVE", java.time.Instant.parse("2025-03-01T12:00:00Z"), null));
         assertThat(page.isLive(id)).isTrue();
         assertThat(page.number()).isEqualTo(2);
         assertThat(page.totalPages()).isEqualTo(3);
