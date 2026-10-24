@@ -5,20 +5,28 @@ import fr.enimaloc.catapult.service.debug.DebugExchangeRecorder;
 import fr.enimaloc.catapult.service.debug.DebugMemberRegistry;
 import fr.enimaloc.catapult.service.debug.DebugMemberRegistry.DebugMode;
 import fr.enimaloc.catapult.service.debug.DebugRedactor;
+import fr.enimaloc.catapult.service.debug.OtherMemberMasker;
 import fr.enimaloc.catapult.service.debug.TraceIdSource;
+import io.sentry.Breadcrumb;
 import io.sentry.CustomSamplingContext;
+import io.sentry.IScope;
 import io.sentry.IScopes;
 import io.sentry.ISentryLifecycleToken;
 import io.sentry.ISpan;
 import io.sentry.ITransaction;
+import io.sentry.ScopeType;
 import io.sentry.Sentry;
 import io.sentry.SentryAttributeType;
 import io.sentry.SentryBaseEvent;
+import io.sentry.SentryEvent;
 import io.sentry.SentryLogEventAttributeValue;
 import io.sentry.SentryOptions;
+import io.sentry.SpanId;
 import io.sentry.TransactionContext;
 import io.sentry.TransactionOptions;
+import io.sentry.protocol.Message;
 import io.sentry.protocol.Request;
+import io.sentry.protocol.SentryException;
 import io.sentry.protocol.SentrySpan;
 import io.sentry.protocol.SentryTransaction;
 import io.sentry.protocol.User;
@@ -30,36 +38,46 @@ import org.springframework.context.annotation.Configuration;
 
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.ListIterator;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
- * catapult-api reports to Sentry only the work of a member in debug mode: its traces, errors and logs, under that
- * member, and nothing at all for anyone else (with no DSN, Sentry stays off and none of this does anything).
+ * catapult-api reports to Sentry only the work of a member in debug mode: its traces, errors, logs and breadcrumbs,
+ * under that member, and nothing at all for anyone else (with no DSN, Sentry stays off and none of this does
+ * anything).
  * <p>
- * Whose work it is comes from {@link DebugContext#subject()} on the thread that captures an error or a log; a
- * transaction, which is sent once that work is over, carries the member in its {@value #MEMBER_TAG} tag, set when
- * the member's work starts ({@link #enter}). Work for a debugged member outside any transaction (scheduled, event
- * driven) runs in a {@value #BACKGROUND_OPERATION} transaction of its own. Unless the member's secrets are revealed,
- * the request data of what is sent is masked as the recorded exchanges are.
+ * Whose work it is comes from {@link DebugContext#subject()} on the thread that captures an error, a log or a
+ * breadcrumb; a transaction, which is sent once that work is over, carries the member in its {@value #MEMBER_TAG}
+ * tag, set when the member's work starts ({@link #enter}). A debugged member's work outside any sampled transaction
+ * (scheduled, event driven, or a request that came without a sampled trace) runs in a transaction of its own.
+ * <p>
+ * Breadcrumbs are kept only for a debugged member's work and marked with that member: an event carries only its own
+ * member's, never those another member's work left on a pooled thread's scopes. What is sent is scrubbed as the
+ * recorded exchanges are: other members' identifiers always, secrets unless the member's are revealed.
  */
 @Configuration
 public class DebugSentryConfig implements InitializingBean, DisposableBean {
 
-    /** Tag (and log attribute) naming the debugged member a report is for. */
+    /** Tag (and log attribute, breadcrumb data) naming the debugged member a report is for. */
     public static final String MEMBER_TAG = "catapult.debug_member";
     /** Name and operation of the transaction wrapping a debugged member's work done outside a request. */
     public static final String BACKGROUND_OPERATION = "debug.background";
-    /** Data key the Sentry HTTP client spans keep the query string of an outgoing call in. */
-    private static final String SPAN_QUERY = "http.query";
+    /** Log attributes naming the member, left as they are by the scrubbing. */
+    private static final Set<String> MEMBER_ATTRIBUTES = Set.of("user.id", MEMBER_TAG);
 
     private final DebugMemberRegistry registry;
     private final DebugRedactor redactor;
+    private final OtherMemberMasker masker;
 
-    public DebugSentryConfig(DebugMemberRegistry registry, DebugRedactor redactor) {
+    public DebugSentryConfig(DebugMemberRegistry registry, DebugRedactor redactor, OtherMemberMasker masker) {
         this.registry = registry;
         this.redactor = redactor;
+        this.masker = masker;
     }
 
     /** {@code catapult-api@<commit>}, as catapult-web names its own release. */
@@ -92,7 +110,10 @@ public class DebugSentryConfig implements InitializingBean, DisposableBean {
     @Bean
     SentryOptions.BeforeSendCallback beforeSend() {
         return (event, hint) -> modeFor(event.getTag(MEMBER_TAG))
-                .map(mode -> decorate(event, mode))
+                .map(mode -> {
+                    scrubTexts(event, mode);
+                    return decorate(event, mode);
+                })
                 .orElse(null);
     }
 
@@ -100,9 +121,7 @@ public class DebugSentryConfig implements InitializingBean, DisposableBean {
     SentryOptions.BeforeSendTransactionCallback beforeSendTransaction() {
         return (transaction, hint) -> modeFor(transaction.getTag(MEMBER_TAG))
                 .map(mode -> {
-                    if (!mode.revealSecrets()) {
-                        transaction.getSpans().forEach(this::maskSpan);
-                    }
+                    scrubSpans(transaction.getSpans(), mode);
                     return decorate(transaction, mode);
                 })
                 .orElse(null);
@@ -112,9 +131,14 @@ public class DebugSentryConfig implements InitializingBean, DisposableBean {
     SentryOptions.Logs.BeforeSendLogCallback beforeSendLog() {
         return log -> currentMode()
                 .map(mode -> {
+                    log.setBody(scrub(log.getBody(), mode));
                     if (log.getAttributes() != null) {
                         log.getAttributes().remove("user.name");
                         log.getAttributes().remove("user.email");
+                        log.getAttributes().replaceAll((name, value) ->
+                                MEMBER_ATTRIBUTES.contains(name) || !(value.getValue() instanceof String text)
+                                        ? value
+                                        : new SentryLogEventAttributeValue(value.getType(), scrub(text, mode)));
                     }
                     log.setAttribute("user.id", text(mode.userId()));
                     log.setAttribute(MEMBER_TAG, text(mode.userId()));
@@ -132,6 +156,21 @@ public class DebugSentryConfig implements InitializingBean, DisposableBean {
                     attributes.put(MEMBER_TAG, text(mode.userId()));
                     metric.setAttributes(attributes);
                     return metric;
+                })
+                .orElse(null);
+    }
+
+    /**
+     * Breadcrumbs (logback's, the HTTP client's) are kept only for a debugged member's work, scrubbed and marked with
+     * that member so that only its own events carry them.
+     */
+    @Bean
+    SentryOptions.BeforeBreadcrumbCallback beforeBreadcrumb() {
+        return (breadcrumb, hint) -> currentMode()
+                .map(mode -> {
+                    scrub(breadcrumb, mode);
+                    breadcrumb.setData(MEMBER_TAG, mode.userId().toString());
+                    return breadcrumb;
                 })
                 .orElse(null);
     }
@@ -159,10 +198,13 @@ public class DebugSentryConfig implements InitializingBean, DisposableBean {
     }
 
     /**
-     * Called as {@code member}'s work starts on this thread. A debugged member's work joins the transaction under
-     * way (tagged with the member unless it already is with someone), or else gets a {@value #BACKGROUND_OPERATION}
-     * one, on scopes of its own so that no other thread sees it, finished when the work is. The recorder's own
-     * threads are left alone: what they do is the recording, not the member's work.
+     * Called as {@code member}'s work starts on this thread. A debugged member's work joins the sampled transaction
+     * under way (tagged with the member unless it already is with someone). Otherwise it gets a transaction of its
+     * own, sampled for the member: a child of the unsampled one under way, in its trace and under its name (a request
+     * that came without a sampled trace), or else a {@value #BACKGROUND_OPERATION} one. That transaction runs on
+     * forked scopes, emptied of the breadcrumbs earlier work left on this thread, which no other thread sees and which
+     * are dropped when the work ends. The recorder's own threads are left alone: what they do is the recording, not
+     * the member's work.
      */
     AutoCloseable enter(UUID member) {
         if (!Sentry.isEnabled() || registry.modeOf(member).isEmpty()
@@ -170,7 +212,7 @@ public class DebugSentryConfig implements InitializingBean, DisposableBean {
             return null;
         }
         ITransaction active = Sentry.getCurrentScopes().getTransaction();
-        if (active != null) {
+        if (active != null && Boolean.TRUE.equals(active.isSampled())) {
             if (active.getTag(MEMBER_TAG) == null) {
                 active.setTag(MEMBER_TAG, member.toString());
             }
@@ -179,13 +221,14 @@ public class DebugSentryConfig implements InitializingBean, DisposableBean {
         IScopes scopes = Sentry.forkedScopes(BACKGROUND_OPERATION);
         ISentryLifecycleToken current = scopes.makeCurrent();
         try {
+            scopes.configureScope(ScopeType.CURRENT, IScope::clearBreadcrumbs);
+            scopes.configureScope(ScopeType.ISOLATION, IScope::clearBreadcrumbs);
             CustomSamplingContext sampling = new CustomSamplingContext();
             sampling.set(MEMBER_TAG, member);
             TransactionOptions options = new TransactionOptions();
             options.setBindToScope(true);
             options.setCustomSamplingContext(sampling);
-            ITransaction transaction = scopes.startTransaction(
-                    new TransactionContext(BACKGROUND_OPERATION, BACKGROUND_OPERATION), options);
+            ITransaction transaction = scopes.startTransaction(transactionContext(active), options);
             transaction.setTag(MEMBER_TAG, member.toString());
             return () -> {
                 try {
@@ -198,6 +241,18 @@ public class DebugSentryConfig implements InitializingBean, DisposableBean {
             current.close();
             throw e;
         }
+    }
+
+    /** The member's own transaction: in the trace of the unsampled {@code active} one when there is one. */
+    private static TransactionContext transactionContext(ITransaction active) {
+        if (active == null) {
+            return new TransactionContext(BACKGROUND_OPERATION, BACKGROUND_OPERATION);
+        }
+        TransactionContext context = new TransactionContext(active.getSpanContext().getTraceId(), new SpanId(),
+                active.getSpanContext().getSpanId(), null, null);
+        context.setName(active.getName());
+        context.setOperation(Objects.requireNonNullElse(active.getOperation(), BACKGROUND_OPERATION));
+        return context;
     }
 
     private Optional<DebugMode> currentMode() {
@@ -217,40 +272,93 @@ public class DebugSentryConfig implements InitializingBean, DisposableBean {
         }
     }
 
-    /** Names the member (and no one else: on an admin's request about a member, the admin is dropped). */
+    /**
+     * Names the member (and no one else: on an admin's request about a member, the admin is dropped), keeps only the
+     * breadcrumbs of that member's work, and masks the request's secrets unless revealed.
+     */
     private <T extends SentryBaseEvent> T decorate(T event, DebugMode mode) {
         User user = new User();
         user.setId(mode.userId().toString());
         event.setUser(user);
         event.setTag(MEMBER_TAG, mode.userId().toString());
-        if (!mode.revealSecrets()) {
-            maskRequest(event.getRequest());
+        if (event.getBreadcrumbs() != null) {
+            String member = mode.userId().toString();
+            event.setBreadcrumbs(event.getBreadcrumbs().stream()
+                    .filter(b -> member.equals(b.getData(MEMBER_TAG)))
+                    .toList());
         }
+        scrubRequest(event.getRequest(), mode);
         return event;
     }
 
-    private void maskRequest(Request request) {
+    /** Other members' identifiers always; secrets in free text (a URL, a form, JSON) unless revealed. */
+    private String scrub(String text, DebugMode mode) {
+        if (text == null || text.isEmpty()) {
+            return text;
+        }
+        String unsecret = mode.revealSecrets() ? text : redactor.text(text, false);
+        return masker.mask(unsecret, mode.userId());
+    }
+
+    private void scrub(Breadcrumb breadcrumb, DebugMode mode) {
+        breadcrumb.setMessage(scrub(breadcrumb.getMessage(), mode));
+        for (Map.Entry<String, Object> data : new HashMap<>(breadcrumb.getData()).entrySet()) {
+            if (data.getValue() instanceof String text) {
+                breadcrumb.setData(data.getKey(), scrub(text, mode));
+            }
+        }
+    }
+
+    private void scrubTexts(SentryEvent event, DebugMode mode) {
+        Message message = event.getMessage();
+        if (message != null) {
+            message.setMessage(scrub(message.getMessage(), mode));
+            message.setFormatted(scrub(message.getFormatted(), mode));
+            if (message.getParams() != null) {
+                message.setParams(message.getParams().stream().map(p -> scrub(p, mode)).toList());
+            }
+        }
+        if (event.getExceptions() != null) {
+            for (SentryException exception : event.getExceptions()) {
+                exception.setValue(scrub(exception.getValue(), mode));
+            }
+        }
+    }
+
+    /** Span descriptions ({@code GET <url>}) and their string data ({@code url}, {@code http.query}…). */
+    private void scrubSpans(List<SentrySpan> spans, DebugMode mode) {
+        for (ListIterator<SentrySpan> it = spans.listIterator(); it.hasNext(); ) {
+            SentrySpan span = it.next();
+            Map<String, Object> data = span.getData() == null ? null : new HashMap<>(span.getData());
+            if (data != null) {
+                data.replaceAll((key, value) -> value instanceof String text ? scrub(text, mode) : value);
+            }
+            SentrySpan scrubbed = new SentrySpan(span.getStartTimestamp(), span.getTimestamp(), span.getTraceId(),
+                    span.getSpanId(), span.getParentSpanId(), span.getOp(), scrub(span.getDescription(), mode),
+                    span.getStatus(), span.getOrigin(), span.getTags(), span.getMeasurements(), data);
+            scrubbed.setUnknown(span.getUnknown());
+            it.set(scrubbed);
+        }
+    }
+
+    private void scrubRequest(Request request, DebugMode mode) {
         if (request == null) {
             return;
         }
-        if (request.getHeaders() != null) {
-            Map<String, String> headers = new LinkedHashMap<>();
-            request.getHeaders().forEach((name, value) ->
-                    headers.put(name, redactor.isSecretHeader(name) ? DebugRedactor.MASK : value));
-            request.setHeaders(headers);
+        if (!mode.revealSecrets()) {
+            if (request.getHeaders() != null) {
+                Map<String, String> headers = new LinkedHashMap<>();
+                request.getHeaders().forEach((name, value) ->
+                        headers.put(name, redactor.isSecretHeader(name) ? DebugRedactor.MASK : value));
+                request.setHeaders(headers);
+            }
+            if (request.getCookies() != null) {
+                request.setCookies(DebugRedactor.MASK);
+            }
+            request.setQueryString(redactor.query(request.getQueryString(), false));
         }
-        if (request.getCookies() != null) {
-            request.setCookies(DebugRedactor.MASK);
-        }
-        request.setQueryString(redactor.query(request.getQueryString(), false));
-    }
-
-    private void maskSpan(SentrySpan span) {
-        if (span.getData() != null && span.getData().get(SPAN_QUERY) instanceof String query) {
-            Map<String, Object> data = new HashMap<>(span.getData());
-            data.put(SPAN_QUERY, redactor.query(query, false));
-            span.setData(data);
-        }
+        request.setUrl(masker.mask(request.getUrl(), mode.userId()));
+        request.setQueryString(masker.mask(request.getQueryString(), mode.userId()));
     }
 
     private static SentryLogEventAttributeValue text(UUID value) {

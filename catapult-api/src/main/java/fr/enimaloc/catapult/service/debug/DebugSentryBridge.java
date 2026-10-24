@@ -22,6 +22,10 @@ import java.util.UUID;
  * on the trace the exchange was made in (the one catapult-web's replay of the member's navigation belongs to), and
  * an {@code http} breadcrumb. Runs on the recorder's thread as the member, on scopes of its own; it makes no HTTP
  * call of its own (that would be recorded in turn), only Sentry's.
+ * <p>
+ * The log is what reaches Sentry: the breadcrumb lives on these scopes, dropped once the exchange is sent, so it
+ * only goes out with an error captured while sending it (Sentry sends breadcrumbs with events only). The member's
+ * own errors carry the HTTP client's breadcrumbs of the same calls, made on the member's thread.
  */
 @Component
 public class DebugSentryBridge implements DebugExchangeListener {
