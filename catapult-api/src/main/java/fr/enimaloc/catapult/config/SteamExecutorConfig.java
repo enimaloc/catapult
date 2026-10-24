@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.config;
 
+import fr.enimaloc.catapult.service.debug.DebugContext;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -15,6 +16,7 @@ public class SteamExecutorConfig {
 
     @Bean(name = "steamExecutor")
     public Executor steamExecutor() {
-        return Executors.newVirtualThreadPerTaskExecutor();
+        Executor delegate = Executors.newVirtualThreadPerTaskExecutor();
+        return task -> delegate.execute(DebugContext.wrap(task));
     }
 }
