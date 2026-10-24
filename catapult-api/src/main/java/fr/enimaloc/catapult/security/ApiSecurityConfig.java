@@ -29,6 +29,9 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.access.expression.WebExpressionAuthorizationManager;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import javax.crypto.SecretKey;
 import java.util.Collection;
@@ -59,6 +62,8 @@ public class ApiSecurityConfig {
             HttpSecurity http, ObjectProvider<UserApiTokenService> userApiTokenService) throws Exception {
         http
                 .securityMatcher(CUSTOM_BINDINGS_API, CUSTOM_BINDINGS_API + "/**")
+                // Answers the preflight before any authentication, and adds the headers to every answer, 401 included
+                .cors(cors -> cors.configurationSource(customBindingsCors()))
                 .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .csrf(AbstractHttpConfigurer::disable)
@@ -73,6 +78,23 @@ public class ApiSecurityConfig {
                 .addFilterAfter(new DebugSubjectFilter(), PersonalTokenAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    /**
+     * The custom bindings API is open to a page of any origin (Twitchat runs in the browser): the personal token, in
+     * {@code Authorization}, is its only credential — no cookie or session counts here — so the answer allows no
+     * credentials and any origin is safe. Not a bean, so no other chain picks it up.
+     */
+    static CorsConfigurationSource customBindingsCors() {
+        CorsConfiguration config = new CorsConfiguration();
+        config.addAllowedOrigin(CorsConfiguration.ALL);
+        config.setAllowedMethods(List.of("GET", "POST", "OPTIONS"));
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+        config.setAllowCredentials(false);
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration(CUSTOM_BINDINGS_API, config);
+        source.registerCorsConfiguration(CUSTOM_BINDINGS_API + "/**", config);
+        return source;
     }
 
     @Bean
