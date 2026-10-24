@@ -62,6 +62,7 @@ GET,/api/connect/steam/start,,,401,ERROR,PASS,PASS,PASS,PASS,401
 POST,/api/experiments/feedback,,"{""experimentId"":""00000000-0000-0000-0000-00000000dead"",""npsScore"":5}",401,401,PASS,PASS,PASS,PASS,401
 GET,/api/experiments/me/variant/{key},,,401,401,PASS,PASS,PASS,PASS,401
 GET,/api/feedback,,,401,401,PASS,PASS,PASS,PASS,401
+# ERROR: GitLab points at a closed local port (full-context.properties) (test artefact)
 POST,/api/feedback,,"{""type"":""bug"",""title"":""matrix""}",401,401,ERROR,ERROR,ERROR,ERROR,401
 # 404 before the JWT is read
 POST,/api/feedback/{id}/unsubscribe,,,401,PASS,PASS,PASS,PASS,PASS,401
@@ -200,6 +201,7 @@ POST,/api/admin/impersonate,,,401,ERROR,403,403,403,PASS,401
 GET,/api/admin/invite,,,401,PASS,403,403,403,PASS,401
 POST,/api/admin/invite/grant/{userId},,,401,PASS,403,403,403,PASS,401
 POST,/api/admin/invite/settings,,"{""defaultCanReinvite"":false}",401,PASS,403,403,403,PASS,401
+# ERROR: the dead id is no invite, and the handler throws IllegalArgumentException for it (test artefact)
 POST,/api/admin/invite/{inviteId}/quota,,,401,ERROR,403,403,403,ERROR,401
 GET,/api/admin/members,,,401,PASS,403,403,403,PASS,401
 GET,/api/admin/members/search,,,401,PASS,403,403,403,PASS,401
@@ -239,6 +241,7 @@ POST,/api/admin/notifications/audience-count,,,401,PASS,403,403,403,PASS,401
 POST,/api/admin/notifications/preview,,,401,PASS,403,403,403,PASS,401
 DELETE,/api/admin/notifications/{id},,,401,PASS,403,403,403,PASS,401
 GET,/api/admin/providers/gitlab/issues/{iid},iid=1,,401,PASS,403,403,403,PASS,401
+# ERROR: the mocked IgdbService has no token (test artefact)
 POST,/api/admin/providers/igdb/query,,"{""endpoint"":""games"",""query"":""fields name;""}",401,ERROR,403,403,403,ERROR,401
 GET,/api/admin/providers/minecraft/friends,?accountId=00000000-0000-0000-0000-00000000dead,,401,PASS,403,403,403,PASS,401
 GET,/api/admin/providers/minecraft/presence,?accountId=00000000-0000-0000-0000-00000000dead,,401,PASS,403,403,403,PASS,401
@@ -260,14 +263,23 @@ POST,/api/admin/tw/rebuild/force,,,401,PASS,403,403,403,PASS,401
 POST,/api/admin/tw/rebuild/force-pinned,,,401,PASS,403,403,403,PASS,401
 DELETE,/api/admin/tw/{id},,,401,PASS,403,403,403,PASS,401
 GET,/api/admin/tw/{id},,,401,PASS,403,403,403,PASS,401
+# ERROR: the dead id is no TW, and the handler throws IllegalArgumentException for it (test artefact)
 PATCH,/api/admin/tw/{id},,,401,ERROR,403,403,403,ERROR,401
+# ERROR: the dead id is no TW, and the handler throws IllegalArgumentException for it (test artefact)
 PUT,/api/admin/tw/{id}/dtdd-topics,,,401,ERROR,403,403,403,ERROR,401
+# ERROR: the dead id is no TW, and the handler throws IllegalArgumentException for it (test artefact)
 PUT,/api/admin/tw/{id}/igdb-descriptors,,,401,ERROR,403,403,403,ERROR,401
+# ERROR: the dead id is no TW, and the handler throws IllegalArgumentException for it (test artefact)
 PUT,/api/admin/tw/{id}/steam-content-ids,,,401,ERROR,403,403,403,ERROR,401
+# ERROR: the dead id is no TW, and the handler throws IllegalArgumentException for it (test artefact)
 GET,/api/admin/tw/{id}/steam-keywords,,,401,ERROR,403,403,403,ERROR,401
+# ERROR: the dead id is no TW, and the handler throws IllegalArgumentException for it (test artefact)
 POST,/api/admin/tw/{id}/steam-keywords,,,401,ERROR,403,403,403,ERROR,401
+# ERROR: the dead id is no TW, and the handler throws IllegalArgumentException for it (test artefact)
 PUT,/api/admin/tw/{id}/steam-keywords,,,401,ERROR,403,403,403,ERROR,401
+# ERROR: the dead id is no TW, and the handler throws IllegalArgumentException for it (test artefact)
 POST,/api/admin/tw/{id}/steam-keywords/test,,,401,ERROR,403,403,403,ERROR,401
+# ERROR: the dead id is no TW, and the handler throws IllegalArgumentException for it (test artefact)
 DELETE,/api/admin/tw/{id}/steam-keywords/{keyword},,,401,ERROR,403,403,403,ERROR,401
 GET,/api/admin/well-known,,,401,PASS,403,403,403,PASS,401
 POST,/api/admin/well-known,,,401,PASS,403,403,403,PASS,401
@@ -280,6 +292,7 @@ GET,/api/admin/whitelist,,,401,PASS,403,403,403,PASS,401
 POST,/api/admin/whitelist/add,,"{""twitchId"":""matrix-whitelisted""}",401,PASS,403,403,403,PASS,401
 POST,/api/admin/whitelist/invite/settings,,"{""defaultCanReinvite"":false}",401,PASS,403,403,403,PASS,401
 POST,/api/admin/whitelist/invite/toggle,,,401,PASS,403,403,403,PASS,401
+# ERROR: the dead id is no invite, and the handler throws IllegalArgumentException for it (test artefact)
 POST,/api/admin/whitelist/invite/{inviteId}/quota,,,401,ERROR,403,403,403,ERROR,401
 POST,/api/admin/whitelist/toggle,,,401,PASS,403,403,403,PASS,401
 POST,/api/admin/whitelist/{id}/delete,,,401,PASS,403,403,403,PASS,401
