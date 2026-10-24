@@ -38,7 +38,7 @@ class BindingServiceMappingTest {
     private final GameStateService gameState = mock(GameStateService.class);
     private final BindingService service =
             new BindingService(bindings, igdb, igdbDetails, twitch, twResolver, gameState, mappings,
-                    mock(CustomBindingActivations.class));
+                    mock(CustomBindingActivations.class), new GameBindingLookup(bindings));
 
     private final DetectedGame cs2 = new DetectedGame("730", GameBinding.SourceType.STEAM, "Counter-Strike 2");
     private UserAccount user;

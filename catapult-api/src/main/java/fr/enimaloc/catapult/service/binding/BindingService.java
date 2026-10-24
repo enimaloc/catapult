@@ -37,6 +37,7 @@ public class BindingService {
     private final GameStateService gameStateService;
     private final GameMappingRepository gameMappingRepository;
     private final CustomBindingActivations customBindingActivations;
+    private final GameBindingLookup gameBindingLookup;
 
     private boolean isActiveBinding(UserAccount user, GameBinding binding) {
         return gameStateService.getLastKnownGame(user)
@@ -342,13 +343,7 @@ public class BindingService {
         return gameBindingRepository.findByIdAndUser(bindingId, user);
     }
 
-    /**
-     * Read-only counterpart to {@link #resolveOrCreate}: the existing binding for a detected
-     * game, or empty when there is none. Creates and mutates nothing, so callers that merely
-     * describe the current state (notifications, read views) can't cause a write.
-     */
     public Optional<GameBinding> findBinding(UserAccount user, DetectedGame detectedGame) {
-        return gameBindingRepository.findByUserAndSourceIdAndSourceType(
-            user, detectedGame.getSourceId(), detectedGame.getSourceType());
+        return gameBindingLookup.findByDetectedGame(user, detectedGame);
     }
 }

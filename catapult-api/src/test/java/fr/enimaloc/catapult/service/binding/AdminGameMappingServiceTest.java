@@ -77,7 +77,8 @@ class AdminGameMappingServiceTest {
     @BeforeEach
     void setUp() {
         bindingService = spy(new BindingService(bindingRepo, igdbService, igdbGameDetailsService, twitchService,
-                twResolverService, gameStateService, mappingRepo, mock(CustomBindingActivations.class)));
+                twResolverService, gameStateService, mappingRepo, mock(CustomBindingActivations.class),
+                new GameBindingLookup(bindingRepo)));
         GameEventListener listener = new GameEventListener(bindingService, twitchService, userSettingsRepository,
                 streamStateService, channelEventPublisher, raidRestoreGameService, mock(CustomBindingActivations.class));
         service = new AdminGameMappingService(mappingRepo, bindingRepo, userRepo, bindingService, gameStateService,

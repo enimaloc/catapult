@@ -40,6 +40,7 @@ class CustomBindingWiringTest {
             .withBean(CustomBindingService.class)
             .withBean(GameEventListener.class)
             .withBean(BindingService.class)
+            .withBean(GameBindingLookup.class)
             .withBean(GameStateService.class)
             .withBean(StreamStateService.class)
             .withBean(RaidRestoreGameService.class)
