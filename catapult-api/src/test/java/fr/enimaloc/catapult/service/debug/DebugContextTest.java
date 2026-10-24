@@ -106,4 +106,42 @@ class DebugContextTest {
         DebugContext.runAs(a, () -> events.add("body"));
         assertThat(events).containsExactly("enter " + a, "body", "exit " + a);
     }
+
+    @Test
+    void capture_restoresStateOnException() {
+        assertThatThrownBy(() -> DebugContext.capture(() -> {
+            throw new IllegalStateException("boom");
+        })).isInstanceOf(IllegalStateException.class);
+        assertThat(DebugContext.capturing()).isFalse();
+    }
+
+    @Test
+    void wrap_restoresStateOnException() {
+        Runnable wrapped = DebugContext.callAs(a, () -> DebugContext.wrap((Runnable) () -> {
+            throw new IllegalStateException("boom");
+        }));
+        assertThatThrownBy(wrapped::run).isInstanceOf(IllegalStateException.class);
+        assertThat(DebugContext.subject()).isEmpty();
+        assertThat(DebugContext.capturing()).isFalse();
+    }
+
+    @Test
+    void wrap_doesNotLeakTheCaptureOntoTheWorkerThread() throws Exception {
+        ExecutorService ex = Executors.newSingleThreadExecutor();
+        try {
+            DebugContext.capture(() -> {
+                try {
+                    ex.submit(DebugContext.wrap(() -> { })).get();
+                } catch (Exception e) {
+                    throw new IllegalStateException(e);
+                }
+                return null;
+            });
+            AtomicBoolean leaked = new AtomicBoolean(true);
+            ex.submit(() -> leaked.set(DebugContext.capturing())).get();
+            assertThat(leaked).isFalse();
+        } finally {
+            ex.shutdownNow();
+        }
+    }
 }
