@@ -16,6 +16,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -36,7 +37,7 @@ class ApiAdminSteamKeysControllerTest {
     private final SteamApiKeyRepository repository = mock(SteamApiKeyRepository.class);
     private final SteamApiKeyRotator rotator = mock(SteamApiKeyRotator.class);
     private final AdminEventPublisher events = mock(AdminEventPublisher.class);
-    private final ApiAdminSteamKeysController controller = new ApiAdminSteamKeysController(repository, rotator, events);
+    private final ApiAdminSteamKeysController controller = new ApiAdminSteamKeysController(repository, Optional.of(rotator), events);
 
     @BeforeEach
     void setUp() {
@@ -77,7 +78,7 @@ class ApiAdminSteamKeysControllerTest {
 
     @Test
     void withoutRotator_steamIsReportedDisabled_andEditsStillWork() {
-        ApiAdminSteamKeysController bare = new ApiAdminSteamKeysController(repository, null, events);
+        ApiAdminSteamKeysController bare = new ApiAdminSteamKeysController(repository, Optional.empty(), events);
         when(repository.findByExclusiveFalseWithOwner()).thenReturn(List.of(entry(KEY, null)));
         when(repository.findByExclusiveFalse()).thenReturn(List.of(entry(KEY, null)));
 

@@ -5,12 +5,15 @@ import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.account.UserSettings;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.steam.SteamApiKeyEntry;
+import fr.enimaloc.catapult.getter.steam.SteamApiKeyRotator;
 import fr.enimaloc.catapult.service.connections.ProviderConnectionsDto;
 import fr.enimaloc.catapult.service.connections.SteamProfileDto;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
@@ -28,10 +31,13 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /** The binding, settings, Steam token and account actions (see the sibling classes for the rest). */
 class ApiChannelActionsControllerTest extends ApiChannelActionsTestSupport {
+
+    @Autowired ObjectProvider<SteamApiKeyRotator> rotators;
 
     private UserAccount owner;
     private UserAccount moderator;
@@ -354,6 +360,29 @@ class ApiChannelActionsControllerTest extends ApiChannelActionsTestSupport {
             assertThat(owner.isSteamTokenShared()).isFalse();
             verify(steamApiKeyRepository).deleteByOwner(owner);
             verify(channelEventPublisher).steamProfileChanged(owner.getId(), profile);
+        }
+
+        @Test
+        void save_withoutRotator_stillPoolsTheKeyAndAnswers204() throws Exception {
+            assertThat(rotators.getIfAvailable()).isNull();
+
+            mvc.perform(postAs(owner, "/settings/steam-personal-token", "{\"token\":\"KEY\",\"shared\":true}"))
+                    .andExpect(status().isNoContent())
+                    .andExpect(content().string(""));
+
+            verify(steamApiKeyRepository).save(argThat((SteamApiKeyEntry key) -> key.getOwner() == owner));
+        }
+
+        @Test
+        void delete_withoutRotator_stillUnpoolsTheKeyAndAnswers204() throws Exception {
+            assertThat(rotators.getIfAvailable()).isNull();
+            owner.setSteamPersonalToken("enc");
+
+            mvc.perform(postAs(owner, "/settings/steam-personal-token/delete", null))
+                    .andExpect(status().isNoContent())
+                    .andExpect(content().string(""));
+
+            verify(steamApiKeyRepository).deleteByOwner(owner);
         }
     }
 

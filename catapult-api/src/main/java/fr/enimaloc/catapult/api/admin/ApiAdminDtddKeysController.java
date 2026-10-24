@@ -8,7 +8,6 @@ import fr.enimaloc.catapult.domain.dtdd.DtddApiKeyEntry;
 import fr.enimaloc.catapult.getter.dtdd.DtddApiKeyRotator;
 import fr.enimaloc.catapult.repository.dtdd.DtddApiKeyRepository;
 import fr.enimaloc.catapult.service.notification.AdminEventPublisher;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -29,11 +28,11 @@ public class ApiAdminDtddKeysController {
     private static final Pattern KEY_PATTERN = Pattern.compile("ddd_[A-Za-z0-9]{16,128}");
 
     private final DtddApiKeyRepository repository;
-    private final DtddApiKeyRotator rotator;
+    private final Optional<DtddApiKeyRotator> rotator;
     private final AdminEventPublisher events;
 
     public ApiAdminDtddKeysController(DtddApiKeyRepository repository,
-                                      @Autowired(required = false) DtddApiKeyRotator rotator,
+                                      Optional<DtddApiKeyRotator> rotator,
                                       AdminEventPublisher events) {
         this.repository = repository;
         this.rotator = rotator;
@@ -49,7 +48,7 @@ public class ApiAdminDtddKeysController {
     @GetMapping
     public DtddKeysPageData page() {
         List<DtddApiKeyEntry> entries = repository.findByExclusiveFalseWithOwner();
-        Map<String, Long> blockedUntil = rotator != null ? rotator.getKeyBlockedUntil() : Map.of();
+        Map<String, Long> blockedUntil = rotator.map(DtddApiKeyRotator::getKeyBlockedUntil).orElseGet(Map::of);
         long now = System.currentTimeMillis();
 
         List<KeyStatus> keys = new ArrayList<>();
@@ -62,7 +61,7 @@ public class ApiAdminDtddKeysController {
             long remainingSec = blocked ? TimeUnit.MILLISECONDS.toSeconds(until - now) : 0L;
             keys.add(new KeyStatus(ApiKeyHasher.id(key), masked, owner, blocked, remainingSec));
         }
-        return new DtddKeysPageData(keys, rotator != null);
+        return new DtddKeysPageData(keys, rotator.isPresent());
     }
 
     @PostMapping("/add")
@@ -74,7 +73,7 @@ public class ApiAdminDtddKeysController {
         }
         if (!repository.existsById(trimmed)) {
             repository.save(new DtddApiKeyEntry(trimmed));
-            if (rotator != null) rotator.refreshKeys();
+            rotator.ifPresent(DtddApiKeyRotator::refreshKeys);
             events.keyAdded(AdminEventPublisher.PROVIDER_DTDD,
                     new KeyStatus(ApiKeyHasher.id(trimmed), mask(trimmed), null, false, 0L));
         }
@@ -91,14 +90,14 @@ public class ApiAdminDtddKeysController {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown keyId");
         }
         repository.deleteById(raw.get());
-        if (rotator != null) rotator.refreshKeys();
+        rotator.ifPresent(DtddApiKeyRotator::refreshKeys);
         events.keyDeleted(AdminEventPublisher.PROVIDER_DTDD, body.keyId());
     }
 
     @PostMapping("/refresh")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void refresh() {
-        if (rotator != null) rotator.refreshKeys();
+        rotator.ifPresent(DtddApiKeyRotator::refreshKeys);
         events.keysRefreshed(AdminEventPublisher.PROVIDER_DTDD, page().keys());
     }
 }

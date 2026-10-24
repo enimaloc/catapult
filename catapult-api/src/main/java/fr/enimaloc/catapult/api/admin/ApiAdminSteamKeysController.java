@@ -8,7 +8,6 @@ import fr.enimaloc.catapult.domain.steam.SteamApiKeyEntry;
 import fr.enimaloc.catapult.getter.steam.SteamApiKeyRotator;
 import fr.enimaloc.catapult.repository.steam.SteamApiKeyRepository;
 import fr.enimaloc.catapult.service.notification.AdminEventPublisher;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -30,12 +29,12 @@ import java.util.concurrent.TimeUnit;
 public class ApiAdminSteamKeysController {
 
     private final SteamApiKeyRepository repository;
-    private final SteamApiKeyRotator rotator;
+    private final Optional<SteamApiKeyRotator> rotator;
     private final AdminEventPublisher events;
 
-    /** The rotator and the admin event stream only exist when Steam (resp. SSE notifications) are enabled. */
+    /** The rotator only exists when Steam is enabled. */
     public ApiAdminSteamKeysController(SteamApiKeyRepository repository,
-                                       @Autowired(required = false) SteamApiKeyRotator rotator,
+                                       Optional<SteamApiKeyRotator> rotator,
                                        AdminEventPublisher events) {
         this.repository = repository;
         this.rotator = rotator;
@@ -53,7 +52,7 @@ public class ApiAdminSteamKeysController {
     }
 
     private void refreshRotator() {
-        if (rotator != null) rotator.refreshKeys();
+        rotator.ifPresent(SteamApiKeyRotator::refreshKeys);
     }
 
     private static String mask(String key) {
@@ -65,11 +64,11 @@ public class ApiAdminSteamKeysController {
     @GetMapping
     public SteamKeysPageData page() {
         List<SteamApiKeyEntry> entries = repository.findByExclusiveFalseWithOwner();
-        Map<String, Long> blockedUntil = rotator != null ? rotator.getKeyBlockedUntil() : Map.of();
+        Map<String, Long> blockedUntil = rotator.map(SteamApiKeyRotator::getKeyBlockedUntil).orElseGet(Map::of);
         long now = System.currentTimeMillis();
 
         List<KeyStatus> keys = entries.stream().map(entry -> status(entry, blockedUntil, now)).toList();
-        return new SteamKeysPageData(keys, rotator != null);
+        return new SteamKeysPageData(keys, rotator.isPresent());
     }
 
     @PostMapping("/add")
