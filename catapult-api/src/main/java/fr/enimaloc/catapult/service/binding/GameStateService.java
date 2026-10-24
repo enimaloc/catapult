@@ -12,6 +12,7 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -36,6 +37,9 @@ public class GameStateService {
 
     private record EndedGame(DetectedGame game, Instant endedAt) {}
 
+    /** The users whose game state has been observed since this instance started (game or no game). */
+    private final Set<UUID> observedSinceStart = ConcurrentHashMap.newKeySet();
+
     private final ChannelEventPublisher channelEventPublisher;
 
     public Optional<DetectedGame> getLastKnownGame(UserAccount user) {
@@ -47,7 +51,17 @@ public class GameStateService {
         return Map.copyOf(lastKnownGame);
     }
 
+    /**
+     * Records that {@code user}'s game state has just been observed. Tells whether it is the first time since this
+     * instance started: the state kept in memory is lost on a restart, so the state before that first observation is
+     * unknown, not "no game".
+     */
+    public boolean markObserved(UserAccount user) {
+        return observedSinceStart.add(user.getId());
+    }
+
     public void updateState(UserAccount user, DetectedGame game) {
+        observedSinceStart.add(user.getId());
         DetectedGame previous = lastKnownGame.put(user.getId(), game);
         if (!sameSource(previous, game)) {
             channelEventPublisher.gameDetected(user.getId(), game);
@@ -55,6 +69,7 @@ public class GameStateService {
     }
 
     public void clearState(UserAccount user) {
+        observedSinceStart.add(user.getId());
         DetectedGame previous = lastKnownGame.remove(user.getId());
         if (previous != null) {
             lastEndedGame.put(user.getId(), new EndedGame(previous, clock.instant()));

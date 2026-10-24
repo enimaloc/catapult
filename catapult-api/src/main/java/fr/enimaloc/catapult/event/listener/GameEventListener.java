@@ -45,11 +45,14 @@ public class GameEventListener {
         raidRestoreGameService.releaseHold(user);
         Optional<CustomBindingActivation> active = customBindingActivations.active(user);
         if (active.isPresent()) {
-            if (active.get().getCustomBinding().isUninterruptible()) {
+            // The first detection since catapult-api started follows an unknown state (the game state is kept in
+            // memory), not a game launch: the game may well have been open since before the activation
+            if (active.get().getCustomBinding().isUninterruptible() || event.isFirstSinceStart()) {
                 // Ignored: the game's binding is created or refreshed for the channel page, the channel left alone
                 GameBinding binding = bindingService.resolveOrCreate(user, event.getDetectedGame());
                 channelEventPublisher.bindingUpserted(user.getId(), binding);
-                log.debug("Uninterruptible custom binding active for user {} — detection not applied", user.getId());
+                log.debug("Custom binding active for user {} ({}) — detection not applied", user.getId(),
+                    event.isFirstSinceStart() ? "first detection since start" : "uninterruptible");
                 return;
             }
             // Any detection after the activation interrupts an interruptible binding, the same game relaunched too
