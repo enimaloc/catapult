@@ -22,9 +22,10 @@ window.CatapultAdminMembers = (function () {
     }
 
     // A failed post already shows its snackbar (CatapultChannel.postJson): the page stays as it was.
-    async function postThenRefresh(card, url, body) {
+    async function postThenRefresh(card, url, body, beforeRefresh = () => {}) {
         const response = await CatapultChannel.postJson(url, body);
         if (!response.ok) return response;
+        beforeRefresh();
         const panel = card.closest("mdui-tab-panel");
         if (panel) await CatapultAdminTabs.reloadResults(panel);
         else await CatapultChannel.refresh();
@@ -138,8 +139,9 @@ window.CatapultAdminMembers = (function () {
 
     async function submitDebug(dialog, card) {
         const revealSecrets = document.getElementById("admin-debug-reveal").checked;
-        const response = await postThenRefresh(card, `/admin/members/${dialog.dataset.memberId}/debug/enable`, { revealSecrets });
-        if (response.ok) dialog.open = false;
+        // closed before the list is swapped: the dialog goes with it, and mdui can't close a detached one
+        await postThenRefresh(card, `/admin/members/${dialog.dataset.memberId}/debug/enable`, { revealSecrets },
+            () => { dialog.open = false; });
     }
 
     // --- targeting ---------------------------------------------------------------------------

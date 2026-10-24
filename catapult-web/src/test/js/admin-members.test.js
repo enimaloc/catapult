@@ -168,6 +168,18 @@ describe("admin-members", () => {
             expect(refreshed()).toBe(1);
         });
 
+        it("closes the dialog before the list it belongs to is rendered again", async () => {
+            page();
+            const dialog = document.getElementById("admin-debug-dialog");
+            let openWhenRefreshed;
+            CatapultSpa.navigate.mockImplementation(async () => { openWhenRefreshed = dialog.open; });
+            await click('[data-action="debug-enable"]');
+            await click("#admin-debug-submit");
+
+            expect(refreshed()).toBe(1);
+            expect(openWhenRefreshed).toBe(false);
+        });
+
         it("sends the secrets in clear when asked, and starts masked again the next time", async () => {
             page();
             await click('[data-action="debug-enable"]');
