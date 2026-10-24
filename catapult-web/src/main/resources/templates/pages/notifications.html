@@ -11,6 +11,8 @@
                          th:text="#{notifications.mark_all_read}">notifications.mark_all_read</mdui-button>
         </div>
 
+        <mdui-card th:replace="~{fragments/notification-channels :: card(${notificationChannels})}"></mdui-card>
+
         <mdui-card th:if="${notifications == null}" id="notifications-page-unavailable" class="settings-card admin-placeholder" variant="outlined">
             <mdui-icon name="error_outline"></mdui-icon>
             <span th:text="#{notifications.unavailable}">notifications.unavailable</span>

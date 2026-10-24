@@ -46,7 +46,8 @@ public class ApiClient {
                 .baseUrl(apiUrl)
                 .requestInterceptor((request, body, execution) -> {
                     boolean anonymous = request.getHeaders().remove(ANONYMOUS_HEADER) != null;
-                    String token = anonymous ? null : currentJwt();
+                    // A call made off the request thread brings its own bearer (see callAs).
+                    String token = anonymous || request.getHeaders().containsHeader(HttpHeaders.AUTHORIZATION) ? null : currentJwt();
                     if (token != null) request.getHeaders().setBearerAuth(token);
                     return execution.execute(request, body);
                 })
@@ -139,6 +140,34 @@ public class ApiClient {
         }
     }
 
+    /**
+     * {@code method} {@code path} on behalf of the holder of {@code jwt} (a session's, kept past its request: the
+     * calling thread has no session of its own), or anonymous when {@code jwt} is null; the status and the body
+     * read as {@code type}, 502 when unreachable.
+     */
+    public <T> Result<T> callAs(HttpMethod method, String path, String jwt, Class<T> type, Object... uriVars) {
+        try {
+            RestClient.RequestBodySpec spec = client.method(method).uri(path, uriVars);
+            if (jwt == null) spec.header(ANONYMOUS_HEADER, "1");
+            else spec.headers(headers -> headers.setBearerAuth(jwt));
+            return spec.exchange((request, response) -> {
+                int status = response.getStatusCode().value();
+                if (response.getStatusCode().isError()) {
+                    logError(response.getStatusCode(), request.getURI().getPath());
+                    return new Result<T>(status, null);
+                }
+                try {
+                    return new Result<>(status, response.bodyTo(type));
+                } catch (Exception e) {
+                    return new Result<T>(status, null);
+                }
+            });
+        } catch (Exception e) {
+            logFailure(method, path, e);
+            return new Result<>(502, null);
+        }
+    }
+
     /** POST {@code path} without a body, the response read as {@code type}; {@code null} on failure. */
     public <T> T post(String path, Class<T> type, Object... uriVars) {
         return exchange(HttpMethod.POST, path, type, uriVars);
@@ -182,7 +211,8 @@ public class ApiClient {
      * An error answer, worth a warning unless it only says the session's JWT is no longer valid, or
      * is a 502 while catapult-api is still starting (expected).
      */
-    private static void logError(HttpStatusCode status, String path) {
+    private static void logError(HttpStatusCode status, String expandedPath) {
+        String path = masked(expandedPath);
         if (status.value() == HttpStatus.BAD_GATEWAY.value()) {
             log.debug("API returned {} for {}", status, path);
         } else if (status.value() != HttpStatus.UNAUTHORIZED.value() && !path.equals(AUTH_VALIDATE_PATH)) {
@@ -190,10 +220,17 @@ public class ApiClient {
         }
     }
 
+    private static final java.util.regex.Pattern WIDGET_TOKEN = java.util.regex.Pattern.compile("(/widget/)[^/\\s\"?]+");
+
+    /** {@code text} without any OBS widget token (a credential: the path segment after /widget/), for the logs. */
+    static String masked(String text) {
+        return text == null ? null : WIDGET_TOKEN.matcher(text).replaceAll("$1***");
+    }
+
     private static void logFailure(HttpMethod method, String path, Exception e) {
         // An error answer was logged when it came.
         if (!(e instanceof ApiErrorException)) {
-            log.warn("{} {} failed: {}", method, path, e.getMessage());
+            log.warn("{} {} failed: {}", method, masked(path), masked(e.getMessage()));
         }
     }
 

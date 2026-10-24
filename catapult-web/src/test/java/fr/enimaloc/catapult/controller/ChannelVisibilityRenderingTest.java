@@ -131,6 +131,38 @@ class ChannelVisibilityRenderingTest {
                 .doesNotContain("disabled=\"disabled\"");
     }
 
+    /** The owner's account preference shows in their Settings tab too; a moderator doesn't get it. */
+    @Test
+    void notificationChannels_inTheOwnersSettingsTab_only() throws Exception {
+        when(apiService.notificationChannels()).thenReturn(new fr.enimaloc.catapult.common.dto.notification.NotificationChannelsDto(
+                Set.of(fr.enimaloc.catapult.common.dto.notification.NotificationChannel.TWITCHAT)));
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(channelPageData(true));
+
+        String owner = mvc.perform(get("/spa/channel/enimaloc")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(owner).contains("id=\"notification-channels\"", "data-channel=\"TWITCHAT\"", "data-channel=\"STREAM_START_CHAT\"");
+        assertThat(openingTagForSwitch(owner, "TWITCHAT")).contains("checked");
+        assertThat(openingTagForSwitch(owner, "STREAM_START_CHAT")).doesNotContain("checked");
+
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(new ChannelPageData(
+                new ChannelUserDto("id-1", "twitch-1", "enimaloc", "https://example.test/avatar.png"),
+                "enimaloc", false, true, true, null,
+                new PagedBindings(0, 1, 0, List.of()),
+                List.of(), Set.of(), List.of(), Set.of(),
+                null, null, null, null, null, null, null, "uuid"));
+
+        String moderator = mvc.perform(get("/spa/channel/enimaloc")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(moderator).doesNotContain("notification-channels");
+    }
+
+    private static String openingTagForSwitch(String html, String channel) {
+        int at = html.indexOf("data-channel=\"" + channel + "\"");
+        return html.substring(html.lastIndexOf("<mdui-switch", at), html.indexOf(">", at) + 1);
+    }
+
     @Test
     void dangerZone_ownerOnly_andPendingShowsTheDate() throws Exception {
         when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(channelPageData(true));

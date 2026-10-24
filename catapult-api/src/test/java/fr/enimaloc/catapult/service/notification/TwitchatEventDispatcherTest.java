@@ -329,4 +329,38 @@ class TwitchatEventDispatcherTest {
         assertThatThrownBy(() -> dispatcher.sendTest(user, STREAM_STARTED, List.of()))
                 .isInstanceOf(TwitchatValidationException.class);
     }
+
+    @Test
+    void onNotification_rendersItsVariables_andReportsItWasSent() {
+        when(eventActionService.enabledActions(user, fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.NOTIFICATION))
+                .thenReturn(List.of(row("CUSTOM_CHAT_MESSAGE",
+                        "{\"message\":\"[Catapult] {{title}} — {{body}} {{ctaUrl}}\",\"actions\":[]}")));
+
+        boolean sent = dispatcher.onNotification(user, "Maintenance", "Ce soir", "https://x.test", "Voir");
+
+        assertThat(sent).isTrue();
+        TwitchatDispatch dispatch = published();
+        assertThat(dispatch.eventType()).isEqualTo("NOTIFICATION");
+        assertThat(dispatch.payloads().getFirst().data().get("message")).isEqualTo("[Catapult] Maintenance — Ce soir https://x.test");
+    }
+
+    @Test
+    void onNotification_widgetDisabled_sendsNothing() {
+        settings.setEnabled(false);
+
+        assertThat(dispatcher.onNotification(user, "T", "B", "", "")).isFalse();
+        verifyNoInteractions(channelEventPublisher);
+    }
+
+    /** The default message ends with {{ctaUrl}}: without a call to action no dangling space is left. */
+    @Test
+    void onNotification_withoutCallToAction_leavesNoTrailingSpace() {
+        when(eventActionService.enabledActions(user, fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.NOTIFICATION))
+                .thenReturn(List.of(row("CUSTOM_CHAT_MESSAGE",
+                        "{\"message\":\"[Catapult] {{title}} — {{body}} {{ctaUrl}}\",\"actions\":[]}")));
+
+        dispatcher.onNotification(user, "Maintenance", "Ce soir", "", "");
+
+        assertThat(published().payloads().getFirst().data().get("message")).isEqualTo("[Catapult] Maintenance — Ce soir");
+    }
 }

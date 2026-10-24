@@ -11,6 +11,7 @@ import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType
 import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.BOT_ENABLED;
 import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.CATEGORY_CHANGED_BY_CATAPULT;
 import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.CATEGORY_CHANGED_MANUALLY;
+import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.NOTIFICATION;
 import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.STREAM_STARTED;
 
 /**
@@ -19,9 +20,13 @@ import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType
  */
 public final class TwitchatEventDefaults {
 
-    /** Every event that used to notify; NO_GAME_DETECTED is opt-in. */
+    /**
+     * Every event that used to notify, and NOTIFICATION (only sent to members who opted in to
+     * Twitchat, so enabled for them from the start); NO_GAME_DETECTED is opt-in.
+     */
     public static final List<TwitchatNotificationEventType> SEEDED =
-            List.of(CATEGORY_CHANGED_BY_CATAPULT, CATEGORY_CHANGED_MANUALLY, STREAM_STARTED, BOT_ENABLED, BOT_DISABLED);
+            List.of(CATEGORY_CHANGED_BY_CATAPULT, CATEGORY_CHANGED_MANUALLY, STREAM_STARTED, BOT_ENABLED, BOT_DISABLED,
+                    NOTIFICATION);
 
     public static final String ACTION_URL = "{{baseUrl}}/widget/twitchat/action/{{action:%s}}";
 

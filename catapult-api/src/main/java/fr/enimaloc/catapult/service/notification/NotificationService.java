@@ -11,6 +11,7 @@ import fr.enimaloc.catapult.domain.notification.NotificationRecipientId;
 import fr.enimaloc.catapult.event.NotificationAllReadEvent;
 import fr.enimaloc.catapult.event.NotificationCreatedEvent;
 import fr.enimaloc.catapult.event.NotificationDeletedEvent;
+import fr.enimaloc.catapult.event.NotificationDeliveryPendingEvent;
 import fr.enimaloc.catapult.event.NotificationReadEvent;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.notification.NotificationRecipientRepository;
@@ -43,6 +44,7 @@ public class NotificationService {
     private final UserAccountRepository userRepo;
     private final NotificationRenderer renderer;
     private final ApplicationEventPublisher publisher;
+    private final NotificationDeliveryService deliveries;
 
     @Autowired(required = false)
     private CatapultApiMetrics apiMetrics;
@@ -57,7 +59,10 @@ public class NotificationService {
         } else {
             recipients = userRepo.findByStatus(UserAccount.Status.ACTIVE);
         }
-        return send(req, actor, recipients, req.targetUserId() == null);
+        List<UUID> pendingTwitchat = new ArrayList<>();
+        NotificationDto dto = send(req, actor, recipients, req.targetUserId() == null, pendingTwitchat);
+        announcePending(pendingTwitchat);
+        return dto;
     }
 
     /** What {@link CreateRequest#ctaUrl()} may carry, replaced by each recipient's channel by {@link #createForEach}. */
@@ -71,7 +76,9 @@ public class NotificationService {
     @Transactional
     public int createForEach(CreateRequest req, UserAccount actor, List<UserAccount> recipients) {
         validate(withChannel(req, "channel"));
-        recipients.forEach(user -> send(withChannel(req, user.getTwitchUsername()), actor, List.of(user), false));
+        List<UUID> pendingTwitchat = new ArrayList<>();
+        recipients.forEach(user -> send(withChannel(req, user.getTwitchUsername()), actor, List.of(user), false, pendingTwitchat));
+        announcePending(pendingTwitchat);
         return recipients.size();
     }
 
@@ -89,11 +96,18 @@ public class NotificationService {
     public int createForAll(CreateRequest req, UserAccount actor, List<UserAccount> recipients) {
         validate(req);
         if (recipients.isEmpty()) return 0;
-        send(req, actor, recipients, false);
+        List<UUID> pendingTwitchat = new ArrayList<>();
+        send(req, actor, recipients, false, pendingTwitchat);
+        announcePending(pendingTwitchat);
         return recipients.size();
     }
 
-    private NotificationDto send(CreateRequest req, UserAccount actor, List<UserAccount> recipients, boolean broadcast) {
+    /**
+     * Stores the notification for {@code recipients} and their pending deliveries, adding to
+     * {@code pendingTwitchat} the members with a Twitchat one (announced once by the caller).
+     */
+    private NotificationDto send(CreateRequest req, UserAccount actor, List<UserAccount> recipients, boolean broadcast,
+                                 List<UUID> pendingTwitchat) {
         boolean hasCta = req.ctaUrl() != null && !req.ctaUrl().isBlank();
         Notification n = new Notification();
         n.setTitle(req.title());
@@ -116,12 +130,21 @@ public class NotificationService {
             rows.add(r);
         }
         recipientRepo.saveAll(rows);
+        // Also through the channels the recipients opted in to: always after their rows, which it selects from
+        pendingTwitchat.addAll(deliveries.createFor(n.getId()));
 
         NotificationDto dto = toDto(n, false);
         List<UUID> ids = recipients.stream().map(UserAccount::getId).toList();
         publisher.publishEvent(new NotificationCreatedEvent(this, ids, dto));
         if (apiMetrics != null) apiMetrics.recordNotificationAction("created");
         return dto;
+    }
+
+    /** catapult-web flushes, after commit, the members it holds a Twitchat page or widget open for. */
+    private void announcePending(List<UUID> pendingTwitchat) {
+        if (!pendingTwitchat.isEmpty()) {
+            publisher.publishEvent(new NotificationDeliveryPendingEvent(List.copyOf(pendingTwitchat)));
+        }
     }
 
     @Transactional
@@ -137,6 +160,7 @@ public class NotificationService {
         if (r.getReadAt() == null) {
             r.setReadAt(Instant.now());
         }
+        deliveries.cancel(userId, notificationId);
         long unread = recipientRepo.countByUserIdAndReadAtIsNull(userId);
         publisher.publishEvent(new NotificationReadEvent(userId, notificationId, unread));
         if (apiMetrics != null) apiMetrics.recordNotificationAction("read");
@@ -145,6 +169,7 @@ public class NotificationService {
     @Transactional
     public void markAllRead(UUID userId) {
         recipientRepo.markAllReadForUser(userId, Instant.now());
+        deliveries.cancelAll(userId);
         publisher.publishEvent(new NotificationAllReadEvent(userId));
         if (apiMetrics != null) apiMetrics.recordNotificationAction("markAllRead");
     }
@@ -153,6 +178,7 @@ public class NotificationService {
     public void delete(UUID userId, UUID notificationId) {
         recipientRepo.findById(new NotificationRecipientId(notificationId, userId))
                 .ifPresent(recipientRepo::delete);
+        deliveries.cancel(userId, notificationId);
         long unread = recipientRepo.countByUserIdAndReadAtIsNull(userId);
         publisher.publishEvent(new NotificationDeletedEvent(userId, notificationId, unread));
         if (apiMetrics != null) apiMetrics.recordNotificationAction("deleted");

@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.domain.twitchat.TwitchatWidgetSettings;
 import fr.enimaloc.catapult.repository.twitchat.TwitchatWidgetSettingsRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.account.WidgetTokenService;
+import fr.enimaloc.catapult.service.notification.NotificationDeliveryDispatcher;
 import fr.enimaloc.catapult.service.notification.TwitchatActionExecutor;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,6 +47,48 @@ class ApiTwitchatWidgetControllerTest {
     @MockitoBean WidgetTokenService widgetTokenService;
     @MockitoBean TokenEncryptionService tokenEncryptionService;
     @MockitoBean TwitchatActionExecutor actionExecutor;
+    @MockitoBean NotificationDeliveryDispatcher deliveryDispatcher;
+
+    @Test
+    void flushNotifications_byTheWidgetsToken_sendsItsOwnersPendingOnes() throws Exception {
+        UUID token = UUID.randomUUID();
+        UserAccount owner = new UserAccount();
+        owner.setId(UUID.randomUUID());
+        when(widgetTokenService.resolve(token)).thenReturn(Optional.of(owner));
+        TwitchatWidgetSettings settings = new TwitchatWidgetSettings();
+        settings.setEnabled(true);
+        when(widgetSettingsRepository.findById(owner.getId())).thenReturn(Optional.of(settings));
+        when(deliveryDispatcher.flushTwitchat(owner)).thenReturn(3);
+
+        mvc.perform(post("/api/twitchat/widget/{uuid}/notifications/flush", token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.delivered").value(3));
+    }
+
+    /** Like config(): a disabled widget is no widget, and its owner's deliveries stay pending. */
+    @Test
+    void flushNotifications_disabledWidget_returns404_withoutFlushing() throws Exception {
+        UUID token = UUID.randomUUID();
+        UserAccount owner = new UserAccount();
+        owner.setId(UUID.randomUUID());
+        when(widgetTokenService.resolve(token)).thenReturn(Optional.of(owner));
+        TwitchatWidgetSettings settings = new TwitchatWidgetSettings();
+        settings.setEnabled(false);
+        when(widgetSettingsRepository.findById(owner.getId())).thenReturn(Optional.of(settings));
+
+        mvc.perform(post("/api/twitchat/widget/{uuid}/notifications/flush", token))
+                .andExpect(status().isNotFound());
+        org.mockito.Mockito.verifyNoInteractions(deliveryDispatcher);
+    }
+
+    @Test
+    void flushNotifications_unknownToken_returns404() throws Exception {
+        UUID token = UUID.randomUUID();
+        when(widgetTokenService.resolve(token)).thenReturn(Optional.empty());
+
+        mvc.perform(post("/api/twitchat/widget/{uuid}/notifications/flush", token))
+                .andExpect(status().isNotFound());
+    }
 
     @Test
     void access_unknownToken_returns404() throws Exception {

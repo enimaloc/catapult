@@ -43,11 +43,11 @@ class TwitchatEventStreamControllerTest {
         MockHttpSession session = new MockHttpSession();
         session.setAttribute(fr.enimaloc.catapult.service.http.ApiClient.SESSION_JWT_KEY, "jwt");
         when(apiService.currentUserId()).thenReturn(owner);
-        when(hub.subscribe(owner, session.getId())).thenReturn(new SseEmitter(0L));
+        when(hub.subscribe(owner, session)).thenReturn(new SseEmitter(0L));
 
         mvc.perform(get("/me/twitchat/events").session(session)).andExpect(request().asyncStarted())
                 .andExpect(header().string("X-Accel-Buffering", "no"));
-        verify(hub).subscribe(owner, session.getId());
+        verify(hub).subscribe(owner, session);
     }
 
     /** An admin acting as a member: the member's dispatches (signed action tokens) never reach the admin's browser. */

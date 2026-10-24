@@ -315,6 +315,61 @@ class ApiClientTest {
     }
 
     @Test
+    void callAs_bringsItsOwnBearer_overTheCallingSessions() throws InterruptedException {
+        inSessionWithJwt("session.jwt.sig");
+        server.enqueue(new MockResponse().setHeader("Content-Type", "application/json").setBody("{\"name\":\"x\"}"));
+
+        assertThat(client.callAs(org.springframework.http.HttpMethod.POST, "/api/flush/{id}", "kept.jwt.sig", Payload.class, "a"))
+                .isEqualTo(new ApiClient.Result<>(200, new Payload("x")));
+
+        RecordedRequest request = server.takeRequest();
+        assertThat(request.getMethod()).isEqualTo("POST");
+        assertThat(request.getPath()).isEqualTo("/api/flush/a");
+        assertThat(request.getHeader("Authorization")).isEqualTo("Bearer kept.jwt.sig");
+    }
+
+    @Test
+    void callAs_withoutAJwt_isAnonymous_andKeepsAnErrorStatus() throws InterruptedException {
+        inSessionWithJwt("session.jwt.sig");
+        server.enqueue(new MockResponse().setResponseCode(404));
+
+        assertThat(client.callAs(org.springframework.http.HttpMethod.POST, "/api/flush", null, Payload.class))
+                .isEqualTo(new ApiClient.Result<Payload>(404, null));
+
+        RecordedRequest request = server.takeRequest();
+        assertThat(request.getHeader("Authorization")).isNull();
+        assertThat(request.getHeader("X-Catapult-Anonymous")).isNull();
+    }
+
+    @org.junit.jupiter.api.extension.ExtendWith(org.springframework.boot.test.system.OutputCaptureExtension.class)
+    @Test
+    void aFailureOnAWidgetRoute_neverLogsTheWidgetToken(org.springframework.boot.test.system.CapturedOutput output) {
+        java.util.UUID token = java.util.UUID.randomUUID();
+        server.enqueue(new MockResponse().setResponseCode(404));
+        server.enqueue(new MockResponse().setResponseCode(500));
+
+        client.callAs(org.springframework.http.HttpMethod.POST, "/api/twitchat/widget/{token}/notifications/flush", null, Payload.class, token);
+        client.getAnonymous("/api/twitchat/widget/{token}/access", Payload.class, token);
+
+        assertThat(output.getAll()).contains("API returned 404").doesNotContain(token.toString());
+    }
+
+    @Test
+    void maskedHidesTheSegmentAfterWidget_inPathsAndMessages() {
+        assertThat(ApiClient.masked("/api/twitchat/widget/abc-123/access")).isEqualTo("/api/twitchat/widget/***/access");
+        assertThat(ApiClient.masked("I/O error on POST request for \"http://h:1/api/twitchat/widget/abc-123/x\": refused"))
+                .doesNotContain("abc-123");
+        assertThat(ApiClient.masked(null)).isNull();
+    }
+
+    @Test
+    void callAs_is502WhenUnreachable() throws IOException {
+        server.shutdown();
+
+        assertThat(client.callAs(org.springframework.http.HttpMethod.POST, "/api/flush", "j.w.t", Payload.class).status()).isEqualTo(502);
+    }
+
+    @Test
     void theSessionsJwt_isUnreadable_whenItsPayloadIsNotBase64_orItsRequestIsOver() {
         inSessionWithJwt("h.!not base64!.sig");
         assertThat(ApiClient.currentSubject()).isNull();

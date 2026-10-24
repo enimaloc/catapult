@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.controller;
 
+import fr.enimaloc.catapult.common.dto.notification.NotificationChannelsDto;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import lombok.RequiredArgsConstructor;
@@ -10,6 +11,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -43,6 +45,13 @@ public class NotificationsController {
     ResponseEntity<Void> readAll() {
         requireSession();
         return ResponseEntity.status(apiService.markAllNotificationsRead()).build();
+    }
+
+    /** The channels the member also gets notifications through, besides the site: the whole chosen set, relayed with catapult-api's status. */
+    @PostMapping("/channels")
+    ResponseEntity<Void> channels(@RequestBody NotificationChannelsDto body) {
+        requireSession();
+        return ResponseEntity.status(apiService.saveNotificationChannels(body.channels())).build();
     }
 
     private static void requireSession() {

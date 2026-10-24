@@ -239,6 +239,7 @@ public class ModelFiller {
                     token == null ? null : absoluteUrl("/api/user/summary/" + token),
                     message("channel.commands.migration.empty", null, LocaleContextHolder.getLocale())));
             model.addAttribute("integrations", IntegrationCards.of(channelPage, twitchatEvents, twitchatEventForms));
+            model.addAttribute("notificationChannels", apiService.notificationChannels());
             model.addAttribute("dangerZone",
                     DangerZoneView.of(apiService.accountInfo(), apiService.accountDeletionDelayDays()));
             model.addAttribute("invite", apiService.invitePage());
@@ -288,6 +289,7 @@ public class ModelFiller {
     /** The notifications page model: the member's page of history, null when catapult-api fails. */
     public void notifications(Model model, int page) {
         model.addAttribute("notifications", apiService.notifications(page));
+        model.addAttribute("notificationChannels", apiService.notificationChannels());
     }
 
     /** Error page model for the status the servlet container forwarded (500 when absent). */
