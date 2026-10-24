@@ -229,16 +229,27 @@ class ChannelDashboardAssemblerTest {
 
         @Test
         void filtersByStatusFirst_thenBySource_caseInsensitive() {
-            when(bindings.findByUserAndStatus(eq(owner), eq(GameBinding.Status.MANUAL), any()))
+            when(bindings.findByUserAndStatusIn(eq(owner), eq(Set.of(GameBinding.Status.MANUAL)), any()))
                     .thenReturn(new PageImpl<>(List.of()));
             when(bindings.findByUserAndSourceType(eq(owner), eq(GameBinding.SourceType.XBOX), any()))
                     .thenReturn(new PageImpl<>(List.of()));
 
             assembler().page(owner, owner, "streamer", 0, "manual", "steam");
-            verify(bindings).findByUserAndStatus(eq(owner), eq(GameBinding.Status.MANUAL), any());
+            verify(bindings).findByUserAndStatusIn(eq(owner), eq(Set.of(GameBinding.Status.MANUAL)), any());
 
             assembler().page(owner, owner, "streamer", 0, " ", "xbox");
             verify(bindings).findByUserAndSourceType(eq(owner), eq(GameBinding.SourceType.XBOX), any());
+        }
+
+        @Test
+        void autoFilter_includesMappedBindings() {
+            Set<GameBinding.Status> automatic = Set.of(GameBinding.Status.AUTO, GameBinding.Status.MAPPED);
+            when(bindings.findByUserAndStatusIn(eq(owner), eq(automatic), any()))
+                    .thenReturn(new PageImpl<>(List.of()));
+
+            assembler().page(owner, owner, "streamer", 0, "auto", null);
+
+            verify(bindings).findByUserAndStatusIn(eq(owner), eq(automatic), any());
         }
 
         @Test

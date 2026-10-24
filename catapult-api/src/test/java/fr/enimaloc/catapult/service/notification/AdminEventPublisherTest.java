@@ -117,4 +117,17 @@ class AdminEventPublisherTest {
         verify(redis).publishAdmin(org.mockito.ArgumentMatchers.eq("group.updated"), org.mockito.ArgumentMatchers.eq(Map.of("group", group)));
         verify(redis).publishAdmin(org.mockito.ArgumentMatchers.eq("group.deleted"), org.mockito.ArgumentMatchers.eq(Map.of("groupId", "g1")));
     }
+
+    @Test
+    void gameMappingCreated_updated_deleted_publishOnDedicatedEvents() {
+        Object mapping = Map.of("id", "m1", "sourceType", "STEAM", "sourceId", "730");
+
+        publisher.gameMappingCreated(mapping);
+        publisher.gameMappingUpdated(mapping);
+        publisher.gameMappingDeleted("m1");
+
+        verify(redis).publishAdmin(org.mockito.ArgumentMatchers.eq("game.mapping.created"), org.mockito.ArgumentMatchers.eq(Map.of("mapping", mapping)));
+        verify(redis).publishAdmin(org.mockito.ArgumentMatchers.eq("game.mapping.updated"), org.mockito.ArgumentMatchers.eq(Map.of("mapping", mapping)));
+        verify(redis).publishAdmin(org.mockito.ArgumentMatchers.eq("game.mapping.deleted"), org.mockito.ArgumentMatchers.eq(Map.of("mappingId", "m1")));
+    }
 }

@@ -334,6 +334,33 @@ class ChannelVisibilityRenderingTest {
         assertThat(openingTagForId(html, "raid-restore-minutes")).contains("value=\"15\"", "disabled");
     }
 
+    /** A MAPPED binding reads as automatic, with the mention that an admin mapping set its category. */
+    @Test
+    void mappedBinding_showsAsAutomatic_withTheAdminMention() throws Exception {
+        BindingDto mapped = new BindingDto("binding-mapped", "MAPPED", "STEAM", "Game A", "123", "Game A",
+                false, true, Set.of(), true, false, Set.of());
+        BindingDto auto = new BindingDto("binding-auto", "AUTO", "STEAM", "Game B", "456", "Game B",
+                false, true, Set.of(), true, false, Set.of());
+        ChannelPageData data = new ChannelPageData(
+                new ChannelUserDto("id-1", "twitch-1", "enimaloc", "https://example.test/avatar.png"),
+                "enimaloc", true, true, true, null,
+                new PagedBindings(0, 1, 2, List.of(mapped, auto)),
+                List.of(), Set.of(), List.of(), Set.of(),
+                null, null, null, null, null, null, null, "uuid");
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(data);
+
+        String html = mvc.perform(get("/spa/channel/enimaloc"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html)
+                .doesNotContain(">MAPPED<")
+                .contains("Category set by the admin");
+        assertThat(countOccurrences(html, "Category set by the admin")).isEqualTo(1);
+        // No dedicated filter: MAPPED bindings come back under the automatic one.
+        assertThat(html).doesNotContain("status=MAPPED");
+    }
+
     private ChannelPageData channelPageData(boolean isLive) {
         return channelPageData(isLive, null);
     }
