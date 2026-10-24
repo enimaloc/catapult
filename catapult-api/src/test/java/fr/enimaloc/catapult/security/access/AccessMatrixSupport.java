@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
 
 import fr.enimaloc.catapult.FullContextContainers;
+import fr.enimaloc.catapult.api.error.ApiProblem;
 import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.experiment.Experiment;
@@ -77,7 +78,6 @@ import org.springframework.web.bind.ServletRequestBindingException;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
-import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.HandlerMapping;
 import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
@@ -94,10 +94,10 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>Callers: {@code anon} (remote {@value #REMOTE}, no header), {@code loop} (remote {@value #LOOPBACK}, no
  * header), {@code member}, {@code mod} (moderates the channel), {@code owner} (the channel, {@value #OWNER}),
  * {@code admin} ({@code ROLE_ADMIN}) with a real JWT, and {@code ptoken} (the owner's personal API token), all
- * remote. Outcomes: {@code 401}/{@code 403} refused, {@code GATED} a feature gate's 403 (reached the handler),
- * {@code ERROR} the request blew up: it threw, or answered a 500 {@code internal_error} problem (an unexpected
- * exception, but also a deliberate 500: a {@code ResponseStatusException} 500 or a 500 Spring resolved itself),
- * {@code PASS} anything else.
+ * remote. Outcomes: {@code 401}/{@code 403} refused, {@code GATED} a feature gate's 403 (a {@code feature_disabled}
+ * problem: the handler was reached), {@code ERROR} the request blew up: it threw, or answered a 500
+ * {@code internal_error} problem (an unexpected exception, but also a deliberate 500: a
+ * {@code ResponseStatusException} 500 or a 500 Spring resolved itself), {@code PASS} anything else.
  *
  * <p>Every outbound client whose host is hard-coded is a mock, so no row calls a third party: {@link TwitchService}
  * (which also says who moderates the channel), {@link SteamStoreService}, {@link XboxService},
@@ -139,8 +139,6 @@ abstract class AccessMatrixSupport {
      */
     private static final List<String> RUN_ORDER = List.of("anon", "loop", "member", "mod", "admin", "ptoken", "owner");
     private static final JsonMapper PROBLEMS = JsonMapper.builder().build();
-    private static final Set<String> GATE_REASONS = Set.of(
-            "Feature not enabled", "Feature Minecraft indisponible", "Raid settings not available for this channel");
     /**
      * The request never reached its handler: the row pins nothing. Bean validation of the arguments
      * ({@code @Valid}, {@code @Validated}) is in the list too, for the same reason: it answers 400 before the handler.
@@ -353,10 +351,7 @@ abstract class AccessMatrixSupport {
         if (status == 500 && isInternalErrorProblem(result)) {
             return new Outcome("ERROR", unreached, pattern, detail);
         }
-        if (status == 403
-                && resolved instanceof ResponseStatusException rse
-                && rse.getReason() != null
-                && GATE_REASONS.contains(rse.getReason())) {
+        if (status == 403 && resolved instanceof ApiProblem problem && problem.code() == ErrorCode.FEATURE_DISABLED) {
             return new Outcome("GATED", unreached, pattern, detail);
         }
         if (status == 401 || status == 403) {

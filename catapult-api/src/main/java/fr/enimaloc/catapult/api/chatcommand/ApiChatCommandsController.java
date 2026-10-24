@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.api.chatcommand;
 
 import fr.enimaloc.catapult.api.ApiUserResolver;
+import fr.enimaloc.catapult.api.error.ApiProblem;
 import fr.enimaloc.catapult.chat.ChatCommandEvent;
 import fr.enimaloc.catapult.chat.ChatCommandPresetCatalog;
 import fr.enimaloc.catapult.chat.PlaceholderResolver;
@@ -14,6 +15,7 @@ import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
 import fr.enimaloc.catapult.common.dto.chatcommand.BotModStatusDto;
 import fr.enimaloc.catapult.common.dto.chatcommand.EnabledChatCommandDto;
 import fr.enimaloc.catapult.common.dto.chatcommand.FallbackDto;
+import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.chatcommand.ChatCommandDefinition;
@@ -252,7 +254,7 @@ public class ApiChatCommandsController {
         // existing assignments, so overrides without a prior assignment would
         // never let the user reach this page.
         if (!experimentService.evaluateGate(user, EXPERIMENT_KEY)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Feature not enabled");
+            throw new ApiProblem(ErrorCode.FEATURE_DISABLED, "Feature not enabled");
         }
     }
 

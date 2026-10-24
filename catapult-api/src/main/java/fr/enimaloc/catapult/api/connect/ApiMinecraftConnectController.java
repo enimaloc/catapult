@@ -1,6 +1,8 @@
 package fr.enimaloc.catapult.api.connect;
 
+import fr.enimaloc.catapult.api.error.ApiProblem;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
+import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.minecraft.MinecraftFriendService;
@@ -90,7 +92,7 @@ public class ApiMinecraftConnectController {
     private UserAccount gatedUser(Jwt jwt) {
         UserAccount user = currentUser(jwt);
         if (!gateService.isAvailableFor(user)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Feature Minecraft indisponible");
+            throw new ApiProblem(ErrorCode.FEATURE_DISABLED, "Minecraft is not available for this account");
         }
         return user;
     }

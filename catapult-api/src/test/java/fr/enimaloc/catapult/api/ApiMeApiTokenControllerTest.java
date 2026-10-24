@@ -92,8 +92,12 @@ class ApiMeApiTokenControllerTest {
     void gateClosed_noTokenToGetOrMake_butOneCanStillBeRevoked() throws Exception {
         when(customBindings.enabled(user)).thenReturn(false);
 
-        mvc.perform(get("/api/me/api-token").with(me())).andExpect(status().isForbidden());
-        mvc.perform(post("/api/me/api-token").with(me()).with(csrf())).andExpect(status().isForbidden());
+        mvc.perform(get("/api/me/api-token").with(me()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("feature_disabled"));
+        mvc.perform(post("/api/me/api-token").with(me()).with(csrf()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("feature_disabled"));
         mvc.perform(post("/api/me/api-token/delete").with(me()).with(csrf())).andExpect(status().isNoContent());
         verify(tokens, never()).regenerate(any());
         verify(tokens).revoke(user);

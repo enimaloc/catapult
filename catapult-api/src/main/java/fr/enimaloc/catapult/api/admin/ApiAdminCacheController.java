@@ -181,7 +181,10 @@ public class ApiAdminCacheController {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cache " + name + " is read-only");
             default -> throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown cache " + name);
         };
-        return removed ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();
+        if (!removed) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown entry " + key);
+        }
+        return ResponseEntity.noContent().build();
     }
 
     private static UUID parseUserId(String key) {

@@ -1,6 +1,8 @@
 package fr.enimaloc.catapult.api.userapi;
 
 import fr.enimaloc.catapult.api.CustomBindingViews;
+import fr.enimaloc.catapult.api.error.ApiProblem;
+import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.CustomBinding;
 import fr.enimaloc.catapult.domain.binding.CustomBindingActivation;
@@ -19,13 +21,11 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
-import org.springframework.web.server.ResponseStatusException;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
@@ -198,12 +198,14 @@ class CustomBindingsApiV2ControllerTest {
 
     @Test
     void gateClosed_is403() throws Exception {
-        ResponseStatusException closed = new ResponseStatusException(HttpStatus.FORBIDDEN, "Feature not enabled");
+        ApiProblem closed = new ApiProblem(ErrorCode.FEATURE_DISABLED, "Feature not enabled");
         when(service.list(any())).thenThrow(closed);
         when(service.resolve(any(), anyString())).thenThrow(closed);
         doThrow(closed).when(service).deactivate(any());
 
-        mvc.perform(withToken(get("/api/v2/custom-bindings"))).andExpect(status().isForbidden());
+        mvc.perform(withToken(get("/api/v2/custom-bindings")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("feature_disabled"));
         mvc.perform(withToken(post("/api/v2/custom-bindings/art/activate"))).andExpect(status().isForbidden());
         mvc.perform(withToken(post("/api/v2/custom-bindings/deactivate"))).andExpect(status().isForbidden());
         verify(service, never()).activate(any(), any());

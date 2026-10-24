@@ -22,14 +22,12 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Optional;
@@ -237,8 +235,10 @@ class ApiChannelCustomBindingsControllerTest {
 
     @Test
     void gateClosed_is403() throws Exception {
-        when(service.list(owner)).thenThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, "Feature not enabled"));
+        when(service.list(owner)).thenThrow(new ApiProblem(ErrorCode.FEATURE_DISABLED, "Feature not enabled"));
 
-        mvc.perform(get(BASE).with(as(owner))).andExpect(status().isForbidden());
+        mvc.perform(get(BASE).with(as(owner)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("feature_disabled"));
     }
 }

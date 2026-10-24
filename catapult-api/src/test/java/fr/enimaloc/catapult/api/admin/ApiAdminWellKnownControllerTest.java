@@ -99,7 +99,8 @@ class ApiAdminWellKnownControllerTest {
     void schemaIs404WhenThereIsNone() throws Exception {
         when(schemas.schemaFor("x")).thenReturn(java.util.Optional.empty());
         mvc.perform(get("/api/admin/well-known/schema").param("path", "x"))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value("No schema for this path"));
     }
 
     @Test

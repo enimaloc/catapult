@@ -84,7 +84,9 @@ class ApiAdminTwControllerTest {
     void get_returnsNotFoundWhenMissing() throws Exception {
         MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
         when(adminTwService.get("missing")).thenReturn(Optional.empty());
-        mvc.perform(get("/api/admin/tw/missing")).andExpect(status().isNotFound());
+        mvc.perform(get("/api/admin/tw/missing"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value("Unknown TW missing"));
     }
 
     @Test

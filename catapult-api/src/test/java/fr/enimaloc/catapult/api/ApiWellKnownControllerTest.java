@@ -53,9 +53,12 @@ class ApiWellKnownControllerTest {
     void answers404WhenAbsentOrUnreadable() throws Exception {
         when(service.find(any(), any())).thenReturn(Optional.empty());
         mvc.perform(get("/api/well-known/serve").param("location", "ROOT").param("path", "riot.txt"))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("not_found"))
+                .andExpect(jsonPath("$.detail").value("Unknown well-known file"));
         mvc.perform(get("/api/well-known/serve").param("location", "NOPE").param("path", "riot.txt"))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value("Unknown well-known file"));
         mvc.perform(get("/api/well-known/serve").param("location", "ROOT"))
                 .andExpect(status().isNotFound());
     }
