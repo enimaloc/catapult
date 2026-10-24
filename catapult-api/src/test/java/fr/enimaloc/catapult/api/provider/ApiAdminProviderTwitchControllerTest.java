@@ -81,7 +81,8 @@ class ApiAdminProviderTwitchControllerTest {
 
         assertThatThrownBy(() -> controller.users(userId, null))
                 .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("404");
+                .hasMessageContaining("404")
+                .hasMessageContaining("Unknown user");
     }
 
     @Test
@@ -94,7 +95,8 @@ class ApiAdminProviderTwitchControllerTest {
 
         assertThatThrownBy(() -> controller.users(userId, null))
                 .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("404");
+                .hasMessageContaining("404")
+                .hasMessageContaining("No Twitch token linked to this user");
     }
 
     @Test

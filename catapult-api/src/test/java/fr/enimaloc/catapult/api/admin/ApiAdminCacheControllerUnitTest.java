@@ -131,7 +131,7 @@ class ApiAdminCacheControllerUnitTest {
 
         assertThat(controller.deleteEntry("igdb-game-cache", "7").getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
         assertThat(controller.deleteEntry("igdb-name-index", "doom").getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
-        assertThat(controller.deleteEntry("igdb-exe-index", "doom.exe").getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertStatus(() -> controller.deleteEntry("igdb-exe-index", "doom.exe"), HttpStatus.NOT_FOUND);
         assertThat(controller.deleteEntry("igdb-ccl-cache", "7").getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
         assertThat(controller.deleteEntry("chat-command-user-cache", userId.toString()).getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
     }

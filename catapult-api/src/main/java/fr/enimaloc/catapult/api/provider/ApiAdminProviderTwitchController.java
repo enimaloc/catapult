@@ -89,11 +89,11 @@ public class ApiAdminProviderTwitchController {
 
     private OAuthToken findToken(UserAccount user) {
         return oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Aucun token Twitch lié pour cet utilisateur"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No Twitch token linked to this user"));
     }
 
     private UserAccount findUser(UUID userId) {
         return userAccountRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Utilisateur inconnu"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown user"));
     }
 }

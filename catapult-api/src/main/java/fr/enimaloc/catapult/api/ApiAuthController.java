@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
@@ -36,7 +37,7 @@ public class ApiAuthController {
     public ResponseEntity<TokenResponse> exchange(@RequestParam String code) {
         return codeStore.consume(code)
                 .map(jwt -> ResponseEntity.ok(new TokenResponse(jwt)))
-                .orElseGet(() -> ResponseEntity.status(HttpStatus.GONE).build());
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.GONE, "The code is expired or already used"));
     }
 
     @GetMapping("/validate")

@@ -12,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -38,7 +39,9 @@ public class ApiAdminWellKnownController {
     /** SchemaStore's JSON Schema for {@code path}, for the admin's generated form; 404 when there is none. */
     @GetMapping(value = "/schema", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<String> schema(@RequestParam String path) {
-        return schemas.schemaFor(path).map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
+        return schemas.schemaFor(path)
+                .map(ResponseEntity::ok)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No schema for this path"));
     }
 
     @GetMapping("/{id}")

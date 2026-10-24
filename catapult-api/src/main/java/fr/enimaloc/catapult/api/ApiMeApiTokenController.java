@@ -1,7 +1,9 @@
 package fr.enimaloc.catapult.api;
 
+import fr.enimaloc.catapult.api.error.ApiProblem;
 import fr.enimaloc.catapult.common.dto.account.ApiTokenCreatedDto;
 import fr.enimaloc.catapult.common.dto.account.ApiTokenStatusDto;
+import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.service.account.UserApiTokenService;
 import fr.enimaloc.catapult.service.binding.CustomBindingService;
@@ -14,7 +16,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 /**
  * The logged-in member's personal API token (the JWT's subject: an admin impersonating a member manages theirs).
@@ -50,7 +51,7 @@ public class ApiMeApiTokenController {
     private UserAccount enabledMember(Jwt jwt) {
         UserAccount member = userResolver.viewer(jwt);
         if (!customBindingService.enabled(member)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Feature not enabled");
+            throw new ApiProblem(ErrorCode.FEATURE_DISABLED, "Feature not enabled");
         }
         return member;
     }

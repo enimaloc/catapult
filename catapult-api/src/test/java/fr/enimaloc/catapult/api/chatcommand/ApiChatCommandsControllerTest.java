@@ -97,7 +97,8 @@ class ApiChatCommandsControllerTest {
         when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(false);
 
         mvc.perform(withAdmin(get("/api/chat-commands")))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("feature_disabled"));
     }
 
     private static ChatCommandDefinition definition(String name, String presetKey, boolean enabled) {

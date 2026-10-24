@@ -90,7 +90,8 @@ class ApiChatCommandTestControllerTest {
         mvc.perform(withAdmin(post("/api/chat-commands/{id}/test", UUID.randomUUID()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(om.writeValueAsString(Map.of("overrides", Map.of()))))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("feature_disabled"));
     }
 
     @Test

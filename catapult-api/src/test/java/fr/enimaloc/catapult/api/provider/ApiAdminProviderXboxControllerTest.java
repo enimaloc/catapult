@@ -56,7 +56,8 @@ class ApiAdminProviderXboxControllerTest {
 
         assertThatThrownBy(() -> controller.presence(userId, "all"))
                 .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("404");
+                .hasMessageContaining("404")
+                .hasMessageContaining("Unknown user");
     }
 
     @Test
@@ -69,7 +70,8 @@ class ApiAdminProviderXboxControllerTest {
 
         assertThatThrownBy(() -> controller.presence(userId, "all"))
                 .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("404");
+                .hasMessageContaining("404")
+                .hasMessageContaining("No Xbox session for this user");
     }
 
     @Test
@@ -99,7 +101,8 @@ class ApiAdminProviderXboxControllerTest {
 
         assertThatThrownBy(() -> controller.presence(userId, "not_a_level"))
                 .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("400");
+                .hasMessageContaining("400")
+                .hasMessageContaining("Invalid Xbox level: not_a_level");
     }
 
     @Test

@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.api.connect;
 
+import fr.enimaloc.catapult.api.error.ApiProblem;
+import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.minecraft.MinecraftFriendLink;
 import fr.enimaloc.catapult.domain.minecraft.MinecraftServiceAccount;
@@ -209,8 +211,8 @@ class ApiMinecraftConnectControllerTest {
         when(gateService.isAvailableFor(user)).thenReturn(false);
 
         assertThatThrownBy(() -> controller.enroll(jwt, Map.of("name", "jeb_")))
-                .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("403");
+                .isInstanceOfSatisfying(ApiProblem.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.FEATURE_DISABLED))
+                .hasMessageContaining("Minecraft is not available for this account");
     }
 
     @Test
@@ -218,8 +220,8 @@ class ApiMinecraftConnectControllerTest {
         when(gateService.isAvailableFor(user)).thenReturn(false);
 
         assertThatThrownBy(() -> controller.syncNow(jwt))
-                .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("403");
+                .isInstanceOfSatisfying(ApiProblem.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.FEATURE_DISABLED))
+                .hasMessageContaining("Minecraft is not available for this account");
     }
 
     @Test
@@ -227,7 +229,7 @@ class ApiMinecraftConnectControllerTest {
         when(gateService.isAvailableFor(user)).thenReturn(false);
 
         assertThatThrownBy(() -> controller.unenroll(jwt))
-                .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("403");
+                .isInstanceOfSatisfying(ApiProblem.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.FEATURE_DISABLED))
+                .hasMessageContaining("Minecraft is not available for this account");
     }
 }

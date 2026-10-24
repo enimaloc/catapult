@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Set;
@@ -52,7 +53,9 @@ public class ApiAdminTwController {
 
     @GetMapping("/{id}")
     public ResponseEntity<TwDefinition> get(@PathVariable String id) {
-        return service.get(id).map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
+        return service.get(id)
+                .map(ResponseEntity::ok)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown TW " + id));
     }
 
     @PostMapping
@@ -131,7 +134,7 @@ public class ApiAdminTwController {
                     backfill.rebuildAllNonOverridden();
                     return ResponseEntity.accepted().<Void>build();
                 })
-                .orElseGet(() -> ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build());
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "The TW backfill is not available"));
     }
 
     @PostMapping("/rebuild/force")
@@ -141,7 +144,7 @@ public class ApiAdminTwController {
                     backfill.rebuildAll();
                     return ResponseEntity.accepted().<Void>build();
                 })
-                .orElseGet(() -> ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build());
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "The TW backfill is not available"));
     }
 
     @PostMapping("/rebuild/force-pinned")
@@ -151,6 +154,6 @@ public class ApiAdminTwController {
                     backfill.forceRebuildAllIncludingPinned();
                     return ResponseEntity.accepted().<Void>build();
                 })
-                .orElseGet(() -> ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build());
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "The TW backfill is not available"));
     }
 }

@@ -1,8 +1,10 @@
 package fr.enimaloc.catapult.api.chatcommand;
 
 import fr.enimaloc.catapult.api.ApiUserResolver;
+import fr.enimaloc.catapult.api.error.ApiProblem;
 import fr.enimaloc.catapult.common.dto.chatcommand.ChatCommandSettingUpsertRequest;
 import fr.enimaloc.catapult.common.dto.chatcommand.SettingDto;
+import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.chatcommand.ChatCommandSetting;
 import fr.enimaloc.catapult.repository.chatcommand.ChatCommandSettingRepository;
@@ -110,7 +112,7 @@ public class ApiChatCommandSettingsController {
 
     private void gate(UserAccount user) {
         if (!experimentService.evaluateGate(user, ApiChatCommandsController.EXPERIMENT_KEY)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Feature not enabled");
+            throw new ApiProblem(ErrorCode.FEATURE_DISABLED, "Feature not enabled");
         }
     }
 }

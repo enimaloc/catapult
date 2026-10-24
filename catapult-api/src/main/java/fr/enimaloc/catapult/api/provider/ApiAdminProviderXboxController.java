@@ -39,13 +39,13 @@ public class ApiAdminProviderXboxController {
             @RequestParam(defaultValue = "all") String level) {
         String normalizedLevel = level.toLowerCase();
         if (!VALID_LEVELS.contains(normalizedLevel)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Level Xbox invalide: " + level);
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid Xbox level: " + level);
         }
 
         UserAccount user = userAccountRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Utilisateur inconnu"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown user"));
         XboxUserTokenService.XstsSession session = tokenService.getToken(user)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Session Xbox indisponible pour cet utilisateur"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No Xbox session for this user"));
 
         return rawSupport.fetch(() -> restClient.get()
                 .uri(URI.create(PRESENCE_URL + session.xuid() + ")?level=" + normalizedLevel))

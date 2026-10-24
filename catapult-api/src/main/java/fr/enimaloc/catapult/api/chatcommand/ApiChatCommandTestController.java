@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.api.chatcommand;
 
 import fr.enimaloc.catapult.api.ApiUserResolver;
+import fr.enimaloc.catapult.api.error.ApiProblem;
 import fr.enimaloc.catapult.chat.PlaceholderResolver;
 import fr.enimaloc.catapult.chat.command.ast.CommandAst;
 import fr.enimaloc.catapult.chat.command.ast.NodeJsonCodec;
@@ -10,6 +11,7 @@ import fr.enimaloc.catapult.chat.command.js.SandboxExecutor;
 import fr.enimaloc.catapult.chat.command.registry.MockingServiceFunctionRegistry;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
 import fr.enimaloc.catapult.chat.command.trace.ExecutionTrace;
+import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.chatcommand.ChatCommandDefinition;
 import fr.enimaloc.catapult.domain.chatcommand.ChatCommandSetting;
@@ -177,7 +179,7 @@ public class ApiChatCommandTestController {
 
     private void gate(UserAccount user) {
         if (!experimentService.evaluateGate(user, ApiChatCommandsController.EXPERIMENT_KEY)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Feature not enabled");
+            throw new ApiProblem(ErrorCode.FEATURE_DISABLED, "Feature not enabled");
         }
     }
 }

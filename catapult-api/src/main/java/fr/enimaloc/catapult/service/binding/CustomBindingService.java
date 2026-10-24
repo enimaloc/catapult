@@ -239,7 +239,7 @@ public class CustomBindingService {
 
     private void requireEnabled(UserAccount user) {
         if (!enabled(user)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Feature not enabled");
+            throw new ApiProblem(ErrorCode.FEATURE_DISABLED, "Feature not enabled");
         }
     }
 

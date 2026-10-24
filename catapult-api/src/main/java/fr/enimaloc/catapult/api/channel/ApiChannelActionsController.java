@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.api.channel;
 
 import fr.enimaloc.catapult.api.ApiUserResolver;
+import fr.enimaloc.catapult.api.error.ApiProblem;
 import fr.enimaloc.catapult.common.dto.channel.CclSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.CclToggleRequest;
 import fr.enimaloc.catapult.common.dto.channel.DeleteAccountRequest;
@@ -18,6 +19,7 @@ import fr.enimaloc.catapult.common.dto.channel.UpdateBindingRequest;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatSettingsBody;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatSettingsResponse;
+import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.account.UserSettings;
@@ -365,7 +367,7 @@ public class ApiChannelActionsController {
 
         UserAccount channelUser = userResolver.channel(username);
         if (!raidRestoreGate.isAvailableFor(channelUser)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Raid settings not available for this channel");
+            throw new ApiProblem(ErrorCode.FEATURE_DISABLED, "Raid settings not available for this channel");
         }
         Integer minutes = body.restoreGameMinutes();
         if (minutes != null && minutes != 0
