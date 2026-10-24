@@ -123,4 +123,33 @@ class DebugSentryBridgeTest {
         assertThat(Sentry.isEnabled()).isFalse();
         assertThat(logs).isEmpty();
     }
+
+    private DebugExchange inbound(String error) {
+        DebugExchange e = new DebugExchange();
+        e.setUserId(member);
+        e.setOccurredAt(Instant.now());
+        e.setDirection(Direction.IN);
+        e.setService("twitch");
+        e.setMethod("WS");
+        e.setUrl("wss://eventsub.wss.twitch.tv/ws");
+        e.setRequestBody("{\"metadata\":{\"message_type\":\"session_keepalive\"}}");
+        e.setError(error);
+        return e;
+    }
+
+    @Test
+    void bridge_anIncomingMessageWithoutStatus_isLoggedAtInfo_unlessItHasAnError() {
+        startSentry();
+        DebugContext.runAs(member, () -> {
+            bridge.onRecorded(member, inbound(null));
+            bridge.onRecorded(member, inbound("could not parse the message"));
+        });
+        Sentry.flush(2000);
+
+        assertThat(logs).hasSize(2);
+        assertThat(logs.get(0).getLevel()).isEqualTo(io.sentry.SentryLogLevel.INFO);
+        assertThat(logs.get(1).getLevel()).isEqualTo(io.sentry.SentryLogLevel.WARN);
+        assertThat(breadcrumbs.get(0).getLevel()).isEqualTo(io.sentry.SentryLevel.INFO);
+        assertThat(breadcrumbs.get(1).getLevel()).isEqualTo(io.sentry.SentryLevel.ERROR);
+    }
 }
