@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.chat.command.registry.ServiceFunction;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.getter.DetectedGame;
+import fr.enimaloc.catapult.service.binding.CustomBindingActivations;
 import fr.enimaloc.catapult.service.binding.GameStateService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
@@ -47,6 +48,7 @@ public class CatapultSetGameFunction implements ServiceFunction {
     private final TwitchService twitchService;
     private final GameStateService gameStateService;
     private final IgdbService igdbService;
+    private final CustomBindingActivations customBindingActivations;
 
     @Override
     public String namespace() {
@@ -90,6 +92,8 @@ public class CatapultSetGameFunction implements ServiceFunction {
         }
         binding.setTwitchGameId(resolveTwitchGameId(user, gameName, igdbId).orElse(null));
         twitchService.updateChannel(user, binding);
+        // A category chosen by hand ends the active custom binding, whatever its kind
+        customBindingActivations.clear(user);
 
         if (igdbId != null && !igdbId.isBlank()) {
             gameStateService.updateState(user,

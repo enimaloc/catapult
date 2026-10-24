@@ -33,6 +33,7 @@ import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.account.AccountService;
 import fr.enimaloc.catapult.service.account.BotToggleService;
 import fr.enimaloc.catapult.service.binding.BindingService;
+import fr.enimaloc.catapult.service.binding.CustomBindingActivations;
 import fr.enimaloc.catapult.service.binding.GameStateService;
 import fr.enimaloc.catapult.service.binding.RaidRestoreGameService;
 import fr.enimaloc.catapult.service.binding.RaidRestoreGateService;
@@ -94,6 +95,7 @@ public class ApiChannelActionsController {
     private final TwitchatEventDispatcher twitchatEventDispatcher;
     private final SteamProfileDiagnostics steamDiagnostics;
     private final RaidRestoreGateService raidRestoreGate;
+    private final CustomBindingActivations customBindingActivations;
 
     @Autowired(required = false)
     private SteamApiKeyRotator rotator;
@@ -329,8 +331,10 @@ public class ApiChannelActionsController {
             s.setApplyDefaultOnNoGame(body.applyOnNoGame());
             s.setApplyDefaultOnStreamEnd(body.applyOnStreamEnd());
         });
-        // Nothing detected right now: the new default category applies immediately.
-        if (gameStateService.getLastKnownGame(channelUser).isEmpty()) {
+        // Nothing detected right now: the new default category applies immediately, unless a custom binding holds
+        // the channel
+        if (gameStateService.getLastKnownGame(channelUser).isEmpty()
+                && customBindingActivations.active(channelUser).isEmpty()) {
             twitchService.resetToDefault(channelUser);
         }
         publishSettings(channelUser, settings);

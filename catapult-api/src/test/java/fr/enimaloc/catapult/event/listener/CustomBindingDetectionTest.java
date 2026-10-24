@@ -190,6 +190,34 @@ class CustomBindingDetectionTest {
     }
 
     @Test
+    void uninterruptibleOffline_detectionStoresNothing_streamStartReapplies_liveDeactivateAppliesTheOpenGame() {
+        activate(true);
+        live(false);
+        settings.setApplyDefaultOnStreamStart(true);
+
+        listener.onGameDetected(new GameDetectedEvent(this, user, game));
+
+        verify(streamStateService, never()).storePending(any(), any());
+        verify(twitchService, never()).updateChannel(any(), any());
+
+        live(true);
+        listener.onStreamOnline(new StreamOnlineEvent(this, user));
+
+        verify(twitchService).updateChannel(eq(user), isArt());
+        verify(twitchService, never()).resetToDefault(any());
+
+        when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(game));
+        CustomBindingService service = new CustomBindingService(mock(CustomBindingRepository.class), activations,
+                twitchService, experimentService, gameStateService, streamStateService, userSettingsRepository,
+                mock(UserAccountRepository.class), mock(OAuthTokenRepository.class), listener, channelEventPublisher);
+
+        service.deactivate(user);
+
+        verify(activationRepository).deleteById(user.getId());
+        verify(twitchService).updateChannel(user, gameBinding);
+    }
+
+    @Test
     void noGameDetected_neverInterrupts_andNoGameFallbackSkipped() {
         activate(false);
         live(true);

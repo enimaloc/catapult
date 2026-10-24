@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.chat.command.registry.catapult;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.getter.DetectedGame;
+import fr.enimaloc.catapult.service.binding.CustomBindingActivations;
 import fr.enimaloc.catapult.service.binding.GameStateService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
@@ -24,7 +25,8 @@ class CatapultSetGameFunctionTest {
     @Test
     void nameAndParameters() {
         CatapultSetGameFunction fn = new CatapultSetGameFunction(
-            mock(TwitchService.class), mock(GameStateService.class), mock(IgdbService.class));
+            mock(TwitchService.class), mock(GameStateService.class), mock(IgdbService.class),
+            mock(CustomBindingActivations.class));
         assertThat(fn.namespace()).isEqualTo("catapult");
         assertThat(fn.name()).isEqualTo("setGame");
         assertThat(fn.parameterNames()).containsExactly("name", "igdbId");
@@ -39,7 +41,7 @@ class CatapultSetGameFunctionTest {
         IgdbService igdbService = mock(IgdbService.class);
         UserAccount user = new UserAccount();
         when(twitchService.findCategoryIdByName(user, "Cyberpunk 2077")).thenReturn(Optional.of("1877"));
-        CatapultSetGameFunction fn = new CatapultSetGameFunction(twitchService, gameStateService, igdbService);
+        CatapultSetGameFunction fn = new CatapultSetGameFunction(twitchService, gameStateService, igdbService, mock(CustomBindingActivations.class));
 
         Object result = fn.invoke(user, new Object[]{"Cyberpunk 2077"});
 
@@ -67,7 +69,7 @@ class CatapultSetGameFunctionTest {
         IgdbService igdbService = mock(IgdbService.class);
         UserAccount user = new UserAccount();
         when(igdbService.findTwitchGameId("1877")).thenReturn(Optional.of("1877"));
-        CatapultSetGameFunction fn = new CatapultSetGameFunction(twitchService, gameStateService, igdbService);
+        CatapultSetGameFunction fn = new CatapultSetGameFunction(twitchService, gameStateService, igdbService, mock(CustomBindingActivations.class));
 
         fn.invoke(user, new Object[]{"Cyberpunk 2077", "1877"});
 
@@ -95,7 +97,7 @@ class CatapultSetGameFunctionTest {
         UserAccount user = new UserAccount();
         when(igdbService.findTwitchGameId("1877")).thenReturn(Optional.empty());
         when(twitchService.findCategoryIdByName(user, "Cyberpunk 2077")).thenReturn(Optional.of("1877"));
-        CatapultSetGameFunction fn = new CatapultSetGameFunction(twitchService, gameStateService, igdbService);
+        CatapultSetGameFunction fn = new CatapultSetGameFunction(twitchService, gameStateService, igdbService, mock(CustomBindingActivations.class));
 
         fn.invoke(user, new Object[]{"Cyberpunk 2077", "1877"});
 
@@ -111,7 +113,7 @@ class CatapultSetGameFunctionTest {
         IgdbService igdbService = mock(IgdbService.class);
         UserAccount user = new UserAccount();
         when(twitchService.findCategoryIdByName(user, "Cyberpunk 2077")).thenReturn(Optional.empty());
-        CatapultSetGameFunction fn = new CatapultSetGameFunction(twitchService, gameStateService, igdbService);
+        CatapultSetGameFunction fn = new CatapultSetGameFunction(twitchService, gameStateService, igdbService, mock(CustomBindingActivations.class));
 
         fn.invoke(user, new Object[]{"Cyberpunk 2077", ""});
 
@@ -121,5 +123,21 @@ class CatapultSetGameFunctionTest {
         verify(twitchService).updateChannel(eq(user), captor.capture());
         assertThat(captor.getValue().getSourceId()).isNull();
         assertThat(captor.getValue().getTwitchGameId()).isNull();
+    }
+
+    @Test
+    void invokeEndsTheActiveCustomBinding_afterTheCategoryIsSent() throws Exception {
+        TwitchService twitchService = mock(TwitchService.class);
+        CustomBindingActivations activations = mock(CustomBindingActivations.class);
+        UserAccount user = new UserAccount();
+        when(twitchService.findCategoryIdByName(user, "Cyberpunk 2077")).thenReturn(Optional.of("1877"));
+        CatapultSetGameFunction fn = new CatapultSetGameFunction(twitchService, mock(GameStateService.class),
+            mock(IgdbService.class), activations);
+
+        fn.invoke(user, new Object[]{"Cyberpunk 2077"});
+
+        var order = org.mockito.Mockito.inOrder(twitchService, activations);
+        order.verify(twitchService).updateChannel(eq(user), any());
+        order.verify(activations).clear(user);
     }
 }

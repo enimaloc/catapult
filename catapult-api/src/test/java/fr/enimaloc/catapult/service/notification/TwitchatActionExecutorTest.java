@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.domain.twitchat.TwitchatActionToken;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.account.BotToggleService;
 import fr.enimaloc.catapult.service.binding.BindingService;
+import fr.enimaloc.catapult.service.binding.CustomBindingActivations;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,6 +30,7 @@ class TwitchatActionExecutorTest {
     @Mock private TwitchService twitchService;
     @Mock private BindingService bindingService;
     @Mock private BotToggleService botToggleService;
+    @Mock private CustomBindingActivations customBindingActivations;
     @InjectMocks private TwitchatActionExecutor executor;
 
     private UserAccount user;
@@ -84,6 +86,34 @@ class TwitchatActionExecutorTest {
         executor.execute(actionToken);
 
         verify(bindingService).setTwitchGame(user, bindingId, "222", "New Game");
+        // Editing the game's binding is saved, not applied, while a custom binding is active: it does not end it
+        verify(customBindingActivations, never()).clear(any());
+    }
+
+    @Test
+    void execute_revertCategory_endsTheActiveCustomBinding() {
+        TwitchatActionToken token = tokenOf(TwitchatActionType.REVERT_CATEGORY,
+                Map.of("gameId", "111", "gameName", "Old Game"), "{}");
+        when(actionTokenService.consume(actionToken)).thenReturn(Optional.of(token));
+
+        executor.execute(actionToken);
+
+        var order = inOrder(twitchService, customBindingActivations);
+        order.verify(twitchService).setCategory(user, "111", "Old Game");
+        order.verify(customBindingActivations).clear(user);
+    }
+
+    @Test
+    void execute_revertToAppCategory_endsTheActiveCustomBinding() {
+        TwitchatActionToken token = tokenOf(TwitchatActionType.REVERT_TO_APP_CATEGORY,
+                Map.of("gameId", "222", "gameName", "App Game"), "{}");
+        when(actionTokenService.consume(actionToken)).thenReturn(Optional.of(token));
+
+        executor.execute(actionToken);
+
+        var order = inOrder(twitchService, customBindingActivations);
+        order.verify(twitchService).setCategory(user, "222", "App Game");
+        order.verify(customBindingActivations).clear(user);
     }
 
     @Test
@@ -94,6 +124,7 @@ class TwitchatActionExecutorTest {
         executor.execute(actionToken);
 
         verify(botToggleService).setBotEnabled(user, false);
+        verify(customBindingActivations, never()).clear(any());
     }
 
     @Test
