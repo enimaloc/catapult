@@ -1,11 +1,17 @@
 package fr.enimaloc.catapult.security;
 
+import fr.enimaloc.catapult.api.ApiUserResolver;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.service.account.ChannelAccessService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.security.authentication.AuthenticationTrustResolver;
 import org.springframework.security.authentication.AuthenticationTrustResolverImpl;
 import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.authorization.AuthorizationManager;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.security.web.access.intercept.RequestAuthorizationContext;
 import org.springframework.security.web.util.matcher.IpAddressMatcher;
 import org.springframework.stereotype.Component;
@@ -14,6 +20,12 @@ import org.springframework.stereotype.Component;
  * The one definition of the request-level access rules: who is a member, an admin, a loopback caller or a personal
  * API token holder. The filter chains and {@link DebugSubjectFilter} use these, so the rules cannot drift apart.
  * A relayed client ({@code X-Forwarded-For}) is never loopback: the remote address is the one of the connection.
+ * <p>
+ * It also decides who reaches a channel, for {@code @PreAuthorize("@authz.canAccessChannel(#username)")} and
+ * {@code @PreAuthorize("@authz.ownsChannel(#username)")}. Those keep the order every channel route answers in: 401 for
+ * a caller without a JWT or with an unknown account, then 404 for an unknown channel (both thrown as
+ * {@link org.springframework.web.server.ResponseStatusException}, which SpEL rethrows as is), then {@code false},
+ * a 403, for a caller who may not see it.
  */
 @Component("authz")
 public class Authz {
@@ -22,6 +34,38 @@ public class Authz {
     private static final IpAddressMatcher LOOPBACK_V4 = new IpAddressMatcher("127.0.0.1");
     private static final IpAddressMatcher LOOPBACK_V6 = new IpAddressMatcher("::1");
     private static final AuthenticationTrustResolver TRUST = new AuthenticationTrustResolverImpl();
+
+    private final ApiUserResolver users;
+    private final ChannelAccessService channels;
+
+    public Authz(ApiUserResolver users, ChannelAccessService channels) {
+        this.users = users;
+        this.channels = channels;
+    }
+
+    /** The current caller is the channel's owner or one of its Twitch moderators. 401, then 404, before deciding. */
+    public boolean canAccessChannel(String username) {
+        UserAccount viewer = users.viewer(currentJwt());
+        return canAccess(viewer, users.channel(username));
+    }
+
+    /** The current caller is the channel's owner. 401, then 404, before deciding; never asks Twitch. */
+    public boolean ownsChannel(String username) {
+        UserAccount viewer = users.viewer(currentJwt());
+        return viewer.getId().equals(users.channel(username).getId());
+    }
+
+    /** {@code viewer} is {@code channel}'s owner or one of its Twitch moderators ({@link ChannelAccessService}). */
+    public boolean canAccess(UserAccount viewer, UserAccount channel) {
+        return channels.canAccess(viewer, channel);
+    }
+
+    /** The current request's JWT, or {@code null} (a 401 from {@link ApiUserResolver#viewer}) when it has none. */
+    private static Jwt currentJwt() {
+        return SecurityContextHolder.getContext().getAuthentication() instanceof JwtAuthenticationToken token
+                ? token.getToken()
+                : null;
+    }
 
     /** The connection comes from {@code 127.0.0.1} or {@code ::1}. */
     public static boolean isLoopback(HttpServletRequest request) {

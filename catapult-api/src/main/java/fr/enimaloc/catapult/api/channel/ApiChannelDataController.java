@@ -14,6 +14,7 @@ import fr.enimaloc.catapult.service.twitch.TwitchService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,7 +27,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 
-/** Read side of a channel's dashboard, for its owner and its moderators. */
+/** Read side of a channel's dashboard, for its owner and its moderators (decided by {@code @authz}). */
 @RestController
 @RequestMapping("/api/channels/{username}")
 @RequiredArgsConstructor
@@ -37,16 +38,19 @@ public class ApiChannelDataController {
     private final ConnectionEventService connectionEventService;
     private final TwitchService twitchService;
 
+    @PreAuthorize("@authz.canAccessChannel(#username)")
     @GetMapping(value = "/logs", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter logs(@PathVariable String username, @AuthenticationPrincipal Jwt jwt) {
-        return activityLogService.subscribe(userResolver.accessibleChannel(username, jwt).getId());
+    public SseEmitter logs(@PathVariable String username) {
+        return activityLogService.subscribe(userResolver.channel(username).getId());
     }
 
+    @PreAuthorize("@authz.canAccessChannel(#username)")
     @GetMapping(value = "/connections", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter connections(@PathVariable String username, @AuthenticationPrincipal Jwt jwt) {
-        return connectionEventService.subscribe(userResolver.accessibleChannel(username, jwt).getId());
+    public SseEmitter connections(@PathVariable String username) {
+        return connectionEventService.subscribe(userResolver.channel(username).getId());
     }
 
+    @PreAuthorize("@authz.canAccessChannel(#username)")
     @GetMapping
     public ChannelPageData channelPage(
             @PathVariable String username,
@@ -55,51 +59,55 @@ public class ApiChannelDataController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String source) {
         UserAccount viewer = userResolver.viewer(jwt);
-        UserAccount channel = userResolver.accessibleChannel(username, viewer);
+        UserAccount channel = userResolver.channel(username);
         return dashboard.page(viewer, channel, username, page, status, source);
     }
 
+    @PreAuthorize("@authz.ownsChannel(#username)")
     @PostMapping("/steam/refresh-profile-cache")
-    public ResponseEntity<Void> refreshProfileCache(@PathVariable String username, @AuthenticationPrincipal Jwt jwt) {
-        dashboard.refreshSteamProfileCache(userResolver.ownChannel(username, jwt));
+    public ResponseEntity<Void> refreshProfileCache(@PathVariable String username) {
+        dashboard.refreshSteamProfileCache(userResolver.channel(username));
         return ResponseEntity.noContent().build();
     }
 
+    @PreAuthorize("@authz.canAccessChannel(#username)")
     @GetMapping("/status")
     public StatusData statusFragment(@PathVariable String username, @AuthenticationPrincipal Jwt jwt) {
         UserAccount viewer = userResolver.viewer(jwt);
-        UserAccount channel = userResolver.accessibleChannel(username, viewer);
+        UserAccount channel = userResolver.channel(username);
         return dashboard.status(viewer, channel, username);
     }
 
+    @PreAuthorize("@authz.canAccessChannel(#username)")
     @GetMapping("/settings")
-    public UserSettingsDto settings(@PathVariable String username, @AuthenticationPrincipal Jwt jwt) {
-        return dashboard.settings(userResolver.accessibleChannel(username, jwt));
+    public UserSettingsDto settings(@PathVariable String username) {
+        return dashboard.settings(userResolver.channel(username));
     }
 
+    @PreAuthorize("@authz.canAccessChannel(#username)")
     @GetMapping(value = "/games/search", produces = MediaType.APPLICATION_JSON_VALUE)
     public List<TwitchCategory> searchGames(
             @PathVariable String username,
             @AuthenticationPrincipal Jwt jwt,
             @RequestParam(defaultValue = "") String q) {
-        UserAccount viewer = userResolver.viewer(jwt);
-        userResolver.accessibleChannel(username, viewer);
         if (q.isBlank()) return List.of();
-        return twitchService.searchCategories(viewer, q);
+        return twitchService.searchCategories(userResolver.viewer(jwt), q);
     }
 
     /** The binding of the game the channel plays now (the OBS dock's), 204 when there is none. */
+    @PreAuthorize("@authz.canAccessChannel(#username)")
     @GetMapping("/bindings/current")
-    public ResponseEntity<BindingDto> currentBinding(@PathVariable String username, @AuthenticationPrincipal Jwt jwt) {
-        return dashboard.currentBinding(userResolver.accessibleChannel(username, jwt))
+    public ResponseEntity<BindingDto> currentBinding(@PathVariable String username) {
+        return dashboard.currentBinding(userResolver.channel(username))
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.noContent().build());
     }
 
+    @PreAuthorize("@authz.canAccessChannel(#username)")
     @GetMapping("/dtdd-mapping")
     public DtddMappingStatusDto dtddMappingStatus(@PathVariable String username, @AuthenticationPrincipal Jwt jwt) {
         UserAccount viewer = userResolver.viewer(jwt);
-        UserAccount channel = userResolver.accessibleChannel(username, viewer);
+        UserAccount channel = userResolver.channel(username);
         return dashboard.dtddMapping(viewer, channel);
     }
 }
