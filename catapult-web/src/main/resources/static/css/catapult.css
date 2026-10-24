@@ -1163,6 +1163,29 @@ a[data-link].active {
     gap: 14px;
 }
 
+/* Custom bindings: a binding's button, its badge and its "Deactivate"; the active one is told by its filled button. */
+.custom-binding-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+#custom-bindings-error {
+    margin: 0;
+    color: rgb(var(--mdui-color-error));
+}
+
+#api-token-curl {
+    margin: 0;
+    padding: 12px;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    border-radius: 8px;
+    background: rgb(var(--mdui-color-surface-container-highest));
+}
+
 /*
  * One row per connection: name on the left, status chip on the right, then any
  * details (diagnostics, token form, Minecraft status) and the actions below,

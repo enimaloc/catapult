@@ -87,7 +87,8 @@ describe("subscriptions", () => {
 
         expect(Object.keys(current().listeners).filter(name => name !== "open" && name !== "error").sort())
             .toEqual(["BindingDeletedEvent", "ChannelConnectionChangedEvent", "ChannelLiveStateEvent",
-                "ChannelSettingsUpdatedEvent", "DtddMappingChangedEvent", "GameChangedEvent"]);
+                "ChannelSettingsUpdatedEvent", "CustomBindingChangedEvent", "CustomBindingsUpdatedEvent",
+                "DtddMappingChangedEvent", "GameChangedEvent"]);
     });
 
     it("subscribes each event only once, adding newly referenced ones on re-render", () => {
@@ -161,6 +162,25 @@ describe("events the page catches up on", () => {
         render();
 
         current().emit("DtddMappingChangedEvent", { username: "enimaloc" });
+        await flush();
+
+        expect(CatapultSpa.navigate).toHaveBeenCalledWith("channel/enimaloc", false, "");
+    });
+
+    it("hands the active custom binding to the overview card", () => {
+        window.CatapultCustomBindings = { setActive: vi.fn() };
+        render();
+
+        current().emit("CustomBindingChangedEvent", { username: "enimaloc", activeId: "b1" });
+        current().emit("CustomBindingChangedEvent", { username: "enimaloc", activeId: null });
+
+        expect(CatapultCustomBindings.setActive.mock.calls).toEqual([["b1"], [null]]);
+    });
+
+    it("re-renders the page when the custom bindings were created, changed or deleted", async () => {
+        render();
+
+        current().emit("CustomBindingsUpdatedEvent", { username: "enimaloc" });
         await flush();
 
         expect(CatapultSpa.navigate).toHaveBeenCalledWith("channel/enimaloc", false, "");
