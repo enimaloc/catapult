@@ -93,6 +93,8 @@ class ChannelDashboardAssemblerTest {
             new MinecraftLinkStateService(minecraft, minecraftGate, minecraftAccounts);
     private final TwitchatWidgetSettingsService twitchat = mock(TwitchatWidgetSettingsService.class);
     private final RaidRestoreGateService raidRestoreGate = mock(RaidRestoreGateService.class);
+    private final fr.enimaloc.catapult.service.binding.CustomBindingService customBindings =
+            mock(fr.enimaloc.catapult.service.binding.CustomBindingService.class);
 
     private UserAccount owner;
     private UserAccount moderator;
@@ -103,7 +105,8 @@ class ChannelDashboardAssemblerTest {
         SteamProfileDiagnostics diagnostics = new SteamProfileDiagnostics(steamClient, Optional.of(keyRotator), encryption);
         ChannelDashboardAssembler assembler = new ChannelDashboardAssembler(bindings, settingsRepository, streamState,
                 gameState, ccls, tws, encryption, steamClient, diagnostics, igdb, dtddMappings, dtddCache,
-                dtddProposals, oauthTokens, backdoor, minecraftService, twitchat, raidRestoreGate);
+                dtddProposals, oauthTokens, backdoor, minecraftService, twitchat, raidRestoreGate,
+                new fr.enimaloc.catapult.api.CustomBindingViews(customBindings));
         ReflectionTestUtils.setField(assembler, "xboxEnabled", xboxEnabled);
         return assembler;
     }
@@ -163,6 +166,32 @@ class ChannelDashboardAssemblerTest {
 
     @Nested
     class Page {
+        @Test
+        void customBindings_areTheOwnersOnly_andOnlyOnceTheExperimentIsOpen() {
+            fr.enimaloc.catapult.domain.binding.CustomBinding art = new fr.enimaloc.catapult.domain.binding.CustomBinding();
+            art.setId(UUID.randomUUID());
+            art.setUser(owner);
+            art.setName("Art");
+            art.setTwitchGameId("509660");
+            art.setTwitchGameName("Art");
+            when(customBindings.list(owner)).thenReturn(List.of(art));
+            when(customBindings.active(owner)).thenReturn(Optional.of(
+                    new fr.enimaloc.catapult.domain.binding.CustomBindingActivation(owner.getId(), art,
+                            java.time.Instant.EPOCH)));
+
+            when(customBindings.enabled(owner)).thenReturn(false);
+            assertThat(assembler().page(owner, owner, "streamer", 0, null, null).customBindings()).isNull();
+
+            when(customBindings.enabled(owner)).thenReturn(true);
+            var state = assembler().page(owner, owner, "streamer", 0, null, null).customBindings();
+            assertThat(state).isNotNull();
+            assertThat(state.enabled()).isTrue();
+            assertThat(state.activeId()).isEqualTo(art.getId());
+            assertThat(state.bindings()).extracting(b -> b.name()).containsExactly("Art");
+
+            assertThat(assembler().page(moderator, owner, "streamer", 0, null, null).customBindings()).isNull();
+        }
+
         @Test
         void describesTheChannelForItsOwner() {
             owner.setBotEnabled(true);

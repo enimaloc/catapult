@@ -304,7 +304,7 @@ public class MockData {
                 new PagedBindings(0, bindings.isEmpty() ? 0 : 1, bindings.size(), bindings),
                 AVAILABLE_CCLS, userSettingsDto.blockedCcls(), AVAILABLE_TWS, userSettingsDto.blockedTws(),
                 status, source, steamData(), hasXboxProvider ? new XboxData(hasXbox) : null, minecraftData(), obsData,
-                obsData == null ? null : TwitchatData.of(twitchatBranch), EXAMPLE_UUID);
+                obsData == null ? null : TwitchatData.of(twitchatBranch), EXAMPLE_UUID, null);
     }
 
     private SteamData steamData() {
