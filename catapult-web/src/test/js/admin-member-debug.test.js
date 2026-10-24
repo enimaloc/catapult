@@ -113,6 +113,32 @@ describe("admin-member-debug", () => {
         expect(urls()).toEqual([`/spa/admin/members/${ID}/debug?service=twitch&from=${encodeURIComponent(from)}&page=2`]);
     });
 
+    it("clears a filter when its \"all\" option is picked", async () => {
+        page();
+        await change("service", "steam");
+        await change("outcome", "error");
+
+        await change("service", "all");
+
+        const from = new Date("2026-10-24T08:00:00Z").toISOString();
+        const query = new URLSearchParams({ outcome: "error", from }).toString();
+        expect(urls().at(-1)).toBe(`/spa/admin/members/${ID}/debug?${query}`);
+        expect(location.search).toBe(`?${query}`);
+    });
+
+    it("shows \"all\" again on a select whose option was picked twice, which unselects it", async () => {
+        page();
+        const select = document.createElement("mdui-select");
+        select.dataset.debugFilter = "direction";
+        filter("direction").replaceWith(select);
+        select.value = "";
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+        await flush();
+
+        expect(select.value).toBe("all");
+        expect(urls().at(-1)).not.toContain("direction");
+    });
+
     it("opens an exchange with its bodies indented when they are JSON, as typed otherwise", async () => {
         fetched.mockResolvedValueOnce(response(200, exchange({ requestBody: "<b>not json</b>" })));
         page();

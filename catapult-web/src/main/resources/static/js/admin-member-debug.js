@@ -12,6 +12,8 @@
 window.CatapultAdminMemberDebug = (function () {
     const FILTERS = ["service", "direction", "outcome", "from", "to"];
     const INSTANT_FILTERS = new Set(["from", "to"]);
+    // a select's "all" option: mdui-select never selects an item whose value is blank
+    const ALL = "all";
     const listening = new WeakSet();
     let latest = 0; // the latest list asked: an older answer is dropped
 
@@ -24,13 +26,13 @@ window.CatapultAdminMemberDebug = (function () {
         return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
     }
 
-    /** The filters set, as the query string they travel in (blank ones left out, the period as ISO instants). */
+    /** The filters set, as the query string they travel in (blank and "all" ones left out, the period as ISO instants). */
     function filterQuery(root) {
         const params = new URLSearchParams();
         for (const name of FILTERS) {
             const field = root.querySelector(`[data-debug-filter="${name}"]`);
             const value = (field?.value ?? "").trim();
-            if (value === "") continue;
+            if (value === "" || value === ALL) continue;
             if (INSTANT_FILTERS.has(name)) {
                 const date = new Date(value);
                 if (!Number.isNaN(date.getTime())) params.set(name, date.toISOString());
@@ -135,7 +137,11 @@ window.CatapultAdminMemberDebug = (function () {
             if (field?.dataset.iso) field.value = toLocalInput(field.dataset.iso);
         });
         root.addEventListener("change", event => {
-            if (event.target.closest?.("[data-debug-filter]")) load(root, 0);
+            const field = event.target.closest?.("[data-debug-filter]");
+            if (!field) return;
+            // picking the selected option again unselects it: it shows "all" again, as it now means
+            if (field.localName === "mdui-select" && field.value === "") field.value = ALL;
+            load(root, 0);
         });
         root.addEventListener("click", event => {
             const target = event.target.closest?.("[data-debug-page],[data-debug-exchange],[data-debug-clear],[data-debug-copy],[data-debug-close]");
