@@ -1,0 +1,133 @@
+<!--/*@thymesVar id="member" type="fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto"*/-->
+<!--/*@thymesVar id="debugState" type="fr.enimaloc.catapult.common.dto.admin.MemberDebugStateDto"*/-->
+<!--/*@thymesVar id="exchanges" type="fr.enimaloc.catapult.common.dto.admin.AdminPage<fr.enimaloc.catapult.common.dto.admin.DebugExchangeSummaryDto>"*/-->
+<!--/*@thymesVar id="services" type="java.util.List<java.lang.String>"*/-->
+<!--/*@thymesVar id="filter" type="fr.enimaloc.catapult.service.DebugExchangeFilter"*/-->
+<!--/*
+  A debugged member's recorded exchanges (#members/{id}/debug): the mode's state, the filters (service, direction,
+  outcome, period), one page of exchanges, and a dialog an exchange opens in. The filters and the page travel in the
+  query string (admin-member-debug.js), only [data-debug-results] is swapped by them. The dialog's texts come
+  from the exchange JSON, by textContent only. Driven by admin-member-debug.js.
+*/-->
+<div th:fragment="content" class="admin-view admin-debug" th:with="name=${member.twitchUsername() ?: '—'}"
+     th:attr="data-debug-member=${member.id()},data-debug-count=${debugState == null ? 0 : debugState.exchangeCount()},
+              data-confirm-text=#{admin.confirm},data-cancel-text=#{admin.cancel},
+              data-clear-confirm=#{admin.debug.clear.confirm(${name})},
+              data-error=#{admin.debug.error('{0}')},data-label-gone=#{admin.debug.gone}">
+    <div class="section-header admin-subheader">
+        <mdui-button-icon icon="arrow_back" data-admin-back th:attr="aria-label=#{admin.back}"></mdui-button-icon>
+        <h2 th:text="#{admin.debug.title(${name})}">Débug</h2>
+        <mdui-button variant="text" icon="delete_sweep" data-debug-clear th:if="${debugState != null}"
+                     th:text="#{admin.debug.clear}">Supprimer l'enregistrement</mdui-button>
+    </div>
+
+    <th:block th:if="${debugState == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
+
+    <th:block th:if="${debugState != null}">
+        <mdui-card class="admin-debug-state" variant="outlined">
+            <span th:if="${debugState.active()}"
+                  th:text="#{admin.debug.state.active(${#temporals.format(debugState.enabledAt(), #messages.msg('format.datetime'))})}">since</span>
+            <span th:unless="${debugState.active()}"
+                  th:text="#{admin.debug.state.disabled(${#temporals.format(debugState.disabledAt(), #messages.msg('format.datetime'))},
+                             ${debugState.purgeAt() == null ? '—' : #temporals.format(debugState.purgeAt(), #messages.msg('format.datetime'))})}">off</span>
+            <mdui-chip th:text="${debugState.revealSecrets()} ? #{admin.debug.secrets.revealed} : #{admin.debug.secrets.masked}"
+                       th:icon="${debugState.revealSecrets()} ? 'lock_open' : 'lock'">masked</mdui-chip>
+            <span th:text="#{admin.debug.count(${debugState.exchangeCount()})}">n</span>
+        </mdui-card>
+
+        <div class="admin-debug-filters">
+            <mdui-select data-debug-filter="service" variant="outlined" th:attr="label=#{admin.debug.filter.service},value=${filter.service()}">
+                <mdui-menu-item value="" th:text="#{admin.debug.filter.all}">all</mdui-menu-item>
+                <mdui-menu-item th:each="s : ${services}" th:value="${s}" th:text="${s}">service</mdui-menu-item>
+            </mdui-select>
+            <mdui-select data-debug-filter="direction" variant="outlined" th:attr="label=#{admin.debug.filter.direction},value=${filter.direction()}">
+                <mdui-menu-item value="" th:text="#{admin.debug.filter.all}">all</mdui-menu-item>
+                <mdui-menu-item value="OUT" th:text="#{admin.debug.direction.out}">out</mdui-menu-item>
+                <mdui-menu-item value="IN" th:text="#{admin.debug.direction.in}">in</mdui-menu-item>
+            </mdui-select>
+            <mdui-select data-debug-filter="outcome" variant="outlined" th:attr="label=#{admin.debug.filter.outcome},value=${filter.outcome()}">
+                <mdui-menu-item value="" th:text="#{admin.debug.filter.all}">all</mdui-menu-item>
+                <mdui-menu-item value="error" th:text="#{admin.debug.outcome.error}">errors</mdui-menu-item>
+                <mdui-menu-item value="success" th:text="#{admin.debug.outcome.success}">successes</mdui-menu-item>
+            </mdui-select>
+            <mdui-text-field data-debug-filter="from" type="datetime-local" variant="outlined"
+                             th:attr="label=#{admin.debug.filter.from},data-iso=${filter.from()}"></mdui-text-field>
+            <mdui-text-field data-debug-filter="to" type="datetime-local" variant="outlined"
+                             th:attr="label=#{admin.debug.filter.to},data-iso=${filter.to()}"></mdui-text-field>
+        </div>
+
+        <div data-debug-results>
+            <th:block th:if="${exchanges == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
+            <th:block th:if="${exchanges != null and exchanges.content().isEmpty()}">
+                <th:block th:replace="~{pages/admin-tab/common :: empty('bug_report', #{admin.debug.empty})}"></th:block>
+            </th:block>
+
+            <mdui-card class="admin-debug-list" variant="outlined" th:if="${exchanges != null and !exchanges.content().isEmpty()}">
+                <div class="admin-row admin-debug-row admin-row-head" aria-hidden="true">
+                    <span th:text="#{admin.debug.column.time}">Heure</span>
+                    <span th:text="#{admin.debug.column.direction}">Sens</span>
+                    <span th:text="#{admin.debug.column.service}">Service</span>
+                    <span th:text="#{admin.debug.column.method}">Méthode</span>
+                    <span th:text="#{admin.debug.column.url}">URL</span>
+                    <span th:text="#{admin.debug.column.status}">Statut</span>
+                    <span th:text="#{admin.debug.column.duration}">Durée</span>
+                    <span></span>
+                </div>
+                <div class="admin-row admin-debug-row admin-debug-exchange" th:each="e : ${exchanges.content()}"
+                     tabindex="0" role="button" th:attr="data-debug-exchange=${e.id()}">
+                    <span class="admin-cell admin-member-id" th:text="${#temporals.format(e.occurredAt(), #messages.msg('format.datetime'))}">time</span>
+                    <span class="admin-cell" th:text="${e.direction()}">OUT</span>
+                    <span class="admin-cell" th:text="${e.service()}" th:title="${e.operation()}">service</span>
+                    <span class="admin-cell admin-member-id" th:text="${e.method()}">GET</span>
+                    <span class="admin-cell admin-member-id" th:text="${#strings.abbreviate(e.url() ?: '', 80)}">url</span>
+                    <span class="admin-cell" th:text="${e.status() ?: '—'}">200</span>
+                    <span class="admin-cell" th:text="|${e.durationMs()} ms|">12 ms</span>
+                    <span class="admin-debug-badges">
+                        <mdui-chip th:if="${e.error()}" icon="error_outline" th:text="#{admin.debug.badge.error}">erreur</mdui-chip>
+                        <mdui-chip th:if="${e.filtered()}" icon="filter_alt" th:text="#{admin.debug.badge.filtered}">filtré</mdui-chip>
+                    </span>
+                </div>
+            </mdui-card>
+
+            <!--/* Like the other tabs' pagination, but in the filters' own words: admin-tabs.js would page without them. */-->
+            <div class="admin-pagination" th:if="${exchanges != null and exchanges.totalPages() > 1}">
+                <mdui-button-icon icon="chevron_left" th:disabled="${exchanges.first()}"
+                                  th:attr="data-debug-page=${exchanges.number() - 1},aria-label=#{admin.pagination.previous}"></mdui-button-icon>
+                <span th:text="|${exchanges.number() + 1} / ${exchanges.totalPages()}|">1 / 1</span>
+                <mdui-button-icon icon="chevron_right" th:disabled="${exchanges.last()}"
+                                  th:attr="data-debug-page=${exchanges.number() + 1},aria-label=#{admin.pagination.next}"></mdui-button-icon>
+            </div>
+        </div>
+
+        <mdui-dialog id="admin-debug-detail" fullscreen close-on-esc close-on-overlay-click class="admin-debug-detail"
+                     th:attr="data-copied=#{admin.debug.copied}">
+            <span slot="headline" data-debug-field="title"></span>
+            <p class="admin-cell-muted" data-debug-field="summary"></p>
+            <section data-debug-section="errorMessage" hidden>
+                <h4 th:text="#{admin.debug.detail.error}">Erreur</h4>
+                <pre data-debug-field="errorMessage"></pre>
+            </section>
+            <section data-debug-section="requestHeaders" hidden>
+                <h4 th:text="#{admin.debug.detail.request-headers}">En-têtes de la requête</h4>
+                <pre data-debug-field="requestHeaders"></pre>
+            </section>
+            <section data-debug-section="requestBody" hidden>
+                <h4 th:text="#{admin.debug.detail.request-body}">Corps de la requête</h4>
+                <pre data-debug-field="requestBody"></pre>
+            </section>
+            <section data-debug-section="responseHeaders" hidden>
+                <h4 th:text="#{admin.debug.detail.response-headers}">En-têtes de la réponse</h4>
+                <pre data-debug-field="responseHeaders"></pre>
+            </section>
+            <section data-debug-section="responseBody" hidden>
+                <h4 th:text="#{admin.debug.detail.response-body}">Corps de la réponse</h4>
+                <pre data-debug-field="responseBody"></pre>
+            </section>
+            <section data-debug-section="traceId" hidden>
+                <h4 th:text="#{admin.debug.detail.trace}">Trace</h4>
+                <code data-debug-field="traceId" data-debug-copy class="admin-debug-trace"></code>
+            </section>
+            <mdui-button slot="action" variant="text" data-debug-close th:text="#{admin.debug.detail.close}">Fermer</mdui-button>
+        </mdui-dialog>
+    </th:block>
+</div>

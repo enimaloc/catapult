@@ -22,7 +22,17 @@ function page() {
                 <mdui-menu-item data-action="delete" data-confirm="Delete enimaloc?"></mdui-menu-item>
                 <mdui-menu-item data-action="steam/unlink" data-confirm="Unlink?"></mdui-menu-item>
                 <mdui-menu-item data-action="migrate"></mdui-menu-item>
+                <mdui-menu-item data-action="debug-enable"></mdui-menu-item>
+                <mdui-menu-item data-action="debug/disable"></mdui-menu-item>
+                <mdui-menu-item data-action="debug/clear" data-confirm="Delete the recording?"></mdui-menu-item>
             </div>
+        </div>
+        <div id="admin-debug-dialog" data-headline="Debug mode for {0}">
+            <span id="admin-debug-headline"></span>
+            <input type="checkbox" id="admin-debug-reveal">
+            <p id="admin-debug-warning" hidden></p>
+            <button id="admin-debug-cancel"></button>
+            <button id="admin-debug-submit"></button>
         </div>
         <div id="admin-migrate-dialog" data-headline="Migrate the data of {0}" data-incomplete="Pick">
             <span id="admin-migrate-headline"></span>
@@ -130,6 +140,71 @@ describe("admin-members", () => {
         expect(posts()).toEqual([[`/admin/members/${ID}/delete`, {}]]);
         expect(CatapultAdminTabs.reloadResults).toHaveBeenCalledWith(panel);
         expect(refreshed()).toBe(0);
+    });
+
+    describe("debug mode", () => {
+        it("turns it on through its dialog, masked unless the secrets switch was flipped, and warns about it", async () => {
+            page();
+            await click('[data-action="debug-enable"]');
+            const dialog = document.getElementById("admin-debug-dialog");
+            const reveal = document.getElementById("admin-debug-reveal");
+            const warning = document.getElementById("admin-debug-warning");
+
+            expect(dialog.open).toBe(true);
+            expect(document.getElementById("admin-debug-headline").textContent).toBe("Debug mode for enimaloc");
+            expect(reveal.checked).toBe(false);
+            expect(warning.hidden).toBe(true);
+
+            reveal.checked = true;
+            reveal.dispatchEvent(new Event("change"));
+            expect(warning.hidden).toBe(false);
+
+            reveal.checked = false;
+            reveal.dispatchEvent(new Event("change"));
+            await click("#admin-debug-submit");
+
+            expect(posts()).toEqual([[`/admin/members/${ID}/debug/enable`, { revealSecrets: false }]]);
+            expect(dialog.open).toBe(false);
+            expect(refreshed()).toBe(1);
+        });
+
+        it("sends the secrets in clear when asked, and starts masked again the next time", async () => {
+            page();
+            await click('[data-action="debug-enable"]');
+            const reveal = document.getElementById("admin-debug-reveal");
+            reveal.checked = true;
+            await click("#admin-debug-submit");
+            await click('[data-action="debug-enable"]');
+
+            expect(posts()).toEqual([[`/admin/members/${ID}/debug/enable`, { revealSecrets: true }]]);
+            expect(reveal.checked).toBe(false);
+        });
+
+        it("keeps the dialog open when the activation is refused, and closes it on cancel", async () => {
+            posted.mockResolvedValue(response(409));
+            page();
+            await click('[data-action="debug-enable"]');
+            await click("#admin-debug-submit");
+            const dialog = document.getElementById("admin-debug-dialog");
+
+            expect(dialog.open).toBe(true);
+            expect(refreshed()).toBe(0);
+
+            await click("#admin-debug-cancel");
+            expect(dialog.open).toBe(false);
+        });
+
+        it("turns it off without asking, and deletes the recording once confirmed", async () => {
+            page();
+            await click('[data-action="debug/disable"]');
+            confirmAnswer = false;
+            await click('[data-action="debug/clear"]');
+            expect(posts()).toEqual([[`/admin/members/${ID}/debug/disable`, {}]]);
+
+            confirmAnswer = true;
+            await click('[data-action="debug/clear"]');
+            expect(posts()).toEqual([[`/admin/members/${ID}/debug/disable`, {}], [`/admin/members/${ID}/debug/clear`, {}]]);
+        });
     });
 
     describe("migrate target search", () => {

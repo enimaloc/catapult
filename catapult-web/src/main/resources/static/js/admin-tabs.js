@@ -53,7 +53,8 @@ window.CatapultAdminTabs = (function () {
     }
 
     function fragmentUrl(tab, sub, params) {
-        const base = `/spa/admin/${tab}` + (sub ? `/${encodeURIComponent(sub)}` : "");
+        // a nested sub-view (a member's debug page: {id}/debug) keeps its slash, which a path can't carry encoded
+        const base = `/spa/admin/${tab}` + (sub ? `/${sub.split("/").map(encodeURIComponent).join("/")}` : "");
         const query = params ? new URLSearchParams(params).toString() : "";
         return query ? `${base}?${query}` : base;
     }
@@ -77,7 +78,8 @@ window.CatapultAdminTabs = (function () {
         const tab = tabOf(panel);
         const current = route();
         const sub = current.tab === tab ? current.sub : null;
-        const url = fragmentUrl(tab, sub);
+        // a member's debug page keeps its filters in the page's query string, so that a reload keeps them
+        const url = fragmentUrl(tab, sub, sub?.endsWith("/debug") ? Object.fromEntries(new URLSearchParams(location.search)) : undefined);
         const state = stateOf(panel);
         if (!force && state.view === url) return;
         clearTimeout(searchTimers.get(panel)); // a search typed in the previous view stays there
@@ -101,7 +103,9 @@ window.CatapultAdminTabs = (function () {
     function open(panel, sub) {
         const tab = tabOf(panel);
         const hash = sub ? `#${tab}/${encodeURIComponent(sub)}` : `#${tab}`;
-        history.pushState(history.state, "", location.pathname + location.search + hash);
+        // the filters of a debug page stay on it
+        const leavesDebug = stateOf(panel).sub?.endsWith("/debug") || sub?.endsWith("/debug");
+        history.pushState(history.state, "", location.pathname + (leavesDebug ? "" : location.search) + hash);
         return show(panel);
     }
 
