@@ -32,7 +32,11 @@ public class MockMembers {
     /** Made-up members filling the listing so it has several pages to browse. */
     private static final int FAKE_MEMBERS = 120;
 
+    /** The made-up member whose debug mode is on from the start, with a few recorded exchanges. */
+    static final UUID DEBUGGED = MockPresets.uuidOf("viewer001");
+
     private final List<AdminMemberDto> members = new ArrayList<>();
+    private final MockDebugStore debug = new MockDebugStore(java.time.Clock.systemUTC(), DEBUGGED);
     private final Map<UUID, Boolean> live = new LinkedHashMap<>();
     /** Every account ever registered: one the admin deleted is not brought back by its session's next request. */
     private final Set<UUID> registered = new HashSet<>();
@@ -46,7 +50,7 @@ public class MockMembers {
             UUID id = MockPresets.uuidOf("viewer%03d".formatted(i));
             SEEDED.add(id);
             members.add(new AdminMemberDto(id, String.valueOf(5_000_000 + i), "viewer%03d".formatted(i),
-                    MockPresets.getDefaultAvatar(), null, false, true, "ACTIVE", CREATED.minus(i, ChronoUnit.DAYS), null));
+                    MockPresets.getDefaultAvatar(), null, false, true, "ACTIVE", CREATED.minus(i, ChronoUnit.DAYS), debug.state(id)));
         }
     }
 
@@ -127,6 +131,19 @@ public class MockMembers {
     public synchronized void promoteToSystem(UUID id) {
         members.replaceAll(m -> m.systemAccount() ? with(m, m.steamId(), false, m.botEnabled()) : m);
         update(id, m -> with(m, m.steamId(), true, m.botEnabled()));
+    }
+
+    /** The mock store of the members' debug mode. */
+    public MockDebugStore debug() {
+        return debug;
+    }
+
+    /** Applies {@code action} (one of {@link #debug()}'s) and shows its outcome in the member's listing. */
+    public synchronized int debugAction(UUID id, java.util.function.ToIntFunction<MockDebugStore> action) {
+        int status = action.applyAsInt(debug);
+        update(id, m -> new AdminMemberDto(m.id(), m.twitchId(), m.twitchUsername(), m.profileImageUrl(), m.steamId(),
+                m.systemAccount(), m.botEnabled(), m.status(), m.createdAt(), debug.state(id)));
+        return status;
     }
 
     public synchronized void delete(UUID id) {

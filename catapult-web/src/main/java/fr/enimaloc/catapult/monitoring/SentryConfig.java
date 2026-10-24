@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.monitoring;
 
+import fr.enimaloc.catapult.service.debug.DebugMembers;
 import io.sentry.Sentry;
 import io.sentry.SentryOptions;
 import jakarta.servlet.http.HttpServletRequest;
@@ -38,7 +39,7 @@ public class SentryConfig {
 
     /**
      * A trace the browser started (it sends sentry-trace with its fetches) goes on as it decided;
-     * other requests are traced at {@code sentry.traces-sample-rate}, but for the {@link #UNTRACED}.
+     * a member in debug mode is always traced, whatever the browser decided; other requests are traced at {@code sentry.traces-sample-rate}, but for the {@link #UNTRACED}.
      * The degraded profile's {@code catapult.degraded.traces-sample-rate}, when set, caps that rate: it is a
      * key of its own because {@code SENTRY_TRACES_SAMPLE_RATE}, which compose always sets, would win over a
      * profile's {@code sentry.traces-sample-rate}.
@@ -46,7 +47,8 @@ public class SentryConfig {
     @Bean
     SentryOptions.TracesSamplerCallback tracesSampler(
             @Value("${sentry.traces-sample-rate:1.0}") double rate,
-            @Value("${catapult.degraded.traces-sample-rate:-1}") double degradedRate) {
+            @Value("${catapult.degraded.traces-sample-rate:-1}") double degradedRate,
+            DebugMembers debugMembers) {
         // Negative = the degraded profile is off
         double tracedRate = degradedRate >= 0 ? Math.min(rate, degradedRate) : rate;
         return context -> {
@@ -54,6 +56,10 @@ public class SentryConfig {
                     && context.getCustomSamplingContext().get("request") instanceof HttpServletRequest request
                     && UNTRACED.matcher(request.getRequestURI()).matches()) {
                 return 0.0;
+            }
+            // A member in debug mode is traced in full, even when the degraded profile caps the rate
+            if (debugMembers.isCurrentActive()) {
+                return 1.0;
             }
             Boolean parentSampled = context.getTransactionContext().getParentSampled();
             return parentSampled != null ? (parentSampled ? 1.0 : 0.0) : tracedRate;

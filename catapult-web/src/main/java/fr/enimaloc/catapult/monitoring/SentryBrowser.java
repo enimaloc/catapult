@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.monitoring;
 import fr.enimaloc.catapult.controller.ErrorPageController;
 import fr.enimaloc.catapult.controller.IndexController;
 import fr.enimaloc.catapult.service.ApiService;
+import fr.enimaloc.catapult.service.debug.DebugMembers;
 import io.sentry.BaggageHeader;
 import io.sentry.Sentry;
 import io.sentry.SentryTraceHeader;
@@ -23,7 +24,7 @@ import java.util.UUID;
  * with it): the same DSN, environment and release as the server's, and the request's trace, which
  * the page's own then continues, and the member's account id (as SentryUserInterceptor names them).
  * Pages are replayed whole at {@code catapult.sentry.replays-session-sample-rate} (none by default,
- * all of them in dev), else only those with an error. None without a DSN.
+ * all of them in dev), else only those with an error; a member in debug mode has every page replayed and traced. None without a DSN.
  */
 @ControllerAdvice(assignableTypes = {IndexController.class, ErrorPageController.class})
 public class SentryBrowser {
@@ -72,12 +73,15 @@ public class SentryBrowser {
     private final double tracesSampleRate;
     private final double replaysSessionSampleRate;
     private final ObjectProvider<ApiService> apiService;
+    private final ObjectProvider<DebugMembers> debugMembers;
 
     public SentryBrowser(@Value("${sentry.dsn:}") String dsn,
                          @Value("${sentry.environment:production}") String environment,
                          @Value("${sentry.traces-sample-rate:1.0}") double tracesSampleRate,
                          @Value("${catapult.sentry.replays-session-sample-rate:0}") double replaysSessionSampleRate,
-                         Optional<BuildProperties> build, ObjectProvider<ApiService> apiService) {
+                         Optional<BuildProperties> build, ObjectProvider<ApiService> apiService,
+                         ObjectProvider<DebugMembers> debugMembers) {
+        this.debugMembers = debugMembers;
         this.dsn = dsn;
         this.environment = environment;
         this.tracesSampleRate = tracesSampleRate;
@@ -95,7 +99,11 @@ public class SentryBrowser {
         BaggageHeader baggage = Sentry.getBaggage();
         ApiService api = apiService.getIfAvailable();
         UUID account = api == null ? null : api.currentUserId();
-        return new Config(dsn, environment, release.orElse(null), tracesSampleRate, replaysSessionSampleRate,
+        // A member in debug mode is replayed and traced in full, whatever the configured (or degraded) rates
+        DebugMembers debug = debugMembers.getIfAvailable();
+        boolean debugged = account != null && debug != null && debug.isActive(account);
+        return new Config(dsn, environment, release.orElse(null), debugged ? 1.0 : tracesSampleRate,
+                debugged ? 1.0 : replaysSessionSampleRate,
                 account == null ? null : account.toString(),
                 trace == null ? null : trace.getValue(), baggage == null ? null : baggage.getValue(), SDK);
     }

@@ -922,6 +922,55 @@ public class MockApiService implements ApiService {
     }
 
     @Override
+    public fr.enimaloc.catapult.common.dto.admin.MemberDebugStateDto memberDebug(UUID memberId) {
+        log.trace("memberDebug({})", memberId);
+        return members.debug().state(memberId);
+    }
+
+    @Override
+    public int enableMemberDebug(UUID memberId, boolean revealSecrets) {
+        log.trace("enableMemberDebug({}, {})", memberId, revealSecrets);
+        return members.debugAction(memberId, store -> store.enable(memberId, revealSecrets));
+    }
+
+    @Override
+    public int disableMemberDebug(UUID memberId) {
+        log.trace("disableMemberDebug({})", memberId);
+        return members.debugAction(memberId, store -> store.disable(memberId));
+    }
+
+    @Override
+    public int clearMemberDebug(UUID memberId) {
+        log.trace("clearMemberDebug({})", memberId);
+        return members.debugAction(memberId, store -> store.clear(memberId));
+    }
+
+    @Override
+    public AdminPage<fr.enimaloc.catapult.common.dto.admin.DebugExchangeSummaryDto> memberDebugExchanges(
+            UUID memberId, fr.enimaloc.catapult.service.DebugExchangeFilter filter, int page) {
+        log.trace("memberDebugExchanges({}, {}, {})", memberId, filter, page);
+        return members.debug().list(memberId, filter, page);
+    }
+
+    @Override
+    public fr.enimaloc.catapult.common.dto.admin.DebugExchangeDto memberDebugExchange(UUID memberId, UUID exchangeId) {
+        log.trace("memberDebugExchange({}, {})", memberId, exchangeId);
+        return members.debug().exchange(memberId, exchangeId);
+    }
+
+    @Override
+    public List<String> memberDebugServices(UUID memberId) {
+        log.trace("memberDebugServices({})", memberId);
+        return members.debug().services(memberId);
+    }
+
+    @Override
+    public boolean myDebugActive() {
+        UUID account = currentUserId();
+        return account != null && members.debug().active(account);
+    }
+
+    @Override
     public int adminToggleMemberBot(UUID memberId) {
         log.trace("adminToggleMemberBot({})", memberId);
         members.toggleBot(memberId);

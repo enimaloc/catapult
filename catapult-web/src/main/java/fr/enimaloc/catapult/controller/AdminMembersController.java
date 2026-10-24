@@ -1,7 +1,9 @@
 package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.common.dto.admin.MigrateRequest;
+import fr.enimaloc.catapult.common.dto.admin.DebugEnableRequest;
 import fr.enimaloc.catapult.service.ApiService;
+import fr.enimaloc.catapult.service.debug.DebugMembers;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -26,6 +28,7 @@ import java.util.function.IntSupplier;
 public class AdminMembersController {
     private final ApiService apiService;
     private final ModelFiller filler;
+    private final DebugMembers debugMembers;
 
     @PostMapping("/bot/toggle")
     public ResponseEntity<Void> toggleBot(@PathVariable UUID id) {
@@ -65,6 +68,32 @@ public class AdminMembersController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
         }
         return ApiStatus.answer(apiService.adminMigrateMember(id, body.targetId(), body.migrateSettings(), body.migrateGetters(), body.migrateBindings()));
+    }
+
+    /** The member's debug mode; {@code revealSecrets} (default false) unmasks the secrets in what is recorded. */
+    @PostMapping("/debug/enable")
+    public ResponseEntity<Void> enableDebug(@PathVariable UUID id, @RequestBody DebugEnableRequest body) {
+        return debugAction(id, () -> apiService.enableMemberDebug(id, body.revealSecrets()));
+    }
+
+    @PostMapping("/debug/disable")
+    public ResponseEntity<Void> disableDebug(@PathVariable UUID id) {
+        return debugAction(id, () -> apiService.disableMemberDebug(id));
+    }
+
+    @PostMapping("/debug/clear")
+    public ResponseEntity<Void> clearDebug(@PathVariable UUID id) {
+        return debugAction(id, () -> apiService.clearMemberDebug(id));
+    }
+
+    /** Forgets what this instance knows of the member's mode, whatever catapult-api answers: it may have changed. */
+    private ResponseEntity<Void> debugAction(UUID id, IntSupplier action) {
+        requireAdmin();
+        try {
+            return ApiStatus.answer(action.getAsInt());
+        } finally {
+            debugMembers.evict(id);
+        }
     }
 
     public record FlagBody(String key, String value) {}

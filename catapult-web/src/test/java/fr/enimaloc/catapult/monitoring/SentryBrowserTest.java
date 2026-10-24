@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.monitoring;
 
 import fr.enimaloc.catapult.service.ApiService;
+import fr.enimaloc.catapult.service.debug.DebugMembers;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.info.BuildProperties;
@@ -38,12 +39,12 @@ class SentryBrowserTest {
 
     @Test
     void noneWithoutADsn() {
-        assertThat(new SentryBrowser("", "production", 1.0, 0, build("abc"), api(MEMBER)).config()).isNull();
+        assertThat(new SentryBrowser("", "production", 1.0, 0, build("abc"), api(MEMBER), new StaticApplicationContext().getBeanProvider(DebugMembers.class)).config()).isNull();
     }
 
     @Test
     void theServersDsnEnvironmentAndRelease_andTheMembersAccount() {
-        SentryBrowser.Config config = new SentryBrowser("https://key@sentry.test/1", "staging", 0.2, 1.0, build("abc"), api(MEMBER)).config();
+        SentryBrowser.Config config = new SentryBrowser("https://key@sentry.test/1", "staging", 0.2, 1.0, build("abc"), api(MEMBER), new StaticApplicationContext().getBeanProvider(DebugMembers.class)).config();
 
         assertThat(config.script()).containsEntry("dsn", "https://key@sentry.test/1")
                 .containsEntry("environment", "staging")
@@ -56,7 +57,7 @@ class SentryBrowserTest {
 
     @Test
     void noReleaseFromAnUnknownCommit_andNoOneWhenLoggedOut() {
-        SentryBrowser.Config config = new SentryBrowser("https://key@sentry.test/1", "production", 1.0, 0, build("unknown"), api(null)).config();
+        SentryBrowser.Config config = new SentryBrowser("https://key@sentry.test/1", "production", 1.0, 0, build("unknown"), api(null), new StaticApplicationContext().getBeanProvider(DebugMembers.class)).config();
 
         assertThat(config.script()).containsEntry("release", null).containsEntry("user", null);
     }
