@@ -32,6 +32,11 @@ public class DebugMemberRegistry {
         return userId == null ? Optional.empty() : Optional.ofNullable(modes.get(userId));
     }
 
+    /** Whether any member is in debug mode right now (lets a caller skip looking up who a grouped call is for). */
+    public boolean hasAny() {
+        return !modes.isEmpty();
+    }
+
     @EventListener(ApplicationReadyEvent.class)
     public synchronized void load() {
         Map<UUID, DebugMode> loaded = new ConcurrentHashMap<>();

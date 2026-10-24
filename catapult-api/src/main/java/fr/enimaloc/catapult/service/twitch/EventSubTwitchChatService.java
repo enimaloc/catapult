@@ -1,6 +1,5 @@
 package fr.enimaloc.catapult.service.twitch;
 
-import fr.enimaloc.catapult.service.debug.DebugContext;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.enimaloc.catapult.chat.ChatCommandEvent;
@@ -10,11 +9,14 @@ import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.event.AccountCreatedEvent;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.service.debug.DebugContext;
+import fr.enimaloc.catapult.service.debug.DebugRecording;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationEventPublisher;
@@ -61,6 +63,14 @@ public class EventSubTwitchChatService implements TwitchChatService {
     private String twitchClientId;
 
     private final EventSubConnections connections;
+
+    private DebugRecording debug = DebugRecording.OFF;
+
+    /** Records this class's grouped calls and incoming messages for the members in debug mode. */
+    @Autowired(required = false)
+    public void setDebugRecording(DebugRecording debug) {
+        this.debug = debug == null ? DebugRecording.OFF : debug;
+    }
 
     public EventSubTwitchChatService(OAuthTokenRepository oAuthTokenRepository,
                                      UserAccountRepository userAccountRepository,
@@ -130,7 +140,11 @@ public class EventSubTwitchChatService implements TwitchChatService {
     }
 
     void handleMessage(UserAccount user, OAuthToken token, String message, boolean reconnectSession) {
-        DebugContext.runAs(user.getId(), () -> dispatch(user, token, message, reconnectSession));
+        DebugContext.runAs(user.getId(), () -> {
+            debug.inbound(user.getId(), "twitch", "WS", EventSubConnections.WS_URI, message,
+                () -> DebugRecording.eventSubOperation(message));
+            dispatch(user, token, message, reconnectSession);
+        });
     }
 
     private void dispatch(UserAccount user, OAuthToken token, String message, boolean reconnectSession) {

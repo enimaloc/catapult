@@ -2,8 +2,11 @@ package fr.enimaloc.catapult.service.twitch;
 
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.service.debug.BatchDebugFilter;
+import fr.enimaloc.catapult.service.debug.DebugRecording;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -23,10 +26,19 @@ public class TwitchAccountValidationService {
 
     private static final String TWITCH_USERS_URL = "https://api.twitch.tv/helix/users";
     private static final int BATCH_SIZE = 100;
+    static final String VALIDATION_OPERATION = "twitch.get_users";
 
     private final UserAccountRepository userAccountRepository;
     private final TwitchTokenService twitchTokenService;
     private final RestClient restClient;
+
+    private DebugRecording debug = DebugRecording.OFF;
+
+    /** Records this class's grouped calls and incoming messages for the members in debug mode. */
+    @Autowired(required = false)
+    public void setDebugRecording(DebugRecording debug) {
+        this.debug = debug == null ? DebugRecording.OFF : debug;
+    }
 
     @Value("${twitch.client-id:}")
     private String twitchClientId;
@@ -58,14 +70,18 @@ public class TwitchAccountValidationService {
         String ids = batch.stream().map(UserAccount::getTwitchId).collect(Collectors.joining("&id="));
         String uri = TWITCH_USERS_URL + "?id=" + ids;
 
+        List<DebugRecording.Member> members = batch.stream()
+            .map(u -> new DebugRecording.Member(u.getId(), u.getTwitchId()))
+            .toList();
         Map<String, Object> response;
         try {
-            response = restClient.get()
-                .uri(uri)
-                .header("Authorization", "Bearer " + appToken)
-                .header("Client-Id", twitchClientId)
-                .retrieve()
-                .body(Map.class);
+            response = debug.batch(VALIDATION_OPERATION, members, BatchDebugFilter::twitchUsers,
+                () -> restClient.get()
+                    .uri(uri)
+                    .header("Authorization", "Bearer " + appToken)
+                    .header("Client-Id", twitchClientId)
+                    .retrieve()
+                    .body(Map.class));
         } catch (Exception e) {
             log.error("Twitch API call failed for batch of {} accounts, skipping", batch.size(), e);
             return;

@@ -6,17 +6,21 @@ import fr.enimaloc.catapult.domain.minecraft.MinecraftFriendLink;
 import fr.enimaloc.catapult.domain.minecraft.MinecraftServiceAccount;
 import fr.enimaloc.catapult.repository.minecraft.MinecraftFriendLinkRepository;
 import fr.enimaloc.catapult.repository.minecraft.MinecraftServiceAccountRepository;
+import fr.enimaloc.catapult.service.debug.BatchDebugFilter;
+import fr.enimaloc.catapult.service.debug.DebugRecording;
 import fr.enimaloc.catapult.service.minecraft.MinecraftGateService;
 import fr.enimaloc.catapult.service.minecraft.MinecraftService;
 import fr.enimaloc.catapult.service.minecraft.MinecraftTokenService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -45,7 +49,17 @@ public class MinecraftPresenceGetter implements GameGetter {
     @Value("${minecraft.presence-max-age-seconds:120}")
     long presenceMaxAgeSeconds = 120;
 
+    static final String PRESENCE_OPERATION = "minecraft.presence";
+
     private volatile Map<String, MinecraftService.PresenceStatus> cycleCache = Map.of();
+
+    private DebugRecording debug = DebugRecording.OFF;
+
+    /** Records this class's grouped calls and incoming messages for the members in debug mode. */
+    @Autowired(required = false)
+    public void setDebugRecording(DebugRecording debug) {
+        this.debug = debug == null ? DebugRecording.OFF : debug;
+    }
 
     @Override
     public String name() {
@@ -61,8 +75,9 @@ public class MinecraftPresenceGetter implements GameGetter {
                 }
                 tokenService.getToken(account).ifPresent(token -> {
                     try {
-                        MinecraftService.PresenceList presences =
-                                minecraftService.updatePresence(token, MinecraftService.PresenceStatus.ONLINE);
+                        MinecraftService.PresenceList presences = debug.batch(PRESENCE_OPERATION,
+                                membersOf(account), BatchDebugFilter::minecraftPresence,
+                                () -> minecraftService.updatePresence(token, MinecraftService.PresenceStatus.ONLINE));
                         Instant staleBefore = Instant.now().minusSeconds(presenceMaxAgeSeconds);
                         for (MinecraftService.PresenceList.Presence presence : presences.presence()) {
                             if (presence.lastUpdated() != null && presence.lastUpdated().isBefore(staleBefore)) {
@@ -78,6 +93,26 @@ public class MinecraftPresenceGetter implements GameGetter {
             }
             cycleCache = Map.copyOf(cache);
         });
+    }
+
+    /**
+     * The members befriended by {@code account}, known to its presence list by their profile id. Looked up only
+     * when someone is in debug mode: otherwise the poll does exactly what it did without it.
+     */
+    private List<DebugRecording.Member> membersOf(MinecraftServiceAccount account) {
+        if (!debug.anyMemberInDebug()) {
+            return List.of();
+        }
+        try {
+            return linkRepository.findByServiceAccount(account).stream()
+                    .filter(link -> link.getUser() != null && link.getMinecraftProfileId() != null)
+                    .map(link -> new DebugRecording.Member(link.getUser().getId(), link.getMinecraftProfileId()))
+                    .toList();
+        } catch (RuntimeException e) {
+            // the presence call goes on, unrecorded
+            log.warn("Could not list the members of {} for the debug recording: {}", account.getLabel(), e.toString());
+            return List.of();
+        }
     }
 
     public void clearCycleCache() {

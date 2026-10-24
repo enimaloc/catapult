@@ -9,10 +9,13 @@ import fr.enimaloc.catapult.domain.minecraft.MinecraftServiceAccount;
 import fr.enimaloc.catapult.repository.binding.GetterConfigRepository;
 import fr.enimaloc.catapult.repository.minecraft.MinecraftFriendLinkRepository;
 import fr.enimaloc.catapult.repository.minecraft.MinecraftServiceAccountRepository;
+import fr.enimaloc.catapult.service.debug.BatchDebugFilter;
+import fr.enimaloc.catapult.service.debug.DebugRecording;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -24,6 +27,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.function.Supplier;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -47,6 +52,17 @@ public class MinecraftFriendService {
     private final ObjectMapper objectMapper;
     private final ChannelEventPublisher channelEventPublisher;
 
+    static final String FRIENDS_OPERATION = "minecraft.friends";
+    static final String MANAGE_FRIENDS_OPERATION = "minecraft.manage_friends";
+
+    private DebugRecording debug = DebugRecording.OFF;
+
+    /** Records this class's grouped calls and incoming messages for the members in debug mode. */
+    @Autowired(required = false)
+    public void setDebugRecording(DebugRecording debug) {
+        this.debug = debug == null ? DebugRecording.OFF : debug;
+    }
+
     @Transactional
     public MinecraftFriendLink enroll(UserAccount user, String pseudo) {
         MinecraftService.ProfileLookup profile = minecraftService.lookupProfile(pseudo)
@@ -61,7 +77,9 @@ public class MinecraftFriendService {
             Optional<String> existingToken = tokenService.getToken(existing.getServiceAccount());
             if (existingToken.isPresent()) {
                 try {
-                    minecraftService.removeFriend(existingToken.get(), null, existing.getMinecraftProfileId());
+                    friendsCall(existing.getUser(), existing.getMinecraftProfileId(),
+                            () -> minecraftService.removeFriend(existingToken.get(), null,
+                                    existing.getMinecraftProfileId()));
                 } catch (Exception e) {
                     log.warn("removeFriend en échec pour {}: {}", existing.getMinecraftProfileId(), e.getMessage());
                 }
@@ -77,7 +95,8 @@ public class MinecraftFriendService {
             if (token.isEmpty()) continue; // compte en échec d'auth : on tente le suivant
 
             try {
-                minecraftService.addFriend(token.get(), null, profile.dashedId());
+                friendsCall(user, profile.dashedId(),
+                        () -> minecraftService.addFriend(token.get(), null, profile.dashedId()));
             } catch (HttpClientErrorException e) {
                 if (isInviteRejected(e)) {
                     log.info("Invite Minecraft rejetée par le joueur (confidentialité) pour {} via {}",
@@ -170,7 +189,9 @@ public class MinecraftFriendService {
 
             MinecraftService.FriendsList friendsList;
             try {
-                friendsList = minecraftService.getFriends(token.get());
+                String accessToken = token.get();
+                friendsList = debug.batch(FRIENDS_OPERATION, membersOf(links), BatchDebugFilter::minecraftFriends,
+                        () -> minecraftService.getFriends(accessToken));
             } catch (Exception e) {
                 log.warn("getFriends en échec pour {}: {}", account.getLabel(), e.getMessage());
                 continue;
@@ -217,7 +238,8 @@ public class MinecraftFriendService {
                                 byIncomingProfileId.get(MinecraftService.normalizeProfileId(link.getMinecraftProfileId()));
                         if (incoming != null) {
                             try {
-                                minecraftService.addFriend(token.get(), null, link.getMinecraftProfileId());
+                                friendsCall(link.getUser(), link.getMinecraftProfileId(),
+                                        () -> minecraftService.addFriend(token.get(), null, link.getMinecraftProfileId()));
                                 link.setStatus(MinecraftFriendLink.Status.ACCEPTED);
                                 link.setAcceptedAt(Instant.now());
                                 log.info("Lien Minecraft accepté (retry après invite manuelle): {} via {}",
@@ -245,11 +267,30 @@ public class MinecraftFriendService {
         }
     }
 
+    /**
+     * Adding or removing one member answers with the service account's whole friend list: it is recorded for that
+     * member cut down to its own entries, like the sync's list.
+     */
+    private MinecraftService.FriendsList friendsCall(UserAccount member, String profileId,
+                                                     Supplier<MinecraftService.FriendsList> call) {
+        UUID userId = member == null ? null : member.getId();
+        return debug.batch(MANAGE_FRIENDS_OPERATION, List.of(new DebugRecording.Member(userId, profileId)),
+                BatchDebugFilter::minecraftFriends, call);
+    }
+
+    private static List<DebugRecording.Member> membersOf(List<MinecraftFriendLink> links) {
+        return links.stream()
+                .filter(link -> link.getUser() != null && link.getMinecraftProfileId() != null)
+                .map(link -> new DebugRecording.Member(link.getUser().getId(), link.getMinecraftProfileId()))
+                .toList();
+    }
+
     private void removeLink(MinecraftFriendLink link) {
         Optional<String> token = tokenService.getToken(link.getServiceAccount());
         if (token.isPresent()) {
             try {
-                minecraftService.removeFriend(token.get(), null, link.getMinecraftProfileId());
+                friendsCall(link.getUser(), link.getMinecraftProfileId(),
+                        () -> minecraftService.removeFriend(token.get(), null, link.getMinecraftProfileId()));
             } catch (Exception e) {
                 // best effort : le lien local est supprimé même si l'API refuse
                 log.warn("removeFriend en échec pour {}: {}", link.getMinecraftProfileId(), e.getMessage());

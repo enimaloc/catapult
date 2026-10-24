@@ -28,6 +28,8 @@ import java.util.concurrent.TimeUnit;
 final class EventSubConnections {
 
     static final String WS_URL = "wss://eventsub.wss.twitch.tv/ws";
+    /** Where the messages are recorded as received from, for the members in debug mode. */
+    static final URI WS_URI = URI.create(WS_URL);
     static final long DEFAULT_KEEPALIVE_SECONDS = 10L;
     private static final long MAX_RETRY_SECONDS = 60L;
     private static final double KEEPALIVE_GRACE = 1.5;
