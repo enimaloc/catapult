@@ -44,26 +44,54 @@ public class GameEventListener {
         // page needs to see it — ApiChannelActionsController only publishes for
         // user-initiated mutations, not for scheduler-triggered creations.
         channelEventPublisher.bindingUpserted(user.getId(), binding);
+        applyBinding(user, binding);
+    }
+
+    /**
+     * Puts the binding of the game the user plays on their channel, as a detection does: the no-game fallback when
+     * it is ignored, the incomplete fallback when it is INCOMPLETE, else the binding itself, or kept pending until
+     * the stream starts.
+     */
+    public void applyBinding(UserAccount user, GameBinding binding) {
+        apply(user, binding, true);
+    }
+
+    /**
+     * {@link #applyBinding} for a live channel only, when an admin game mapping changed its binding: nothing is
+     * done, and nothing kept pending, once the stream is offline.
+     *
+     * @return false when the stream was offline, so nothing was applied.
+     */
+    public boolean applyBindingIfLive(UserAccount user, GameBinding binding) {
+        return apply(user, binding, false);
+    }
+
+    private boolean apply(UserAccount user, GameBinding binding, boolean pendingWhenOffline) {
+        if (!pendingWhenOffline && !streamStateService.isLive(user)) {
+            log.debug("User {} no longer live — binding {} not applied", user.getId(), binding.getId());
+            return false;
+        }
 
         if (binding.isIgnored()) {
             log.debug("Binding is ignored — applying no-game fallback for user {}", user.getId());
             applyNoGameFallback(user);
-            return;
+            return true;
         }
 
         if (binding.getStatus() == GameBinding.Status.INCOMPLETE) {
             log.debug("Binding is INCOMPLETE — checking fallback for user {}", user.getId());
-            applyIncompleteFallback(user);
-            return;
+            return applyIncompleteFallback(user, pendingWhenOffline);
         }
 
         if (streamStateService.isLive(user)) {
             twitchService.updateChannel(user, binding);
-        } else {
-            streamStateService.storePending(user, binding);
-            log.debug("User {} not live — stored pending binding for game {}",
-                user.getId(), binding.getSourceName());
+            return true;
         }
+        if (!pendingWhenOffline) return false;
+        streamStateService.storePending(user, binding);
+        log.debug("User {} not live — stored pending binding for game {}",
+            user.getId(), binding.getSourceName());
+        return false;
     }
 
     @EventListener
@@ -138,7 +166,9 @@ public class GameEventListener {
         });
     }
 
-    private void applyIncompleteFallback(UserAccount user) {
+    /** @return false when the stream was offline and the fallback not applied (kept pending or not). */
+    private boolean applyIncompleteFallback(UserAccount user, boolean pendingWhenOffline) {
+        java.util.concurrent.atomic.AtomicBoolean applied = new java.util.concurrent.atomic.AtomicBoolean(true);
         userSettingsRepository.findById(user.getId()).ifPresent(settings -> {
             if (settings.getIncompleteFallbackTwitchGameId() == null
                     || settings.getIncompleteFallbackTwitchGameId().isBlank()) {
@@ -157,9 +187,12 @@ public class GameEventListener {
             if (streamStateService.isLive(user)) {
                 twitchService.updateChannel(user, fallback);
             } else {
+                applied.set(false);
+                if (!pendingWhenOffline) return;
                 streamStateService.storePending(user, fallback);
                 log.debug("User {} not live — stored incomplete fallback as pending", user.getId());
             }
         });
+        return applied.get();
     }
 }
