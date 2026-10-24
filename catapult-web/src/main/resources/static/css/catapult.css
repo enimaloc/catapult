@@ -1706,10 +1706,10 @@ mdui-select::part(menu) {
  * The tables below are one grid each, every row (header included) a subgrid of it: as separate grids,
  * the rows sized their action column to their own buttons, so no cell sat under its header.
  */
-.admin-table:has(> :is(.admin-dtdd-row, .admin-groups-row, .admin-whitelist-invite-row, .admin-whitelist-row, .admin-keys-row, .admin-minecraft-row, .admin-tw-row, .admin-meta-tag-row, .invite-row)) { display: grid; column-gap: 12px; }
-.admin-table:has(> :is(.admin-dtdd-row, .admin-groups-row, .admin-whitelist-invite-row, .admin-whitelist-row, .admin-keys-row, .admin-minecraft-row, .admin-tw-row, .admin-meta-tag-row, .invite-row)) > * { grid-column: 1 / -1; }
-.admin-table > :is(.admin-dtdd-row, .admin-groups-row, .admin-whitelist-invite-row, .admin-whitelist-row, .admin-keys-row, .admin-minecraft-row, .admin-tw-row, .admin-meta-tag-row, .invite-row) { grid-template-columns: subgrid; }
-.admin-table > :is(.admin-dtdd-row, .admin-groups-row, .admin-whitelist-invite-row, .admin-whitelist-row, .admin-keys-row, .admin-minecraft-row, .admin-tw-row, .admin-meta-tag-row, .invite-row) > .admin-row-actions { justify-content: flex-end; }
+.admin-table:has(> :is(.admin-dtdd-row, .admin-groups-row, .admin-whitelist-invite-row, .admin-whitelist-row, .admin-keys-row, .admin-minecraft-row, .admin-tw-row, .admin-meta-tag-row, .invite-row, .admin-gm-row, .admin-gm-missing-row)) { display: grid; column-gap: 12px; }
+.admin-table:has(> :is(.admin-dtdd-row, .admin-groups-row, .admin-whitelist-invite-row, .admin-whitelist-row, .admin-keys-row, .admin-minecraft-row, .admin-tw-row, .admin-meta-tag-row, .invite-row, .admin-gm-row, .admin-gm-missing-row)) > * { grid-column: 1 / -1; }
+.admin-table > :is(.admin-dtdd-row, .admin-groups-row, .admin-whitelist-invite-row, .admin-whitelist-row, .admin-keys-row, .admin-minecraft-row, .admin-tw-row, .admin-meta-tag-row, .invite-row, .admin-gm-row, .admin-gm-missing-row) { grid-template-columns: subgrid; }
+.admin-table > :is(.admin-dtdd-row, .admin-groups-row, .admin-whitelist-invite-row, .admin-whitelist-row, .admin-keys-row, .admin-minecraft-row, .admin-tw-row, .admin-meta-tag-row, .invite-row, .admin-gm-row, .admin-gm-missing-row) > .admin-row-actions { justify-content: flex-end; }
 
 .admin-pagination {
     display: flex;
@@ -1958,6 +1958,31 @@ mdui-snackbar.broadcast-warning { --mdui-color-inverse-surface: var(--mdui-color
     .admin-dtdd-row > [data-label]::before { content: attr(data-label) " : "; color: var(--catapult-text-muted); }
     .admin-dtdd-row > .admin-dtdd-reason, .admin-dtdd-row > .admin-row-actions { grid-column: 1 / -1; }
     .admin-dtdd-row > .admin-cell { white-space: normal; }
+}
+
+/* The admin game mappings tab. */
+.admin-gm-hint { margin: 0 0 16px; }
+.admin-gm-missing-header { margin-top: 24px; }
+.admin-gm-row, .admin-table:has(> .admin-gm-row) { grid-template-columns: 7.5rem minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr) 5.5rem 9rem auto; }
+.admin-gm-missing-row, .admin-table:has(> .admin-gm-missing-row) { grid-template-columns: 7.5rem minmax(0, 1fr) minmax(0, 2fr) 6rem auto; }
+.admin-gm-labels { min-width: 0; overflow-wrap: anywhere; }
+.admin-gm-row > .admin-member-id { display: flex; flex-direction: column; }
+.admin-gm-form { display: flex; flex-direction: column; gap: 12px; min-width: min(560px, 100%); }
+.admin-gm-form [hidden] { display: none; }
+.admin-gm-search { display: flex; flex-direction: column; gap: 4px; }
+.admin-gm-suggestions, .admin-gm-category-results { max-height: 220px; overflow-y: auto; padding: 0; }
+.admin-gm-override { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 8px 12px 12px; border: 1px solid var(--catapult-border); border-radius: 12px; }
+.admin-gm-override legend { padding: 0 4px; color: var(--catapult-text-muted); }
+.admin-gm-switch { display: flex; align-items: center; gap: 12px; }
+.admin-gm-choices { display: flex; flex-wrap: wrap; gap: 0 16px; }
+.admin-gm-error { margin: 0; color: rgb(var(--mdui-color-error)); }
+.admin-gm-result { margin: 0; color: var(--catapult-text-secondary); }
+@media (max-width: 650px) {
+    .admin-gm-row, .admin-table:has(> .admin-gm-row),
+    .admin-gm-missing-row, .admin-table:has(> .admin-gm-missing-row) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .admin-gm-row > [data-label]::before, .admin-gm-missing-row > [data-label]::before { content: attr(data-label) " : "; color: var(--catapult-text-muted); }
+    .admin-gm-row > .admin-row-actions, .admin-gm-missing-row > .admin-row-actions { grid-column: 1 / -1; }
+    .admin-gm-row > .admin-cell, .admin-gm-missing-row > .admin-cell { white-space: normal; }
 }
 
 /* The admin Groups tab. */
