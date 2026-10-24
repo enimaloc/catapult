@@ -83,7 +83,8 @@ class CommonDtoContractTest {
         when(environment.getActiveProfiles()).thenReturn(new String[0]);
         ApiAdminMembersController controller = new ApiAdminMembersController(accounts, streams,
                 mock(AccountService.class), mock(BotToggleService.class), mock(AdminMigrationService.class),
-                environment, mock(UserFlagRepository.class), mock(UserGroupRepository.class));
+                environment, mock(UserFlagRepository.class), mock(UserGroupRepository.class),
+                mock(fr.enimaloc.catapult.service.debug.MemberDebugService.class));
 
         AdminMembersPage produced = controller.page(0, null);
         String json = JSON.writeValueAsString(produced);

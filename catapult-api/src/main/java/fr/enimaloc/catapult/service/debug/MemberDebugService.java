@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.debug;
 
+import fr.enimaloc.catapult.common.dto.admin.MemberDebugStateDto;
 import fr.enimaloc.catapult.domain.debug.MemberDebugSession;
 import fr.enimaloc.catapult.repository.debug.DebugExchangeRepository;
 import fr.enimaloc.catapult.repository.debug.MemberDebugSessionRepository;
@@ -12,6 +13,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.HashMap;
@@ -22,6 +24,9 @@ import java.util.UUID;
 /** Admin-driven switch of a member's debug mode, and the clearing of what was recorded. */
 @Service
 public class MemberDebugService {
+
+    /** How long a member's exchanges outlive the end of their debug mode; the purge job applies it. */
+    static final Duration RETENTION_AFTER_DISABLE = Duration.ofDays(30);
 
     private final MemberDebugSessionRepository sessions;
     private final DebugExchangeRepository exchanges;
@@ -106,5 +111,23 @@ public class MemberDebugService {
         }
         sessions.findByUserIdInAndActiveTrue(userIds).forEach(s -> result.put(s.getUserId(), s));
         return result;
+    }
+
+    /** The member's debug mode as the admin sees it; empty when it was never switched on. */
+    public Optional<MemberDebugStateDto> stateDto(UUID userId) {
+        return sessions.findById(userId).map(this::toDto);
+    }
+
+    /** {@link #activeStates} as DTOs. */
+    public Map<UUID, MemberDebugStateDto> activeStateDtos(Collection<UUID> userIds) {
+        Map<UUID, MemberDebugStateDto> result = new HashMap<>();
+        activeStates(userIds).forEach((id, session) -> result.put(id, toDto(session)));
+        return result;
+    }
+
+    private MemberDebugStateDto toDto(MemberDebugSession s) {
+        Instant purgeAt = s.getDisabledAt() == null ? null : s.getDisabledAt().plus(RETENTION_AFTER_DISABLE);
+        return new MemberDebugStateDto(s.isActive(), s.isRevealSecrets(), s.getEnabledAt(), s.getEnabledBy(),
+                s.getDisabledAt(), purgeAt, exchanges.countByUserId(s.getUserId()));
     }
 }

@@ -20,7 +20,7 @@ import java.util.UUID;
 @Component
 public class DebugPurgeJob {
 
-    private static final Duration RETENTION_AFTER_DISABLE = Duration.ofDays(30);
+    private static final Duration RETENTION_AFTER_DISABLE = MemberDebugService.RETENTION_AFTER_DISABLE;
 
     private final MemberDebugSessionRepository sessions;
     private final DebugExchangeRepository exchanges;

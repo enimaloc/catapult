@@ -39,14 +39,14 @@ public class MockMembers {
 
     MockMembers() {
         members.add(new AdminMemberDto(MockPresets.uuidOf("inactive"), null, null, null, null,
-                false, false, "INACTIVE", CREATED.minus(90, ChronoUnit.DAYS)));
+                false, false, "INACTIVE", CREATED.minus(90, ChronoUnit.DAYS), null));
         members.add(new AdminMemberDto(MockPresets.uuidOf("catapult_bot"), "99999999", "catapult_bot",
-                MockPresets.getDefaultAvatar(), null, true, true, "ACTIVE", CREATED.minus(365, ChronoUnit.DAYS)));
+                MockPresets.getDefaultAvatar(), null, true, true, "ACTIVE", CREATED.minus(365, ChronoUnit.DAYS), null));
         for (int i = 1; i <= FAKE_MEMBERS; i++) {
             UUID id = MockPresets.uuidOf("viewer%03d".formatted(i));
             SEEDED.add(id);
             members.add(new AdminMemberDto(id, String.valueOf(5_000_000 + i), "viewer%03d".formatted(i),
-                    MockPresets.getDefaultAvatar(), null, false, true, "ACTIVE", CREATED.minus(i, ChronoUnit.DAYS)));
+                    MockPresets.getDefaultAvatar(), null, false, true, "ACTIVE", CREATED.minus(i, ChronoUnit.DAYS), null));
         }
     }
 
@@ -62,7 +62,7 @@ public class MockMembers {
         int beforeSeeded = (int) members.stream().filter(m -> !SEEDED.contains(m.id())).count();
         members.add(beforeSeeded, new AdminMemberDto(channel.id(), channel.twitchId(), channel.twitchUsername(),
                 channel.profileImageUrl(), steamId, false, true, "ACTIVE",
-                CREATED.minus(beforeSeeded * 30L, ChronoUnit.DAYS)));
+                CREATED.minus(beforeSeeded * 30L, ChronoUnit.DAYS), null));
         live.put(channel.id(), channel.live());
     }
 
@@ -119,7 +119,7 @@ public class MockMembers {
 
     public synchronized void unlinkTwitch(UUID id) {
         update(id, m -> new AdminMemberDto(m.id(), null, null, null, m.steamId(), m.systemAccount(),
-                false, "INACTIVE", m.createdAt()));
+                false, "INACTIVE", m.createdAt(), m.debug()));
         live.remove(id);
     }
 
@@ -140,6 +140,6 @@ public class MockMembers {
 
     private static AdminMemberDto with(AdminMemberDto m, String steamId, boolean systemAccount, boolean botEnabled) {
         return new AdminMemberDto(m.id(), m.twitchId(), m.twitchUsername(), m.profileImageUrl(), steamId,
-                systemAccount, botEnabled, m.status(), m.createdAt());
+                systemAccount, botEnabled, m.status(), m.createdAt(), m.debug());
     }
 }
