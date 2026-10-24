@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
@@ -84,12 +85,17 @@ class AuthorizationConventionsTest {
     assertThat(violations).isEmpty();
   }
 
+  /**
+   * Every handler under {@code /api/channels/{...}} carries its own {@code @PreAuthorize}. A class-level one is not
+   * enough and is refused: it would also guard the controller's {@code @ExceptionHandler}s.
+   */
   @Test
   void channelRoutesAreAuthorized() throws ClassNotFoundException {
     List<String> handlers = new ArrayList<>();
     List<String> violations = new ArrayList<>();
     for (Class<?> type : scan(org.springframework.stereotype.Controller.class)) {
       boolean classRule = AnnotatedElementUtils.findMergedAnnotation(type, PreAuthorize.class) != null;
+      boolean channelController = false;
       for (Method method : type.getDeclaredMethods()) {
         RequestMapping mapping = AnnotatedElementUtils.findMergedAnnotation(method, RequestMapping.class);
         if (mapping == null
@@ -97,18 +103,22 @@ class AuthorizationConventionsTest {
             || !underChannel(type, mapping)) {
           continue;
         }
+        channelController = true;
         String name = type.getName() + "#" + method.getName();
         handlers.add(name);
-        if (!classRule && method.getAnnotation(PreAuthorize.class) == null) {
+        if (method.getAnnotation(PreAuthorize.class) == null) {
           violations.add(name + " has no @PreAuthorize");
         }
       }
+      if (channelController && classRule) {
+        violations.add(type.getName() + " has a class-level @PreAuthorize, which also guards its @ExceptionHandler");
+      }
     }
-    assertThat(handlers).as("handlers under /api/channels/{username}").isNotEmpty();
+    assertThat(handlers).as("handlers under /api/channels/{...}").isNotEmpty();
     assertThat(violations).isEmpty();
   }
 
-  /** {@code mapping}, joined to {@code type}'s own mapping, is under {@code /api/channels/{username}}. */
+  /** {@code mapping}, joined to {@code type}'s own mapping as Spring joins them, is under {@code /api/channels/{...}}. */
   private static boolean underChannel(Class<?> type, RequestMapping mapping) {
     RequestMapping classMapping = AnnotatedElementUtils.findMergedAnnotation(type, RequestMapping.class);
     List<String> prefixes = classMapping == null || classMapping.path().length == 0
@@ -117,13 +127,34 @@ class AuthorizationConventionsTest {
     List<String> suffixes = mapping.path().length == 0 ? List.of("") : List.of(mapping.path());
     for (String prefix : prefixes) {
       for (String suffix : suffixes) {
-        String path = prefix + suffix;
-        if (path.equals("/api/channels/{username}") || path.startsWith("/api/channels/{username}/")) {
+        if (join(prefix, suffix).startsWith("/api/channels/{")) {
           return true;
         }
       }
     }
     return false;
+  }
+
+  /** {@code prefix} then {@code suffix}, each led by exactly one slash, as Spring combines a class and method path. */
+  static String join(String prefix, String suffix) {
+    return slashed(prefix) + slashed(suffix);
+  }
+
+  private static String slashed(String path) {
+    String trimmed = path.replaceAll("/+$", "");
+    return trimmed.isEmpty() || trimmed.startsWith("/") ? trimmed : "/" + trimmed;
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+      "/api/channels/{username},/logs,/api/channels/{username}/logs",
+      "/api/channels/{username},logs,/api/channels/{username}/logs",
+      "api/channels/{username}/,logs,/api/channels/{username}/logs",
+      "'',/api/channels/{login},/api/channels/{login}",
+      "/api/channels/{username},'',/api/channels/{username}"
+  })
+  void pathsJoinAsSpringJoinsThem(String prefix, String suffix, String joined) {
+    assertThat(join(prefix, suffix)).isEqualTo(joined);
   }
 
   private static void check(Object where, PreAuthorize annotation, List<String> out) {
