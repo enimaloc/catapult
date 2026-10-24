@@ -39,6 +39,7 @@ public class RaidRestoreGameService {
     private final GameStateService gameStateService;
     private final BindingService bindingService;
     private final TwitchService twitchService;
+    private final CustomBindingActivations customBindingActivations;
 
     /** Channels whose game a raid put back: no "no game" fallback for them until released. In memory, like the game state. */
     private final Set<UUID> holdingNoGameFallback = ConcurrentHashMap.newKeySet();
@@ -55,6 +56,11 @@ public class RaidRestoreGameService {
                 .filter(m -> m >= MIN_MINUTES)
                 .orElse(null);
         if (minutes == null || !gate.isAvailableReadOnly(user)) return;
+        if (customBindingActivations.active(user).isPresent()) {
+            // The channel is on the streamer's custom binding, not on the "no game" category: nothing to put back
+            log.debug("Raid by user {}: custom binding active, game not put back", user.getId());
+            return;
+        }
 
         Optional<DetectedGame> recent = gameStateService.recentlyDetectedGame(user, Duration.ofMinutes(minutes));
         Optional<GameBinding> binding = recent

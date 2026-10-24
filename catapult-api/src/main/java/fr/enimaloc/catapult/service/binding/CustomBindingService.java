@@ -56,7 +56,7 @@ public class CustomBindingService {
     public static final int MAX_NAME_LENGTH = 40;
     static final int MAX_TW_LENGTH = 40;
     /** {@link GameBinding#getSourceName()} prefix of the transient binding a custom binding is applied through. */
-    public static final String SOURCE_NAME_PREFIX = "custom:";
+    public static final String SOURCE_NAME_PREFIX = CustomBinding.SOURCE_NAME_PREFIX;
 
     public enum ActivationResult {
         /** Twitch accepted the category: the binding is now the active one. */
@@ -214,7 +214,7 @@ public class CustomBindingService {
     /** {@code binding} sent to Twitch, the bot's state checked first so a paused bot is not taken for a Twitch problem. */
     private ActivationResult applyToTwitch(UserAccount user, CustomBinding binding) {
         if (!botActive(user)) return ActivationResult.BOT_DISABLED;
-        ChannelUpdateOutcome outcome = twitchService.updateChannelReporting(user, toGameBinding(user, binding));
+        ChannelUpdateOutcome outcome = twitchService.updateChannelReporting(user, binding.toGameBinding(user));
         return switch (outcome) {
             case APPLIED -> ActivationResult.APPLIED;
             // Only the bot's state skips a custom binding's update: it changed since the check above
@@ -233,19 +233,6 @@ public class CustomBindingService {
     private boolean twitchUnusable(UserAccount user) {
         return oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH).isEmpty()
                 || userAccountRepository.findById(user.getId()).map(account -> !account.isBotEnabled()).orElse(true);
-    }
-
-    static GameBinding toGameBinding(UserAccount user, CustomBinding binding) {
-        GameBinding applied = new GameBinding();
-        applied.setUser(user);
-        applied.setSourceType(GameBinding.SourceType.MANUAL);
-        applied.setStatus(GameBinding.Status.MANUAL);
-        applied.setSourceName(SOURCE_NAME_PREFIX + binding.getName());
-        applied.setTwitchGameId(binding.getTwitchGameId());
-        applied.setTwitchGameName(binding.getTwitchGameName());
-        applied.getCcls().addAll(binding.getCcls());
-        applied.getTws().addAll(binding.getTws());
-        return applied;
     }
 
     private void requireEnabled(UserAccount user) {

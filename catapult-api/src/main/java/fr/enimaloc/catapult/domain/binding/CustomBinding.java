@@ -19,6 +19,9 @@ import java.util.UUID;
 @Setter
 public class CustomBinding {
 
+    /** {@link GameBinding#getSourceName()} prefix of the transient binding a custom binding is applied through. */
+    public static final String SOURCE_NAME_PREFIX = "custom:";
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
@@ -57,4 +60,22 @@ public class CustomBinding {
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
+
+    /**
+     * The transient (never saved) {@link GameBinding} this binding is sent to Twitch through, like the detection's
+     * fallbacks. Here rather than in a service so the activation and the detection path build it alike, without
+     * depending on each other.
+     */
+    public GameBinding toGameBinding(UserAccount owner) {
+        GameBinding applied = new GameBinding();
+        applied.setUser(owner);
+        applied.setSourceType(GameBinding.SourceType.MANUAL);
+        applied.setStatus(GameBinding.Status.MANUAL);
+        applied.setSourceName(SOURCE_NAME_PREFIX + name);
+        applied.setTwitchGameId(twitchGameId);
+        applied.setTwitchGameName(twitchGameName);
+        applied.getCcls().addAll(ccls);
+        applied.getTws().addAll(tws);
+        return applied;
+    }
 }
