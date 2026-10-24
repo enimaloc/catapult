@@ -1,13 +1,24 @@
 package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.api.admin.ApiAdminDtddMappingController;
+import fr.enimaloc.catapult.api.admin.ApiAdminExperimentsController;
+import fr.enimaloc.catapult.api.admin.ApiAdminFlagsController;
 import fr.enimaloc.catapult.api.admin.ApiAdminMembersController;
 import fr.enimaloc.catapult.api.channel.ApiTwitchatWidgetController;
 import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
 import fr.enimaloc.catapult.common.dto.admin.DtddProposalDto;
+import fr.enimaloc.catapult.common.dto.admin.FlagKeyDto;
 import fr.enimaloc.catapult.common.dto.channel.ConfigResponse;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentAssignmentsDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentRebalanceDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentSettingsDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentSummaryDto;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.dtdd.DtddMappingProposal;
+import fr.enimaloc.catapult.domain.experiment.Experiment;
+import fr.enimaloc.catapult.domain.experiment.ExperimentVariant;
+import fr.enimaloc.catapult.repository.experiment.ExperimentOverrideRepository;
+import fr.enimaloc.catapult.repository.experiment.ExperimentRepository;
 import fr.enimaloc.catapult.domain.twitchat.TwitchatWidgetSettings;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.account.UserFlagRepository;
@@ -126,5 +137,100 @@ class CommonDtoContractTest {
 
         assertThat(roundTrip(produced, ConfigResponse.class))
                 .isEqualTo(new ConfigResponse("127.0.0.1", 4455, null, "beta"));
+    }
+
+    @Test
+    void adminExperiments_readAsSummaryAndSettingsDtos() {
+        ExperimentRepository experiments = mock(ExperimentRepository.class);
+        ExperimentOverrideRepository overrides = mock(ExperimentOverrideRepository.class);
+        Experiment experiment = new Experiment();
+        experiment.setId(UUID.randomUUID());
+        experiment.setKey("new-dashboard");
+        experiment.setName("New dashboard");
+        ExperimentVariant control = new ExperimentVariant();
+        control.setId(UUID.randomUUID());
+        control.setKey("old");
+        control.setName("Old");
+        control.setControl(true);
+        experiment.setVariants(new java.util.ArrayList<>(List.of(control)));
+        when(experiments.findAll()).thenReturn(List.of(experiment));
+        when(experiments.findById(experiment.getId())).thenReturn(Optional.of(experiment));
+        when(overrides.findByExperimentOrderByPriorityAsc(experiment)).thenReturn(List.of());
+        ApiAdminExperimentsController controller = new ApiAdminExperimentsController(experiments,
+                null, null, null, null, null, overrides, null, null, null, null, null,
+                mock(fr.enimaloc.catapult.service.experiment.ForcedMembers.class));
+
+        List<ExperimentSummaryDto> summaries = controller.list();
+        ExperimentSettingsDto settings = controller.settings(experiment.getId());
+
+        assertThat(JSON.readValue(JSON.writeValueAsString(summaries), new TypeReference<List<ExperimentSummaryDto>>() {}))
+                .isEqualTo(summaries);
+        assertThat(roundTrip(settings, ExperimentSettingsDto.class)).isEqualTo(settings);
+        assertThat(settings.variants().getFirst().control()).isTrue();
+    }
+
+    @Test
+    void adminFlags_readAsFlagKeyDtos() {
+        UserFlagRepository flags = mock(UserFlagRepository.class);
+        when(flags.findDistinctKeyValues()).thenReturn(List.of(
+                new Object[] {"beta", "on"}, new Object[] {"tester", null}));
+
+        List<FlagKeyDto> produced = new ApiAdminFlagsController(flags).list();
+
+        assertThat(JSON.readValue(JSON.writeValueAsString(produced), new TypeReference<List<FlagKeyDto>>() {}))
+                .containsExactly(new FlagKeyDto("beta", List.of("on")), new FlagKeyDto("tester", List.of()));
+    }
+
+    @Test
+    void experimentAssignments_readAsExperimentAssignmentsDto() {
+        Experiment experiment = new Experiment();
+        experiment.setId(UUID.randomUUID());
+        ExperimentVariant control = new ExperimentVariant();
+        control.setId(UUID.randomUUID());
+        control.setKey("old");
+        UserAccount member = new UserAccount();
+        member.setId(UUID.randomUUID());
+        member.setTwitchUsername("viewer");
+        fr.enimaloc.catapult.domain.experiment.ExperimentAssignment assignment =
+                new fr.enimaloc.catapult.domain.experiment.ExperimentAssignment();
+        assignment.setUser(member);
+        assignment.setVariant(control);
+        assignment.setAssignedAt(Instant.parse("2026-10-22T10:00:00Z"));
+        fr.enimaloc.catapult.repository.experiment.ExperimentAssignmentRepository assignments =
+                mock(fr.enimaloc.catapult.repository.experiment.ExperimentAssignmentRepository.class);
+        ExperimentRepository experiments = mock(ExperimentRepository.class);
+        ExperimentOverrideRepository overrides = mock(ExperimentOverrideRepository.class);
+        when(experiments.findById(experiment.getId())).thenReturn(Optional.of(experiment));
+        when(assignments.searchAll(org.mockito.ArgumentMatchers.eq(experiment), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(assignment),
+                        org.springframework.data.domain.PageRequest.of(0, 20), 41));
+        when(assignments.countByVariant(experiment)).thenReturn(java.util.Collections.singletonList(
+                new Object[] {control.getId(), 41L}));
+        experiment.setVariants(new java.util.ArrayList<>(List.of(control)));
+        when(overrides.findByExperimentOrderByPriorityAsc(experiment)).thenReturn(List.of());
+        ApiAdminExperimentsController controller = new ApiAdminExperimentsController(experiments,
+                null, null, assignments, null, null, overrides, null, null, null, null, null,
+                mock(fr.enimaloc.catapult.service.experiment.ForcedMembers.class));
+
+        ExperimentAssignmentsDto produced = controller.assignments(experiment.getId(), null, null, 0);
+
+        ExperimentAssignmentsDto read = roundTrip(produced, ExperimentAssignmentsDto.class);
+        assertThat(read).isEqualTo(produced);
+        assertThat(read.page().content()).singleElement().satisfies(a -> {
+            assertThat(a.twitchUsername()).isEqualTo("viewer");
+            assertThat(a.assignedAt()).isEqualTo(Instant.parse("2026-10-22T10:00:00Z"));
+        });
+        assertThat(read.page().totalElements()).isEqualTo(41);
+        assertThat(read.page().totalPages()).isEqualTo(3);
+        assertThat(read.counts()).containsEntry(control.getId(), 41L);
+    }
+
+    @Test
+    void experimentRebalance_readsAsExperimentRebalanceDto() {
+        ExperimentRebalanceDto produced = new ExperimentRebalanceDto(List.of(
+                new ExperimentRebalanceDto.Move(UUID.randomUUID(), UUID.randomUUID(), 100)));
+
+        assertThat(roundTrip(produced, ExperimentRebalanceDto.class)).isEqualTo(produced);
+        assertThat(roundTrip(new ExperimentRebalanceDto(List.of()), ExperimentRebalanceDto.class).moves()).isEmpty();
     }
 }

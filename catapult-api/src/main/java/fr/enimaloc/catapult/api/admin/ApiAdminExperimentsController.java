@@ -2,6 +2,17 @@ package fr.enimaloc.catapult.api.admin;
 
 import fr.enimaloc.catapult.common.dto.admin.AssignRequest;
 import fr.enimaloc.catapult.common.dto.admin.NpsStat;
+import fr.enimaloc.catapult.common.dto.admin.AdminPage;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentAssignmentDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentAssignmentsDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentOverrideDto;
+import fr.enimaloc.catapult.common.dto.experiment.MoveAssignmentRequest;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentRebalanceDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentRuleDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentSettingsDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentStatus;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentSummaryDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentVariantDto;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.experiment.Experiment;
 import fr.enimaloc.catapult.domain.experiment.ExperimentAssignment;
@@ -20,8 +31,11 @@ import fr.enimaloc.catapult.repository.experiment.ExperimentRepository;
 import fr.enimaloc.catapult.repository.experiment.ExperimentVariantRepository;
 import fr.enimaloc.catapult.service.StatisticsService;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
+import fr.enimaloc.catapult.service.experiment.ExperimentRebalancer;
+import fr.enimaloc.catapult.service.experiment.ForcedMembers;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -31,12 +45,18 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Locale;
+import java.util.Set;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -59,17 +79,40 @@ public class ApiAdminExperimentsController {
     private final ExperimentVariantRepository variantRepository;
     private final ExperimentService experimentService;
     private final ApplicationEventPublisher eventPublisher;
+    private final ExperimentRebalancer rebalancer;
+    private final ForcedMembers forcedMembers;
 
     @Transactional(readOnly = true)
     @GetMapping
-    public List<Experiment> list() {
-        List<Experiment> all = experimentRepository.findAll();
-        // Force-load lazy collections inside the transaction so Jackson can serialize after it closes
-        all.forEach(e -> {
-            e.getRules().size();
-            e.getVariants().size();
-        });
-        return all;
+    public List<ExperimentSummaryDto> list() {
+        return experimentRepository.findAll().stream()
+                .sorted(Comparator.comparing(Experiment::getKey))
+                .map(e -> new ExperimentSummaryDto(e.getId(), e.getKey(), e.getName(),
+                        ExperimentStatus.valueOf(e.getStatus().name()), variantDtos(e), e.getRules().size()))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    @GetMapping("/{id}/settings")
+    public ExperimentSettingsDto settings(@PathVariable UUID id) {
+        Experiment exp = findOrThrow(id);
+        return new ExperimentSettingsDto(exp.getId(), exp.getKey(), exp.getName(), exp.getDescription(),
+                ExperimentStatus.valueOf(exp.getStatus().name()), variantDtos(exp),
+                exp.getRules().stream().map(r -> new ExperimentRuleDto(r.getId(), r.getRuleType().name(),
+                        r.getPercentage(), r.getAttributeKey(), r.getAttributeOperator(), r.getAttributeValue())).toList(),
+                overrideRepository.findByExperimentOrderByPriorityAsc(exp).stream().map(o -> new ExperimentOverrideDto(
+                        o.getId(), o.getOverrideType().name(), o.getAction().name(), o.getPriority(),
+                        o.getTargetUser() == null ? null : o.getTargetUser().getTwitchUsername(),
+                        o.getAttributeKey(), o.getAttributeOp(), o.getAttributeVal(),
+                        o.getTargetVariant() == null ? null : o.getTargetVariant().getId())).toList());
+    }
+
+    /** Variants in creation order (internalId); the sort is stable, so ties keep the entity's order. */
+    private static List<ExperimentVariantDto> variantDtos(Experiment exp) {
+        return exp.getVariants().stream()
+                .sorted(Comparator.comparingInt(ExperimentVariant::getInternalId))
+                .map(v -> new ExperimentVariantDto(v.getId(), v.getKey(), v.getName(), v.getWeight(), v.isControl()))
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -135,8 +178,15 @@ public class ApiAdminExperimentsController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void activate(@PathVariable UUID id) {
         Experiment exp = findOrThrow(id);
+        if (exp.getStatus() == Experiment.Status.PAUSED) {
+            // Resuming is not a first start: keep startedAt and stay silent, as the activation listeners
+            // (metrics, mock data seeding) count and seed first starts only.
+            exp.setStatus(Experiment.Status.ACTIVE);
+            experimentRepository.save(exp);
+            return;
+        }
         if (exp.getStatus() != Experiment.Status.DRAFT) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Experiment not in DRAFT status");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Experiment not in DRAFT or PAUSED status");
         }
         exp.setStatus(Experiment.Status.ACTIVE);
         exp.setStartedAt(Instant.now());
@@ -193,13 +243,36 @@ public class ApiAdminExperimentsController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updateWeights(@PathVariable UUID id, @RequestBody Map<UUID, Integer> weights) {
         Experiment exp = findOrThrow(id);
+        if (exp.getStatus() == Experiment.Status.ENDED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Experiment ended");
+        }
+        Map<UUID, Integer> effective = effectiveWeights(exp, weights);
         for (ExperimentVariant v : exp.getVariants()) {
-            Integer weight = weights.get(v.getId());
-            if (weight != null) {
-                v.setWeight(Math.max(0, weight));
+            if (weights.get(v.getId()) != null) {
+                v.setWeight(effective.get(v.getId()));
                 variantRepository.save(v);
             }
         }
+        // Same transaction: the members follow the new weights, moving only those a variant now has too many of.
+        rebalancer.apply(exp, rebalancer.plan(exp, effective));
+    }
+
+    /** What saving these weights would move, without saving or moving anything. */
+    @PostMapping("/{id}/variants/weights/preview")
+    @Transactional(readOnly = true)
+    public ExperimentRebalanceDto previewWeights(@PathVariable UUID id, @RequestBody Map<UUID, Integer> weights) {
+        Experiment exp = findOrThrow(id);
+        return rebalancer.plan(exp, effectiveWeights(exp, weights)).toDto();
+    }
+
+    /** Each variant's weight once {@code proposed} is applied: clamped at 0, unlisted variants unchanged. */
+    private static Map<UUID, Integer> effectiveWeights(Experiment exp, Map<UUID, Integer> proposed) {
+        Map<UUID, Integer> effective = new HashMap<>();
+        for (ExperimentVariant v : exp.getVariants()) {
+            Integer weight = proposed.get(v.getId());
+            effective.put(v.getId(), weight != null ? Math.max(0, weight) : v.getWeight());
+        }
+        return effective;
     }
 
     @PostMapping("/{id}/rules")
@@ -265,6 +338,10 @@ public class ApiAdminExperimentsController {
             if (tv.isEmpty()) {
                 throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Variant not found");
             }
+            // A variant of another experiment is as good as unknown: forcing it would leak across experiments.
+            if (tv.get().getExperiment() == null || !tv.get().getExperiment().getId().equals(exp.getId())) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Variant not found");
+            }
             override.setTargetVariant(tv.get());
         }
         overrideRepository.save(override);
@@ -280,6 +357,106 @@ public class ApiAdminExperimentsController {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
         overrideRepository.delete(override);
+    }
+
+    private static final int PARTICIPANTS_PAGE_SIZE = 20;
+
+    /**
+     * An experiment's participants, one page at a time (there can be many), plus how many each variant holds
+     * whatever the filter. {@code variant} narrows to one variant, {@code q} to usernames containing it.
+     */
+    @Transactional(readOnly = true)
+    @GetMapping("/{id}/assignments")
+    public ExperimentAssignmentsDto assignments(@PathVariable UUID id,
+                                                @RequestParam(required = false) UUID variant,
+                                                @RequestParam(required = false) String q,
+                                                @RequestParam(defaultValue = "0") int page) {
+        Experiment exp = findOrThrow(id);
+        if (variant != null) {
+            findVariantOf(exp, variant);
+        }
+        PageRequest paging = PageRequest.of(Math.max(0, page), PARTICIPANTS_PAGE_SIZE);
+        String needle = q == null ? "" : q.trim().toLowerCase(Locale.ROOT);
+        Page<ExperimentAssignment> found;
+        if (needle.isEmpty()) {
+            found = variant == null ? assignmentRepository.searchAll(exp, paging)
+                    : assignmentRepository.searchByVariant(exp, variant, paging);
+        } else {
+            String pattern = "%" + needle.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
+            found = variant == null ? assignmentRepository.searchByUsername(exp, pattern, paging)
+                    : assignmentRepository.searchByVariantAndUsername(exp, variant, pattern, paging);
+        }
+
+        Set<UUID> forced = forcedMembers.userIds(exp);
+        List<ExperimentAssignmentDto> rows = found.getContent().stream()
+                .map(a -> new ExperimentAssignmentDto(a.getUser().getId(), a.getUser().getTwitchUsername(),
+                        a.getVariant().getId(), a.getAssignedAt(), forced.contains(a.getUser().getId())))
+                .toList();
+
+        Map<UUID, Long> counts = new HashMap<>();
+        exp.getVariants().forEach(v -> counts.put(v.getId(), 0L));
+        for (Object[] row : assignmentRepository.countByVariant(exp)) {
+            counts.put((UUID) row[0], ((Number) row[1]).longValue());
+        }
+        return new ExperimentAssignmentsDto(
+                new AdminPage<>(rows, found.getNumber(), found.getTotalPages(), found.getTotalElements()), counts);
+    }
+
+    /**
+     * Moves a participant to another variant: a USER FORCE_VARIANT override keeps them there on later
+     * evaluations, and their assignment is corrected now so the list shows it at once.
+     */
+    @PostMapping("/{id}/assignments/{userId}/variant")
+    @Transactional
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void moveAssignment(@PathVariable UUID id, @PathVariable UUID userId,
+                               @RequestBody MoveAssignmentRequest body) {
+        Experiment exp = findOrThrow(id);
+        if (body == null || body.variantId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing variantId");
+        }
+        if (exp.getStatus() == Experiment.Status.ENDED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Experiment ended");
+        }
+        UserAccount user = userAccountRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        ExperimentVariant target = findVariantOf(exp, body.variantId());
+
+        List<ExperimentOverride> mine = overrideRepository.findByExperimentOrderByPriorityAsc(exp).stream()
+                .filter(o -> o.getOverrideType() == ExperimentOverride.OverrideType.USER
+                        && o.getTargetUser() != null && o.getTargetUser().getId().equals(userId))
+                .toList();
+        // Keep one override (preferably the FORCE_VARIANT one) and drop the others: a lower-priority
+        // FORCE_EXCLUDE left behind would still win over the move.
+        ExperimentOverride keep = mine.stream()
+                .filter(o -> o.getAction() == ExperimentOverride.OverrideAction.FORCE_VARIANT).findFirst()
+                .orElse(mine.isEmpty() ? null : mine.getFirst());
+        mine.stream().filter(o -> o != keep).forEach(overrideRepository::delete);
+        ExperimentOverride override = keep != null ? keep : new ExperimentOverride();
+        override.setExperiment(exp);
+        override.setOverrideType(ExperimentOverride.OverrideType.USER);
+        override.setTargetUser(user);
+        override.setAction(ExperimentOverride.OverrideAction.FORCE_VARIANT);
+        override.setTargetVariant(target);
+        override.setPriority(0);
+        overrideRepository.save(override);
+
+        ExperimentAssignment assignment = assignmentRepository.findByExperimentAndUser(exp, user)
+                .orElseGet(() -> {
+                    ExperimentAssignment created = new ExperimentAssignment();
+                    created.setExperiment(exp);
+                    created.setUser(user);
+                    return created;
+                });
+        assignment.setVariant(target);
+        assignmentRepository.save(assignment);
+    }
+
+    /** A variant of this experiment; unknown or belonging to another experiment is a 404. */
+    private ExperimentVariant findVariantOf(Experiment exp, UUID variantId) {
+        return variantRepository.findById(variantId)
+                .filter(v -> v.getExperiment() != null && v.getExperiment().getId().equals(exp.getId()))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Variant not found"));
     }
 
     @PostMapping("/{id}/reassign")

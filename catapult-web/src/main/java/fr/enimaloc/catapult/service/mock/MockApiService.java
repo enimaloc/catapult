@@ -11,7 +11,14 @@ import fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody;
 import fr.enimaloc.catapult.common.dto.admin.DtddProposalDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.FlagKeyDto;
 import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentAssignmentsDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentOverrideRequest;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentRebalanceDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentRuleRequest;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentSettingsDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider;
 import fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto;
 import fr.enimaloc.catapult.common.dto.admin.TwDefinitionDto;
@@ -131,6 +138,8 @@ public class MockApiService implements ApiService {
     private final MockDtddProposalsStore dtddProposals = new MockDtddProposalsStore();
     /** Application-wide: the groups an admin creates are the same for every mock session. */
     private final MockGroupsStore groups = new MockGroupsStore();
+    /** Application-wide: the experiments an admin edits are the same for every mock session. */
+    private final MockExperimentsStore experiments = new MockExperimentsStore();
     /** Application-wide: the whitelist and its invitations are the same for every mock session. */
     private final MockWhitelistStore whitelist = new MockWhitelistStore();
     /** Application-wide: the shared Steam and DTDD keys are the same for every mock session. */
@@ -624,6 +633,85 @@ public class MockApiService implements ApiService {
                 .filter(m -> m.twitchUsername() != null && m.twitchUsername().equalsIgnoreCase(wanted))
                 .map(m -> m.id()).findFirst().orElse(null);
         return memberId == null ? 404 : groups.addMember(id, memberId);
+    }
+
+    @Override
+    public List<ExperimentSummaryDto> adminExperiments() {
+        log.trace("adminExperiments()");
+        return experiments.list();
+    }
+
+    @Override
+    public ExperimentSettingsDto adminExperiment(UUID id) {
+        log.trace("adminExperiment({})", id);
+        return experiments.find(id).orElse(null);
+    }
+
+    @Override
+    public List<FlagKeyDto> adminFlagKeys() {
+        log.trace("adminFlagKeys()");
+        return targeting.flagKeys();
+    }
+
+    @Override
+    public int adminExperimentAction(UUID id, String action) {
+        log.trace("adminExperimentAction({}, {})", id, action);
+        return experiments.action(id, action);
+    }
+
+    @Override
+    public ExperimentRebalanceDto adminExperimentWeightsPreview(UUID id, Map<UUID, Integer> weights) {
+        log.trace("adminExperimentWeightsPreview({})", id);
+        return experiments.previewWeights(id, weights).orElse(null);
+    }
+
+    @Override
+    public int adminExperimentWeights(UUID id, Map<UUID, Integer> weights) {
+        log.trace("adminExperimentWeights({})", id);
+        return experiments.setWeights(id, weights);
+    }
+
+    @Override
+    public int adminAddExperimentRule(UUID id, ExperimentRuleRequest rule) {
+        log.trace("adminAddExperimentRule({})", id);
+        return experiments.addRule(id, rule);
+    }
+
+    @Override
+    public int adminDeleteExperimentRule(UUID id, UUID ruleId) {
+        log.trace("adminDeleteExperimentRule({}, {})", id, ruleId);
+        return experiments.deleteRule(id, ruleId);
+    }
+
+    @Override
+    public int adminAddExperimentOverride(UUID id, ExperimentOverrideRequest override) {
+        log.trace("adminAddExperimentOverride({})", id);
+        boolean userKnown = false;
+        if ("USER".equals(override.overrideType())) {
+            AdminMembersPage page = memberPage();
+            String wanted = override.twitchUsername() == null ? "" : override.twitchUsername().trim();
+            userKnown = page != null && page.members().stream()
+                    .anyMatch(m -> m.twitchUsername() != null && m.twitchUsername().equalsIgnoreCase(wanted));
+        }
+        return experiments.addOverride(id, override, userKnown);
+    }
+
+    @Override
+    public int adminDeleteExperimentOverride(UUID id, UUID overrideId) {
+        log.trace("adminDeleteExperimentOverride({}, {})", id, overrideId);
+        return experiments.deleteOverride(id, overrideId);
+    }
+
+    @Override
+    public ExperimentAssignmentsDto adminExperimentAssignments(UUID id, UUID variantId, String q, int page) {
+        log.trace("adminExperimentAssignments({}, {}, {}, {})", id, variantId, q, page);
+        return experiments.assignments(id, variantId, q, page).orElse(null);
+    }
+
+    @Override
+    public int adminMoveExperimentAssignment(UUID id, UUID userId, UUID variantId) {
+        log.trace("adminMoveExperimentAssignment({}, {}, {})", id, userId, variantId);
+        return experiments.move(id, userId, variantId);
     }
 
     @Override

@@ -24,7 +24,7 @@ public class FlagResolver implements AttributeResolver {
     public AttributeValue resolve(UserAccount user, String key) {
         String flagKey = key.substring(PREFIX.length());
         return flagRepository.findByUserAndFlagKey(user, flagKey)
-            .map(f -> AttributeValue.text(f.getFlagValue()))
+            .map(f -> f.getFlagValue() == null ? AttributeValue.present() : AttributeValue.text(f.getFlagValue()))
             .orElse(AttributeValue.missing());
     }
 }

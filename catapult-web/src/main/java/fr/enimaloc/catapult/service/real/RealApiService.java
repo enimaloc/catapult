@@ -13,7 +13,15 @@ import fr.enimaloc.catapult.common.dto.admin.DtddProposalDto;
 import fr.enimaloc.catapult.common.dto.admin.ImpersonateRequest;
 import fr.enimaloc.catapult.common.dto.admin.ImpersonateResponse;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.FlagKeyDto;
 import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentAssignmentsDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentOverrideRequest;
+import fr.enimaloc.catapult.common.dto.experiment.MoveAssignmentRequest;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentRebalanceDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentRuleRequest;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentSettingsDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider;
 import fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminTwCreateBody;
@@ -112,6 +120,8 @@ public class RealApiService implements ApiService {
     private static final ParameterizedTypeReference<List<TwDefinitionDto>> TWS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<fr.enimaloc.catapult.common.dto.chatcommand.EnabledChatCommandDto>> ENABLED_COMMANDS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<GroupSummaryDto>> GROUPS = new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<List<ExperimentSummaryDto>> EXPERIMENTS = new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<List<FlagKeyDto>> FLAG_KEYS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<AdminPage<AdminNotificationDto>> ADMIN_NOTIFICATIONS = new ParameterizedTypeReference<>() {};
 
     private final ApiClient client;
@@ -666,6 +676,70 @@ public class RealApiService implements ApiService {
     @Override
     public int adminAddGroupMember(UUID id, String twitchUsername) {
         return client.call(HttpMethod.POST, "/api/admin/groups/{id}/members", Map.of("twitchUsername", twitchUsername), Void.class, id).status();
+    }
+
+    @Override
+    public List<ExperimentSummaryDto> adminExperiments() {
+        return client.get("/api/admin/experiments", EXPERIMENTS);
+    }
+
+    @Override
+    public ExperimentSettingsDto adminExperiment(UUID id) {
+        return client.get("/api/admin/experiments/{id}/settings", ExperimentSettingsDto.class, id);
+    }
+
+    @Override
+    public List<FlagKeyDto> adminFlagKeys() {
+        return client.get("/api/admin/flags", FLAG_KEYS);
+    }
+
+    @Override
+    public int adminExperimentAction(UUID id, String action) {
+        return client.call(HttpMethod.POST, "/api/admin/experiments/{id}/{action}", null, Void.class, id, action).status();
+    }
+
+    @Override
+    public int adminExperimentWeights(UUID id, Map<UUID, Integer> weights) {
+        return client.call(HttpMethod.POST, "/api/admin/experiments/{id}/variants/weights", weights, Void.class, id).status();
+    }
+
+    @Override
+    public ExperimentRebalanceDto adminExperimentWeightsPreview(UUID id, Map<UUID, Integer> weights) {
+        ApiClient.Result<ExperimentRebalanceDto> result = client.call(HttpMethod.POST,
+                "/api/admin/experiments/{id}/variants/weights/preview", weights, ExperimentRebalanceDto.class, id);
+        return result.ok() ? result.body() : null;
+    }
+
+    @Override
+    public int adminAddExperimentRule(UUID id, ExperimentRuleRequest rule) {
+        return client.call(HttpMethod.POST, "/api/admin/experiments/{id}/rules", rule, Void.class, id).status();
+    }
+
+    @Override
+    public int adminDeleteExperimentRule(UUID id, UUID ruleId) {
+        return client.call(HttpMethod.POST, "/api/admin/experiments/{id}/rules/{ruleId}/delete", null, Void.class, id, ruleId).status();
+    }
+
+    @Override
+    public int adminAddExperimentOverride(UUID id, ExperimentOverrideRequest override) {
+        return client.call(HttpMethod.POST, "/api/admin/experiments/{id}/overrides", override, Void.class, id).status();
+    }
+
+    @Override
+    public int adminDeleteExperimentOverride(UUID id, UUID overrideId) {
+        return client.call(HttpMethod.POST, "/api/admin/experiments/{id}/overrides/{overrideId}/delete", null, Void.class, id, overrideId).status();
+    }
+
+    @Override
+    public ExperimentAssignmentsDto adminExperimentAssignments(UUID id, UUID variantId, String q, int page) {
+        return client.get("/api/admin/experiments/{id}/assignments?variant={variant}&q={q}&page={page}",
+                ExperimentAssignmentsDto.class, id, variantId == null ? "" : variantId, q == null ? "" : q, page);
+    }
+
+    @Override
+    public int adminMoveExperimentAssignment(UUID id, UUID userId, UUID variantId) {
+        return client.call(HttpMethod.POST, "/api/admin/experiments/{id}/assignments/{userId}/variant",
+                new MoveAssignmentRequest(variantId), Void.class, id, userId).status();
     }
 
     @Override

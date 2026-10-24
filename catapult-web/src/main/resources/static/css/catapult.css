@@ -22,6 +22,13 @@
     --catapult-radius: 20px;
 
     --catapult-gradient: linear-gradient(135deg, #a78bfa 0%, #818cf8 50%, #60a5fa 100%);
+
+    /* An experiment's variants (the admin weight bar): the control in the muted grey, the others in the gradient's hues. */
+    --catapult-variant-control: var(--catapult-text-muted);
+    --catapult-variant-1: var(--catapult-primary);
+    --catapult-variant-2: #818cf8;
+    --catapult-variant-3: #60a5fa;
+    --catapult-variant-4: var(--catapult-primary-hover);
 }
 
 
@@ -2273,4 +2280,40 @@ body.obs-dock-mode .footer {
 
 .command-migration-name {
     font-weight: 650;
+}
+
+.admin-experiments-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 2fr) auto; gap: 12px; align-items: center; padding: 8px 0; cursor: pointer; }
+.admin-experiments-row + .admin-experiments-row { border-top: 1px solid var(--catapult-border, rgba(127, 127, 127, 0.2)); }
+.admin-experiments-chips { display: flex; gap: 8px; justify-content: flex-end; }
+.admin-experiments-actions, .admin-experiments-form { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; }
+.admin-experiments-form [hidden] { display: none; }
+.admin-experiments-weight { display: flex; gap: 8px; align-items: center; }
+/* A confirmation's description with one line per item (the rebalance preview) */
+mdui-dialog::part(description) { white-space: pre-line; }
+.experiment-weight-bar { position: relative; display: flex; width: 100%; height: 40px; border-radius: 12px; overflow: hidden; background: var(--catapult-surface-elevated); border: 1px solid var(--catapult-border); }
+.experiment-weight-bar.is-mini { height: 10px; border-radius: 5px; min-width: 120px; }
+.experiment-weight-segment { flex: 0 1 0; min-width: 0; display: flex; align-items: center; justify-content: center; background: var(--variant-color); color: #fff; font-size: 0.8125rem; white-space: nowrap; overflow: hidden; transition: flex-grow 0.12s ease; }
+.experiment-weight-bar.is-dragging .experiment-weight-segment { transition: none; }
+.experiment-weight-label { overflow: hidden; text-overflow: ellipsis; padding: 0 6px; }
+.experiment-weight-handle { position: relative; flex: 0 0 0; z-index: 1; cursor: ew-resize; touch-action: none; outline: none; }
+.experiment-weight-handle::before { content: ""; position: absolute; top: 4px; bottom: 4px; left: -3px; width: 6px; border-radius: 3px; background: var(--catapult-text); box-shadow: 0 0 0 2px var(--catapult-background); }
+.experiment-weight-handle::after { content: ""; position: absolute; top: 0; bottom: 0; left: -12px; width: 24px; }
+.experiment-weight-handle:focus-visible::before { background: var(--catapult-primary-hover); box-shadow: 0 0 0 3px var(--catapult-primary-dark); }
+.admin-experiments-weight [data-weight-share] { white-space: nowrap; }
+.experiment-weight-swatch { flex: none; width: 12px; height: 12px; border-radius: 50%; background: var(--variant-color); }
+#experiment-weights > .experiment-weight-bar { flex-basis: 100%; }
+.admin-experiments-rule-warning { display: flex; gap: 8px; align-items: center; }
+.admin-participants-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.admin-participants-chips .experiment-weight-swatch { margin-inline-start: 4px; }
+.admin-participants > .admin-search { display: block; margin-bottom: 12px; }
+.admin-participants-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 3fr); gap: 12px; align-items: center; padding: 8px 0; }
+.admin-participants-row + .admin-participants-row { border-top: 1px solid var(--catapult-border, rgba(127, 127, 127, 0.2)); }
+.admin-participants-variant { display: flex; gap: 8px; align-items: center; }
+.admin-participants-actions { display: flex; flex-wrap: nowrap; gap: 8px; align-items: center; justify-content: flex-end; }
+.admin-participants-actions mdui-select { min-width: 180px; }
+@media (max-width: 650px) {
+    .admin-experiments-row { grid-template-columns: minmax(0, 1fr); }
+    .admin-experiments-chips { justify-content: flex-start; }
+    .admin-participants-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .admin-participants-actions { flex-wrap: wrap; justify-content: flex-start; grid-column: 1 / -1; }
 }
