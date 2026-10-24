@@ -349,7 +349,8 @@ public class DebugSentryConfig implements InitializingBean, DisposableBean {
             if (request.getHeaders() != null) {
                 Map<String, String> headers = new LinkedHashMap<>();
                 request.getHeaders().forEach((name, value) ->
-                        headers.put(name, redactor.isSecretHeader(name) ? DebugRedactor.MASK : value));
+                        headers.put(name, redactor.isSecretHeader(name)
+                                ? DebugRedactor.MASK : redactor.text(value, false)));
                 request.setHeaders(headers);
             }
             if (request.getCookies() != null) {
