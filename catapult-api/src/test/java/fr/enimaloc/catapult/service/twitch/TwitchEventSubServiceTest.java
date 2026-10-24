@@ -404,4 +404,23 @@ class TwitchEventSubServiceTest {
     private Object connectionState(String field) {
         return ReflectionTestUtils.getField(ReflectionTestUtils.getField(service, "connections"), field);
     }
+
+    @Test
+    void handleMessage_runsAsTheMemberTheSocketIsFor() {
+        List<UUID> seen = new java.util.ArrayList<>();
+        doAnswer(inv -> {
+            seen.add(fr.enimaloc.catapult.service.debug.DebugContext.subject().orElse(null));
+            return null;
+        }).when(eventPublisher).publishEvent(any(ApplicationEvent.class));
+
+        service.handleMessage(user, token, """
+            {
+              "metadata": { "message_type": "notification", "subscription_type": "stream.online" },
+              "payload": { "event": {} }
+            }
+            """, false);
+
+        assertThat(seen).containsExactly(user.getId());
+        assertThat(fr.enimaloc.catapult.service.debug.DebugContext.subject()).isEmpty();
+    }
 }

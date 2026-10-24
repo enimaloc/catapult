@@ -20,6 +20,7 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
 import org.springframework.security.oauth2.server.resource.web.DefaultBearerTokenResolver;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.expression.WebExpressionAuthorizationManager;
 
@@ -53,6 +54,8 @@ public class ApiSecurityConfig {
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt ->
                         jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())))
+                // Not a bean: a Filter bean would also be registered on the servlet container, outside the chain
+                .addFilterAfter(new DebugSubjectFilter(), BearerTokenAuthenticationFilter.class)
                 .csrf(AbstractHttpConfigurer::disable);
 
         return http.build();
@@ -95,6 +98,8 @@ public class ApiSecurityConfig {
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt ->
                         jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())))
+                // Not a bean: a Filter bean would also be registered on the servlet container, outside the chain
+                .addFilterAfter(new DebugSubjectFilter(), BearerTokenAuthenticationFilter.class)
                 .csrf(AbstractHttpConfigurer::disable);
 
         return http.build();

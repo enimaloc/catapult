@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.chat.command.js;
 
+import fr.enimaloc.catapult.service.debug.DebugContext;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunction;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
 import fr.enimaloc.catapult.chat.command.trace.ExecutionTrace;
@@ -33,6 +34,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
@@ -117,7 +119,9 @@ public class SandboxExecutor {
         ExecutorService executor = Executors.newSingleThreadExecutor();
         Context context = buildContext();
         try {
-            Future<String> future = executor.submit(() -> runInContext(context, compiledJs, placeholders, lists, registry, user, settings));
+            Supplier<String> run = DebugContext.wrap(
+                    () -> runInContext(context, compiledJs, placeholders, lists, registry, user, settings));
+            Future<String> future = executor.submit(run::get);
             try {
                 String result = future.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
                 outcome = "success";
@@ -155,8 +159,9 @@ public class SandboxExecutor {
         ExecutorService executor = Executors.newSingleThreadExecutor();
         Context context = buildContext();
         try {
-            Future<String> future = executor.submit(() ->
+            Supplier<String> run = DebugContext.wrap(() ->
                 runInContextWithTrace(context, compiledJs, placeholders, lists, registry, user, settings, trace));
+            Future<String> future = executor.submit(run::get);
             try {
                 String output = future.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
                 trace.finish(output);

@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.binding;
 
+import fr.enimaloc.catapult.service.debug.DebugContext;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.binding.GameMapping;
@@ -92,7 +93,8 @@ public class BindingService {
         log.info("Refreshing {} INCOMPLETE binding(s)", incomplete.size());
         int resolved = 0;
         for (GameBinding binding : incomplete) {
-            GameBinding updated = updateWithIgdbResolution(binding.getUser(), detectedOf(binding), binding);
+            GameBinding updated = DebugContext.callAs(binding.getUser().getId(),
+                    () -> updateWithIgdbResolution(binding.getUser(), detectedOf(binding), binding));
             if (updated.getStatus() != GameBinding.Status.INCOMPLETE) resolved++;
         }
         log.info("INCOMPLETE binding refresh complete: {}/{} resolved", resolved, incomplete.size());
