@@ -18,7 +18,9 @@ public interface GameBindingRepository extends JpaRepository<GameBinding, UUID> 
 
     Page<GameBinding> findByUser(UserAccount user, Pageable pageable);
 
-    Page<GameBinding> findByUserAndStatus(UserAccount user, GameBinding.Status status, Pageable pageable);
+    Page<GameBinding> findByUserAndStatusIn(
+        UserAccount user, java.util.Collection<GameBinding.Status> statuses, Pageable pageable
+    );
 
     Page<GameBinding> findByUserAndSourceType(UserAccount user, GameBinding.SourceType sourceType, Pageable pageable);
 
@@ -39,13 +41,18 @@ public interface GameBindingRepository extends JpaRepository<GameBinding, UUID> 
 
     List<GameBinding> findAllByStatusAndIgnoredFalse(GameBinding.Status status);
 
+    /** Every streamer's binding of one game in the given statuses — the ones an admin game mapping applies to. */
+    List<GameBinding> findAllBySourceTypeAndSourceIdAndStatusIn(
+        GameBinding.SourceType sourceType, String sourceId, java.util.Collection<GameBinding.Status> statuses
+    );
+
     @org.springframework.data.jpa.repository.Query(
         "SELECT COUNT(b) > 0 FROM GameBinding b JOIN b.tws t WHERE t = :twId")
     boolean existsByTwsContaining(@org.springframework.data.repository.query.Param("twId") String twId);
 
     @org.springframework.data.jpa.repository.Query(
         "SELECT b FROM GameBinding b WHERE b.ignored = false " +
-        "AND b.twOverride = false AND b.status IN ('AUTO','MANUAL') " +
+        "AND b.twOverride = false AND b.status IN ('AUTO','MAPPED','MANUAL') " +
         "AND SIZE(b.tws) = 0")
     org.springframework.data.domain.Page<GameBinding> findCandidatesForTwBackfill(
         org.springframework.data.domain.Pageable pageable);
@@ -57,7 +64,7 @@ public interface GameBindingRepository extends JpaRepository<GameBinding, UUID> 
      */
     @org.springframework.data.jpa.repository.Query(
         "SELECT b FROM GameBinding b WHERE b.ignored = false " +
-        "AND b.twOverride = false AND b.status IN ('AUTO','MANUAL')")
+        "AND b.twOverride = false AND b.status IN ('AUTO','MAPPED','MANUAL')")
     org.springframework.data.domain.Page<GameBinding> findCandidatesForTwRebuild(
         org.springframework.data.domain.Pageable pageable);
 
@@ -68,7 +75,7 @@ public interface GameBindingRepository extends JpaRepository<GameBinding, UUID> 
      */
     @org.springframework.data.jpa.repository.Query(
         "SELECT b FROM GameBinding b WHERE b.ignored = false " +
-        "AND b.status IN ('AUTO','MANUAL')")
+        "AND b.status IN ('AUTO','MAPPED','MANUAL')")
     org.springframework.data.domain.Page<GameBinding> findAllCandidatesForTwForceRebuild(
         org.springframework.data.domain.Pageable pageable);
 }

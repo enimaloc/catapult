@@ -1,8 +1,10 @@
 package fr.enimaloc.catapult.service.tw;
 
 import fr.enimaloc.catapult.domain.binding.GameBinding;
+import fr.enimaloc.catapult.domain.binding.GameMapping;
 import fr.enimaloc.catapult.domain.config.AppState;
 import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
+import fr.enimaloc.catapult.repository.binding.GameMappingRepository;
 import fr.enimaloc.catapult.repository.config.AppStateRepository;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -24,6 +26,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class TwBackfillServiceTest {
+
+    private final GameMappingRepository mappings = mock(GameMappingRepository.class);
 
     @Test
     void skipsWhenFlagPresent() {
@@ -98,9 +102,85 @@ class TwBackfillServiceTest {
         assertThat(pinned.getTws()).containsExactly("new_tw");
     }
 
+    /** A MAPPED binding of a game whose admin mapping replaces the TWs (here by none), and one that doesn't. */
+    private record MappedPair(GameBinding adminTws, GameBinding igdbTws, IgdbService igdb, TwResolverService res) {}
+
+    private MappedPair mappedPair() {
+        GameBinding adminTws = mappedBinding("730");
+        GameBinding igdbTws = mappedBinding("440");
+        GameMapping replacing = new GameMapping();
+        replacing.setTwsOverridden(true);
+        when(mappings.findBySourceTypeAndSourceId(GameBinding.SourceType.STEAM, "730")).thenReturn(Optional.of(replacing));
+        when(mappings.findBySourceTypeAndSourceId(GameBinding.SourceType.STEAM, "440"))
+            .thenReturn(Optional.of(new GameMapping()));
+
+        IgdbService igdb = mock(IgdbService.class);
+        when(igdb.resolveIgdbIdForBinding(any())).thenReturn(Optional.of("igdb"));
+        TwResolverService res = mock(TwResolverService.class);
+        when(res.suggest(any())).thenReturn(Set.of("igdb_tw"));
+        return new MappedPair(adminTws, igdbTws, igdb, res);
+    }
+
+    private static GameBinding mappedBinding(String sourceId) {
+        GameBinding b = new GameBinding();
+        b.setId(UUID.randomUUID());
+        b.setStatus(GameBinding.Status.MAPPED);
+        b.setSourceType(GameBinding.SourceType.STEAM);
+        b.setSourceId(sourceId);
+        b.setSourceName("Game " + sourceId);
+        return b;
+    }
+
+    @Test
+    void backfill_skipsMappedBindingsWhoseMappingReplacesTheTws() {
+        AppStateRepository appRepo = mock(AppStateRepository.class);
+        when(appRepo.findById("tw_backfill_completed")).thenReturn(Optional.empty());
+        GameBindingRepository bRepo = mock(GameBindingRepository.class);
+        MappedPair p = mappedPair();
+        when(bRepo.findCandidatesForTwBackfill(any(Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of(p.adminTws(), p.igdbTws())));
+
+        build(appRepo, bRepo, p.igdb(), p.res()).run();
+
+        // Replaced by none stays none; the mapping that keeps IGDB's TWs is backfilled as before.
+        assertThat(p.adminTws().getTws()).isEmpty();
+        verify(bRepo, never()).save(p.adminTws());
+        assertThat(p.igdbTws().getTws()).containsExactly("igdb_tw");
+    }
+
+    @Test
+    void rebuild_keepsTheAdminTwsOfMappedBindings() {
+        GameBindingRepository bRepo = mock(GameBindingRepository.class);
+        MappedPair p = mappedPair();
+        p.adminTws().setTws(new java.util.HashSet<>(Set.of("admin_tw")));
+        when(bRepo.findCandidatesForTwRebuild(any(Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of(p.adminTws(), p.igdbTws())));
+
+        build(mock(AppStateRepository.class), bRepo, p.igdb(), p.res()).rebuildAllNonOverridden();
+
+        assertThat(p.adminTws().getTws()).containsExactly("admin_tw");
+        verify(bRepo, never()).save(p.adminTws());
+        assertThat(p.igdbTws().getTws()).containsExactly("igdb_tw");
+    }
+
+    @Test
+    void forceRebuild_keepsTheAdminTwsOfMappedBindings() {
+        GameBindingRepository bRepo = mock(GameBindingRepository.class);
+        MappedPair p = mappedPair();
+        p.adminTws().setTws(new java.util.HashSet<>(Set.of("admin_tw")));
+        when(bRepo.findAllCandidatesForTwForceRebuild(any(Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of(p.adminTws(), p.igdbTws())));
+
+        build(mock(AppStateRepository.class), bRepo, p.igdb(), p.res()).forceRebuildAllIncludingPinned();
+
+        assertThat(p.adminTws().getTws()).containsExactly("admin_tw");
+        verify(bRepo, never()).save(p.adminTws());
+        assertThat(p.igdbTws().getTws()).containsExactly("igdb_tw");
+    }
+
     private TwBackfillService build(AppStateRepository app, GameBindingRepository b,
                                     IgdbService igdb, TwResolverService res) {
-        TwBackfillService s = new TwBackfillService(app, b, igdb, res, new SimpleMeterRegistry());
+        TwBackfillService s = new TwBackfillService(app, b, mappings, igdb, res, new SimpleMeterRegistry());
         s.setBatchSize(50);
         s.setThrottle(1000);
         return s;
