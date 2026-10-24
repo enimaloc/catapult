@@ -32,6 +32,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -70,10 +71,12 @@ import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.bind.ServletRequestBindingException;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.servlet.HandlerMapping;
 import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
@@ -142,7 +145,15 @@ abstract class AccessMatrixSupport {
             MethodArgumentTypeMismatchException.class,
             HttpRequestMethodNotSupportedException.class,
             HttpMediaTypeNotSupportedException.class,
-            NoResourceFoundException.class);
+            NoResourceFoundException.class,
+            ServletRequestBindingException.class);
+    /**
+     * Rows that address a route by a concrete URI rather than by its pattern ({@code /api/channels/nobody-here/…}, an
+     * unknown channel): Spring matches them to the pattern they fill, so they are not checked against their own.
+     */
+    private static final String LITERAL_PREFIX = "/api/channels/nobody-here/";
+    /** Rows a Spring Security filter answers before any handler: no handler mapping holds them. */
+    private static final Set<String> FILTER_ROUTES = Set.of("GET /oauth2/authorization/twitch");
     private static final Pattern VARIABLE = Pattern.compile("\\{([^}:]+)(?::[^}]*)?}");
 
     @MockitoBean
@@ -285,6 +296,11 @@ abstract class AccessMatrixSupport {
             softly.assertThat(outcome.unreached())
                     .as("%s as %s never reached its handler (%s): fix vars/body", row, caller, outcome.detail())
                     .isFalse();
+            if (outcome.pattern() != null && row.routed()) {
+                softly.assertThat(outcome.pattern())
+                        .as("%s as %s reached another route's handler (%s): fix vars", row, caller, outcome.detail())
+                        .isEqualTo(row.pattern());
+            }
             softly.assertThat(outcome.token())
                     .as("%s as %s (%s)", row, caller, outcome.detail())
                     .isEqualTo(row.expected().get(caller));
@@ -316,23 +332,26 @@ abstract class AccessMatrixSupport {
             while (cause.getCause() != null && cause.getCause() != cause) {
                 cause = cause.getCause();
             }
-            return new Outcome("ERROR", false, "threw " + cause);
+            return new Outcome("ERROR", false, null, "threw " + cause);
         }
         Exception resolved = result.getResolvedException();
         int status = result.getResponse().getStatus();
         boolean unreached =
                 resolved != null && !row.unmapped() && UNREACHED.stream().anyMatch(t -> t.isInstance(resolved));
         String detail = status + (resolved == null ? "" : " " + resolved);
+        String pattern = result.getHandler() == null
+                ? null
+                : (String) result.getRequest().getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);
         if (status == 403
                 && resolved instanceof ResponseStatusException rse
                 && rse.getReason() != null
                 && GATE_REASONS.contains(rse.getReason())) {
-            return new Outcome("GATED", unreached, detail);
+            return new Outcome("GATED", unreached, pattern, detail);
         }
         if (status == 401 || status == 403) {
-            return new Outcome(String.valueOf(status), unreached, detail);
+            return new Outcome(String.valueOf(status), unreached, pattern, detail);
         }
-        return new Outcome("PASS", unreached, detail);
+        return new Outcome("PASS", unreached, pattern, detail);
     }
 
     /** {@code work}'s result, in a transaction that is rolled back whatever happens; its failure is rethrown. */
@@ -353,8 +372,16 @@ abstract class AccessMatrixSupport {
         return value;
     }
 
-    /** One caller's {@code token}; {@code detail} (status, resolved exception) only explains a failure. */
-    private record Outcome(String token, boolean unreached, String detail) {}
+    /**
+     * One caller's {@code token}; {@code pattern} is the pattern of the handler the request reached ({@code null} when
+     * none did), and {@code detail} (status, resolved exception) only explains a failure.
+     */
+    private record Outcome(String token, boolean unreached, String pattern, String detail) {}
+
+    /** The file a row for {@code key} belongs in; a profile whose rows come from more than one file overrides it. */
+    protected String rowFile(String key) {
+        return matrixResource();
+    }
 
     @Test
     void everyHandlerHasARow() throws IOException {
@@ -377,7 +404,8 @@ abstract class AccessMatrixSupport {
                     String key = method + " " + pattern;
                     long count = rowsByKey.getOrDefault(key, 0L);
                     if (count == 0) {
-                        missing.add(key + "  (" + entry.getValue().getShortLogMessage() + ")");
+                        missing.add(key + "  (" + entry.getValue().getShortLogMessage() + ") belongs in "
+                                + rowFile(key));
                     } else if (count > 1) {
                         duplicated.add(key);
                     }
@@ -385,18 +413,58 @@ abstract class AccessMatrixSupport {
             }
         }
         missing.sort(null);
-        assertThat(missing).as("handlers without a row in %s", matrixResource()).isEmpty();
-        assertThat(duplicated).as("handlers with more than one row in %s", matrixResource()).isEmpty();
+        assertThat(missing).as("handlers without a row").isEmpty();
+        assertThat(duplicated).as("handlers with more than one row").isEmpty();
     }
 
     /**
-     * One line of the matrix: a request ({@code method}, {@code pattern} with its variables substituted, {@code vars},
-     * {@code body}) and the outcome expected for each caller.
+     * The reverse of {@link #everyHandlerHasARow}: every row (but the {@code unmapped}, literal and filter ones) is the
+     * method and pattern of a real handler, so a row left behind by a removed or renamed route fails.
      */
-    record Row(int line, String method, String pattern, String vars, String body, Map<String, String> expected) {
+    @Test
+    void everyRowHasAHandler() throws IOException {
+        Set<String> keys = new HashSet<>();
+        for (RequestMappingInfo info : handlerMapping.getHandlerMethods().keySet()) {
+            Set<String> methods = info.getMethodsCondition().getMethods().stream()
+                    .map(Enum::name)
+                    .collect(Collectors.toSet());
+            for (String pattern : info.getPatternValues()) {
+                if (methods.isEmpty()) {
+                    keys.add("* " + pattern);
+                }
+                methods.forEach(method -> keys.add(method + " " + pattern));
+            }
+        }
+        List<String> stale = matrixRows().stream()
+                .filter(Row::routed)
+                .filter(r -> !FILTER_ROUTES.contains(r.key()))
+                .filter(r -> !keys.contains(r.key()) && !keys.contains("* " + r.pattern()))
+                .map(r -> r.key() + " (" + r.file() + " line " + r.line() + ")")
+                .sorted()
+                .toList();
+        assertThat(stale).as("rows that match no handler").isEmpty();
+    }
+
+    /**
+     * One line of the matrix ({@code file}, {@code line}): a request ({@code method}, {@code pattern} with its
+     * variables substituted, {@code vars}, {@code body}) and the outcome expected for each caller.
+     */
+    record Row(
+            String file,
+            int line,
+            String method,
+            String pattern,
+            String vars,
+            String body,
+            Map<String, String> expected) {
 
         boolean unmapped() {
             return "unmapped".equals(vars);
+        }
+
+        /** The row addresses its route by its own pattern, so the handler it reaches must be mapped to that pattern. */
+        boolean routed() {
+            return !unmapped() && !pattern.startsWith(LITERAL_PREFIX);
         }
 
         String key() {
@@ -490,7 +558,8 @@ abstract class AccessMatrixSupport {
                                 .isIn("401", "403", "GATED", "ERROR", "PASS");
                         expected.put(CALLERS.get(i), cell);
                     }
-                    rows.add(new Row(number, cells.get(0), cells.get(1), cells.get(2), cells.get(3), expected));
+                    rows.add(new Row(
+                            resource, number, cells.get(0), cells.get(1), cells.get(2), cells.get(3), expected));
                 }
             }
             return rows;
