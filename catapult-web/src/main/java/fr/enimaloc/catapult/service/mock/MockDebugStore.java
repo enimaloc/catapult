@@ -54,6 +54,15 @@ class MockDebugStore {
                 "GET", "https://api.twitch.tv/helix/users?id=5000001&id=[membre]", 200, false, 61, true,
                 "{\"Authorization\":\"[masked]\"}", null, "{\"Content-Type\":\"application/json\"}",
                 "{\"data\":[{\"login\":\"viewer001\"}]}", null, "c0ffee00c0ffee00c0ffee00c0ffee00"));
+        // more than a page of them, for the pagination
+        seeded.add(new DebugExchangeDto(UUID.randomUUID(), now.minus(10, ChronoUnit.MINUTES), "OUT", "igdb", "games",
+                "POST", "https://api.igdb.com/v4/games", null, true, 5000, false,
+                "{\"Client-ID\":\"[masked]\",\"Authorization\":\"[masked]\"}", "fields name; where id = 119133;",
+                null, null, "Read timed out", null));
+        seeded.add(new DebugExchangeDto(UUID.randomUUID(), now.minus(5, ChronoUnit.MINUTES), "OUT", "minecraft", "friends",
+                "GET", "https://api.minecraftservices.com/friends", 200, false, 143, false,
+                "{\"Authorization\":\"[masked]\"}", null, "{\"Content-Type\":\"application/json\"}",
+                "{\"friends\":[{\"name\":\"[membre]\"},{\"name\":\"Notch\"}]}", null, null));
         exchanges.put(seededMember, seeded);
     }
 
