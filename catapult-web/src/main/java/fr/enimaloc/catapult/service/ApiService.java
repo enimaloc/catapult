@@ -31,6 +31,11 @@ import fr.enimaloc.catapult.common.dto.admin.MinecraftDeviceCodeDto;
 import fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
+import fr.enimaloc.catapult.common.dto.admin.DetectedGameDto;
+import fr.enimaloc.catapult.common.dto.admin.GameMappingDto;
+import fr.enimaloc.catapult.common.dto.admin.GameMappingRequest;
+import fr.enimaloc.catapult.common.dto.admin.GameMappingResult;
+import fr.enimaloc.catapult.common.dto.admin.TwitchCategoryDto;
 import fr.enimaloc.catapult.common.dto.notification.AdminNotificationDto;
 import fr.enimaloc.catapult.common.dto.notification.BroadcastRequestDto;
 import fr.enimaloc.catapult.common.dto.notification.NotificationChannel;
@@ -264,6 +269,21 @@ public interface ApiService {
     int adminApproveDtddProposal(UUID id);
     /** As {@link #adminApproveDtddProposal}; the reason is sent only when not blank. */
     int adminRejectDtddProposal(UUID id, String reason);
+    /** One page of the admin game mappings, last changed first; null when catapult-api fails. */
+    AdminPage<GameMappingDto> adminGameMappings(int page);
+    /** One page of the detected games still missing a mapping, most streamers first; null when catapult-api fails. */
+    AdminPage<DetectedGameDto> adminMissingGameMappings(int page);
+    /** The games detected on {@code sourceType} matching {@code q} (20 at most); null when catapult-api fails. */
+    List<DetectedGameDto> adminDetectedGames(String sourceType, String q);
+    /** The Twitch categories matching {@code q}, with the box art as catapult-api returns it; null when catapult-api fails. */
+    List<TwitchCategoryDto> adminSearchCategories(String q);
+    /** catapult-api's status (201; 400 MANUAL platform, missing ID or category; 409 already mapped) and result, 502 when unreachable. */
+    ApiClient.Result<GameMappingResult> adminCreateGameMapping(GameMappingRequest request);
+    /** catapult-api's status (200; 400 as for a creation; 404 unknown) and result, 502 when unreachable. */
+    ApiClient.Result<GameMappingResult> adminUpdateGameMapping(UUID id, GameMappingRequest request);
+    /** catapult-api's status (200; 404 unknown) and result (no mapping), 502 when unreachable. */
+    ApiClient.Result<GameMappingResult> adminDeleteGameMapping(UUID id, boolean applyLive);
+
     /** The member groups, with their member counts; null when catapult-api fails. */
     List<GroupSummaryDto> adminGroups();
     /** catapult-api's status (201; 400 blank key; 409 key already used), 502 when unreachable. */

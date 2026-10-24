@@ -11,6 +11,12 @@ import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminCclPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody;
 import fr.enimaloc.catapult.common.dto.admin.DtddProposalDto;
+import fr.enimaloc.catapult.common.dto.admin.AdminPage;
+import fr.enimaloc.catapult.common.dto.admin.DetectedGameDto;
+import fr.enimaloc.catapult.common.dto.admin.GameMappingDto;
+import fr.enimaloc.catapult.common.dto.admin.GameMappingRequest;
+import fr.enimaloc.catapult.common.dto.admin.GameMappingResult;
+import fr.enimaloc.catapult.common.dto.admin.TwitchCategoryDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.FlagKeyDto;
@@ -145,6 +151,8 @@ public class MockApiService implements ApiService {
     /** Application-wide, like the well-known files: a notification sent in one session reaches the others. */
     private MockNotificationStore notifications;
     private final MockDtddProposalsStore dtddProposals = new MockDtddProposalsStore();
+    /** Application-wide: the game mappings an admin edits are the same for every mock session. */
+    private final MockGameMappingsStore gameMappings = new MockGameMappingsStore();
     /** Application-wide: the groups an admin creates are the same for every mock session. */
     private final MockGroupsStore groups = new MockGroupsStore();
     /** Application-wide: the experiments an admin edits are the same for every mock session. */
@@ -616,6 +624,52 @@ public class MockApiService implements ApiService {
         dtddProposals.propose(igdbId, dtddId, reason, current == null ? null : current.getChannelDto().twitchUsername());
         if (current != null) eventPublisher.publishEvent(new DtddMappingChangedEvent(current.getChannelDto().twitchUsername()));
         return NO_CONTENT;
+    }
+
+    @Override
+    public AdminPage<GameMappingDto> adminGameMappings(int page) {
+        log.trace("adminGameMappings({})", page);
+        return gameMappings.list(page);
+    }
+
+    @Override
+    public AdminPage<DetectedGameDto> adminMissingGameMappings(int page) {
+        log.trace("adminMissingGameMappings({})", page);
+        return gameMappings.missing(page);
+    }
+
+    @Override
+    public List<DetectedGameDto> adminDetectedGames(String sourceType, String q) {
+        log.trace("adminDetectedGames({}, {})", sourceType, q);
+        return gameMappings.detected(sourceType, q);
+    }
+
+    @Override
+    public List<TwitchCategoryDto> adminSearchCategories(String q) {
+        log.trace("adminSearchCategories({})", q);
+        if (q == null || q.isBlank()) return List.of();
+        return MockPresets.CATEGORIES.stream()
+                .filter(c -> c.name().toLowerCase().contains(q.trim().toLowerCase()))
+                .limit(10)
+                .toList();
+    }
+
+    @Override
+    public ApiClient.Result<GameMappingResult> adminCreateGameMapping(GameMappingRequest request) {
+        log.trace("adminCreateGameMapping({})", request);
+        return gameMappings.create(request, "admin");
+    }
+
+    @Override
+    public ApiClient.Result<GameMappingResult> adminUpdateGameMapping(UUID id, GameMappingRequest request) {
+        log.trace("adminUpdateGameMapping({}, {})", id, request);
+        return gameMappings.update(id, request, "admin");
+    }
+
+    @Override
+    public ApiClient.Result<GameMappingResult> adminDeleteGameMapping(UUID id, boolean applyLive) {
+        log.trace("adminDeleteGameMapping({}, {})", id, applyLive);
+        return gameMappings.delete(id, applyLive);
     }
 
     @Override

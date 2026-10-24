@@ -70,7 +70,7 @@ class AdminTabsFragmentControllerTest {
         for (String url : List.of("/spa/admin/ccl", "/spa/admin/caches", "/spa/admin/caches/igdb-game-cache",
                 "/spa/admin/caches/igdb-game-cache/entry?key=1",
                 "/spa/admin/data", "/spa/admin/data/chat-command", "/spa/admin/data/chat-command/row?id=1",
-                "/spa/admin/members?q=a&page=1", "/spa/admin/members/search?q=a", "/spa/admin/meta", "/spa/admin/meta/file?id=1", "/spa/admin/notifications?page=1", "/spa/admin/broadcast", "/spa/admin/dtdd-mapping", "/spa/admin/groups", "/spa/admin/whitelist", "/spa/admin/keys", "/spa/admin/tw", "/spa/admin/tw/gore",
+                "/spa/admin/members?q=a&page=1", "/spa/admin/members/search?q=a", "/spa/admin/meta", "/spa/admin/meta/file?id=1", "/spa/admin/notifications?page=1", "/spa/admin/broadcast", "/spa/admin/dtdd-mapping", "/spa/admin/game-mappings?page=1&missingPage=1", "/spa/admin/groups", "/spa/admin/whitelist", "/spa/admin/keys", "/spa/admin/tw", "/spa/admin/tw/gore",
                 "/spa/admin/members", "/spa/admin/members/00000000-0000-0000-0000-000000000001",
                 "/spa/admin/experiments", "/spa/admin/experiments/00000000-0000-0000-0000-000000000001",
                 "/spa/admin/experiments/00000000-0000-0000-0000-000000000001/participants?variant=&q=x&page=1")) {
@@ -90,6 +90,8 @@ class AdminTabsFragmentControllerTest {
         verify(apiService, never()).adminWellKnownFile(org.mockito.ArgumentMatchers.anyLong());
         verify(apiService, never()).adminNotifications(org.mockito.ArgumentMatchers.anyInt());
         verify(apiService, never()).adminDtddProposals(org.mockito.ArgumentMatchers.any());
+        verify(apiService, never()).adminGameMappings(anyInt());
+        verify(apiService, never()).adminMissingGameMappings(anyInt());
         verify(apiService, never()).adminGroups();
         verify(apiService, never()).adminWhitelist();
         verify(apiService, never()).adminApiKeys(org.mockito.ArgumentMatchers.any());
@@ -555,6 +557,33 @@ class AdminTabsFragmentControllerTest {
         String approved = asAdmin("/spa/admin/dtdd-mapping?status=APPROVED");
 
         assertThat(approved).contains("data-status=\"APPROVED\"", "bob").doesNotContain("data-approve=").doesNotContain("data-reject=");
+    }
+
+    @Test
+    void gameMappings_rendersBothLists_fromTheirOwnPages() throws Exception {
+        var mapping = new fr.enimaloc.catapult.common.dto.admin.GameMappingDto(UUID.fromString("00000000-0000-0000-0000-000000000042"),
+                "STEAM", "730", "Counter <Strike>", "32399", "Counter-Strike", null, null, 3,
+                Instant.parse("2026-10-24T10:00:00Z"), "alice");
+        var game = new fr.enimaloc.catapult.common.dto.admin.DetectedGameDto("XBOX", "1942", "Halo Infinite", 7);
+        when(apiService.adminGameMappings(1)).thenReturn(new AdminPage<>(List.of(mapping), 1, 3, 51));
+        when(apiService.adminMissingGameMappings(2)).thenReturn(new AdminPage<>(List.of(game), 2, 3, 51));
+
+        String html = asAdmin("/spa/admin/game-mappings?page=1&missingPage=2");
+
+        assertThat(html).contains("admin-game-mappings", "Counter &lt;Strike&gt;", "Counter-Strike", "Halo Infinite");
+        verify(apiService).adminGameMappings(1);
+        verify(apiService).adminMissingGameMappings(2);
+    }
+
+    @Test
+    void gameMappings_negativePagesAreTheFirst() throws Exception {
+        when(apiService.adminGameMappings(0)).thenReturn(new AdminPage<>(List.of(), 0, 0, 0));
+        when(apiService.adminMissingGameMappings(0)).thenReturn(new AdminPage<>(List.of(), 0, 0, 0));
+
+        asAdmin("/spa/admin/game-mappings?page=-3&missingPage=-1");
+
+        verify(apiService).adminGameMappings(0);
+        verify(apiService).adminMissingGameMappings(0);
     }
 
     @Test

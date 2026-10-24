@@ -1,0 +1,15 @@
+<!--/*@thymesVar id="mappings" type="fr.enimaloc.catapult.common.dto.admin.AdminPage<fr.enimaloc.catapult.common.dto.admin.GameMappingDto>"*/-->
+<!--/*@thymesVar id="missing" type="fr.enimaloc.catapult.common.dto.admin.AdminPage<fr.enimaloc.catapult.common.dto.admin.DetectedGameDto>"*/-->
+<!--/* Placeholder: both lists, unstyled. The tab itself (form, paging, actions) replaces it. */-->
+<div th:fragment="content" class="admin-view admin-game-mappings">
+    <h2>Game mappings</h2>
+    <ul class="admin-game-mappings-list">
+        <li th:each="m : ${mappings?.content}"
+            th:text="${m.sourceType + ' ' + m.sourceId + ' ' + m.sourceName + ' -> ' + m.twitchGameName}">mapping</li>
+    </ul>
+    <h3>Missing</h3>
+    <ul class="admin-game-mappings-missing">
+        <li th:each="g : ${missing?.content}"
+            th:text="${g.sourceType + ' ' + g.sourceId + ' ' + g.sourceName + ' (' + g.streamerCount + ')'}">game</li>
+    </ul>
+</div>

@@ -268,6 +268,17 @@ public class AdminTabsFragmentController {
         });
     }
 
+    /** One page of the game mappings and one of the detected games still missing one, each with its own page number. */
+    @GetMapping("/game-mappings")
+    String gameMappings(Model model, HttpServletResponse response, @RequestParam(defaultValue = "0") int page,
+                        @RequestParam(defaultValue = "0") int missingPage) {
+        return guarded(model, response, () -> {
+            model.addAttribute("mappings", apiService.adminGameMappings(Math.max(0, page)));
+            model.addAttribute("missing", apiService.adminMissingGameMappings(Math.max(0, missingPage)));
+            return "pages/admin-tab/game-mappings :: content";
+        });
+    }
+
     @GetMapping("/groups")
     String groups(Model model, HttpServletResponse response) {
         return guarded(model, response, () -> {

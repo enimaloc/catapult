@@ -44,6 +44,11 @@ import fr.enimaloc.catapult.common.dto.admin.SteamKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
+import fr.enimaloc.catapult.common.dto.admin.DetectedGameDto;
+import fr.enimaloc.catapult.common.dto.admin.GameMappingDto;
+import fr.enimaloc.catapult.common.dto.admin.GameMappingRequest;
+import fr.enimaloc.catapult.common.dto.admin.GameMappingResult;
+import fr.enimaloc.catapult.common.dto.admin.TwitchCategoryDto;
 import fr.enimaloc.catapult.common.dto.notification.AdminNotificationDto;
 import fr.enimaloc.catapult.common.dto.notification.BroadcastRequestDto;
 import fr.enimaloc.catapult.common.dto.notification.NotificationChannel;
@@ -125,6 +130,10 @@ public class RealApiService implements ApiService {
     private static final ParameterizedTypeReference<Map<String, Object>> DATA_ROW = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<AdminPage<NotificationDto>> NOTIFICATIONS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<AdminMemberDto>> MEMBERS = new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<AdminPage<GameMappingDto>> GAME_MAPPINGS = new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<AdminPage<DetectedGameDto>> MISSING_GAMES = new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<List<DetectedGameDto>> DETECTED_GAMES = new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<List<TwitchCategoryDto>> CATEGORIES = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<DtddProposalDto>> DTDD_PROPOSALS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<TwDefinitionDto>> TWS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<fr.enimaloc.catapult.common.dto.chatcommand.EnabledChatCommandDto>> ENABLED_COMMANDS = new ParameterizedTypeReference<>() {};
@@ -682,6 +691,43 @@ public class RealApiService implements ApiService {
     public int adminRejectDtddProposal(UUID id, String reason) {
         Map<String, String> body = reason == null || reason.isBlank() ? Map.of() : Map.of("reason", reason);
         return client.call(HttpMethod.POST, "/api/admin/dtdd-mapping/proposals/{id}/reject", body, Void.class, id).status();
+    }
+
+    @Override
+    public AdminPage<GameMappingDto> adminGameMappings(int page) {
+        return client.get("/api/admin/game-mappings?page={page}&size=20", GAME_MAPPINGS, page);
+    }
+
+    @Override
+    public AdminPage<DetectedGameDto> adminMissingGameMappings(int page) {
+        return client.get("/api/admin/game-mappings/missing?page={page}&size=20", MISSING_GAMES, page);
+    }
+
+    @Override
+    public List<DetectedGameDto> adminDetectedGames(String sourceType, String q) {
+        return client.get("/api/admin/game-mappings/detected?sourceType={sourceType}&q={q}", DETECTED_GAMES,
+                sourceType, q == null ? "" : q);
+    }
+
+    @Override
+    public List<TwitchCategoryDto> adminSearchCategories(String q) {
+        return client.get("/api/admin/game-mappings/categories?q={q}", CATEGORIES, q == null ? "" : q);
+    }
+
+    @Override
+    public ApiClient.Result<GameMappingResult> adminCreateGameMapping(GameMappingRequest request) {
+        return client.call(HttpMethod.POST, "/api/admin/game-mappings", request, GameMappingResult.class);
+    }
+
+    @Override
+    public ApiClient.Result<GameMappingResult> adminUpdateGameMapping(UUID id, GameMappingRequest request) {
+        return client.call(HttpMethod.PUT, "/api/admin/game-mappings/{id}", request, GameMappingResult.class, id);
+    }
+
+    @Override
+    public ApiClient.Result<GameMappingResult> adminDeleteGameMapping(UUID id, boolean applyLive) {
+        return client.call(HttpMethod.DELETE, "/api/admin/game-mappings/{id}?applyLive={applyLive}", null,
+                GameMappingResult.class, id, applyLive);
     }
 
     @Override
