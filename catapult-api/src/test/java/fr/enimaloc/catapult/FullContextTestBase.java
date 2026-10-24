@@ -22,7 +22,7 @@ import org.springframework.test.context.TestPropertySource;
         properties = "spring.config.additional-location=file:./src/main/resources/")
 @TestPropertySource(locations = "classpath:full-context.properties")
 @DirtiesContext
-abstract class FullContextTestBase {
+public abstract class FullContextTestBase {
 
     @Autowired
     protected ApplicationContext context;
