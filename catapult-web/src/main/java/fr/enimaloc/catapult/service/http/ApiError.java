@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.service.http;
 
 import fr.enimaloc.catapult.common.error.ErrorCode;
+import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -12,7 +13,13 @@ import tools.jackson.databind.json.JsonMapper;
  */
 public record ApiError(ErrorCode code, String detail, JsonNode problem) {
 
-    private static final JsonMapper JSON = JsonMapper.builder().build();
+    /**
+     * Reads catapult-api's answers (problems, error bodies, JWT claims) as leniently as RestClient's converters:
+     * a field this build does not know is ignored. Shared with {@link ApiClient}.
+     */
+    static final JsonMapper JSON = JsonMapper.builder()
+            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+            .build();
 
     /** The problem's {@code name} extension read as {@code type}; null when absent or not a {@code type}. */
     public <T> T property(String name, Class<T> type) {
