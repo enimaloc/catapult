@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.tw;
 
+import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.binding.GameMapping;
 import fr.enimaloc.catapult.domain.config.AppState;
@@ -27,6 +28,13 @@ import static org.mockito.Mockito.when;
 
 class TwBackfillServiceTest {
 
+    /** A binding always has an owner (user_id is NOT NULL); the backfill runs each one as it. */
+    private static UserAccount owner() {
+        UserAccount user = new UserAccount();
+        user.setId(UUID.randomUUID());
+        return user;
+    }
+
     private final GameMappingRepository mappings = mock(GameMappingRepository.class);
 
     @Test
@@ -47,12 +55,16 @@ class TwBackfillServiceTest {
         GameBindingRepository bRepo = mock(GameBindingRepository.class);
 
         GameBinding b1 = new GameBinding();
+
+        b1.setUser(owner());
         b1.setId(UUID.randomUUID());
         b1.setSourceType(GameBinding.SourceType.STEAM);
         b1.setSourceId("42");
         b1.setSourceName("X");
 
         GameBinding b2 = new GameBinding();
+
+        b2.setUser(owner());
         b2.setId(UUID.randomUUID());
         b2.setTwOverride(true);
 
@@ -79,6 +91,8 @@ class TwBackfillServiceTest {
         GameBindingRepository bRepo = mock(GameBindingRepository.class);
 
         GameBinding pinned = new GameBinding();
+
+        pinned.setUser(owner());
         pinned.setId(UUID.randomUUID());
         pinned.setSourceType(GameBinding.SourceType.STEAM);
         pinned.setSourceId("99");
@@ -123,6 +137,7 @@ class TwBackfillServiceTest {
 
     private static GameBinding mappedBinding(String sourceId) {
         GameBinding b = new GameBinding();
+        b.setUser(owner());
         b.setId(UUID.randomUUID());
         b.setStatus(GameBinding.Status.MAPPED);
         b.setSourceType(GameBinding.SourceType.STEAM);

@@ -123,9 +123,17 @@ class DebugAttributionTest {
         new DebugSubjectFilter().doFilter(request, new MockHttpServletResponse(), (req, res) -> note());
     }
 
-    private static void authenticate(String subject) {
+    private static void authenticate(String subject, String... authorities) {
         Jwt jwt = Jwt.withTokenValue("t").header("alg", "none").subject(subject).build();
-        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt));
+        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt,
+                java.util.Arrays.stream(authorities)
+                        .map(org.springframework.security.core.authority.SimpleGrantedAuthority::new).toList()));
+    }
+
+    private static MockHttpServletRequest remote(String method, String uri) {
+        MockHttpServletRequest request = new MockHttpServletRequest(method, uri);
+        request.setRemoteAddr("203.0.113.7");
+        return request;
     }
 
     @Test
@@ -151,13 +159,41 @@ class DebugAttributionTest {
     void adminActionOnMember_isAttributedToThatMember() throws Exception {
         UUID admin = UUID.randomUUID();
         UUID member = UUID.randomUUID();
-        authenticate(admin.toString());
+        authenticate(admin.toString(), "ROLE_ADMIN");
 
-        filter(new MockHttpServletRequest("POST", "/api/admin/members/" + member + "/debug"));
-        filter(new MockHttpServletRequest("GET", "/api/admin/members/" + member));
-        filter(new MockHttpServletRequest("GET", "/api/admin/members"));
+        filter(remote("POST", "/api/admin/members/" + member + "/debug"));
+        filter(remote("GET", "/api/admin/members/" + member));
+        filter(remote("GET", "/api/admin/members"));
 
         assertThat(seen).containsExactly(member, member, admin);
+    }
+
+    /** Only an admin acts on another member: anyone else hitting the route (and its 403) stays themself. */
+    @Test
+    void nonAdminOnAMembersAdminRoute_staysAttributedToItself() throws Exception {
+        UUID caller = UUID.randomUUID();
+        UUID member = UUID.randomUUID();
+        authenticate(caller.toString(), "ROLE_USER");
+
+        filter(remote("POST", "/api/admin/members/" + member + "/debug"));
+
+        assertThat(seen).containsExactly(caller);
+    }
+
+    /** Loopback passes the /api/admin/** rule without a JWT, like an admin. */
+    @Test
+    void loopbackOnAMembersAdminRoute_isAttributedToThatMember() throws Exception {
+        UUID member = UUID.randomUUID();
+        MockHttpServletRequest v4 = new MockHttpServletRequest("POST", "/api/admin/members/" + member + "/debug");
+        v4.setRemoteAddr("127.0.0.1");
+        MockHttpServletRequest v6 = new MockHttpServletRequest("POST", "/api/admin/members/" + member + "/debug");
+        v6.setRemoteAddr("0:0:0:0:0:0:0:1");
+
+        filter(v4);
+        filter(v6);
+        filter(remote("POST", "/api/admin/members/" + member + "/debug"));
+
+        assertThat(seen).containsExactly(member, member, null);
     }
 
     @Test
