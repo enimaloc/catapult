@@ -104,12 +104,9 @@ public final class MockPresets {
             binding("MainFrames", "656286460", "MainFrames", Set.of("DrugsIntoxication"), Set.of())
     );
 
-    /** A Twitch category the mock game search can return. */
-    public record TwitchCategory(String id, String name) {}
-
     /** One category per preset binding, under its Twitch name. */
-    public static final List<TwitchCategory> CATEGORIES = BINDINGS.stream()
-            .map(binding -> new TwitchCategory(binding.twitchGameId(), binding.twitchGameName()))
+    public static final List<fr.enimaloc.catapult.common.dto.admin.TwitchCategoryDto> CATEGORIES = BINDINGS.stream()
+            .map(binding -> new fr.enimaloc.catapult.common.dto.admin.TwitchCategoryDto(binding.twitchGameId(), binding.twitchGameName(), null))
             .toList();
 
     public static final UserSettingsDto DEFAULT_SETTINGS = new UserSettingsDto(
