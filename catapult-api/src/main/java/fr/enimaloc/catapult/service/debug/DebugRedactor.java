@@ -20,7 +20,7 @@ import java.util.regex.Pattern;
 @Component
 public class DebugRedactor {
 
-    static final String MASK = "[masqué]";
+    public static final String MASK = "[masqué]";
     static final int MAX_BODY_CHARS = 65_536;
 
     private static final Set<String> MASKED_HEADERS = Set.of(
@@ -46,6 +46,16 @@ public class DebugRedactor {
             }
         }
         return sb.toString();
+    }
+
+    /** Whether a header of that name carries a secret (masked unless revealed). */
+    public boolean isSecretHeader(String name) {
+        return name != null && MASKED_HEADERS.contains(name.toLowerCase());
+    }
+
+    /** A raw query string ({@code a=1&token=x}), its secret parameters masked unless revealed. Null stays null. */
+    public String query(String query, boolean reveal) {
+        return query == null || reveal ? query : maskParams(query);
     }
 
     public String url(URI uri, boolean reveal) {

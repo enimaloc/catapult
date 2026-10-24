@@ -20,6 +20,9 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - CATAPULT_WEB_URL=${CATAPULT_WEB_URL}
       - REDIS_HOST=catapult-redis
+      # Empty = Sentry off (only members in debug mode are ever sent)
+      - API_SENTRY_DSN=${API_SENTRY_DSN:-}
+      - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-production}
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8080/actuator/health || exit 1"]
       interval: 10s
