@@ -141,6 +141,26 @@ class ApiChannelCustomBindingsControllerTest {
     }
 
     @Test
+    void aRefusedSave_tellsWhyInACode() throws Exception {
+        when(service.create(owner, REQUEST)).thenThrow(new fr.enimaloc.catapult.service.binding.CustomBindingException(
+                HttpStatus.CONFLICT, "name_taken", "taken"));
+        mvc.perform(postJson("", owner))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("name_taken"));
+
+        org.mockito.Mockito.doThrow(new fr.enimaloc.catapult.service.binding.CustomBindingException(
+                HttpStatus.CONFLICT, "limit_reached", "max")).when(service).create(owner, REQUEST);
+        mvc.perform(postJson("", owner))
+                .andExpect(jsonPath("$.code").value("limit_reached"));
+
+        when(service.update(owner, art.getId(), REQUEST)).thenThrow(new fr.enimaloc.catapult.service.binding.CustomBindingException(
+                HttpStatus.BAD_REQUEST, "invalid", "bad"));
+        mvc.perform(postJson("/" + art.getId(), owner))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("invalid"));
+    }
+
+    @Test
     void update_ofAnInactiveBinding_hasNoReapplyOutcome() throws Exception {
         when(service.update(owner, art.getId(), REQUEST)).thenReturn(new UpdateResult(art, null));
 

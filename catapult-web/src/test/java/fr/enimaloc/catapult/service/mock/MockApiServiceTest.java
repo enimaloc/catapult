@@ -919,14 +919,14 @@ class MockApiServiceTest {
         assertThat(created.body().name()).isEqualTo("Musique");
         assertThat(events).contains(new fr.enimaloc.catapult.event.binding.CustomBindingsUpdatedEvent(username));
 
-        assertThat(service.createCustomBinding(username, customBinding("musique")).status()).isEqualTo(409);
-        assertThat(service.createCustomBinding(username, customBinding("   ")).status()).isEqualTo(400);
+        assertThat(service.createCustomBinding(username, customBinding("musique")).code()).isEqualTo("name_taken");
+        assertThat(service.createCustomBinding(username, customBinding("   ")).code()).isEqualTo("invalid");
         assertThat(service.createCustomBinding(username, customBinding("x".repeat(41))).status()).isEqualTo(400);
         assertThat(service.createCustomBinding(username, new fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest(
                 "No category", null, null, Set.of(), Set.of(), false)).status()).isEqualTo(400);
         for (int i = 0; i < 17; i++) assertThat(service.createCustomBinding(username, customBinding("n" + i)).status()).isEqualTo(201);
         assertThat(service.customBindings(username).bindings()).hasSize(20);
-        assertThat(service.createCustomBinding(username, customBinding("one more")).status()).isEqualTo(409);
+        assertThat(service.createCustomBinding(username, customBinding("one more")).code()).isEqualTo("limit_reached");
     }
 
     @Test
@@ -942,7 +942,7 @@ class MockApiServiceTest {
 
         assertThat(service.updateCustomBinding(username, dev.id(), customBinding("Dev 2")).body().reapplyOutcome()).isNull();
         assertThat(service.updateCustomBinding(username, UUID.randomUUID(), customBinding("Nope")).status()).isEqualTo(404);
-        assertThat(service.updateCustomBinding(username, dev.id(), customBinding("art 2")).status()).isEqualTo(409);
+        assertThat(service.updateCustomBinding(username, dev.id(), customBinding("art 2")).code()).isEqualTo("name_taken");
     }
 
     @Test

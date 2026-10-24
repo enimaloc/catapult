@@ -1592,9 +1592,12 @@ class RealApiServiceTest {
 
     @Test
     void createCustomBinding_aRefusalKeepsItsStatus() {
-        expect(HttpMethod.POST, "/api/channels/streamer/custom-bindings").andRespond(withStatus(HttpStatus.CONFLICT));
+        expect(HttpMethod.POST, "/api/channels/streamer/custom-bindings").andRespond(withStatus(HttpStatus.CONFLICT)
+                .contentType(MediaType.APPLICATION_JSON).body("{\"code\":\"name_taken\",\"message\":\"taken\"}"));
 
-        assertThat(service.createCustomBinding("streamer", CB_REQUEST).status()).isEqualTo(409);
+        var refused = service.createCustomBinding("streamer", CB_REQUEST);
+        assertThat(refused.status()).isEqualTo(409);
+        assertThat(refused.code()).isEqualTo("name_taken");
     }
 
     @Test

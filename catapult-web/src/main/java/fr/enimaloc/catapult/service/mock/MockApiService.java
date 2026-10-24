@@ -102,6 +102,7 @@ import fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto;
 import fr.enimaloc.catapult.event.binding.CustomBindingChangedEvent;
 import fr.enimaloc.catapult.event.binding.CustomBindingsUpdatedEvent;
 import fr.enimaloc.catapult.service.ActivationOutcome;
+import fr.enimaloc.catapult.service.CustomBindingSave;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import fr.enimaloc.catapult.twitchat.TwitchatDispatchHub;
@@ -1628,17 +1629,17 @@ public class MockApiService implements ApiService {
     }
 
     @Override
-    public ApiClient.Result<CustomBindingDto> createCustomBinding(String username, CustomBindingRequest request) {
+    public CustomBindingSave<CustomBindingDto> createCustomBinding(String username, CustomBindingRequest request) {
         log.trace("createCustomBinding({})", username);
-        ApiClient.Result<CustomBindingDto> result = currentData().customBindings().create(request);
+        CustomBindingSave<CustomBindingDto> result = currentData().customBindings().create(request);
         if (result.ok()) eventPublisher.publishEvent(new CustomBindingsUpdatedEvent(username));
         return result;
     }
 
     @Override
-    public ApiClient.Result<CustomBindingSaveResult> updateCustomBinding(String username, UUID id, CustomBindingRequest request) {
+    public CustomBindingSave<CustomBindingSaveResult> updateCustomBinding(String username, UUID id, CustomBindingRequest request) {
         log.trace("updateCustomBinding({}, {})", username, id);
-        ApiClient.Result<CustomBindingSaveResult> result = currentData().customBindings().update(id, request);
+        CustomBindingSave<CustomBindingSaveResult> result = currentData().customBindings().update(id, request);
         if (result.ok()) eventPublisher.publishEvent(new CustomBindingsUpdatedEvent(username));
         return result;
     }

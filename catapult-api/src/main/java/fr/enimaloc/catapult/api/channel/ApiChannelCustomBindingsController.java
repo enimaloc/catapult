@@ -3,7 +3,10 @@ package fr.enimaloc.catapult.api.channel;
 import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.api.CustomBindingViews;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingDto;
+import fr.enimaloc.catapult.common.dto.binding.CustomBindingErrorDto;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest;
+import fr.enimaloc.catapult.service.binding.CustomBindingException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingSaveResult;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto;
 import fr.enimaloc.catapult.domain.account.UserAccount;
@@ -77,5 +80,11 @@ public class ApiChannelCustomBindingsController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deactivate(@PathVariable String username, @AuthenticationPrincipal Jwt jwt) {
         customBindingService.deactivate(userResolver.ownChannel(username, jwt));
+    }
+
+    /** A refused save tells why in a {@link CustomBindingErrorDto} (name taken, limit reached, invalid). */
+    @ExceptionHandler(CustomBindingException.class)
+    public ResponseEntity<CustomBindingErrorDto> refused(CustomBindingException e) {
+        return ResponseEntity.status(e.getStatusCode()).body(new CustomBindingErrorDto(e.code(), e.getReason()));
     }
 }

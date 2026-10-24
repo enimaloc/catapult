@@ -460,10 +460,10 @@ public interface ApiService {
     /** The owner's custom bindings; null when catapult-api fails or refuses (experiment closed to the channel). */
     fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto customBindings(String username);
     /** Creates one; catapult-api's status (201, or 400/403/409) with the created binding on success. */
-    ApiClient.Result<fr.enimaloc.catapult.common.dto.binding.CustomBindingDto> createCustomBinding(
+    CustomBindingSave<fr.enimaloc.catapult.common.dto.binding.CustomBindingDto> createCustomBinding(
             String username, fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest request);
     /** Saves an edit; catapult-api's status with how re-applying the active binding went on success. */
-    ApiClient.Result<fr.enimaloc.catapult.common.dto.binding.CustomBindingSaveResult> updateCustomBinding(
+    CustomBindingSave<fr.enimaloc.catapult.common.dto.binding.CustomBindingSaveResult> updateCustomBinding(
             String username, UUID id, fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest request);
     /** catapult-api's status (204), 502 when unreachable. */
     int deleteCustomBinding(String username, UUID id);

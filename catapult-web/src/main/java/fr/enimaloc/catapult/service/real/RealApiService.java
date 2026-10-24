@@ -109,6 +109,8 @@ import fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingSaveResult;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto;
 import fr.enimaloc.catapult.service.ActivationOutcome;
+import fr.enimaloc.catapult.service.CustomBindingSave;
+import tools.jackson.databind.JsonNode;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import lombok.RequiredArgsConstructor;
@@ -151,6 +153,8 @@ public class RealApiService implements ApiService {
     private static final ParameterizedTypeReference<List<ExperimentSummaryDto>> EXPERIMENTS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<FlagKeyDto>> FLAG_KEYS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<AdminPage<AdminNotificationDto>> ADMIN_NOTIFICATIONS = new ParameterizedTypeReference<>() {};
+
+    private static final tools.jackson.databind.json.JsonMapper SAVE_JSON = tools.jackson.databind.json.JsonMapper.builder().build();
 
     private final ApiClient client;
 
@@ -1179,14 +1183,26 @@ public class RealApiService implements ApiService {
     }
 
     @Override
-    public ApiClient.Result<CustomBindingDto> createCustomBinding(String username, CustomBindingRequest request) {
-        return client.call(HttpMethod.POST, "/api/channels/{username}/custom-bindings", request, CustomBindingDto.class, username);
+    public CustomBindingSave<CustomBindingDto> createCustomBinding(String username, CustomBindingRequest request) {
+        return save(client.call(HttpMethod.POST, "/api/channels/{username}/custom-bindings", request, JsonNode.class, username),
+                CustomBindingDto.class);
     }
 
     @Override
-    public ApiClient.Result<CustomBindingSaveResult> updateCustomBinding(String username, UUID id, CustomBindingRequest request) {
-        return client.call(HttpMethod.POST, "/api/channels/{username}/custom-bindings/{id}", request,
-                CustomBindingSaveResult.class, username, id);
+    public CustomBindingSave<CustomBindingSaveResult> updateCustomBinding(String username, UUID id, CustomBindingRequest request) {
+        return save(client.call(HttpMethod.POST, "/api/channels/{username}/custom-bindings/{id}", request,
+                JsonNode.class, username, id), CustomBindingSaveResult.class);
+    }
+
+    /** The saved binding when catapult-api took it; else the error code of its {@link CustomBindingErrorDto} body. */
+    private static <T> CustomBindingSave<T> save(ApiClient.Result<JsonNode> result, Class<T> type) {
+        JsonNode body = result.body();
+        if (result.ok()) {
+            return body == null ? new CustomBindingSave<>(502, null, null)
+                    : new CustomBindingSave<>(result.status(), SAVE_JSON.treeToValue(body, type), null);
+        }
+        String code = body == null ? null : body.path("code").asString(null);
+        return new CustomBindingSave<>(result.status(), null, code);
     }
 
     @Override
