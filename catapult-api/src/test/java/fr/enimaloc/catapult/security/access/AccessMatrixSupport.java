@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
 
 import fr.enimaloc.catapult.FullContextContainers;
+import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.experiment.Experiment;
 import fr.enimaloc.catapult.domain.experiment.ExperimentAssignment;
@@ -30,6 +31,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -80,6 +82,9 @@ import org.springframework.web.servlet.HandlerMapping;
 import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Who reaches every catapult-api route today: each row of {@link #matrixResource()} is one handler method (plus a
@@ -90,7 +95,8 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
  * header), {@code member}, {@code mod} (moderates the channel), {@code owner} (the channel, {@value #OWNER}),
  * {@code admin} ({@code ROLE_ADMIN}) with a real JWT, and {@code ptoken} (the owner's personal API token), all
  * remote. Outcomes: {@code 401}/{@code 403} refused, {@code GATED} a feature gate's 403 (reached the handler),
- * {@code ERROR} the request threw (a 500 on a real server), {@code PASS} anything else.
+ * {@code ERROR} the request blew up (it threw, or answered a 500 {@code internal_error} problem), {@code PASS}
+ * anything else.
  *
  * <p>Every outbound client whose host is hard-coded is a mock, so no row calls a third party: {@link TwitchService}
  * (which also says who moderates the channel), {@link SteamStoreService}, {@link XboxService},
@@ -131,6 +137,7 @@ abstract class AccessMatrixSupport {
      * rolled-back transaction (caches, events) cannot change what the others get.
      */
     private static final List<String> RUN_ORDER = List.of("anon", "loop", "member", "mod", "admin", "ptoken", "owner");
+    private static final JsonMapper PROBLEMS = JsonMapper.builder().build();
     private static final Set<String> GATE_REASONS = Set.of(
             "Feature not enabled", "Feature Minecraft indisponible", "Raid settings not available for this channel");
     /**
@@ -342,6 +349,9 @@ abstract class AccessMatrixSupport {
         String pattern = result.getHandler() == null
                 ? null
                 : (String) result.getRequest().getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);
+        if (status == 500 && isInternalErrorProblem(result)) {
+            return new Outcome("ERROR", unreached, pattern, detail);
+        }
         if (status == 403
                 && resolved instanceof ResponseStatusException rse
                 && rse.getReason() != null
@@ -352,6 +362,16 @@ abstract class AccessMatrixSupport {
             return new Outcome(String.valueOf(status), unreached, pattern, detail);
         }
         return new Outcome("PASS", unreached, pattern, detail);
+    }
+
+    /** The answer is {@code ProblemAdvice}'s problem for an unexpected exception: the request blew up. */
+    private static boolean isInternalErrorProblem(MvcResult result) {
+        try {
+            JsonNode body = PROBLEMS.readTree(result.getResponse().getContentAsString());
+            return ErrorCode.INTERNAL_ERROR.code().equals(body.path(ErrorCode.PROPERTY).asString(null));
+        } catch (JacksonException | UnsupportedEncodingException e) {
+            return false;
+        }
     }
 
     /** {@code work}'s result, in a transaction that is rolled back whatever happens; its failure is rethrown. */
