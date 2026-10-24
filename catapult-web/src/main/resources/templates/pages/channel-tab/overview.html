@@ -126,7 +126,10 @@
                           spa:value="textContent:BindingUpdatedEvent.twitchGameName|—"
                           th:text="${b.sourceName() ?: b.twitchGameName() ?: '—'}"></span>
                     <span class="binding-platform-chips" th:text="${b.sourceType()}"></span>
-                    <span th:text="${b.status()}"></span>
+                    <!--/* MAPPED is an automatic binding whose category an admin mapping set. */-->
+                    <span th:text="${b.status() == 'MAPPED' ? 'AUTO' : b.status()}"></span>
+                    <span class="binding-mapped-note" th:if="${b.status() == 'MAPPED'}"
+                          th:text="#{binding.mapped}">Catégorie fixée par l'admin</span>
                 </mdui-list-item>
                 <!--/* The owner and moderators alike, but for the TWs (see below). */-->
                 <mdui-list-item>

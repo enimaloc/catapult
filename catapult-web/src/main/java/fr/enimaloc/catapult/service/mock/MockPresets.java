@@ -79,7 +79,7 @@ public final class MockPresets {
             new TwDto("social_issue", "Social Issue")
     );
 
-    public static final List<String> BINDING_STATUSES = List.of("AUTO", "MANUAL", "INCOMPLETE");
+    public static final List<String> BINDING_STATUSES = List.of("AUTO", "MANUAL", "INCOMPLETE", "MAPPED");
     public static final List<String> SOURCE_TYPES = List.of("STEAM", "XBOX", "MINECRAFT");
     public static final List<String> MINECRAFT_STATUSES =
             List.of("NONE", "PENDING", "INVITE_REJECTED", "ACCEPTED", "REMOVED", "FULL");
@@ -100,7 +100,8 @@ public final class MockPresets {
                     Set.of("death_animal", "supernatural", "sensory_motion", "graphic_violence", "phobia_snakes",
                             "violence", "phobia_water", "animal_abuse", "gross_out", "phobia_insects",
                             "death_human", "asphyxiation", "social_issue")),
-            binding("Jusant", "524807049", "Jusant", Set.of(), Set.of()),
+            // Its category comes from an admin game mapping.
+            binding("Jusant", "524807049", "Jusant", Set.of(), Set.of(), "MAPPED"),
             binding("MainFrames", "656286460", "MainFrames", Set.of("DrugsIntoxication"), Set.of())
     );
 
@@ -127,7 +128,12 @@ public final class MockPresets {
 
     private static BindingDto binding(String sourceName, String twitchGameId, String twitchGameName,
                                       Set<String> ccls, Set<String> tws) {
-        return new BindingDto(uuidOf(sourceName).toString(), "AUTO", "STEAM", sourceName, twitchGameId,
+        return binding(sourceName, twitchGameId, twitchGameName, ccls, tws, "AUTO");
+    }
+
+    private static BindingDto binding(String sourceName, String twitchGameId, String twitchGameName,
+                                      Set<String> ccls, Set<String> tws, String status) {
+        return new BindingDto(uuidOf(sourceName).toString(), status, "STEAM", sourceName, twitchGameId,
                 twitchGameName, false, true, ccls, true, false, tws);
     }
 }
