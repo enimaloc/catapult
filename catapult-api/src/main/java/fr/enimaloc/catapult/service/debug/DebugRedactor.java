@@ -13,6 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /** Masks secrets (headers, query / form parameters, JSON fields) in a recorded exchange and truncates bodies. */
@@ -80,6 +81,27 @@ public class DebugRedactor {
         }
         return truncate(text);
     }
+
+    /**
+     * Free text (an exception message, say) that may quote a URL, a form or a JSON fragment: secret
+     * {@code name=value} parameters and JSON fields are masked, then the text is truncated. Null stays null.
+     */
+    public String text(String text, boolean reveal) {
+        if (text == null) {
+            return null;
+        }
+        if (!reveal) {
+            text = maskJsonByRegex(FREE_TEXT_SECRET_PARAM.matcher(text)
+                    .replaceAll(r -> Matcher.quoteReplacement(r.group(1) + "=" + MASK)));
+        }
+        return truncate(text);
+    }
+
+    /** A secret parameter name not glued to a longer name ({@code monkey=} is not {@code key=}), its value up to a separator. */
+    private static final Pattern FREE_TEXT_SECRET_PARAM = Pattern.compile(
+            "(?<![\\w.-])(" + String.join("|", MASKED_PARAMS.stream().map(Pattern::quote).toList()) + ")"
+                    + "=[^&\\s\"'#<>,;)\\]}]*",
+            Pattern.CASE_INSENSITIVE);
 
     private static Charset charset(MediaType type) {
         try {

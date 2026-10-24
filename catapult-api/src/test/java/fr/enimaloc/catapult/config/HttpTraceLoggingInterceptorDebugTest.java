@@ -2,6 +2,8 @@ package fr.enimaloc.catapult.config;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import fr.enimaloc.catapult.domain.debug.DebugExchange.Direction;
 import fr.enimaloc.catapult.service.debug.DebugContext;
 import fr.enimaloc.catapult.service.debug.DebugExchangeRecorder;
@@ -20,6 +22,7 @@ import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.mock.http.client.MockClientHttpRequest;
 import org.springframework.mock.http.client.MockClientHttpResponse;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -27,6 +30,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -184,6 +188,50 @@ class HttpTraceLoggingInterceptorDebugTest {
         });
 
         assertThat(captured.exchanges()).singleElement().satisfies(r -> assertThat(r.error()).contains("nope"));
+    }
+
+    @Test
+    void clientError_isRecorded_andItsBodyStillReadable() {
+        debugged(member);
+        ClientHttpRequestExecution notFound = (request, payload) ->
+                new MockClientHttpResponse("{\"error\":\"nope\"}".getBytes(StandardCharsets.UTF_8), HttpStatus.NOT_FOUND);
+
+        ClientHttpResponse response = DebugContext.callAs(member, () -> call(request(), new byte[0], notFound));
+
+        assertThat(read(response)).isEqualTo("{\"error\":\"nope\"}");
+        ArgumentCaptor<RawExchange> raw = ArgumentCaptor.forClass(RawExchange.class);
+        verify(recorder).record(eq(member), eq(Direction.OUT), raw.capture(), isNull(), eq(false));
+        assertThat(raw.getValue().status()).isEqualTo(404);
+        assertThat(new String(raw.getValue().responseBody(), StandardCharsets.UTF_8)).isEqualTo("{\"error\":\"nope\"}");
+    }
+
+    @Test
+    void traceAndDebug_bodyReadOnce_loggedAndRecorded() {
+        logger.setLevel(Level.TRACE);
+        ListAppender<ILoggingEvent> logs = new ListAppender<>();
+        logs.start();
+        logger.addAppender(logs);
+        debugged(member);
+        AtomicInteger reads = new AtomicInteger();
+        ClientHttpRequestExecution counted = (request, payload) -> new MockClientHttpResponse(new byte[0], HttpStatus.OK) {
+            @Override
+            public InputStream getBody() {
+                reads.incrementAndGet();
+                return new ByteArrayInputStream("once".getBytes(StandardCharsets.UTF_8));
+            }
+        };
+        try {
+            ClientHttpResponse response = DebugContext.callAs(member, () -> call(request(), new byte[0], counted));
+
+            assertThat(read(response)).isEqualTo("once");
+            assertThat(reads).hasValue(1);
+            assertThat(logs.list).anySatisfy(ev -> assertThat(ev.getFormattedMessage()).contains("body=once"));
+            ArgumentCaptor<RawExchange> raw = ArgumentCaptor.forClass(RawExchange.class);
+            verify(recorder).record(eq(member), eq(Direction.OUT), raw.capture(), isNull(), eq(false));
+            assertThat(new String(raw.getValue().responseBody(), StandardCharsets.UTF_8)).isEqualTo("once");
+        } finally {
+            logger.detachAppender(logs);
+        }
     }
 
     private ClientHttpResponse call(MockClientHttpRequest request, byte[] body, ClientHttpRequestExecution execution) {

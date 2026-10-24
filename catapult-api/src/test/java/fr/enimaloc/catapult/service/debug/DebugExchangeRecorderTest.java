@@ -274,4 +274,56 @@ class DebugExchangeRecorderTest {
 
         assertThat(saved().getService()).hasSize(32);
     }
+
+    @Test
+    void error_isRedactedThenMasked() {
+        debugged(false);
+
+        recorder().record(member, Direction.OUT, raw("https://api.twitch.tv/x", null, null,
+                "IOException: https://api.twitch.tv/x?access_token=tok&login=bob"), null, false);
+
+        assertThat(saved().getError()).isEqualTo("IOException: https://api.twitch.tv/x?access_token=[masqué]&login=[membre]");
+    }
+
+    @Test
+    void error_keepsSecretsWhenRevealed() {
+        debugged(true);
+
+        recorder().record(member, Direction.OUT, raw("https://api.twitch.tv/x", null, null,
+                "IOException: https://api.twitch.tv/x?access_token=tok"), null, false);
+
+        assertThat(saved().getError()).isEqualTo("IOException: https://api.twitch.tv/x?access_token=tok");
+    }
+
+    @Test
+    void queueFull_exchangeDropped_callerReturnsAtOnce_oneWarn() throws InterruptedException {
+        debugged(false);
+        CountDownLatch started = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        when(repository.save(any())).thenAnswer(inv -> {
+            started.countDown();
+            release.await(5, TimeUnit.SECONDS);
+            return inv.getArgument(0);
+        });
+        var bounded = DebugExchangeRecorder.boundedExecutor(1, 1);
+        executor = bounded;
+        DebugExchangeRecorder recorder = recorder();
+        try {
+            recorder.record(member, Direction.OUT, raw("https://api.twitch.tv/1", null, null, null), null, false);
+            assertThat(started.await(5, TimeUnit.SECONDS)).isTrue();
+            recorder.record(member, Direction.OUT, raw("https://api.twitch.tv/2", null, null, null), null, false);
+
+            long t0 = System.nanoTime();
+            assertThatCode(() -> {
+                recorder.record(member, Direction.OUT, raw("https://api.twitch.tv/3", null, null, null), null, false);
+                recorder.record(member, Direction.OUT, raw("https://api.twitch.tv/4", null, null, null), null, false);
+            }).doesNotThrowAnyException();
+            assertThat(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - t0)).isLessThan(1000);
+            assertThat(logs.list.stream().filter(ev -> ev.getFormattedMessage().contains("dropped"))).hasSize(1);
+        } finally {
+            release.countDown();
+            recorder.close();
+        }
+        verify(repository, org.mockito.Mockito.times(2)).save(any());
+    }
 }
