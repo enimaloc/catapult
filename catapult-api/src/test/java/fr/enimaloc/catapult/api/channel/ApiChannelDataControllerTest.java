@@ -7,6 +7,8 @@ import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
 import fr.enimaloc.catapult.common.dto.channel.StatusData;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.security.Authz;
+import fr.enimaloc.catapult.security.MethodSecurityConfig;
 import fr.enimaloc.catapult.service.ActivityLogService;
 import fr.enimaloc.catapult.service.account.ChannelAccessService;
 import fr.enimaloc.catapult.service.connections.ConnectionEventService;
@@ -45,7 +47,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         controllers = ApiChannelDataController.class,
         excludeAutoConfiguration = ThymeleafAutoConfiguration.class,
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
-@Import(ApiUserResolver.class)
+@Import({ApiUserResolver.class, MethodSecurityConfig.class, Authz.class})
 class ApiChannelDataControllerTest {
 
     @Autowired MockMvc mvc;

@@ -6,6 +6,8 @@ import fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.CustomBinding;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.security.Authz;
+import fr.enimaloc.catapult.security.MethodSecurityConfig;
 import fr.enimaloc.catapult.service.account.ChannelAccessService;
 import fr.enimaloc.catapult.service.binding.CustomBindingService;
 import fr.enimaloc.catapult.service.binding.CustomBindingService.ActivationResult;
@@ -49,7 +51,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         controllers = ApiChannelCustomBindingsController.class,
         excludeAutoConfiguration = ThymeleafAutoConfiguration.class,
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
-@Import({ApiUserResolver.class, CustomBindingViews.class})
+@Import({ApiUserResolver.class, CustomBindingViews.class, MethodSecurityConfig.class, Authz.class})
 class ApiChannelCustomBindingsControllerTest {
 
     private static final String BODY = """
