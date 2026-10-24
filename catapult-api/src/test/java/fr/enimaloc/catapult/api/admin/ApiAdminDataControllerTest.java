@@ -261,6 +261,28 @@ class ApiAdminDataControllerTest {
     }
 
     @Test
+    void delete_referencedRow_returns409WithoutDatabaseText() throws Exception {
+        chatCommandDefinitionRepository.deleteAll();
+
+        UserAccount owner = new UserAccount();
+        owner.setTwitchUsername("cmd-owner-" + java.util.UUID.randomUUID());
+        owner = userAccountRepository.save(owner);
+
+        ChatCommandDefinition definition = new ChatCommandDefinition();
+        definition.setUser(owner);
+        definition.setName("greet");
+        definition.setTemplate("Hello!");
+        definition.setPermission(ChatCommandEvent.SenderRole.VIEWERS);
+        chatCommandDefinitionRepository.save(definition);
+
+        MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
+        mvc.perform(delete("/api/admin/data/user-account/" + owner.getId()).with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("conflict"))
+                .andExpect(jsonPath("$.detail").value("Cannot delete: referenced by other data"));
+    }
+
+    @Test
     void delete_unknownId_returns404() throws Exception {
         MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
         mvc.perform(delete("/api/admin/data/tw-definition/does-not-exist").with(csrf()))

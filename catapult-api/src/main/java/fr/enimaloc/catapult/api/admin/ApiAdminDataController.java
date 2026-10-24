@@ -16,6 +16,7 @@ import jakarta.persistence.metamodel.Attribute;
 import jakarta.persistence.metamodel.EntityType;
 import jakarta.persistence.metamodel.SingularAttribute;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.hibernate.Hibernate;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -46,6 +47,7 @@ import java.util.Optional;
 @RestController
 @RequestMapping("/api/admin/data")
 @RequiredArgsConstructor
+@Slf4j
 public class ApiAdminDataController {
 
     private final DataRegistry registry;
@@ -168,8 +170,8 @@ public class ApiAdminDataController {
             entry.repository().deleteById(entityId);
             changed(existing);
         } catch (DataIntegrityViolationException e) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
-                "Cannot delete: referenced by other data (" + e.getMostSpecificCause().getMessage() + ")");
+            log.warn("Cannot delete {} {}: referenced by other data", repo, id, e.getMostSpecificCause());
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot delete: referenced by other data");
         }
         return ResponseEntity.noContent().build();
     }
