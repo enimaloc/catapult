@@ -18,7 +18,6 @@ import fr.enimaloc.catapult.common.dto.channel.UpdateBindingRequest;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatSettingsBody;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatSettingsResponse;
-import fr.enimaloc.catapult.common.dto.twitchat.TwitchatValidationError;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.account.UserSettings;
@@ -44,14 +43,12 @@ import fr.enimaloc.catapult.service.connections.SteamProfileDto;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import fr.enimaloc.catapult.service.notification.TwitchatEventActionService;
 import fr.enimaloc.catapult.service.notification.TwitchatEventDispatcher;
-import fr.enimaloc.catapult.service.notification.TwitchatValidationException;
 import fr.enimaloc.catapult.service.notification.TwitchatWidgetSettingsService;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.transaction.annotation.Transactional;
@@ -259,12 +256,6 @@ public class ApiChannelActionsController {
             @RequestBody List<TwitchatEventActionDto> body) {
         UserAccount channelUser = userResolver.channel(username);
         twitchatEventDispatcher.sendTest(channelUser, parseEventType(eventType), body);
-    }
-
-    @ExceptionHandler(TwitchatValidationException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public List<TwitchatValidationError> onInvalidTwitchatPayloads(TwitchatValidationException e) {
-        return e.errors();
     }
 
     private static TwitchatNotificationEventType parseEventType(String raw) {

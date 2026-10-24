@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.api.error;
 
 import fr.enimaloc.catapult.common.error.ErrorCode;
+import fr.enimaloc.catapult.service.notification.TwitchatValidationException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.nio.charset.StandardCharsets;
@@ -63,6 +64,20 @@ public class ProblemAdvice extends ResponseEntityExceptionHandler {
     @SneakyThrows
     public void security(Exception ex) {
         throw ex;
+    }
+
+    /** Refused Twitchat payloads: a 400 whose {@code errors} extension lists every one ({@code index, field, message}). */
+    @ExceptionHandler(TwitchatValidationException.class)
+    @SneakyThrows
+    public ResponseEntity<ProblemDetail> invalidTwitchatPayloads(
+            TwitchatValidationException ex, HttpServletRequest request) {
+        if (FrozenRoutes.isFrozen(request)) {
+            throw ex;
+        }
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        problem.setProperty(ErrorCode.PROPERTY, ErrorCode.TWITCHAT_INVALID_PAYLOAD.code());
+        problem.setProperty("errors", ex.errors());
+        return ResponseEntity.badRequest().body(problem);
     }
 
     @ExceptionHandler(Exception.class)

@@ -1,6 +1,8 @@
 package fr.enimaloc.catapult.api.channel;
 
+import fr.enimaloc.catapult.api.error.ApiProblem;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
+import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatValidationError;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.twitchat.TwitchatEventAction;
@@ -88,8 +90,22 @@ class ApiChannelActionsTwitchatEventsTest extends ApiChannelActionsTestSupport {
         mvc.perform(put("/api/channels/streamer/twitchat/events/STREAM_STARTED/actions")
                         .with(userJwt(userId)).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$[0].index").value(0))
-                .andExpect(jsonPath("$[0].field").value("message"));
+                .andExpect(jsonPath("$.code").value("twitchat_invalid_payload"))
+                .andExpect(jsonPath("$.errors[0].index").value(0))
+                .andExpect(jsonPath("$.errors[0].field").value("message"));
+    }
+
+    @Test
+    void testWithTheWidgetDisabled_isAProblem() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UserAccount user = stubOwner(userId);
+        doThrow(new ApiProblem(ErrorCode.TWITCHAT_WIDGET_DISABLED, "The Twitchat widget is disabled: enable it to test"))
+                .when(twitchatEventDispatcher).sendTest(eq(user), any(), any());
+
+        mvc.perform(post("/api/channels/streamer/twitchat/events/NO_GAME_DETECTED/test")
+                        .with(userJwt(userId)).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(BODY))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("twitchat_widget_disabled"));
     }
 
     @Test

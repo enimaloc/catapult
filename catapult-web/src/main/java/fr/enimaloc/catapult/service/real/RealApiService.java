@@ -112,7 +112,11 @@ import fr.enimaloc.catapult.service.ActivationOutcome;
 import fr.enimaloc.catapult.service.CustomBindingSave;
 import tools.jackson.databind.JsonNode;
 import fr.enimaloc.catapult.service.ApiService;
+import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.service.http.ApiClient;
+import fr.enimaloc.catapult.service.http.ApiError;
+import fr.enimaloc.catapult.service.http.ApiErrorText;
+import org.springframework.context.i18n.LocaleContextHolder;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.ParameterizedTypeReference;
@@ -157,6 +161,7 @@ public class RealApiService implements ApiService {
     private static final tools.jackson.databind.json.JsonMapper SAVE_JSON = tools.jackson.databind.json.JsonMapper.builder().build();
 
     private final ApiClient client;
+    private final ApiErrorText errorText;
 
     @Override
     public TokenResponse exchangeCode(String code) {
@@ -412,13 +417,13 @@ public class RealApiService implements ApiService {
     @Override
     public List<TwitchatValidationError> saveTwitchatEvent(String username, String eventType, List<TwitchatEventActionDto> payloads) {
         return errors(client.call(HttpMethod.PUT, "/api/channels/{username}/twitchat/events/{eventType}/actions",
-                payloads, TwitchatValidationError[].class, username, eventType));
+                payloads, Void.class, username, eventType));
     }
 
     @Override
     public List<TwitchatValidationError> testTwitchatEvent(String username, String eventType, List<TwitchatEventActionDto> payloads) {
         return errors(client.call(HttpMethod.POST, "/api/channels/{username}/twitchat/events/{eventType}/test",
-                payloads, TwitchatValidationError[].class, username, eventType));
+                payloads, Void.class, username, eventType));
     }
 
     @Override
@@ -652,11 +657,19 @@ public class RealApiService implements ApiService {
         return client.call(HttpMethod.DELETE, "/api/admin/data/{repo}/{id}", null, Void.class, repo, id).status();
     }
 
-    /** No error when it went through; a 4xx/5xx without a list becomes one error naming the status. */
-    private static List<TwitchatValidationError> errors(ApiClient.Result<TwitchatValidationError[]> result) {
+    /**
+     * No error when it went through; refused payloads are the problem's list; any other refusal is one error with
+     * this app's own text for its code, else naming the status.
+     */
+    private List<TwitchatValidationError> errors(ApiClient.Result<Void> result) {
         if (result.ok()) return List.of();
-        if (result.body() != null) return List.of(result.body());
-        return List.of(new TwitchatValidationError(-1, "", "HTTP " + result.status()));
+        ApiError error = result.error();
+        if (error != null && error.code() == ErrorCode.TWITCHAT_INVALID_PAYLOAD) {
+            TwitchatValidationError[] listed = error.property("errors", TwitchatValidationError[].class);
+            if (listed != null) return List.of(listed);
+        }
+        return List.of(new TwitchatValidationError(-1, "",
+                errorText.text(error, LocaleContextHolder.getLocale()).orElse("HTTP " + result.status())));
     }
 
     @Override

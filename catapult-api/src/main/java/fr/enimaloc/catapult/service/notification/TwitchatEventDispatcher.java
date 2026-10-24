@@ -1,9 +1,11 @@
 package fr.enimaloc.catapult.service.notification;
 
+import fr.enimaloc.catapult.api.error.ApiProblem;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatActionType;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatDispatch;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatPayload;
+import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.common.twitchat.TwitchatPayloadRenderer;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
@@ -15,9 +17,7 @@ import fr.enimaloc.catapult.service.binding.GameStateService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.event.EventListener;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -141,8 +141,8 @@ public class TwitchatEventDispatcher {
      */
     public void sendTest(UserAccount user, TwitchatNotificationEventType type, List<TwitchatEventActionDto> payloads) {
         if (!widgetSettingsService.isEnabled(user)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Le widget Twitchat est désactivé : active-le pour pouvoir tester.");
+            throw new ApiProblem(ErrorCode.TWITCHAT_WIDGET_DISABLED,
+                    "The Twitchat widget is disabled: enable it to test");
         }
         eventActionService.validate(payloads);
         TwitchatPayloadRenderer renderer = new TwitchatPayloadRenderer(variables(user, TEST_GAMES),

@@ -21,6 +21,10 @@ import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetAccessResponse;
 import fr.enimaloc.catapult.service.http.ApiClient;
+import fr.enimaloc.catapult.service.http.ApiErrorText;
+import java.util.Locale;
+import org.springframework.context.i18n.LocaleContextHolder;
+import org.springframework.context.support.StaticMessageSource;
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -53,7 +57,9 @@ class RealApiServiceTest {
     void setUp() {
         RestClient.Builder builder = RestClient.builder();
         api = MockRestServiceServer.bindTo(builder).build();
-        service = new RealApiService(new ApiClient(API, builder));
+        StaticMessageSource messages = new StaticMessageSource();
+        messages.addMessage("api.error.twitchat_widget_disabled", Locale.FRENCH, "Widget desactive");
+        service = new RealApiService(new ApiClient(API, builder), new ApiErrorText(messages));
     }
 
     @AfterEach
@@ -591,13 +597,49 @@ class RealApiServiceTest {
     }
 
     @Test
-    void saveTwitchatEvent_relaysTheValidationErrors() {
+    void saveTwitchatEvent_listsTheProblemsErrors() {
         expect(HttpMethod.PUT, "/api/channels/streamer/twitchat/events/STREAM_STARTED/actions")
-                .andRespond(withStatus(HttpStatus.BAD_REQUEST).contentType(MediaType.APPLICATION_JSON)
-                        .body("[{\"index\":0,\"field\":\"message\",\"message\":\"Required\"}]"));
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST).contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                        .body("{\"status\":400,\"code\":\"twitchat_invalid_payload\","
+                                + "\"errors\":[{\"index\":0,\"field\":\"message\",\"message\":\"Required\"}]}"));
 
         assertThat(service.saveTwitchatEvent("streamer", "STREAM_STARTED", List.of()))
                 .containsExactly(new TwitchatValidationError(0, "message", "Required"));
+    }
+
+    @Test
+    void saveTwitchatEvent_problemWithoutItsList_isTheStatus() {
+        expect(HttpMethod.PUT, "/api/channels/streamer/twitchat/events/STREAM_STARTED/actions")
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST).contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                        .body("{\"status\":400,\"code\":\"twitchat_invalid_payload\"}"));
+
+        assertThat(service.saveTwitchatEvent("streamer", "STREAM_STARTED", List.of()))
+                .containsExactly(new TwitchatValidationError(-1, "", "HTTP 400"));
+    }
+
+    @Test
+    void testTwitchatEvent_widgetDisabled_isTheWebsOwnText() {
+        expect(HttpMethod.POST, "/api/channels/streamer/twitchat/events/STREAM_STARTED/test")
+                .andRespond(withStatus(HttpStatus.CONFLICT).contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                        .body("{\"status\":409,\"detail\":\"The Twitchat widget is disabled: enable it to test\","
+                                + "\"code\":\"twitchat_widget_disabled\"}"));
+
+        LocaleContextHolder.setLocale(Locale.FRENCH);
+        try {
+            assertThat(service.testTwitchatEvent("streamer", "STREAM_STARTED", List.of()))
+                    .containsExactly(new TwitchatValidationError(-1, "", "Widget desactive"));
+        } finally {
+            LocaleContextHolder.resetLocaleContext();
+        }
+    }
+
+    @Test
+    void testTwitchatEvent_otherRefusal_isTheStatus() {
+        expect(HttpMethod.POST, "/api/channels/streamer/twitchat/events/STREAM_STARTED/test")
+                .andRespond(withStatus(HttpStatus.FORBIDDEN));
+
+        assertThat(service.testTwitchatEvent("streamer", "STREAM_STARTED", List.of()))
+                .containsExactly(new TwitchatValidationError(-1, "", "HTTP 403"));
     }
 
     @Test
