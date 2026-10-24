@@ -523,6 +523,63 @@ class DebugSentryConfigTest {
         }
     }
 
+    @Test
+    void gitlabExchange_reachesSentryThroughTheBridge_withoutItsPrivateToken() throws Exception {
+        RecordingSentry sentry = startSentry();
+        DebugRedactor redactor = new DebugRedactor();
+        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+        headers.add("PRIVATE-TOKEN", "glpat-" + SECRET);
+        headers.add("Content-Type", "application/json");
+        fr.enimaloc.catapult.domain.debug.DebugExchange exchange = new fr.enimaloc.catapult.domain.debug.DebugExchange();
+        exchange.setUserId(debugged);
+        exchange.setOccurredAt(java.time.Instant.now());
+        exchange.setDirection(fr.enimaloc.catapult.domain.debug.DebugExchange.Direction.OUT);
+        exchange.setService("gitlab");
+        exchange.setMethod("POST");
+        exchange.setUrl("https://git.enimaloc.fr/api/v4/projects/1/issues");
+        exchange.setRequestHeaders(redactor.headers(headers, false));
+        exchange.setRequestBody("{}");
+        exchange.setStatus(201);
+
+        DebugContext.runAs(debugged, () -> new fr.enimaloc.catapult.service.debug.DebugSentryBridge()
+                .onRecorded(debugged, exchange));
+
+        var logs = sentry.items(SentryItemType.Log);
+        assertThat(logs).isNotEmpty();
+        for (var item : sentry.items()) {
+            String sent = new String(item.getData(), java.nio.charset.StandardCharsets.UTF_8);
+            assertThat(sent).doesNotContain(SECRET);
+        }
+        assertThat(new String(logs.getFirst().getData(), java.nio.charset.StandardCharsets.UTF_8))
+                .contains("PRIVATE-TOKEN: [masqué]");
+    }
+
+    @Test
+    void beforeSendLog_masksAPrivateTokenHeaderAndABearerQuotedInAnAttribute() {
+        SentryLogEvent log = log();
+        log.setAttribute("request_headers", new io.sentry.SentryLogEventAttributeValue(
+                io.sentry.SentryAttributeType.STRING, "PRIVATE-TOKEN: glpat-" + SECRET + "\nAccept: */*"));
+        log.setAttribute("error", new io.sentry.SentryLogEventAttributeValue(
+                io.sentry.SentryAttributeType.STRING, "401 with Bearer " + SECRET));
+
+        SentryLogEvent kept = DebugContext.callAs(debugged, () -> config.beforeSendLog().execute(log));
+
+        assertThat((String) kept.getAttributes().get("request_headers").getValue())
+                .isEqualTo("PRIVATE-TOKEN: [masqué]\nAccept: */*");
+        assertThat((String) kept.getAttributes().get("error").getValue()).isEqualTo("401 with Bearer [masqué]");
+    }
+
+    @Test
+    void beforeSend_masksSecretsInsideTheRequestHeaderValues() {
+        SentryEvent event = eventWithRequest();
+        event.getRequest().getHeaders().put("Referer", "https://catapult.test/connect/cb?code=" + SECRET + "&state=1");
+        event.getRequest().getHeaders().put("Private-Token", SECRET);
+        SentryEvent masked = DebugContext.callAs(debugged, () -> config.beforeSend().execute(event, new Hint()));
+        assertThat(masked.getRequest().getHeaders())
+                .containsEntry("Referer", "https://catapult.test/connect/cb?code=[masqué]&state=1")
+                .containsEntry("Private-Token", "[masqué]");
+    }
+
     // ---------------------------------------------------------------- unsampled requests
 
     @Test
