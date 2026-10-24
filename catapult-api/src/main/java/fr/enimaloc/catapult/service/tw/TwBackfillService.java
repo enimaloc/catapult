@@ -176,11 +176,7 @@ public class TwBackfillService {
      * throttles. Returns {@code false} when interrupted during the throttle sleep.
      */
     private boolean remap(GameBinding b, String mode, Counts c, long sleepMs) {
-        if (b.getUser() != null) {
-            DebugContext.runAs(b.getUser().getId(), () -> resolveTws(b, mode, c));
-        } else {
-            resolveTws(b, mode, c);
-        }
+        DebugContext.runAs(b.getUser().getId(), () -> resolveTws(b, mode, c));
         try {
             Thread.sleep(sleepMs);
         } catch (InterruptedException ie) {

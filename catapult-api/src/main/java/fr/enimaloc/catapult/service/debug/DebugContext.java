@@ -40,7 +40,11 @@ public final class DebugContext {
         });
     }
 
-    /** A {@code null} member (an entity not saved yet) runs the work without a subject rather than failing it. */
+    /**
+     * Runs {@code s} as {@code userId}, restoring the previous subject afterwards. A {@code null} member (an entity
+     * not saved yet) runs the work without a subject rather than failing it, which also clears an outer subject for
+     * its duration.
+     */
     public static <T> T callAs(UUID userId, Supplier<T> s) {
         if (userId == null) {
             return runWithoutSubject(s);
