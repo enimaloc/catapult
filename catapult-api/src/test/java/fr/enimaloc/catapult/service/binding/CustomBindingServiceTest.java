@@ -12,7 +12,6 @@ import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
-import fr.enimaloc.catapult.repository.binding.CustomBindingActivationRepository;
 import fr.enimaloc.catapult.repository.binding.CustomBindingRepository;
 import fr.enimaloc.catapult.service.binding.CustomBindingService.ActivationResult;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
@@ -28,6 +27,7 @@ import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -40,6 +40,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -52,7 +53,7 @@ import static org.mockito.Mockito.when;
 class CustomBindingServiceTest {
 
     @Mock private CustomBindingRepository bindings;
-    @Mock private CustomBindingActivationRepository activations;
+    @Mock private CustomBindingActivations activations;
     @Mock private TwitchService twitchService;
     @Mock private ExperimentService experimentService;
     @Mock private GameStateService gameStateService;
@@ -72,13 +73,14 @@ class CustomBindingServiceTest {
         user = new UserAccount();
         user.setId(UUID.randomUUID());
         user.setBotEnabled(true);
+        user.setStatus(UserAccount.Status.ACTIVE);
+        lenient().when(userAccountRepository.findById(user.getId())).thenReturn(Optional.of(user));
         lenient().when(experimentService.evaluateGate(user, CustomBindingService.EXPERIMENT_KEY)).thenReturn(true);
         lenient().when(bindings.save(any(CustomBinding.class))).thenAnswer(inv -> {
             CustomBinding b = inv.getArgument(0);
             if (b.getId() == null) b.setId(UUID.randomUUID());
             return b;
         });
-        lenient().when(activations.save(any(CustomBindingActivation.class))).thenAnswer(inv -> inv.getArgument(0));
     }
 
     private static CustomBindingRequest request(String name) {
@@ -167,14 +169,58 @@ class CustomBindingServiceTest {
         assertStatus(() -> service.update(user, art.getId(), request("dev")), HttpStatus.CONFLICT);
 
         when(bindings.findByUserAndNameIgnoreCase(user, "ART")).thenReturn(Optional.of(art));
-        CustomBinding updated = service.update(user, art.getId(),
+        CustomBindingService.UpdateResult result = service.update(user, art.getId(),
                 new CustomBindingRequest("ART", "1469308723", "Software and Game Development", Set.of(), Set.of(), true));
+        CustomBinding updated = result.binding();
 
         assertThat(updated.getName()).isEqualTo("ART");
         assertThat(updated.getTwitchGameId()).isEqualTo("1469308723");
         assertThat(updated.getCcls()).isEmpty();
         assertThat(updated.isUninterruptible()).isTrue();
         verify(channelEventPublisher).customBindingsUpdated(user.getId());
+        // Not the active one: saved only
+        assertThat(result.reapplied()).isNull();
+        verifyNoInteractions(twitchService);
+    }
+
+    @Test
+    void updateActive_isSaved_thenReappliedToTwitch_andStaysActiveWhateverTwitchSays() {
+        CustomBinding art = binding("Art");
+        when(bindings.findByIdAndUser(art.getId(), user)).thenReturn(Optional.of(art));
+        when(bindings.findByUserAndNameIgnoreCase(user, "Art")).thenReturn(Optional.of(art));
+        givenActive(art);
+        when(twitchService.updateChannelReporting(eq(user), any()))
+                .thenReturn(ChannelUpdateOutcome.APPLIED, ChannelUpdateOutcome.FAILED);
+        when(oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH))
+                .thenReturn(Optional.of(new OAuthToken()));
+        CustomBindingRequest dev = new CustomBindingRequest("Art", "1469308723", "Software and Game Development",
+                Set.of(), Set.of(), false);
+
+        assertThat(service.update(user, art.getId(), dev).reapplied()).isEqualTo(ActivationResult.APPLIED);
+        assertThat(service.update(user, art.getId(), dev).reapplied()).isEqualTo(ActivationResult.FAILED);
+
+        ArgumentCaptor<GameBinding> applied = ArgumentCaptor.forClass(GameBinding.class);
+        InOrder order = inOrder(bindings, twitchService);
+        order.verify(bindings).save(art);
+        order.verify(twitchService).updateChannelReporting(eq(user), applied.capture());
+        assertThat(applied.getValue().getTwitchGameId()).isEqualTo("1469308723");
+        verify(bindings, times(2)).save(art);
+        // Kept active either way: neither re-recorded nor cleared
+        verify(activations, never()).record(any(), any());
+        verify(activations, never()).clear(any());
+    }
+
+    @Test
+    void save_onlyTheUniqueNameViolation_isANameConflict() {
+        when(bindings.findByUserAndNameIgnoreCase(user, "Art")).thenReturn(Optional.empty());
+        doThrow(new DataIntegrityViolationException("dup", new org.hibernate.exception.ConstraintViolationException(
+                        "duplicate key", new java.sql.SQLException("duplicate key"), "uq_custom_binding_user_name")))
+                .doThrow(new DataIntegrityViolationException("fk", new org.hibernate.exception.ConstraintViolationException(
+                        "fk", new java.sql.SQLException("fk"), "custom_binding_user_id_fkey")))
+                .when(bindings).save(any(CustomBinding.class));
+
+        assertStatus(() -> service.create(user, request("Art")), HttpStatus.CONFLICT);
+        assertThatThrownBy(() -> service.create(user, request("Art"))).isInstanceOf(DataIntegrityViolationException.class);
     }
 
     @Test
@@ -228,12 +274,7 @@ class CustomBindingServiceTest {
         assertThat(transientBinding.getCcls()).containsExactly("ProfanityVulgarity");
         assertThat(transientBinding.getTws()).containsExactly("chill");
 
-        ArgumentCaptor<CustomBindingActivation> recorded = ArgumentCaptor.forClass(CustomBindingActivation.class);
-        verify(activations).save(recorded.capture());
-        assertThat(recorded.getValue().getUserId()).isEqualTo(user.getId());
-        assertThat(recorded.getValue().getCustomBinding()).isSameAs(art);
-        assertThat(recorded.getValue().getActivatedAt()).isNotNull();
-        verify(channelEventPublisher).customBindingChanged(user.getId(), art.getId());
+        verify(activations).record(user, art);
         verify(streamStateService, never()).storePending(any(), any());
     }
 
@@ -246,12 +287,10 @@ class CustomBindingServiceTest {
         service.activate(user, art);
         service.activate(user, dev);
 
-        ArgumentCaptor<CustomBindingActivation> recorded = ArgumentCaptor.forClass(CustomBindingActivation.class);
-        verify(activations, times(2)).save(recorded.capture());
-        CustomBindingActivation last = recorded.getAllValues().get(1);
-        assertThat(last.getUserId()).isEqualTo(user.getId());
-        assertThat(last.getCustomBinding()).isSameAs(dev);
-        verify(channelEventPublisher).customBindingChanged(user.getId(), dev.getId());
+        InOrder order = inOrder(activations);
+        order.verify(activations).record(user, art);
+        order.verify(activations).record(user, dev);
+        verify(activations, never()).clear(any());
         // Replacing is not a deactivation: the open game does not get a turn in between
         verifyNoInteractions(gameEventListener);
     }
@@ -259,15 +298,14 @@ class CustomBindingServiceTest {
     @Test
     void reactivate_sameOne_reappliesWithoutError() {
         CustomBinding art = binding("Art");
-        lenient().when(activations.findById(user.getId()))
+        lenient().when(activations.active(user))
                 .thenReturn(Optional.of(new CustomBindingActivation(user.getId(), art, java.time.Instant.EPOCH)));
         when(twitchService.updateChannelReporting(eq(user), any())).thenReturn(ChannelUpdateOutcome.APPLIED);
 
         assertThat(service.activate(user, art)).isEqualTo(ActivationResult.APPLIED);
 
         verify(twitchService).updateChannelReporting(eq(user), any());
-        verify(activations).save(any(CustomBindingActivation.class));
-        verify(channelEventPublisher).customBindingChanged(user.getId(), art.getId());
+        verify(activations).record(user, art);
     }
 
     @Test
@@ -276,31 +314,59 @@ class CustomBindingServiceTest {
         OAuthToken token = new OAuthToken();
         lenient().when(oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH))
                 .thenReturn(Optional.of(token));
-        lenient().when(userAccountRepository.findById(user.getId())).thenReturn(Optional.of(user));
 
-        // Twitch refused or failed the update, the token still being there
+        // Twitch refused or failed the update, the token still being there and the bot still on
         when(twitchService.updateChannelReporting(eq(user), any())).thenReturn(ChannelUpdateOutcome.FAILED);
         assertThat(service.activate(user, art)).isEqualTo(ActivationResult.FAILED);
 
-        // Bot paused (what a refused token leads to) or account not active: nothing could be sent
-        when(twitchService.updateChannelReporting(eq(user), any())).thenReturn(ChannelUpdateOutcome.SKIPPED);
-        assertThat(service.activate(user, art)).isEqualTo(ActivationResult.TWITCH_UNAVAILABLE);
-
         // No Twitch token at all
-        when(twitchService.updateChannelReporting(eq(user), any())).thenReturn(ChannelUpdateOutcome.FAILED);
         when(oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)).thenReturn(Optional.empty());
         assertThat(service.activate(user, art)).isEqualTo(ActivationResult.TWITCH_UNAVAILABLE);
 
-        // The token was just refused: TwitchServiceImpl paused the bot while failing
+        // The token was refused during the call: TwitchServiceImpl paused the bot while failing
         UserAccount paused = new UserAccount();
         paused.setId(user.getId());
         paused.setBotEnabled(false);
         when(oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)).thenReturn(Optional.of(token));
-        when(userAccountRepository.findById(user.getId())).thenReturn(Optional.of(paused));
+        when(userAccountRepository.findById(user.getId())).thenReturn(Optional.of(user), Optional.of(paused));
         assertThat(service.activate(user, art)).isEqualTo(ActivationResult.TWITCH_UNAVAILABLE);
 
-        verify(activations, never()).save(any());
-        verify(channelEventPublisher, never()).customBindingChanged(any(), any());
+        verify(activations, never()).record(any(), any());
+    }
+
+    @Test
+    void activate_botPaused_isBotDisabled_withoutCallingTwitch() {
+        UserAccount paused = new UserAccount();
+        paused.setId(user.getId());
+        paused.setBotEnabled(false);
+        when(userAccountRepository.findById(user.getId())).thenReturn(Optional.of(paused));
+
+        assertThat(service.activate(user, binding("Art"))).isEqualTo(ActivationResult.BOT_DISABLED);
+
+        verifyNoInteractions(twitchService, oAuthTokenRepository);
+        verify(activations, never()).record(any(), any());
+    }
+
+    @Test
+    void activate_accountNotActive_isBotDisabled_withoutCallingTwitch() {
+        UserAccount leaving = new UserAccount();
+        leaving.setId(user.getId());
+        leaving.setBotEnabled(true);
+        leaving.setStatus(UserAccount.Status.PENDING_DELETION);
+        when(userAccountRepository.findById(user.getId())).thenReturn(Optional.of(leaving));
+
+        assertThat(service.activate(user, binding("Art"))).isEqualTo(ActivationResult.BOT_DISABLED);
+
+        verifyNoInteractions(twitchService);
+        verify(activations, never()).record(any(), any());
+    }
+
+    @Test
+    void activate_botPausedBetweenTheCheckAndTheCall_isBotDisabled() {
+        when(twitchService.updateChannelReporting(eq(user), any())).thenReturn(ChannelUpdateOutcome.SKIPPED);
+
+        assertThat(service.activate(user, binding("Art"))).isEqualTo(ActivationResult.BOT_DISABLED);
+        verify(activations, never()).record(any(), any());
     }
 
     @Test
@@ -317,7 +383,7 @@ class CustomBindingServiceTest {
     @Test
     void active_returnsTheRecordedActivation() {
         CustomBindingActivation activation = new CustomBindingActivation(user.getId(), binding("Art"), java.time.Instant.EPOCH);
-        when(activations.findById(user.getId())).thenReturn(Optional.of(activation));
+        when(activations.active(user)).thenReturn(Optional.of(activation));
 
         assertThat(service.active(user)).contains(activation);
     }
@@ -325,7 +391,7 @@ class CustomBindingServiceTest {
     // ── Deactivation ─────────────────────────────────────────────────────────
 
     private void givenActive(CustomBinding binding) {
-        when(activations.findById(user.getId()))
+        lenient().when(activations.active(user))
                 .thenReturn(Optional.of(new CustomBindingActivation(user.getId(), binding, java.time.Instant.EPOCH)));
     }
 
@@ -339,11 +405,10 @@ class CustomBindingServiceTest {
         service.deactivate(user);
 
         InOrder order = inOrder(activations, gameEventListener);
-        order.verify(activations).deleteById(user.getId());
+        order.verify(activations).clear(user);
         order.verify(gameEventListener).applyDetectedGame(user, game);
         verify(gameEventListener, never()).applyNoGameFallback(any());
         verify(twitchService, never()).resetToDefault(any());
-        verify(channelEventPublisher).customBindingChanged(user.getId(), null);
     }
 
     @Test
@@ -354,11 +419,10 @@ class CustomBindingServiceTest {
 
         service.deactivate(user);
 
-        verify(activations).deleteById(user.getId());
+        verify(activations).clear(user);
         verify(gameEventListener).applyNoGameFallback(user);
         verify(gameEventListener, never()).applyDetectedGame(any(), any());
         verify(twitchService, never()).resetToDefault(any());
-        verify(channelEventPublisher).customBindingChanged(user.getId(), null);
     }
 
     @Test
@@ -375,10 +439,9 @@ class CustomBindingServiceTest {
 
         // Offline, a detection stores the game's binding pending (GameEventListener#applyDetectedGame)
         InOrder order = inOrder(activations, gameEventListener, twitchService);
-        order.verify(activations).deleteById(user.getId());
+        order.verify(activations).clear(user);
         order.verify(gameEventListener).applyDetectedGame(user, game);
         order.verify(twitchService).resetToDefault(user);
-        verify(channelEventPublisher).customBindingChanged(user.getId(), null);
     }
 
     @Test
@@ -392,7 +455,7 @@ class CustomBindingServiceTest {
 
         service.deactivate(user);
 
-        verify(activations).deleteById(user.getId());
+        verify(activations).clear(user);
         verify(twitchService, never()).resetToDefault(any());
         verify(twitchService, never()).updateChannel(any(), any());
         verify(gameEventListener, never()).applyDetectedGame(any(), any());
@@ -400,11 +463,11 @@ class CustomBindingServiceTest {
 
     @Test
     void deactivate_nothingActive_doesNothing() {
-        when(activations.findById(user.getId())).thenReturn(Optional.empty());
+        when(activations.active(user)).thenReturn(Optional.empty());
 
         service.deactivate(user);
 
-        verify(activations, never()).deleteById(any());
+        verify(activations, never()).clear(any());
         verifyNoInteractions(gameEventListener, twitchService, channelEventPublisher);
     }
 
@@ -421,8 +484,7 @@ class CustomBindingServiceTest {
         service.delete(user, art.getId());
 
         InOrder order = inOrder(activations, gameEventListener, bindings, channelEventPublisher);
-        order.verify(activations).deleteById(user.getId());
-        order.verify(channelEventPublisher).customBindingChanged(user.getId(), null);
+        order.verify(activations).clear(user);
         order.verify(gameEventListener).applyNoGameFallback(user);
         order.verify(bindings).delete(art);
         order.verify(channelEventPublisher).customBindingsUpdated(user.getId());
@@ -438,7 +500,7 @@ class CustomBindingServiceTest {
         service.delete(user, art.getId());
 
         verify(bindings).delete(art);
-        verify(activations, never()).deleteById(any());
+        verify(activations, never()).clear(any());
         verifyNoInteractions(gameEventListener, twitchService);
         verify(channelEventPublisher).customBindingsUpdated(user.getId());
     }
@@ -457,8 +519,6 @@ class CustomBindingServiceTest {
     void gateClosed_everyOperationIsForbidden() {
         when(experimentService.evaluateGate(user, CustomBindingService.EXPERIMENT_KEY)).thenReturn(false);
         CustomBinding art = binding("Art");
-        lenient().when(activations.findById(user.getId()))
-                .thenReturn(Optional.of(new CustomBindingActivation(user.getId(), art, java.time.Instant.EPOCH)));
 
         assertThat(service.enabled(user)).isFalse();
         assertStatus(() -> service.list(user), HttpStatus.FORBIDDEN);
@@ -468,13 +528,11 @@ class CustomBindingServiceTest {
         assertStatus(() -> service.resolve(user, "Art"), HttpStatus.FORBIDDEN);
         assertStatus(() -> service.activate(user, art), HttpStatus.FORBIDDEN);
         assertStatus(() -> service.deactivate(user), HttpStatus.FORBIDDEN);
-        // An activation left from before the member left the experiment counts as none
-        assertThat(service.active(user)).isEmpty();
-
         verifyNoInteractions(twitchService, gameEventListener);
         verify(bindings, never()).save(any());
         verify(bindings, never()).delete(any());
-        verify(activations, never()).save(any());
+        verify(activations, never()).record(any(), any());
+        verify(activations, never()).clear(any());
     }
 
     @Test
