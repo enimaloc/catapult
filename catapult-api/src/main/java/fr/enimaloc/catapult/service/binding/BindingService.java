@@ -2,9 +2,11 @@ package fr.enimaloc.catapult.service.binding;
 
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
+import fr.enimaloc.catapult.domain.binding.GameMapping;
 import fr.enimaloc.catapult.domain.igdb.IgdbGameDetails;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
+import fr.enimaloc.catapult.repository.binding.GameMappingRepository;
 import fr.enimaloc.catapult.service.igdb.IgdbGameDetailsService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.tw.TwResolverService;
@@ -15,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -31,6 +34,7 @@ public class BindingService {
     private final TwitchService twitchService;
     private final TwResolverService twResolverService;
     private final GameStateService gameStateService;
+    private final GameMappingRepository gameMappingRepository;
 
     private boolean isActiveBinding(UserAccount user, GameBinding binding) {
         return gameStateService.getLastKnownGame(user)
@@ -105,7 +109,71 @@ public class BindingService {
         return updateWithIgdbResolution(user, detectedGame, binding);
     }
 
+    /**
+     * Resolves the binding's category and saves it: from the admin game mapping of its game when there is one
+     * (MAPPED), else from IGDB (AUTO, or INCOMPLETE when IGDB finds no Twitch category).
+     */
     private GameBinding updateWithIgdbResolution(UserAccount user, DetectedGame detectedGame, GameBinding binding) {
+        // A MANUAL binding only gets here through resetTws: it keeps being re-resolved from IGDB, as before mappings.
+        boolean mappable = binding.getStatus() != GameBinding.Status.MANUAL && detectedGame.getSourceId() != null;
+        Optional<GameMapping> mapping = mappable
+                ? gameMappingRepository.findBySourceTypeAndSourceId(
+                        detectedGame.getSourceType(), detectedGame.getSourceId())
+                : Optional.empty();
+        if (mapping.isPresent()) {
+            applyMapping(binding, mapping.get());
+            log.info("Binding updated as MAPPED for user {} — game '{}' mapped by an admin to '{}' (twitchId={})",
+                    user.getId(), detectedGame.getSourceName(), binding.getTwitchGameName(), binding.getTwitchGameId());
+            return gameBindingRepository.save(binding);
+        }
+        return updateWithoutMapping(user, detectedGame, binding);
+    }
+
+    /**
+     * Applies an admin game mapping to a binding of its game, without saving it: MAPPED, the mapping's category,
+     * the admin's CCLs/TWs when the mapping replaces them (else IGDB's), the streamer's TWs when pinned
+     * ({@code twOverride}). The streamer's toggles (ignored, cclEnabled, twEnabled) stay as they are.
+     *
+     * @return whether the binding changed; always false for a MANUAL binding, which is never touched.
+     */
+    public boolean applyMapping(GameBinding binding, GameMapping mapping) {
+        if (binding.getStatus() == GameBinding.Status.MANUAL) return false;
+
+        DetectedGame game = detectedOf(binding);
+        boolean keepsTws = binding.isTwOverride() || mapping.isTwsOverridden();
+        Optional<String> igdbId = mapping.isCclsOverridden() && keepsTws
+                ? Optional.empty()
+                : resolveViaIgdb(game).map(IgdbService.IgdbGame::id);
+        Set<String> ccls = mapping.isCclsOverridden()
+                ? Set.copyOf(mapping.getCcls())
+                : igdbId.map(igdbService::suggestCcls).orElse(Set.of());
+        Set<String> tws = binding.isTwOverride() ? Set.copyOf(binding.getTws())
+                : mapping.isTwsOverridden() ? Set.copyOf(mapping.getTws())
+                : igdbId.map(id -> suggestTws(id, game)).orElse(Set.of());
+
+        boolean changed = binding.getStatus() != GameBinding.Status.MAPPED
+                || !Objects.equals(binding.getTwitchGameId(), mapping.getTwitchGameId())
+                || !Objects.equals(binding.getTwitchGameName(), mapping.getTwitchGameName())
+                || !binding.getCcls().equals(ccls)
+                || !binding.getTws().equals(tws);
+
+        binding.setStatus(GameBinding.Status.MAPPED);
+        binding.setTwitchGameId(mapping.getTwitchGameId());
+        binding.setTwitchGameName(mapping.getTwitchGameName());
+        binding.getCcls().clear();
+        binding.getCcls().addAll(ccls);
+        binding.getTws().clear();
+        binding.getTws().addAll(tws);
+        return changed;
+    }
+
+    /** Resolves and saves the binding from IGDB alone, its game's mapping ignored — for a deleted mapping. */
+    @Transactional
+    public GameBinding resolveWithoutMapping(GameBinding binding) {
+        return updateWithoutMapping(binding.getUser(), detectedOf(binding), binding);
+    }
+
+    private GameBinding updateWithoutMapping(UserAccount user, DetectedGame detectedGame, GameBinding binding) {
         Optional<IgdbService.IgdbGame> igdbGame = resolveViaIgdb(detectedGame);
 
         if (igdbGame.isPresent()) {
