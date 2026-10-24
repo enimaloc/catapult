@@ -13,6 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /** Masks secrets (headers, query / form parameters, JSON fields) in a recorded exchange and truncates bodies. */
 @Component
@@ -25,7 +26,7 @@ public class DebugRedactor {
             "authorization", "cookie", "set-cookie", "x-api-key", "proxy-authorization");
     private static final Set<String> MASKED_PARAMS = Set.of(
             "key", "api_key", "apikey", "access_token", "refresh_token", "id_token", "client_secret",
-            "token", "password", "code", "openid.sig");
+            "token", "password", "code", "device_code", "openid.sig");
 
     private final JsonMapper json = JsonMapper.builder().build();
 
@@ -68,7 +69,7 @@ public class DebugRedactor {
         if (bytes == null || bytes.length == 0) {
             return "";
         }
-        Charset cs = type != null && type.getCharset() != null ? type.getCharset() : StandardCharsets.UTF_8;
+        Charset cs = charset(type);
         String text = new String(bytes, cs);
         if (!reveal && type != null) {
             if (MediaType.APPLICATION_FORM_URLENCODED.isCompatibleWith(type)) {
@@ -78,6 +79,24 @@ public class DebugRedactor {
             }
         }
         return truncate(text);
+    }
+
+    private static Charset charset(MediaType type) {
+        try {
+            Charset cs = type == null ? null : type.getCharset();
+            return cs != null ? cs : StandardCharsets.UTF_8;
+        } catch (RuntimeException e) {
+            return StandardCharsets.UTF_8;
+        }
+    }
+
+    private static final Pattern JSON_SECRET_FIELD = Pattern.compile(
+            "\"(" + String.join("|", MASKED_PARAMS.stream().map(Pattern::quote).toList()) + ")\"\\s*:\\s*"
+                    + "(\"(?:[^\"\\\\]|\\\\.)*\"|[^,}\\]\\s]+)",
+            Pattern.CASE_INSENSITIVE);
+
+    private static String maskJsonByRegex(String text) {
+        return JSON_SECRET_FIELD.matcher(text).replaceAll(r -> "\"" + r.group(1) + "\":\"" + MASK + "\"");
     }
 
     private static boolean isJson(MediaType type) {
@@ -113,12 +132,12 @@ public class DebugRedactor {
         try {
             JsonNode root = json.readTree(text);
             if (root == null || root.isMissingNode()) {
-                return text;
+                return maskJsonByRegex(text);
             }
             maskNode(root);
             return json.writeValueAsString(root);
         } catch (RuntimeException e) {
-            return text;
+            return maskJsonByRegex(text);
         }
     }
 
