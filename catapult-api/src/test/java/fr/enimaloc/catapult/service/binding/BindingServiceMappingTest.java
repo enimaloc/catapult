@@ -210,6 +210,36 @@ class BindingServiceMappingTest {
     }
 
     @Test
+    void resetTws_onAManualBinding_followsTheMapping() {
+        GameBinding binding = binding(GameBinding.Status.MANUAL);
+        binding.setTwOverride(true);
+
+        service.resetTws(user, binding.getId());
+
+        assertThat(binding.getStatus()).isEqualTo(GameBinding.Status.MAPPED);
+        assertThat(binding.getTwitchGameId()).isEqualTo("32399");
+        assertThat(binding.getTwitchGameName()).isEqualTo("Counter-Strike");
+        assertThat(binding.isTwOverride()).isFalse();
+        assertThat(binding.getTws()).containsExactly("tw-igdb");
+        verify(bindings).save(binding);
+        verify(igdb, never()).findTwitchGameId(anyString());
+    }
+
+    @Test
+    void resetTws_onAManualBinding_withoutMapping_goesBackToIgdb() {
+        when(mappings.findBySourceTypeAndSourceId(GameBinding.SourceType.STEAM, "730")).thenReturn(Optional.empty());
+        GameBinding binding = binding(GameBinding.Status.MANUAL);
+        binding.setTwOverride(true);
+
+        service.resetTws(user, binding.getId());
+
+        assertThat(binding.getStatus()).isEqualTo(GameBinding.Status.AUTO);
+        assertThat(binding.getTwitchGameId()).isEqualTo("igdb-twitch");
+        assertThat(binding.getTwitchGameName()).isEqualTo("Counter-Strike 2");
+        assertThat(binding.getTws()).containsExactly("tw-igdb");
+    }
+
+    @Test
     void resolveWithoutMapping_fallsBackToIgdb() {
         GameBinding found = binding(GameBinding.Status.MAPPED);
 

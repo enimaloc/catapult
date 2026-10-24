@@ -114,9 +114,7 @@ public class BindingService {
      * (MAPPED), else from IGDB (AUTO, or INCOMPLETE when IGDB finds no Twitch category).
      */
     private GameBinding updateWithIgdbResolution(UserAccount user, DetectedGame detectedGame, GameBinding binding) {
-        // A MANUAL binding only gets here through resetTws: it keeps being re-resolved from IGDB, as before mappings.
-        boolean mappable = binding.getStatus() != GameBinding.Status.MANUAL && detectedGame.getSourceId() != null;
-        Optional<GameMapping> mapping = mappable
+        Optional<GameMapping> mapping = detectedGame.getSourceId() != null
                 ? gameMappingRepository.findBySourceTypeAndSourceId(
                         detectedGame.getSourceType(), detectedGame.getSourceId())
                 : Optional.empty();
@@ -302,6 +300,9 @@ public class BindingService {
     public void resetTws(UserAccount user, UUID bindingId) {
         gameBindingRepository.findByIdAndUser(bindingId, user).ifPresent(binding -> {
             binding.setTwOverride(false);
+            // Resetting the TWs hands a MANUAL binding back to the automatic resolution: its game's admin mapping
+            // when there is one, else IGDB (which sets the status itself).
+            if (binding.getStatus() == GameBinding.Status.MANUAL) binding.setStatus(GameBinding.Status.AUTO);
             updateWithIgdbResolution(user, detectedOf(binding), binding);
         });
     }
