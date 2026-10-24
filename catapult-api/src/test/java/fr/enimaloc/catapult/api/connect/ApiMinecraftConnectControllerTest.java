@@ -112,7 +112,8 @@ class ApiMinecraftConnectControllerTest {
 
         assertThatThrownBy(() -> controller.enroll(jwt, Map.of("name", "nexistepas")))
                 .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("404");
+                .hasMessageContaining("404")
+                .hasMessageContaining("Unknown Minecraft player");
     }
 
     @Test
@@ -123,14 +124,16 @@ class ApiMinecraftConnectControllerTest {
 
         assertThatThrownBy(() -> controller.enroll(jwt, Map.of("name", "jeb_")))
                 .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("503");
+                .hasMessageContaining("503")
+                .hasMessageContaining("No Minecraft service account has room left, contact an administrator");
     }
 
     @Test
     void post_blankName_maps400() {
         assertThatThrownBy(() -> controller.enroll(jwt, Map.of("name", "   ")))
                 .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("400");
+                .hasMessageContaining("400")
+                .hasMessageContaining("A Minecraft username is required");
     }
 
     @Test

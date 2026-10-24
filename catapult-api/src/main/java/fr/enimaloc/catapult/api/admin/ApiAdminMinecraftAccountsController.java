@@ -1,6 +1,8 @@
 package fr.enimaloc.catapult.api.admin;
 
+import fr.enimaloc.catapult.api.error.ApiProblem;
 import fr.enimaloc.catapult.common.dto.admin.AccountDto;
+import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.domain.minecraft.MinecraftServiceAccount;
 import fr.enimaloc.catapult.repository.minecraft.MinecraftFriendLinkRepository;
 import fr.enimaloc.catapult.repository.minecraft.MinecraftServiceAccountRepository;
@@ -50,8 +52,8 @@ public class ApiAdminMinecraftAccountsController {
             // ex. AADSTS70002 (app Azure non déclarée client public) : le message doit
             // remonter jusqu'à l'UI admin au lieu de mourir en 500 dans les logs
             log.warn("Device-code Microsoft refusé: {}", e.getResponseBodyAsString());
-            return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
-                    .body(Map.of("message", "Device-code Microsoft refusé: " + e.getResponseBodyAsString()));
+            throw new ApiProblem(ErrorCode.MINECRAFT_DEVICE_CODE_REFUSED, "Microsoft refused the device code",
+                    Map.of("upstream", e.getResponseBodyAsString()));
         }
     }
 
@@ -130,7 +132,7 @@ public class ApiAdminMinecraftAccountsController {
         }
         if (username == null) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
-                    "Chaîne d'auth Xbox/Minecraft en échec pour ce compte (profil Xbox ou Minecraft manquant ?)");
+                    "The Xbox/Minecraft auth chain failed for this account (missing Xbox or Minecraft profile?)");
         }
         return new ValidatedProfile(rotated, username);
     }
@@ -155,8 +157,7 @@ public class ApiAdminMinecraftAccountsController {
     public ResponseEntity<?> delete(@PathVariable UUID id) {
         MinecraftServiceAccount account = findOrThrow(id);
         if (!linkRepository.findByServiceAccount(account).isEmpty()) {
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(Map.of("error", "Des utilisateurs sont liés à ce compte"));
+            throw new ApiProblem(ErrorCode.MINECRAFT_ACCOUNT_IN_USE, "Members are linked to this account");
         }
         tokenService.evict(account.getId());
         accountRepository.delete(account);
@@ -165,13 +166,13 @@ public class ApiAdminMinecraftAccountsController {
 
     private MinecraftServiceAccount findOrThrow(UUID id) {
         return accountRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Compte inconnu"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown account"));
     }
 
     private static String requireDeviceCode(Map<String, String> body) {
         String deviceCode = body.get("deviceCode");
         if (deviceCode == null || deviceCode.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "deviceCode requis");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "deviceCode is required");
         }
         return deviceCode;
     }
@@ -185,7 +186,7 @@ public class ApiAdminMinecraftAccountsController {
     private static <T> T field(Map<String, Object> body, String name, Class<T> type) {
         Object value = body.get(name);
         if (!type.isInstance(value)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Type invalide pour " + name);
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid type for " + name);
         }
         return type.cast(value);
     }

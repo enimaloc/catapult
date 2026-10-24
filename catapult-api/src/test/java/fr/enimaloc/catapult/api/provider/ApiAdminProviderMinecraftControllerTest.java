@@ -78,7 +78,8 @@ class ApiAdminProviderMinecraftControllerTest {
 
         assertThatThrownBy(() -> controller.friends(accountId))
                 .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("404");
+                .hasMessageContaining("404")
+                .hasMessageContaining("Unknown Minecraft service account");
     }
 
     @Test
@@ -90,7 +91,8 @@ class ApiAdminProviderMinecraftControllerTest {
 
         assertThatThrownBy(() -> controller.friends(accountId))
                 .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("404");
+                .hasMessageContaining("404")
+                .hasMessageContaining("No Minecraft token for this account");
     }
 
     @Test
@@ -130,7 +132,8 @@ class ApiAdminProviderMinecraftControllerTest {
 
         assertThatThrownBy(() -> controller.presence(accountId, "NOT_A_STATUS", null))
                 .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("400");
+                .hasMessageContaining("400")
+                .hasMessageContaining("Invalid presence status: NOT_A_STATUS");
     }
 
     @Test

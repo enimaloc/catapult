@@ -51,15 +51,15 @@ public class ApiMinecraftConnectController {
         String name = body.get("name");
         name = name == null ? null : name.trim();
         if (name == null || name.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Pseudo requis");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A Minecraft username is required");
         }
         try {
             return published(user, MinecraftLinkStateService.of(friendService.enroll(user, name)));
         } catch (MinecraftFriendService.MinecraftEnrollmentException e) {
             throw switch (e.getReason()) {
-                case UNKNOWN_PLAYER -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Joueur introuvable");
+                case UNKNOWN_PLAYER -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown Minecraft player");
                 case NO_CAPACITY, NO_ACCOUNT_AVAILABLE ->
-                        new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Aucune capacité disponible, contacte un administrateur");
+                        new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "No Minecraft service account has room left, contact an administrator");
             };
         }
     }
@@ -84,7 +84,7 @@ public class ApiMinecraftConnectController {
 
     private UserAccount currentUser(Jwt jwt) {
         return userAccountRepository.findById(UUID.fromString(jwt.getSubject()))
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Utilisateur inconnu"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unknown user"));
     }
 
     private UserAccount gatedUser(Jwt jwt) {

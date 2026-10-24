@@ -77,7 +77,7 @@ public class ApiAdminProviderMinecraftController {
         try {
             presenceStatus = MinecraftService.PresenceStatus.valueOf(status.toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Statut de présence invalide: " + status);
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid presence status: " + status);
         }
         var body = new MinecraftService.PresenceUpdate(
                 presenceStatus, new MinecraftService.PresenceUpdate.JoinInfo(activityId, new String[0]));
@@ -93,8 +93,8 @@ public class ApiAdminProviderMinecraftController {
 
     private String resolveAccountToken(UUID accountId) {
         MinecraftServiceAccount account = accountRepository.findById(accountId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Compte de service Minecraft inconnu"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown Minecraft service account"));
         return tokenService.getToken(account)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Token Minecraft indisponible pour ce compte"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No Minecraft token for this account"));
     }
 }

@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.api.error;
 
 import fr.enimaloc.catapult.common.error.ErrorCode;
+import fr.enimaloc.catapult.service.minecraft.MsaAuthClient;
 import fr.enimaloc.catapult.service.notification.TwitchatValidationException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -77,6 +78,20 @@ public class ProblemAdvice extends ResponseEntityExceptionHandler {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
         problem.setProperty(ErrorCode.PROPERTY, ErrorCode.TWITCHAT_INVALID_PAYLOAD.code());
         problem.setProperty("errors", ex.errors());
+        return ResponseEntity.badRequest().body(problem);
+    }
+
+    /** An expired Microsoft device code: the admin starts the flow again. */
+    @ExceptionHandler(MsaAuthClient.DeviceCodeExpiredException.class)
+    @SneakyThrows
+    public ResponseEntity<ProblemDetail> deviceCodeExpired(
+            MsaAuthClient.DeviceCodeExpiredException ex, HttpServletRequest request) {
+        if (FrozenRoutes.isFrozen(request)) {
+            throw ex;
+        }
+        ProblemDetail problem =
+                ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "The device code expired");
+        problem.setProperty(ErrorCode.PROPERTY, ErrorCode.MINECRAFT_DEVICE_CODE_EXPIRED.code());
         return ResponseEntity.badRequest().body(problem);
     }
 
