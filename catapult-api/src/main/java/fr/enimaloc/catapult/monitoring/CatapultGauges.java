@@ -30,7 +30,7 @@ public class CatapultGauges implements MeterBinder {
     private final ObjectProvider<IrcTwitchChatService> ircChat;
     private final ChatCommandDefinitionRepository chatCommandDefinitionRepository;
     private final OAuthTokenRepository oAuthTokenRepository;
-    private final ObjectProvider<IgdbService> igdbService;
+    private final IgdbService igdbService;
     private final SystemTwitchAccountService systemTwitchAccountService;
     private final MinecraftServiceAccountRepository minecraftServiceAccountRepository;
 
@@ -82,7 +82,7 @@ public class CatapultGauges implements MeterBinder {
             .register(registry);
 
         Gauge.builder("catapult.token.expiry.seconds", igdbService,
-                p -> { IgdbService s = p.getIfAvailable(); return s == null ? Double.NaN : secondsUntil(s.getTokenExpiresAt()); })
+                s -> secondsUntil(s.getTokenExpiresAt()))
             .tag("service", "igdb")
             .description("Secondes avant expiration du token app IGDB (négatif = expiré)")
             .register(registry);

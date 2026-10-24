@@ -34,7 +34,7 @@ class CatapultGaugesTest {
     @Mock ObjectProvider<IrcTwitchChatService> ircChatProvider;
     @Mock ChatCommandDefinitionRepository chatCommandDefinitionRepository;
     @Mock OAuthTokenRepository oAuthTokenRepository;
-    @Mock ObjectProvider<IgdbService> igdbServiceProvider;
+    @Mock IgdbService igdbService;
     @Mock SystemTwitchAccountService systemTwitchAccountService;
     @Mock EventSubTwitchChatService eventSubTwitchChatService;
     @Mock MinecraftServiceAccountRepository minecraftServiceAccountRepository;
@@ -42,7 +42,7 @@ class CatapultGaugesTest {
     private CatapultGauges gauges() {
         return new CatapultGauges(userAccountRepository, streamStateService,
                 eventSubChatProvider, ircChatProvider, chatCommandDefinitionRepository,
-                oAuthTokenRepository, igdbServiceProvider, systemTwitchAccountService,
+                oAuthTokenRepository, igdbService, systemTwitchAccountService,
                 minecraftServiceAccountRepository);
     }
 
@@ -96,14 +96,26 @@ class CatapultGaugesTest {
     }
 
     @Test
+    void igdbTokenExpiryGauge_readsTheService() {
+        when(igdbService.getTokenExpiresAt()).thenReturn(Instant.now().plusSeconds(120));
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+
+        gauges().bindTo(registry);
+
+        assertThat(registry.get("catapult.token.expiry.seconds").tag("service", "igdb").gauge().value())
+                .isBetween(110.0, 120.0);
+    }
+
+    @Test
     void token_expiry_gauges_registered() {
-        when(igdbServiceProvider.getIfAvailable()).thenReturn(null);
+        when(igdbService.getTokenExpiresAt()).thenReturn(Instant.now().plusSeconds(300));
         when(systemTwitchAccountService.tokenExpiry()).thenReturn(Optional.of(Instant.now().plusSeconds(600)));
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
 
         gauges().bindTo(registry);
 
-        assertThat(registry.get("catapult.token.expiry.seconds").tag("service", "igdb").gauge().value()).isNaN();
+        assertThat(registry.get("catapult.token.expiry.seconds").tag("service", "igdb").gauge().value())
+                .isCloseTo(300.0, within(5.0));
         assertThat(registry.get("catapult.token.expiry.seconds").tag("service", "twitch_bot").gauge().value())
                 .isCloseTo(600.0, within(5.0));
     }
