@@ -138,18 +138,47 @@ public class BindingService {
      */
     public boolean applyMapping(GameBinding binding, GameMapping mapping) {
         if (binding.getStatus() == GameBinding.Status.MANUAL) return false;
-
-        DetectedGame game = detectedOf(binding);
         boolean keepsTws = binding.isTwOverride() || mapping.isTwsOverridden();
-        Optional<String> igdbId = mapping.isCclsOverridden() && keepsTws
-                ? Optional.empty()
-                : resolveViaIgdb(game).map(IgdbService.IgdbGame::id);
-        Set<String> ccls = mapping.isCclsOverridden()
-                ? Set.copyOf(mapping.getCcls())
-                : igdbId.map(igdbService::suggestCcls).orElse(Set.of());
+        return applyMapping(binding, mapping,
+                igdbSuggestions(detectedOf(binding), !mapping.isCclsOverridden(), !keepsTws));
+    }
+
+    /** IGDB's CCLs and TWs for a game, resolved once for all its bindings (empty when IGDB does not know it). */
+    public record MappingSuggestions(Set<String> ccls, Set<String> tws) {
+        public static final MappingSuggestions NONE = new MappingSuggestions(Set.of(), Set.of());
+    }
+
+    /**
+     * IGDB's CCL and/or TW suggestions for a detected game (by its app ID, else its name when given), for
+     * {@link #applyMapping(GameBinding, GameMapping, MappingSuggestions)}: resolved before the transaction that
+     * applies a mapping to all the game's bindings, so their rows are not locked during IGDB calls. Looks IGDB up
+     * only when one of them is wanted; the unwanted one is empty.
+     */
+    public MappingSuggestions igdbSuggestions(DetectedGame game, boolean ccls, boolean tws) {
+        if (!ccls && !tws) return MappingSuggestions.NONE;
+        Optional<String> igdbId = (game.getSourceName() != null ? resolveViaIgdb(game)
+                : game.getSourceId() != null
+                        ? igdbService.findByExternalAppId(game.getSourceType(), game.getSourceId())
+                        : Optional.<IgdbService.IgdbGame>empty())
+                .map(IgdbService.IgdbGame::id);
+        return new MappingSuggestions(
+                ccls ? igdbId.map(igdbService::suggestCcls).orElse(Set.of()) : Set.of(),
+                tws ? igdbId.map(id -> suggestTws(id, game)).orElse(Set.of()) : Set.of());
+    }
+
+    /**
+     * {@link #applyMapping(GameBinding, GameMapping)} with IGDB's suggestions already resolved: they serve the CCLs
+     * and TWs the mapping does not replace (and the TWs the streamer did not pin). Does not save.
+     *
+     * @return whether the binding changed; always false for a MANUAL binding, which is never touched.
+     */
+    public boolean applyMapping(GameBinding binding, GameMapping mapping, MappingSuggestions suggestions) {
+        if (binding.getStatus() == GameBinding.Status.MANUAL) return false;
+
+        Set<String> ccls = mapping.isCclsOverridden() ? Set.copyOf(mapping.getCcls()) : suggestions.ccls();
         Set<String> tws = binding.isTwOverride() ? Set.copyOf(binding.getTws())
                 : mapping.isTwsOverridden() ? Set.copyOf(mapping.getTws())
-                : igdbId.map(id -> suggestTws(id, game)).orElse(Set.of());
+                : suggestions.tws();
 
         boolean changed = binding.getStatus() != GameBinding.Status.MAPPED
                 || !Objects.equals(binding.getTwitchGameId(), mapping.getTwitchGameId())

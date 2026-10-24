@@ -74,4 +74,19 @@ public class AdminEventPublisher {
     public void groupDeleted(String groupId) {
         redisPublisher.publishAdmin("group.deleted", Map.of("groupId", groupId));
     }
+
+    /** An admin game mapping was created. {@code mapping} is its list row (GameMappingDto). */
+    public void gameMappingCreated(Object mapping) {
+        redisPublisher.publishAdmin("game.mapping.created", Map.of("mapping", mapping));
+    }
+
+    /** An admin game mapping changed. {@code mapping} is its fresh list row. */
+    public void gameMappingUpdated(Object mapping) {
+        redisPublisher.publishAdmin("game.mapping.updated", Map.of("mapping", mapping));
+    }
+
+    /** An admin game mapping was deleted. */
+    public void gameMappingDeleted(String mappingId) {
+        redisPublisher.publishAdmin("game.mapping.deleted", Map.of("mappingId", mappingId));
+    }
 }
