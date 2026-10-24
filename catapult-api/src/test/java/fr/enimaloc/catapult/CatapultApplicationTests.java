@@ -3,6 +3,7 @@ package fr.enimaloc.catapult;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.zaxxer.hikari.HikariDataSource;
+import fr.enimaloc.catapult.service.feedback.GitLabClient;
 import fr.enimaloc.catapult.service.twitch.EventSubService;
 import fr.enimaloc.catapult.service.twitch.EventSubTwitchChatService;
 import fr.enimaloc.catapult.service.twitch.TwitchChatService;
@@ -12,10 +13,12 @@ import fr.enimaloc.catapult.service.twitch.TwitchServiceImpl;
 import io.sentry.Sentry;
 import java.net.http.HttpResponse;
 import javax.sql.DataSource;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
+import org.springframework.test.context.TestPropertySource;
 
 @Import(FullContextContainers.class)
 class CatapultApplicationTests extends FullContextTestBase {
@@ -49,5 +52,15 @@ class CatapultApplicationTests extends FullContextTestBase {
         HttpResponse<String> response = get(managementPort, "/actuator/health");
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(response.body()).contains("\"status\":\"UP\"");
+    }
+
+    @Nested
+    @TestPropertySource(properties = "gitlab.token=false")
+    class WithGitLabTokenFalse {
+
+        @Test
+        void startsAndRegistersGitLabClient() {
+            assertThat(context.getBean(GitLabClient.class)).isNotNull();
+        }
     }
 }
