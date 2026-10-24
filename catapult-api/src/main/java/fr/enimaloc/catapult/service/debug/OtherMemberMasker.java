@@ -12,9 +12,15 @@ import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -32,13 +38,18 @@ public class OtherMemberMasker {
     static final String MARKER = "[membre]";
     private static final int MIN_LENGTH = 4;
 
-    private record Index(Map<String, UUID> owners, Pattern pattern) {
+    private record Index(Map<String, Set<UUID>> owners, Pattern pattern) {
         static final Index EMPTY = new Index(Map.of(), null);
     }
 
     private final UserAccountRepository users;
     private final MinecraftFriendLinkRepository links;
     private volatile Index index = Index.EMPTY;
+    private final Executor reloader = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "debug-member-masker-reload");
+        t.setDaemon(true);
+        return t;
+    });
 
     public OtherMemberMasker(UserAccountRepository users, MinecraftFriendLinkRepository links) {
         this.users = users;
@@ -50,7 +61,7 @@ public class OtherMemberMasker {
     @Transactional(readOnly = true)
     public void reload() {
         try {
-            Map<String, UUID> owners = new HashMap<>();
+            Map<String, Set<UUID>> owners = new HashMap<>();
             for (UserAccount u : users.findAll()) {
                 add(owners, u.getTwitchId(), u.getId());
                 add(owners, u.getTwitchUsername(), u.getId());
@@ -69,9 +80,10 @@ public class OtherMemberMasker {
         }
     }
 
-    @EventListener
+    /** Reloads after the creating transaction commits, on another thread, so a failure can never affect the login. */
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void onAccountCreated(AccountCreatedEvent event) {
-        reload();
+        reloader.execute(this::reload);
     }
 
     public String mask(String text, UUID subject) {
@@ -82,24 +94,25 @@ public class OtherMemberMasker {
         Matcher m = current.pattern().matcher(text);
         StringBuilder sb = new StringBuilder();
         while (m.find()) {
-            UUID owner = current.owners().get(m.group().toLowerCase(Locale.ROOT));
-            m.appendReplacement(sb, Matcher.quoteReplacement(owner != null && owner.equals(subject) ? m.group() : MARKER));
+            Set<UUID> owners = current.owners().get(m.group().toLowerCase(Locale.ROOT));
+            boolean keep = owners != null && owners.size() == 1 && owners.contains(subject);
+            m.appendReplacement(sb, Matcher.quoteReplacement(keep ? m.group() : MARKER));
         }
         m.appendTail(sb);
         return sb.toString();
     }
 
-    private static void add(Map<String, UUID> owners, String identifier, UUID owner) {
+    private static void add(Map<String, Set<UUID>> owners, String identifier, UUID owner) {
         if (identifier == null || owner == null) {
             return;
         }
         String id = identifier.trim();
         if (id.length() >= MIN_LENGTH) {
-            owners.put(id.toLowerCase(Locale.ROOT), owner);
+            owners.computeIfAbsent(id.toLowerCase(Locale.ROOT), k -> new HashSet<>()).add(owner);
         }
     }
 
-    private static Index build(Map<String, UUID> owners) {
+    private static Index build(Map<String, Set<UUID>> owners) {
         if (owners.isEmpty()) {
             return Index.EMPTY;
         }
@@ -108,8 +121,10 @@ public class OtherMemberMasker {
                 .sorted(Comparator.comparingInt(String::length).reversed().thenComparing(Comparator.naturalOrder()))
                 .forEach(id -> alternation.append(alternation.isEmpty() ? "" : "|").append(Pattern.quote(id)));
         Pattern pattern = Pattern.compile(
-                "(?<![\\p{L}\\p{N}])(?:" + alternation + ")(?![\\p{L}\\p{N}])",
+                "(?<![\\p{L}\\p{N}_])(?:" + alternation + ")(?![\\p{L}\\p{N}_])",
                 Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
-        return new Index(Map.copyOf(owners), pattern);
+        Map<String, Set<UUID>> frozen = new HashMap<>();
+        owners.forEach((k, v) -> frozen.put(k, Set.copyOf(v)));
+        return new Index(Map.copyOf(frozen), pattern);
     }
 }

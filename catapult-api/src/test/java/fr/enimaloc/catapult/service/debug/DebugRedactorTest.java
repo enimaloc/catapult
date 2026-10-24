@@ -45,8 +45,24 @@ class DebugRedactorTest {
     }
 
     @Test
-    void invalidJson_isLeftUnchanged() {
-        assertThat(redactor.body(b("not json"), MediaType.APPLICATION_JSON, false)).isEqualTo("not json");
+    void secretInMalformedJson_isStillMasked() {
+        String out = redactor.body(b("{\"a\":1}\n{\"Device_Code\": \"dc123\", \"token\":abc, \"n\":2"), MediaType.APPLICATION_JSON, false);
+        assertThat(out).doesNotContain("dc123").doesNotContain("abc").contains("\"n\":2");
+    }
+
+    @Test
+    void deviceCode_isMaskedInFormAndJson() {
+        assertThat(redactor.body(b("device_code=zzz&grant_type=x"), MediaType.APPLICATION_FORM_URLENCODED, false))
+                .isEqualTo("device_code=[masqué]&grant_type=x");
+        assertThat(redactor.body(b("{\"device_code\":\"zzz\"}"), MediaType.APPLICATION_JSON, false)).doesNotContain("zzz");
+    }
+
+    @Test
+    void unsupportedCharset_fallsBackToUtf8() {
+        MediaType bad = new MediaType("text", "plain") {
+            @Override public java.nio.charset.Charset getCharset() { throw new java.nio.charset.UnsupportedCharsetException("x"); }
+        };
+        assertThat(redactor.body(b("héllo"), bad, false)).isEqualTo("héllo");
     }
 
     @Test
