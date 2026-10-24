@@ -976,6 +976,77 @@ class RealApiServiceTest {
     }
 
     @Test
+    void adminExperimentReads_hitTheirEndpoints() {
+        respond(HttpMethod.GET, "/api/admin/experiments", "[]");
+        respond(HttpMethod.GET, "/api/admin/flags", "[{\"key\":\"beta\",\"values\":[\"true\"]}]");
+        respond(HttpMethod.GET, "/api/admin/experiments/" + NOTIF_ID + "/settings",
+                "{\"id\":\"" + NOTIF_ID + "\",\"key\":\"exp\"}");
+
+        assertThat(service.adminExperiments()).isEmpty();
+        assertThat(service.adminFlagKeys()).singleElement().satisfies(k -> {
+            assertThat(k.key()).isEqualTo("beta");
+            assertThat(k.values()).containsExactly("true");
+        });
+        assertThat(service.adminExperiment(NOTIF_ID).key()).isEqualTo("exp");
+    }
+
+    @Test
+    void adminExperimentWrites_postTheirShapes_andReturnTheStatus() {
+        expect(HttpMethod.POST, "/api/admin/experiments/" + NOTIF_ID + "/activate").andRespond(withNoContent());
+        expect(HttpMethod.POST, "/api/admin/experiments/" + NOTIF_ID + "/variants/weights")
+                .andExpect(content().json("{\"" + GROUP_ID + "\":40}", true)).andRespond(withNoContent());
+        expect(HttpMethod.POST, "/api/admin/experiments/" + NOTIF_ID + "/rules")
+                .andExpect(content().json("{\"ruleType\":\"RANDOM\",\"priority\":1,\"percentage\":50,"
+                        + "\"attributeKey\":null,\"attributeOperator\":null,\"attributeValue\":null}", true))
+                .andRespond(withStatus(HttpStatus.CONFLICT));
+        expect(HttpMethod.POST, "/api/admin/experiments/" + NOTIF_ID + "/rules/" + GROUP_ID + "/delete")
+                .andRespond(withNoContent());
+        expect(HttpMethod.POST, "/api/admin/experiments/" + NOTIF_ID + "/overrides")
+                .andExpect(content().json("{\"overrideType\":\"USER\",\"action\":\"EXCLUDE\",\"priority\":2,"
+                        + "\"twitchUsername\":\"alice\",\"attributeKey\":null,\"attributeOp\":null,"
+                        + "\"attributeVal\":null,\"targetVariantId\":null}", true))
+                .andRespond(withStatus(HttpStatus.NOT_FOUND));
+        expect(HttpMethod.POST, "/api/admin/experiments/" + NOTIF_ID + "/overrides/" + GROUP_ID + "/delete")
+                .andRespond(withNoContent());
+        expect(HttpMethod.POST, "/api/admin/experiments/" + NOTIF_ID + "/assignments/" + GROUP_ID + "/variant")
+                .andExpect(content().json("{\"variantId\":\"" + NOTIF_ID + "\"}", true)).andRespond(withNoContent());
+
+        assertThat(service.adminExperimentAction(NOTIF_ID, "activate")).isEqualTo(204);
+        assertThat(service.adminExperimentWeights(NOTIF_ID, Map.of(GROUP_ID, 40))).isEqualTo(204);
+        assertThat(service.adminAddExperimentRule(NOTIF_ID,
+                new fr.enimaloc.catapult.common.dto.experiment.ExperimentRuleRequest("RANDOM", 1, 50, null, null, null)))
+                .isEqualTo(409);
+        assertThat(service.adminDeleteExperimentRule(NOTIF_ID, GROUP_ID)).isEqualTo(204);
+        assertThat(service.adminAddExperimentOverride(NOTIF_ID,
+                new fr.enimaloc.catapult.common.dto.experiment.ExperimentOverrideRequest("USER", "EXCLUDE", 2, "alice",
+                        null, null, null, null))).isEqualTo(404);
+        assertThat(service.adminDeleteExperimentOverride(NOTIF_ID, GROUP_ID)).isEqualTo(204);
+        assertThat(service.adminMoveExperimentAssignment(NOTIF_ID, GROUP_ID, NOTIF_ID)).isEqualTo(204);
+    }
+
+    @Test
+    void adminExperimentWeightsPreview_returnsTheRebalance_orNullWhenRefused() {
+        expect(HttpMethod.POST, "/api/admin/experiments/" + NOTIF_ID + "/variants/weights/preview")
+                .andExpect(content().json("{\"" + GROUP_ID + "\":40}", true))
+                .andRespond(withSuccess("{\"moves\":[]}", MediaType.APPLICATION_JSON));
+        expect(HttpMethod.POST, "/api/admin/experiments/" + NOTIF_ID + "/variants/weights/preview")
+                .andRespond(withStatus(HttpStatus.NOT_FOUND));
+
+        assertThat(service.adminExperimentWeightsPreview(NOTIF_ID, Map.of(GROUP_ID, 40))).isNotNull();
+        assertThat(service.adminExperimentWeightsPreview(NOTIF_ID, Map.of())).isNull();
+    }
+
+    @Test
+    void adminExperimentAssignments_passTheFilters_andDefaultNullOnesToEmpty() {
+        respond(HttpMethod.GET, "/api/admin/experiments/" + NOTIF_ID + "/assignments?variant=" + GROUP_ID + "&q=ali&page=2",
+                "{\"counts\":{\"" + GROUP_ID + "\":7}}");
+        respond(HttpMethod.GET, "/api/admin/experiments/" + NOTIF_ID + "/assignments?variant=&q=&page=0", "{\"counts\":{}}");
+
+        assertThat(service.adminExperimentAssignments(NOTIF_ID, GROUP_ID, "ali", 2).counts()).containsEntry(GROUP_ID, 7L);
+        assertThat(service.adminExperimentAssignments(NOTIF_ID, null, null, 0).counts()).isEmpty();
+    }
+
+    @Test
     void adminWhitelist_readsThePage() {
         respond(HttpMethod.GET, "/api/admin/whitelist", "{\"entries\":[{\"twitchId\":\"123\"}],\"resolvedUsernames\":{\"123\":\"alice\"},"
                 + "\"whitelistEnabled\":true,\"inviteEnabled\":true,\"globalMaxMembers\":null,\"defaultMaxUses\":3,"
