@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.admin;
 
+import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.common.dto.admin.AddToGroupRequest;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
@@ -121,7 +122,7 @@ public class ApiAdminMembersController {
         if (user.isSystemAccount()) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
-        String callerTwitchId = jwt.getClaimAsString("twitchId");
+        String callerTwitchId = ApiUserResolver.requireJwt(jwt).getClaimAsString("twitchId");
         if (user.getTwitchId().equals(callerTwitchId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }

@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.connect;
 
+import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.api.error.ApiProblem;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
 import fr.enimaloc.catapult.common.error.ErrorCode;
@@ -85,7 +86,7 @@ public class ApiMinecraftConnectController {
     }
 
     private UserAccount currentUser(Jwt jwt) {
-        return userAccountRepository.findById(UUID.fromString(jwt.getSubject()))
+        return userAccountRepository.findById(UUID.fromString(ApiUserResolver.requireJwt(jwt).getSubject()))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unknown user"));
     }
 

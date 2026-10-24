@@ -28,8 +28,8 @@ GET,/api/v2/custom-bindings,,,401,401,401,401,401,401,PASS
 POST,/api/v2/custom-bindings/deactivate,,,401,401,401,401,401,401,PASS
 POST,/api/v2/custom-bindings/{idOrName}/activate,,,401,401,401,401,401,401,PASS
 # member
-GET,/api/auth/me,,,401,ERROR,PASS,PASS,PASS,PASS,401
-GET,/api/auth/validate,,,401,ERROR,PASS,PASS,PASS,PASS,401
+GET,/api/auth/me,,,401,401,PASS,PASS,PASS,PASS,401
+GET,/api/auth/validate,,,401,401,PASS,PASS,PASS,PASS,401
 POST,/api/channel/bindings/{bindingId}/tw-enabled,,"{""enabled"":false}",401,401,PASS,PASS,PASS,PASS,401
 POST,/api/channel/bindings/{bindingId}/tws,,,401,401,PASS,PASS,PASS,PASS,401
 POST,/api/channel/bindings/{bindingId}/tws/reset,,,401,401,PASS,PASS,PASS,PASS,401
@@ -38,7 +38,7 @@ GET,/api/channel/dtdd-mapping,?igdbId=1,,401,PASS,PASS,PASS,PASS,PASS,401
 POST,/api/channel/dtdd-mapping/propose,,,401,401,PASS,PASS,PASS,PASS,401
 GET,/api/channel/dtdd-mapping/search,?q=matrix,,401,PASS,PASS,PASS,PASS,PASS,401
 POST,/api/channel/dtdd-mapping/validate,,"{""igdbId"":""1""}",401,PASS,PASS,PASS,PASS,PASS,401
-GET,/api/channels,,,401,ERROR,PASS,PASS,PASS,PASS,401
+GET,/api/channels,,,401,401,PASS,PASS,PASS,PASS,401
 GET,/api/chat-command-settings,,,401,401,GATED,GATED,GATED,GATED,401
 DELETE,/api/chat-command-settings/{key},,,401,401,GATED,GATED,GATED,GATED,401
 PUT,/api/chat-command-settings/{key},,,401,401,GATED,GATED,GATED,GATED,401
@@ -53,12 +53,12 @@ POST,/api/chat-commands/presets/{presetKey},,,401,401,GATED,GATED,GATED,GATED,40
 DELETE,/api/chat-commands/{id},,,401,401,GATED,GATED,GATED,GATED,401
 PUT,/api/chat-commands/{id},,"{""name"":""!matrix"",""template"":""matrix"",""permission"":""VIEWERS"",""enabled"":false}",401,401,GATED,GATED,GATED,GATED,401
 POST,/api/chat-commands/{id}/test,,,401,401,GATED,GATED,GATED,GATED,401
-DELETE,/api/connect/minecraft,,,401,ERROR,GATED,GATED,GATED,GATED,401
-GET,/api/connect/minecraft,,,401,ERROR,PASS,PASS,PASS,PASS,401
-POST,/api/connect/minecraft,,,401,ERROR,GATED,GATED,GATED,GATED,401
-POST,/api/connect/minecraft/sync,,,401,ERROR,GATED,GATED,GATED,GATED,401
-POST,/api/connect/steam/disconnect,,,401,ERROR,PASS,PASS,PASS,PASS,401
-GET,/api/connect/steam/start,,,401,ERROR,PASS,PASS,PASS,PASS,401
+DELETE,/api/connect/minecraft,,,401,401,GATED,GATED,GATED,GATED,401
+GET,/api/connect/minecraft,,,401,401,PASS,PASS,PASS,PASS,401
+POST,/api/connect/minecraft,,,401,401,GATED,GATED,GATED,GATED,401
+POST,/api/connect/minecraft/sync,,,401,401,GATED,GATED,GATED,GATED,401
+POST,/api/connect/steam/disconnect,,,401,401,PASS,PASS,PASS,PASS,401
+GET,/api/connect/steam/start,,,401,401,PASS,PASS,PASS,PASS,401
 POST,/api/experiments/feedback,,"{""experimentId"":""00000000-0000-0000-0000-00000000dead"",""npsScore"":5}",401,401,PASS,PASS,PASS,PASS,401
 GET,/api/experiments/me/variant/{key},,,401,401,PASS,PASS,PASS,PASS,401
 GET,/api/feedback,,,401,401,PASS,PASS,PASS,PASS,401
@@ -197,7 +197,7 @@ POST,/api/admin/groups/{id}/members,,,401,PASS,403,403,403,PASS,401
 POST,/api/admin/groups/{id}/members/{userId}/delete,,,401,PASS,403,403,403,PASS,401
 POST,/api/admin/groups/{id}/rename,,,401,PASS,403,403,403,PASS,401
 GET,/api/admin/igdb/search,,,401,PASS,403,403,403,PASS,401
-POST,/api/admin/impersonate,,,401,ERROR,403,403,403,PASS,401
+POST,/api/admin/impersonate,,,401,401,403,403,403,PASS,401
 GET,/api/admin/invite,,,401,PASS,403,403,403,PASS,401
 POST,/api/admin/invite/grant/{userId},,,401,PASS,403,403,403,PASS,401
 POST,/api/admin/invite/settings,,"{""defaultCanReinvite"":false}",401,PASS,403,403,403,PASS,401

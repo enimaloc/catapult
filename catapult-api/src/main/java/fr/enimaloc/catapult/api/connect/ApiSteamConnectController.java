@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.connect;
 
+import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.common.dto.connect.SteamStartResponse;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.event.SteamLinkedEvent;
@@ -72,7 +73,7 @@ public class ApiSteamConnectController {
 
     @GetMapping("/start")
     public SteamStartResponse start(@AuthenticationPrincipal Jwt jwt) {
-        UUID userId = UUID.fromString(jwt.getSubject());
+        UUID userId = UUID.fromString(ApiUserResolver.requireJwt(jwt).getSubject());
         String nonce = generateNonce();
         pendingNonces.put(nonce, userId);
         scheduler.schedule(() -> pendingNonces.remove(nonce), 5, TimeUnit.MINUTES);
@@ -158,7 +159,7 @@ public class ApiSteamConnectController {
     @PostMapping("/disconnect")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void disconnect(@AuthenticationPrincipal Jwt jwt) {
-        UUID userId = UUID.fromString(jwt.getSubject());
+        UUID userId = UUID.fromString(ApiUserResolver.requireJwt(jwt).getSubject());
         UserAccount account = findOrThrow(userId);
         account.setSteamId(null);
         userAccountRepository.save(account);

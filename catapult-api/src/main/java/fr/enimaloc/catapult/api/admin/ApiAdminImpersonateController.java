@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.admin;
 
+import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.common.dto.admin.ImpersonateRequest;
 import fr.enimaloc.catapult.common.dto.admin.ImpersonateResponse;
 import fr.enimaloc.catapult.domain.account.UserAccount;
@@ -34,7 +35,7 @@ public class ApiAdminImpersonateController {
     @PostMapping
     public ImpersonateResponse impersonate(@AuthenticationPrincipal Jwt jwt,
                                            @RequestBody ImpersonateRequest body) {
-        UUID adminId = UUID.fromString(jwt.getSubject());
+        UUID adminId = UUID.fromString(ApiUserResolver.requireJwt(jwt).getSubject());
 
         UserAccount target = userAccountRepository.findByTwitchUsername(body.username())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));

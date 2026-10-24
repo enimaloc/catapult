@@ -47,6 +47,13 @@ class ApiUserResolverTest {
     }
 
     @Test
+    void requireJwt_nullIs401() {
+        assertStatus(() -> ApiUserResolver.requireJwt(null), HttpStatus.UNAUTHORIZED);
+        Jwt jwt = jwtFor(account("me"));
+        assertThat(ApiUserResolver.requireJwt(jwt)).isSameAs(jwt);
+    }
+
+    @Test
     void viewer_unknownIsUnauthorized() {
         assertStatus(() -> resolver.viewer(jwtFor(account("ghost"))), HttpStatus.UNAUTHORIZED);
     }
