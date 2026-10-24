@@ -128,6 +128,25 @@ class MemberDebugServiceTest {
     }
 
     @Test
+    void stateDtos_coverActiveAndDisabledSessions_butNotMembersNeverDebugged() {
+        UUID never = UUID.randomUUID();
+        MemberDebugSession off = new MemberDebugSession();
+        off.setUserId(member);
+        off.setEnabledAt(NOW.minusSeconds(100));
+        off.setDisabledAt(NOW.minusSeconds(50));
+        when(sessions.findAllById(List.of(member, never))).thenReturn(List.of(off));
+        when(exchanges.countByUserId(member)).thenReturn(4L);
+
+        var dtos = service.stateDtos(List.of(member, never));
+
+        assertThat(dtos).containsOnlyKeys(member);
+        assertThat(dtos.get(member).active()).isFalse();
+        assertThat(dtos.get(member).exchangeCount()).isEqualTo(4);
+        assertThat(dtos.get(member).purgeAt()).isEqualTo(NOW.minusSeconds(50).plus(java.time.Duration.ofDays(30)));
+        assertThat(service.stateDtos(List.of())).isEmpty();
+    }
+
+    @Test
     void activeStates_indexesTheActiveSessionsByUser() {
         MemberDebugSession on = new MemberDebugSession();
         on.setUserId(member);

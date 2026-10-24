@@ -118,10 +118,16 @@ public class MemberDebugService {
         return sessions.findById(userId).map(this::toDto);
     }
 
-    /** {@link #activeStates} as DTOs. */
-    public Map<UUID, MemberDebugStateDto> activeStateDtos(Collection<UUID> userIds) {
+    /**
+     * The state of every member among {@code userIds} that has a session, switched off with its
+     * exchanges awaiting purge included; a member never debugged is absent.
+     */
+    public Map<UUID, MemberDebugStateDto> stateDtos(Collection<UUID> userIds) {
         Map<UUID, MemberDebugStateDto> result = new HashMap<>();
-        activeStates(userIds).forEach((id, session) -> result.put(id, toDto(session)));
+        if (userIds.isEmpty()) {
+            return result;
+        }
+        sessions.findAllById(userIds).forEach(s -> result.put(s.getUserId(), toDto(s)));
         return result;
     }
 
