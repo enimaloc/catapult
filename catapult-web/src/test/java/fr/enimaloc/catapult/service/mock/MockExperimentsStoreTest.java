@@ -259,4 +259,19 @@ class MockExperimentsStoreTest {
         assertThat(store.action(id, "end")).isEqualTo(204);
         assertThat(store.move(id, user, other)).isEqualTo(409);
     }
+
+    @Test
+    void participantIds_areEveryonesOrOneVariants_andEmptyForAnUnknownOrForeignOne() {
+        ExperimentSettingsDto exp = settings("new-dashboard");
+        UUID control = exp.variants().get(0).id();
+        UUID other = exp.variants().get(1).id();
+        int inControl = (int) store.assignments(exp.id(), control, null, 0).orElseThrow().page().totalElements();
+        int inOther = (int) store.assignments(exp.id(), other, null, 0).orElseThrow().page().totalElements();
+
+        assertThat(store.participantIds(exp.id(), null).orElseThrow()).hasSize(inControl + inOther).doesNotHaveDuplicates();
+        assertThat(store.participantIds(exp.id(), other).orElseThrow()).hasSize(inOther);
+        assertThat(store.participantIds(UUID.randomUUID(), null)).isEmpty();
+        assertThat(store.participantIds(exp.id(), UUID.randomUUID())).isEmpty();
+        assertThat(store.participantIds(idOf("minecraft.integration"), other)).isEmpty();
+    }
 }

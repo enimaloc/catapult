@@ -10,6 +10,9 @@ import fr.enimaloc.catapult.common.dto.admin.AdminMemberDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminCclPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody;
+import fr.enimaloc.catapult.common.dto.admin.AudienceCountDto;
+import fr.enimaloc.catapult.common.dto.admin.AudienceCountRequest;
+import fr.enimaloc.catapult.common.dto.admin.NotificationSentDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddProposalDto;
 import fr.enimaloc.catapult.common.dto.admin.ImpersonateRequest;
 import fr.enimaloc.catapult.common.dto.admin.ImpersonateResponse;
@@ -608,8 +611,17 @@ public class RealApiService implements ApiService {
     }
 
     @Override
-    public int adminCreateNotification(AdminNotificationCreateBody body) {
-        return client.call(HttpMethod.POST, "/api/admin/notifications", body, Void.class).status();
+    public ApiClient.Result<Integer> adminSendNotification(AdminNotificationCreateBody body) {
+        ApiClient.Result<NotificationSentDto> result = client.call(HttpMethod.POST, "/api/admin/notifications", body,
+                NotificationSentDto.class);
+        return new ApiClient.Result<>(result.status(), result.body() == null ? null : result.body().sent());
+    }
+
+    @Override
+    public Long adminNotificationAudienceCount(UUID experimentId, UUID variantId) {
+        ApiClient.Result<AudienceCountDto> result = client.call(HttpMethod.POST, "/api/admin/notifications/audience-count",
+                new AudienceCountRequest(AdminNotificationCreateBody.EXPERIMENT, experimentId, variantId), AudienceCountDto.class);
+        return result.ok() && result.body() != null ? result.body().count() : null;
     }
 
     @Override

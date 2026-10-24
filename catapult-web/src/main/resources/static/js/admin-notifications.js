@@ -6,6 +6,9 @@
  * (400: data-label-invalid, 404: data-label-unknown-member, else data-label-unavailable) and leaves the dialog open, a success
  * closes it and reloads the tab. The Preview toggle renders the Markdown through the server
  * (catapult-api sanitizes it), shown as HTML in .notification-preview. Delete asks first.
+ * "Experiment participants" picks an experiment and, optionally, one of its variants (the options come
+ * from the fragment's .admin-notifications-variants-of lists), shows how many members that reaches
+ * (/admin/notifications/audience-count, asked on every change) and, once sent, how many were told.
  * "One member" searches as the admin types (300 ms after the last key, /spa/admin/members/search, at
  * most 20 matches listed as options); picking an option sets the recipient.
  * Listeners are delegated to the panel: its content comes and goes.
@@ -22,7 +25,7 @@ window.CatapultAdminNotifications = (function () {
     }
 
     function resetForm(form) {
-        ["title", "body", "ctaLabel", "ctaUrl", "expiresAt", "memberSearch"].forEach(name => {
+        ["title", "body", "ctaLabel", "ctaUrl", "expiresAt", "memberSearch", "experimentId"].forEach(name => {
             const field = fieldOf(form, name);
             field.value = "";
             field.removeAttribute("invalid");
@@ -31,6 +34,8 @@ window.CatapultAdminNotifications = (function () {
         fieldOf(form, "audience").value = "ALL";
         fieldOf(form, "mode").value = "edit";
         delete form.dataset.member;
+        fillVariants(form, "");
+        showCount(form, null);
         showMode(form, "edit");
         showAudience(form, "ALL");
         clearMemberOptions(form);
@@ -50,6 +55,62 @@ window.CatapultAdminNotifications = (function () {
     function showAudience(form, audience) {
         form.querySelector(".admin-notifications-member").hidden = audience !== "ONE";
         form.querySelector(".admin-notifications-chat-commands").hidden = audience !== "CHAT_COMMANDS";
+        const experiment = form.querySelector(".admin-notifications-experiment-audience");
+        if (experiment) experiment.hidden = audience !== "EXPERIMENT";
+        if (audience === "EXPERIMENT") refreshCount(form);
+    }
+
+    const ALL_VARIANTS = "ALL";
+
+    /** The variant select's options: "all variants", then the experiment's own (none for a blank id); back on "all". */
+    function fillVariants(form, experimentId) {
+        const root = rootOfForm(form);
+        const select = fieldOf(form, "variantId");
+        if (!select) return;
+        const option = (value, label) => {
+            const item = document.createElement("mdui-menu-item");
+            item.setAttribute("value", value);
+            item.dataset.variantOption = "";
+            item.textContent = label;
+            return item;
+        };
+        const source = [...form.querySelectorAll(".admin-notifications-variants-of")]
+            .find(list => list.dataset.experimentId === experimentId);
+        const variants = source ? [...source.querySelectorAll("[data-variant-id]")] : [];
+        select.replaceChildren(option(ALL_VARIANTS, root.dataset.labelVariantAll),
+                ...variants.map(v => option(v.dataset.variantId, v.textContent)));
+        select.value = ALL_VARIANTS;
+    }
+
+    const experimentOf = form => fieldOf(form, "experimentId")?.value || "";
+    const variantOf = form => {
+        const value = fieldOf(form, "variantId")?.value;
+        return !value || value === ALL_VARIANTS ? null : value;
+    };
+
+    function showCount(form, count) {
+        const line = form.querySelector(".admin-notifications-count");
+        if (!line) return;
+        line.hidden = count === null;
+        line.textContent = count === null ? "" : rootOfForm(form).dataset.labelRecipients.replace("{n}", count);
+    }
+
+    let counting = 0; // the latest count asked: an older answer is dropped
+
+    /** Asks how many members the chosen experiment (and variant) reaches; the line is hidden when there is no answer. */
+    async function refreshCount(form) {
+        const asked = ++counting;
+        const experimentId = experimentOf(form);
+        if (experimentId === "") return showCount(form, null);
+        let count = null;
+        try {
+            const response = await CatapultCsrf.postJson("/admin/notifications/audience-count",
+                { audience: "EXPERIMENT", experimentId, variantId: variantOf(form) });
+            if (response.ok) count = (await response.json()).count ?? null;
+        } catch {
+            // no count: the line stays hidden, sending is unaffected
+        }
+        if (asked === counting) showCount(form, count);
     }
 
     /** The request's body, or null when a field is refused (told in the view's language). */
@@ -84,6 +145,11 @@ window.CatapultAdminNotifications = (function () {
             targetUserId = form.dataset.member || null;
             if (targetUserId === null) return refuse("labelMemberRequired", fieldOf(form, "memberSearch"));
         }
+        const audience = fieldOf(form, "audience").value;
+        const experiment = audience === "EXPERIMENT" ? { experimentId: experimentOf(form), variantId: variantOf(form) } : {};
+        if (audience === "EXPERIMENT" && experiment.experimentId === "") {
+            return refuse("labelExperimentRequired", fieldOf(form, "experimentId"));
+        }
         return {
             title,
             body: fieldOf(form, "body").value,
@@ -92,17 +158,25 @@ window.CatapultAdminNotifications = (function () {
             ctaLabel: ctaLabel || null,
             expiresAt,
             targetUserId,
-            audience: fieldOf(form, "audience").value === "CHAT_COMMANDS" ? "CHAT_COMMANDS" : null
+            audience: audience === "CHAT_COMMANDS" || audience === "EXPERIMENT" ? audience : null,
+            ...experiment
         };
     }
 
-    /** The status of a POST (0 when it couldn't be sent), `button` disabled meanwhile. */
+    /** The status of a POST (0 when it couldn't be sent) and its JSON body when it has one, `button` disabled meanwhile. */
     async function post(button, url, body) {
         button.disabled = true;
         try {
-            return (await CatapultCsrf.postJson(url, body)).status;
+            const response = await CatapultCsrf.postJson(url, body);
+            let data = null;
+            try {
+                data = await response.json();
+            } catch {
+                // no body, or not JSON
+            }
+            return { status: response.status, data };
         } catch {
-            return 0;
+            return { status: 0, data: null };
         } finally {
             button.disabled = false;
         }
@@ -115,13 +189,14 @@ window.CatapultAdminNotifications = (function () {
     async function saveForm(panel, root, dialog, form, button) {
         const body = bodyOf(root, form);
         if (body === null) return;
-        const status = await post(button, "/admin/notifications", body);
+        const { status, data } = await post(button, "/admin/notifications", body);
         if (!ok(status)) {
             CatapultChannel.showError(refusal(root, status));
             return;
         }
         dialog.open = false;
-        window.mdui?.snackbar?.({ message: root.dataset.labelCreated });
+        const message = Number.isInteger(data?.sent) ? root.dataset.labelSent.replace("{n}", data.sent) : root.dataset.labelCreated;
+        window.mdui?.snackbar?.({ message });
         await CatapultAdminTabs.reload(panel);
     }
 
@@ -129,7 +204,7 @@ window.CatapultAdminNotifications = (function () {
         button.disabled = true; // before the confirmation: a second click must not open another
         try {
             if (!await CatapultAdminTabs.confirmed(root, button.dataset.confirm)) return;
-            const status = await post(button, `/admin/notifications/${encodeURIComponent(button.dataset.delete)}/delete`, {});
+            const { status } = await post(button, `/admin/notifications/${encodeURIComponent(button.dataset.delete)}/delete`, {});
             button.disabled = true; // post() re-enabled it; still busy until the tab reloads
             if (ok(status)) await CatapultAdminTabs.reload(panel);
             else CatapultChannel.showError(refusal(root, status));
@@ -243,6 +318,11 @@ window.CatapultAdminNotifications = (function () {
             if (!form) return;
             if (target.matches('[name="mode"]')) switchMode(rootOf(), form, target.value);
             else if (target.matches('[name="audience"]')) showAudience(form, target.value);
+            else if (target.matches('[name="experimentId"]')) {
+                target.removeAttribute("invalid");
+                fillVariants(form, target.value);
+                refreshCount(form);
+            } else if (target.matches('[name="variantId"]')) refreshCount(form);
         });
     }
 

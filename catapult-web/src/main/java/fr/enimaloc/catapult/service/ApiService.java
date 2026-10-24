@@ -224,7 +224,19 @@ public interface ApiService {
     /** One page (20, newest first) of every notification sent; null when catapult-api fails. */
     AdminPage<AdminNotificationDto> adminNotifications(int page);
     /** catapult-api's status (201; 400 invalid), 502 when unreachable. */
-    int adminCreateNotification(AdminNotificationCreateBody body);
+    default int adminCreateNotification(AdminNotificationCreateBody body) {
+        return adminSendNotification(body).status();
+    }
+    /**
+     * {@link #adminCreateNotification} with, for an audience reached by one send ({@code EXPERIMENT} and
+     * {@code CHAT_COMMANDS}), how many members were told; the count is null otherwise.
+     */
+    ApiClient.Result<Integer> adminSendNotification(AdminNotificationCreateBody body);
+    /**
+     * How many members an experiment's participants audience reaches (all of its variants when
+     * {@code variantId} is null); null when unknown or catapult-api fails.
+     */
+    Long adminNotificationAudienceCount(UUID experimentId, UUID variantId);
     /** catapult-api's status (204; 404), 502 when unreachable. */
     int adminDeleteNotification(UUID id);
     /**

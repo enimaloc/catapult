@@ -6,6 +6,9 @@ import fr.enimaloc.catapult.api.admin.ApiAdminFlagsController;
 import fr.enimaloc.catapult.api.admin.ApiAdminMembersController;
 import fr.enimaloc.catapult.api.channel.ApiTwitchatWidgetController;
 import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
+import fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody;
+import fr.enimaloc.catapult.common.dto.admin.AudienceCountDto;
+import fr.enimaloc.catapult.common.dto.admin.AudienceCountRequest;
 import fr.enimaloc.catapult.common.dto.admin.DtddProposalDto;
 import fr.enimaloc.catapult.common.dto.admin.FlagKeyDto;
 import fr.enimaloc.catapult.common.dto.channel.ConfigResponse;
@@ -235,5 +238,29 @@ class CommonDtoContractTest {
 
         assertThat(roundTrip(produced, ExperimentRebalanceDto.class)).isEqualTo(produced);
         assertThat(roundTrip(new ExperimentRebalanceDto(List.of()), ExperimentRebalanceDto.class).moves()).isEmpty();
+    }
+
+    @Test
+    void notificationAudienceDtos_readBackWithTheirIds() {
+        UUID experiment = UUID.randomUUID();
+        UUID variant = UUID.randomUUID();
+
+        AudienceCountRequest request = new AudienceCountRequest(AdminNotificationCreateBody.EXPERIMENT, experiment, variant);
+        assertThat(roundTrip(request, AudienceCountRequest.class)).isEqualTo(request);
+        assertThat(roundTrip(new AudienceCountDto(42), AudienceCountDto.class)).isEqualTo(new AudienceCountDto(42));
+
+        AdminNotificationCreateBody body = new AdminNotificationCreateBody("T", "B",
+                fr.enimaloc.catapult.common.dto.notification.Severity.INFO, null, null, null, null,
+                AdminNotificationCreateBody.EXPERIMENT, experiment, null);
+        assertThat(roundTrip(body, AdminNotificationCreateBody.class)).isEqualTo(body);
+    }
+
+    @Test
+    void adminNotification_readsBackWithItsRecipientCount() {
+        var produced = new fr.enimaloc.catapult.common.dto.notification.AdminNotificationDto(UUID.randomUUID(), "T", "b", "<p>b</p>",
+                fr.enimaloc.catapult.common.dto.notification.Severity.INFO, null, null, null,
+                Instant.parse("2026-10-22T10:00:00Z"), "TARGETED", null, null, 3);
+
+        assertThat(roundTrip(produced, fr.enimaloc.catapult.common.dto.notification.AdminNotificationDto.class)).isEqualTo(produced);
     }
 }

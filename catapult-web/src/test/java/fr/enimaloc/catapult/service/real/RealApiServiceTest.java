@@ -910,7 +910,7 @@ class RealApiServiceTest {
     void adminNotifications_readsAPageOfAdminDtos() {
         respond(HttpMethod.GET, "/api/admin/notifications?page=0&size=20", "{\"content\":[{\"id\":\"" + NOTIF_ID
                 + "\",\"title\":\"t\",\"body\":\"b\",\"bodyHtml\":\"<p>b</p>\",\"severity\":\"WARNING\",\"audience\":\"TARGETED\","
-                + "\"targetUserId\":\"" + NOTIF_ID + "\",\"targetLogin\":\"alice\","
+                + "\"targetUserId\":\"" + NOTIF_ID + "\",\"targetLogin\":\"alice\",\"recipientCount\":1,"
                 + "\"createdAt\":\"2026-10-18T10:00:00Z\"}],\"number\":0,\"totalPages\":1,\"totalElements\":1}");
 
         var page = service.adminNotifications(0);
@@ -918,6 +918,7 @@ class RealApiServiceTest {
         assertThat(page.content()).extracting("body").containsExactly("b");
         assertThat(page.content().get(0).audience()).isEqualTo("TARGETED");
         assertThat(page.content().get(0).targetLogin()).isEqualTo("alice");
+        assertThat(page.content().get(0).recipientCount()).isEqualTo(1);
     }
 
     @Test
@@ -928,6 +929,48 @@ class RealApiServiceTest {
                 .andRespond(withStatus(HttpStatus.CREATED));
 
         assertThat(service.adminCreateNotification(body)).isEqualTo(201);
+    }
+
+    @Test
+    void adminSendNotification_readsHowManyWereTold_andPassesTheExperimentIds() {
+        UUID experiment = UUID.randomUUID();
+        UUID variant = UUID.randomUUID();
+        var body = new fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody("t", "b",
+                fr.enimaloc.catapult.common.dto.notification.Severity.INFO, null, null, null, null, "EXPERIMENT", experiment, variant);
+        expect(HttpMethod.POST, "/api/admin/notifications")
+                .andExpect(content().json("{\"audience\":\"EXPERIMENT\",\"experimentId\":\"" + experiment + "\",\"variantId\":\"" + variant + "\"}"))
+                .andRespond(withStatus(HttpStatus.CREATED).contentType(MediaType.APPLICATION_JSON).body("{\"sent\":7}"));
+
+        var result = service.adminSendNotification(body);
+
+        assertThat(result.status()).isEqualTo(201);
+        assertThat(result.body()).isEqualTo(7);
+    }
+
+    @Test
+    void adminSendNotification_ofASingleNotification_hasNoCount() {
+        var body = new fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody("t", "b",
+                fr.enimaloc.catapult.common.dto.notification.Severity.INFO, null, null, null, null);
+        expect(HttpMethod.POST, "/api/admin/notifications").andRespond(withStatus(HttpStatus.CREATED)
+                .contentType(MediaType.APPLICATION_JSON).body("{\"id\":\"" + NOTIF_ID + "\",\"title\":\"t\"}"));
+
+        var result = service.adminSendNotification(body);
+
+        assertThat(result.status()).isEqualTo(201);
+        assertThat(result.body()).isNull();
+    }
+
+    @Test
+    void adminNotificationAudienceCount_postsTheIds_andIsNullOnFailure() {
+        UUID experiment = UUID.randomUUID();
+        UUID variant = UUID.randomUUID();
+        expect(HttpMethod.POST, "/api/admin/notifications/audience-count")
+                .andExpect(content().json("{\"audience\":\"EXPERIMENT\",\"experimentId\":\"" + experiment + "\",\"variantId\":\"" + variant + "\"}"))
+                .andRespond(withSuccess("{\"count\":12}", MediaType.APPLICATION_JSON));
+        expect(HttpMethod.POST, "/api/admin/notifications/audience-count").andRespond(withStatus(HttpStatus.NOT_FOUND));
+
+        assertThat(service.adminNotificationAudienceCount(experiment, variant)).isEqualTo(12L);
+        assertThat(service.adminNotificationAudienceCount(experiment, null)).isNull();
     }
 
     @Test

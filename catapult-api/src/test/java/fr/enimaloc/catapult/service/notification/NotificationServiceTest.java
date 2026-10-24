@@ -119,6 +119,38 @@ class NotificationServiceTest {
     }
 
     @Test
+    void createForAll_storesOneTargetedNotificationSharedByEveryRecipient() {
+        UserAccount u1 = userWithStatus(UserAccount.Status.ACTIVE);
+        UserAccount u2 = userWithStatus(UserAccount.Status.ACTIVE);
+        when(notifRepo.save(any())).thenAnswer(inv -> {
+            Notification n = inv.getArgument(0);
+            n.setId(UUID.randomUUID());
+            return n;
+        });
+
+        int sent = service.createForAll(new NotificationService.CreateRequest("T", "B", Severity.INFO,
+                null, null, null, null), admin, List.of(u1, u2));
+
+        assertThat(sent).isEqualTo(2);
+        ArgumentCaptor<Notification> saved = ArgumentCaptor.forClass(Notification.class);
+        verify(notifRepo).save(saved.capture());
+        assertThat(saved.getValue().getAudience()).isEqualTo(Notification.Audience.TARGETED);
+        ArgumentCaptor<List<NotificationRecipient>> cap = ArgumentCaptor.forClass(List.class);
+        verify(recipientRepo).saveAll(cap.capture());
+        assertThat(cap.getValue()).extracting(NotificationRecipient::getUser).containsExactly(u1, u2);
+    }
+
+    @Test
+    void createForAll_withNoRecipient_storesNothing() {
+        int sent = service.createForAll(new NotificationService.CreateRequest("T", "B", Severity.INFO,
+                null, null, null, null), admin, List.of());
+
+        assertThat(sent).isZero();
+        verify(notifRepo, never()).save(any());
+        verify(publisher, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
     void createBroadcast_savesAllActiveUsers() {
         UserAccount u1 = userWithStatus(UserAccount.Status.ACTIVE);
         UserAccount u2 = userWithStatus(UserAccount.Status.ACTIVE);
@@ -247,6 +279,7 @@ class NotificationServiceTest {
         NotificationRecipient r = new NotificationRecipient();
         r.setUser(target);
         when(notifRepo.findAllByOrderByCreatedAtDesc(any())).thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(n, all)));
+        when(recipientRepo.countByIdNotificationId(n.getId())).thenReturn(1L);
         when(recipientRepo.findByIdNotificationId(n.getId())).thenReturn(List.of(r));
 
         var page = service.adminPage(org.springframework.data.domain.Pageable.unpaged());
@@ -254,8 +287,28 @@ class NotificationServiceTest {
         assertThat(page.getContent().get(0).targetUserId()).isEqualTo(target.getId());
         assertThat(page.getContent().get(0).targetLogin()).isEqualTo("someone");
         assertThat(page.getContent().get(0).bodyHtml()).isEqualTo("<p>b</p>");
+        assertThat(page.getContent().get(0).recipientCount()).isEqualTo(1);
         assertThat(page.getContent().get(1).targetLogin()).isNull();
         verify(recipientRepo, never()).findByIdNotificationId(all.getId());
+        verify(recipientRepo, never()).countByIdNotificationId(all.getId());
+    }
+
+    @Test
+    void adminPageCountsASharedNotificationsRecipients_withoutLoadingThemOrNamingOne() {
+        Notification shared = new Notification();
+        shared.setId(UUID.randomUUID());
+        shared.setBody("b");
+        shared.setSeverity(Severity.INFO);
+        shared.setAudience(Notification.Audience.TARGETED);
+        when(notifRepo.findAllByOrderByCreatedAtDesc(any())).thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(shared)));
+        when(recipientRepo.countByIdNotificationId(shared.getId())).thenReturn(3L);
+
+        var dto = service.adminPage(org.springframework.data.domain.Pageable.unpaged()).getContent().get(0);
+
+        assertThat(dto.recipientCount()).isEqualTo(3);
+        assertThat(dto.targetUserId()).isNull();
+        assertThat(dto.targetLogin()).isNull();
+        verify(recipientRepo, never()).findByIdNotificationId(shared.getId());
     }
 
     private UserAccount userWithStatus(UserAccount.Status s) {

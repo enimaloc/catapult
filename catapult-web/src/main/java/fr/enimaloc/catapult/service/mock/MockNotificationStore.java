@@ -14,6 +14,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.LinkedHashMap;
@@ -99,8 +100,35 @@ class MockNotificationStore {
             publish(account, NotificationStreamEvent.CREATED, dto);
         }
         sent.add(new AdminNotificationDto(id, title, body, html, severity, ctaUrl, ctaLabel, expiresAt, now,
-                target == null ? "BROADCAST" : "TARGETED", target, target == null ? null : memberLogin.apply(target)));
+                target == null ? "BROADCAST" : "TARGETED", target, target == null ? null : memberLogin.apply(target),
+                target == null ? 0 : 1));
         return 201;
+    }
+
+    /** One notification shared by {@code recipients} alone (accounts are seeded as needed); catapult-api's status. */
+    synchronized int createShared(String title, String body, Severity severity, String ctaUrl, String ctaLabel,
+                                  Instant expiresAt, Collection<UUID> recipients) {
+        if (!valid(title, body, severity, ctaUrl, ctaLabel, expiresAt)) return 400;
+        ctaUrl = blankToNull(ctaUrl);
+        ctaLabel = blankToNull(ctaLabel);
+        UUID id = UUID.randomUUID();
+        Instant now = clock.instant();
+        String html = html(body);
+        NotificationDto dto = new NotificationDto(id, title, html, severity, ctaUrl, ctaLabel, expiresAt, now, false);
+        for (UUID account : recipients) {
+            notifications(account).add(dto);
+            publish(account, NotificationStreamEvent.CREATED, dto);
+        }
+        UUID first = recipients.stream().findFirst().orElse(null);
+        sent.add(new AdminNotificationDto(id, title, body, html, severity, ctaUrl, ctaLabel, expiresAt, now,
+                "TARGETED", recipients.size() == 1 ? first : null,
+                recipients.size() == 1 ? memberLogin.apply(first) : null, recipients.size()));
+        return 201;
+    }
+
+    /** How many accounts the mock has seen: whom a broadcast reaches. */
+    synchronized int accountCount() {
+        return byAccount.size();
     }
 
     synchronized int delete(UUID id) {

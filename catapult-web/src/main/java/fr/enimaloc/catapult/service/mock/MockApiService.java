@@ -1087,13 +1087,32 @@ public class MockApiService implements ApiService {
     }
 
     @Override
-    public int adminCreateNotification(AdminNotificationCreateBody body) {
-        log.trace("adminCreateNotification({})", body);
+    public ApiClient.Result<Integer> adminSendNotification(AdminNotificationCreateBody body) {
+        log.trace("adminSendNotification({})", body);
         UUID creator = currentUserId();
         // The creator's bell exists before an "everyone" notification goes out, so it reaches them too.
         if (creator != null) notifications().snapshot(creator);
-        return notifications().create(body.title(), body.body(), body.severity(), body.ctaUrl(), body.ctaLabel(),
-                body.expiresAt(), body.targetUserId());
+        if (AdminNotificationCreateBody.EXPERIMENT.equals(body.audience())) {
+            if (body.experimentId() == null) return new ApiClient.Result<>(400, null);
+            Optional<List<UUID>> participants = experiments.participantIds(body.experimentId(), body.variantId());
+            if (participants.isEmpty()) return new ApiClient.Result<>(404, null);
+            List<UUID> recipients = participants.get();
+            if (recipients.isEmpty()) return new ApiClient.Result<>(201, 0);
+            int status = notifications().createShared(body.title(), body.body(), body.severity(), body.ctaUrl(),
+                    body.ctaLabel(), body.expiresAt(), recipients);
+            return new ApiClient.Result<>(status, status == 201 ? recipients.size() : null);
+        }
+        int status = notifications().create(body.title(), body.body(), body.severity(), body.ctaUrl(),
+                body.ctaLabel(), body.expiresAt(), body.targetUserId());
+        // the mock has no chat commands: everyone it has seen stands for the streamers told
+        boolean counted = AdminNotificationCreateBody.CHAT_COMMANDS.equals(body.audience()) && status == 201;
+        return new ApiClient.Result<>(status, counted ? notifications().accountCount() : null);
+    }
+
+    @Override
+    public Long adminNotificationAudienceCount(UUID experimentId, UUID variantId) {
+        log.trace("adminNotificationAudienceCount({}, {})", experimentId, variantId);
+        return experiments.participantIds(experimentId, variantId).map(ids -> (long) ids.size()).orElse(null);
     }
 
     @Override
