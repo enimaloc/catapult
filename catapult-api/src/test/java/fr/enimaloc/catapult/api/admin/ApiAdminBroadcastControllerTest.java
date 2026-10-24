@@ -63,10 +63,9 @@ class ApiAdminBroadcastControllerTest {
         when(userRepo.findByTwitchId(any())).thenReturn(Optional.of(admin));
     }
 
-    // Non-admin access is enforced by the path matcher in ApiSecurityConfig
-    // (.requestMatchers("/api/admin/**").hasRole("ADMIN")), which lives outside
-    // the @WebMvcTest slice. The @PreAuthorize annotation on the controller is
-    // a defence-in-depth marker; covered by the broader security integration tests.
+    // Admin access is enforced by the /api/admin/** URL rule (Authz.admin()) in ApiSecurityConfig,
+    // which lives outside the @WebMvcTest slice. It is the only admin gate: the controller carries
+    // no annotation. The access matrix covers it.
 
     @Test
     void valid_alert_info_returns_202_and_publishes_on_global_channel() throws Exception {
