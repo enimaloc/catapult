@@ -1,8 +1,10 @@
 package fr.enimaloc.catapult.service.tw;
 
 import fr.enimaloc.catapult.domain.binding.GameBinding;
+import fr.enimaloc.catapult.domain.binding.GameMapping;
 import fr.enimaloc.catapult.domain.config.AppState;
 import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
+import fr.enimaloc.catapult.repository.binding.GameMappingRepository;
 import fr.enimaloc.catapult.repository.config.AppStateRepository;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -30,6 +32,7 @@ public class TwBackfillService {
 
     private final AppStateRepository appStateRepo;
     private final GameBindingRepository bindingRepo;
+    private final GameMappingRepository mappingRepo;
     private final IgdbService igdbService;
     private final TwResolverService resolver;
     private final MeterRegistry meterRegistry;
@@ -120,7 +123,7 @@ public class TwBackfillService {
                 ? bindingRepo.findCandidatesForTwBackfill(PageRequest.of(page++, batchSize))
                 : bindingRepo.findCandidatesForTwRebuild(PageRequest.of(page++, batchSize));
             for (GameBinding b : batch) {
-                if (b.isTwOverride() || (backfillOnly && !b.getTws().isEmpty())) {
+                if (b.isTwOverride() || (backfillOnly && !b.getTws().isEmpty()) || hasAdminTws(b)) {
                     c.skipped++;
                     meterRegistry.counter("catapult.tw." + mode + ".skipped").increment();
                     continue;
@@ -133,7 +136,7 @@ public class TwBackfillService {
         return c;
     }
 
-    /** Same loop as {@link #process}, but never skips on {@code twOverride}. */
+    /** Same loop as {@link #process}, but never skips on {@code twOverride} (the admin's mapped TWs still win). */
     private Counts processForceAll() {
         long sleepMs = 1000L / Math.max(throttle, 1);
         Counts c = new Counts();
@@ -143,12 +146,28 @@ public class TwBackfillService {
         do {
             batch = bindingRepo.findAllCandidatesForTwForceRebuild(PageRequest.of(page++, batchSize));
             for (GameBinding b : batch) {
+                if (hasAdminTws(b)) {
+                    c.skipped++;
+                    meterRegistry.counter("catapult.tw." + mode + ".skipped").increment();
+                    continue;
+                }
                 if (!remap(b, mode, c, sleepMs)) {
                     return c;
                 }
             }
         } while (batch.hasNext());
         return c;
+    }
+
+    /**
+     * A MAPPED binding whose admin game mapping replaces the TWs carries the admin's choice (even none), not an
+     * IGDB suggestion: no backfill or rebuild may overwrite it.
+     */
+    private boolean hasAdminTws(GameBinding b) {
+        return b.getStatus() == GameBinding.Status.MAPPED
+            && mappingRepo.findBySourceTypeAndSourceId(b.getSourceType(), b.getSourceId())
+                .map(GameMapping::isTwsOverridden)
+                .orElse(false);
     }
 
     /**

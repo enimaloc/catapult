@@ -24,7 +24,9 @@ public class GameBinding {
     }
 
     public enum Status {
-        AUTO, MANUAL, INCOMPLETE
+        AUTO, MANUAL, INCOMPLETE,
+        /** Category set by an admin game mapping ({@link GameMapping}); complete, like AUTO. */
+        MAPPED
     }
 
     @Id

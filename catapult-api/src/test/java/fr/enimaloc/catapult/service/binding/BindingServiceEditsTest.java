@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
+import fr.enimaloc.catapult.repository.binding.GameMappingRepository;
 import fr.enimaloc.catapult.service.igdb.IgdbGameDetailsService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.tw.TwResolverService;
@@ -36,7 +37,8 @@ class BindingServiceEditsTest {
     private final TwitchService twitch = mock(TwitchService.class);
     private final TwResolverService twResolver = mock(TwResolverService.class);
     private final GameStateService gameState = mock(GameStateService.class);
-    private final BindingService service = new BindingService(bindings, igdb, igdbDetails, twitch, twResolver, gameState);
+    private final GameMappingRepository mappings = mock(GameMappingRepository.class);
+    private final BindingService service = new BindingService(bindings, igdb, igdbDetails, twitch, twResolver, gameState, mappings);
 
     private UserAccount user;
     private GameBinding binding;

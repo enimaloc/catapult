@@ -140,13 +140,16 @@ public class ChannelDashboardAssembler {
                 channel.getProfileImageUrl());
     }
 
-    /** One page of bindings, filtered by status (which wins) or source type. */
+    /** One page of bindings, filtered by status (which wins; AUTO includes MAPPED) or source type. */
     private PagedBindings bindings(UserAccount channel, int page, String status, String source) {
         PageRequest request = PageRequest.of(page, BINDINGS_PAGE_SIZE);
         Page<GameBinding> bindings;
         if (status != null && !status.isBlank()) {
-            bindings = gameBindingRepository.findByUserAndStatus(
-                    channel, GameBinding.Status.valueOf(status.toUpperCase()), request);
+            GameBinding.Status wanted = GameBinding.Status.valueOf(status.toUpperCase());
+            Set<GameBinding.Status> statuses = wanted == GameBinding.Status.AUTO
+                    ? Set.of(GameBinding.Status.AUTO, GameBinding.Status.MAPPED)
+                    : Set.of(wanted);
+            bindings = gameBindingRepository.findByUserAndStatusIn(channel, statuses, request);
         } else if (source != null && !source.isBlank()) {
             bindings = gameBindingRepository.findByUserAndSourceType(
                     channel, GameBinding.SourceType.valueOf(source.toUpperCase()), request);

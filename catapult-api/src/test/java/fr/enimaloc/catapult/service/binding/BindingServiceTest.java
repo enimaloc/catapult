@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.igdb.IgdbGameDetails;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
+import fr.enimaloc.catapult.repository.binding.GameMappingRepository;
 import fr.enimaloc.catapult.service.igdb.IgdbGameDetailsService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.tw.TwResolverService;
@@ -36,6 +37,7 @@ class BindingServiceTest {
     @Mock private TwitchService twitchService;
     @Mock private TwResolverService twResolverService;
     @Mock private GameStateService gameStateService;
+    @Mock private GameMappingRepository gameMappingRepository;
 
     private BindingService bindingService;
 
@@ -45,7 +47,7 @@ class BindingServiceTest {
 
     @BeforeEach
     void setup() {
-        bindingService = new BindingService(gameBindingRepository, igdbService, igdbGameDetailsService, twitchService, twResolverService, gameStateService);
+        bindingService = new BindingService(gameBindingRepository, igdbService, igdbGameDetailsService, twitchService, twResolverService, gameStateService, gameMappingRepository);
 
         user = new UserAccount();
         bindingId = UUID.randomUUID();
