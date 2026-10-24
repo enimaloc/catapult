@@ -41,6 +41,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc(addFilters = false)
 @Import(I18nConfig.class)
 class UserApiV1ControllerTest {
+    @MockitoBean fr.enimaloc.catapult.service.account.UserApiTokenService userApiTokenService;
 
     @Autowired MockMvc mvc;
 

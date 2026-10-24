@@ -34,6 +34,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import({ApiSecurityConfig.class, ApiAdminMemberDebugSecurityTest.Keys.class})
 @ActiveProfiles("test")
 class ApiAdminMemberDebugSecurityTest {
+    @MockitoBean fr.enimaloc.catapult.service.account.UserApiTokenService userApiTokenService;
     @org.springframework.boot.test.context.TestConfiguration
     static class Keys {
         @org.springframework.context.annotation.Bean

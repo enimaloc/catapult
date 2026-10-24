@@ -36,6 +36,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import({ApiSecurityConfig.class, ApiSecurityConfigWellKnownTest.Keys.class})
 @ActiveProfiles("test")
 class ApiSecurityConfigWellKnownTest {
+    @MockitoBean fr.enimaloc.catapult.service.account.UserApiTokenService userApiTokenService;
     @org.springframework.boot.test.context.TestConfiguration
     static class Keys {
         @org.springframework.context.annotation.Bean

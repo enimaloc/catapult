@@ -6,7 +6,6 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.AuthorityUtils;
@@ -31,9 +30,9 @@ public class PersonalTokenAuthenticationFilter extends OncePerRequestFilter {
     public static final String AUTHORITY = "API_TOKEN";
     private static final String BEARER = "Bearer ";
 
-    private final ObjectProvider<UserApiTokenService> tokens;
+    private final UserApiTokenService tokens;
 
-    public PersonalTokenAuthenticationFilter(ObjectProvider<UserApiTokenService> tokens) {
+    public PersonalTokenAuthenticationFilter(UserApiTokenService tokens) {
         this.tokens = tokens;
     }
 
@@ -41,7 +40,7 @@ public class PersonalTokenAuthenticationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         bearer(request)
-                .flatMap(token -> Optional.ofNullable(tokens.getIfAvailable()).flatMap(s -> s.authenticate(token)))
+                .flatMap(tokens::authenticate)
                 .map(UserAccount::getId)
                 .ifPresent(userId -> {
                     SecurityContext context = SecurityContextHolder.createEmptyContext();

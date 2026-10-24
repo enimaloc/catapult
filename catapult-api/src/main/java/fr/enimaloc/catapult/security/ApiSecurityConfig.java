@@ -1,7 +1,6 @@
 package fr.enimaloc.catapult.security;
 
 import fr.enimaloc.catapult.service.account.UserApiTokenService;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -59,7 +58,7 @@ public class ApiSecurityConfig {
     @Bean
     @Order(Ordered.HIGHEST_PRECEDENCE)
     public SecurityFilterChain customBindingsApiSecurityFilterChain(
-            HttpSecurity http, ObjectProvider<UserApiTokenService> userApiTokenService) throws Exception {
+            HttpSecurity http, UserApiTokenService userApiTokenService) throws Exception {
         http
                 .securityMatcher(CUSTOM_BINDINGS_API, CUSTOM_BINDINGS_API + "/**")
                 // Answers the preflight before any authentication, and adds the headers to every answer, 401 included
