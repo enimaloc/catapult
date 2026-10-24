@@ -88,6 +88,9 @@ class ApiAdminSteamKeysControllerTest {
         bare.refresh();
 
         verify(repository).deleteById(KEY);
+        verify(events).keyAdded(eq(AdminEventPublisher.PROVIDER_STEAM), any());
+        verify(events).keyDeleted(AdminEventPublisher.PROVIDER_STEAM, ApiKeyHasher.id(KEY));
+        verify(events).keysRefreshed(eq(AdminEventPublisher.PROVIDER_STEAM), anyList());
     }
 
     @Test
