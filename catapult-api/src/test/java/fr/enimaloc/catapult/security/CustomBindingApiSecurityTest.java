@@ -13,6 +13,7 @@ import fr.enimaloc.catapult.service.binding.CustomBindingService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import jakarta.servlet.http.Cookie;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.thymeleaf.autoconfigure.ThymeleafAutoConfiguration;
@@ -37,7 +38,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -136,6 +139,61 @@ class CustomBindingApiSecurityTest {
             mvc.perform(get("/api/me/api-token").header("Authorization", "Bearer " + PERSONAL_TOKEN)
                             .with(r -> { r.setRemoteAddr("203.0.113.9"); return r; }))
                     .andExpect(status().isUnauthorized());
+        }
+
+        // --- CORS: a page of any origin (Twitchat) calls this API with its token, never with cookies ---
+
+        private static final String ORIGIN = "https://example.org";
+
+        @Test
+        void preflight_fromAnyOrigin_isAnsweredWithoutAuthentication() throws Exception {
+            for (String path : List.of("/api/v2/custom-bindings", "/api/v2/custom-bindings/art/activate")) {
+                mvc.perform(options(path)
+                                .header("Origin", ORIGIN)
+                                .header("Access-Control-Request-Method", "POST")
+                                .header("Access-Control-Request-Headers", "authorization, content-type"))
+                        .andExpect(status().is2xxSuccessful())
+                        .andExpect(header().string("Access-Control-Allow-Origin", "*"))
+                        .andExpect(header().string("Access-Control-Allow-Methods", "GET,POST,OPTIONS"))
+                        .andExpect(header().string("Access-Control-Allow-Headers",
+                                org.hamcrest.Matchers.containsStringIgnoringCase("authorization")))
+                        .andExpect(header().doesNotExist("Access-Control-Allow-Credentials"));
+            }
+        }
+
+        @Test
+        void actualRequests_fromAnyOrigin_carryTheCorsHeaders_refusalsIncluded() throws Exception {
+            mvc.perform(post("/api/v2/custom-bindings/deactivate").header("Origin", ORIGIN)
+                            .header("Authorization", "Bearer " + PERSONAL_TOKEN))
+                    .andExpect(status().is2xxSuccessful())
+                    .andExpect(header().string("Access-Control-Allow-Origin", "*"))
+                    .andExpect(header().doesNotExist("Access-Control-Allow-Credentials"));
+            verify(customBindings).deactivate(user);
+
+            mvc.perform(post("/api/v2/custom-bindings/deactivate").header("Origin", ORIGIN)
+                            .header("Authorization", "Bearer cat_" + "y".repeat(43)))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(header().string("Access-Control-Allow-Origin", "*"));
+        }
+
+        @Test
+        void aSessionCookieAlone_is401() throws Exception {
+            mvc.perform(post("/api/v2/custom-bindings/deactivate").header("Origin", ORIGIN)
+                            .cookie(new Cookie("CATAPULT_API_SESSION", "s1"), new Cookie("JSESSIONID", "s2")))
+                    .andExpect(status().isUnauthorized());
+            verify(customBindings, never()).deactivate(any());
+        }
+
+        @Test
+        void otherRoutes_getNoCors() throws Exception {
+            mvc.perform(get("/api/me/api-token").header("Origin", ORIGIN).header("Authorization", "Bearer " + jwt()))
+                    .andExpect(status().isOk())
+                    .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
+            mvc.perform(options("/api/me/api-token")
+                            .header("Origin", ORIGIN)
+                            .header("Access-Control-Request-Method", "GET")
+                            .header("Access-Control-Request-Headers", "authorization"))
+                    .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
         }
     }
 

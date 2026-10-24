@@ -104,8 +104,14 @@ public class ApiRelayController {
             return;
         }
         response.setStatus(answer.statusCode());
+        // Answered by catapult-web's own CORS (CustomBindingsCorsConfig): catapult-api's would repeat them, and a
+        // browser refuses an Access-Control-Allow-Origin given twice
+        boolean corsAnsweredHere = response.containsHeader("Access-Control-Allow-Origin");
         answer.headers().map().forEach((name, values) -> {
             String lower = name.toLowerCase(Locale.ROOT);
+            if (corsAnsweredHere && lower.startsWith("access-control-")) {
+                return;
+            }
             if (lower.equals("content-length")) {
                 values.stream().findFirst().ifPresent(length -> response.setContentLengthLong(Long.parseLong(length)));
             } else if (!NOT_RELAYED.contains(lower) && !lower.startsWith(":")) {
