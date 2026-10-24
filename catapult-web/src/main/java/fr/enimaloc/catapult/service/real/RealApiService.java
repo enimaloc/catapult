@@ -1075,7 +1075,7 @@ public class RealApiService implements ApiService {
 
     @Override
     public MinecraftDeviceCodeStart adminMinecraftDeviceCode() {
-        // read as a map: the code on 200 (snake_case, Microsoft's own fields), {message} on a refusal
+        // read as a map: the code on 200 (snake_case, Microsoft's own fields); a refusal is read as its problem
         @SuppressWarnings("rawtypes")
         ApiClient.Result<Map> result = client.call(HttpMethod.POST, MINECRAFT_ACCOUNTS + "/device-code", null, Map.class);
         Map<?, ?> body = result.body() == null ? Map.of() : result.body();
@@ -1087,7 +1087,7 @@ public class RealApiService implements ApiService {
                     text(body.get("verification_uri")), body.get("interval") instanceof Number n ? n.intValue() : 0,
                     body.get("expires_in") instanceof Number n ? n.intValue() : 0), null);
         }
-        return new MinecraftDeviceCodeStart(result.ok() ? 502 : result.status(), null, text(body.get("message")));
+        return new MinecraftDeviceCodeStart(result.ok() ? 502 : result.status(), null, result.error());
     }
 
     private static String text(Object value) {

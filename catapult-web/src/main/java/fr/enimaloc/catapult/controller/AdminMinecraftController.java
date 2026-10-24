@@ -1,7 +1,10 @@
 package fr.enimaloc.catapult.controller;
 
+import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
+import fr.enimaloc.catapult.service.http.ApiError;
+import fr.enimaloc.catapult.service.http.ApiErrorText;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -12,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Supplier;
@@ -20,9 +24,8 @@ import java.util.function.Supplier;
  * The admin Keys tab's Minecraft service accounts: enable / disable, reset the friend limit and
  * delete (409 while users are linked to it), each answered with catapult-api's status (502 when
  * unreachable); and the Microsoft device-code flow catapult-api runs, which this only relays: the
- * device code (else catapult-api's status and {@code message}, 502 when unreachable), then each create / reauth poll with catapult-api's status
- * (202 not confirmed yet, 200 done with the account's {@code minecraftUsername} and {@code label},
- * else the error and its {@code message} when catapult-api gave one).
+ * device code (else catapult-api's status and the refusal's {@code message}, 502 when unreachable), then each create / reauth poll with catapult-api's status
+ * (202 not confirmed yet, 200 done with the account's {@code minecraftUsername} and {@code label}, else the status alone).
  */
 @RestController
 @RequestMapping("/admin/minecraft-accounts")
@@ -30,6 +33,7 @@ import java.util.function.Supplier;
 public class AdminMinecraftController {
     private final ApiService apiService;
     private final ModelFiller filler;
+    private final ApiErrorText errorText;
 
     public record EnabledBody(Boolean enabled) {}
     public record CreateBody(String deviceCode, String label) {}
@@ -54,14 +58,17 @@ public class AdminMinecraftController {
         return ResponseEntity.status(apiService.adminDeleteMinecraftAccount(id)).build();
     }
 
-    /** The code (200), else catapult-api's status with its {@code message} when it gave one: Microsoft's refusal must reach the admin. */
+    /**
+     * The code (200), else catapult-api's status, with Microsoft's refusal as the admin's own-language {@code message}:
+     * it must reach the admin.
+     */
     @PostMapping("/device-code")
-    public ResponseEntity<?> deviceCode() {
+    public ResponseEntity<?> deviceCode(Locale locale) {
         AdminAccess.require(filler);
         ApiService.MinecraftDeviceCodeStart start = apiService.adminMinecraftDeviceCode();
         if (start.status() == 200 && start.code() != null) return ResponseEntity.ok(start.code());
         int status = start.status() == 200 ? HttpStatus.BAD_GATEWAY.value() : start.status();
-        return ResponseEntity.status(status).body(message(start.message()));
+        return ResponseEntity.status(status).body(refusal(start.error(), locale));
     }
 
     @PostMapping("/create")
@@ -83,7 +90,7 @@ public class AdminMinecraftController {
         return value == null || value.isBlank();
     }
 
-    /** catapult-api's status, with only what the page shows: the account once done, the error's message otherwise. */
+    /** catapult-api's status, with only what the page shows: the account once done. */
     private static ResponseEntity<Map<String, Object>> poll(Supplier<ApiClient.Result<Map<String, Object>>> call) {
         ApiClient.Result<Map<String, Object>> result = call.get();
         Map<String, Object> answer = result.body() == null ? Map.of() : result.body();
@@ -91,14 +98,15 @@ public class AdminMinecraftController {
         if (result.status() == 200) {
             shown.put("minecraftUsername", answer.get("minecraftUsername"));
             shown.put("label", answer.get("label"));
-        } else if (result.status() != 202) {
-            shown.putAll(message(answer.get("message")));
         }
         return ResponseEntity.status(result.status()).body(shown);
     }
 
-    /** {@code {message}} for a non-blank message, else nothing. */
-    private static Map<String, Object> message(Object message) {
-        return message instanceof String text && !text.isBlank() ? Map.of("message", text) : Map.of();
+    /** {@code {message}}: the refusal's text, with Microsoft's answer, for a refused device code; else nothing. */
+    private Map<String, Object> refusal(ApiError error, Locale locale) {
+        if (error == null || error.code() != ErrorCode.MINECRAFT_DEVICE_CODE_REFUSED) return Map.of();
+        String upstream = error.property("upstream", String.class);
+        return errorText.text(error, locale, upstream == null ? "" : upstream)
+                .<Map<String, Object>>map(text -> Map.of("message", text)).orElse(Map.of());
     }
 }

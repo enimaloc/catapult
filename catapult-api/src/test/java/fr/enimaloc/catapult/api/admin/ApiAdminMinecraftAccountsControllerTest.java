@@ -80,8 +80,8 @@ class ApiAdminMinecraftAccountsControllerTest {
         when(accountRepository.findById(account.getId())).thenReturn(Optional.of(account));
         when(linkRepository.findByServiceAccount(account)).thenReturn(java.util.List.of(new fr.enimaloc.catapult.domain.minecraft.MinecraftFriendLink()));
 
-        ResponseEntity<?> response = controller.delete(account.getId());
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> controller.delete(account.getId()))
+                .isInstanceOfSatisfying(fr.enimaloc.catapult.api.error.ApiProblem.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
     }
 }

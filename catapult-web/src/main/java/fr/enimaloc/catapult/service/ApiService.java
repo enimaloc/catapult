@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import fr.enimaloc.catapult.service.http.ApiClient;
+import fr.enimaloc.catapult.service.http.ApiError;
 import fr.enimaloc.catapult.common.dto.*;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
@@ -408,13 +409,13 @@ public interface ApiService {
     /** Deletes an account; catapult-api's status (204; 409 while users are linked to it; 404 unknown), 502 when unreachable. */
     int adminDeleteMinecraftAccount(UUID id);
     /**
-     * Starts a Microsoft device-code flow: status 200 with the code, else catapult-api's status and the
-     * refusal's message when it gave one (e.g. Microsoft's AADSTS error), 502 when unreachable.
+     * Starts a Microsoft device-code flow: status 200 with the code, else catapult-api's status and its
+     * problem when it gave one (Microsoft's AADSTS answer is the {@code upstream} of a refusal), 502 when unreachable.
      */
     MinecraftDeviceCodeStart adminMinecraftDeviceCode();
 
-    /** A device-code start: the code when {@code status} is 200, else null and catapult-api's message (may be null). */
-    record MinecraftDeviceCodeStart(int status, MinecraftDeviceCodeDto code, String message) {}
+    /** A device-code start: the code when {@code status} is 200, else null and catapult-api's problem (may be null). */
+    record MinecraftDeviceCodeStart(int status, MinecraftDeviceCodeDto code, ApiError error) {}
     /**
      * Polls the device code to enrol a new account ({@code label} null: catapult-api's default):
      * 202 while it isn't confirmed yet, 200 with the account once it is, else the error; 502 when unreachable.
