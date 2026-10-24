@@ -15,6 +15,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 
 import tools.jackson.databind.json.JsonMapper;
 
+import java.io.IOException;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
@@ -110,8 +111,15 @@ public class ApiClient {
         }
     }
 
-    /** A call's HTTP status and its body read as {@code type} (null when empty); status 502 when the call itself failed. */
-    public record Result<T>(int status, T body) {
+    /**
+     * A call's HTTP status and its body read as {@code type} (null when empty); status 502 when the call itself
+     * failed. {@code error} is catapult-api's problem on an error answer that holds one, else null.
+     */
+    public record Result<T>(int status, T body, ApiError error) {
+        public Result(int status, T body) {
+            this(status, body, null);
+        }
+
         public boolean ok() {
             return status >= 200 && status < 300;
         }
@@ -119,7 +127,8 @@ public class ApiClient {
 
     /**
      * {@code method} {@code body} (none when null) to {@code path}, keeping the status and body
-     * of a 4xx answer instead of dropping them, for callers that relay validation errors.
+     * of a 4xx answer instead of dropping them, for callers that relay validation errors. An error answer's
+     * problem, whatever its content type, is kept as the result's {@link ApiError}.
      */
     public <T> Result<T> call(HttpMethod method, String path, Object body, Class<T> type, Object... uriVars) {
         try {
@@ -127,6 +136,16 @@ public class ApiClient {
             if (body != null) spec.body(body);
             return spec.exchange((request, response) -> {
                 int status = response.getStatusCode().value();
+                if (response.getStatusCode().isError()) {
+                    byte[] bytes;
+                    try {
+                        bytes = response.getBody().readAllBytes();
+                    } catch (IOException e) {
+                        // The body is lost, not the status.
+                        bytes = new byte[0];
+                    }
+                    return new Result<>(status, errorBody(bytes, type), ApiError.parse(bytes));
+                }
                 try {
                     return new Result<>(status, response.bodyTo(type));
                 } catch (Exception e) {
@@ -137,6 +156,16 @@ public class ApiClient {
         } catch (Exception e) {
             logFailure(method, path, e);
             return new Result<>(502, null);
+        }
+    }
+
+    /** An error answer's {@code bytes} read as {@code type}, as a 2xx's would be; null when they are not one. */
+    private static <T> T errorBody(byte[] bytes, Class<T> type) {
+        if (bytes.length == 0) return null;
+        try {
+            return JSON.readValue(bytes, type);
+        } catch (RuntimeException e) {
+            return null;
         }
     }
 
