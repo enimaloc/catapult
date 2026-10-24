@@ -30,6 +30,8 @@ import java.util.concurrent.atomic.AtomicLong;
 @Component
 public class DebugExchangeRecorder {
 
+    /** Its worker threads are named after this: work they do is the recording itself, not the member's. */
+    public static final String THREAD_NAME_PREFIX = "debug-recorder-";
     static final int SERVICE_MAX = 32;
     static final int OPERATION_MAX = 128;
     static final int METHOD_MAX = 16;
@@ -126,7 +128,7 @@ public class DebugExchangeRecorder {
      */
     static ExecutorService boundedExecutor(int workers, int capacity) {
         return new ThreadPoolExecutor(workers, workers, 0L, TimeUnit.MILLISECONDS,
-                new ArrayBlockingQueue<>(capacity), Thread.ofVirtual().name("debug-recorder-", 0).factory(),
+                new ArrayBlockingQueue<>(capacity), Thread.ofVirtual().name(THREAD_NAME_PREFIX, 0).factory(),
                 new ThreadPoolExecutor.AbortPolicy());
     }
 
