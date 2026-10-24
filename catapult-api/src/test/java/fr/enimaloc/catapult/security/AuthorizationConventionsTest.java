@@ -12,10 +12,14 @@ import org.springframework.context.annotation.ClassPathScanningCandidateComponen
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.core.type.filter.AnnotationTypeFilter;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Authorization conventions: access rules live in {@link Authz}, admin routes sit under /api/admin. */
+/**
+ * Authorization conventions: access rules live in {@link Authz}, admin routes sit under /api/admin, and every channel
+ * route asks {@link Authz} before its body runs.
+ */
 class AuthorizationConventionsTest {
 
   private static final Pattern AUTHZ_CALL = Pattern.compile("^@authz\\.\\w+\\(.*\\)$");
@@ -59,6 +63,48 @@ class AuthorizationConventionsTest {
       }
     }
     assertThat(violations).isEmpty();
+  }
+
+  @Test
+  void channelRoutesAreAuthorized() throws ClassNotFoundException {
+    List<String> handlers = new ArrayList<>();
+    List<String> violations = new ArrayList<>();
+    for (Class<?> type : scan(org.springframework.stereotype.Controller.class)) {
+      boolean classRule = AnnotatedElementUtils.findMergedAnnotation(type, PreAuthorize.class) != null;
+      for (Method method : type.getDeclaredMethods()) {
+        RequestMapping mapping = AnnotatedElementUtils.findMergedAnnotation(method, RequestMapping.class);
+        if (mapping == null
+            || method.isAnnotationPresent(ExceptionHandler.class)
+            || !underChannel(type, mapping)) {
+          continue;
+        }
+        String name = type.getName() + "#" + method.getName();
+        handlers.add(name);
+        if (!classRule && method.getAnnotation(PreAuthorize.class) == null) {
+          violations.add(name + " has no @PreAuthorize");
+        }
+      }
+    }
+    assertThat(handlers).as("handlers under /api/channels/{username}").isNotEmpty();
+    assertThat(violations).isEmpty();
+  }
+
+  /** {@code mapping}, joined to {@code type}'s own mapping, is under {@code /api/channels/{username}}. */
+  private static boolean underChannel(Class<?> type, RequestMapping mapping) {
+    RequestMapping classMapping = AnnotatedElementUtils.findMergedAnnotation(type, RequestMapping.class);
+    List<String> prefixes = classMapping == null || classMapping.path().length == 0
+        ? List.of("")
+        : List.of(classMapping.path());
+    List<String> suffixes = mapping.path().length == 0 ? List.of("") : List.of(mapping.path());
+    for (String prefix : prefixes) {
+      for (String suffix : suffixes) {
+        String path = prefix + suffix;
+        if (path.equals("/api/channels/{username}") || path.startsWith("/api/channels/{username}/")) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   private static void check(Object where, PreAuthorize annotation, List<String> out) {

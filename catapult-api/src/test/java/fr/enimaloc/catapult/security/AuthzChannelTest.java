@@ -33,7 +33,7 @@ class AuthzChannelTest {
 
     private final UserAccountRepository accounts = mock(UserAccountRepository.class);
     private final ChannelAccessService channelAccessService = mock(ChannelAccessService.class);
-    private final ApiUserResolver users = new ApiUserResolver(accounts, channelAccessService);
+    private final ApiUserResolver users = new ApiUserResolver(accounts);
     private final Authz authz = new Authz(users, channelAccessService);
 
     private UserAccount owner;
@@ -130,7 +130,7 @@ class AuthzChannelTest {
         TwitchService twitch = mock(TwitchService.class);
         when(twitch.getModeratedChannelIds(any())).thenThrow(new IllegalStateException("Twitch is down"));
         ChannelAccessService real = new ChannelAccessService(twitch, accounts);
-        Authz withRealAccess = new Authz(new ApiUserResolver(accounts, real), real);
+        Authz withRealAccess = new Authz(new ApiUserResolver(accounts), real);
 
         signInAs(moderator.getId());
         assertThat(withRealAccess.canAccessChannel("streamer")).isFalse();
