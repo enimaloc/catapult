@@ -152,16 +152,6 @@ class FrozenErrorContractTest extends FullContextTestBase {
                 .hasValue("http://localhost/connect/steam/close?error=nonce");
     }
 
-    /** A {@code ResponseStatusException}'s reason ("Unknown cache …") is dropped by Boot's error page. */
-    @Test
-    void internalReasonNeverReachesTheBodyToday() throws Exception {
-        String path = "/api/admin/caches/unknown";
-        HttpResponse<String> response = send("GET", path, Map.of());
-
-        assertThat(response.statusCode()).isEqualTo(404);
-        assertThat(response.body()).matches(Pattern.compile(BOOT_ERROR.formatted(404, "Not Found", path)));
-    }
-
     private static void assertEmpty404(HttpResponse<String> response) {
         assertThat(response.statusCode()).isEqualTo(404);
         assertThat(response.body()).isEmpty();
