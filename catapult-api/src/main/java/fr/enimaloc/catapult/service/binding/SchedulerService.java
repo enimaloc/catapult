@@ -147,13 +147,14 @@ public class SchedulerService {
 
     private void detect(UserAccount user) {
         Optional<DetectedGame> detected = gameGetterChain.resolve(user);
+        boolean firstSinceStart = gameStateService.markObserved(user);
 
         if (detected.isPresent()) {
             DetectedGame game = detected.get();
             if (gameStateService.hasChanged(user, game)) {
                 gameStateService.updateState(user, game);
                 log.debug("Game changed for user {}: {}", user.getId(), game.getSourceName());
-                eventPublisher.publishEvent(new GameDetectedEvent(this, user, game));
+                eventPublisher.publishEvent(new GameDetectedEvent(this, user, game, firstSinceStart));
             }
         } else {
             if (gameStateService.getLastKnownGame(user).isPresent()) {

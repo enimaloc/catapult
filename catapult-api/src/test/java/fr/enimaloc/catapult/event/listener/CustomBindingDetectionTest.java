@@ -14,6 +14,7 @@ import fr.enimaloc.catapult.event.NoGameDetectedEvent;
 import fr.enimaloc.catapult.event.StreamOfflineEvent;
 import fr.enimaloc.catapult.event.StreamOnlineEvent;
 import fr.enimaloc.catapult.getter.DetectedGame;
+import fr.enimaloc.catapult.getter.GameGetterChain;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
@@ -24,6 +25,7 @@ import fr.enimaloc.catapult.service.binding.BindingService;
 import fr.enimaloc.catapult.service.binding.CustomBindingActivations;
 import fr.enimaloc.catapult.service.binding.CustomBindingService;
 import fr.enimaloc.catapult.service.binding.GameStateService;
+import fr.enimaloc.catapult.service.binding.SchedulerService;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import fr.enimaloc.catapult.service.igdb.IgdbGameDetailsService;
@@ -31,6 +33,7 @@ import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import fr.enimaloc.catapult.service.tw.TwResolverService;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -293,5 +296,101 @@ class CustomBindingDetectionTest {
         verify(twitchService).resetToDefault(user);
         verify(twitchService, never()).updateChannel(eq(user), isArt());
         verify(activationRepository, never()).deleteById(any());
+    }
+    // --- A restart of catapult-api: the game state kept in memory is lost, the activation is not ---
+
+    @Test
+    void firstDetectionSinceStart_doesNotInterruptAnInterruptibleBinding() {
+        activate(false);
+        live(true);
+
+        listener.onGameDetected(new GameDetectedEvent(this, user, game, true));
+
+        verify(activationRepository, never()).deleteById(any());
+        verify(channelEventPublisher, never()).customBindingChanged(any(), any());
+        verify(twitchService, never()).updateChannel(any(), any());
+        verify(streamStateService, never()).storePending(any(), any());
+        // The game's binding is still created or refreshed for the channel page
+        verify(channelEventPublisher).bindingUpserted(user.getId(), gameBinding);
+    }
+
+    @Test
+    void firstDetectionSinceStart_withoutAnActiveBinding_appliesAsUsual() {
+        live(true);
+
+        listener.onGameDetected(new GameDetectedEvent(this, user, game, true));
+
+        verify(twitchService).updateChannel(user, gameBinding);
+    }
+
+    /** The real detection cycle ({@link SchedulerService} + {@link GameStateService}) feeding the listener. */
+    private SchedulerService freshlyStartedScheduler(GameGetterChain chain) {
+        GameStateService freshState = new GameStateService(channelEventPublisher);
+        return new SchedulerService(mock(UserAccountRepository.class), chain, freshState, this::dispatch,
+                new SimpleMeterRegistry(), Optional.empty(), Optional.empty(), bindingService);
+    }
+
+    private void dispatch(Object event) {
+        if (event instanceof GameDetectedEvent detected) listener.onGameDetected(detected);
+        else if (event instanceof NoGameDetectedEvent noGame) listener.onNoGameDetected(noGame);
+    }
+
+    @Test
+    void afterARestart_theStillOpenGameKeepsTheBinding_aLaterDetectionInterruptsIt() {
+        activate(false);
+        live(true);
+        DetectedGame other = new DetectedGame("g2", GameBinding.SourceType.STEAM, "Other");
+        GameBinding otherBinding = new GameBinding();
+        otherBinding.setId(UUID.randomUUID());
+        when(bindingService.resolveOrCreate(user, other)).thenReturn(otherBinding);
+        GameGetterChain chain = mock(GameGetterChain.class);
+        when(chain.resolve(user)).thenReturn(Optional.of(game), Optional.of(game), Optional.of(other));
+        SchedulerService scheduler = freshlyStartedScheduler(chain);
+
+        scheduler.triggerManualCheck(user); // first poll after the start: the game open before the restart
+        scheduler.triggerManualCheck(user); // same game, no event
+
+        verify(activationRepository, never()).deleteById(any());
+        verify(twitchService, never()).updateChannel(any(), any());
+
+        scheduler.triggerManualCheck(user); // another game: a real detection
+
+        verify(activationRepository).deleteById(user.getId());
+        verify(twitchService).updateChannel(user, otherBinding);
+    }
+
+    @Test
+    void afterARestart_theSameGameClosedThenRelaunched_interrupts() {
+        activate(false);
+        live(true);
+        GameGetterChain chain = mock(GameGetterChain.class);
+        when(chain.resolve(user)).thenReturn(Optional.of(game), Optional.empty(), Optional.of(game));
+        SchedulerService scheduler = freshlyStartedScheduler(chain);
+
+        scheduler.triggerManualCheck(user);
+        scheduler.triggerManualCheck(user);
+
+        verify(activationRepository, never()).deleteById(any());
+        verify(twitchService, never()).updateChannel(any(), any());
+
+        scheduler.triggerManualCheck(user);
+
+        verify(activationRepository).deleteById(user.getId());
+        verify(twitchService).updateChannel(user, gameBinding);
+    }
+
+    @Test
+    void afterARestart_noGameFirst_thenAGameLaunched_interrupts() {
+        activate(false);
+        live(true);
+        GameGetterChain chain = mock(GameGetterChain.class);
+        when(chain.resolve(user)).thenReturn(Optional.empty(), Optional.of(game));
+        SchedulerService scheduler = freshlyStartedScheduler(chain);
+
+        scheduler.triggerManualCheck(user); // known state: no game
+        scheduler.triggerManualCheck(user);
+
+        verify(activationRepository).deleteById(user.getId());
+        verify(twitchService).updateChannel(user, gameBinding);
     }
 }
