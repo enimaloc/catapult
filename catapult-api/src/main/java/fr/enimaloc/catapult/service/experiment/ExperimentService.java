@@ -15,7 +15,6 @@ import fr.enimaloc.catapult.repository.experiment.ExperimentOverrideRepository;
 import fr.enimaloc.catapult.repository.experiment.ExperimentRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,7 +33,6 @@ public class ExperimentService {
     private final ExperimentAssignmentRepository assignmentRepository;
     private final ExperimentEventRepository eventRepository;
     private final ExperimentOverrideRepository overrideRepository;
-    private final ExperimentService self;
     private final AttributeEvaluator attributeEvaluator;
     private final UserGroupRepository userGroupRepository;
 
@@ -42,12 +40,11 @@ public class ExperimentService {
     private final Set<String> knownKeys = ConcurrentHashMap.newKeySet();
 
     @Autowired
-    public ExperimentService(ExperimentRepository experimentRepository, ExperimentAssignmentRepository assignmentRepository, ExperimentEventRepository eventRepository, ExperimentOverrideRepository overrideRepository, @Lazy ExperimentService self, AttributeEvaluator attributeEvaluator, UserGroupRepository userGroupRepository) {
+    public ExperimentService(ExperimentRepository experimentRepository, ExperimentAssignmentRepository assignmentRepository, ExperimentEventRepository eventRepository, ExperimentOverrideRepository overrideRepository, AttributeEvaluator attributeEvaluator, UserGroupRepository userGroupRepository) {
         this.experimentRepository = experimentRepository;
         this.assignmentRepository = assignmentRepository;
         this.eventRepository = eventRepository;
         this.overrideRepository = overrideRepository;
-        this.self = self;
         this.attributeEvaluator = attributeEvaluator;
         this.userGroupRepository = userGroupRepository;
     }
@@ -98,7 +95,7 @@ public class ExperimentService {
         List<UserAccount> users = assignmentRepository.findAllByExperiment(experiment)
             .stream().map(ExperimentAssignment::getUser).toList();
         assignmentRepository.deleteAllByExperiment(experiment);
-        users.forEach(u -> self.getVariant(u, experiment.getKey()));
+        users.forEach(u -> getVariant(u, experiment.getKey()));
     }
 
     public List<ExperimentAssignment> getActiveAssignments(UserAccount user) {
@@ -130,7 +127,7 @@ public class ExperimentService {
      */
     @Transactional
     public boolean evaluateGate(UserAccount user, String experimentKey) {
-        return self.getVariant(user, experimentKey)
+        return getVariant(user, experimentKey)
             .map(v -> !v.isControl())
             .orElse(false);
     }
