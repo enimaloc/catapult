@@ -10,6 +10,9 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.TransactionCallback;
+import org.springframework.transaction.support.TransactionOperations;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
@@ -20,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -48,14 +52,21 @@ class AdminCclServiceTest {
     private final Map<String, TwitchCclDefinition> storedCcls = new HashMap<>();
     private final List<IgdbRatingDescriptor> storedDescriptors = new ArrayList<>();
     private MockRestServiceServer server;
+    private final AtomicInteger transactionCount = new AtomicInteger();
+    private final TransactionOperations transactions = new TransactionOperations() {
+        @Override
+        public <T> T execute(TransactionCallback<T> action) {
+            transactionCount.incrementAndGet();
+            return action.doInTransaction(mock(TransactionStatus.class));
+        }
+    };
     private AdminCclService service;
 
     @BeforeEach
     void setUp() {
         RestClient.Builder builder = RestClient.builder();
         server = MockRestServiceServer.bindTo(builder).build();
-        service = new AdminCclService(builder.build(), ccls, descriptors, null);
-        ReflectionTestUtils.setField(service, "self", service);
+        service = new AdminCclService(builder.build(), ccls, descriptors, transactions);
         ReflectionTestUtils.setField(service, "twitchClientId", "twitch-id");
         ReflectionTestUtils.setField(service, "twitchClientSecret", "secret");
         ReflectionTestUtils.setField(service, "igdbClientId", "");
@@ -187,6 +198,28 @@ class AdminCclServiceTest {
             service.init();
 
             server.verify();
+        }
+
+        @Test
+        void init_runsEachSyncInItsOwnTransaction_andStopsAtTheFirstFailure() {
+            json(TOKEN_URL, HttpMethod.POST, "{\"access_token\":\"tok\"}");
+            json(CCL_URL, HttpMethod.GET, "{\"data\":[]}");
+            json(AGE_RATINGS_URL, HttpMethod.POST, "[]");
+
+            service.init();
+
+            server.verify();
+            assertThat(transactionCount).hasValue(3);
+
+            transactionCount.set(0);
+            server.reset();
+            json(TOKEN_URL, HttpMethod.POST, "{\"access_token\":\"tok\"}");
+            server.expect(requestTo(CCL_URL)).andRespond(withServerError());
+
+            service.init();
+
+            server.verify();
+            assertThat(transactionCount).hasValue(1);
         }
 
         @Test
