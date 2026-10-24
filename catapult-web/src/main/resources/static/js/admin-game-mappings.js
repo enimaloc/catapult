@@ -5,7 +5,7 @@
  *
  * The form (a dialog) creates a mapping (new, or from a missing game's row: its platform and ID filled in) or
  * changes one (from its row). Its game field suggests the platform's detected games as the ID or name is typed
- * ("name — ID · n streamers"; picking one fills the ID, any ID typed is kept as is); its category field searches
+ * ("name — ID · Streamers: n"; picking one fills the ID, any ID typed is kept as is); its category field searches
  * Twitch through GameSearch. The CCLs and TWs stay IGDB's (null) unless their switch replaces them with the boxes
  * checked (even none). After a save the form shows what changed and turns into the saved mapping's edit form.
  * A deletion asks first, in its own dialog. A refusal is told by its status, never by catapult-api's message
@@ -48,7 +48,7 @@ window.CatapultAdminGameMappings = (function () {
         return root.dataset[`labelError-${status}`] ?? root.dataset.labelUnavailable;
     }
 
-    /** "n bindings updated, n live channels updated, n failures". */
+    /** "Bindings updated: n · Live channels updated: n · Failures: n", worded to read right for any count. */
     function resultText(root, result) {
         return fill(root.dataset.labelResult, {
             bindings: result?.bindingsUpdated ?? 0,

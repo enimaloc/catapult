@@ -121,4 +121,18 @@ class AdminGameMappingsRenderingTest {
         assertThat(en).doesNotContain("??").contains("Game mappings", "Missing mappings", "Create the mapping",
                 "Apply to the streams live now", "Replace IGDB&#39;s", "None");
     }
+
+    @Test
+    void countLabels_readRightForAnyCount() throws Exception {
+        String fr = render(Locale.FRENCH);
+        String en = render(Locale.ENGLISH);
+
+        // Each count after its label, so "1" and "0" read as well as "2" (filled in by the script)
+        assertThat(en).contains(
+                "data-label-result=\"Bindings updated: {bindings} · Live channels updated: {live} · Failures: {failed}\"",
+                "data-label-suggestion=\"{name} — {id} · Streamers: {n}\"");
+        assertThat(fr).contains(
+                "data-label-result=\"Associations mises à jour : {bindings} · Chaînes en live mises à jour : {live} · Échecs : {failed}\"",
+                "data-label-suggestion=\"{name} — {id} · Streamers : {n}\"");
+    }
 }
