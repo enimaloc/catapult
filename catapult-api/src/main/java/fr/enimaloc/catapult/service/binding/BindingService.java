@@ -343,6 +343,7 @@ public class BindingService {
         return gameBindingRepository.findByIdAndUser(bindingId, user);
     }
 
+    /** Delegates to {@link GameBindingLookup#findByDetectedGame}: read-only, creates nothing. */
     public Optional<GameBinding> findBinding(UserAccount user, DetectedGame detectedGame) {
         return gameBindingLookup.findByDetectedGame(user, detectedGame);
     }

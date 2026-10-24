@@ -173,16 +173,12 @@ public class DebugExchangeRecorder {
     }
 
     private void notifyListeners(UUID userId, DebugExchange saved) {
-        try {
-            for (DebugExchangeListener listener : listeners) {
-                try {
-                    listener.onRecorded(userId, saved);
-                } catch (RuntimeException ex) {
-                    log.warn("Debug exchange listener {} failed: {}", listener.getClass().getName(), ex.toString());
-                }
+        for (DebugExchangeListener listener : listeners) {
+            try {
+                listener.onRecorded(userId, saved);
+            } catch (RuntimeException ex) {
+                log.warn("Debug exchange listener {} failed: {}", listener.getClass().getName(), ex.toString());
             }
-        } catch (RuntimeException ex) {
-            log.warn("Could not look up the debug exchange listeners: {}", ex.toString());
         }
     }
 
