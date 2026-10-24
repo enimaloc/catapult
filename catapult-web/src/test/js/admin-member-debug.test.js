@@ -214,4 +214,103 @@ describe("admin-member-debug", () => {
         expect(posted).toHaveBeenCalledTimes(1);
         expect(back).not.toHaveBeenCalled();
     });
+
+    it("shows the refusal and keeps the list when the results cannot be read", async () => {
+        page();
+        const before = document.querySelector("[data-debug-results]");
+
+        fetched.mockResolvedValueOnce(response(503, ""));
+        await change("service", "steam");
+        expect(document.querySelector("mdui-snackbar").textContent).toBe("Failed (503)");
+
+        fetched.mockRejectedValueOnce(new Error("offline"));
+        await change("service", "twitch");
+
+        expect(document.querySelector("[data-debug-results]")).toBe(before);
+        expect(location.search).toBe("");
+    });
+
+    it("keeps the list when the answer carries no results to swap in", async () => {
+        page();
+        const before = document.querySelector("[data-debug-results]");
+        fetched.mockResolvedValueOnce(response(200, "<p>nothing here</p>"));
+
+        await change("service", "steam");
+
+        expect(document.querySelector("[data-debug-results]")).toBe(before);
+        expect(location.search).toBe("");
+    });
+
+    it("drops the answer to a list that a later one overtook", async () => {
+        page();
+        let answerFirst;
+        fetched.mockImplementationOnce(() => new Promise(resolve => { answerFirst = resolve; }));
+        filter("service").value = "steam";
+        filter("service").dispatchEvent(new Event("change", { bubbles: true }));
+        await change("service", "twitch");
+
+        answerFirst(response(200, fragment("<div data-debug-exchange=\"stale\">stale</div>")));
+        await flush();
+
+        expect(document.querySelector("[data-debug-results]").textContent).toBe("fresh");
+        expect(location.search).toContain("service=twitch");
+    });
+
+    it("tells why an exchange could not be read when it is not simply gone", async () => {
+        page();
+
+        fetched.mockResolvedValueOnce(response(500, ""));
+        document.querySelector("[data-debug-exchange]").click();
+        await flush();
+        expect(document.querySelector("mdui-snackbar").textContent).toBe("Failed (500)");
+
+        fetched.mockRejectedValueOnce(new Error("offline"));
+        document.querySelector("[data-debug-exchange]").click();
+        await flush();
+
+        expect(document.getElementById("admin-debug-detail").open).not.toBe(true);
+    });
+
+    it("closes the dialog from its close button", async () => {
+        page();
+        const dialog = document.createElement("mdui-dialog");
+        dialog.open = true;
+        dialog.innerHTML = "<button data-debug-close></button>";
+        root().append(dialog);
+
+        dialog.querySelector("[data-debug-close]").click();
+
+        expect(dialog.open).toBe(false);
+    });
+
+    it("copies the trace id and says so, or says nothing when the clipboard refuses", async () => {
+        page();
+        const writeText = vi.fn(() => Promise.resolve());
+        Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+        window.mdui.snackbar = vi.fn();
+        const wrapper = document.createElement("div");
+        wrapper.dataset.copied = "Copied";
+        wrapper.innerHTML = "<code data-debug-copy>abc123</code>";
+        root().append(wrapper);
+
+        wrapper.querySelector("[data-debug-copy]").click();
+        await flush();
+        expect(writeText).toHaveBeenCalledWith("abc123");
+        expect(window.mdui.snackbar).toHaveBeenCalledWith({ message: "Copied" });
+
+        writeText.mockReturnValueOnce(Promise.reject(new Error("denied")));
+        wrapper.querySelector("[data-debug-copy]").click();
+        await flush();
+        expect(window.mdui.snackbar).toHaveBeenCalledTimes(1);
+    });
+
+    it("listens once per page, however many times it is attached", async () => {
+        page();
+        document.dispatchEvent(new CustomEvent("catapult:admin-panel", { detail: { tab: "members" } }));
+        document.dispatchEvent(new CustomEvent("catapult:admin-panel", { detail: { tab: "groups" } }));
+
+        await change("service", "steam");
+
+        expect(fetched).toHaveBeenCalledTimes(1);
+    });
 });

@@ -346,6 +346,17 @@ describe("admin-members", () => {
             expect(document.getElementById("impersonate").disabled).toBe(false);
         });
 
+        it("tells the service is down when the request never reached it", async () => {
+            impersonatePage();
+            posted.mockRejectedValue(new TypeError("offline"));
+
+            await click("#impersonate");
+
+            expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Down");
+            expect(assign).not.toHaveBeenCalled();
+            expect(document.getElementById("impersonate").disabled).toBe(false);
+        });
+
         it("posts nothing for a disabled item, and once on a double click", async () => {
             impersonatePage();
             await click("#self");
