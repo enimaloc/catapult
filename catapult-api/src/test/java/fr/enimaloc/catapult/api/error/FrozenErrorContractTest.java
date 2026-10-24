@@ -40,6 +40,8 @@ class FrozenErrorContractTest extends FullContextTestBase {
 
     private static final String UNKNOWN = UUID.randomUUID().toString();
 
+    private final HttpClient client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).build();
+
     @LocalServerPort
     int port;
 
@@ -121,8 +123,13 @@ class FrozenErrorContractTest extends FullContextTestBase {
 
         assertThat(response.statusCode()).isEqualTo(401);
         assertThat(response.body()).isEmpty();
-        assertThat(response.headers().firstValue("WWW-Authenticate"))
-                .hasValueSatisfying(value -> assertThat(value).startsWith("Bearer error=\"invalid_token\""));
+        assertThat(response.headers().firstValue("Content-Type")).isEmpty();
+        // resource_metadata names the server's own origin, so this run's random port
+        assertThat(response.headers().allValues("WWW-Authenticate"))
+                .containsExactly("Bearer error=\"invalid_token\", "
+                        + "error_description=\"An error occurred while attempting to decode the Jwt: Malformed token\", "
+                        + "error_uri=\"https://tools.ietf.org/html/rfc6750#section-3.1\", "
+                        + "resource_metadata=\"http://localhost:" + port + "/.well-known/oauth-protected-resource\"");
     }
 
     @Test
@@ -130,6 +137,7 @@ class FrozenErrorContractTest extends FullContextTestBase {
         HttpResponse<String> response = send("POST", "/api/twitchat/actions/" + UNKNOWN, Map.of());
 
         assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(response.headers().firstValue("Content-Type")).hasValue("application/json");
         assertThat(response.body()).isEqualTo("{\"result\":\"ALREADY_USED_OR_EXPIRED\"}");
     }
 
@@ -138,6 +146,8 @@ class FrozenErrorContractTest extends FullContextTestBase {
         HttpResponse<String> response = send("GET", "/api/connect/steam/callback", Map.of());
 
         assertThat(response.statusCode()).isEqualTo(302);
+        assertThat(response.body()).isEmpty();
+        assertThat(response.headers().firstValue("Content-Type")).isEmpty();
         assertThat(response.headers().firstValue("Location"))
                 .hasValue("http://localhost/connect/steam/close?error=nonce");
     }
@@ -163,7 +173,6 @@ class FrozenErrorContractTest extends FullContextTestBase {
         HttpRequest.Builder request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
                 .method(method, HttpRequest.BodyPublishers.noBody());
         headers.forEach(request::header);
-        HttpClient client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).build();
         return client.send(request.build(), HttpResponse.BodyHandlers.ofString());
     }
 }
