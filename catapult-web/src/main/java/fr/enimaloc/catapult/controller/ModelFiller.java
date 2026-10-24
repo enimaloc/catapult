@@ -8,6 +8,9 @@ import fr.enimaloc.catapult.dto.index.FeatureDto;
 import fr.enimaloc.catapult.dto.index.PlatformDto;
 import fr.enimaloc.catapult.dto.index.SpaPage;
 import fr.enimaloc.catapult.service.ApiService;
+import fr.enimaloc.catapult.service.degraded.DegradedLabels;
+import fr.enimaloc.catapult.service.degraded.DegradedState;
+import fr.enimaloc.catapult.service.degraded.DegradedView;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,6 +27,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -43,6 +47,7 @@ public class ModelFiller {
     static final Set<Integer> DESCRIBED_ERRORS = Set.of(400, 401, 403, 404, 405, 429, 500, 502, 503);
     private static final java.util.regex.Pattern INVITE_CODE = java.util.regex.Pattern.compile("[A-Z2-9]{1,12}");
     private static final String DEFAULT_PRIVACY_LANGUAGE = "en";
+    private static final JsonMapper JSON = JsonMapper.builder().build();
 
     /**
      * What index.html's head tells search engines and link previews: the page's title, and for
@@ -61,6 +66,8 @@ public class ModelFiller {
     private final ApiService apiService;
     private final TwitchatEventForms twitchatEventForms;
     private final ObjectProvider<SiteMetaTags> siteMetaTags;
+    private final ObjectProvider<DegradedState> degradedState;
+    private final ObjectProvider<DegradedLabels> degradedLabels;
 
     public void defaultAttr(Model model, String page) {
         model.addAttribute("app", APP_MODEL);
@@ -69,8 +76,9 @@ public class ModelFiller {
 
     /**
      * Full-page variant: also the head's {@link Seo} and admin-configured meta tags, the localized
-     * titles spa.js swaps in on client-side navigation, and the navbar's login and admin states (its
-     * channels come after, see {@link #navChannels(Model)}).
+     * titles spa.js swaps in on client-side navigation, the degraded banner's {@link DegradedView} and
+     * {@link DegradedLabels}, and the navbar's login and admin states (its channels come after, see
+     * {@link #navChannels(Model)}).
      */
     public void defaultAttr(Model model, String page, Locale locale) {
         defaultAttr(model, page);
@@ -78,9 +86,24 @@ public class ModelFiller {
         model.addAttribute("seo", seo(model, page == null ? "" : page, locale));
         SiteMetaTags metaTags = siteMetaTags.getIfAvailable();
         model.addAttribute("metaTags", metaTags == null ? List.of() : metaTags.tags());
+        DegradedView degraded = degradedView();
+        DegradedLabels labels = degradedLabels.getIfAvailable();
+        Map<String, String> effectLabels = labels == null ? Map.of() : labels.labels(locale);
+        model.addAttribute("degraded", degraded);
+        model.addAttribute("degradedLabels", effectLabels);
+        // For degraded.js, in data-* attributes: Thymeleaf forbids static calls there, and escapes the JSON
+        model.addAttribute("degradedJson", JSON.writeValueAsString(degraded));
+        model.addAttribute("degradedLabelsJson", JSON.writeValueAsString(effectLabels));
         model.addAttribute("loggedIn", ApiClient.hasSession());
         model.addAttribute("admin", isAdmin());
         model.addAttribute("impersonatedLogin", impersonatedLogin());
+    }
+
+    /** What the degraded banner shows; not degraded without a {@link DegradedState} (or a view from it). */
+    private DegradedView degradedView() {
+        DegradedState state = degradedState.getIfAvailable();
+        DegradedView view = state == null ? null : state.current();
+        return view == null ? DegradedView.NONE : view;
     }
 
     /**

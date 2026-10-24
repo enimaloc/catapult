@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.service.mock;
 
+import fr.enimaloc.catapult.common.dto.DegradedEffectDto;
+import fr.enimaloc.catapult.common.dto.DegradedStatusDto;
 import fr.enimaloc.catapult.common.dto.InvitePageData;
 import fr.enimaloc.catapult.common.dto.UserInfoResponse;
 import fr.enimaloc.catapult.common.dto.TokenResponse;
@@ -90,6 +92,7 @@ import fr.enimaloc.catapult.service.http.ApiClient;
 import fr.enimaloc.catapult.twitchat.TwitchatDispatchHub;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Profile;
@@ -120,6 +123,10 @@ public class MockApiService implements ApiService {
     private static final JsonMapper JSON = JsonMapper.builder().build();
     /** What catapult-api answers an action that went through. */
     private static final int NO_CONTENT = 204;
+
+    /** {@code catapult.mock.degraded=true} shows the degraded banner. */
+    @Value("${catapult.mock.degraded:false}")
+    private boolean degraded;
 
     private final ApplicationEventPublisher eventPublisher;
     private final TwitchatDispatchHub twitchatHub;
@@ -1473,6 +1480,16 @@ public class MockApiService implements ApiService {
     public List<ChangelogSection> changelog() {
         log.trace("changelog()");
         return MOCK_CHANGELOG;
+    }
+
+    @Override
+    public DegradedStatusDto degradedStatus() {
+        log.trace("degradedStatus()");
+        return degraded
+                ? new DegradedStatusDto(true, List.of(
+                        new DegradedEffectDto("app.polling.interval-seconds", "60", "30"),
+                        new DegradedEffectDto("minecraft.friends-sync-interval-ms", "900000", "300000")))
+                : new DegradedStatusDto(false, null);
     }
 
     /** The mock's catapult-api is always up. */

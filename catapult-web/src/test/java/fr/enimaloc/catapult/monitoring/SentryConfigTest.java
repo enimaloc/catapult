@@ -16,10 +16,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class SentryConfigTest {
 
-    private final SentryOptions.TracesSamplerCallback sampler = new SentryConfig().tracesSampler(0.25);
+    private final SentryOptions.TracesSamplerCallback sampler = new SentryConfig().tracesSampler(0.25, -1);
 
     /** The sampling of a request to {@code uri}, its trace started by the browser as {@code parentSampled}. */
     private Double sample(String uri, Boolean parentSampled) {
+        return sample(sampler, uri, parentSampled);
+    }
+
+    private static Double sample(SentryOptions.TracesSamplerCallback sampler, String uri, Boolean parentSampled) {
         TransactionContext transaction = new TransactionContext("GET " + uri, "http.server");
         transaction.setParentSampled(parentSampled);
         CustomSamplingContext custom = new CustomSamplingContext();
@@ -49,6 +53,14 @@ class SentryConfigTest {
 
         TransactionContext scheduled = new TransactionContext("heartbeat", "task");
         assertThat(sampler.sample(new SamplingContext(scheduled, null, 0.5, Map.of()))).isEqualTo(0.25);
+    }
+
+    @Test
+    void theDegradedRate_capsTheConfiguredRate_butNeverRaisesIt() {
+        assertThat(sample(new SentryConfig().tracesSampler(1.0, 0.1), "/dashboard", null)).isEqualTo(0.1);
+        assertThat(sample(new SentryConfig().tracesSampler(0.2, 0.5), "/dashboard", null)).isEqualTo(0.2);
+        assertThat(sample(new SentryConfig().tracesSampler(1.0, 0.1), "/dashboard", true)).isEqualTo(1.0);
+        assertThat(sample(new SentryConfig().tracesSampler(1.0, 0.1), "/events/nav", null)).isZero();
     }
 
     @Test

@@ -3,10 +3,13 @@ package fr.enimaloc.catapult.controller;
 import fr.enimaloc.catapult.cluster.InstanceBus;
 import fr.enimaloc.catapult.common.dto.channel.ChannelDto;
 import fr.enimaloc.catapult.event.ChannelLiveStateEvent;
+import fr.enimaloc.catapult.event.DegradedStateChangedEvent;
 import fr.enimaloc.catapult.event.NavChannelsChangedEvent;
 import fr.enimaloc.catapult.event.notification.BroadcastStreamEvent;
 import fr.enimaloc.catapult.event.notification.NotificationStreamEvent;
 import fr.enimaloc.catapult.service.ApiService;
+import fr.enimaloc.catapult.service.degraded.DegradedState;
+import fr.enimaloc.catapult.service.degraded.DegradedView;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
@@ -48,7 +51,9 @@ import java.util.function.Supplier;
  *     another account's nor a logged-out page's;</li>
  *     <li>to every page, catapult-api's broadcasts as {@code Broadcast} ({@code {name, data}}): a
  *     stream opening during an announced maintenance gets it first (see {@link BroadcastState}), and
- *     every stream gets {@code maintenance.imminent} when this server shuts down.</li>
+ *     every stream gets {@code maintenance.imminent} when this server shuts down;</li>
+ *     <li>to every page, whether catapult runs degraded as {@code Degraded} ({@link DegradedView}): sent
+ *     when a stream opens, even when it does not, and again whenever it changes.</li>
  * </ul>
  * A session keeps at most a few streams ({@link SessionStreams}); visitors' streams are bounded per
  * address and overall, and closed after a while ({@link AnonymousStreams}): past the overall bound
@@ -64,6 +69,7 @@ public class NavEventStreamController {
     static final String LIVE = "NavChannelLive";
     static final String CHANGED = "NavChannelsChanged";
     static final String BROADCAST = "Broadcast";
+    static final String DEGRADED = "Degraded";
     static final String IMMINENT = "maintenance.imminent";
 
     /** A {@link #LIVE} event's data. */
@@ -98,13 +104,16 @@ public class NavEventStreamController {
     private final BroadcastState broadcastState;
     /** Tells the other instances what a navbar lists; null alone (a test). */
     private final InstanceBus bus;
+    /** Tells whether catapult runs degraded; null alone (a test). */
+    private final DegradedState degradedState;
     /** Makes the streams, by timeout; tests swap it for one whose writes can be made to fail. */
     LongFunction<SseEmitter> emitters = SseEmitter::new;
 
     public NavEventStreamController(SseStreams sse, ApiService apiService, BroadcastState broadcastState,
-                                    ObjectProvider<InstanceBus> bus) {
+                                    ObjectProvider<InstanceBus> bus, ObjectProvider<DegradedState> degradedState) {
         this.sse = sse;
         this.bus = bus.getIfAvailable();
+        this.degradedState = degradedState.getIfAvailable();
         if (this.bus != null) this.bus.on(REMEMBER_TOPIC, this::remembered);
         streams = sse.sessionStreams("nav");
         anonymousStreams = sse.anonymousStreams(AnonymousStreams.STREAM);
@@ -123,6 +132,8 @@ public class NavEventStreamController {
         // page only sees the stream open (live.js's onOpen, lifting the restart veil) once they do.
         broadcastState.maintenance().ifPresent(maintenance ->
                 sse.send(emitter, BROADCAST, new Broadcast(BroadcastState.SCHEDULED, maintenance)));
+        DegradedView degraded = degradedState == null ? null : degradedState.current();
+        if (degraded != null) sse.send(emitter, DEGRADED, degraded);
         return ResponseEntity.ok().header("X-Accel-Buffering", "no").body(emitter);
     }
 
@@ -219,6 +230,12 @@ public class NavEventStreamController {
     public void onBroadcast(BroadcastStreamEvent event) {
         broadcastState.accept(event.name(), event.data());
         broadcastToAll(new Broadcast(event.name(), event.data()));
+    }
+
+    /** catapult runs degraded, or no longer (DegradedState): to every stream. */
+    @EventListener
+    public void onDegraded(DegradedStateChangedEvent event) {
+        toAll(() -> SseEmitter.event().name(DEGRADED).data(event.view()));
     }
 
     /** An account's notification changes: to the streams of the sessions still logged in as it, by the same login. */

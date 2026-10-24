@@ -54,6 +54,34 @@ Le proxy TLS placé devant (Caddy, Traefik, Cloudflare…) doit :
 - avec plusieurs instances (`CATAPULT_WEB_REPLICAS=N`, `WEB_PORTS=8081-808N`), répartir entre elles : sessions et
   événements passent par Redis, n'importe quelle instance sert n'importe quel visiteur.
 
+### Serveur de secours (mode dégradé)
+
+Pour faire tourner catapult sur un serveur de secours moins puissant, activer le profil `degraded` sur
+`catapult-api` et `catapult-web` :
+
+```bash
+SPRING_PROFILES_ACTIVE=degraded
+INSTATUS_PAGE_URL=https://votre-page.instatus.com   # page de statut Instatus, optionnelle
+CATAPULT_WEB_REPLICAS=1                             # une seule instance de catapult-web
+```
+
+`docker-compose.yml` transmet `SPRING_PROFILES_ACTIVE` et `INSTATUS_PAGE_URL` aux conteneurs (vides par défaut :
+aucun profil, pas de lien).
+
+Le profil espace les boucles de fond (détection de jeu toutes les 60 s, synchronisation des amis Minecraft
+toutes les 15 min, relance des données incomplètes et sondage des retours moins fréquents) et plafonne
+l'échantillonnage des traces Sentry à 10 % (clé `catapult.degraded.traces-sample-rate`, qui s'applique même si
+`SENTRY_TRACES_SAMPLE_RATE` est définie). Ses valeurs l'emportent sur les surcharges de configuration de l'admin. `catapult-web`
+affiche alors un bandeau repliable ; avec `INSTATUS_PAGE_URL`, il renvoie aussi vers l'incident en cours sur la page
+de statut. `GET /api/status/degraded` indique l'état courant et les propriétés que le profil modifie, chacune avec sa valeur normale ;
+il n'est joignable que depuis le réseau interne (`catapult-api` n'est jamais exposée, `catapult-web` l'appelle).
+Une propriété ajoutée au profil `degraded` de `catapult-api` apparaît dans le bandeau dès qu'elle a un libellé
+`degraded.effect.<clé>` (FR et EN, dans `catapult-web/src/main/resources/lang/`), et seulement si sa valeur diffère
+de sa valeur normale. Une ligne est aussi masquée quand `<premier segment de la clé>.enabled=false` (par exemple
+`minecraft.enabled` pour `minecraft.*`). La clé doit aussi être présente dans l'`application.properties` de
+`catapult-api` : une valeur normale qui n'existe que comme défaut dans le code (`${x:5}`) ne peut pas être comparée,
+la ligne n'apparaît jamais et un avertissement est journalisé au démarrage.
+
 ## Configuration
 
 | Variable | Obligatoire | Description |
