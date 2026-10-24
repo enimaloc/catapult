@@ -101,6 +101,14 @@ import fr.enimaloc.catapult.common.dto.channel.ConfigResponse;
 import fr.enimaloc.catapult.common.dto.channel.TwitchatData;
 import fr.enimaloc.catapult.common.dto.connect.SteamStartResponse;
 import fr.enimaloc.catapult.dto.changelog.ChangelogSection;
+import fr.enimaloc.catapult.common.dto.account.ApiTokenCreatedDto;
+import fr.enimaloc.catapult.common.dto.account.ApiTokenStatusDto;
+import fr.enimaloc.catapult.common.dto.binding.CustomBindingDto;
+import fr.enimaloc.catapult.common.dto.binding.CustomBindingErrorDto;
+import fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest;
+import fr.enimaloc.catapult.common.dto.binding.CustomBindingSaveResult;
+import fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto;
+import fr.enimaloc.catapult.service.ActivationOutcome;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import lombok.RequiredArgsConstructor;
@@ -1163,5 +1171,57 @@ public class RealApiService implements ApiService {
     public boolean apiAvailable() {
         ApiClient.Result<Map> health = client.getAnonymous("/api/health", Map.class);
         return health.ok() && health.body() != null && "UP".equals(health.body().get("status"));
+    }
+
+    @Override
+    public CustomBindingsStateDto customBindings(String username) {
+        return client.get("/api/channels/{username}/custom-bindings", CustomBindingsStateDto.class, username);
+    }
+
+    @Override
+    public ApiClient.Result<CustomBindingDto> createCustomBinding(String username, CustomBindingRequest request) {
+        return client.call(HttpMethod.POST, "/api/channels/{username}/custom-bindings", request, CustomBindingDto.class, username);
+    }
+
+    @Override
+    public ApiClient.Result<CustomBindingSaveResult> updateCustomBinding(String username, UUID id, CustomBindingRequest request) {
+        return client.call(HttpMethod.POST, "/api/channels/{username}/custom-bindings/{id}", request,
+                CustomBindingSaveResult.class, username, id);
+    }
+
+    @Override
+    public int deleteCustomBinding(String username, UUID id) {
+        return client.postVoid("/api/channels/{username}/custom-bindings/{id}/delete", null, username, id);
+    }
+
+    @Override
+    public ActivationOutcome activateCustomBinding(String username, UUID id) {
+        // Its 409 body tells a missing Twitch link from a paused bot.
+        ApiClient.Result<CustomBindingErrorDto> result = client.call(HttpMethod.POST,
+                "/api/channels/{username}/custom-bindings/{id}/activate", null, CustomBindingErrorDto.class, username, id);
+        return ActivationOutcome.of(result.status(), result.body() == null ? null : result.body().code());
+    }
+
+    @Override
+    public int deactivateCustomBinding(String username) {
+        return client.postVoid("/api/channels/{username}/custom-bindings/deactivate", null, username);
+    }
+
+    @Override
+    public ApiTokenStatusDto apiTokenStatus() {
+        return client.get("/api/me/api-token", ApiTokenStatusDto.class);
+    }
+
+    @Override
+    public ApiClient.Result<ApiTokenCreatedDto> regenerateApiToken() {
+        // The answer carries the new token, shown once: ApiClient never logs a body, and nothing here keeps it.
+        ApiClient.Result<ApiTokenCreatedDto> result = client.call(HttpMethod.POST, "/api/me/api-token", null,
+                ApiTokenCreatedDto.class);
+        return result.ok() && result.body() != null ? result : new ApiClient.Result<>(result.ok() ? 502 : result.status(), null);
+    }
+
+    @Override
+    public int revokeApiToken() {
+        return client.postVoid("/api/me/api-token/delete", null);
     }
 }

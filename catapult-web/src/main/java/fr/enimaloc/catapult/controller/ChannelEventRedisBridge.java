@@ -12,6 +12,8 @@ import fr.enimaloc.catapult.event.binding.BindingDeletedEvent;
 import fr.enimaloc.catapult.event.binding.BindingIgnoredStateEvent;
 import fr.enimaloc.catapult.event.binding.BindingUpdatedEvent;
 import fr.enimaloc.catapult.event.binding.CclStateEvent;
+import fr.enimaloc.catapult.event.binding.CustomBindingChangedEvent;
+import fr.enimaloc.catapult.event.binding.CustomBindingsUpdatedEvent;
 import fr.enimaloc.catapult.event.binding.GameChangedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftDisconnectedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftSyncEvent;
@@ -116,6 +118,9 @@ public class ChannelEventRedisBridge {
             case ChannelEvents.BINDING_UPSERTED -> binding(login, read(data, ChannelEvents.BindingUpserted.class).binding());
             case ChannelEvents.BINDING_DELETED -> List.of(new BindingDeletedEvent(login,
                     read(data, ChannelEvents.BindingDeleted.class).bindingId()));
+            case ChannelEvents.CUSTOM_BINDING_CHANGED -> List.of(new CustomBindingChangedEvent(login,
+                    read(data, ChannelEvents.CustomBindingChanged.class).activeId()));
+            case ChannelEvents.CUSTOM_BINDINGS_UPDATED -> List.of(new CustomBindingsUpdatedEvent(login));
             case ChannelEvents.SETTINGS_UPDATED -> List.of(new ChannelSettingsUpdatedEvent(login,
                     read(data, ChannelEvents.SettingsUpdated.class).settings()));
             case ChannelEvents.STEAM_PROFILE_CHANGED -> steam(login, read(data, ChannelEvents.SteamProfileChanged.class).profile());
