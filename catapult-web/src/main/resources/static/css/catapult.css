@@ -1087,8 +1087,10 @@ a[data-link].active {
     background: rgb(var(--mdui-color-surface-container-high));
 }
 
-.admin-debug-row {
-    grid-template-columns: 11rem 3.5rem 6rem 4rem minmax(0, 1fr) 3.5rem 5rem auto;
+/* .admin-row's own columns come later in this file: the second class outranks them. Every column has its own
+   width, the badges' too (room for both): each row is its own grid, they line up only if none is sized by content. */
+.admin-row.admin-debug-row {
+    grid-template-columns: 11rem 3.5rem 6rem 4rem minmax(0, 1fr) 3.5rem 5rem 12rem;
 }
 
 .admin-debug-badges {
@@ -1113,7 +1115,7 @@ a[data-link].active {
 }
 
 @media (max-width: 650px) {
-    .admin-debug-row {
+    .admin-row.admin-debug-row {
         grid-template-columns: minmax(0, 1fr) auto;
     }
 
