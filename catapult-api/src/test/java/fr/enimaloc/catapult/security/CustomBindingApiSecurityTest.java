@@ -22,9 +22,11 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultMatcher;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
@@ -40,6 +42,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -80,6 +83,15 @@ class CustomBindingApiSecurityTest {
             when(tokens.status(any())).thenReturn(new ApiTokenStatusDto(true, Instant.EPOCH));
         }
 
+        /** A 401 whose body is a problem with the code {@code unauthorized} (CORS headers aside). */
+        static ResultMatcher unauthorizedProblem() {
+            return result -> {
+                status().isUnauthorized().match(result);
+                content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON).match(result);
+                jsonPath("$.code").value("unauthorized").match(result);
+            };
+        }
+
         String jwt() {
             return new JwtService(KEY, -1).generateForUser(user, List.of("ROLE_USER", "ROLE_ADMIN"));
         }
@@ -93,9 +105,9 @@ class CustomBindingApiSecurityTest {
 
         @Test
         void missingToken_is401() throws Exception {
-            mvc.perform(get("/api/v2/custom-bindings")).andExpect(status().isUnauthorized());
-            mvc.perform(post("/api/v2/custom-bindings/art/activate")).andExpect(status().isUnauthorized());
-            mvc.perform(post("/api/v2/custom-bindings/deactivate")).andExpect(status().isUnauthorized());
+            mvc.perform(get("/api/v2/custom-bindings")).andExpect(unauthorizedProblem());
+            mvc.perform(post("/api/v2/custom-bindings/art/activate")).andExpect(unauthorizedProblem());
+            mvc.perform(post("/api/v2/custom-bindings/deactivate")).andExpect(unauthorizedProblem());
             verify(customBindings, never()).activate(any(), any());
             verify(customBindings, never()).deactivate(any());
         }
@@ -104,9 +116,9 @@ class CustomBindingApiSecurityTest {
         void invalidPersonalToken_is401() throws Exception {
             mvc.perform(post("/api/v2/custom-bindings/art/activate")
                             .header("Authorization", "Bearer cat_" + "y".repeat(43)))
-                    .andExpect(status().isUnauthorized());
+                    .andExpect(unauthorizedProblem());
             mvc.perform(post("/api/v2/custom-bindings/art/activate").header("Authorization", PERSONAL_TOKEN))
-                    .andExpect(status().isUnauthorized());
+                    .andExpect(unauthorizedProblem());
             verify(customBindings, never()).activate(any(), any());
         }
 
@@ -114,9 +126,9 @@ class CustomBindingApiSecurityTest {
         void widgetToken_isRejected() throws Exception {
             String widget = user.getWidgetToken().toString();
             mvc.perform(post("/api/v2/custom-bindings/art/activate").header("Authorization", "Bearer " + widget))
-                    .andExpect(status().isUnauthorized());
+                    .andExpect(unauthorizedProblem());
             mvc.perform(post("/api/v2/custom-bindings/art/activate").param("uuid", widget))
-                    .andExpect(status().isUnauthorized());
+                    .andExpect(unauthorizedProblem());
             verify(customBindings, never()).activate(any(), any());
         }
 
@@ -128,9 +140,9 @@ class CustomBindingApiSecurityTest {
                     .andExpect(status().isOk());
             // ...but not here
             mvc.perform(get("/api/v2/custom-bindings").header("Authorization", "Bearer " + jwt))
-                    .andExpect(status().isUnauthorized());
+                    .andExpect(unauthorizedProblem());
             mvc.perform(post("/api/v2/custom-bindings/art/activate").header("Authorization", "Bearer " + jwt))
-                    .andExpect(status().isUnauthorized());
+                    .andExpect(unauthorizedProblem());
             verify(customBindings, never()).activate(any(), any());
         }
 
@@ -138,7 +150,7 @@ class CustomBindingApiSecurityTest {
         void personalToken_isUselessElsewhere() throws Exception {
             mvc.perform(get("/api/me/api-token").header("Authorization", "Bearer " + PERSONAL_TOKEN)
                             .with(r -> { r.setRemoteAddr("203.0.113.9"); return r; }))
-                    .andExpect(status().isUnauthorized());
+                    .andExpect(unauthorizedProblem());
         }
 
         // --- CORS: a page of any origin (Twitchat) calls this API with its token, never with cookies ---
@@ -172,7 +184,7 @@ class CustomBindingApiSecurityTest {
 
             mvc.perform(post("/api/v2/custom-bindings/deactivate").header("Origin", ORIGIN)
                             .header("Authorization", "Bearer cat_" + "y".repeat(43)))
-                    .andExpect(status().isUnauthorized())
+                    .andExpect(unauthorizedProblem())
                     .andExpect(header().string("Access-Control-Allow-Origin", "*"));
         }
 
@@ -180,7 +192,7 @@ class CustomBindingApiSecurityTest {
         void aSessionCookieAlone_is401() throws Exception {
             mvc.perform(post("/api/v2/custom-bindings/deactivate").header("Origin", ORIGIN)
                             .cookie(new Cookie("CATAPULT_API_SESSION", "s1"), new Cookie("JSESSIONID", "s2")))
-                    .andExpect(status().isUnauthorized());
+                    .andExpect(unauthorizedProblem());
             verify(customBindings, never()).deactivate(any());
         }
 
