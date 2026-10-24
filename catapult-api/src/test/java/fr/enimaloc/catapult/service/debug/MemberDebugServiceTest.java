@@ -9,6 +9,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -132,5 +135,36 @@ class MemberDebugServiceTest {
 
         assertThat(service.activeStates(List.of(member))).isEqualTo(Map.of(member, on));
         assertThat(service.activeStates(List.of())).isEmpty();
+    }
+
+    @Test
+    void enable_inTransaction_updatesTheRegistryOnlyAfterCommit() {
+        when(sessions.findById(member)).thenReturn(Optional.empty());
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            service.enable(member, false, admin);
+            assertThat(registry.modeOf(member)).isEmpty();
+
+            TransactionSynchronizationManager.getSynchronizations().forEach(TransactionSynchronization::afterCommit);
+            assertThat(registry.modeOf(member)).contains(new DebugMode(member, false));
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    @Test
+    void disable_inTransaction_rolledBack_keepsTheMemberDebugged() {
+        stored(true, null);
+        registry.activate(member, false);
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            service.disable(member);
+            // rollback: afterCommit is never called
+            TransactionSynchronizationManager.getSynchronizations()
+                .forEach(sync -> sync.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK));
+            assertThat(registry.modeOf(member)).contains(new DebugMode(member, false));
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
     }
 }

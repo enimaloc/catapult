@@ -15,7 +15,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * In-memory view of the members currently in debug mode, so that the hot path (every outbound HTTP call) costs one
- * map lookup. Loaded at startup, kept up to date by {@link MemberDebugService}.
+ * map lookup (lock-free). Loaded at startup, kept up to date by {@link MemberDebugService}.
+ * Writers are serialized, load() reading the DB under the lock, so none of them can be lost or undone by another.
  */
 @Slf4j
 @Component
@@ -32,7 +33,7 @@ public class DebugMemberRegistry {
     }
 
     @EventListener(ApplicationReadyEvent.class)
-    public void load() {
+    public synchronized void load() {
         Map<UUID, DebugMode> loaded = new ConcurrentHashMap<>();
         for (MemberDebugSession s : sessions.findByActiveTrue()) {
             loaded.put(s.getUserId(), new DebugMode(s.getUserId(), s.isRevealSecrets()));
@@ -42,11 +43,11 @@ public class DebugMemberRegistry {
         log.info("Debug mode active for {} member(s)", loaded.size());
     }
 
-    void activate(UUID userId, boolean revealSecrets) {
+    synchronized void activate(UUID userId, boolean revealSecrets) {
         modes.put(userId, new DebugMode(userId, revealSecrets));
     }
 
-    void deactivate(UUID userId) {
+    synchronized void deactivate(UUID userId) {
         modes.remove(userId);
     }
 }
