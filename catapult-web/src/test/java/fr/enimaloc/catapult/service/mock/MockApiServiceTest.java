@@ -853,4 +853,46 @@ class MockApiServiceTest {
         assertThat(service.notificationChannels()).isNull();
         assertThat(service.saveNotificationChannels(Set.of())).isEqualTo(401);
     }
+
+    @Test
+    void memberDebug_enableDisableAndClear_showInTheMembersListing() {
+        UUID me = service.currentUserId();
+        assertThat(service.memberDebug(me)).isNull();
+        assertThat(service.myDebugActive()).isFalse();
+
+        assertThat(service.enableMemberDebug(me, true)).isEqualTo(204);
+        assertThat(service.enableMemberDebug(me, true)).isEqualTo(409);
+        assertThat(service.myDebugActive()).isTrue();
+        assertThat(service.memberDebug(me).revealSecrets()).isTrue();
+        assertThat(allMembers().stream().filter(m -> m.id().equals(me)).findFirst().orElseThrow().debug().active()).isTrue();
+
+        assertThat(service.clearMemberDebug(me)).isEqualTo(204);
+        assertThat(service.memberDebug(me).exchangeCount()).isZero();
+
+        assertThat(service.disableMemberDebug(me)).isEqualTo(204);
+        assertThat(service.myDebugActive()).isFalse();
+        assertThat(service.memberDebug(me).active()).isFalse();
+        assertThat(allMembers().stream().filter(m -> m.id().equals(me)).findFirst().orElseThrow().debug().active()).isFalse();
+    }
+
+    @Test
+    void memberDebug_theSeededMemberHasExchanges_toListReadAndFilterByService() {
+        UUID seeded = MockPresets.uuidOf("viewer001");
+        var filter = new fr.enimaloc.catapult.service.DebugExchangeFilter("steam", null, null, null, null);
+
+        var page = service.memberDebugExchanges(seeded, filter, 0);
+
+        assertThat(page.content()).singleElement().satisfies(e -> assertThat(e.operation()).isEqualTo("getOwnedGames"));
+        assertThat(service.memberDebugExchange(seeded, page.content().getFirst().id()).service()).isEqualTo("steam");
+        assertThat(service.memberDebugExchange(service.currentUserId(), page.content().getFirst().id())).isNull();
+        assertThat(service.memberDebugServices(seeded)).contains("steam", "twitch");
+        assertThat(service.memberDebug(seeded).active()).isTrue();
+    }
+
+    @Test
+    void myDebugActive_isFalseForAVisitor() {
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(new MockHttpServletRequest()));
+
+        assertThat(service.myDebugActive()).isFalse();
+    }
 }

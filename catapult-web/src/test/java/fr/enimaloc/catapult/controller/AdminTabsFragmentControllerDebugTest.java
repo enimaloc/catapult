@@ -182,4 +182,13 @@ class AdminTabsFragmentControllerDebugTest {
         mvc.perform(get("/spa/admin/members/" + ID + "/debug/" + UUID.randomUUID()).sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
                 .andExpect(status().isNotFound());
     }
+
+    @Test
+    void exchange_isRefusedToNonAdmins() throws Exception {
+        when(apiService.isAdmin()).thenReturn(false);
+
+        mvc.perform(get("/spa/admin/members/" + ID + "/debug/" + EXCHANGE).sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+                .andExpect(status().isForbidden());
+        verify(apiService, never()).memberDebugExchange(any(), any());
+    }
 }
