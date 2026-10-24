@@ -22,13 +22,13 @@ public class ApiUserResolver {
 
     /** The caller, by the JWT's subject (their account id). */
     public UserAccount viewer(Jwt jwt) {
-        return userAccountRepository.findById(UUID.fromString(token(jwt).getSubject()))
+        return userAccountRepository.findById(UUID.fromString(requireJwt(jwt).getSubject()))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
     }
 
     /** The caller, by the JWT's {@code twitchId} claim. */
     public UserAccount viewerByTwitchId(Jwt jwt) {
-        return userAccountRepository.findByTwitchId(token(jwt).getClaimAsString("twitchId"))
+        return userAccountRepository.findByTwitchId(requireJwt(jwt).getClaimAsString("twitchId"))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
     }
 
@@ -36,9 +36,9 @@ public class ApiUserResolver {
      * {@code jwt}, or 401 when the request carries none — the chain lets token-less requests
      * through in dev and from localhost, so a missing token reaches the controllers.
      */
-    private static Jwt token(Jwt jwt) {
+    public static Jwt requireJwt(Jwt jwt) {
         if (jwt == null) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "A token is required");
         }
         return jwt;
     }

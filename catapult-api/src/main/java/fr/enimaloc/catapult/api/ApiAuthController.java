@@ -42,7 +42,7 @@ public class ApiAuthController {
 
     @GetMapping("/validate")
     public UserInfoResponse validate(@AuthenticationPrincipal Jwt jwt) {
-        UUID userId = UUID.fromString(jwt.getSubject());
+        UUID userId = UUID.fromString(ApiUserResolver.requireJwt(jwt).getSubject());
         UserAccount account = userAccountRepository.findById(userId)
                 .orElseThrow(() -> new IllegalStateException("User not found: " + userId));
 
