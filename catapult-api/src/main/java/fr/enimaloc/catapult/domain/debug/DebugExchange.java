@@ -69,7 +69,17 @@ public class DebugExchange {
     @Column(name = "trace_id", length = 64)
     private String traceId;
 
+    /**
+     * An outgoing call failed when it got no status (no answer), a status from 400 on, or an error; an incoming
+     * message (an EventSub one, a sign-in callback) has no status of its own and failed only when it has an error.
+     */
     public boolean isError() {
-        return error != null || status == null || status >= 400;
+        if (error != null) {
+            return true;
+        }
+        if (status == null) {
+            return direction != Direction.IN;
+        }
+        return status >= 400;
     }
 }

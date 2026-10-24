@@ -46,10 +46,11 @@ class MockDebugStore {
                 "GET", "https://api.steampowered.com/IPlayerService/GetOwnedGames/v1?key=[masked]", 500, true, 1203, false,
                 "{}", null, "{\"Content-Type\":\"text/html\"}", "<html>Internal Server Error</html>",
                 "Steam answered 500", "a1b2c3d4e5f60718293a4b5c6d7e8f90"));
+        // An incoming EventSub message, as catapult-api records it: no status, no headers, a success.
         seeded.add(new DebugExchangeDto(UUID.randomUUID(), now.minus(45, ChronoUnit.MINUTES), "IN", "twitch", "eventsub.notification",
-                "POST", "https://catapult.example/api/eventsub/callback", 204, false, 12, false,
-                "{\"Twitch-Eventsub-Message-Signature\":\"[masked]\"}", "{\"subscription\":{\"type\":\"stream.online\"}}",
-                "{}", null, null, "0f9e8d7c6b5a49382716f5e4d3c2b1a0"));
+                "WS", "wss://eventsub.wss.twitch.tv/ws", null, false, 12, false,
+                null, "{\"metadata\":{\"message_type\":\"notification\"},\"payload\":{\"subscription\":{\"type\":\"stream.online\"}}}",
+                null, null, null, "0f9e8d7c6b5a49382716f5e4d3c2b1a0"));
         seeded.add(new DebugExchangeDto(UUID.randomUUID(), now.minus(20, ChronoUnit.MINUTES), "OUT", "twitch", "getUsers",
                 "GET", "https://api.twitch.tv/helix/users?id=5000001&id=[membre]", 200, false, 61, true,
                 "{\"Authorization\":\"[masked]\"}", null, "{\"Content-Type\":\"application/json\"}",
@@ -63,7 +64,24 @@ class MockDebugStore {
                 "GET", "https://api.minecraftservices.com/friends", 200, false, 143, false,
                 "{\"Authorization\":\"[masked]\"}", null, "{\"Content-Type\":\"application/json\"}",
                 "{\"friends\":[{\"name\":\"[membre]\"},{\"name\":\"Notch\"}]}", null, null));
+        seeded.replaceAll(MockDebugStore::withComputedError);
         exchanges.put(seededMember, seeded);
+    }
+
+    /**
+     * Whether catapult-api counts the exchange as failed: an outgoing call without status, with a status from 400
+     * on, or with an error; an incoming message, which has no status, only with an error.
+     */
+    static boolean isError(String direction, Integer status, String errorMessage) {
+        if (errorMessage != null) return true;
+        if (status == null) return !"IN".equalsIgnoreCase(direction);
+        return status >= 400;
+    }
+
+    private static DebugExchangeDto withComputedError(DebugExchangeDto e) {
+        return new DebugExchangeDto(e.id(), e.occurredAt(), e.direction(), e.service(), e.operation(), e.method(),
+                e.url(), e.status(), isError(e.direction(), e.status(), e.errorMessage()), e.durationMs(), e.filtered(),
+                e.requestHeaders(), e.requestBody(), e.responseHeaders(), e.responseBody(), e.errorMessage(), e.traceId());
     }
 
     synchronized MemberDebugStateDto state(UUID member) {
