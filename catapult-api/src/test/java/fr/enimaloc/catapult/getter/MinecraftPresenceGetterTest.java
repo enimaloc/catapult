@@ -1,6 +1,7 @@
 // test/…/getter/MinecraftPresenceGetterTest.java
 package fr.enimaloc.catapult.getter;
 
+import fr.enimaloc.catapult.service.debug.DebugRecording;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.minecraft.MinecraftFriendLink;
 import fr.enimaloc.catapult.domain.minecraft.MinecraftServiceAccount;
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -36,6 +38,7 @@ class MinecraftPresenceGetterTest {
     @Mock private MinecraftFriendLinkRepository linkRepository;
     @Mock private MinecraftGateService gateService;
 
+    @Spy private DebugRecording debug = DebugRecording.OFF;
     @InjectMocks private MinecraftPresenceGetter getter;
 
     private UserAccount user;

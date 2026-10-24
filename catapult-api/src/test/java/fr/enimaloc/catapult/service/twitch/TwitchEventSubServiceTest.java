@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.twitch;
 
+import fr.enimaloc.catapult.service.debug.DebugRecording;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -57,6 +59,7 @@ class TwitchEventSubServiceTest {
     @Mock private RestClient.RequestHeadersSpec getHeaderSpec;
     @Mock private RestClient.ResponseSpec getResponseSpec;
 
+    @Spy private DebugRecording debug = DebugRecording.OFF;
     @InjectMocks private TwitchEventSubService service;
 
     private final ObjectMapper mapper = new ObjectMapper();

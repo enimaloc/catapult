@@ -13,7 +13,6 @@ import fr.enimaloc.catapult.service.minecraft.MinecraftService;
 import fr.enimaloc.catapult.service.minecraft.MinecraftTokenService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.stereotype.Component;
@@ -53,13 +52,7 @@ public class MinecraftPresenceGetter implements GameGetter {
 
     private volatile Map<String, MinecraftService.PresenceStatus> cycleCache = Map.of();
 
-    private DebugRecording debug = DebugRecording.OFF;
-
-    /** Records this class's grouped calls and incoming messages for the members in debug mode. */
-    @Autowired(required = false)
-    public void setDebugRecording(DebugRecording debug) {
-        this.debug = debug == null ? DebugRecording.OFF : debug;
-    }
+    private final DebugRecording debug;
 
     @Override
     public String name() {

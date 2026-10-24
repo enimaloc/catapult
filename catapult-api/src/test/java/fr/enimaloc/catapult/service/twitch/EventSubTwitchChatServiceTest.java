@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.twitch;
 
+import fr.enimaloc.catapult.service.debug.DebugRecording;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
@@ -52,6 +53,7 @@ class EventSubTwitchChatServiceTest {
     @Mock private RestClient.RequestBodySpec postBodySpec;
     @Mock private RestClient.ResponseSpec postResponseSpec;
 
+    @Spy private DebugRecording debug = DebugRecording.OFF;
     @InjectMocks private EventSubTwitchChatService service;
 
     private UserAccount user;

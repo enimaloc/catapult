@@ -15,7 +15,6 @@ import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -55,13 +54,7 @@ public class MinecraftFriendService {
     static final String FRIENDS_OPERATION = "minecraft.friends";
     static final String MANAGE_FRIENDS_OPERATION = "minecraft.manage_friends";
 
-    private DebugRecording debug = DebugRecording.OFF;
-
-    /** Records this class's grouped calls and incoming messages for the members in debug mode. */
-    @Autowired(required = false)
-    public void setDebugRecording(DebugRecording debug) {
-        this.debug = debug == null ? DebugRecording.OFF : debug;
-    }
+    private final DebugRecording debug;
 
     @Transactional
     public MinecraftFriendLink enroll(UserAccount user, String pseudo) {

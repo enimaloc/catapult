@@ -16,7 +16,6 @@ import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationEventPublisher;
@@ -64,13 +63,7 @@ public class EventSubTwitchChatService implements TwitchChatService {
 
     private final EventSubConnections connections;
 
-    private DebugRecording debug = DebugRecording.OFF;
-
-    /** Records this class's grouped calls and incoming messages for the members in debug mode. */
-    @Autowired(required = false)
-    public void setDebugRecording(DebugRecording debug) {
-        this.debug = debug == null ? DebugRecording.OFF : debug;
-    }
+    private final DebugRecording debug;
 
     public EventSubTwitchChatService(OAuthTokenRepository oAuthTokenRepository,
                                      UserAccountRepository userAccountRepository,
@@ -82,7 +75,8 @@ public class EventSubTwitchChatService implements TwitchChatService {
                                      SystemTwitchAccountService systemTwitchAccountService,
                                      MeterRegistry meterRegistry,
                                      ExternalApiObservations apiObservations,
-                                     TwitchChatRateLimiter chatRateLimiter) {
+                                     TwitchChatRateLimiter chatRateLimiter,
+                                     DebugRecording debug) {
         this.oAuthTokenRepository = oAuthTokenRepository;
         this.userAccountRepository = userAccountRepository;
         this.twitchTokenService = twitchTokenService;
@@ -94,6 +88,7 @@ public class EventSubTwitchChatService implements TwitchChatService {
         this.meterRegistry = meterRegistry;
         this.apiObservations = apiObservations;
         this.chatRateLimiter = chatRateLimiter;
+        this.debug = debug;
         this.connections = new EventSubConnections(
             "[EventSub Chat]", "twitch-chat-watchdog", oAuthTokenRepository, this::handleMessage);
     }

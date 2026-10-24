@@ -6,7 +6,6 @@ import fr.enimaloc.catapult.service.debug.BatchDebugFilter;
 import fr.enimaloc.catapult.service.debug.DebugRecording;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -32,13 +31,7 @@ public class TwitchAccountValidationService {
     private final TwitchTokenService twitchTokenService;
     private final RestClient restClient;
 
-    private DebugRecording debug = DebugRecording.OFF;
-
-    /** Records this class's grouped calls and incoming messages for the members in debug mode. */
-    @Autowired(required = false)
-    public void setDebugRecording(DebugRecording debug) {
-        this.debug = debug == null ? DebugRecording.OFF : debug;
-    }
+    private final DebugRecording debug;
 
     @Value("${twitch.client-id:}")
     private String twitchClientId;

@@ -20,7 +20,6 @@ import fr.enimaloc.catapult.service.notification.TwitchatEventDispatcher;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
@@ -63,13 +62,7 @@ public class TwitchEventSubService implements EventSubService {
     private final Set<UUID> channelStateWarnedUsers = ConcurrentHashMap.newKeySet();
     private final EventSubConnections connections;
 
-    private DebugRecording debug = DebugRecording.OFF;
-
-    /** Records this class's grouped calls and incoming messages for the members in debug mode. */
-    @Autowired(required = false)
-    public void setDebugRecording(DebugRecording debug) {
-        this.debug = debug == null ? DebugRecording.OFF : debug;
-    }
+    private final DebugRecording debug;
 
     public TwitchEventSubService(OAuthTokenRepository oAuthTokenRepository,
                                  UserAccountRepository userAccountRepository,
@@ -79,7 +72,8 @@ public class TwitchEventSubService implements EventSubService {
                                  RestClient restClient,
                                  ObjectMapper objectMapper,
                                  TwitchatEventDispatcher twitchatEventDispatcher,
-                                 CatapultCategoryChangeStateService categoryChangeStateService) {
+                                 CatapultCategoryChangeStateService categoryChangeStateService,
+                                 DebugRecording debug) {
         this.oAuthTokenRepository = oAuthTokenRepository;
         this.userAccountRepository = userAccountRepository;
         this.twitchTokenService = twitchTokenService;
@@ -89,6 +83,7 @@ public class TwitchEventSubService implements EventSubService {
         this.objectMapper = objectMapper;
         this.twitchatEventDispatcher = twitchatEventDispatcher;
         this.categoryChangeStateService = categoryChangeStateService;
+        this.debug = debug;
         this.connections = new EventSubConnections(
             "[EventSub]", "twitch-eventsub-watchdog", oAuthTokenRepository, this::handleMessage);
     }
