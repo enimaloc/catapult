@@ -1,6 +1,8 @@
 package fr.enimaloc.catapult.api.channel;
 
 import fr.enimaloc.catapult.api.ApiUserResolver;
+import fr.enimaloc.catapult.api.error.ApiProblem;
+import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.api.CustomBindingViews;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest;
 import fr.enimaloc.catapult.domain.account.UserAccount;
@@ -44,6 +46,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -144,19 +147,19 @@ class ApiChannelCustomBindingsControllerTest {
 
     @Test
     void aRefusedSave_tellsWhyInACode() throws Exception {
-        when(service.create(owner, REQUEST)).thenThrow(new fr.enimaloc.catapult.service.binding.CustomBindingException(
-                HttpStatus.CONFLICT, "name_taken", "taken"));
+        when(service.create(owner, REQUEST)).thenThrow(new ApiProblem(ErrorCode.NAME_TAKEN, "taken"));
         mvc.perform(postJson("", owner))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("name_taken"));
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.code").value("name_taken"))
+                .andExpect(jsonPath("$.detail").value("taken"));
 
-        org.mockito.Mockito.doThrow(new fr.enimaloc.catapult.service.binding.CustomBindingException(
-                HttpStatus.CONFLICT, "limit_reached", "max")).when(service).create(owner, REQUEST);
+        org.mockito.Mockito.doThrow(new ApiProblem(ErrorCode.LIMIT_REACHED, "max")).when(service).create(owner, REQUEST);
         mvc.perform(postJson("", owner))
+                .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("limit_reached"));
 
-        when(service.update(owner, art.getId(), REQUEST)).thenThrow(new fr.enimaloc.catapult.service.binding.CustomBindingException(
-                HttpStatus.BAD_REQUEST, "invalid", "bad"));
+        when(service.update(owner, art.getId(), REQUEST)).thenThrow(new ApiProblem(ErrorCode.INVALID, "bad"));
         mvc.perform(postJson("/" + art.getId(), owner))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("invalid"));

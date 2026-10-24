@@ -3,9 +3,9 @@ package fr.enimaloc.catapult.service.mock;
 import fr.enimaloc.catapult.common.dto.account.ApiTokenCreatedDto;
 import fr.enimaloc.catapult.common.dto.account.ApiTokenStatusDto;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingDto;
-import fr.enimaloc.catapult.common.dto.binding.CustomBindingErrorDto;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingSaveResult;
+import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto;
 import fr.enimaloc.catapult.service.CustomBindingSave;
 
@@ -49,7 +49,7 @@ class MockCustomBindings {
     synchronized CustomBindingSave<CustomBindingDto> create(CustomBindingRequest request) {
         CustomBindingSave<CustomBindingDto> refused = refusal(request, null);
         if (refused != null) return refused;
-        if (bindings.size() >= MAX) return new CustomBindingSave<>(409, null, CustomBindingErrorDto.LIMIT_REACHED);
+        if (bindings.size() >= MAX) return new CustomBindingSave<>(409, null, ErrorCode.LIMIT_REACHED);
         CustomBindingDto created = dto(UUID.randomUUID(), request);
         bindings.add(created);
         return new CustomBindingSave<>(201, created, null);
@@ -113,10 +113,10 @@ class MockCustomBindings {
     private <T> CustomBindingSave<T> refusal(CustomBindingRequest request, UUID self) {
         String name = request == null || request.name() == null ? "" : request.name().trim();
         if (name.isEmpty() || name.length() > NAME_MAX || blank(request.twitchGameId()) || blank(request.twitchGameName())) {
-            return new CustomBindingSave<>(400, null, CustomBindingErrorDto.INVALID);
+            return new CustomBindingSave<>(400, null, ErrorCode.INVALID);
         }
         boolean taken = bindings.stream().anyMatch(b -> !b.id().equals(self) && b.name().toLowerCase(Locale.ROOT).equals(name.toLowerCase(Locale.ROOT)));
-        return taken ? new CustomBindingSave<>(409, null, CustomBindingErrorDto.NAME_TAKEN) : null;
+        return taken ? new CustomBindingSave<>(409, null, ErrorCode.NAME_TAKEN) : null;
     }
 
     private static boolean blank(String value) {

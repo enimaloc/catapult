@@ -104,7 +104,6 @@ import fr.enimaloc.catapult.dto.changelog.ChangelogSection;
 import fr.enimaloc.catapult.common.dto.account.ApiTokenCreatedDto;
 import fr.enimaloc.catapult.common.dto.account.ApiTokenStatusDto;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingDto;
-import fr.enimaloc.catapult.common.dto.binding.CustomBindingErrorDto;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingSaveResult;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto;
@@ -1207,15 +1206,14 @@ public class RealApiService implements ApiService {
                 JsonNode.class, username, id), CustomBindingSaveResult.class);
     }
 
-    /** The saved binding when catapult-api took it; else the error code of its {@link CustomBindingErrorDto} body. */
+    /** The saved binding when catapult-api took it; else the code of its problem. */
     private static <T> CustomBindingSave<T> save(ApiClient.Result<JsonNode> result, Class<T> type) {
         JsonNode body = result.body();
         if (result.ok()) {
             return body == null ? new CustomBindingSave<>(502, null, null)
                     : new CustomBindingSave<>(result.status(), SAVE_JSON.treeToValue(body, type), null);
         }
-        String code = body == null ? null : body.path("code").asString(null);
-        return new CustomBindingSave<>(result.status(), null, code);
+        return new CustomBindingSave<>(result.status(), null, result.error() == null ? null : result.error().code());
     }
 
     @Override
@@ -1225,10 +1223,10 @@ public class RealApiService implements ApiService {
 
     @Override
     public ActivationOutcome activateCustomBinding(String username, UUID id) {
-        // Its 409 body tells a missing Twitch link from a paused bot.
-        ApiClient.Result<CustomBindingErrorDto> result = client.call(HttpMethod.POST,
-                "/api/channels/{username}/custom-bindings/{id}/activate", null, CustomBindingErrorDto.class, username, id);
-        return ActivationOutcome.of(result.status(), result.body() == null ? null : result.body().code());
+        // Its 409 problem tells a missing Twitch link from a paused bot.
+        ApiClient.Result<Void> result = client.call(HttpMethod.POST,
+                "/api/channels/{username}/custom-bindings/{id}/activate", null, Void.class, username, id);
+        return ActivationOutcome.of(result.status(), result.error() == null ? null : result.error().code());
     }
 
     @Override

@@ -1,7 +1,8 @@
 package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingDto;
-import fr.enimaloc.catapult.common.dto.binding.CustomBindingErrorDto;
+import fr.enimaloc.catapult.api.error.ApiProblem;
+import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingSaveResult;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto;
 import fr.enimaloc.catapult.domain.account.UserAccount;
@@ -10,7 +11,6 @@ import fr.enimaloc.catapult.domain.binding.CustomBindingActivation;
 import fr.enimaloc.catapult.service.binding.CustomBindingService;
 import fr.enimaloc.catapult.service.binding.CustomBindingService.ActivationResult;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 
@@ -20,7 +20,7 @@ import java.util.Optional;
 /**
  * How the custom bindings read on the wire, shared by the token API ({@code /api/v2/custom-bindings}), the owner's
  * endpoints and the channel dashboard: the DTOs, and what an activation's outcome answers (204 once applied; 409
- * for a broken Twitch link or a paused bot, 502 when Twitch failed, with a {@link CustomBindingErrorDto}).
+ * for a broken Twitch link or a paused bot, 502 when Twitch failed, each an {@link ApiProblem}).
  */
 @Component
 @RequiredArgsConstructor
@@ -53,16 +53,13 @@ public class CustomBindingViews {
                 result.reapplied() == null ? null : outcomeCode(result.reapplied()));
     }
 
-    /** What triggering a binding answers: 204 once Twitch took it, else the error and its code. */
-    public static ResponseEntity<?> activation(ActivationResult result) {
+    /** What triggering a binding answers: 204 once Twitch took it, else a problem with the outcome's code. */
+    public static ResponseEntity<Void> activation(ActivationResult result) {
         return switch (result) {
             case APPLIED -> ResponseEntity.noContent().build();
-            case TWITCH_UNAVAILABLE -> ResponseEntity.status(HttpStatus.CONFLICT).body(new CustomBindingErrorDto(
-                    CustomBindingErrorDto.TWITCH_UNAVAILABLE, "Reconnecte ton compte Twitch"));
-            case BOT_DISABLED -> ResponseEntity.status(HttpStatus.CONFLICT).body(new CustomBindingErrorDto(
-                    CustomBindingErrorDto.BOT_DISABLED, "Catapult est en pause sur cette chaîne"));
-            case FAILED -> ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(new CustomBindingErrorDto(
-                    CustomBindingErrorDto.TWITCH_FAILED, "Twitch n'a pas accepté le changement de catégorie"));
+            case TWITCH_UNAVAILABLE -> throw new ApiProblem(ErrorCode.TWITCH_UNAVAILABLE, "Reconnect your Twitch account");
+            case BOT_DISABLED -> throw new ApiProblem(ErrorCode.BOT_DISABLED, "Catapult is paused on this channel");
+            case FAILED -> throw new ApiProblem(ErrorCode.TWITCH_FAILED, "Twitch did not accept the category change");
         };
     }
 
@@ -70,9 +67,9 @@ public class CustomBindingViews {
     public static String outcomeCode(ActivationResult result) {
         return switch (result) {
             case APPLIED -> CustomBindingSaveResult.APPLIED;
-            case TWITCH_UNAVAILABLE -> CustomBindingErrorDto.TWITCH_UNAVAILABLE;
-            case BOT_DISABLED -> CustomBindingErrorDto.BOT_DISABLED;
-            case FAILED -> CustomBindingErrorDto.TWITCH_FAILED;
+            case TWITCH_UNAVAILABLE -> ErrorCode.TWITCH_UNAVAILABLE.code();
+            case BOT_DISABLED -> ErrorCode.BOT_DISABLED.code();
+            case FAILED -> ErrorCode.TWITCH_FAILED.code();
         };
     }
 }

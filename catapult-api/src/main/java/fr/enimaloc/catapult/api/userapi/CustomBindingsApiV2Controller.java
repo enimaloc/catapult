@@ -46,8 +46,8 @@ public class CustomBindingsApiV2Controller {
 
     @PostMapping("/{idOrName}/activate")
     @Operation(summary = "Apply a custom binding now (204), live or not; 404 unknown, 409 Twitch link broken or "
-            + "Catapult paused, 502 Twitch failed")
-    public ResponseEntity<?> activate(@AuthenticationPrincipal UUID userId, @PathVariable String idOrName) {
+            + "Catapult paused, 502 Twitch failed; errors are application/problem+json with a code")
+    public ResponseEntity<Void> activate(@AuthenticationPrincipal UUID userId, @PathVariable String idOrName) {
         UserAccount user = member(userId);
         return customBindingService.resolve(user, idOrName)
                 .map(binding -> CustomBindingViews.activation(customBindingService.activate(user, binding)))

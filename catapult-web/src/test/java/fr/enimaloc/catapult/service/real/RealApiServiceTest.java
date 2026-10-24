@@ -1611,7 +1611,7 @@ class RealApiServiceTest {
     private void activationAnswers(HttpStatus status, String body, fr.enimaloc.catapult.service.ActivationOutcome expected) {
         var answer = withStatus(status);
         expect(HttpMethod.POST, "/api/channels/streamer/custom-bindings/" + CB_ID + "/activate")
-                .andRespond(body == null ? answer : answer.contentType(MediaType.APPLICATION_JSON).body(body));
+                .andRespond(body == null ? answer : answer.contentType(MediaType.APPLICATION_PROBLEM_JSON).body(body));
         assertThat(service.activateCustomBinding("streamer", CB_ID)).isEqualTo(expected);
     }
 
@@ -1638,11 +1638,11 @@ class RealApiServiceTest {
     @Test
     void createCustomBinding_aRefusalKeepsItsStatus() {
         expect(HttpMethod.POST, "/api/channels/streamer/custom-bindings").andRespond(withStatus(HttpStatus.CONFLICT)
-                .contentType(MediaType.APPLICATION_JSON).body("{\"code\":\"name_taken\",\"message\":\"taken\"}"));
+                .contentType(MediaType.APPLICATION_PROBLEM_JSON).body("{\"status\":409,\"detail\":\"taken\",\"code\":\"name_taken\"}"));
 
         var refused = service.createCustomBinding("streamer", CB_REQUEST);
         assertThat(refused.status()).isEqualTo(409);
-        assertThat(refused.code()).isEqualTo("name_taken");
+        assertThat(refused.code()).isEqualTo(fr.enimaloc.catapult.common.error.ErrorCode.NAME_TAKEN);
     }
 
     @Test
@@ -1672,19 +1672,19 @@ class RealApiServiceTest {
 
     @Test
     void activation_a409CarriesWhyInItsCode() {
-        activationAnswers(HttpStatus.CONFLICT, "{\"code\":\"twitch_unavailable\",\"message\":\"reconnect\"}",
+        activationAnswers(HttpStatus.CONFLICT, "{\"detail\":\"x\",\"code\":\"twitch_unavailable\"}",
                 fr.enimaloc.catapult.service.ActivationOutcome.TWITCH_UNAVAILABLE);
     }
 
     @Test
     void activation_aPausedBotIsTold() {
-        activationAnswers(HttpStatus.CONFLICT, "{\"code\":\"bot_disabled\",\"message\":\"paused\"}",
+        activationAnswers(HttpStatus.CONFLICT, "{\"detail\":\"x\",\"code\":\"bot_disabled\"}",
                 fr.enimaloc.catapult.service.ActivationOutcome.BOT_DISABLED);
     }
 
     @Test
     void activation_twitchFailingIsAFailure() {
-        activationAnswers(HttpStatus.BAD_GATEWAY, "{\"code\":\"twitch_failed\",\"message\":\"x\"}",
+        activationAnswers(HttpStatus.BAD_GATEWAY, "{\"detail\":\"x\",\"code\":\"twitch_failed\"}",
                 fr.enimaloc.catapult.service.ActivationOutcome.FAILED);
     }
 

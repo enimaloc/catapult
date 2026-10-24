@@ -20,6 +20,7 @@ import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -41,6 +42,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -143,7 +145,9 @@ class CustomBindingsApiV2ControllerTest {
         when(service.resolve(any(), anyString())).thenReturn(Optional.empty());
 
         mvc.perform(withToken(post("/api/v2/custom-bindings/nope/activate")))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.code").value("not_found"));
 
         verify(service, never()).activate(any(), any());
     }
@@ -155,8 +159,9 @@ class CustomBindingsApiV2ControllerTest {
 
         mvc.perform(withToken(post("/api/v2/custom-bindings/art/activate")))
                 .andExpect(status().isConflict())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.code").value("twitch_unavailable"))
-                .andExpect(jsonPath("$.message").value("Reconnecte ton compte Twitch"));
+                .andExpect(jsonPath("$.detail").value("Reconnect your Twitch account"));
     }
 
     @Test
@@ -166,8 +171,9 @@ class CustomBindingsApiV2ControllerTest {
 
         mvc.perform(withToken(post("/api/v2/custom-bindings/art/activate")))
                 .andExpect(status().isConflict())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.code").value("bot_disabled"))
-                .andExpect(jsonPath("$.message").value("Catapult est en pause sur cette chaîne"));
+                .andExpect(jsonPath("$.detail").value("Catapult is paused on this channel"));
     }
 
     @Test
@@ -177,7 +183,9 @@ class CustomBindingsApiV2ControllerTest {
 
         mvc.perform(withToken(post("/api/v2/custom-bindings/art/activate")))
                 .andExpect(status().isBadGateway())
-                .andExpect(jsonPath("$.code").value("twitch_failed"));
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.code").value("twitch_failed"))
+                .andExpect(jsonPath("$.detail").value("Twitch did not accept the category change"));
     }
 
     @Test

@@ -3,10 +3,10 @@ package fr.enimaloc.catapult.controller;
 import fr.enimaloc.catapult.common.dto.account.ApiTokenCreatedDto;
 import fr.enimaloc.catapult.common.dto.account.ApiTokenStatusDto;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingDto;
-import fr.enimaloc.catapult.common.dto.binding.CustomBindingErrorDto;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingSaveResult;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto;
+import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.service.ActivationOutcome;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.CustomBindingSave;
@@ -14,6 +14,7 @@ import fr.enimaloc.catapult.service.http.ApiClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -58,10 +59,10 @@ public class ChannelCustomBindingsController {
 
     /** 204 once applied; 409 with the {@code code} to translate (no Twitch link, bot paused); 502 when Twitch failed. */
     @PostMapping("/channel/{username}/custom-bindings/{id}/activate")
-    public ResponseEntity<CustomBindingErrorDto> activate(@PathVariable String username, @PathVariable UUID id) {
+    public ResponseEntity<ProblemDetail> activate(@PathVariable String username, @PathVariable UUID id) {
         ActivationOutcome outcome = apiService.activateCustomBinding(username, id);
         ResponseEntity.BodyBuilder response = ResponseEntity.status(outcome.status());
-        return outcome.code() == null ? response.build() : response.body(new CustomBindingErrorDto(outcome.code(), null));
+        return outcome.code() == null ? response.build() : response.body(problem(outcome.status(), outcome.code()));
     }
 
     @PostMapping("/channel/{username}/custom-bindings/deactivate")
@@ -97,7 +98,14 @@ public class ChannelCustomBindingsController {
     private static ResponseEntity<?> relay(CustomBindingSave<?> result) {
         ResponseEntity.BodyBuilder response = ResponseEntity.status(status(result.status()));
         if (result.ok()) return result.body() != null ? response.body(result.body()) : response.build();
-        return result.code() == null ? response.build() : response.body(new CustomBindingErrorDto(result.code(), null));
+        return result.code() == null ? response.build() : response.body(problem(result.status(), result.code()));
+    }
+
+    /** The browser's error: a problem whose top-level {@code code} the card's script translates. */
+    private static ProblemDetail problem(int status, ErrorCode code) {
+        ProblemDetail problem = ProblemDetail.forStatus(status(status));
+        problem.setProperty(ErrorCode.PROPERTY, code.code());
+        return problem;
     }
 
     private static int status(int status) {

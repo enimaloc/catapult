@@ -511,15 +511,13 @@ class ApiClientTest {
     }
 
     @Test
-    void call_problemBody_readsAsACustomBindingError_keepingItsCode() {
+    void call_problemBody_keepsItsCodeOnTheError() {
         server.enqueue(problem(409, "application/problem+json", "{\"type\":\"about:blank\",\"title\":\"Conflict\","
                 + "\"status\":409,\"detail\":\"Name taken\",\"instance\":\"/api/v2/custom-bindings\",\"code\":\"name_taken\"}"));
 
-        ApiClient.Result<fr.enimaloc.catapult.common.dto.binding.CustomBindingErrorDto> result = client.call(HttpMethod.POST,
-                "/api/v2/custom-bindings", null, fr.enimaloc.catapult.common.dto.binding.CustomBindingErrorDto.class);
+        ApiClient.Result<Void> result = client.call(HttpMethod.POST, "/api/v2/custom-bindings", null, Void.class);
 
-        assertThat(result.body()).isNotNull();
-        assertThat(result.body().code()).isEqualTo("name_taken");
+        assertThat(result.status()).isEqualTo(409);
         assertThat(result.error().code()).isEqualTo(ErrorCode.NAME_TAKEN);
     }
 }
