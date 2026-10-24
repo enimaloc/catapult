@@ -33,6 +33,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -99,6 +100,38 @@ class ProblemAdviceTest {
     }
 
     @Test
+    void declaredStatusIsAProblemAndNotLogged() throws Exception {
+        mvc.perform(get("/api/probe/declared"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.code").value("bad_request"))
+                .andExpect(jsonPath("$.detail").value("Bad Request"));
+        mvc.perform(get("/api/probe/declared-reason"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("bad_request"))
+                .andExpect(jsonPath("$.detail").value("Code expired"));
+        mvc.perform(get("/api/probe/declared-french"))
+                .andExpect(status().isGone())
+                .andExpect(jsonPath("$.code").value("gone"))
+                .andExpect(jsonPath("$.detail").value("Gone"));
+
+        assertThat(logs.list).isEmpty();
+    }
+
+    @Test
+    void wrappedResponseStatusKeepsItsStatus() throws Exception {
+        mvc.perform(get("/api/probe/wrapped"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("conflict"))
+                .andExpect(jsonPath("$.detail").value("Already taken"));
+        mvc.perform(get("/api/probe/wrapped-problem"))
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.code").value("minecraft_device_code_refused"));
+
+        assertThat(logs.list).isEmpty();
+    }
+
+    @Test
     void securityExceptionsAreLeftToSpringSecurity() {
         assertThatThrownBy(() -> mvc.perform(get("/api/probe/denied")))
                 .isInstanceOf(ServletException.class)
@@ -108,7 +141,10 @@ class ProblemAdviceTest {
 
     @Test
     void committedResponseIsRethrown() {
-        assertThatThrownBy(() -> mvc.perform(get("/api/probe/committed"))).isInstanceOf(Exception.class);
+        assertThatThrownBy(() -> mvc.perform(get("/api/probe/committed")))
+                .isInstanceOf(ServletException.class)
+                .cause()
+                .isInstanceOf(IllegalStateException.class);
         assertThat(logs.list).isEmpty();
     }
 
@@ -125,10 +161,22 @@ class ProblemAdviceTest {
                 .andReturn();
         assertThat(uuid.getResponse().getContentAsString()).isEmpty();
 
-        assertThatThrownBy(() -> mvc.perform(get("/api/game/probe/npe"))).isInstanceOf(Exception.class);
+        assertThatThrownBy(() -> mvc.perform(get("/api/game/probe/npe")))
+                .isInstanceOf(ServletException.class)
+                .cause()
+                .isInstanceOf(NullPointerException.class);
     }
 
     record Payload(String name) {}
+
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    static class Declared extends RuntimeException {}
+
+    @ResponseStatus(code = HttpStatus.BAD_REQUEST, reason = "Code expired")
+    static class DeclaredWithReason extends RuntimeException {}
+
+    @ResponseStatus(code = HttpStatus.GONE, reason = "Code expir\u00e9")
+    static class DeclaredInFrench extends RuntimeException {}
 
     @RestController
     @RequestMapping({"/api/probe", "/api/game/probe"})
@@ -145,6 +193,34 @@ class ProblemAdviceTest {
                     ErrorCode.MINECRAFT_DEVICE_CODE_REFUSED,
                     "Microsoft refused the device code",
                     Map.of("upstream", "AADSTS70002"));
+        }
+
+        @GetMapping("/declared")
+        String declared() {
+            throw new Declared();
+        }
+
+        @GetMapping("/declared-reason")
+        String declaredReason() {
+            throw new DeclaredWithReason();
+        }
+
+        @GetMapping("/declared-french")
+        String declaredFrench() {
+            throw new DeclaredInFrench();
+        }
+
+        @GetMapping("/wrapped")
+        String wrapped() {
+            throw new IllegalStateException(
+                    "wrapper", new ResponseStatusException(HttpStatus.CONFLICT, "Already taken"));
+        }
+
+        @GetMapping("/wrapped-problem")
+        String wrappedProblem() {
+            throw new IllegalStateException(
+                    "wrapper",
+                    new ApiProblem(ErrorCode.MINECRAFT_DEVICE_CODE_REFUSED, "Microsoft refused the device code"));
         }
 
         @GetMapping("/npe")

@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.api.error;
 
 import fr.enimaloc.catapult.common.error.ErrorCode;
 import java.util.Map;
+import java.util.Set;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -12,6 +13,9 @@ import org.springframework.web.server.ResponseStatusException;
  */
 public class ApiProblem extends ResponseStatusException {
 
+    /** The members of a problem itself, and the code: an extension under one of these names would clash. */
+    static final Set<String> RESERVED = Set.of("type", "title", "status", "detail", "instance", ErrorCode.PROPERTY);
+
     private final ErrorCode code;
 
     public ApiProblem(ErrorCode code, String detail) {
@@ -20,6 +24,9 @@ public class ApiProblem extends ResponseStatusException {
 
     public ApiProblem(ErrorCode code, String detail, Map<String, ?> properties) {
         super(HttpStatusCode.valueOf(code.status()), detail);
+        properties.keySet().stream().filter(RESERVED::contains).findFirst().ifPresent(name -> {
+            throw new IllegalArgumentException("Reserved problem member: " + name);
+        });
         this.code = code;
         properties.forEach(getBody()::setProperty);
         getBody().setProperty(ErrorCode.PROPERTY, code.code());

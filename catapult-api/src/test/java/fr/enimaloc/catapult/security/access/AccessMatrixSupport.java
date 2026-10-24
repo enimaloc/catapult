@@ -95,8 +95,9 @@ import tools.jackson.databind.json.JsonMapper;
  * header), {@code member}, {@code mod} (moderates the channel), {@code owner} (the channel, {@value #OWNER}),
  * {@code admin} ({@code ROLE_ADMIN}) with a real JWT, and {@code ptoken} (the owner's personal API token), all
  * remote. Outcomes: {@code 401}/{@code 403} refused, {@code GATED} a feature gate's 403 (reached the handler),
- * {@code ERROR} the request blew up (it threw, or answered a 500 {@code internal_error} problem), {@code PASS}
- * anything else.
+ * {@code ERROR} the request blew up: it threw, or answered a 500 {@code internal_error} problem (an unexpected
+ * exception, but also a deliberate 500: a {@code ResponseStatusException} 500 or a 500 Spring resolved itself),
+ * {@code PASS} anything else.
  *
  * <p>Every outbound client whose host is hard-coded is a mock, so no row calls a third party: {@link TwitchService}
  * (which also says who moderates the channel), {@link SteamStoreService}, {@link XboxService},
