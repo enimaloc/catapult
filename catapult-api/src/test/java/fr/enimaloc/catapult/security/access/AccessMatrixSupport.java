@@ -264,7 +264,12 @@ abstract class AccessMatrixSupport {
     }
 
     protected Stream<Row> rows() throws IOException {
-        return Row.parse(matrixResource()).stream();
+        return matrixRows().stream();
+    }
+
+    /** The rows to run; a profile that differs from the pinned matrix on a few cells overrides this. */
+    protected List<Row> matrixRows() throws IOException {
+        return Row.parse(matrixResource());
     }
 
     @ParameterizedTest(name = "{0}")
@@ -353,7 +358,7 @@ abstract class AccessMatrixSupport {
 
     @Test
     void everyHandlerHasARow() throws IOException {
-        Map<String, Long> rowsByKey = Row.parse(matrixResource()).stream()
+        Map<String, Long> rowsByKey = matrixRows().stream()
                 .filter(r -> !r.unmapped())
                 .collect(Collectors.groupingBy(Row::key, TreeMap::new, Collectors.counting()));
         List<String> missing = new ArrayList<>();
