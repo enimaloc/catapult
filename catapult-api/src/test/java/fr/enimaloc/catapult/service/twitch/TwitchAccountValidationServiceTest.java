@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.twitch;
 
+import fr.enimaloc.catapult.service.debug.DebugRecording;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,7 +34,7 @@ class TwitchAccountValidationServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new TwitchAccountValidationService(userAccountRepository, twitchTokenService, restClient);
+        service = new TwitchAccountValidationService(userAccountRepository, twitchTokenService, restClient, DebugRecording.OFF);
         ReflectionTestUtils.setField(service, "twitchClientId", "client-id");
     }
 

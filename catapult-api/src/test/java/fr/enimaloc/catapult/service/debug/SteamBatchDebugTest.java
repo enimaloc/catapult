@@ -88,8 +88,8 @@ class SteamBatchDebugTest {
                 return result;
             }), pool);
         });
-        getter = new SteamGameGetter(steamApi, mock(TokenEncryptionService.class), mock(SteamStoreService.class));
-        getter.setDebugRecording(new DebugRecording(registry, recorder));
+        getter = new SteamGameGetter(steamApi, mock(TokenEncryptionService.class), mock(SteamStoreService.class),
+                new DebugRecording(registry, recorder));
     }
 
     @AfterEach

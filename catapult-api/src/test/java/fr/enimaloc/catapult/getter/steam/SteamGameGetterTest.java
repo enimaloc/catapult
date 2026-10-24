@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.getter.steam;
 
+import fr.enimaloc.catapult.service.debug.DebugRecording;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
@@ -30,7 +31,7 @@ class SteamGameGetterTest {
 
     @BeforeEach
     void setUp() {
-        getter = new SteamGameGetter(steamApiClient, tokenEncryptionService, steamStoreService);
+        getter = new SteamGameGetter(steamApiClient, tokenEncryptionService, steamStoreService, DebugRecording.OFF);
     }
 
     @Test

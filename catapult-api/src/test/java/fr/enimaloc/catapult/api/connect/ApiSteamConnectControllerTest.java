@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.connect;
 
+import fr.enimaloc.catapult.service.debug.DebugRecording;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.event.SteamLinkedEvent;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
@@ -54,7 +55,8 @@ class ApiSteamConnectControllerTest {
     void setUp() {
         RestClient.Builder builder = RestClient.builder();
         steam = MockRestServiceServer.bindTo(builder).build();
-        controller = new ApiSteamConnectController(accounts, events, channelEvents, builder.build());
+        controller = new ApiSteamConnectController(accounts, events, channelEvents, builder.build(),
+                DebugRecording.OFF);
         ReflectionTestUtils.setField(controller, "apiBaseUrl", "http://api.test");
         ReflectionTestUtils.setField(controller, "webBaseUrl", "http://web.test");
         account = new UserAccount();

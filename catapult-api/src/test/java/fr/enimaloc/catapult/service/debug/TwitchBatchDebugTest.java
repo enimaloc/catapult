@@ -65,9 +65,9 @@ class TwitchBatchDebugTest {
         RestClient.Builder builder = RestClient.builder()
                 .requestInterceptor(new HttpTraceLoggingInterceptor(registry, recorder));
         helix = MockRestServiceServer.bindTo(builder).build();
-        service = new TwitchAccountValidationService(accounts, tokens, builder.build());
+        service = new TwitchAccountValidationService(accounts, tokens, builder.build(),
+                new DebugRecording(registry, recorder));
         ReflectionTestUtils.setField(service, "twitchClientId", "client-id");
-        service.setDebugRecording(new DebugRecording(registry, recorder));
         when(accounts.findByStatusAndTwitchIdNotNull(UserAccount.Status.ACTIVE)).thenReturn(List.of(a, b, c));
         when(tokens.getAppAccessToken()).thenReturn("app-token");
         helix.expect(requestTo(URL + "?id=101&id=102&id=103")).andRespond(withSuccess("""

@@ -104,8 +104,7 @@ class MinecraftBatchDebugTest {
 
     private MinecraftPresenceGetter presenceGetter() {
         MinecraftPresenceGetter getter = new MinecraftPresenceGetter(minecraft, tokens, serviceAccounts, links,
-                mock(MinecraftGateService.class));
-        getter.setDebugRecording(new DebugRecording(registry, recorder));
+                mock(MinecraftGateService.class), new DebugRecording(registry, recorder));
         return getter;
     }
 
@@ -149,8 +148,7 @@ class MinecraftBatchDebugTest {
     private MinecraftFriendService friendService() {
         MinecraftFriendService friends = new MinecraftFriendService(minecraft, tokens, serviceAccounts, links,
                 mock(MinecraftAccountLimitMarker.class), mock(GetterConfigRepository.class), new ObjectMapper(),
-                mock(ChannelEventPublisher.class));
-        friends.setDebugRecording(new DebugRecording(registry, recorder));
+                mock(ChannelEventPublisher.class), new DebugRecording(registry, recorder));
         return friends;
     }
 

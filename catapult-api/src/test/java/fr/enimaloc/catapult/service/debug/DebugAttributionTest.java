@@ -236,7 +236,8 @@ class DebugAttributionTest {
         steam.expect(requestTo("https://steamcommunity.com/openid/login"))
                 .andRespond(withSuccess("is_valid:true\n", MediaType.TEXT_PLAIN));
         ApiSteamConnectController controller = new ApiSteamConnectController(accounts,
-                mock(ApplicationEventPublisher.class), mock(ChannelEventPublisher.class), builder.build());
+                mock(ApplicationEventPublisher.class), mock(ChannelEventPublisher.class), builder.build(),
+                DebugRecording.OFF);
         ReflectionTestUtils.setField(controller, "apiBaseUrl", "http://api.test");
         ReflectionTestUtils.setField(controller, "webBaseUrl", "http://web.test");
         Jwt jwt = Jwt.withTokenValue("t").header("alg", "none").subject(user.getId().toString()).build();
