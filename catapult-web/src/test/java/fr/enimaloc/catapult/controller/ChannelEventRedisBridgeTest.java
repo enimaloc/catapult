@@ -11,6 +11,8 @@ import fr.enimaloc.catapult.event.binding.BindingDeletedEvent;
 import fr.enimaloc.catapult.event.binding.BindingIgnoredStateEvent;
 import fr.enimaloc.catapult.event.binding.BindingUpdatedEvent;
 import fr.enimaloc.catapult.event.binding.CclStateEvent;
+import fr.enimaloc.catapult.event.binding.CustomBindingChangedEvent;
+import fr.enimaloc.catapult.event.binding.CustomBindingsUpdatedEvent;
 import fr.enimaloc.catapult.event.binding.GameChangedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftDisconnectedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftSyncEvent;
@@ -69,6 +71,19 @@ class ChannelEventRedisBridgeTest {
                 new ChannelEvents.BotToggled(owner.toString(), "Streamer", true)));
 
         verify(publisher).publishEvent(new BotStateChangedEvent("streamer", true));
+    }
+
+    @Test
+    void customBindings_theActiveOneChanged_andTheListUpdated() {
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.CUSTOM_BINDING_CHANGED,
+                new ChannelEvents.CustomBindingChanged(owner.toString(), "Streamer", "b-1"))))
+                .containsExactly(new CustomBindingChangedEvent("streamer", "b-1"));
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.CUSTOM_BINDING_CHANGED,
+                new ChannelEvents.CustomBindingChanged(owner.toString(), "Streamer", null))))
+                .containsExactly(new CustomBindingChangedEvent("streamer", null));
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.CUSTOM_BINDINGS_UPDATED,
+                new ChannelEvents.CustomBindingsUpdated(owner.toString(), "Streamer"))))
+                .containsExactly(new CustomBindingsUpdatedEvent("streamer"));
     }
 
     @Test

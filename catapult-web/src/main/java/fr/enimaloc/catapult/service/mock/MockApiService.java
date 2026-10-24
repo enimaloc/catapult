@@ -93,6 +93,15 @@ import fr.enimaloc.catapult.event.steam.SteamTokenSharedStateEvent;
 import fr.enimaloc.catapult.event.tw.TwEnabledStateEvent;
 import fr.enimaloc.catapult.event.tw.TwResetEvent;
 import fr.enimaloc.catapult.event.tw.TwUpdatedEvent;
+import fr.enimaloc.catapult.common.dto.account.ApiTokenCreatedDto;
+import fr.enimaloc.catapult.common.dto.account.ApiTokenStatusDto;
+import fr.enimaloc.catapult.common.dto.binding.CustomBindingDto;
+import fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest;
+import fr.enimaloc.catapult.common.dto.binding.CustomBindingSaveResult;
+import fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto;
+import fr.enimaloc.catapult.event.binding.CustomBindingChangedEvent;
+import fr.enimaloc.catapult.event.binding.CustomBindingsUpdatedEvent;
+import fr.enimaloc.catapult.service.ActivationOutcome;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import fr.enimaloc.catapult.twitchat.TwitchatDispatchHub;
@@ -1611,4 +1620,75 @@ public class MockApiService implements ApiService {
             new ChangelogSection("0.3.9", List.of(
                     new ChangelogSection.Entry("bead001", "fix", null, "open an OBS widget on its owner's Twitchat branch", false),
                     new ChangelogSection.Entry("bead002", "perf", "web", "build each expanded message's format once", false))));
+
+    @Override
+    public CustomBindingsStateDto customBindings(String username) {
+        log.trace("customBindings({})", username);
+        return currentData().customBindings().state();
+    }
+
+    @Override
+    public ApiClient.Result<CustomBindingDto> createCustomBinding(String username, CustomBindingRequest request) {
+        log.trace("createCustomBinding({})", username);
+        ApiClient.Result<CustomBindingDto> result = currentData().customBindings().create(request);
+        if (result.ok()) eventPublisher.publishEvent(new CustomBindingsUpdatedEvent(username));
+        return result;
+    }
+
+    @Override
+    public ApiClient.Result<CustomBindingSaveResult> updateCustomBinding(String username, UUID id, CustomBindingRequest request) {
+        log.trace("updateCustomBinding({}, {})", username, id);
+        ApiClient.Result<CustomBindingSaveResult> result = currentData().customBindings().update(id, request);
+        if (result.ok()) eventPublisher.publishEvent(new CustomBindingsUpdatedEvent(username));
+        return result;
+    }
+
+    @Override
+    public int deleteCustomBinding(String username, UUID id) {
+        log.trace("deleteCustomBinding({}, {})", username, id);
+        MockCustomBindings store = currentData().customBindings();
+        boolean wasActive = id.equals(store.state().activeId());
+        int status = store.delete(id);
+        if (status == NO_CONTENT) {
+            if (wasActive) eventPublisher.publishEvent(new CustomBindingChangedEvent(username, null));
+            eventPublisher.publishEvent(new CustomBindingsUpdatedEvent(username));
+        }
+        return status;
+    }
+
+    @Override
+    public ActivationOutcome activateCustomBinding(String username, UUID id) {
+        log.trace("activateCustomBinding({}, {})", username, id);
+        if (!currentData().customBindings().activate(id)) return ActivationOutcome.NOT_FOUND;
+        eventPublisher.publishEvent(new CustomBindingChangedEvent(username, id.toString()));
+        return ActivationOutcome.APPLIED;
+    }
+
+    @Override
+    public int deactivateCustomBinding(String username) {
+        log.trace("deactivateCustomBinding({})", username);
+        currentData().customBindings().deactivate();
+        eventPublisher.publishEvent(new CustomBindingChangedEvent(username, null));
+        return NO_CONTENT;
+    }
+
+    @Override
+    public ApiTokenStatusDto apiTokenStatus() {
+        MockData current = currentData();
+        return current == null ? null : current.customBindings().tokenStatus();
+    }
+
+    @Override
+    public ApiClient.Result<ApiTokenCreatedDto> regenerateApiToken() {
+        MockData current = currentData();
+        return current == null ? new ApiClient.Result<>(401, null) : new ApiClient.Result<>(200, current.customBindings().regenerateToken());
+    }
+
+    @Override
+    public int revokeApiToken() {
+        MockData current = currentData();
+        if (current == null) return 401;
+        current.customBindings().revokeToken();
+        return NO_CONTENT;
+    }
 }

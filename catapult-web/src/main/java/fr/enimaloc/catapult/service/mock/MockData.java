@@ -76,6 +76,7 @@ public class MockData {
     private boolean hasSteamProvider;
     @Getter
     private boolean hasSteam;
+    private final MockCustomBindings customBindings = new MockCustomBindings();
     @Getter
     private boolean hasSteamPersonalToken;
     @Getter
@@ -283,6 +284,11 @@ public class MockData {
         return adminData;
     }
 
+    /** The member's custom bindings and personal API token. */
+    MockCustomBindings customBindings() {
+        return customBindings;
+    }
+
     public ChannelListResponse getChannelList() {
         return new ChannelListResponse(channelDto.twitchId(), withFirst(channelDto, moderatedChannels));
     }
@@ -304,7 +310,8 @@ public class MockData {
                 new PagedBindings(0, bindings.isEmpty() ? 0 : 1, bindings.size(), bindings),
                 AVAILABLE_CCLS, userSettingsDto.blockedCcls(), AVAILABLE_TWS, userSettingsDto.blockedTws(),
                 status, source, steamData(), hasXboxProvider ? new XboxData(hasXbox) : null, minecraftData(), obsData,
-                obsData == null ? null : TwitchatData.of(twitchatBranch), EXAMPLE_UUID, null);
+                obsData == null ? null : TwitchatData.of(twitchatBranch), EXAMPLE_UUID,
+                username.equals(channelDto.twitchUsername()) ? customBindings.state() : null);
     }
 
     private SteamData steamData() {

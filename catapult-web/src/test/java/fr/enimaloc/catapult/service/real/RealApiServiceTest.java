@@ -1556,4 +1556,126 @@ class RealApiServiceTest {
         assertThat(service.myDebugActive()).isTrue();
         assertThat(service.myDebugActive()).isNull();
     }
+
+    private static final UUID CB_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
+    private static final String CB_JSON = "{\"id\":\"" + CB_ID + "\",\"name\":\"Art\",\"twitchGameId\":\"1\","
+            + "\"twitchGameName\":\"Art\",\"ccls\":[],\"tws\":[],\"uninterruptible\":false}";
+    private static final fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest CB_REQUEST =
+            new fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest("Art", "1", "Art", Set.of(), Set.of(), false);
+
+    private void activationAnswers(HttpStatus status, String body, fr.enimaloc.catapult.service.ActivationOutcome expected) {
+        var answer = withStatus(status);
+        expect(HttpMethod.POST, "/api/channels/streamer/custom-bindings/" + CB_ID + "/activate")
+                .andRespond(body == null ? answer : answer.contentType(MediaType.APPLICATION_JSON).body(body));
+        assertThat(service.activateCustomBinding("streamer", CB_ID)).isEqualTo(expected);
+    }
+
+    @Test
+    void customBindings_areReadFromTheOwnerRoute() {
+        respond(HttpMethod.GET, "/api/channels/streamer/custom-bindings",
+                "{\"enabled\":true,\"bindings\":[" + CB_JSON + "],\"activeId\":\"" + CB_ID + "\",\"activatedAt\":null}");
+
+        assertThat(service.customBindings("streamer").activeId()).isEqualTo(CB_ID);
+    }
+
+    @Test
+    void createCustomBinding_sendsTheRequest_andKeepsTheStatusAndBody() {
+        expect(HttpMethod.POST, "/api/channels/streamer/custom-bindings")
+                .andExpect(content().json("{\"name\":\"Art\",\"twitchGameId\":\"1\",\"uninterruptible\":false}"))
+                .andRespond(withStatus(HttpStatus.CREATED).contentType(MediaType.APPLICATION_JSON).body(CB_JSON));
+
+        var created = service.createCustomBinding("streamer", CB_REQUEST);
+
+        assertThat(created.status()).isEqualTo(201);
+        assertThat(created.body().id()).isEqualTo(CB_ID);
+    }
+
+    @Test
+    void createCustomBinding_aRefusalKeepsItsStatus() {
+        expect(HttpMethod.POST, "/api/channels/streamer/custom-bindings").andRespond(withStatus(HttpStatus.CONFLICT));
+
+        assertThat(service.createCustomBinding("streamer", CB_REQUEST).status()).isEqualTo(409);
+    }
+
+    @Test
+    void updateCustomBinding_readsHowReapplyingWent() {
+        respond(HttpMethod.POST, "/api/channels/streamer/custom-bindings/" + CB_ID,
+                "{\"binding\":" + CB_JSON + ",\"reapplyOutcome\":\"applied\"}");
+
+        assertThat(service.updateCustomBinding("streamer", CB_ID, CB_REQUEST).body().reapplyOutcome()).isEqualTo("applied");
+    }
+
+    @Test
+    void deleteCustomBinding_postsWithoutABody() {
+        expectPost("/api/channels/streamer/custom-bindings/" + CB_ID + "/delete");
+        assertThat(service.deleteCustomBinding("streamer", CB_ID)).isEqualTo(204);
+    }
+
+    @Test
+    void deactivateCustomBinding_postsWithoutABody() {
+        expectPost("/api/channels/streamer/custom-bindings/deactivate");
+        assertThat(service.deactivateCustomBinding("streamer")).isEqualTo(204);
+    }
+
+    @Test
+    void activation_appliedIsA2xx() {
+        activationAnswers(HttpStatus.NO_CONTENT, null, fr.enimaloc.catapult.service.ActivationOutcome.APPLIED);
+    }
+
+    @Test
+    void activation_a409CarriesWhyInItsCode() {
+        activationAnswers(HttpStatus.CONFLICT, "{\"code\":\"twitch_unavailable\",\"message\":\"reconnect\"}",
+                fr.enimaloc.catapult.service.ActivationOutcome.TWITCH_UNAVAILABLE);
+    }
+
+    @Test
+    void activation_aPausedBotIsTold() {
+        activationAnswers(HttpStatus.CONFLICT, "{\"code\":\"bot_disabled\",\"message\":\"paused\"}",
+                fr.enimaloc.catapult.service.ActivationOutcome.BOT_DISABLED);
+    }
+
+    @Test
+    void activation_twitchFailingIsAFailure() {
+        activationAnswers(HttpStatus.BAD_GATEWAY, "{\"code\":\"twitch_failed\",\"message\":\"x\"}",
+                fr.enimaloc.catapult.service.ActivationOutcome.FAILED);
+    }
+
+    @Test
+    void activation_anUnknownBindingIsNotFound() {
+        activationAnswers(HttpStatus.NOT_FOUND, null, fr.enimaloc.catapult.service.ActivationOutcome.NOT_FOUND);
+    }
+
+    @Test
+    void apiTokenStatus_isReadFromTheMeRoute() {
+        respond(HttpMethod.GET, "/api/me/api-token", "{\"exists\":true,\"createdAt\":\"2026-01-01T00:00:00Z\"}");
+
+        assertThat(service.apiTokenStatus().exists()).isTrue();
+    }
+
+    @Test
+    void regenerateApiToken_givesTheNewTokenToTheCaller() {
+        respond(HttpMethod.POST, "/api/me/api-token", "{\"token\":\"cat_abc\",\"createdAt\":\"2026-01-01T00:00:00Z\"}");
+
+        var created = service.regenerateApiToken();
+
+        assertThat(created.status()).isEqualTo(200);
+        assertThat(created.body().token()).isEqualTo("cat_abc");
+    }
+
+    @Test
+    void regenerateApiToken_aRefusalHasNoBody() {
+        expect(HttpMethod.POST, "/api/me/api-token").andRespond(withStatus(HttpStatus.FORBIDDEN));
+
+        var refused = service.regenerateApiToken();
+
+        assertThat(refused.status()).isEqualTo(403);
+        assertThat(refused.body()).isNull();
+    }
+
+    @Test
+    void revokeApiToken_postsToTheDeleteRoute() {
+        expectPost("/api/me/api-token/delete");
+
+        assertThat(service.revokeApiToken()).isEqualTo(204);
+    }
 }

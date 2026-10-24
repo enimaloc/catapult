@@ -456,4 +456,25 @@ public interface ApiService {
     DegradedStatusDto degradedStatus();
     /** Whether catapult-api answers and reports itself up (its health, asked without the session's bearer). */
     boolean apiAvailable();
+
+    /** The owner's custom bindings; null when catapult-api fails or refuses (experiment closed to the channel). */
+    fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto customBindings(String username);
+    /** Creates one; catapult-api's status (201, or 400/403/409) with the created binding on success. */
+    ApiClient.Result<fr.enimaloc.catapult.common.dto.binding.CustomBindingDto> createCustomBinding(
+            String username, fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest request);
+    /** Saves an edit; catapult-api's status with how re-applying the active binding went on success. */
+    ApiClient.Result<fr.enimaloc.catapult.common.dto.binding.CustomBindingSaveResult> updateCustomBinding(
+            String username, UUID id, fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest request);
+    /** catapult-api's status (204), 502 when unreachable. */
+    int deleteCustomBinding(String username, UUID id);
+    /** Makes the binding the active one, applying its category on Twitch. */
+    ActivationOutcome activateCustomBinding(String username, UUID id);
+    /** catapult-api's status (204), 502 when unreachable. */
+    int deactivateCustomBinding(String username);
+    /** Whether the logged-in member has a personal API token; null when catapult-api fails or refuses. */
+    fr.enimaloc.catapult.common.dto.account.ApiTokenStatusDto apiTokenStatus();
+    /** Replaces the personal API token; the body carries the new one, shown once, never logged or kept. */
+    ApiClient.Result<fr.enimaloc.catapult.common.dto.account.ApiTokenCreatedDto> regenerateApiToken();
+    /** catapult-api's status (204), 502 when unreachable. */
+    int revokeApiToken();
 }
