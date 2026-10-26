@@ -12,8 +12,12 @@
 // viewers    each polls its streamer's public game route, /api/user/game/{widgetToken}, relayed by web,
 //            every 15 s: no widget script in the repository sets an interval, 15 s is the plan's default.
 //
-// A live stream closed before the end of the run, or refused, counts in ws_unexpected_close; one closed
-// by the server at its 30 min timeout (SseStreams.TIMEOUT) is reopened, as EventSource does, and does not.
+// A live stream closed before the end of the run, or refused, counts in ws_unexpected_close (the plan's
+// name, kept although they are SSE streams); one closed by the server at its 30 min timeout
+// (SseStreams.TIMEOUT) is reopened, as EventSource does, and does not.
+//
+// Every request is tagged kind:request, but the streams, kind:stream: a stream's duration is how long it stayed
+// open, so the latency threshold only looks at kind:request.
 
 import http from "k6/http";
 import exec from "k6/execution";
@@ -59,7 +63,7 @@ export const options = {
         viewers: { executor: "constant-vus", exec: "viewer", vus: VIEWERS, duration: DURATION },
     },
     thresholds: {
-        http_req_duration: ["p(95)<500"],
+        "http_req_duration{kind:request}": ["p(95)<500"],
         http_req_failed: ["rate<0.01"],
         ws_unexpected_close: ["count==0"],
         ...groupThresholds,
@@ -80,7 +84,7 @@ const jittered = (every, jitter) => every - jitter + Math.random() * 2 * jitter;
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
 
 export function setup() {
-    const res = http.get(`${API}/api/internal/perf/accounts`, { tags: { group: "setup" } });
+    const res = http.get(`${API}/api/internal/perf/accounts`, { tags: { group: "setup", kind: "request" } });
     if (res.status !== 200) throw new Error(`GET /api/internal/perf/accounts: ${res.status}`);
     const accounts = res.json();
     if (accounts.length < STREAMERS) {
@@ -115,7 +119,7 @@ async function liveStream(path, end) {
             headers: { Accept: "text/event-stream" },
             timeout: `${end - opened}ms`,
             responseType: "none",
-            tags: { group: "stream", name: "stream" },
+            tags: { group: "stream", name: "stream", kind: "stream" },
             // Status 0: the request timed out at the end of the run, which is how this script closes it
             responseCallback: http.expectedStatuses(0, 200),
         });
@@ -128,15 +132,23 @@ async function liveStream(path, end) {
     }
 }
 
+/** This VU's streamer (module state is per VU). */
+let streamerAccount;
+
 /** One streamer for the whole scenario (one iteration per VU). */
 export async function streamer(data) {
     const end = deadline();
     if (await over(end)) return;
-    const account = data.accounts[exec.scenario.iterationInTest % data.accounts.length];
+    // Chosen once per VU and kept: the first iterations of the scenario's VUs are its first STREAMERS ones,
+    // so no two VUs share a streamer, even when one signs in again after a failed login.
+    if (streamerAccount === undefined) {
+        streamerAccount = data.accounts[exec.scenario.iterationInTest % data.accounts.length];
+    }
+    const account = streamerAccount;
     const user = encodeURIComponent(account.username);
 
     const login = await http.asyncRequest("GET", `${WEB}/perf/login?username=${user}`, null, {
-        redirects: 0, tags: { group: "login", name: "login" },
+        redirects: 0, tags: { group: "login", name: "login", kind: "request" },
         responseCallback: http.expectedStatuses(302),
     });
     const signedIn = check(login, {
@@ -164,14 +176,14 @@ export async function streamer(data) {
         if (Date.now() >= nextPage) {
             const [group, path] = landed ? pick(pages) : pages[0];
             landed = true;
-            const res = await http.asyncRequest("GET", `${WEB}${path}`, null, { tags: { group, name: group } });
+            const res = await http.asyncRequest("GET", `${WEB}${path}`, null, { tags: { group, name: group, kind: "request" } });
             check(res, { [`${group}: 200`]: (r) => r.status === 200 });
             nextPage = Date.now() + jittered(PAGE_EVERY_MS, PAGE_JITTER_MS);
         }
         if (Date.now() >= nextGame) {
             const res = await http.asyncRequest("POST",
                 `${API}/api/internal/perf/users/${user}/game?name=${encodeURIComponent(pick(GAMES))}`, null,
-                { tags: { group: "game", name: "game" } });
+                { tags: { group: "game", name: "game", kind: "request" } });
             check(res, { "game: 204": (r) => r.status === 204 });
             nextGame = Date.now() + jittered(GAME_EVERY_MS, GAME_JITTER_MS);
         }
@@ -189,7 +201,7 @@ export async function viewer(data) {
     while (Date.now() < end) {
         const started = Date.now();
         const res = await http.asyncRequest("GET", `${WEB}/api/user/game/${account.widgetToken}`, null, {
-            tags: { group: "widget", name: "widget" },
+            tags: { group: "widget", name: "widget", kind: "request" },
         });
         check(res, { "widget: 200": (r) => r.status === 200 });
         await wait(Math.min(started + WIDGET_EVERY_MS, end) - Date.now());

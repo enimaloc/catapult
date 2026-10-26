@@ -10,6 +10,7 @@
 //   load.json         {streamers, viewers, duration, k6Image}, written by run.sh before the load run
 //   k6-summary.json   k6's --summary-export: thresholds, and per-group submetrics ({group:...})
 //   docker-stats.csv  time,container,cpu,memory lines (docker stats every 5 s)
+//   jvm-memory.csv    time,app,heapUsed,nonHeapUsed,heapMax lines in bytes (actuator metrics every 5 s)
 //   pages.json        the page timings: [{name, metric, samples, p50, p95, budget, note?}]
 //   outbound.txt      log lines with a connection error towards a host outside the stack
 
@@ -130,15 +131,50 @@ export function containerStats(csv) {
     return { containers, total };
 }
 
+const MIB = 1024 * 1024;
+
 /**
- * The machine that runs the stack with the headroom above, on its sustained CPU and its peak memory (a JVM
- * keeps its heap once grown): vCPUs and GiB, whole.
+ * jvm-memory.csv: per app, the peaks of its used heap, used non-heap and their sum (MiB), and its heap's
+ * maximum; and the peak of the apps' per-sample used sum. A JVM's container memory (RSS) is the heap it has
+ * grown to and keeps, whatever it uses: what it uses is what a machine needs.
  */
-export function sizing(total) {
+export function jvmStats(csv) {
+    const byApp = new Map();
+    const byTime = new Map();
+    for (const line of csv.split("\n")) {
+        const [time, app, ...numbers] = line.trim().split(",");
+        const [heap, nonHeap, heapMax] = numbers.map(Number);
+        if (!app || !Number.isFinite(heap) || !Number.isFinite(nonHeap)) continue; // the header
+        if (!byApp.has(app)) byApp.set(app, []);
+        byApp.get(app).push({ heap: heap / MIB, nonHeap: nonHeap / MIB, heapMax: (heapMax || 0) / MIB });
+        byTime.set(time, (byTime.get(time) ?? 0) + (heap + nonHeap) / MIB);
+    }
+    const apps = [...byApp.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([name, samples]) => ({
+        name,
+        samples: samples.length,
+        heapPeakMiB: round(max(samples.map((s) => s.heap))),
+        nonHeapPeakMiB: round(max(samples.map((s) => s.nonHeap))),
+        usedPeakMiB: round(max(samples.map((s) => s.heap + s.nonHeap))),
+        heapMaxMiB: round(max(samples.map((s) => s.heapMax))),
+    }));
+    return { apps, usedPeakMiB: apps.length ? round(max([...byTime.values()])) : null };
+}
+
+/**
+ * The machine that runs the stack with the headroom above, on its sustained CPU and on its memory: the JVMs'
+ * peak used memory (heap and non-heap) plus the other containers' peak RSS when the JVMs were sampled, the
+ * stack's peak RSS otherwise. vCPUs and GiB, whole.
+ */
+export function sizing(total, jvm = null, containers = []) {
     if (!total) return null;
+    const jvmNames = new Set((jvm?.apps ?? []).map((app) => app.name));
+    const memoryMiB = jvm?.usedPeakMiB == null ? total.memPeakMiB : jvm.usedPeakMiB
+        + containers.filter((c) => !jvmNames.has(c.name)).reduce((sum, c) => sum + c.memPeakMiB, 0);
     return {
         vcpus: Math.max(1, Math.ceil(total.cpuSustained / 100 / CPU_TARGET)),
-        ramGiB: Math.max(1, Math.ceil(total.memPeakMiB / 1024 / MEMORY_TARGET)),
+        ramGiB: Math.max(1, Math.ceil(memoryMiB / 1024 / MEMORY_TARGET)),
+        memoryMiB: round(memoryMiB),
+        memoryBasis: jvm?.usedPeakMiB == null ? "rss" : "jvm",
     };
 }
 
@@ -193,6 +229,8 @@ export function buildReport(runDir) {
     };
     const summary = json("k6-summary.json");
     const stats = read("docker-stats.csv");
+    const jvmCsv = read("jvm-memory.csv");
+    const jvm = jvmCsv === null ? null : jvmStats(jvmCsv);
     const outbound = read("outbound.txt");
     const { containers, total } = stats === null ? { containers: [], total: null } : containerStats(stats);
     const outboundLines = outbound === null ? null : outbound.split("\n").filter((line) => line.trim());
@@ -209,28 +247,46 @@ export function buildReport(runDir) {
         pages: pageTimings(json("pages.json")),
         containers,
         total,
-        sizing: sizing(total),
+        jvm: jvm?.apps.length ? jvm : null,
+        sizing: sizing(total, jvm?.apps.length ? jvm : null, containers),
         outbound: outboundLines === null ? null : { lines: outboundLines.length, first: outboundLines.slice(0, 20) },
     };
 }
 
-/** The latest sibling of `runDir` (by name) before it with a report.json; null if none. */
-export function findPrevious(runDir) {
+/**
+ * The run to compare `runDir` with, among its siblings before it (by name) with a report.json: the latest
+ * under the same load (`load`, as in load.json), else the latest with a load run, else the latest; null if
+ * none.
+ */
+export function findPrevious(runDir, load = null) {
     const parent = dirname(resolve(runDir));
     const self = basename(resolve(runDir));
     const earlier = readdirSync(parent, { withFileTypes: true })
         .filter((entry) => entry.isDirectory() && entry.name < self
             && existsSync(join(parent, entry.name, "report.json")))
         .map((entry) => entry.name)
-        .sort();
-    return earlier.length ? join(parent, earlier[earlier.length - 1]) : null;
+        .sort()
+        .reverse()
+        .map((name) => ({ dir: join(parent, name), report: readPreviousReport(join(parent, name)) }));
+    const shape = JSON.stringify(loadShape(load));
+    const found = earlier.find((run) => JSON.stringify(loadShape(run.report.load)) === shape)
+        ?? earlier.find((run) => run.report.requests)
+        ?? earlier[0];
+    return found ? found.dir : null;
+}
+
+/** `dir`'s report.json; an error that says so when there is none. */
+export function readPreviousReport(dir) {
+    const file = join(dir, "report.json");
+    if (!existsSync(file)) throw new Error(`${dir} has no report.json to compare with`);
+    return JSON.parse(readFileSync(file, "utf8"));
 }
 
 function delta(section, name, field, before, after) {
     if (typeof before !== "number" || typeof after !== "number") return null;
     return {
         section, name, field, before, after,
-        delta: round(after - before),
+        delta: round(after - before, field === "errorRate" ? 2 : 1),
         pct: before === 0 ? null : round(((after - before) / before) * 100),
     };
 }
@@ -259,6 +315,7 @@ export function compare(current, previous) {
             if (d) deltas.push(d);
         }
     }
+    pairs("jvm", (r) => r.jvm?.apps, (a) => a.name, ["heapPeakMiB", "nonHeapPeakMiB", "usedPeakMiB"]);
     const sameLoad = JSON.stringify(loadShape(current.load)) === JSON.stringify(loadShape(previous.load));
     return { run: previous.run, load: previous.load ?? null, sameLoad, deltas };
 }
@@ -269,7 +326,8 @@ const loadShape = (load) => (load ? { streamers: load.streamers, viewers: load.v
 const FIELD_LABELS = {
     p50: "p50 (ms)", p95: "p95 (ms)", errorRate: "errors (%)", cpuAvg: "avg CPU (%)", cpuPeak: "peak CPU (%)",
     cpuSustained: "sustained CPU (%)",
-    memAvgMiB: "avg RAM (MiB)", memPeakMiB: "peak RAM (MiB)",
+    memAvgMiB: "avg RSS (MiB)", memPeakMiB: "peak RSS (MiB)", heapPeakMiB: "peak used heap (MiB)",
+    nonHeapPeakMiB: "peak used non-heap (MiB)", usedPeakMiB: "peak used heap + non-heap (MiB)",
 };
 
 const show = (value, suffix = "") => (value === null || value === undefined ? "–" : `${value}${suffix}`);
@@ -292,7 +350,11 @@ export function renderMarkdown(report) {
     out.push("## Thresholds", "");
     if (report.thresholds.length) {
         out.push(table(["Metric", "Threshold", "Result"],
-            report.thresholds.map((t) => [`\`${t.metric}\``, `\`${t.expression}\``, t.ok ? "pass" : "**FAIL**"])));
+            report.thresholds.map((t) => [`\`${t.metric}\``, `\`${t.expression}\``, t.ok ? "pass" : "**FAIL**"])),
+            "",
+            "`ws_unexpected_close` counts the live streams (SSE, catapult has no WebSocket) closed or refused "
+            + "before the end of the run. The latency threshold is on `kind:request`, every request but those "
+            + "streams.");
     } else {
         out.push("No load run.");
     }
@@ -320,22 +382,38 @@ export function renderMarkdown(report) {
 
     if (report.containers.length) {
         out.push("## CPU and memory", "",
-            "CPU in % of one core (docker stats, every 5 s during the load run).", "",
-            table(["Container", "Samples", "Avg CPU", "Peak CPU", "Avg RAM", "Peak RAM"], [
+            "CPU in % of one core; RSS is the container's memory (docker stats, every 5 s during the load run), "
+            + "for a JVM the heap it has grown to rather than what it uses.", "",
+            table(["Container", "Samples", "Avg CPU", "Peak CPU", "Avg RSS", "Peak RSS"], [
                 ...report.containers.map((c) => [c.name, c.samples, show(c.cpuAvg, " %"), show(c.cpuPeak, " %"),
                     show(c.memAvgMiB, " MiB"), show(c.memPeakMiB, " MiB")]),
                 ["**stack**", "", show(report.total.cpuAvg, " %"), show(report.total.cpuPeak, " %"),
                     show(report.total.memAvgMiB, " MiB"), show(report.total.memPeakMiB, " MiB")],
             ]),
-            "",
-            "## Machine for this load", "",
+            "");
+        if (report.jvm) {
+            out.push("## JVM memory", "",
+                "Used memory from each app's actuator (`jvm_memory_used_bytes`, `jvm_memory_max_bytes`), "
+                + "every 5 s.", "",
+                table(["App", "Samples", "Peak used heap", "Peak used non-heap", "Peak used, both", "Max heap"], [
+                    ...report.jvm.apps.map((a) => [a.name, a.samples, show(a.heapPeakMiB, " MiB"),
+                        show(a.nonHeapPeakMiB, " MiB"), show(a.usedPeakMiB, " MiB"), show(a.heapMaxMiB, " MiB")]),
+                    ["**both**", "", "", "", show(report.jvm.usedPeakMiB, " MiB"), ""],
+                ]),
+                "");
+        }
+        const memory = report.sizing.memoryBasis === "jvm"
+            ? `${report.sizing.memoryMiB} MiB of memory at most (the JVMs' peak used heap and non-heap, `
+                + "plus the other containers' peak RSS)"
+            : `${report.sizing.memoryMiB} MiB of memory at most (peak RSS: the JVMs were not sampled, and their `
+                + "RSS is the heap they grew to, not what they need)";
+        out.push("## Machine for this load", "",
             `${report.load ? `For ${describeLoad(report.load)}: the` : "The"} whole stack used `
             + `${report.total.cpuSustained} % of a core (p95 of the samples after the first `
-            + `${WARMUP_SECONDS} s; ${report.total.cpuPeak} % at its peak, warm-up included) and `
-            + `${report.total.memPeakMiB} MiB at most. Keeping CPU under ${CPU_TARGET * 100} % and memory `
-            + `under ${MEMORY_TARGET * 100} % takes **${report.sizing.vcpus} vCPU and ${report.sizing.ramGiB} GiB `
-            + "of RAM** (the system's own needs aside). The JVMs' memory is mostly heap they keep once grown, sized from the host's RAM by default: "
-            + "a smaller machine with a capped heap (`-Xmx`) may do, which only a run on it can tell. "
+            + `${WARMUP_SECONDS} s; ${report.total.cpuPeak} % at its peak, warm-up included) and ${memory}. `
+            + `Keeping CPU under ${CPU_TARGET * 100} % and memory under ${MEMORY_TARGET * 100} % takes `
+            + `**${report.sizing.vcpus} vCPU and ${report.sizing.ramGiB} GiB of RAM** (the system's own needs `
+            + "aside), each JVM's heap capped (`-Xmx`) under what it leaves. "
             + "k6 ran on the same host, so it took CPU from the stack.",
             "");
     }
@@ -370,10 +448,14 @@ export function renderMarkdown(report) {
     return out.join("\n");
 }
 
-/** Writes report.json and report.md in `runDir`; returns the report. */
-export function writeReport(runDir, previousDir = findPrevious(runDir)) {
+/**
+ * Writes report.json and report.md in `runDir`, compared with `previousDir`'s report (found by findPrevious
+ * when undefined, none when null); returns the report.
+ */
+export function writeReport(runDir, previousDir) {
     const report = buildReport(runDir);
-    const previous = previousDir ? JSON.parse(readFileSync(join(previousDir, "report.json"), "utf8")) : null;
+    const dir = previousDir === undefined ? findPrevious(runDir, report.load) : previousDir;
+    const previous = dir ? readPreviousReport(dir) : null;
     report.previous = compare(report, previous);
     writeFileSync(join(runDir, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
     writeFileSync(join(runDir, "report.md"), renderMarkdown(report));
@@ -386,7 +468,13 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
         console.error("Usage: node perf/report.mjs <run dir> [<previous run dir>]");
         process.exit(2);
     }
-    const report = writeReport(runDir, previousDir ?? findPrevious(runDir));
+    let report;
+    try {
+        report = writeReport(runDir, previousDir);
+    } catch (e) {
+        console.error(`report.mjs: ${e.message}`);
+        process.exit(1);
+    }
     const failed = report.thresholds.filter((t) => !t.ok);
     console.log(`Wrote ${join(runDir, "report.md")}${report.previous ? ` (compared with ${report.previous.run})` : ""}`);
     if (failed.length) console.log(`Thresholds failed: ${failed.map((t) => `${t.metric} ${t.expression}`).join(", ")}`);
