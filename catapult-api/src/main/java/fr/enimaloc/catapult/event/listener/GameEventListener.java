@@ -2,7 +2,6 @@ package fr.enimaloc.catapult.event.listener;
 
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.account.UserSettings;
-import fr.enimaloc.catapult.domain.binding.CustomBindingActivation;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.event.GameDetectedEvent;
 import fr.enimaloc.catapult.event.NoGameDetectedEvent;
@@ -16,9 +15,12 @@ import fr.enimaloc.catapult.service.binding.RaidRestoreHold;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
 import fr.enimaloc.catapult.service.category.CategoryChain;
 import fr.enimaloc.catapult.service.category.CategoryOutcome;
+import fr.enimaloc.catapult.service.category.CategoryRule;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.GameClosed;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.GameDetected;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.NoGameAfterCustomBinding;
+import fr.enimaloc.catapult.service.category.CategoryTrigger.StreamEnded;
+import fr.enimaloc.catapult.service.category.CategoryTrigger.StreamStarted;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import fr.enimaloc.catapult.service.twitch.ChannelUpdateOutcome;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
@@ -138,26 +140,9 @@ public class GameEventListener {
     public void onStreamOnline(StreamOnlineEvent event) {
         UserAccount user = event.getUser();
         log.debug("StreamOnlineEvent for user {}", user.getId());
-        Optional<CustomBindingActivation> active = customBindingActivations.active(user);
-        if (active.isPresent()) {
-            // The prepared category wins over the default and the pending one; the pending one stays stored for
-            // when the binding is deactivated
-            log.debug("Custom binding {} active for user {} — re-applied at stream start",
-                active.get().getCustomBinding().getId(), user.getId());
-            twitchService.updateChannelReporting(user, active.get().getCustomBinding().toGameBinding(user));
-            return;
-        }
-        boolean applyDefault = userSettingsRepository.findById(user.getId())
-            .map(UserSettings::isApplyDefaultOnStreamStart)
-            .orElse(false);
-        if (applyDefault) {
-            twitchService.resetToDefault(user);
-            streamStateService.clearPending(user);
-            return;
-        }
-        Optional<GameBinding> pending = streamStateService.getPending(user);
-        if (pending.isPresent()) {
-            twitchService.updateChannelReporting(user, pending.get());
+        CategoryOutcome outcome = categoryChain.apply(user, new StreamStarted()).orThrow();
+        // A custom binding keeps the pending one stored for when it is deactivated
+        if (outcome.rule() != CategoryRule.CUSTOM_BINDING) {
             streamStateService.clearPending(user);
         }
     }
@@ -170,11 +155,7 @@ public class GameEventListener {
         customBindingActivations.clear(user);
         streamStateService.clearPending(user);
         raidRestoreHold.release(user);
-        userSettingsRepository.findById(user.getId()).ifPresent(settings -> {
-            if (settings.isApplyDefaultOnStreamEnd()) {
-                twitchService.resetToDefault(user);
-            }
-        });
+        categoryChain.apply(user, new StreamEnded()).orThrow();
     }
 
     /** The usual "no game" category after a custom binding ended, applied when live and enabled in the settings. */

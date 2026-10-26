@@ -19,4 +19,13 @@ public sealed interface CategoryTrigger {
 
     /** A custom binding ended with no game open: the usual "no game" category, the custom binding not read again. */
     record NoGameAfterCustomBinding() implements CategoryTrigger {}
+
+    /**
+     * {@code stream.online}: the active custom binding re-applied, else the default category when enabled, else the
+     * binding kept pending while offline.
+     */
+    record StreamStarted() implements CategoryTrigger {}
+
+    /** {@code stream.offline}: the default category when enabled; the custom binding is never read. */
+    record StreamEnded() implements CategoryTrigger {}
 }
