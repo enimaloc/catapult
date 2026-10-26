@@ -7,7 +7,8 @@ import org.springframework.context.ApplicationEvent;
 import java.util.List;
 
 /**
- * Published when a valid command is recognised in the Twitch chat.
+ * Published when a valid command is recognised in the Twitch chat. The chat command system is
+ * retired: this event has no consumer, and nothing answers it in chat.
  */
 @Getter
 public class ChatCommandEvent extends ApplicationEvent {
