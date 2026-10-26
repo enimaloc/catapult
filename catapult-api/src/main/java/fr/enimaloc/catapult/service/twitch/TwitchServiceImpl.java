@@ -80,7 +80,12 @@ public class TwitchServiceImpl implements TwitchService {
             oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
                 .map(token -> {
                         String accessToken = twitchTokenService.resolveAccessToken(token, user);
-                        patchChannel(user, accessToken, Map.of("game_id", twitchGameId));
+                        try {
+                            patchRefreshingTheToken(user, token, accessToken, Map.of("game_id", twitchGameId));
+                        } catch (TokenRefreshFailedException e) {
+                            // The bot is paused; the Twitchat action still fails (its transaction rolls back)
+                            throw e.getCause();
+                        }
                         log.info("Twitch category set for user {} — game_id={} ({})",
                             user.getId(), twitchGameId, twitchGameName);
                         // Same self-set marker as doUpdateChannel: without it the channel.update
@@ -119,6 +124,47 @@ public class TwitchServiceImpl implements TwitchService {
             .toBodilessEntity();
     }
 
+    /**
+     * {@link #patchChannel}, with an expired token refreshed and the PATCH retried once on a 401. When the refresh
+     * or the retry fails, the bot is paused and {@link TokenRefreshFailedException} thrown, carrying what failed;
+     * any other error is thrown as is.
+     */
+    private void patchRefreshingTheToken(UserAccount user, OAuthToken token, String accessToken,
+                                         Map<String, Object> body) {
+        try {
+            patchChannel(user, accessToken, body);
+        } catch (HttpClientErrorException e) {
+            if (e.getStatusCode() != HttpStatus.UNAUTHORIZED) throw e;
+            String refreshed = twitchTokenService.refreshAccessToken(token, user);
+            if (refreshed == null) {
+                log.warn("Twitch token invalid for user {} — pausing bot", user.getId());
+                botToggleService.setBotEnabled(user, false);
+                throw new TokenRefreshFailedException(e);
+            }
+            try {
+                patchChannel(user, refreshed, body);
+                log.info("Twitch channel patched for user {} after token refresh", user.getId());
+            } catch (RuntimeException retryEx) {
+                log.warn("Twitch channel update failed for user {} after token refresh — pausing bot: {}",
+                    user.getId(), retryEx.getMessage());
+                botToggleService.setBotEnabled(user, false);
+                throw new TokenRefreshFailedException(retryEx);
+            }
+        }
+    }
+
+    /** A 401 the token refresh did not get past: the bot is already paused. */
+    private static final class TokenRefreshFailedException extends RuntimeException {
+        TokenRefreshFailedException(RuntimeException cause) {
+            super(cause.getMessage(), cause, false, false);
+        }
+
+        @Override
+        public synchronized RuntimeException getCause() {
+            return (RuntimeException) super.getCause();
+        }
+    }
+
     private ChannelUpdateOutcome doUpdateChannel(UserAccount user, GameBinding binding, OAuthToken token) {
         String accessToken = twitchTokenService.resolveAccessToken(token, user);
 
@@ -134,33 +180,17 @@ public class TwitchServiceImpl implements TwitchService {
         }
 
         try {
-            patchChannel(user, accessToken, body);
+            patchRefreshingTheToken(user, token, accessToken, body);
             log.info("Twitch channel updated for user {} — game_id={}, ccls={}",
                 user.getId(), binding.getTwitchGameId(), binding.getCcls());
             // Marker only: the Twitchat notification is emitted once, from
             // TwitchEventSubService's channel.update handler, when Twitch confirms the change.
             categoryChangeStateService.recordCatapultChangeAndReturnPrevious(user, binding.getTwitchGameId());
             return ChannelUpdateOutcome.APPLIED;
+        } catch (TokenRefreshFailedException e) {
+            return ChannelUpdateOutcome.FAILED;
         } catch (HttpClientErrorException e) {
-            if (e.getStatusCode() == HttpStatus.UNAUTHORIZED) {
-                String refreshed = twitchTokenService.refreshAccessToken(token, user);
-                if (refreshed == null) {
-                    log.warn("Twitch token invalid for user {} — pausing bot", user.getId());
-                    botToggleService.setBotEnabled(user, false);
-                    return ChannelUpdateOutcome.FAILED;
-                }
-                try {
-                    patchChannel(user, refreshed, body);
-                    log.info("Twitch channel updated for user {} after token refresh — game_id={}",
-                        user.getId(), binding.getTwitchGameId());
-                    categoryChangeStateService.recordCatapultChangeAndReturnPrevious(user, binding.getTwitchGameId());
-                    return ChannelUpdateOutcome.APPLIED;
-                } catch (Exception retryEx) {
-                    log.warn("Twitch channel update failed for user {} after token refresh — pausing bot: {}", user.getId(), retryEx.getMessage());
-                    botToggleService.setBotEnabled(user, false);
-                    return ChannelUpdateOutcome.FAILED;
-                }
-            } else if (e.getStatusCode() == HttpStatus.TOO_MANY_REQUESTS) {
+            if (e.getStatusCode() == HttpStatus.TOO_MANY_REQUESTS) {
                 log.warn("Twitch rate limit hit for user {} — will retry next cycle", user.getId());
             } else {
                 log.error("Twitch API error for user {}: {} {}", user.getId(), e.getStatusCode(), e.getMessage());
@@ -290,41 +320,23 @@ public class TwitchServiceImpl implements TwitchService {
             body.put("content_classification_labels", buildCclPayload(settings.getNoGameCcls(), Set.of()));
         }
         try {
-            patchChannel(user, accessToken, body);
+            patchRefreshingTheToken(user, token, accessToken, body);
             log.info("Twitch channel reset to default for user {} — game_id={}, ccls={}",
                 user.getId(), settings.getNoGameTwitchGameId(), settings.getNoGameCcls());
             // The default category is Catapult's change, like any other: the channel.update it
             // triggers must not be reported to the streamer as a manual change.
             categoryChangeStateService.recordCatapultChangeAndReturnPrevious(user, settings.getNoGameTwitchGameId());
             return ChannelUpdateOutcome.APPLIED;
+        } catch (TokenRefreshFailedException e) {
+            return ChannelUpdateOutcome.FAILED;
         } catch (HttpClientErrorException e) {
-            if (e.getStatusCode() == HttpStatus.UNAUTHORIZED) {
-                String refreshed = twitchTokenService.refreshAccessToken(token, user);
-                if (refreshed == null) {
-                    log.warn("Twitch token invalid for user {} during reset — pausing bot", user.getId());
-                    botToggleService.setBotEnabled(user, false);
-                    return ChannelUpdateOutcome.FAILED;
-                }
-                try {
-                    patchChannel(user, refreshed, body);
-                    log.info("Twitch channel reset to default for user {} after token refresh — game_id={}",
-                        user.getId(), settings.getNoGameTwitchGameId());
-                    categoryChangeStateService.recordCatapultChangeAndReturnPrevious(user,
-                        settings.getNoGameTwitchGameId());
-                    return ChannelUpdateOutcome.APPLIED;
-                } catch (Exception retryEx) {
-                    log.warn("Twitch channel reset failed for user {} after token refresh — pausing bot: {}", user.getId(), retryEx.getMessage());
-                    botToggleService.setBotEnabled(user, false);
-                    return ChannelUpdateOutcome.FAILED;
-                }
-            } else if (e.getStatusCode() == HttpStatus.TOO_MANY_REQUESTS) {
+            if (e.getStatusCode() == HttpStatus.TOO_MANY_REQUESTS) {
                 log.warn("Twitch rate limit hit for user {} during reset — skipping", user.getId());
-                return ChannelUpdateOutcome.FAILED;
             } else {
                 log.error("Twitch API error during reset for user {}: {} {}",
                     user.getId(), e.getStatusCode(), e.getMessage());
-                return ChannelUpdateOutcome.FAILED;
             }
+            return ChannelUpdateOutcome.FAILED;
         } catch (Exception e) {
             log.error("Unexpected error resetting Twitch channel for user {}", user.getId(), e);
             return ChannelUpdateOutcome.FAILED;

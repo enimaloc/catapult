@@ -12,7 +12,11 @@ public interface TwitchService {
      * nothing to send, failed when the update was refused or could not be sent. Errors are still logged, not thrown.
      */
     ChannelUpdateOutcome updateChannelReporting(UserAccount user, GameBinding binding);
-    /** Sends a bare Twitch category: applied once patched, skipped when the bot is off, failed without a token. */
+    /**
+     * Sends a bare Twitch category: applied once patched, skipped when the bot is off, failed without a token. An
+     * expired token is refreshed and the PATCH retried once (the bot paused when that fails); any HTTP error that
+     * remains is thrown.
+     */
     ChannelUpdateOutcome setCategory(UserAccount user, String twitchGameId, String twitchGameName);
     Optional<String> findCategoryIdByName(UserAccount user, String gameName);
     List<TwitchCategory> searchCategories(UserAccount user, String query);
