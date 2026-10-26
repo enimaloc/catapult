@@ -47,7 +47,9 @@ class ControllerConventionsTest {
   @Test
   void controllersFollowTheConventions() throws Exception {
     Set<String> violations = new TreeSet<>();
-    for (Class<?> controller : controllers()) {
+    List<Class<?>> controllers = controllers();
+    assertThat(controllers).as("the scan finds the controllers").hasSizeGreaterThanOrEqualTo(60);
+    for (Class<?> controller : controllers) {
       violations.addAll(violations(controller, SOURCES));
     }
     assertThat(violations).isEmpty();
