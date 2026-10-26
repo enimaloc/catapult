@@ -4,12 +4,12 @@ import { join } from "node:path";
 import { measureNavigation, measureTab } from "./vitals";
 
 /**
- * Page timings under the perf profile (perf/run.sh --pages-only): 1 warm-up then 5 measured runs
+ * Page timings under the perf profile (perf/run.sh --pages-only): 1 warm-up then 20 measured runs
  * per page and tab, judged on the p95. Run by hand before a release, never in CI.
  */
 
 const WARM_UP = 1;
-const RUNS = 5;
+const RUNS = 20;
 const BUDGETS = { lcp: 2500, ttfb: 800, tab: 500, inp: 200 };
 
 interface Result {
@@ -19,6 +19,7 @@ interface Result {
   p50: number;
   p95: number;
   budget: number;
+  note?: string;
 }
 
 const resultsDir = process.env.PERF_RESULTS_DIR || join(__dirname, "..", "..", "perf-results");
@@ -40,6 +41,9 @@ function record(name: string, metric: string, samples: number[], budget: number)
     p95: round(percentile(samples, 95)),
     budget,
   };
+  if (metric === "inp" && samples.every((sample) => sample === 0)) {
+    result.note = "below the 16 ms Event Timing threshold: no entry reported, not a measured 0 ms";
+  }
   // Rewritten at each record: a failed test restarts the worker, which must not lose the earlier ones.
   const known: Result[] = existsSync(resultsFile) ? JSON.parse(readFileSync(resultsFile, "utf8")) : [];
   mkdirSync(resultsDir, { recursive: true });
@@ -74,6 +78,8 @@ async function openCustomBindingsExperiment() {
     const id = row?.slice(0, 36);
     expect(id, "custom.bindings experiment in the admin list").toBeTruthy();
     const detail = await (await api.get(`/spa/admin/experiments/${id}`)).text();
+    // Already open (the worker restarts after a failed test and runs this again): activating again answers 409.
+    if (/data-status="ACTIVE"/.test(detail)) return;
     const weights: Record<string, number> = {};
     for (const [, variant, key] of detail.matchAll(/data-variant="([0-9a-f-]{36})"[^>]*data-variant-key="([^"]+)"/g)) {
       weights[variant] = key === "control" ? 0 : 1;
@@ -118,7 +124,7 @@ function tabTest(user: string, name: string, pageUrl: string, tabs: string, tab:
     const inp: number[] = [];
     for (let i = 0; i < WARM_UP + RUNS; i++) {
       await page.goto(pageUrl, { waitUntil: "load" });
-      if ((await page.locator(tabSelector(tab)).count()) === 0) test.skip(true, `no ${tab} tab for ${user}`);
+      await expect(page.locator(tabSelector(tab)), `${tab} tab for ${user}`).toHaveCount(1);
       if (defaultTab) await measureTab(page, tabSelector(otherTab), panelSelector(otherTab));
       const timing = await measureTab(page, tabSelector(tab), panelSelector(tab));
       if (i >= WARM_UP) {
