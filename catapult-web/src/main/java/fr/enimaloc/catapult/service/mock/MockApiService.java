@@ -1409,8 +1409,7 @@ public class MockApiService implements ApiService {
         MockData current = currentData();
         if (current == null) return 401;
         if (!current.getChannelDto().twitchUsername().equals(username)) return 403;
-        current.requestAccountDeletion(confirmUsername);
-        return 204;
+        return current.requestAccountDeletion(confirmUsername) ? 204 : 400;
     }
 
     @Override

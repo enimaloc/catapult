@@ -477,11 +477,12 @@ public class MockData {
         return code.toString();
     }
 
-    /** Mirrors catapult-api: only the channel's own name (case-insensitive) starts the deletion, anything else is ignored. */
-    public void requestAccountDeletion(String confirmUsername) {
-        if (!channelDto.twitchUsername().equalsIgnoreCase(confirmUsername)) return;
+    /** Mirrors catapult-api: only the channel's own name (case-insensitive) starts the deletion; false otherwise. */
+    public boolean requestAccountDeletion(String confirmUsername) {
+        if (!channelDto.twitchUsername().equalsIgnoreCase(confirmUsername)) return false;
         accountStatus = "PENDING_DELETION";
         deletionRequestedAt = Instant.now();
+        return true;
     }
 
     public void cancelAccountDeletion() {

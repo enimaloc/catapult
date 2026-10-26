@@ -1,8 +1,8 @@
 /**
  * The Settings tab's danger zone (owners only). "Delete my account" opens a dialog emptied each
  * time; its confirm button stays disabled until the typed name equals the channel's, ignoring case
- * as catapult-api compares it (which answers 204 and does nothing on a mismatch, so this check is
- * all that keeps a typo from looking like a success). Confirm and "Cancel the deletion" post once
+ * as catapult-api compares it (which refuses a mismatch with a 400, shown as unavailable).
+ * Confirm and "Cancel the deletion" post once
  * (the button is disabled while the request runs), then re-render the channel page, which shows
  * the card's new state; a refusal or an outage is shown as a localized message (data-label-* on the
  * card). The card is replaced by each render: listeners go on its elements.

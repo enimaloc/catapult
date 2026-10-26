@@ -486,7 +486,7 @@ class ApiChannelActionsControllerTest extends ApiChannelActionsTestSupport {
         @Test
         void deletion_needsTheUsernameTyped_caseInsensitive() throws Exception {
             mvc.perform(as(owner, HttpMethod.POST, "/deletion", "{\"confirmUsername\":\"wrong\"}"))
-                    .andExpect(status().isNoContent());
+                    .andExpect(status().isBadRequest());
             verify(accountService, never()).initiateAccountDeletion(any());
 
             mvc.perform(as(owner, HttpMethod.POST, "/deletion", "{\"confirmUsername\":\"STREAMER\"}"))
