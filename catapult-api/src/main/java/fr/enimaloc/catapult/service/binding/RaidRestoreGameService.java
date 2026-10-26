@@ -10,6 +10,7 @@ import fr.enimaloc.catapult.service.category.CategoryDecision;
 import fr.enimaloc.catapult.service.category.CategoryOutcome;
 import fr.enimaloc.catapult.service.category.CategoryRule;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.RaidedOut;
+import fr.enimaloc.catapult.service.twitch.ChannelUpdateOutcome;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
@@ -20,7 +21,8 @@ import org.springframework.stereotype.Service;
  * leave from it. With the channel's {@link UserSettings#getRaidRestoreGameMinutes() delay} set (and the
  * {@value RaidRestoreGateService#EXPERIMENT_KEY} gate on), an outgoing raid puts the game detected within
  * that delay back (unless the channel is already on it), and the "no game" fallback then holds off until the
- * stream ends or a new game is detected ({@link RaidRestoreHold}), so a later detection doesn't undo it.
+ * stream ends or a new game is detected ({@link RaidRestoreHold}), so a later detection doesn't undo it. A restore
+ * Twitch did not apply (refused, skipped, or an error) releases the hold at once.
  */
 @Slf4j
 @Service
@@ -59,6 +61,12 @@ public class RaidRestoreGameService {
             raidRestoreHold.release(user);
             log.warn("Raid by user {}: could not put {} back: {}", user.getId(),
                     decision.binding().getTwitchGameName(), outcome.error().getMessage());
+        } else if (decision.action() == CategoryDecision.Action.UPDATE_CHANNEL
+                && outcome.status() != ChannelUpdateOutcome.APPLIED) {
+            // Twitch refused or skipped it: the game is not back, so the "no game" fallback must not stay off
+            raidRestoreHold.release(user);
+            log.info("Raid by user {}: {} not put back ({})", user.getId(),
+                    decision.binding().getTwitchGameName(), outcome.status());
         }
     }
 }

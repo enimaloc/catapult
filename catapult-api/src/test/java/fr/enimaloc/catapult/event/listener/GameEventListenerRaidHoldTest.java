@@ -21,6 +21,7 @@ import fr.enimaloc.catapult.service.binding.StreamStateService;
 import fr.enimaloc.catapult.service.category.CategoryApplier;
 import fr.enimaloc.catapult.service.category.CategoryChain;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
+import fr.enimaloc.catapult.service.twitch.ChannelUpdateOutcome;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -101,6 +102,8 @@ class GameEventListenerRaidHoldTest {
         doomBinding.setTwitchGameId(DOOM_ID);
         doomBinding.setStatus(GameBinding.Status.AUTO);
         when(bindingLookup.findByDetectedGame(user, doom)).thenReturn(Optional.of(doomBinding));
+        // Twitch accepts the restore (a restore it does not apply releases the hold)
+        lenient().when(twitchService.updateChannelReporting(user, doomBinding)).thenReturn(ChannelUpdateOutcome.APPLIED);
     }
 
     private static GameBinding noGameFallback() {

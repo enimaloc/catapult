@@ -9,6 +9,7 @@ import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
 import fr.enimaloc.catapult.service.category.CategoryApplier;
 import fr.enimaloc.catapult.service.category.CategoryChain;
+import fr.enimaloc.catapult.service.twitch.ChannelUpdateOutcome;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -75,6 +76,7 @@ class RaidRestoreGameServiceTest {
         binding.setTwitchGameName("DOOM");
         binding.setStatus(GameBinding.Status.AUTO);
         lenient().when(bindingLookup.findByDetectedGame(user, doom)).thenReturn(Optional.of(binding));
+        lenient().when(twitchService.updateChannelReporting(user, binding)).thenReturn(ChannelUpdateOutcome.APPLIED);
     }
 
     private void raid(String currentCategoryId) {
@@ -170,6 +172,24 @@ class RaidRestoreGameServiceTest {
     @Test
     void aFailedRestoreReleasesTheHold() {
         doThrow(new IllegalStateException("Twitch down")).when(twitchService).updateChannelReporting(user, binding);
+
+        raid("509658");
+
+        assertThat(hold.isHolding(user)).isFalse();
+    }
+
+    @Test
+    void aRestoreTwitchRefusedReleasesTheHold() {
+        when(twitchService.updateChannelReporting(user, binding)).thenReturn(ChannelUpdateOutcome.FAILED);
+
+        raid("509658");
+
+        assertThat(hold.isHolding(user)).isFalse();
+    }
+
+    @Test
+    void aRestoreTwitchSkippedReleasesTheHold() {
+        when(twitchService.updateChannelReporting(user, binding)).thenReturn(ChannelUpdateOutcome.SKIPPED);
 
         raid("509658");
 
