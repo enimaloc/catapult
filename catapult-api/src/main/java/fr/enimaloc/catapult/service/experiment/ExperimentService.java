@@ -73,6 +73,12 @@ public class ExperimentService {
         return Optional.of(persistAssignment(weightedRandom(experiment.getVariants(), user, experimentKey), user, experiment));
     }
 
+    /** The key of {@link #getVariant}'s variant, read inside its transaction (the variant may be a lazy proxy). */
+    @Transactional
+    public Optional<String> getVariantKey(UserAccount user, String experimentKey) {
+        return getVariant(user, experimentKey).map(ExperimentVariant::getKey);
+    }
+
     @Transactional
     public void track(UserAccount user, String experimentKey, String eventKey) {
         Optional<Experiment> opt = experimentRepository.findByKey(experimentKey);
