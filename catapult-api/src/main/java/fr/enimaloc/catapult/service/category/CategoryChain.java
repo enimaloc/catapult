@@ -12,6 +12,8 @@ import fr.enimaloc.catapult.service.category.CategoryOutcome.Reason;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.GameClosed;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.GameDetected;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.NoGameAfterCustomBinding;
+import fr.enimaloc.catapult.service.category.CategoryTrigger.StreamEnded;
+import fr.enimaloc.catapult.service.category.CategoryTrigger.StreamStarted;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -61,6 +63,8 @@ public class CategoryChain {
             case GameDetected detected -> gameBinding(user, detected.binding(), true);
             case GameClosed closed -> gameClosed(user);
             case NoGameAfterCustomBinding after -> noGameFallback(user);
+            case StreamStarted started -> streamStarted(user);
+            case StreamEnded ended -> streamEnded(user);
         };
     }
 
@@ -77,6 +81,36 @@ public class CategoryChain {
             return DetectionGuard.KEEPS_CUSTOM_BINDING;
         }
         return DetectionGuard.INTERRUPTS_CUSTOM_BINDING;
+    }
+
+    private CategoryDecision streamStarted(UserAccount user) {
+        Optional<CustomBindingActivation> active = customBindingActivations.active(user);
+        if (active.isPresent()) {
+            // The prepared category wins over the default and the pending one; the pending one stays stored for
+            // when the binding is deactivated
+            log.debug("Custom binding {} active for user {} — re-applied at stream start",
+                    active.get().getCustomBinding().getId(), user.getId());
+            return CategoryDecision.update(CategoryRule.CUSTOM_BINDING,
+                    active.get().getCustomBinding().toGameBinding(user));
+        }
+        boolean applyDefault = userSettingsRepository.findById(user.getId())
+                .map(UserSettings::isApplyDefaultOnStreamStart)
+                .orElse(false);
+        if (applyDefault) {
+            return CategoryDecision.reset(CategoryRule.DEFAULT_CATEGORY);
+        }
+        return streamStateService.getPending(user)
+                .map(pending -> CategoryDecision.update(CategoryRule.PENDING, pending))
+                .orElseGet(() -> CategoryDecision.none(CategoryRule.PENDING, Reason.NOTHING_PENDING));
+    }
+
+    private CategoryDecision streamEnded(UserAccount user) {
+        boolean applyDefault = userSettingsRepository.findById(user.getId())
+                .map(UserSettings::isApplyDefaultOnStreamEnd)
+                .orElse(false);
+        return applyDefault
+                ? CategoryDecision.reset(CategoryRule.DEFAULT_CATEGORY)
+                : CategoryDecision.none(CategoryRule.DEFAULT_CATEGORY, Reason.DEFAULT_OFF);
     }
 
     private CategoryDecision gameClosed(UserAccount user) {

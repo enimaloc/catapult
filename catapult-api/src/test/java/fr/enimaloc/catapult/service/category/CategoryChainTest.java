@@ -15,6 +15,8 @@ import fr.enimaloc.catapult.service.category.CategoryOutcome.Reason;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.GameClosed;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.GameDetected;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.NoGameAfterCustomBinding;
+import fr.enimaloc.catapult.service.category.CategoryTrigger.StreamEnded;
+import fr.enimaloc.catapult.service.category.CategoryTrigger.StreamStarted;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -27,6 +29,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -83,6 +86,8 @@ class CategoryChainTest {
         custom.setId(UUID.randomUUID());
         custom.setUser(user);
         custom.setName("Art");
+        custom.setTwitchGameId("509660");
+        custom.setTwitchGameName("Art");
         custom.setUninterruptible(uninterruptible);
         when(activations.active(user))
                 .thenReturn(Optional.of(new CustomBindingActivation(user.getId(), custom, Instant.EPOCH)));
@@ -312,6 +317,103 @@ class CategoryChainTest {
 
         assertThat(chain.apply(user, new GameDetected(binding))).isSameAs(applied);
         verify(applier).apply(user, CategoryDecision.update(CategoryRule.GAME_BINDING, binding));
+    }
+
+    // ---- StreamStarted ----
+
+    @Test
+    void streamStarted_customBinding() {
+        activeCustom(false);
+
+        CategoryDecision decision = chain.decide(user, new StreamStarted());
+
+        assertThat(decision.action()).isEqualTo(Action.UPDATE_CHANNEL);
+        assertThat(decision.rule()).isEqualTo(CategoryRule.CUSTOM_BINDING);
+        assertThat(decision.binding().getSourceName()).isEqualTo("custom:Art");
+        assertThat(decision.binding().getTwitchGameId()).isEqualTo("509660");
+        assertThat(decision.binding().getUser()).isSameAs(user);
+        verifyNoInteractions(settingsRepository, streamStateService);
+    }
+
+    @Test
+    void streamStarted_default() {
+        when(activations.active(user)).thenReturn(Optional.empty());
+        settings.setApplyDefaultOnStreamStart(true);
+        withSettings();
+
+        assertThat(chain.decide(user, new StreamStarted()))
+                .isEqualTo(CategoryDecision.reset(CategoryRule.DEFAULT_CATEGORY));
+        verify(streamStateService, never()).getPending(user);
+    }
+
+    @Test
+    void streamStarted_pending() {
+        settings.setApplyDefaultOnStreamStart(false);
+        when(activations.active(user)).thenReturn(Optional.empty());
+        withSettings();
+        when(streamStateService.getPending(user)).thenReturn(Optional.of(binding));
+
+        assertThat(chain.decide(user, new StreamStarted()))
+                .isEqualTo(CategoryDecision.update(CategoryRule.PENDING, binding));
+    }
+
+    @Test
+    void streamStarted_noSettings_stillUsesThePending() {
+        when(activations.active(user)).thenReturn(Optional.empty());
+        when(settingsRepository.findById(user.getId())).thenReturn(Optional.empty());
+        when(streamStateService.getPending(user)).thenReturn(Optional.of(binding));
+
+        assertThat(chain.decide(user, new StreamStarted()))
+                .isEqualTo(CategoryDecision.update(CategoryRule.PENDING, binding));
+    }
+
+    @Test
+    void streamStarted_nothing() {
+        settings.setApplyDefaultOnStreamStart(false);
+        when(activations.active(user)).thenReturn(Optional.empty());
+        withSettings();
+        when(streamStateService.getPending(user)).thenReturn(Optional.empty());
+
+        assertThat(chain.decide(user, new StreamStarted()))
+                .isEqualTo(CategoryDecision.none(CategoryRule.PENDING, Reason.NOTHING_PENDING));
+    }
+
+    // ---- StreamEnded ----
+
+    @Test
+    void streamEnded_default() {
+        settings.setApplyDefaultOnStreamEnd(true);
+        withSettings();
+
+        assertThat(chain.decide(user, new StreamEnded()))
+                .isEqualTo(CategoryDecision.reset(CategoryRule.DEFAULT_CATEGORY));
+    }
+
+    @Test
+    void streamEnded_off() {
+        settings.setApplyDefaultOnStreamEnd(false);
+        withSettings();
+
+        assertThat(chain.decide(user, new StreamEnded()))
+                .isEqualTo(CategoryDecision.none(CategoryRule.DEFAULT_CATEGORY, Reason.DEFAULT_OFF));
+    }
+
+    @Test
+    void streamEnded_noSettings() {
+        when(settingsRepository.findById(user.getId())).thenReturn(Optional.empty());
+
+        assertThat(chain.decide(user, new StreamEnded()))
+                .isEqualTo(CategoryDecision.none(CategoryRule.DEFAULT_CATEGORY, Reason.DEFAULT_OFF));
+    }
+
+    @Test
+    void streamEnded_neverReadsTheCustomBinding() {
+        settings.setApplyDefaultOnStreamEnd(true);
+        withSettings();
+
+        chain.decide(user, new StreamEnded());
+
+        verifyNoInteractions(activations);
     }
 
     // ---- detectionGuard ----
