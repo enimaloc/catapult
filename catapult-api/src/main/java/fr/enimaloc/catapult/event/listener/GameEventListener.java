@@ -11,9 +11,14 @@ import fr.enimaloc.catapult.event.StreamOnlineEvent;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
 import fr.enimaloc.catapult.service.binding.BindingService;
-import fr.enimaloc.catapult.service.binding.RaidRestoreGameService;
 import fr.enimaloc.catapult.service.binding.CustomBindingActivations;
+import fr.enimaloc.catapult.service.binding.RaidRestoreHold;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
+import fr.enimaloc.catapult.service.category.CategoryChain;
+import fr.enimaloc.catapult.service.category.CategoryOutcome;
+import fr.enimaloc.catapult.service.category.CategoryTrigger.GameClosed;
+import fr.enimaloc.catapult.service.category.CategoryTrigger.GameDetected;
+import fr.enimaloc.catapult.service.category.CategoryTrigger.NoGameAfterCustomBinding;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import fr.enimaloc.catapult.service.twitch.ChannelUpdateOutcome;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
@@ -34,20 +39,18 @@ public class GameEventListener {
     private final UserSettingsRepository userSettingsRepository;
     private final StreamStateService streamStateService;
     private final ChannelEventPublisher channelEventPublisher;
-    private final RaidRestoreGameService raidRestoreGameService;
+    private final RaidRestoreHold raidRestoreHold;
     private final CustomBindingActivations customBindingActivations;
+    private final CategoryChain categoryChain;
 
     @EventListener
     public void onGameDetected(GameDetectedEvent event) {
         UserAccount user = event.getUser();
         log.debug("GameDetectedEvent for user {}: {}", user.getId(), event.getDetectedGame().getSourceName());
         // A new game: a raid's restored game no longer has to be kept
-        raidRestoreGameService.releaseHold(user);
-        Optional<CustomBindingActivation> active = customBindingActivations.active(user);
-        if (active.isPresent()) {
-            // The first detection since catapult-api started follows an unknown state (the game state is kept in
-            // memory), not a game launch: the game may well have been open since before the activation
-            if (active.get().getCustomBinding().isUninterruptible() || event.isFirstSinceStart()) {
+        raidRestoreHold.release(user);
+        switch (categoryChain.detectionGuard(user, event.isFirstSinceStart())) {
+            case KEEPS_CUSTOM_BINDING -> {
                 // Ignored: the game's binding is created or refreshed for the channel page, the channel left alone
                 GameBinding binding = bindingService.resolveOrCreate(user, event.getDetectedGame());
                 channelEventPublisher.bindingUpserted(user.getId(), binding);
@@ -55,11 +58,13 @@ public class GameEventListener {
                     event.isFirstSinceStart() ? "first detection since start" : "uninterruptible");
                 return;
             }
-            // Any detection after the activation interrupts an interruptible binding, the same game relaunched too
-            log.debug("Detection interrupts the custom binding of user {}", user.getId());
-            customBindingActivations.clear(user);
+            case INTERRUPTS_CUSTOM_BINDING -> {
+                log.debug("Detection interrupts the custom binding of user {}", user.getId());
+                customBindingActivations.clear(user);
+            }
+            case NO_CUSTOM_BINDING -> { }
         }
-        applyDetectedGame(user, event.getDetectedGame());
+        applyDetectedGame(user, event.getDetectedGame()).orThrow();
     }
 
     /**
@@ -67,27 +72,18 @@ public class GameEventListener {
      * applied when live, stored pending otherwise. Also the path a custom binding's deactivation takes, so the game
      * open at that moment takes over exactly as if it had just been detected.
      */
-    public void applyDetectedGame(UserAccount user, DetectedGame game) {
+    public CategoryOutcome applyDetectedGame(UserAccount user, DetectedGame game) {
         GameBinding binding = bindingService.resolveOrCreate(user, game);
         // resolveOrCreate may have just inserted a new row (new game ever detected
         // for this user) or refreshed an INCOMPLETE one. Either way the channel
         // page needs to see it — ApiChannelActionsController only publishes for
         // user-initiated mutations, not for scheduler-triggered creations.
         channelEventPublisher.bindingUpserted(user.getId(), binding);
-        applyBinding(user, binding);
+        return categoryChain.apply(user, new GameDetected(binding));
     }
 
     /**
-     * Puts the binding of the game the user plays on their channel, as a detection does: the no-game fallback when
-     * it is ignored, the incomplete fallback when it is INCOMPLETE, else the binding itself, or kept pending until
-     * the stream starts.
-     */
-    public void applyBinding(UserAccount user, GameBinding binding) {
-        apply(user, binding, true, updateChannel(user));
-    }
-
-    /**
-     * {@link #applyBinding} for a live channel only, when an admin game mapping changed its binding: nothing is
+     * A detection's binding rules for a live channel only, when an admin game mapping changed its binding: nothing is
      * done, and nothing kept pending, once the stream is offline.
      *
      * @return applied when Twitch took the change, failed when it did not, skipped when there was nothing to send
@@ -100,14 +96,6 @@ public class GameEventListener {
             return ChannelUpdateOutcome.SKIPPED;
         }
         return apply(user, binding, false, b -> twitchService.updateChannelReporting(user, b));
-    }
-
-    /** The detection's own push: {@link TwitchService#updateChannelReporting}, whose outcome nobody reads. */
-    private Function<GameBinding, ChannelUpdateOutcome> updateChannel(UserAccount user) {
-        return b -> {
-            twitchService.updateChannelReporting(user, b);
-            return ChannelUpdateOutcome.APPLIED;
-        };
     }
 
     /** {@code push} sends a binding to the user's channel and tells what happened. */
@@ -143,12 +131,7 @@ public class GameEventListener {
         UserAccount user = event.getUser();
         log.debug("NoGameDetectedEvent for user {}", user.getId());
         streamStateService.clearPending(user);
-        if (customBindingActivations.active(user).isPresent()) {
-            // Closing the game never interrupts a custom binding, and the "no game" category would overwrite it
-            log.debug("Custom binding active for user {} — skipping no-game fallback", user.getId());
-            return;
-        }
-        applyNoGameFallback(user, updateChannel(user));
+        categoryChain.apply(user, new GameClosed()).orThrow();
     }
 
     @EventListener
@@ -186,7 +169,7 @@ public class GameEventListener {
         // A custom binding, interruptible or not, ends with the stream; then the usual end of stream
         customBindingActivations.clear(user);
         streamStateService.clearPending(user);
-        raidRestoreGameService.releaseHold(user);
+        raidRestoreHold.release(user);
         userSettingsRepository.findById(user.getId()).ifPresent(settings -> {
             if (settings.isApplyDefaultOnStreamEnd()) {
                 twitchService.resetToDefault(user);
@@ -194,9 +177,9 @@ public class GameEventListener {
         });
     }
 
-    /** The usual "no game" category, applied when live and enabled in the streamer's settings. */
-    public void applyNoGameFallback(UserAccount user) {
-        applyNoGameFallback(user, updateChannel(user));
+    /** The usual "no game" category after a custom binding ended, applied when live and enabled in the settings. */
+    public CategoryOutcome applyNoGameFallback(UserAccount user) {
+        return categoryChain.apply(user, new NoGameAfterCustomBinding());
     }
 
     private ChannelUpdateOutcome applyNoGameFallback(UserAccount user,
@@ -205,7 +188,7 @@ public class GameEventListener {
             log.debug("User {} not live — skipping no-game fallback", user.getId());
             return ChannelUpdateOutcome.SKIPPED;
         }
-        if (raidRestoreGameService.isHoldingNoGameFallback(user)) {
+        if (raidRestoreHold.isHolding(user)) {
             log.debug("User {} raided out with their last game put back — skipping no-game fallback", user.getId());
             return ChannelUpdateOutcome.SKIPPED;
         }
@@ -227,7 +210,7 @@ public class GameEventListener {
         fallbackBinding.setTwitchGameName(settings.getNoGameTwitchGameName());
         fallbackBinding.setStatus(GameBinding.Status.MANUAL);
         // Checked again right before the PATCH: a raid may have taken the hold since the check above
-        if (raidRestoreGameService.isHoldingNoGameFallback(user)) {
+        if (raidRestoreHold.isHolding(user)) {
             log.debug("User {} raided out meanwhile — skipping no-game fallback", user.getId());
             return ChannelUpdateOutcome.SKIPPED;
         }

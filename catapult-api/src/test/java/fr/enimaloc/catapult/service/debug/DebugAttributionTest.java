@@ -35,6 +35,7 @@ import fr.enimaloc.catapult.service.binding.BindingService;
 import fr.enimaloc.catapult.service.binding.GameBindingLookup;
 import fr.enimaloc.catapult.service.binding.GameStateService;
 import fr.enimaloc.catapult.service.binding.RaidRestoreGameService;
+import fr.enimaloc.catapult.service.binding.RaidRestoreHold;
 import fr.enimaloc.catapult.service.binding.RaidRestoreGateService;
 import fr.enimaloc.catapult.service.binding.SchedulerService;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
@@ -416,7 +417,7 @@ class DebugAttributionTest {
         });
         RaidRestoreGameService service = new RaidRestoreGameService(settings, mock(RaidRestoreGateService.class),
                 mock(GameStateService.class), mock(BindingService.class), mock(TwitchService.class),
-                mock(CustomBindingActivations.class));
+                mock(CustomBindingActivations.class), new RaidRestoreHold());
 
         service.onRaidedOut(new ChannelRaidedOutEvent(this, user, "509658"));
 

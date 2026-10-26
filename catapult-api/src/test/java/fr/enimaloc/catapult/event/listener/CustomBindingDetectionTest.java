@@ -3,7 +3,9 @@ package fr.enimaloc.catapult.event.listener;
 import static org.assertj.core.api.Assertions.assertThat;
 import fr.enimaloc.catapult.service.twitch.ChannelUpdateOutcome;
 import fr.enimaloc.catapult.repository.binding.GameMappingRepository;
-import fr.enimaloc.catapult.service.binding.RaidRestoreGameService;
+import fr.enimaloc.catapult.service.binding.RaidRestoreHold;
+import fr.enimaloc.catapult.service.category.CategoryApplier;
+import fr.enimaloc.catapult.service.category.CategoryChain;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.account.UserSettings;
 import fr.enimaloc.catapult.domain.binding.CustomBinding;
@@ -112,8 +114,11 @@ class CustomBindingDetectionTest {
 
         when(experimentService.evaluateGate(user, CustomBindingService.EXPERIMENT_KEY)).thenReturn(true);
         activations = new CustomBindingActivations(activationRepository, experimentService, channelEventPublisher);
+        RaidRestoreHold hold = mock(RaidRestoreHold.class);
+        CategoryChain chain = new CategoryChain(activations, streamStateService, userSettingsRepository, hold,
+                new CategoryApplier(twitchService, streamStateService));
         listener = new GameEventListener(bindingService, twitchService, userSettingsRepository,
-                streamStateService, channelEventPublisher, mock(RaidRestoreGameService.class), activations);
+                streamStateService, channelEventPublisher, hold, activations, chain);
     }
 
     private void activate(boolean uninterruptible) {
