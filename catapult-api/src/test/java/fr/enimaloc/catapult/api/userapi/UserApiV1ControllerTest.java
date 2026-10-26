@@ -12,6 +12,7 @@ import fr.enimaloc.catapult.service.igdb.IgdbGameDetailsService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.steam.SteamStoreService;
 import fr.enimaloc.catapult.service.tw.TwLabelService;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.thymeleaf.autoconfigure.ThymeleafAutoConfiguration;
@@ -252,5 +253,28 @@ class UserApiV1ControllerTest {
         mvc.perform(get("/api/game/{uuid}", token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.version").value(1));
+    }
+
+    /** An IGDB game without a slug has no IGDB page: null, not a link ending at /games/. */
+    @Disabled("fixed in Task 2")
+    @Test
+    void gameInfo_blankSlug_hasNullIgdbUrl() throws Exception {
+        UUID token = UUID.randomUUID();
+        UserAccount user = new UserAccount();
+        user.setId(UUID.randomUUID());
+        IgdbGameDetails details = new IgdbGameDetails();
+        details.setIgdbId("1234");
+        details.setSlug("");
+        when(widgetTokenService.resolve(token)).thenReturn(Optional.of(user));
+        when(gameStateService.getLastKnownGame(user))
+                .thenReturn(Optional.of(new DetectedGame("440", GameBinding.SourceType.STEAM, "Team Fortress 2")));
+        when(igdbService.findByExternalAppId(GameBinding.SourceType.STEAM, "440"))
+                .thenReturn(Optional.of(new IgdbService.IgdbGame("1234", "Team Fortress 2")));
+        when(igdbGameDetailsService.getDetails("1234")).thenReturn(Optional.of(details));
+
+        mvc.perform(get("/api/game/{uuid}", token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.igdbUrl").exists())
+                .andExpect(jsonPath("$.igdbUrl").value(org.hamcrest.Matchers.nullValue()));
     }
 }
