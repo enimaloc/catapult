@@ -145,7 +145,8 @@ public class DebugCommand implements ChatCommand {
      * + {@code IOAccess.NONE}). This is only safe because {@link #isOwnerOnly()} is checked by
      * {@link fr.enimaloc.catapult.chat.CommandRegistry#dispatch} (against the app's own Twitch
      * id, not a role/permission tier) before {@link #execute} is ever called — nobody else can
-     * reach this method.
+     * reach this method. The chat command system is retired: nothing dispatches from chat any
+     * more, so this is unreachable until the command is removed.
      */
     private Object executeRawJs(String code) {
         if (code.isBlank()) {

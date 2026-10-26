@@ -183,6 +183,7 @@ public class IrcTwitchChatService implements TwitchChatService {
         String command = "!" + parts[0];
         List<String> args = parts.length > 1 ? List.of(parts[1].split(" ")) : List.of();
 
+        // The chat command system is retired: no listener consumes this event any more.
         eventPublisher.publishEvent(
             new ChatCommandEvent(this, user, command, args, extractRole(tags), extractSenderId(tags)));
     }

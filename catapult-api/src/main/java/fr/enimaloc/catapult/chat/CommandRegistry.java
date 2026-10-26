@@ -19,6 +19,10 @@ import java.util.stream.Collectors;
  * Central registry of the available chat commands.
  * Every ChatCommand implementation is auto-discovered by Spring.
  * Static commands take priority over dynamic (data-driven) ones.
+ * <p>
+ * The chat command system is retired: no listener consumes {@link ChatCommandEvent} any more, so
+ * nothing calls {@link #dispatch} from chat. It is kept for the editor's test route until the
+ * system is removed.
  */
 @Slf4j
 @Component
