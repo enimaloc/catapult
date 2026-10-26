@@ -425,8 +425,12 @@ class EnglishConventionsTest {
         }
     }
 
+    /** The boundary inside a camelCase name, so a test name such as {@code retourneVideSiAbsent} reads as words. */
+    private static final Pattern SPLIT_CAMEL = Pattern.compile("(?<=\\p{Ll})(?=\\p{Lu})");
+
     private static void add(List<Hit> hits, String path, Kind kind, int line, String text) {
-        boolean french = kind == Kind.LITERAL ? looksFrench(text) : looksFrenchProse(text);
+        String words = kind == Kind.TEST_NAME ? SPLIT_CAMEL.matcher(text).replaceAll(" ").replace('_', ' ') : text;
+        boolean french = kind == Kind.LITERAL ? looksFrench(text) : looksFrenchProse(words);
         if (french) {
             hits.add(new Hit(path, kind, line, text.strip().replaceAll("\\s+", " ")));
         }
