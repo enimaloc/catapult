@@ -21,7 +21,6 @@ import fr.enimaloc.catapult.service.steam.SteamStoreService;
 import fr.enimaloc.catapult.service.tw.TwLabelService;
 import fr.enimaloc.catapult.service.xbox.XboxStoreService;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -655,16 +654,12 @@ class UserApiV2ControllerTest {
 
         // ---- Task 5: the summary's name, release date and trigger warnings ----
 
-        @Disabled("fixed in Task 5")
-
         @Test
         void summaryNameFallsBackToTheDetectedName() throws Exception {
             manualGameWithIgdb(details("valheim"));
 
             mvc.perform(get("/api/user/summary/{uuid}", token)).andExpect(jsonPath("$.name").value("Valheim"));
         }
-
-        @Disabled("fixed in Task 5")
 
         @Test
         void summaryReleaseDateFallsBackToIgdb() throws Exception {
@@ -677,8 +672,6 @@ class UserApiV2ControllerTest {
                     .andExpect(jsonPath("$.releaseDate.releaseDate").value("2021-02-02T00:00:00Z"))
                     .andExpect(jsonPath("$.releaseDate.comingSoon").value(false));
         }
-
-        @Disabled("fixed in Task 5")
 
         @Test
         void summaryTwsAreLabelsOnceEachInOrder() throws Exception {
@@ -697,6 +690,36 @@ class UserApiV2ControllerTest {
 
             mvc.perform(get("/api/user/summary/{uuid}", token))
                     .andExpect(jsonPath("$.tws").value("flashing-label, gore-label"));
+        }
+
+        @Test
+        void summaryOfAnIgdbOnlyGameWithoutSummaryIsNotAnError() throws Exception {
+            playing(GameBinding.SourceType.MANUAL, "m1", "Valheim");
+            when(igdbService.findByName("Valheim")).thenReturn(Optional.of(new IgdbService.IgdbGame("42", "Valheim")));
+            when(igdbGameDetailsService.getDetails("42")).thenReturn(Optional.of(details("valheim")));
+
+            mvc.perform(get("/api/user/summary/{uuid}", token))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$").value(hasKey("description")))
+                    .andExpect(jsonPath("$.description").value(nullValue()));
+        }
+
+        @Test
+        void igdbAndCatapultObjectsKeepTheirMembers() throws Exception {
+            steamGameWithIgdb(details("valheim"));
+            GameBinding binding = new GameBinding();
+            binding.setId(UUID.randomUUID());
+            binding.setTws(Set.of("flashing"));
+            when(gameBindingRepository.findByUserAndSourceIdAndSourceType(user, "892970", GameBinding.SourceType.STEAM))
+                    .thenReturn(Optional.of(binding));
+
+            String body = mvc.perform(get("/api/user/game/{uuid}", token)).andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+            var tree = JSON.readTree(body);
+            assertEquals(List.of("igdbId", "slug", "summary", "coverUrl", "genres", "more", "url"),
+                    List.copyOf(tree.get("igdb").propertyNames()));
+            assertEquals(List.of("bindingId", "createdAt", "tws", "ccls", "more"),
+                    List.copyOf(tree.get("catapult").propertyNames()));
         }
 
         @Test
