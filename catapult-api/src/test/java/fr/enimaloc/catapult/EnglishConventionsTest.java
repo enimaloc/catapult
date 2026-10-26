@@ -136,6 +136,7 @@ class EnglishConventionsTest {
             API + "chat/command/DebugCommand.java LITERAL",
             API + "chat/command/registry/catapult/CatapultSetParamFunction.java COMMENT",
             API + "config/MockWebConfig.java COMMENT",
+            API + "domain/minecraft/MinecraftFriendLink.java COMMENT",
             API + "event/ChatCommandDefinitionChangedEvent.java COMMENT",
             API + "event/GameDetectedEvent.java COMMENT",
             API + "event/NoGameDetectedEvent.java COMMENT",
@@ -154,6 +155,7 @@ class EnglishConventionsTest {
             API + "getter/steam/SteamRateLimiter.java LITERAL",
             API + "monitoring/CatapultGauges.java LITERAL",
             API + "repository/igdb/IgdbGameExternalIdRepository.java COMMENT",
+            API + "security/ApiSecurityConfig.java COMMENT",
             API + "security/CatapultOAuth2User.java COMMENT",
             API + "security/CatapultOAuth2UserService.java COMMENT",
             API + "security/TokenEncryptionService.java COMMENT",
@@ -176,6 +178,7 @@ class EnglishConventionsTest {
             API + "service/twitch/SystemTwitchAccountService.java COMMENT",
             "catapult-api/src/main/resources/application-mock-web.properties COMMENT",
             "catapult-api/src/main/resources/application.properties COMMENT",
+            API_TEST + "api/chatcommand/ApiChatCommandsControllerTest.java COMMENT",
             API_TEST + "chat/PlaceholderResolverTest.java COMMENT",
             API_TEST + "event/listener/MetricsEventListenerTest.java COMMENT",
             API_TEST + "getter/MinecraftPresenceGetterTest.java COMMENT",
@@ -192,6 +195,14 @@ class EnglishConventionsTest {
     private static final Path ROOT = Path.of("..");
     private static final String SELF = "catapult-api/src/test/java/fr/enimaloc/catapult/EnglishConventionsTest.java";
     private static final List<String> MODULES = List.of("catapult-api", "catapult-common", "catapult-web");
+    /** Fewer files than this under a prefix means a tree went missing, not that it got English. */
+    private static final Map<String, Integer> MIN_FILES = Map.of(
+            "catapult-api/", 900,
+            "catapult-common/", 150,
+            "catapult-web/", 400,
+            "catapult-web/src/main/resources/static/js/", 40,
+            "catapult-web/src/test/js/", 40,
+            "catapult-web/src/main/resources/templates/", 30);
 
     // ---------------------------------------------------------------------------------------------- detector
 
@@ -229,7 +240,7 @@ class EnglishConventionsTest {
     /**
      * Whether a text reads as French: an accented word English does not borrow, a word of {@link #FRENCH_WORDS}, two
      * distinct function words, or one function word and an elision such as {@code l'}. URLs and code-like chunks
-     * (dotted, snake_case, camelCase, calls) are not prose and are skipped.
+     * (dotted, snake_case, camelCase, calls) are not prose and are skipped; an all-caps function word is an acronym.
      */
     static boolean looksFrench(String text) {
         String prose = URL.matcher(text).replaceAll(" ");
@@ -250,12 +261,52 @@ class EnglishConventionsTest {
                 if (FRENCH_WORDS.contains(lower)) {
                     return true;
                 }
-                if (FRENCH_FUNCTION_WORDS.contains(lower)) {
+                if (FRENCH_FUNCTION_WORDS.contains(lower) && !ALL_CAPS.matcher(word).matches()) {
                     functionWords.add(lower);
                 }
             }
         }
         return functionWords.size() >= 2 || (!functionWords.isEmpty() && ELISION.matcher(prose).find());
+    }
+
+    /**
+     * Function words no English prose uses: in a comment, a log or a test name one is enough. {@code la, du, de, et,
+     * ou, sur, pas, que, un, en, a} stay out ("a la carte", "Smith et al.", "en route"), and an all-caps word
+     * ({@code DES}, {@code EST}, {@code AUX}) is an acronym, not French.
+     */
+    private static final Set<String> FRENCH_PROSE_WORDS = Set.of(
+            "le", "les", "des", "une", "avec", "sans", "dans", "pour", "est", "sont", "aux", "cette", "ces", "ce",
+            "cet", "leur", "leurs", "chaque", "depuis", "lorsque", "quand", "parce", "alors", "donc", "mais", "ainsi",
+            "afin", "sinon", "tant", "lors", "selon", "sous", "puis");
+    /** Verbs that open French comments ("Retourne null", "Vérifie le token"), unaccented spellings included. */
+    private static final Set<String> FRENCH_PROSE_VERBS = Set.of(
+            "retourne", "renvoie", "verifie", "cree", "recupere", "supprime", "ajoute", "permet", "evite",
+            "utilise", "gere", "declenche", "enregistre", "lance", "construit", "calcule", "affiche", "doit");
+    private static final Pattern ALL_CAPS = Pattern.compile("\\p{Lu}{2,}");
+
+    /**
+     * Whether a comment, a log or a test name reads as French: {@link #looksFrench}, or one word of
+     * {@link #FRENCH_PROSE_WORDS} or {@link #FRENCH_PROSE_VERBS}. Literals keep the stricter rule, since they are
+     * often data.
+     */
+    static boolean looksFrenchProse(String text) {
+        if (looksFrench(text)) {
+            return true;
+        }
+        for (String chunk : URL.matcher(text).replaceAll(" ").split("\\s+")) {
+            String bare = EDGES.matcher(chunk).replaceAll("");
+            if (bare.isEmpty() || CODE_CHUNK.matcher(bare).find() || bare.equalsIgnoreCase("sans-serif")) {
+                continue;
+            }
+            for (String word : WORD_SEPARATOR.split(bare)) {
+                String lower = word.toLowerCase(Locale.ROOT);
+                if (!ALL_CAPS.matcher(word).matches()
+                        && (FRENCH_PROSE_WORDS.contains(lower) || FRENCH_PROSE_VERBS.contains(lower))) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private static final Pattern IDENTIFIER_PART = Pattern.compile("\\p{Lu}?\\p{Ll}+|\\p{Lu}+(?!\\p{Ll})");
@@ -288,8 +339,13 @@ class EnglishConventionsTest {
             assertThat(repoRoot.resolve(module)).as("module %s from %s", module, repoRoot.toAbsolutePath())
                     .isDirectory();
         }
+        List<Path> files = sources(repoRoot);
+        MIN_FILES.forEach((prefix, floor) -> assertThat(files.stream()
+                        .filter(f -> repoRoot.relativize(f).toString().replace('\\', '/').startsWith(prefix)))
+                .as("files scanned under %s", prefix)
+                .hasSizeGreaterThanOrEqualTo(floor));
         List<Hit> hits = new ArrayList<>();
-        for (Path file : sources(repoRoot)) {
+        for (Path file : files) {
             String path = repoRoot.relativize(file).toString().replace('\\', '/');
             if (path.equals(SELF)) {
                 continue;
@@ -441,7 +497,8 @@ class EnglishConventionsTest {
     }
 
     private static void add(List<Hit> hits, String path, Kind kind, int line, String text) {
-        if (looksFrench(text)) {
+        boolean french = kind == Kind.LITERAL ? looksFrench(text) : looksFrenchProse(text);
+        if (french) {
             hits.add(new Hit(path, kind, line, text.strip().replaceAll("\\s+", " ")));
         }
     }
@@ -763,6 +820,38 @@ class EnglishConventionsTest {
         assertThat(looksFrench(text)).isFalse();
     }
 
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                "Ignore le header Authorization",
+                "UUID Mojang (format avec tirets).",
+                "\"Revenir aux Blocs/Texte\" sends a request",
+                "Utilise un cache",
+                "Ce champ",
+                "Gere les erreurs",
+                "Retourne null",
+                "Verifie le token",
+                "Charge la config pour chaque user"
+            })
+    void oneFrenchWordIsEnoughInProse(String text) {
+        assertThat(looksFrenchProse(text)).isTrue();
+    }
+
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                "a la carte",
+                "Smith et al. describe it",
+                "en route to the API",
+                "the DES key, EST and AUX",
+                "a sans-serif font",
+                "de-duplicate the list",
+                "Check if a user is the owner or not"
+            })
+    void englishProsePasses(String text) {
+        assertThat(looksFrenchProse(text)).isFalse();
+    }
+
     @Test
     void frenchIdentifiersAreSplitOnCamelCaseAndUnderscores() {
         assertThat(frenchIdentifierWord("BACKDOOR_MASK_PREMIER_ENTIER")).isEqualTo("premier");
@@ -822,6 +911,11 @@ class EnglishConventionsTest {
                 .map(hit -> hit.path() + ":" + hit.line() + " " + hit.kind() + " " + shorten(hit.text()))
                 .toList();
         assertThat(unexpected).as("French in the sources (translate it)").isEmpty();
+    }
+
+    @Test
+    void keptAndLegacyAreDisjoint() {
+        assertThat(LEGACY).as("keys both kept and legacy").doesNotContainAnyElementsOf(KEPT.keySet());
     }
 
     @Test
