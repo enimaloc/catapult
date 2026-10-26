@@ -11,10 +11,10 @@ import org.springframework.stereotype.Service;
 import java.util.UUID;
 
 /**
- * Décision centralisée de disponibilité de la feature Minecraft pour un
- * utilisateur : configuration valide ET experiment {@value #EXPERIMENT_KEY}.
- * Volontairement non conditionnel : il doit répondre « indisponible » même
- * quand {@code minecraft.enabled=false} (l'aide en dépend).
+ * Central decision on whether the Minecraft feature is available to a
+ * user: valid configuration AND experiment {@value #EXPERIMENT_KEY}.
+ * Deliberately unconditional: it must answer "unavailable" even
+ * when {@code minecraft.enabled=false} (the help depends on it).
  */
 @Slf4j
 @Service
@@ -40,7 +40,7 @@ public class MinecraftGateService {
     @PostConstruct
     void warnIfMisconfigured() {
         if (minecraftEnabled && (msaClientId == null || msaClientId.isBlank())) {
-            log.warn("minecraft.enabled=true mais minecraft.msa-client-id est vide : la feature Minecraft restera masquée");
+            log.warn("minecraft.enabled=true but minecraft.msa-client-id is empty: the Minecraft feature will stay hidden");
         }
     }
 
@@ -48,17 +48,17 @@ public class MinecraftGateService {
         return minecraftEnabled && msaClientId != null && !msaClientId.isBlank();
     }
 
-    /** Chemins user-facing : déclenche l'assignation à l'experiment (visite de page). */
+    /** User-facing paths: triggers the assignment to the experiment (page visit). */
     public boolean isAvailableFor(UserAccount user) {
         return isConfigured() && experimentService.evaluateGate(user, EXPERIMENT_KEY);
     }
 
-    /** Comme {@link #isAvailableFor(UserAccount)} pour le compte {@code userId} ; un compte inconnu donne false. */
+    /** Like {@link #isAvailableFor(UserAccount)} for the account {@code userId}; an unknown account gives false. */
     public boolean isAvailableForAccount(UUID userId) {
         return userAccountRepository.findById(userId).map(this::isAvailableFor).orElse(false);
     }
 
-    /** Chemins background (scheduler/getter) : lecture seule, aucune assignation. */
+    /** Background paths (scheduler/getter): read-only, no assignment. */
     public boolean isAvailableReadOnly(UserAccount user) {
         return isConfigured() && experimentService.isRolledOut(user, EXPERIMENT_KEY);
     }

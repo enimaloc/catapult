@@ -26,7 +26,7 @@ public class MinecraftConnectService {
     private final MinecraftLinkStateService linkStates;
     private final ChannelEventPublisher channelEventPublisher;
 
-    /** Vérification immédiate : force la sync des liens puis retourne l'état à jour. */
+    /** Immediate check: forces the links sync, then returns the up-to-date state. */
     public LinkStateResponse sync(UUID caller) {
         UserAccount user = gatedUser(caller);
         friendService.syncFriendLinks();
@@ -40,7 +40,7 @@ public class MinecraftConnectService {
     }
 
     public LinkStateResponse enroll(UUID caller, String rawName) {
-        UserAccount user = gatedUser(caller); // le gate prime sur la validation métier (403 avant 400)
+        UserAccount user = gatedUser(caller); // the gate comes before the business validation (403 before 400)
         String name = rawName == null ? null : rawName.trim();
         if (name == null || name.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A Minecraft username is required");

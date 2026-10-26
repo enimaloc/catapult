@@ -30,7 +30,7 @@ public class ApiAdminMinecraftAccountsController {
         return ResponseEntity.ok(accounts.startDeviceCode());
     }
 
-    /** 202 tant que l'admin n'a pas validé le code sur microsoft.com/link ; 200 + compte créé ensuite. */
+    /** 202 while the admin hasn't validated the code on microsoft.com/link; 200 + the created account afterwards. */
     @PostMapping
     public ResponseEntity<?> create(@RequestBody Map<String, String> body) {
         return accounts.create(body.get("deviceCode"), body.getOrDefault("label", "Compte Minecraft"))

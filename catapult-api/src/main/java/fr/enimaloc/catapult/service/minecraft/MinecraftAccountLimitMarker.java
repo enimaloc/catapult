@@ -11,9 +11,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 
 /**
- * Persiste le flag « limite d'amis atteinte » dans une transaction indépendante :
- * le rollback d'un enroll qui échoue (NO_CAPACITY) ne doit pas effacer la découverte
- * des comptes pleins, sinon ils seraient retentés à chaque enrôlement.
+ * Persists the "friend limit reached" flag in an independent transaction:
+ * the rollback of a failing enroll (NO_CAPACITY) must not erase the discovery
+ * of full accounts, or they would be retried on every enrolment.
  */
 @Component
 @RequiredArgsConstructor
