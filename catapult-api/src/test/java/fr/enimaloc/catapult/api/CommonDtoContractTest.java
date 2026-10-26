@@ -81,10 +81,11 @@ class CommonDtoContractTest {
                 List.of(member), org.springframework.data.domain.PageRequest.of(0, 50), 1));
         when(streams.isLive(member)).thenReturn(true);
         when(environment.getActiveProfiles()).thenReturn(new String[0]);
-        ApiAdminMembersController controller = new ApiAdminMembersController(accounts, streams,
-                mock(AccountService.class), mock(BotToggleService.class), mock(AdminMigrationService.class),
-                environment, mock(UserFlagRepository.class), mock(UserGroupRepository.class),
-                mock(fr.enimaloc.catapult.service.debug.MemberDebugService.class));
+        ApiAdminMembersController controller = new ApiAdminMembersController(
+                new fr.enimaloc.catapult.service.account.AdminMemberService(accounts, streams,
+                        mock(AccountService.class), mock(BotToggleService.class), mock(AdminMigrationService.class),
+                        environment, mock(UserFlagRepository.class), mock(UserGroupRepository.class),
+                        mock(fr.enimaloc.catapult.service.debug.MemberDebugService.class)));
 
         AdminMembersPage produced = controller.page(0, null);
         String json = JSON.writeValueAsString(produced);
@@ -191,7 +192,12 @@ class CommonDtoContractTest {
         when(flags.findDistinctKeyValues()).thenReturn(List.of(
                 new Object[] {"beta", "on"}, new Object[] {"tester", null}));
 
-        List<FlagKeyDto> produced = new ApiAdminFlagsController(flags).list();
+        List<FlagKeyDto> produced = new ApiAdminFlagsController(
+                new fr.enimaloc.catapult.service.account.AdminMemberService(mock(UserAccountRepository.class),
+                        mock(StreamStateService.class), mock(AccountService.class), mock(BotToggleService.class),
+                        mock(AdminMigrationService.class), mock(Environment.class), flags,
+                        mock(UserGroupRepository.class),
+                        mock(fr.enimaloc.catapult.service.debug.MemberDebugService.class))).list();
 
         assertThat(JSON.readValue(JSON.writeValueAsString(produced), new TypeReference<List<FlagKeyDto>>() {}))
                 .containsExactly(new FlagKeyDto("beta", List.of("on")), new FlagKeyDto("tester", List.of()));

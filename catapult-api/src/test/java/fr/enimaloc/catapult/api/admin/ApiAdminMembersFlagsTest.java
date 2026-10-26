@@ -7,6 +7,7 @@ import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.account.UserFlagRepository;
 import fr.enimaloc.catapult.repository.account.UserGroupRepository;
 import fr.enimaloc.catapult.service.account.AccountService;
+import fr.enimaloc.catapult.service.account.AdminMemberService;
 import fr.enimaloc.catapult.service.account.AdminMigrationService;
 import fr.enimaloc.catapult.service.account.BotToggleService;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
@@ -16,6 +17,7 @@ import org.springframework.boot.thymeleaf.autoconfigure.ThymeleafAutoConfigurati
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -41,6 +43,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         controllers = ApiAdminMembersController.class,
         excludeAutoConfiguration = ThymeleafAutoConfiguration.class,
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
+@Import(AdminMemberService.class)
 class ApiAdminMembersFlagsTest {
 
     @Autowired MockMvc mvc;
@@ -101,6 +104,34 @@ class ApiAdminMembersFlagsTest {
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"key\":\"tier\",\"value\":\"vip\"}"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void setFlag_unknownMemberWithoutKey_is404() throws Exception {
+        UUID userId = UUID.randomUUID();
+        when(userAccountRepository.findById(userId)).thenReturn(Optional.empty());
+
+        mvc.perform(post("/api/internal/admin/members/" + userId + "/flags")
+                        .with(adminJwt())
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"value\":\"vip\"}"))
+                .andExpect(status().isNotFound());
+    }
+
+    /** No target and nothing chosen: each would be a 400, the unknown source wins. */
+    @Test
+    void migrate_unknownSourceWithAnEmptyBody_is404() throws Exception {
+        UUID userId = UUID.randomUUID();
+        when(userAccountRepository.findById(userId)).thenReturn(Optional.empty());
+
+        mvc.perform(post("/api/internal/admin/members/" + userId + "/migrate")
+                        .with(adminJwt())
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"targetId\":null,\"migrateSettings\":false,"
+                                + "\"migrateGetters\":false,\"migrateBindings\":false}"))
                 .andExpect(status().isNotFound());
     }
 

@@ -12,6 +12,7 @@ import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.experiment.ExperimentAssignmentRepository;
 import fr.enimaloc.catapult.repository.experiment.ExperimentRepository;
 import fr.enimaloc.catapult.security.JwtService;
+import fr.enimaloc.catapult.service.access.InviteService;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -21,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Import;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * On the whole application, the routes whose answer reads a lazy association: the read must stay inside the
@@ -43,6 +45,9 @@ class ControllerBoundariesTest extends FullContextTestBase {
 
     @Autowired
     JwtService jwtService;
+
+    @Autowired
+    InviteService inviteService;
 
     private static ExperimentVariant variant(Experiment experiment, String key, boolean control, int internalId) {
         ExperimentVariant variant = new ExperimentVariant();
@@ -86,5 +91,20 @@ class ControllerBoundariesTest extends FullContextTestBase {
 
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(response.body()).isEqualTo("{\"variant\":\"treatment\"}");
+    }
+
+    @Test
+    void whitelistPage_namesEachInviteOwner() throws Exception {
+        UserAccount owner = new UserAccount();
+        owner.setTwitchId("boundaries-invite-owner");
+        owner.setTwitchUsername("boundaries-inviter");
+        owner = users.save(owner);
+        inviteService.grantInvite(owner);
+
+        HttpResponse<String> response = get(port, "/api/internal/admin/whitelist");
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(JsonMapper.builder().build().readTree(response.body())
+                .path("invites").path(0).path("ownerUsername").asString()).isEqualTo("boundaries-inviter");
     }
 }

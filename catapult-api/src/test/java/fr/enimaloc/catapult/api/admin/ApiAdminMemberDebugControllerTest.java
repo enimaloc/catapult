@@ -8,6 +8,7 @@ import fr.enimaloc.catapult.common.dto.admin.MemberDebugStateDto;
 import fr.enimaloc.catapult.domain.debug.DebugExchange;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.debug.DebugExchangeRepository;
+import fr.enimaloc.catapult.service.debug.MemberDebugAdmin;
 import fr.enimaloc.catapult.service.debug.MemberDebugService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -53,7 +54,7 @@ class ApiAdminMemberDebugControllerTest {
 
     @BeforeEach
     void setUp() {
-        controller = new ApiAdminMemberDebugController(service, exchangeRepo, users);
+        controller = new ApiAdminMemberDebugController(new MemberDebugAdmin(service, exchangeRepo, users));
         when(users.existsById(any())).thenReturn(true);
     }
 
