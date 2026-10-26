@@ -606,8 +606,6 @@ class UserApiV2ControllerTest {
 
         // ---- Task 3: a Steam link needs an app id ----
 
-        @Disabled("fixed in Task 3")
-
         @Test
         void igdbSteamWebsiteGivenAsAStoreUrlKeepsOneStoreLink() throws Exception {
             igdbWith(Map.of("steam", "https://store.steampowered.com/app/892970/Valheim/"));
@@ -616,8 +614,6 @@ class UserApiV2ControllerTest {
                     .andExpect(jsonPath("$.websites.steam.url").value(STEAM_APP + "892970"))
                     .andExpect(jsonPath("$.websites.steam.more").value(BASE + "/steam/892970"));
         }
-
-        @Disabled("fixed in Task 3")
 
         @Test
         void igdbSteamWebsiteWithoutAnAppIdHasNoDetailRoute() throws Exception {
@@ -628,8 +624,6 @@ class UserApiV2ControllerTest {
                     .andExpect(jsonPath("$.websites.steam").value(hasKey("more")))
                     .andExpect(jsonPath("$.websites.steam.more").value(nullValue()));
         }
-
-        @Disabled("fixed in Task 3")
 
         @Test
         void steamFullGameWithoutAnAppIdHasNoMoreLink() throws Exception {

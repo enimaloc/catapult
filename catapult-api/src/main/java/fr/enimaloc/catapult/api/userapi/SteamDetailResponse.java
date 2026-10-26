@@ -60,7 +60,7 @@ public record SteamDetailResponse(String storeUrl, Set<String> ccls, GameInfoRes
         public record FullGame(@JsonIgnore String baseUrl, @JsonUnwrapped SteamStoreService.SteamStorePage.FullGame fullGame) {
             @JsonGetter
             public String more() {
-                return baseUrl + ApiV2.PATH + "/steam/" + fullGame.appid();
+                return fullGame.appid() == null ? null : baseUrl + ApiV2.PATH + "/steam/" + fullGame.appid();
             }
         }
 

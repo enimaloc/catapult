@@ -3,6 +3,8 @@ package fr.enimaloc.catapult.service.link;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
+import java.util.Optional;
+
 import org.junit.jupiter.api.Test;
 
 class ExternalLinksTest {
@@ -38,5 +40,16 @@ class ExternalLinksTest {
     @Test
     void youtubeVideoIsTheWatchPage() {
         assertEquals("https://www.youtube.com/watch?v=abc", ExternalLinks.youtubeVideo("abc"));
+    }
+
+    @Test
+    void steamAppIdIsReadFromAnIdOrAStoreUrl() {
+        assertEquals(Optional.of("440"), ExternalLinks.steamAppId("440"));
+        assertEquals(Optional.of("440"),
+                ExternalLinks.steamAppId("https://store.steampowered.com/app/440/Team_Fortress_2/"));
+        assertEquals(Optional.of("440"), ExternalLinks.steamAppId("http://store.steampowered.com/app/440"));
+        assertEquals(Optional.empty(), ExternalLinks.steamAppId("https://example.com/app/440"));
+        assertEquals(Optional.empty(), ExternalLinks.steamAppId("abc"));
+        assertEquals(Optional.empty(), ExternalLinks.steamAppId(""));
     }
 }
