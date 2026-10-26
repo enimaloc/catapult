@@ -221,16 +221,35 @@ run_pages() {
     return "${status}"
 }
 
-# CPU and memory of the stack's containers every 5 s, as "time,container,cpu,memory" lines, until killed.
+# CPU and memory of the stack's containers every 5 s, as "time,container,cpu,memory" lines in $1, and the
+# JVMs' own memory as "time,app,heapUsed,nonHeapUsed,heapMax" lines (bytes) in $2, until killed.
 sample_stats() {
     local ids
     mapfile -t ids < <("${COMPOSE[@]}" ps -q)
-    echo "time,container,cpu,memory"
+    # docker stats without ids samples every container of the machine, the user's included
+    if [[ "${#ids[@]}" == 0 || -z "${ids[0]}" ]]; then
+        echo "WARNING: no ${PROJECT} container to sample" >&2
+        return 0
+    fi
+    echo "time,container,cpu,memory" >"$1"
+    echo "time,app,heapUsed,nonHeapUsed,heapMax" >"$2"
     while :; do
         docker stats --no-stream --format '{{.Name}},{{.CPUPerc}},{{.MemUsage}}' "${ids[@]}" \
-            | sed "s/^/$(date +%s),/" || true
+            | sed "s/^/$(date +%s),/" >>"$1" || true
+        jvm_memory api 8090 >>"$2" || true
+        jvm_memory web 8092 >>"$2" || true
         sleep 5
     done
+}
+
+# One line of $1's JVM memory, from its actuator's Prometheus metrics on management port $2: the sums of
+# jvm_memory_used_bytes over the heap and the non-heap pools, and of the heap pools' jvm_memory_max_bytes.
+jvm_memory() {
+    "${COMPOSE[@]}" exec -T "$1" wget -q -T 4 -O- "http://localhost:$2/actuator/prometheus" 2>/dev/null \
+        | awk -v time="$(date +%s)" -v app="$1" '
+            /^jvm_memory_used_bytes\{/ { if ($0 ~ /area="heap"/) heap += $NF; else nonheap += $NF }
+            /^jvm_memory_max_bytes\{/ && /area="heap"/ && $NF > 0 { max += $NF }
+            END { if (heap + nonheap > 0) printf "%s,%s,%.0f,%.0f,%.0f\n", time, app, heap, nonheap, max }'
 }
 
 stop_stats() {
@@ -242,13 +261,13 @@ stop_stats() {
 }
 
 # Load (k6, perf/k6/evening.js) on perf-internal, with docker stats sampled meanwhile: writes
-# ${REPORT_DIR}/load.json, k6-summary.json and docker-stats.csv. A failed threshold fails the run, after
+# ${REPORT_DIR}/load.json, k6-summary.json, docker-stats.csv and jvm-memory.csv. A failed threshold fails the run, after
 # the report is written.
 run_load() {
     echo "Load: ${STREAMERS} streamers, ${VIEWERS} viewers, ${DURATION} (${K6_IMAGE})"
     printf '{"streamers": %s, "viewers": %s, "duration": "%s", "k6Image": "%s"}\n' \
         "${STREAMERS}" "${VIEWERS}" "${DURATION}" "${K6_IMAGE}" >"${REPORT_DIR}/load.json"
-    sample_stats >"${REPORT_DIR}/docker-stats.csv" 2>/dev/null &
+    sample_stats "${REPORT_DIR}/docker-stats.csv" "${REPORT_DIR}/jvm-memory.csv" &
     stats_pid=$!
     local status=0
     run docker run --rm --name "${K6_CONTAINER}" --network "${PROJECT}_perf-internal" \

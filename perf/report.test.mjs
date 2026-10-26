@@ -1,13 +1,13 @@
 // node --test perf/report.test.mjs
 import assert from "node:assert/strict";
-import { cpSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, describe, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import {
-    compare, containerStats, findPrevious, parseMemory, parsePercent, renderMarkdown, requestGroups, sizing,
-    thresholds, writeReport,
+    compare, containerStats, findPrevious, jvmStats, parseMemory, parsePercent, readPreviousReport, renderMarkdown,
+    requestGroups, sizing, thresholds, writeReport,
 } from "./report.mjs";
 
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), "fixtures", "reports");
@@ -80,10 +80,33 @@ describe("containerStats", () => {
     });
 });
 
-test("sizing keeps the sustained CPU under 70 % and the peak memory under 75 %", () => {
-    assert.deepEqual(sizing({ cpuSustained: 70, memPeakMiB: 2304 }), { vcpus: 1, ramGiB: 3 });
-    assert.deepEqual(sizing({ cpuSustained: 250, cpuPeak: 900, memPeakMiB: 4000 }), { vcpus: 4, ramGiB: 6 });
-    assert.equal(sizing(null), null);
+test("jvmStats gives each app's peak used heap and non-heap, and the apps' peak used sum", () => {
+    const csv = readFileSync(join(FIXTURES, CURRENT, "jvm-memory.csv"), "utf8");
+    assert.deepEqual(jvmStats(csv), {
+        apps: [
+            { name: "api", samples: 2, heapPeakMiB: 300, nonHeapPeakMiB: 100, usedPeakMiB: 400, heapMaxMiB: 1024 },
+            { name: "web", samples: 2, heapPeakMiB: 100, nonHeapPeakMiB: 60, usedPeakMiB: 150, heapMaxMiB: 1024 },
+        ],
+        usedPeakMiB: 510,
+    });
+    assert.deepEqual(jvmStats("time,app,heapUsed,nonHeapUsed,heapMax\n"), { apps: [], usedPeakMiB: null });
+});
+
+describe("sizing", () => {
+    test("keeps the sustained CPU under 70 % and the peak RSS under 75 % without JVM figures", () => {
+        assert.deepEqual(sizing({ cpuSustained: 70, memPeakMiB: 2304 }),
+            { vcpus: 1, ramGiB: 3, memoryMiB: 2304, memoryBasis: "rss" });
+        assert.deepEqual(sizing({ cpuSustained: 250, cpuPeak: 900, memPeakMiB: 4000 }),
+            { vcpus: 4, ramGiB: 6, memoryMiB: 4000, memoryBasis: "rss" });
+        assert.equal(sizing(null), null);
+    });
+
+    test("counts the JVMs' used memory instead of their RSS, and the other containers' RSS", () => {
+        const jvm = { apps: [{ name: "api" }], usedPeakMiB: 1000 };
+        const containers = [{ name: "api", memPeakMiB: 3000 }, { name: "db", memPeakMiB: 536 }];
+        assert.deepEqual(sizing({ cpuSustained: 70, memPeakMiB: 5000 }, jvm, containers),
+            { vcpus: 1, ramGiB: 2, memoryMiB: 1536, memoryBasis: "jvm" });
+    });
 });
 
 describe("k6 summary", () => {
@@ -91,7 +114,7 @@ describe("k6 summary", () => {
 
     test("thresholds are read, a true value being a failure; the group submetrics are left out", () => {
         assert.deepEqual(thresholds(summary), [
-            { metric: "http_req_duration", expression: "p(95)<500", ok: true },
+            { metric: "http_req_duration{kind:request}", expression: "p(95)<500", ok: true },
             { metric: "http_req_failed", expression: "rate<0.01", ok: true },
             { metric: "ws_unexpected_close", expression: "count==0", ok: false },
         ]);
@@ -115,6 +138,27 @@ describe("findPrevious", () => {
         const dir = runs(CURRENT, LATER);
         assert.equal(findPrevious(join(dir, CURRENT)), null);
     });
+
+    test("prefers the same load, then a run with a load run, then the latest", () => {
+        const dir = runs(PREVIOUS, CURRENT);
+        const earlier = (name, report) => {
+            mkdirSync(join(dir, name));
+            writeFileSync(join(dir, name, "report.json"), JSON.stringify({ run: name, ...report }));
+        };
+        earlier("20260101-100000", { load: { streamers: 100, viewers: 1000, duration: "30m" }, requests: {} });
+        earlier("20260101-200000", { load: null, requests: null });
+        const current = join(dir, CURRENT);
+        assert.equal(findPrevious(current, { streamers: 10, viewers: 100, duration: "2m", k6Image: "x" }),
+            join(dir, PREVIOUS));
+        assert.equal(findPrevious(current, { streamers: 5, viewers: 5, duration: "1m" }), join(dir, "20260101-100000"));
+        assert.equal(findPrevious(current, null), join(dir, "20260101-200000"));
+    });
+
+    test("a previous run without a report.json says so", () => {
+        const dir = runs(CURRENT);
+        assert.throws(() => readPreviousReport(join(dir, "nowhere")), /nowhere has no report\.json to compare with/);
+        assert.throws(() => writeReport(join(dir, CURRENT), join(dir, "nowhere")), /has no report\.json/);
+    });
 });
 
 describe("compare", () => {
@@ -128,7 +172,7 @@ describe("compare", () => {
         assert.deepEqual(find("requests", "widget", "p95"),
             { section: "requests", name: "widget", field: "p95", before: 25, after: 30.1, delta: 5.1, pct: 20.4 });
         assert.deepEqual(find("requests", "widget", "errorRate"),
-            { section: "requests", name: "widget", field: "errorRate", before: 0, after: 0.25, delta: 0.3, pct: null });
+            { section: "requests", name: "widget", field: "errorRate", before: 0, after: 0.25, delta: 0.25, pct: null });
         assert.equal(find("pages", "home (ttfb)", "p95").pct, -12.5);
         assert.equal(find("containers", "api", "cpuAvg").pct, 50);
         assert.equal(find("containers", "total", "cpuPeak").delta, 10);
@@ -160,11 +204,14 @@ describe("writeReport", () => {
         assert.match(markdown, /\| `ws_unexpected_close` \| `count==0` \| \*\*FAIL\*\* \|/);
         assert.match(markdown, /\| widget \| 800 \| 12\.3 \| 30\.1 \| 2 \(0\.25 %\) \|/);
         assert.match(markdown, /\| channel \| lcp \| 3000 \| 3000 \| 2500 \| \*\*FAIL\*\* \(slow\) \|/);
-        assert.match(markdown, /\*\*1 vCPU and 3 GiB of RAM\*\*/);
+        assert.match(markdown, /\*\*1 vCPU and 1 GiB of RAM\*\*/);
+        assert.match(markdown, /510 MiB of memory at most \(the JVMs' peak used heap and non-heap/);
+        assert.match(markdown, /\| api \| 2 \| 300 MiB \| 100 MiB \| 400 MiB \| 1024 MiB \|/);
+        assert.match(markdown, /`ws_unexpected_close` counts the live streams \(SSE/);
         assert.match(markdown, /## Outbound traffic\n\n1 line\(s\)[^\n]*\n\n```\napi-1 {2}\| java\.net\.UnknownHostException/);
         assert.match(markdown, /Run 20260101-000000 \(10 streamers, 100 viewers, 2m\)/);
         assert.match(markdown, /\| containers \| api \| avg CPU \(%\) \| 20 \| 30 \| \+10 \| \+50 % \|/);
-        assert.deepEqual(json.sizing, { vcpus: 1, ramGiB: 3 });
+        assert.deepEqual(json.sizing, { vcpus: 1, ramGiB: 1, memoryMiB: 510, memoryBasis: "jvm" });
         assert.equal(json.requests.unexpectedStreamCloses, 2);
     });
 

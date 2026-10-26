@@ -67,9 +67,15 @@ routes of catapult-api as `http://api:8080`), for `DURATION`:
 - `VIEWERS` viewers: each one's overlay polls its streamer's `/api/user/game/{widgetToken}` through the site
   every 15 s.
 
-It fails on `http_req_duration` p95 ≥ 500 ms, `http_req_failed` ≥ 1 %, or any `ws_unexpected_close` (a live
+It fails on `http_req_duration{kind:request}` p95 ≥ 500 ms (every request but the live streams, whose
+duration is how long they stayed open), `http_req_failed` ≥ 1 %, or any `ws_unexpected_close` (a live
 stream closed or refused before the end of the run, the server's 30 min timeout aside). Meanwhile, `docker
-stats` samples each container's CPU and memory every 5 s. The run still writes its report when it fails.
+stats` samples each container's CPU and memory every 5 s, and each JVM's used heap and non-heap memory is
+read from its actuator (`jvm_memory_used_bytes`, on the management port, through `docker compose exec`).
+
+Both JVMs run with `-Xmx1g -XX:+UseG1GC` in a 1.5 GiB container (`perf/compose.yml`): uncapped, a JVM
+sizes its heap from the host's RAM and keeps growing it, so its memory would say more about the host than
+about catapult, and differ from one host to the next. The run still writes its report when it fails.
 
 `node --test perf/report.test.mjs` tests the report.
 
@@ -85,11 +91,13 @@ Each run writes `perf/reports/<timestamp>/` (ignored by git):
 | `load.json`         | the load run's streamers, viewers, duration and k6 image             |
 | `k6-summary.json`   | k6 summary of the load run                                           |
 | `docker-stats.csv`  | CPU and memory of each container during the load run                 |
+| `jvm-memory.csv`    | used heap, used non-heap and max heap of each JVM during the load run |
 | `report.md`, `.json`| the report, with its "Outbound traffic" section                      |
 
 `report.md` has the thresholds, p50, p95 and errors per request group and per page, each container's
-average and peak CPU (in % of one core) and memory, the machine that load takes (the stack's peak kept
-under 70 % CPU and 75 % memory), and the differences with the latest earlier run that has a
+average and peak CPU (in % of one core) and memory (RSS), each JVM's peak used memory, the machine that
+load takes (sustained CPU kept under 70 %, the JVMs' peak used memory plus the other containers' RSS
+under 75 %), and the differences with the latest earlier run under the same load that has a
 `report.json` (`node perf/report.mjs <run dir> [<previous run dir>]` writes it again, against another run).
 
 `outbound.txt` lists the log lines with a connection error (unknown host, refused, unreachable,
