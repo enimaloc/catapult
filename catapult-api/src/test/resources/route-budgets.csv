@@ -21,7 +21,7 @@ GET,/api/internal/users/{userId}/dashboard,,visitor,12,
 # admin
 GET,/api/internal/admin/members,?page=0&q=,admin,2,
 GET,/api/internal/admin/members/search,?q=budget,admin,2,
-GET,/api/internal/admin/experiments,,admin,19,n+1
+GET,/api/internal/admin/experiments,,admin,3,
 GET,/api/internal/admin/experiments/{id}/settings,,admin,4,
 GET,/api/internal/admin/experiments/{id}/assignments,?page=0,admin,6,
 # personal API token
