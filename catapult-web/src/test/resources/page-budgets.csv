@@ -1,0 +1,15 @@
+method,path,caller,api_calls,notes
+# owner
+GET,/,owner,1,
+GET,/channel/budget-owner,owner,13,
+GET,/spa/channel/budget-owner,owner,12,
+GET,/channel/budget-owner/dock,owner,5,
+GET,/spa/nav-channels,owner,1,
+GET,/me/api-token,owner,1,fixed:one token status
+# visitor
+GET,/channel/budget-owner,visitor,6,
+# admin
+GET,/admin,admin,3,
+GET,/spa/admin/members?q=&page=0,admin,2,
+GET,/spa/admin/experiments,admin,1,
+GET,/spa/admin/experiments/{id},admin,4,
