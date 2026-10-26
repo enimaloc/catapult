@@ -78,7 +78,7 @@ services:
       - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-}
       # Empty = Sentry off
       - SENTRY_DSN=${SENTRY_DSN:-}
-      - SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE:-1.0}
+      - SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE:-0.1}
       # Empty = no link to the status page in the degraded banner
       - INSTATUS_PAGE_URL=${INSTATUS_PAGE_URL:-}
     healthcheck:
