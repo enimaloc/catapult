@@ -1,8 +1,8 @@
 package fr.enimaloc.catapult.service.xbox;
 
-import fr.enimaloc.catapult.service.link.ExternalLinks;
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import fr.enimaloc.catapult.service.link.ExternalLinks;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

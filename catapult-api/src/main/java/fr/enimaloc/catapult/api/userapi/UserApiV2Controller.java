@@ -1,6 +1,5 @@
 package fr.enimaloc.catapult.api.userapi;
 
-import fr.enimaloc.catapult.service.link.ExternalLinks;
 import com.fasterxml.jackson.annotation.JsonView;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
@@ -17,6 +16,7 @@ import fr.enimaloc.catapult.service.dtdd.DtddService;
 import fr.enimaloc.catapult.service.dtdd.DtddSignalService;
 import fr.enimaloc.catapult.service.igdb.IgdbGameDetailsService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
+import fr.enimaloc.catapult.service.link.ExternalLinks;
 import fr.enimaloc.catapult.service.steam.SteamIADisclosure;
 import fr.enimaloc.catapult.service.steam.SteamStoreService;
 import fr.enimaloc.catapult.service.tw.TwLabelService;
@@ -263,7 +263,7 @@ public class UserApiV2Controller {
         }
         IgdbGameDetails d = details.get();
         String baseUrl = publicBaseUrl.get();
-        List<String> videoUrls = d.getVideoIds().stream().map(id -> ExternalLinks.youtubeVideo(id)).toList();
+        List<String> videoUrls = d.getVideoIds().stream().map(ExternalLinks::youtubeVideo).toList();
         return ResponseEntity.ok(new IgdbDetailResponse(baseUrl, d.getSlug(),
                 ExternalLinks.igdbGame(d.getSlug()),
                 d.getSummary(), d.getStoryline(), d.getPlatforms(), d.getRating(), d.getAggregatedRating(),

@@ -1,9 +1,9 @@
 package fr.enimaloc.catapult.api.userapi;
 
-import fr.enimaloc.catapult.service.link.ExternalLinks;
 import com.fasterxml.jackson.annotation.JsonGetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonView;
+import fr.enimaloc.catapult.service.link.ExternalLinks;
 import fr.enimaloc.catapult.service.steam.SteamStoreService;
 
 import java.time.Instant;
