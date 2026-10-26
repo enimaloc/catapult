@@ -215,7 +215,7 @@ class TwitchServiceTest {
         assertThat(user.isBotEnabled()).isTrue(); // pre-condition
         twitchService.updateChannelReporting(user, binding(GameBinding.Status.AUTO, false, true, Set.of()));
 
-        verify(botToggleService).setBotEnabled(user, false);
+        verify(botToggleService).pauseAfterATokenFailure(user);
     }
 
     @Test
@@ -523,7 +523,7 @@ class TwitchServiceTest {
 
         twitchService.updateChannelReporting(user, binding(GameBinding.Status.AUTO, false, true, Set.of()));
 
-        verify(botToggleService, never()).setBotEnabled(eq(user), anyBoolean());
+        verifyNoInteractions(botToggleService);
     }
 
     @Test
@@ -534,7 +534,7 @@ class TwitchServiceTest {
 
         twitchService.updateChannelReporting(user, binding(GameBinding.Status.AUTO, false, true, Set.of()));
 
-        verify(botToggleService).setBotEnabled(user, false);
+        verify(botToggleService).pauseAfterATokenFailure(user);
     }
 
     @Test
@@ -656,7 +656,7 @@ class TwitchServiceTest {
 
         twitchService.resetToDefault(user);
 
-        verify(botToggleService).setBotEnabled(user, false);
+        verify(botToggleService).pauseAfterATokenFailure(user);
     }
 
     @Test
@@ -671,7 +671,7 @@ class TwitchServiceTest {
 
         twitchService.resetToDefault(user);
 
-        verify(botToggleService, never()).setBotEnabled(eq(user), anyBoolean());
+        verifyNoInteractions(botToggleService);
     }
 
     // ---- Pins of today's Twitch layer, before the category chain moves (see CategoryBehaviourTest) ----
@@ -687,7 +687,7 @@ class TwitchServiceTest {
 
         verify(twitchTokenService).refreshAccessToken(any(OAuthToken.class), eq(user));
         verify(bodySpec).header(TwitchServiceImpl.AUTHORIZATION, TwitchServiceImpl.AUTHORIZATION_BEARER + "refreshed-token");
-        verify(botToggleService, never()).setBotEnabled(eq(user), anyBoolean());
+        verifyNoInteractions(botToggleService);
         verify(categoryChangeStateService, times(1)).recordCatapultChangeAndReturnPrevious(user, "12345");
         assertThat(timer("set_category", "success")).isNotNull();
     }
@@ -699,7 +699,7 @@ class TwitchServiceTest {
         assertThrows(HttpClientErrorException.class, () -> twitchService.setCategory(user, "12345", "Some Game"));
 
         verify(twitchTokenService).refreshAccessToken(any(OAuthToken.class), eq(user));
-        verify(botToggleService).setBotEnabled(user, false);
+        verify(botToggleService).pauseAfterATokenFailure(user);
         verify(categoryChangeStateService, never()).recordCatapultChangeAndReturnPrevious(any(), any());
         assertThat(timer("set_category", "error")).isNotNull();
     }
@@ -713,7 +713,7 @@ class TwitchServiceTest {
 
         assertThrows(HttpServerErrorException.class, () -> twitchService.setCategory(user, "12345", "Some Game"));
 
-        verify(botToggleService).setBotEnabled(user, false);
+        verify(botToggleService).pauseAfterATokenFailure(user);
         verify(categoryChangeStateService, never()).recordCatapultChangeAndReturnPrevious(any(), any());
     }
 
@@ -724,7 +724,7 @@ class TwitchServiceTest {
         assertThrows(HttpClientErrorException.class, () -> twitchService.setCategory(user, "12345", "Some Game"));
 
         verify(twitchTokenService, never()).refreshAccessToken(any(), any());
-        verify(botToggleService, never()).setBotEnabled(eq(user), anyBoolean());
+        verifyNoInteractions(botToggleService);
     }
 
     @Test
@@ -788,7 +788,7 @@ class TwitchServiceTest {
         assertThat(twitchService.resetToDefault(user)).isEqualTo(ChannelUpdateOutcome.FAILED);
 
         verify(twitchTokenService).refreshAccessToken(any(OAuthToken.class), eq(user));
-        verify(botToggleService).setBotEnabled(user, false);
+        verify(botToggleService).pauseAfterATokenFailure(user);
         verifyNoInteractions(categoryChangeStateService);
     }
 
@@ -855,7 +855,7 @@ class TwitchServiceTest {
         assertThat(twitchService.updateChannelReporting(user, binding(GameBinding.Status.AUTO, false, true, Set.of())))
             .isEqualTo(ChannelUpdateOutcome.FAILED);
 
-        verify(botToggleService).setBotEnabled(user, false);
+        verify(botToggleService).pauseAfterATokenFailure(user);
         assertThat(meters.find(ExternalApiObservations.METRIC).tags("api", "twitch", "operation", "update_channel",
             "outcome", "error", "error", "HttpClientErrorException", "status", "401").timer()).isNotNull();
     }

@@ -135,8 +135,8 @@ public class TwitchServiceImpl implements TwitchService {
 
     /**
      * {@link #patchChannel}, with an expired token refreshed and the PATCH retried once on a 401. When the refresh
-     * or the retry fails, the bot is paused and {@link TokenRefreshFailedException} thrown, carrying what failed;
-     * any other error is thrown as is.
+     * or the retry fails, the bot is paused (in its own transaction, so a caller's rollback keeps it paused) and
+     * {@link TokenRefreshFailedException} thrown, carrying what failed; any other error is thrown as is.
      */
     private void patchRefreshingTheToken(UserAccount user, OAuthToken token, String accessToken,
                                          Map<String, Object> body) {
@@ -147,7 +147,7 @@ public class TwitchServiceImpl implements TwitchService {
             String refreshed = twitchTokenService.refreshAccessToken(token, user);
             if (refreshed == null) {
                 log.warn("Twitch token invalid for user {} — pausing bot", user.getId());
-                botToggleService.setBotEnabled(user, false);
+                botToggleService.pauseAfterATokenFailure(user);
                 throw new TokenRefreshFailedException(e);
             }
             try {
@@ -156,7 +156,7 @@ public class TwitchServiceImpl implements TwitchService {
             } catch (RuntimeException retryEx) {
                 log.warn("Twitch channel update failed for user {} after token refresh — pausing bot: {}",
                     user.getId(), retryEx.getMessage());
-                botToggleService.setBotEnabled(user, false);
+                botToggleService.pauseAfterATokenFailure(user);
                 throw new TokenRefreshFailedException(retryEx);
             }
         }

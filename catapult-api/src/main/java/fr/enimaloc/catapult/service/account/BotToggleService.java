@@ -9,6 +9,7 @@ import fr.enimaloc.catapult.service.twitch.TwitchChatService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -29,6 +30,16 @@ public class BotToggleService {
     private final EventSubService twitchEventSubService;
     private final ChannelEventPublisher channelEventPublisher;
     private final TwitchatEventDispatcher twitchatEventDispatcher;
+
+    /**
+     * Pauses the bot because its Twitch token is dead (the refresh, or the call retried after it, failed), in a
+     * transaction of its own: the caller's may roll back (a Twitchat revert answers an error), and the pause must stay,
+     * as its side effects (connections closed, dashboard and Twitchat told) do.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void pauseAfterATokenFailure(UserAccount user) {
+        setBotEnabled(user, false);
+    }
 
     @Transactional
     public void setBotEnabled(UserAccount user, boolean enabled) {
