@@ -81,15 +81,31 @@ class WebTrustedProxiesTest extends WebFullContextTestBase {
     }
 
     @Test
-    void composeTrustsTheDockerGatewaysOnly() {
-        Pattern pattern = Pattern.compile(
-                "172\\.(1[6-9]|2[0-9]|3[01])\\.0\\.1|192\\.168\\.(0|16|32|48|64|80|96|112|128|144|160|176|192|208|224|240)\\.1");
+    void composeTrustsTheDockerGatewaysOnly() throws Exception {
+        Pattern pattern = Pattern.compile(composeDefault("WEB_TRUSTED_PROXIES"));
         assertThat(List.of("172.17.0.1", "172.31.0.1", "192.168.0.1", "192.168.240.1"))
                 .allMatch(a -> pattern.matcher(a).matches());
         assertThat(List.of(
                         "172.18.0.2", "172.18.1.1", "172.32.0.1", "192.168.17.1", "192.168.1.1", "10.250.250.1",
                         "127.0.0.1"))
                 .noneMatch(a -> pattern.matcher(a).matches());
+    }
+
+    /** The default of {@code WEB_TRUSTED_PROXIES=${WEB_TRUSTED_PROXIES:-default}} in the repository's docker-compose.yml (what a deployment really gets). */
+    private static String composeDefault(String variable) throws java.io.IOException {
+        java.nio.file.Path compose = java.nio.file.Path.of("docker-compose.yml");
+        if (!java.nio.file.Files.exists(compose)) {
+            compose = java.nio.file.Path.of("..", "docker-compose.yml");
+        }
+        String prefix = variable + "=${" + variable + ":-";
+        for (String line : java.nio.file.Files.readAllLines(compose)) {
+            String trimmed = line.trim();
+            int at = trimmed.indexOf(prefix);
+            if (at >= 0 && trimmed.endsWith("}")) {
+                return trimmed.substring(at + prefix.length(), trimmed.length() - 1);
+            }
+        }
+        throw new IllegalStateException(variable + " default not found in " + compose);
     }
 
     private com.sun.net.httpserver.Headers relayed(String fromAddress, Map<String, String> headers) throws Exception {

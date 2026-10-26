@@ -101,13 +101,29 @@ class TrustedProxiesTest extends FullContextTestBase {
     }
 
     @Test
-    void composeTrustsTheApiNetworkOnly() {
-        Pattern pattern = Pattern.compile(
-                "10\\.250\\.250\\.([2-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-4])");
+    void composeTrustsTheApiNetworkOnly() throws Exception {
+        Pattern pattern = Pattern.compile(composeDefault("API_TRUSTED_PROXIES"));
         assertThat(List.of("10.250.250.2", "10.250.250.7", "10.250.250.254"))
                 .allMatch(a -> pattern.matcher(a).matches());
         assertThat(List.of("10.250.250.1", "10.250.250.255", "10.250.251.7", "172.18.0.5"))
                 .noneMatch(a -> pattern.matcher(a).matches());
+    }
+
+    /** The default of {@code API_TRUSTED_PROXIES=${API_TRUSTED_PROXIES:-default}} in the repository's docker-compose.yml (what a deployment really gets). */
+    private static String composeDefault(String variable) throws java.io.IOException {
+        java.nio.file.Path compose = java.nio.file.Path.of("docker-compose.yml");
+        if (!java.nio.file.Files.exists(compose)) {
+            compose = java.nio.file.Path.of("..", "docker-compose.yml");
+        }
+        String prefix = variable + "=${" + variable + ":-";
+        for (String line : java.nio.file.Files.readAllLines(compose)) {
+            String trimmed = line.trim();
+            int at = trimmed.indexOf(prefix);
+            if (at >= 0 && trimmed.endsWith("}")) {
+                return trimmed.substring(at + prefix.length(), trimmed.length() - 1);
+            }
+        }
+        throw new IllegalStateException(variable + " default not found in " + compose);
     }
 
     private RawResponse rawGet(String fromAddress, String path, Map<String, String> headers) throws Exception {
