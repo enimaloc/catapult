@@ -28,6 +28,9 @@ readonly REPO_DIR="${PERF_DIR%/perf}"
 # The first live-stream detection poll (30 s after startup) puts a category on every seeded streamer:
 # measuring before it would time pages that are not in their steady state.
 readonly SETTLE_SECONDS=35
+# The latest k6 1.x at least two weeks old when chosen (1.8.2 came out on 2026-10-24)
+readonly K6_IMAGE=grafana/k6:1.8.1
+readonly K6_CONTAINER="${PROJECT}-k6"
 
 MODE=full
 case "${1:-}" in
@@ -70,6 +73,8 @@ mkdir -p "${REPORT_DIR}"
 # Long commands run in the background and are waited for, so that a signal sent to this script alone
 # (not to its process group) is handled at once instead of after the command ends.
 child=""
+stats_pid=""
+load_status=0
 cleaned=0
 started=0
 scanned=0
@@ -80,6 +85,9 @@ cleanup() {
         kill "${child}" 2>/dev/null || true
         wait "${child}" 2>/dev/null || true
     fi
+    stop_stats
+    # Killing docker run's client stops k6 too, unless the client was killed outright
+    docker rm -f "${K6_CONTAINER}" >/dev/null 2>&1 || true
     # A run that failed or was interrupted keeps its logs: they say why
     if [[ "${started}" == 1 && "${scanned}" == 0 && -d "${REPORT_DIR:-}" ]]; then
         scan_outbound || true
@@ -213,15 +221,51 @@ run_pages() {
     return "${status}"
 }
 
-# Load (k6, task 9): writes ${REPORT_DIR}/k6-summary.json and ${REPORT_DIR}/docker-stats.csv.
-run_load() {
-    echo "TODO: load (k6) is not wired yet"
+# CPU and memory of the stack's containers every 5 s, as "time,container,cpu,memory" lines, until killed.
+sample_stats() {
+    local ids
+    mapfile -t ids < <("${COMPOSE[@]}" ps -q)
+    echo "time,container,cpu,memory"
+    while :; do
+        docker stats --no-stream --format '{{.Name}},{{.CPUPerc}},{{.MemUsage}}' "${ids[@]}" \
+            | sed "s/^/$(date +%s),/" || true
+        sleep 5
+    done
 }
 
-# Report (task 9): writes ${REPORT_DIR}/report.md and ${REPORT_DIR}/report.json, with the
-# "Outbound traffic" section from ${REPORT_DIR}/outbound.txt.
+stop_stats() {
+    if [[ -n "${stats_pid}" ]] && kill -0 "${stats_pid}" 2>/dev/null; then
+        kill "${stats_pid}" 2>/dev/null || true
+        wait "${stats_pid}" 2>/dev/null || true
+    fi
+    stats_pid=""
+}
+
+# Load (k6, perf/k6/evening.js) on perf-internal, with docker stats sampled meanwhile: writes
+# ${REPORT_DIR}/load.json, k6-summary.json and docker-stats.csv. A failed threshold fails the run, after
+# the report is written.
+run_load() {
+    echo "Load: ${STREAMERS} streamers, ${VIEWERS} viewers, ${DURATION} (${K6_IMAGE})"
+    printf '{"streamers": %s, "viewers": %s, "duration": "%s", "k6Image": "%s"}\n' \
+        "${STREAMERS}" "${VIEWERS}" "${DURATION}" "${K6_IMAGE}" >"${REPORT_DIR}/load.json"
+    sample_stats >"${REPORT_DIR}/docker-stats.csv" 2>/dev/null &
+    stats_pid=$!
+    local status=0
+    run docker run --rm --name "${K6_CONTAINER}" --network "${PROJECT}_perf-internal" \
+        --user "$(id -u):$(id -g)" \
+        -v "${PERF_DIR}/k6:/scripts:ro" -v "${REPORT_DIR}:/out" \
+        "${K6_IMAGE}" run --quiet --summary-export /out/k6-summary.json \
+        -e STREAMERS="${STREAMERS}" -e VIEWERS="${VIEWERS}" -e DURATION="${DURATION}" \
+        -e WEB=http://web:8081 -e API=http://api:8080 /scripts/evening.js || status=$?
+    stop_stats
+    [[ -f "${REPORT_DIR}/k6-summary.json" ]] && echo "Wrote ${REPORT_DIR}/k6-summary.json"
+    load_status=${status}
+}
+
+# Report (perf/report.mjs): writes ${REPORT_DIR}/report.md and report.json, with the "Outbound traffic"
+# section from outbound.txt, compared with the latest earlier perf/reports/*/report.json.
 write_report() {
-    echo "TODO: report is not wired yet"
+    node "${PERF_DIR}/report.mjs" "${REPORT_DIR}"
 }
 
 # ── Main ─────────────────────────────────────────────────────────────────
@@ -236,3 +280,7 @@ fi
 scan_outbound
 [[ "${MODE}" != smoke ]] && write_report
 echo "Done: ${REPORT_DIR}"
+if [[ "${load_status}" != 0 ]]; then
+    echo "FAIL: k6 exited with ${load_status} (a threshold failed, or k6 itself did)" >&2
+    exit "${load_status}"
+fi
