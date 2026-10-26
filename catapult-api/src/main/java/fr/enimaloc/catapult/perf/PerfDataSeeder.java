@@ -1,11 +1,13 @@
 package fr.enimaloc.catapult.perf;
 
+import fr.enimaloc.catapult.chat.ChatCommandEvent;
 import fr.enimaloc.catapult.common.dto.notification.NotificationChannel;
 import fr.enimaloc.catapult.common.dto.notification.Severity;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.account.UserSettings;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.binding.GetterConfig;
+import fr.enimaloc.catapult.domain.chatcommand.ChatCommandDefinition;
 import fr.enimaloc.catapult.domain.experiment.Experiment;
 import fr.enimaloc.catapult.domain.experiment.ExperimentVariant;
 import fr.enimaloc.catapult.getter.steam.MockSteamApiClient;
@@ -13,6 +15,7 @@ import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
 import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
 import fr.enimaloc.catapult.repository.binding.GetterConfigRepository;
+import fr.enimaloc.catapult.repository.chatcommand.ChatCommandDefinitionRepository;
 import fr.enimaloc.catapult.repository.experiment.ExperimentRepository;
 import fr.enimaloc.catapult.service.account.WidgetTokenService;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
@@ -56,6 +59,8 @@ public class PerfDataSeeder implements ApplicationRunner {
     public static final String ADMIN_TWITCH_ID = "perf-admin-twitch";
     static final int NOTIFICATIONS = 5;
     private static final int EXPERIMENTS = 3;
+    /** The chat command every streamer has enabled: it is what makes the channel page show its Commands tab. */
+    static final String COMMAND_NAME = "!perf";
 
     /**
      * A game the streamers play: its Steam app, the Twitch category their binding puts the channel on, and its
@@ -82,6 +87,7 @@ public class PerfDataSeeder implements ApplicationRunner {
     private final GameBindingRepository bindings;
     private final GetterConfigRepository getters;
     private final ExperimentRepository experiments;
+    private final ChatCommandDefinitionRepository commands;
     private final NotificationService notifications;
     private final NotificationDeliveryService deliveries;
     private final WidgetTokenService widgetTokens;
@@ -96,6 +102,7 @@ public class PerfDataSeeder implements ApplicationRunner {
             GameBindingRepository bindings,
             GetterConfigRepository getters,
             ExperimentRepository experiments,
+            ChatCommandDefinitionRepository commands,
             NotificationService notifications,
             NotificationDeliveryService deliveries,
             WidgetTokenService widgetTokens,
@@ -108,6 +115,7 @@ public class PerfDataSeeder implements ApplicationRunner {
         this.bindings = bindings;
         this.getters = getters;
         this.experiments = experiments;
+        this.commands = commands;
         this.notifications = notifications;
         this.deliveries = deliveries;
         this.widgetTokens = widgetTokens;
@@ -138,6 +146,7 @@ public class PerfDataSeeder implements ApplicationRunner {
             if (existing.isEmpty()) {
                 created++;
             }
+            transactions.executeWithoutResult(status -> command(streamer));
             startPlaying(streamer);
         }
         transactions.executeWithoutResult(status -> experiments());
@@ -169,6 +178,19 @@ public class PerfDataSeeder implements ApplicationRunner {
         }
         widgetTokens.getOrCreate(streamer);
         return accounts.findById(streamer.getId()).orElseThrow();
+    }
+
+    private void command(UserAccount streamer) {
+        if (commands.existsByUserAndName(streamer, COMMAND_NAME)) {
+            return;
+        }
+        ChatCommandDefinition command = new ChatCommandDefinition();
+        command.setUser(streamer);
+        command.setName(COMMAND_NAME);
+        command.setTemplate("Perf command");
+        command.setPermission(ChatCommandEvent.SenderRole.VIEWERS);
+        command.setEnabled(true);
+        commands.save(command);
     }
 
     /** Live, and playing the first game on the fake Steam: picked up by the next detection cycle. */
