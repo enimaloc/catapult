@@ -14,6 +14,7 @@ import fr.enimaloc.catapult.service.account.ChannelAccountActions;
 import fr.enimaloc.catapult.service.account.ChannelSettingsService;
 import fr.enimaloc.catapult.service.binding.ChannelDashboardActions;
 import fr.enimaloc.catapult.service.steam.SteamPersonalTokenService;
+import fr.enimaloc.catapult.service.steam.SteamPersonalTokenStore;
 import fr.enimaloc.catapult.service.account.BotToggleService;
 import fr.enimaloc.catapult.service.account.ChannelAccessService;
 import fr.enimaloc.catapult.service.binding.BindingService;
@@ -71,7 +72,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
                 pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
 @Import({ApiUserResolver.class, MethodSecurityConfig.class, Authz.class, CategoryChain.class, CategoryApplier.class,
         ChannelSettingsService.class, ChannelDashboardActions.class, SteamPersonalTokenService.class,
-        ChannelAccountActions.class,
+        SteamPersonalTokenStore.class, ChannelAccountActions.class,
         RaidRestoreHold.class})
 class AccountResolutionPerRequestTest {
 

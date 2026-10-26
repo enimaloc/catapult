@@ -9,10 +9,12 @@ import fr.enimaloc.catapult.domain.chatcommand.ChatCommandSetting;
 import fr.enimaloc.catapult.domain.experiment.Experiment;
 import fr.enimaloc.catapult.domain.experiment.ExperimentAssignment;
 import fr.enimaloc.catapult.domain.experiment.ExperimentVariant;
+import fr.enimaloc.catapult.domain.steam.SteamApiKeyEntry;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.chatcommand.ChatCommandSettingRepository;
 import fr.enimaloc.catapult.repository.experiment.ExperimentAssignmentRepository;
 import fr.enimaloc.catapult.repository.experiment.ExperimentRepository;
+import fr.enimaloc.catapult.repository.steam.SteamApiKeyRepository;
 import fr.enimaloc.catapult.security.JwtService;
 import fr.enimaloc.catapult.service.access.InviteService;
 import fr.enimaloc.catapult.service.chatcommand.ChatCommandGate;
@@ -57,6 +59,9 @@ class ControllerBoundariesTest extends FullContextTestBase {
 
     @Autowired
     ChatCommandSettingRepository chatCommandSettings;
+
+    @Autowired
+    SteamApiKeyRepository steamKeys;
 
     @Autowired
     PlatformTransactionManager transactionManager;
@@ -187,5 +192,27 @@ class ControllerBoundariesTest extends FullContextTestBase {
 
         assertThat(response.statusCode()).as(response.body()).isEqualTo(204);
         assertThat(chatCommandSettings.findByUserAndKey(member, "greeting")).isEmpty();
+    }
+
+    @Test
+    void resavingAndResharingASteamToken_updatesThePool() throws Exception {
+        UserAccount member = member("steam-resaver");
+        String path = "/api/internal/users/" + member.getId() + "/settings/steam-personal-token";
+
+        HttpResponse<String> first = send("PUT", path, member, "{\"token\":\"BOUNDARIES-KEY-1\",\"shared\":true}");
+        assertThat(first.statusCode()).as(first.body()).isEqualTo(204);
+
+        HttpResponse<String> resave = send("PUT", path, member, "{\"token\":\"BOUNDARIES-KEY-2\",\"shared\":true}");
+        assertThat(resave.statusCode()).as(resave.body()).isEqualTo(204);
+        assertThat(steamKeys.findByOwner(member)).map(SteamApiKeyEntry::getApiKey).contains("BOUNDARIES-KEY-2");
+        assertThat(steamKeys.existsById("BOUNDARIES-KEY-1")).isFalse();
+
+        HttpResponse<String> reshare = send("PUT", path + "/sharing", member, "{\"shared\":false}");
+        assertThat(reshare.statusCode()).as(reshare.body()).isEqualTo(204);
+        assertThat(steamKeys.findByOwner(member)).hasValueSatisfying(entry -> {
+            assertThat(entry.getApiKey()).isEqualTo("BOUNDARIES-KEY-2");
+            assertThat(entry.isExclusive()).isTrue();
+        });
+        assertThat(users.findById(member.getId()).orElseThrow().isSteamTokenShared()).isFalse();
     }
 }
