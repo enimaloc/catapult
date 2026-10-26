@@ -5,7 +5,6 @@ import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
-import fr.enimaloc.catapult.domain.account.UserSettings;
 import fr.enimaloc.catapult.domain.binding.CustomBinding;
 import fr.enimaloc.catapult.domain.binding.CustomBindingActivation;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
@@ -13,12 +12,14 @@ import fr.enimaloc.catapult.event.listener.GameEventListener;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
-import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
 import fr.enimaloc.catapult.repository.binding.CustomBindingRepository;
+import fr.enimaloc.catapult.service.category.CategoryChain;
+import fr.enimaloc.catapult.service.category.CategoryOutcome;
+import fr.enimaloc.catapult.service.category.CategoryTrigger.CustomBindingTriggered;
+import fr.enimaloc.catapult.service.category.CategoryTrigger.NoGameAfterCustomBinding;
+import fr.enimaloc.catapult.service.category.CategoryTrigger.StreamEnded;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
-import fr.enimaloc.catapult.service.twitch.ChannelUpdateOutcome;
-import fr.enimaloc.catapult.service.twitch.TwitchService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.exception.ConstraintViolationException;
@@ -78,15 +79,14 @@ public class CustomBindingService {
 
     private final CustomBindingRepository bindings;
     private final CustomBindingActivations activations;
-    private final TwitchService twitchService;
     private final ExperimentService experimentService;
     private final GameStateService gameStateService;
     private final StreamStateService streamStateService;
-    private final UserSettingsRepository userSettingsRepository;
     private final UserAccountRepository userAccountRepository;
     private final OAuthTokenRepository oAuthTokenRepository;
     private final GameEventListener gameEventListener;
     private final ChannelEventPublisher channelEventPublisher;
+    private final CategoryChain categoryChain;
 
     /** Created DRAFT, so closed to everyone until the admin opens it. */
     @EventListener(ApplicationReadyEvent.class)
@@ -199,36 +199,27 @@ public class CustomBindingService {
         activations.clear(user);
         Optional<DetectedGame> open = gameStateService.getLastKnownGame(user);
         if (streamStateService.isLive(user)) {
-            open.ifPresentOrElse(game -> gameEventListener.applyDetectedGame(user, game).orThrow(),
-                    () -> gameEventListener.applyNoGameFallback(user).orThrow());
+            if (open.isPresent()) {
+                gameEventListener.applyDetectedGame(user, open.get()).orThrow();
+            } else {
+                categoryChain.apply(user, new NoGameAfterCustomBinding()).orThrow();
+            }
             return;
         }
         // Offline, a detection only stores the game pending; the channel gets the end-of-stream choice
         open.ifPresent(game -> gameEventListener.applyDetectedGame(user, game).orThrow());
-        boolean applyDefaultOnStreamEnd = userSettingsRepository.findById(user.getId())
-                .map(UserSettings::isApplyDefaultOnStreamEnd)
-                .orElse(false);
-        if (applyDefaultOnStreamEnd) {
-            twitchService.resetToDefault(user);
-        }
+        categoryChain.apply(user, new StreamEnded()).orThrow();
     }
 
-    /** {@code binding} sent to Twitch, the bot's state checked first so a paused bot is not taken for a Twitch problem. */
+    /** {@code binding} sent to Twitch through the category chain, which checks the bot's state first. */
     private ActivationResult applyToTwitch(UserAccount user, CustomBinding binding) {
-        if (!botActive(user)) return ActivationResult.BOT_DISABLED;
-        ChannelUpdateOutcome outcome = twitchService.updateChannelReporting(user, binding.toGameBinding(user));
-        return switch (outcome) {
+        CategoryOutcome outcome = categoryChain.apply(user, new CustomBindingTriggered(binding)).orThrow();
+        return switch (outcome.status()) {
             case APPLIED -> ActivationResult.APPLIED;
-            // Only the bot's state skips a custom binding's update: it changed since the check above
+            // Only the bot's state skips a custom binding's update (the chain's BOT_INACTIVE, or it changed since)
             case SKIPPED -> ActivationResult.BOT_DISABLED;
             case FAILED -> twitchUnusable(user) ? ActivationResult.TWITCH_UNAVAILABLE : ActivationResult.FAILED;
         };
-    }
-
-    private boolean botActive(UserAccount user) {
-        return userAccountRepository.findById(user.getId())
-                .map(account -> account.isBotEnabled() && account.getStatus() == UserAccount.Status.ACTIVE)
-                .orElse(false);
     }
 
     /** After a failed update: whether the cause is the Twitch link (no token, or one refused, which pauses the bot). */

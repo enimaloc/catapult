@@ -2,8 +2,10 @@ package fr.enimaloc.catapult.service.category;
 
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.account.UserSettings;
+import fr.enimaloc.catapult.domain.binding.CustomBinding;
 import fr.enimaloc.catapult.domain.binding.CustomBindingActivation;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
 import fr.enimaloc.catapult.service.binding.CustomBindingActivations;
 import fr.enimaloc.catapult.service.binding.GameStateService;
@@ -11,6 +13,7 @@ import fr.enimaloc.catapult.service.binding.RaidRestoreHold;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
 import fr.enimaloc.catapult.service.category.CategoryOutcome.Reason;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.BindingEdited;
+import fr.enimaloc.catapult.service.category.CategoryTrigger.CustomBindingTriggered;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.GameClosed;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.GameDetected;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.MappingChanged;
@@ -55,6 +58,7 @@ public class CategoryChain {
     private final UserSettingsRepository userSettingsRepository;
     private final RaidRestoreHold raidRestoreHold;
     private final GameStateService gameStateService;
+    private final UserAccountRepository userAccountRepository;
     private final CategoryApplier applier;
 
     /** {@link #decide}, then applied right away. */
@@ -71,6 +75,7 @@ public class CategoryChain {
             case StreamEnded ended -> streamEnded(user);
             case BindingEdited edited -> bindingEdited(user, edited.binding());
             case MappingChanged changed -> mappingChanged(user, changed.binding());
+            case CustomBindingTriggered triggered -> customBindingTriggered(user, triggered.binding());
         };
     }
 
@@ -117,6 +122,15 @@ public class CategoryChain {
             return CategoryDecision.none(CategoryRule.CUSTOM_BINDING, Reason.CUSTOM_BINDING_ACTIVE);
         }
         return gameBinding(user, binding, false);
+    }
+
+    /** The custom binding's category, the bot's state checked first so a paused bot is not taken for a Twitch problem. */
+    private CategoryDecision customBindingTriggered(UserAccount user, CustomBinding binding) {
+        boolean botActive = userAccountRepository.findById(user.getId())
+                .map(account -> account.isBotEnabled() && account.getStatus() == UserAccount.Status.ACTIVE)
+                .orElse(false);
+        if (!botActive) return CategoryDecision.none(CategoryRule.CUSTOM_BINDING, Reason.BOT_INACTIVE);
+        return CategoryDecision.update(CategoryRule.CUSTOM_BINDING, binding.toGameBinding(user));
     }
 
     private CategoryDecision streamStarted(UserAccount user) {

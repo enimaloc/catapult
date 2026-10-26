@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.category;
 
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.binding.GameStateService;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.account.UserSettings;
@@ -17,6 +18,7 @@ import fr.enimaloc.catapult.service.category.CategoryOutcome.Reason;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.BindingEdited;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.GameClosed;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.GameDetected;
+import fr.enimaloc.catapult.service.category.CategoryTrigger.CustomBindingTriggered;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.MappingChanged;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.NoGameAfterCustomBinding;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.StreamEnded;
@@ -33,6 +35,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -46,6 +49,7 @@ class CategoryChainTest {
     @Mock private StreamStateService streamStateService;
     @Mock private UserSettingsRepository settingsRepository;
     @Mock private GameStateService gameStateService;
+    @Mock private UserAccountRepository accountRepository;
     @Mock private CategoryApplier applier;
 
     private final RaidRestoreHold hold = new RaidRestoreHold();
@@ -56,7 +60,8 @@ class CategoryChainTest {
 
     @BeforeEach
     void setUp() {
-        chain = new CategoryChain(activations, streamStateService, settingsRepository, hold, gameStateService, applier);
+        chain = new CategoryChain(activations, streamStateService, settingsRepository, hold, gameStateService,
+                accountRepository, applier);
         user = new UserAccount();
         user.setId(UUID.randomUUID());
 
@@ -563,6 +568,66 @@ class CategoryChainTest {
 
         assertThat(chain.decide(user, new MappingChanged(binding)))
                 .isEqualTo(CategoryDecision.update(CategoryRule.GAME_BINDING, binding));
+    }
+
+    // ---- CustomBindingTriggered ----
+
+    private CustomBinding art() {
+        CustomBinding art = new CustomBinding();
+        art.setId(UUID.randomUUID());
+        art.setUser(user);
+        art.setName("Art");
+        art.setTwitchGameId("509660");
+        art.setTwitchGameName("Art");
+        return art;
+    }
+
+    private UserAccount account(boolean botEnabled, UserAccount.Status status) {
+        UserAccount account = new UserAccount();
+        account.setId(user.getId());
+        account.setBotEnabled(botEnabled);
+        account.setStatus(status);
+        return account;
+    }
+
+    @Test
+    void customBindingTriggered_botOff() {
+        when(accountRepository.findById(user.getId()))
+                .thenReturn(Optional.of(account(false, UserAccount.Status.ACTIVE)));
+
+        assertThat(chain.decide(user, new CustomBindingTriggered(art())))
+                .isEqualTo(CategoryDecision.none(CategoryRule.CUSTOM_BINDING, Reason.BOT_INACTIVE));
+    }
+
+    @Test
+    void customBindingTriggered_accountInactive() {
+        when(accountRepository.findById(user.getId()))
+                .thenReturn(Optional.of(account(true, UserAccount.Status.INACTIVE)));
+
+        assertThat(chain.decide(user, new CustomBindingTriggered(art())))
+                .isEqualTo(CategoryDecision.none(CategoryRule.CUSTOM_BINDING, Reason.BOT_INACTIVE));
+    }
+
+    @Test
+    void customBindingTriggered_accountMissing() {
+        when(accountRepository.findById(user.getId())).thenReturn(Optional.empty());
+
+        assertThat(chain.decide(user, new CustomBindingTriggered(art())))
+                .isEqualTo(CategoryDecision.none(CategoryRule.CUSTOM_BINDING, Reason.BOT_INACTIVE));
+    }
+
+    @Test
+    void customBindingTriggered_offline_updatesIt() {
+        when(accountRepository.findById(user.getId()))
+                .thenReturn(Optional.of(account(true, UserAccount.Status.ACTIVE)));
+
+        CategoryDecision decision = chain.decide(user, new CustomBindingTriggered(art()));
+
+        assertThat(decision.action()).isEqualTo(CategoryDecision.Action.UPDATE_CHANNEL);
+        assertThat(decision.rule()).isEqualTo(CategoryRule.CUSTOM_BINDING);
+        assertThat(decision.binding().getTwitchGameId()).isEqualTo("509660");
+        assertThat(decision.binding().getSourceName()).startsWith(CustomBinding.SOURCE_NAME_PREFIX);
+        verify(streamStateService, never()).isLive(any());
     }
 
     // ---- detectionGuard ----

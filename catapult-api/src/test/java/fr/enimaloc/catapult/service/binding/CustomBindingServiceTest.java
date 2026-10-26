@@ -15,6 +15,8 @@ import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
 import fr.enimaloc.catapult.repository.binding.CustomBindingRepository;
 import fr.enimaloc.catapult.service.binding.CustomBindingService.ActivationResult;
+import fr.enimaloc.catapult.service.category.CategoryApplier;
+import fr.enimaloc.catapult.service.category.CategoryChain;
 import fr.enimaloc.catapult.service.category.CategoryOutcome;
 import fr.enimaloc.catapult.service.category.CategoryRule;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
@@ -27,7 +29,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.function.Executable;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -42,6 +43,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
@@ -67,12 +69,19 @@ class CustomBindingServiceTest {
     @Mock private GameEventListener gameEventListener;
     @Mock private ChannelEventPublisher channelEventPublisher;
 
-    @InjectMocks private CustomBindingService service;
+    private CustomBindingService service;
 
     private UserAccount user;
 
     @BeforeEach
     void setUp() {
+        // The real chain and applier: the Twitch stubs below are what the category decision ends up calling
+        CategoryChain chain = new CategoryChain(activations, streamStateService, userSettingsRepository,
+                new RaidRestoreHold(), gameStateService, userAccountRepository,
+                new CategoryApplier(twitchService, streamStateService));
+        service = new CustomBindingService(bindings, activations, experimentService, gameStateService,
+                streamStateService, userAccountRepository, oAuthTokenRepository, gameEventListener,
+                channelEventPublisher, chain);
         user = new UserAccount();
         user.setId(UUID.randomUUID());
         user.setBotEnabled(true);
@@ -82,8 +91,6 @@ class CustomBindingServiceTest {
         // The detection path answers its outcome, which the deactivation only checks for an exception
         lenient().when(gameEventListener.applyDetectedGame(any(), any()))
                 .thenReturn(CategoryOutcome.applied(CategoryRule.GAME_BINDING));
-        lenient().when(gameEventListener.applyNoGameFallback(any()))
-                .thenReturn(CategoryOutcome.applied(CategoryRule.NO_GAME_FALLBACK));
         lenient().when(bindings.save(any(CustomBinding.class))).thenAnswer(inv -> {
             CustomBinding b = inv.getArgument(0);
             if (b.getId() == null) b.setId(UUID.randomUUID());
@@ -328,6 +335,29 @@ class CustomBindingServiceTest {
     }
 
     @Test
+    void activate_aThrowPropagates_andRecordsNothing() {
+        CustomBinding art = binding("Art");
+        when(twitchService.updateChannelReporting(eq(user), any())).thenThrow(new IllegalStateException("twitch"));
+
+        assertThatThrownBy(() -> service.activate(user, art)).isInstanceOf(IllegalStateException.class)
+                .hasMessage("twitch");
+
+        verify(activations, never()).record(any(), any());
+    }
+
+    @Test
+    void activate_aDecisionThatThrowsPropagates() {
+        CustomBinding art = binding("Art");
+        when(userAccountRepository.findById(user.getId())).thenThrow(new IllegalStateException("db"));
+
+        assertThatThrownBy(() -> service.activate(user, art)).isInstanceOf(IllegalStateException.class)
+                .hasMessage("db");
+
+        verifyNoInteractions(twitchService);
+        verify(activations, never()).record(any(), any());
+    }
+
+    @Test
     void twitchFailure_recordsNothing() {
         CustomBinding art = binding("Art");
         OAuthToken token = new OAuthToken();
@@ -414,6 +444,14 @@ class CustomBindingServiceTest {
                 .thenReturn(Optional.of(new CustomBindingActivation(user.getId(), binding, java.time.Instant.EPOCH)));
     }
 
+    private void givenNoGameFallback() {
+        UserSettings settings = new UserSettings();
+        settings.setApplyDefaultOnNoGame(true);
+        settings.setNoGameTwitchGameId("509658");
+        settings.setNoGameTwitchGameName("Just Chatting");
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
+    }
+
     @Test
     void deactivate_live_appliesTheOpenGame() {
         givenActive(binding("Art"));
@@ -426,7 +464,7 @@ class CustomBindingServiceTest {
         InOrder order = inOrder(activations, gameEventListener);
         order.verify(activations).clear(user);
         order.verify(gameEventListener).applyDetectedGame(user, game);
-        verify(gameEventListener, never()).applyNoGameFallback(any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
         verify(twitchService, never()).resetToDefault(any());
     }
 
@@ -435,11 +473,14 @@ class CustomBindingServiceTest {
         givenActive(binding("Art"));
         when(streamStateService.isLive(user)).thenReturn(true);
         when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.empty());
+        givenNoGameFallback();
+        when(twitchService.updateChannelReporting(eq(user), any())).thenReturn(ChannelUpdateOutcome.APPLIED);
 
         service.deactivate(user);
 
         verify(activations).clear(user);
-        verify(gameEventListener).applyNoGameFallback(user);
+        verify(twitchService).updateChannelReporting(eq(user), argThat(sent ->
+                "no-game-fallback".equals(sent.getSourceName()) && "509658".equals(sent.getTwitchGameId())));
         verify(gameEventListener, never()).applyDetectedGame(any(), any());
         verify(twitchService, never()).resetToDefault(any());
     }
@@ -499,12 +540,15 @@ class CustomBindingServiceTest {
         givenActive(art);
         when(streamStateService.isLive(user)).thenReturn(true);
         when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.empty());
+        givenNoGameFallback();
+        when(twitchService.updateChannelReporting(eq(user), any())).thenReturn(ChannelUpdateOutcome.APPLIED);
 
         service.delete(user, art.getId());
 
-        InOrder order = inOrder(activations, gameEventListener, bindings, channelEventPublisher);
+        InOrder order = inOrder(activations, twitchService, bindings, channelEventPublisher);
         order.verify(activations).clear(user);
-        order.verify(gameEventListener).applyNoGameFallback(user);
+        order.verify(twitchService).updateChannelReporting(eq(user), argThat(sent ->
+                "no-game-fallback".equals(sent.getSourceName())));
         order.verify(bindings).delete(art);
         order.verify(channelEventPublisher).customBindingsUpdated(user.getId());
     }

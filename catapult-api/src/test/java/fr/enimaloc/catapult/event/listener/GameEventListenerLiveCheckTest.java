@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.event.listener;
 
 import static org.mockito.Mockito.mock;
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.binding.GameStateService;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.account.UserSettings;
@@ -50,7 +51,7 @@ class GameEventListenerLiveCheckTest {
     @BeforeEach
     void setUp() {
         CategoryChain chain = new CategoryChain(customBindingActivations, streamStateService, userSettingsRepository,
-                raidRestoreHold, mock(GameStateService.class), new CategoryApplier(twitchService, streamStateService));
+                raidRestoreHold, mock(GameStateService.class), mock(UserAccountRepository.class), new CategoryApplier(twitchService, streamStateService));
         listener = new GameEventListener(bindingService, streamStateService, channelEventPublisher,
                 raidRestoreHold, customBindingActivations, chain);
         user = new UserAccount();
