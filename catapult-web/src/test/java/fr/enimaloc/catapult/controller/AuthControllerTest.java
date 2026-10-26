@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.common.dto.TokenResponse;
 import fr.enimaloc.catapult.common.dto.channel.ChannelDto;
 import fr.enimaloc.catapult.common.dto.channel.ChannelListResponse;
 import fr.enimaloc.catapult.monitoring.InteractionMetrics;
+import fr.enimaloc.catapult.security.SessionLogin;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
@@ -28,7 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = AuthController.class)
-@Import({WebSecurityConfig.class, InteractionMetrics.class, SimpleMeterRegistry.class})
+@Import({WebSecurityConfig.class, SessionLogin.class, InteractionMetrics.class, SimpleMeterRegistry.class})
 class AuthControllerTest {
 
     @Autowired MockMvc mvc;
