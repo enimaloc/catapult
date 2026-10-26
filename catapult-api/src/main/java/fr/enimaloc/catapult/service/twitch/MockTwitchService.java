@@ -10,8 +10,11 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Service
@@ -26,16 +29,32 @@ public class MockTwitchService implements TwitchService {
 
     private final TwitchCategoryService twitchCategoryService;
 
+    /** The category each channel was last put on, by account id: what Twitch would show. */
+    private final Map<UUID, String> categoryNameByUser = new ConcurrentHashMap<>();
+
     @Override
     public ChannelUpdateOutcome updateChannelReporting(UserAccount user, GameBinding binding) {
         log.debug("[Mock Twitch] updateChannelReporting() — no-op for user {}", user.getId());
+        remember(user, binding.getTwitchGameName());
         return ChannelUpdateOutcome.APPLIED;
     }
 
     @Override
     public ChannelUpdateOutcome setCategory(UserAccount user, String twitchGameId, String twitchGameName) {
         log.debug("[Mock Twitch] setCategory() — no-op for user {}", user.getId());
+        remember(user, twitchGameName);
         return ChannelUpdateOutcome.APPLIED;
+    }
+
+    /** The name of the category the channel of account {@code userId} was last put on, if any. */
+    public Optional<String> lastCategoryName(UUID userId) {
+        return Optional.ofNullable(categoryNameByUser.get(userId));
+    }
+
+    private void remember(UserAccount user, String twitchGameName) {
+        if (twitchGameName != null) {
+            categoryNameByUser.put(user.getId(), twitchGameName);
+        }
     }
 
     @Override

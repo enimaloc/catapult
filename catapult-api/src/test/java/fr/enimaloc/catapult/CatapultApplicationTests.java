@@ -11,10 +11,16 @@ import fr.enimaloc.catapult.service.twitch.TwitchEventSubService;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
 import fr.enimaloc.catapult.service.twitch.TwitchServiceImpl;
 import io.sentry.Sentry;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.Arrays;
+import java.util.Objects;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
@@ -22,6 +28,9 @@ import org.springframework.test.context.TestPropertySource;
 
 @Import(FullContextContainers.class)
 class CatapultApplicationTests extends FullContextTestBase {
+
+    @LocalServerPort
+    int port;
 
     @Test
     void runsTheProductionBeanSet() {
@@ -52,6 +61,27 @@ class CatapultApplicationTests extends FullContextTestBase {
         HttpResponse<String> response = get(managementPort, "/actuator/health");
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(response.body()).contains("\"status\":\"UP\"");
+    }
+
+    @Test
+    void noPerfBeanOutsideThePerfProfile() throws Exception {
+        assertThat(Arrays.stream(context.getBeanDefinitionNames())
+                        .map(context::getType)
+                        .filter(Objects::nonNull)
+                        .map(Class::getName))
+                .noneMatch(name -> name.startsWith("fr.enimaloc.catapult.perf."));
+        assertThat(perfLogin(null)).isIn(401, 404);
+        assertThat(perfLogin("203.0.113.7")).isIn(401, 404);
+    }
+
+    private int perfLogin(String forwardedFor) throws Exception {
+        HttpRequest.Builder request = HttpRequest.newBuilder(
+                        URI.create("http://localhost:" + port + "/api/internal/perf/login?username=x"))
+                .POST(HttpRequest.BodyPublishers.noBody());
+        if (forwardedFor != null) {
+            request.header("X-Forwarded-For", forwardedFor);
+        }
+        return HttpClient.newHttpClient().send(request.build(), HttpResponse.BodyHandlers.ofString()).statusCode();
     }
 
     @Nested
