@@ -31,6 +31,8 @@ configure(subprojects.filter { it.name in coverageFloors }) {
         val floor = coverageFloors.getValue(project.name)
 
         tasks.withType<Test>().configureEach {
+            // Gradle's default test heap (512 MB) overflows once the suite has cached its Spring contexts
+            maxHeapSize = "1g"
             finalizedBy("jacocoTestReport")
         }
 
