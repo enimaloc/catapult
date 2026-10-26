@@ -8,8 +8,10 @@ import fr.enimaloc.catapult.service.feedback.GitLabClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -24,7 +26,7 @@ import java.util.UUID;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/feedback")
+@RequestMapping(ApiPaths.USER + "/feedback")
 @RequiredArgsConstructor
 public class ApiFeedbackController {
 
@@ -32,15 +34,17 @@ public class ApiFeedbackController {
     private final ApiUserResolver userResolver;
     private final GitLabClient gitLabClient;
 
+    @PreAuthorize("@authz.isSelf(#userId)")
     @GetMapping
-    public List<FeedbackSubmission> list(@AuthenticationPrincipal Jwt jwt) {
+    public List<FeedbackSubmission> list(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt) {
         UserAccount user = userResolver.viewer(jwt);
         return repository.findByUserOrderByCreatedAtDesc(user);
     }
 
+    @PreAuthorize("@authz.isSelf(#userId)")
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public FeedbackSubmission submit(@AuthenticationPrincipal Jwt jwt, @RequestBody SubmitRequest body) {
+    public FeedbackSubmission submit(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt, @RequestBody SubmitRequest body) {
         if (body.title() == null || body.title().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Title is required");
         }
@@ -72,9 +76,10 @@ public class ApiFeedbackController {
         return submission;
     }
 
-    @PostMapping("/{id}/unsubscribe")
+    @PreAuthorize("@authz.isSelf(#userId)")
+    @DeleteMapping("/{id}/subscription")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void unsubscribe(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
+    public void unsubscribe(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
         FeedbackSubmission submission = repository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         UserAccount user = userResolver.viewer(jwt);

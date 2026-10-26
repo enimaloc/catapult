@@ -169,7 +169,9 @@ public class RealApiService implements ApiService {
 
     @Override
     public ChannelListResponse channelList() {
-        return client.get("/api/channels", ChannelListResponse.class);
+        UUID me = me();
+        if (me == null) return null;
+        return client.get("/api/internal/users/{userId}/channels", ChannelListResponse.class, me);
     }
 
     @Override
@@ -263,22 +265,30 @@ public class RealApiService implements ApiService {
 
     @Override
     public LinkStateResponse minecraftStatus(String username) {
-        return client.get("/api/connect/minecraft", LinkStateResponse.class);
+        UUID me = me();
+        if (me == null) return null;
+        return client.get("/api/internal/users/{userId}/links/minecraft", LinkStateResponse.class, me);
     }
 
     @Override
     public int minecraftEnroll(String username, String name) {
-        return client.postVoid("/api/connect/minecraft", Map.of("name", name));
+        UUID me = me();
+        if (me == null) return HttpStatus.UNAUTHORIZED.value();
+        return client.putVoid("/api/internal/users/{userId}/links/minecraft", Map.of("name", name), me);
     }
 
     @Override
     public int minecraftSync(String username) {
-        return client.postVoid("/api/connect/minecraft/sync", null);
+        UUID me = me();
+        if (me == null) return HttpStatus.UNAUTHORIZED.value();
+        return client.postVoid("/api/internal/users/{userId}/links/minecraft/sync", null, me);
     }
 
     @Override
     public int minecraftDisconnect(String username) {
-        return client.delete("/api/connect/minecraft");
+        UUID me = me();
+        if (me == null) return HttpStatus.UNAUTHORIZED.value();
+        return client.delete("/api/internal/users/{userId}/links/minecraft", me);
     }
 
     @Override
@@ -288,7 +298,9 @@ public class RealApiService implements ApiService {
 
     @Override
     public TwitchatWidgetConfig obsConnection() {
-        return client.get("/api/me/obs", TwitchatWidgetConfig.class);
+        UUID me = me();
+        if (me == null) return null;
+        return client.get("/api/internal/users/{userId}/obs", TwitchatWidgetConfig.class, me);
     }
 
     @Override
@@ -354,7 +366,9 @@ public class RealApiService implements ApiService {
 
     @Override
     public List<fr.enimaloc.catapult.common.dto.chatcommand.EnabledChatCommandDto> enabledChatCommands() {
-        var commands = client.get("/api/chat-commands/enabled", ENABLED_COMMANDS);
+        UUID me = me();
+        if (me == null) return List.of();
+        var commands = client.get("/api/internal/users/{userId}/chat-commands/enabled", ENABLED_COMMANDS, me);
         return commands == null ? List.of() : commands;
     }
 
@@ -490,7 +504,9 @@ public class RealApiService implements ApiService {
 
     @Override
     public Boolean myDebugActive() {
-        fr.enimaloc.catapult.common.dto.MyDebugDto debug = client.get("/api/me/debug", fr.enimaloc.catapult.common.dto.MyDebugDto.class);
+        UUID me = me();
+        if (me == null) return null;
+        fr.enimaloc.catapult.common.dto.MyDebugDto debug = client.get("/api/internal/users/{userId}/debug", fr.enimaloc.catapult.common.dto.MyDebugDto.class, me);
         return debug == null ? null : debug.active();
     }
 
@@ -673,42 +689,58 @@ public class RealApiService implements ApiService {
 
     @Override
     public NotificationSnapshotDto notificationSnapshot() {
-        return client.get("/api/notifications/snapshot", NotificationSnapshotDto.class);
+        UUID me = me();
+        if (me == null) return null;
+        return client.get("/api/internal/users/{userId}/notifications/snapshot", NotificationSnapshotDto.class, me);
     }
 
     @Override
     public AdminPage<NotificationDto> notifications(int page) {
-        return client.get("/api/notifications?page={page}&size=20", NOTIFICATIONS, page);
+        UUID me = me();
+        if (me == null) return null;
+        return client.get("/api/internal/users/{userId}/notifications?page={page}&size=20", NOTIFICATIONS, me, page);
     }
 
     @Override
     public int markNotificationRead(UUID id) {
-        return client.call(HttpMethod.POST, "/api/notifications/{id}/read", null, Void.class, id).status();
+        UUID me = me();
+        if (me == null) return HttpStatus.UNAUTHORIZED.value();
+        return client.call(HttpMethod.POST, "/api/internal/users/{userId}/notifications/{id}/read", null, Void.class, me, id).status();
     }
 
     @Override
     public int markAllNotificationsRead() {
-        return client.call(HttpMethod.POST, "/api/notifications/read-all", null, Void.class).status();
+        UUID me = me();
+        if (me == null) return HttpStatus.UNAUTHORIZED.value();
+        return client.call(HttpMethod.POST, "/api/internal/users/{userId}/notifications/read-all", null, Void.class, me).status();
     }
 
     @Override
     public NotificationChannelsDto notificationChannels() {
-        return client.get("/api/me/notification-channels", NotificationChannelsDto.class);
+        UUID me = me();
+        if (me == null) return null;
+        return client.get("/api/internal/users/{userId}/notification-channels", NotificationChannelsDto.class, me);
     }
 
     @Override
     public int saveNotificationChannels(java.util.Set<NotificationChannel> channels) {
-        return client.call(HttpMethod.PUT, "/api/me/notification-channels", new NotificationChannelsDto(channels), Void.class).status();
+        UUID me = me();
+        if (me == null) return HttpStatus.UNAUTHORIZED.value();
+        return client.call(HttpMethod.PUT, "/api/internal/users/{userId}/notification-channels", new NotificationChannelsDto(channels), Void.class, me).status();
     }
 
     @Override
     public List<String> seenFeatures() {
-        return client.get("/api/me/seen-features", FEATURE_KEYS);
+        UUID me = me();
+        if (me == null) return null;
+        return client.get("/api/internal/users/{userId}/seen-features", FEATURE_KEYS, me);
     }
 
     @Override
     public int markFeatureSeen(String key) {
-        return client.call(HttpMethod.PUT, "/api/me/seen-features/{key}", null, Void.class, key).status();
+        UUID me = me();
+        if (me == null) return HttpStatus.UNAUTHORIZED.value();
+        return client.call(HttpMethod.PUT, "/api/internal/users/{userId}/seen-features/{key}", null, Void.class, me, key).status();
     }
 
     @Override
@@ -1026,12 +1058,16 @@ public class RealApiService implements ApiService {
 
     @Override
     public InvitePageData invitePage() {
-        return client.get("/api/invite", InvitePageData.class);
+        UUID me = me();
+        if (me == null) return null;
+        return client.get("/api/internal/users/{userId}/invite", InvitePageData.class, me);
     }
 
     @Override
     public int regenerateInvite() {
-        return client.call(HttpMethod.POST, "/api/invite/regenerate", null, Void.class).status();
+        UUID me = me();
+        if (me == null) return HttpStatus.UNAUTHORIZED.value();
+        return client.call(HttpMethod.POST, "/api/internal/users/{userId}/invite/regenerate", null, Void.class, me).status();
     }
 
     @Override
@@ -1186,14 +1222,17 @@ public class RealApiService implements ApiService {
 
     @Override
     public String steamConnectUrl() {
-        if (!ApiClient.hasSession()) return null;
-        SteamStartResponse start = client.get("/api/connect/steam/start", SteamStartResponse.class);
+        UUID me = me();
+        if (me == null) return null;
+        SteamStartResponse start = client.get("/api/internal/users/{userId}/links/steam/start", SteamStartResponse.class, me);
         return start == null ? null : start.redirectUrl();
     }
 
     @Override
     public int steamDisconnect() {
-        return client.call(HttpMethod.POST, "/api/connect/steam/disconnect", null, Void.class).status();
+        UUID me = me();
+        if (me == null) return HttpStatus.UNAUTHORIZED.value();
+        return client.delete("/api/internal/users/{userId}/links/steam", me);
     }
 
     @Override
@@ -1262,19 +1301,33 @@ public class RealApiService implements ApiService {
 
     @Override
     public ApiTokenStatusDto apiTokenStatus() {
-        return client.get("/api/me/api-token", ApiTokenStatusDto.class);
+        UUID me = me();
+        if (me == null) return null;
+        return client.get("/api/internal/users/{userId}/api-token", ApiTokenStatusDto.class, me);
     }
 
     @Override
     public ApiClient.Result<ApiTokenCreatedDto> regenerateApiToken() {
+        UUID me = me();
+        if (me == null) return new ApiClient.Result<>(HttpStatus.UNAUTHORIZED.value(), null);
         // The answer carries the new token, shown once: ApiClient never logs a body, and nothing here keeps it.
-        ApiClient.Result<ApiTokenCreatedDto> result = client.call(HttpMethod.POST, "/api/me/api-token", null,
-                ApiTokenCreatedDto.class);
+        ApiClient.Result<ApiTokenCreatedDto> result = client.call(HttpMethod.POST, "/api/internal/users/{userId}/api-token", null,
+                ApiTokenCreatedDto.class, me);
         return result.ok() && result.body() != null ? result : new ApiClient.Result<>(result.ok() ? 502 : result.status(), null);
     }
 
     @Override
     public int revokeApiToken() {
-        return client.postVoid("/api/me/api-token/delete", null);
+        UUID me = me();
+        if (me == null) return HttpStatus.UNAUTHORIZED.value();
+        return client.delete("/api/internal/users/{userId}/api-token", me);
+    }
+
+    /**
+     * The calling session's account id, the {@code userId} of a member's own routes (an impersonating admin's session
+     * holds the target's JWT, so it is the target's); null without a session.
+     */
+    private static UUID me() {
+        return ApiClient.currentSubject();
     }
 }

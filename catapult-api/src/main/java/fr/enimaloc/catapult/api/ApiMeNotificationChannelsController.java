@@ -4,11 +4,14 @@ import fr.enimaloc.catapult.common.dto.notification.NotificationChannelsDto;
 import fr.enimaloc.catapult.common.dto.notification.NotificationFlushResultDto;
 import fr.enimaloc.catapult.service.notification.NotificationDeliveryDispatcher;
 import fr.enimaloc.catapult.service.notification.NotificationDeliveryService;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -28,19 +31,22 @@ public class ApiMeNotificationChannelsController {
     private final NotificationDeliveryDispatcher deliveryDispatcher;
     private final ApiUserResolver userResolver;
 
-    @GetMapping("/api/me/notification-channels")
-    public NotificationChannelsDto channels(@AuthenticationPrincipal Jwt jwt) {
+    @PreAuthorize("@authz.isSelf(#userId)")
+    @GetMapping(ApiPaths.USER + "/notification-channels")
+    public NotificationChannelsDto channels(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt) {
         return new NotificationChannelsDto(deliveryService.channels(userResolver.viewer(jwt).getId()));
     }
 
-    @PutMapping("/api/me/notification-channels")
+    @PreAuthorize("@authz.isSelf(#userId)")
+    @PutMapping(ApiPaths.USER + "/notification-channels")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void replace(@AuthenticationPrincipal Jwt jwt, @RequestBody NotificationChannelsDto body) {
+    public void replace(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt, @RequestBody NotificationChannelsDto body) {
         deliveryService.replaceChannels(userResolver.viewer(jwt), body.channels());
     }
 
-    @PostMapping("/api/me/twitchat/notifications/flush")
-    public NotificationFlushResultDto flush(@AuthenticationPrincipal Jwt jwt) {
+    @PreAuthorize("@authz.isSelf(#userId)")
+    @PostMapping(ApiPaths.USER + "/twitchat-notifications/flush")
+    public NotificationFlushResultDto flush(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt) {
         return new NotificationFlushResultDto(deliveryDispatcher.flushTwitchat(userResolver.viewer(jwt)));
     }
 }

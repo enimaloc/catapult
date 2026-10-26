@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.connect;
 
+import fr.enimaloc.catapult.api.ApiPaths;
 import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.api.error.ApiProblem;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
@@ -13,6 +14,7 @@ import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
@@ -22,7 +24,7 @@ import java.util.Map;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/connect/minecraft")
+@RequestMapping(ApiPaths.USER + "/links/minecraft")
 @RequiredArgsConstructor
 @ConditionalOnBooleanProperty("minecraft.enabled")
 public class ApiMinecraftConnectController {
@@ -34,8 +36,9 @@ public class ApiMinecraftConnectController {
     private final ChannelEventPublisher channelEventPublisher;
 
     /** Vérification immédiate : force la sync des liens puis retourne l'état à jour. */
+    @PreAuthorize("@authz.isSelf(#userId)")
     @PostMapping("/sync")
-    public LinkStateResponse syncNow(@AuthenticationPrincipal Jwt jwt) {
+    public LinkStateResponse syncNow(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt) {
         UserAccount user = gatedUser(jwt);
         friendService.syncFriendLinks();
         return published(user, friendService.getLink(user)
@@ -43,13 +46,15 @@ public class ApiMinecraftConnectController {
                 .orElseGet(ApiMinecraftConnectController::none));
     }
 
+    @PreAuthorize("@authz.isSelf(#userId)")
     @GetMapping
-    public LinkStateResponse status(@AuthenticationPrincipal Jwt jwt) {
+    public LinkStateResponse status(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt) {
         return linkStates.state(currentUser(jwt));
     }
 
-    @PostMapping
-    public LinkStateResponse enroll(@AuthenticationPrincipal Jwt jwt, @RequestBody Map<String, String> body) {
+    @PreAuthorize("@authz.isSelf(#userId)")
+    @PutMapping
+    public LinkStateResponse enroll(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt, @RequestBody Map<String, String> body) {
         UserAccount user = gatedUser(jwt); // le gate prime sur la validation métier (403 avant 400)
         String name = body.get("name");
         name = name == null ? null : name.trim();
@@ -67,9 +72,10 @@ public class ApiMinecraftConnectController {
         }
     }
 
+    @PreAuthorize("@authz.isSelf(#userId)")
     @DeleteMapping
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void unenroll(@AuthenticationPrincipal Jwt jwt) {
+    public void unenroll(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt) {
         UserAccount user = gatedUser(jwt);
         friendService.unenroll(user);
         published(user, none());

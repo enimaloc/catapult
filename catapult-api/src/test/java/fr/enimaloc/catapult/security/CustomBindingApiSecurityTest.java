@@ -53,6 +53,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 class CustomBindingApiSecurityTest {
 
+    private static final UUID SELF = UUID.randomUUID();
+    private static final String OWN = "/api/internal/users/" + SELF;
+
     private static final SecretKey KEY = new SecretKeySpec(new byte[32], "HmacSHA256");
     private static final String PERSONAL_TOKEN = "cat_" + "x".repeat(43);
 
@@ -136,7 +139,7 @@ class CustomBindingApiSecurityTest {
         void jwt_isRejected() throws Exception {
             String jwt = jwt();
             // The same JWT is good elsewhere on the API...
-            mvc.perform(get("/api/me/api-token").header("Authorization", "Bearer " + jwt))
+            mvc.perform(get(OWN + "/api-token").header("Authorization", "Bearer " + jwt))
                     .andExpect(status().isOk());
             // ...but not here
             mvc.perform(get("/api/v2/custom-bindings").header("Authorization", "Bearer " + jwt))
@@ -148,7 +151,7 @@ class CustomBindingApiSecurityTest {
 
         @Test
         void personalToken_isUselessElsewhere() throws Exception {
-            mvc.perform(get("/api/me/api-token").header("Authorization", "Bearer " + PERSONAL_TOKEN)
+            mvc.perform(get(OWN + "/api-token").header("Authorization", "Bearer " + PERSONAL_TOKEN)
                             .with(r -> { r.setRemoteAddr("203.0.113.9"); return r; }))
                     .andExpect(unauthorizedProblem());
         }
@@ -209,10 +212,10 @@ class CustomBindingApiSecurityTest {
 
         @Test
         void otherRoutes_getNoCors() throws Exception {
-            mvc.perform(get("/api/me/api-token").header("Origin", ORIGIN).header("Authorization", "Bearer " + jwt()))
+            mvc.perform(get(OWN + "/api-token").header("Origin", ORIGIN).header("Authorization", "Bearer " + jwt()))
                     .andExpect(status().isOk())
                     .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
-            mvc.perform(options("/api/me/api-token")
+            mvc.perform(options(OWN + "/api-token")
                             .header("Origin", ORIGIN)
                             .header("Access-Control-Request-Method", "GET")
                             .header("Access-Control-Request-Headers", "authorization"))

@@ -10,6 +10,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.web.client.RestClient;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -32,15 +34,27 @@ class ApiNotificationFlusherTest {
     }
 
     @Test
-    void page_flushesWithTheOwnersJwt() throws InterruptedException {
+    void flushPage_postsToTheTokensOwner() throws InterruptedException {
         server.enqueue(new MockResponse().setHeader("Content-Type", "application/json").setBody("{\"delivered\":2}"));
 
-        assertThat(flusher.flushPage("owner.jwt.sig")).isEqualTo(200);
+        UUID owner = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
+        String jwt = "header." + Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(("{\"sub\":\"" + owner + "\"}").getBytes(StandardCharsets.UTF_8)) + ".sig";
+
+        assertThat(flusher.flushPage(jwt)).isEqualTo(200);
 
         RecordedRequest request = server.takeRequest();
         assertThat(request.getMethod()).isEqualTo("POST");
-        assertThat(request.getPath()).isEqualTo("/api/me/twitchat/notifications/flush");
-        assertThat(request.getHeader("Authorization")).isEqualTo("Bearer owner.jwt.sig");
+        assertThat(request.getPath()).isEqualTo("/api/internal/users/" + owner + "/twitchat-notifications/flush");
+        assertThat(request.getHeader("Authorization")).isEqualTo("Bearer " + jwt);
+    }
+
+    @Test
+    void flushPage_withoutAReadableTokenAnswers401WithoutCalling() {
+        assertThat(flusher.flushPage("not-a-jwt")).isEqualTo(401);
+        assertThat(flusher.flushPage(null)).isEqualTo(401);
+
+        assertThat(server.getRequestCount()).isZero();
     }
 
     @Test
@@ -59,8 +73,10 @@ class ApiNotificationFlusherTest {
     void anError_isReportedAsItsStatus() {
         server.enqueue(new MockResponse().setResponseCode(401));
         server.enqueue(new MockResponse().setResponseCode(404));
+        String jwt = "header." + Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(("{\"sub\":\"" + UUID.randomUUID() + "\"}").getBytes(StandardCharsets.UTF_8)) + ".sig";
 
-        assertThat(flusher.flushPage("expired.jwt.sig")).isEqualTo(401);
+        assertThat(flusher.flushPage(jwt)).isEqualTo(401);
         assertThat(flusher.flushWidget(UUID.randomUUID())).isEqualTo(404);
     }
 }

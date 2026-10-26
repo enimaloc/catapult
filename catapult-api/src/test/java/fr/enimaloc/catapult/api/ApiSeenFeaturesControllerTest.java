@@ -34,6 +34,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
 class ApiSeenFeaturesControllerTest {
 
+    private static final UUID SELF = UUID.randomUUID();
+    private static final String OWN = "/api/internal/users/" + SELF;
+
     @Autowired MockMvc mvc;
     @MockitoBean SeenFeatureRepository seenFeatureRepository;
     @MockitoBean ApiUserResolver userResolver;
@@ -51,14 +54,14 @@ class ApiSeenFeaturesControllerTest {
     void seen_listsTheViewersKeys() throws Exception {
         when(seenFeatureRepository.findFeatureKeysByUserId(userId)).thenReturn(List.of("channel.commands"));
 
-        mvc.perform(get("/api/me/seen-features").with(jwt().jwt(j -> j.subject(userId.toString()))))
+        mvc.perform(get(OWN + "/seen-features").with(jwt().jwt(j -> j.subject(userId.toString()))))
                 .andExpect(status().isOk())
                 .andExpect(content().json("[\"channel.commands\"]"));
     }
 
     @Test
     void markSeen_recordsTheKeyForTheViewer() throws Exception {
-        mvc.perform(put("/api/me/seen-features/channel.commands").with(csrf())
+        mvc.perform(put(OWN + "/seen-features/channel.commands").with(csrf())
                         .with(jwt().jwt(j -> j.subject(userId.toString()))))
                 .andExpect(status().isNoContent());
 
@@ -67,7 +70,7 @@ class ApiSeenFeaturesControllerTest {
 
     @Test
     void markSeen_refusesAKeyCatapultWebWouldNeverWrite() throws Exception {
-        mvc.perform(put("/api/me/seen-features/Not A Key").with(csrf())
+        mvc.perform(put(OWN + "/seen-features/Not A Key").with(csrf())
                         .with(jwt().jwt(j -> j.subject(userId.toString()))))
                 .andExpect(status().isBadRequest());
 

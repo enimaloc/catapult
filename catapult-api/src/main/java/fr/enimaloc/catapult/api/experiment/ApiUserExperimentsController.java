@@ -1,11 +1,14 @@
 package fr.enimaloc.catapult.api.experiment;
 
+import fr.enimaloc.catapult.api.ApiPaths;
 import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.common.dto.experiment.VariantResponse;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.experiment.ExperimentVariant;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,7 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 
 @RestController
-@RequestMapping("/api/experiments/me")
+@RequestMapping(ApiPaths.USER)
 @RequiredArgsConstructor
 public class ApiUserExperimentsController {
 
@@ -29,8 +32,9 @@ public class ApiUserExperimentsController {
      * Returns {"variant": null} when no assignment applies (experiment paused/ended/excluded).
      */
     @Transactional
-    @GetMapping("/variant/{key}")
-    public VariantResponse getVariant(@PathVariable String key, @AuthenticationPrincipal Jwt jwt) {
+    @PreAuthorize("@authz.isSelf(#userId)")
+    @GetMapping("/experiment-variants/{key}")
+    public VariantResponse getVariant(@PathVariable UUID userId, @PathVariable String key, @AuthenticationPrincipal Jwt jwt) {
         UserAccount user = userResolver.viewer(jwt);
         return new VariantResponse(
             experimentService.getVariant(user, key).map(ExperimentVariant::getKey).orElse(null)

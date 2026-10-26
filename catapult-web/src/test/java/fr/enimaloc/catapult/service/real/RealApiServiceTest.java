@@ -50,6 +50,10 @@ class RealApiServiceTest {
 
     private static final String API = "http://api.test";
 
+    /** The member the tests are signed in as: a member's own routes sit under their id. */
+    private static final UUID ME = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
+    private static final String OWN = "/api/internal/users/" + ME;
+
     private MockRestServiceServer api;
     private RealApiService service;
 
@@ -60,11 +64,57 @@ class RealApiServiceTest {
         StaticMessageSource messages = new StaticMessageSource();
         messages.addMessage("api.error.twitchat_widget_disabled", Locale.FRENCH, "Widget desactive");
         service = new RealApiService(new ApiClient(API, builder), new ApiErrorText(messages));
+        signIn(jwtFor(ME));
     }
 
     @AfterEach
     void verifyEveryExpectedCallWasMade() {
+        org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes();
         api.verify();
+    }
+
+    /** A session token whose subject is {@code subject}; ApiClient only reads it. */
+    private static String jwtFor(UUID subject) {
+        String payload = java.util.Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(("{\"sub\":\"" + subject + "\"}").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        return "header." + payload + ".signature";
+    }
+
+    /** The calling request now holds {@code jwt} as its session's catapult-api token. */
+    private static void signIn(String jwt) {
+        org.springframework.mock.web.MockHttpServletRequest request = new org.springframework.mock.web.MockHttpServletRequest();
+        request.getSession(true).setAttribute(ApiClient.SESSION_JWT_KEY, jwt);
+        org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(
+                new org.springframework.web.context.request.ServletRequestAttributes(request));
+    }
+
+    @Test
+    void selfRoutesUseTheSessionSubject() {
+        // The page's channel is someone else's: a member's own routes still take the session's account.
+        respond(HttpMethod.GET, OWN + "/links/minecraft", "{\"status\":\"NONE\"}");
+
+        service.minecraftStatus("someone-else");
+    }
+
+    @Test
+    void selfRoutesFollowImpersonation() {
+        UUID target = UUID.fromString("00000000-0000-0000-0000-0000000000b2");
+        signIn(jwtFor(target));
+        respond(HttpMethod.GET, "/api/internal/users/" + target + "/links/minecraft", "{\"status\":\"NONE\"}");
+
+        service.minecraftStatus("someone-else");
+    }
+
+    @Test
+    void selfRoutesWithoutASessionDoNotCall() {
+        org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes();
+
+        assertThat(service.myDebugActive()).isNull();
+        assertThat(service.obsConnection()).isNull();
+        assertThat(service.minecraftDisconnect("someone-else")).isEqualTo(401);
+        assertThat(service.regenerateApiToken().status()).isEqualTo(401);
+        assertThat(service.enabledChatCommands()).isEmpty();
+        // api.verify() in the teardown, and the mock server refusing any request it did not expect: none was sent.
     }
 
     private ResponseActions expect(HttpMethod httpMethod, String path) {
@@ -86,23 +136,17 @@ class RealApiServiceTest {
 
     @Test
     void steamConnectUrl_isWhereCatapultApiSendsTheMember_andNeverAskedLoggedOut() {
+        org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes();
         assertThat(service.steamConnectUrl()).isNull();
 
-        org.springframework.mock.web.MockHttpServletRequest request = new org.springframework.mock.web.MockHttpServletRequest();
-        request.getSession(true).setAttribute(ApiClient.SESSION_JWT_KEY, "jwt");
-        org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(
-                new org.springframework.web.context.request.ServletRequestAttributes(request));
-        try {
-            respond(HttpMethod.GET, "/api/connect/steam/start", "{\"redirectUrl\":\"https://steamcommunity.com/openid/login?x\"}");
-            assertThat(service.steamConnectUrl()).isEqualTo("https://steamcommunity.com/openid/login?x");
-        } finally {
-            org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes();
-        }
+        signIn(jwtFor(ME));
+        respond(HttpMethod.GET, OWN + "/links/steam/start", "{\"redirectUrl\":\"https://steamcommunity.com/openid/login?x\"}");
+        assertThat(service.steamConnectUrl()).isEqualTo("https://steamcommunity.com/openid/login?x");
     }
 
     @Test
-    void steamDisconnect_postsAndRelaysTheStatus() {
-        expectPost("/api/connect/steam/disconnect");
+    void steamDisconnect_deletesAndRelaysTheStatus() {
+        expect(HttpMethod.DELETE, OWN + "/links/steam").andRespond(withNoContent());
         assertThat(service.steamDisconnect()).isEqualTo(204);
     }
 
@@ -128,7 +172,7 @@ class RealApiServiceTest {
 
     @Test
     void invitePage_readsTheCodeLinkAndRedemptions() {
-        respond(HttpMethod.GET, "/api/invite", """
+        respond(HttpMethod.GET, OWN + "/invite", """
                 {"canInvite":true,"inviteId":"00000000-0000-0000-0000-000000000001","code":"ABC234",
                  "inviteUrl":"https://catapult.test/join?invite=ABC234","regeneratedAt":"2026-10-01T10:00:00Z",
                  "redemptions":[{"inviteeTwitchId":"42","redeemedAt":"2026-10-02T10:00:00Z"}]}""");
@@ -143,14 +187,14 @@ class RealApiServiceTest {
 
     @Test
     void invitePage_isNullWhenItFails() {
-        expect(HttpMethod.GET, "/api/invite").andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
+        expect(HttpMethod.GET, OWN + "/invite").andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
 
         assertThat(service.invitePage()).isNull();
     }
 
     @Test
     void regenerateInvite_posts() {
-        expectPost("/api/invite/regenerate");
+        expectPost(OWN + "/invite/regenerate");
 
         assertThat(service.regenerateInvite()).isEqualTo(204);
     }
@@ -213,7 +257,7 @@ class RealApiServiceTest {
 
     @Test
     void channelList() {
-        respond(HttpMethod.GET, "/api/channels", """
+        respond(HttpMethod.GET, OWN + "/channels", """
                 {"viewerTwitchId":"1","channels":[{"id":"00000000-0000-0000-0000-000000000001","twitchId":"1",
                  "twitchUsername":"enimaloc","profileImageUrl":"img","live":true}]}""");
 
@@ -258,21 +302,21 @@ class RealApiServiceTest {
 
     @Test
     void minecraftStatus() {
-        respond(HttpMethod.GET, "/api/connect/minecraft", "{\"status\":\"PENDING\",\"minecraftName\":\"Steve\"}");
+        respond(HttpMethod.GET, OWN + "/links/minecraft", "{\"status\":\"PENDING\",\"minecraftName\":\"Steve\"}");
 
         assertThat(service.minecraftStatus("enimaloc")).isEqualTo(new LinkStateResponse("PENDING", "Steve", null));
     }
 
     @Test
     void obsConnection() {
-        respond(HttpMethod.GET, "/api/me/obs", "{\"obsHost\":\"10.0.0.2\",\"obsPort\":4456,\"obsPassword\":\"pw\",\"twitchatBranch\":\"auto\"}");
+        respond(HttpMethod.GET, OWN + "/obs", "{\"obsHost\":\"10.0.0.2\",\"obsPort\":4456,\"obsPassword\":\"pw\",\"twitchatBranch\":\"auto\"}");
 
         assertThat(service.obsConnection()).isEqualTo(new TwitchatWidgetConfig("10.0.0.2", 4456, "pw", "auto"));
     }
 
     @Test
     void obsConnection_noContentIsNull() {
-        expect(HttpMethod.GET, "/api/me/obs").andRespond(withNoContent());
+        expect(HttpMethod.GET, OWN + "/obs").andRespond(withNoContent());
 
         assertThat(service.obsConnection()).isNull();
     }
@@ -469,7 +513,9 @@ class RealApiServiceTest {
 
     @Test
     void minecraftEnroll() {
-        expectPost("/api/connect/minecraft", "{\"name\":\"Steve\"}");
+        expect(HttpMethod.PUT, OWN + "/links/minecraft")
+                .andExpect(content().json("{\"name\":\"Steve\"}", org.springframework.test.json.JsonCompareMode.STRICT))
+                .andRespond(withNoContent());
         service.minecraftEnroll("enimaloc", "Steve");
     }
 
@@ -518,13 +564,13 @@ class RealApiServiceTest {
 
     @Test
     void minecraftSync() {
-        expectPost("/api/connect/minecraft/sync");
+        expectPost(OWN + "/links/minecraft/sync");
         service.minecraftSync("enimaloc");
     }
 
     @Test
     void minecraftDisconnect() {
-        expect(HttpMethod.DELETE, "/api/connect/minecraft").andRespond(withNoContent());
+        expect(HttpMethod.DELETE, OWN + "/links/minecraft").andRespond(withNoContent());
         service.minecraftDisconnect("enimaloc");
     }
 
@@ -927,7 +973,7 @@ class RealApiServiceTest {
 
     @Test
     void notificationSnapshot_readsTheSnapshot() {
-        respond(HttpMethod.GET, "/api/notifications/snapshot", "{\"items\":[" + NOTIF + "],\"unreadCount\":4}");
+        respond(HttpMethod.GET, OWN + "/notifications/snapshot", "{\"items\":[" + NOTIF + "],\"unreadCount\":4}");
 
         var snapshot = service.notificationSnapshot();
 
@@ -939,7 +985,7 @@ class RealApiServiceTest {
     void notifications_mapsASpringPage() {
         // No sort parameter: catapult-api's repository already orders newest first and would reject
         // a Pageable sort on a property NotificationRecipient does not have.
-        respond(HttpMethod.GET, "/api/notifications?page=2&size=20", "{\"content\":[" + NOTIF + "],"
+        respond(HttpMethod.GET, OWN + "/notifications?page=2&size=20", "{\"content\":[" + NOTIF + "],"
                 + "\"number\":2,\"totalPages\":3,\"totalElements\":41,\"size\":20,\"pageable\":{\"pageNumber\":2,\"paged\":true},"
                 + "\"first\":false,\"last\":true}");
 
@@ -953,8 +999,8 @@ class RealApiServiceTest {
 
     @Test
     void markNotificationRead_andReadAll_returnTheStatus() {
-        expect(HttpMethod.POST, "/api/notifications/" + NOTIF_ID + "/read").andRespond(withNoContent());
-        expect(HttpMethod.POST, "/api/notifications/read-all").andRespond(withNoContent());
+        expect(HttpMethod.POST, OWN + "/notifications/" + NOTIF_ID + "/read").andRespond(withNoContent());
+        expect(HttpMethod.POST, OWN + "/notifications/read-all").andRespond(withNoContent());
 
         assertThat(service.markNotificationRead(NOTIF_ID)).isEqualTo(204);
         assertThat(service.markAllNotificationsRead()).isEqualTo(204);
@@ -1620,8 +1666,8 @@ class RealApiServiceTest {
 
     @Test
     void myDebugActive_readsTheCallersMode_orNullWhenTheApiCouldNotTell() {
-        respond(HttpMethod.GET, "/api/me/debug", "{\"active\":true}");
-        expect(HttpMethod.GET, "/api/me/debug").andRespond(withStatus(HttpStatus.BAD_GATEWAY));
+        respond(HttpMethod.GET, OWN + "/debug", "{\"active\":true}");
+        expect(HttpMethod.GET, OWN + "/debug").andRespond(withStatus(HttpStatus.BAD_GATEWAY));
 
         assertThat(service.myDebugActive()).isTrue();
         assertThat(service.myDebugActive()).isNull();
@@ -1720,14 +1766,14 @@ class RealApiServiceTest {
 
     @Test
     void apiTokenStatus_isReadFromTheMeRoute() {
-        respond(HttpMethod.GET, "/api/me/api-token", "{\"exists\":true,\"createdAt\":\"2026-01-01T00:00:00Z\"}");
+        respond(HttpMethod.GET, OWN + "/api-token", "{\"exists\":true,\"createdAt\":\"2026-01-01T00:00:00Z\"}");
 
         assertThat(service.apiTokenStatus().exists()).isTrue();
     }
 
     @Test
     void regenerateApiToken_givesTheNewTokenToTheCaller() {
-        respond(HttpMethod.POST, "/api/me/api-token", "{\"token\":\"cat_abc\",\"createdAt\":\"2026-01-01T00:00:00Z\"}");
+        respond(HttpMethod.POST, OWN + "/api-token", "{\"token\":\"cat_abc\",\"createdAt\":\"2026-01-01T00:00:00Z\"}");
 
         var created = service.regenerateApiToken();
 
@@ -1737,7 +1783,7 @@ class RealApiServiceTest {
 
     @Test
     void regenerateApiToken_aRefusalHasNoBody() {
-        expect(HttpMethod.POST, "/api/me/api-token").andRespond(withStatus(HttpStatus.FORBIDDEN));
+        expect(HttpMethod.POST, OWN + "/api-token").andRespond(withStatus(HttpStatus.FORBIDDEN));
 
         var refused = service.regenerateApiToken();
 
@@ -1746,8 +1792,8 @@ class RealApiServiceTest {
     }
 
     @Test
-    void revokeApiToken_postsToTheDeleteRoute() {
-        expectPost("/api/me/api-token/delete");
+    void revokeApiToken_deletesTheToken() {
+        expect(HttpMethod.DELETE, OWN + "/api-token").andRespond(withNoContent());
 
         assertThat(service.revokeApiToken()).isEqualTo(204);
     }

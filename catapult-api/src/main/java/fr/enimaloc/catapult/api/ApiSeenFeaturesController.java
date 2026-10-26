@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.repository.feature.SeenFeatureRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,7 +25,7 @@ import java.util.regex.Pattern;
  * logged-in user has opened: catapult-web drops a feature's "new" dot for them once it's here.
  */
 @RestController
-@RequestMapping("/api/me/seen-features")
+@RequestMapping(ApiPaths.USER + "/seen-features")
 @RequiredArgsConstructor
 public class ApiSeenFeaturesController {
 
@@ -34,19 +35,21 @@ public class ApiSeenFeaturesController {
     private final SeenFeatureRepository seenFeatureRepository;
     private final ApiUserResolver userResolver;
 
+    @PreAuthorize("@authz.isSelf(#userId)")
     @GetMapping
-    public List<String> seen(@AuthenticationPrincipal Jwt jwt) {
+    public List<String> seen(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt) {
         return seenFeatureRepository.findFeatureKeysByUserId(userResolver.viewer(jwt).getId());
     }
 
     @Transactional
+    @PreAuthorize("@authz.isSelf(#userId)")
     @PutMapping("/{key}")
-    public ResponseEntity<Void> markSeen(@PathVariable String key, @AuthenticationPrincipal Jwt jwt) {
+    public ResponseEntity<Void> markSeen(@PathVariable String key, @PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt) {
         if (!KEY.matcher(key).matches()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
         }
-        UUID userId = userResolver.viewer(jwt).getId();
-        seenFeatureRepository.insertIfAbsent(userId, key, Instant.now());
+        UUID viewerId = userResolver.viewer(jwt).getId();
+        seenFeatureRepository.insertIfAbsent(viewerId, key, Instant.now());
         return ResponseEntity.noContent().build();
     }
 }

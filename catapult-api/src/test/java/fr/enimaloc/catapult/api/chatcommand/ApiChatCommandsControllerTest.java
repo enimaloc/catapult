@@ -61,6 +61,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
 @Import({JsCompiler.class, ServiceFunctionRegistry.class, TwitchShoutoutFunction.class, ApiUserResolver.class})
 class ApiChatCommandsControllerTest {
+
+    private static final UUID SELF = UUID.randomUUID();
+    private static final String OWN = "/api/internal/users/" + SELF;
     @MockitoBean ChannelAccessService channelAccessService;
 
     @Autowired MockMvc mvc;
@@ -96,7 +99,7 @@ class ApiChatCommandsControllerTest {
         mockUser();
         when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(false);
 
-        mvc.perform(withAdmin(get("/api/chat-commands")))
+        mvc.perform(withAdmin(get(OWN + "/chat-commands")))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("feature_disabled"));
     }
@@ -121,7 +124,7 @@ class ApiChatCommandsControllerTest {
                 definition("!off", "game", false),
                 definition("!mine", null, true)));
 
-        mvc.perform(withAdmin(get("/api/chat-commands/enabled")))
+        mvc.perform(withAdmin(get(OWN + "/chat-commands/enabled")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[0].name").value("!mine"))
@@ -141,7 +144,7 @@ class ApiChatCommandsControllerTest {
         when(systemAccount.check(any(), any()))
                 .thenReturn(new SystemTwitchAccountService.BotModStatus(false, Instant.now()));
 
-        mvc.perform(withAdmin(get("/api/chat-commands")))
+        mvc.perform(withAdmin(get(OWN + "/chat-commands")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.presets").isArray())
                 .andExpect(jsonPath("$.commands").isArray())
@@ -160,7 +163,7 @@ class ApiChatCommandsControllerTest {
                 "permission", "VIEWERS",
                 "enabled", true));
 
-        mvc.perform(withAdmin(post("/api/chat-commands"))
+        mvc.perform(withAdmin(post(OWN + "/chat-commands"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isBadRequest());
@@ -181,7 +184,7 @@ class ApiChatCommandsControllerTest {
                 "permission", "VIEWERS",
                 "enabled", true));
 
-        mvc.perform(withAdmin(post("/api/chat-commands"))
+        mvc.perform(withAdmin(post(OWN + "/chat-commands"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isBadRequest());
@@ -207,7 +210,7 @@ class ApiChatCommandsControllerTest {
                 "permission", "VIEWERS",
                 "enabled", true));
 
-        mvc.perform(withAdmin(post("/api/chat-commands"))
+        mvc.perform(withAdmin(post(OWN + "/chat-commands"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isCreated())
@@ -244,7 +247,7 @@ class ApiChatCommandsControllerTest {
                 "enabled", true,
                 "ast", astJson));
 
-        mvc.perform(withAdmin(put("/api/chat-commands/{id}", id))
+        mvc.perform(withAdmin(put(OWN + "/chat-commands/{id}", id))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isOk())
@@ -280,7 +283,7 @@ class ApiChatCommandsControllerTest {
                 "enabled", true,
                 "ast", astJson));
 
-        mvc.perform(withAdmin(put("/api/chat-commands/{id}", id))
+        mvc.perform(withAdmin(put(OWN + "/chat-commands/{id}", id))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isOk())
@@ -316,7 +319,7 @@ class ApiChatCommandsControllerTest {
                 "enabled", true,
                 "ast", astJson));
 
-        mvc.perform(withAdmin(put("/api/chat-commands/{id}", id))
+        mvc.perform(withAdmin(put(OWN + "/chat-commands/{id}", id))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isOk())
@@ -349,7 +352,7 @@ class ApiChatCommandsControllerTest {
                 "ast", astJson,
                 "ejectedJs", "return \"hand-written\";"));
 
-        mvc.perform(withAdmin(put("/api/chat-commands/{id}", id))
+        mvc.perform(withAdmin(put(OWN + "/chat-commands/{id}", id))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isOk());
@@ -389,7 +392,7 @@ class ApiChatCommandsControllerTest {
                 "enabled", true,
                 "ast", astJson));
 
-        mvc.perform(withAdmin(put("/api/chat-commands/{id}", id))
+        mvc.perform(withAdmin(put(OWN + "/chat-commands/{id}", id))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isOk());
@@ -416,7 +419,7 @@ class ApiChatCommandsControllerTest {
         def.setPermission(ChatCommandEvent.SenderRole.VIEWERS);
         when(repository.findById(otherId)).thenReturn(Optional.of(def));
 
-        mvc.perform(withAdmin(delete("/api/chat-commands/{id}", otherId)))
+        mvc.perform(withAdmin(delete(OWN + "/chat-commands/{id}", otherId)))
                 .andExpect(status().isNotFound());
 
         verify(repository, never()).delete(any(ChatCommandDefinition.class));

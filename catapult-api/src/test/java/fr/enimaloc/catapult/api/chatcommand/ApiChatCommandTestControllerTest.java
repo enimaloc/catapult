@@ -52,6 +52,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
 @Import(ApiUserResolver.class)
 class ApiChatCommandTestControllerTest {
+
+    private static final UUID SELF = UUID.randomUUID();
+    private static final String OWN = "/api/internal/users/" + SELF;
     @MockitoBean ChannelAccessService channelAccessService;
 
     @Autowired MockMvc mvc;
@@ -87,7 +90,7 @@ class ApiChatCommandTestControllerTest {
         mockUser();
         when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(false);
 
-        mvc.perform(withAdmin(post("/api/chat-commands/{id}/test", UUID.randomUUID()))
+        mvc.perform(withAdmin(post(OWN + "/chat-commands/{id}/test", UUID.randomUUID()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(om.writeValueAsString(Map.of("overrides", Map.of()))))
                 .andExpect(status().isForbidden())
@@ -110,7 +113,7 @@ class ApiChatCommandTestControllerTest {
         def.setPermission(ChatCommandEvent.SenderRole.VIEWERS);
         when(repository.findById(otherId)).thenReturn(Optional.of(def));
 
-        mvc.perform(withAdmin(post("/api/chat-commands/{id}/test", otherId))
+        mvc.perform(withAdmin(post(OWN + "/chat-commands/{id}/test", otherId))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(om.writeValueAsString(Map.of("overrides", Map.of()))))
                 .andExpect(status().isNotFound());
@@ -135,7 +138,7 @@ class ApiChatCommandTestControllerTest {
         trace.finish("Now playing Valorant!");
         when(sandboxExecutor.executeWithTrace(any(), any(), any(), any(), any(), any(), any())).thenReturn(trace);
 
-        mvc.perform(withAdmin(post("/api/chat-commands/{id}/test", id))
+        mvc.perform(withAdmin(post(OWN + "/chat-commands/{id}/test", id))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(om.writeValueAsString(Map.of("overrides", Map.of()))))
                 .andExpect(status().isOk())
@@ -163,7 +166,7 @@ class ApiChatCommandTestControllerTest {
         trace.finish("hand-written output");
         when(sandboxExecutor.executeWithTrace(any(), any(), any(), any(), any(), any(), any())).thenReturn(trace);
 
-        mvc.perform(withAdmin(post("/api/chat-commands/{id}/test", id))
+        mvc.perform(withAdmin(post(OWN + "/chat-commands/{id}/test", id))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(om.writeValueAsString(Map.of("overrides", Map.of(),
                                 "ejectedJs", "return \"hand-written output\";"))))
@@ -194,7 +197,7 @@ class ApiChatCommandTestControllerTest {
         trace.finish("persisted ejected output");
         when(sandboxExecutor.executeWithTrace(any(), any(), any(), any(), any(), any(), any())).thenReturn(trace);
 
-        mvc.perform(withAdmin(post("/api/chat-commands/{id}/test", id))
+        mvc.perform(withAdmin(post(OWN + "/chat-commands/{id}/test", id))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(om.writeValueAsString(Map.of("overrides", Map.of()))))
                 .andExpect(status().isOk())
@@ -227,7 +230,7 @@ class ApiChatCommandTestControllerTest {
         trace.finish("irrelevant");
         when(sandboxExecutor.executeWithTrace(any(), any(), any(), any(), any(), any(), any())).thenReturn(trace);
 
-        mvc.perform(withAdmin(post("/api/chat-commands/{id}/test", id))
+        mvc.perform(withAdmin(post(OWN + "/chat-commands/{id}/test", id))
                         .contentType(MediaType.APPLICATION_JSON)
                         // "tw#active" left out entirely, like a blank test-override field would be
                         .content(om.writeValueAsString(Map.of("overrides", Map.of("game#name", "Valorant")))))
@@ -269,7 +272,7 @@ class ApiChatCommandTestControllerTest {
         when(sandboxExecutor.executeWithTrace(any(), any(), any(), any(), any(), any(), any())).thenReturn(trace);
 
         // No "settings" field sent at all — must still resolve from the real saved value.
-        mvc.perform(withAdmin(post("/api/chat-commands/{id}/test", id))
+        mvc.perform(withAdmin(post(OWN + "/chat-commands/{id}/test", id))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(om.writeValueAsString(Map.of("overrides", Map.of()))))
                 .andExpect(status().isOk())
@@ -304,7 +307,7 @@ class ApiChatCommandTestControllerTest {
         trace.finish("en");
         when(sandboxExecutor.executeWithTrace(any(), any(), any(), any(), any(), any(), any())).thenReturn(trace);
 
-        mvc.perform(withAdmin(post("/api/chat-commands/{id}/test", id))
+        mvc.perform(withAdmin(post(OWN + "/chat-commands/{id}/test", id))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(om.writeValueAsString(Map.of("overrides", Map.of(), "settings", Map.of("language", "en")))))
                 .andExpect(status().isOk())
@@ -335,7 +338,7 @@ class ApiChatCommandTestControllerTest {
         trace.finish("Go check out myfriend!");
         when(sandboxExecutor.executeWithTrace(any(), any(), any(), any(), any(), any(), any())).thenReturn(trace);
 
-        mvc.perform(withAdmin(post("/api/chat-commands/{id}/test", id))
+        mvc.perform(withAdmin(post(OWN + "/chat-commands/{id}/test", id))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(om.writeValueAsString(Map.of("overrides", Map.of(),
                                 "args", java.util.List.of("myfriend")))))
@@ -367,7 +370,7 @@ class ApiChatCommandTestControllerTest {
         trace.finish("[]");
         when(sandboxExecutor.executeWithTrace(any(), any(), any(), any(), any(), any(), any())).thenReturn(trace);
 
-        mvc.perform(withAdmin(post("/api/chat-commands/{id}/test", id))
+        mvc.perform(withAdmin(post(OWN + "/chat-commands/{id}/test", id))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(om.writeValueAsString(Map.of("overrides", Map.of()))))
                 .andExpect(status().isOk());
