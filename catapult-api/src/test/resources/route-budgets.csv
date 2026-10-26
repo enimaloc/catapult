@@ -5,7 +5,7 @@ GET,/api/internal/users/{userId}/seen-features,,owner,2,
 GET,/api/internal/users/{userId}/settings,,owner,5,fixed:one settings row; the CCL and TW catalogs are global
 GET,/api/internal/users/{userId}/dtdd-mapping,,owner,5,fixed:the mapping of the one game the channel plays
 GET,/api/internal/users/{userId}/twitchat-events,,owner,2,
-GET,/api/internal/users/{userId}/chat-commands/enabled,,owner,7,n+1
+GET,/api/internal/users/{userId}/chat-commands/enabled,,owner,3,
 GET,/api/internal/users/{userId}/settings/twitchat,,owner,2,fixed:one settings row
 GET,/api/internal/users/{userId}/notification-channels,,owner,2,fixed:there are only two channels and both are on
 GET,/api/internal/users/{userId}/notifications,,owner,7,n+1
