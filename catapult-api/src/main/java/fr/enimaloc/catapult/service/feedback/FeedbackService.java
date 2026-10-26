@@ -29,8 +29,11 @@ public class FeedbackService {
         return repository.findByUserOrderByCreatedAtDesc(user).stream().map(Submission::of).toList();
     }
 
-    /** Opens the GitLab issue first, then saves the submission. */
-    public FeedbackSubmission submit(UserAccount user, String title, FeedbackSubmission.Type feedbackType, String description) {
+    /**
+     * Opens the GitLab issue first, then saves the submission; answers it as {@link #list} does, without the member.
+     * No transaction: nothing lazy is read, and none is held open across the GitLab call.
+     */
+    public Submission submit(UserAccount user, String title, FeedbackSubmission.Type feedbackType, String description) {
         String label = feedbackType == FeedbackSubmission.Type.BUG ? "bug" : "enhancement";
         String issueBody = buildIssueBody(user, description);
 
@@ -47,7 +50,7 @@ public class FeedbackService {
         repository.save(submission);
 
         log.info("Feedback submitted by user {}: {} #{}", user.getId(), feedbackType, created.iid());
-        return submission;
+        return Submission.of(submission);
     }
 
     public void unsubscribe(UserAccount user, UUID id) {
