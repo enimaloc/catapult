@@ -18,6 +18,9 @@ import org.springframework.web.util.UriComponentsBuilder;
  * login hands out a seeded account's JWT, and the session opens as the Twitch callback opens it
  * ({@link SessionLogin}). The member lands on their channel, the admin on the admin page. Open to anyone
  * (the default security chain lets every request through); absent outside {@code perf}.
+ *
+ * <p>A GET that logs in is deliberately CSRF-able (a link logs a browser in, which the runs rely on): that is why
+ * it exists only under {@code perf}, on seeded accounts.
  */
 @Controller
 @Profile("perf")

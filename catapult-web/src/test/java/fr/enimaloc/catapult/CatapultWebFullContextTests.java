@@ -32,7 +32,7 @@ class CatapultWebFullContextTests extends WebFullContextTestBase {
     void noPerfRouteOutsideThePerfProfile() throws Exception {
         assertThat(context.getBeanNamesForType(PerfLoginController.class)).isEmpty();
         var answer = get(port, "/perf/login?username=x");
-        assertThat(answer.statusCode()).isNotEqualTo(200).isNotIn(301, 302, 303, 307, 308);
+        assertThat(answer.statusCode()).isEqualTo(404);
         assertThat(answer.headers().allValues("Set-Cookie")).noneMatch(c -> c.startsWith("SESSION="));
     }
 }

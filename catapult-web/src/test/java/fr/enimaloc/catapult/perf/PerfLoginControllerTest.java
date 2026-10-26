@@ -78,7 +78,8 @@ class PerfLoginControllerTest {
         answer("perf-streamer-001", new ApiClient.Result<>(200, null));
 
         mvc.perform(get("/perf/login").param("username", "perf-streamer-001"))
-                .andExpect(status().isBadGateway());
+                .andExpect(status().isBadGateway())
+                .andExpect(request().sessionAttributeDoesNotExist(ApiClient.SESSION_JWT_KEY));
     }
 
     private void answer(String username, ApiClient.Result<TokenResponse> result) {
