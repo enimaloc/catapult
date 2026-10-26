@@ -36,7 +36,7 @@ class MetricsEventListenerTest {
 
         listener.onStreamOffline(new StreamOfflineEvent(this, user));
 
-        // Le timer est pré-enregistré (exporté à 0) mais rien ne doit y être enregistré
+        // The timer is pre-registered (exported at 0) but nothing must be recorded in it
         assertThat(registry.get("catapult.stream.duration").timer().count()).isZero();
     }
 }

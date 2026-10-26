@@ -104,7 +104,7 @@ class MinecraftTokenServiceTest {
 
     @Test
     void getToken_transientAccountWithoutId_validatesWithoutPersistingOrCaching() {
-        // compte pas encore persisté (validation d'enrôlement) : id null ne doit ni NPE ni écrire en base
+        // account not persisted yet (enrolment validation): a null id must neither NPE nor write to the database
         var transientAccount = new MinecraftServiceAccount();
         transientAccount.setLabel("Nouveau");
         transientAccount.setMsaRefreshToken("enc-refresh");

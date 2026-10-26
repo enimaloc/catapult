@@ -283,7 +283,7 @@ class MinecraftFriendServiceTest {
 
     @Test
     void sync_matchesProfileIdsRegardlessOfDashes() {
-        // lien stocké avec tirets (lookup), friends list sans tirets : doit matcher quand même
+        // link stored with dashes (lookup), friends list without dashes: must still match
         var link = pendingLink("069a79f4-44e9-4726-a5be-fca90e38aaf5", "jeb_");
         when(linkRepository.findByServiceAccount(bot1)).thenReturn(List.of(link));
         when(linkRepository.findByServiceAccount(bot2)).thenReturn(List.of());

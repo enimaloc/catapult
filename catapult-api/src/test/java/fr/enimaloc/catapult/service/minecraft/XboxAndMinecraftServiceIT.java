@@ -14,16 +14,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
 /**
- * Test d'intégration de la chaîne complète d'authentification Minecraft :
+ * Integration test of the whole Minecraft authentication chain:
  * rpsTicket → user token Xbox → token XSTS → token Minecraft.
- * Skippé sauf si {@code XBOX_RPS_TICKET} est défini :
+ * Skipped unless {@code XBOX_RPS_TICKET} is set:
  *
  * <pre>
  * XBOX_RPS_TICKET="d=&lt;ticket&gt;" ./gradlew :catapult-api:test --tests XboxAndMinecraftServiceIT
  * </pre>
  * <p>
- * Le préfixe {@code d=} est requis pour un ticket issu du flux OAuth Live
- * (scope {@code XboxLive.signin}) ; il est ajouté automatiquement s'il manque.
+ * The {@code d=} prefix is required for a ticket coming from the Live OAuth flow
+ * (scope {@code XboxLive.signin}); it is added automatically when missing.
  */
 @EnabledIfEnvironmentVariable(named = "XBOX_RPS_TICKET", matches = ".+")
 class XboxAndMinecraftServiceIT {
@@ -53,7 +53,7 @@ class XboxAndMinecraftServiceIT {
         System.out.println("  notAfter = " + token.notAfter());
         System.out.println("  token    = " + token.token().substring(0, Math.min(40, token.token().length())) + "…");
 
-        // XSTS attend le user token de l'étape 1, pas le rpsTicket
+        // XSTS expects the user token from step 1, not the rpsTicket
         var xstsToken = xboxService.getXstsToken(token);
 
         assertThat(xstsToken).isNotNull();
@@ -107,13 +107,13 @@ class XboxAndMinecraftServiceIT {
         System.out.println("  friends    = " + Arrays.toString(afterAdd.friends()));
         System.out.println("  outgoing   = " + Arrays.toString(afterAdd.outgoingRequests()));
 
-        System.out.println("En attente de l'acceptation de la demande d'ami par enimaloc…");
-        await("acceptation de la demande d'ami par enimaloc")
+        System.out.println("Waiting for enimaloc to accept the friend request…");
+        await("friend request acceptance by enimaloc")
                 .atMost(Duration.ofMinutes(5))
                 .pollInterval(Duration.ofSeconds(10))
                 .until(() -> Arrays.stream(minecraftService.getFriends(minecraftToken).friends())
                         .anyMatch(friend -> "enimaloc".equalsIgnoreCase(friend.name())));
-        System.out.println("Demande d'ami acceptée");
+        System.out.println("Friend request accepted");
 
         var presences = minecraftService.updatePresence(minecraftToken, MinecraftService.PresenceStatus.ONLINE);
 
@@ -126,7 +126,7 @@ class XboxAndMinecraftServiceIT {
                     presence.profileId(), presence.status(), presence.lastUpdated());
         }
 
-        // Retour OFFLINE pour ne pas laisser une fausse présence sur le compte
+        // Back to OFFLINE so no false presence is left on the account
         minecraftService.updatePresence(minecraftToken, MinecraftService.PresenceStatus.OFFLINE);
     }
 }
