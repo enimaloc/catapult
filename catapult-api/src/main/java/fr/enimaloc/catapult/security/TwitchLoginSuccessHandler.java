@@ -69,7 +69,7 @@ public class TwitchLoginSuccessHandler implements AuthenticationSuccessHandler {
                 saveRefreshToken(request, authentication, catUser, "twitch", OAuthToken.Provider.TWITCH);
 
                 // If catapult-web is configured, redirect there with a one-time code instead of the JWT.
-                // catapult-web exchanges the code server-to-server via POST /api/auth/exchange (30s TTL, single-use).
+                // catapult-web exchanges the code server-to-server via POST /api/internal/auth/exchange (30s TTL, single-use).
                 // catapult-web's state comes back with it: its callback only completes a login its session started.
                 if (webUrl != null && !webUrl.isBlank()) {
                     String jwt = jwtService.generate(catUser);

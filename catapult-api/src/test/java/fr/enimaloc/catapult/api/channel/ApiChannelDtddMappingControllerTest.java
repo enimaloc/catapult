@@ -1,8 +1,7 @@
 package fr.enimaloc.catapult.api.channel;
 
-import fr.enimaloc.catapult.common.dto.channel.ProposeRequest;
+import fr.enimaloc.catapult.common.dto.channel.DtddProposalRequest;
 import fr.enimaloc.catapult.common.dto.channel.SearchResultDto;
-import fr.enimaloc.catapult.common.dto.channel.ValidateRequest;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.dtdd.DtddGameCache;
 import fr.enimaloc.catapult.domain.dtdd.DtddGameMapping;
@@ -105,7 +104,7 @@ class ApiChannelDtddMappingControllerTest {
         when(mappingRepo.findById("100")).thenReturn(Optional.of(mapping));
         when(proposalRepo.countByIgdbIdAndStatus("100", Status.PENDING)).thenReturn(0L);
 
-        controller.validate(new ValidateRequest("100"));
+        controller.validate("100");
 
         assertThat(mapping.isVerified()).isTrue();
         assertThat(mapping.getConfidence()).isEqualTo(1.0);
@@ -117,14 +116,14 @@ class ApiChannelDtddMappingControllerTest {
     void validate_rejects_whenAlreadyVerified() {
         when(mappingRepo.findById("100")).thenReturn(Optional.of(
             new DtddGameMapping("100", 4521L, 0.92, true, Instant.now())));
-        assertThatThrownBy(() -> controller.validate(new ValidateRequest("100")))
+        assertThatThrownBy(() -> controller.validate("100"))
             .isInstanceOf(ResponseStatusException.class);
         verifyNoInteractions(mappingEvents);
     }
 
     @Test
     void propose_createsPendingProposal() {
-        controller.propose(new ProposeRequest("100", 1287L, "wrong game"), jwt);
+        controller.propose("100", new DtddProposalRequest(1287L, "wrong game"), jwt);
         var saved = org.mockito.ArgumentCaptor.forClass(DtddMappingProposal.class);
         verify(proposalRepo).save(saved.capture());
         assertThat(saved.getValue().getProposer()).isSameAs(user); // the caller, from the JWT

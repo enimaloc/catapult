@@ -108,8 +108,8 @@ class RealApiServiceTest {
 
     @Test
     void changelog_readsTheVersions_orNullWhenItFails() {
-        respond(HttpMethod.GET, "/api/changelog", "[{\"version\":\"0.3.7\",\"entries\":[]}]");
-        expect(HttpMethod.GET, "/api/changelog").andRespond(withStatus(HttpStatus.BAD_GATEWAY));
+        respond(HttpMethod.GET, "/api/internal/changelog", "[{\"version\":\"0.3.7\",\"entries\":[]}]");
+        expect(HttpMethod.GET, "/api/internal/changelog").andRespond(withStatus(HttpStatus.BAD_GATEWAY));
 
         assertThat(service.changelog()).singleElement().satisfies(s -> assertThat(s.version()).isEqualTo("0.3.7"));
         assertThat(service.changelog()).isNull();
@@ -117,9 +117,9 @@ class RealApiServiceTest {
 
     @Test
     void apiAvailable_onlyWhenItsHealthIsUp() {
-        respond(HttpMethod.GET, "/api/health", "{\"status\":\"UP\"}");
-        respond(HttpMethod.GET, "/api/health", "{\"status\":\"DOWN\"}");
-        expect(HttpMethod.GET, "/api/health").andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
+        respond(HttpMethod.GET, "/api/internal/health", "{\"status\":\"UP\"}");
+        respond(HttpMethod.GET, "/api/internal/health", "{\"status\":\"DOWN\"}");
+        expect(HttpMethod.GET, "/api/internal/health").andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
 
         assertThat(service.apiAvailable()).isTrue();
         assertThat(service.apiAvailable()).isFalse();
@@ -171,7 +171,7 @@ class RealApiServiceTest {
 
     @Test
     void accountInfo_readsTheValidatedAccount() {
-        respond(HttpMethod.GET, "/api/auth/validate", """
+        respond(HttpMethod.GET, "/api/internal/auth/validate", """
                 {"id":"00000000-0000-0000-0000-000000000001","twitchId":"1","username":"me","status":"PENDING_DELETION",
                  "roles":[],"deletionRequestedAt":"2026-10-01T10:00:00Z"}""");
 
@@ -183,21 +183,21 @@ class RealApiServiceTest {
 
     @Test
     void accountInfo_isNullWhenItFails() {
-        expect(HttpMethod.GET, "/api/auth/validate").andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+        expect(HttpMethod.GET, "/api/internal/auth/validate").andRespond(withStatus(HttpStatus.UNAUTHORIZED));
 
         assertThat(service.accountInfo()).isNull();
     }
 
     @Test
     void accountDeletionDelayDays_readsTheConfig() {
-        respond(HttpMethod.GET, "/api/config/app", "{\"name\":\"Catapult\",\"deletionDelayDays\":14,\"gettersName\":[]}");
+        respond(HttpMethod.GET, "/api/internal/config/app", "{\"name\":\"Catapult\",\"deletionDelayDays\":14,\"gettersName\":[]}");
 
         assertThat(service.accountDeletionDelayDays()).isEqualTo(14);
     }
 
     @Test
     void accountDeletionDelayDays_fallsBackTo7() {
-        expect(HttpMethod.GET, "/api/config/app").andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
+        expect(HttpMethod.GET, "/api/internal/config/app").andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
 
         assertThat(service.accountDeletionDelayDays()).isEqualTo(7);
     }
@@ -206,7 +206,7 @@ class RealApiServiceTest {
 
     @Test
     void exchangeCode() {
-        respond(HttpMethod.POST, "/api/auth/exchange?code=abc", "{\"token\":\"jwt\"}");
+        respond(HttpMethod.POST, "/api/internal/auth/exchange?code=abc", "{\"token\":\"jwt\"}");
 
         assertThat(service.exchangeCode("abc")).isEqualTo(new TokenResponse("jwt"));
     }
@@ -298,7 +298,7 @@ class RealApiServiceTest {
 
     @Test
     void help_forwardsTheLocale() {
-        expect(HttpMethod.GET, "/api/help/status")
+        expect(HttpMethod.GET, "/api/internal/help-cards/status")
                 .andExpect(org.springframework.test.web.client.match.MockRestRequestMatchers.header("Accept-Language", "fr-FR"))
                 .andRespond(withSuccess("{\"title\":\"Statut\",\"body\":\"<p>x</p>\"}", MediaType.APPLICATION_JSON));
 
@@ -308,7 +308,7 @@ class RealApiServiceTest {
 
     @Test
     void help_isNullWhenUnreachable() {
-        expect(HttpMethod.GET, "/api/help/status").andRespond(withStatus(HttpStatus.BAD_GATEWAY));
+        expect(HttpMethod.GET, "/api/internal/help-cards/status").andRespond(withStatus(HttpStatus.BAD_GATEWAY));
         assertThat(service.help("status", java.util.Locale.ENGLISH)).isNull();
     }
 
@@ -381,7 +381,7 @@ class RealApiServiceTest {
 
     @Test
     void dtddSearch() {
-        respond(HttpMethod.GET, "/api/channel/dtdd-mapping/search?q=doom", "{\"results\":[]}");
+        respond(HttpMethod.GET, "/api/internal/dtdd-games?q=doom", "{\"results\":[]}");
 
         assertThat(service.dtddSearch("doom")).isEqualTo(new SearchResponse(java.util.List.of()));
     }
@@ -566,13 +566,13 @@ class RealApiServiceTest {
 
     @Test
     void dtddValidate() {
-        expectPost("/api/channel/dtdd-mapping/validate", "{\"igdbId\":\"42\"}");
+        expectPost("/api/internal/admin/dtdd-mappings/42/validate");
         service.dtddValidate("42");
     }
 
     @Test
     void dtddPropose() {
-        expectPost("/api/channel/dtdd-mapping/propose", "{\"igdbId\":\"42\",\"dtddId\":9,\"reason\":\"correction\"}");
+        expectPost("/api/internal/dtdd-mappings/42/proposals", "{\"dtddId\":9,\"reason\":\"correction\"}");
         service.dtddPropose("42", 9L, "correction");
     }
 
@@ -808,7 +808,7 @@ class RealApiServiceTest {
 
     @Test
     void wellKnown_mapsTheEnvelope_withoutTheBearer() {
-        expect(HttpMethod.GET, "/api/well-known/serve?location=WELL_KNOWN&path=change-password")
+        expect(HttpMethod.GET, "/api/internal/well-known-files?location=WELL_KNOWN&path=change-password")
                 .andRespond(withSuccess("{\"status\":302,\"contentType\":\"text/plain\",\"headers\":"
                         + "[{\"name\":\"Location\",\"value\":\"/x\"}],\"content\":\"\"}", MediaType.APPLICATION_JSON));
 
@@ -835,11 +835,11 @@ class RealApiServiceTest {
         org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(
                 new org.springframework.web.context.request.ServletRequestAttributes(request));
         try {
-            expect(HttpMethod.GET, "/api/meta-tags")
+            expect(HttpMethod.GET, "/api/internal/meta-tags")
                     .andExpect(org.springframework.test.web.client.match.MockRestRequestMatchers.headerDoesNotExist("Authorization"))
                     .andRespond(withSuccess("[{\"id\":1,\"attribute\":\"PROPERTY\",\"key\":\"og:image\",\"content\":\"https://x/y.png\","
                             + "\"updatedAt\":\"2026-10-19T10:00:00Z\"}]", MediaType.APPLICATION_JSON));
-            expect(HttpMethod.GET, "/api/meta-tags").andRespond(withStatus(HttpStatus.BAD_GATEWAY));
+            expect(HttpMethod.GET, "/api/internal/meta-tags").andRespond(withStatus(HttpStatus.BAD_GATEWAY));
 
             assertThat(service.metaTags()).containsExactly(new fr.enimaloc.catapult.common.dto.admin.MetaTagDto(1,
                     fr.enimaloc.catapult.common.dto.admin.MetaTagAttribute.PROPERTY, "og:image", "https://x/y.png",
@@ -866,7 +866,7 @@ class RealApiServiceTest {
 
     @Test
     void wellKnown_relaysA404() {
-        expect(HttpMethod.GET, "/api/well-known/serve?location=ROOT&path=nope.txt").andRespond(withStatus(HttpStatus.NOT_FOUND));
+        expect(HttpMethod.GET, "/api/internal/well-known-files?location=ROOT&path=nope.txt").andRespond(withStatus(HttpStatus.NOT_FOUND));
 
         assertThat(service.wellKnown(fr.enimaloc.catapult.common.dto.admin.WellKnownLocation.ROOT, "nope.txt").status())
                 .isEqualTo(404);
@@ -905,7 +905,7 @@ class RealApiServiceTest {
         org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(
                 new org.springframework.web.context.request.ServletRequestAttributes(request));
         try {
-            expect(HttpMethod.GET, "/api/well-known/serve?location=WELL_KNOWN&path=a.txt")
+            expect(HttpMethod.GET, "/api/internal/well-known-files?location=WELL_KNOWN&path=a.txt")
                     .andExpect(org.springframework.test.web.client.match.MockRestRequestMatchers
                             .headerDoesNotExist("Authorization"))
                     .andExpect(org.springframework.test.web.client.match.MockRestRequestMatchers

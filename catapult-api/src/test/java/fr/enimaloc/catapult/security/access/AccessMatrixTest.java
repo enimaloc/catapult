@@ -27,7 +27,7 @@ class AccessMatrixTest extends AccessMatrixSupport {
                     return r;
                 }))
                 .andExpect(status().isOk());
-        mvc.perform(get("/api/auth/validate")
+        mvc.perform(get("/api/internal/auth/validate")
                         .header("Authorization", authorization.get("owner"))
                         .with(r -> {
                             r.setRemoteAddr(REMOTE);

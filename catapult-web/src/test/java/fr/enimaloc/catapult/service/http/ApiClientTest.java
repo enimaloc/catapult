@@ -127,12 +127,12 @@ class ApiClientTest {
     void post_sendsNoBodyAndReadsTheResponse() throws InterruptedException {
         server.enqueue(new MockResponse().setHeader("Content-Type", "application/json").setBody("{\"name\":\"tok\"}"));
 
-        Payload payload = client.post("/api/auth/exchange?code={code}", Payload.class, "abc");
+        Payload payload = client.post("/api/internal/auth/exchange?code={code}", Payload.class, "abc");
 
         assertThat(payload).isEqualTo(new Payload("tok"));
         RecordedRequest recorded = server.takeRequest();
         assertThat(recorded.getMethod()).isEqualTo("POST");
-        assertThat(recorded.getPath()).isEqualTo("/api/auth/exchange?code=abc");
+        assertThat(recorded.getPath()).isEqualTo("/api/internal/auth/exchange?code=abc");
     }
 
     @Test
@@ -220,7 +220,7 @@ class ApiClientTest {
 
         assertThat(client.get("/api/a", Payload.class)).isNull();
         assertThat(client.post("/api/b", Payload.class)).isNull();
-        assertThat(client.get("/api/auth/validate", Payload.class)).isNull();
+        assertThat(client.get("/api/internal/auth/validate", Payload.class)).isNull();
     }
 
     @Test

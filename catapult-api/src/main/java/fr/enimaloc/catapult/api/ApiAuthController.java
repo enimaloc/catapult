@@ -17,10 +17,10 @@ import java.util.Map;
 
 /**
  * REST endpoints for JWT-based authentication used by catapult-web.
- * /api/auth/validate is called by catapult-web to confirm a JWT is valid and retrieve user info.
+ * /api/internal/auth/validate is called by catapult-web to confirm a JWT is valid and retrieve user info.
  */
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping(ApiPaths.INTERNAL + "/auth")
 @RequiredArgsConstructor
 public class ApiAuthController {
 

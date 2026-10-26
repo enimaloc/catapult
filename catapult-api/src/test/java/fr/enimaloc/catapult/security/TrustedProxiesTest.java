@@ -35,7 +35,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Import({FullContextContainers.class, TrustedProxiesTest.EchoConfig.class})
 class TrustedProxiesTest extends FullContextTestBase {
 
-    private static final String ECHO = "/api/config/test-echo-peer";
+    private static final String ECHO = "/api/internal/config/test-echo-peer";
     private static final String PROPERTY = "server.tomcat.remoteip.internal-proxies";
 
     @LocalServerPort

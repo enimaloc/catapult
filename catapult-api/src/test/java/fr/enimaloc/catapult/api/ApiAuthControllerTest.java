@@ -64,7 +64,7 @@ class ApiAuthControllerTest {
         when(accounts.findById(gone)).thenReturn(Optional.empty());
         signedInAs(gone);
 
-        mvc.perform(get("/api/auth/validate"))
+        mvc.perform(get("/api/internal/auth/validate"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.code").value("unauthorized"));
@@ -76,7 +76,7 @@ class ApiAuthControllerTest {
         when(accounts.findById(gone)).thenReturn(Optional.empty());
         signedInAs(gone);
 
-        mvc.perform(get("/api/auth/me"))
+        mvc.perform(get("/api/internal/auth/me"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("unauthorized"));
     }
@@ -91,7 +91,7 @@ class ApiAuthControllerTest {
         when(accounts.findById(account.getId())).thenReturn(Optional.of(account));
         signedInAs(account.getId());
 
-        mvc.perform(get("/api/auth/validate"))
+        mvc.perform(get("/api/internal/auth/validate"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(account.getId().toString()))
                 .andExpect(jsonPath("$.username").value("streamer"))

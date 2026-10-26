@@ -5,7 +5,7 @@ import java.util.Map;
 import java.util.function.Predicate;
 
 /**
- * One version of catapult-api's changelog ({@code GET /api/changelog}, built from its git history):
+ * One version of catapult-api's changelog ({@code GET /api/internal/changelog}, built from its git history):
  * its conventional commits, newest first.
  */
 public record ChangelogSection(String version, List<Entry> entries) {

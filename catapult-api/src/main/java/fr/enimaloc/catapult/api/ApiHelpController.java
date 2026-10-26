@@ -17,7 +17,7 @@ import java.util.Locale;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/help")
+@RequestMapping(ApiPaths.INTERNAL + "/help-cards")
 @RequiredArgsConstructor
 public class ApiHelpController {
 

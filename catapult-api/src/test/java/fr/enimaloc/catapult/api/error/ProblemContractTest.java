@@ -100,7 +100,7 @@ class ProblemContractTest extends FullContextTestBase {
         String jwt = jwtService.generateForUser(saved, List.of("ROLE_USER"));
         accounts.delete(saved);
 
-        HttpResponse<String> response = send("/api/auth/validate", Map.of("Authorization", "Bearer " + jwt));
+        HttpResponse<String> response = send("/api/internal/auth/validate", Map.of("Authorization", "Bearer " + jwt));
 
         assertThat(response.statusCode()).isEqualTo(401);
         assertThat(response.headers().firstValue("Content-Type")).hasValue(PROBLEM_JSON);

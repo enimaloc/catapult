@@ -16,7 +16,7 @@ import org.springframework.test.context.ActiveProfiles;
 class AccessMatrixDevTest extends AccessMatrixSupport {
 
     private static final String OVERRIDES = "access-matrix-dev-overrides.csv";
-    private static final String DEV_ROUTES = "/api/dev/";
+    private static final String DEV_ROUTES = "/api/internal/dev/";
 
     @Override
     protected String matrixResource() {

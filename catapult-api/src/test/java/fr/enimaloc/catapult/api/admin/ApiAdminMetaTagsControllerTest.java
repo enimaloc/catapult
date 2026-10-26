@@ -57,7 +57,7 @@ class ApiAdminMetaTagsControllerTest {
     void listPubliclyUpdateAndDelete() throws Exception {
         when(service.list()).thenReturn(List.of(TAG));
         when(service.update(eq(3L), any())).thenReturn(TAG);
-        mvc.perform(get("/api/meta-tags")).andExpect(jsonPath("$[0].content").value("https://x/y.png"));
+        mvc.perform(get("/api/internal/meta-tags")).andExpect(jsonPath("$[0].content").value("https://x/y.png"));
         mvc.perform(put("/api/admin/meta-tags/3").contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isOk());
         verify(service).update(3L, REQUEST);

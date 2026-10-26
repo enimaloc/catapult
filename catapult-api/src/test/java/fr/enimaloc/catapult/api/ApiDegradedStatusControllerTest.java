@@ -33,7 +33,7 @@ class ApiDegradedStatusControllerTest {
         when(service.status()).thenReturn(new DegradedStatusDto(true,
                 List.of(new DegradedEffectDto("app.polling.interval-seconds", "60", "30"))));
 
-        mvc.perform(get("/api/status/degraded"))
+        mvc.perform(get("/api/internal/status/degraded"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.degraded").value(true))
                 .andExpect(jsonPath("$.effects[0].key").value("app.polling.interval-seconds"))
@@ -45,7 +45,7 @@ class ApiDegradedStatusControllerTest {
     void notDegraded_leavesTheEffectsOut() throws Exception {
         when(service.status()).thenReturn(new DegradedStatusDto(false, null));
 
-        mvc.perform(get("/api/status/degraded"))
+        mvc.perform(get("/api/internal/status/degraded"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.degraded").value(false))
                 .andExpect(jsonPath("$.effects").doesNotExist());
