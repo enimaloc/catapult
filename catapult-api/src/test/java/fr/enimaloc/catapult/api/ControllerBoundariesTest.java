@@ -20,6 +20,7 @@ import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.chatcommand.ChatCommandSettingRepository;
 import fr.enimaloc.catapult.repository.experiment.ExperimentAssignmentRepository;
 import fr.enimaloc.catapult.repository.experiment.ExperimentRepository;
+import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import fr.enimaloc.catapult.repository.feedback.FeedbackSubmissionRepository;
 import fr.enimaloc.catapult.repository.steam.SteamApiKeyRepository;
 import fr.enimaloc.catapult.security.JwtService;
@@ -61,6 +62,9 @@ class ControllerBoundariesTest extends FullContextTestBase {
 
     @Autowired
     ExperimentRepository experiments;
+
+    @Autowired
+    ExperimentService experimentService;
 
     @Autowired
     ExperimentAssignmentRepository assignments;
@@ -127,8 +131,9 @@ class ControllerBoundariesTest extends FullContextTestBase {
         assignments.save(assignment);
     }
 
-    /** Activates the experiment {@code key} the application created at startup, and rolls {@code member} out to it. */
+    /** Activates the experiment {@code key}, created here when no one has yet, and rolls {@code member} out to it. */
     private void rollOut(String key, UserAccount member) {
+        experimentService.ensureExists(key, "enabled");
         new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
             Experiment experiment = experiments.findByKey(key).orElseThrow();
             experiment.setStatus(Experiment.Status.ACTIVE);

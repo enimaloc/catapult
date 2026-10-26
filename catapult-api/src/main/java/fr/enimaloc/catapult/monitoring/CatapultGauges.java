@@ -3,7 +3,6 @@ package fr.enimaloc.catapult.monitoring;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
-import fr.enimaloc.catapult.repository.chatcommand.ChatCommandDefinitionRepository;
 import fr.enimaloc.catapult.repository.minecraft.MinecraftServiceAccountRepository;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
@@ -28,7 +27,6 @@ public class CatapultGauges implements MeterBinder {
     private final StreamStateService streamStateService;
     private final ObjectProvider<EventSubTwitchChatService> eventSubChat;
     private final ObjectProvider<IrcTwitchChatService> ircChat;
-    private final ChatCommandDefinitionRepository chatCommandDefinitionRepository;
     private final OAuthTokenRepository oAuthTokenRepository;
     private final IgdbService igdbService;
     private final SystemTwitchAccountService systemTwitchAccountService;
@@ -56,11 +54,6 @@ public class CatapultGauges implements MeterBinder {
                 p -> { IrcTwitchChatService s = p.getIfAvailable(); return s == null ? 0 : s.connectionCount(); })
             .tag("transport", "irc")
             .description("Open IRC chat connections")
-            .register(registry);
-
-        Gauge.builder("catapult.commands.registered", chatCommandDefinitionRepository,
-                repo -> repo.count())
-            .description("Registered dynamic chat commands")
             .register(registry);
 
         Gauge.builder("catapult.tokens.oauth", oAuthTokenRepository,

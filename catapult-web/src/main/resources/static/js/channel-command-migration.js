@@ -1,5 +1,5 @@
 /**
- * The Integrations tab's chat command migration card: the menu shows the steps of the tool picked
+ * The Commands tab's chat command migration card: the menu shows the steps of the tool picked
  * (the other panels get the `hidden` class), and each line's button puts it on the clipboard. The
  * card is replaced by each render: listeners go on its elements.
  */
