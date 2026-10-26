@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.service.config;
 
 import fr.enimaloc.catapult.config.DatabaseOverridePropertySource;
+import fr.enimaloc.catapult.common.dto.admin.ModuleOverrideDto;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.config.ConfigAudit;
 import fr.enimaloc.catapult.domain.config.ConfigOverride;
@@ -17,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
@@ -108,6 +110,28 @@ public class ConfigOverrideService {
             refresher.refresh();
         }
         eventPublisher.publishEvent(new ConfigOverrideAppliedEvent(this, key, null));
+    }
+
+    /** The history of an API override, newest first. */
+    public List<ConfigAudit> audit(String key) {
+        return auditRepo.findByKeyOrderByChangedAtDesc(key);
+    }
+
+    /** The history of a module's override, newest first. */
+    public List<ConfigAudit> audit(String module, String key) {
+        return auditRepo.findByModuleAndKeyOrderByChangedAtDesc(module, key);
+    }
+
+    /** A module's overrides, a secret's value withheld. */
+    public List<ModuleOverrideDto> moduleOverrides(String module) {
+        return overrideRepo.findByIdModule(module).stream()
+                .map(o -> new ModuleOverrideDto(
+                        o.getKey(),
+                        o.isSecret() ? null : o.getValue(),
+                        o.isSecret(),
+                        o.getUpdatedAt(),
+                        o.getUpdatedBy()))
+                .toList();
     }
 
     private String normalizeModule(String module) {

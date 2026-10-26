@@ -2,12 +2,10 @@ package fr.enimaloc.catapult.api.admin;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.enimaloc.catapult.api.ApiUserResolver;
+import fr.enimaloc.catapult.common.dto.admin.ModuleOverrideDto;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.config.ConfigAudit;
-import fr.enimaloc.catapult.domain.config.ConfigOverride;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
-import fr.enimaloc.catapult.repository.config.ConfigAuditRepository;
-import fr.enimaloc.catapult.repository.config.ConfigOverrideRepository;
 import fr.enimaloc.catapult.service.account.ChannelAccessService;
 import fr.enimaloc.catapult.service.config.ConfigCatalogService;
 import fr.enimaloc.catapult.service.config.ConfigEntry;
@@ -53,8 +51,6 @@ class ApiAdminConfigControllerTest {
     @MockitoBean ConfigCatalogService catalogService;
     @MockitoBean ConfigOverrideService overrideService;
     @MockitoBean UserAccountRepository userRepo;
-    @MockitoBean ConfigAuditRepository auditRepo;
-    @MockitoBean ConfigOverrideRepository overrideRepo;
 
     @Test
     @WithMockUser(roles = "ADMIN")
@@ -102,7 +98,7 @@ class ApiAdminConfigControllerTest {
     @Test
     @WithMockUser(roles = "ADMIN")
     void audit_returnsHistory() throws Exception {
-        when(auditRepo.findByKeyOrderByChangedAtDesc("app.foo")).thenReturn(List.of(new ConfigAudit()));
+        when(overrideService.audit("app.foo")).thenReturn(List.of(new ConfigAudit()));
         mvc.perform(get("/api/internal/admin/config/audit").param("key", "app.foo"))
                 .andExpect(status().isOk());
     }
@@ -116,14 +112,8 @@ class ApiAdminConfigControllerTest {
     @Test
     @WithMockUser(roles = "ADMIN")
     void getModuleOverrides_returnsList() throws Exception {
-        ConfigOverride o = new ConfigOverride();
-        o.setModule("web");
-        o.setKey("web.feature.foo");
-        o.setValue("true");
-        o.setSecret(false);
-        o.setUpdatedAt(Instant.parse("2026-01-01T00:00:00Z"));
-        o.setUpdatedBy(UUID.randomUUID());
-        when(overrideRepo.findByIdModule("web")).thenReturn(List.of(o));
+        when(overrideService.moduleOverrides("web")).thenReturn(List.of(new ModuleOverrideDto(
+                "web.feature.foo", "true", false, Instant.parse("2026-01-01T00:00:00Z"), UUID.randomUUID())));
 
         mvc.perform(get("/api/internal/admin/config/modules/{module}", "web"))
                 .andExpect(status().isOk())
@@ -167,7 +157,7 @@ class ApiAdminConfigControllerTest {
     @Test
     @WithMockUser(roles = "ADMIN")
     void moduleAudit_returnsHistoryScopedToModule() throws Exception {
-        when(auditRepo.findByModuleAndKeyOrderByChangedAtDesc("web", "web.feature.foo"))
+        when(overrideService.audit("web", "web.feature.foo"))
                 .thenReturn(List.of(new ConfigAudit()));
         mvc.perform(get("/api/internal/admin/config/modules/{m}/audit", "web").param("key", "web.feature.foo"))
                 .andExpect(status().isOk());
