@@ -28,4 +28,16 @@ public sealed interface CategoryTrigger {
 
     /** {@code stream.offline}: the default category when enabled; the custom binding is never read. */
     record StreamEnded() implements CategoryTrigger {}
+
+    /**
+     * A game binding was edited (and saved): it is sent as is when it is the game played now and no custom binding is
+     * active. No live check and no fallback: an ignored or INCOMPLETE binding is skipped by Twitch itself.
+     */
+    record BindingEdited(GameBinding binding) implements CategoryTrigger {}
+
+    /**
+     * An admin game mapping changed {@code binding}, the channel playing it: the detection's rules for a live channel
+     * only (nothing kept pending), skipped while a custom binding is active.
+     */
+    record MappingChanged(GameBinding binding) implements CategoryTrigger {}
 }

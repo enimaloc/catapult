@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.category;
 
+import fr.enimaloc.catapult.service.category.CategoryTrigger.MappingChanged;
 import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.api.channel.ApiChannelActionsController;
 import fr.enimaloc.catapult.chat.command.registry.catapult.CatapultSetGameFunction;
@@ -106,6 +107,7 @@ public class ChannelFixture {
     private final StreamStateService streamStateService;
     private final RaidRestoreHold raidRestoreHold = new RaidRestoreHold();
     private final RaidRestoreGameService raidRestoreGameService;
+    private final CategoryChain categoryChain;
     private final GameEventListener listener;
     private final BindingService bindingService;
     private final CustomBindingService customBindingService;
@@ -205,15 +207,14 @@ public class ChannelFixture {
                 new CustomBindingActivations(activationRepository, experimentService, publisher);
         gameStateService = new GameStateService(publisher);
         streamStateService = new StreamStateService(publisher, dispatcher);
+        categoryChain = new CategoryChain(activations, streamStateService, settingsRepository,
+                raidRestoreHold, gameStateService, new CategoryApplier(twitch, streamStateService));
         bindingService = new BindingService(bindingRepository, igdbService, mock(IgdbGameDetailsService.class),
-                twitch, mock(TwResolverService.class), gameStateService, mock(GameMappingRepository.class),
-                activations, lookup);
+                twitch, mock(TwResolverService.class), mock(GameMappingRepository.class), lookup, categoryChain);
         raidRestoreGameService = new RaidRestoreGameService(settingsRepository,
                 new RaidRestoreGateService(experimentService), gameStateService, bindingService, twitch, activations,
                 raidRestoreHold);
-        CategoryChain categoryChain = new CategoryChain(activations, streamStateService, settingsRepository,
-                raidRestoreHold, new CategoryApplier(twitch, streamStateService));
-        listener = new GameEventListener(bindingService, twitch, settingsRepository, streamStateService, publisher,
+        listener = new GameEventListener(bindingService, streamStateService, publisher,
                 raidRestoreHold, activations, categoryChain);
         customBindingService = new CustomBindingService(customBindingRepository, activations, twitch,
                 experimentService, gameStateService, streamStateService, settingsRepository, accountRepository,
@@ -373,7 +374,7 @@ public class ChannelFixture {
 
     /** An admin game mapping changed {@code binding}, the channel playing it. */
     public ChannelUpdateOutcome mappingChanged(GameBinding binding) {
-        return listener.applyBindingIfLive(user, binding);
+        return categoryChain.apply(user, new MappingChanged(binding)).orThrow().status();
     }
 
     public ActivationResult activate(CustomBinding custom) {

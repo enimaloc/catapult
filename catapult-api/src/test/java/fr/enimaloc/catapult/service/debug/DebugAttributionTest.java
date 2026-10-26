@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.debug;
 
+import fr.enimaloc.catapult.service.category.CategoryChain;
 import fr.enimaloc.catapult.service.binding.CustomBindingActivations;
 import fr.enimaloc.catapult.api.connect.ApiSteamConnectController;
 import fr.enimaloc.catapult.chat.ChatCommandEvent;
@@ -309,8 +310,7 @@ class DebugAttributionTest {
         });
         BindingService service = new BindingService(bindings, mock(IgdbService.class),
                 mock(IgdbGameDetailsService.class), mock(TwitchService.class), mock(TwResolverService.class),
-                mock(GameStateService.class), mappings, mock(CustomBindingActivations.class),
-                new GameBindingLookup(bindings));
+                mappings, new GameBindingLookup(bindings), mock(CategoryChain.class));
 
         service.refreshIncompleteBindings();
 

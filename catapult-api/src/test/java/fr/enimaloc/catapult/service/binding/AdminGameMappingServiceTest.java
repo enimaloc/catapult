@@ -16,6 +16,9 @@ import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
 import fr.enimaloc.catapult.repository.binding.GameMappingRepository;
 import fr.enimaloc.catapult.service.category.CategoryApplier;
 import fr.enimaloc.catapult.service.category.CategoryChain;
+import fr.enimaloc.catapult.service.category.CategoryOutcome;
+import fr.enimaloc.catapult.service.category.CategoryRule;
+import fr.enimaloc.catapult.service.category.CategoryTrigger.MappingChanged;
 import fr.enimaloc.catapult.service.igdb.IgdbGameDetailsService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
@@ -71,6 +74,7 @@ class AdminGameMappingServiceTest {
     @Mock PlatformTransactionManager transactionManager;
 
     BindingService bindingService;
+    CategoryChain chain;
     AdminGameMappingService service;
     UserAccount admin;
     final AtomicBoolean committed = new AtomicBoolean();
@@ -78,16 +82,13 @@ class AdminGameMappingServiceTest {
 
     @BeforeEach
     void setUp() {
-        bindingService = spy(new BindingService(bindingRepo, igdbService, igdbGameDetailsService, twitchService,
-                twResolverService, gameStateService, mappingRepo, mock(CustomBindingActivations.class),
-                new GameBindingLookup(bindingRepo)));
         CustomBindingActivations activations = mock(CustomBindingActivations.class);
-        CategoryChain chain = new CategoryChain(activations, streamStateService, userSettingsRepository,
-                raidRestoreHold, new CategoryApplier(twitchService, streamStateService));
-        GameEventListener listener = new GameEventListener(bindingService, twitchService, userSettingsRepository,
-                streamStateService, channelEventPublisher, raidRestoreHold, activations, chain);
+        chain = spy(new CategoryChain(activations, streamStateService, userSettingsRepository,
+                raidRestoreHold, gameStateService, new CategoryApplier(twitchService, streamStateService)));
+        bindingService = spy(new BindingService(bindingRepo, igdbService, igdbGameDetailsService, twitchService,
+                twResolverService, mappingRepo, new GameBindingLookup(bindingRepo), chain));
         service = new AdminGameMappingService(mappingRepo, bindingRepo, userRepo, bindingService, gameStateService,
-                streamStateService, channelEventPublisher, listener, transactionManager);
+                streamStateService, channelEventPublisher, chain, transactionManager);
 
         admin = user("admin");
         doAnswer(inv -> { committed.set(true); return null; }).when(transactionManager).commit(any());
@@ -340,6 +341,21 @@ class AdminGameMappingServiceTest {
         assertThat(result.liveChannelsFailed()).isEqualTo(1);
         assertThat(result.liveChannelsUpdated()).isZero();
         verify(transactionManager, never()).rollback(any());
+    }
+
+    @Test
+    void aCarriedErrorCountsAsFailed() {
+        UserAccount onIt = user("on-it");
+        bindingsOfTheGame(binding(onIt, "730", Status.AUTO));
+        liveOn(onIt, "730");
+        doReturn(CategoryOutcome.error(CategoryRule.GAME_BINDING, new IllegalStateException("boom")))
+                .when(chain).apply(any(), any(MappingChanged.class));
+
+        GameMappingResult result = service.create(request("730", "32399", true), admin);
+
+        assertThat(result.liveChannelsUpdated()).isZero();
+        assertThat(result.liveChannelsFailed()).isEqualTo(1);
+        assertThat(result.mapping()).isNotNull();
     }
 
     @Test

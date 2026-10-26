@@ -9,13 +9,14 @@ import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.binding.GameBinding.SourceType;
 import fr.enimaloc.catapult.domain.binding.GameBinding.Status;
 import fr.enimaloc.catapult.domain.binding.GameMapping;
-import fr.enimaloc.catapult.event.listener.GameEventListener;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
 import fr.enimaloc.catapult.repository.binding.GameMappingRepository;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
-import fr.enimaloc.catapult.service.twitch.ChannelUpdateOutcome;
+import fr.enimaloc.catapult.service.category.CategoryChain;
+import fr.enimaloc.catapult.service.category.CategoryOutcome;
+import fr.enimaloc.catapult.service.category.CategoryTrigger.MappingChanged;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.Hibernate;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -48,7 +49,7 @@ import java.util.stream.Collectors;
  * choice), deleting one sends its MAPPED bindings back to IGDB, in the same transaction as the mapping itself.
  * After the commit, each changed binding is pushed to its streamer's dashboard and, when asked, the channels live
  * on that game get it on Twitch through the detection's own path
- * ({@link GameEventListener#applyBindingIfLive}); a Twitch failure there is logged and counted, the mapping stays.
+ * ({@link CategoryChain}, {@link MappingChanged}); a Twitch failure there is logged and counted, the mapping stays.
  */
 @Slf4j
 @Service
@@ -68,13 +69,13 @@ public class AdminGameMappingService {
     private final GameStateService gameStateService;
     private final StreamStateService streamStateService;
     private final ChannelEventPublisher channelEventPublisher;
-    private final GameEventListener gameEventListener;
+    private final CategoryChain categoryChain;
     private final TransactionTemplate transactions;
 
     public AdminGameMappingService(GameMappingRepository mappingRepository, GameBindingRepository bindingRepository,
                                    UserAccountRepository userAccountRepository, BindingService bindingService,
                                    GameStateService gameStateService, StreamStateService streamStateService,
-                                   ChannelEventPublisher channelEventPublisher, GameEventListener gameEventListener,
+                                   ChannelEventPublisher channelEventPublisher, CategoryChain categoryChain,
                                    PlatformTransactionManager transactionManager) {
         this.mappingRepository = mappingRepository;
         this.bindingRepository = bindingRepository;
@@ -83,7 +84,7 @@ public class AdminGameMappingService {
         this.gameStateService = gameStateService;
         this.streamStateService = streamStateService;
         this.channelEventPublisher = channelEventPublisher;
-        this.gameEventListener = gameEventListener;
+        this.categoryChain = categoryChain;
         this.transactions = new TransactionTemplate(transactionManager);
     }
 
@@ -209,18 +210,16 @@ public class AdminGameMappingService {
         int failed = 0;
         for (GameBinding binding : written.live()) {
             UserAccount user = binding.getUser();
-            ChannelUpdateOutcome outcome;
-            try {
-                outcome = gameEventListener.applyBindingIfLive(user, binding);
-            } catch (RuntimeException e) {
+            CategoryOutcome outcome = categoryChain.apply(user, new MappingChanged(binding));
+            if (outcome.error() != null) {
                 failed++;
                 log.warn("Live channel of user {} not updated after a game mapping change: {}",
-                        user.getId(), e.getMessage(), e);
+                        user.getId(), outcome.error().getMessage(), outcome.error());
                 continue;
             }
             // Skipped (offline since the transaction picked it, bot disabled, no fallback for an INCOMPLETE binding):
             // neither updated nor failed, never kept pending.
-            switch (outcome) {
+            switch (outcome.status()) {
                 case APPLIED -> updated++;
                 case FAILED -> {
                     failed++;

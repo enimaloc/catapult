@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.category;
 
+import fr.enimaloc.catapult.service.binding.GameStateService;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.account.UserSettings;
 import fr.enimaloc.catapult.domain.binding.CustomBinding;
@@ -7,13 +8,16 @@ import fr.enimaloc.catapult.domain.binding.CustomBindingActivation;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
 import fr.enimaloc.catapult.service.binding.CustomBindingActivations;
+import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.service.binding.RaidRestoreHold;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
 import fr.enimaloc.catapult.service.category.CategoryChain.DetectionGuard;
 import fr.enimaloc.catapult.service.category.CategoryDecision.Action;
 import fr.enimaloc.catapult.service.category.CategoryOutcome.Reason;
+import fr.enimaloc.catapult.service.category.CategoryTrigger.BindingEdited;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.GameClosed;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.GameDetected;
+import fr.enimaloc.catapult.service.category.CategoryTrigger.MappingChanged;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.NoGameAfterCustomBinding;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.StreamEnded;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.StreamStarted;
@@ -41,6 +45,7 @@ class CategoryChainTest {
     @Mock private CustomBindingActivations activations;
     @Mock private StreamStateService streamStateService;
     @Mock private UserSettingsRepository settingsRepository;
+    @Mock private GameStateService gameStateService;
     @Mock private CategoryApplier applier;
 
     private final RaidRestoreHold hold = new RaidRestoreHold();
@@ -51,7 +56,7 @@ class CategoryChainTest {
 
     @BeforeEach
     void setUp() {
-        chain = new CategoryChain(activations, streamStateService, settingsRepository, hold, applier);
+        chain = new CategoryChain(activations, streamStateService, settingsRepository, hold, gameStateService, applier);
         user = new UserAccount();
         user.setId(UUID.randomUUID());
 
@@ -414,6 +419,138 @@ class CategoryChainTest {
         chain.decide(user, new StreamEnded());
 
         verifyNoInteractions(activations);
+    }
+
+    // ---- BindingEdited ----
+
+    private void playing(boolean playing) {
+        when(gameStateService.getLastKnownGame(user)).thenReturn(playing
+                ? Optional.of(new DetectedGame("570", GameBinding.SourceType.STEAM, "Dota 2"))
+                : Optional.of(new DetectedGame("730", GameBinding.SourceType.STEAM, "CS2")));
+    }
+
+    @Test
+    void bindingEdited_played_updatesItAsIs() {
+        playing(true);
+        when(activations.active(user)).thenReturn(Optional.empty());
+
+        assertThat(chain.decide(user, new BindingEdited(binding)))
+                .isEqualTo(CategoryDecision.update(CategoryRule.GAME_BINDING, binding));
+        verifyNoInteractions(streamStateService);
+    }
+
+    @Test
+    void bindingEdited_playedIgnoredOrIncomplete_isStillUpdatedAsIs() {
+        playing(true);
+        when(activations.active(user)).thenReturn(Optional.empty());
+        binding.setIgnored(true);
+        assertThat(chain.decide(user, new BindingEdited(binding)))
+                .isEqualTo(CategoryDecision.update(CategoryRule.GAME_BINDING, binding));
+
+        binding.setIgnored(false);
+        binding.setStatus(GameBinding.Status.INCOMPLETE);
+        assertThat(chain.decide(user, new BindingEdited(binding)))
+                .isEqualTo(CategoryDecision.update(CategoryRule.GAME_BINDING, binding));
+        verifyNoInteractions(streamStateService, settingsRepository);
+    }
+
+    @Test
+    void bindingEdited_notPlayed() {
+        playing(false);
+
+        assertThat(chain.decide(user, new BindingEdited(binding)))
+                .isEqualTo(CategoryDecision.none(CategoryRule.GAME_BINDING, Reason.NOT_PLAYED_NOW));
+        verifyNoInteractions(activations);
+    }
+
+    @Test
+    void bindingEdited_nothingPlaying_isNotPlayed() {
+        when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.empty());
+
+        assertThat(chain.decide(user, new BindingEdited(binding)).reason()).isEqualTo(Reason.NOT_PLAYED_NOW);
+        verifyNoInteractions(activations);
+    }
+
+    @Test
+    void bindingEdited_customBinding() {
+        playing(true);
+        activeCustom(false);
+
+        assertThat(chain.decide(user, new BindingEdited(binding)))
+                .isEqualTo(CategoryDecision.none(CategoryRule.CUSTOM_BINDING, Reason.CUSTOM_BINDING_ACTIVE));
+        verifyNoInteractions(streamStateService);
+    }
+
+    // ---- MappingChanged ----
+
+    @Test
+    void mappingChanged_customBinding() {
+        activeCustom(false);
+
+        assertThat(chain.decide(user, new MappingChanged(binding)))
+                .isEqualTo(CategoryDecision.none(CategoryRule.CUSTOM_BINDING, Reason.CUSTOM_BINDING_ACTIVE));
+        verifyNoInteractions(streamStateService);
+    }
+
+    @Test
+    void mappingChanged_offline() {
+        when(activations.active(user)).thenReturn(Optional.empty());
+        live(false);
+
+        assertThat(chain.decide(user, new MappingChanged(binding)))
+                .isEqualTo(CategoryDecision.none(CategoryRule.GAME_BINDING, Reason.OFFLINE));
+    }
+
+    @Test
+    void mappingChanged_ignored_isTheNoGameDecision() {
+        when(activations.active(user)).thenReturn(Optional.empty());
+        binding.setIgnored(true);
+        live(true);
+        withSettings();
+        settings.setApplyDefaultOnNoGame(true);
+
+        CategoryDecision decision = chain.decide(user, new MappingChanged(binding));
+
+        assertThat(decision.action()).isEqualTo(Action.UPDATE_CHANNEL);
+        assertThat(decision.rule()).isEqualTo(CategoryRule.NO_GAME_FALLBACK);
+        assertThat(decision.binding().getSourceName()).isEqualTo(CategoryChain.NO_GAME_FALLBACK_SOURCE);
+    }
+
+    @Test
+    void mappingChanged_incompleteLive_updatesTheFallback() {
+        when(activations.active(user)).thenReturn(Optional.empty());
+        binding.setStatus(GameBinding.Status.INCOMPLETE);
+        live(true);
+        withSettings();
+
+        CategoryDecision decision = chain.decide(user, new MappingChanged(binding));
+
+        assertThat(decision.action()).isEqualTo(Action.UPDATE_CHANNEL);
+        assertThat(decision.rule()).isEqualTo(CategoryRule.INCOMPLETE_FALLBACK);
+        assertThat(decision.binding().getSourceName()).isEqualTo(CategoryChain.INCOMPLETE_FALLBACK_SOURCE);
+    }
+
+    @Test
+    void mappingChanged_incompleteOffline() {
+        when(activations.active(user)).thenReturn(Optional.empty());
+        binding.setStatus(GameBinding.Status.INCOMPLETE);
+        live(false);
+
+        CategoryDecision decision = chain.decide(user, new MappingChanged(binding));
+
+        // The offline check comes first, as the detection's own: the settings are never read
+        assertThat(decision).isEqualTo(CategoryDecision.none(CategoryRule.GAME_BINDING, Reason.OFFLINE));
+        verifyNoInteractions(settingsRepository);
+        assertThat(decision.action()).isNotEqualTo(Action.STORE_PENDING);
+    }
+
+    @Test
+    void mappingChanged_live() {
+        when(activations.active(user)).thenReturn(Optional.empty());
+        live(true);
+
+        assertThat(chain.decide(user, new MappingChanged(binding)))
+                .isEqualTo(CategoryDecision.update(CategoryRule.GAME_BINDING, binding));
     }
 
     // ---- detectionGuard ----

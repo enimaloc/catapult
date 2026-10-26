@@ -72,9 +72,9 @@ class GameEventListenerRaidHoldTest {
                 mock(CustomBindingActivations.class), hold);
         CustomBindingActivations activations = mock(CustomBindingActivations.class);
         CategoryChain chain = new CategoryChain(activations, streamStateService, userSettingsRepository, hold,
-                new CategoryApplier(twitchService, streamStateService));
-        listener = new GameEventListener(bindingService, twitchService, userSettingsRepository, streamStateService,
-                channelEventPublisher, hold, activations, chain);
+                gameStateService, new CategoryApplier(twitchService, streamStateService));
+        listener = new GameEventListener(bindingService, streamStateService, channelEventPublisher, hold,
+                activations, chain);
         user = new UserAccount();
         user.setId(UUID.randomUUID());
 
