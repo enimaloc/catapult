@@ -63,7 +63,7 @@ class TrustedProxiesTest extends FullContextTestBase {
 
     @Test
     void untrustedForwardedHostIsIgnored() throws Exception {
-        RawResponse response = RawHttp.get(port, 
+        RawResponse response = RawHttp.get(port,
                 "127.0.0.2", ECHO, Map.of("X-Forwarded-Host", "evil.example", "X-Forwarded-Proto", "https"));
         assertThat(response.status()).isEqualTo(200);
         assertThat(response.body()).doesNotContain("evil.example").startsWith("http|").endsWith("|127.0.0.2");

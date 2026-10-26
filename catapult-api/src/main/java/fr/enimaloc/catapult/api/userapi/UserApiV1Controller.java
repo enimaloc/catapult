@@ -1,6 +1,5 @@
 package fr.enimaloc.catapult.api.userapi;
 
-import fr.enimaloc.catapult.service.link.ExternalLinks;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.igdb.IgdbGameDetails;
@@ -10,6 +9,7 @@ import fr.enimaloc.catapult.service.account.WidgetTokenService;
 import fr.enimaloc.catapult.service.binding.GameStateService;
 import fr.enimaloc.catapult.service.igdb.IgdbGameDetailsService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
+import fr.enimaloc.catapult.service.link.ExternalLinks;
 import fr.enimaloc.catapult.service.steam.SteamStoreService;
 import fr.enimaloc.catapult.service.tw.TwLabelService;
 import io.swagger.v3.oas.annotations.Operation;

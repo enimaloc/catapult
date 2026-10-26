@@ -567,8 +567,7 @@ class UserApiV2ControllerTest {
             }
         }
 
-        // ---- Task 2: the IGDB page lives under /games/ ----
-
+        // ---- the IGDB page lives under /games/ ----
 
         @Test
         void igdbObjectLinksTheIgdbGamesPage() throws Exception {
@@ -578,7 +577,6 @@ class UserApiV2ControllerTest {
                     .andExpect(jsonPath("$.igdb.url").value(IGDB_GAMES + "valheim"));
         }
 
-
         @Test
         void summaryIgdbUrlIsTheIgdbGamesPage() throws Exception {
             steamGameWithIgdb(details("valheim"));
@@ -586,7 +584,6 @@ class UserApiV2ControllerTest {
             mvc.perform(get("/api/user/summary/{uuid}", token))
                     .andExpect(jsonPath("$.igdbUrl").value(IGDB_GAMES + "valheim"));
         }
-
 
         @Test
         void blankSlugHasNoIgdbPage() throws Exception {
@@ -603,7 +600,7 @@ class UserApiV2ControllerTest {
                     .andExpect(jsonPath("$.url").value(nullValue()));
         }
 
-        // ---- Task 3: a Steam link needs an app id ----
+        // ---- a Steam link needs an app id ----
 
         @Test
         void igdbSteamWebsiteGivenAsAStoreUrlKeepsOneStoreLink() throws Exception {
@@ -636,7 +633,7 @@ class UserApiV2ControllerTest {
                     .andExpect(jsonPath("$.page.fullgame.more").value(nullValue()));
         }
 
-        // ---- Task 4: the links use the request's origin ----
+        // ---- the links use the request's origin ----
 
         @Test
         void moreLinksUseTheRequestsOrigin() throws Exception {
@@ -652,7 +649,7 @@ class UserApiV2ControllerTest {
                     .andExpect(jsonPath("$.steam.more").value("https://catapult.example/api/user/steam/892970"));
         }
 
-        // ---- Task 5: the summary's name, release date and trigger warnings ----
+        // ---- the summary's name, release date and trigger warnings ----
 
         @Test
         void summaryNameFallsBackToTheDetectedName() throws Exception {

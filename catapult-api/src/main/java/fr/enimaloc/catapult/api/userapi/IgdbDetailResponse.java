@@ -1,8 +1,8 @@
 package fr.enimaloc.catapult.api.userapi;
 
-import fr.enimaloc.catapult.service.link.ExternalLinks;
 import com.fasterxml.jackson.annotation.JsonGetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import fr.enimaloc.catapult.service.link.ExternalLinks;
 
 import java.time.Instant;
 import java.util.ArrayList;
