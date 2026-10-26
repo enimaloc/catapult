@@ -6,11 +6,14 @@ import fr.enimaloc.catapult.domain.binding.CustomBindingActivation;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
 import fr.enimaloc.catapult.service.binding.CustomBindingActivations;
+import fr.enimaloc.catapult.service.binding.GameStateService;
 import fr.enimaloc.catapult.service.binding.RaidRestoreHold;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
 import fr.enimaloc.catapult.service.category.CategoryOutcome.Reason;
+import fr.enimaloc.catapult.service.category.CategoryTrigger.BindingEdited;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.GameClosed;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.GameDetected;
+import fr.enimaloc.catapult.service.category.CategoryTrigger.MappingChanged;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.NoGameAfterCustomBinding;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.StreamEnded;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.StreamStarted;
@@ -51,6 +54,7 @@ public class CategoryChain {
     private final StreamStateService streamStateService;
     private final UserSettingsRepository userSettingsRepository;
     private final RaidRestoreHold raidRestoreHold;
+    private final GameStateService gameStateService;
     private final CategoryApplier applier;
 
     /** {@link #decide}, then applied right away. */
@@ -65,6 +69,8 @@ public class CategoryChain {
             case NoGameAfterCustomBinding after -> noGameFallback(user);
             case StreamStarted started -> streamStarted(user);
             case StreamEnded ended -> streamEnded(user);
+            case BindingEdited edited -> bindingEdited(user, edited.binding());
+            case MappingChanged changed -> mappingChanged(user, changed.binding());
         };
     }
 
@@ -81,6 +87,36 @@ public class CategoryChain {
             return DetectionGuard.KEEPS_CUSTOM_BINDING;
         }
         return DetectionGuard.INTERRUPTS_CUSTOM_BINDING;
+    }
+
+    /**
+     * The edited binding as is, when it is the game played now and no custom binding is active (then it only applies
+     * once the custom binding is deactivated). The custom binding is read only for the game played now.
+     */
+    private CategoryDecision bindingEdited(UserAccount user, GameBinding binding) {
+        if (!isActiveBinding(user, binding)) {
+            return CategoryDecision.none(CategoryRule.GAME_BINDING, Reason.NOT_PLAYED_NOW);
+        }
+        if (customBindingActivations.active(user).isPresent()) {
+            return CategoryDecision.none(CategoryRule.CUSTOM_BINDING, Reason.CUSTOM_BINDING_ACTIVE);
+        }
+        return CategoryDecision.update(CategoryRule.GAME_BINDING, binding);
+    }
+
+    private boolean isActiveBinding(UserAccount user, GameBinding binding) {
+        return gameStateService.getLastKnownGame(user)
+                .map(active -> active.getSourceType() == binding.getSourceType()
+                        && active.getSourceId().equals(binding.getSourceId()))
+                .orElse(false);
+    }
+
+    private CategoryDecision mappingChanged(UserAccount user, GameBinding binding) {
+        if (customBindingActivations.active(user).isPresent()) {
+            // Like an edit of the binding: only saved, it applies once the custom binding is deactivated
+            log.debug("Custom binding active for user {} — binding {} not applied", user.getId(), binding.getId());
+            return CategoryDecision.none(CategoryRule.CUSTOM_BINDING, Reason.CUSTOM_BINDING_ACTIVE);
+        }
+        return gameBinding(user, binding, false);
     }
 
     private CategoryDecision streamStarted(UserAccount user) {

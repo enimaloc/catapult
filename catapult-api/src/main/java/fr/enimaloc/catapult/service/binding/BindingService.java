@@ -8,6 +8,8 @@ import fr.enimaloc.catapult.domain.igdb.IgdbGameDetails;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
 import fr.enimaloc.catapult.repository.binding.GameMappingRepository;
+import fr.enimaloc.catapult.service.category.CategoryChain;
+import fr.enimaloc.catapult.service.category.CategoryTrigger.BindingEdited;
 import fr.enimaloc.catapult.service.igdb.IgdbGameDetailsService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.tw.TwResolverService;
@@ -34,17 +36,9 @@ public class BindingService {
     private final IgdbGameDetailsService igdbGameDetailsService;
     private final TwitchService twitchService;
     private final TwResolverService twResolverService;
-    private final GameStateService gameStateService;
     private final GameMappingRepository gameMappingRepository;
-    private final CustomBindingActivations customBindingActivations;
     private final GameBindingLookup gameBindingLookup;
-
-    private boolean isActiveBinding(UserAccount user, GameBinding binding) {
-        return gameStateService.getLastKnownGame(user)
-                .map(active -> active.getSourceType() == binding.getSourceType()
-                        && active.getSourceId().equals(binding.getSourceId()))
-                .orElse(false);
-    }
+    private final CategoryChain categoryChain;
 
     /**
      * Applies {@code change} to the user's binding (if it exists), saves it, and pushes it to
@@ -55,9 +49,7 @@ public class BindingService {
         gameBindingRepository.findByIdAndUser(bindingId, user).ifPresent(binding -> {
             change.accept(binding);
             gameBindingRepository.save(binding);
-            if (isActiveBinding(user, binding) && customBindingActivations.active(user).isEmpty()) {
-                twitchService.updateChannelReporting(user, binding);
-            }
+            categoryChain.apply(user, new BindingEdited(binding)).orThrow();
         });
     }
 

@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.repository.binding.GameMappingRepository;
 import fr.enimaloc.catapult.service.binding.RaidRestoreHold;
 import fr.enimaloc.catapult.service.category.CategoryApplier;
 import fr.enimaloc.catapult.service.category.CategoryChain;
+import fr.enimaloc.catapult.service.category.CategoryTrigger.MappingChanged;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.account.UserSettings;
 import fr.enimaloc.catapult.domain.binding.CustomBinding;
@@ -77,6 +78,7 @@ class CustomBindingDetectionTest {
     @Mock private GameStateService gameStateService;
 
     private CustomBindingActivations activations;
+    private CategoryChain chain;
     private GameEventListener listener;
 
     private UserAccount user;
@@ -115,10 +117,10 @@ class CustomBindingDetectionTest {
         when(experimentService.evaluateGate(user, CustomBindingService.EXPERIMENT_KEY)).thenReturn(true);
         activations = new CustomBindingActivations(activationRepository, experimentService, channelEventPublisher);
         RaidRestoreHold hold = mock(RaidRestoreHold.class);
-        CategoryChain chain = new CategoryChain(activations, streamStateService, userSettingsRepository, hold,
-                new CategoryApplier(twitchService, streamStateService));
-        listener = new GameEventListener(bindingService, twitchService, userSettingsRepository,
-                streamStateService, channelEventPublisher, hold, activations, chain);
+        chain = new CategoryChain(activations, streamStateService, userSettingsRepository, hold,
+                gameStateService, new CategoryApplier(twitchService, streamStateService));
+        listener = new GameEventListener(bindingService, streamStateService, channelEventPublisher, hold,
+                activations, chain);
     }
 
     private void activate(boolean uninterruptible) {
@@ -142,7 +144,7 @@ class CustomBindingDetectionTest {
     void anAdminMappingChange_isNotAppliedWhileACustomBindingIsActive() {
         activate(false);
 
-        assertThat(listener.applyBindingIfLive(user, gameBinding)).isEqualTo(ChannelUpdateOutcome.SKIPPED);
+        assertThat(chain.apply(user, new MappingChanged(gameBinding)).status()).isEqualTo(ChannelUpdateOutcome.SKIPPED);
 
         verify(twitchService, never()).updateChannelReporting(any(), any());
         verify(activationRepository, never()).deleteById(any());
@@ -277,9 +279,11 @@ class CustomBindingDetectionTest {
         when(gameBindings.findByIdAndUser(gameBinding.getId(), user)).thenReturn(Optional.of(gameBinding));
         // The edited binding is the game being played: without an activation it would go to Twitch at once
         when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(game));
+        CategoryChain realChain = new CategoryChain(activations, streamStateService, userSettingsRepository,
+                mock(RaidRestoreHold.class), gameStateService, new CategoryApplier(twitchService, streamStateService));
         BindingService realBindings = new BindingService(gameBindings, mock(IgdbService.class),
-                mock(IgdbGameDetailsService.class), twitchService, mock(TwResolverService.class), gameStateService,
-                mock(GameMappingRepository.class), activations, new GameBindingLookup(gameBindings));
+                mock(IgdbGameDetailsService.class), twitchService, mock(TwResolverService.class),
+                mock(GameMappingRepository.class), new GameBindingLookup(gameBindings), realChain);
 
         realBindings.setTwitchGame(user, gameBinding.getId(), "1234", "Other");
 
