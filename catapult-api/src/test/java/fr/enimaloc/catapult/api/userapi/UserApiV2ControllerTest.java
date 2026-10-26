@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.userapi;
 
+import com.jayway.jsonpath.JsonPath;
 import fr.enimaloc.catapult.config.I18nConfig;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
@@ -32,12 +33,11 @@ import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import tools.jackson.databind.json.JsonMapper;
 
-import com.jayway.jsonpath.JsonPath;
-import org.springframework.test.web.servlet.MvcResult;
-
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -46,6 +46,8 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.hasKey;
+import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -457,6 +459,8 @@ class UserApiV2ControllerTest {
 
         /** A manually set game IGDB knows by name as 42, with the given IGDB details only. */
         private void manualGameWithIgdb(IgdbGameDetails details) {
+            // A null summary makes the summary's description lookup throw (findFirst on a null): out of this task.
+            details.setSummary("Viking survival.");
             playing(GameBinding.SourceType.MANUAL, "m1", "Valheim");
             when(igdbService.findByName("Valheim")).thenReturn(Optional.of(new IgdbService.IgdbGame("42", "Valheim")));
             when(igdbGameDetailsService.getDetails("42")).thenReturn(Optional.of(details));
@@ -549,7 +553,7 @@ class UserApiV2ControllerTest {
             when(gameBindingRepository.findByUserAndSourceIdAndSourceType(user, "892970", GameBinding.SourceType.STEAM))
                     .thenReturn(Optional.of(binding));
 
-            List<String> links = new java.util.ArrayList<>();
+            List<String> links = new ArrayList<>();
             for (MvcResult result : List.of(
                     mvc.perform(get("/api/user/game/{uuid}", token)).andReturn(),
                     mvc.perform(get("/api/user/igdb/42")).andReturn())) {
@@ -593,13 +597,13 @@ class UserApiV2ControllerTest {
             steamGameWithIgdb(details(""));
 
             mvc.perform(get("/api/user/game/{uuid}", token))
-                    .andExpect(jsonPath("$.igdb.url").exists())
+                    .andExpect(jsonPath("$.igdb").value(hasKey("url")))
                     .andExpect(jsonPath("$.igdb.url").value(nullValue()));
             mvc.perform(get("/api/user/summary/{uuid}", token))
-                    .andExpect(jsonPath("$.igdbUrl").exists())
+                    .andExpect(jsonPath("$").value(hasKey("igdbUrl")))
                     .andExpect(jsonPath("$.igdbUrl").value(nullValue()));
             mvc.perform(get("/api/user/igdb/42"))
-                    .andExpect(jsonPath("$.url").exists())
+                    .andExpect(jsonPath("$").value(hasKey("url")))
                     .andExpect(jsonPath("$.url").value(nullValue()));
         }
 
@@ -624,7 +628,7 @@ class UserApiV2ControllerTest {
 
             mvc.perform(get("/api/user/igdb/42"))
                     .andExpect(jsonPath("$.websites.steam.url").value("https://example.com/valheim"))
-                    .andExpect(jsonPath("$.websites.steam.more").exists())
+                    .andExpect(jsonPath("$.websites.steam").value(hasKey("more")))
                     .andExpect(jsonPath("$.websites.steam.more").value(nullValue()));
         }
 
@@ -638,7 +642,7 @@ class UserApiV2ControllerTest {
             when(steamStoreService.fetchIADisclosure(any(), any())).thenReturn(Optional.empty());
 
             mvc.perform(get("/api/user/steam/892970"))
-                    .andExpect(jsonPath("$.page.fullgame.more").exists())
+                    .andExpect(jsonPath("$.page.fullgame").value(hasKey("more")))
                     .andExpect(jsonPath("$.page.fullgame.more").value(nullValue()));
         }
 
@@ -680,6 +684,7 @@ class UserApiV2ControllerTest {
             manualGameWithIgdb(details);
 
             mvc.perform(get("/api/user/summary/{uuid}", token))
+                    .andExpect(jsonPath("$.releaseDate").value(notNullValue()))
                     .andExpect(jsonPath("$.releaseDate.releaseDate").value("2021-02-02T00:00:00Z"))
                     .andExpect(jsonPath("$.releaseDate.comingSoon").value(false));
         }

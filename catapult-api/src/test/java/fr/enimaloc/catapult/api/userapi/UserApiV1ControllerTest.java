@@ -28,6 +28,8 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.hamcrest.Matchers.hasKey;
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -274,7 +276,7 @@ class UserApiV1ControllerTest {
 
         mvc.perform(get("/api/game/{uuid}", token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.igdbUrl").exists())
-                .andExpect(jsonPath("$.igdbUrl").value(org.hamcrest.Matchers.nullValue()));
+                .andExpect(jsonPath("$").value(hasKey("igdbUrl")))
+                .andExpect(jsonPath("$.igdbUrl").value(nullValue()));
     }
 }
