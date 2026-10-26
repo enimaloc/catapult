@@ -698,7 +698,7 @@ class TwitchServiceTest {
     }
 
     @Test
-    void resetToDefault_recordsNoMarker() {
+    void resetToDefault_recordsTheMarker() {
         UserSettings settings = new UserSettings();
         settings.setNoGameTwitchGameId("12345");
         when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
@@ -706,8 +706,35 @@ class TwitchServiceTest {
         twitchService.resetToDefault(user);
 
         verify(bodySpec).body(any(Map.class));
-        verifyNoInteractions(categoryChangeStateService);
+        verify(categoryChangeStateService, times(1)).recordCatapultChangeAndReturnPrevious(user, "12345");
         assertThat(timer("reset_to_default", "success")).isNotNull();
+    }
+
+    @Test
+    void resetToDefault_afterATokenRefresh_recordsTheMarker() {
+        UserSettings settings = new UserSettings();
+        settings.setNoGameTwitchGameId("12345");
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
+        when(twitchTokenService.refreshAccessToken(any(OAuthToken.class), eq(user))).thenReturn("refreshed-token");
+        doThrow(new HttpClientErrorException(HttpStatus.UNAUTHORIZED))
+            .doReturn(null)
+            .when(responseSpec).toBodilessEntity();
+
+        assertThat(twitchService.resetToDefault(user)).isEqualTo(ChannelUpdateOutcome.APPLIED);
+
+        verify(categoryChangeStateService, times(1)).recordCatapultChangeAndReturnPrevious(user, "12345");
+    }
+
+    @Test
+    void resetToDefault_twitchError_recordsNoMarker() {
+        UserSettings settings = new UserSettings();
+        settings.setNoGameTwitchGameId("12345");
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
+        doThrow(new HttpClientErrorException(HttpStatus.BAD_REQUEST)).when(responseSpec).toBodilessEntity();
+
+        assertThat(twitchService.resetToDefault(user)).isEqualTo(ChannelUpdateOutcome.FAILED);
+
+        verifyNoInteractions(categoryChangeStateService);
     }
 
     @Test
