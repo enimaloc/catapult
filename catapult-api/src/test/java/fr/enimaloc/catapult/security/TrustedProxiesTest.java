@@ -102,10 +102,12 @@ class TrustedProxiesTest extends FullContextTestBase {
 
     @Test
     void composeTrustsTheApiNetworkOnly() {
-        Pattern pattern = Pattern.compile("10\\.250\\.250\\.[0-9]+");
-        assertThat(pattern.matcher("10.250.250.7").matches()).isTrue();
-        assertThat(pattern.matcher("10.250.251.7").matches()).isFalse();
-        assertThat(pattern.matcher("172.18.0.5").matches()).isFalse();
+        Pattern pattern = Pattern.compile(
+                "10\\.250\\.250\\.([2-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-4])");
+        assertThat(List.of("10.250.250.2", "10.250.250.7", "10.250.250.254"))
+                .allMatch(a -> pattern.matcher(a).matches());
+        assertThat(List.of("10.250.250.1", "10.250.250.255", "10.250.251.7", "172.18.0.5"))
+                .noneMatch(a -> pattern.matcher(a).matches());
     }
 
     private RawResponse rawGet(String fromAddress, String path, Map<String, String> headers) throws Exception {
