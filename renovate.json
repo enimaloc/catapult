@@ -50,8 +50,7 @@
       "automerge": true
     },
     {
-      "description": "No PostgreSQL major upgrade: a new major cannot read the old data directory without a manual pg_upgrade",
-      "matchManagers": ["docker-compose"],
+      "description": "No PostgreSQL major upgrade anywhere (compose, Dockerfiles, CI services): prod's data directory needs a manual pg_upgrade, and the tests must run on prod's major",
       "matchPackageNames": ["postgres"],
       "matchUpdateTypes": ["major"],
       "enabled": false
