@@ -91,6 +91,7 @@ dependencies {
     testImplementation("org.testcontainers:testcontainers-junit-jupiter")
     testImplementation("org.testcontainers:testcontainers-postgresql")
     testImplementation("com.squareup.okhttp3:mockwebserver:5.4.0")
+    testImplementation("net.ttddyy:datasource-proxy:1.11.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
