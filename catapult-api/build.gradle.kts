@@ -113,6 +113,12 @@ tasks.processResources {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+    // EnglishConventionsTest reads the sibling modules' sources: a change there reruns the tests
+    listOf("catapult-common", "catapult-web").forEach { module ->
+        inputs.dir(rootProject.file("$module/src"))
+            .withPropertyName("${module}Sources")
+            .withPathSensitivity(PathSensitivity.RELATIVE)
+    }
 }
 
 springBoot {
