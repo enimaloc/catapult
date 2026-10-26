@@ -393,7 +393,7 @@ class ApiChatCommandsControllerTest {
         when(repository.findById(id)).thenReturn(Optional.of(existing));
         when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        // "Revenir aux Blocs/Texte" sends a request without ejectedJs at all.
+        // The editor's "back to Blocks/Text" action sends a request without ejectedJs at all.
         String body = om.writeValueAsString(Map.of(
                 "name", "!foo",
                 "template", "Now playing {game#name}!",

@@ -127,19 +127,7 @@ class EnglishConventionsTest {
             API + "chat/command/DebugCommand.java LITERAL",
             API + "service/feedback/ChangelogService.java LITERAL",
             API + "service/provider/IgdbRawQueries.java LITERAL",
-            API_TEST + "api/chatcommand/ApiChatCommandsControllerTest.java COMMENT",
-            API_TEST + "chat/PlaceholderResolverTest.java COMMENT",
-            API_TEST + "event/listener/MetricsEventListenerTest.java COMMENT",
-            API_TEST + "getter/MinecraftPresenceGetterTest.java COMMENT",
-            API_TEST + "service/minecraft/MinecraftFriendServiceTest.java COMMENT",
-            API_TEST + "service/minecraft/MinecraftTokenServiceTest.java COMMENT",
-            API_TEST + "service/minecraft/MsaAuthClientTest.java COMMENT",
-            API_TEST + "service/minecraft/XboxAndMinecraftServiceIT.java COMMENT",
-            API_TEST + "service/minecraft/XboxAndMinecraftServiceIT.java LOG",
-            API_TEST + "service/xbox/XboxServiceTest.java COMMENT",
-            WEB + "service/mock/MockCustomBindings.java COMMENT",
-            WEB + "service/mock/MockMinecraftAccountsStore.java LITERAL",
-            "catapult-web/src/main/resources/static/js/channel-obs-widget.js COMMENT");
+            WEB + "service/mock/MockMinecraftAccountsStore.java LITERAL");
 
     private static final Path ROOT = Path.of("..");
     private static final String SELF = "catapult-api/src/test/java/fr/enimaloc/catapult/EnglishConventionsTest.java";

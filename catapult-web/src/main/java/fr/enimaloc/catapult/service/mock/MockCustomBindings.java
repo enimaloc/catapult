@@ -20,7 +20,7 @@ import java.util.UUID;
 /**
  * One mock member's custom bindings and personal API token, answering like catapult-api: a name is trimmed, 1-40
  * characters and unique whatever its case (400 invalid, 409 taken), a Twitch category is required (400), 20 at most
- * (409), a single binding active at a time. Starts with "Art" (active) and "Développement".
+ * (409), a single binding active at a time. Starts with two bindings, the first one active.
  */
 class MockCustomBindings {
     static final int MAX = 20;

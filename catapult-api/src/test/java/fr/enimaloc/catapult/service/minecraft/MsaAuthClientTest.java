@@ -38,7 +38,7 @@ class MsaAuthClientTest {
     void setup() {
         doReturn(postSpec).when(restClient).post();
         doReturn(bodySpec).when(postSpec).uri(any(URI.class));
-        // body(Object) : matcher explicite sinon Mockito choisit l'overload body(Class) -> NPE
+        // body(Object): explicit matcher, otherwise Mockito picks the body(Class) overload -> NPE
         doReturn(bodySpec).when(bodySpec).body(any(Object.class));
         doReturn(bodySpec).when(bodySpec).contentType(any());
         doReturn(bodySpec).when(bodySpec).accept(any());
