@@ -247,8 +247,7 @@ public class ChannelFixture {
                         new RaidRestoreGateService(experimentService), publisher),
                 new SteamPersonalTokenService(
                         new SteamPersonalTokenStore(accountRepository, mock(SteamApiKeyRepository.class)),
-                        accountRepository, mock(TokenEncryptionService.class),
-                        mock(SteamApiKeyRepository.class), publisher, mock(SteamProfileDiagnostics.class),
+                        mock(TokenEncryptionService.class), publisher, mock(SteamProfileDiagnostics.class),
                         Optional.empty()),
                 mock(AccountService.class),
                 new ChannelAccountActions(mock(AccountService.class), publisher),

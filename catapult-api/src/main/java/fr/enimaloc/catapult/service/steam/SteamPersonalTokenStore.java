@@ -31,4 +31,13 @@ public class SteamPersonalTokenStore {
             steamApiKeyRepository.save(entry);
         }
     }
+
+    /** Clears the token on the account and drops the key it pooled. */
+    @Transactional
+    public void delete(UserAccount channelUser) {
+        channelUser.setSteamPersonalToken(null);
+        channelUser.setSteamTokenShared(false);
+        userAccountRepository.save(channelUser);
+        steamApiKeyRepository.deleteByOwner(channelUser);
+    }
 }
