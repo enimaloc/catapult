@@ -2,6 +2,7 @@ package fr.enimaloc.catapult;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import fr.enimaloc.catapult.perf.PerfLoginController;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.real.RealApiService;
 import io.sentry.Sentry;
@@ -24,5 +25,14 @@ class CatapultWebFullContextTests extends WebFullContextTestBase {
         var health = get(managementPort, "/actuator/health");
         assertThat(health.statusCode()).isEqualTo(200);
         assertThat(health.body()).contains("\"status\":\"UP\"");
+    }
+
+    /** The perf test login is not there outside the perf profile: nothing answers it, no session is opened. */
+    @Test
+    void noPerfRouteOutsideThePerfProfile() throws Exception {
+        assertThat(context.getBeanNamesForType(PerfLoginController.class)).isEmpty();
+        var answer = get(port, "/perf/login?username=x");
+        assertThat(answer.statusCode()).isNotEqualTo(200).isNotIn(301, 302, 303, 307, 308);
+        assertThat(answer.headers().allValues("Set-Cookie")).noneMatch(c -> c.startsWith("SESSION="));
     }
 }
