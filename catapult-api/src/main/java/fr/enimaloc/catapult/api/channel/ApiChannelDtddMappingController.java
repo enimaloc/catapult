@@ -1,13 +1,13 @@
 package fr.enimaloc.catapult.api.channel;
 
+import fr.enimaloc.catapult.api.ApiPaths;
 import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingCurrentDto;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingProposalDto;
-import fr.enimaloc.catapult.common.dto.channel.ProposeRequest;
+import fr.enimaloc.catapult.common.dto.channel.DtddProposalRequest;
 import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
 import fr.enimaloc.catapult.common.dto.channel.SearchResultDto;
 import fr.enimaloc.catapult.common.dto.channel.StatusResponse;
-import fr.enimaloc.catapult.common.dto.channel.ValidateRequest;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.dtdd.DtddGameCache;
 import fr.enimaloc.catapult.domain.dtdd.DtddGameMapping;
@@ -39,7 +39,6 @@ import java.time.Instant;
 import java.util.*;
 
 @RestController
-@RequestMapping("/api/channel/dtdd-mapping")
 @RequiredArgsConstructor
 @ConditionalOnBooleanProperty("dtdd.enabled")
 public class ApiChannelDtddMappingController {
@@ -52,8 +51,8 @@ public class ApiChannelDtddMappingController {
     private final DtddMappingEvents mappingEvents;
     private final ApiUserResolver userResolver;
 
-    @GetMapping
-    public StatusResponse status(@RequestParam("igdbId") String igdbId,
+    @GetMapping(ApiPaths.INTERNAL + "/dtdd-mappings/{igdbId}")
+    public StatusResponse status(@PathVariable("igdbId") String igdbId,
                                  @AuthenticationPrincipal Jwt jwt,
                                  Authentication authentication,
                                  HttpServletRequest request) {
@@ -81,32 +80,33 @@ public class ApiChannelDtddMappingController {
     }
 
     @PreAuthorize("@authz.isAdmin()")
-    @PostMapping("/validate")
+    @PostMapping(ApiPaths.ADMIN + "/dtdd-mappings/{igdbId}/validate")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Transactional
-    public void validate(@RequestBody ValidateRequest body) {
-        DtddGameMapping mapping = mappingRepo.findById(body.igdbId())
+    public void validate(@PathVariable("igdbId") String igdbId) {
+        DtddGameMapping mapping = mappingRepo.findById(igdbId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         if (mapping.isVerified()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Mapping already verified");
         }
-        if (proposalRepo.countByIgdbIdAndStatus(body.igdbId(), Status.PENDING) > 0) {
+        if (proposalRepo.countByIgdbIdAndStatus(igdbId, Status.PENDING) > 0) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Pending proposals exist");
         }
         mapping.setVerified(true);
         mapping.setConfidence(1.0);
         mappingRepo.save(mapping);
-        mappingEvents.mappingChanged(body.igdbId());
+        mappingEvents.mappingChanged(igdbId);
     }
 
-    @PostMapping("/propose")
+    @PostMapping(ApiPaths.INTERNAL + "/dtdd-mappings/{igdbId}/proposals")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Transactional
-    public void propose(@RequestBody ProposeRequest body, @AuthenticationPrincipal Jwt jwt) {
+    public void propose(@PathVariable("igdbId") String igdbId, @RequestBody DtddProposalRequest body,
+                        @AuthenticationPrincipal Jwt jwt) {
         UserAccount user = userResolver.viewer(jwt);
         DtddMappingProposal p = new DtddMappingProposal();
         p.setId(UUID.randomUUID());
-        p.setIgdbId(body.igdbId());
+        p.setIgdbId(igdbId);
         p.setProposedDtddId(body.dtddId());
         p.setProposer(user);
         p.setReason(body.reason());
@@ -114,10 +114,10 @@ public class ApiChannelDtddMappingController {
         p.setCreatedAt(Instant.now());
         proposalRepo.save(p);
         // A pending proposal is part of the mapping's state: nobody may validate it directly meanwhile
-        mappingEvents.mappingChanged(body.igdbId());
+        mappingEvents.mappingChanged(igdbId);
     }
 
-    @GetMapping("/search")
+    @GetMapping(ApiPaths.INTERNAL + "/dtdd-games")
     public SearchResponse search(@RequestParam("q") String q) {
         if (q == null || q.isBlank()) return new SearchResponse(List.of());
         if (q.length() > 200) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Query too long");

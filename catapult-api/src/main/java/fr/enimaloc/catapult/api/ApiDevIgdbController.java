@@ -25,7 +25,7 @@ import java.util.List;
 @Slf4j
 @RestController
 @Profile("dev")
-@RequestMapping("/api/dev/igdb")
+@RequestMapping(ApiPaths.INTERNAL + "/dev/igdb")
 @RequiredArgsConstructor
 public class ApiDevIgdbController {
 

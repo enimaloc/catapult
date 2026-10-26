@@ -75,13 +75,13 @@ import fr.enimaloc.catapult.common.dto.channel.CclToggleRequest;
 import fr.enimaloc.catapult.common.dto.channel.ChannelListResponse;
 import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
+import fr.enimaloc.catapult.common.dto.channel.DtddProposalRequest;
 import fr.enimaloc.catapult.common.dto.channel.IgnoredToggleRequest;
 import fr.enimaloc.catapult.common.dto.channel.IncompleteFallbackRequest;
 import fr.enimaloc.catapult.common.dto.channel.NoGameSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.ObsSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.RaidSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.TwitchatBranchRequest;
-import fr.enimaloc.catapult.common.dto.channel.ProposeRequest;
 import fr.enimaloc.catapult.common.dto.channel.SaveBody;
 import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
 import fr.enimaloc.catapult.common.dto.channel.SteamTokenRequest;
@@ -90,7 +90,6 @@ import fr.enimaloc.catapult.common.dto.channel.TwEnabledBody;
 import fr.enimaloc.catapult.common.dto.channel.TwSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.UpdateBindingRequest;
 import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
-import fr.enimaloc.catapult.common.dto.channel.ValidateRequest;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatValidationError;
@@ -165,7 +164,7 @@ public class RealApiService implements ApiService {
 
     @Override
     public TokenResponse exchangeCode(String code) {
-        return client.post("/api/auth/exchange?code={code}", TokenResponse.class, code);
+        return client.post("/api/internal/auth/exchange?code={code}", TokenResponse.class, code);
     }
 
     @Override
@@ -385,17 +384,17 @@ public class RealApiService implements ApiService {
 
     @Override
     public SearchResponse dtddSearch(String q) {
-        return client.get("/api/channel/dtdd-mapping/search?q={q}", SearchResponse.class, q);
+        return client.get("/api/internal/dtdd-games?q={q}", SearchResponse.class, q);
     }
 
     @Override
     public int dtddValidate(String igdbId) {
-        return client.postVoid("/api/channel/dtdd-mapping/validate", new ValidateRequest(igdbId));
+        return client.postVoid("/api/internal/admin/dtdd-mappings/{igdbId}/validate", null, igdbId);
     }
 
     @Override
     public int dtddPropose(String igdbId, Long dtddId, String reason) {
-        return client.postVoid("/api/channel/dtdd-mapping/propose", new ProposeRequest(igdbId, dtddId, reason));
+        return client.postVoid("/api/internal/dtdd-mappings/{igdbId}/proposals", new DtddProposalRequest(dtddId, reason), igdbId);
     }
 
     @Override
@@ -591,7 +590,7 @@ public class RealApiService implements ApiService {
     @Override
     public WellKnownContent wellKnown(WellKnownLocation location, String path) {
         ApiClient.Result<WellKnownResponseDto> result = client.getAnonymous(
-                "/api/well-known/serve?location={location}&path={path}", WellKnownResponseDto.class, location.name(), path);
+                "/api/internal/well-known-files?location={location}&path={path}", WellKnownResponseDto.class, location.name(), path);
         if (result.status() == 200 && result.body() == null) return new WellKnownContent(502, null);
         return new WellKnownContent(result.status(), result.body());
     }
@@ -633,7 +632,7 @@ public class RealApiService implements ApiService {
 
     @Override
     public List<MetaTagDto> metaTags() {
-        ApiClient.Result<MetaTagDto[]> result = client.getAnonymous("/api/meta-tags", MetaTagDto[].class);
+        ApiClient.Result<MetaTagDto[]> result = client.getAnonymous("/api/internal/meta-tags", MetaTagDto[].class);
         return result.status() == 200 && result.body() != null ? List.of(result.body()) : null;
     }
 
@@ -999,17 +998,17 @@ public class RealApiService implements ApiService {
 
     @Override
     public UserInfoResponse accountInfo() {
-        return client.get("/api/auth/validate", UserInfoResponse.class);
+        return client.get("/api/internal/auth/validate", UserInfoResponse.class);
     }
 
     @Override
     public int validateSession() {
-        return client.call(HttpMethod.GET, "/api/auth/validate", null, Void.class).status();
+        return client.call(HttpMethod.GET, "/api/internal/auth/validate", null, Void.class).status();
     }
 
     @Override
     public int accountDeletionDelayDays() {
-        AppConfigResponse config = client.get("/api/config/app", AppConfigResponse.class);
+        AppConfigResponse config = client.get("/api/internal/config/app", AppConfigResponse.class);
         return config == null || config.deletionDelayDays() <= 0 ? DEFAULT_DELETION_DELAY_DAYS : config.deletionDelayDays();
     }
 
@@ -1182,7 +1181,7 @@ public class RealApiService implements ApiService {
 
     @Override
     public fr.enimaloc.catapult.common.dto.HelpContent help(String cardId, java.util.Locale locale) {
-        return client.getLocalized("/api/help/{cardId}", fr.enimaloc.catapult.common.dto.HelpContent.class, locale, cardId);
+        return client.getLocalized("/api/internal/help-cards/{cardId}", fr.enimaloc.catapult.common.dto.HelpContent.class, locale, cardId);
     }
 
     @Override
@@ -1199,20 +1198,20 @@ public class RealApiService implements ApiService {
 
     @Override
     public List<ChangelogSection> changelog() {
-        ApiClient.Result<ChangelogSection[]> result = client.getAnonymous("/api/changelog", ChangelogSection[].class);
+        ApiClient.Result<ChangelogSection[]> result = client.getAnonymous("/api/internal/changelog", ChangelogSection[].class);
         return result.ok() && result.body() != null ? List.of(result.body()) : null;
     }
 
     @Override
     public DegradedStatusDto degradedStatus() {
-        ApiClient.Result<DegradedStatusDto> result = client.getAnonymous("/api/status/degraded", DegradedStatusDto.class);
+        ApiClient.Result<DegradedStatusDto> result = client.getAnonymous("/api/internal/status/degraded", DegradedStatusDto.class);
         return result.ok() ? result.body() : null;
     }
 
     @Override
     @SuppressWarnings("rawtypes")
     public boolean apiAvailable() {
-        ApiClient.Result<Map> health = client.getAnonymous("/api/health", Map.class);
+        ApiClient.Result<Map> health = client.getAnonymous("/api/internal/health", Map.class);
         return health.ok() && health.body() != null && "UP".equals(health.body().get("status"));
     }
 

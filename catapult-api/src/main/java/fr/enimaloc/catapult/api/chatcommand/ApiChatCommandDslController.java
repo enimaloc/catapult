@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.chatcommand;
 
+import fr.enimaloc.catapult.api.ApiPaths;
 import fr.enimaloc.catapult.chat.PlaceholderResolver;
 import fr.enimaloc.catapult.chat.command.ast.NodeJsonCodec;
 import fr.enimaloc.catapult.chat.command.dsl.CommandDslGenerator;
@@ -66,7 +67,7 @@ public class ApiChatCommandDslController {
      * paths, service functions) still renders even for a caller the JWT can't be matched to a
      * {@link UserAccount} for (e.g. an incomplete test JWT).
      */
-    @GetMapping("/api/chat-commands/dsl/catalog")
+    @GetMapping(ApiPaths.INTERNAL + "/chat-command-dsl/catalog")
     public CatalogDto catalog(@AuthenticationPrincipal Jwt jwt) {
         List<ServiceFunctionDto> functions = serviceFunctionRegistry.all().stream()
             .map(f -> new ServiceFunctionDto(f.namespace(), f.name(), f.parameterNames(), f.returnKeys(),
@@ -88,7 +89,7 @@ public class ApiChatCommandDslController {
         return userAccountRepository.findByTwitchId(twitchId);
     }
 
-    @PostMapping("/api/chat-commands/dsl/text-to-ast")
+    @PostMapping(ApiPaths.INTERNAL + "/chat-command-dsl/text-to-ast")
     public Map<String, String> textToAst(@RequestBody Map<String, String> body) {
         try {
             return Map.of("ast", CODEC.toJson(PARSER.parse(body.get("text"))));
@@ -97,7 +98,7 @@ public class ApiChatCommandDslController {
         }
     }
 
-    @PostMapping("/api/chat-commands/dsl/ast-to-text")
+    @PostMapping(ApiPaths.INTERNAL + "/chat-command-dsl/ast-to-text")
     public Map<String, String> astToText(@RequestBody Map<String, String> body) {
         try {
             return Map.of("text", GENERATOR.generate(CODEC.fromJson(body.get("ast"))));
@@ -107,7 +108,7 @@ public class ApiChatCommandDslController {
     }
 
     /** Backs the read-only "JS généré" tab — same compiler used at actual dispatch time. */
-    @PostMapping("/api/chat-commands/dsl/ast-to-js")
+    @PostMapping(ApiPaths.INTERNAL + "/chat-command-dsl/ast-to-js")
     public Map<String, String> astToJs(@RequestBody Map<String, String> body) {
         try {
             return Map.of("js", jsCompiler.compile(CODEC.fromJson(body.get("ast"))));

@@ -54,7 +54,7 @@ class ApiSecurityConfigWellKnownTest {
     @Test
     void theServeRouteIsPublic() throws Exception {
         when(service.find(any(), any())).thenReturn(Optional.empty());
-        mvc.perform(get("/api/well-known/serve").param("location", "WELL_KNOWN").param("path", "x.txt")
+        mvc.perform(get("/api/internal/well-known-files").param("location", "WELL_KNOWN").param("path", "x.txt")
                         .with(r -> { r.setRemoteAddr("203.0.113.9"); return r; }))
                 .andExpect(status().isNotFound());
     }
@@ -68,7 +68,7 @@ class ApiSecurityConfigWellKnownTest {
     @Test
     void theMetaTagsAreReadPublicly_butAdministeredByAnAdminOnly() throws Exception {
         when(metaTags.list()).thenReturn(java.util.List.of());
-        mvc.perform(get("/api/meta-tags").with(r -> { r.setRemoteAddr("203.0.113.9"); return r; }))
+        mvc.perform(get("/api/internal/meta-tags").with(r -> { r.setRemoteAddr("203.0.113.9"); return r; }))
                 .andExpect(status().isOk());
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/admin/meta-tags")
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content("{}")

@@ -108,8 +108,8 @@ public class ApiSecurityConfig {
         DefaultBearerTokenResolver resolver = new DefaultBearerTokenResolver();
 
         return request -> {
-            if (request.getRequestURI().startsWith("/api/config/app")
-                    || request.getRequestURI().startsWith("/api/config/providers")) {
+            if (request.getRequestURI().startsWith(ApiPaths.INTERNAL + "/config/app")
+                    || request.getRequestURI().startsWith(ApiPaths.INTERNAL + "/config/providers")) {
                 return null; // Ignore le header Authorization
             }
             return resolver.resolve(request);
@@ -130,8 +130,8 @@ public class ApiSecurityConfig {
                 // to the CorsConfigurationSource Spring MVC derives from it.
                 .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/health", "/api/config/**", "/api/changelog", "/api/status/degraded", "/api/twitchat/widget/**", "/api/twitchat/actions/**", "/api/game/**", "/api/user/**", "/api/well-known/serve", "/api/meta-tags", "/api/v3/api-docs/**").permitAll()
-                        .requestMatchers("/api/auth/exchange").permitAll()
+                        .requestMatchers(ApiPaths.INTERNAL + "/health", ApiPaths.INTERNAL + "/config/**", ApiPaths.INTERNAL + "/changelog", ApiPaths.INTERNAL + "/status/degraded", ApiPaths.INTERNAL + "/well-known-files", ApiPaths.INTERNAL + "/meta-tags", "/api/twitchat/widget/**", "/api/twitchat/actions/**", "/api/game/**", "/api/user/**", "/api/v3/api-docs/**").permitAll()
+                        .requestMatchers(ApiPaths.INTERNAL + "/auth/exchange").permitAll()
                         .requestMatchers("/api/connect/steam/callback").permitAll()
                         .requestMatchers("/api/admin/**").access(Authz.admin())
                         .requestMatchers(ApiPaths.ADMIN + "/**").access(Authz.admin())

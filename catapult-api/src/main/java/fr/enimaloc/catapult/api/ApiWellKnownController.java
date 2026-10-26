@@ -21,7 +21,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class ApiWellKnownController {
     private final WellKnownFileService service;
 
-    @GetMapping("/api/well-known/serve")
+    @GetMapping(ApiPaths.INTERNAL + "/well-known-files")
     public ResponseEntity<WellKnownResponseDto> serve(@RequestParam(required = false) String location,
                                                   @RequestParam(required = false) String path) {
         WellKnownLocation where;

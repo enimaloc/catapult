@@ -55,7 +55,7 @@ class WebCallsMatchApiRoutesTest {
             "twitchat/ApiNotificationFlusher.java",
             "service/real/ChannelIds.java");
     /** {@code ApiClient}'s own literal: the session check it does not warn about, not a call. */
-    private static final String AUTH_VALIDATE_PATH = "/api/auth/validate";
+    private static final String AUTH_VALIDATE_PATH = "/api/internal/auth/validate";
 
     private static final String LITERAL = "\\s*\"(/[^\"]*)\"";
     private static final Pattern GET = Pattern.compile("\\.(?:get|getAnonymous|getLocalized)\\(" + LITERAL);

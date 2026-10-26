@@ -17,7 +17,7 @@ import java.util.Optional;
  * No authentication required — only exposes non-sensitive feature flags.
  */
 @RestController
-@RequestMapping("/api/config")
+@RequestMapping(ApiPaths.INTERNAL + "/config")
 public class ApiConfigController {
 
     @Value("${minecraft.enabled:false}")         private boolean minecraftEnabled;

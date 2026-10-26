@@ -71,28 +71,6 @@ class RouteConventionsTest {
      * list is gone once the last one has moved.
      */
     static final Set<String> LEGACY = Set.of(
-            // Task 8
-            "POST /api/auth/exchange",
-            "GET /api/auth/validate",
-            "GET /api/auth/me",
-            "GET /api/changelog",
-            "GET /api/config/providers",
-            "GET /api/config/app",
-            "GET /api/status/degraded",
-            "GET /api/dev/igdb",
-            "POST /api/dev/igdb/query",
-            "GET /api/health",
-            "GET /api/help/{cardId}",
-            "GET /api/meta-tags",
-            "GET /api/well-known/serve",
-            "GET /api/chat-commands/dsl/catalog",
-            "POST /api/chat-commands/dsl/text-to-ast",
-            "POST /api/chat-commands/dsl/ast-to-text",
-            "POST /api/chat-commands/dsl/ast-to-js",
-            "GET /api/channel/dtdd-mapping",
-            "POST /api/channel/dtdd-mapping/validate",
-            "POST /api/channel/dtdd-mapping/propose",
-            "GET /api/channel/dtdd-mapping/search",
             // Task 9
             "GET /api/feedback",
             "POST /api/feedback",
