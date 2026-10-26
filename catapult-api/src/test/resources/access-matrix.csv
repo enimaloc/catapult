@@ -84,6 +84,36 @@ POST,/api/internal/users/{userId}/notifications/read-all,userId=self,,401,401,PA
 GET,/api/internal/users/{userId}/notifications/snapshot,userId=self,,401,401,PASS,PASS,PASS,PASS,401
 GET,/api/internal/users/{userId}/notifications/unread-count,userId=self,,401,401,PASS,PASS,PASS,PASS,401
 POST,/api/internal/users/{userId}/notifications/{id}/read,userId=self,,401,401,PASS,PASS,PASS,PASS,401
+# own-resource routes addressed with the OWNER's userId (not userId=self): a member, a moderator and an admin are refused
+# (only the account itself may use them); unmapped so the row is not the self row's duplicate
+GET,/api/internal/users/{userId}/notification-channels,unmapped,,401,401,403,403,PASS,403,401
+PUT,/api/internal/users/{userId}/notification-channels,unmapped,,401,401,403,403,PASS,403,401
+GET,/api/internal/users/{userId}/invite,unmapped,,401,401,403,403,PASS,403,401
+POST,/api/internal/users/{userId}/invite/regenerate,unmapped,,401,401,403,403,PASS,403,401
+GET,/api/internal/users/{userId}/seen-features,unmapped,,401,401,403,403,PASS,403,401
+PUT,/api/internal/users/{userId}/seen-features/{key},unmapped,,401,401,403,403,PASS,403,401
+GET,/api/internal/users/{userId}/feedback,unmapped,,401,401,403,403,PASS,403,401
+DELETE,/api/internal/users/{userId}/feedback/{id}/subscription,unmapped,,401,401,403,403,PASS,403,401
+GET,/api/internal/users/{userId}/links/minecraft,unmapped,,401,401,403,403,PASS,403,401
+PUT,/api/internal/users/{userId}/links/minecraft,unmapped,,401,401,403,403,GATED,403,401
+POST,/api/internal/users/{userId}/experiment-feedback,unmapped,"{""experimentId"":""00000000-0000-0000-0000-00000000dead"",""npsScore"":5}",401,401,403,403,PASS,403,401
+DELETE,/api/internal/users/{userId}/links/steam,unmapped,,401,401,403,403,PASS,403,401
+GET,/api/internal/users/{userId}/links/steam/start,unmapped,,401,401,403,403,PASS,403,401
+GET,/api/internal/users/{userId}/notifications,unmapped,,401,401,403,403,PASS,403,401
+POST,/api/internal/users/{userId}/notifications/read-all,unmapped,,401,401,403,403,PASS,403,401
+GET,/api/internal/users/{userId}/obs,unmapped,,401,401,403,403,PASS,403,401
+GET,/api/internal/users/{userId}/chat-command-settings,unmapped,,401,401,403,403,GATED,403,401
+PUT,/api/internal/users/{userId}/chat-command-settings/{key},unmapped,,401,401,403,403,GATED,403,401
+GET,/api/internal/users/{userId}/bindings/{bindingId}/tws/suggestions,unmapped,,401,401,403,403,PASS,403,401
+PUT,/api/internal/users/{userId}/bindings/{bindingId}/tws,unmapped,,401,401,403,403,PASS,403,401
+GET,/api/internal/users/{userId}/api-token,unmapped,,401,401,403,403,PASS,403,401
+DELETE,/api/internal/users/{userId}/api-token,unmapped,,401,401,403,403,PASS,403,401
+GET,/api/internal/users/{userId}/channels,unmapped,,401,401,403,403,PASS,403,401
+GET,/api/internal/users/{userId}/debug,unmapped,,401,401,403,403,PASS,403,401
+GET,/api/internal/users/{userId}/chat-commands/enabled,unmapped,,401,401,403,403,PASS,403,401
+POST,/api/internal/users/{userId}/chat-commands,unmapped,"{""name"":""!matrix"",""template"":""matrix"",""permission"":""VIEWERS"",""enabled"":false}",401,401,403,403,GATED,403,401
+POST,/api/internal/users/{userId}/chat-commands/{id}/test,unmapped,,401,401,403,403,GATED,403,401
+GET,/api/internal/users/{userId}/experiment-variants/{key},unmapped,,401,401,403,403,PASS,403,401
 GET,/api/internal/users/{userId}/channel-access,,,401,PASS,PASS,PASS,PASS,PASS,401
 # channel
 GET,/api/internal/users/{userId}/dashboard,,,401,401,403,PASS,PASS,403,401
