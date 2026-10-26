@@ -1,20 +1,14 @@
 package fr.enimaloc.catapult.api.chatcommand;
 
 import fr.enimaloc.catapult.api.ApiPaths;
-import fr.enimaloc.catapult.chat.PlaceholderResolver;
+import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.chat.command.ast.NodeJsonCodec;
 import fr.enimaloc.catapult.chat.command.dsl.CommandDslGenerator;
 import fr.enimaloc.catapult.chat.command.dsl.CommandDslParser;
 import fr.enimaloc.catapult.chat.command.js.JsCompiler;
-import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
 import fr.enimaloc.catapult.common.dto.chatcommand.CatalogDto;
-import fr.enimaloc.catapult.common.dto.chatcommand.ServiceFunctionDto;
-import fr.enimaloc.catapult.common.dto.chatcommand.TwOptionDto;
-import fr.enimaloc.catapult.domain.account.UserAccount;
-import fr.enimaloc.catapult.domain.chatcommand.ChatCommandSetting;
-import fr.enimaloc.catapult.repository.account.UserAccountRepository;
-import fr.enimaloc.catapult.repository.chatcommand.ChatCommandSettingRepository;
-import fr.enimaloc.catapult.repository.tw.TwDefinitionRepository;
+import fr.enimaloc.catapult.service.chatcommand.ChatCommandDslCatalog;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -24,9 +18,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * Bridges the browser's Blocks tab to the (Java-only) text DSL grammar so the editor modal
@@ -38,55 +30,24 @@ import java.util.Optional;
  * editing the generated JS is explicitly Phase 2, reserved behind the disabled "Éjecter" button).
  */
 @RestController
+@RequiredArgsConstructor
 public class ApiChatCommandDslController {
 
     private static final CommandDslParser PARSER = new CommandDslParser();
     private static final CommandDslGenerator GENERATOR = new CommandDslGenerator();
     private static final NodeJsonCodec CODEC = new NodeJsonCodec();
 
-    private final ServiceFunctionRegistry serviceFunctionRegistry;
+    private final ChatCommandDslCatalog dslCatalog;
+    private final ApiUserResolver userResolver;
     private final JsCompiler jsCompiler;
-    private final ChatCommandSettingRepository settingRepository;
-    private final UserAccountRepository userAccountRepository;
-    private final TwDefinitionRepository twDefinitionRepository;
-
-    public ApiChatCommandDslController(ServiceFunctionRegistry serviceFunctionRegistry, JsCompiler jsCompiler,
-                                        ChatCommandSettingRepository settingRepository,
-                                        UserAccountRepository userAccountRepository,
-                                        TwDefinitionRepository twDefinitionRepository) {
-        this.serviceFunctionRegistry = serviceFunctionRegistry;
-        this.jsCompiler = jsCompiler;
-        this.settingRepository = settingRepository;
-        this.userAccountRepository = userAccountRepository;
-        this.twDefinitionRepository = twDefinitionRepository;
-    }
 
     /**
-     * The settings block's dropdown needs the streamer's own saved keys (unlike context paths,
-     * which are a fixed known catalog) — resolved best-effort so the rest of the catalog (context
-     * paths, service functions) still renders even for a caller the JWT can't be matched to a
-     * {@link UserAccount} for (e.g. an incomplete test JWT).
+     * The settings block's dropdown needs the streamer's own saved keys, so the caller is resolved best-effort:
+     * the rest of the catalog still renders for a caller the JWT can't be matched to an account for.
      */
     @GetMapping(ApiPaths.INTERNAL + "/chat-command-dsl/catalog")
     public CatalogDto catalog(@AuthenticationPrincipal Jwt jwt) {
-        List<ServiceFunctionDto> functions = serviceFunctionRegistry.all().stream()
-            .map(f -> new ServiceFunctionDto(f.namespace(), f.name(), f.parameterNames(), f.returnKeys(),
-                f.optionalParameterNames(), f.isAction()))
-            .toList();
-        List<String> settingKeys = currentUser(jwt)
-            .map(user -> settingRepository.findByUser(user).stream()
-                .map(ChatCommandSetting::getKey).sorted().toList())
-            .orElse(List.of());
-        List<TwOptionDto> knownTws = twDefinitionRepository.findAllByOrderBySortOrderAscIdAsc().stream()
-            .map(d -> new TwOptionDto(d.getId(), d.getLabel()))
-            .toList();
-        return new CatalogDto(List.copyOf(PlaceholderResolver.KNOWN_PATHS), functions, settingKeys, knownTws);
-    }
-
-    private Optional<UserAccount> currentUser(Jwt jwt) {
-        if (jwt == null) return Optional.empty();
-        String twitchId = jwt.getClaimAsString("twitchId");
-        return userAccountRepository.findByTwitchId(twitchId);
+        return dslCatalog.catalog(userResolver.viewerByTwitchIdIfAny(jwt));
     }
 
     @PostMapping(ApiPaths.INTERNAL + "/chat-command-dsl/text-to-ast")
