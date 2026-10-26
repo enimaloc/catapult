@@ -33,8 +33,10 @@ import fr.enimaloc.catapult.repository.steam.SteamApiKeyRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.account.AccountService;
 import fr.enimaloc.catapult.service.account.BotToggleService;
+import fr.enimaloc.catapult.service.account.ChannelAccountActions;
 import fr.enimaloc.catapult.service.account.ChannelSettingsService;
 import fr.enimaloc.catapult.service.binding.BindingService;
+import fr.enimaloc.catapult.service.binding.ChannelDashboardActions;
 import fr.enimaloc.catapult.service.binding.CustomBindingActivations;
 import fr.enimaloc.catapult.service.binding.CustomBindingService;
 import fr.enimaloc.catapult.service.binding.CustomBindingService.ActivationResult;
@@ -50,6 +52,7 @@ import fr.enimaloc.catapult.service.connections.SteamProfileDiagnostics;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import fr.enimaloc.catapult.service.igdb.IgdbGameDetailsService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
+import fr.enimaloc.catapult.service.steam.SteamPersonalTokenService;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import fr.enimaloc.catapult.service.notification.TwitchatActionExecutor;
 import fr.enimaloc.catapult.service.notification.TwitchatActionExecutor.Result;
@@ -234,14 +237,19 @@ public class ChannelFixture {
                 activations);
         twitchatActionExecutor = new TwitchatActionExecutor(actionTokenService, accountRepository, categoryChain,
                 bindingService, mock(BotToggleService.class), activations);
-        channelActionsController = new ApiChannelActionsController(accountRepository,
-                new ApiUserResolver(accountRepository), bindingService, mock(BotToggleService.class),
+        channelActionsController = new ApiChannelActionsController(
+                new ApiUserResolver(accountRepository),
+                new ChannelDashboardActions(bindingService, mock(SchedulerService.class), gameStateService,
+                        publisher),
+                mock(BotToggleService.class),
                 new ChannelSettingsService(settingsRepository, categoryChain,
                         new RaidRestoreGateService(experimentService), publisher),
-                gameStateService, mock(AccountService.class), mock(SchedulerService.class),
-                mock(TokenEncryptionService.class), mock(SteamApiKeyRepository.class), publisher,
-                mock(TwitchatWidgetSettingsService.class), mock(TwitchatEventActionService.class), dispatcher,
-                mock(SteamProfileDiagnostics.class), Optional.empty());
+                new SteamPersonalTokenService(accountRepository, mock(TokenEncryptionService.class),
+                        mock(SteamApiKeyRepository.class), publisher, mock(SteamProfileDiagnostics.class),
+                        Optional.empty()),
+                mock(AccountService.class),
+                new ChannelAccountActions(mock(AccountService.class), publisher),
+                mock(TwitchatWidgetSettingsService.class), mock(TwitchatEventActionService.class), dispatcher);
     }
 
     /** The category events and Twitch writes, in order. */

@@ -86,6 +86,19 @@ class ApiChannelActionsControllerTest extends ApiChannelActionsTestSupport {
         }
 
         @Test
+        void toggleCcl_publishesAfterTheWrite() throws Exception {
+            GameBinding binding = storedBinding();
+
+            mvc.perform(as(moderator, HttpMethod.PUT, "/bindings/" + bindingId + "/ccl-enabled", "{\"enabled\":false}"))
+                    .andExpect(status().isNoContent());
+
+            InOrder order = inOrder(bindingService, channelEventPublisher);
+            order.verify(bindingService).toggleCclEnabled(owner, bindingId, false);
+            order.verify(bindingService).findBinding(owner, bindingId);
+            order.verify(channelEventPublisher).bindingUpserted(owner.getId(), binding);
+        }
+
+        @Test
         void ignoredToggle() throws Exception {
             storedBinding();
 
