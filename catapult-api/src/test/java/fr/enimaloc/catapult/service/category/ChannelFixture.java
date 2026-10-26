@@ -53,6 +53,7 @@ import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import fr.enimaloc.catapult.service.igdb.IgdbGameDetailsService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.steam.SteamPersonalTokenService;
+import fr.enimaloc.catapult.service.steam.SteamPersonalTokenStore;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import fr.enimaloc.catapult.service.notification.TwitchatActionExecutor;
 import fr.enimaloc.catapult.service.notification.TwitchatActionExecutor.Result;
@@ -244,7 +245,9 @@ public class ChannelFixture {
                 mock(BotToggleService.class),
                 new ChannelSettingsService(settingsRepository, categoryChain,
                         new RaidRestoreGateService(experimentService), publisher),
-                new SteamPersonalTokenService(accountRepository, mock(TokenEncryptionService.class),
+                new SteamPersonalTokenService(
+                        new SteamPersonalTokenStore(accountRepository, mock(SteamApiKeyRepository.class)),
+                        accountRepository, mock(TokenEncryptionService.class),
                         mock(SteamApiKeyRepository.class), publisher, mock(SteamProfileDiagnostics.class),
                         Optional.empty()),
                 mock(AccountService.class),

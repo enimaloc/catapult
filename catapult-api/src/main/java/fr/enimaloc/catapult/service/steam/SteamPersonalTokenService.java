@@ -2,7 +2,6 @@ package fr.enimaloc.catapult.service.steam;
 
 import fr.enimaloc.catapult.common.dto.channel.SteamTokenRequest;
 import fr.enimaloc.catapult.domain.account.UserAccount;
-import fr.enimaloc.catapult.domain.steam.SteamApiKeyEntry;
 import fr.enimaloc.catapult.getter.steam.SteamApiKeyRotator;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.steam.SteamApiKeyRepository;
@@ -17,13 +16,14 @@ import java.util.Optional;
 
 /**
  * A member's own Steam API key: saved on the account, kept in step with the shared key pool, then published to the
- * dashboards. {@link #save} and {@link #updateSharing} are not transactional, as the handlers they serve were not;
- * {@link #delete} is.
+ * dashboards. {@link #save} and {@link #updateSharing} write through {@link SteamPersonalTokenStore}'s transaction,
+ * then refresh the pool and publish once it has committed; {@link #delete} is one transaction.
  */
 @Service
 @RequiredArgsConstructor
 public class SteamPersonalTokenService {
 
+    private final SteamPersonalTokenStore store;
     private final UserAccountRepository userAccountRepository;
     private final TokenEncryptionService tokenEncryptionService;
     private final SteamApiKeyRepository steamApiKeyRepository;
@@ -37,17 +37,17 @@ public class SteamPersonalTokenService {
         String trimmed = body.token().trim();
         channelUser.setSteamPersonalToken(tokenEncryptionService.encrypt(trimmed));
         channelUser.setSteamTokenShared(body.shared());
-        userAccountRepository.save(channelUser);
-        syncTokenToPool(channelUser, trimmed, body.shared());
+        store.save(channelUser, trimmed, body.shared());
+        rotator.ifPresent(SteamApiKeyRotator::refreshKeys);
         channelEventPublisher.steamProfileChanged(channelUser.getId(), steamDiagnostics.diagnose(channelUser));
     }
 
     public void updateSharing(UserAccount channelUser, boolean shared) {
         if (channelUser.getSteamPersonalToken() == null) return;
         channelUser.setSteamTokenShared(shared);
-        userAccountRepository.save(channelUser);
         String decryptedToken = tokenEncryptionService.decrypt(channelUser.getSteamPersonalToken());
-        syncTokenToPool(channelUser, decryptedToken, shared);
+        store.save(channelUser, decryptedToken, shared);
+        rotator.ifPresent(SteamApiKeyRotator::refreshKeys);
         channelEventPublisher.steamProfileChanged(channelUser.getId(), steamDiagnostics.diagnose(channelUser));
     }
 
@@ -59,16 +59,5 @@ public class SteamPersonalTokenService {
         steamApiKeyRepository.deleteByOwner(channelUser);
         rotator.ifPresent(SteamApiKeyRotator::refreshKeys);
         channelEventPublisher.steamProfileChanged(channelUser.getId(), steamDiagnostics.diagnose(channelUser));
-    }
-
-    private void syncTokenToPool(UserAccount user, String plainToken, boolean shared) {
-        steamApiKeyRepository.deleteByOwner(user);
-        if (!steamApiKeyRepository.existsById(plainToken)) {
-            SteamApiKeyEntry entry = new SteamApiKeyEntry(plainToken);
-            entry.setOwner(user);
-            entry.setExclusive(!shared);
-            steamApiKeyRepository.save(entry);
-        }
-        rotator.ifPresent(SteamApiKeyRotator::refreshKeys);
     }
 }
