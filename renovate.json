@@ -10,6 +10,12 @@
   "automergeStrategy": "squash",
   "packageRules": [
     {
+      "description": "Open the PR as soon as a version is out, but keep its renovate/stability-days check pending for a week, so automerge waits: a hijacked or broken release is usually pulled within days",
+      "matchPackageNames": ["*"],
+      "minimumReleaseAge": "7 days",
+      "internalChecksFilter": "none"
+    },
+    {
       "description": "Gradle dependencies and the Gradle wrapper: one PR for every non-major update",
       "matchManagers": ["gradle", "gradle-wrapper"],
       "matchUpdateTypes": ["minor", "patch"],
