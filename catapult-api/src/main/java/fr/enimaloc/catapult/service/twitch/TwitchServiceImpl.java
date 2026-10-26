@@ -293,6 +293,9 @@ public class TwitchServiceImpl implements TwitchService {
             patchChannel(user, accessToken, body);
             log.info("Twitch channel reset to default for user {} — game_id={}, ccls={}",
                 user.getId(), settings.getNoGameTwitchGameId(), settings.getNoGameCcls());
+            // The default category is Catapult's change, like any other: the channel.update it
+            // triggers must not be reported to the streamer as a manual change.
+            categoryChangeStateService.recordCatapultChangeAndReturnPrevious(user, settings.getNoGameTwitchGameId());
             return ChannelUpdateOutcome.APPLIED;
         } catch (HttpClientErrorException e) {
             if (e.getStatusCode() == HttpStatus.UNAUTHORIZED) {
@@ -306,6 +309,8 @@ public class TwitchServiceImpl implements TwitchService {
                     patchChannel(user, refreshed, body);
                     log.info("Twitch channel reset to default for user {} after token refresh — game_id={}",
                         user.getId(), settings.getNoGameTwitchGameId());
+                    categoryChangeStateService.recordCatapultChangeAndReturnPrevious(user,
+                        settings.getNoGameTwitchGameId());
                     return ChannelUpdateOutcome.APPLIED;
                 } catch (Exception retryEx) {
                     log.warn("Twitch channel reset failed for user {} after token refresh — pausing bot: {}", user.getId(), retryEx.getMessage());
