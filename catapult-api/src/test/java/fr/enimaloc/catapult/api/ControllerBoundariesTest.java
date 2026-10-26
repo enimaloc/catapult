@@ -10,6 +10,8 @@ import fr.enimaloc.catapult.domain.experiment.Experiment;
 import fr.enimaloc.catapult.domain.experiment.ExperimentAssignment;
 import fr.enimaloc.catapult.domain.experiment.ExperimentVariant;
 import fr.enimaloc.catapult.domain.steam.SteamApiKeyEntry;
+import fr.enimaloc.catapult.domain.access.AlphaInvite;
+import fr.enimaloc.catapult.repository.access.AlphaInviteRepository;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.chatcommand.ChatCommandSettingRepository;
 import fr.enimaloc.catapult.repository.experiment.ExperimentAssignmentRepository;
@@ -39,6 +41,8 @@ import tools.jackson.databind.json.JsonMapper;
 @Import(FullContextContainers.class)
 class ControllerBoundariesTest extends FullContextTestBase {
 
+    private static final JsonMapper JSON = JsonMapper.builder().build();
+
     @LocalServerPort
     int port;
 
@@ -62,6 +66,9 @@ class ControllerBoundariesTest extends FullContextTestBase {
 
     @Autowired
     SteamApiKeyRepository steamKeys;
+
+    @Autowired
+    AlphaInviteRepository invites;
 
     @Autowired
     PlatformTransactionManager transactionManager;
@@ -238,5 +245,23 @@ class ControllerBoundariesTest extends FullContextTestBase {
         assertThat(response.statusCode()).as(response.body()).isEqualTo(204);
         assertThat(response.body()).isEmpty();
         assertThat(assignments.findByExperimentAndUser(experiment, member)).isPresent();
+    }
+
+    @Test
+    void invitesPage_namesEachInviteOwner() throws Exception {
+        UserAccount owner = member("invites-page-owner");
+        AlphaInvite invite = inviteService.grantInvite(owner);
+        HttpResponse<String> response;
+        try {
+            response = get(port, "/api/internal/admin/invites");
+        } finally {
+            // whitelistPage_namesEachInviteOwner reads the first invite: leave it alone
+            invites.delete(invite);
+        }
+
+        assertThat(response.statusCode()).as(response.body()).isEqualTo(200);
+        List<String> owners = JSON.readTree(response.body()).path("invites").valueStream()
+                .map(row -> row.path("ownerUsername").asString()).toList();
+        assertThat(owners).contains("invites-page-owner");
     }
 }
