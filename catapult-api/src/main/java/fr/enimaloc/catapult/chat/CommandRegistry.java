@@ -16,9 +16,9 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Registre centralisé des commandes chat disponibles.
- * Toutes les implémentations de ChatCommand sont auto-découvertes par Spring.
- * Les commandes statiques sont prioritaires sur les commandes dynamiques (data-driven).
+ * Central registry of the available chat commands.
+ * Every ChatCommand implementation is auto-discovered by Spring.
+ * Static commands take priority over dynamic (data-driven) ones.
  */
 @Slf4j
 @Component

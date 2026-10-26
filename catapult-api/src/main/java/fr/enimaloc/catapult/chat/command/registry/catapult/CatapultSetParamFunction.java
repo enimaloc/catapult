@@ -13,7 +13,7 @@ import java.util.regex.Pattern;
 
 /**
  * The one write action, scoped to the streamer's own {@link ChatCommandSetting} store (the same
- * one the dedicated "Paramètres" UI section manages) — never {@code UserFlag}, which is an
+ * one the dedicated settings UI section manages) — never {@code UserFlag}, which is an
  * admin/experiment-targeting mechanism a command must not be able to influence.
  */
 @Component

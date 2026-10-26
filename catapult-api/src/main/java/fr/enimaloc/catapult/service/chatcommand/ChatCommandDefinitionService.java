@@ -248,9 +248,9 @@ public class ChatCommandDefinitionService {
     }
 
     private void applyRequest(ChatCommandDefinition def, UpsertRequest req) {
-        // Renommage autorisé même pour les built-ins : le DynamicCommandResolver
-        // route les rows builtin vers le bean Java statique via leur presetKey,
-        // donc le nom peut diverger de cmd.getName() sans casser la dispatch.
+        // Renaming is allowed even for built-ins: the DynamicCommandResolver
+        // routes builtin rows to the static Java bean through their presetKey,
+        // so the name can differ from cmd.getName() without breaking the dispatch.
         def.setName(req.name());
         if (req.ast() != null) {
             def.setAst(req.ast());

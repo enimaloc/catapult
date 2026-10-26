@@ -7,13 +7,12 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 /**
- * Reçoit les ChatCommandEvent et délègue l'exécution au CommandRegistry.
- * Le gate d'expérience contrôle l'accès aux commandes dynamiques (data-driven).
+ * Receives the ChatCommandEvents and hands their execution to the CommandRegistry.
+ * The experiment gate controls access to the dynamic (data-driven) commands.
  * <p>
- * On utilise {@link ExperimentService#evaluateGate} pour déclencher la création
- * de l'assignation depuis un éventuel override admin au premier dispatch (et
- * éviter les LazyInitializationException en restant dans la transaction du
- * service).
+ * {@link ExperimentService#evaluateGate} is used so that the first dispatch creates the
+ * assignment from any admin override (and so that a LazyInitializationException is avoided
+ * by staying within the service's transaction).
  */
 @Component
 @RequiredArgsConstructor

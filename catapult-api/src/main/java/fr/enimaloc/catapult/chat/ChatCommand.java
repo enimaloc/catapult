@@ -5,8 +5,8 @@ import fr.enimaloc.catapult.domain.account.UserAccount;
 import java.util.List;
 
 /**
- * Interface d'une commande chat Twitch.
- * L'ajout d'une nouvelle commande ne nécessite aucune modification de TwitchChatListener.
+ * A Twitch chat command.
+ * Adding a new command needs no change to TwitchChatListener.
  */
 public interface ChatCommand {
 
@@ -15,8 +15,8 @@ public interface ChatCommand {
     ChatCommandEvent.SenderRole getRequiredPermission();
 
     /**
-     * Réservée à l'owner de l'application ({@code app.owner-id}), quel que soit
-     * le channel. Vérifié par le CommandRegistry via le Twitch ID du sender.
+     * Reserved to the application owner ({@code app.owner-id}), whatever the channel.
+     * Checked by the CommandRegistry against the sender's Twitch ID.
      */
     default boolean isOwnerOnly() {
         return false;
