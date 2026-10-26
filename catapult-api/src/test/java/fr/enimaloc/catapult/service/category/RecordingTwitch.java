@@ -25,15 +25,21 @@ public class RecordingTwitch implements TwitchService {
 
     public enum Kind { UPDATE, SET_CATEGORY, RESET }
 
-    /** One category write. {@code persisted}: the binding sent has an id (a saved binding, not a transient one). */
+    /**
+     * One category write. {@code persisted}: the binding sent has an id (a saved binding, not a transient one), which
+     * is what decides whether Twitch applies the CCL blocklist; {@code cclEnabled}: whether the binding sends its
+     * CCLs at all.
+     */
     public record Write(Kind kind, String gameId, String gameName, String sourceName, GameBinding.Status status,
-                        Set<String> ccls, boolean ignored, boolean persisted, Optional<UUID> subject) {}
+                        Set<String> ccls, boolean cclEnabled, boolean ignored, boolean persisted,
+                        Optional<UUID> subject) {}
 
     private final List<String> journal;
     private final List<Write> writes = new ArrayList<>();
     private final Map<String, String> categories = new HashMap<>();
     private ChannelUpdateOutcome answer = ChannelUpdateOutcome.APPLIED;
     private RuntimeException next;
+    private int thrown;
     private Consumer<Write> onWrite = w -> { };
 
     RecordingTwitch(List<String> journal) {
@@ -49,9 +55,14 @@ public class RecordingTwitch implements TwitchService {
         this.answer = outcome;
     }
 
-    /** The next write throws {@code e} instead of being recorded. */
+    /** The next write throws {@code e} instead of being recorded (it still goes through {@link #onWrite}). */
     public void throwNext(RuntimeException e) {
         this.next = e;
+    }
+
+    /** How many writes have thrown so far (see {@link #throwNext}). */
+    public int thrown() {
+        return thrown;
     }
 
     /** {@link #findCategoryIdByName} answers {@code id} for {@code name}. */
@@ -59,7 +70,9 @@ public class RecordingTwitch implements TwitchService {
         categories.put(name, id);
     }
 
-    /** Called at each recorded write, before it is recorded: to observe the state at the moment of the call. */
+    /**
+     * Called at each write attempt, before it is recorded or thrown: to observe the state at the moment of the call.
+     */
     public void onWrite(Consumer<Write> hook) {
         this.onWrite = hook;
     }
@@ -77,13 +90,14 @@ public class RecordingTwitch implements TwitchService {
 
     @Override
     public void setCategory(UserAccount user, String twitchGameId, String twitchGameName) {
-        record(new Write(Kind.SET_CATEGORY, twitchGameId, twitchGameName, null, null, Set.of(), false, false,
+        record(new Write(Kind.SET_CATEGORY, twitchGameId, twitchGameName, null, null, Set.of(), false, false, false,
                 DebugContext.subject()), "twitch:set " + twitchGameId);
     }
 
     @Override
     public void resetToDefault(UserAccount user) {
-        record(new Write(Kind.RESET, null, null, null, null, Set.of(), false, false, DebugContext.subject()),
+        record(new Write(Kind.RESET, null, null, null, null, Set.of(), false, false, false,
+                DebugContext.subject()),
                 "twitch:reset");
     }
 
@@ -104,18 +118,20 @@ public class RecordingTwitch implements TwitchService {
 
     private void update(GameBinding binding) {
         record(new Write(Kind.UPDATE, binding.getTwitchGameId(), binding.getTwitchGameName(),
-                binding.getSourceName(), binding.getStatus(), Set.copyOf(binding.getCcls()), binding.isIgnored(),
+                binding.getSourceName(), binding.getStatus(), Set.copyOf(binding.getCcls()), binding.isCclEnabled(),
+                binding.isIgnored(),
                 binding.getId() != null, DebugContext.subject()),
                 "twitch:update " + binding.getTwitchGameId() + " " + binding.getSourceName());
     }
 
     private void record(Write write, String entry) {
+        onWrite.accept(write);
         if (next != null) {
             RuntimeException e = next;
             next = null;
+            thrown++;
             throw e;
         }
-        onWrite.accept(write);
         writes.add(write);
         journal.add(entry);
     }

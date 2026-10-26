@@ -19,6 +19,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -36,7 +37,7 @@ import static org.mockito.Mockito.verify;
 class CategoryBehaviourTest {
 
     private ChannelFixture f;
-    /** The game played in most tests: STEAM AUTO "Minecraft". */
+    /** The game played in most tests: STEAM AUTO "Minecraft", CCL {@code ViolentGraphic}. */
     private GameBinding g1;
     /** An interruptible custom binding, CCL {@code SexualThemes}. */
     private CustomBinding art;
@@ -45,6 +46,7 @@ class CategoryBehaviourTest {
     void setUp() {
         f = new ChannelFixture();
         g1 = f.binding("g1", GameBinding.Status.AUTO, "27471", "Minecraft");
+        g1.getCcls().add("ViolentGraphic");
         art = f.custom("Art", "509660", "Art", false);
         art.getCcls().add("SexualThemes");
     }
@@ -61,8 +63,23 @@ class CategoryBehaviourTest {
         return f.twitch.writes().getFirst();
     }
 
-    private List<String> twitchEntries() {
-        return f.journal().stream().filter(e -> e.startsWith("twitch:")).toList();
+    /**
+     * {@code write} sent a binding to Twitch with this payload: its status, its CCLs and whether it sends them, ignored
+     * or not, and saved ({@code persisted}: Twitch applies the CCL blocklist) or transient.
+     */
+    private static void assertBindingWrite(Write write, GameBinding.Status status, Set<String> ccls,
+                                           boolean cclEnabled, boolean ignored, boolean persisted) {
+        assertThat(write.kind()).isEqualTo(Kind.UPDATE);
+        assertThat(write.status()).isEqualTo(status);
+        assertThat(write.ccls()).containsExactlyInAnyOrderElementsOf(ccls);
+        assertThat(write.cclEnabled()).as("cclEnabled").isEqualTo(cclEnabled);
+        assertThat(write.ignored()).as("ignored").isEqualTo(ignored);
+        assertThat(write.persisted()).as("persisted").isEqualTo(persisted);
+    }
+
+    /** {@code write} sent {@link #g1} as it is stored. */
+    private static void assertG1Write(Write write) {
+        assertBindingWrite(write, GameBinding.Status.AUTO, Set.of("ViolentGraphic"), true, false, true);
     }
 
     @Nested
@@ -75,13 +92,24 @@ class CategoryBehaviourTest {
             f.detect(f.gameOf(g1), false);
 
             assertThat(f.journal()).containsExactly("event:bindingUpserted g1", "twitch:update 27471 Minecraft");
+            assertG1Write(onlyWrite());
+        }
+
+        @Test
+        void live_sendsTheBindingsOwnCclSwitch() {
+            g1.setCclEnabled(false);
+            f.live(true);
+
+            f.detect(f.gameOf(g1), false);
+
+            assertBindingWrite(onlyWrite(), GameBinding.Status.AUTO, Set.of("ViolentGraphic"), false, false, true);
         }
 
         @Test
         void offline_storesItPending() {
             f.detect(f.gameOf(g1), false);
 
-            assertThat(twitchEntries()).isEmpty();
+            assertThat(f.journal()).containsExactly("event:bindingUpserted g1");
             assertThat(f.pending()).containsSame(g1);
         }
 
@@ -97,8 +125,7 @@ class CategoryBehaviourTest {
             assertThat(write.gameId()).isEqualTo("509658");
             assertThat(write.sourceName()).isEqualTo("no-game-fallback");
             assertThat(write.status()).isEqualTo(GameBinding.Status.MANUAL);
-            assertThat(write.ccls()).isEmpty();
-            assertThat(write.persisted()).isFalse();
+            assertBindingWrite(write, GameBinding.Status.MANUAL, Set.of(), true, false, false);
             assertThat(f.journal())
                     .containsExactly("event:bindingUpserted g1", "twitch:update 509658 no-game-fallback");
         }
@@ -137,8 +164,7 @@ class CategoryBehaviourTest {
             assertThat(write.gameId()).isEqualTo("1469308723");
             assertThat(write.sourceName()).isEqualTo("incomplete-fallback");
             assertThat(write.status()).isEqualTo(GameBinding.Status.MANUAL);
-            assertThat(write.ccls()).containsExactly("ProfanityVulgarity");
-            assertThat(write.persisted()).isFalse();
+            assertBindingWrite(write, GameBinding.Status.MANUAL, Set.of("ProfanityVulgarity"), true, false, false);
             assertThat(f.journal())
                     .containsExactly("event:bindingUpserted g1", "twitch:update 1469308723 incomplete-fallback");
         }
@@ -183,6 +209,9 @@ class CategoryBehaviourTest {
             f.hold();
             f.detect(f.gameOf(other), false);
             assertThat(f.holding()).isFalse();
+
+            assertThat(f.journal()).containsExactly("event:bindingUpserted g1", "twitch:update 27471 Minecraft",
+                    "event:bindingUpserted g2");
         }
 
         @Test
@@ -194,6 +223,7 @@ class CategoryBehaviourTest {
 
             assertThat(f.journal()).containsExactly("event:customBindingChanged null",
                     "event:bindingUpserted g1", "twitch:update 27471 Minecraft");
+            assertG1Write(onlyWrite());
             assertThat(f.activeCustom()).isEmpty();
         }
 
@@ -258,9 +288,7 @@ class CategoryBehaviourTest {
             f.closeGame();
 
             assertThat(f.journal()).containsExactly("twitch:update 509658 no-game-fallback");
-            Write write = onlyWrite();
-            assertThat(write.status()).isEqualTo(GameBinding.Status.MANUAL);
-            assertThat(write.ccls()).isEmpty();
+            assertBindingWrite(onlyWrite(), GameBinding.Status.MANUAL, Set.of(), true, false, false);
             assertThat(f.pending()).isEmpty();
         }
 
@@ -333,8 +361,18 @@ class CategoryBehaviourTest {
             f.streamOnline();
 
             assertThat(f.journal()).containsExactly("twitch:update 509660 custom:Art");
-            assertThat(onlyWrite().ccls()).containsExactly("SexualThemes");
+            assertBindingWrite(onlyWrite(), GameBinding.Status.MANUAL, Set.of("SexualThemes"), true, false, false);
             assertThat(f.pending()).containsSame(g1);
+        }
+
+        @Test
+        void customBindingIsReapplied_withoutABotCheckOfItsOwn() {
+            f.bot(false);
+            f.active(art);
+
+            f.streamOnline();
+
+            assertThat(f.journal()).containsExactly("twitch:update 509660 custom:Art");
         }
 
         @Test
@@ -368,6 +406,7 @@ class CategoryBehaviourTest {
             f.streamOnline();
 
             assertThat(f.journal()).containsExactly("twitch:update 27471 Minecraft");
+            assertG1Write(onlyWrite());
             assertThat(f.pending()).isEmpty();
         }
 
@@ -415,7 +454,7 @@ class CategoryBehaviourTest {
 
             f.streamOffline();
 
-            assertThat(twitchEntries()).isEmpty();
+            assertThat(f.journal()).isEmpty();
             assertThat(f.pending()).isEmpty();
         }
     }
@@ -430,9 +469,20 @@ class CategoryBehaviourTest {
             f.setTwitchGame(g1, "33214", "Fortnite");
 
             assertThat(f.journal()).containsExactly("twitch:update 33214 Minecraft");
-            Write write = onlyWrite();
-            assertThat(write.status()).isEqualTo(GameBinding.Status.MANUAL);
-            assertThat(write.persisted()).isTrue();
+            assertBindingWrite(onlyWrite(), GameBinding.Status.MANUAL, Set.of("ViolentGraphic"), true, false, true);
+        }
+
+        @Test
+        void editingThePlayedIncompleteBinding_sendsItAsIs() {
+            g1.setStatus(GameBinding.Status.INCOMPLETE);
+            f.playing(f.gameOf(g1));
+            f.live(true);
+
+            f.toggleIgnored(g1, false);
+
+            assertThat(f.journal()).containsExactly("twitch:update 27471 Minecraft");
+            assertBindingWrite(onlyWrite(), GameBinding.Status.INCOMPLETE, Set.of("ViolentGraphic"), true, false,
+                    true);
         }
 
         @Test
@@ -456,7 +506,7 @@ class CategoryBehaviourTest {
             f.toggleIgnored(g1, true);
 
             Write write = onlyWrite();
-            assertThat(write.ignored()).isTrue();
+            assertBindingWrite(write, GameBinding.Status.AUTO, Set.of("ViolentGraphic"), true, true, true);
             assertThat(write.sourceName()).isEqualTo("Minecraft");
             assertThat(f.journal()).containsExactly("twitch:update 27471 Minecraft");
         }
@@ -513,6 +563,7 @@ class CategoryBehaviourTest {
             assertThat(f.mappingChanged(g1)).isEqualTo(ChannelUpdateOutcome.FAILED);
 
             assertThat(f.journal()).containsExactly("twitch:update 27471 Minecraft");
+            assertG1Write(onlyWrite());
         }
 
         @Test
@@ -531,7 +582,8 @@ class CategoryBehaviourTest {
             assertThat(f.mappingChanged(g1)).isEqualTo(ChannelUpdateOutcome.APPLIED);
 
             assertThat(f.journal()).containsExactly("twitch:update 1469308723 incomplete-fallback");
-            assertThat(onlyWrite().ccls()).containsExactly("ProfanityVulgarity");
+            assertBindingWrite(onlyWrite(), GameBinding.Status.MANUAL, Set.of("ProfanityVulgarity"), true, false,
+                    false);
         }
 
         @Test
@@ -573,9 +625,7 @@ class CategoryBehaviourTest {
 
             assertThat(f.journal()).containsExactly("twitch:update 509660 custom:Art",
                     "event:customBindingChanged " + art.getId());
-            Write write = onlyWrite();
-            assertThat(write.ccls()).containsExactly("SexualThemes");
-            assertThat(write.status()).isEqualTo(GameBinding.Status.MANUAL);
+            assertBindingWrite(onlyWrite(), GameBinding.Status.MANUAL, Set.of("SexualThemes"), true, false, false);
             assertThat(f.activeCustom()).containsSame(art);
         }
 
@@ -609,6 +659,7 @@ class CategoryBehaviourTest {
 
             assertThat(result.reapplied()).isEqualTo(ActivationResult.FAILED);
             assertThat(f.journal()).containsExactly("twitch:update 509660 custom:Art");
+            assertBindingWrite(onlyWrite(), GameBinding.Status.MANUAL, Set.of("SexualThemes"), true, false, false);
             assertThat(f.activeCustom()).containsSame(art);
         }
 
@@ -622,6 +673,7 @@ class CategoryBehaviourTest {
 
             assertThat(f.journal()).containsExactly("event:customBindingChanged null",
                     "event:bindingUpserted g1", "twitch:update 27471 Minecraft");
+            assertG1Write(onlyWrite());
         }
 
         @Test
@@ -633,6 +685,7 @@ class CategoryBehaviourTest {
 
             assertThat(f.journal()).containsExactly("event:customBindingChanged null",
                     "twitch:update 509658 no-game-fallback");
+            assertBindingWrite(onlyWrite(), GameBinding.Status.MANUAL, Set.of(), true, false, false);
         }
 
         @Test
@@ -648,6 +701,28 @@ class CategoryBehaviourTest {
         }
 
         @Test
+        void deactivateOfflineWithoutGame_resets() {
+            f.active(art);
+
+            f.deactivate();
+
+            assertThat(f.journal()).containsExactly("event:customBindingChanged null", "twitch:reset");
+            assertThat(f.pending()).isEmpty();
+        }
+
+        @Test
+        void deactivateOffline_endOfStreamDefaultOff_onlyStoresTheGame() {
+            f.settings.setApplyDefaultOnStreamEnd(false);
+            f.active(art);
+            f.playing(f.gameOf(g1));
+
+            f.deactivate();
+
+            assertThat(f.journal()).containsExactly("event:customBindingChanged null", "event:bindingUpserted g1");
+            assertThat(f.pending()).containsSame(g1);
+        }
+
+        @Test
         void deactivate_keepsTheRaidHold() {
             f.active(art);
             f.playing(f.gameOf(g1));
@@ -659,6 +734,7 @@ class CategoryBehaviourTest {
             assertThat(f.holding()).isTrue();
             assertThat(f.journal()).containsExactly("event:customBindingChanged null",
                     "event:bindingUpserted g1", "twitch:update 27471 Minecraft");
+            assertG1Write(onlyWrite());
         }
 
         @Test
@@ -671,6 +747,7 @@ class CategoryBehaviourTest {
 
             assertThat(f.journal()).containsExactly("event:customBindingChanged null",
                     "event:bindingUpserted g1", "twitch:update 27471 Minecraft");
+            assertG1Write(onlyWrite());
             assertThat(f.activeCustom()).isEmpty();
         }
     }
@@ -694,10 +771,7 @@ class CategoryBehaviourTest {
 
             assertThat(f.journal()).containsExactly("twitch:update 504461 Celeste",
                     "event:customBindingChanged null");
-            Write write = onlyWrite();
-            assertThat(write.status()).isEqualTo(GameBinding.Status.MANUAL);
-            assertThat(write.ccls()).isEmpty();
-            assertThat(write.persisted()).isFalse();
+            assertBindingWrite(onlyWrite(), GameBinding.Status.MANUAL, Set.of(), true, false, false);
             assertThat(f.activeCustom()).isEmpty();
         }
 
@@ -771,7 +845,7 @@ class CategoryBehaviourTest {
             f.raid("509658");
 
             assertThat(f.journal()).containsExactly("twitch:update 27471 Minecraft");
-            assertThat(onlyWrite().persisted()).isTrue();
+            assertG1Write(onlyWrite());
             assertThat(f.holding()).isTrue();
         }
 
@@ -806,10 +880,29 @@ class CategoryBehaviourTest {
 
         @Test
         void twitchThrows_releasesTheHold() {
+            AtomicBoolean holdingAtWrite = new AtomicBoolean();
+            f.twitch.onWrite(w -> holdingAtWrite.set(f.holding()));
             f.twitch.throwNext(new IllegalStateException("database down"));
 
             f.raid("509658");
 
+            assertThat(f.twitch.thrown()).as("the write was attempted and threw").isEqualTo(1);
+            assertThat(holdingAtWrite).as("held while Twitch was called").isTrue();
+            assertThat(f.holding()).isFalse();
+            assertThat(f.journal()).isEmpty();
+        }
+
+        @Test
+        void restoreOffOrGateClosed_changesNothing() {
+            f.settings.setRaidRestoreGameMinutes(null);
+            f.raid("509658");
+            f.settings.setRaidRestoreGameMinutes(0);
+            f.raid("509658");
+            f.settings.setRaidRestoreGameMinutes(10);
+            f.raidGate(false);
+            f.raid("509658");
+
+            assertThat(f.journal()).isEmpty();
             assertThat(f.holding()).isFalse();
         }
 
@@ -851,6 +944,62 @@ class CategoryBehaviourTest {
         }
     }
 
+    @Nested
+    class NoGameSettingsSaved {
+
+        @Test
+        void liveDuringARaidHold_resets() {
+            f.live(true);
+            f.hold();
+
+            f.noGameSettingsSaved();
+
+            assertThat(f.journal()).containsExactly("twitch:reset");
+            assertThat(f.holding()).isTrue();
+        }
+
+        @Test
+        void offline_resets() {
+            f.noGameSettingsSaved();
+
+            assertThat(f.journal()).containsExactly("twitch:reset");
+        }
+
+        @Test
+        void noGameFallbackOff_stillResets() {
+            f.settings.setApplyDefaultOnNoGame(false);
+            f.live(true);
+
+            f.noGameSettingsSaved();
+
+            assertThat(f.journal()).containsExactly("twitch:reset");
+        }
+
+        @Test
+        void gameDetected_changesNothing_withoutReadingTheCustomBinding() {
+            f.playing(f.gameOf(g1));
+            f.active(art);
+            f.live(true);
+            int before = f.activationReads();
+
+            f.noGameSettingsSaved();
+
+            assertThat(f.journal()).isEmpty();
+            assertThat(f.activationReads() - before).isZero();
+        }
+
+        @Test
+        void customBindingActive_changesNothing() {
+            f.active(art);
+            f.live(true);
+
+            f.noGameSettingsSaved();
+
+            assertThat(f.journal()).isEmpty();
+            assertThat(f.activeCustom()).containsSame(art);
+        }
+    }
+
     @Test
     void eachTriggerReadsTheCustomBindingAtMostOnce() {
         f.settings.setApplyDefaultOnStreamStart(false);
@@ -861,6 +1010,7 @@ class CategoryBehaviourTest {
         assertThat(readsOf(f::closeGame)).as("game closed").isEqualTo(1);
         assertThat(readsOf(f::streamOnline)).as("stream start").isEqualTo(1);
         assertThat(readsOf(f::streamOffline)).as("stream end").isZero();
+        assertThat(readsOf(f::noGameSettingsSaved)).as("no-game settings saved, nothing detected").isEqualTo(1);
         f.playing(f.gameOf(other));
         assertThat(readsOf(() -> f.setTwitchGame(other, "33214", "Fortnite"))).as("edit of the played binding")
                 .isEqualTo(1);
@@ -870,13 +1020,20 @@ class CategoryBehaviourTest {
         assertThat(readsOf(() -> f.setGame("Celeste", null))).as("!setgame").isZero();
         assertThat(readsOf(() -> f.twitchat(TwitchatActionType.REVERT_CATEGORY,
                 Map.of("gameId", "509658", "gameName", "Just Chatting")))).as("revert").isZero();
+        assertThat(gateChecks).as("custom bindings gate, per trigger in the same order")
+                .containsExactly(1, 1, 1, 0, 1, 1, 1, 1, 0, 0);
     }
+
+    /** The custom bindings gate evaluations of each {@link #readsOf} trigger, in order. */
+    private final List<Integer> gateChecks = new java.util.ArrayList<>();
 
     /** The activation row's reads during {@code trigger}, with {@code art} active when it starts. */
     private int readsOf(Runnable trigger) {
         f.active(art);
         int before = f.activationReads();
+        int gateBefore = f.gateChecks();
         trigger.run();
+        gateChecks.add(f.gateChecks() - gateBefore);
         return f.activationReads() - before;
     }
 }
