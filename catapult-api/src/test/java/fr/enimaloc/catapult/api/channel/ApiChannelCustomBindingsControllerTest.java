@@ -80,7 +80,7 @@ class ApiChannelCustomBindingsControllerTest {
         other = registered("someone");
         // A moderator of the channel, even: still not its owner
         when(channelAccess.canAccess(any(), any())).thenReturn(true);
-        doCallRealMethod().when(service).activate(any(UserAccount.class), anyString());
+        doCallRealMethod().when(service).activateByIdOrName(any(UserAccount.class), anyString());
         art = new CustomBinding();
         art.setId(UUID.randomUUID());
         art.setUser(owner);
@@ -242,7 +242,7 @@ class ApiChannelCustomBindingsControllerTest {
 
         mvc.perform(post(base() + "/" + unknown + "/activate").with(as(owner)).with(csrf()))
                 .andExpect(status().isNotFound());
-        verify(service, never()).activate(any(), any(CustomBinding.class));
+        verify(service, never()).activate(any(), any());
     }
 
     @Test

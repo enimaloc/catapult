@@ -73,7 +73,7 @@ public class ApiChannelCustomBindingsController {
     @PreAuthorize("@authz.ownsChannel(#userId)")
     @PostMapping("/{customBindingId}/activate")
     public ResponseEntity<Void> activate(@PathVariable UUID userId, @PathVariable UUID customBindingId) {
-        return customBindingService.activate(userResolver.user(userId), customBindingId.toString())
+        return customBindingService.activateByIdOrName(userResolver.user(userId), customBindingId.toString())
                 .map(CustomBindingViews::activation)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown custom binding"));
     }
