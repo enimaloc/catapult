@@ -175,29 +175,44 @@ class ApiChannelActionsControllerTest extends ApiChannelActionsTestSupport {
 
         @Test
         void noGame_appliesTheDefaultRightAwayWhenNothingIsDetected() throws Exception {
+            when(streamStateService.isLive(owner)).thenReturn(true);
+
             mvc.perform(as(owner, HttpMethod.PUT, "/settings/no-game", """
                             {"twitchGameId":"1","twitchGameName":"Just Chatting","ccls":["Gore"],
-                             "applyOnStreamStart":true,"applyOnNoGame":false,"applyOnStreamEnd":true}"""))
+                             "applyOnStreamStart":true,"applyOnNoGame":true,"applyOnStreamEnd":false}"""))
                     .andExpect(status().isNoContent());
 
             UserSettings settings = saved();
             assertThat(settings.getNoGameTwitchGameName()).isEqualTo("Just Chatting");
             assertThat(settings.getNoGameCcls()).containsExactly("Gore");
             assertThat(settings.isApplyDefaultOnStreamStart()).isTrue();
-            assertThat(settings.isApplyDefaultOnNoGame()).isFalse();
-            assertThat(settings.isApplyDefaultOnStreamEnd()).isTrue();
+            assertThat(settings.isApplyDefaultOnNoGame()).isTrue();
+            assertThat(settings.isApplyDefaultOnStreamEnd()).isFalse();
             verify(twitchService).resetToDefault(owner);
         }
 
         @Test
-        void noGame_appliesTheDefaultEvenWithApplyOnNoGameOff() throws Exception {
+        void noGame_applyOnNoGameOff_onlySaves() throws Exception {
+            when(streamStateService.isLive(owner)).thenReturn(true);
+
             mvc.perform(as(owner, HttpMethod.PUT, "/settings/no-game", """
                             {"twitchGameId":"1","twitchGameName":"Just Chatting","ccls":null,
                              "applyOnStreamStart":false,"applyOnNoGame":false,"applyOnStreamEnd":false}"""))
                     .andExpect(status().isNoContent());
 
             assertThat(saved().isApplyDefaultOnNoGame()).isFalse();
-            verify(twitchService).resetToDefault(owner);
+            verify(twitchService, never()).resetToDefault(any());
+        }
+
+        @Test
+        void noGame_offline_onlySaves() throws Exception {
+            mvc.perform(as(owner, HttpMethod.PUT, "/settings/no-game", """
+                            {"twitchGameId":"1","twitchGameName":"Just Chatting","ccls":null,
+                             "applyOnStreamStart":false,"applyOnNoGame":true,"applyOnStreamEnd":false}"""))
+                    .andExpect(status().isNoContent());
+
+            assertThat(saved().getNoGameTwitchGameId()).isEqualTo("1");
+            verify(twitchService, never()).resetToDefault(any());
         }
 
         @Test

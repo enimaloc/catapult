@@ -1101,31 +1101,40 @@ class CategoryBehaviourTest {
     class NoGameSettingsSaved {
 
         @Test
-        void liveDuringARaidHold_resets() {
+        void liveNothingDetected_resets() {
+            f.live(true);
+
+            f.noGameSettingsSaved();
+
+            assertThat(f.journal()).containsExactly("twitch:reset");
+        }
+
+        @Test
+        void liveDuringARaidHold_onlySaves() {
             f.live(true);
             f.hold();
 
             f.noGameSettingsSaved();
 
-            assertThat(f.journal()).containsExactly("twitch:reset");
+            assertThat(f.journal()).isEmpty();
             assertThat(f.holding()).isTrue();
         }
 
         @Test
-        void offline_resets() {
+        void offline_onlySaves() {
             f.noGameSettingsSaved();
 
-            assertThat(f.journal()).containsExactly("twitch:reset");
+            assertThat(f.journal()).isEmpty();
         }
 
         @Test
-        void noGameFallbackOff_stillResets() {
+        void noGameFallbackOff_onlySaves() {
             f.settings.setApplyDefaultOnNoGame(false);
             f.live(true);
 
             f.noGameSettingsSaved();
 
-            assertThat(f.journal()).containsExactly("twitch:reset");
+            assertThat(f.journal()).isEmpty();
         }
 
         @Test

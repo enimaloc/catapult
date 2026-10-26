@@ -718,24 +718,47 @@ class CategoryChainTest {
     }
 
     @Test
-    void noGameSettingsSaved_nothingDetected() {
+    void noGameSettingsSaved_liveNothingDetected_resets() {
         when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.empty());
         when(activations.active(user)).thenReturn(Optional.empty());
+        live(true);
 
-        assertThat(chain.decide(user, new NoGameSettingsSaved()))
+        assertThat(chain.decide(user, new NoGameSettingsSaved(true)))
                 .isEqualTo(CategoryDecision.reset(CategoryRule.DEFAULT_CATEGORY));
 
-        verify(streamStateService, never()).isLive(any());
+        // The value just saved, not a re-read
         verifyNoInteractions(settingsRepository);
     }
 
     @Test
-    void noGameSettingsSaved_nothingDetected_ignoresTheRaidHold() {
+    void noGameSettingsSaved_offline_onlySaves() {
+        when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.empty());
+        when(activations.active(user)).thenReturn(Optional.empty());
+        live(false);
+
+        assertThat(chain.decide(user, new NoGameSettingsSaved(true)))
+                .isEqualTo(CategoryDecision.none(CategoryRule.DEFAULT_CATEGORY, Reason.OFFLINE));
+    }
+
+    @Test
+    void noGameSettingsSaved_duringARaidHold_onlySaves() {
         hold.hold(user);
         when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.empty());
         when(activations.active(user)).thenReturn(Optional.empty());
+        live(true);
 
-        assertThat(chain.decide(user, new NoGameSettingsSaved()).action()).isEqualTo(Action.RESET_TO_DEFAULT);
+        assertThat(chain.decide(user, new NoGameSettingsSaved(true)))
+                .isEqualTo(CategoryDecision.none(CategoryRule.DEFAULT_CATEGORY, Reason.RAID_HOLD));
+    }
+
+    @Test
+    void noGameSettingsSaved_applyOnNoGameOff_onlySaves() {
+        when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.empty());
+        when(activations.active(user)).thenReturn(Optional.empty());
+        live(true);
+
+        assertThat(chain.decide(user, new NoGameSettingsSaved(false)))
+                .isEqualTo(CategoryDecision.none(CategoryRule.DEFAULT_CATEGORY, Reason.NO_GAME_FALLBACK_OFF));
     }
 
     @Test
@@ -743,7 +766,7 @@ class CategoryChainTest {
         when(gameStateService.getLastKnownGame(user))
                 .thenReturn(Optional.of(new DetectedGame("570", GameBinding.SourceType.STEAM, "Dota 2")));
 
-        assertThat(chain.decide(user, new NoGameSettingsSaved()))
+        assertThat(chain.decide(user, new NoGameSettingsSaved(true)))
                 .isEqualTo(CategoryDecision.none(CategoryRule.DEFAULT_CATEGORY, Reason.GAME_DETECTED));
 
         verifyNoInteractions(activations);
@@ -754,7 +777,7 @@ class CategoryChainTest {
         when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.empty());
         activeCustom(false);
 
-        assertThat(chain.decide(user, new NoGameSettingsSaved()))
+        assertThat(chain.decide(user, new NoGameSettingsSaved(true)))
                 .isEqualTo(CategoryDecision.none(CategoryRule.CUSTOM_BINDING, Reason.CUSTOM_BINDING_ACTIVE));
     }
 

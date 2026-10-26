@@ -91,7 +91,7 @@ public class CategoryChain {
             case ManualCategory manual -> CategoryDecision.update(CategoryRule.MANUAL_CHOICE, manual.binding());
             case RevertCategory revert -> CategoryDecision.setCategory(CategoryRule.MANUAL_CHOICE,
                     revert.twitchGameId(), revert.twitchGameName());
-            case NoGameSettingsSaved saved -> noGameSettingsSaved(user);
+            case NoGameSettingsSaved saved -> noGameSettingsSaved(user, saved.applyDefaultOnNoGame());
             case RaidedOut raided -> raidedOut(user, raided.currentCategoryId());
         };
     }
@@ -152,13 +152,26 @@ public class CategoryChain {
         return CategoryDecision.update(CategoryRule.CUSTOM_BINDING, binding.toGameBinding(user));
     }
 
-    /** The default category at once, only when nothing is detected now and then no custom binding holds the channel. */
-    private CategoryDecision noGameSettingsSaved(UserAccount user) {
+    /**
+     * The default category at once, only when the "no game" fallback would apply now: nothing detected, then no
+     * custom binding holding the channel, live, no raid hold, and {@code applyDefaultOnNoGame} on (the value just
+     * saved). Otherwise the settings are only saved.
+     */
+    private CategoryDecision noGameSettingsSaved(UserAccount user, boolean applyDefaultOnNoGame) {
         if (gameStateService.getLastKnownGame(user).isPresent()) {
             return CategoryDecision.none(CategoryRule.DEFAULT_CATEGORY, Reason.GAME_DETECTED);
         }
         if (customBindingActivations.active(user).isPresent()) {
             return CategoryDecision.none(CategoryRule.CUSTOM_BINDING, Reason.CUSTOM_BINDING_ACTIVE);
+        }
+        if (!streamStateService.isLive(user)) {
+            return CategoryDecision.none(CategoryRule.DEFAULT_CATEGORY, Reason.OFFLINE);
+        }
+        if (raidRestoreHold.isHolding(user)) {
+            return CategoryDecision.none(CategoryRule.DEFAULT_CATEGORY, Reason.RAID_HOLD);
+        }
+        if (!applyDefaultOnNoGame) {
+            return CategoryDecision.none(CategoryRule.DEFAULT_CATEGORY, Reason.NO_GAME_FALLBACK_OFF);
         }
         return CategoryDecision.reset(CategoryRule.DEFAULT_CATEGORY);
     }
