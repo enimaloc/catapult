@@ -150,7 +150,7 @@ class AdminMinecraftControllerTest {
     }
 
     @Test
-    void create_anErrorIsRelayedAsItsStatusAlone_andABlankLabelIsLeftToTheApi() throws Exception {
+    void create_anErrorIsRelayedAsItsStatusAlone_andABlankLabelIsFilledWithTheBundlesDefault() throws Exception {
         when(apiService.isAdmin()).thenReturn(true);
         when(apiService.adminCreateMinecraftAccount("dc-1", "Minecraft account"))
                 .thenReturn(new ApiClient.Result<>(502, Map.of("message", "Xbox chain failed", "trace", "x")));
