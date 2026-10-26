@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.api.ApiMeApiTokenController;
 import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.api.CustomBindingViews;
 import fr.enimaloc.catapult.api.userapi.CustomBindingsApiV2Controller;
+import fr.enimaloc.catapult.domain.binding.CustomBinding;
 import fr.enimaloc.catapult.common.dto.account.ApiTokenStatusDto;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
@@ -111,7 +112,7 @@ class CustomBindingApiSecurityTest {
             mvc.perform(get("/api/v2/custom-bindings")).andExpect(unauthorizedProblem());
             mvc.perform(post("/api/v2/custom-bindings/art/activate")).andExpect(unauthorizedProblem());
             mvc.perform(post("/api/v2/custom-bindings/deactivate")).andExpect(unauthorizedProblem());
-            verify(customBindings, never()).activate(any(), any());
+            verify(customBindings, never()).activate(any(), any(CustomBinding.class));
             verify(customBindings, never()).deactivate(any());
         }
 
@@ -122,7 +123,7 @@ class CustomBindingApiSecurityTest {
                     .andExpect(unauthorizedProblem());
             mvc.perform(post("/api/v2/custom-bindings/art/activate").header("Authorization", PERSONAL_TOKEN))
                     .andExpect(unauthorizedProblem());
-            verify(customBindings, never()).activate(any(), any());
+            verify(customBindings, never()).activate(any(), any(CustomBinding.class));
         }
 
         @Test
@@ -132,7 +133,7 @@ class CustomBindingApiSecurityTest {
                     .andExpect(unauthorizedProblem());
             mvc.perform(post("/api/v2/custom-bindings/art/activate").param("uuid", widget))
                     .andExpect(unauthorizedProblem());
-            verify(customBindings, never()).activate(any(), any());
+            verify(customBindings, never()).activate(any(), any(CustomBinding.class));
         }
 
         @Test
@@ -146,7 +147,7 @@ class CustomBindingApiSecurityTest {
                     .andExpect(unauthorizedProblem());
             mvc.perform(post("/api/v2/custom-bindings/art/activate").header("Authorization", "Bearer " + jwt))
                     .andExpect(unauthorizedProblem());
-            verify(customBindings, never()).activate(any(), any());
+            verify(customBindings, never()).activate(any(), any(CustomBinding.class));
         }
 
         @Test

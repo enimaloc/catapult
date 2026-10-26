@@ -6,12 +6,14 @@ import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.igdb.IgdbGameDetails;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
+import fr.enimaloc.catapult.repository.tw.TwDtddTopicMappingRepository;
 import fr.enimaloc.catapult.service.account.WidgetTokenService;
 import fr.enimaloc.catapult.service.binding.GameStateService;
 import fr.enimaloc.catapult.service.igdb.IgdbGameDetailsService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.steam.SteamStoreService;
 import fr.enimaloc.catapult.service.tw.TwLabelService;
+import fr.enimaloc.catapult.service.xbox.XboxStoreService;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,7 +44,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 // /api/game/** is permitAll (widget-token authenticated, no JWT) in ApiSecurityConfig,
 // so disabling filters here does not hide an auth regression.
 @AutoConfigureMockMvc(addFilters = false)
-@Import(I18nConfig.class)
+@Import({I18nConfig.class, PublicBaseUrl.class, GameInfoAssembler.class})
 class UserApiV1ControllerTest {
     @MockitoBean fr.enimaloc.catapult.service.account.UserApiTokenService userApiTokenService;
 
@@ -55,6 +57,9 @@ class UserApiV1ControllerTest {
     @MockitoBean IgdbGameDetailsService igdbGameDetailsService;
     @MockitoBean SteamStoreService steamStoreService;
     @MockitoBean TwLabelService twLabelService;
+    @MockitoBean XboxStoreService xboxStoreService;
+    @MockitoBean TwDtddTopicMappingRepository twDtddTopicMappingRepository;
+    @MockitoBean DevBackdoorResolver devBackdoorResolver;
 
     @Test
     void gameInfo_unknownToken_returns404() throws Exception {

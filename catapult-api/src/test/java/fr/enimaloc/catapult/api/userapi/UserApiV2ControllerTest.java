@@ -67,7 +67,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
 // /api/user/** is public (widget-token authenticated) in ApiSecurityConfig.
 @AutoConfigureMockMvc(addFilters = false)
-@Import({I18nConfig.class, PublicBaseUrl.class})
+@Import({I18nConfig.class, PublicBaseUrl.class, GameInfoAssembler.class})
 class UserApiV2ControllerTest {
     @MockitoBean fr.enimaloc.catapult.service.account.UserApiTokenService userApiTokenService;
 

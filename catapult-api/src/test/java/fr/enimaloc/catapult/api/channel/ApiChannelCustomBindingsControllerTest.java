@@ -35,7 +35,9 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -78,6 +80,7 @@ class ApiChannelCustomBindingsControllerTest {
         other = registered("someone");
         // A moderator of the channel, even: still not its owner
         when(channelAccess.canAccess(any(), any())).thenReturn(true);
+        doCallRealMethod().when(service).activate(any(UserAccount.class), anyString());
         art = new CustomBinding();
         art.setId(UUID.randomUUID());
         art.setUser(owner);
@@ -239,7 +242,7 @@ class ApiChannelCustomBindingsControllerTest {
 
         mvc.perform(post(base() + "/" + unknown + "/activate").with(as(owner)).with(csrf()))
                 .andExpect(status().isNotFound());
-        verify(service, never()).activate(any(), any());
+        verify(service, never()).activate(any(), any(CustomBinding.class));
     }
 
     @Test
