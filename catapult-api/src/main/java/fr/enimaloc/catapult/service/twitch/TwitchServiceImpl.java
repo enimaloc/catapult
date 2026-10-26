@@ -54,20 +54,29 @@ public class TwitchServiceImpl implements TwitchService {
             log.debug("Skipping Twitch channel update for user {} — bot disabled or account not active", user.getId());
             return ChannelUpdateOutcome.SKIPPED;
         }
-        return apiObservations.observe("twitch", "update_channel", () -> {
-            if (binding.getStatus() == GameBinding.Status.INCOMPLETE || binding.isIgnored()) {
-                log.debug("Skipping Twitch update for user {} — binding is {} or ignored",
-                    user.getId(), binding.getStatus());
-                return ChannelUpdateOutcome.SKIPPED;
-            }
+        // The PATCH's failure, thrown through the observation so the metric counts it as an error, then answered
+        // FAILED; any other exception (a repository failure) still propagates
+        RuntimeException[] refused = new RuntimeException[1];
+        try {
+            return apiObservations.observe("twitch", "update_channel", () -> {
+                if (binding.getStatus() == GameBinding.Status.INCOMPLETE || binding.isIgnored()) {
+                    log.debug("Skipping Twitch update for user {} — binding is {} or ignored",
+                        user.getId(), binding.getStatus());
+                    return ChannelUpdateOutcome.SKIPPED;
+                }
 
-            Optional<OAuthToken> token = oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH);
-            if (token.isEmpty()) {
-                log.warn("No Twitch token found for user {}", user.getId());
-                return ChannelUpdateOutcome.FAILED;
-            }
-            return doUpdateChannel(user, binding, token.get());
-        });
+                Optional<OAuthToken> token =
+                    oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH);
+                if (token.isEmpty()) {
+                    log.warn("No Twitch token found for user {}", user.getId());
+                    return ChannelUpdateOutcome.FAILED;
+                }
+                return doUpdateChannel(user, binding, token.get(), refused);
+            });
+        } catch (RuntimeException e) {
+            if (e != refused[0]) throw e;
+            return ChannelUpdateOutcome.FAILED;
+        }
     }
 
     @Override
@@ -165,7 +174,9 @@ public class TwitchServiceImpl implements TwitchService {
         }
     }
 
-    private ChannelUpdateOutcome doUpdateChannel(UserAccount user, GameBinding binding, OAuthToken token) {
+    /** {@code APPLIED}, or the PATCH's failure (logged, the bot paused when the token is dead) noted then thrown. */
+    private ChannelUpdateOutcome doUpdateChannel(UserAccount user, GameBinding binding, OAuthToken token,
+                                                 RuntimeException[] refused) {
         String accessToken = twitchTokenService.resolveAccessToken(token, user);
 
         Map<String, Object> body = new LinkedHashMap<>();
@@ -188,17 +199,17 @@ public class TwitchServiceImpl implements TwitchService {
             categoryChangeStateService.recordCatapultChangeAndReturnPrevious(user, binding.getTwitchGameId());
             return ChannelUpdateOutcome.APPLIED;
         } catch (TokenRefreshFailedException e) {
-            return ChannelUpdateOutcome.FAILED;
+            throw refused[0] = e.getCause();
         } catch (HttpClientErrorException e) {
             if (e.getStatusCode() == HttpStatus.TOO_MANY_REQUESTS) {
                 log.warn("Twitch rate limit hit for user {} — will retry next cycle", user.getId());
             } else {
                 log.error("Twitch API error for user {}: {} {}", user.getId(), e.getStatusCode(), e.getMessage());
             }
-            return ChannelUpdateOutcome.FAILED;
-        } catch (Exception e) {
+            throw refused[0] = e;
+        } catch (RuntimeException e) {
             log.error("Unexpected error updating Twitch channel for user {}", user.getId(), e);
-            return ChannelUpdateOutcome.FAILED;
+            throw refused[0] = e;
         }
     }
 
