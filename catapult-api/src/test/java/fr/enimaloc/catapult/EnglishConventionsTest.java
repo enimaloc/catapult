@@ -124,9 +124,7 @@ class EnglishConventionsTest {
     /** The French still in the sources: {@code "<path> <KIND>"}. Each translating task deletes its own entries. */
     static final Set<String> LEGACY = Set.of(
             API + "api/admin/ApiAdminMinecraftAccountsController.java LITERAL",
-            API + "chat/command/DebugCommand.java LITERAL",
             API + "service/feedback/ChangelogService.java LITERAL",
-            API + "service/provider/IgdbRawQueries.java LITERAL",
             WEB + "service/mock/MockMinecraftAccountsStore.java LITERAL");
 
     private static final Path ROOT = Path.of("..");
