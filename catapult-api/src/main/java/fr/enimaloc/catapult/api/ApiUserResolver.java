@@ -88,6 +88,12 @@ public class ApiUserResolver {
         return byId(userId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
 
+    /** The account whose Twitch username is exactly {@code twitchUsername} (case included), or 404. */
+    public UserAccount byTwitchUsername(String twitchUsername) {
+        return remember(userAccountRepository.findByTwitchUsername(twitchUsername))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+    }
+
     private Optional<UserAccount> byId(UUID id) {
         UserAccount remembered = remembered(ID_KEY + id);
         if (remembered != null && id.equals(remembered.getId())) {

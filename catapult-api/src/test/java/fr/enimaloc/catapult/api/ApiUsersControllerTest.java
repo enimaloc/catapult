@@ -9,6 +9,7 @@ import org.springframework.boot.thymeleaf.autoconfigure.ThymeleafAutoConfigurati
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -26,6 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /** The username lookup catapult-web turns a channel's page URL into the channel's account id with. */
+@Import(ApiUserResolver.class)
 @WebMvcTest(
         controllers = ApiUsersController.class,
         excludeAutoConfiguration = ThymeleafAutoConfiguration.class,

@@ -98,7 +98,7 @@ class ApiChannelDataControllerTest {
         for (UserAccount account : List.of(owner, moderator)) {
             when(userAccountRepository.findById(account.getId())).thenReturn(Optional.of(account));
         }
-        when(channelAccessService.canAccess(any(), any())).thenReturn(true);
+        when(channelAccessService.canAccess(any(UserAccount.class), any(UserAccount.class))).thenReturn(true);
     }
 
     @Test

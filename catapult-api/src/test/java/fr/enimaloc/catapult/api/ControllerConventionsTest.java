@@ -38,20 +38,11 @@ import org.springframework.web.client.RestTemplate;
 /**
  * Controller conventions: a controller resolves the caller, validates the request and shapes the response; it holds no
  * repository, entity manager, outbound client, event publisher or debug recorder, opens no transaction and does not
- * scope debug attribution. {@link #LEGACY} lists the controllers not yet thinned; it can only shrink.
+ * scope debug attribution.
  */
 class ControllerConventionsTest {
 
   private static final Path SOURCES = Path.of("src/main/java");
-
-  /** Today's violations, to be emptied by moving the code into services. */
-  static final Set<String> LEGACY =
-      Set.of(
-          "ApiChannelAccessController depends on UserAccountRepository",
-          "ApiHelpController depends on UserAccountRepository",
-          "ApiSeenFeaturesController depends on SeenFeatureRepository",
-          "ApiSeenFeaturesController#markSeen is @Transactional",
-          "ApiUsersController depends on UserAccountRepository");
 
   @Test
   void controllersFollowTheConventions() throws Exception {
@@ -59,19 +50,7 @@ class ControllerConventionsTest {
     for (Class<?> controller : controllers()) {
       violations.addAll(violations(controller, SOURCES));
     }
-    violations.removeAll(LEGACY);
     assertThat(violations).isEmpty();
-  }
-
-  @Test
-  void legacyOnlyListsRealViolations() throws Exception {
-    Set<String> violations = new TreeSet<>();
-    for (Class<?> controller : controllers()) {
-      violations.addAll(violations(controller, SOURCES));
-    }
-    Set<String> stale = new TreeSet<>(LEGACY);
-    stale.removeAll(violations);
-    assertThat(stale).isEmpty();
   }
 
   @ParameterizedTest
@@ -120,7 +99,7 @@ class ControllerConventionsTest {
     assertThat(violations(Thin.class, SOURCES)).isEmpty();
   }
 
-  /** The violations of one controller, formatted as {@link #LEGACY} entries. */
+  /** The violations of one controller, formatted as "Controller depends on Type" style entries. */
   static Set<String> violations(Class<?> controller, Path sources) {
     String name = controller.getSimpleName();
     Set<String> found = new TreeSet<>();
