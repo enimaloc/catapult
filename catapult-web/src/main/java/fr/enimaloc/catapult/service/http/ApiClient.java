@@ -7,6 +7,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.ResponseEntity;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -22,6 +23,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 /**
  * Calls catapult-api on behalf of the current browser session, authenticated with the JWT
@@ -73,6 +75,31 @@ public class ApiClient {
         } catch (Exception e) {
             logFailure(HttpMethod.GET, path, e);
             return null;
+        }
+    }
+
+    /**
+     * GET {@code path}, keeping the status: its body read as {@code type} on a 2xx (null when empty), none on an error
+     * answer (logged as {@link #get} logs it); 502 when the call itself failed.
+     */
+    public <T> Result<T> getResult(String path, Class<T> type, Object... uriVars) {
+        return read(path, () -> client.get().uri(path, uriVars).retrieve().toEntity(type));
+    }
+
+    /** {@link #getResult(String, Class, Object...)}, its body read as the generic {@code type}. */
+    public <T> Result<T> getResult(String path, ParameterizedTypeReference<T> type, Object... uriVars) {
+        return read(path, () -> client.get().uri(path, uriVars).retrieve().toEntity(type));
+    }
+
+    private <T> Result<T> read(String path, Supplier<ResponseEntity<T>> call) {
+        try {
+            ResponseEntity<T> answer = call.get();
+            return new Result<>(answer.getStatusCode().value(), answer.getBody());
+        } catch (ApiErrorException e) {
+            return new Result<>(e.status(), null);
+        } catch (Exception e) {
+            logFailure(HttpMethod.GET, path, e);
+            return new Result<>(HttpStatus.BAD_GATEWAY.value(), null);
         }
     }
 

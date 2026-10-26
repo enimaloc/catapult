@@ -1,11 +1,11 @@
 package fr.enimaloc.catapult.api.channel;
 
+import fr.enimaloc.catapult.api.ApiPaths;
 import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.api.error.ApiProblem;
 import fr.enimaloc.catapult.common.dto.channel.CclSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.CclToggleRequest;
 import fr.enimaloc.catapult.common.dto.channel.DeleteAccountRequest;
-import fr.enimaloc.catapult.common.dto.channel.DisconnectRequest;
 import fr.enimaloc.catapult.common.dto.channel.IgnoredToggleRequest;
 import fr.enimaloc.catapult.common.dto.channel.IncompleteFallbackRequest;
 import fr.enimaloc.catapult.common.dto.channel.NoGameSettingsRequest;
@@ -51,7 +51,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -74,12 +76,12 @@ import java.util.function.Consumer;
  * What a channel's dashboard changes: its bindings and settings ({@code @authz.canAccessChannel}, the owner or one of
  * its moderators) and its owner-only settings, Twitchat and account actions ({@code @authz.ownsChannel}). The raid
  * settings' experiment gate stays in the body. The rule sits on each handler, not on the class: a class-level one
- * would also guard {@link #onInvalidTwitchatPayloads}, which has no {@code username}, and turn every refused Twitchat
+ * would also guard {@link #onInvalidTwitchatPayloads}, which has no {@code userId}, and turn every refused Twitchat
  * payload into a 404.
  */
 @Slf4j
 @RestController
-@RequestMapping("/api/channels/{username}")
+@RequestMapping(ApiPaths.USER)
 @RequiredArgsConstructor
 public class ApiChannelActionsController {
 
@@ -107,110 +109,110 @@ public class ApiChannelActionsController {
 
     // ── Binding actions ───────────────────────────────────────────────────────
 
-    @PreAuthorize("@authz.canAccessChannel(#username)")
-    @PostMapping("/bindings/{id}/ccl-toggle")
+    @PreAuthorize("@authz.canAccessChannel(#userId)")
+    @PutMapping("/bindings/{bindingId}/ccl-enabled")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void toggleCclEnabled(
-            @PathVariable String username,
-            @PathVariable UUID id,
+            @PathVariable UUID userId,
+            @PathVariable UUID bindingId,
             @RequestBody CclToggleRequest body) {
 
-        UserAccount channelUser = userResolver.channel(username);
-        bindingService.toggleCclEnabled(channelUser, id, body.enabled());
-        publishBinding(channelUser, id);
+        UserAccount channelUser = userResolver.user(userId);
+        bindingService.toggleCclEnabled(channelUser, bindingId, body.enabled());
+        publishBinding(channelUser, bindingId);
     }
 
-    @PreAuthorize("@authz.canAccessChannel(#username)")
-    @PostMapping("/bindings/{id}/ignored-toggle")
+    @PreAuthorize("@authz.canAccessChannel(#userId)")
+    @PutMapping("/bindings/{bindingId}/ignored")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void toggleIgnored(
-            @PathVariable String username,
-            @PathVariable UUID id,
+            @PathVariable UUID userId,
+            @PathVariable UUID bindingId,
             @RequestBody IgnoredToggleRequest body) {
 
-        UserAccount channelUser = userResolver.channel(username);
-        bindingService.toggleIgnored(channelUser, id, body.ignored());
-        publishBinding(channelUser, id);
+        UserAccount channelUser = userResolver.user(userId);
+        bindingService.toggleIgnored(channelUser, bindingId, body.ignored());
+        publishBinding(channelUser, bindingId);
     }
 
-    @PreAuthorize("@authz.canAccessChannel(#username)")
-    @PostMapping("/bindings/{id}/delete")
+    @PreAuthorize("@authz.canAccessChannel(#userId)")
+    @DeleteMapping("/bindings/{bindingId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteBinding(
-            @PathVariable String username,
-            @PathVariable UUID id) {
+            @PathVariable UUID userId,
+            @PathVariable UUID bindingId) {
 
-        UserAccount channelUser = userResolver.channel(username);
-        bindingService.deleteBinding(channelUser, id);
-        channelEventPublisher.bindingDeleted(channelUser.getId(), id);
+        UserAccount channelUser = userResolver.user(userId);
+        bindingService.deleteBinding(channelUser, bindingId);
+        channelEventPublisher.bindingDeleted(channelUser.getId(), bindingId);
     }
 
-    @PreAuthorize("@authz.canAccessChannel(#username)")
-    @PostMapping("/bindings/{id}")
+    @PreAuthorize("@authz.canAccessChannel(#userId)")
+    @PatchMapping("/bindings/{bindingId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updateBinding(
-            @PathVariable String username,
-            @PathVariable UUID id,
+            @PathVariable UUID userId,
+            @PathVariable UUID bindingId,
             @RequestBody UpdateBindingRequest body) {
 
-        UserAccount channelUser = userResolver.channel(username);
+        UserAccount channelUser = userResolver.user(userId);
         Set<String> ccls = body.ccls() != null ? body.ccls() : Set.of();
-        bindingService.updateBinding(channelUser, id, body.twitchGameId(), body.twitchGameName(), ccls, false);
-        publishBinding(channelUser, id);
+        bindingService.updateBinding(channelUser, bindingId, body.twitchGameId(), body.twitchGameName(), ccls, false);
+        publishBinding(channelUser, bindingId);
     }
 
     // ── Settings ──────────────────────────────────────────────────────────────
 
-    @PreAuthorize("@authz.ownsChannel(#username)")
-    @PostMapping("/settings/bot")
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @PostMapping("/settings/bot/toggle")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void toggleBot(
-            @PathVariable String username) {
+            @PathVariable UUID userId) {
 
-        UserAccount user = userResolver.channel(username);
+        UserAccount user = userResolver.user(userId);
         botToggleService.setBotEnabled(user, !user.isBotEnabled());
     }
 
-    @PreAuthorize("@authz.ownsChannel(#username)")
+    @PreAuthorize("@authz.ownsChannel(#userId)")
     @GetMapping("/settings/twitchat")
     public TwitchatSettingsResponse getTwitchatSettings(
-            @PathVariable String username) {
+            @PathVariable UUID userId) {
 
-        UserAccount channelUser = userResolver.channel(username);
+        UserAccount channelUser = userResolver.user(userId);
         var settings = twitchatWidgetSettingsService.getOrCreate(channelUser);
         return twitchatResponse(channelUser, settings);
     }
 
-    @PreAuthorize("@authz.ownsChannel(#username)")
-    @PostMapping("/settings/twitchat")
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @PutMapping("/settings/twitchat")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void saveTwitchatSettings(
-            @PathVariable String username,
+            @PathVariable UUID userId,
             @RequestBody TwitchatSettingsBody body) {
 
-        UserAccount channelUser = userResolver.channel(username);
+        UserAccount channelUser = userResolver.user(userId);
         twitchatWidgetSettingsService.updateSettings(channelUser, body.enabled(), body.obsHost(), body.obsPort(), body.obsPassword());
     }
 
-    @PreAuthorize("@authz.ownsChannel(#username)")
-    @PostMapping("/settings/obs")
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @PutMapping("/settings/obs")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void saveObsSettings(
-            @PathVariable String username,
+            @PathVariable UUID userId,
             @RequestBody ObsSettingsRequest body) {
 
-        UserAccount channelUser = userResolver.channel(username);
+        UserAccount channelUser = userResolver.user(userId);
         twitchatWidgetSettingsService.updateSettings(channelUser, body.enabled(), body.host(), body.port(), body.password());
     }
 
-    @PreAuthorize("@authz.ownsChannel(#username)")
-    @PostMapping("/settings/twitchat/branch")
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @PutMapping("/settings/twitchat/branch")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void saveTwitchatBranch(
-            @PathVariable String username,
+            @PathVariable UUID userId,
             @RequestBody TwitchatBranchRequest body) {
 
-        UserAccount channelUser = userResolver.channel(username);
+        UserAccount channelUser = userResolver.user(userId);
         try {
             twitchatWidgetSettingsService.updateBranch(channelUser, body.branch());
         } catch (IllegalArgumentException e) {
@@ -218,21 +220,21 @@ public class ApiChannelActionsController {
         }
     }
 
-    @PreAuthorize("@authz.ownsChannel(#username)")
+    @PreAuthorize("@authz.ownsChannel(#userId)")
     @PostMapping("/settings/twitchat/regenerate")
     public TwitchatSettingsResponse regenerateTwitchatToken(
-            @PathVariable String username) {
+            @PathVariable UUID userId) {
 
-        UserAccount channelUser = userResolver.channel(username);
+        UserAccount channelUser = userResolver.user(userId);
         var settings = twitchatWidgetSettingsService.regenerateToken(channelUser);
         return twitchatResponse(channelUser, settings);
     }
 
-    @PreAuthorize("@authz.ownsChannel(#username)")
-    @GetMapping("/twitchat/events")
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @GetMapping("/twitchat-events")
     public Map<String, List<TwitchatEventActionDto>> twitchatEvents(
-            @PathVariable String username) {
-        UserAccount channelUser = userResolver.channel(username);
+            @PathVariable UUID userId) {
+        UserAccount channelUser = userResolver.user(userId);
         Map<String, List<TwitchatEventActionDto>> result = new LinkedHashMap<>();
         twitchatEventActionService.all(channelUser).forEach((type, actions) -> result.put(type.name(), actions.stream()
                 .map(a -> new TwitchatEventActionDto(a.getAction(), a.getMode().name(), a.getDataJson(), a.isEnabled()))
@@ -240,23 +242,23 @@ public class ApiChannelActionsController {
         return result;
     }
 
-    @PreAuthorize("@authz.ownsChannel(#username)")
-    @PutMapping("/twitchat/events/{eventType}/actions")
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @PutMapping("/twitchat-events/{eventType}/actions")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void saveTwitchatEvent(
-            @PathVariable String username, @PathVariable String eventType,
+            @PathVariable UUID userId, @PathVariable String eventType,
             @RequestBody List<TwitchatEventActionDto> body) {
-        UserAccount channelUser = userResolver.channel(username);
+        UserAccount channelUser = userResolver.user(userId);
         twitchatEventActionService.replace(channelUser, parseEventType(eventType), body);
     }
 
-    @PreAuthorize("@authz.ownsChannel(#username)")
-    @PostMapping("/twitchat/events/{eventType}/test")
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @PostMapping("/twitchat-events/{eventType}/test")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void testTwitchatEvent(
-            @PathVariable String username, @PathVariable String eventType,
+            @PathVariable UUID userId, @PathVariable String eventType,
             @RequestBody List<TwitchatEventActionDto> body) {
-        UserAccount channelUser = userResolver.channel(username);
+        UserAccount channelUser = userResolver.user(userId);
         twitchatEventDispatcher.sendTest(channelUser, parseEventType(eventType), body);
     }
 
@@ -270,13 +272,13 @@ public class ApiChannelActionsController {
 
     // ── Game detection ───────────────────────────────────────────────────────
 
-    @PreAuthorize("@authz.ownsChannel(#username)")
+    @PreAuthorize("@authz.ownsChannel(#userId)")
     @PostMapping("/game/recheck")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void recheckGame(
-            @PathVariable String username) {
+            @PathVariable UUID userId) {
 
-        UserAccount user = userResolver.channel(username);
+        UserAccount user = userResolver.user(userId);
         if (user.getStatus() != UserAccount.Status.ACTIVE) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Account is not active");
         }
@@ -286,14 +288,14 @@ public class ApiChannelActionsController {
         channelEventPublisher.gameDetected(user.getId(), gameStateService.getLastKnownGame(user).orElse(null));
     }
 
-    @PreAuthorize("@authz.canAccessChannel(#username)")
-    @PostMapping("/settings/ccl")
+    @PreAuthorize("@authz.canAccessChannel(#userId)")
+    @PutMapping("/settings/ccl")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void saveCclSettings(
-            @PathVariable String username,
+            @PathVariable UUID userId,
             @RequestBody CclSettingsRequest body) {
 
-        UserAccount channelUser = userResolver.channel(username);
+        UserAccount channelUser = userResolver.user(userId);
         UserSettings settings = saveSettings(channelUser, s -> {
             s.setCclFeatureEnabled(body.cclEnabled());
             replace(s.getBlockedCcls(), body.blockedCcls());
@@ -301,14 +303,14 @@ public class ApiChannelActionsController {
         publishSettings(channelUser, settings);
     }
 
-    @PreAuthorize("@authz.canAccessChannel(#username)")
-    @PostMapping("/settings/tws")
+    @PreAuthorize("@authz.canAccessChannel(#userId)")
+    @PutMapping("/settings/tws")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void saveTwSettings(
-            @PathVariable String username,
+            @PathVariable UUID userId,
             @RequestBody TwSettingsRequest body) {
 
-        UserAccount channelUser = userResolver.channel(username);
+        UserAccount channelUser = userResolver.user(userId);
         UserSettings settings = saveSettings(channelUser, s -> {
             s.setTwFeatureEnabled(body.enabled());
             replace(s.getBlockedTws(), body.blockedTws());
@@ -316,14 +318,14 @@ public class ApiChannelActionsController {
         publishSettings(channelUser, settings);
     }
 
-    @PreAuthorize("@authz.canAccessChannel(#username)")
-    @PostMapping("/settings/no-game")
+    @PreAuthorize("@authz.canAccessChannel(#userId)")
+    @PutMapping("/settings/no-game")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void saveNoGameSettings(
-            @PathVariable String username,
+            @PathVariable UUID userId,
             @RequestBody NoGameSettingsRequest body) {
 
-        UserAccount channelUser = userResolver.channel(username);
+        UserAccount channelUser = userResolver.user(userId);
         UserSettings settings = saveSettings(channelUser, s -> {
             s.setNoGameTwitchGameId(body.twitchGameId());
             s.setNoGameTwitchGameName(body.twitchGameName());
@@ -341,14 +343,14 @@ public class ApiChannelActionsController {
         publishSettings(channelUser, settings);
     }
 
-    @PreAuthorize("@authz.canAccessChannel(#username)")
-    @PostMapping("/settings/incomplete-fallback")
+    @PreAuthorize("@authz.canAccessChannel(#userId)")
+    @PutMapping("/settings/incomplete-fallback")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void saveIncompleteFallbackSettings(
-            @PathVariable String username,
+            @PathVariable UUID userId,
             @RequestBody IncompleteFallbackRequest body) {
 
-        UserAccount channelUser = userResolver.channel(username);
+        UserAccount channelUser = userResolver.user(userId);
         UserSettings settings = saveSettings(channelUser, s -> {
             s.setIncompleteFallbackTwitchGameId(body.twitchGameId());
             s.setIncompleteFallbackTwitchGameName(body.twitchGameName());
@@ -358,14 +360,14 @@ public class ApiChannelActionsController {
     }
 
     /** 0 or null turns it off; refused (403) while the channel isn't in the {@value RaidRestoreGateService#EXPERIMENT_KEY} experiment. */
-    @PreAuthorize("@authz.canAccessChannel(#username)")
-    @PostMapping("/settings/raid")
+    @PreAuthorize("@authz.canAccessChannel(#userId)")
+    @PutMapping("/settings/raid")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void saveRaidSettings(
-            @PathVariable String username,
+            @PathVariable UUID userId,
             @RequestBody RaidSettingsRequest body) {
 
-        UserAccount channelUser = userResolver.channel(username);
+        UserAccount channelUser = userResolver.user(userId);
         if (!raidRestoreGate.isAvailableFor(channelUser)) {
             throw new ApiProblem(ErrorCode.FEATURE_DISABLED, "Raid settings not available for this channel");
         }
@@ -379,14 +381,14 @@ public class ApiChannelActionsController {
         publishSettings(channelUser, settings);
     }
 
-    @PreAuthorize("@authz.ownsChannel(#username)")
-    @PostMapping("/settings/steam-personal-token")
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @PutMapping("/settings/steam-personal-token")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void saveSteamPersonalToken(
-            @PathVariable String username,
+            @PathVariable UUID userId,
             @RequestBody SteamTokenRequest body) {
 
-        UserAccount channelUser = userResolver.channel(username);
+        UserAccount channelUser = userResolver.user(userId);
         if (body.token() == null || body.token().isBlank()) return;
         String trimmed = body.token().trim();
         channelUser.setSteamPersonalToken(tokenEncryptionService.encrypt(trimmed));
@@ -396,14 +398,14 @@ public class ApiChannelActionsController {
         channelEventPublisher.steamProfileChanged(channelUser.getId(), buildSteamProfile(channelUser));
     }
 
-    @PreAuthorize("@authz.ownsChannel(#username)")
-    @PostMapping("/settings/steam-personal-token/sharing")
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @PutMapping("/settings/steam-personal-token/sharing")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updateSteamTokenSharing(
-            @PathVariable String username,
+            @PathVariable UUID userId,
             @RequestBody SteamTokenSharingRequest body) {
 
-        UserAccount channelUser = userResolver.channel(username);
+        UserAccount channelUser = userResolver.user(userId);
         if (channelUser.getSteamPersonalToken() == null) return;
         channelUser.setSteamTokenShared(body.shared());
         userAccountRepository.save(channelUser);
@@ -412,14 +414,14 @@ public class ApiChannelActionsController {
         channelEventPublisher.steamProfileChanged(channelUser.getId(), buildSteamProfile(channelUser));
     }
 
-    @PreAuthorize("@authz.ownsChannel(#username)")
+    @PreAuthorize("@authz.ownsChannel(#userId)")
     @Transactional
-    @PostMapping("/settings/steam-personal-token/delete")
+    @DeleteMapping("/settings/steam-personal-token")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteSteamPersonalToken(
-            @PathVariable String username) {
+            @PathVariable UUID userId) {
 
-        UserAccount channelUser = userResolver.channel(username);
+        UserAccount channelUser = userResolver.user(userId);
         channelUser.setSteamPersonalToken(null);
         channelUser.setSteamTokenShared(false);
         userAccountRepository.save(channelUser);
@@ -428,41 +430,41 @@ public class ApiChannelActionsController {
         channelEventPublisher.steamProfileChanged(channelUser.getId(), buildSteamProfile(channelUser));
     }
 
-    @PreAuthorize("@authz.ownsChannel(#username)")
-    @PostMapping("/settings/delete-account")
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @PostMapping("/deletion")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteAccount(
-            @PathVariable String username,
+            @PathVariable UUID userId,
             @RequestBody DeleteAccountRequest body) {
 
-        UserAccount channelUser = userResolver.channel(username);
+        UserAccount channelUser = userResolver.user(userId);
         if (channelUser.getTwitchUsername().equalsIgnoreCase(body.confirmUsername())) {
             accountService.initiateAccountDeletion(channelUser);
         }
     }
 
-    @PreAuthorize("@authz.ownsChannel(#username)")
-    @PostMapping("/settings/cancel-deletion")
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @DeleteMapping("/deletion")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void cancelDeletion(
-            @PathVariable String username) {
+            @PathVariable UUID userId) {
 
-        UserAccount channelUser = userResolver.channel(username);
+        UserAccount channelUser = userResolver.user(userId);
         accountService.cancelAccountDeletion(channelUser);
     }
 
-    @PreAuthorize("@authz.ownsChannel(#username)")
-    @PostMapping("/settings/disconnect")
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @DeleteMapping("/oauth-tokens/{provider}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void disconnectProvider(
-            @PathVariable String username,
-            @RequestBody DisconnectRequest body) {
+            @PathVariable UUID userId,
+            @PathVariable String provider) {
 
-        UserAccount channelUser = userResolver.channel(username);
-        OAuthToken.Provider provider = OAuthToken.Provider.valueOf(body.provider().toUpperCase());
-        accountService.disconnectProvider(channelUser, provider);
+        UserAccount channelUser = userResolver.user(userId);
+        OAuthToken.Provider disconnected = OAuthToken.Provider.valueOf(provider.toUpperCase());
+        accountService.disconnectProvider(channelUser, disconnected);
         channelEventPublisher.connectionChanged(channelUser.getId(),
-                new ProviderConnectionsDto(provider.name(), false, null));
+                new ProviderConnectionsDto(disconnected.name(), false, null));
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

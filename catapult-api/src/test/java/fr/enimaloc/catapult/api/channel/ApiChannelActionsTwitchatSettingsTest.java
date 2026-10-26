@@ -11,6 +11,7 @@ import java.util.UUID;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -40,11 +41,10 @@ class ApiChannelActionsTwitchatSettingsTest extends ApiChannelActionsTestSupport
         TwitchatWidgetSettings settings = settingsFor(user, widgetToken);
 
         when(userAccountRepository.findById(userId)).thenReturn(Optional.of(user));
-        when(userAccountRepository.findByTwitchUsername("streamer")).thenReturn(Optional.of(user));
         when(channelAccessService.canAccess(user, user)).thenReturn(true);
         when(twitchatWidgetSettingsService.getOrCreate(user)).thenReturn(settings);
 
-        mvc.perform(get("/api/channels/streamer/settings/twitchat")
+        mvc.perform(get("/api/internal/users/{userId}/settings/twitchat", user.getId())
                         .with(userJwt(userId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.enabled").value(true))
@@ -66,10 +66,10 @@ class ApiChannelActionsTwitchatSettingsTest extends ApiChannelActionsTestSupport
         channelUser.setTwitchUsername("streamer");
 
         when(userAccountRepository.findById(viewerId)).thenReturn(Optional.of(viewer));
-        when(userAccountRepository.findByTwitchUsername("streamer")).thenReturn(Optional.of(channelUser));
+        when(userAccountRepository.findById(channelUser.getId())).thenReturn(Optional.of(channelUser));
         when(channelAccessService.canAccess(viewer, channelUser)).thenReturn(true);
 
-        mvc.perform(get("/api/channels/streamer/settings/twitchat")
+        mvc.perform(get("/api/internal/users/{userId}/settings/twitchat", channelUser.getId())
                         .with(userJwt(viewerId)))
                 .andExpect(status().isForbidden());
     }
@@ -82,10 +82,9 @@ class ApiChannelActionsTwitchatSettingsTest extends ApiChannelActionsTestSupport
         user.setTwitchUsername("streamer");
 
         when(userAccountRepository.findById(userId)).thenReturn(Optional.of(user));
-        when(userAccountRepository.findByTwitchUsername("streamer")).thenReturn(Optional.of(user));
         when(channelAccessService.canAccess(user, user)).thenReturn(true);
 
-        mvc.perform(post("/api/channels/streamer/settings/twitchat")
+        mvc.perform(put("/api/internal/users/{userId}/settings/twitchat", user.getId())
                         .with(userJwt(userId))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -107,10 +106,10 @@ class ApiChannelActionsTwitchatSettingsTest extends ApiChannelActionsTestSupport
         channelUser.setTwitchUsername("streamer");
 
         when(userAccountRepository.findById(viewerId)).thenReturn(Optional.of(viewer));
-        when(userAccountRepository.findByTwitchUsername("streamer")).thenReturn(Optional.of(channelUser));
+        when(userAccountRepository.findById(channelUser.getId())).thenReturn(Optional.of(channelUser));
         when(channelAccessService.canAccess(viewer, channelUser)).thenReturn(true);
 
-        mvc.perform(post("/api/channels/streamer/settings/twitchat")
+        mvc.perform(put("/api/internal/users/{userId}/settings/twitchat", channelUser.getId())
                         .with(userJwt(viewerId))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -129,11 +128,10 @@ class ApiChannelActionsTwitchatSettingsTest extends ApiChannelActionsTestSupport
         TwitchatWidgetSettings settings = settingsFor(user, newToken);
 
         when(userAccountRepository.findById(userId)).thenReturn(Optional.of(user));
-        when(userAccountRepository.findByTwitchUsername("streamer")).thenReturn(Optional.of(user));
         when(channelAccessService.canAccess(user, user)).thenReturn(true);
         when(twitchatWidgetSettingsService.regenerateToken(user)).thenReturn(settings);
 
-        mvc.perform(post("/api/channels/streamer/settings/twitchat/regenerate")
+        mvc.perform(post("/api/internal/users/{userId}/settings/twitchat/regenerate", user.getId())
                         .with(userJwt(userId))
                         .with(csrf()))
                 .andExpect(status().isOk())
@@ -152,10 +150,10 @@ class ApiChannelActionsTwitchatSettingsTest extends ApiChannelActionsTestSupport
         channelUser.setTwitchUsername("streamer");
 
         when(userAccountRepository.findById(viewerId)).thenReturn(Optional.of(viewer));
-        when(userAccountRepository.findByTwitchUsername("streamer")).thenReturn(Optional.of(channelUser));
+        when(userAccountRepository.findById(channelUser.getId())).thenReturn(Optional.of(channelUser));
         when(channelAccessService.canAccess(viewer, channelUser)).thenReturn(true);
 
-        mvc.perform(post("/api/channels/streamer/settings/twitchat/regenerate")
+        mvc.perform(post("/api/internal/users/{userId}/settings/twitchat/regenerate", channelUser.getId())
                         .with(userJwt(viewerId))
                         .with(csrf()))
                 .andExpect(status().isForbidden());

@@ -71,52 +71,6 @@ class RouteConventionsTest {
      * list is gone once the last one has moved.
      */
     static final Set<String> LEGACY = Set.of(
-            // Task 10
-            "GET /api/users/{ownerId}/channel-access",
-            "POST /api/channels/{username}/bindings/{id}/ccl-toggle",
-            "POST /api/channels/{username}/bindings/{id}/ignored-toggle",
-            "POST /api/channels/{username}/bindings/{id}/delete",
-            "POST /api/channels/{username}/bindings/{id}",
-            "POST /api/channels/{username}/settings/bot",
-            "GET /api/channels/{username}/settings/twitchat",
-            "POST /api/channels/{username}/settings/twitchat",
-            "POST /api/channels/{username}/settings/obs",
-            "POST /api/channels/{username}/settings/twitchat/branch",
-            "POST /api/channels/{username}/settings/twitchat/regenerate",
-            "GET /api/channels/{username}/twitchat/events",
-            "PUT /api/channels/{username}/twitchat/events/{eventType}/actions",
-            "POST /api/channels/{username}/twitchat/events/{eventType}/test",
-            "POST /api/channels/{username}/game/recheck",
-            "POST /api/channels/{username}/settings/ccl",
-            "POST /api/channels/{username}/settings/tws",
-            "POST /api/channels/{username}/settings/no-game",
-            "POST /api/channels/{username}/settings/incomplete-fallback",
-            "POST /api/channels/{username}/settings/raid",
-            "POST /api/channels/{username}/settings/steam-personal-token",
-            "POST /api/channels/{username}/settings/steam-personal-token/sharing",
-            "POST /api/channels/{username}/settings/steam-personal-token/delete",
-            "POST /api/channels/{username}/settings/delete-account",
-            "POST /api/channels/{username}/settings/cancel-deletion",
-            "POST /api/channels/{username}/settings/disconnect",
-            "GET /api/channels/{username}/custom-bindings",
-            "POST /api/channels/{username}/custom-bindings",
-            "POST /api/channels/{username}/custom-bindings/{id}",
-            "POST /api/channels/{username}/custom-bindings/{id}/delete",
-            "POST /api/channels/{username}/custom-bindings/{id}/activate",
-            "POST /api/channels/{username}/custom-bindings/deactivate",
-            "GET /api/channels/{username}/logs",
-            "GET /api/channels/{username}/connections",
-            "GET /api/channels/{username}",
-            "POST /api/channels/{username}/steam/refresh-profile-cache",
-            "GET /api/channels/{username}/status",
-            "GET /api/channels/{username}/settings",
-            "GET /api/channels/{username}/games/search",
-            "GET /api/channels/{username}/bindings/current",
-            "GET /api/channels/{username}/dtdd-mapping",
-            "POST /api/channel/bindings/{bindingId}/tws",
-            "POST /api/channel/bindings/{bindingId}/tws/reset",
-            "POST /api/channel/bindings/{bindingId}/tw-enabled",
-            "GET /api/channel/bindings/{bindingId}/tws/suggest",
             // Task 11
             "POST /api/admin/broadcast",
             "GET /api/admin/experiments",
@@ -275,6 +229,12 @@ class RouteConventionsTest {
             "POST " + ApiPaths.ADMIN + "/data/{repo}",
             "POST " + ApiPaths.USER + "/chat-commands/presets/{presetKey}");
 
+    /**
+     * The access probe takes its {@code userId} as a {@code String}: it answers {@code false} for a malformed one
+     * rather than a 400 (see its javadoc).
+     */
+    private static final String CHANNEL_ACCESS_PROBE = "GET " + ApiPaths.USER + "/channel-access";
+
     @Autowired
     RequestMappingHandlerMapping handlerMapping;
 
@@ -369,7 +329,7 @@ class RouteConventionsTest {
             }
             if (!pattern.equals(ApiPaths.USER) && !pattern.startsWith(ApiPaths.USER + "/")) {
                 violations.add(route.key() + " names its owner other than {userId}");
-            } else if (!bindsUserId(route.handler())) {
+            } else if (!bindsUserId(route.handler()) && !route.key().equals(CHANNEL_ACCESS_PROBE)) {
                 violations.add(route.key() + " (" + route.handler().getShortLogMessage()
                         + ") has no @PathVariable UUID userId");
             }

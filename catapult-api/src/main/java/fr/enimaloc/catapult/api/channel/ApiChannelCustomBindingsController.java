@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.channel;
 
+import fr.enimaloc.catapult.api.ApiPaths;
 import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.api.CustomBindingViews;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingDto;
@@ -12,9 +13,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -29,7 +32,7 @@ import java.util.UUID;
  * {@link CustomBindingService}. The rule sits on each handler, not on the class.
  */
 @RestController
-@RequestMapping("/api/channels/{username}/custom-bindings")
+@RequestMapping(ApiPaths.USER + "/custom-bindings")
 @RequiredArgsConstructor
 public class ApiChannelCustomBindingsController {
 
@@ -37,49 +40,49 @@ public class ApiChannelCustomBindingsController {
     private final CustomBindingService customBindingService;
     private final CustomBindingViews views;
 
-    @PreAuthorize("@authz.ownsChannel(#username)")
+    @PreAuthorize("@authz.ownsChannel(#userId)")
     @GetMapping
-    public CustomBindingsStateDto state(@PathVariable String username) {
-        return views.state(userResolver.channel(username));
+    public CustomBindingsStateDto state(@PathVariable UUID userId) {
+        return views.state(userResolver.user(userId));
     }
 
-    @PreAuthorize("@authz.ownsChannel(#username)")
+    @PreAuthorize("@authz.ownsChannel(#userId)")
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public CustomBindingDto create(@PathVariable String username, @RequestBody CustomBindingRequest body) {
-        UserAccount owner = userResolver.channel(username);
+    public CustomBindingDto create(@PathVariable UUID userId, @RequestBody CustomBindingRequest body) {
+        UserAccount owner = userResolver.user(userId);
         return CustomBindingViews.toDto(customBindingService.create(owner, body));
     }
 
     /** Always saved; when it is the active one, how re-applying it to Twitch went (null otherwise). */
-    @PreAuthorize("@authz.ownsChannel(#username)")
-    @PostMapping("/{id}")
-    public CustomBindingSaveResult update(@PathVariable String username, @PathVariable UUID id,
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @PutMapping("/{customBindingId}")
+    public CustomBindingSaveResult update(@PathVariable UUID userId, @PathVariable UUID customBindingId,
                                           @RequestBody CustomBindingRequest body) {
-        UserAccount owner = userResolver.channel(username);
-        return CustomBindingViews.saved(customBindingService.update(owner, id, body));
+        UserAccount owner = userResolver.user(userId);
+        return CustomBindingViews.saved(customBindingService.update(owner, customBindingId, body));
     }
 
-    @PreAuthorize("@authz.ownsChannel(#username)")
-    @PostMapping("/{id}/delete")
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @DeleteMapping("/{customBindingId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@PathVariable String username, @PathVariable UUID id) {
-        customBindingService.delete(userResolver.channel(username), id);
+    public void delete(@PathVariable UUID userId, @PathVariable UUID customBindingId) {
+        customBindingService.delete(userResolver.user(userId), customBindingId);
     }
 
-    @PreAuthorize("@authz.ownsChannel(#username)")
-    @PostMapping("/{id}/activate")
-    public ResponseEntity<Void> activate(@PathVariable String username, @PathVariable UUID id) {
-        UserAccount owner = userResolver.channel(username);
-        return customBindingService.resolve(owner, id.toString())
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @PostMapping("/{customBindingId}/activate")
+    public ResponseEntity<Void> activate(@PathVariable UUID userId, @PathVariable UUID customBindingId) {
+        UserAccount owner = userResolver.user(userId);
+        return customBindingService.resolve(owner, customBindingId.toString())
                 .map(binding -> CustomBindingViews.activation(customBindingService.activate(owner, binding)))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown custom binding"));
     }
 
-    @PreAuthorize("@authz.ownsChannel(#username)")
+    @PreAuthorize("@authz.ownsChannel(#userId)")
     @PostMapping("/deactivate")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deactivate(@PathVariable String username) {
-        customBindingService.deactivate(userResolver.channel(username));
+    public void deactivate(@PathVariable UUID userId) {
+        customBindingService.deactivate(userResolver.user(userId));
     }
 }

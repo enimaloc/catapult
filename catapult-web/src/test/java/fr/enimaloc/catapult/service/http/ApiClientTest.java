@@ -250,6 +250,29 @@ class ApiClientTest {
     }
 
     @Test
+    void getResult_keepsTheStatus_withTheBodyOnlyOnASuccess_or502WhenUnreachable() throws Exception {
+        server.enqueue(new MockResponse().setHeader("Content-Type", "application/json").setBody("{\"name\":\"x\"}"));
+        server.enqueue(new MockResponse().setResponseCode(204));
+        server.enqueue(new MockResponse().setResponseCode(404).setHeader("Content-Type", "application/json")
+                .setBody("{\"name\":\"not me\"}"));
+        server.enqueue(new MockResponse().setHeader("Content-Type", "application/json").setBody("[{\"name\":\"y\"}]"));
+        server.enqueue(new MockResponse().setResponseCode(403));
+
+        assertThat(client.getResult("/api/things/{id}", Payload.class, "42"))
+                .isEqualTo(new ApiClient.Result<>(200, new Payload("x")));
+        assertThat(server.takeRequest().getPath()).isEqualTo("/api/things/42");
+        assertThat(client.getResult("/api/things", Payload.class)).isEqualTo(new ApiClient.Result<>(204, null));
+        assertThat(client.getResult("/api/things", Payload.class)).isEqualTo(new ApiClient.Result<>(404, null));
+        assertThat(client.getResult("/api/things", new ParameterizedTypeReference<List<Payload>>() {}).body())
+                .containsExactly(new Payload("y"));
+        assertThat(client.getResult("/api/things", new ParameterizedTypeReference<List<Payload>>() {}).status())
+                .isEqualTo(403);
+
+        server.shutdown();
+        assertThat(client.getResult("/api/unreachable", Payload.class).status()).isEqualTo(502);
+    }
+
+    @Test
     void unreachableBackend_returnsNull() throws IOException {
         server.shutdown();
 

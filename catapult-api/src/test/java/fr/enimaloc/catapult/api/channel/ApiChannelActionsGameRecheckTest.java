@@ -25,10 +25,9 @@ class ApiChannelActionsGameRecheckTest extends ApiChannelActionsTestSupport {
         user.setBotEnabled(false);
 
         when(userAccountRepository.findById(userId)).thenReturn(Optional.of(user));
-        when(userAccountRepository.findByTwitchUsername("streamer")).thenReturn(Optional.of(user));
         when(channelAccessService.canAccess(user, user)).thenReturn(true);
 
-        mvc.perform(post("/api/channels/streamer/game/recheck")
+        mvc.perform(post("/api/internal/users/{userId}/game/recheck", user.getId())
                         .with(userJwt(userId))
                         .with(csrf()))
                 .andExpect(status().isNoContent());
@@ -47,10 +46,9 @@ class ApiChannelActionsGameRecheckTest extends ApiChannelActionsTestSupport {
         user.setStatus(UserAccount.Status.INACTIVE);
 
         when(userAccountRepository.findById(userId)).thenReturn(Optional.of(user));
-        when(userAccountRepository.findByTwitchUsername("streamer")).thenReturn(Optional.of(user));
         when(channelAccessService.canAccess(user, user)).thenReturn(true);
 
-        mvc.perform(post("/api/channels/streamer/game/recheck")
+        mvc.perform(post("/api/internal/users/{userId}/game/recheck", user.getId())
                         .with(userJwt(userId))
                         .with(csrf()))
                 .andExpect(status().isConflict());
@@ -71,10 +69,10 @@ class ApiChannelActionsGameRecheckTest extends ApiChannelActionsTestSupport {
         channelUser.setStatus(UserAccount.Status.ACTIVE);
 
         when(userAccountRepository.findById(viewerId)).thenReturn(Optional.of(viewer));
-        when(userAccountRepository.findByTwitchUsername("streamer")).thenReturn(Optional.of(channelUser));
+        when(userAccountRepository.findById(channelUser.getId())).thenReturn(Optional.of(channelUser));
         when(channelAccessService.canAccess(viewer, channelUser)).thenReturn(true);
 
-        mvc.perform(post("/api/channels/streamer/game/recheck")
+        mvc.perform(post("/api/internal/users/{userId}/game/recheck", channelUser.getId())
                         .with(userJwt(viewerId))
                         .with(csrf()))
                 .andExpect(status().isForbidden());

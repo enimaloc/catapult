@@ -36,6 +36,9 @@ class AuthzChannelTest {
     private final ApiUserResolver users = new ApiUserResolver(accounts);
     private final Authz authz = new Authz(users, channelAccessService);
 
+    /** No account has this id. */
+    private static final UUID UNKNOWN = UUID.randomUUID();
+
     private UserAccount owner;
     private UserAccount moderator;
     private UserAccount member;
@@ -45,8 +48,6 @@ class AuthzChannelTest {
         owner = registered("streamer", "1");
         moderator = registered("mod", "2");
         member = registered("someone", "3");
-        when(accounts.findByTwitchUsername("streamer")).thenReturn(Optional.of(owner));
-        when(accounts.findByTwitchUsername("nobody-here")).thenReturn(Optional.empty());
     }
 
     @AfterEach
@@ -82,30 +83,32 @@ class AuthzChannelTest {
     void canAccessChannel_unknownViewerIs401_beforeUnknownChannel() {
         signInAs(UUID.randomUUID());
 
-        assertStatus(() -> authz.canAccessChannel("nobody-here"), HttpStatus.UNAUTHORIZED);
-        assertStatus(() -> authz.ownsChannel("nobody-here"), HttpStatus.UNAUTHORIZED);
+        assertStatus(() -> authz.canAccessChannel(UNKNOWN), HttpStatus.UNAUTHORIZED);
+        assertStatus(() -> authz.ownsChannel(UNKNOWN), HttpStatus.UNAUTHORIZED);
+        assertStatus(() -> authz.isSelf(UNKNOWN), HttpStatus.UNAUTHORIZED);
     }
 
     @Test
     void canAccessChannel_noJwtIs401() {
-        assertStatus(() -> authz.canAccessChannel("streamer"), HttpStatus.UNAUTHORIZED);
+        assertStatus(() -> authz.canAccessChannel(owner.getId()), HttpStatus.UNAUTHORIZED);
 
         signIn(new AnonymousAuthenticationToken("key", "anonymous", AuthorityUtils.createAuthorityList("ROLE_ANONYMOUS")));
-        assertStatus(() -> authz.canAccessChannel("streamer"), HttpStatus.UNAUTHORIZED);
-        assertStatus(() -> authz.ownsChannel("streamer"), HttpStatus.UNAUTHORIZED);
+        assertStatus(() -> authz.canAccessChannel(owner.getId()), HttpStatus.UNAUTHORIZED);
+        assertStatus(() -> authz.ownsChannel(owner.getId()), HttpStatus.UNAUTHORIZED);
 
         signIn(UsernamePasswordAuthenticationToken.authenticated(owner.getId(), null,
                 AuthorityUtils.createAuthorityList(PersonalTokenAuthenticationFilter.AUTHORITY)));
-        assertStatus(() -> authz.canAccessChannel("streamer"), HttpStatus.UNAUTHORIZED);
-        assertStatus(() -> authz.ownsChannel("streamer"), HttpStatus.UNAUTHORIZED);
+        assertStatus(() -> authz.canAccessChannel(owner.getId()), HttpStatus.UNAUTHORIZED);
+        assertStatus(() -> authz.ownsChannel(owner.getId()), HttpStatus.UNAUTHORIZED);
     }
 
     @Test
     void canAccessChannel_unknownChannelIs404() {
         signInAs(owner.getId());
 
-        assertStatus(() -> authz.canAccessChannel("nobody-here"), HttpStatus.NOT_FOUND);
-        assertStatus(() -> authz.ownsChannel("nobody-here"), HttpStatus.NOT_FOUND);
+        assertStatus(() -> authz.canAccessChannel(UNKNOWN), HttpStatus.NOT_FOUND);
+        assertStatus(() -> authz.ownsChannel(UNKNOWN), HttpStatus.NOT_FOUND);
+        assertStatus(() -> authz.isSelf(UNKNOWN), HttpStatus.NOT_FOUND);
     }
 
     @Test
@@ -115,11 +118,11 @@ class AuthzChannelTest {
         when(channelAccessService.canAccess(member, owner)).thenReturn(false);
 
         signInAs(owner.getId());
-        assertThat(authz.canAccessChannel("streamer")).isTrue();
+        assertThat(authz.canAccessChannel(owner.getId())).isTrue();
         signInAs(moderator.getId());
-        assertThat(authz.canAccessChannel("streamer")).isTrue();
+        assertThat(authz.canAccessChannel(owner.getId())).isTrue();
         signInAs(member.getId());
-        assertThat(authz.canAccessChannel("streamer")).isFalse();
+        assertThat(authz.canAccessChannel(owner.getId())).isFalse();
 
         assertThat(authz.canAccess(moderator, owner)).isTrue();
         assertThat(authz.canAccess(member, owner)).isFalse();
@@ -133,41 +136,23 @@ class AuthzChannelTest {
         Authz withRealAccess = new Authz(new ApiUserResolver(accounts), real);
 
         signInAs(moderator.getId());
-        assertThat(withRealAccess.canAccessChannel("streamer")).isFalse();
+        assertThat(withRealAccess.canAccessChannel(owner.getId())).isFalse();
     }
 
     @Test
     void ownsChannel_neverAsksTwitch() {
         signInAs(owner.getId());
-        assertThat(authz.ownsChannel("streamer")).isTrue();
+        assertThat(authz.ownsChannel(owner.getId())).isTrue();
         signInAs(moderator.getId());
-        assertThat(authz.ownsChannel("streamer")).isFalse();
+        assertThat(authz.ownsChannel(owner.getId())).isFalse();
 
         verifyNoInteractions(channelAccessService);
     }
 
-    @Test
-    void canAccessChannelById_unknownViewerIs401_beforeUnknownChannel() {
-        signInAs(UUID.randomUUID());
-        UUID unknown = UUID.randomUUID();
 
-        assertStatus(() -> authz.canAccessChannel(unknown), HttpStatus.UNAUTHORIZED);
-        assertStatus(() -> authz.ownsChannel(unknown), HttpStatus.UNAUTHORIZED);
-        assertStatus(() -> authz.isSelf(unknown), HttpStatus.UNAUTHORIZED);
-    }
 
     @Test
-    void canAccessChannelById_unknownChannelIs404() {
-        signInAs(owner.getId());
-        UUID unknown = UUID.randomUUID();
-
-        assertStatus(() -> authz.canAccessChannel(unknown), HttpStatus.NOT_FOUND);
-        assertStatus(() -> authz.ownsChannel(unknown), HttpStatus.NOT_FOUND);
-        assertStatus(() -> authz.isSelf(unknown), HttpStatus.NOT_FOUND);
-    }
-
-    @Test
-    void canAccessChannelById_moderatorIsTrue() {
+    void canAccessChannel_moderatorIsTrue_memberFalse() {
         when(channelAccessService.canAccess(moderator, owner)).thenReturn(true);
         when(channelAccessService.canAccess(member, owner)).thenReturn(false);
 
@@ -178,7 +163,7 @@ class AuthzChannelTest {
     }
 
     @Test
-    void ownsChannelById_moderatorIsFalse() {
+    void ownsChannel_moderatorIsFalse() {
         signInAs(moderator.getId());
         assertThat(authz.ownsChannel(owner.getId())).isFalse();
         signInAs(owner.getId());

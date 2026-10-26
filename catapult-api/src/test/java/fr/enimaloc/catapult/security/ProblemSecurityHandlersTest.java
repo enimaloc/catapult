@@ -115,7 +115,7 @@ class ProblemSecurityHandlersTest {
 
     @Test
     void channelDenialIs403Problem() throws Exception {
-        mvc.perform(remote(get("/api/channels/{u}/settings", owner.getTwitchUsername()))
+        mvc.perform(remote(get("/api/internal/users/{userId}/settings", owner.getId()))
                         .header("Authorization", memberJwt))
                 .andExpect(status().isForbidden())
                 .andExpect(header().string("WWW-Authenticate", startsWith("Bearer error=\"insufficient_scope\"")))

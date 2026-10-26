@@ -29,8 +29,8 @@ import java.util.UUID;
  * Only the proxies of {@code server.tomcat.remoteip.internal-proxies} (loopback by default, catapult-web's network in
  * compose) are believed; from any other address the header is ignored and the peer's own address is what counts.
  * <p>
- * It also decides who reaches a channel, for {@code @PreAuthorize("@authz.canAccessChannel(#username)")} and
- * {@code @PreAuthorize("@authz.ownsChannel(#username)")} (or {@code #userId}, the channel's account id), and whose own
+ * It also decides who reaches a channel, for {@code @PreAuthorize("@authz.canAccessChannel(#userId)")} and
+ * {@code @PreAuthorize("@authz.ownsChannel(#userId)")} ({@code userId} the channel's account id), and whose own
  * resources a route under {@code /api/internal/users/{userId}} serves ({@code @authz.isSelf(#userId)}). Those keep
  * the order every channel route answers in: 401 for a caller without a JWT or with an unknown account, then 404 for an
  * unknown channel or account (both thrown as
@@ -51,18 +51,6 @@ public class Authz {
     public Authz(ApiUserResolver users, ChannelAccessService channels) {
         this.users = users;
         this.channels = channels;
-    }
-
-    /** The current caller is the channel's owner or one of its Twitch moderators. 401, then 404, before deciding. */
-    public boolean canAccessChannel(String username) {
-        UserAccount viewer = users.viewer(currentJwt());
-        return canAccess(viewer, users.channel(username));
-    }
-
-    /** The current caller is the channel's owner. 401, then 404, before deciding; never asks Twitch. */
-    public boolean ownsChannel(String username) {
-        UserAccount viewer = users.viewer(currentJwt());
-        return viewer.getId().equals(users.channel(username).getId());
     }
 
     /**

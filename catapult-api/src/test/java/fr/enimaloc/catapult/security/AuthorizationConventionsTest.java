@@ -31,7 +31,6 @@ class AuthorizationConventionsTest {
   private static final Pattern AUTHZ_CALL = Pattern.compile("^@authz\\.\\w+\\((#\\w+(\\s*,\\s*#\\w+)*)?\\)$");
   /** A rule that decides on the route's owner, the {@code userId} path variable. */
   private static final Pattern NAMES_USER_ID = Pattern.compile("#userId\\b");
-  private static final String CHANNELS = "/api/channels/{";
   private static final String USERS = ApiPaths.INTERNAL + "/users/{";
   /** The access probe: it answers {@code false} rather than refusing (see its javadoc), so it has no rule. */
   private static final String CHANNEL_ACCESS_PROBE = ApiPaths.USER + "/channel-access";
@@ -95,8 +94,8 @@ class AuthorizationConventionsTest {
   }
 
   /**
-   * Every handler under {@code /api/channels/{...}} or {@code /api/internal/users/{...}} carries its own
-   * {@code @PreAuthorize}; under {@code /api/internal/users/{userId}} it decides on {@code #userId}. A class-level one
+   * Every handler under {@code /api/internal/users/{...}} carries its own {@code @PreAuthorize}, which decides on
+   * {@code #userId}. A class-level one
    * is not enough and is refused: it would also guard the controller's {@code @ExceptionHandler}s.
    */
   @Test
@@ -112,9 +111,8 @@ class AuthorizationConventionsTest {
           continue;
         }
         List<String> paths = paths(type, mapping);
-        boolean channel = paths.stream().anyMatch(p -> p.startsWith(CHANNELS));
         boolean user = paths.stream().anyMatch(p -> p.startsWith(USERS));
-        if ((!channel && !user) || (user && isChannelAccessProbe(mapping, paths))) {
+        if (!user || isChannelAccessProbe(mapping, paths)) {
           continue;
         }
         channelController = true;
@@ -123,7 +121,7 @@ class AuthorizationConventionsTest {
         PreAuthorize rule = method.getAnnotation(PreAuthorize.class);
         if (rule == null) {
           violations.add(name + " has no @PreAuthorize");
-        } else if (user && !NAMES_USER_ID.matcher(rule.value()).find()) {
+        } else if (!NAMES_USER_ID.matcher(rule.value()).find()) {
           violations.add(name + " @PreAuthorize(" + rule.value() + ") does not decide on #userId");
         }
       }
@@ -131,7 +129,7 @@ class AuthorizationConventionsTest {
         violations.add(type.getName() + " has a class-level @PreAuthorize, which also guards its @ExceptionHandler");
       }
     }
-    assertThat(handlers).as("handlers under /api/channels/{...} or /api/internal/users/{...}").isNotEmpty();
+    assertThat(handlers).as("handlers under /api/internal/users/{...}").isNotEmpty();
     assertThat(violations).isEmpty();
   }
 
@@ -167,11 +165,11 @@ class AuthorizationConventionsTest {
 
   @ParameterizedTest
   @CsvSource({
-      "/api/channels/{username},/logs,/api/channels/{username}/logs",
-      "/api/channels/{username},logs,/api/channels/{username}/logs",
-      "api/channels/{username}/,logs,/api/channels/{username}/logs",
-      "'',/api/channels/{login},/api/channels/{login}",
-      "/api/channels/{username},'',/api/channels/{username}"
+      "/api/internal/users/{userId},/logs,/api/internal/users/{userId}/logs",
+      "/api/internal/users/{userId},logs,/api/internal/users/{userId}/logs",
+      "api/internal/users/{userId}/,logs,/api/internal/users/{userId}/logs",
+      "'',/api/internal/users/{userId},/api/internal/users/{userId}",
+      "/api/internal/users/{userId},'',/api/internal/users/{userId}"
   })
   void pathsJoinAsSpringJoinsThem(String prefix, String suffix, String joined) {
     assertThat(join(prefix, suffix)).isEqualTo(joined);

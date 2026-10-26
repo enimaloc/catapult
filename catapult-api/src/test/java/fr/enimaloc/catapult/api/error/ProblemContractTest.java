@@ -14,6 +14,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -83,7 +84,7 @@ class ProblemContractTest extends FullContextTestBase {
     @Test
     void problemOnAnEventStreamRouteKeepsItsStatus() throws Exception {
         HttpResponse<String> response = send(
-                "/api/channels/nobody-here/connections",
+                "/api/internal/users/" + UUID.randomUUID() + "/connections",
                 Map.of("Authorization", "Bearer " + memberJwt, "Accept", "text/event-stream"));
 
         assertThat(response.statusCode()).isEqualTo(404);

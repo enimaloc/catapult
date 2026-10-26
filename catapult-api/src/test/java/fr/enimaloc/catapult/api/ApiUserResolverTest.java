@@ -73,10 +73,6 @@ class ApiUserResolverTest {
         assertStatus(() -> resolver.viewerByTwitchId(null), HttpStatus.UNAUTHORIZED);
     }
 
-    @Test
-    void channel_unknownIsNotFound() {
-        assertStatus(() -> resolver.channel("nope"), HttpStatus.NOT_FOUND);
-    }
 
     @Test
     void user_byAccountId_orNotFound() {
