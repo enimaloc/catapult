@@ -584,3 +584,64 @@ describe("personal API token card", () => {
         expect(byId("api-token-reveal").classList.contains("hidden")).toBe(true);
     });
 });
+
+describe("personal API token status, once per page", () => {
+    const tokenFetches = () => fetch.mock.calls.filter(([url]) => url === "/me/api-token");
+
+    it("token_isFetchedOncePerPageLoad", async () => {
+        fetch.mockResolvedValue(response(200, { exists: true, createdAt: "2026-10-20T10:00:00Z" }));
+        for (let i = 0; i < 3; i++) {
+            tokenCard();
+            await flush();
+            expect(byId("api-token-status").textContent).toMatch(/^Généré le .*2026/);
+        }
+
+        expect(tokenFetches()).toHaveLength(1);
+    });
+
+    it("token_afterRegenerate_rendersWithoutRefetching", async () => {
+        fetch.mockResolvedValue(response(200, { exists: false, createdAt: null }));
+        tokenCard();
+        await flush();
+        postJson.mockResolvedValue(response(200, { token: "cat_NEW", createdAt: "2026-10-26T10:00:00Z" }));
+        byId("api-token-generate-btn").click();
+        await flush();
+
+        tokenCard();
+        await flush();
+
+        expect(byId("api-token-status").textContent).toMatch(/^Généré le .*2026/);
+        expect(byId("api-token-generate-btn").textContent).toBe("Régénérer");
+        expect(tokenFetches()).toHaveLength(1);
+    });
+
+    it("token_afterRevoke_rendersWithoutRefetching", async () => {
+        fetch.mockResolvedValue(response(200, { exists: true, createdAt: "2026-10-20T10:00:00Z" }));
+        tokenCard();
+        await flush();
+        byId("api-token-revoke-btn").click();
+        document.querySelector(".api-token-confirm-ok").click();
+        await flush();
+
+        tokenCard();
+        await flush();
+
+        expect(byId("api-token-status").textContent).toBe("Aucun jeton");
+        expect(tokenFetches()).toHaveLength(1);
+    });
+
+    it("token_afterAFailedFetch_retriesOnTheNextRender", async () => {
+        fetch.mockResolvedValueOnce(response(500));
+        tokenCard();
+        byId("channel-api-token-card").dataset.labelUnavailable = "Indisponible";
+        await flush();
+        expect(byId("api-token-status").textContent).toBe("Indisponible");
+
+        fetch.mockResolvedValueOnce(response(200, { exists: true, createdAt: "2026-10-20T10:00:00Z" }));
+        tokenCard();
+        await flush();
+
+        expect(byId("api-token-status").textContent).toMatch(/^Généré le .*2026/);
+        expect(tokenFetches()).toHaveLength(2);
+    });
+});
