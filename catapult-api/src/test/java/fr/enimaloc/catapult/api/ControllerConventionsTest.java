@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import fr.enimaloc.catapult.getter.dtdd.DtddApiClient;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
@@ -204,6 +205,35 @@ class ControllerConventionsTest {
   }
 
   @Test
+  void classLevelTransactionIsCaught() {
+    assertThat(violations(WithClassTransaction.class, SOURCES))
+        .containsExactly("WithClassTransaction is @Transactional");
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "DebugContext.runAs(id, () -> x());",
+        "import static fr.enimaloc.catapult.service.debug.DebugContext.callAs;"
+      })
+  void debugContextUseIsCaught(String source) {
+    assertThat(callsDebugContext(source)).isTrue();
+  }
+
+  @Test
+  void importingDebugContextAloneIsNotAUse() {
+    assertThat(callsDebugContext("import fr.enimaloc.catapult.service.debug.DebugContext;"))
+        .isFalse();
+  }
+
+  @Test
+  void aMissingControllerSourceFailsLoudly() {
+    assertThatThrownBy(() -> violations(ApiUserResolver.class, Path.of("nowhere")))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("nowhere");
+  }
+
+  @Test
   void aThinControllerPasses() {
     assertThat(violations(Thin.class, SOURCES)).isEmpty();
   }
@@ -228,7 +258,7 @@ class ControllerConventionsTest {
         found.add(name + "#" + method.getName() + " is @Transactional");
       }
     }
-    if (source(controller, sources).contains("DebugContext.")) {
+    if (callsDebugContext(source(controller, sources))) {
       found.add(name + " calls DebugContext");
     }
     return found;
@@ -277,6 +307,10 @@ class ControllerConventionsTest {
         || (type.getName().startsWith("fr.enimaloc.catapult.") && type.getSimpleName().endsWith("Client"));
   }
 
+  static boolean callsDebugContext(String source) {
+    return source.contains("DebugContext.");
+  }
+
   private static String source(Class<?> controller, Path sources) {
     Class<?> top = controller;
     while (top.getEnclosingClass() != null) {
@@ -284,7 +318,10 @@ class ControllerConventionsTest {
     }
     Path file = sources.resolve(top.getName().replace('.', '/') + ".java");
     if (!Files.exists(file)) {
-      return "";
+      if (top == ControllerConventionsTest.class) {
+        return "";
+      }
+      throw new IllegalStateException("controller source not found: " + file.toAbsolutePath());
     }
     try {
       return Files.readString(file);
@@ -305,8 +342,13 @@ class ControllerConventionsTest {
         };
     List<Class<?>> controllers = new ArrayList<>();
     for (BeanDefinition definition : scanner.findCandidateComponents("fr.enimaloc.catapult")) {
-      if (!definition.getBeanClassName().contains("ControllerConventionsTest$")) {
-        controllers.add(Class.forName(definition.getBeanClassName()));
+      if (definition.getBeanClassName().contains("ControllerConventionsTest$")) {
+        continue;
+      }
+      Class<?> type = Class.forName(definition.getBeanClassName());
+      // Fixtures declared by other tests live in the test classes, not in src/main.
+      if (!type.getProtectionDomain().getCodeSource().getLocation().getPath().contains("/test/")) {
+        controllers.add(type);
       }
     }
     return controllers;
@@ -335,6 +377,10 @@ class ControllerConventionsTest {
     @Transactional
     void write() {}
   }
+
+  @RestController
+  @Transactional
+  static class WithClassTransaction {}
 
   @RestController
   static class WithEventPublisher {
