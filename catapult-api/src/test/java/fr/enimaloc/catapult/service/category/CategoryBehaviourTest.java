@@ -880,13 +880,23 @@ class CategoryBehaviourTest {
         }
 
         @Test
-        void twitchFails_keepsTheHold() {
+        void twitchFails_releasesTheHold() {
             f.twitch.answer(ChannelUpdateOutcome.FAILED);
 
             f.raid("509658");
 
             assertThat(f.journal()).containsExactly("twitch:update 27471 Minecraft");
-            assertThat(f.holding()).isTrue();
+            assertThat(f.holding()).isFalse();
+        }
+
+        @Test
+        void twitchSkips_releasesTheHold() {
+            f.twitch.answer(ChannelUpdateOutcome.SKIPPED);
+
+            f.raid("509658");
+
+            assertThat(f.journal()).containsExactly("twitch:update 27471 Minecraft");
+            assertThat(f.holding()).isFalse();
         }
 
         @Test
