@@ -113,14 +113,8 @@ class ControllerConventionsTest {
           "ApiFeedbackController depends on FeedbackSubmissionRepository",
           "ApiFeedbackController depends on GitLabClient",
           "ApiHelpController depends on UserAccountRepository",
-          "ApiMinecraftConnectController depends on UserAccountRepository",
           "ApiSeenFeaturesController depends on SeenFeatureRepository",
           "ApiSeenFeaturesController#markSeen is @Transactional",
-          "ApiSteamConnectController calls DebugContext",
-          "ApiSteamConnectController depends on ApplicationEventPublisher",
-          "ApiSteamConnectController depends on DebugRecording",
-          "ApiSteamConnectController depends on RestClient",
-          "ApiSteamConnectController depends on UserAccountRepository",
           "ApiUsersController depends on UserAccountRepository");
 
   @Test

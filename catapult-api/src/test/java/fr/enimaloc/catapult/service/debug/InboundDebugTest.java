@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.service.debug;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.enimaloc.catapult.api.connect.ApiSteamConnectController;
+import fr.enimaloc.catapult.service.steam.SteamOpenIdLinkService;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.debug.DebugExchange;
@@ -218,10 +219,11 @@ class InboundDebugTest {
         MockRestServiceServer steam = MockRestServiceServer.bindTo(builder).build();
         steam.expect(requestTo("https://steamcommunity.com/openid/login"))
                 .andRespond(withSuccess("is_valid:true\n", MediaType.TEXT_PLAIN));
-        ApiSteamConnectController controller = new ApiSteamConnectController(accounts,
+        SteamOpenIdLinkService links = new SteamOpenIdLinkService(accounts,
                 mock(ApplicationEventPublisher.class), mock(ChannelEventPublisher.class), builder.build(),
                 new DebugRecording(registry, realRecorder()));
-        ReflectionTestUtils.setField(controller, "apiBaseUrl", "http://api.test");
+        ReflectionTestUtils.setField(links, "apiBaseUrl", "http://api.test");
+        ApiSteamConnectController controller = new ApiSteamConnectController(links);
         ReflectionTestUtils.setField(controller, "webBaseUrl", "http://web.test");
         Jwt jwt = Jwt.withTokenValue("t").header("alg", "none").subject(user.getId().toString()).build();
         String returnTo = UriComponentsBuilder.fromUriString(controller.start(UUID.randomUUID(), jwt).redirectUrl()).build()
