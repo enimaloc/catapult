@@ -40,6 +40,7 @@ export default defineConfig({
       // Timing run under the perf profile: perf/run.sh --pages-only, never against a real stack.
       name: "perf",
       testDir: "./tests/perf",
+      timeout: 600_000, // 21 page loads per tab
       use: { ...devices["Desktop Chrome"], baseURL: process.env.PERF_BASE_URL },
     },
   ],
