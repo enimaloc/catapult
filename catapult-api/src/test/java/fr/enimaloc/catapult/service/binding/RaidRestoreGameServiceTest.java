@@ -79,7 +79,7 @@ class RaidRestoreGameServiceTest {
 
         // updateChannel records the Catapult self-change marker (TwitchServiceImpl), so the
         // resulting channel.update is reported as Catapult's, never as a manual change.
-        verify(twitchService).updateChannel(user, binding);
+        verify(twitchService).updateChannelReporting(user, binding);
         assertThat(service.isHoldingNoGameFallback(user)).isTrue();
     }
 
@@ -90,7 +90,7 @@ class RaidRestoreGameServiceTest {
 
         raid("509658");
 
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
         assertThat(service.isHoldingNoGameFallback(user)).isFalse();
     }
 
@@ -98,7 +98,7 @@ class RaidRestoreGameServiceTest {
     void restoresWhenTheCurrentCategoryIsUnknown() {
         raid(null);
 
-        verify(twitchService).updateChannel(user, binding);
+        verify(twitchService).updateChannelReporting(user, binding);
     }
 
     @Test
@@ -107,7 +107,7 @@ class RaidRestoreGameServiceTest {
 
         raid("509658");
 
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
         assertThat(service.isHoldingNoGameFallback(user)).isFalse();
     }
 
@@ -117,7 +117,7 @@ class RaidRestoreGameServiceTest {
 
         raid("509658");
 
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
         verify(gate, never()).isAvailableReadOnly(any());
     }
 
@@ -127,7 +127,7 @@ class RaidRestoreGameServiceTest {
 
         raid("509658");
 
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
     }
 
     @Test
@@ -136,7 +136,7 @@ class RaidRestoreGameServiceTest {
 
         raid("509658");
 
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
         assertThat(service.isHoldingNoGameFallback(user)).isFalse();
     }
 
@@ -144,7 +144,7 @@ class RaidRestoreGameServiceTest {
     void alreadyOnThatGame_changesNothingButStillHoldsTheNoGameFallback() {
         raid("517");
 
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
         assertThat(service.isHoldingNoGameFallback(user)).isTrue();
     }
 
@@ -152,7 +152,7 @@ class RaidRestoreGameServiceTest {
     void theHoldIsTakenBeforeTheCategoryIsChanged() {
         boolean[] holdingDuringTheChange = new boolean[1];
         doAnswer(invocation -> holdingDuringTheChange[0] = service.isHoldingNoGameFallback(user))
-                .when(twitchService).updateChannel(user, binding);
+                .when(twitchService).updateChannelReporting(user, binding);
 
         raid("509658");
 
@@ -161,7 +161,7 @@ class RaidRestoreGameServiceTest {
 
     @Test
     void aFailedRestoreReleasesTheHold() {
-        doThrow(new IllegalStateException("Twitch down")).when(twitchService).updateChannel(user, binding);
+        doThrow(new IllegalStateException("Twitch down")).when(twitchService).updateChannelReporting(user, binding);
 
         raid("509658");
 
@@ -178,7 +178,7 @@ class RaidRestoreGameServiceTest {
         when(bindingService.findBinding(user, doom)).thenReturn(Optional.empty());
         raid("509658");
 
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
     }
 
     @Test

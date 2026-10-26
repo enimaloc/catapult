@@ -469,7 +469,7 @@ class CustomBindingServiceTest {
 
         verify(activations).clear(user);
         verify(twitchService, never()).resetToDefault(any());
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
         verify(gameEventListener, never()).applyDetectedGame(any(), any());
     }
 

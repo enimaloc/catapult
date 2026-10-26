@@ -125,14 +125,14 @@ class TwitchServiceTest {
 
     @Test
     void updateChannel_skipsIncompleteBinding() {
-        twitchService.updateChannel(user, binding(GameBinding.Status.INCOMPLETE, false, true, Set.of()));
+        twitchService.updateChannelReporting(user, binding(GameBinding.Status.INCOMPLETE, false, true, Set.of()));
 
         verifyNoInteractions(restClient);
     }
 
     @Test
     void updateChannel_skipsIgnoredBinding() {
-        twitchService.updateChannel(user, binding(GameBinding.Status.AUTO, true, true, Set.of()));
+        twitchService.updateChannelReporting(user, binding(GameBinding.Status.AUTO, true, true, Set.of()));
 
         verifyNoInteractions(restClient);
     }
@@ -142,14 +142,14 @@ class TwitchServiceTest {
         when(oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH))
             .thenReturn(Optional.empty());
 
-        twitchService.updateChannel(user, binding(GameBinding.Status.AUTO, false, true, Set.of()));
+        twitchService.updateChannelReporting(user, binding(GameBinding.Status.AUTO, false, true, Set.of()));
 
         verifyNoInteractions(restClient);
     }
 
     @Test
     void updateChannel_withEmptyCcls_sendsAllEditableAsDisabled() {
-        twitchService.updateChannel(user, binding(GameBinding.Status.AUTO, false, true, Set.of()));
+        twitchService.updateChannelReporting(user, binding(GameBinding.Status.AUTO, false, true, Set.of()));
 
         ArgumentCaptor<Map> bodyCaptor = ArgumentCaptor.forClass(Map.class);
         verify(bodySpec).body(bodyCaptor.capture());
@@ -165,7 +165,7 @@ class TwitchServiceTest {
 
     @Test
     void updateChannel_withSomeCcls_enablesOnlyMatching() {
-        twitchService.updateChannel(user,
+        twitchService.updateChannelReporting(user,
             binding(GameBinding.Status.AUTO, false, true, Set.of("ViolentGraphic", "Gambling")));
 
         ArgumentCaptor<Map> bodyCaptor = ArgumentCaptor.forClass(Map.class);
@@ -185,7 +185,7 @@ class TwitchServiceTest {
 
     @Test
     void updateChannel_matureGameNotInCclPayload() {
-        twitchService.updateChannel(user,
+        twitchService.updateChannelReporting(user,
             binding(GameBinding.Status.AUTO, false, true, Set.of("MatureGame")));
 
         ArgumentCaptor<Map> bodyCaptor = ArgumentCaptor.forClass(Map.class);
@@ -200,7 +200,7 @@ class TwitchServiceTest {
 
     @Test
     void updateChannel_cclDisabledOnBinding_doesNotSendCclPayload() {
-        twitchService.updateChannel(user, binding(GameBinding.Status.AUTO, false, false, Set.of("ViolentGraphic")));
+        twitchService.updateChannelReporting(user, binding(GameBinding.Status.AUTO, false, false, Set.of("ViolentGraphic")));
 
         ArgumentCaptor<Map> bodyCaptor = ArgumentCaptor.forClass(Map.class);
         verify(bodySpec).body(bodyCaptor.capture());
@@ -213,7 +213,7 @@ class TwitchServiceTest {
         doThrow(new HttpClientErrorException(HttpStatus.UNAUTHORIZED)).when(responseSpec).toBodilessEntity();
 
         assertThat(user.isBotEnabled()).isTrue(); // pre-condition
-        twitchService.updateChannel(user, binding(GameBinding.Status.AUTO, false, true, Set.of()));
+        twitchService.updateChannelReporting(user, binding(GameBinding.Status.AUTO, false, true, Set.of()));
 
         verify(botToggleService).setBotEnabled(user, false);
     }
@@ -224,7 +224,7 @@ class TwitchServiceTest {
         binding.setTwitchGameId("222");
         binding.setTwitchGameName("New Game");
 
-        twitchService.updateChannel(user, binding);
+        twitchService.updateChannelReporting(user, binding);
 
         // The Twitchat dispatcher is not a collaborator of TwitchServiceImpl: the notification
         // is emitted once, from TwitchEventSubService's channel.update handler.
@@ -240,7 +240,7 @@ class TwitchServiceTest {
 
     @Test
     void setCategory_botActive_patchesOnlyGameId() {
-        twitchService.setCategory(user, "12345", "Some Game");
+        assertThat(twitchService.setCategory(user, "12345", "Some Game")).isEqualTo(ChannelUpdateOutcome.APPLIED);
 
         ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
         verify(patchSpec).uri(uriCaptor.capture());
@@ -255,7 +255,7 @@ class TwitchServiceTest {
     void setCategory_botDisabled_skipsPatch() {
         user.setBotEnabled(false);
 
-        twitchService.setCategory(user, "12345", "Some Game");
+        assertThat(twitchService.setCategory(user, "12345", "Some Game")).isEqualTo(ChannelUpdateOutcome.SKIPPED);
 
         verifyNoInteractions(restClient, oAuthTokenRepository);
     }
@@ -264,7 +264,7 @@ class TwitchServiceTest {
     void updateChannel_botDisabled_doesNotCallHelix() {
         user.setBotEnabled(false);
 
-        twitchService.updateChannel(user, binding(GameBinding.Status.AUTO, false, true, Set.of()));
+        twitchService.updateChannelReporting(user, binding(GameBinding.Status.AUTO, false, true, Set.of()));
 
         verifyNoInteractions(restClient, oAuthTokenRepository);
     }
@@ -273,7 +273,7 @@ class TwitchServiceTest {
     void updateChannel_accountInactive_doesNotCallHelix() {
         user.setStatus(UserAccount.Status.INACTIVE);
 
-        twitchService.updateChannel(user, binding(GameBinding.Status.AUTO, false, true, Set.of()));
+        twitchService.updateChannelReporting(user, binding(GameBinding.Status.AUTO, false, true, Set.of()));
 
         verifyNoInteractions(restClient, oAuthTokenRepository);
     }
@@ -290,7 +290,7 @@ class TwitchServiceTest {
         when(userAccountRepository.findById(staleUser.getId())).thenReturn(Optional.of(user));
         user.setBotEnabled(false);
 
-        twitchService.updateChannel(staleUser, binding(GameBinding.Status.AUTO, false, true, Set.of()));
+        twitchService.updateChannelReporting(staleUser, binding(GameBinding.Status.AUTO, false, true, Set.of()));
 
         assertThat(staleUser.isBotEnabled()).isTrue(); // the stale flag itself never flips
         verifyNoInteractions(restClient, oAuthTokenRepository);
@@ -300,7 +300,7 @@ class TwitchServiceTest {
     void resetToDefault_noSettings_doesNotCallApi() {
         when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.empty());
 
-        twitchService.resetToDefault(user);
+        assertThat(twitchService.resetToDefault(user)).isEqualTo(ChannelUpdateOutcome.SKIPPED);
 
         verify(restClient, never()).patch();
     }
@@ -311,7 +311,7 @@ class TwitchServiceTest {
         settings.setNoGameTwitchGameId(null);
         when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
 
-        twitchService.resetToDefault(user);
+        assertThat(twitchService.resetToDefault(user)).isEqualTo(ChannelUpdateOutcome.SKIPPED);
 
         verify(restClient, never()).patch();
     }
@@ -330,7 +330,7 @@ class TwitchServiceTest {
         when(bodySpec.retrieve()).thenReturn(responseSpec);
         when(responseSpec.toBodilessEntity()).thenReturn(null);
 
-        twitchService.resetToDefault(user);
+        assertThat(twitchService.resetToDefault(user)).isEqualTo(ChannelUpdateOutcome.APPLIED);
 
         ArgumentCaptor<Map> bodyCaptor = ArgumentCaptor.forClass(Map.class);
         verify(bodySpec).body(bodyCaptor.capture());
@@ -521,7 +521,7 @@ class TwitchServiceTest {
             .doReturn(null)
             .when(responseSpec).toBodilessEntity();
 
-        twitchService.updateChannel(user, binding(GameBinding.Status.AUTO, false, true, Set.of()));
+        twitchService.updateChannelReporting(user, binding(GameBinding.Status.AUTO, false, true, Set.of()));
 
         verify(botToggleService, never()).setBotEnabled(eq(user), anyBoolean());
     }
@@ -532,7 +532,7 @@ class TwitchServiceTest {
         doThrow(new HttpClientErrorException(HttpStatus.UNAUTHORIZED))
             .when(responseSpec).toBodilessEntity();
 
-        twitchService.updateChannel(user, binding(GameBinding.Status.AUTO, false, true, Set.of()));
+        twitchService.updateChannelReporting(user, binding(GameBinding.Status.AUTO, false, true, Set.of()));
 
         verify(botToggleService).setBotEnabled(user, false);
     }
@@ -617,7 +617,7 @@ class TwitchServiceTest {
     void resetToDefault_botDisabled_doesNotCallHelix() {
         user.setBotEnabled(false);
 
-        twitchService.resetToDefault(user);
+        assertThat(twitchService.resetToDefault(user)).isEqualTo(ChannelUpdateOutcome.SKIPPED);
 
         verifyNoInteractions(restClient, userSettingsRepository);
     }
@@ -691,7 +691,7 @@ class TwitchServiceTest {
         when(oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH))
             .thenReturn(Optional.empty());
 
-        twitchService.setCategory(user, "12345", "Some Game");
+        assertThat(twitchService.setCategory(user, "12345", "Some Game")).isEqualTo(ChannelUpdateOutcome.FAILED);
 
         verify(restClient, never()).patch();
         verifyNoInteractions(categoryChangeStateService);
@@ -717,7 +717,7 @@ class TwitchServiceTest {
         when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
         doThrow(new HttpClientErrorException(HttpStatus.UNAUTHORIZED)).when(responseSpec).toBodilessEntity();
 
-        twitchService.resetToDefault(user);
+        assertThat(twitchService.resetToDefault(user)).isEqualTo(ChannelUpdateOutcome.FAILED);
 
         verify(twitchTokenService).refreshAccessToken(any(OAuthToken.class), eq(user));
         verify(botToggleService).setBotEnabled(user, false);
@@ -732,7 +732,7 @@ class TwitchServiceTest {
         GameBinding fallback = binding(GameBinding.Status.MANUAL, false, true, Set.of("Gambling"));
         fallback.setId(null);
 
-        twitchService.updateChannel(user, fallback);
+        twitchService.updateChannelReporting(user, fallback);
 
         assertThat(cclEnabled("Gambling")).isTrue();
     }
@@ -745,14 +745,14 @@ class TwitchServiceTest {
         GameBinding saved = binding(GameBinding.Status.AUTO, false, true, Set.of("Gambling"));
         saved.setId(java.util.UUID.randomUUID());
 
-        twitchService.updateChannel(user, saved);
+        twitchService.updateChannelReporting(user, saved);
 
         assertThat(cclEnabled("Gambling")).isFalse();
     }
 
     @Test
     void updateChannel_recordsTheMarkerOnce() {
-        twitchService.updateChannel(user, binding(GameBinding.Status.AUTO, false, true, Set.of()));
+        twitchService.updateChannelReporting(user, binding(GameBinding.Status.AUTO, false, true, Set.of()));
 
         verify(categoryChangeStateService, times(1)).recordCatapultChangeAndReturnPrevious(user, "game-456");
     }
@@ -761,7 +761,7 @@ class TwitchServiceTest {
     void updateChannel_twitchError_isObservedAsASuccess() {
         doThrow(new HttpServerErrorException(HttpStatus.INTERNAL_SERVER_ERROR)).when(responseSpec).toBodilessEntity();
 
-        twitchService.updateChannel(user, binding(GameBinding.Status.AUTO, false, true, Set.of()));
+        twitchService.updateChannelReporting(user, binding(GameBinding.Status.AUTO, false, true, Set.of()));
 
         assertThat(timer("update_channel", "success")).isNotNull();
         assertThat(timer("update_channel", "error")).isNull();

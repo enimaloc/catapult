@@ -66,7 +66,7 @@ class GameEventListenerLiveCheckTest {
 
         listener.onGameDetected(new GameDetectedEvent(this, user, game));
 
-        verify(twitchService).updateChannel(user, binding);
+        verify(twitchService).updateChannelReporting(user, binding);
         verify(streamStateService, never()).storePending(any(), any());
     }
 
@@ -79,7 +79,7 @@ class GameEventListenerLiveCheckTest {
         listener.onGameDetected(new GameDetectedEvent(this, user, game));
 
         verify(streamStateService).storePending(user, binding);
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
     }
 
     @Test
@@ -88,7 +88,7 @@ class GameEventListenerLiveCheckTest {
 
         listener.onStreamOnline(new StreamOnlineEvent(this, user));
 
-        verify(twitchService).updateChannel(user, binding);
+        verify(twitchService).updateChannelReporting(user, binding);
         verify(streamStateService).clearPending(user);
     }
 
@@ -99,7 +99,7 @@ class GameEventListenerLiveCheckTest {
 
         listener.onStreamOnline(new StreamOnlineEvent(this, user));
 
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
         verify(twitchService, never()).resetToDefault(any());
     }
 
@@ -112,7 +112,7 @@ class GameEventListenerLiveCheckTest {
         listener.onStreamOnline(new StreamOnlineEvent(this, user));
 
         verify(twitchService).resetToDefault(user);
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
         verify(streamStateService).clearPending(user);
     }
 
@@ -127,7 +127,7 @@ class GameEventListenerLiveCheckTest {
         listener.onStreamOnline(new StreamOnlineEvent(this, user));
 
         verify(twitchService, never()).resetToDefault(any());
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
     }
 
     @Test
@@ -139,7 +139,7 @@ class GameEventListenerLiveCheckTest {
         listener.onStreamOnline(new StreamOnlineEvent(this, user));
 
         verify(twitchService).resetToDefault(user);
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
         verify(streamStateService).clearPending(user);
     }
 
@@ -152,7 +152,7 @@ class GameEventListenerLiveCheckTest {
 
         listener.onStreamOnline(new StreamOnlineEvent(this, user));
 
-        verify(twitchService).updateChannel(user, binding);
+        verify(twitchService).updateChannelReporting(user, binding);
         verify(twitchService, never()).resetToDefault(any());
         verify(streamStateService).clearPending(user);
     }
@@ -198,7 +198,7 @@ class GameEventListenerLiveCheckTest {
         listener.onNoGameDetected(new NoGameDetectedEvent(this, user));
 
         verify(userSettingsRepository, never()).findById(any());
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
     }
 
     @Test
@@ -221,7 +221,7 @@ class GameEventListenerLiveCheckTest {
 
         listener.onNoGameDetected(new NoGameDetectedEvent(this, user));
 
-        verify(twitchService).updateChannel(eq(user), any(GameBinding.class));
+        verify(twitchService).updateChannelReporting(eq(user), any(GameBinding.class));
     }
 
     @Test
@@ -236,7 +236,7 @@ class GameEventListenerLiveCheckTest {
 
         listener.onNoGameDetected(new NoGameDetectedEvent(this, user));
 
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
     }
 
     @Test
@@ -253,7 +253,7 @@ class GameEventListenerLiveCheckTest {
         DetectedGame game = new DetectedGame("g1", GameBinding.SourceType.STEAM, "Unknown Game");
         listener.onGameDetected(new GameDetectedEvent(this, user, game));
 
-        verify(twitchService).updateChannel(eq(user), any(GameBinding.class));
+        verify(twitchService).updateChannelReporting(eq(user), any(GameBinding.class));
         verify(streamStateService, never()).storePending(any(), any());
     }
 
@@ -272,7 +272,7 @@ class GameEventListenerLiveCheckTest {
         listener.onGameDetected(new GameDetectedEvent(this, user, game));
 
         verify(streamStateService).storePending(eq(user), any(GameBinding.class));
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
     }
 
     @Test
@@ -287,7 +287,7 @@ class GameEventListenerLiveCheckTest {
         DetectedGame game = new DetectedGame("g1", GameBinding.SourceType.STEAM, "Unknown Game");
         listener.onGameDetected(new GameDetectedEvent(this, user, game));
 
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
         verify(streamStateService, never()).storePending(any(), any());
     }
 
@@ -300,7 +300,7 @@ class GameEventListenerLiveCheckTest {
         DetectedGame game = new DetectedGame("g1", GameBinding.SourceType.STEAM, "Unknown Game");
         listener.onGameDetected(new GameDetectedEvent(this, user, game));
 
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
         verify(streamStateService, never()).storePending(any(), any());
     }
 
@@ -317,7 +317,7 @@ class GameEventListenerLiveCheckTest {
 
         listener.onGameDetected(new GameDetectedEvent(this, user, new DetectedGame("g1", GameBinding.SourceType.STEAM, "Ignored Game")));
 
-        verify(twitchService).updateChannel(eq(user), any(GameBinding.class));
+        verify(twitchService).updateChannelReporting(eq(user), any(GameBinding.class));
     }
 
     @Test
@@ -333,7 +333,7 @@ class GameEventListenerLiveCheckTest {
 
         listener.onGameDetected(new GameDetectedEvent(this, user, new DetectedGame("g1", GameBinding.SourceType.STEAM, "Ignored Game")));
 
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
     }
 
     @Test
@@ -348,7 +348,7 @@ class GameEventListenerLiveCheckTest {
 
         listener.onGameDetected(new GameDetectedEvent(this, user, new DetectedGame("g1", GameBinding.SourceType.STEAM, "Ignored Game")));
 
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
     }
 
     @Test
@@ -360,7 +360,7 @@ class GameEventListenerLiveCheckTest {
         listener.onGameDetected(new GameDetectedEvent(this, user, new DetectedGame("g1", GameBinding.SourceType.STEAM, "Ignored Game")));
 
         verify(userSettingsRepository, never()).findById(any());
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
     }
 
     @Test
@@ -372,7 +372,7 @@ class GameEventListenerLiveCheckTest {
 
         listener.onGameDetected(new GameDetectedEvent(this, user, new DetectedGame("g1", GameBinding.SourceType.STEAM, "Ignored Game")));
 
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
     }
 
     @Test
@@ -387,7 +387,7 @@ class GameEventListenerLiveCheckTest {
 
         listener.onNoGameDetected(new NoGameDetectedEvent(this, user));
 
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
     }
 
     @Test
@@ -396,7 +396,6 @@ class GameEventListenerLiveCheckTest {
         when(twitchService.updateChannelReporting(user, binding)).thenReturn(ChannelUpdateOutcome.FAILED);
 
         assertThat(listener.applyBindingIfLive(user, binding)).isEqualTo(ChannelUpdateOutcome.FAILED);
-        verify(twitchService, never()).updateChannel(any(), any());
     }
 
     @Test

@@ -102,10 +102,10 @@ public class GameEventListener {
         return apply(user, binding, false, b -> twitchService.updateChannelReporting(user, b));
     }
 
-    /** The detection's own push: {@link TwitchService#updateChannel}, whose outcome nobody reads. */
+    /** The detection's own push: {@link TwitchService#updateChannelReporting}, whose outcome nobody reads. */
     private Function<GameBinding, ChannelUpdateOutcome> updateChannel(UserAccount user) {
         return b -> {
-            twitchService.updateChannel(user, b);
+            twitchService.updateChannelReporting(user, b);
             return ChannelUpdateOutcome.APPLIED;
         };
     }
@@ -161,7 +161,7 @@ public class GameEventListener {
             // when the binding is deactivated
             log.debug("Custom binding {} active for user {} — re-applied at stream start",
                 active.get().getCustomBinding().getId(), user.getId());
-            twitchService.updateChannel(user, active.get().getCustomBinding().toGameBinding(user));
+            twitchService.updateChannelReporting(user, active.get().getCustomBinding().toGameBinding(user));
             return;
         }
         boolean applyDefault = userSettingsRepository.findById(user.getId())
@@ -174,7 +174,7 @@ public class GameEventListener {
         }
         Optional<GameBinding> pending = streamStateService.getPending(user);
         if (pending.isPresent()) {
-            twitchService.updateChannel(user, pending.get());
+            twitchService.updateChannelReporting(user, pending.get());
             streamStateService.clearPending(user);
         }
     }

@@ -98,7 +98,7 @@ class BindingServiceTest {
     void updateBinding_callsTwitchUpdateChannel() {
         bindingService.updateBinding(user, bindingId, "new-id", "New Game", Set.of(), false);
 
-        verify(twitchService).updateChannel(user, binding);
+        verify(twitchService).updateChannelReporting(user, binding);
     }
 
     @Test
@@ -138,7 +138,7 @@ class BindingServiceTest {
         assertThat(binding.getTwitchGameName()).isEqualTo("New Game");
         assertThat(binding.getStatus()).isEqualTo(GameBinding.Status.MANUAL);
         verify(gameBindingRepository).save(binding);
-        verify(twitchService).updateChannel(user, binding);
+        verify(twitchService).updateChannelReporting(user, binding);
     }
 
     @Test
@@ -170,7 +170,7 @@ class BindingServiceTest {
         bindingService.toggleCclEnabled(user, bindingId, false);
 
         assertThat(binding.isCclEnabled()).isFalse();
-        verify(twitchService).updateChannel(user, binding);
+        verify(twitchService).updateChannelReporting(user, binding);
     }
 
     @Test
@@ -180,7 +180,7 @@ class BindingServiceTest {
         bindingService.toggleIgnored(user, bindingId, true);
 
         assertThat(binding.isIgnored()).isTrue();
-        verify(twitchService).updateChannel(user, binding);
+        verify(twitchService).updateChannelReporting(user, binding);
     }
 
     @Test
@@ -426,6 +426,6 @@ class BindingServiceTest {
         assertThat(binding.getTws()).containsExactly("violence_graphic");
         assertThat(binding.isTwOverride()).isTrue();
         verify(gameBindingRepository).save(binding);
-        verify(twitchService).updateChannel(user, binding);
+        verify(twitchService).updateChannelReporting(user, binding);
     }
 }
