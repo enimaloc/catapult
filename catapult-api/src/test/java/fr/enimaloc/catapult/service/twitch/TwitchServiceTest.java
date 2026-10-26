@@ -826,13 +826,64 @@ class TwitchServiceTest {
     }
 
     @Test
-    void updateChannel_twitchError_isObservedAsASuccess() {
+    void updateChannel_twitchError_isObservedAsAnError() {
         doThrow(new HttpServerErrorException(HttpStatus.INTERNAL_SERVER_ERROR)).when(responseSpec).toBodilessEntity();
 
+        assertThat(twitchService.updateChannelReporting(user, binding(GameBinding.Status.AUTO, false, true, Set.of())))
+            .isEqualTo(ChannelUpdateOutcome.FAILED);
+
+        assertThat(timer("update_channel", "success")).isNull();
+        assertThat(meters.find(ExternalApiObservations.METRIC).tags("api", "twitch", "operation", "update_channel",
+            "outcome", "error", "error", "HttpServerErrorException", "status", "500").timer()).isNotNull();
+    }
+
+    @Test
+    void updateChannel_rateLimited_isObservedAsAnError() {
+        doThrow(new HttpClientErrorException(HttpStatus.TOO_MANY_REQUESTS)).when(responseSpec).toBodilessEntity();
+
+        assertThat(twitchService.updateChannelReporting(user, binding(GameBinding.Status.AUTO, false, true, Set.of())))
+            .isEqualTo(ChannelUpdateOutcome.FAILED);
+
+        assertThat(meters.find(ExternalApiObservations.METRIC).tags("api", "twitch", "operation", "update_channel",
+            "outcome", "error", "status", "429").timer()).isNotNull();
+    }
+
+    @Test
+    void updateChannel_on401_refreshFails_isObservedAsAnError() {
+        doThrow(new HttpClientErrorException(HttpStatus.UNAUTHORIZED)).when(responseSpec).toBodilessEntity();
+
+        assertThat(twitchService.updateChannelReporting(user, binding(GameBinding.Status.AUTO, false, true, Set.of())))
+            .isEqualTo(ChannelUpdateOutcome.FAILED);
+
+        verify(botToggleService).setBotEnabled(user, false);
+        assertThat(meters.find(ExternalApiObservations.METRIC).tags("api", "twitch", "operation", "update_channel",
+            "outcome", "error", "error", "HttpClientErrorException", "status", "401").timer()).isNotNull();
+    }
+
+    @Test
+    void updateChannel_unexpectedError_isObservedAsAnError_andNotThrown() {
+        doThrow(new IllegalStateException("network down")).when(responseSpec).toBodilessEntity();
+
+        assertThat(twitchService.updateChannelReporting(user, binding(GameBinding.Status.AUTO, false, true, Set.of())))
+            .isEqualTo(ChannelUpdateOutcome.FAILED);
+
+        assertThat(timer("update_channel", "error")).isNotNull();
+    }
+
+    @Test
+    void updateChannel_accepted_isObservedAsASuccess() {
         twitchService.updateChannelReporting(user, binding(GameBinding.Status.AUTO, false, true, Set.of()));
 
         assertThat(timer("update_channel", "success")).isNotNull();
         assertThat(timer("update_channel", "error")).isNull();
+    }
+
+    @Test
+    void updateChannel_repositoryFailure_stillPropagates() {
+        when(userSettingsRepository.findById(any())).thenThrow(new IllegalStateException("database down"));
+
+        assertThrows(IllegalStateException.class, () ->
+            twitchService.updateChannelReporting(user, binding(GameBinding.Status.AUTO, false, true, Set.of())));
     }
 
     @Test
