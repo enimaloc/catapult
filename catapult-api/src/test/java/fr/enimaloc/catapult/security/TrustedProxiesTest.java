@@ -4,18 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import fr.enimaloc.catapult.FullContextContainers;
 import fr.enimaloc.catapult.FullContextTestBase;
+import fr.enimaloc.catapult.RawHttp;
+import fr.enimaloc.catapult.RawHttp.RawResponse;
 import jakarta.servlet.http.HttpServletRequest;
-import java.io.ByteArrayOutputStream;
-import java.io.InputStream;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.Socket;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -54,23 +49,21 @@ class TrustedProxiesTest extends FullContextTestBase {
         }
     }
 
-    record RawResponse(int status, Map<String, String> headers, String body) {}
-
     @Test
     void privateClientForgingLoopbackIsNotAdmin() throws Exception {
         RawResponse response =
-                rawGet("127.0.0.2", "/api/internal/admin/flags", Map.of("X-Forwarded-For", "127.0.0.1"));
+                RawHttp.get(port, "127.0.0.2", "/api/internal/admin/flags", Map.of("X-Forwarded-For", "127.0.0.1"));
         assertThat(response.status()).isEqualTo(401);
     }
 
     @Test
     void privateClientIsNotLoopback() throws Exception {
-        assertThat(rawGet("127.0.0.2", "/api/internal/admin/flags", Map.of()).status()).isEqualTo(401);
+        assertThat(RawHttp.get(port, "127.0.0.2", "/api/internal/admin/flags", Map.of()).status()).isEqualTo(401);
     }
 
     @Test
     void untrustedForwardedHostIsIgnored() throws Exception {
-        RawResponse response = rawGet(
+        RawResponse response = RawHttp.get(port, 
                 "127.0.0.2", ECHO, Map.of("X-Forwarded-Host", "evil.example", "X-Forwarded-Proto", "https"));
         assertThat(response.status()).isEqualTo(200);
         assertThat(response.body()).doesNotContain("evil.example").startsWith("http|").endsWith("|127.0.0.2");
@@ -124,35 +117,5 @@ class TrustedProxiesTest extends FullContextTestBase {
             }
         }
         throw new IllegalStateException(variable + " default not found in " + compose);
-    }
-
-    private RawResponse rawGet(String fromAddress, String path, Map<String, String> headers) throws Exception {
-        try (Socket socket = new Socket()) {
-            socket.bind(new InetSocketAddress(InetAddress.getByName(fromAddress), 0));
-            socket.connect(new InetSocketAddress(InetAddress.getByName("127.0.0.1"), port), 5000);
-            socket.setSoTimeout(10000);
-            StringBuilder request = new StringBuilder("GET " + path + " HTTP/1.1\r\nHost: 127.0.0.1:" + port + "\r\n");
-            headers.forEach((name, value) -> request.append(name).append(": ").append(value).append("\r\n"));
-            request.append("Connection: close\r\n\r\n");
-            socket.getOutputStream().write(request.toString().getBytes(StandardCharsets.UTF_8));
-            socket.getOutputStream().flush();
-            ByteArrayOutputStream raw = new ByteArrayOutputStream();
-            InputStream in = socket.getInputStream();
-            in.transferTo(raw);
-            String text = raw.toString(StandardCharsets.UTF_8);
-            int split = text.indexOf("\r\n\r\n");
-            String head = split < 0 ? text : text.substring(0, split);
-            String body = split < 0 ? "" : text.substring(split + 4);
-            String[] lines = head.split("\r\n");
-            int status = Integer.parseInt(lines[0].split(" ")[1]);
-            Map<String, String> parsed = new LinkedHashMap<>();
-            for (int i = 1; i < lines.length; i++) {
-                int colon = lines[i].indexOf(':');
-                if (colon > 0) {
-                    parsed.put(lines[i].substring(0, colon).trim().toLowerCase(), lines[i].substring(colon + 1).trim());
-                }
-            }
-            return new RawResponse(status, parsed, body.trim());
-        }
     }
 }
