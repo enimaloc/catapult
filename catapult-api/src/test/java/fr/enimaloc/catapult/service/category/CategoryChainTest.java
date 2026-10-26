@@ -135,6 +135,7 @@ class CategoryChainTest {
     @Test
     void gameDetected_ignored_isTheNoGameFallback() {
         binding.setIgnored(true);
+        settings.getNoGameCcls().add("Gambling");
         live(true);
         withSettings();
 
@@ -153,7 +154,21 @@ class CategoryChainTest {
         assertThat(sent.getTwitchGameId()).isEqualTo("509658");
         assertThat(sent.getTwitchGameName()).isEqualTo("Just Chatting");
         assertThat(sent.getStatus()).isEqualTo(GameBinding.Status.MANUAL);
+        // The configured "no game" CCLs, as the reset sends them
+        assertThat(sent.getCcls()).containsExactly("Gambling");
+        assertThat(sent.isCclEnabled()).isTrue();
+    }
+
+    @Test
+    void noGameFallback_withoutNoGameCcls_sendsNoCclPayload() {
+        live(true);
+        withSettings();
+
+        GameBinding sent = chain.decide(user, new GameClosed()).binding();
+
+        // Like the reset: an empty set leaves the channel's CCLs as they are
         assertThat(sent.getCcls()).isEmpty();
+        assertThat(sent.isCclEnabled()).isFalse();
     }
 
     @Test
@@ -525,11 +540,14 @@ class CategoryChainTest {
         withSettings();
         settings.setApplyDefaultOnNoGame(true);
 
+        settings.getNoGameCcls().add("Gambling");
+
         CategoryDecision decision = chain.decide(user, new MappingChanged(binding));
 
         assertThat(decision.action()).isEqualTo(Action.UPDATE_CHANNEL);
         assertThat(decision.rule()).isEqualTo(CategoryRule.NO_GAME_FALLBACK);
         assertThat(decision.binding().getSourceName()).isEqualTo(CategoryChain.NO_GAME_FALLBACK_SOURCE);
+        assertThat(decision.binding().getCcls()).containsExactly("Gambling");
     }
 
     @Test
