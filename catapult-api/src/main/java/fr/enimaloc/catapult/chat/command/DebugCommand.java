@@ -30,21 +30,21 @@ import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 /**
- * !debug [path] — Affiche la valeur résolue de tous les placeholders connus
- * (ou d'un seul si précisé) contre le GameContext courant du channel.
+ * !debug [path] — Shows the resolved value of every known placeholder
+ * (or of a single one if given) against the channel's current GameContext.
  * <p>
- * !debug tpl &lt;template text&gt; — parse/compile/exécute un template DSL à la volée à travers
- * le même pipeline sandboxé qu'une {@link fr.enimaloc.catapult.chat.DynamicChatCommand} réelle,
- * sans avoir à créer une {@link fr.enimaloc.catapult.domain.chatcommand.ChatCommandDefinition} au préalable.
+ * !debug tpl &lt;template text&gt; — parses/compiles/runs a DSL template on the fly through
+ * the same sandboxed pipeline as a real {@link fr.enimaloc.catapult.chat.DynamicChatCommand},
+ * without having to create a {@link fr.enimaloc.catapult.domain.chatcommand.ChatCommandDefinition} first.
  * <p>
- * !debug js &lt;code&gt; — évalue du JS brut avec un accès host COMPLET (non sandboxé) : sûr
- * uniquement parce que {@link #isOwnerOnly()} garantit qu'aucun autre utilisateur que l'owner
- * de l'application ne peut jamais atteindre {@link #execute}.
+ * !debug js &lt;code&gt; — evaluates raw JS with FULL host access (not sandboxed): safe
+ * only because {@link #isOwnerOnly()} guarantees that no user other than the application
+ * owner can ever reach {@link #execute}.
  * <p>
- * Réservée à l'owner de l'application ({@code isOwnerOnly}). Volontairement
- * absente du {@code ChatCommandPresetCatalog} et sans lookup de
- * {@code ChatCommandDefinition} : invisible dans l'UI streamer et
- * non-désactivable.
+ * Reserved to the application owner ({@code isOwnerOnly}). Deliberately
+ * absent from the {@code ChatCommandPresetCatalog} and with no
+ * {@code ChatCommandDefinition} lookup: invisible in the streamer UI and
+ * not disableable.
  */
 @Component
 @RequiredArgsConstructor
@@ -90,7 +90,7 @@ public class DebugCommand implements ChatCommand {
         }
 
         GameContext ctx = gameContextService.get(user).orElse(GameContext.empty());
-        // Même locale figée que DynamicCommandResolver (pas de locale par user).
+        // Same fixed locale as DynamicCommandResolver (no per-user locale).
         Locale locale = Locale.FRANCE;
 
         if (!args.isEmpty()) {

@@ -7,11 +7,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /**
- * Garantit que l'experiment qui gate les commandes chat data-driven est connu
- * du système au démarrage. La création (DRAFT + variants control/enabled +
- * poids par défaut) est déléguée à {@link ExperimentService#ensureExists} —
- * c'est l'admin qui ajuste statut, poids, règles et overrides via
- * {@code /admin/experiments}.
+ * Makes sure the experiment gating the data-driven chat commands is known to the system at
+ * startup. Creating it (DRAFT + control/enabled variants + default weights) is delegated to
+ * {@link ExperimentService#ensureExists}; the admin then adjusts status, weights, rules and
+ * overrides through {@code /admin/experiments}.
  */
 @Slf4j
 @Component

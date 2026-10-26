@@ -26,8 +26,8 @@ import java.util.Map;
  * in JavaScript, and serves the block/dropdown catalog so the server stays the single source
  * of truth for what a streamer can build — the client never hardcodes known context paths or
  * service functions, it renders whatever this endpoint reports. Also renders the read-only
- * "JS généré" tab's content (Phase 1 scope only — see design spec's Block Editor section:
- * editing the generated JS is explicitly Phase 2, reserved behind the disabled "Éjecter" button).
+ * generated-JS tab's content (Phase 1 scope only — see design spec's Block Editor section:
+ * editing the generated JS is explicitly Phase 2, reserved behind the disabled eject button).
  */
 @RestController
 @RequiredArgsConstructor
@@ -68,7 +68,7 @@ public class ApiChatCommandDslController {
         }
     }
 
-    /** Backs the read-only "JS généré" tab — same compiler used at actual dispatch time. */
+    /** Backs the read-only generated-JS tab — same compiler used at actual dispatch time. */
     @PostMapping(ApiPaths.INTERNAL + "/chat-command-dsl/ast-to-js")
     public Map<String, String> astToJs(@RequestBody Map<String, String> body) {
         try {
