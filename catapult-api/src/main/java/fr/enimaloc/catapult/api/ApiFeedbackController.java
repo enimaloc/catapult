@@ -3,8 +3,7 @@ package fr.enimaloc.catapult.api;
 import fr.enimaloc.catapult.common.dto.SubmitRequest;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.feedback.FeedbackSubmission;
-import fr.enimaloc.catapult.repository.feedback.FeedbackSubmissionRepository;
-import fr.enimaloc.catapult.service.feedback.GitLabClient;
+import fr.enimaloc.catapult.service.feedback.FeedbackService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -30,15 +29,14 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ApiFeedbackController {
 
-    private final FeedbackSubmissionRepository repository;
+    private final FeedbackService feedback;
     private final ApiUserResolver userResolver;
-    private final GitLabClient gitLabClient;
 
     @PreAuthorize("@authz.isSelf(#userId)")
     @GetMapping
     public List<FeedbackSubmission> list(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt) {
         UserAccount user = userResolver.viewer(jwt);
-        return repository.findByUserOrderByCreatedAtDesc(user);
+        return feedback.list(user);
     }
 
     @PreAuthorize("@authz.isSelf(#userId)")
@@ -57,47 +55,14 @@ public class ApiFeedbackController {
         }
 
         UserAccount user = userResolver.viewer(jwt);
-        String label = feedbackType == FeedbackSubmission.Type.BUG ? "bug" : "enhancement";
-        String issueBody = buildIssueBody(user, body.description());
-
-        GitLabClient.CreatedIssue created = gitLabClient.createIssue(body.title().strip(), issueBody, List.of(label, "user-submitted"));
-
-        FeedbackSubmission submission = new FeedbackSubmission();
-        submission.setUser(user);
-        submission.setType(feedbackType);
-        submission.setTitle(body.title().strip());
-        submission.setDescription(strippedOrNull(body.description()));
-        submission.setGitlabIssueIid(created.iid());
-        submission.setGitlabIssueUrl(created.webUrl());
-        submission.setLastKnownUpdatedAt(created.updatedAt());
-        repository.save(submission);
-
-        log.info("Feedback submitted by user {}: {} #{}", user.getId(), feedbackType, created.iid());
-        return submission;
+        return feedback.submit(user, body.title(), feedbackType, body.description());
     }
 
     @PreAuthorize("@authz.isSelf(#userId)")
     @DeleteMapping("/{id}/subscription")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void unsubscribe(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
-        FeedbackSubmission submission = repository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         UserAccount user = userResolver.viewer(jwt);
-        if (!submission.getUser().getId().equals(user.getId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
-        }
-        submission.setSubscribed(false);
-        repository.save(submission);
-    }
-
-    /** The description (if any) followed by a signature naming the submitter. */
-    private static String buildIssueBody(UserAccount user, String description) {
-        String text = strippedOrNull(description);
-        String body = text != null ? text + "\n\n" : "";
-        return body + "---\n*Soumis par @" + user.getTwitchUsername() + " via Catapult*";
-    }
-
-    private static String strippedOrNull(String text) {
-        return text != null && !text.isBlank() ? text.strip() : null;
+        feedback.unsubscribe(user, id);
     }
 }

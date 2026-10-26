@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.api.provider;
 
+import fr.enimaloc.catapult.service.provider.RawProviderResponseSupport;
+import fr.enimaloc.catapult.service.provider.SteamRawQueries;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,13 +26,15 @@ class ApiAdminProviderSteamControllerTest {
     @Mock private RestClient.RequestHeadersUriSpec getSpec;
     @Mock private RestClient.ResponseSpec responseSpec;
 
-    @InjectMocks private ApiAdminProviderSteamController controller;
+    @InjectMocks private SteamRawQueries queries;
+    private ApiAdminProviderSteamController controller;
     private final RawProviderResponseSupport rawSupport =
             new RawProviderResponseSupport(new com.fasterxml.jackson.databind.ObjectMapper());
 
     @BeforeEach
     void setup() {
-        org.springframework.test.util.ReflectionTestUtils.setField(controller, "rawSupport", rawSupport);
+        controller = new ApiAdminProviderSteamController(queries);
+        org.springframework.test.util.ReflectionTestUtils.setField(queries, "rawSupport", rawSupport);
         doReturn(getSpec).when(restClient).get();
         doReturn(getSpec).when(getSpec).uri(any(String.class));
         doReturn(responseSpec).when(getSpec).retrieve();

@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.api.provider;
 
+import fr.enimaloc.catapult.service.provider.RawProviderResponseSupport;
+import fr.enimaloc.catapult.service.provider.GitLabRawQueries;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,16 +27,18 @@ class ApiAdminProviderGitLabControllerTest {
     @Mock private RestClient.RequestHeadersSpec headersSpec;
     @Mock private RestClient.ResponseSpec responseSpec;
 
-    @InjectMocks private ApiAdminProviderGitLabController controller;
+    @InjectMocks private GitLabRawQueries queries;
+    private ApiAdminProviderGitLabController controller;
     private final RawProviderResponseSupport rawSupport =
             new RawProviderResponseSupport(new com.fasterxml.jackson.databind.ObjectMapper());
 
     @BeforeEach
     void setup() {
-        ReflectionTestUtils.setField(controller, "rawSupport", rawSupport);
-        ReflectionTestUtils.setField(controller, "baseUrl", "https://git.enimaloc.fr");
-        ReflectionTestUtils.setField(controller, "token", "glpat-test");
-        ReflectionTestUtils.setField(controller, "projectId", "1");
+        controller = new ApiAdminProviderGitLabController(queries);
+        ReflectionTestUtils.setField(queries, "rawSupport", rawSupport);
+        ReflectionTestUtils.setField(queries, "baseUrl", "https://git.enimaloc.fr");
+        ReflectionTestUtils.setField(queries, "token", "glpat-test");
+        ReflectionTestUtils.setField(queries, "projectId", "1");
         doReturn(getSpec).when(restClient).get();
         doReturn(headersSpec).when(getSpec).uri(any(String.class));
         doReturn(headersSpec).when(headersSpec).header(any(), any());

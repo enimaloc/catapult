@@ -47,20 +47,7 @@ class ControllerConventionsTest {
   /** Today's violations, to be emptied by moving the code into services. */
   static final Set<String> LEGACY =
       Set.of(
-          "ApiAdminProviderGitLabController depends on RestClient",
-          "ApiAdminProviderIgdbController depends on RestClient",
-          "ApiAdminProviderMinecraftController depends on MinecraftServiceAccountRepository",
-          "ApiAdminProviderMinecraftController depends on RestClient",
-          "ApiAdminProviderSteamController depends on RestClient",
-          "ApiAdminProviderTwitchController depends on OAuthTokenRepository",
-          "ApiAdminProviderTwitchController depends on RestClient",
-          "ApiAdminProviderTwitchController depends on UserAccountRepository",
-          "ApiAdminProviderXboxController depends on RestClient",
-          "ApiAdminProviderXboxController depends on UserAccountRepository",
           "ApiChannelAccessController depends on UserAccountRepository",
-          "ApiDevIgdbController depends on RestClient",
-          "ApiFeedbackController depends on FeedbackSubmissionRepository",
-          "ApiFeedbackController depends on GitLabClient",
           "ApiHelpController depends on UserAccountRepository",
           "ApiSeenFeaturesController depends on SeenFeatureRepository",
           "ApiSeenFeaturesController#markSeen is @Transactional",

@@ -1,9 +1,8 @@
 package fr.enimaloc.catapult.api.provider;
 
 import fr.enimaloc.catapult.api.ApiPaths;
-import fr.enimaloc.catapult.domain.account.UserAccount;
-import fr.enimaloc.catapult.repository.account.UserAccountRepository;
-import fr.enimaloc.catapult.service.xbox.XboxUserTokenService;
+import fr.enimaloc.catapult.service.provider.RawProviderResponseSupport;
+import fr.enimaloc.catapult.service.provider.XboxRawQueries;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
@@ -12,10 +11,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.client.RestClient;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.net.URI;
 import java.util.Set;
 import java.util.UUID;
 
@@ -26,13 +23,9 @@ import java.util.UUID;
 @ConditionalOnBooleanProperty("xbox.enabled")
 public class ApiAdminProviderXboxController {
 
-    private static final String PRESENCE_URL = "https://userpresence.xboxlive.com/users/xuid(";
     private static final Set<String> VALID_LEVELS = Set.of("user", "device", "title", "all");
 
-    private final XboxUserTokenService tokenService;
-    private final UserAccountRepository userAccountRepository;
-    private final RestClient restClient;
-    private final RawProviderResponseSupport rawSupport;
+    private final XboxRawQueries queries;
 
     @GetMapping("/presence")
     public RawProviderResponseSupport.RawProviderResponse presence(
@@ -42,17 +35,6 @@ public class ApiAdminProviderXboxController {
         if (!VALID_LEVELS.contains(normalizedLevel)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid Xbox level: " + level);
         }
-
-        UserAccount user = userAccountRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown user"));
-        XboxUserTokenService.XstsSession session = tokenService.getToken(user)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No Xbox session for this user"));
-
-        return rawSupport.fetch(() -> restClient.get()
-                .uri(URI.create(PRESENCE_URL + session.xuid() + ")?level=" + normalizedLevel))
-                .header("Authorization", "XBL3.0 x=" + session.userHash() + ";" + session.token())
-                .header("x-xbl-contract-version", "3")
-                .retrieve()
-                .body(String.class));
+        return queries.presence(userId, normalizedLevel);
     }
 }

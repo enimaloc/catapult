@@ -1,4 +1,4 @@
-package fr.enimaloc.catapult.api.provider;
+package fr.enimaloc.catapult.service.provider;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;

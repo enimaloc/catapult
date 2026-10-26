@@ -1,24 +1,16 @@
 package fr.enimaloc.catapult.api.provider;
 
 import fr.enimaloc.catapult.api.ApiPaths;
-import fr.enimaloc.catapult.domain.minecraft.MinecraftServiceAccount;
-import fr.enimaloc.catapult.repository.minecraft.MinecraftServiceAccountRepository;
-import fr.enimaloc.catapult.service.minecraft.MinecraftService;
-import fr.enimaloc.catapult.service.minecraft.MinecraftTokenService;
+import fr.enimaloc.catapult.service.provider.MinecraftRawQueries;
+import fr.enimaloc.catapult.service.provider.RawProviderResponseSupport;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.client.RestClient;
-import org.springframework.web.server.ResponseStatusException;
-import org.springframework.web.util.UriComponentsBuilder;
 
-import java.net.URI;
 import java.util.UUID;
 
 @Slf4j
@@ -28,44 +20,21 @@ import java.util.UUID;
 @ConditionalOnBooleanProperty("minecraft.enabled")
 public class ApiAdminProviderMinecraftController {
 
-    private final MinecraftTokenService tokenService;
-    private final MinecraftServiceAccountRepository accountRepository;
-    private final RestClient restClient;
-    private final RawProviderResponseSupport rawSupport;
+    private final MinecraftRawQueries queries;
 
     @GetMapping("/profile-lookup")
     public RawProviderResponseSupport.RawProviderResponse profileLookup(@RequestParam String name) {
-        return rawSupport.fetch(() -> restClient.get()
-                .uri(UriComponentsBuilder
-                        .fromUriString(MinecraftService.MINECRAFT_SERVICE_URL)
-                        .path("/minecraft/profile/lookup/name/{name}")
-                        .buildAndExpand(name)
-                        .toUri())
-                .accept(MediaType.APPLICATION_JSON)
-                .retrieve()
-                .body(String.class));
+        return queries.profileLookup(name);
     }
 
     @GetMapping("/friends")
     public RawProviderResponseSupport.RawProviderResponse friends(@RequestParam UUID accountId) {
-        String token = resolveAccountToken(accountId);
-        return rawSupport.fetch(() -> restClient.get()
-                .uri(URI.create(MinecraftService.MINECRAFT_SERVICE_URL + "/friends"))
-                .header("Authorization", "Bearer " + token)
-                .accept(MediaType.APPLICATION_JSON)
-                .retrieve()
-                .body(String.class));
+        return queries.friends(accountId);
     }
 
     @GetMapping("/profile")
     public RawProviderResponseSupport.RawProviderResponse profile(@RequestParam UUID accountId) {
-        String token = resolveAccountToken(accountId);
-        return rawSupport.fetch(() -> restClient.get()
-                .uri(URI.create(MinecraftService.MINECRAFT_SERVICE_URL + "/minecraft/profile"))
-                .header("Authorization", "Bearer " + token)
-                .accept(MediaType.APPLICATION_JSON)
-                .retrieve()
-                .body(String.class));
+        return queries.profile(accountId);
     }
 
     @GetMapping("/presence")
@@ -73,29 +42,6 @@ public class ApiAdminProviderMinecraftController {
             @RequestParam UUID accountId,
             @RequestParam(defaultValue = "ONLINE") String status,
             @RequestParam(required = false) String activityId) {
-        String token = resolveAccountToken(accountId);
-        MinecraftService.PresenceStatus presenceStatus;
-        try {
-            presenceStatus = MinecraftService.PresenceStatus.valueOf(status.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid presence status: " + status);
-        }
-        var body = new MinecraftService.PresenceUpdate(
-                presenceStatus, new MinecraftService.PresenceUpdate.JoinInfo(activityId, new String[0]));
-        return rawSupport.fetch(() -> restClient.post()
-                .uri(URI.create(MinecraftService.MINECRAFT_SERVICE_URL + "/presence"))
-                .body(body)
-                .header("Authorization", "Bearer " + token)
-                .contentType(MediaType.APPLICATION_JSON)
-                .accept(MediaType.APPLICATION_JSON)
-                .retrieve()
-                .body(String.class));
-    }
-
-    private String resolveAccountToken(UUID accountId) {
-        MinecraftServiceAccount account = accountRepository.findById(accountId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown Minecraft service account"));
-        return tokenService.getToken(account)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No Minecraft token for this account"));
+        return queries.presence(accountId, status, activityId);
     }
 }
