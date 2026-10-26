@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.provider;
 
+import fr.enimaloc.catapult.api.ApiPaths;
 import fr.enimaloc.catapult.domain.minecraft.MinecraftServiceAccount;
 import fr.enimaloc.catapult.repository.minecraft.MinecraftServiceAccountRepository;
 import fr.enimaloc.catapult.service.minecraft.MinecraftService;
@@ -22,7 +23,7 @@ import java.util.UUID;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/admin/providers/minecraft")
+@RequestMapping(ApiPaths.ADMIN + "/providers/minecraft")
 @RequiredArgsConstructor
 @ConditionalOnBooleanProperty("minecraft.enabled")
 public class ApiAdminProviderMinecraftController {

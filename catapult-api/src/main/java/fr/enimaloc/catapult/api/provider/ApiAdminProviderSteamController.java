@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.provider;
 
+import fr.enimaloc.catapult.api.ApiPaths;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -10,7 +11,7 @@ import org.springframework.web.client.RestClient;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/admin/providers/steam")
+@RequestMapping(ApiPaths.ADMIN + "/providers/steam")
 @RequiredArgsConstructor
 public class ApiAdminProviderSteamController {
 

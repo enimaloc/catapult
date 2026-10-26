@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.admin;
 
+import fr.enimaloc.catapult.api.ApiPaths;
 import fr.enimaloc.catapult.chat.DynamicCommandResolver;
 import fr.enimaloc.catapult.chat.TwPlaceholderRegistry;
 import fr.enimaloc.catapult.common.dto.admin.CacheEntryDetailDto;
@@ -42,7 +43,7 @@ import java.util.UUID;
  * app. This lets an admin inspect and selectively evict individual entries instead.
  */
 @RestController
-@RequestMapping("/api/admin/caches")
+@RequestMapping(ApiPaths.ADMIN + "/caches")
 @RequiredArgsConstructor
 public class ApiAdminCacheController {
 

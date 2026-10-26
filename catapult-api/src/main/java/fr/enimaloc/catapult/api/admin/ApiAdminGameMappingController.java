@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.admin;
 
+import fr.enimaloc.catapult.api.ApiPaths;
 import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.common.dto.admin.DetectedGameDto;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingDto;
@@ -25,7 +26,7 @@ import java.util.UUID;
  * detected games still missing one, and the lookups of the mapping form (detected games, Twitch categories).
  */
 @RestController
-@RequestMapping("/api/admin/game-mappings")
+@RequestMapping(ApiPaths.ADMIN + "/game-mappings")
 @RequiredArgsConstructor
 public class ApiAdminGameMappingController {
 

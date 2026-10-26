@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.admin;
 
+import fr.enimaloc.catapult.api.ApiPaths;
 import fr.enimaloc.catapult.common.dto.admin.MetaTagDto;
 import fr.enimaloc.catapult.common.dto.admin.MetaTagRequest;
 import fr.enimaloc.catapult.service.meta.MetaTagService;
@@ -9,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 
 /** The admin page's meta tag changes; the list is read publicly through {@link fr.enimaloc.catapult.api.ApiMetaTagsController}. */
 @RestController
-@RequestMapping("/api/admin/meta-tags")
+@RequestMapping(ApiPaths.ADMIN + "/meta-tags")
 @RequiredArgsConstructor
 public class ApiAdminMetaTagsController {
     private final MetaTagService service;

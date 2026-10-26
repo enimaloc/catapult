@@ -52,7 +52,7 @@ class ApiAdminWellKnownControllerTest {
     @Test
     void createAnswers201WithTheFile() throws Exception {
         when(service.create(any())).thenReturn(DETAIL);
-        mvc.perform(post("/api/admin/well-known").contentType(MediaType.APPLICATION_JSON).content(BODY))
+        mvc.perform(post("/api/internal/admin/well-known-files").contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(3))
                 .andExpect(jsonPath("$.location").value("WELL_KNOWN"));
@@ -63,7 +63,7 @@ class ApiAdminWellKnownControllerTest {
     @Test
     void createWithoutStatusOrHeaders_isAccepted_forOlderClients() throws Exception {
         when(service.create(any())).thenReturn(DETAIL);
-        mvc.perform(post("/api/admin/well-known").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/api/internal/admin/well-known-files").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"location\":\"WELL_KNOWN\",\"path\":\"a.txt\",\"contentType\":\"text/plain\",\"content\":\"x\"}"))
                 .andExpect(status().isCreated());
         verify(service).create(new WellKnownFileRequest(WELL_KNOWN, "a.txt", null, null, "text/plain", "x"));
@@ -73,24 +73,24 @@ class ApiAdminWellKnownControllerTest {
     void updateGetDelete() throws Exception {
         when(service.update(eq(3L), any())).thenReturn(DETAIL);
         when(service.get(3L)).thenReturn(DETAIL);
-        mvc.perform(put("/api/admin/well-known/3").contentType(MediaType.APPLICATION_JSON).content(BODY))
+        mvc.perform(put("/api/internal/admin/well-known-files/3").contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isOk());
-        mvc.perform(get("/api/admin/well-known/3")).andExpect(jsonPath("$.content").value("x"));
-        mvc.perform(delete("/api/admin/well-known/3")).andExpect(status().isNoContent());
+        mvc.perform(get("/api/internal/admin/well-known-files/3")).andExpect(jsonPath("$.content").value("x"));
+        mvc.perform(delete("/api/internal/admin/well-known-files/3")).andExpect(status().isNoContent());
         verify(service).delete(3L);
     }
 
     @Test
     void relaysTheServicesRefusals() throws Exception {
         when(service.create(any())).thenThrow(new ResponseStatusException(HttpStatus.CONFLICT));
-        mvc.perform(post("/api/admin/well-known").contentType(MediaType.APPLICATION_JSON).content(BODY))
+        mvc.perform(post("/api/internal/admin/well-known-files").contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isConflict());
     }
 
     @Test
     void schemaAnswersSchemaStoresJson() throws Exception {
         when(schemas.schemaFor("gpc.json")).thenReturn(java.util.Optional.of("{\"title\":\"gpc\"}"));
-        mvc.perform(get("/api/admin/well-known/schema").param("path", "gpc.json"))
+        mvc.perform(get("/api/internal/admin/well-known-files/schema").param("path", "gpc.json"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.title").value("gpc"));
     }
@@ -98,7 +98,7 @@ class ApiAdminWellKnownControllerTest {
     @Test
     void schemaIs404WhenThereIsNone() throws Exception {
         when(schemas.schemaFor("x")).thenReturn(java.util.Optional.empty());
-        mvc.perform(get("/api/admin/well-known/schema").param("path", "x"))
+        mvc.perform(get("/api/internal/admin/well-known-files/schema").param("path", "x"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.detail").value("No schema for this path"));
     }
@@ -107,7 +107,7 @@ class ApiAdminWellKnownControllerTest {
     void ianaAnswersTheRegistry() throws Exception {
         when(registry.registry()).thenReturn(new IanaRegistryDto(
                 java.util.List.of(new IanaWellKnownDto("security.txt", "RFC 9116", "permanent", "IETF")), "LIVE"));
-        mvc.perform(get("/api/admin/well-known/iana"))
+        mvc.perform(get("/api/internal/admin/well-known-files/iana"))
                 .andExpect(jsonPath("$.source").value("LIVE"))
                 .andExpect(jsonPath("$.entries[0].suffix").value("security.txt"));
     }

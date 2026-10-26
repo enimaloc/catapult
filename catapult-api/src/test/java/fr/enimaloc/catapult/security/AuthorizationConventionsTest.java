@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Authorization conventions: access rules live in {@link Authz}, admin routes sit under /api/admin or
+ * Authorization conventions: access rules live in {@link Authz}, admin routes sit under
  * /api/internal/admin, and every channel or user route asks {@link Authz} before its body runs.
  */
 class AuthorizationConventionsTest {
@@ -68,7 +68,7 @@ class AuthorizationConventionsTest {
   }
 
   @Test
-  void adminControllersAreUnderApiAdmin() throws ClassNotFoundException {
+  void adminControllersAreUnderTheAdminPrefix() throws ClassNotFoundException {
     List<String> violations = new ArrayList<>();
     for (Class<?> type : scan(RestController.class)) {
       String pkg = type.getPackageName();
@@ -85,7 +85,7 @@ class AuthorizationConventionsTest {
         violations.add(type.getName() + " has no class-level @RequestMapping path");
       }
       for (String path : paths) {
-        if (!path.startsWith("/api/admin/") && !path.startsWith(ApiPaths.ADMIN + "/")) {
+        if (!path.startsWith(ApiPaths.ADMIN + "/")) {
           violations.add(type.getName() + " maps " + path);
         }
       }

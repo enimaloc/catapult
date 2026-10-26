@@ -2,7 +2,7 @@ package fr.enimaloc.catapult.common.dto.admin;
 
 /**
  * The providers whose shared API keys an admin manages: the path segment of catapult-api's
- * {@code /api/admin/{apiPath}} routes, and the {@code steam} / {@code dtdd} one catapult-web uses.
+ * {@code /api/internal/admin/{apiPath}} routes, and the {@code steam} / {@code dtdd} one catapult-web uses.
  */
 public enum ApiKeyProvider {
     STEAM("steam-keys", "steam"),

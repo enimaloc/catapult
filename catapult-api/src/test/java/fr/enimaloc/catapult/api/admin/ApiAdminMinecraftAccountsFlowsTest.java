@@ -95,8 +95,8 @@ class ApiAdminMinecraftAccountsFlowsTest {
                 .setControllerAdvice(new ProblemAdvice())
                 .build();
 
-        for (String path : List.of("/api/admin/minecraft-accounts",
-                "/api/admin/minecraft-accounts/" + account.getId() + "/reauth")) {
+        for (String path : List.of("/api/internal/admin/minecraft-accounts",
+                "/api/internal/admin/minecraft-accounts/" + account.getId() + "/reauth")) {
             mvc.perform(post(path).contentType(MediaType.APPLICATION_JSON).content("{\"deviceCode\":\"dc\"}"))
                     .andExpect(status().isBadRequest())
                     .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
@@ -132,7 +132,7 @@ class ApiAdminMinecraftAccountsFlowsTest {
         when(msa.startDeviceCode()).thenThrow(HttpClientErrorException.create(HttpStatus.BAD_REQUEST, "Bad Request",
                 new HttpHeaders(), "AADSTS70002".getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8));
 
-        mvc().perform(post("/api/admin/minecraft-accounts/device-code"))
+        mvc().perform(post("/api/internal/admin/minecraft-accounts/device-code"))
                 .andExpect(status().isBadGateway())
                 .andExpect(jsonPath("$.code").value("minecraft_device_code_refused"))
                 .andExpect(jsonPath("$.detail").value("Microsoft refused the device code"))
@@ -143,7 +143,7 @@ class ApiAdminMinecraftAccountsFlowsTest {
     void deleteWithLinks_isAccountInUse() throws Exception {
         when(links.findByServiceAccount(account)).thenReturn(List.of(new MinecraftFriendLink()));
 
-        mvc().perform(delete("/api/admin/minecraft-accounts/" + account.getId()))
+        mvc().perform(delete("/api/internal/admin/minecraft-accounts/" + account.getId()))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("minecraft_account_in_use"))
                 .andExpect(jsonPath("$.detail").value("Members are linked to this account"));

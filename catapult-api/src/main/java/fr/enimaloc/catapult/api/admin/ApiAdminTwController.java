@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.admin;
 
+import fr.enimaloc.catapult.api.ApiPaths;
 import fr.enimaloc.catapult.common.dto.admin.AdminTwCreateBody;
 import fr.enimaloc.catapult.common.dto.admin.DtddTopicsBody;
 import fr.enimaloc.catapult.common.dto.admin.IgdbDescriptorsBody;
@@ -33,7 +34,7 @@ import java.util.List;
 import java.util.Set;
 
 @RestController
-@RequestMapping("/api/admin/tw")
+@RequestMapping(ApiPaths.ADMIN + "/tws")
 @RequiredArgsConstructor
 public class ApiAdminTwController {
 

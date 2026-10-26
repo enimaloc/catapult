@@ -133,7 +133,6 @@ public class ApiSecurityConfig {
                         .requestMatchers(ApiPaths.INTERNAL + "/health", ApiPaths.INTERNAL + "/config/**", ApiPaths.INTERNAL + "/changelog", ApiPaths.INTERNAL + "/status/degraded", ApiPaths.INTERNAL + "/well-known-files", ApiPaths.INTERNAL + "/meta-tags", "/api/twitchat/widget/**", "/api/twitchat/actions/**", "/api/game/**", "/api/user/**", "/api/v3/api-docs/**").permitAll()
                         .requestMatchers(ApiPaths.INTERNAL + "/auth/exchange").permitAll()
                         .requestMatchers("/api/connect/steam/callback").permitAll()
-                        .requestMatchers("/api/admin/**").access(Authz.admin())
                         .requestMatchers(ApiPaths.ADMIN + "/**").access(Authz.admin())
                         .anyRequest().access(Authz.memberOrLoopback())
                 )

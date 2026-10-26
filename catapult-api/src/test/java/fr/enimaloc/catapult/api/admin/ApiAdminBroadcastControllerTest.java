@@ -63,7 +63,7 @@ class ApiAdminBroadcastControllerTest {
         when(userRepo.findByTwitchId(any())).thenReturn(Optional.of(admin));
     }
 
-    // Admin access is enforced by the /api/admin/** URL rule (Authz.admin()) in ApiSecurityConfig,
+    // Admin access is enforced by the /api/internal/admin/** URL rule (Authz.admin()) in ApiSecurityConfig,
     // which lives outside the @WebMvcTest slice. It is the only admin gate: the controller carries
     // no annotation. The access matrix covers it.
 

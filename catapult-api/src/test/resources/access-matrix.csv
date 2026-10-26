@@ -130,40 +130,40 @@ GET,/api/internal/users/00000000-0000-0000-0000-00000000dead/settings,,,401,401,
 # admin
 # handler reads the JWT itself: 401 without one
 POST,/api/internal/admin/broadcasts,,"{""name"":""alert.info"",""title"":""matrix"",""body"":""matrix"",""ttlSeconds"":0}",401,401,403,403,403,PASS,401
-GET,/api/admin/caches,,,401,PASS,403,403,403,PASS,401
-DELETE,/api/admin/caches/{name},?key=matrix,,401,PASS,403,403,403,PASS,401
-GET,/api/admin/caches/{name},,,401,PASS,403,403,403,PASS,401
-GET,/api/admin/caches/{name}/entry,?key=matrix,,401,PASS,403,403,403,PASS,401
-GET,/api/admin/ccl,,,401,PASS,403,403,403,PASS,401
-POST,/api/admin/ccl/refresh,,,401,PASS,403,403,403,PASS,401
-POST,/api/admin/ccl/{cclId}/mappings,,,401,PASS,403,403,403,PASS,401
-GET,/api/admin/config,,,401,PASS,403,403,403,PASS,401
-GET,/api/admin/config/audit,?key=matrix,,401,PASS,403,403,403,PASS,401
-GET,/api/admin/config/module/{module},module=matrix,,401,PASS,403,403,403,PASS,401
-GET,/api/admin/config/module/{module}/audit,module=matrix;?key=matrix,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/caches,,,401,PASS,403,403,403,PASS,401
+DELETE,/api/internal/admin/caches/{name},?key=matrix,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/caches/{name},,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/caches/{name}/entry,?key=matrix,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/ccls,,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/ccls/refresh,,,401,PASS,403,403,403,PASS,401
+PUT,/api/internal/admin/ccls/{cclId}/mappings,,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/config,,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/config/audit,?key=matrix,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/config/modules/{module},module=matrix,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/config/modules/{module}/audit,module=matrix;?key=matrix,,401,PASS,403,403,403,PASS,401
 # handler reads the JWT itself: 401 without one
-DELETE,/api/admin/config/module/{module}/{key},module=matrix,,401,401,403,403,403,PASS,401
+DELETE,/api/internal/admin/config/modules/{module}/{key},module=matrix,,401,401,403,403,403,PASS,401
 # handler reads the JWT itself: 401 without one
-PUT,/api/admin/config/module/{module}/{key},module=matrix,,401,401,403,403,403,PASS,401
+PUT,/api/internal/admin/config/modules/{module}/{key},module=matrix,,401,401,403,403,403,PASS,401
 # handler reads the JWT itself: 401 without one
-DELETE,/api/admin/config/{key},,,401,401,403,403,403,PASS,401
+DELETE,/api/internal/admin/config/{key},,,401,401,403,403,403,PASS,401
 # handler reads the JWT itself: 401 without one
-PUT,/api/admin/config/{key},,,401,401,403,403,403,PASS,401
-GET,/api/admin/data,,,401,PASS,403,403,403,PASS,401
-GET,/api/admin/data/{repo},,,401,PASS,403,403,403,PASS,401
-POST,/api/admin/data/{repo},,,401,PASS,403,403,403,PASS,401
-DELETE,/api/admin/data/{repo}/{id},,,401,PASS,403,403,403,PASS,401
-GET,/api/admin/data/{repo}/{id},,,401,PASS,403,403,403,PASS,401
-PUT,/api/admin/data/{repo}/{id},,,401,PASS,403,403,403,PASS,401
-GET,/api/admin/dtdd-keys,,,401,PASS,403,403,403,PASS,401
-POST,/api/admin/dtdd-keys/add,,"{""apiKey"":""matrix""}",401,PASS,403,403,403,PASS,401
-POST,/api/admin/dtdd-keys/delete,,,401,PASS,403,403,403,PASS,401
-POST,/api/admin/dtdd-keys/refresh,,,401,PASS,403,403,403,PASS,401
-GET,/api/admin/dtdd-mapping/proposals,,,401,PASS,403,403,403,PASS,401
+PUT,/api/internal/admin/config/{key},,,401,401,403,403,403,PASS,401
+GET,/api/internal/admin/data,,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/data/{repo},,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/data/{repo},,,401,PASS,403,403,403,PASS,401
+DELETE,/api/internal/admin/data/{repo}/{id},,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/data/{repo}/{id},,,401,PASS,403,403,403,PASS,401
+PUT,/api/internal/admin/data/{repo}/{id},,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/dtdd-keys,,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/dtdd-keys,,"{""apiKey"":""matrix""}",401,PASS,403,403,403,PASS,401
+DELETE,/api/internal/admin/dtdd-keys/{keyId},keyId=matrix,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/dtdd-keys/refresh,,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/dtdd-mapping-proposals,,,401,PASS,403,403,403,PASS,401
 # handler reads the JWT itself: 401 without one
-POST,/api/admin/dtdd-mapping/proposals/{id}/approve,,,401,401,403,403,403,PASS,401
+POST,/api/internal/admin/dtdd-mapping-proposals/{id}/approve,,,401,401,403,403,403,PASS,401
 # handler reads the JWT itself: 401 without one
-POST,/api/admin/dtdd-mapping/proposals/{id}/reject,,,401,401,403,403,403,PASS,401
+POST,/api/internal/admin/dtdd-mapping-proposals/{id}/reject,,,401,401,403,403,403,PASS,401
 GET,/api/internal/admin/experiments,,,401,PASS,403,403,403,PASS,401
 GET,/api/internal/admin/experiments/{id},,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/experiments/{id}/activate,,,401,PASS,403,403,403,PASS,401
@@ -181,22 +181,22 @@ GET,/api/internal/admin/experiments/{id}/settings,,,401,PASS,403,403,403,PASS,40
 PUT,/api/internal/admin/experiments/{id}/variants/weights,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/experiments/{id}/variants/weights/preview,,,401,PASS,403,403,403,PASS,401
 GET,/api/internal/admin/flags,,,401,PASS,403,403,403,PASS,401
-GET,/api/admin/game-mappings,,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/game-mappings,,,401,PASS,403,403,403,PASS,401
 # handler reads the JWT itself: 401 without one
-POST,/api/admin/game-mappings,,"{""applyLive"":false}",401,401,403,403,403,PASS,401
-GET,/api/admin/game-mappings/categories,,,401,PASS,403,403,403,PASS,401
-GET,/api/admin/game-mappings/detected,,,401,PASS,403,403,403,PASS,401
-GET,/api/admin/game-mappings/missing,,,401,PASS,403,403,403,PASS,401
-DELETE,/api/admin/game-mappings/{id},,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/game-mappings,,"{""applyLive"":false}",401,401,403,403,403,PASS,401
+GET,/api/internal/admin/game-mappings/categories,,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/game-mappings/detected,,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/game-mappings/missing,,,401,PASS,403,403,403,PASS,401
+DELETE,/api/internal/admin/game-mappings/{id},,,401,PASS,403,403,403,PASS,401
 # handler reads the JWT itself: 401 without one
-PUT,/api/admin/game-mappings/{id},,"{""applyLive"":false}",401,401,403,403,403,PASS,401
+PUT,/api/internal/admin/game-mappings/{id},,"{""applyLive"":false}",401,401,403,403,403,PASS,401
 GET,/api/internal/admin/groups,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/groups,,,401,PASS,403,403,403,PASS,401
 DELETE,/api/internal/admin/groups/{id},,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/groups/{id}/members,,,401,PASS,403,403,403,PASS,401
 DELETE,/api/internal/admin/groups/{id}/members/{memberId},,,401,PASS,403,403,403,PASS,401
 PATCH,/api/internal/admin/groups/{id},,,401,PASS,403,403,403,PASS,401
-GET,/api/admin/igdb/search,,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/igdb-games,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/impersonations,,,401,401,403,403,403,PASS,401
 GET,/api/internal/admin/invites,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/invites/grants/{memberId},,,401,PASS,403,403,403,PASS,401
@@ -225,69 +225,69 @@ POST,/api/internal/admin/members/{id}/promote-to-system,,,401,PASS,403,403,403,P
 DELETE,/api/internal/admin/members/{id}/links/steam,,,401,PASS,403,403,403,PASS,401
 GET,/api/internal/admin/members/{id}/targeting,,,401,PASS,403,403,403,PASS,401
 DELETE,/api/internal/admin/members/{id}/links/twitch,,,401,PASS,403,403,403,PASS,401
-POST,/api/admin/meta-tags,,,401,PASS,403,403,403,PASS,401
-DELETE,/api/admin/meta-tags/{id},id=1,,401,PASS,403,403,403,PASS,401
-PUT,/api/admin/meta-tags/{id},id=1,,401,PASS,403,403,403,PASS,401
-GET,/api/admin/minecraft-accounts,,,401,PASS,403,403,403,PASS,401
-POST,/api/admin/minecraft-accounts,,,401,PASS,403,403,403,PASS,401
-POST,/api/admin/minecraft-accounts/device-code,,,401,PASS,403,403,403,PASS,401
-DELETE,/api/admin/minecraft-accounts/{id},,,401,PASS,403,403,403,PASS,401
-PATCH,/api/admin/minecraft-accounts/{id},,,401,PASS,403,403,403,PASS,401
-POST,/api/admin/minecraft-accounts/{id}/reauth,,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/meta-tags,,,401,PASS,403,403,403,PASS,401
+DELETE,/api/internal/admin/meta-tags/{id},id=1,,401,PASS,403,403,403,PASS,401
+PUT,/api/internal/admin/meta-tags/{id},id=1,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/minecraft-accounts,,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/minecraft-accounts,,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/minecraft-accounts/device-code,,,401,PASS,403,403,403,PASS,401
+DELETE,/api/internal/admin/minecraft-accounts/{id},,,401,PASS,403,403,403,PASS,401
+PATCH,/api/internal/admin/minecraft-accounts/{id},,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/minecraft-accounts/{id}/reauth,,,401,PASS,403,403,403,PASS,401
 GET,/api/internal/admin/notifications,,,401,PASS,403,403,403,PASS,401
 # handler reads the JWT itself: 401 without one
 POST,/api/internal/admin/notifications,,,401,401,403,403,403,PASS,401
 POST,/api/internal/admin/notifications/audience-count,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/notifications/preview,,,401,PASS,403,403,403,PASS,401
 DELETE,/api/internal/admin/notifications/{id},,,401,PASS,403,403,403,PASS,401
-GET,/api/admin/providers/gitlab/issues/{iid},iid=1,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/providers/gitlab/issues/{iid},iid=1,,401,PASS,403,403,403,PASS,401
 # ERROR: the mocked IgdbService has no token (test artefact)
-POST,/api/admin/providers/igdb/query,,"{""endpoint"":""games"",""query"":""fields name;""}",401,ERROR,403,403,403,ERROR,401
-GET,/api/admin/providers/minecraft/friends,?accountId=00000000-0000-0000-0000-00000000dead,,401,PASS,403,403,403,PASS,401
-GET,/api/admin/providers/minecraft/presence,?accountId=00000000-0000-0000-0000-00000000dead,,401,PASS,403,403,403,PASS,401
-GET,/api/admin/providers/minecraft/profile,?accountId=00000000-0000-0000-0000-00000000dead,,401,PASS,403,403,403,PASS,401
-GET,/api/admin/providers/minecraft/profile-lookup,?name=matrix,,401,PASS,403,403,403,PASS,401
-GET,/api/admin/providers/steam/appdetails,?appId=1,,401,PASS,403,403,403,PASS,401
-GET,/api/admin/providers/twitch/games,?name=matrix,,401,PASS,403,403,403,PASS,401
-GET,/api/admin/providers/twitch/moderated-channels,?userId=00000000-0000-0000-0000-00000000dead,,401,PASS,403,403,403,PASS,401
-GET,/api/admin/providers/twitch/users,?userId=00000000-0000-0000-0000-00000000dead,,401,PASS,403,403,403,PASS,401
-GET,/api/admin/providers/xbox/presence,?userId=00000000-0000-0000-0000-00000000dead,,401,PASS,403,403,403,PASS,401
-GET,/api/admin/steam-keys,,,401,PASS,403,403,403,PASS,401
-POST,/api/admin/steam-keys/add,,"{""apiKey"":""matrix""}",401,PASS,403,403,403,PASS,401
-POST,/api/admin/steam-keys/delete,,,401,PASS,403,403,403,PASS,401
-POST,/api/admin/steam-keys/refresh,,,401,PASS,403,403,403,PASS,401
-GET,/api/admin/tw,,,401,PASS,403,403,403,PASS,401
-POST,/api/admin/tw,,"{""id"":""matrix"",""label"":""matrix""}",401,PASS,403,403,403,PASS,401
-POST,/api/admin/tw/rebuild,,,401,PASS,403,403,403,PASS,401
-POST,/api/admin/tw/rebuild/force,,,401,PASS,403,403,403,PASS,401
-POST,/api/admin/tw/rebuild/force-pinned,,,401,PASS,403,403,403,PASS,401
-DELETE,/api/admin/tw/{id},,,401,PASS,403,403,403,PASS,401
-GET,/api/admin/tw/{id},,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/providers/igdb/query,,"{""endpoint"":""games"",""query"":""fields name;""}",401,ERROR,403,403,403,ERROR,401
+GET,/api/internal/admin/providers/minecraft/friends,?accountId=00000000-0000-0000-0000-00000000dead,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/providers/minecraft/presence,?accountId=00000000-0000-0000-0000-00000000dead,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/providers/minecraft/profile,?accountId=00000000-0000-0000-0000-00000000dead,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/providers/minecraft/profile-lookup,?name=matrix,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/providers/steam/appdetails,?appId=1,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/providers/twitch/games,?name=matrix,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/providers/twitch/moderated-channels,?userId=00000000-0000-0000-0000-00000000dead,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/providers/twitch/users,?userId=00000000-0000-0000-0000-00000000dead,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/providers/xbox/presence,?userId=00000000-0000-0000-0000-00000000dead,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/steam-keys,,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/steam-keys,,"{""apiKey"":""matrix""}",401,PASS,403,403,403,PASS,401
+DELETE,/api/internal/admin/steam-keys/{keyId},keyId=matrix,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/steam-keys/refresh,,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/tws,,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/tws,,"{""id"":""matrix"",""label"":""matrix""}",401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/tws/rebuild,,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/tws/rebuild/force,,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/tws/rebuild/force-pinned,,,401,PASS,403,403,403,PASS,401
+DELETE,/api/internal/admin/tws/{id},,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/tws/{id},,,401,PASS,403,403,403,PASS,401
 # ERROR: the dead id is no TW, and the handler throws IllegalArgumentException for it (test artefact)
-PATCH,/api/admin/tw/{id},,,401,ERROR,403,403,403,ERROR,401
+PATCH,/api/internal/admin/tws/{id},,,401,ERROR,403,403,403,ERROR,401
 # ERROR: the dead id is no TW, and the handler throws IllegalArgumentException for it (test artefact)
-PUT,/api/admin/tw/{id}/dtdd-topics,,,401,ERROR,403,403,403,ERROR,401
+PUT,/api/internal/admin/tws/{id}/dtdd-topics,,,401,ERROR,403,403,403,ERROR,401
 # ERROR: the dead id is no TW, and the handler throws IllegalArgumentException for it (test artefact)
-PUT,/api/admin/tw/{id}/igdb-descriptors,,,401,ERROR,403,403,403,ERROR,401
+PUT,/api/internal/admin/tws/{id}/igdb-descriptors,,,401,ERROR,403,403,403,ERROR,401
 # ERROR: the dead id is no TW, and the handler throws IllegalArgumentException for it (test artefact)
-PUT,/api/admin/tw/{id}/steam-content-ids,,,401,ERROR,403,403,403,ERROR,401
+PUT,/api/internal/admin/tws/{id}/steam-content-ids,,,401,ERROR,403,403,403,ERROR,401
 # ERROR: the dead id is no TW, and the handler throws IllegalArgumentException for it (test artefact)
-GET,/api/admin/tw/{id}/steam-keywords,,,401,ERROR,403,403,403,ERROR,401
+GET,/api/internal/admin/tws/{id}/steam-keywords,,,401,ERROR,403,403,403,ERROR,401
 # ERROR: the dead id is no TW, and the handler throws IllegalArgumentException for it (test artefact)
-POST,/api/admin/tw/{id}/steam-keywords,,,401,ERROR,403,403,403,ERROR,401
+POST,/api/internal/admin/tws/{id}/steam-keywords,,,401,ERROR,403,403,403,ERROR,401
 # ERROR: the dead id is no TW, and the handler throws IllegalArgumentException for it (test artefact)
-PUT,/api/admin/tw/{id}/steam-keywords,,,401,ERROR,403,403,403,ERROR,401
+PUT,/api/internal/admin/tws/{id}/steam-keywords,,,401,ERROR,403,403,403,ERROR,401
 # ERROR: the dead id is no TW, and the handler throws IllegalArgumentException for it (test artefact)
-POST,/api/admin/tw/{id}/steam-keywords/test,,,401,ERROR,403,403,403,ERROR,401
+POST,/api/internal/admin/tws/{id}/steam-keywords/test,,,401,ERROR,403,403,403,ERROR,401
 # ERROR: the dead id is no TW, and the handler throws IllegalArgumentException for it (test artefact)
-DELETE,/api/admin/tw/{id}/steam-keywords/{keyword},,,401,ERROR,403,403,403,ERROR,401
-GET,/api/admin/well-known,,,401,PASS,403,403,403,PASS,401
-POST,/api/admin/well-known,,,401,PASS,403,403,403,PASS,401
-GET,/api/admin/well-known/iana,,,401,PASS,403,403,403,PASS,401
-GET,/api/admin/well-known/schema,?path=matrix,,401,PASS,403,403,403,PASS,401
-DELETE,/api/admin/well-known/{id},id=1,,401,PASS,403,403,403,PASS,401
-GET,/api/admin/well-known/{id},id=1,,401,PASS,403,403,403,PASS,401
-PUT,/api/admin/well-known/{id},id=1,,401,PASS,403,403,403,PASS,401
+DELETE,/api/internal/admin/tws/{id}/steam-keywords/{keyword},,,401,ERROR,403,403,403,ERROR,401
+GET,/api/internal/admin/well-known-files,,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/well-known-files,,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/well-known-files/iana,,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/well-known-files/schema,?path=matrix,,401,PASS,403,403,403,PASS,401
+DELETE,/api/internal/admin/well-known-files/{id},id=1,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/well-known-files/{id},id=1,,401,PASS,403,403,403,PASS,401
+PUT,/api/internal/admin/well-known-files/{id},id=1,,401,PASS,403,403,403,PASS,401
 GET,/api/internal/admin/whitelist,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/whitelist/entries,,"{""twitchId"":""matrix-whitelisted""}",401,PASS,403,403,403,PASS,401
 PUT,/api/internal/admin/whitelist/invite/settings,,"{""defaultCanReinvite"":false}",401,PASS,403,403,403,PASS,401

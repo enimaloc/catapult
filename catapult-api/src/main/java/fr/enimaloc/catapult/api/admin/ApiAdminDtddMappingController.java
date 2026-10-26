@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.admin;
 
+import fr.enimaloc.catapult.api.ApiPaths;
 import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.common.dto.admin.DtddProposalDto;
 import fr.enimaloc.catapult.common.dto.admin.RejectRequest;
@@ -26,7 +27,7 @@ import java.util.Objects;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/admin/dtdd-mapping")
+@RequestMapping(ApiPaths.ADMIN + "/dtdd-mapping-proposals")
 @RequiredArgsConstructor
 public class ApiAdminDtddMappingController {
 
@@ -42,7 +43,7 @@ public class ApiAdminDtddMappingController {
      * The proposals in {@code status}, oldest first, as catapult-web reads them (not the entities,
      * whose lazy proposer can't be serialized once the transaction is over).
      */
-    @GetMapping("/proposals")
+    @GetMapping
     @Transactional(readOnly = true)
     public List<DtddProposalDto> pending(@RequestParam(defaultValue = "PENDING") String status) {
         Status wanted;
@@ -63,7 +64,7 @@ public class ApiAdminDtddMappingController {
                 p.getReason(), p.getStatus().name());
     }
 
-    @PostMapping("/proposals/{id}/approve")
+    @PostMapping("/{id}/approve")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Transactional
     public void approve(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
@@ -98,7 +99,7 @@ public class ApiAdminDtddMappingController {
         mappingEvents.mappingChanged(p.getIgdbId());
     }
 
-    @PostMapping("/proposals/{id}/reject")
+    @PostMapping("/{id}/reject")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Transactional
     public void reject(@PathVariable UUID id, @RequestBody(required = false) RejectRequest body,

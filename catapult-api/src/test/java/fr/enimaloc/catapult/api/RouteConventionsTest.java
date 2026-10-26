@@ -25,7 +25,7 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
 
 /**
  * The conventions of the internal routes (see {@link ApiPaths}): every catapult route is under
- * {@value ApiPaths#INTERNAL}, one of the frozen external ones, or a {@link #LEGACY} route not moved yet; an internal
+ * {@value ApiPaths#INTERNAL} or one of the frozen external ones; an internal
  * route says what it does with its verb, not a path segment; and a route under {@value ApiPaths#USER} takes its owner
  * as a {@code UUID userId}.
  */
@@ -66,97 +66,6 @@ class RouteConventionsTest {
             "POST /api/twitchat/widget/{uuid}/notifications/flush",
             "POST /api/twitchat/actions/{token}");
 
-    /**
-     * The internal routes still at their old path, by the task that moves them: each slice deletes its lines, and the
-     * list is gone once the last one has moved.
-     */
-    static final Set<String> LEGACY = Set.of(
-            // Task 12
-            "GET /api/admin/caches",
-            "GET /api/admin/caches/{name}",
-            "GET /api/admin/caches/{name}/entry",
-            "DELETE /api/admin/caches/{name}",
-            "GET /api/admin/ccl",
-            "POST /api/admin/ccl/refresh",
-            "POST /api/admin/ccl/{cclId}/mappings",
-            "GET /api/admin/config",
-            "PUT /api/admin/config/{key}",
-            "DELETE /api/admin/config/{key}",
-            "GET /api/admin/config/audit",
-            "GET /api/admin/config/module/{module}",
-            "PUT /api/admin/config/module/{module}/{key}",
-            "DELETE /api/admin/config/module/{module}/{key}",
-            "GET /api/admin/config/module/{module}/audit",
-            "GET /api/admin/data",
-            "GET /api/admin/data/{repo}",
-            "GET /api/admin/data/{repo}/{id}",
-            "POST /api/admin/data/{repo}",
-            "PUT /api/admin/data/{repo}/{id}",
-            "DELETE /api/admin/data/{repo}/{id}",
-            "GET /api/admin/dtdd-keys",
-            "POST /api/admin/dtdd-keys/add",
-            "POST /api/admin/dtdd-keys/delete",
-            "POST /api/admin/dtdd-keys/refresh",
-            "GET /api/admin/dtdd-mapping/proposals",
-            "POST /api/admin/dtdd-mapping/proposals/{id}/approve",
-            "POST /api/admin/dtdd-mapping/proposals/{id}/reject",
-            "GET /api/admin/game-mappings",
-            "POST /api/admin/game-mappings",
-            "PUT /api/admin/game-mappings/{id}",
-            "DELETE /api/admin/game-mappings/{id}",
-            "GET /api/admin/game-mappings/missing",
-            "GET /api/admin/game-mappings/detected",
-            "GET /api/admin/game-mappings/categories",
-            "GET /api/admin/igdb/search",
-            "POST /api/admin/meta-tags",
-            "PUT /api/admin/meta-tags/{id}",
-            "DELETE /api/admin/meta-tags/{id}",
-            "GET /api/admin/minecraft-accounts",
-            "POST /api/admin/minecraft-accounts/device-code",
-            "POST /api/admin/minecraft-accounts",
-            "POST /api/admin/minecraft-accounts/{id}/reauth",
-            "PATCH /api/admin/minecraft-accounts/{id}",
-            "DELETE /api/admin/minecraft-accounts/{id}",
-            "GET /api/admin/steam-keys",
-            "POST /api/admin/steam-keys/add",
-            "POST /api/admin/steam-keys/delete",
-            "POST /api/admin/steam-keys/refresh",
-            "GET /api/admin/tw",
-            "GET /api/admin/tw/{id}",
-            "POST /api/admin/tw",
-            "PATCH /api/admin/tw/{id}",
-            "DELETE /api/admin/tw/{id}",
-            "PUT /api/admin/tw/{id}/dtdd-topics",
-            "PUT /api/admin/tw/{id}/igdb-descriptors",
-            "PUT /api/admin/tw/{id}/steam-content-ids",
-            "PUT /api/admin/tw/{id}/steam-keywords",
-            "GET /api/admin/tw/{id}/steam-keywords",
-            "POST /api/admin/tw/{id}/steam-keywords",
-            "DELETE /api/admin/tw/{id}/steam-keywords/{keyword}",
-            "POST /api/admin/tw/{id}/steam-keywords/test",
-            "POST /api/admin/tw/rebuild",
-            "POST /api/admin/tw/rebuild/force",
-            "POST /api/admin/tw/rebuild/force-pinned",
-            "GET /api/admin/well-known",
-            "GET /api/admin/well-known/iana",
-            "GET /api/admin/well-known/schema",
-            "GET /api/admin/well-known/{id}",
-            "POST /api/admin/well-known",
-            "PUT /api/admin/well-known/{id}",
-            "DELETE /api/admin/well-known/{id}",
-            "GET /api/admin/providers/gitlab/issues/{iid}",
-            "POST /api/admin/providers/igdb/query",
-            "GET /api/admin/providers/minecraft/profile-lookup",
-            "GET /api/admin/providers/minecraft/friends",
-            "GET /api/admin/providers/minecraft/profile",
-            "GET /api/admin/providers/minecraft/presence",
-            "GET /api/admin/providers/steam/appdetails",
-            "GET /api/admin/providers/twitch/games",
-            "GET /api/admin/providers/twitch/users",
-            "GET /api/admin/providers/twitch/moderated-channels",
-            "GET /api/admin/providers/xbox/presence"
-    );
-
     /** Path segments that name a CRUD operation the verb should carry. */
     private static final Set<String> CRUD_SEGMENTS = Set.of(
             "delete", "add", "remove", "update", "unlink", "rename", "disconnect", "cancel-deletion", "delete-account");
@@ -177,24 +86,23 @@ class RouteConventionsTest {
     RequestMappingHandlerMapping handlerMapping;
 
     @Test
-    void everyRouteIsInternalFrozenOrLegacy() {
+    void everyRouteIsInternalOrFrozen() {
         List<String> stray = new ArrayList<>();
         for (Route route : routes()) {
             if (!route.pattern().startsWith(ApiPaths.INTERNAL + "/")
-                    && !FROZEN.contains(route.key())
-                    && !LEGACY.contains(route.key())) {
+                    && !FROZEN.contains(route.key())) {
                 stray.add(route.key() + " (" + route.handler().getShortLogMessage() + ")");
             }
         }
         stray.sort(null);
-        assertThat(stray).as("routes neither under " + ApiPaths.INTERNAL + "/, frozen nor legacy").isEmpty();
+        assertThat(stray).as("routes neither under " + ApiPaths.INTERNAL + "/ nor frozen").isEmpty();
     }
 
     @Test
     void internalRoutesUseRestVerbs() {
         List<String> violations = new ArrayList<>();
         for (Route route : routes()) {
-            if (route.pattern().startsWith(ApiPaths.INTERNAL + "/") && !LEGACY.contains(route.key())) {
+            if (route.pattern().startsWith(ApiPaths.INTERNAL + "/")) {
                 String violation = restViolation(route.method(), route.pattern());
                 if (violation != null) {
                     violations.add(route.key() + ": " + violation);

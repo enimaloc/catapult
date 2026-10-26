@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.api.admin;
 
+import fr.enimaloc.catapult.api.ApiPaths;
 import fr.enimaloc.catapult.common.dto.admin.AddKeyRequest;
-import fr.enimaloc.catapult.common.dto.admin.DeleteKeyRequest;
 import fr.enimaloc.catapult.common.dto.admin.KeyStatus;
 import fr.enimaloc.catapult.common.dto.admin.SteamKeysPageData;
 import fr.enimaloc.catapult.domain.steam.SteamApiKeyEntry;
@@ -9,7 +9,9 @@ import fr.enimaloc.catapult.getter.steam.SteamApiKeyRotator;
 import fr.enimaloc.catapult.repository.steam.SteamApiKeyRepository;
 import fr.enimaloc.catapult.service.notification.AdminEventPublisher;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -23,7 +25,7 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 @RestController
-@RequestMapping("/api/admin/steam-keys")
+@RequestMapping(ApiPaths.ADMIN + "/steam-keys")
 public class ApiAdminSteamKeysController {
 
     private final SteamApiKeyRepository repository;
@@ -69,7 +71,7 @@ public class ApiAdminSteamKeysController {
         return new SteamKeysPageData(keys, rotator.isPresent());
     }
 
-    @PostMapping("/add")
+    @PostMapping
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void add(@RequestBody AddKeyRequest body) {
         String trimmed = body.apiKey().trim();
@@ -84,19 +86,19 @@ public class ApiAdminSteamKeysController {
         }
     }
 
-    @PostMapping("/delete")
+    @DeleteMapping("/{keyId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@RequestBody DeleteKeyRequest body) {
+    public void delete(@PathVariable String keyId) {
         Optional<String> raw = repository.findByExclusiveFalse().stream()
             .map(SteamApiKeyEntry::getApiKey)
-            .filter(k -> ApiKeyHasher.id(k).equals(body.keyId()))
+            .filter(k -> ApiKeyHasher.id(k).equals(keyId))
             .findFirst();
         if (raw.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown keyId");
         }
         repository.deleteById(raw.get());
         refreshRotator();
-        events.keyDeleted(AdminEventPublisher.PROVIDER_STEAM, body.keyId());
+        events.keyDeleted(AdminEventPublisher.PROVIDER_STEAM, keyId);
     }
 
     @PostMapping("/refresh")

@@ -71,7 +71,7 @@ class ApiAdminCacheControllerTest {
     void entries_defaultPaginationReturnsFirstPage() throws Exception {
         when(igdbService.getGameCache()).thenReturn(fiveGameEntries());
 
-        mvc.perform(get("/api/admin/caches/igdb-game-cache").param("size", "2")
+        mvc.perform(get("/api/internal/admin/caches/igdb-game-cache").param("size", "2")
                 .with(jwt().jwt(j -> j.claim("twitchId", "123")).authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(2))
@@ -84,7 +84,7 @@ class ApiAdminCacheControllerTest {
     void entries_secondPageReturnsRemainder() throws Exception {
         when(igdbService.getGameCache()).thenReturn(fiveGameEntries());
 
-        mvc.perform(get("/api/admin/caches/igdb-game-cache").param("size", "2").param("page", "2")
+        mvc.perform(get("/api/internal/admin/caches/igdb-game-cache").param("size", "2").param("page", "2")
                 .with(jwt().jwt(j -> j.claim("twitchId", "123")).authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(1))
@@ -95,7 +95,7 @@ class ApiAdminCacheControllerTest {
     void entries_searchMatchesKey() throws Exception {
         when(igdbService.getGameCache()).thenReturn(fiveGameEntries());
 
-        mvc.perform(get("/api/admin/caches/igdb-game-cache").param("q", "103")
+        mvc.perform(get("/api/internal/admin/caches/igdb-game-cache").param("q", "103")
                 .with(jwt().jwt(j -> j.claim("twitchId", "123")).authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(1))
@@ -106,7 +106,7 @@ class ApiAdminCacheControllerTest {
     void entries_searchMatchesValueCaseInsensitive() throws Exception {
         when(igdbService.getGameCache()).thenReturn(fiveGameEntries());
 
-        mvc.perform(get("/api/admin/caches/igdb-game-cache").param("q", "PORTAL")
+        mvc.perform(get("/api/internal/admin/caches/igdb-game-cache").param("q", "PORTAL")
                 .with(jwt().jwt(j -> j.claim("twitchId", "123")).authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(2));
@@ -116,7 +116,7 @@ class ApiAdminCacheControllerTest {
     void entries_searchWithNoMatchReturnsEmptyPage() throws Exception {
         when(igdbService.getGameCache()).thenReturn(fiveGameEntries());
 
-        mvc.perform(get("/api/admin/caches/igdb-game-cache").param("q", "nonexistent")
+        mvc.perform(get("/api/internal/admin/caches/igdb-game-cache").param("q", "nonexistent")
                 .with(jwt().jwt(j -> j.claim("twitchId", "123")).authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(0))
@@ -133,7 +133,7 @@ class ApiAdminCacheControllerTest {
         details.setFetchedAt(Instant.now());
         when(igdbGameDetailsRepository.findById("103")).thenReturn(Optional.of(details));
 
-        mvc.perform(get("/api/admin/caches/igdb-game-cache/entry").param("key", "103"))
+        mvc.perform(get("/api/internal/admin/caches/igdb-game-cache/entry").param("key", "103"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.key").value("103"))
                 .andExpect(jsonPath("$.detail.slug").value("portal"))
@@ -145,7 +145,7 @@ class ApiAdminCacheControllerTest {
         MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
         when(igdbGameDetailsRepository.findById("999")).thenReturn(Optional.empty());
 
-        mvc.perform(get("/api/admin/caches/igdb-game-cache/entry").param("key", "999"))
+        mvc.perform(get("/api/internal/admin/caches/igdb-game-cache/entry").param("key", "999"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.key").value("999"))
                 .andExpect(jsonPath("$.detail").doesNotExist());
@@ -159,7 +159,7 @@ class ApiAdminCacheControllerTest {
         details.setIgdbId("104");
         when(igdbGameDetailsRepository.findById("104")).thenReturn(Optional.of(details));
 
-        mvc.perform(get("/api/admin/caches/igdb-name-index/entry").param("key", "portal 2"))
+        mvc.perform(get("/api/internal/admin/caches/igdb-name-index/entry").param("key", "portal 2"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.detail.igdbId").value("104"));
     }
@@ -170,7 +170,7 @@ class ApiAdminCacheControllerTest {
         IgdbGameCcl ccl = new IgdbGameCcl("103", Set.of("ViolentGraphic"), "PEGI 16");
         when(igdbGameCclRepository.findById("103")).thenReturn(Optional.of(ccl));
 
-        mvc.perform(get("/api/admin/caches/igdb-ccl-cache/entry").param("key", "103"))
+        mvc.perform(get("/api/internal/admin/caches/igdb-ccl-cache/entry").param("key", "103"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.detail.ageRatings").value("PEGI 16"))
                 .andExpect(jsonPath("$.expiresInSeconds").doesNotExist());
@@ -185,7 +185,7 @@ class ApiAdminCacheControllerTest {
         def.setDescription("Strobe or rapid flashing.");
         when(twDefinitionRepository.findById("flashing-lights")).thenReturn(Optional.of(def));
 
-        mvc.perform(get("/api/admin/caches/tw-all-options/entry").param("key", "flashing-lights"))
+        mvc.perform(get("/api/internal/admin/caches/tw-all-options/entry").param("key", "flashing-lights"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.detail.description").value("Strobe or rapid flashing."));
     }
@@ -203,7 +203,7 @@ class ApiAdminCacheControllerTest {
         def.setTemplate("Hi there!");
         when(chatCommandDefinitionRepository.findByUser(user)).thenReturn(List.of(def));
 
-        mvc.perform(get("/api/admin/caches/chat-command-user-cache/entry").param("key", userId.toString()))
+        mvc.perform(get("/api/internal/admin/caches/chat-command-user-cache/entry").param("key", userId.toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.detail[0].name").value("hello"));
     }

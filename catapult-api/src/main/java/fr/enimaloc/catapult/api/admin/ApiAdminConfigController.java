@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.admin;
 
+import fr.enimaloc.catapult.api.ApiPaths;
 import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.common.dto.admin.ApplyRequest;
 import fr.enimaloc.catapult.common.dto.admin.ModuleOverrideDto;
@@ -26,7 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/admin/config")
+@RequestMapping(ApiPaths.ADMIN + "/config")
 @RequiredArgsConstructor
 public class ApiAdminConfigController {
 
@@ -58,7 +59,7 @@ public class ApiAdminConfigController {
         return auditRepo.findByKeyOrderByChangedAtDesc(key);
     }
 
-    @GetMapping("/module/{module}")
+    @GetMapping("/modules/{module}")
     public List<ModuleOverrideDto> moduleOverrides(@PathVariable String module) {
         return overrideRepo.findByIdModule(module).stream()
                 .map(o -> new ModuleOverrideDto(
@@ -70,7 +71,7 @@ public class ApiAdminConfigController {
                 .toList();
     }
 
-    @PutMapping("/module/{module}/{key}")
+    @PutMapping("/modules/{module}/{key}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void applyForModule(@PathVariable String module,
                                @PathVariable String key,
@@ -79,7 +80,7 @@ public class ApiAdminConfigController {
         overrideService.apply(module, key, body.value(), userResolver.viewerByTwitchId(jwt));
     }
 
-    @DeleteMapping("/module/{module}/{key}")
+    @DeleteMapping("/modules/{module}/{key}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void clearForModule(@PathVariable String module,
                                @PathVariable String key,
@@ -87,7 +88,7 @@ public class ApiAdminConfigController {
         overrideService.clear(module, key, userResolver.viewerByTwitchId(jwt));
     }
 
-    @GetMapping("/module/{module}/audit")
+    @GetMapping("/modules/{module}/audit")
     public List<ConfigAudit> moduleAudit(@PathVariable String module, @RequestParam String key) {
         return auditRepo.findByModuleAndKeyOrderByChangedAtDesc(module, key);
     }
