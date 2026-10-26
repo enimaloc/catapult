@@ -190,6 +190,31 @@ class ApiChannelActionsControllerTest extends ApiChannelActionsTestSupport {
         }
 
         @Test
+        void noGame_appliesTheDefaultEvenWithApplyOnNoGameOff() throws Exception {
+            mvc.perform(as(owner, HttpMethod.PUT, "/settings/no-game", """
+                            {"twitchGameId":"1","twitchGameName":"Just Chatting","ccls":null,
+                             "applyOnStreamStart":false,"applyOnNoGame":false,"applyOnStreamEnd":false}"""))
+                    .andExpect(status().isNoContent());
+
+            assertThat(saved().isApplyDefaultOnNoGame()).isFalse();
+            verify(twitchService).resetToDefault(owner);
+        }
+
+        @Test
+        void noGame_readsTheCustomBindingOnlyWhenNothingIsDetected() throws Exception {
+            when(gameStateService.getLastKnownGame(owner)).thenReturn(Optional.of(
+                    new fr.enimaloc.catapult.getter.DetectedGame("1", GameBinding.SourceType.STEAM, "Doom")));
+
+            mvc.perform(as(owner, HttpMethod.PUT, "/settings/no-game", """
+                            {"twitchGameId":"1","twitchGameName":"Just Chatting","ccls":null,
+                             "applyOnStreamStart":true,"applyOnNoGame":true,"applyOnStreamEnd":true}"""))
+                    .andExpect(status().isNoContent());
+
+            verify(customBindingActivations, never()).active(any());
+            verify(twitchService, never()).resetToDefault(any());
+        }
+
+        @Test
         void noGame_leavesTheCategoryAloneWhileAGameIsDetected() throws Exception {
             when(gameStateService.getLastKnownGame(owner)).thenReturn(Optional.of(
                     new fr.enimaloc.catapult.getter.DetectedGame("1", GameBinding.SourceType.STEAM, "Doom")));

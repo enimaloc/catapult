@@ -11,6 +11,8 @@ import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.account.BotToggleService;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
 import fr.enimaloc.catapult.service.notification.CatapultCategoryChangeStateService;
+import io.micrometer.core.instrument.Timer;
+import io.micrometer.core.instrument.observation.DefaultMeterObservationHandler;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.observation.ObservationRegistry;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,6 +28,7 @@ import org.mockito.quality.Strictness;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestClient;
 
 import java.util.List;
@@ -34,6 +37,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
@@ -51,9 +55,10 @@ class TwitchServiceTest {
     @Mock private BotToggleService botToggleService;
     @Mock private CatapultCategoryChangeStateService categoryChangeStateService;
 
+    private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
+
     @Spy
-    private ExternalApiObservations apiObservations =
-        new ExternalApiObservations(ObservationRegistry.create(), new SimpleMeterRegistry());
+    private ExternalApiObservations apiObservations = new ExternalApiObservations(meteredRegistry(), meters);
 
     @Mock private RestClient.RequestBodyUriSpec patchSpec;
     @Mock private RestClient.RequestBodySpec bodySpec;
@@ -98,6 +103,13 @@ class TwitchServiceTest {
         doReturn(headersSpec).when(getSpec).uri(anyString(), any(Object[].class));
         doReturn(headersSpec).when(headersSpec).header(anyString(), anyString());
         doReturn(getResponseSpec).when(headersSpec).retrieve();
+    }
+
+    /** The registry the observations go through: each one ends up as a timer in {@link #meters}. */
+    private ObservationRegistry meteredRegistry() {
+        ObservationRegistry registry = ObservationRegistry.create();
+        registry.observationConfig().observationHandler(new DefaultMeterObservationHandler(meters));
+        return registry;
     }
 
     private GameBinding binding(GameBinding.Status status, boolean ignored, boolean cclEnabled, Set<String> ccls) {
@@ -660,5 +672,122 @@ class TwitchServiceTest {
         twitchService.resetToDefault(user);
 
         verify(botToggleService, never()).setBotEnabled(eq(user), anyBoolean());
+    }
+
+    // ---- Pins of today's Twitch layer, before the category chain moves (see CategoryBehaviourTest) ----
+
+    @Test
+    void setCategory_on401_doesNotRefresh_andThrows() {
+        doThrow(new HttpClientErrorException(HttpStatus.UNAUTHORIZED)).when(responseSpec).toBodilessEntity();
+
+        assertThrows(HttpClientErrorException.class, () -> twitchService.setCategory(user, "12345", "Some Game"));
+
+        verify(twitchTokenService, never()).refreshAccessToken(any(), any());
+        verify(categoryChangeStateService, never()).recordCatapultChangeAndReturnPrevious(any(), any());
+    }
+
+    @Test
+    void setCategory_withoutToken_recordsNoMarker() {
+        when(oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH))
+            .thenReturn(Optional.empty());
+
+        twitchService.setCategory(user, "12345", "Some Game");
+
+        verify(restClient, never()).patch();
+        verifyNoInteractions(categoryChangeStateService);
+    }
+
+    @Test
+    void resetToDefault_recordsNoMarker() {
+        UserSettings settings = new UserSettings();
+        settings.setNoGameTwitchGameId("12345");
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
+
+        twitchService.resetToDefault(user);
+
+        verify(bodySpec).body(any(Map.class));
+        verifyNoInteractions(categoryChangeStateService);
+    }
+
+    @Test
+    void resetToDefault_on401_refreshFails_pausesTheBot() {
+        UserSettings settings = new UserSettings();
+        settings.setNoGameTwitchGameId("12345");
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
+        doThrow(new HttpClientErrorException(HttpStatus.UNAUTHORIZED)).when(responseSpec).toBodilessEntity();
+
+        twitchService.resetToDefault(user);
+
+        verify(twitchTokenService).refreshAccessToken(any(OAuthToken.class), eq(user));
+        verify(botToggleService).setBotEnabled(user, false);
+        verifyNoInteractions(categoryChangeStateService);
+    }
+
+    @Test
+    void updateChannel_syntheticBinding_ignoresTheBlocklist() {
+        UserSettings settings = new UserSettings();
+        settings.setBlockedCcls(new java.util.HashSet<>(Set.of("Gambling")));
+        when(userSettingsRepository.findById(any())).thenReturn(Optional.of(settings));
+        GameBinding fallback = binding(GameBinding.Status.MANUAL, false, true, Set.of("Gambling"));
+        fallback.setId(null);
+
+        twitchService.updateChannel(user, fallback);
+
+        assertThat(cclEnabled("Gambling")).isTrue();
+    }
+
+    @Test
+    void updateChannel_persistedBinding_appliesTheBlocklist() {
+        UserSettings settings = new UserSettings();
+        settings.setBlockedCcls(new java.util.HashSet<>(Set.of("Gambling")));
+        when(userSettingsRepository.findById(any())).thenReturn(Optional.of(settings));
+        GameBinding saved = binding(GameBinding.Status.AUTO, false, true, Set.of("Gambling"));
+        saved.setId(java.util.UUID.randomUUID());
+
+        twitchService.updateChannel(user, saved);
+
+        assertThat(cclEnabled("Gambling")).isFalse();
+    }
+
+    @Test
+    void updateChannel_recordsTheMarkerOnce() {
+        twitchService.updateChannel(user, binding(GameBinding.Status.AUTO, false, true, Set.of()));
+
+        verify(categoryChangeStateService, times(1)).recordCatapultChangeAndReturnPrevious(user, "game-456");
+    }
+
+    @Test
+    void updateChannel_twitchError_isObservedAsASuccess() {
+        doThrow(new HttpServerErrorException(HttpStatus.INTERNAL_SERVER_ERROR)).when(responseSpec).toBodilessEntity();
+
+        twitchService.updateChannel(user, binding(GameBinding.Status.AUTO, false, true, Set.of()));
+
+        assertThat(timer("update_channel", "success")).isNotNull();
+        assertThat(timer("update_channel", "error")).isNull();
+    }
+
+    @Test
+    void setCategory_twitchError_isObservedAsAnError() {
+        doThrow(new HttpServerErrorException(HttpStatus.INTERNAL_SERVER_ERROR)).when(responseSpec).toBodilessEntity();
+
+        assertThrows(HttpServerErrorException.class, () -> twitchService.setCategory(user, "12345", "Some Game"));
+
+        assertThat(timer("set_category", "error")).isNotNull();
+        assertThat(timer("set_category", "success")).isNull();
+    }
+
+    /** Whether the PATCH sent {@code ccl} enabled. */
+    private boolean cclEnabled(String ccl) {
+        ArgumentCaptor<Map> bodyCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(bodySpec).body(bodyCaptor.capture());
+        List<Map<String, Object>> cclPayload =
+            (List<Map<String, Object>>) bodyCaptor.getValue().get("content_classification_labels");
+        return cclPayload.stream().filter(e -> ccl.equals(e.get("id")))
+            .map(e -> (Boolean) e.get("is_enabled")).findFirst().orElseThrow();
+    }
+
+    private Timer timer(String operation, String outcome) {
+        return meters.find(ExternalApiObservations.METRIC)
+            .tags("api", "twitch", "operation", operation, "outcome", outcome).timer();
     }
 }
