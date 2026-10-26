@@ -2,15 +2,8 @@ package fr.enimaloc.catapult.api.connect;
 
 import fr.enimaloc.catapult.api.ApiPaths;
 import fr.enimaloc.catapult.api.ApiUserResolver;
-import fr.enimaloc.catapult.api.error.ApiProblem;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
-import fr.enimaloc.catapult.common.error.ErrorCode;
-import fr.enimaloc.catapult.domain.account.UserAccount;
-import fr.enimaloc.catapult.repository.account.UserAccountRepository;
-import fr.enimaloc.catapult.service.minecraft.MinecraftFriendService;
-import fr.enimaloc.catapult.service.minecraft.MinecraftGateService;
-import fr.enimaloc.catapult.service.minecraft.MinecraftLinkStateService;
-import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
+import fr.enimaloc.catapult.service.minecraft.MinecraftConnectService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.http.HttpStatus;
@@ -18,7 +11,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Map;
 import java.util.UUID;
@@ -29,78 +21,34 @@ import java.util.UUID;
 @ConditionalOnBooleanProperty("minecraft.enabled")
 public class ApiMinecraftConnectController {
 
-    private final MinecraftFriendService friendService;
-    private final UserAccountRepository userAccountRepository;
-    private final MinecraftGateService gateService;
-    private final MinecraftLinkStateService linkStates;
-    private final ChannelEventPublisher channelEventPublisher;
+    private final MinecraftConnectService minecraft;
 
-    /** Vérification immédiate : force la sync des liens puis retourne l'état à jour. */
     @PreAuthorize("@authz.isSelf(#userId)")
     @PostMapping("/sync")
     public LinkStateResponse syncNow(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt) {
-        UserAccount user = gatedUser(jwt);
-        friendService.syncFriendLinks();
-        return published(user, friendService.getLink(user)
-                .map(MinecraftLinkStateService::of)
-                .orElseGet(ApiMinecraftConnectController::none));
+        return minecraft.sync(caller(jwt));
     }
 
     @PreAuthorize("@authz.isSelf(#userId)")
     @GetMapping
     public LinkStateResponse status(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt) {
-        return linkStates.state(currentUser(jwt));
+        return minecraft.status(caller(jwt));
     }
 
     @PreAuthorize("@authz.isSelf(#userId)")
     @PutMapping
     public LinkStateResponse enroll(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt, @RequestBody Map<String, String> body) {
-        UserAccount user = gatedUser(jwt); // le gate prime sur la validation métier (403 avant 400)
-        String name = body.get("name");
-        name = name == null ? null : name.trim();
-        if (name == null || name.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A Minecraft username is required");
-        }
-        try {
-            return published(user, MinecraftLinkStateService.of(friendService.enroll(user, name)));
-        } catch (MinecraftFriendService.MinecraftEnrollmentException e) {
-            throw switch (e.getReason()) {
-                case UNKNOWN_PLAYER -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown Minecraft player");
-                case NO_CAPACITY, NO_ACCOUNT_AVAILABLE ->
-                        new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "No Minecraft service account has room left, contact an administrator");
-            };
-        }
+        return minecraft.enroll(caller(jwt), body.get("name"));
     }
 
     @PreAuthorize("@authz.isSelf(#userId)")
     @DeleteMapping
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void unenroll(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt) {
-        UserAccount user = gatedUser(jwt);
-        friendService.unenroll(user);
-        published(user, none());
+        minecraft.unenroll(caller(jwt));
     }
 
-    /** {@code state}, once told to the member's dashboards. */
-    private LinkStateResponse published(UserAccount user, LinkStateResponse state) {
-        channelEventPublisher.minecraftLinkChanged(user.getId(), state.status(), state.minecraftName());
-        return state;
-    }
-
-    private static LinkStateResponse none() {
-        return MinecraftLinkStateService.of(MinecraftLinkStateService.NONE);
-    }
-
-    private UserAccount currentUser(Jwt jwt) {
-        return userAccountRepository.findById(UUID.fromString(ApiUserResolver.requireJwt(jwt).getSubject()))
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unknown user"));
-    }
-
-    private UserAccount gatedUser(Jwt jwt) {
-        UserAccount user = currentUser(jwt);
-        if (!gateService.isAvailableFor(user)) {
-            throw new ApiProblem(ErrorCode.FEATURE_DISABLED, "Minecraft is not available for this account");
-        }
-        return user;
+    private static UUID caller(Jwt jwt) {
+        return UUID.fromString(ApiUserResolver.requireJwt(jwt).getSubject());
     }
 }

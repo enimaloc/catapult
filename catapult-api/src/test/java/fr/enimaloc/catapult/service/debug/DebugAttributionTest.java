@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.service.binding.StreamStateService;
 import fr.enimaloc.catapult.service.category.CategoryApplier;
 import fr.enimaloc.catapult.service.binding.CustomBindingActivations;
 import fr.enimaloc.catapult.api.connect.ApiSteamConnectController;
+import fr.enimaloc.catapult.service.steam.SteamOpenIdLinkService;
 import fr.enimaloc.catapult.chat.ChatCommandEvent;
 import fr.enimaloc.catapult.chat.ChatCommandListener;
 import fr.enimaloc.catapult.chat.CommandRegistry;
@@ -239,10 +240,11 @@ class DebugAttributionTest {
         MockRestServiceServer steam = MockRestServiceServer.bindTo(builder).build();
         steam.expect(requestTo("https://steamcommunity.com/openid/login"))
                 .andRespond(withSuccess("is_valid:true\n", MediaType.TEXT_PLAIN));
-        ApiSteamConnectController controller = new ApiSteamConnectController(accounts,
+        SteamOpenIdLinkService links = new SteamOpenIdLinkService(accounts,
                 mock(ApplicationEventPublisher.class), mock(ChannelEventPublisher.class), builder.build(),
                 DebugRecording.OFF);
-        ReflectionTestUtils.setField(controller, "apiBaseUrl", "http://api.test");
+        ReflectionTestUtils.setField(links, "apiBaseUrl", "http://api.test");
+        ApiSteamConnectController controller = new ApiSteamConnectController(links);
         ReflectionTestUtils.setField(controller, "webBaseUrl", "http://web.test");
         Jwt jwt = Jwt.withTokenValue("t").header("alg", "none").subject(user.getId().toString()).build();
         String returnTo = UriComponentsBuilder.fromUriString(controller.start(UUID.randomUUID(), jwt).redirectUrl()).build()

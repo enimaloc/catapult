@@ -7,6 +7,7 @@ import fr.enimaloc.catapult.domain.minecraft.MinecraftFriendLink;
 import fr.enimaloc.catapult.domain.minecraft.MinecraftServiceAccount;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.minecraft.MinecraftServiceAccountRepository;
+import fr.enimaloc.catapult.service.minecraft.MinecraftConnectService;
 import fr.enimaloc.catapult.service.minecraft.MinecraftFriendService;
 import fr.enimaloc.catapult.service.minecraft.MinecraftGateService;
 import fr.enimaloc.catapult.service.minecraft.MinecraftLinkStateService;
@@ -46,8 +47,9 @@ class ApiMinecraftConnectControllerTest {
 
     @BeforeEach
     void setup() {
-        controller = new ApiMinecraftConnectController(friendService, userAccountRepository, gateService,
-                new MinecraftLinkStateService(friendService, gateService, accountRepository), channelEventPublisher);
+        controller = new ApiMinecraftConnectController(new MinecraftConnectService(friendService, userAccountRepository,
+                gateService, new MinecraftLinkStateService(friendService, gateService, accountRepository),
+                channelEventPublisher));
         user = new UserAccount();
         UUID userId = UUID.randomUUID();
         when(jwt.getSubject()).thenReturn(userId.toString());
