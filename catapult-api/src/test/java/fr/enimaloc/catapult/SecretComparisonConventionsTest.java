@@ -39,7 +39,7 @@ class SecretComparisonConventionsTest {
     private static final String COMMON = "catapult-common/src/main/java/fr/enimaloc/catapult/common/";
     private static final String WEB = "catapult-web/src/main/java/fr/enimaloc/catapult/";
 
-    /** The comparisons of values that are not received secrets: {@code "<path>:<line>"} → why. */
+    /** The comparisons of values that are not received secrets: {@code "<path>:<normalized line text>"} → why. */
     static final Map<String, String> KEPT = Map.ofEntries(
             Map.entry(
                     API + "service/igdb/IgdbClient.java:if (!token.equals(currentToken)) {",
