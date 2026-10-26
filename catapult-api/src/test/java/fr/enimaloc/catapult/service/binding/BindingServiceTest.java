@@ -56,7 +56,7 @@ class BindingServiceTest {
         bindingService = new BindingService(gameBindingRepository, igdbService, igdbGameDetailsService, twitchService, twResolverService, gameMappingRepository, new GameBindingLookup(gameBindingRepository),
                 new CategoryChain(mock(CustomBindingActivations.class), mock(StreamStateService.class),
                         mock(UserSettingsRepository.class), new RaidRestoreHold(), gameStateService,
-                        mock(UserAccountRepository.class), new CategoryApplier(twitchService, mock(StreamStateService.class))));
+                        mock(UserAccountRepository.class), new CategoryApplier(twitchService, mock(StreamStateService.class)), mock(RaidRestoreGateService.class), mock(GameBindingLookup.class)));
 
         user = new UserAccount();
         bindingId = UUID.randomUUID();

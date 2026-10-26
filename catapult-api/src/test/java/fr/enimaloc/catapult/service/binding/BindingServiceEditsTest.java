@@ -47,7 +47,7 @@ class BindingServiceEditsTest {
     private final BindingService service = new BindingService(bindings, igdb, igdbDetails, twitch, twResolver, mappings,
             new GameBindingLookup(bindings), new CategoryChain(mock(CustomBindingActivations.class),
                     mock(StreamStateService.class), mock(UserSettingsRepository.class), new RaidRestoreHold(),
-                    gameState, mock(UserAccountRepository.class), new CategoryApplier(twitch, mock(StreamStateService.class))));
+                    gameState, mock(UserAccountRepository.class), new CategoryApplier(twitch, mock(StreamStateService.class)), mock(RaidRestoreGateService.class), mock(GameBindingLookup.class)));
 
     private UserAccount user;
     private GameBinding binding;

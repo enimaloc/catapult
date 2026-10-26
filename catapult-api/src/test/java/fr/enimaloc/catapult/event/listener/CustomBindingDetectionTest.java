@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.event.listener;
 
+import fr.enimaloc.catapult.service.binding.RaidRestoreGateService;
 import static org.assertj.core.api.Assertions.assertThat;
 import fr.enimaloc.catapult.service.twitch.ChannelUpdateOutcome;
 import fr.enimaloc.catapult.repository.binding.GameMappingRepository;
@@ -118,7 +119,7 @@ class CustomBindingDetectionTest {
         activations = new CustomBindingActivations(activationRepository, experimentService, channelEventPublisher);
         RaidRestoreHold hold = mock(RaidRestoreHold.class);
         chain = new CategoryChain(activations, streamStateService, userSettingsRepository, hold,
-                gameStateService, mock(UserAccountRepository.class), new CategoryApplier(twitchService, streamStateService));
+                gameStateService, mock(UserAccountRepository.class), new CategoryApplier(twitchService, streamStateService), mock(RaidRestoreGateService.class), mock(GameBindingLookup.class));
         listener = new GameEventListener(bindingService, streamStateService, channelEventPublisher, hold,
                 activations, chain);
     }
@@ -281,7 +282,7 @@ class CustomBindingDetectionTest {
         // The edited binding is the game being played: without an activation it would go to Twitch at once
         when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(game));
         CategoryChain realChain = new CategoryChain(activations, streamStateService, userSettingsRepository,
-                mock(RaidRestoreHold.class), gameStateService, mock(UserAccountRepository.class), new CategoryApplier(twitchService, streamStateService));
+                mock(RaidRestoreHold.class), gameStateService, mock(UserAccountRepository.class), new CategoryApplier(twitchService, streamStateService), mock(RaidRestoreGateService.class), mock(GameBindingLookup.class));
         BindingService realBindings = new BindingService(gameBindings, mock(IgdbService.class),
                 mock(IgdbGameDetailsService.class), twitchService, mock(TwResolverService.class),
                 mock(GameMappingRepository.class), new GameBindingLookup(gameBindings), realChain);

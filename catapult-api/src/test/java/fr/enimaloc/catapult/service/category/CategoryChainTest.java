@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.service.category;
 
+import fr.enimaloc.catapult.service.binding.GameBindingLookup;
+import fr.enimaloc.catapult.service.binding.RaidRestoreGateService;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.binding.GameStateService;
 import fr.enimaloc.catapult.domain.account.UserAccount;
@@ -22,6 +24,7 @@ import fr.enimaloc.catapult.service.category.CategoryTrigger.CustomBindingTrigge
 import fr.enimaloc.catapult.service.category.CategoryTrigger.ManualCategory;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.MappingChanged;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.NoGameSettingsSaved;
+import fr.enimaloc.catapult.service.category.CategoryTrigger.RaidedOut;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.RevertCategory;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.NoGameAfterCustomBinding;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.StreamEnded;
@@ -32,13 +35,16 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+import static org.mockito.Mockito.mock;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -54,6 +60,8 @@ class CategoryChainTest {
     @Mock private GameStateService gameStateService;
     @Mock private UserAccountRepository accountRepository;
     @Mock private CategoryApplier applier;
+    @Mock private RaidRestoreGateService gate;
+    @Mock private GameBindingLookup lookup;
 
     private final RaidRestoreHold hold = new RaidRestoreHold();
     private CategoryChain chain;
@@ -64,7 +72,7 @@ class CategoryChainTest {
     @BeforeEach
     void setUp() {
         chain = new CategoryChain(activations, streamStateService, settingsRepository, hold, gameStateService,
-                accountRepository, applier);
+                accountRepository, applier, gate, lookup);
         user = new UserAccount();
         user.setId(UUID.randomUUID());
 
@@ -722,5 +730,122 @@ class CategoryChainTest {
         activeCustom(false);
 
         assertThat(chain.detectionGuard(user, false)).isEqualTo(DetectionGuard.INTERRUPTS_CUSTOM_BINDING);
+    }
+
+    // ---- RaidedOut ----
+
+    private final DetectedGame played = new DetectedGame("570", GameBinding.SourceType.STEAM, "Dota 2");
+
+    private void raidSetUp() {
+        settings.setRaidRestoreGameMinutes(10);
+        withSettings();
+        when(gate.isAvailableReadOnly(user)).thenReturn(true);
+        when(gameStateService.recentlyDetectedGame(user, Duration.ofMinutes(10))).thenReturn(Optional.of(played));
+        lenient().when(lookup.findByDetectedGame(user, played)).thenReturn(Optional.of(binding));
+    }
+
+    @Test
+    void raidedOut_settingOff() {
+        settings.setRaidRestoreGameMinutes(null);
+        withSettings();
+
+        assertThat(chain.decide(user, new RaidedOut("1")))
+                .isEqualTo(CategoryDecision.none(CategoryRule.RAID_RESTORE, Reason.RAID_RESTORE_OFF));
+        verifyNoInteractions(gate);
+    }
+
+    @Test
+    void raidedOut_noSettings() {
+        when(settingsRepository.findById(user.getId())).thenReturn(Optional.empty());
+
+        assertThat(chain.decide(user, new RaidedOut("1")))
+                .isEqualTo(CategoryDecision.none(CategoryRule.RAID_RESTORE, Reason.RAID_RESTORE_OFF));
+        verifyNoInteractions(gate);
+    }
+
+    @Test
+    void raidedOut_underOneMinute() {
+        settings.setRaidRestoreGameMinutes(0);
+        withSettings();
+
+        assertThat(chain.decide(user, new RaidedOut("1")))
+                .isEqualTo(CategoryDecision.none(CategoryRule.RAID_RESTORE, Reason.RAID_RESTORE_OFF));
+        verifyNoInteractions(gate);
+    }
+
+    @Test
+    void raidedOut_gateClosed() {
+        settings.setRaidRestoreGameMinutes(10);
+        withSettings();
+        when(gate.isAvailableReadOnly(user)).thenReturn(false);
+
+        assertThat(chain.decide(user, new RaidedOut("1")))
+                .isEqualTo(CategoryDecision.none(CategoryRule.RAID_RESTORE, Reason.RAID_RESTORE_OFF));
+        verify(gate, never()).isAvailableFor(any());
+    }
+
+    @Test
+    void raidedOut_customBinding() {
+        settings.setRaidRestoreGameMinutes(10);
+        withSettings();
+        when(gate.isAvailableReadOnly(user)).thenReturn(true);
+        activeCustom(false);
+
+        assertThat(chain.decide(user, new RaidedOut("1")))
+                .isEqualTo(CategoryDecision.none(CategoryRule.CUSTOM_BINDING, Reason.CUSTOM_BINDING_ACTIVE));
+        verifyNoInteractions(gameStateService);
+    }
+
+    @Test
+    void raidedOut_nothingRecent() {
+        raidSetUp();
+        when(gameStateService.recentlyDetectedGame(user, Duration.ofMinutes(10))).thenReturn(Optional.empty());
+
+        assertThat(chain.decide(user, new RaidedOut("1")))
+                .isEqualTo(CategoryDecision.none(CategoryRule.RAID_RESTORE, Reason.NOTHING_TO_RESTORE));
+    }
+
+    @Test
+    void raidedOut_ignoredIncompleteOrWithoutTwitchId_nothingToRestore() {
+        raidSetUp();
+        CategoryDecision expected = CategoryDecision.none(CategoryRule.RAID_RESTORE, Reason.NOTHING_TO_RESTORE);
+
+        binding.setIgnored(true);
+        assertThat(chain.decide(user, new RaidedOut("1"))).isEqualTo(expected);
+        binding.setIgnored(false);
+        binding.setStatus(GameBinding.Status.INCOMPLETE);
+        assertThat(chain.decide(user, new RaidedOut("1"))).isEqualTo(expected);
+        binding.setStatus(GameBinding.Status.AUTO);
+        binding.setTwitchGameId(" ");
+        assertThat(chain.decide(user, new RaidedOut("1"))).isEqualTo(expected);
+    }
+
+    @Test
+    void raidedOut_alreadyOnIt() {
+        raidSetUp();
+
+        assertThat(chain.decide(user, new RaidedOut("29595")))
+                .isEqualTo(CategoryDecision.none(CategoryRule.RAID_RESTORE, Reason.ALREADY_ON_CATEGORY));
+    }
+
+    @Test
+    void raidedOut_restores() {
+        raidSetUp();
+
+        assertThat(chain.decide(user, new RaidedOut("509658")))
+                .isEqualTo(CategoryDecision.update(CategoryRule.RAID_RESTORE, binding));
+        assertThat(chain.decide(user, new RaidedOut(null)))
+                .isEqualTo(CategoryDecision.update(CategoryRule.RAID_RESTORE, binding));
+        verify(streamStateService, never()).isLive(any());
+    }
+
+    @Test
+    void raidedOut_decidingTakesNoHold() {
+        raidSetUp();
+
+        chain.decide(user, new RaidedOut("509658"));
+        chain.decide(user, new RaidedOut("29595"));
+
+        assertThat(hold.isHolding(user)).isFalse();
     }
 }

@@ -71,6 +71,7 @@ abstract class ApiChannelActionsTestSupport {
     @MockitoBean TwitchatEventDispatcher twitchatEventDispatcher;
     @MockitoBean SteamProfileDiagnostics steamProfileDiagnostics;
     @MockitoBean RaidRestoreGateService raidRestoreGate;
+    @MockitoBean fr.enimaloc.catapult.service.binding.GameBindingLookup gameBindingLookup;
     @MockitoBean fr.enimaloc.catapult.service.binding.CustomBindingActivations customBindingActivations;
 
     static RequestPostProcessor userJwt(UUID id) {

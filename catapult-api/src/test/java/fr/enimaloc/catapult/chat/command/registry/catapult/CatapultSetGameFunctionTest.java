@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.chat.command.registry.catapult;
 
+import fr.enimaloc.catapult.service.binding.GameBindingLookup;
+import fr.enimaloc.catapult.service.binding.RaidRestoreGateService;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.getter.DetectedGame;
@@ -32,7 +34,7 @@ class CatapultSetGameFunctionTest {
     private static CategoryChain chainOver(TwitchService twitchService) {
         return new CategoryChain(mock(CustomBindingActivations.class), mock(StreamStateService.class),
             mock(UserSettingsRepository.class), new RaidRestoreHold(), mock(GameStateService.class),
-            mock(UserAccountRepository.class), new CategoryApplier(twitchService, mock(StreamStateService.class)));
+            mock(UserAccountRepository.class), new CategoryApplier(twitchService, mock(StreamStateService.class)), mock(RaidRestoreGateService.class), mock(GameBindingLookup.class));
     }
 
     @Test
