@@ -40,7 +40,7 @@ STREAMERS=50 VIEWERS=200 DURATION=5m perf/run.sh --load-only
 | `SENTRY_TRACES_SAMPLE_RATE` | unset   | catapult-web's trace sampling                   |
 
 Runs are tagged `environment=perf` in Sentry. Never set `SENTRY_ENVIRONMENT` or `ENVIRONMENT`:
-catapult-api refuses to start with any other environment. With `API_SENTRY_DSN`, catapult-api also
+catapult-api and catapult-web refuse to start with any other environment. With `API_SENTRY_DSN`, catapult-api also
 joins the `edge` network (`perf/compose.sentry.yml`) to reach Sentry.
 
 The secrets (database password, token encryption key, `perf-` JWT key) are generated for each run.
@@ -113,8 +113,9 @@ web client that is not faked and reaches the internet succeeds silently and leav
 
 catapult-api trusts the `X-Forwarded-*` headers of `perf-internal` (`API_TRUSTED_PROXIES`), as it
 trusts catapult-web's network in production: the links it builds point at the site, and on the
-requests catapult-web relays (`ApiRelayController`) the client address is the viewer's. The subnet is fixed for that; if it clashes with
-a network of yours, change it in `perf/compose.yml` together with `API_TRUSTED_PROXIES`.
+requests catapult-web relays (`ApiRelayController`) the client address is the viewer's. The subnet is
+fixed for that; if it clashes with a network of yours, change it in `perf/compose.yml` together with
+`API_TRUSTED_PROXIES`.
 
 ## Cleaning up by hand
 
