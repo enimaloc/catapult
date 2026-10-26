@@ -16,10 +16,12 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * A channel's account id by its Twitch username: catapult-web's pages name a channel by its username, catapult-api's
- * channel routes by its account id. Asked with the session's JWT, so an unknown caller is a 401 and an unknown
- * channel a 404, as the channel route would answer. A found id is kept {@link #TTL}, by the username as given (the
- * match is exact); nothing else is kept, so an account deleted then re-created under the same name is not addressed
- * by its old id for long, and a refusal is asked again.
+ * channel routes by its account id. Asked with the session's JWT: a missing or invalid token is a 401 and an unknown
+ * channel a 404 (a token whose account was deleted is not a 401: the lookup only needs a member or the loopback,
+ * so it answers as for any caller). The cache is safe across users only because the lookup is not filtered by
+ * access (every member gets the same answer); if it ever filters, the cache must be keyed by caller. A found id is kept
+ * {@link #TTL}, by the username as given (the match is exact); nothing else is kept, so an account deleted then
+ * re-created under the same name is not addressed by its old id for long, and a refusal is asked again.
  */
 @Component
 public class ChannelIds {
