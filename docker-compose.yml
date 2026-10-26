@@ -3,6 +3,11 @@ services:
     build:
       context: .
       dockerfile: catapult-api/Dockerfile
+    networks:
+      default:
+      api-internal:
+        aliases:
+          - catapult-api-internal
     environment:
       - DB_URL=jdbc:postgresql://catapult-db:5432/${POSTGRES_DB}
       - DB_USERNAME=${POSTGRES_USER}
@@ -23,6 +28,10 @@ services:
       # Empty = Sentry off (only members in debug mode are ever sent)
       - API_SENTRY_DSN=${API_SENTRY_DSN:-}
       - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-production}
+      # Who may relay X-Forwarded-* (a Java regex on the peer address): catapult-web, on api-internal only.
+      # Must describe the same subnet as API_NETWORK_SUBNET below. No braces: Compose would end the
+      # interpolation at the first one.
+      - API_TRUSTED_PROXIES=${API_TRUSTED_PROXIES:-10\.250\.250\.[0-9]+}
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8080/actuator/health || exit 1"]
       interval: 10s
@@ -46,12 +55,17 @@ services:
     # WEB_PORTS one host port per instance (e.g. 8081-8083) for the proxy to balance across. No fixed
     # container_name, so the replicas don't collide. Published on the loopback only (WEB_BIND): catapult-web
     # trusts the X-Forwarded-* of private addresses, which only the TLS proxy in front may send it.
+    networks:
+      - default
+      - api-internal
     deploy:
       replicas: ${CATAPULT_WEB_REPLICAS:-1}
     ports:
       - "${WEB_BIND:-127.0.0.1}:${WEB_PORTS:-80}:8081"
     environment:
-      - CATAPULT_API_URL=${CATAPULT_API_URL:-http://catapult-api:8080}
+      # The alias exists on api-internal only, so catapult-web always reaches catapult-api from the trusted
+      # network (on `default` its X-Forwarded-Host would be ignored and the login's redirect_uri wrong).
+      - CATAPULT_API_URL=${CATAPULT_API_URL:-http://catapult-api-internal:8080}
       - REDIS_HOST=catapult-redis
       # Empty = no profile; "degraded" on the backup server
       - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-}
@@ -94,6 +108,15 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+
+networks:
+  # catapult-api <-> catapult-web only. internal: no gateway, so neither the Docker host nor the outside can
+  # open a connection on it. API_NETWORK_SUBNET and API_TRUSTED_PROXIES must describe the same subnet.
+  api-internal:
+    internal: true
+    ipam:
+      config:
+        - subnet: ${API_NETWORK_SUBNET:-10.250.250.0/24}
 
 volumes:
   postgres_data:

@@ -24,6 +24,8 @@ import org.springframework.web.context.request.ServletRequestAttributes;
  * A relayed client ({@code X-Forwarded-For}) is never loopback: with {@code server.forward-headers-strategy=native}
  * the server (Tomcat's {@code RemoteIpValve}) replaces the remote address with the client it resolves from
  * {@code X-Forwarded-For}, so a request relayed by a local proxy carries that client's address, not the proxy's.
+ * Only the proxies of {@code server.tomcat.remoteip.internal-proxies} (loopback by default, catapult-web's network in
+ * compose) are believed; from any other address the header is ignored and the peer's own address is what counts.
  * <p>
  * It also decides who reaches a channel, for {@code @PreAuthorize("@authz.canAccessChannel(#username)")} and
  * {@code @PreAuthorize("@authz.ownsChannel(#username)")}. Those keep the order every channel route answers in: 401 for
