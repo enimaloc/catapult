@@ -68,12 +68,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
 // /api/user/** is public (widget-token authenticated) in ApiSecurityConfig.
 @AutoConfigureMockMvc(addFilters = false)
-@Import(I18nConfig.class)
+@Import({I18nConfig.class, PublicBaseUrl.class})
 class UserApiV2ControllerTest {
     @MockitoBean fr.enimaloc.catapult.service.account.UserApiTokenService userApiTokenService;
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
-    private static final String BASE = "http://localhost:8080/api/user";
+    private static final String BASE = "http://localhost/api/user";
 
     @Autowired MockMvc mvc;
 
@@ -638,8 +638,6 @@ class UserApiV2ControllerTest {
         }
 
         // ---- Task 4: the links use the request's origin ----
-
-        @Disabled("fixed in Task 4")
 
         @Test
         void moreLinksUseTheRequestsOrigin() throws Exception {

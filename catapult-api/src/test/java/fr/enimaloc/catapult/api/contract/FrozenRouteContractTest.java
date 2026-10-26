@@ -262,12 +262,26 @@ class FrozenRouteContractTest extends FullContextTestBase {
                 c("v1-game-lang-fr", "GET", "/api/game/" + t + "?lang=fr"),
                 new Case("v1-game-cors", "GET", "/api/game/" + t, headers("Origin", "https://obs.example")),
                 // the binding's generated id (also in its "more" link) and creation time
-                c("v2-game", "GET", "/api/user/game/" + t, "/catapult/bindingId", "/catapult/createdAt", "/catapult/more"),
+                // as catapult-web's relay sends them: the links name the public origin
+                new Case(
+                        "v2-game",
+                        "GET",
+                        "/api/user/game/" + t,
+                        headers(
+                                "X-Forwarded-Proto", "https",
+                                "X-Forwarded-Host", "catapult.example",
+                                "X-Forwarded-Port", "443"),
+                        "/catapult/bindingId", "/catapult/createdAt", "/catapult/more"),
+                // as catapult-web's relay sends them: the links name the public origin
                 new Case(
                         "v2-game-version-2",
                         "GET",
                         "/api/user/game/" + t,
-                        headers("X-API-Version", "2"),
+                        headers(
+                                "X-API-Version", "2",
+                                "X-Forwarded-Proto", "https",
+                                "X-Forwarded-Host", "catapult.example",
+                                "X-Forwarded-Port", "443"),
                         "/catapult/bindingId", "/catapult/createdAt", "/catapult/more"),
                 c("v2-summary", "GET", "/api/user/summary/" + t),
                 // creation and update time of the binding
