@@ -2,8 +2,8 @@ package fr.enimaloc.catapult;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import fr.enimaloc.catapult.cluster.InstanceBus;
 import fr.enimaloc.catapult.controller.SiteMetaTags;
+import fr.enimaloc.catapult.controller.SiteMetaTagsTestAccess;
 import fr.enimaloc.catapult.perf.FakeApi;
 import fr.enimaloc.catapult.service.debug.DebugMembers;
 import fr.enimaloc.catapult.service.http.ApiClient;
@@ -25,8 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 import okhttp3.mockwebserver.MockWebServer;
 import org.assertj.core.api.SoftAssertions;
 import org.junit.jupiter.api.AfterAll;
@@ -49,9 +47,10 @@ import tools.jackson.databind.json.JsonMapper;
  * count is the last call's, the time the median of the {@value #CALLS}. It is done with {@value FakeApi#SMALL}
  * elements in every collection the pages show, then again with {@value FakeApi#LARGE}.
  *
- * <p>Before every call the caches catapult-web keeps for a while (a channel's id by its login, the meta tags, who
- * is in debug mode) are emptied: a page is counted as it costs once they have expired, not luckily within their
- * TTL, so the count does not depend on how long the run takes.
+ * <p>Before each row's warm-up the caches catapult-web keeps for a while (a channel's id by its login, the meta
+ * tags, who is in debug mode) are emptied, so that the warm-up fills them: the {@value #CALLS} calls that follow,
+ * well within their TTLs (30 s or more), are counted warm, as most pages are served. A cache removed, or its TTL
+ * dropped to nothing, shows as calls over the budget.
  *
  * <p>A row fails when its page answers anything but a 200, calls catapult-api more times than its
  * {@code api_calls} budget (the count measured when the row was written: lower one that drops), takes more than
@@ -74,8 +73,7 @@ class WebPageBudgetTest extends WebFullContextTestBase {
     private static final List<String> HEADER = List.of("method", "path", "caller", "api_calls", "notes");
     private static final String N_PLUS_ONE = "n+1";
     private static final String FIXED = "fixed:";
-    /** SiteMetaTags' topic: its own handler empties the list, ours (registered after it) tells it is done. */
-    private static final String META_TAGS_CLEAR = "meta-tags.clear";
+    private static final String CSRF_TOKEN = "budget-csrf-token";
 
     /** Answers from the start: DegradedState asks catapult-api as soon as the context is up. */
     private static final FakeApi FAKE = new FakeApi(JsonMapper.builder().build());
@@ -107,18 +105,13 @@ class WebPageBudgetTest extends WebFullContextTestBase {
     @Autowired
     SiteMetaTags metaTags;
 
-    @Autowired
-    InstanceBus bus;
-
     private final HttpClient http = HttpClient.newHttpClient();
-    private volatile CountDownLatch metaTagsCleared = new CountDownLatch(0);
     private final Map<Row, Measure> small = new HashMap<>();
     private final Map<Row, Measure> large = new HashMap<>();
 
     /** Measures every row at both sizes up front, so that each row's test only reads its measures. */
     @BeforeAll
     void measure() throws Exception {
-        bus.on(META_TAGS_CLEAR, ignored -> metaTagsCleared.countDown());
         List<Row> rows = rows();
         for (Row row : rows) {
             small.put(row, measure(row));
@@ -149,18 +142,21 @@ class WebPageBudgetTest extends WebFullContextTestBase {
         assertThat(FAKE.unexpected()).as("calls the fake catapult-api has no answer for (each got a 599)").isEmpty();
     }
 
-    /** The count of a page is the same however many times it is shown: no cache left warm by a call before it. */
+    /** A page is the same, and costs the same calls, however many times it is shown once warm. */
     @Test
     void countsAreStableAcrossThreeRuns() throws Exception {
         SoftAssertions softly = new SoftAssertions();
         for (Row row : rows()) {
-            String cookie = login(row.caller());
-            call(row, cookie);
-            List<List<String>> runs = new ArrayList<>();
+            String cookie = warmUp(row);
+            List<Measure> runs = new ArrayList<>();
             for (int i = 0; i < 3; i++) {
-                runs.add(call(row, cookie).calls());
+                runs.add(call(row, cookie));
             }
-            softly.assertThat(runs).as("%s : the calls of three runs", row.label()).containsOnly(runs.getFirst());
+            softly.assertThat(runs).extracting(Measure::calls).as("%s : the calls of three runs", row.label())
+                    .containsOnly(runs.getFirst().calls());
+            // so that grownFixtureChangesThePage sees the fixture, not something new on every answer
+            softly.assertThat(runs).extracting(Measure::body).as("%s : the page of three runs", row.label())
+                    .containsOnly(runs.getFirst().body());
         }
         softly.assertAll();
     }
@@ -186,6 +182,28 @@ class WebPageBudgetTest extends WebFullContextTestBase {
                     .isNotEqualTo(small.get(row).body());
         }
         softly.assertAll();
+    }
+
+    /** The fake's data reach the pages, each as its caller may see it: no page is counted on an empty shell. */
+    @Test
+    void pagesShowWhatTheirCallerMaySee() throws IOException {
+        Map<String, Row> byLabel = new HashMap<>();
+        rows().forEach(row -> byLabel.put(row.label(), row));
+        SoftAssertions softly = new SoftAssertions();
+        // the integration cards are the owner's alone
+        softly.assertThat(body(byLabel, "GET /channel/budget-owner [owner]"))
+                .contains("id=\"twitchat-events\"", "Budget game 4");
+        softly.assertThat(body(byLabel, "GET /channel/budget-owner [visitor]"))
+                .contains("Budget game 4")
+                .doesNotContain("id=\"twitchat-events\"");
+        softly.assertThat(body(byLabel, "GET /admin [admin]")).contains("budget-member-4");
+        softly.assertThat(body(byLabel, "GET /spa/admin/experiments/{id} [admin]")).contains("Budget experiment 0");
+        softly.assertThat(body(byLabel, "GET /spa/nav-channels [owner]")).contains("budget-channel-4");
+        softly.assertAll();
+    }
+
+    private String body(Map<String, Row> byLabel, String label) {
+        return large.get(Objects.requireNonNull(byLabel.get(label), label)).body();
     }
 
     @ParameterizedTest(name = "{0}")
@@ -227,8 +245,7 @@ class WebPageBudgetTest extends WebFullContextTestBase {
 
     /** One warm-up call on a fresh session, then {@value #CALLS}: the last one's calls and answer, the median time. */
     private Measure measure(Row row) throws Exception {
-        String cookie = login(row.caller());
-        call(row, cookie);
+        String cookie = warmUp(row);
         long[] millis = new long[CALLS];
         Measure last = null;
         for (int i = 0; i < CALLS; i++) {
@@ -240,42 +257,52 @@ class WebPageBudgetTest extends WebFullContextTestBase {
         return new Measure(measured.status(), measured.calls(), millis[CALLS / 2], measured.body());
     }
 
-    /** {@code row}'s page once, its caches emptied first (see the class comment). */
-    private Measure call(Row row, String cookie) throws Exception {
+    /** A fresh session for {@code row}'s caller, its caches emptied then filled by a first call: its cookie. */
+    private String warmUp(Row row) throws Exception {
         expireCaches();
+        String cookie = login(row.caller());
+        call(row, cookie);
+        return cookie;
+    }
+
+    /** {@code row}'s page once. */
+    private Measure call(Row row, String cookie) throws Exception {
         HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + row.uri()))
                 .header("Cookie", cookie)
                 .GET()
                 .build();
-        FAKE.mark();
+        FAKE.mark(row.label());
         long start = System.nanoTime();
         HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
         long millis = (System.nanoTime() - start) / 1_000_000;
         return new Measure(response.statusCode(), FAKE.pageCalls(), millis, response.body());
     }
 
-    private void expireCaches() throws InterruptedException {
+    /**
+     * Empties the caches catapult-web keeps for a while (a channel's id by its login, the meta tags, who is in debug
+     * mode), so that the warm-up call that follows fills them, as the first page after they expired does.
+     */
+    private void expireCaches() {
         channelIds.forget(FakeApi.OWNER_LOGIN);
         for (UUID member : List.of(FakeApi.OWNER, FakeApi.VISITOR, FakeApi.ADMIN)) {
             debugMembers.evict(member);
         }
-        // through Redis, as an admin's change empties it on every instance
-        metaTagsCleared = new CountDownLatch(1);
-        metaTags.clear();
-        assertThat(metaTagsCleared.await(5, TimeUnit.SECONDS)).as("the meta tags were emptied").isTrue();
+        SiteMetaTagsTestAccess.clearLocally(metaTags);
     }
 
     /** A new session in Redis, logged in as {@code caller}: the cookie that names it. */
     private String login(String caller) {
-        String jwt = switch (caller) {
-            case "owner" -> FakeApi.jwt(FakeApi.OWNER, List.of("ROLE_USER"));
-            case "visitor" -> FakeApi.jwt(FakeApi.VISITOR, List.of("ROLE_USER"));
-            case "admin" -> FakeApi.jwt(FakeApi.ADMIN, List.of("ROLE_USER", "ROLE_ADMIN"));
+        UUID member = switch (caller) {
+            case "owner" -> FakeApi.OWNER;
+            case "visitor" -> FakeApi.VISITOR;
+            case "admin" -> FakeApi.ADMIN;
             default -> throw new IllegalArgumentException(caller);
         };
-        String id = save(sessions, jwt);
-        // Spring Session's default cookie serializer writes the id in Base64
-        return "JSESSIONID=" + Base64.getEncoder().encodeToString(id.getBytes(StandardCharsets.UTF_8));
+        String id = save(sessions, FakeApi.jwt(member));
+        // Spring Session's default cookie serializer writes the id in Base64; a CSRF cookie of our own, else every
+        // page would carry a new token in its logout form and no two answers would be alike
+        return "JSESSIONID=" + Base64.getEncoder().encodeToString(id.getBytes(StandardCharsets.UTF_8))
+                + "; XSRF-TOKEN=" + CSRF_TOKEN;
     }
 
     private static <S extends Session> String save(SessionRepository<S> repository, String jwt) {
