@@ -1,15 +1,18 @@
 package fr.enimaloc.catapult.api.channel;
 
 import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.steam.SteamApiKeyEntry;
 import fr.enimaloc.catapult.getter.steam.SteamApiKeyRotator;
 import fr.enimaloc.catapult.service.connections.SteamProfileDto;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -40,6 +43,22 @@ class ApiChannelActionsSteamRotatorTest extends ApiChannelActionsTestSupport {
                 .andExpect(status().isNoContent());
 
         verify(rotator).refreshKeys();
+    }
+
+    @Test
+    void steamToken_save_savesPoolsThenPublishes() throws Exception {
+        mvc.perform(put("/api/internal/users/{userId}/settings/steam-personal-token", owner.getId())
+                        .with(userJwt(owner.getId())).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"token\":\"KEY\",\"shared\":true}"))
+                .andExpect(status().isNoContent());
+
+        InOrder order = inOrder(userAccountRepository, steamApiKeyRepository, rotator, channelEventPublisher);
+        order.verify(userAccountRepository).save(owner);
+        order.verify(steamApiKeyRepository).deleteByOwner(owner);
+        order.verify(steamApiKeyRepository).existsById("KEY");
+        order.verify(steamApiKeyRepository).save(any(SteamApiKeyEntry.class));
+        order.verify(rotator).refreshKeys();
+        order.verify(channelEventPublisher).steamProfileChanged(eq(owner.getId()), any());
     }
 
     @Test

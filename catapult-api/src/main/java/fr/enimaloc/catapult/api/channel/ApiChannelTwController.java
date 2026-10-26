@@ -6,7 +6,8 @@ import fr.enimaloc.catapult.common.dto.channel.SaveBody;
 import fr.enimaloc.catapult.common.dto.channel.TwEnabledBody;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.service.binding.BindingService;
-import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
+import fr.enimaloc.catapult.service.binding.ChannelDashboardActions;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -38,9 +39,9 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ApiChannelTwController {
 
-    private final BindingService bindingService;
     private final ApiUserResolver userResolver;
-    private final ChannelEventPublisher channelEventPublisher;
+    private final ChannelDashboardActions dashboardActions;
+    private final BindingService bindingService;
 
     @PreAuthorize("@authz.isSelf(#userId)")
     @PutMapping("/tws")
@@ -49,9 +50,7 @@ public class ApiChannelTwController {
                                         @AuthenticationPrincipal Jwt jwt,
                                         @RequestBody SaveBody body) {
         UserAccount user = userResolver.viewerByTwitchId(jwt);
-        bindingService.setTwsForBinding(user, bindingId,
-                body.tws() == null ? Set.of() : body.tws());
-        publishBinding(user, bindingId);
+        dashboardActions.setTws(user, bindingId, body.tws());
         return ResponseEntity.noContent().build();
     }
 
@@ -61,8 +60,7 @@ public class ApiChannelTwController {
                                          @PathVariable UUID bindingId,
                                          @AuthenticationPrincipal Jwt jwt) {
         UserAccount user = userResolver.viewerByTwitchId(jwt);
-        bindingService.resetTws(user, bindingId);
-        publishBinding(user, bindingId);
+        dashboardActions.resetTws(user, bindingId);
         return ResponseEntity.noContent().build();
     }
 
@@ -73,8 +71,7 @@ public class ApiChannelTwController {
                                                 @AuthenticationPrincipal Jwt jwt,
                                                 @RequestBody TwEnabledBody body) {
         UserAccount user = userResolver.viewerByTwitchId(jwt);
-        bindingService.toggleTwEnabled(user, bindingId, body.enabled());
-        publishBinding(user, bindingId);
+        dashboardActions.toggleTwEnabled(user, bindingId, body.enabled());
         return ResponseEntity.noContent().build();
     }
 
@@ -85,11 +82,5 @@ public class ApiChannelTwController {
                                                @AuthenticationPrincipal Jwt jwt) {
         UserAccount user = userResolver.viewerByTwitchId(jwt);
         return Map.of("preview", bindingService.previewTws(user, bindingId));
-    }
-
-    /** Tells the owner's dashboards about the binding's new state (nothing if it isn't theirs). */
-    private void publishBinding(UserAccount user, UUID bindingId) {
-        bindingService.findBinding(user, bindingId)
-                .ifPresent(binding -> channelEventPublisher.bindingUpserted(user.getId(), binding));
     }
 }
