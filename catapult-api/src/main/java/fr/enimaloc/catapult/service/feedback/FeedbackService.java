@@ -7,8 +7,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -21,8 +23,10 @@ public class FeedbackService {
     private final FeedbackSubmissionRepository repository;
     private final GitLabClient gitLabClient;
 
-    public List<FeedbackSubmission> list(UserAccount user) {
-        return repository.findByUserOrderByCreatedAtDesc(user);
+    /** The member's submissions, newest first, without the (lazy) member: mapped inside the transaction. */
+    @Transactional(readOnly = true)
+    public List<Submission> list(UserAccount user) {
+        return repository.findByUserOrderByCreatedAtDesc(user).stream().map(Submission::of).toList();
     }
 
     /** Opens the GitLab issue first, then saves the submission. */
@@ -65,5 +69,17 @@ public class FeedbackService {
 
     private static String strippedOrNull(String text) {
         return text != null && !text.isBlank() ? text.strip() : null;
+    }
+
+    /** A submission as its member lists it: every column but the member. */
+    public record Submission(UUID id, FeedbackSubmission.Type type, String title, String description,
+                             int gitlabIssueIid, String gitlabIssueUrl, Instant lastKnownUpdatedAt,
+                             boolean subscribed, Instant createdAt) {
+
+        static Submission of(FeedbackSubmission submission) {
+            return new Submission(submission.getId(), submission.getType(), submission.getTitle(),
+                    submission.getDescription(), submission.getGitlabIssueIid(), submission.getGitlabIssueUrl(),
+                    submission.getLastKnownUpdatedAt(), submission.isSubscribed(), submission.getCreatedAt());
+        }
     }
 }

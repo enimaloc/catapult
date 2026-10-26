@@ -84,9 +84,18 @@ class ApiFeedbackControllerTest {
     @Test
     void list_returnsTheViewersOwnSubmissions() {
         FeedbackSubmission mine = new FeedbackSubmission();
+        mine.setId(UUID.randomUUID());
+        mine.setUser(viewer);
+        mine.setType(FeedbackSubmission.Type.BUG);
+        mine.setTitle("Crash");
+        mine.setGitlabIssueIid(42);
+        mine.setGitlabIssueUrl("https://gitlab/issues/42");
+        mine.setLastKnownUpdatedAt(Instant.EPOCH);
         when(repository.findByUserOrderByCreatedAtDesc(viewer)).thenReturn(List.of(mine));
 
-        assertThat(controller.list(UUID.randomUUID(), jwt)).containsExactly(mine);
+        assertThat(controller.list(UUID.randomUUID(), jwt)).containsExactly(new FeedbackService.Submission(
+                mine.getId(), FeedbackSubmission.Type.BUG, "Crash", null, 42, "https://gitlab/issues/42",
+                Instant.EPOCH, true, null));
     }
 
     @Test
