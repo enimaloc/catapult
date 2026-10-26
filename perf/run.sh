@@ -146,9 +146,21 @@ scan_outbound() {
 }
 
 # ── Measurement hooks ────────────────────────────────────────────────────
-# Page timings (Playwright, task 8): writes ${REPORT_DIR}/pages.json.
+# Page timings (Playwright, e2e/tests/perf): writes ${REPORT_DIR}/pages.json.
 run_pages() {
-    echo "TODO: page timings (Playwright) are not wired yet"
+    echo "Page timings (headless Chromium)"
+    [[ -d "${REPO_DIR}/e2e/node_modules" ]] || run npm --prefix "${REPO_DIR}/e2e" install
+    local status=0
+    (
+        cd "${REPO_DIR}/e2e"
+        PERF_BASE_URL="${BASE_URL}" PERF_RESULTS_DIR="${REPORT_DIR}" \
+            exec npx playwright test --project=perf
+    ) &
+    child=$!
+    wait "${child}" || status=$?
+    child=""
+    [[ -f "${REPORT_DIR}/pages.json" ]] && echo "Wrote ${REPORT_DIR}/pages.json"
+    return "${status}"
 }
 
 # Load (k6, task 9): writes ${REPORT_DIR}/k6-summary.json and ${REPORT_DIR}/docker-stats.csv.
