@@ -2,6 +2,8 @@ name: Build
 
 on:
   push:
+  # Lets renovate-merge.yml run it on master after a checkbox merge, which GITHUB_TOKEN pushes cannot trigger
+  workflow_dispatch:
 
 jobs:
   build:
