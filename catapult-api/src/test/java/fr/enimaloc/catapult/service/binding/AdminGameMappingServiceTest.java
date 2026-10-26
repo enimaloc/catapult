@@ -8,7 +8,6 @@ import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.binding.GameBinding.SourceType;
 import fr.enimaloc.catapult.domain.binding.GameBinding.Status;
 import fr.enimaloc.catapult.domain.binding.GameMapping;
-import fr.enimaloc.catapult.event.listener.GameEventListener;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
@@ -75,6 +74,7 @@ class AdminGameMappingServiceTest {
 
     BindingService bindingService;
     CategoryChain chain;
+    CustomBindingActivations chainActivations;
     AdminGameMappingService service;
     UserAccount admin;
     final AtomicBoolean committed = new AtomicBoolean();
@@ -83,6 +83,7 @@ class AdminGameMappingServiceTest {
     @BeforeEach
     void setUp() {
         CustomBindingActivations activations = mock(CustomBindingActivations.class);
+        chainActivations = activations;
         chain = spy(new CategoryChain(activations, streamStateService, userSettingsRepository,
                 raidRestoreHold, gameStateService, new CategoryApplier(twitchService, streamStateService)));
         bindingService = spy(new BindingService(bindingRepo, igdbService, igdbGameDetailsService, twitchService,
@@ -356,6 +357,27 @@ class AdminGameMappingServiceTest {
         assertThat(result.liveChannelsUpdated()).isZero();
         assertThat(result.liveChannelsFailed()).isEqualTo(1);
         assertThat(result.mapping()).isNotNull();
+    }
+
+    @Test
+    void aDecisionErrorCountsAsFailed_andTheLoopContinues() {
+        UserAccount first = user("first");
+        UserAccount second = user("second");
+        bindingsOfTheGame(binding(first, "730", Status.AUTO), binding(second, "730", Status.AUTO));
+        liveOn(first, "730");
+        liveOn(second, "730");
+        when(gameStateService.lastKnownGames()).thenReturn(Map.of(
+                first.getId(), new DetectedGame("730", SourceType.STEAM, "CS2"),
+                second.getId(), new DetectedGame("730", SourceType.STEAM, "CS2")));
+        when(chainActivations.active(first)).thenThrow(new IllegalStateException("db down"));
+        when(chainActivations.active(second)).thenReturn(Optional.empty());
+
+        GameMappingResult result = service.create(request("730", "32399", true), admin);
+
+        assertThat(result.liveChannelsUpdated()).isEqualTo(1);
+        assertThat(result.liveChannelsFailed()).isEqualTo(1);
+        verify(twitchService, never()).updateChannelReporting(eq(first), any());
+        verify(twitchService).updateChannelReporting(eq(second), any());
     }
 
     @Test

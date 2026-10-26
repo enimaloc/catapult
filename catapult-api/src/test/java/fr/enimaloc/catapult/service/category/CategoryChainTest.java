@@ -545,6 +545,18 @@ class CategoryChainTest {
     }
 
     @Test
+    void mappingChanged_incompleteLiveWithoutFallback() {
+        when(activations.active(user)).thenReturn(Optional.empty());
+        binding.setStatus(GameBinding.Status.INCOMPLETE);
+        live(true);
+        settings.setIncompleteFallbackTwitchGameId(null);
+        withSettings();
+
+        assertThat(chain.decide(user, new MappingChanged(binding))).isEqualTo(
+                CategoryDecision.none(CategoryRule.INCOMPLETE_FALLBACK, Reason.NOTHING_CONFIGURED));
+    }
+
+    @Test
     void mappingChanged_live() {
         when(activations.active(user)).thenReturn(Optional.empty());
         live(true);

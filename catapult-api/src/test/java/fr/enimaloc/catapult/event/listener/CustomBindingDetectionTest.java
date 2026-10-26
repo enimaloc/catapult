@@ -144,7 +144,8 @@ class CustomBindingDetectionTest {
     void anAdminMappingChange_isNotAppliedWhileACustomBindingIsActive() {
         activate(false);
 
-        assertThat(chain.apply(user, new MappingChanged(gameBinding)).status()).isEqualTo(ChannelUpdateOutcome.SKIPPED);
+        assertThat(chain.apply(user, new MappingChanged(gameBinding)).status())
+                .isEqualTo(ChannelUpdateOutcome.SKIPPED);
 
         verify(twitchService, never()).updateChannelReporting(any(), any());
         verify(activationRepository, never()).deleteById(any());
