@@ -16,10 +16,15 @@ import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.chatcommand.ChatCommandDefinitionRepository;
 import fr.enimaloc.catapult.service.account.ChannelAccessService;
+import fr.enimaloc.catapult.service.chatcommand.ChatCommandDefinitionService;
+import fr.enimaloc.catapult.service.chatcommand.ChatCommandGate;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import fr.enimaloc.catapult.service.twitch.SystemTwitchAccountService;
 import fr.enimaloc.catapult.service.twitch.TwitchChatService;
+import fr.enimaloc.catapult.event.ChatCommandDefinitionChangedEvent;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.thymeleaf.autoconfigure.ThymeleafAutoConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -44,6 +49,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -59,7 +65,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         controllers = ApiChatCommandsController.class,
         excludeAutoConfiguration = ThymeleafAutoConfiguration.class,
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
-@Import({JsCompiler.class, ServiceFunctionRegistry.class, TwitchShoutoutFunction.class, ApiUserResolver.class})
+@Import({JsCompiler.class, ServiceFunctionRegistry.class, TwitchShoutoutFunction.class, ApiUserResolver.class,
+        ChatCommandDefinitionService.class, ChatCommandGate.class})
+@RecordApplicationEvents
 class ApiChatCommandsControllerTest {
 
     private static final UUID SELF = UUID.randomUUID();
@@ -67,6 +75,7 @@ class ApiChatCommandsControllerTest {
     @MockitoBean ChannelAccessService channelAccessService;
 
     @Autowired MockMvc mvc;
+    @Autowired ApplicationEvents events;
     final ObjectMapper om = new ObjectMapper();
     @MockitoBean ChatCommandDefinitionRepository repository;
     @MockitoBean ChatCommandPresetCatalog catalog;
@@ -423,5 +432,127 @@ class ApiChatCommandsControllerTest {
                 .andExpect(status().isNotFound());
 
         verify(repository, never()).delete(any(ChatCommandDefinition.class));
+    }
+
+    private String upsertBody(String name) throws Exception {
+        return om.writeValueAsString(Map.of(
+                "name", name,
+                "template", "Hi",
+                "permission", "VIEWERS",
+                "enabled", true));
+    }
+
+    private long changedEvents() {
+        return events.stream(ChatCommandDefinitionChangedEvent.class).count();
+    }
+
+    @Test
+    void create_publishesTheChangeAfterSaving() throws Exception {
+        mockUser();
+        when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
+        when(repository.save(any())).thenAnswer(inv -> {
+            // The resolver's cache is evicted by this event: it must not fire before the save.
+            assertThat(changedEvents()).isZero();
+            ChatCommandDefinition d = inv.getArgument(0);
+            d.setId(UUID.randomUUID());
+            return d;
+        });
+
+        mvc.perform(withAdmin(post(OWN + "/chat-commands"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(upsertBody("!foo")))
+                .andExpect(status().isCreated());
+
+        verify(repository).save(any(ChatCommandDefinition.class));
+        assertThat(changedEvents()).isEqualTo(1);
+    }
+
+    @Test
+    void post_reservedName_returns409() throws Exception {
+        mockUser();
+        when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
+
+        mvc.perform(withAdmin(post(OWN + "/chat-commands"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(upsertBody("!setgame")))
+                .andExpect(status().isConflict());
+
+        verify(repository, never()).save(any());
+        assertThat(changedEvents()).isZero();
+    }
+
+    @Test
+    void post_duplicateName_returns409() throws Exception {
+        mockUser();
+        when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
+        when(repository.existsByUserAndName(any(), eq("!foo"))).thenReturn(true);
+
+        mvc.perform(withAdmin(post(OWN + "/chat-commands"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(upsertBody("!foo")))
+                .andExpect(status().isConflict());
+
+        verify(repository, never()).save(any());
+        assertThat(changedEvents()).isZero();
+    }
+
+    @Test
+    void delete_builtin_returns409() throws Exception {
+        UserAccount user = mockUser();
+        when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
+        UUID id = UUID.randomUUID();
+        ChatCommandDefinition builtin = definition("!setgame", "builtin:setgame", true);
+        builtin.setId(id);
+        builtin.setUser(user);
+        when(repository.findById(id)).thenReturn(Optional.of(builtin));
+
+        mvc.perform(withAdmin(delete(OWN + "/chat-commands/{id}", id)))
+                .andExpect(status().isConflict());
+
+        verify(repository, never()).delete(any(ChatCommandDefinition.class));
+        assertThat(changedEvents()).isZero();
+    }
+
+    @Test
+    void instantiatePreset_unknown_returns404_taken_returns409() throws Exception {
+        mockUser();
+        when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
+        when(catalog.instantiate(any(), eq("nope"), any())).thenThrow(new IllegalArgumentException("Unknown preset"));
+        when(catalog.instantiate(any(), eq("taken"), any())).thenThrow(new IllegalStateException("Already instantiated"));
+
+        mvc.perform(withAdmin(post(OWN + "/chat-commands/presets/{key}", "nope")))
+                .andExpect(status().isNotFound());
+        mvc.perform(withAdmin(post(OWN + "/chat-commands/presets/{key}", "taken")))
+                .andExpect(status().isConflict());
+
+        assertThat(changedEvents()).isZero();
+    }
+
+    @Test
+    void list_firstVisit_seedsThePresetsDisabled() throws Exception {
+        UserAccount user = mockUser();
+        when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
+        when(repository.findByUser(any())).thenReturn(List.of());
+
+        mvc.perform(withAdmin(get(OWN + "/chat-commands")))
+                .andExpect(status().isOk());
+
+        verify(catalog).ensureBuiltins(any(), any());
+        verify(catalog, times(1)).bootstrapPresetsDisabled(any(), any());
+        verify(repository, times(2)).findByUser(any());
+    }
+
+    @Test
+    void list_withoutSystemBot_reportsModded() throws Exception {
+        mockUser();
+        when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
+        when(repository.findByUser(any())).thenReturn(List.of());
+        when(systemAccount.getSystemTwitchId()).thenReturn(null);
+
+        mvc.perform(withAdmin(get(OWN + "/chat-commands")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.botModStatus.modded").value(true));
+
+        verify(systemAccount, never()).check(any(), any());
     }
 }

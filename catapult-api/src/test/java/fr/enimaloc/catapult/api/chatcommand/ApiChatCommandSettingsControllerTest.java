@@ -6,6 +6,8 @@ import fr.enimaloc.catapult.domain.chatcommand.ChatCommandSetting;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.chatcommand.ChatCommandSettingRepository;
 import fr.enimaloc.catapult.service.account.ChannelAccessService;
+import fr.enimaloc.catapult.service.chatcommand.ChatCommandGate;
+import fr.enimaloc.catapult.service.chatcommand.ChatCommandSettingService;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -35,7 +37,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(ApiChatCommandSettingsController.class)
-@Import(ApiUserResolver.class)
+@Import({ApiUserResolver.class, ChatCommandSettingService.class, ChatCommandGate.class})
 class ApiChatCommandSettingsControllerTest {
 
     private static final UUID SELF = UUID.randomUUID();
@@ -131,5 +133,17 @@ class ApiChatCommandSettingsControllerTest {
                 .andExpect(status().isNoContent());
 
         verify(repository).deleteByUserAndKey(user, "language");
+    }
+
+    @Test
+    void upsert_closedGateBeatsAnInvalidKey() throws Exception {
+        mockUser();
+        when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(false);
+
+        mvc.perform(withAdmin(put(OWN + "/chat-command-settings/{key}", "not a valid key"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(om.writeValueAsString(Map.of("value", "fr"))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("feature_disabled"));
     }
 }

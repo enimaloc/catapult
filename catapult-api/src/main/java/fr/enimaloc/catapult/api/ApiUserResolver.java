@@ -53,6 +53,19 @@ public class ApiUserResolver {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
     }
 
+    /** The caller by the JWT's {@code twitchId} claim, or empty when there is no token or no such account. */
+    public Optional<UserAccount> viewerByTwitchIdIfAny(Jwt jwt) {
+        if (jwt == null) {
+            return Optional.empty();
+        }
+        String twitchId = jwt.getClaimAsString("twitchId");
+        UserAccount remembered = twitchId == null ? null : remembered(TWITCH_KEY + twitchId);
+        if (remembered != null && twitchId.equals(remembered.getTwitchId())) {
+            return Optional.of(remembered);
+        }
+        return remember(userAccountRepository.findByTwitchId(twitchId));
+    }
+
     /**
      * {@code jwt}, or 401 when the request carries none — the chain lets token-less requests
      * through in dev and from localhost, so a missing token reaches the controllers.
