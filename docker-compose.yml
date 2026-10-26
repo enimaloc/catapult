@@ -53,8 +53,10 @@ services:
     # Several instances can run behind the TLS proxy in front (sessions and browser events go through
     # Redis): raise CATAPULT_WEB_REPLICAS, or `docker compose up --scale catapult-web=N`, and give
     # WEB_PORTS one host port per instance (e.g. 8081-8083) for the proxy to balance across. No fixed
-    # container_name, so the replicas don't collide. Published on the loopback only (WEB_BIND): catapult-web
-    # trusts the X-Forwarded-* of private addresses, which only the TLS proxy in front may send it.
+    # container_name, so the replicas don't collide. Published on the loopback only (WEB_BIND), so the TLS
+    # proxy arrives from the `default` network's gateway, which is what WEB_TRUSTED_PROXIES trusts (the
+    # gateways Docker's default address pools give). With custom `default-address-pools` in the Docker daemon,
+    # set it to that gateway: docker network inspect <project>_default -f '{{(index .IPAM.Config 0).Gateway}}'
     networks:
       - default
       - api-internal
@@ -66,6 +68,9 @@ services:
       # The alias exists on api-internal only, so catapult-web always reaches catapult-api from the trusted
       # network (on `default` its X-Forwarded-Host would be ignored and the login's redirect_uri wrong).
       - CATAPULT_API_URL=${CATAPULT_API_URL:-http://catapult-api-internal:8080}
+      # Who may relay X-Forwarded-* (a Java regex on the peer address). No braces: Compose would end the
+      # interpolation at the first one.
+      - WEB_TRUSTED_PROXIES=${WEB_TRUSTED_PROXIES:-172\.(1[6-9]|2[0-9]|3[01])\.0\.1|192\.168\.(0|16|32|48|64|80|96|112|128|144|160|176|192|208|224|240)\.1}
       - REDIS_HOST=catapult-redis
       # Empty = no profile; "degraded" on the backup server
       - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-}
