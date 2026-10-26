@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.userapi;
 
+import fr.enimaloc.catapult.service.link.ExternalLinks;
 import com.fasterxml.jackson.annotation.JsonView;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
@@ -258,9 +259,9 @@ public class UserApiV2Controller {
             return ResponseEntity.notFound().build();
         }
         IgdbGameDetails d = details.get();
-        List<String> videoUrls = d.getVideoIds().stream().map(id -> "https://www.youtube.com/watch?v=" + id).toList();
+        List<String> videoUrls = d.getVideoIds().stream().map(id -> ExternalLinks.youtubeVideo(id)).toList();
         return ResponseEntity.ok(new IgdbDetailResponse(baseUrl, d.getSlug(),
-                "https://www.igdb.com/games/" + d.getSlug(),
+                ExternalLinks.igdbGame(d.getSlug()),
                 d.getSummary(), d.getStoryline(), d.getPlatforms(), d.getRating(), d.getAggregatedRating(),
                 d.getTotalRating(), d.getTotalRatingCount(), d.getFirstReleaseDate(), new HashMap<>(d.getWebsites()),
                 IgdbDetailResponse.zipRefs(d.getDlcIds(), d.getDlcNames(), baseUrl),
@@ -303,7 +304,7 @@ public class UserApiV2Controller {
         Set<String> ccls = steamStoreService.fetchCcls(List.of(appId)).getOrDefault(appId, Set.of());
         SteamStoreService.ResolvedParentApp parentApp = steamStoreService.resolveEffectiveApp(appId).orElse(null);
         GameInfoResponse.IaDisclosure ia = iaDisclosure(appId, steamLocale);
-        return ResponseEntity.ok(new SteamDetailResponse("https://store.steampowered.com/app/" + appId,
+        return ResponseEntity.ok(new SteamDetailResponse(ExternalLinks.steamApp(appId),
                 ccls, ia, parentApp == null ? null : new SteamDetailResponse.ParentApp(baseUrl, parentApp),
                 new SteamDetailResponse.Page(baseUrl, steamLocale, page.get())));
     }
@@ -350,7 +351,7 @@ public class UserApiV2Controller {
             return ResponseEntity.notFound().build();
         }
         return ResponseEntity.ok(new DtddDetailResponse(
-                "https://www.doesthedogdie.com/media/" + dtddId,
+                ExternalLinks.dtddMedia(dtddId),
                 topics.map(DtddApiClient.DtddTopics::yesTopics).orElse(List.of()),
                 topics.map(DtddApiClient.DtddTopics::noTopics).orElse(List.of()),
                 topics.map(DtddApiClient.DtddTopics::mostlyTopics).orElse(List.of()),
@@ -409,7 +410,7 @@ public class UserApiV2Controller {
         Set<String> twIds = topics.isEmpty() ? Set.of() : twDtddTopicMappingRepository.findTwIdsByDtddTopicNameInIgnoreCase(
                 topics.stream().map(t -> t.toLowerCase(Locale.ROOT)).collect(Collectors.toSet()));
         return new GameInfoResponse.DtddObject(mapping.getDtddId(),
-                "https://www.doesthedogdie.com/media/" + mapping.getDtddId(), twIds, localizeTws(twIds, locale),
+                ExternalLinks.dtddMedia(mapping.getDtddId()), twIds, localizeTws(twIds, locale),
                 moreUrl("/dtdd/" + mapping.getDtddId()));
     }
 

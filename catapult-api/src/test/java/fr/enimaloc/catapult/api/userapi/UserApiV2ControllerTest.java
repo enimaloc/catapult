@@ -570,7 +570,6 @@ class UserApiV2ControllerTest {
 
         // ---- Task 2: the IGDB page lives under /games/ ----
 
-        @Disabled("fixed in Task 2")
 
         @Test
         void igdbObjectLinksTheIgdbGamesPage() throws Exception {
@@ -580,7 +579,6 @@ class UserApiV2ControllerTest {
                     .andExpect(jsonPath("$.igdb.url").value(IGDB_GAMES + "valheim"));
         }
 
-        @Disabled("fixed in Task 2")
 
         @Test
         void summaryIgdbUrlIsTheIgdbGamesPage() throws Exception {
@@ -590,7 +588,6 @@ class UserApiV2ControllerTest {
                     .andExpect(jsonPath("$.igdbUrl").value(IGDB_GAMES + "valheim"));
         }
 
-        @Disabled("fixed in Task 2")
 
         @Test
         void blankSlugHasNoIgdbPage() throws Exception {

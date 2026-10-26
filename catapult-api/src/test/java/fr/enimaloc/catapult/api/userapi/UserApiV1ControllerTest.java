@@ -258,7 +258,6 @@ class UserApiV1ControllerTest {
     }
 
     /** An IGDB game without a slug has no IGDB page: null, not a link ending at /games/. */
-    @Disabled("fixed in Task 2")
     @Test
     void gameInfo_blankSlug_hasNullIgdbUrl() throws Exception {
         UUID token = UUID.randomUUID();
