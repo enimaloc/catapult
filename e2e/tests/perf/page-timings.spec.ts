@@ -137,6 +137,8 @@ function tabTest(user: string, name: string, pageUrl: string, tabs: string, tab:
   });
 }
 
+test.skip(!process.env.PERF_BASE_URL, "perf/run.sh only: needs a perf stack (PERF_BASE_URL)");
+
 test.describe("streamer", () => {
   test.beforeAll(openCustomBindingsExperiment);
 
