@@ -19,7 +19,10 @@ import fr.enimaloc.catapult.service.category.CategoryTrigger.BindingEdited;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.GameClosed;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.GameDetected;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.CustomBindingTriggered;
+import fr.enimaloc.catapult.service.category.CategoryTrigger.ManualCategory;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.MappingChanged;
+import fr.enimaloc.catapult.service.category.CategoryTrigger.NoGameSettingsSaved;
+import fr.enimaloc.catapult.service.category.CategoryTrigger.RevertCategory;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.NoGameAfterCustomBinding;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.StreamEnded;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.StreamStarted;
@@ -628,6 +631,67 @@ class CategoryChainTest {
         assertThat(decision.binding().getTwitchGameId()).isEqualTo("509660");
         assertThat(decision.binding().getSourceName()).startsWith(CustomBinding.SOURCE_NAME_PREFIX);
         verify(streamStateService, never()).isLive(any());
+    }
+
+    // ---- ManualCategory, RevertCategory, NoGameSettingsSaved ----
+
+    @Test
+    void manualCategory_alwaysUpdates() {
+        assertThat(chain.decide(user, new ManualCategory(binding)))
+                .isEqualTo(CategoryDecision.update(CategoryRule.MANUAL_CHOICE, binding));
+
+        verify(streamStateService, never()).isLive(any());
+        verifyNoInteractions(activations);
+    }
+
+    @Test
+    void revertCategory_alwaysSets() {
+        assertThat(chain.decide(user, new RevertCategory("509658", "Just Chatting")))
+                .isEqualTo(CategoryDecision.setCategory(CategoryRule.MANUAL_CHOICE, "509658", "Just Chatting"));
+
+        verify(streamStateService, never()).isLive(any());
+        verifyNoInteractions(activations);
+    }
+
+    @Test
+    void noGameSettingsSaved_nothingDetected() {
+        when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.empty());
+        when(activations.active(user)).thenReturn(Optional.empty());
+
+        assertThat(chain.decide(user, new NoGameSettingsSaved()))
+                .isEqualTo(CategoryDecision.reset(CategoryRule.DEFAULT_CATEGORY));
+
+        verify(streamStateService, never()).isLive(any());
+        verifyNoInteractions(settingsRepository);
+    }
+
+    @Test
+    void noGameSettingsSaved_nothingDetected_ignoresTheRaidHold() {
+        hold.hold(user);
+        when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.empty());
+        when(activations.active(user)).thenReturn(Optional.empty());
+
+        assertThat(chain.decide(user, new NoGameSettingsSaved()).action()).isEqualTo(Action.RESET_TO_DEFAULT);
+    }
+
+    @Test
+    void noGameSettingsSaved_gameDetected() {
+        when(gameStateService.getLastKnownGame(user))
+                .thenReturn(Optional.of(new DetectedGame("570", GameBinding.SourceType.STEAM, "Dota 2")));
+
+        assertThat(chain.decide(user, new NoGameSettingsSaved()))
+                .isEqualTo(CategoryDecision.none(CategoryRule.DEFAULT_CATEGORY, Reason.GAME_DETECTED));
+
+        verifyNoInteractions(activations);
+    }
+
+    @Test
+    void noGameSettingsSaved_customBinding() {
+        when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.empty());
+        activeCustom(false);
+
+        assertThat(chain.decide(user, new NoGameSettingsSaved()))
+                .isEqualTo(CategoryDecision.none(CategoryRule.CUSTOM_BINDING, Reason.CUSTOM_BINDING_ACTIVE));
     }
 
     // ---- detectionGuard ----

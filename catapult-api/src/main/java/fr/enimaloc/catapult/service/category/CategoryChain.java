@@ -16,8 +16,11 @@ import fr.enimaloc.catapult.service.category.CategoryTrigger.BindingEdited;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.CustomBindingTriggered;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.GameClosed;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.GameDetected;
+import fr.enimaloc.catapult.service.category.CategoryTrigger.ManualCategory;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.MappingChanged;
+import fr.enimaloc.catapult.service.category.CategoryTrigger.NoGameSettingsSaved;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.NoGameAfterCustomBinding;
+import fr.enimaloc.catapult.service.category.CategoryTrigger.RevertCategory;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.StreamEnded;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.StreamStarted;
 import lombok.RequiredArgsConstructor;
@@ -76,6 +79,10 @@ public class CategoryChain {
             case BindingEdited edited -> bindingEdited(user, edited.binding());
             case MappingChanged changed -> mappingChanged(user, changed.binding());
             case CustomBindingTriggered triggered -> customBindingTriggered(user, triggered.binding());
+            case ManualCategory manual -> CategoryDecision.update(CategoryRule.MANUAL_CHOICE, manual.binding());
+            case RevertCategory revert -> CategoryDecision.setCategory(CategoryRule.MANUAL_CHOICE,
+                    revert.twitchGameId(), revert.twitchGameName());
+            case NoGameSettingsSaved saved -> noGameSettingsSaved(user);
         };
     }
 
@@ -131,6 +138,17 @@ public class CategoryChain {
                 .orElse(false);
         if (!botActive) return CategoryDecision.none(CategoryRule.CUSTOM_BINDING, Reason.BOT_INACTIVE);
         return CategoryDecision.update(CategoryRule.CUSTOM_BINDING, binding.toGameBinding(user));
+    }
+
+    /** The default category at once, only when nothing is detected now and then no custom binding holds the channel. */
+    private CategoryDecision noGameSettingsSaved(UserAccount user) {
+        if (gameStateService.getLastKnownGame(user).isPresent()) {
+            return CategoryDecision.none(CategoryRule.DEFAULT_CATEGORY, Reason.GAME_DETECTED);
+        }
+        if (customBindingActivations.active(user).isPresent()) {
+            return CategoryDecision.none(CategoryRule.CUSTOM_BINDING, Reason.CUSTOM_BINDING_ACTIVE);
+        }
+        return CategoryDecision.reset(CategoryRule.DEFAULT_CATEGORY);
     }
 
     private CategoryDecision streamStarted(UserAccount user) {

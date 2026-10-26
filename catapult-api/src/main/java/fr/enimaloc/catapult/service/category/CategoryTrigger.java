@@ -47,4 +47,23 @@ public sealed interface CategoryTrigger {
      * is off or the account inactive (then nothing is sent).
      */
     record CustomBindingTriggered(CustomBinding binding) implements CategoryTrigger {}
+
+    /**
+     * {@code !setgame}: the chosen category sent as a transient MANUAL binding without CCLs, live or not, a custom
+     * binding or not (the caller ends it afterwards).
+     */
+    record ManualCategory(GameBinding binding) implements CategoryTrigger {}
+
+    /**
+     * A Twitchat revert action: the payload's category set by its game id alone, live or not, a custom binding or not
+     * (the caller ends it afterwards).
+     */
+    record RevertCategory(String twitchGameId, String twitchGameName) implements CategoryTrigger {}
+
+    /**
+     * The no-game settings were saved: the default category applies at once when no game is detected and no custom
+     * binding is active. No live check, no {@code applyDefaultOnNoGame} and no raid hold: the streamer just asked
+     * for it.
+     */
+    record NoGameSettingsSaved() implements CategoryTrigger {}
 }

@@ -220,16 +220,16 @@ public class ChannelFixture {
         customBindingService = new CustomBindingService(customBindingRepository, activations,
                 experimentService, gameStateService, streamStateService, accountRepository,
                 tokenRepository, listener, publisher, categoryChain);
-        setGameFunction = new CatapultSetGameFunction(twitch, gameStateService, igdbService, activations);
-        twitchatActionExecutor = new TwitchatActionExecutor(actionTokenService, accountRepository, twitch,
+        setGameFunction = new CatapultSetGameFunction(twitch, categoryChain, gameStateService, igdbService,
+                activations);
+        twitchatActionExecutor = new TwitchatActionExecutor(actionTokenService, accountRepository, categoryChain,
                 bindingService, mock(BotToggleService.class), activations);
         channelActionsController = new ApiChannelActionsController(accountRepository, settingsRepository,
-                new ApiUserResolver(accountRepository), bindingService, mock(BotToggleService.class), twitch,
-                gameStateService, mock(AccountService.class), mock(SchedulerService.class),
+                new ApiUserResolver(accountRepository), bindingService, mock(BotToggleService.class),
+                categoryChain, gameStateService, mock(AccountService.class), mock(SchedulerService.class),
                 mock(TokenEncryptionService.class), mock(SteamApiKeyRepository.class), publisher,
                 mock(TwitchatWidgetSettingsService.class), mock(TwitchatEventActionService.class), dispatcher,
-                mock(SteamProfileDiagnostics.class), new RaidRestoreGateService(experimentService), activations,
-                Optional.empty());
+                mock(SteamProfileDiagnostics.class), new RaidRestoreGateService(experimentService), Optional.empty());
     }
 
     /** The category events and Twitch writes, in order. */

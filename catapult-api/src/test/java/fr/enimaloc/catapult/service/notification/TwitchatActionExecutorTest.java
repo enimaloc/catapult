@@ -7,11 +7,16 @@ import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.account.BotToggleService;
 import fr.enimaloc.catapult.service.binding.BindingService;
 import fr.enimaloc.catapult.service.binding.CustomBindingActivations;
+import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
+import fr.enimaloc.catapult.service.binding.GameStateService;
+import fr.enimaloc.catapult.service.binding.RaidRestoreHold;
+import fr.enimaloc.catapult.service.binding.StreamStateService;
+import fr.enimaloc.catapult.service.category.CategoryApplier;
+import fr.enimaloc.catapult.service.category.CategoryChain;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -20,6 +25,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -31,7 +37,7 @@ class TwitchatActionExecutorTest {
     @Mock private BindingService bindingService;
     @Mock private BotToggleService botToggleService;
     @Mock private CustomBindingActivations customBindingActivations;
-    @InjectMocks private TwitchatActionExecutor executor;
+    private TwitchatActionExecutor executor;
 
     private UserAccount user;
     private UUID actionToken;
@@ -42,6 +48,11 @@ class TwitchatActionExecutorTest {
         user.setId(UUID.randomUUID());
         actionToken = UUID.randomUUID();
         lenient().when(userAccountRepository.findById(user.getId())).thenReturn(Optional.of(user));
+        CategoryChain chain = new CategoryChain(customBindingActivations, mock(StreamStateService.class),
+                mock(UserSettingsRepository.class), new RaidRestoreHold(), mock(GameStateService.class),
+                userAccountRepository, new CategoryApplier(twitchService, mock(StreamStateService.class)));
+        executor = new TwitchatActionExecutor(actionTokenService, userAccountRepository, chain, bindingService,
+                botToggleService, customBindingActivations);
     }
 
     private TwitchatActionToken tokenOf(TwitchatActionType type, Map<String, String> payload, String json) {
@@ -74,6 +85,19 @@ class TwitchatActionExecutorTest {
 
         assertThat(result).isEqualTo(TwitchatActionExecutor.Result.EXECUTED);
         verify(twitchService).setCategory(user, "111", "Old Game");
+    }
+
+    @Test
+    void revert_aThrowPropagates_andKeepsTheCustomBinding() {
+        TwitchatActionToken token = tokenOf(TwitchatActionType.REVERT_CATEGORY,
+                Map.of("gameId", "111", "gameName", "Old Game"), "{}");
+        when(actionTokenService.consume(actionToken)).thenReturn(Optional.of(token));
+        doThrow(new IllegalStateException("twitch down")).when(twitchService).setCategory(user, "111", "Old Game");
+
+        assertThatThrownBy(() -> executor.execute(actionToken))
+                .isInstanceOf(IllegalStateException.class).hasMessage("twitch down");
+
+        verify(customBindingActivations, never()).clear(any());
     }
 
     @Test
