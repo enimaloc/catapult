@@ -5,8 +5,6 @@ import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.common.dto.admin.ApplyRequest;
 import fr.enimaloc.catapult.common.dto.admin.ModuleOverrideDto;
 import fr.enimaloc.catapult.domain.config.ConfigAudit;
-import fr.enimaloc.catapult.repository.config.ConfigAuditRepository;
-import fr.enimaloc.catapult.repository.config.ConfigOverrideRepository;
 import fr.enimaloc.catapult.service.config.ConfigCatalogService;
 import fr.enimaloc.catapult.service.config.ConfigEntry;
 import fr.enimaloc.catapult.service.config.ConfigOverrideService;
@@ -34,8 +32,6 @@ public class ApiAdminConfigController {
     private final ConfigCatalogService catalogService;
     private final ConfigOverrideService overrideService;
     private final ApiUserResolver userResolver;
-    private final ConfigAuditRepository auditRepo;
-    private final ConfigOverrideRepository overrideRepo;
 
     @GetMapping
     public List<ConfigEntry> catalog() {
@@ -56,19 +52,12 @@ public class ApiAdminConfigController {
 
     @GetMapping("/audit")
     public List<ConfigAudit> audit(@RequestParam String key) {
-        return auditRepo.findByKeyOrderByChangedAtDesc(key);
+        return overrideService.audit(key);
     }
 
     @GetMapping("/modules/{module}")
     public List<ModuleOverrideDto> moduleOverrides(@PathVariable String module) {
-        return overrideRepo.findByIdModule(module).stream()
-                .map(o -> new ModuleOverrideDto(
-                        o.getKey(),
-                        o.isSecret() ? null : o.getValue(),
-                        o.isSecret(),
-                        o.getUpdatedAt(),
-                        o.getUpdatedBy()))
-                .toList();
+        return overrideService.moduleOverrides(module);
     }
 
     @PutMapping("/modules/{module}/{key}")
@@ -90,7 +79,7 @@ public class ApiAdminConfigController {
 
     @GetMapping("/modules/{module}/audit")
     public List<ConfigAudit> moduleAudit(@PathVariable String module, @RequestParam String key) {
-        return auditRepo.findByModuleAndKeyOrderByChangedAtDesc(module, key);
+        return overrideService.audit(module, key);
     }
 
 }

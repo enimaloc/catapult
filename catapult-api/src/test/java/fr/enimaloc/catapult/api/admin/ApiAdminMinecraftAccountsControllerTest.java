@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.repository.minecraft.MinecraftFriendLinkRepository;
 import fr.enimaloc.catapult.repository.minecraft.MinecraftServiceAccountRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.minecraft.MinecraftService;
+import fr.enimaloc.catapult.service.minecraft.MinecraftServiceAccountAdmin;
 import fr.enimaloc.catapult.service.minecraft.MinecraftTokenService;
 import fr.enimaloc.catapult.service.minecraft.MsaAuthClient;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,10 +40,13 @@ class ApiAdminMinecraftAccountsControllerTest {
     @Mock private MinecraftFriendLinkRepository linkRepository;
     @Mock private TokenEncryptionService encryption;
 
-    @InjectMocks private ApiAdminMinecraftAccountsController controller;
+    @InjectMocks private MinecraftServiceAccountAdmin accounts;
+
+    private ApiAdminMinecraftAccountsController controller;
 
     @BeforeEach
     void setup() {
+        controller = new ApiAdminMinecraftAccountsController(accounts);
         when(encryption.encrypt(anyString())).thenAnswer(inv -> "enc:" + inv.getArgument(0));
         when(accountRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
     }

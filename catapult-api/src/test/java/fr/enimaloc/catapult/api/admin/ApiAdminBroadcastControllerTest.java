@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.ActivityLogService;
 import fr.enimaloc.catapult.service.account.ChannelAccessService;
+import fr.enimaloc.catapult.service.notification.AdminBroadcastService;
 import fr.enimaloc.catapult.service.notification.BroadcastRateLimiter;
 import fr.enimaloc.catapult.service.notification.BroadcastValidator;
 import fr.enimaloc.catapult.service.notification.RedisEventPublisher;
@@ -41,7 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         controllers = ApiAdminBroadcastController.class,
         excludeAutoConfiguration = ThymeleafAutoConfiguration.class,
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
-@Import({BroadcastValidator.class, BroadcastRateLimiter.class, ApiUserResolver.class})
+@Import({BroadcastValidator.class, BroadcastRateLimiter.class, ApiUserResolver.class, AdminBroadcastService.class})
 class ApiAdminBroadcastControllerTest {
     @MockitoBean fr.enimaloc.catapult.service.account.UserApiTokenService userApiTokenService;
     @MockitoBean ChannelAccessService channelAccessService;
@@ -165,6 +166,25 @@ class ApiAdminBroadcastControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isTooManyRequests());
+    }
+
+    @Test
+    void broadcast_rateLimited_recordsAFailedAttemptAndAuditsNothing() throws Exception {
+        String body = om.writeValueAsString(Map.of(
+                "name", "alert.info", "title", "t", "body", "b", "ttlSeconds", 1));
+        for (int i = 0; i < BroadcastRateLimiter.PER_MINUTE; i++) {
+            mvc.perform(post("/api/internal/admin/broadcasts").with(adminJwt()).with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isAccepted());
+        }
+        org.mockito.Mockito.clearInvocations(publisher, activityLog, apiMetrics);
+
+        mvc.perform(post("/api/internal/admin/broadcasts").with(adminJwt()).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isTooManyRequests());
+
+        verify(apiMetrics).recordBroadcastAttempt("alert.info", false);
+        verify(apiMetrics, org.mockito.Mockito.never()).recordBroadcastAttempt(eq("alert.info"), eq(true));
+        verifyNoInteractions(publisher, activityLog);
     }
 
     private static org.springframework.test.web.servlet.request.RequestPostProcessor adminJwt() {

@@ -212,4 +212,36 @@ class ConfigOverrideServiceTest {
         verify(auditRepo).save(auCap.capture());
         assertThat(auCap.getValue().getModule()).isEqualTo("web");
     }
+
+    @Test
+    void moduleOverrides_withholdsASecretsValue() {
+        ConfigOverride plain = new ConfigOverride();
+        plain.setModule("web");
+        plain.setKey("web.feature.foo");
+        plain.setValue("true");
+        plain.setSecret(false);
+        ConfigOverride secret = new ConfigOverride();
+        secret.setModule("web");
+        secret.setKey("web.some.secret");
+        secret.setValue("hunter2");
+        secret.setSecret(true);
+        when(overrideRepo.findByIdModule("web")).thenReturn(List.of(plain, secret));
+
+        assertThat(service.moduleOverrides("web"))
+                .extracting(o -> o.key(), o -> o.value(), o -> o.secret())
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple("web.feature.foo", "true", false),
+                        org.assertj.core.groups.Tuple.tuple("web.some.secret", null, true));
+    }
+
+    @Test
+    void audit_readsTheHistoryOfTheKeyAndOfTheModulesKey() {
+        ConfigAudit api = new ConfigAudit();
+        ConfigAudit web = new ConfigAudit();
+        when(auditRepo.findByKeyOrderByChangedAtDesc("app.foo")).thenReturn(List.of(api));
+        when(auditRepo.findByModuleAndKeyOrderByChangedAtDesc("web", "web.feature.foo")).thenReturn(List.of(web));
+
+        assertThat(service.audit("app.foo")).containsExactly(api);
+        assertThat(service.audit("web", "web.feature.foo")).containsExactly(web);
+    }
 }

@@ -7,6 +7,7 @@ import fr.enimaloc.catapult.repository.minecraft.MinecraftFriendLinkRepository;
 import fr.enimaloc.catapult.repository.minecraft.MinecraftServiceAccountRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.minecraft.MinecraftService;
+import fr.enimaloc.catapult.service.minecraft.MinecraftServiceAccountAdmin;
 import fr.enimaloc.catapult.service.minecraft.MinecraftTokenService;
 import fr.enimaloc.catapult.service.minecraft.MsaAuthClient;
 import fr.enimaloc.catapult.api.error.ApiProblem;
@@ -52,8 +53,8 @@ class ApiAdminMinecraftAccountsFlowsTest {
     private final MinecraftServiceAccountRepository accounts = mock(MinecraftServiceAccountRepository.class);
     private final MinecraftFriendLinkRepository links = mock(MinecraftFriendLinkRepository.class);
     private final TokenEncryptionService encryption = mock(TokenEncryptionService.class);
-    private final ApiAdminMinecraftAccountsController controller =
-            new ApiAdminMinecraftAccountsController(msa, tokens, minecraft, accounts, links, encryption);
+    private final ApiAdminMinecraftAccountsController controller = new ApiAdminMinecraftAccountsController(
+            new MinecraftServiceAccountAdmin(msa, tokens, minecraft, accounts, links, encryption));
 
     private MinecraftServiceAccount account;
 
@@ -245,6 +246,12 @@ class ApiAdminMinecraftAccountsFlowsTest {
         assertStatus(() -> controller.update(account.getId(), Map.of("friendLimitReached", 1)), HttpStatus.BAD_REQUEST);
         assertStatus(() -> controller.update(account.getId(), Map.of("fillOrder", "4")), HttpStatus.BAD_REQUEST);
         assertStatus(() -> controller.update(UUID.randomUUID(), Map.of()), HttpStatus.NOT_FOUND);
+        verify(accounts, never()).save(any());
+    }
+
+    @Test
+    void update_unknownAccountWithABadType_is404() {
+        assertStatus(() -> controller.update(UUID.randomUUID(), Map.of("enabled", "yes")), HttpStatus.NOT_FOUND);
         verify(accounts, never()).save(any());
     }
 

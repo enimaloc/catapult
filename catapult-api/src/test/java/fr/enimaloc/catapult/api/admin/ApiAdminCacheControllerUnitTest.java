@@ -11,6 +11,7 @@ import fr.enimaloc.catapult.repository.chatcommand.ChatCommandDefinitionReposito
 import fr.enimaloc.catapult.repository.igdb.IgdbGameCclRepository;
 import fr.enimaloc.catapult.repository.igdb.IgdbGameDetailsRepository;
 import fr.enimaloc.catapult.repository.tw.TwDefinitionRepository;
+import fr.enimaloc.catapult.service.cache.AdminCacheService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,13 +43,14 @@ class ApiAdminCacheControllerUnitTest {
     private final TwDefinitionRepository twDefinitions = mock(TwDefinitionRepository.class);
     private final ChatCommandDefinitionRepository commandDefinitions = mock(ChatCommandDefinitionRepository.class);
     private final UserAccountRepository accounts = mock(UserAccountRepository.class);
-    private final ApiAdminCacheController controller = new ApiAdminCacheController(
+    private final AdminCacheService caches = new AdminCacheService(
             igdb, commands, tws, details, ccls, twDefinitions, commandDefinitions, accounts);
+    private final ApiAdminCacheController controller = new ApiAdminCacheController(caches);
     private final UUID userId = UUID.randomUUID();
 
     @BeforeEach
     void setUp() {
-        ReflectionTestUtils.setField(controller, "detailsCacheTtlHours", 168);
+        ReflectionTestUtils.setField(caches, "detailsCacheTtlHours", 168);
         IgdbService.IgdbGame doom = new IgdbService.IgdbGame("7", "DOOM");
         when(igdb.getGameCache()).thenReturn(Map.of("7", "DOOM"));
         when(igdb.getNameIndex()).thenReturn(Map.of("doom", doom));

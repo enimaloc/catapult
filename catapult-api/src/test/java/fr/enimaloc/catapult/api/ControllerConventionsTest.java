@@ -47,21 +47,6 @@ class ControllerConventionsTest {
   /** Today's violations, to be emptied by moving the code into services. */
   static final Set<String> LEGACY =
       Set.of(
-          "ApiAdminCacheController depends on ChatCommandDefinitionRepository",
-          "ApiAdminCacheController depends on IgdbGameCclRepository",
-          "ApiAdminCacheController depends on IgdbGameDetailsRepository",
-          "ApiAdminCacheController depends on TwDefinitionRepository",
-          "ApiAdminCacheController depends on UserAccountRepository",
-          "ApiAdminConfigController depends on ConfigAuditRepository",
-          "ApiAdminConfigController depends on ConfigOverrideRepository",
-          "ApiAdminMinecraftAccountsController depends on MinecraftFriendLinkRepository",
-          "ApiAdminMinecraftAccountsController depends on MinecraftServiceAccountRepository",
-          "ApiAdminMinecraftAccountsController depends on MsaAuthClient",
-          "ApiAdminNotificationsController depends on ChatCommandDefinitionRepository",
-          "ApiAdminNotificationsController depends on ExperimentAssignmentRepository",
-          "ApiAdminNotificationsController depends on ExperimentRepository",
-          "ApiAdminNotificationsController depends on ExperimentVariantRepository",
-          "ApiAdminNotificationsController depends on NotificationRepository",
           "ApiAdminProviderGitLabController depends on RestClient",
           "ApiAdminProviderIgdbController depends on RestClient",
           "ApiAdminProviderMinecraftController depends on MinecraftServiceAccountRepository",
