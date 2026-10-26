@@ -12,7 +12,7 @@
         <p th:if="${changelog != null and changelog.isEmpty()}" id="changelog-empty" th:text="#{changelog.empty}">changelog.empty</p>
 
         <mdui-card th:each="version : ${changelog}" class="privacy-card changelog-card" variant="outlined">
-            <h2 class="changelog-version" th:text="${version.version()}">1.0.0</h2>
+            <h2 class="changelog-version" th:text="${version.version()} ?: #{changelog.unreleased}">1.0.0</h2>
             <th:block th:each="group : ${version.groups()}">
                 <h3 class="changelog-kind" th:text="#{${'changelog.kind.' + group.kind()}}">changelog.kind</h3>
                 <ul class="changelog-entries">

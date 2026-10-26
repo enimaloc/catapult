@@ -27,7 +27,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 /**
  * Code, comments, logs and test names are written in English, read from the sources of catapult-api, catapult-common
  * and catapult-web as text. The texts the API stores or sends to viewers and streamers stay as they are: they are
- * listed in {@link #KEPT} with the reason. {@link #LEGACY} holds the French still left in the sources; it only shrinks.
+ * listed in {@link #KEPT} with the reason.
  */
 class EnglishConventionsTest {
 
@@ -120,12 +120,6 @@ class EnglishConventionsTest {
                     API + "service/notification/TwitchatEventDispatcher.java LITERAL",
                     "streamer-visible sample texts of the Twitchat test event (spec keeps viewer/streamer-facing "
                             + "default texts)"));
-
-    /** The French still in the sources: {@code "<path> <KIND>"}. Each translating task deletes its own entries. */
-    static final Set<String> LEGACY = Set.of(
-            API + "api/admin/ApiAdminMinecraftAccountsController.java LITERAL",
-            API + "service/feedback/ChangelogService.java LITERAL",
-            WEB + "service/mock/MockMinecraftAccountsStore.java LITERAL");
 
     private static final Path ROOT = Path.of("..");
     private static final String SELF = "catapult-api/src/test/java/fr/enimaloc/catapult/EnglishConventionsTest.java";
@@ -842,15 +836,10 @@ class EnglishConventionsTest {
     @Test
     void sourcesAreEnglish() {
         List<String> unexpected = scan(ROOT).stream()
-                .filter(hit -> !KEPT.containsKey(hit.key()) && !LEGACY.contains(hit.key()))
+                .filter(hit -> !KEPT.containsKey(hit.key()))
                 .map(hit -> hit.path() + ":" + hit.line() + " " + hit.kind() + " " + shorten(hit.text()))
                 .toList();
         assertThat(unexpected).as("French in the sources (translate it)").isEmpty();
-    }
-
-    @Test
-    void keptAndLegacyAreDisjoint() {
-        assertThat(LEGACY).as("keys both kept and legacy").doesNotContainAnyElementsOf(KEPT.keySet());
     }
 
     @Test
@@ -858,14 +847,6 @@ class EnglishConventionsTest {
         Set<String> keys = keys();
         assertThat(KEPT.keySet().stream().filter(key -> !keys.contains(key)).sorted())
                 .as("KEPT entries the scan no longer reports")
-                .isEmpty();
-    }
-
-    @Test
-    void legacyOnlyListsRealViolations() {
-        Set<String> keys = keys();
-        assertThat(LEGACY.stream().filter(key -> !keys.contains(key)).sorted())
-                .as("LEGACY entries already translated (delete them)")
                 .isEmpty();
     }
 

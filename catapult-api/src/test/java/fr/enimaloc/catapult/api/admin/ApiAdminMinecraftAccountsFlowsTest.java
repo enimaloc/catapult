@@ -186,7 +186,7 @@ class ApiAdminMinecraftAccountsFlowsTest {
         ResponseEntity<?> created = controller.create(Map.of("deviceCode", "dc"));
 
         assertThat(created.getBody()).isInstanceOfSatisfying(AccountDto.class, dto -> {
-            assertThat(dto.label()).isEqualTo("Compte Minecraft");
+            assertThat(dto.label()).isEqualTo("Minecraft account");
             assertThat(dto.minecraftUsername()).isEqualTo("Alex");
             assertThat(dto.fillOrder()).isEqualTo(2);
             assertThat(dto.linkCount()).isZero();

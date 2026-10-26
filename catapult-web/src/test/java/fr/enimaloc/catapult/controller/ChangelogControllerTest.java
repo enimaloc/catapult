@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -60,6 +61,22 @@ class ChangelogControllerTest {
             assertThat(html.indexOf("a feature")).isLessThan(html.indexOf("escaped")).isLessThan(html.indexOf("bump"));
         }
         assertThat(full).contains("<title>Changelog - ").contains("rel=\"canonical\"");
+    }
+
+    // The controller keeps the versions for a few minutes: don't leave this section to the other tests.
+    @Test
+    @DirtiesContext(methodMode = DirtiesContext.MethodMode.AFTER_METHOD)
+    void anUnreleasedSection_isTitledInTheVisitorsLanguage() throws Exception {
+        when(apiService.changelog()).thenReturn(List.of(
+                new ChangelogSection(null, List.of(new Entry("u1", "feat", null, "soon", false)))));
+
+        String french = mvc.perform(get("/spa/changelog").locale(Locale.FRENCH)).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String english = mvc.perform(get("/spa/changelog").locale(Locale.ENGLISH)).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(french).contains("Dernières modifications").doesNotContain("null");
+        assertThat(english).contains("Latest changes").doesNotContain("null");
     }
 
     @Test
