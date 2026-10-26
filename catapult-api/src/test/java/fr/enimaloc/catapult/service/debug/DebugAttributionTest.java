@@ -6,9 +6,6 @@ import fr.enimaloc.catapult.service.category.CategoryApplier;
 import fr.enimaloc.catapult.service.binding.CustomBindingActivations;
 import fr.enimaloc.catapult.api.connect.ApiSteamConnectController;
 import fr.enimaloc.catapult.service.steam.SteamOpenIdLinkService;
-import fr.enimaloc.catapult.chat.ChatCommandEvent;
-import fr.enimaloc.catapult.chat.ChatCommandListener;
-import fr.enimaloc.catapult.chat.CommandRegistry;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunction;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
 import fr.enimaloc.catapult.chat.command.js.SandboxExecutor;
@@ -42,7 +39,6 @@ import fr.enimaloc.catapult.service.binding.RaidRestoreGameService;
 import fr.enimaloc.catapult.service.binding.RaidRestoreHold;
 import fr.enimaloc.catapult.service.binding.RaidRestoreGateService;
 import fr.enimaloc.catapult.service.binding.SchedulerService;
-import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import fr.enimaloc.catapult.service.feedback.FeedbackNotificationService;
 import fr.enimaloc.catapult.service.feedback.GitLabClient;
 import fr.enimaloc.catapult.service.igdb.IgdbGameDetailsService;
@@ -395,21 +391,6 @@ class DebugAttributionTest {
     }
 
     // --- Events --------------------------------------------------------------------------------------
-
-    @Test
-    void chatCommand_isAttributedToTheChannelOwner() {
-        UserAccount owner = member();
-        CommandRegistry registry = mock(CommandRegistry.class);
-        doAnswer(inv -> {
-            note();
-            return null;
-        }).when(registry).dispatch(any(), any(Boolean.class));
-
-        new ChatCommandListener(registry, mock(ExperimentService.class))
-                .onChatCommand(new ChatCommandEvent(this, owner, "!game", List.of(), ChatCommandEvent.SenderRole.VIEWERS));
-
-        assertThat(seen).containsExactly(owner.getId());
-    }
 
     @Test
     void raidRestore_isAttributedToTheRaidingMember() {

@@ -21,7 +21,7 @@ public class ChatCommandsExperimentSeeder {
 
     @PostConstruct
     public void seed() {
-        experimentService.ensureExists(ChatCommandListener.EXPERIMENT_KEY, "control", "enabled");
-        log.info("Chat commands experiment ensured: {}", ChatCommandListener.EXPERIMENT_KEY);
+        experimentService.ensureExists(fr.enimaloc.catapult.service.chatcommand.ChatCommandGate.EXPERIMENT_KEY, "control", "enabled");
+        log.info("Chat commands experiment ensured: {}", fr.enimaloc.catapult.service.chatcommand.ChatCommandGate.EXPERIMENT_KEY);
     }
 }
