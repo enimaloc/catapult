@@ -15,6 +15,8 @@ import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
 import fr.enimaloc.catapult.repository.binding.CustomBindingRepository;
 import fr.enimaloc.catapult.service.binding.CustomBindingService.ActivationResult;
+import fr.enimaloc.catapult.service.category.CategoryOutcome;
+import fr.enimaloc.catapult.service.category.CategoryRule;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import fr.enimaloc.catapult.service.twitch.ChannelUpdateOutcome;
@@ -77,6 +79,11 @@ class CustomBindingServiceTest {
         user.setStatus(UserAccount.Status.ACTIVE);
         lenient().when(userAccountRepository.findById(user.getId())).thenReturn(Optional.of(user));
         lenient().when(experimentService.evaluateGate(user, CustomBindingService.EXPERIMENT_KEY)).thenReturn(true);
+        // The detection path answers its outcome, which the deactivation only checks for an exception
+        lenient().when(gameEventListener.applyDetectedGame(any(), any()))
+                .thenReturn(CategoryOutcome.applied(CategoryRule.GAME_BINDING));
+        lenient().when(gameEventListener.applyNoGameFallback(any()))
+                .thenReturn(CategoryOutcome.applied(CategoryRule.NO_GAME_FALLBACK));
         lenient().when(bindings.save(any(CustomBinding.class))).thenAnswer(inv -> {
             CustomBinding b = inv.getArgument(0);
             if (b.getId() == null) b.setId(UUID.randomUUID());

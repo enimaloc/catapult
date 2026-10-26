@@ -10,16 +10,17 @@ import fr.enimaloc.catapult.event.StreamOnlineEvent;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
 import fr.enimaloc.catapult.service.binding.BindingService;
-import fr.enimaloc.catapult.service.binding.RaidRestoreGameService;
+import fr.enimaloc.catapult.service.binding.RaidRestoreHold;
 import fr.enimaloc.catapult.service.binding.CustomBindingActivations;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
+import fr.enimaloc.catapult.service.category.CategoryApplier;
+import fr.enimaloc.catapult.service.category.CategoryChain;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import fr.enimaloc.catapult.service.twitch.ChannelUpdateOutcome;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -37,16 +38,20 @@ class GameEventListenerLiveCheckTest {
     @Mock private StreamStateService streamStateService;
     @Mock private UserSettingsRepository userSettingsRepository;
     @Mock private ChannelEventPublisher channelEventPublisher;
-    @Mock private RaidRestoreGameService raidRestoreGameService;
+    @Mock private RaidRestoreHold raidRestoreHold;
     @Mock private CustomBindingActivations customBindingActivations;
 
-    @InjectMocks private GameEventListener listener;
+    private GameEventListener listener;
 
     private UserAccount user;
     private GameBinding binding;
 
     @BeforeEach
     void setUp() {
+        CategoryChain chain = new CategoryChain(customBindingActivations, streamStateService, userSettingsRepository,
+                raidRestoreHold, new CategoryApplier(twitchService, streamStateService));
+        listener = new GameEventListener(bindingService, twitchService, userSettingsRepository, streamStateService,
+                channelEventPublisher, raidRestoreHold, customBindingActivations, chain);
         user = new UserAccount();
         user.setId(UUID.randomUUID());
 
@@ -383,7 +388,7 @@ class GameEventListenerLiveCheckTest {
         when(streamStateService.isLive(user)).thenReturn(true);
         when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
         // A raid takes the hold between the first check and the PATCH
-        when(raidRestoreGameService.isHoldingNoGameFallback(user)).thenReturn(false, true);
+        when(raidRestoreHold.isHolding(user)).thenReturn(false, true);
 
         listener.onNoGameDetected(new NoGameDetectedEvent(this, user));
 

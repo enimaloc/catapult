@@ -47,8 +47,8 @@ import java.util.stream.Collectors;
  * streamer. Saving one applies it to the game's AUTO, INCOMPLETE and MAPPED bindings (never to a streamer's MANUAL
  * choice), deleting one sends its MAPPED bindings back to IGDB, in the same transaction as the mapping itself.
  * After the commit, each changed binding is pushed to its streamer's dashboard and, when asked, the channels live
- * on that game get it on Twitch through the detection's own path ({@link GameEventListener#applyBinding}); a Twitch
- * failure there is logged and counted, the mapping stays.
+ * on that game get it on Twitch through the detection's own path
+ * ({@link GameEventListener#applyBindingIfLive}); a Twitch failure there is logged and counted, the mapping stays.
  */
 @Slf4j
 @Service

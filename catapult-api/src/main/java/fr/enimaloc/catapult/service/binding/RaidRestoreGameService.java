@@ -15,16 +15,13 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * A streamer who closes their game gets the "no game" category; raiding out minutes later would then
  * leave from it. With the channel's {@link UserSettings#getRaidRestoreGameMinutes() delay} set (and the
  * {@value RaidRestoreGateService#EXPERIMENT_KEY} gate on), an outgoing raid puts the game detected within
  * that delay back (unless the channel is already on it), and the "no game" fallback then holds off until the
- * stream ends or a new game is detected, so a later detection doesn't undo it.
+ * stream ends or a new game is detected ({@link RaidRestoreHold}), so a later detection doesn't undo it.
  */
 @Slf4j
 @Service
@@ -40,9 +37,7 @@ public class RaidRestoreGameService {
     private final BindingService bindingService;
     private final TwitchService twitchService;
     private final CustomBindingActivations customBindingActivations;
-
-    /** Channels whose game a raid put back: no "no game" fallback for them until released. In memory, like the game state. */
-    private final Set<UUID> holdingNoGameFallback = ConcurrentHashMap.newKeySet();
+    private final RaidRestoreHold raidRestoreHold;
 
     @EventListener
     public void onRaidedOut(ChannelRaidedOutEvent event) {
@@ -73,7 +68,7 @@ public class RaidRestoreGameService {
         }
         // Held first, so a detection tick running meanwhile can't put the "no game" category back after us;
         // also when already on the game, which may still be closed before the stream ends.
-        holdingNoGameFallback.add(user.getId());
+        raidRestoreHold.hold(user);
         if (binding.get().getTwitchGameId().equals(event.getCurrentCategoryId())) {
             log.debug("Raid by user {}: already on {}", user.getId(), binding.get().getTwitchGameName());
             return;
@@ -83,19 +78,9 @@ public class RaidRestoreGameService {
             // updateChannelReporting records Catapult's own change, so the channel.update isn't taken for a manual one
             twitchService.updateChannelReporting(user, binding.get());
         } catch (RuntimeException e) {
-            holdingNoGameFallback.remove(user.getId());
+            raidRestoreHold.release(user);
             log.warn("Raid by user {}: could not put {} back: {}", user.getId(),
                     binding.get().getTwitchGameName(), e.getMessage());
         }
-    }
-
-    /** True while a raid's restored game must not be replaced by the "no game" category. */
-    public boolean isHoldingNoGameFallback(UserAccount user) {
-        return holdingNoGameFallback.contains(user.getId());
-    }
-
-    /** Ends the hold: the stream ended or a new game was detected. */
-    public void releaseHold(UserAccount user) {
-        holdingNoGameFallback.remove(user.getId());
     }
 }

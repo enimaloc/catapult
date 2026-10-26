@@ -14,6 +14,8 @@ import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
 import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
 import fr.enimaloc.catapult.repository.binding.GameMappingRepository;
+import fr.enimaloc.catapult.service.category.CategoryApplier;
+import fr.enimaloc.catapult.service.category.CategoryChain;
 import fr.enimaloc.catapult.service.igdb.IgdbGameDetailsService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
@@ -65,7 +67,7 @@ class AdminGameMappingServiceTest {
     @Mock StreamStateService streamStateService;
     @Mock ChannelEventPublisher channelEventPublisher;
     @Mock UserSettingsRepository userSettingsRepository;
-    @Mock RaidRestoreGameService raidRestoreGameService;
+    @Mock RaidRestoreHold raidRestoreHold;
     @Mock PlatformTransactionManager transactionManager;
 
     BindingService bindingService;
@@ -79,8 +81,11 @@ class AdminGameMappingServiceTest {
         bindingService = spy(new BindingService(bindingRepo, igdbService, igdbGameDetailsService, twitchService,
                 twResolverService, gameStateService, mappingRepo, mock(CustomBindingActivations.class),
                 new GameBindingLookup(bindingRepo)));
+        CustomBindingActivations activations = mock(CustomBindingActivations.class);
+        CategoryChain chain = new CategoryChain(activations, streamStateService, userSettingsRepository,
+                raidRestoreHold, new CategoryApplier(twitchService, streamStateService));
         GameEventListener listener = new GameEventListener(bindingService, twitchService, userSettingsRepository,
-                streamStateService, channelEventPublisher, raidRestoreGameService, mock(CustomBindingActivations.class));
+                streamStateService, channelEventPublisher, raidRestoreHold, activations, chain);
         service = new AdminGameMappingService(mappingRepo, bindingRepo, userRepo, bindingService, gameStateService,
                 streamStateService, channelEventPublisher, listener, transactionManager);
 

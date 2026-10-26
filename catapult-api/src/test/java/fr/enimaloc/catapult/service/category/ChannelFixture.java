@@ -39,6 +39,7 @@ import fr.enimaloc.catapult.service.binding.CustomBindingService.UpdateResult;
 import fr.enimaloc.catapult.service.binding.GameBindingLookup;
 import fr.enimaloc.catapult.service.binding.GameStateService;
 import fr.enimaloc.catapult.service.binding.RaidRestoreGameService;
+import fr.enimaloc.catapult.service.binding.RaidRestoreHold;
 import fr.enimaloc.catapult.service.binding.SchedulerService;
 import fr.enimaloc.catapult.service.binding.RaidRestoreGateService;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
@@ -55,7 +56,6 @@ import fr.enimaloc.catapult.service.notification.TwitchatEventDispatcher;
 import fr.enimaloc.catapult.service.notification.TwitchatWidgetSettingsService;
 import fr.enimaloc.catapult.service.tw.TwResolverService;
 import fr.enimaloc.catapult.service.twitch.ChannelUpdateOutcome;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -104,6 +104,7 @@ public class ChannelFixture {
 
     private final GameStateService gameStateService;
     private final StreamStateService streamStateService;
+    private final RaidRestoreHold raidRestoreHold = new RaidRestoreHold();
     private final RaidRestoreGameService raidRestoreGameService;
     private final GameEventListener listener;
     private final BindingService bindingService;
@@ -208,9 +209,12 @@ public class ChannelFixture {
                 twitch, mock(TwResolverService.class), gameStateService, mock(GameMappingRepository.class),
                 activations, lookup);
         raidRestoreGameService = new RaidRestoreGameService(settingsRepository,
-                new RaidRestoreGateService(experimentService), gameStateService, bindingService, twitch, activations);
+                new RaidRestoreGateService(experimentService), gameStateService, bindingService, twitch, activations,
+                raidRestoreHold);
+        CategoryChain categoryChain = new CategoryChain(activations, streamStateService, settingsRepository,
+                raidRestoreHold, new CategoryApplier(twitch, streamStateService));
         listener = new GameEventListener(bindingService, twitch, settingsRepository, streamStateService, publisher,
-                raidRestoreGameService, activations);
+                raidRestoreHold, activations, categoryChain);
         customBindingService = new CustomBindingService(customBindingRepository, activations, twitch,
                 experimentService, gameStateService, streamStateService, settingsRepository, accountRepository,
                 tokenRepository, listener, publisher);
@@ -290,13 +294,12 @@ public class ChannelFixture {
     }
 
     /** A raid has put a game back: the no-game fallback holds off. */
-    @SuppressWarnings("unchecked")
     public void hold() {
-        ((Set<UUID>) ReflectionTestUtils.getField(raidRestoreGameService, "holdingNoGameFallback")).add(user.getId());
+        raidRestoreHold.hold(user);
     }
 
     public boolean holding() {
-        return raidRestoreGameService.isHoldingNoGameFallback(user);
+        return raidRestoreHold.isHolding(user);
     }
 
     public void pending(GameBinding binding) {

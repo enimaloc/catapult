@@ -199,12 +199,12 @@ public class CustomBindingService {
         activations.clear(user);
         Optional<DetectedGame> open = gameStateService.getLastKnownGame(user);
         if (streamStateService.isLive(user)) {
-            open.ifPresentOrElse(game -> gameEventListener.applyDetectedGame(user, game),
-                    () -> gameEventListener.applyNoGameFallback(user));
+            open.ifPresentOrElse(game -> gameEventListener.applyDetectedGame(user, game).orThrow(),
+                    () -> gameEventListener.applyNoGameFallback(user).orThrow());
             return;
         }
         // Offline, a detection only stores the game pending; the channel gets the end-of-stream choice
-        open.ifPresent(game -> gameEventListener.applyDetectedGame(user, game));
+        open.ifPresent(game -> gameEventListener.applyDetectedGame(user, game).orThrow());
         boolean applyDefaultOnStreamEnd = userSettingsRepository.findById(user.getId())
                 .map(UserSettings::isApplyDefaultOnStreamEnd)
                 .orElse(false);

@@ -14,7 +14,10 @@ import fr.enimaloc.catapult.service.binding.BindingService;
 import fr.enimaloc.catapult.service.binding.GameStateService;
 import fr.enimaloc.catapult.service.binding.RaidRestoreGameService;
 import fr.enimaloc.catapult.service.binding.RaidRestoreGateService;
+import fr.enimaloc.catapult.service.binding.RaidRestoreHold;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
+import fr.enimaloc.catapult.service.category.CategoryApplier;
+import fr.enimaloc.catapult.service.category.CategoryChain;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
 import org.junit.jupiter.api.BeforeEach;
@@ -64,10 +67,14 @@ class GameEventListenerRaidHoldTest {
 
     @BeforeEach
     void setUp() {
+        RaidRestoreHold hold = new RaidRestoreHold();
         raidRestore = new RaidRestoreGameService(userSettingsRepository, gate, gameStateService, bindingService, twitchService,
-                mock(CustomBindingActivations.class));
+                mock(CustomBindingActivations.class), hold);
+        CustomBindingActivations activations = mock(CustomBindingActivations.class);
+        CategoryChain chain = new CategoryChain(activations, streamStateService, userSettingsRepository, hold,
+                new CategoryApplier(twitchService, streamStateService));
         listener = new GameEventListener(bindingService, twitchService, userSettingsRepository, streamStateService,
-                channelEventPublisher, raidRestore, mock(CustomBindingActivations.class));
+                channelEventPublisher, hold, activations, chain);
         user = new UserAccount();
         user.setId(UUID.randomUUID());
 
