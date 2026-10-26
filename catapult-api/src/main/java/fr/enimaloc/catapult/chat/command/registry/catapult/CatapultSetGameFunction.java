@@ -6,6 +6,8 @@ import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.service.binding.CustomBindingActivations;
 import fr.enimaloc.catapult.service.binding.GameStateService;
+import fr.enimaloc.catapult.service.category.CategoryChain;
+import fr.enimaloc.catapult.service.category.CategoryTrigger.ManualCategory;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
 import lombok.RequiredArgsConstructor;
@@ -24,7 +26,7 @@ import java.util.Set;
  * implement {@code !setgame}, now a fully data-driven command like any other (no more
  * Java-hardcoded {@code SetGameCommand} bean).
  *
- * <p>Always resolves a Twitch category id before calling {@link TwitchService#updateChannelReporting}
+ * <p>Always resolves a Twitch category id before sending it through {@link CategoryChain}
  * (skipping this — sending {@code game_id: null} — is a silent no-op on Twitch's side): {@code
  * igdbId}, when given, maps to a Twitch id via {@link IgdbService#findTwitchGameId}; either way
  * (or as a fallback when that mapping is missing) it falls back to a live Twitch category name
@@ -46,6 +48,7 @@ import java.util.Set;
 public class CatapultSetGameFunction implements ServiceFunction {
 
     private final TwitchService twitchService;
+    private final CategoryChain categoryChain;
     private final GameStateService gameStateService;
     private final IgdbService igdbService;
     private final CustomBindingActivations customBindingActivations;
@@ -91,7 +94,7 @@ public class CatapultSetGameFunction implements ServiceFunction {
             binding.setSourceId(igdbId);
         }
         binding.setTwitchGameId(resolveTwitchGameId(user, gameName, igdbId).orElse(null));
-        twitchService.updateChannelReporting(user, binding);
+        categoryChain.apply(user, new ManualCategory(binding)).orThrow();
         // A category chosen by hand ends the active custom binding, whatever its kind
         customBindingActivations.clear(user);
 

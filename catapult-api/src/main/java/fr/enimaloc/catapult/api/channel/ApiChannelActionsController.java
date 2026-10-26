@@ -34,11 +34,12 @@ import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.account.AccountService;
 import fr.enimaloc.catapult.service.account.BotToggleService;
 import fr.enimaloc.catapult.service.binding.BindingService;
-import fr.enimaloc.catapult.service.binding.CustomBindingActivations;
 import fr.enimaloc.catapult.service.binding.GameStateService;
 import fr.enimaloc.catapult.service.binding.RaidRestoreGameService;
 import fr.enimaloc.catapult.service.binding.RaidRestoreGateService;
 import fr.enimaloc.catapult.service.binding.SchedulerService;
+import fr.enimaloc.catapult.service.category.CategoryChain;
+import fr.enimaloc.catapult.service.category.CategoryTrigger.NoGameSettingsSaved;
 import fr.enimaloc.catapult.service.connections.ProviderConnectionsDto;
 import fr.enimaloc.catapult.service.connections.SteamProfileDiagnostics;
 import fr.enimaloc.catapult.service.connections.SteamProfileDto;
@@ -46,7 +47,6 @@ import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import fr.enimaloc.catapult.service.notification.TwitchatEventActionService;
 import fr.enimaloc.catapult.service.notification.TwitchatEventDispatcher;
 import fr.enimaloc.catapult.service.notification.TwitchatWidgetSettingsService;
-import fr.enimaloc.catapult.service.twitch.TwitchService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -90,7 +90,7 @@ public class ApiChannelActionsController {
     private final ApiUserResolver userResolver;
     private final BindingService bindingService;
     private final BotToggleService botToggleService;
-    private final TwitchService twitchService;
+    private final CategoryChain categoryChain;
     private final GameStateService gameStateService;
     private final AccountService accountService;
     private final SchedulerService schedulerService;
@@ -102,7 +102,6 @@ public class ApiChannelActionsController {
     private final TwitchatEventDispatcher twitchatEventDispatcher;
     private final SteamProfileDiagnostics steamDiagnostics;
     private final RaidRestoreGateService raidRestoreGate;
-    private final CustomBindingActivations customBindingActivations;
 
     private final Optional<SteamApiKeyRotator> rotator;
 
@@ -336,10 +335,7 @@ public class ApiChannelActionsController {
         });
         // Nothing detected right now: the new default category applies immediately, unless a custom binding holds
         // the channel
-        if (gameStateService.getLastKnownGame(channelUser).isEmpty()
-                && customBindingActivations.active(channelUser).isEmpty()) {
-            twitchService.resetToDefault(channelUser);
-        }
+        categoryChain.apply(channelUser, new NoGameSettingsSaved()).orThrow();
         publishSettings(channelUser, settings);
     }
 

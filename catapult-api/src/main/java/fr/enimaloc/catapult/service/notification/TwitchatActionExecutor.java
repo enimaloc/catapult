@@ -6,7 +6,8 @@ import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.account.BotToggleService;
 import fr.enimaloc.catapult.service.binding.BindingService;
 import fr.enimaloc.catapult.service.binding.CustomBindingActivations;
-import fr.enimaloc.catapult.service.twitch.TwitchService;
+import fr.enimaloc.catapult.service.category.CategoryChain;
+import fr.enimaloc.catapult.service.category.CategoryTrigger.RevertCategory;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,7 +23,7 @@ public class TwitchatActionExecutor {
 
     private final TwitchatActionTokenService actionTokenService;
     private final UserAccountRepository userAccountRepository;
-    private final TwitchService twitchService;
+    private final CategoryChain categoryChain;
     private final BindingService bindingService;
     private final BotToggleService botToggleService;
     private final CustomBindingActivations customBindingActivations;
@@ -43,7 +44,7 @@ public class TwitchatActionExecutor {
 
         switch (token.getActionType()) {
             case REVERT_CATEGORY, REVERT_TO_APP_CATEGORY -> {
-                twitchService.setCategory(user, payload.get("gameId"), payload.get("gameName"));
+                categoryChain.apply(user, new RevertCategory(payload.get("gameId"), payload.get("gameName"))).orThrow();
                 // A category chosen by hand ends the active custom binding, whatever its kind
                 customBindingActivations.clear(user);
             }
