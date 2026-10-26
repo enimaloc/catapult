@@ -87,6 +87,22 @@ class ChannelCustomBindingsRenderingTest {
     }
 
     @Test
+    void theTokenCardIsInTheAccountTab_andNoLongerInTheSettingsTab() throws Exception {
+        String html = render(true, state());
+        int account = html.indexOf("<mdui-tab-panel slot=\"panel\" value=\"account\"");
+        int settings = html.indexOf("<mdui-tab-panel slot=\"panel\" value=\"settings\"");
+        int token = html.indexOf("id=\"channel-api-token-card\"");
+
+        assertThat(account).isPositive();
+        assertThat(settings).isNotNegative();
+        assertThat(token).isGreaterThan(account);
+        assertThat(html.indexOf("id=\"channel-api-token-card\"", token + 1)).isNegative();
+        // The settings panel keeps the management card but not the token one.
+        assertThat(html.substring(settings, account)).contains("channel-custom-bindings-settings")
+                .doesNotContain("channel-api-token-card");
+    }
+
+    @Test
     void experimentClosed_hidesEveryCard() throws Exception {
         assertThat(render(true, null))
                 .doesNotContain("channel-custom-bindings-card").doesNotContain("channel-custom-bindings-settings")

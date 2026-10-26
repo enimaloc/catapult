@@ -11,6 +11,40 @@
 
     <mdui-card th:replace="~{fragments/notification-channels :: card(${notificationChannels})}"></mdui-card>
 
+    <!--/* The personal API token of the custom bindings (null while the experiment is closed to the channel). The owner's
+         alone, like the whole tab. channel-custom-bindings.js. */-->
+    <th:block th:if="${channelPage.customBindings() != null}"
+              th:with="bindings=${channelPage.customBindings().bindings()}">
+    <!--/* The status is read by channel-custom-bindings.js (GET /me/api-token); the token only ever appears in #api-token-value, once. */-->
+    <mdui-card id="channel-api-token-card" class="settings-card" variant="outlined"
+               th:attr="data-example-name=${bindings.isEmpty() ? 'Art' : bindings.get(0).name()},data-label-none=#{channel.api_token.none},data-label-since=#{channel.api_token.since('{0}')},data-label-generate=#{channel.api_token.generate},data-label-regenerate=#{channel.api_token.regenerate},data-label-copied=#{channel.api_token.copied},data-label-unavailable=#{channel.api_token.unavailable}">
+        <div class="title-row">
+            <h3 th:text="#{channel.api_token.title}">Jeton d'API</h3>
+        </div>
+        <p th:text="#{channel.api_token.description}">Description</p>
+        <p id="api-token-status"></p>
+        <mdui-button id="api-token-generate-btn" th:text="#{channel.api_token.generate}">Générer un jeton</mdui-button>
+        <mdui-button id="api-token-revoke-btn" class="hidden" variant="text" th:text="#{channel.api_token.revoke}">Révoquer</mdui-button>
+        <div id="api-token-reveal" class="hidden">
+            <p th:text="#{channel.api_token.once}">Copie-le maintenant.</p>
+            <mdui-text-field id="api-token-value" variant="outlined" readonly autocomplete="off"></mdui-text-field>
+            <mdui-button id="api-token-copy-btn" variant="tonal" th:text="#{channel.api_token.copy}">Copier</mdui-button>
+            <p th:text="#{channel.api_token.curl_hint}">Exemple :</p>
+            <pre id="api-token-curl"></pre>
+        </div>
+        <mdui-dialog id="api-token-confirm-dialog" close-on-overlay-click>
+            <p data-for="regenerate" class="hidden"><strong th:text="#{channel.api_token.confirm.regenerate.title}">Régénérer ?</strong>
+                <span th:text="#{channel.api_token.confirm.regenerate.body}">L'ancien jeton cesse de fonctionner.</span></p>
+            <p data-for="revoke" class="hidden"><strong th:text="#{channel.api_token.confirm.revoke.title}">Révoquer ?</strong>
+                <span th:text="#{channel.api_token.confirm.revoke.body}">Le jeton cesse de fonctionner.</span></p>
+            <mdui-button slot="action" variant="text" class="api-token-confirm-dismiss"
+                         th:text="#{channel.api_token.confirm.dismiss}">Annuler</mdui-button>
+            <mdui-button slot="action" variant="filled" class="api-token-confirm-ok"
+                         th:text="#{channel.api_token.confirm.ok}">Confirmer</mdui-button>
+        </mdui-dialog>
+    </mdui-card>
+    </th:block>
+
     <mdui-card id="channel-danger-zone" class="settings-card danger-zone-card" variant="outlined"
                th:if="${dangerZone != null}" th:attr="data-username=${username},data-label-refused=#{channel.settings.danger.error.refused},data-label-unavailable=#{channel.settings.danger.error.unavailable}">
         <div class="title-row">
