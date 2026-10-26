@@ -114,7 +114,7 @@ class CategoryBehaviourTest {
         }
 
         @Test
-        void ignoredLive_appliesTheNoGameFallbackWithoutCcls() {
+        void ignoredLive_appliesTheNoGameFallbackWithItsCcls() {
             g1.setIgnored(true);
             f.live(true);
 
@@ -125,7 +125,7 @@ class CategoryBehaviourTest {
             assertThat(write.gameId()).isEqualTo("509658");
             assertThat(write.sourceName()).isEqualTo("no-game-fallback");
             assertThat(write.status()).isEqualTo(GameBinding.Status.MANUAL);
-            assertBindingWrite(write, GameBinding.Status.MANUAL, Set.of(), true, false, false);
+            assertBindingWrite(write, GameBinding.Status.MANUAL, Set.of("Gambling"), true, false, false);
             assertThat(f.journal())
                     .containsExactly("event:bindingUpserted g1", "twitch:update 509658 no-game-fallback");
         }
@@ -288,7 +288,7 @@ class CategoryBehaviourTest {
             f.closeGame();
 
             assertThat(f.journal()).containsExactly("twitch:update 509658 no-game-fallback");
-            assertBindingWrite(onlyWrite(), GameBinding.Status.MANUAL, Set.of(), true, false, false);
+            assertBindingWrite(onlyWrite(), GameBinding.Status.MANUAL, Set.of("Gambling"), true, false, false);
             assertThat(f.pending()).isEmpty();
         }
 
@@ -575,6 +575,17 @@ class CategoryBehaviourTest {
         }
 
         @Test
+        void ignoredLive_appliesTheNoGameFallbackWithItsCcls() {
+            g1.setIgnored(true);
+            f.live(true);
+
+            assertThat(f.mappingChanged(g1)).isEqualTo(ChannelUpdateOutcome.APPLIED);
+
+            assertThat(f.journal()).containsExactly("twitch:update 509658 no-game-fallback");
+            assertBindingWrite(onlyWrite(), GameBinding.Status.MANUAL, Set.of("Gambling"), true, false, false);
+        }
+
+        @Test
         void incompleteLive_appliesTheFallback() {
             g1.setStatus(GameBinding.Status.INCOMPLETE);
             f.live(true);
@@ -685,7 +696,7 @@ class CategoryBehaviourTest {
 
             assertThat(f.journal()).containsExactly("event:customBindingChanged null",
                     "twitch:update 509658 no-game-fallback");
-            assertBindingWrite(onlyWrite(), GameBinding.Status.MANUAL, Set.of(), true, false, false);
+            assertBindingWrite(onlyWrite(), GameBinding.Status.MANUAL, Set.of("Gambling"), true, false, false);
         }
 
         @Test

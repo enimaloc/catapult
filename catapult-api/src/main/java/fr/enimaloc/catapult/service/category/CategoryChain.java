@@ -287,6 +287,11 @@ public class CategoryChain {
         fallbackBinding.setSourceName(NO_GAME_FALLBACK_SOURCE);
         fallbackBinding.setTwitchGameId(settings.getNoGameTwitchGameId());
         fallbackBinding.setTwitchGameName(settings.getNoGameTwitchGameName());
+        // The configured "no game" CCLs, sent like the reset sends them: only when there are some (the channel's
+        // CCLs are otherwise left as they are), under the same CCL feature switch (applied by the Twitch layer), and
+        // without the blocklist (a transient binding)
+        fallbackBinding.getCcls().addAll(settings.getNoGameCcls());
+        fallbackBinding.setCclEnabled(!settings.getNoGameCcls().isEmpty());
         fallbackBinding.setStatus(GameBinding.Status.MANUAL);
         // Checked again right before the PATCH: a raid may have taken the hold since the check above
         if (raidRestoreHold.isHolding(user)) {
