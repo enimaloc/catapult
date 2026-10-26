@@ -25,7 +25,7 @@ configurations {
 val igdbApiVersion = "1.3.2"
 val unleashVersion = "9.3.2"
 val growthbookVersion = "0.11.3"
-val icuVersion = "76.1"
+val icuVersion = "79.1"
 val jsoupVersion = "1.23.2"
 val jjwtVersion = "0.13.0"
 val commonmarkVersion = "0.31.0"
