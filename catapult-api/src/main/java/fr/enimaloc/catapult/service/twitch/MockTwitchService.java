@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.service.twitch;
 
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
+import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,6 +29,7 @@ public class MockTwitchService implements TwitchService {
     private int mockUsersCount;
 
     private final TwitchCategoryService twitchCategoryService;
+    private final UserSettingsRepository userSettingsRepository;
 
     /** The category each channel was last put on, by account id: what Twitch would show. */
     private final Map<UUID, String> categoryNameByUser = new ConcurrentHashMap<>();
@@ -70,6 +72,9 @@ public class MockTwitchService implements TwitchService {
     @Override
     public ChannelUpdateOutcome resetToDefault(UserAccount user) {
         log.debug("[Mock Twitch] resetToDefault() — no-op for user {}", user.getId());
+        // the default category the real reset would put the channel on
+        userSettingsRepository.findById(user.getId())
+            .ifPresent(settings -> remember(user, settings.getNoGameTwitchGameName()));
         return ChannelUpdateOutcome.APPLIED;
     }
 
