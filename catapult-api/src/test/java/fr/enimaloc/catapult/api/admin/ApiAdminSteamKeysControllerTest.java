@@ -6,6 +6,8 @@ import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.steam.SteamApiKeyEntry;
 import fr.enimaloc.catapult.getter.steam.SteamApiKeyRotator;
 import fr.enimaloc.catapult.repository.steam.SteamApiKeyRepository;
+import fr.enimaloc.catapult.service.ApiKeyHasher;
+import fr.enimaloc.catapult.service.steam.SteamKeyPoolService;
 import fr.enimaloc.catapult.service.notification.AdminEventPublisher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,7 +38,7 @@ class ApiAdminSteamKeysControllerTest {
     private final SteamApiKeyRepository repository = mock(SteamApiKeyRepository.class);
     private final SteamApiKeyRotator rotator = mock(SteamApiKeyRotator.class);
     private final AdminEventPublisher events = mock(AdminEventPublisher.class);
-    private final ApiAdminSteamKeysController controller = new ApiAdminSteamKeysController(repository, Optional.of(rotator), events);
+    private final ApiAdminSteamKeysController controller = new ApiAdminSteamKeysController(new SteamKeyPoolService(repository, Optional.of(rotator), events));
 
     @BeforeEach
     void setUp() {
@@ -77,7 +79,7 @@ class ApiAdminSteamKeysControllerTest {
 
     @Test
     void withoutRotator_steamIsReportedDisabled_andEditsStillWork() {
-        ApiAdminSteamKeysController bare = new ApiAdminSteamKeysController(repository, Optional.empty(), events);
+        ApiAdminSteamKeysController bare = new ApiAdminSteamKeysController(new SteamKeyPoolService(repository, Optional.empty(), events));
         when(repository.findByExclusiveFalseWithOwner()).thenReturn(List.of(entry(KEY, null)));
         when(repository.findByExclusiveFalse()).thenReturn(List.of(entry(KEY, null)));
 

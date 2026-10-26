@@ -112,10 +112,14 @@ class CommonDtoContractTest {
         proposal.setStatus(DtddMappingProposal.Status.PENDING);
         proposal.setCreatedAt(Instant.parse("2026-10-16T10:00:00Z"));
         when(proposals.findByStatusOrderByCreatedAtAsc(DtddMappingProposal.Status.PENDING)).thenReturn(List.of(proposal));
-        ApiAdminDtddMappingController controller = new ApiAdminDtddMappingController(proposals,
-                mock(DtddGameMappingRepository.class), mock(DtddTopicsCacheRepository.class),
-                mock(fr.enimaloc.catapult.service.dtdd.DtddMappingEvents.class), mock(ApiUserResolver.class),
-                mock(fr.enimaloc.catapult.service.notification.AdminEventPublisher.class));
+        ApiAdminDtddMappingController controller = new ApiAdminDtddMappingController(
+                new fr.enimaloc.catapult.service.dtdd.DtddMappingProposalService(
+                        mock(DtddGameMappingRepository.class),
+                        mock(fr.enimaloc.catapult.repository.dtdd.DtddGameCacheRepository.class), proposals,
+                        mock(DtddTopicsCacheRepository.class),
+                        mock(fr.enimaloc.catapult.service.dtdd.DtddMappingEvents.class),
+                        mock(fr.enimaloc.catapult.service.notification.AdminEventPublisher.class)),
+                mock(ApiUserResolver.class));
 
         List<DtddProposalDto> produced = controller.pending("PENDING");
         List<DtddProposalDto> read = JSON.readValue(JSON.writeValueAsString(produced), new TypeReference<>() {});

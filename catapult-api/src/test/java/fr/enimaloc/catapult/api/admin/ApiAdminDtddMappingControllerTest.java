@@ -8,6 +8,7 @@ import fr.enimaloc.catapult.domain.dtdd.DtddMappingProposal.Status;
 import fr.enimaloc.catapult.repository.dtdd.DtddGameMappingRepository;
 import fr.enimaloc.catapult.repository.dtdd.DtddMappingProposalRepository;
 import fr.enimaloc.catapult.repository.dtdd.DtddTopicsCacheRepository;
+import fr.enimaloc.catapult.service.dtdd.DtddMappingProposalService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -27,6 +28,7 @@ class ApiAdminDtddMappingControllerTest {
     @Mock DtddMappingProposalRepository proposalRepo;
     @Mock DtddGameMappingRepository mappingRepo;
     @Mock DtddTopicsCacheRepository topicsRepo;
+    @Mock fr.enimaloc.catapult.repository.dtdd.DtddGameCacheRepository gameRepo;
     @Mock fr.enimaloc.catapult.service.dtdd.DtddMappingEvents mappingEvents;
     @Mock fr.enimaloc.catapult.api.ApiUserResolver userResolver;
     @Mock fr.enimaloc.catapult.service.notification.AdminEventPublisher events;
@@ -37,7 +39,8 @@ class ApiAdminDtddMappingControllerTest {
 
     @BeforeEach
     void setUp() {
-        controller = new ApiAdminDtddMappingController(proposalRepo, mappingRepo, topicsRepo, mappingEvents, userResolver, events);
+        controller = new ApiAdminDtddMappingController(new DtddMappingProposalService(mappingRepo, gameRepo, proposalRepo,
+                topicsRepo, mappingEvents, events), userResolver);
         admin = new UserAccount();
         admin.setId(UUID.randomUUID());
         lenient().when(userResolver.viewer(jwt)).thenReturn(admin);
@@ -105,5 +108,25 @@ class ApiAdminDtddMappingControllerTest {
 
         assertThat(proposal.getStatus()).isEqualTo(Status.REJECTED);
         verify(mappingRepo, never()).save(any());
+    }
+
+    @Test
+    void approve_replacingAnotherDtddId_dropsItsTopics() {
+        UUID propId = UUID.randomUUID();
+        DtddMappingProposal proposal = new DtddMappingProposal();
+        proposal.setId(propId);
+        proposal.setIgdbId("100");
+        proposal.setProposedDtddId(1287L);
+        proposal.setStatus(Status.PENDING);
+        when(proposalRepo.findById(propId)).thenReturn(Optional.of(proposal));
+        when(mappingRepo.findById("100")).thenReturn(Optional.of(
+            new DtddGameMapping("100", 4521L, 0.71, false, Instant.now())));
+
+        controller.approve(propId, jwt);
+
+        var order = inOrder(topicsRepo, events, mappingEvents);
+        order.verify(topicsRepo).deleteById(4521L);
+        order.verify(events).dtddProposalResolved(propId.toString(), "APPROVED");
+        order.verify(mappingEvents).mappingChanged("100");
     }
 }

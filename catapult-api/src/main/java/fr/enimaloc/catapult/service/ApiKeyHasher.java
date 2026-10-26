@@ -1,4 +1,4 @@
-package fr.enimaloc.catapult.api.admin;
+package fr.enimaloc.catapult.service;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -9,10 +9,10 @@ import java.security.NoSuchAlgorithmException;
  * secret never leaves the server. 64-bit truncated SHA-256 — collision-free
  * for any realistic pool size (≪ 4 billion keys).
  */
-final class ApiKeyHasher {
+public final class ApiKeyHasher {
     private ApiKeyHasher() {}
 
-    static String id(String key) {
+    public static String id(String key) {
         try {
             byte[] hash = MessageDigest.getInstance("SHA-256")
                 .digest(key.getBytes(StandardCharsets.UTF_8));

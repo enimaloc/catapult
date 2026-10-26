@@ -4,6 +4,8 @@ import fr.enimaloc.catapult.common.dto.admin.AddKeyRequest;
 import fr.enimaloc.catapult.domain.dtdd.DtddApiKeyEntry;
 import fr.enimaloc.catapult.getter.dtdd.DtddApiKeyRotator;
 import fr.enimaloc.catapult.repository.dtdd.DtddApiKeyRepository;
+import fr.enimaloc.catapult.service.ApiKeyHasher;
+import fr.enimaloc.catapult.service.dtdd.DtddKeyPoolService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,7 +35,7 @@ class ApiAdminDtddKeysControllerTest {
 
     @BeforeEach
     void setUp() {
-        controller = new ApiAdminDtddKeysController(repository, Optional.of(rotator), events);
+        controller = new ApiAdminDtddKeysController(new DtddKeyPoolService(repository, Optional.of(rotator), events));
     }
 
     @Test
@@ -80,7 +82,7 @@ class ApiAdminDtddKeysControllerTest {
 
     @Test
     void page_withoutRotator_dtddIsReportedDisabled_andNothingIsBlocked() {
-        var bare = new ApiAdminDtddKeysController(repository, Optional.empty(), events);
+        var bare = new ApiAdminDtddKeysController(new DtddKeyPoolService(repository, Optional.empty(), events));
         when(repository.findByExclusiveFalseWithOwner()).thenReturn(List.of(
             new DtddApiKeyEntry("ABCDEFGHIJKLMNOP")
         ));
@@ -94,7 +96,7 @@ class ApiAdminDtddKeysControllerTest {
 
     @Test
     void editsWithoutRotator_stillWork_andAreAnnounced() {
-        var bare = new ApiAdminDtddKeysController(repository, Optional.empty(), events);
+        var bare = new ApiAdminDtddKeysController(new DtddKeyPoolService(repository, Optional.empty(), events));
         when(repository.existsById("ddd_abcdef1234567890ABCD")).thenReturn(false);
         when(repository.findByExclusiveFalse()).thenReturn(List.of(new DtddApiKeyEntry("ABCDEFGHIJKLMNOP")));
         when(repository.findByExclusiveFalseWithOwner()).thenReturn(List.of());
