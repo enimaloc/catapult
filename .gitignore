@@ -71,3 +71,7 @@ e2e/package-lock.json
 test-results/
 /catapult-web-old/
 catapult-web/node_modules/
+
+### Perf (timing runs) ###
+perf/reports/
+e2e/perf-results/
