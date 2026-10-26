@@ -51,8 +51,8 @@ public class IgdbClient {
     }
 
     /**
-     * Résout les sources externes par nom (ex: "Steam").
-     * Propage RequestException — l'appelant gère l'erreur.
+     * Resolves external sources by name (e.g. "Steam").
+     * Propagates RequestException — the caller handles the error.
      */
     public List<ExternalGameSource> findSourcesByName(String name, String token) throws RequestException {
         long start = System.nanoTime();
@@ -69,8 +69,8 @@ public class IgdbClient {
     }
 
     /**
-     * Cherche un jeu externe par son uid (Steam appId) — lookup unitaire.
-     * sourceId >= 0 → filtre par external_game_source ; sinon pas de filtre source.
+     * Looks up an external game by its uid (Steam appId) — single lookup.
+     * sourceId >= 0 → filters by external_game_source; otherwise no source filter.
      */
     public List<ExternalGame> findExternalGameByUid(String uid, long sourceId, String token) {
         return apiObservations.observe("igdb", "find_external_game_by_uid", () -> {
@@ -82,8 +82,8 @@ public class IgdbClient {
     }
 
     /**
-     * Cherche plusieurs jeux externes par leurs uids — batch (max 500 par appel).
-     * sourceId >= 0 → filtre par external_game_source ; sinon pas de filtre source.
+     * Looks up several external games by their uids — batch (max 500 per call).
+     * sourceId >= 0 → filters by external_game_source; otherwise no source filter.
      */
     public List<ExternalGame> findExternalGamesByUids(List<String> uids, long sourceId, String token) {
         if (uids.isEmpty()) return List.of();
@@ -97,7 +97,7 @@ public class IgdbClient {
     }
 
     /**
-     * Cherche un jeu IGDB via le nom de son exécutable Windows (alternative_names).
+     * Looks up an IGDB game by its Windows executable name (alternative_names).
      */
     public List<AlternativeName> findByWindowsExecutable(String exeName, String token) {
         return apiObservations.observe("igdb", "find_by_windows_executable", () -> {
@@ -112,7 +112,7 @@ public class IgdbClient {
     }
 
     /**
-     * Recherche plein-texte d'un jeu par son nom.
+     * Full-text search of a game by name.
      */
     public List<Game> searchByName(String name, String token) {
         return apiObservations.observe("igdb", "search_by_name", () -> {
@@ -122,7 +122,7 @@ public class IgdbClient {
     }
 
     /**
-     * Récupère les détails de plusieurs jeux par leurs IDs IGDB en un seul appel (batch).
+     * Fetches the details of several games by their IGDB ids in a single call (batch).
      */
     public List<Game> fetchGamesByIds(List<String> igdbIds, String fields, String token) {
         if (igdbIds.isEmpty()) return List.of();
@@ -134,7 +134,7 @@ public class IgdbClient {
     }
 
     /**
-     * Récupère les détails d'un jeu par son ID IGDB.
+     * Fetches a game's details by its IGDB id.
      */
     public List<Game> fetchGameById(String igdbId, String fields, String token) {
         return apiObservations.observe("igdb", "fetch_game_by_id", () -> {
@@ -144,8 +144,8 @@ public class IgdbClient {
     }
 
     /**
-     * Récupère les détails enrichis d'un jeu (slug, summary, first_release_date,
-     * websites, external_games) pour la cache stale-while-revalidate.
+     * Fetches a game's enriched details (slug, summary, first_release_date,
+     * websites, external_games) for the stale-while-revalidate cache.
      */
     public Optional<Game> fetchGameDetails(String igdbId, String token) {
         return apiObservations.observe("igdb", "fetch_game_details", () -> {
@@ -186,7 +186,7 @@ public class IgdbClient {
         }
     }
 
-    /** Appelé à l'intérieur d'un bloc synchronized(IGDBWrapper.INSTANCE). */
+    /** Called inside a synchronized(IGDBWrapper.INSTANCE) block. */
     private void setCredentialsIfChanged(String token) {
         if (!token.equals(currentToken)) {
             IGDBWrapper.INSTANCE.setCredentials(clientId, token);

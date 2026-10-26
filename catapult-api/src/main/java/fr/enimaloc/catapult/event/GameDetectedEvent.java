@@ -6,9 +6,9 @@ import lombok.Getter;
 import org.springframework.context.ApplicationEvent;
 
 /**
- * Publié lorsqu'un jeu est détecté et qu'il diffère du dernier jeu connu pour cet utilisateur.
- * {@code firstSinceStart} : première observation de l'utilisateur depuis le démarrage de catapult-api — l'état
- * précédent est inconnu (perdu au redémarrage), le jeu n'est donc pas forcément nouveau.
+ * Published when a game is detected and differs from the last game known for this user.
+ * {@code firstSinceStart}: the user's first observation since catapult-api started — the previous state
+ * is unknown (lost on restart), so the game is not necessarily new.
  */
 @Getter
 public class GameDetectedEvent extends ApplicationEvent {

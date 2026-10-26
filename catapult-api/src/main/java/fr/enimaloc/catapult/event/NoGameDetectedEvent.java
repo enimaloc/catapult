@@ -5,8 +5,8 @@ import lombok.Getter;
 import org.springframework.context.ApplicationEvent;
 
 /**
- * Publié lorsque tous les getters actifs retournent vide et que l'utilisateur
- * était précédemment en train de jouer.
+ * Published when all active getters return empty and the user
+ * was previously playing.
  */
 @Getter
 public class NoGameDetectedEvent extends ApplicationEvent {

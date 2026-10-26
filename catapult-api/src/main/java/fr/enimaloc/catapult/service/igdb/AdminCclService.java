@@ -19,8 +19,8 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * Gestion de la configuration admin des CCLs.
- * Au démarrage, synchronise les CCLs Twitch et les descripteurs de contenu IGDB depuis leurs APIs.
+ * Admin configuration of the CCLs.
+ * At startup, syncs the Twitch CCLs and the IGDB content descriptors from their APIs.
  */
 @Slf4j
 @Service
@@ -49,8 +49,8 @@ public class AdminCclService {
     private String igdbClientId;
 
     /**
-     * Mots-clés partagés entre les descriptions IGDB et les CCL Twitch.
-     * Utilisés pour le seeding automatique des mappings au premier démarrage.
+     * Keywords shared between the IGDB descriptions and the Twitch CCLs.
+     * Used to seed the mappings automatically on first startup.
      */
     private static final Map<String, Set<String>> DEFAULT_KEYWORDS = Map.of(
         "ViolentGraphic",    Set.of("blood", "gore", "violence", "violent", "killing", "combat", "death", "injury"),

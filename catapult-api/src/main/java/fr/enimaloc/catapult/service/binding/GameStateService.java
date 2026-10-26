@@ -17,8 +17,8 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Maintient en mémoire le dernier jeu connu par utilisateur actif.
- * Permet d'éviter des appels Twitch inutiles si le jeu n'a pas changé.
+ * Keeps the last known game of each active user in memory.
+ * Avoids needless Twitch calls when the game has not changed.
  */
 @Service
 @RequiredArgsConstructor

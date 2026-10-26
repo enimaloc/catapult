@@ -61,7 +61,7 @@ public class AccountService {
     private int deletionDelayDays;
 
     // =========================================================
-    // Suppression en deux temps
+    // Two-step deletion
     // =========================================================
 
     @Transactional
@@ -117,7 +117,7 @@ public class AccountService {
         catapultCategoryChangeStateRepository.deleteByUser(account);
         twitchatActionTokenRepository.deleteByUserId(account.getId());
         twitchatEventActionService.deleteAllOfUser(account);
-        // Pas d'endpoint de révocation officiel pour ces providers — suppression en base uniquement
+        // No official revocation endpoint for these providers — database deletion only
 //        for (OAuthToken.Provider p : List.of(OAuthToken.Provider.XBOX, OAuthToken.Provider.BATTLENET)) {
 //            oAuthTokenRepository.findByUserAndProvider(account, p)
 //                .ifPresent(oAuthTokenRepository::delete);
@@ -130,7 +130,7 @@ public class AccountService {
     private void revokeTwitchToken(UserAccount account) {
         oAuthTokenRepository.findByUserAndProvider(account, OAuthToken.Provider.TWITCH).ifPresent(token -> {
             try {
-                // La révocation effective est gérée par TwitchService/DiscordService
+                // The actual revocation is handled by TwitchService/DiscordService
                 oAuthTokenRepository.delete(token);
             } catch (Exception e) {
                 log.warn("Failed to revoke TWITCH token for account {}", account.getId(), e);
@@ -139,7 +139,7 @@ public class AccountService {
     }
 
     // =========================================================
-    // Déconnexion provider secondaire
+    // Secondary provider disconnection
     // =========================================================
 
     @Transactional

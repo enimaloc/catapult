@@ -152,9 +152,9 @@ public class AdminMemberService {
     }
 
     /**
-     * Marque un UserAccount régulier comme compte système (le bot pour les
-     * commandes chat). Tout précédent système account est démarqué ; s'il n'a
-     * pas de Twitch identity, il est supprimé pour éviter l'orphelin.
+     * Marks a regular UserAccount as the system account (the bot for chat
+     * commands). Any previous system account is unmarked; if it has no
+     * Twitch identity, it is deleted to avoid leaving an orphan.
      */
     @Transactional
     public void promoteToSystem(UUID id) {
