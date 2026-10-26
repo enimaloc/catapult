@@ -1,6 +1,9 @@
 package fr.enimaloc.catapult.service.category;
 
+import fr.enimaloc.catapult.api.ApiUserResolver;
+import fr.enimaloc.catapult.api.channel.ApiChannelActionsController;
 import fr.enimaloc.catapult.chat.command.registry.catapult.CatapultSetGameFunction;
+import fr.enimaloc.catapult.common.dto.channel.NoGameSettingsRequest;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatActionType;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
@@ -24,6 +27,9 @@ import fr.enimaloc.catapult.repository.binding.CustomBindingActivationRepository
 import fr.enimaloc.catapult.repository.binding.CustomBindingRepository;
 import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
 import fr.enimaloc.catapult.repository.binding.GameMappingRepository;
+import fr.enimaloc.catapult.repository.steam.SteamApiKeyRepository;
+import fr.enimaloc.catapult.security.TokenEncryptionService;
+import fr.enimaloc.catapult.service.account.AccountService;
 import fr.enimaloc.catapult.service.account.BotToggleService;
 import fr.enimaloc.catapult.service.binding.BindingService;
 import fr.enimaloc.catapult.service.binding.CustomBindingActivations;
@@ -33,8 +39,10 @@ import fr.enimaloc.catapult.service.binding.CustomBindingService.UpdateResult;
 import fr.enimaloc.catapult.service.binding.GameBindingLookup;
 import fr.enimaloc.catapult.service.binding.GameStateService;
 import fr.enimaloc.catapult.service.binding.RaidRestoreGameService;
+import fr.enimaloc.catapult.service.binding.SchedulerService;
 import fr.enimaloc.catapult.service.binding.RaidRestoreGateService;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
+import fr.enimaloc.catapult.service.connections.SteamProfileDiagnostics;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import fr.enimaloc.catapult.service.igdb.IgdbGameDetailsService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
@@ -42,7 +50,9 @@ import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import fr.enimaloc.catapult.service.notification.TwitchatActionExecutor;
 import fr.enimaloc.catapult.service.notification.TwitchatActionExecutor.Result;
 import fr.enimaloc.catapult.service.notification.TwitchatActionTokenService;
+import fr.enimaloc.catapult.service.notification.TwitchatEventActionService;
 import fr.enimaloc.catapult.service.notification.TwitchatEventDispatcher;
+import fr.enimaloc.catapult.service.notification.TwitchatWidgetSettingsService;
 import fr.enimaloc.catapult.service.tw.TwResolverService;
 import fr.enimaloc.catapult.service.twitch.ChannelUpdateOutcome;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -59,6 +69,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -82,6 +93,8 @@ public class ChannelFixture {
     private final Map<UUID, CustomBinding> customBindings = new HashMap<>();
     private CustomBindingActivation activation;
     private final AtomicInteger activationReads = new AtomicInteger();
+    private final AtomicInteger gateChecks = new AtomicInteger();
+    private boolean raidGateOpen = true;
     private Runnable onSettingsRead = () -> { };
     private TwitchatActionToken actionToken;
     private Map<String, String> actionPayload = Map.of();
@@ -97,6 +110,7 @@ public class ChannelFixture {
     private final CustomBindingService customBindingService;
     private final CatapultSetGameFunction setGameFunction;
     private final TwitchatActionExecutor twitchatActionExecutor;
+    private final ApiChannelActionsController channelActionsController;
 
     public ChannelFixture() {
         user.setId(UUID.randomUUID());
@@ -174,7 +188,11 @@ public class ChannelFixture {
         // Every experiment gate open: the custom bindings and the raid restore
         ExperimentService experimentService = mock(ExperimentService.class);
         when(experimentService.evaluateGate(any(), anyString())).thenReturn(true);
-        when(experimentService.isRolledOut(any(), anyString())).thenReturn(true);
+        when(experimentService.evaluateGate(any(), eq(CustomBindingService.EXPERIMENT_KEY))).thenAnswer(inv -> {
+            gateChecks.incrementAndGet();
+            return true;
+        });
+        when(experimentService.isRolledOut(any(), anyString())).thenAnswer(inv -> raidGateOpen);
 
         TwitchatActionTokenService actionTokenService = mock(TwitchatActionTokenService.class);
         when(actionTokenService.consume(any())).thenAnswer(inv -> Optional.ofNullable(actionToken));
@@ -199,6 +217,13 @@ public class ChannelFixture {
         setGameFunction = new CatapultSetGameFunction(twitch, gameStateService, igdbService, activations);
         twitchatActionExecutor = new TwitchatActionExecutor(actionTokenService, accountRepository, twitch,
                 bindingService, mock(BotToggleService.class), activations);
+        channelActionsController = new ApiChannelActionsController(accountRepository, settingsRepository,
+                new ApiUserResolver(accountRepository), bindingService, mock(BotToggleService.class), twitch,
+                gameStateService, mock(AccountService.class), mock(SchedulerService.class),
+                mock(TokenEncryptionService.class), mock(SteamApiKeyRepository.class), publisher,
+                mock(TwitchatWidgetSettingsService.class), mock(TwitchatEventActionService.class), dispatcher,
+                mock(SteamProfileDiagnostics.class), new RaidRestoreGateService(experimentService), activations,
+                Optional.empty());
     }
 
     /** The category events and Twitch writes, in order. */
@@ -287,6 +312,16 @@ public class ChannelFixture {
         return activationReads.get();
     }
 
+    /** How many times the custom bindings' experiment gate has been evaluated so far. */
+    public int gateChecks() {
+        return gateChecks.get();
+    }
+
+    /** Whether the raid restore's experiment is rolled out to the channel (it is unless told otherwise). */
+    public void raidGate(boolean open) {
+        this.raidGateOpen = open;
+    }
+
     /** Runs {@code hook} at every read of the channel's settings. */
     public void whenSettingsRead(Runnable hook) {
         this.onSettingsRead = hook;
@@ -371,6 +406,14 @@ public class ChannelFixture {
         actionToken.setPayloadJson("{}");
         actionPayload = payload;
         return twitchatActionExecutor.execute(actionToken.getToken());
+    }
+
+    /** The no-game settings form saved with the values {@link #settings} holds now. */
+    public void noGameSettingsSaved() {
+        channelActionsController.saveNoGameSettings(user.getId(), new NoGameSettingsRequest(
+                settings.getNoGameTwitchGameId(), settings.getNoGameTwitchGameName(),
+                Set.copyOf(settings.getNoGameCcls()), settings.isApplyDefaultOnStreamStart(),
+                settings.isApplyDefaultOnNoGame(), settings.isApplyDefaultOnStreamEnd()));
     }
 
     /** The streamer raided out, the channel last seen on {@code currentCategoryId}. */

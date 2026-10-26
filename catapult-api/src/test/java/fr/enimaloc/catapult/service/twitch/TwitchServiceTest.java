@@ -707,6 +707,7 @@ class TwitchServiceTest {
 
         verify(bodySpec).body(any(Map.class));
         verifyNoInteractions(categoryChangeStateService);
+        assertThat(timer("reset_to_default", "success")).isNotNull();
     }
 
     @Test
