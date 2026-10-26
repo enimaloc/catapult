@@ -1,0 +1,51 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":semanticCommits"
+  ],
+  "timezone": "Europe/Paris",
+  "labels": ["dependencies"],
+  "platformAutomerge": false,
+  "automergeStrategy": "squash",
+  "packageRules": [
+    {
+      "description": "Gradle dependencies and the Gradle wrapper: one PR for every non-major update",
+      "matchManagers": ["gradle", "gradle-wrapper"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "gradle dependencies"
+    },
+    {
+      "description": "Docker images of the Dockerfiles and the compose file: one PR for every non-major update",
+      "matchManagers": ["dockerfile", "docker-compose"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "docker images"
+    },
+    {
+      "description": "GitHub Actions: one PR for every non-major update",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "github actions"
+    },
+    {
+      "description": "End-to-end test tooling: one PR for every non-major update",
+      "matchManagers": ["npm"],
+      "matchFileNames": ["e2e/**"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "e2e dependencies"
+    },
+    {
+      "description": "Merge minor and patch updates by themselves once every check is green; 0.x versions and majors stay manual",
+      "matchUpdateTypes": ["minor", "patch"],
+      "matchCurrentVersion": "!/^v?0\\./",
+      "automerge": true
+    },
+    {
+      "description": "No PostgreSQL major upgrade: a new major cannot read the old data directory without a manual pg_upgrade",
+      "matchManagers": ["docker-compose"],
+      "matchPackageNames": ["postgres"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
+    }
+  ]
+}
