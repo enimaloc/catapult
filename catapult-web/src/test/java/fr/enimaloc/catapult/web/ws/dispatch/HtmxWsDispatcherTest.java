@@ -50,7 +50,7 @@ import static org.mockito.Mockito.when;
 class HtmxWsDispatcherTest {
 
     @Container
-    static GenericContainer<?> redis = new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
+    static GenericContainer<?> redis = new GenericContainer<>("redis:8-alpine").withExposedPorts(6379);
 
     @DynamicPropertySource
     static void props(DynamicPropertyRegistry r) {

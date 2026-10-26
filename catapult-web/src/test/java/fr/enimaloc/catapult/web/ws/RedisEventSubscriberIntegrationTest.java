@@ -27,7 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class RedisEventSubscriberIntegrationTest {
 
     @Container
-    static GenericContainer<?> redis = new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
+    static GenericContainer<?> redis = new GenericContainer<>("redis:8-alpine").withExposedPorts(6379);
 
     @DynamicPropertySource
     static void props(DynamicPropertyRegistry r) {
