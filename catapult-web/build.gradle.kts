@@ -2,7 +2,7 @@ import java.time.Instant
 
 plugins {
     java
-    id("org.springframework.boot") version "4.0.4"
+    id("org.springframework.boot") version "4.1.2"
     id("io.spring.dependency-management") version "1.1.7"
 }
 
@@ -20,8 +20,8 @@ configurations {
     }
 }
 
-val chartjsVersion = "4.4.9"
-val htmxVersion = "2.0.4"
+val chartjsVersion = "4.6.1"
+val htmxVersion = "2.0.11"
 val blocklyVersion = "10.4.1" // latest version published on the webjars.npm mirror at time of writing
 
 dependencies {
