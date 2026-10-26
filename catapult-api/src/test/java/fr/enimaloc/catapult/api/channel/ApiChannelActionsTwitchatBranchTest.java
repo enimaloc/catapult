@@ -12,7 +12,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class ApiChannelActionsTwitchatBranchTest extends ApiChannelActionsTestSupport {
@@ -22,7 +22,6 @@ class ApiChannelActionsTwitchatBranchTest extends ApiChannelActionsTestSupport {
         user.setId(userId);
         user.setTwitchUsername("streamer");
         when(userAccountRepository.findById(userId)).thenReturn(Optional.of(user));
-        when(userAccountRepository.findByTwitchUsername("streamer")).thenReturn(Optional.of(user));
         when(channelAccessService.canAccess(user, user)).thenReturn(true);
         return user;
     }
@@ -32,7 +31,7 @@ class ApiChannelActionsTwitchatBranchTest extends ApiChannelActionsTestSupport {
         UUID userId = UUID.randomUUID();
         UserAccount user = owner(userId);
 
-        mvc.perform(post("/api/channels/streamer/settings/twitchat/branch")
+        mvc.perform(put("/api/internal/users/{userId}/settings/twitchat/branch", user.getId())
                         .with(userJwt(userId))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -49,7 +48,7 @@ class ApiChannelActionsTwitchatBranchTest extends ApiChannelActionsTestSupport {
         when(twitchatWidgetSettingsService.updateBranch(user, "main"))
                 .thenThrow(new IllegalArgumentException("Unknown Twitchat branch main"));
 
-        mvc.perform(post("/api/channels/streamer/settings/twitchat/branch")
+        mvc.perform(put("/api/internal/users/{userId}/settings/twitchat/branch", user.getId())
                         .with(userJwt(userId))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -68,10 +67,10 @@ class ApiChannelActionsTwitchatBranchTest extends ApiChannelActionsTestSupport {
         channelUser.setTwitchUsername("streamer");
 
         when(userAccountRepository.findById(viewerId)).thenReturn(Optional.of(viewer));
-        when(userAccountRepository.findByTwitchUsername("streamer")).thenReturn(Optional.of(channelUser));
+        when(userAccountRepository.findById(channelUser.getId())).thenReturn(Optional.of(channelUser));
         when(channelAccessService.canAccess(viewer, channelUser)).thenReturn(true);
 
-        mvc.perform(post("/api/channels/streamer/settings/twitchat/branch")
+        mvc.perform(put("/api/internal/users/{userId}/settings/twitchat/branch", channelUser.getId())
                         .with(userJwt(viewerId))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)

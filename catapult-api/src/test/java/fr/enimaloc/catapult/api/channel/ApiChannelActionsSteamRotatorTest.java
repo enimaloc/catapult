@@ -13,7 +13,8 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /** With Steam enabled the key pool's rotator exists: a member's personal token changes refresh it. */
@@ -33,7 +34,7 @@ class ApiChannelActionsSteamRotatorTest extends ApiChannelActionsTestSupport {
 
     @Test
     void save_refreshesTheRotator() throws Exception {
-        mvc.perform(post("/api/channels/streamer/settings/steam-personal-token")
+        mvc.perform(put("/api/internal/users/{userId}/settings/steam-personal-token", owner.getId())
                         .with(userJwt(owner.getId())).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON).content("{\"token\":\"KEY\",\"shared\":true}"))
                 .andExpect(status().isNoContent());
@@ -43,7 +44,7 @@ class ApiChannelActionsSteamRotatorTest extends ApiChannelActionsTestSupport {
 
     @Test
     void delete_refreshesTheRotator() throws Exception {
-        mvc.perform(post("/api/channels/streamer/settings/steam-personal-token/delete")
+        mvc.perform(delete("/api/internal/users/{userId}/settings/steam-personal-token", owner.getId())
                         .with(userJwt(owner.getId())).with(csrf()))
                 .andExpect(status().isNoContent());
 

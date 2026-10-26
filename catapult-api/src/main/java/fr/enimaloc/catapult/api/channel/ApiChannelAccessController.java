@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.channel;
 
+import fr.enimaloc.catapult.api.ApiPaths;
 import fr.enimaloc.catapult.common.dto.channel.ChannelAccessResponse;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
@@ -19,7 +20,8 @@ import java.util.UUID;
  * whether the authenticated viewer is allowed to receive events for that
  * channel before binding the subscription.
  *
- * <p>Returns {@code accessible: false} for unknown owners (no 404, no oracle
+ * <p>Its {@code userId} is the channel owner's, taken as text: a malformed one answers {@code false} too, not a 400.
+ * Returns {@code accessible: false} for unknown owners (no 404, no oracle
  * for account existence). Always {@code accessible: false} for an anonymous
  * call — the channel-events feed is gated to authenticated viewers in V1.</p>
  */
@@ -30,8 +32,8 @@ public class ApiChannelAccessController {
     private final UserAccountRepository userAccountRepository;
     private final Authz authz;
 
-    @GetMapping("/api/users/{ownerId}/channel-access")
-    public ChannelAccessResponse canAccess(@PathVariable String ownerId,
+    @GetMapping(ApiPaths.USER + "/channel-access")
+    public ChannelAccessResponse canAccess(@PathVariable String userId,
                                     @AuthenticationPrincipal Jwt jwt) {
         if (jwt == null) return new ChannelAccessResponse(false);
 
@@ -39,7 +41,7 @@ public class ApiChannelAccessController {
         UUID ownerUuid;
         try {
             viewerUuid = UUID.fromString(jwt.getSubject());
-            ownerUuid = UUID.fromString(ownerId);
+            ownerUuid = UUID.fromString(userId);
         } catch (IllegalArgumentException e) {
             return new ChannelAccessResponse(false);
         }

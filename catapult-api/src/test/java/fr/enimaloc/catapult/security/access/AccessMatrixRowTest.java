@@ -62,7 +62,6 @@ class AccessMatrixRowTest {
     @Test
     void literalUnknownUserRowsAreNotRouted() {
         assertThat(row("/api/internal/users/" + AccessMatrixSupport.DEAD + "/settings", "").routed()).isFalse();
-        assertThat(row("/api/channels/nobody-here/settings", "").routed()).isFalse();
         assertThat(row("/api/internal/users/{userId}/settings", "").routed()).isTrue();
     }
 }

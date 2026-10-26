@@ -42,8 +42,10 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -98,28 +100,41 @@ class ApiChannelCustomBindingsControllerTest {
                 .authorities(new SimpleGrantedAuthority("ROLE_USER"));
     }
 
-    private static final String BASE = "/api/channels/enimaloc/custom-bindings";
+    /** The owner's custom bindings. */
+    private String base() {
+        return "/api/internal/users/" + owner.getId() + "/custom-bindings";
+    }
 
-    private MockHttpServletRequestBuilder postJson(String path, UserAccount as) {
-        return post(BASE + path).contentType(MediaType.APPLICATION_JSON).content(BODY).with(as(as)).with(csrf());
+    /** Creates a custom binding, as {@code as}. */
+    private MockHttpServletRequestBuilder create(UserAccount as) {
+        return json(post(base()), as);
+    }
+
+    /** Replaces the custom binding {@code id}, as {@code as}. */
+    private MockHttpServletRequestBuilder update(UUID id, UserAccount as) {
+        return json(put(base() + "/" + id), as);
+    }
+
+    private static MockHttpServletRequestBuilder json(MockHttpServletRequestBuilder request, UserAccount as) {
+        return request.contentType(MediaType.APPLICATION_JSON).content(BODY).with(as(as)).with(csrf());
     }
 
     @Test
     void ownerEndpoints_rejectAnotherMember() throws Exception {
-        mvc.perform(get(BASE).with(as(other))).andExpect(status().isForbidden());
-        mvc.perform(postJson("", other)).andExpect(status().isForbidden());
-        mvc.perform(postJson("/" + art.getId(), other)).andExpect(status().isForbidden());
-        mvc.perform(post(BASE + "/" + art.getId() + "/delete").with(as(other)).with(csrf()))
+        mvc.perform(get(base()).with(as(other))).andExpect(status().isForbidden());
+        mvc.perform(create(other)).andExpect(status().isForbidden());
+        mvc.perform(update(art.getId(), other)).andExpect(status().isForbidden());
+        mvc.perform(delete(base() + "/" + art.getId()).with(as(other)).with(csrf()))
                 .andExpect(status().isForbidden());
-        mvc.perform(post(BASE + "/" + art.getId() + "/activate").with(as(other)).with(csrf()))
+        mvc.perform(post(base() + "/" + art.getId() + "/activate").with(as(other)).with(csrf()))
                 .andExpect(status().isForbidden());
-        mvc.perform(post(BASE + "/deactivate").with(as(other)).with(csrf())).andExpect(status().isForbidden());
+        mvc.perform(post(base() + "/deactivate").with(as(other)).with(csrf())).andExpect(status().isForbidden());
         verifyNoInteractions(service);
     }
 
     @Test
     void anonymous_is401() throws Exception {
-        mvc.perform(get(BASE)).andExpect(status().isUnauthorized());
+        mvc.perform(get(base())).andExpect(status().isUnauthorized());
         verifyNoInteractions(service);
     }
 
@@ -127,7 +142,7 @@ class ApiChannelCustomBindingsControllerTest {
     void state_listsTheOwnersBindings() throws Exception {
         when(service.list(owner)).thenReturn(List.of(art));
 
-        mvc.perform(get(BASE).with(as(owner)))
+        mvc.perform(get(base()).with(as(owner)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.enabled").value(true))
                 .andExpect(jsonPath("$.bindings[0].name").value("Art"));
@@ -137,7 +152,7 @@ class ApiChannelCustomBindingsControllerTest {
     void create_answersTheSavedBinding() throws Exception {
         when(service.create(owner, REQUEST)).thenReturn(art);
 
-        mvc.perform(postJson("", owner))
+        mvc.perform(create(owner))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(art.getId().toString()))
                 .andExpect(jsonPath("$.name").value("Art"));
@@ -146,19 +161,19 @@ class ApiChannelCustomBindingsControllerTest {
     @Test
     void aRefusedSave_tellsWhyInACode() throws Exception {
         when(service.create(owner, REQUEST)).thenThrow(new ApiProblem(ErrorCode.NAME_TAKEN, "taken"));
-        mvc.perform(postJson("", owner))
+        mvc.perform(create(owner))
                 .andExpect(status().isConflict())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.code").value("name_taken"))
                 .andExpect(jsonPath("$.detail").value("taken"));
 
         org.mockito.Mockito.doThrow(new ApiProblem(ErrorCode.LIMIT_REACHED, "max")).when(service).create(owner, REQUEST);
-        mvc.perform(postJson("", owner))
+        mvc.perform(create(owner))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("limit_reached"));
 
         when(service.update(owner, art.getId(), REQUEST)).thenThrow(new ApiProblem(ErrorCode.INVALID, "bad"));
-        mvc.perform(postJson("/" + art.getId(), owner))
+        mvc.perform(update(art.getId(), owner))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("invalid"));
     }
@@ -167,7 +182,7 @@ class ApiChannelCustomBindingsControllerTest {
     void update_ofAnInactiveBinding_hasNoReapplyOutcome() throws Exception {
         when(service.update(owner, art.getId(), REQUEST)).thenReturn(new UpdateResult(art, null));
 
-        mvc.perform(postJson("/" + art.getId(), owner))
+        mvc.perform(update(art.getId(), owner))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.binding.id").value(art.getId().toString()))
                 .andExpect(jsonPath("$.reapplyOutcome").doesNotExist());
@@ -178,19 +193,19 @@ class ApiChannelCustomBindingsControllerTest {
         when(service.update(owner, art.getId(), REQUEST))
                 .thenReturn(new UpdateResult(art, ActivationResult.TWITCH_UNAVAILABLE));
 
-        mvc.perform(postJson("/" + art.getId(), owner))
+        mvc.perform(update(art.getId(), owner))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.binding.name").value("Art"))
                 .andExpect(jsonPath("$.reapplyOutcome").value("twitch_unavailable"));
 
         when(service.update(owner, art.getId(), REQUEST)).thenReturn(new UpdateResult(art, ActivationResult.APPLIED));
-        mvc.perform(postJson("/" + art.getId(), owner))
+        mvc.perform(update(art.getId(), owner))
                 .andExpect(jsonPath("$.reapplyOutcome").value("applied"));
     }
 
     @Test
     void delete_is204() throws Exception {
-        mvc.perform(post(BASE + "/" + art.getId() + "/delete").with(as(owner)).with(csrf()))
+        mvc.perform(delete(base() + "/" + art.getId()).with(as(owner)).with(csrf()))
                 .andExpect(status().isNoContent());
         verify(service).delete(owner, art.getId());
     }
@@ -200,7 +215,7 @@ class ApiChannelCustomBindingsControllerTest {
         when(service.resolve(owner, art.getId().toString())).thenReturn(Optional.of(art));
         when(service.activate(owner, art)).thenReturn(ActivationResult.APPLIED);
 
-        mvc.perform(post(BASE + "/" + art.getId() + "/activate").with(as(owner)).with(csrf()))
+        mvc.perform(post(base() + "/" + art.getId() + "/activate").with(as(owner)).with(csrf()))
                 .andExpect(status().isNoContent());
     }
 
@@ -208,12 +223,12 @@ class ApiChannelCustomBindingsControllerTest {
     void activate_mapsTwitchOutcomes() throws Exception {
         when(service.resolve(owner, art.getId().toString())).thenReturn(Optional.of(art));
         when(service.activate(owner, art)).thenReturn(ActivationResult.BOT_DISABLED);
-        mvc.perform(post(BASE + "/" + art.getId() + "/activate").with(as(owner)).with(csrf()))
+        mvc.perform(post(base() + "/" + art.getId() + "/activate").with(as(owner)).with(csrf()))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("bot_disabled"));
 
         when(service.activate(owner, art)).thenReturn(ActivationResult.FAILED);
-        mvc.perform(post(BASE + "/" + art.getId() + "/activate").with(as(owner)).with(csrf()))
+        mvc.perform(post(base() + "/" + art.getId() + "/activate").with(as(owner)).with(csrf()))
                 .andExpect(status().isBadGateway());
     }
 
@@ -222,14 +237,14 @@ class ApiChannelCustomBindingsControllerTest {
         UUID unknown = UUID.randomUUID();
         when(service.resolve(eq(owner), any())).thenReturn(Optional.empty());
 
-        mvc.perform(post(BASE + "/" + unknown + "/activate").with(as(owner)).with(csrf()))
+        mvc.perform(post(base() + "/" + unknown + "/activate").with(as(owner)).with(csrf()))
                 .andExpect(status().isNotFound());
         verify(service, never()).activate(any(), any());
     }
 
     @Test
     void deactivate_is204() throws Exception {
-        mvc.perform(post(BASE + "/deactivate").with(as(owner)).with(csrf())).andExpect(status().isNoContent());
+        mvc.perform(post(base() + "/deactivate").with(as(owner)).with(csrf())).andExpect(status().isNoContent());
         verify(service).deactivate(owner);
     }
 
@@ -237,7 +252,7 @@ class ApiChannelCustomBindingsControllerTest {
     void gateClosed_is403() throws Exception {
         when(service.list(owner)).thenThrow(new ApiProblem(ErrorCode.FEATURE_DISABLED, "Feature not enabled"));
 
-        mvc.perform(get(BASE).with(as(owner)))
+        mvc.perform(get(base()).with(as(owner)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("feature_disabled"));
     }

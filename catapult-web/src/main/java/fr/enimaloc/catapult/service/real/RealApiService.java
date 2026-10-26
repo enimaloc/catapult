@@ -127,6 +127,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.function.IntFunction;
 
 @Service
 @RequiredArgsConstructor
@@ -161,6 +163,7 @@ public class RealApiService implements ApiService {
 
     private final ApiClient client;
     private final ApiErrorText errorText;
+    private final ChannelIds channelIds;
 
     @Override
     public TokenResponse exchangeCode(String code) {
@@ -176,91 +179,105 @@ public class RealApiService implements ApiService {
 
     @Override
     public ChannelPageData channelPage(String username, int page, String status, String source) {
-        StringBuilder path = new StringBuilder("/api/channels/{username}?page={page}");
-        List<Object> vars = new ArrayList<>(List.of(username, page));
-        if (status != null && !status.isBlank()) {
-            path.append("&status={status}");
-            vars.add(status);
-        } else if (source != null && !source.isBlank()) {
-            path.append("&source={source}");
-            vars.add(source);
-        }
-        return client.get(path.toString(), ChannelPageData.class, vars.toArray());
+        return readChannel(username, id -> {
+            StringBuilder path = new StringBuilder("/api/internal/users/{userId}/dashboard?page={page}");
+            List<Object> vars = new ArrayList<>(List.of(id, page));
+            if (status != null && !status.isBlank()) {
+                path.append("&status={status}");
+                vars.add(status);
+            } else if (source != null && !source.isBlank()) {
+                path.append("&source={source}");
+                vars.add(source);
+            }
+            return client.getResult(path.toString(), ChannelPageData.class, vars.toArray());
+        });
     }
 
     @Override
     public int toggleBot(String username) {
-        return client.postVoid("/api/channels/{username}/settings/bot", null, username);
+        return onChannel(username, id -> client.postVoid("/api/internal/users/{userId}/settings/bot/toggle", null, id),
+                status -> status);
     }
 
     @Override
     public int recheckGame(String username) {
-        return client.postVoid("/api/channels/{username}/game/recheck", null, username);
+        return onChannel(username, id -> client.postVoid("/api/internal/users/{userId}/game/recheck", null, id),
+                status -> status);
     }
 
     @Override
     public int cclToggle(String username, String bindingId, boolean enabled) {
-        return client.postVoid("/api/channels/{username}/bindings/{bindingId}/ccl-toggle",
-                new CclToggleRequest(enabled), username, bindingId);
+        return onChannel(username, id -> client.putVoid("/api/internal/users/{userId}/bindings/{bindingId}/ccl-enabled",
+                new CclToggleRequest(enabled), id, bindingId), status -> status);
     }
 
     @Override
     public int ignoredToggle(String username, String bindingId, boolean ignored) {
-        return client.postVoid("/api/channels/{username}/bindings/{bindingId}/ignored-toggle",
-                new IgnoredToggleRequest(ignored), username, bindingId);
+        return onChannel(username, id -> client.putVoid("/api/internal/users/{userId}/bindings/{bindingId}/ignored",
+                new IgnoredToggleRequest(ignored), id, bindingId), status -> status);
     }
 
     @Override
     public int deleteBinding(String username, String bindingId) {
-        return client.postVoid("/api/channels/{username}/bindings/{bindingId}/delete", null, username, bindingId);
+        return onChannel(username, id -> client.delete("/api/internal/users/{userId}/bindings/{bindingId}", id, bindingId),
+                status -> status);
     }
 
     @Override
     public Object searchGames(String username, String q) {
-        return client.get("/api/channels/{username}/games/search?q={q}", Object.class, username, q);
+        return readChannel(username, id -> client.getResult("/api/internal/users/{userId}/games?q={q}", Object.class, id, q));
     }
 
     @Override
     public int updateBinding(String username, String bindingId, String twitchGameId, String twitchGameName, Set<String> ccls) {
-        return client.postVoid("/api/channels/{username}/bindings/{bindingId}",
-                new UpdateBindingRequest(twitchGameId, twitchGameName, ccls), username, bindingId);
+        return onChannel(username, id -> client.patchVoid("/api/internal/users/{userId}/bindings/{bindingId}",
+                new UpdateBindingRequest(twitchGameId, twitchGameName, ccls), id, bindingId), status -> status);
     }
 
     @Override
     public int saveTws(String bindingId, Set<String> tws) {
-        return client.postVoid("/api/channel/bindings/{bindingId}/tws", new SaveBody(tws), bindingId);
+        UUID me = me();
+        if (me == null) return HttpStatus.UNAUTHORIZED.value();
+        return client.putVoid("/api/internal/users/{userId}/bindings/{bindingId}/tws", new SaveBody(tws), me, bindingId);
     }
 
     @Override
     public int resetTws(String bindingId) {
-        return client.postVoid("/api/channel/bindings/{bindingId}/tws/reset", null, bindingId);
+        UUID me = me();
+        if (me == null) return HttpStatus.UNAUTHORIZED.value();
+        return client.delete("/api/internal/users/{userId}/bindings/{bindingId}/tws", me, bindingId);
     }
 
     @Override
     public int toggleTwEnabled(String bindingId, boolean enabled) {
-        return client.postVoid("/api/channel/bindings/{bindingId}/tw-enabled", new TwEnabledBody(enabled), bindingId);
+        UUID me = me();
+        if (me == null) return HttpStatus.UNAUTHORIZED.value();
+        return client.putVoid("/api/internal/users/{userId}/bindings/{bindingId}/tw-enabled", new TwEnabledBody(enabled), me,
+                bindingId);
     }
 
     @Override
     public int saveSteamToken(String username, String token, boolean shared) {
-        return client.postVoid("/api/channels/{username}/settings/steam-personal-token",
-                new SteamTokenRequest(token, shared), username);
+        return onChannel(username, id -> client.putVoid("/api/internal/users/{userId}/settings/steam-personal-token",
+                new SteamTokenRequest(token, shared), id), status -> status);
     }
 
     @Override
     public int steamTokenSharing(String username, boolean shared) {
-        return client.postVoid("/api/channels/{username}/settings/steam-personal-token/sharing",
-                new SteamTokenSharingRequest(shared), username);
+        return onChannel(username, id -> client.putVoid("/api/internal/users/{userId}/settings/steam-personal-token/sharing",
+                new SteamTokenSharingRequest(shared), id), status -> status);
     }
 
     @Override
     public int deleteSteamToken(String username) {
-        return client.postVoid("/api/channels/{username}/settings/steam-personal-token/delete", null, username);
+        return onChannel(username, id -> client.delete("/api/internal/users/{userId}/settings/steam-personal-token", id),
+                status -> status);
     }
 
     @Override
     public int refreshSteamProfileCache(String username) {
-        return client.postVoid("/api/channels/{username}/steam/refresh-profile-cache", null, username);
+        return onChannel(username, id -> client.postVoid("/api/internal/users/{userId}/steam-profile/refresh", null, id),
+                status -> status);
     }
 
     @Override
@@ -293,7 +310,8 @@ public class RealApiService implements ApiService {
 
     @Override
     public int xboxDisconnect(String username) {
-        return client.postVoid("/api/channels/{username}/settings/disconnect", Map.of("provider", "XBOX"), username);
+        return onChannel(username, id -> client.delete("/api/internal/users/{userId}/oauth-tokens/{provider}", id, "xbox"),
+                status -> status);
     }
 
     @Override
@@ -320,48 +338,51 @@ public class RealApiService implements ApiService {
 
     @Override
     public TwitchatSettingsResponse twitchatSettings(String username) {
-        return client.get("/api/channels/{username}/settings/twitchat", TwitchatSettingsResponse.class, username);
+        return readChannel(username, id -> client.getResult("/api/internal/users/{userId}/settings/twitchat",
+                TwitchatSettingsResponse.class, id));
     }
 
     @Override
     public ApiClient.Result<TwitchatSettingsResponse> regenerateTwitchatWidget(String username) {
         // The answer carries the new token: never logged.
-        ApiClient.Result<TwitchatSettingsResponse> result = client.call(HttpMethod.POST,
-                "/api/channels/{username}/settings/twitchat/regenerate", null, TwitchatSettingsResponse.class, username);
+        ApiClient.Result<TwitchatSettingsResponse> result = onChannel(username, id -> client.call(HttpMethod.POST,
+                "/api/internal/users/{userId}/settings/twitchat/regenerate", null, TwitchatSettingsResponse.class, id),
+                status -> new ApiClient.Result<>(status, null));
         return result.ok() ? result : new ApiClient.Result<>(result.status(), null);
     }
 
     @Override
     public int saveObsSettings(String username, boolean enabled, String host, Integer port, String password) {
-        return client.postVoid("/api/channels/{username}/settings/obs",
-                new ObsSettingsRequest(enabled, host, port, password), username);
+        return onChannel(username, id -> client.putVoid("/api/internal/users/{userId}/settings/obs",
+                new ObsSettingsRequest(enabled, host, port, password), id), status -> status);
     }
 
     @Override
     public int saveTwitchatBranch(String username, String branch) {
-        return client.postVoid("/api/channels/{username}/settings/twitchat/branch", new TwitchatBranchRequest(branch), username);
+        return onChannel(username, id -> client.putVoid("/api/internal/users/{userId}/settings/twitchat/branch",
+                new TwitchatBranchRequest(branch), id), status -> status);
     }
 
     @Override
     public int saveCclSettings(String username, boolean enabled, Set<String> blockedCcls) {
-        return client.postVoid("/api/channels/{username}/settings/ccl",
-                new CclSettingsRequest(enabled, blockedCcls), username);
+        return onChannel(username, id -> client.putVoid("/api/internal/users/{userId}/settings/ccl",
+                new CclSettingsRequest(enabled, blockedCcls), id), status -> status);
     }
 
     @Override
     public int saveTwSettings(String username, boolean enabled, Set<String> blockedTws) {
-        return client.postVoid("/api/channels/{username}/settings/tws",
-                new TwSettingsRequest(enabled, blockedTws), username);
+        return onChannel(username, id -> client.putVoid("/api/internal/users/{userId}/settings/tws",
+                new TwSettingsRequest(enabled, blockedTws), id), status -> status);
     }
 
     @Override
     public UserSettingsDto channelSettings(String username) {
-        return client.get("/api/channels/{username}/settings", UserSettingsDto.class, username);
+        return readChannel(username, id -> client.getResult("/api/internal/users/{userId}/settings", UserSettingsDto.class, id));
     }
 
     @Override
     public BindingDto currentBinding(String username) {
-        return client.get("/api/channels/{username}/bindings/current", BindingDto.class, username);
+        return readChannel(username, id -> client.getResult("/api/internal/users/{userId}/bindings/current", BindingDto.class, id));
     }
 
     @Override
@@ -375,25 +396,27 @@ public class RealApiService implements ApiService {
     @Override
     public int saveNoGameSettings(String username, String twitchGameId, String twitchGameName, Set<String> ccls,
                                     boolean applyOnStreamStart, boolean applyOnNoGame, boolean applyOnStreamEnd) {
-        return client.postVoid("/api/channels/{username}/settings/no-game",
+        return onChannel(username, id -> client.putVoid("/api/internal/users/{userId}/settings/no-game",
                 new NoGameSettingsRequest(twitchGameId, twitchGameName, ccls, applyOnStreamStart, applyOnNoGame, applyOnStreamEnd),
-                username);
+                id), status -> status);
     }
 
     @Override
     public int saveRaidSettings(String username, Integer restoreGameMinutes) {
-        return client.postVoid("/api/channels/{username}/settings/raid", new RaidSettingsRequest(restoreGameMinutes), username);
+        return onChannel(username, id -> client.putVoid("/api/internal/users/{userId}/settings/raid",
+                new RaidSettingsRequest(restoreGameMinutes), id), status -> status);
     }
 
     @Override
     public int saveIncompleteFallbackSettings(String username, String twitchGameId, String twitchGameName, Set<String> ccls) {
-        return client.postVoid("/api/channels/{username}/settings/incomplete-fallback",
-                new IncompleteFallbackRequest(twitchGameId, twitchGameName, ccls), username);
+        return onChannel(username, id -> client.putVoid("/api/internal/users/{userId}/settings/incomplete-fallback",
+                new IncompleteFallbackRequest(twitchGameId, twitchGameName, ccls), id), status -> status);
     }
 
     @Override
     public DtddMappingStatusDto dtddMappingStatus(String username) {
-        return client.get("/api/channels/{username}/dtdd-mapping", DtddMappingStatusDto.class, username);
+        return readChannel(username, id -> client.getResult("/api/internal/users/{userId}/dtdd-mapping",
+                DtddMappingStatusDto.class, id));
     }
 
     @Override
@@ -423,20 +446,23 @@ public class RealApiService implements ApiService {
 
     @Override
     public Map<String, List<TwitchatEventActionDto>> twitchatEvents(String username) {
-        Map<String, List<TwitchatEventActionDto>> events = client.get("/api/channels/{username}/twitchat/events", EVENTS, username);
+        Map<String, List<TwitchatEventActionDto>> events = readChannel(username,
+                id -> client.getResult("/api/internal/users/{userId}/twitchat-events", EVENTS, id));
         return events == null ? Map.of() : events;
     }
 
     @Override
     public List<TwitchatValidationError> saveTwitchatEvent(String username, String eventType, List<TwitchatEventActionDto> payloads) {
-        return errors(client.call(HttpMethod.PUT, "/api/channels/{username}/twitchat/events/{eventType}/actions",
-                payloads, Void.class, username, eventType));
+        return errors(onChannel(username, id -> client.call(HttpMethod.PUT,
+                "/api/internal/users/{userId}/twitchat-events/{eventType}/actions", payloads, Void.class, id, eventType),
+                status -> new ApiClient.Result<>(status, null)));
     }
 
     @Override
     public List<TwitchatValidationError> testTwitchatEvent(String username, String eventType, List<TwitchatEventActionDto> payloads) {
-        return errors(client.call(HttpMethod.POST, "/api/channels/{username}/twitchat/events/{eventType}/test",
-                payloads, Void.class, username, eventType));
+        return errors(onChannel(username, id -> client.call(HttpMethod.POST,
+                "/api/internal/users/{userId}/twitchat-events/{eventType}/test", payloads, Void.class, id, eventType),
+                status -> new ApiClient.Result<>(status, null)));
     }
 
     @Override
@@ -1046,14 +1072,14 @@ public class RealApiService implements ApiService {
 
     @Override
     public int deleteAccount(String username, String confirmUsername) {
-        return client.call(HttpMethod.POST, "/api/channels/{username}/settings/delete-account",
-                new DeleteAccountRequest(confirmUsername), Void.class, username).status();
+        return onChannel(username, id -> client.call(HttpMethod.POST, "/api/internal/users/{userId}/deletion",
+                new DeleteAccountRequest(confirmUsername), Void.class, id).status(), status -> status);
     }
 
     @Override
     public int cancelAccountDeletion(String username) {
-        return client.call(HttpMethod.POST, "/api/channels/{username}/settings/cancel-deletion", null, Void.class,
-                username).status();
+        return onChannel(username, id -> client.call(HttpMethod.DELETE, "/api/internal/users/{userId}/deletion", null,
+                Void.class, id).status(), status -> status);
     }
 
     @Override
@@ -1256,19 +1282,21 @@ public class RealApiService implements ApiService {
 
     @Override
     public CustomBindingsStateDto customBindings(String username) {
-        return client.get("/api/channels/{username}/custom-bindings", CustomBindingsStateDto.class, username);
+        return readChannel(username, id -> client.getResult("/api/internal/users/{userId}/custom-bindings",
+                CustomBindingsStateDto.class, id));
     }
 
     @Override
     public CustomBindingSave<CustomBindingDto> createCustomBinding(String username, CustomBindingRequest request) {
-        return save(client.call(HttpMethod.POST, "/api/channels/{username}/custom-bindings", request, JsonNode.class, username),
-                CustomBindingDto.class);
+        return save(onChannel(username, id -> client.call(HttpMethod.POST, "/api/internal/users/{userId}/custom-bindings",
+                request, JsonNode.class, id), status -> new ApiClient.Result<>(status, null)), CustomBindingDto.class);
     }
 
     @Override
     public CustomBindingSave<CustomBindingSaveResult> updateCustomBinding(String username, UUID id, CustomBindingRequest request) {
-        return save(client.call(HttpMethod.POST, "/api/channels/{username}/custom-bindings/{id}", request,
-                JsonNode.class, username, id), CustomBindingSaveResult.class);
+        return save(onChannel(username, userId -> client.call(HttpMethod.PUT,
+                "/api/internal/users/{userId}/custom-bindings/{customBindingId}", request, JsonNode.class, userId, id),
+                status -> new ApiClient.Result<>(status, null)), CustomBindingSaveResult.class);
     }
 
     /** The saved binding when catapult-api took it; else the code of its problem. */
@@ -1283,20 +1311,23 @@ public class RealApiService implements ApiService {
 
     @Override
     public int deleteCustomBinding(String username, UUID id) {
-        return client.postVoid("/api/channels/{username}/custom-bindings/{id}/delete", null, username, id);
+        return onChannel(username, userId -> client.delete("/api/internal/users/{userId}/custom-bindings/{customBindingId}",
+                userId, id), status -> status);
     }
 
     @Override
     public ActivationOutcome activateCustomBinding(String username, UUID id) {
         // Its 409 problem tells a missing Twitch link from a paused bot.
-        ApiClient.Result<Void> result = client.call(HttpMethod.POST,
-                "/api/channels/{username}/custom-bindings/{id}/activate", null, Void.class, username, id);
+        ApiClient.Result<Void> result = onChannel(username, userId -> client.call(HttpMethod.POST,
+                "/api/internal/users/{userId}/custom-bindings/{customBindingId}/activate", null, Void.class, userId, id),
+                status -> new ApiClient.Result<>(status, null));
         return ActivationOutcome.of(result.status(), result.error() == null ? null : result.error().code());
     }
 
     @Override
     public int deactivateCustomBinding(String username) {
-        return client.postVoid("/api/channels/{username}/custom-bindings/deactivate", null, username);
+        return onChannel(username, id -> client.postVoid("/api/internal/users/{userId}/custom-bindings/deactivate", null, id),
+                status -> status);
     }
 
     @Override
@@ -1321,6 +1352,33 @@ public class RealApiService implements ApiService {
         UUID me = me();
         if (me == null) return HttpStatus.UNAUTHORIZED.value();
         return client.delete("/api/internal/users/{userId}/api-token", me);
+    }
+
+    /**
+     * {@code call} on the channel named {@code username}, given its account id (the {@code userId} of a channel's
+     * routes): {@code refused} with the lookup's status, without calling, when catapult-api does not tell it (401 for
+     * an unknown caller, 404 for an unknown channel, as the channel route would answer). A call that answers 404 drops
+     * the id kept for {@code username}, which may have been deleted then re-created.
+     */
+    private <T> T onChannel(String username, Function<UUID, T> call, IntFunction<T> refused) {
+        ChannelIds.Lookup lookup = channelIds.resolve(username);
+        if (!lookup.found()) return refused.apply(lookup.status());
+        T answer = call.apply(lookup.id());
+        if (statusOf(answer) == HttpStatus.NOT_FOUND.value()) channelIds.forget(username);
+        return answer;
+    }
+
+    /** A channel's read ({@link #onChannel}): its body, null when refused or empty. */
+    private <T> T readChannel(String username, Function<UUID, ApiClient.Result<T>> read) {
+        ApiClient.Result<T> result = onChannel(username, read, status -> new ApiClient.Result<>(status, null));
+        return result.ok() ? result.body() : null;
+    }
+
+    /** The status a channel call answered: its {@code int}, or its {@link ApiClient.Result}'s; 0 for anything else. */
+    private static int statusOf(Object answer) {
+        if (answer instanceof Integer status) return status;
+        if (answer instanceof ApiClient.Result<?> result) return result.status();
+        return 0;
     }
 
     /**

@@ -11,7 +11,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.UUID;
 
 /**
- * Turns a request's JWT and {@code {username}} or {@code {userId}} path variable into accounts,
+ * Turns a request's JWT and {@code {userId}} path variable into accounts,
  * failing the request the way every API controller does: 401 for an unknown caller, 404 for an
  * unknown channel or account. Who may reach a channel is {@link fr.enimaloc.catapult.security.Authz}'s call.
  */
@@ -46,12 +46,6 @@ public class ApiUserResolver {
     /** The account {@code userId} (a channel, or a member's own), or 404. */
     public UserAccount user(UUID userId) {
         return userAccountRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-    }
-
-    /** The channel named {@code username}. */
-    public UserAccount channel(String username) {
-        return userAccountRepository.findByTwitchUsername(username)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
 }

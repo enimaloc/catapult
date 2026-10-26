@@ -10,7 +10,7 @@ import java.util.UUID;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class ApiChannelActionsObsSettingsTest extends ApiChannelActionsTestSupport {
@@ -25,10 +25,9 @@ class ApiChannelActionsObsSettingsTest extends ApiChannelActionsTestSupport {
         user.setTwitchUsername("streamer");
 
         when(userAccountRepository.findById(userId)).thenReturn(Optional.of(user));
-        when(userAccountRepository.findByTwitchUsername("streamer")).thenReturn(Optional.of(user));
         when(channelAccessService.canAccess(user, user)).thenReturn(true);
 
-        mvc.perform(post("/api/channels/streamer/settings/obs")
+        mvc.perform(put("/api/internal/users/{userId}/settings/obs", user.getId())
                         .with(userJwt(userId))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -49,10 +48,10 @@ class ApiChannelActionsObsSettingsTest extends ApiChannelActionsTestSupport {
         channelUser.setTwitchUsername("streamer");
 
         when(userAccountRepository.findById(viewerId)).thenReturn(Optional.of(viewer));
-        when(userAccountRepository.findByTwitchUsername("streamer")).thenReturn(Optional.of(channelUser));
+        when(userAccountRepository.findById(channelUser.getId())).thenReturn(Optional.of(channelUser));
         when(channelAccessService.canAccess(viewer, channelUser)).thenReturn(true);
 
-        mvc.perform(post("/api/channels/streamer/settings/obs")
+        mvc.perform(put("/api/internal/users/{userId}/settings/obs", channelUser.getId())
                         .with(userJwt(viewerId))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)

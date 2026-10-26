@@ -56,6 +56,8 @@ class RealApiServiceTest {
 
     private MockRestServiceServer api;
     private RealApiService service;
+    /** The channels catapult-web has looked up in this test: it keeps their ids, so it asks once. */
+    private final Set<String> lookedUp = new java.util.HashSet<>();
 
     @BeforeEach
     void setUp() {
@@ -63,7 +65,8 @@ class RealApiServiceTest {
         api = MockRestServiceServer.bindTo(builder).build();
         StaticMessageSource messages = new StaticMessageSource();
         messages.addMessage("api.error.twitchat_widget_disabled", Locale.FRENCH, "Widget desactive");
-        service = new RealApiService(new ApiClient(API, builder), new ApiErrorText(messages));
+        ApiClient client = new ApiClient(API, builder);
+        service = new RealApiService(client, new ApiErrorText(messages), new ChannelIds(client));
         signIn(jwtFor(ME));
     }
 
@@ -114,7 +117,84 @@ class RealApiServiceTest {
         assertThat(service.minecraftDisconnect("someone-else")).isEqualTo(401);
         assertThat(service.regenerateApiToken().status()).isEqualTo(401);
         assertThat(service.enabledChatCommands()).isEmpty();
+        // The TW overrides are the member's own too.
+        assertThat(service.saveTws("b1", Set.of("spiders"))).isEqualTo(401);
         // api.verify() in the teardown, and the mock server refusing any request it did not expect: none was sent.
+    }
+
+    private static final String SETTINGS_JSON = """
+            {"cclFeatureEnabled":true,"blockedCcls":[],"noGameCcls":[],"applyDefaultOnStreamStart":false,
+             "applyDefaultOnNoGame":false,"applyDefaultOnStreamEnd":false,"incompleteFallbackCcls":[],
+             "availableCcls":[],"twFeatureEnabled":false,"blockedTws":[],"availableTws":[],
+             "raidRestoreGameMinutes":15,"raidRestoreGameAvailable":true}""";
+
+    @Test
+    void channelRoutesUseTheChannelsId() {
+        // Signed in as ME, on someone else's channel: the channel's routes take the channel's account id.
+        respond(HttpMethod.GET, "/api/internal/users?twitchUsername=owner",
+                "{\"id\":\"" + idOf("owner") + "\",\"twitchUsername\":\"owner\"}");
+        respond(HttpMethod.GET, "/api/internal/users/" + idOf("owner") + "/settings", SETTINGS_JSON);
+
+        assertThat(service.channelSettings("owner")).extracting(UserSettingsDto::cclFeatureEnabled).isEqualTo(true);
+    }
+
+    @Test
+    void unknownChannel_answers404WithoutCallingTheRoute() {
+        for (int i = 0; i < 2; i++) {
+            // Not kept: each call asks again.
+            expect(HttpMethod.GET, "/api/internal/users?twitchUsername=nobody-here")
+                    .andRespond(withStatus(HttpStatus.NOT_FOUND).contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                            .body("{\"status\":404,\"code\":\"not_found\"}"));
+        }
+
+        assertThat(service.toggleBot("nobody-here")).isEqualTo(404);
+        assertThat(service.channelSettings("nobody-here")).isNull();
+        // api.verify() in the teardown, and the mock server refusing any request it did not expect: no route was called.
+    }
+
+    @Test
+    void lookupRefused401_answers401() {
+        for (int i = 0; i < 2; i++) {
+            // Not kept either: the second call asks again.
+            expect(HttpMethod.GET, "/api/internal/users?twitchUsername=enimaloc").andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+        }
+
+        assertThat(service.toggleBot("enimaloc")).isEqualTo(401);
+        assertThat(service.channelSettings("enimaloc")).isNull();
+    }
+
+    @Test
+    void channel404_forgetsTheId() {
+        String route = channel("enimaloc") + "/settings/bot/toggle";
+        expect(HttpMethod.POST, route).andRespond(withStatus(HttpStatus.NOT_FOUND));
+        assertThat(service.toggleBot("enimaloc")).isEqualTo(404);
+
+        api.reset();
+        // The id is no longer kept: the next call looks the channel up again, and finds its new id.
+        UUID recreated = UUID.fromString("00000000-0000-0000-0000-0000000000c3");
+        respond(HttpMethod.GET, "/api/internal/users?twitchUsername=enimaloc",
+                "{\"id\":\"" + recreated + "\",\"twitchUsername\":\"enimaloc\"}");
+        expect(HttpMethod.POST, "/api/internal/users/" + recreated + "/settings/bot/toggle").andRespond(withNoContent());
+        assertThat(service.toggleBot("enimaloc")).isEqualTo(204);
+    }
+
+    @Test
+    void channelReadAnswering404_forgetsTheIdToo() {
+        expect(HttpMethod.GET, channel("enimaloc") + "/settings").andRespond(withStatus(HttpStatus.NOT_FOUND));
+        assertThat(service.channelSettings("enimaloc")).isNull();
+
+        api.reset();
+        respond(HttpMethod.GET, "/api/internal/users?twitchUsername=enimaloc",
+                "{\"id\":\"" + idOf("enimaloc") + "\",\"twitchUsername\":\"enimaloc\"}");
+        respond(HttpMethod.GET, channel("enimaloc") + "/settings", SETTINGS_JSON);
+        assertThat(service.channelSettings("enimaloc")).isNotNull();
+    }
+
+    @Test
+    void xboxDisconnect_deletesTheChannelsXboxToken() {
+        expectDelete(channel("enimaloc") + "/oauth-tokens/xbox");
+
+        assertThat(service.xboxDisconnect("enimaloc")).isEqualTo(204);
     }
 
     private ResponseActions expect(HttpMethod httpMethod, String path) {
@@ -132,6 +212,34 @@ class RealApiServiceTest {
 
     private void respond(HttpMethod httpMethod, String path, String json) {
         expect(httpMethod, path).andRespond(withSuccess(json, MediaType.APPLICATION_JSON));
+    }
+
+    private void expectPut(String path, String json) {
+        expect(HttpMethod.PUT, path).andExpect(content().json(json, org.springframework.test.json.JsonCompareMode.STRICT))
+                .andRespond(withNoContent());
+    }
+
+    private void expectPatch(String path, String json) {
+        expect(HttpMethod.PATCH, path).andExpect(content().json(json, org.springframework.test.json.JsonCompareMode.STRICT))
+                .andRespond(withNoContent());
+    }
+
+    private void expectDelete(String path) {
+        expect(HttpMethod.DELETE, path).andExpect(content().string("")).andRespond(withNoContent());
+    }
+
+    /** The account id catapult-api knows {@code username}'s channel by, in these tests. */
+    private static UUID idOf(String username) {
+        return UUID.nameUUIDFromBytes(username.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    /** {@code username}'s channel routes; catapult-web looks its id up first, the first time only. */
+    private String channel(String username) {
+        if (lookedUp.add(username)) {
+            respond(HttpMethod.GET, "/api/internal/users?twitchUsername=" + username,
+                    "{\"id\":\"" + idOf(username) + "\",\"twitchUsername\":\"" + username + "\"}");
+        }
+        return "/api/internal/users/" + idOf(username);
     }
 
     @Test
@@ -201,14 +309,14 @@ class RealApiServiceTest {
 
     @Test
     void deleteAccount_postsTheConfirmation() {
-        expectPost("/api/channels/me/settings/delete-account", "{\"confirmUsername\":\"Me\"}");
+        expectPost(channel("me") + "/deletion", "{\"confirmUsername\":\"Me\"}");
 
         assertThat(service.deleteAccount("me", "Me")).isEqualTo(204);
     }
 
     @Test
-    void cancelAccountDeletion_posts() {
-        expectPost("/api/channels/me/settings/cancel-deletion");
+    void cancelAccountDeletion_deletesTheDeletion() {
+        expectDelete(channel("me") + "/deletion");
 
         assertThat(service.cancelAccountDeletion("me")).isEqualTo(204);
     }
@@ -267,35 +375,35 @@ class RealApiServiceTest {
 
     @Test
     void channelPage_withoutFilter() {
-        respond(HttpMethod.GET, "/api/channels/enimaloc?page=2", "{}");
+        respond(HttpMethod.GET, channel("enimaloc") + "/dashboard?page=2", "{}");
 
         service.channelPage("enimaloc", 2, null, null);
     }
 
     @Test
     void channelPage_statusFilterWinsOverSource() {
-        respond(HttpMethod.GET, "/api/channels/enimaloc?page=0&status=AUTO", "{}");
+        respond(HttpMethod.GET, channel("enimaloc") + "/dashboard?page=0&status=AUTO", "{}");
 
         service.channelPage("enimaloc", 0, "AUTO", "STEAM");
     }
 
     @Test
     void channelPage_sourceFilter() {
-        respond(HttpMethod.GET, "/api/channels/enimaloc?page=0&source=STEAM", "{}");
+        respond(HttpMethod.GET, channel("enimaloc") + "/dashboard?page=0&source=STEAM", "{}");
 
         service.channelPage("enimaloc", 0, " ", "STEAM");
     }
 
     @Test
     void channelPage_blankFiltersAreDropped() {
-        respond(HttpMethod.GET, "/api/channels/enimaloc?page=0", "{}");
+        respond(HttpMethod.GET, channel("enimaloc") + "/dashboard?page=0", "{}");
 
         service.channelPage("enimaloc", 0, "", " ");
     }
 
     @Test
     void searchGames() {
-        respond(HttpMethod.GET, "/api/channels/enimaloc/games/search?q=doom%20eternal", "[{\"id\":\"1\"}]");
+        respond(HttpMethod.GET, channel("enimaloc") + "/games?q=doom%20eternal", "[{\"id\":\"1\"}]");
 
         assertThat(service.searchGames("enimaloc", "doom eternal")).asInstanceOf(InstanceOfAssertFactories.LIST).hasSize(1);
     }
@@ -391,7 +499,7 @@ class RealApiServiceTest {
 
     @Test
     void channelSettings() {
-        respond(HttpMethod.GET, "/api/channels/enimaloc/settings", """
+        respond(HttpMethod.GET, channel("enimaloc") + "/settings", """
                 {"cclFeatureEnabled":true,"blockedCcls":[],"noGameCcls":[],"applyDefaultOnStreamStart":false,
                  "applyDefaultOnNoGame":false,"applyDefaultOnStreamEnd":false,"incompleteFallbackCcls":[],
                  "availableCcls":[],"twFeatureEnabled":false,"blockedTws":[],"availableTws":[],
@@ -405,20 +513,20 @@ class RealApiServiceTest {
 
     @Test
     void currentBinding_isTheGamePlayedNows_nullOnNoContent() {
-        respond(HttpMethod.GET, "/api/channels/enimaloc/bindings/current", """
+        respond(HttpMethod.GET, channel("enimaloc") + "/bindings/current", """
                 {"id":"b1","status":"AUTO","sourceType":"STEAM","sourceName":"Valheim","twitchGameId":"508455",
                  "twitchGameName":"Valheim","ignored":false,"cclEnabled":true,"ccls":["a"],"twEnabled":false,
                  "twOverride":false,"tws":[]}""");
         assertThat(service.currentBinding("enimaloc")).extracting(BindingDto::id).isEqualTo("b1");
 
         api.reset();
-        expect(HttpMethod.GET, "/api/channels/enimaloc/bindings/current").andRespond(withNoContent());
+        expect(HttpMethod.GET, channel("enimaloc") + "/bindings/current").andRespond(withNoContent());
         assertThat(service.currentBinding("enimaloc")).isNull();
     }
 
     @Test
     void dtddMappingStatus() {
-        respond(HttpMethod.GET, "/api/channels/enimaloc/dtdd-mapping", "{\"igdbId\":\"42\",\"canValidateDirectly\":false}");
+        respond(HttpMethod.GET, channel("enimaloc") + "/dtdd-mapping", "{\"igdbId\":\"42\",\"canValidateDirectly\":false}");
 
         assertThat(service.dtddMappingStatus("enimaloc")).extracting(DtddMappingStatusDto::igdbId).isEqualTo("42");
     }
@@ -434,80 +542,80 @@ class RealApiServiceTest {
 
     @Test
     void toggleBot() {
-        expectPost("/api/channels/enimaloc/settings/bot");
+        expectPost(channel("enimaloc") + "/settings/bot/toggle");
         service.toggleBot("enimaloc");
     }
 
     @Test
     void recheckGame() {
-        expectPost("/api/channels/enimaloc/game/recheck");
+        expectPost(channel("enimaloc") + "/game/recheck");
         service.recheckGame("enimaloc");
     }
 
     @Test
     void cclToggle() {
-        expectPost("/api/channels/enimaloc/bindings/b1/ccl-toggle", "{\"enabled\":true}");
+        expectPut(channel("enimaloc") + "/bindings/b1/ccl-enabled", "{\"enabled\":true}");
         service.cclToggle("enimaloc", "b1", true);
     }
 
     @Test
     void ignoredToggle() {
-        expectPost("/api/channels/enimaloc/bindings/b1/ignored-toggle", "{\"ignored\":false}");
+        expectPut(channel("enimaloc") + "/bindings/b1/ignored", "{\"ignored\":false}");
         service.ignoredToggle("enimaloc", "b1", false);
     }
 
     @Test
     void deleteBinding() {
-        expectPost("/api/channels/enimaloc/bindings/b1/delete");
+        expectDelete(channel("enimaloc") + "/bindings/b1");
         service.deleteBinding("enimaloc", "b1");
     }
 
     @Test
     void updateBinding() {
-        expectPost("/api/channels/enimaloc/bindings/b1",
+        expectPatch(channel("enimaloc") + "/bindings/b1",
                 "{\"twitchGameId\":\"7\",\"twitchGameName\":\"Doom\",\"ccls\":[\"Gore\"]}");
         service.updateBinding("enimaloc", "b1", "7", "Doom", Set.of("Gore"));
     }
 
     @Test
     void saveTws() {
-        expectPost("/api/channel/bindings/b1/tws", "{\"tws\":[\"spiders\"]}");
+        expectPut(OWN + "/bindings/b1/tws", "{\"tws\":[\"spiders\"]}");
         service.saveTws("b1", Set.of("spiders"));
     }
 
     @Test
     void resetTws() {
-        expectPost("/api/channel/bindings/b1/tws/reset");
+        expectDelete(OWN + "/bindings/b1/tws");
         service.resetTws("b1");
     }
 
     @Test
     void toggleTwEnabled() {
-        expectPost("/api/channel/bindings/b1/tw-enabled", "{\"enabled\":true}");
+        expectPut(OWN + "/bindings/b1/tw-enabled", "{\"enabled\":true}");
         service.toggleTwEnabled("b1", true);
     }
 
     @Test
     void saveSteamToken() {
-        expectPost("/api/channels/enimaloc/settings/steam-personal-token", "{\"token\":\"KEY\",\"shared\":true}");
+        expectPut(channel("enimaloc") + "/settings/steam-personal-token", "{\"token\":\"KEY\",\"shared\":true}");
         service.saveSteamToken("enimaloc", "KEY", true);
     }
 
     @Test
     void steamTokenSharing() {
-        expectPost("/api/channels/enimaloc/settings/steam-personal-token/sharing", "{\"shared\":false}");
+        expectPut(channel("enimaloc") + "/settings/steam-personal-token/sharing", "{\"shared\":false}");
         service.steamTokenSharing("enimaloc", false);
     }
 
     @Test
     void deleteSteamToken() {
-        expectPost("/api/channels/enimaloc/settings/steam-personal-token/delete");
+        expectDelete(channel("enimaloc") + "/settings/steam-personal-token");
         service.deleteSteamToken("enimaloc");
     }
 
     @Test
     void refreshSteamProfileCache() {
-        expectPost("/api/channels/enimaloc/steam/refresh-profile-cache");
+        expectPost(channel("enimaloc") + "/steam-profile/refresh");
         service.refreshSteamProfileCache("enimaloc");
     }
 
@@ -521,14 +629,14 @@ class RealApiServiceTest {
 
     @Test
     void saveObsSettings() {
-        expectPost("/api/channels/enimaloc/settings/obs",
+        expectPut(channel("enimaloc") + "/settings/obs",
                 "{\"enabled\":true,\"host\":\"10.0.0.2\",\"port\":4456,\"password\":\"pw\"}");
         service.saveObsSettings("enimaloc", true, "10.0.0.2", 4456, "pw");
     }
 
     @Test
     void twitchatSettings_readsTheWidgetToken() {
-        respond(HttpMethod.GET, "/api/channels/enimaloc/settings/twitchat",
+        respond(HttpMethod.GET, channel("enimaloc") + "/settings/twitchat",
                 "{\"enabled\":true,\"obsHost\":\"h\",\"obsPort\":4455,\"hasPassword\":true,\"widgetToken\":\"11111111-2222-3333-4444-555555555555\"}");
 
         assertThat(service.twitchatSettings("enimaloc")).isEqualTo(new fr.enimaloc.catapult.common.dto.twitchat.TwitchatSettingsResponse(
@@ -537,7 +645,7 @@ class RealApiServiceTest {
 
     @Test
     void regenerateTwitchatWidget_postsAndReadsTheNewSettings() {
-        expect(HttpMethod.POST, "/api/channels/enimaloc/settings/twitchat/regenerate").andExpect(content().string(""))
+        expect(HttpMethod.POST, channel("enimaloc") + "/settings/twitchat/regenerate").andExpect(content().string(""))
                 .andRespond(withSuccess("{\"enabled\":true,\"obsHost\":\"h\",\"obsPort\":4455,\"hasPassword\":true,\"widgetToken\":\"aaaaaaaa-2222-3333-4444-555555555555\"}",
                         MediaType.APPLICATION_JSON));
 
@@ -548,17 +656,17 @@ class RealApiServiceTest {
 
     @Test
     void regenerateTwitchatWidget_relaysTheRefusalsStatus_and502WhenUnreachable() {
-        expect(HttpMethod.POST, "/api/channels/enimaloc/settings/twitchat/regenerate").andRespond(withStatus(HttpStatus.FORBIDDEN));
+        expect(HttpMethod.POST, channel("enimaloc") + "/settings/twitchat/regenerate").andRespond(withStatus(HttpStatus.FORBIDDEN));
         assertThat(service.regenerateTwitchatWidget("enimaloc")).isEqualTo(new fr.enimaloc.catapult.service.http.ApiClient.Result<>(403, null));
 
         api.reset();
-        expect(HttpMethod.POST, "/api/channels/enimaloc/settings/twitchat/regenerate").andRespond(withStatus(HttpStatus.BAD_GATEWAY));
+        expect(HttpMethod.POST, channel("enimaloc") + "/settings/twitchat/regenerate").andRespond(withStatus(HttpStatus.BAD_GATEWAY));
         assertThat(service.regenerateTwitchatWidget("enimaloc").status()).isEqualTo(502);
     }
 
     @Test
     void saveTwitchatBranch() {
-        expectPost("/api/channels/enimaloc/settings/twitchat/branch", "{\"branch\":\"beta\"}");
+        expectPut(channel("enimaloc") + "/settings/twitchat/branch", "{\"branch\":\"beta\"}");
         service.saveTwitchatBranch("enimaloc", "beta");
     }
 
@@ -576,19 +684,19 @@ class RealApiServiceTest {
 
     @Test
     void saveCclSettings() {
-        expectPost("/api/channels/enimaloc/settings/ccl", "{\"cclEnabled\":true,\"blockedCcls\":[\"Gore\"]}");
+        expectPut(channel("enimaloc") + "/settings/ccl", "{\"cclEnabled\":true,\"blockedCcls\":[\"Gore\"]}");
         service.saveCclSettings("enimaloc", true, Set.of("Gore"));
     }
 
     @Test
     void saveTwSettings() {
-        expectPost("/api/channels/enimaloc/settings/tws", "{\"enabled\":false,\"blockedTws\":[]}");
+        expectPut(channel("enimaloc") + "/settings/tws", "{\"enabled\":false,\"blockedTws\":[]}");
         service.saveTwSettings("enimaloc", false, Set.of());
     }
 
     @Test
     void saveNoGameSettings() {
-        expectPost("/api/channels/enimaloc/settings/no-game", """
+        expectPut(channel("enimaloc") + "/settings/no-game", """
                 {"twitchGameId":"1","twitchGameName":"Just Chatting","ccls":[],
                  "applyOnStreamStart":true,"applyOnNoGame":false,"applyOnStreamEnd":true}""");
         service.saveNoGameSettings("enimaloc", "1", "Just Chatting", Set.of(), true, false, true);
@@ -596,16 +704,16 @@ class RealApiServiceTest {
 
     @Test
     void saveRaidSettings() {
-        expectPost("/api/channels/enimaloc/settings/raid", "{\"restoreGameMinutes\":15}");
+        expectPut(channel("enimaloc") + "/settings/raid", "{\"restoreGameMinutes\":15}");
         service.saveRaidSettings("enimaloc", 15);
         api.reset();
-        expectPost("/api/channels/enimaloc/settings/raid", "{\"restoreGameMinutes\":null}");
+        expectPut(channel("enimaloc") + "/settings/raid", "{\"restoreGameMinutes\":null}");
         service.saveRaidSettings("enimaloc", null);
     }
 
     @Test
     void saveIncompleteFallbackSettings() {
-        expectPost("/api/channels/enimaloc/settings/incomplete-fallback",
+        expectPut(channel("enimaloc") + "/settings/incomplete-fallback",
                 "{\"twitchGameId\":null,\"twitchGameName\":null,\"ccls\":[\"Drugs\"]}");
         service.saveIncompleteFallbackSettings("enimaloc", null, null, Set.of("Drugs"));
     }
@@ -624,7 +732,7 @@ class RealApiServiceTest {
 
     @Test
     void twitchatEvents_readsTheOwnersLists() {
-        expect(HttpMethod.GET, "/api/channels/streamer/twitchat/events").andRespond(withSuccess(
+        expect(HttpMethod.GET, channel("streamer") + "/twitchat-events").andRespond(withSuccess(
                 "{\"STREAM_STARTED\":[{\"action\":\"SEND_MESSAGE\",\"mode\":\"FORM\",\"dataJson\":\"{}\",\"enabled\":true}]}",
                 MediaType.APPLICATION_JSON));
 
@@ -634,7 +742,7 @@ class RealApiServiceTest {
 
     @Test
     void saveTwitchatEvent_putsTheList_andReturnsNoErrorOn204() {
-        expect(HttpMethod.PUT, "/api/channels/streamer/twitchat/events/STREAM_STARTED/actions")
+        expect(HttpMethod.PUT, channel("streamer") + "/twitchat-events/STREAM_STARTED/actions")
                 .andExpect(content().json("[{\"action\":\"SEND_MESSAGE\",\"mode\":\"RAW\",\"dataJson\":\"{}\",\"enabled\":false}]"))
                 .andRespond(withNoContent());
 
@@ -644,7 +752,7 @@ class RealApiServiceTest {
 
     @Test
     void saveTwitchatEvent_listsTheProblemsErrors() {
-        expect(HttpMethod.PUT, "/api/channels/streamer/twitchat/events/STREAM_STARTED/actions")
+        expect(HttpMethod.PUT, channel("streamer") + "/twitchat-events/STREAM_STARTED/actions")
                 .andRespond(withStatus(HttpStatus.BAD_REQUEST).contentType(MediaType.APPLICATION_PROBLEM_JSON)
                         .body("{\"status\":400,\"code\":\"twitchat_invalid_payload\","
                                 + "\"errors\":[{\"index\":0,\"field\":\"message\",\"message\":\"Required\"}]}"));
@@ -655,7 +763,7 @@ class RealApiServiceTest {
 
     @Test
     void saveTwitchatEvent_problemWithoutItsList_isTheStatus() {
-        expect(HttpMethod.PUT, "/api/channels/streamer/twitchat/events/STREAM_STARTED/actions")
+        expect(HttpMethod.PUT, channel("streamer") + "/twitchat-events/STREAM_STARTED/actions")
                 .andRespond(withStatus(HttpStatus.BAD_REQUEST).contentType(MediaType.APPLICATION_PROBLEM_JSON)
                         .body("{\"status\":400,\"code\":\"twitchat_invalid_payload\"}"));
 
@@ -665,7 +773,7 @@ class RealApiServiceTest {
 
     @Test
     void testTwitchatEvent_widgetDisabled_isTheWebsOwnText() {
-        expect(HttpMethod.POST, "/api/channels/streamer/twitchat/events/STREAM_STARTED/test")
+        expect(HttpMethod.POST, channel("streamer") + "/twitchat-events/STREAM_STARTED/test")
                 .andRespond(withStatus(HttpStatus.CONFLICT).contentType(MediaType.APPLICATION_PROBLEM_JSON)
                         .body("{\"status\":409,\"detail\":\"The Twitchat widget is disabled: enable it to test\","
                                 + "\"code\":\"twitchat_widget_disabled\"}"));
@@ -681,7 +789,7 @@ class RealApiServiceTest {
 
     @Test
     void testTwitchatEvent_otherRefusal_isTheStatus() {
-        expect(HttpMethod.POST, "/api/channels/streamer/twitchat/events/STREAM_STARTED/test")
+        expect(HttpMethod.POST, channel("streamer") + "/twitchat-events/STREAM_STARTED/test")
                 .andRespond(withStatus(HttpStatus.FORBIDDEN));
 
         assertThat(service.testTwitchatEvent("streamer", "STREAM_STARTED", List.of()))
@@ -1681,14 +1789,14 @@ class RealApiServiceTest {
 
     private void activationAnswers(HttpStatus status, String body, fr.enimaloc.catapult.service.ActivationOutcome expected) {
         var answer = withStatus(status);
-        expect(HttpMethod.POST, "/api/channels/streamer/custom-bindings/" + CB_ID + "/activate")
+        expect(HttpMethod.POST, channel("streamer") + "/custom-bindings/" + CB_ID + "/activate")
                 .andRespond(body == null ? answer : answer.contentType(MediaType.APPLICATION_PROBLEM_JSON).body(body));
         assertThat(service.activateCustomBinding("streamer", CB_ID)).isEqualTo(expected);
     }
 
     @Test
     void customBindings_areReadFromTheOwnerRoute() {
-        respond(HttpMethod.GET, "/api/channels/streamer/custom-bindings",
+        respond(HttpMethod.GET, channel("streamer") + "/custom-bindings",
                 "{\"enabled\":true,\"bindings\":[" + CB_JSON + "],\"activeId\":\"" + CB_ID + "\",\"activatedAt\":null}");
 
         assertThat(service.customBindings("streamer").activeId()).isEqualTo(CB_ID);
@@ -1696,7 +1804,7 @@ class RealApiServiceTest {
 
     @Test
     void createCustomBinding_sendsTheRequest_andKeepsTheStatusAndBody() {
-        expect(HttpMethod.POST, "/api/channels/streamer/custom-bindings")
+        expect(HttpMethod.POST, channel("streamer") + "/custom-bindings")
                 .andExpect(content().json("{\"name\":\"Art\",\"twitchGameId\":\"1\",\"uninterruptible\":false}"))
                 .andRespond(withStatus(HttpStatus.CREATED).contentType(MediaType.APPLICATION_JSON).body(CB_JSON));
 
@@ -1708,7 +1816,7 @@ class RealApiServiceTest {
 
     @Test
     void createCustomBinding_aRefusalKeepsItsStatus() {
-        expect(HttpMethod.POST, "/api/channels/streamer/custom-bindings").andRespond(withStatus(HttpStatus.CONFLICT)
+        expect(HttpMethod.POST, channel("streamer") + "/custom-bindings").andRespond(withStatus(HttpStatus.CONFLICT)
                 .contentType(MediaType.APPLICATION_PROBLEM_JSON).body("{\"status\":409,\"detail\":\"taken\",\"code\":\"name_taken\"}"));
 
         var refused = service.createCustomBinding("streamer", CB_REQUEST);
@@ -1718,21 +1826,21 @@ class RealApiServiceTest {
 
     @Test
     void updateCustomBinding_readsHowReapplyingWent() {
-        respond(HttpMethod.POST, "/api/channels/streamer/custom-bindings/" + CB_ID,
+        respond(HttpMethod.PUT, channel("streamer") + "/custom-bindings/" + CB_ID,
                 "{\"binding\":" + CB_JSON + ",\"reapplyOutcome\":\"applied\"}");
 
         assertThat(service.updateCustomBinding("streamer", CB_ID, CB_REQUEST).body().reapplyOutcome()).isEqualTo("applied");
     }
 
     @Test
-    void deleteCustomBinding_postsWithoutABody() {
-        expectPost("/api/channels/streamer/custom-bindings/" + CB_ID + "/delete");
+    void deleteCustomBinding_deletesIt() {
+        expectDelete(channel("streamer") + "/custom-bindings/" + CB_ID);
         assertThat(service.deleteCustomBinding("streamer", CB_ID)).isEqualTo(204);
     }
 
     @Test
     void deactivateCustomBinding_postsWithoutABody() {
-        expectPost("/api/channels/streamer/custom-bindings/deactivate");
+        expectPost(channel("streamer") + "/custom-bindings/deactivate");
         assertThat(service.deactivateCustomBinding("streamer")).isEqualTo(204);
     }
 

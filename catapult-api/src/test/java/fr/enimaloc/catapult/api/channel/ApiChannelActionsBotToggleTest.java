@@ -23,10 +23,9 @@ class ApiChannelActionsBotToggleTest extends ApiChannelActionsTestSupport {
         user.setBotEnabled(true);
 
         when(userAccountRepository.findById(userId)).thenReturn(Optional.of(user));
-        when(userAccountRepository.findByTwitchUsername("streamer")).thenReturn(Optional.of(user));
         when(channelAccessService.canAccess(user, user)).thenReturn(true);
 
-        mvc.perform(post("/api/channels/streamer/settings/bot")
+        mvc.perform(post("/api/internal/users/{userId}/settings/bot/toggle", user.getId())
                         .with(userJwt(userId))
                         .with(csrf()))
                 .andExpect(status().isNoContent());
@@ -47,10 +46,10 @@ class ApiChannelActionsBotToggleTest extends ApiChannelActionsTestSupport {
         channelUser.setBotEnabled(true);
 
         when(userAccountRepository.findById(viewerId)).thenReturn(Optional.of(viewer));
-        when(userAccountRepository.findByTwitchUsername("streamer")).thenReturn(Optional.of(channelUser));
+        when(userAccountRepository.findById(channelUser.getId())).thenReturn(Optional.of(channelUser));
         when(channelAccessService.canAccess(viewer, channelUser)).thenReturn(true);
 
-        mvc.perform(post("/api/channels/streamer/settings/bot")
+        mvc.perform(post("/api/internal/users/{userId}/settings/bot/toggle", channelUser.getId())
                         .with(userJwt(viewerId))
                         .with(csrf()))
                 .andExpect(status().isForbidden());
