@@ -181,7 +181,7 @@ public class SystemTwitchAccountService {
         }
     }
 
-    /** Expiration du token du bot système, empty si le bot n'est pas lié. */
+    /** Expiry of the system bot's token, empty if the bot is not linked. */
     public Optional<Instant> tokenExpiry() {
         return linkedBotToken().map(SystemTwitchAccountService::expiryOf);
     }

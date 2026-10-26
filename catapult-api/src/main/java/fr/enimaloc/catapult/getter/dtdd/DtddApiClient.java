@@ -7,14 +7,14 @@ import java.util.Optional;
 
 public interface DtddApiClient {
 
-    /** Search par nom. Liste peut être vide. Renvoie Optional.empty() si toutes les clés sont rate-limit. */
+    /** Searches by name. The list may be empty. Returns Optional.empty() if all keys are rate-limited. */
     Optional<List<DtddSearchResult>> search(String query, @Nullable String mediaType);
 
     default Optional<List<DtddSearchResult>> search(String query) {
         return search(query, "Video Game");
     }
 
-    /** Fetch topics par dtddId. Optional.empty() si 404 ou rate-limit total. */
+    /** Fetches topics by dtddId. Optional.empty() on a 404 or when every key is rate-limited. */
     Optional<DtddTopics> fetchTopics(long dtddId);
 
     Optional<DtddItem> item(long dtddId);

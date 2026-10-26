@@ -8,9 +8,9 @@ import org.springframework.context.annotation.Profile;
 @Profile("mock-web")
 public class MockWebConfig {
 
-    // IgdbService a @DependsOn("flyway") pour s'assurer que le schéma existe avant
-    // son @PostConstruct. En mode mock-web, FlywayConfig est exclus et Flyway est
-    // désactivé — ce bean factice satisfait la dépendance sans exécuter de migrations.
+    // IgdbService has @DependsOn("flyway") to make sure the schema exists before
+    // its @PostConstruct. In mock-web mode, FlywayConfig is excluded and Flyway is
+    // disabled — this dummy bean satisfies the dependency without running migrations.
     @Bean("flyway")
     public Object mockFlyway() {
         return new Object();

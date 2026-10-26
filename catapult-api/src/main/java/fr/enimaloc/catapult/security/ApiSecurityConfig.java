@@ -110,7 +110,7 @@ public class ApiSecurityConfig {
         return request -> {
             if (request.getRequestURI().startsWith(ApiPaths.INTERNAL + "/config/app")
                     || request.getRequestURI().startsWith(ApiPaths.INTERNAL + "/config/providers")) {
-                return null; // Ignore le header Authorization
+                return null; // Ignores the Authorization header
             }
             return resolver.resolve(request);
         };

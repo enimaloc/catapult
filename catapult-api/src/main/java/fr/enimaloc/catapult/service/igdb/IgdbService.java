@@ -93,7 +93,7 @@ public class IgdbService {
     private volatile String appAccessToken;
     private volatile Instant tokenExpiresAt = Instant.EPOCH;
 
-    /** Expiration du token app Twitch/IGDB courant (EPOCH tant qu'aucun token obtenu). */
+    /** Expiry of the current Twitch/IGDB app token (EPOCH until a token is obtained). */
     public Instant getTokenExpiresAt() {
         return tokenExpiresAt;
     }
@@ -195,13 +195,13 @@ public class IgdbService {
     }
 
     /**
-     * Pré-chauffe le cache pour une liste de Steam appIds en batch (max 500 par appel IGDB).
-     * Les jeux déjà en cache DB ou mémoire sont ignorés.
+     * Warms the cache for a list of Steam appIds in batch (max 500 per IGDB call).
+     * Games already in the DB or memory cache are skipped.
      */
     public void prewarmSteamAppIds(List<String> appIds) {
         if (clientId.isBlank() || appIds.isEmpty()) return;
 
-        // Filtrer ceux déjà en cache mémoire (via external ID table ou igdbGameCache)
+        // Filter out those already in the memory cache (via the external ID table or igdbGameCache)
         List<String> uncached = appIds.stream()
             .filter(id -> externalIdRepository.findBySourceIdAndUid(steamSourceId, id).isEmpty())
             .filter(id -> lookupInDb(KEY_STEAM_PREFIX + id).isEmpty())
@@ -308,8 +308,8 @@ public class IgdbService {
     }
 
     /**
-     * Pré-chauffe le cache CCL pour tous les jeux déjà connus (igdb_game_cache) mais
-     * pas encore dans igdb_game_ccl_cache. Utilise des appels batch IGDB (max 500 par requête).
+     * Warms the CCL cache for every already-known game (igdb_game_cache) that is
+     * not yet in igdb_game_ccl_cache. Uses IGDB batch calls (max 500 per request).
      */
     public void prewarmCclCache() {
         if (clientId.isBlank()) return;

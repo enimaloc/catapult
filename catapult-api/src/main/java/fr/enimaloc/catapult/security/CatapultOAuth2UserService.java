@@ -115,9 +115,9 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
     }
 
     /**
-     * La chaîne de détection ne consulte que les providers ayant une ligne
-     * GetterConfig activée : la liaison doit créer/activer celle du provider
-     * (les comptes créés avant l'ajout du provider n'en ont pas).
+     * The detection chain only consults providers that have an enabled
+     * GetterConfig row: linking must create/enable the provider's one
+     * (accounts created before the provider was added have none).
      */
     private void enableGetter(UserAccount user, GetterConfig.Provider provider) {
         GetterConfig config = getterConfigRepository.findByUserAndProvider(user, provider)

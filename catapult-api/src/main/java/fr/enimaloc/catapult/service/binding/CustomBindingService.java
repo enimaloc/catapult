@@ -38,7 +38,7 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * The bindings a streamer creates and triggers by hand, tied to no game (« Art », « Développement »…), behind the
+ * The bindings a streamer creates and triggers by hand, tied to no game ("Art", "Software and Game Development"…), behind the
  * {@value #EXPERIMENT_KEY} experiment: outside it every operation is a 403 and an activation left over counts as none.
  *
  * <p>Triggering one applies its category straight to Twitch, live or not, through a transient {@link GameBinding}

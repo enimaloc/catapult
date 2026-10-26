@@ -13,9 +13,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Wrapper OAuth2User qui expose le UserAccount applicatif.
- * ROLE_ADMIN est accordé si le twitchId correspond à l'owner configuré.
- * Implémente UserDetails pour permettre l'utilisation avec SwitchUserFilter.
+ * OAuth2User wrapper that exposes the application's UserAccount.
+ * ROLE_ADMIN is granted if the twitchId matches the configured owner.
+ * Implements UserDetails so it can be used with SwitchUserFilter.
  */
 @Getter
 public class CatapultOAuth2User implements OAuth2User, UserDetails {
@@ -23,7 +23,7 @@ public class CatapultOAuth2User implements OAuth2User, UserDetails {
     @Serial
     private static final long serialVersionUID = 1L;
 
-    private final OAuth2User delegate; // null pour les sessions impersonifiées
+    private final OAuth2User delegate; // null for impersonated sessions
     private final UserAccount userAccount;
     private final boolean admin;
 

@@ -38,64 +38,64 @@ public class CatapultGauges implements MeterBinder {
     public void bindTo(MeterRegistry registry) {
         Gauge.builder("catapult.users.active", userAccountRepository,
                 repo -> repo.countByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE))
-            .description("Nombre d'utilisateurs avec le bot activé et statut ACTIVE")
+            .description("Number of users with the bot enabled and ACTIVE status")
             .register(registry);
 
         Gauge.builder("catapult.streams.live", streamStateService,
                 StreamStateService::countLive)
-            .description("Nombre de streams actuellement live en mémoire")
+            .description("Number of streams currently live in memory")
             .register(registry);
 
         Gauge.builder("catapult.chat.connections", eventSubChat,
                 p -> { EventSubTwitchChatService s = p.getIfAvailable(); return s == null ? 0 : s.connectionCount(); })
             .tag("transport", "eventsub")
-            .description("Connexions chat EventSub ouvertes")
+            .description("Open EventSub chat connections")
             .register(registry);
 
         Gauge.builder("catapult.chat.connections", ircChat,
                 p -> { IrcTwitchChatService s = p.getIfAvailable(); return s == null ? 0 : s.connectionCount(); })
             .tag("transport", "irc")
-            .description("Connexions chat IRC ouvertes")
+            .description("Open IRC chat connections")
             .register(registry);
 
         Gauge.builder("catapult.commands.registered", chatCommandDefinitionRepository,
                 repo -> repo.count())
-            .description("Commandes chat dynamiques enregistrées")
+            .description("Registered dynamic chat commands")
             .register(registry);
 
         Gauge.builder("catapult.tokens.oauth", oAuthTokenRepository,
                 repo -> repo.countByExpiresAtAfter(Instant.now()))
             .tag("state", "valid")
-            .description("Tokens OAuth utilisateurs non expirés")
+            .description("Unexpired user OAuth tokens")
             .register(registry);
 
         Gauge.builder("catapult.tokens.oauth", oAuthTokenRepository,
                 repo -> repo.countByExpiresAtBefore(Instant.now()))
             .tag("state", "expired")
-            .description("Tokens OAuth utilisateurs expirés (en attente de refresh)")
+            .description("Expired user OAuth tokens (awaiting refresh)")
             .register(registry);
 
         Gauge.builder("catapult.tokens.oauth", oAuthTokenRepository,
                 repo -> repo.countByRefreshTokenIsNull())
             .tag("state", "no_refresh")
-            .description("Tokens OAuth utilisateurs sans refresh token (irrécupérables)")
+            .description("User OAuth tokens without a refresh token (unrecoverable)")
             .register(registry);
 
         Gauge.builder("catapult.token.expiry.seconds", igdbService,
                 s -> secondsUntil(s.getTokenExpiresAt()))
             .tag("service", "igdb")
-            .description("Secondes avant expiration du token app IGDB (négatif = expiré)")
+            .description("Seconds before the IGDB app token expires (negative = expired)")
             .register(registry);
 
         Gauge.builder("catapult.token.expiry.seconds", systemTwitchAccountService,
                 s -> s.tokenExpiry().map(CatapultGauges::secondsUntil).orElse(Double.NaN))
             .tag("service", "twitch_bot")
-            .description("Secondes avant expiration du token du bot système (NaN = bot non lié)")
+            .description("Seconds before the system bot token expires (NaN = bot not linked)")
             .register(registry);
 
         Gauge.builder("catapult.minecraft.accounts.total", minecraftServiceAccountRepository,
                 MinecraftServiceAccountRepository::countByEnabledTrue)
-            .description("Nombre de comptes de service Minecraft activés")
+            .description("Number of enabled Minecraft service accounts")
             .register(registry);
     }
 

@@ -10,15 +10,15 @@ import java.util.Optional;
 
 public interface IgdbGameExternalIdRepository extends JpaRepository<IgdbGameExternalId, IgdbGameExternalIdPk> {
 
-    /** Lookup inverse : trouve le jeu IGDB correspondant à un uid sur une plateforme. */
+    /** Reverse lookup: finds the IGDB game matching a uid on a platform. */
     Optional<IgdbGameExternalId> findBySourceIdAndUid(long sourceId, String uid);
 
-    /** Lookup direct : trouve l'entrée externe d'une plateforme pour un jeu IGDB donné. */
+    /** Direct lookup: finds a platform's external entry for a given IGDB game. */
     Optional<IgdbGameExternalId> findByIgdbIdAndSourceId(String igdbId, long sourceId);
 
-    /** Bulk lookup : toutes les entrées d'une plateforme pour une liste d'IDs IGDB. */
+    /** Bulk lookup: every entry of a platform for a list of IGDB ids. */
     List<IgdbGameExternalId> findBySourceIdAndIgdbIdIn(long sourceId, Collection<String> igdbIds);
 
-    /** Toutes les entrées externes pour une source donnée (ex : tous les Twitch IDs connus). */
+    /** Every external entry for a given source (e.g. all the known Twitch ids). */
     List<IgdbGameExternalId> findBySourceId(long sourceId);
 }
