@@ -80,7 +80,7 @@ import tools.jackson.databind.json.JsonMapper;
  * {@value #LARGE} once {@link #grow() grown}. The channel is {@value #OWNER_LOGIN}'s ({@link #OWNER}); the caller is
  * the subject of the request's bearer, so only {@link #OWNER} is told they own it. A request no route answers gets
  * a 599 and is kept in {@link #unexpected()}. Every request but the background degraded poll is recorded, so a test
- * can {@link #mark()} before a page and read {@link #pageCalls()} after it.
+ * can {@link #mark(String)} before a page and read {@link #pageCalls()} after it.
  */
 public final class FakeApi extends Dispatcher {
 
@@ -103,6 +103,7 @@ public final class FakeApi extends Dispatcher {
     private final List<String> unexpected = Collections.synchronizedList(new ArrayList<>());
     private volatile int size = SMALL;
     private volatile int marked;
+    private volatile String page = "no page";
 
     public FakeApi(JsonMapper json) {
         this.json = json;
@@ -111,7 +112,7 @@ public final class FakeApi extends Dispatcher {
                 "budget-tag-" + i, "Budget content " + i, AT)));
         route("/api/internal/users", caller -> new UserRefDto(OWNER, OWNER_LOGIN));
         route("/api/internal/auth/validate", caller -> new UserInfoResponse(caller, twitchId(caller),
-                login(caller), avatar(caller), "ACTIVE", List.of("ROLE_USER"), null));
+                login(caller), avatar(caller), "ACTIVE", roles(caller), null));
         route("/api/internal/config/app", caller -> new AppConfigResponse("Catapult", 7, List.of("steam")));
         route("/api/internal/users/{id}/dashboard", caller -> channelPage(OWNER.equals(caller)));
         route("/api/internal/users/{id}/seen-features", caller -> List.of());
@@ -190,6 +191,12 @@ public final class FakeApi extends Dispatcher {
 
     /** Starts a page: {@link #pageCalls()} lists the calls from here on. */
     public void mark() {
+        mark("no page");
+    }
+
+    /** {@link #mark()}, the calls from here on made for {@code page} (as {@link #unexpected()} names it). */
+    public void mark(String page) {
+        this.page = page;
         marked = calls.size();
     }
 
@@ -200,18 +207,26 @@ public final class FakeApi extends Dispatcher {
         }
     }
 
-    /** {@code METHOD path?query} of every call no route answered (each got a 599). */
+    /** {@code METHOD path?query (for <page>)} of every call no route answered (each got a 599). */
     public List<String> unexpected() {
         synchronized (unexpected) {
             return List.copyOf(unexpected);
         }
     }
 
-    /** A session JWT as catapult-api issues one for {@code subject}; catapult-web reads it without checking it. */
-    public static String jwt(UUID subject, List<String> roles) {
+    /** The roles catapult-api gives {@code subject}: {@link #ADMIN} is the admin. */
+    public static List<String> roles(UUID subject) {
+        return ADMIN.equals(subject) ? List.of("ROLE_USER", "ROLE_ADMIN") : List.of("ROLE_USER");
+    }
+
+    /**
+     * A session JWT as catapult-api issues one for {@code subject}, with its {@link #roles}; catapult-web reads it
+     * without checking it.
+     */
+    public static String jwt(UUID subject) {
         Base64.Encoder b64 = Base64.getUrlEncoder().withoutPadding();
         String claims = "{\"sub\":\"" + subject + "\",\"username\":\"" + login(subject) + "\",\"roles\":["
-                + String.join(",", roles.stream().map(r -> "\"" + r + "\"").toList()) + "],\"exp\":"
+                + String.join(",", roles(subject).stream().map(r -> "\"" + r + "\"").toList()) + "],\"exp\":"
                 + Instant.now().plusSeconds(3600).getEpochSecond() + "}";
         return b64.encodeToString("{\"alg\":\"none\"}".getBytes(StandardCharsets.UTF_8)) + "."
                 + b64.encodeToString(claims.getBytes(StandardCharsets.UTF_8)) + ".sig";
@@ -234,7 +249,7 @@ public final class FakeApi extends Dispatcher {
                         .setBody(json.writeValueAsString(body));
             }
         }
-        unexpected.add(call);
+        unexpected.add(call + " (for " + page + ")");
         return new MockResponse().setResponseCode(UNEXPECTED)
                 .setSocketPolicy(SocketPolicy.DISCONNECT_AT_END);
     }
