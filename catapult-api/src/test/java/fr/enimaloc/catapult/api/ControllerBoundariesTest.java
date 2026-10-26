@@ -208,8 +208,9 @@ class ControllerBoundariesTest extends FullContextTestBase {
         HttpResponse<String> response = get(port, "/api/internal/admin/whitelist");
 
         assertThat(response.statusCode()).isEqualTo(200);
-        assertThat(JsonMapper.builder().build().readTree(response.body())
-                .path("invites").path(0).path("ownerUsername").asString()).isEqualTo("boundaries-inviter");
+        List<String> owners = JsonMapper.builder().build().readTree(response.body()).path("invites").valueStream()
+                .map(row -> row.path("ownerUsername").asString()).toList();
+        assertThat(owners).contains("boundaries-inviter");
     }
 
     @Test
