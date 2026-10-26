@@ -75,6 +75,7 @@ mkdir -p "${REPORT_DIR}"
 child=""
 stats_pid=""
 load_status=0
+pages_status=0
 cleaned=0
 started=0
 scanned=0
@@ -293,13 +294,17 @@ start_stack
 check_login
 if [[ "${MODE}" != smoke ]]; then
     settle
-    [[ "${MODE}" == full || "${MODE}" == pages ]] && run_pages
-    [[ "${MODE}" == full || "${MODE}" == load ]] && run_load
+    if [[ "${MODE}" == full || "${MODE}" == pages ]]; then run_pages || pages_status=$?; fi
+    if [[ "${MODE}" == full || "${MODE}" == load ]]; then run_load; fi
 fi
 scan_outbound
 [[ "${MODE}" != smoke ]] && write_report
 echo "Done: ${REPORT_DIR}"
+if [[ "${pages_status}" != 0 ]]; then
+    echo "FAIL: the page timings exited with ${pages_status} (a budget failed, or Playwright itself did)" >&2
+fi
 if [[ "${load_status}" != 0 ]]; then
     echo "FAIL: k6 exited with ${load_status} (a threshold failed, or k6 itself did)" >&2
-    exit "${load_status}"
 fi
+if [[ "${pages_status}" != 0 ]]; then exit "${pages_status}"; fi
+exit "${load_status}"
