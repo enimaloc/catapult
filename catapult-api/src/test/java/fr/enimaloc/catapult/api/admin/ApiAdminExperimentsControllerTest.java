@@ -25,6 +25,7 @@ import fr.enimaloc.catapult.repository.experiment.ExperimentOverrideRepository;
 import fr.enimaloc.catapult.repository.experiment.ExperimentRepository;
 import fr.enimaloc.catapult.repository.experiment.ExperimentVariantRepository;
 import fr.enimaloc.catapult.service.StatisticsService;
+import fr.enimaloc.catapult.service.experiment.ExperimentAdminService;
 import fr.enimaloc.catapult.service.experiment.ExperimentRebalancer;
 import fr.enimaloc.catapult.service.experiment.ForcedMembers;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
@@ -32,6 +33,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -48,6 +50,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -69,8 +72,9 @@ class ApiAdminExperimentsControllerTest {
     private final ExperimentRebalancer rebalancer = mock(ExperimentRebalancer.class);
     private final ForcedMembers forcedMembers = mock(ForcedMembers.class);
 
-    private final ApiAdminExperimentsController controller = new ApiAdminExperimentsController(experiments, events,
-            feedback, assignments, users, statistics, overrides, rules, variants, experimentService, publisher, rebalancer, forcedMembers);
+    private final ApiAdminExperimentsController controller = new ApiAdminExperimentsController(new ExperimentAdminService(
+            experiments, events, feedback, assignments, users, statistics, overrides, rules, variants, experimentService,
+            publisher, rebalancer, forcedMembers));
 
     private Experiment experiment;
     private ExperimentVariant control;
@@ -208,7 +212,7 @@ class ApiAdminExperimentsControllerTest {
 
             var detail = controller.detail(experiment.getId());
 
-            assertThat(detail.conversionStats()).extracting(ApiAdminExperimentsController.ConversionStat::variantKey)
+            assertThat(detail.conversionStats()).extracting(ExperimentAdminService.ConversionStat::variantKey)
                     .containsExactly("old");
         }
 
@@ -256,6 +260,15 @@ class ApiAdminExperimentsControllerTest {
             assertThat(event.getValue().getExperimentKey()).isEqualTo("new-dashboard");
 
             assertStatus(() -> controller.activate(experiment.getId()), HttpStatus.CONFLICT);
+        }
+
+        @Test
+        void activate_announcesOnlyAfterSaving() {
+            controller.activate(experiment.getId());
+
+            InOrder order = inOrder(experiments, publisher);
+            order.verify(experiments).save(experiment);
+            order.verify(publisher).publishEvent(any(ExperimentActivatedEvent.class));
         }
 
         @Test
@@ -422,7 +435,7 @@ class ApiAdminExperimentsControllerTest {
 
         @Test
         void randomRuleKeepsItsPercentage() {
-            controller.addRule(experiment.getId(), new ApiAdminExperimentsController.AddRuleRequest(
+            controller.addRule(experiment.getId(), new ExperimentAdminService.AddRuleRequest(
                     ExperimentAssignmentRule.RuleType.RANDOM, 1, 25, "ignored", "=", "x"));
 
             ExperimentAssignmentRule rule = saved();
@@ -433,7 +446,7 @@ class ApiAdminExperimentsControllerTest {
 
         @Test
         void attributeRuleKeepsItsCondition() {
-            controller.addRule(experiment.getId(), new ApiAdminExperimentsController.AddRuleRequest(
+            controller.addRule(experiment.getId(), new ExperimentAdminService.AddRuleRequest(
                     ExperimentAssignmentRule.RuleType.GROUP, 2, null, "group", "in", "beta"));
 
             ExperimentAssignmentRule rule = saved();
@@ -445,7 +458,7 @@ class ApiAdminExperimentsControllerTest {
 
         @Test
         void manualRuleHasNoExtraFields() {
-            controller.addRule(experiment.getId(), new ApiAdminExperimentsController.AddRuleRequest(
+            controller.addRule(experiment.getId(), new ExperimentAdminService.AddRuleRequest(
                     ExperimentAssignmentRule.RuleType.MANUAL, 0, 50, "k", "=", "v"));
 
             assertThat(saved().getPercentage()).isNull();
@@ -471,10 +484,10 @@ class ApiAdminExperimentsControllerTest {
 
     @Nested
     class Overrides {
-        private ApiAdminExperimentsController.AddOverrideRequest request(ExperimentOverride.OverrideType type,
+        private ExperimentAdminService.AddOverrideRequest request(ExperimentOverride.OverrideType type,
                                                                          ExperimentOverride.OverrideAction action,
                                                                          String username, UUID variantId) {
-            return new ApiAdminExperimentsController.AddOverrideRequest(type, action, 1, username, "k", "=", "v", variantId);
+            return new ExperimentAdminService.AddOverrideRequest(type, action, 1, username, "k", "=", "v", variantId);
         }
 
         private ExperimentOverride saved() {

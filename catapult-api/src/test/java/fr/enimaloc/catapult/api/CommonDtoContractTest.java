@@ -165,9 +165,10 @@ class CommonDtoContractTest {
         when(experiments.findAll()).thenReturn(List.of(experiment));
         when(experiments.findById(experiment.getId())).thenReturn(Optional.of(experiment));
         when(overrides.findByExperimentOrderByPriorityAsc(experiment)).thenReturn(List.of());
-        ApiAdminExperimentsController controller = new ApiAdminExperimentsController(experiments,
+        ApiAdminExperimentsController controller = new ApiAdminExperimentsController(
+                new fr.enimaloc.catapult.service.experiment.ExperimentAdminService(experiments,
                 null, null, null, null, null, overrides, null, null, null, null, null,
-                mock(fr.enimaloc.catapult.service.experiment.ForcedMembers.class));
+                mock(fr.enimaloc.catapult.service.experiment.ForcedMembers.class)));
 
         List<ExperimentSummaryDto> summaries = controller.list();
         ExperimentSettingsDto settings = controller.settings(experiment.getId());
@@ -217,9 +218,10 @@ class CommonDtoContractTest {
                 new Object[] {control.getId(), 41L}));
         experiment.setVariants(new java.util.ArrayList<>(List.of(control)));
         when(overrides.findByExperimentOrderByPriorityAsc(experiment)).thenReturn(List.of());
-        ApiAdminExperimentsController controller = new ApiAdminExperimentsController(experiments,
+        ApiAdminExperimentsController controller = new ApiAdminExperimentsController(
+                new fr.enimaloc.catapult.service.experiment.ExperimentAdminService(experiments,
                 null, null, assignments, null, null, overrides, null, null, null, null, null,
-                mock(fr.enimaloc.catapult.service.experiment.ForcedMembers.class));
+                mock(fr.enimaloc.catapult.service.experiment.ForcedMembers.class)));
 
         ExperimentAssignmentsDto produced = controller.assignments(experiment.getId(), null, null, 0);
 
