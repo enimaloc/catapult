@@ -8,6 +8,7 @@ import fr.enimaloc.catapult.service.feedback.FeedbackService;
 import fr.enimaloc.catapult.service.feedback.GitLabClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.server.ResponseStatusException;
@@ -54,23 +55,27 @@ class ApiFeedbackControllerTest {
 
     @Test
     void bugs_becomeLabelledIssues_signedByTheSubmitter() {
-        FeedbackSubmission submission = controller.submit(UUID.randomUUID(), jwt, new SubmitRequest("bug", "  Crash  ", " It crashed. "));
+        FeedbackService.Submission answer =
+                controller.submit(UUID.randomUUID(), jwt, new SubmitRequest("bug", "  Crash  ", " It crashed. "));
 
         verify(gitLab).createIssue("Crash", "It crashed.\n\n---\n*Soumis par @streamer via Catapult*", List.of("bug", "user-submitted"));
-        assertThat(submission.getTitle()).isEqualTo("Crash");
-        assertThat(submission.getDescription()).isEqualTo("It crashed.");
-        assertThat(submission.getType()).isEqualTo(FeedbackSubmission.Type.BUG);
-        assertThat(submission.getGitlabIssueIid()).isEqualTo(42);
-        assertThat(submission.getUser()).isSameAs(viewer);
-        verify(repository).save(submission);
+        assertThat(answer.title()).isEqualTo("Crash");
+        assertThat(answer.description()).isEqualTo("It crashed.");
+        assertThat(answer.type()).isEqualTo(FeedbackSubmission.Type.BUG);
+        assertThat(answer.gitlabIssueIid()).isEqualTo(42);
+        ArgumentCaptor<FeedbackSubmission> saved = ArgumentCaptor.forClass(FeedbackSubmission.class);
+        verify(repository).save(saved.capture());
+        assertThat(saved.getValue().getUser()).isSameAs(viewer);
+        assertThat(saved.getValue().getTitle()).isEqualTo("Crash");
     }
 
     @Test
     void featureRequests_withoutDescription() {
-        FeedbackSubmission submission = controller.submit(UUID.randomUUID(), jwt, new SubmitRequest("Feature", "Dark mode", " "));
+        FeedbackService.Submission answer =
+                controller.submit(UUID.randomUUID(), jwt, new SubmitRequest("Feature", "Dark mode", " "));
 
         verify(gitLab).createIssue("Dark mode", "---\n*Soumis par @streamer via Catapult*", List.of("enhancement", "user-submitted"));
-        assertThat(submission.getDescription()).isNull();
+        assertThat(answer.description()).isNull();
     }
 
     @Test

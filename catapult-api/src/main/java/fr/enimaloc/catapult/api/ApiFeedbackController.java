@@ -42,7 +42,7 @@ public class ApiFeedbackController {
     @PreAuthorize("@authz.isSelf(#userId)")
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public FeedbackSubmission submit(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt, @RequestBody SubmitRequest body) {
+    public FeedbackService.Submission submit(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt, @RequestBody SubmitRequest body) {
         if (body.title() == null || body.title().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Title is required");
         }

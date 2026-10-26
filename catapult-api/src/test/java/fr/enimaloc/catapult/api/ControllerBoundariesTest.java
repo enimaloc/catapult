@@ -1,6 +1,9 @@
 package fr.enimaloc.catapult.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
 
 import fr.enimaloc.catapult.FullContextContainers;
 import fr.enimaloc.catapult.FullContextTestBase;
@@ -22,16 +25,19 @@ import fr.enimaloc.catapult.repository.steam.SteamApiKeyRepository;
 import fr.enimaloc.catapult.security.JwtService;
 import fr.enimaloc.catapult.service.access.InviteService;
 import fr.enimaloc.catapult.service.chatcommand.ChatCommandGate;
+import fr.enimaloc.catapult.service.feedback.GitLabClient;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.JsonNode;
@@ -79,6 +85,10 @@ class ControllerBoundariesTest extends FullContextTestBase {
 
     @Autowired
     PlatformTransactionManager transactionManager;
+
+    /** GitLab is a third party: its answer is the issue the submission remembers. */
+    @MockitoBean
+    GitLabClient gitLab;
 
     private static ExperimentVariant variant(Experiment experiment, String key, boolean control, int internalId) {
         ExperimentVariant variant = new ExperimentVariant();
@@ -297,6 +307,31 @@ class ControllerBoundariesTest extends FullContextTestBase {
         assertThat(row.path("title").asString()).isEqualTo("Crash");
         assertThat(row.path("gitlabIssueIid").asInt()).isEqualTo(42);
         assertThat(row.path("subscribed").asBoolean()).isTrue();
+    }
+
+    @Test
+    void feedbackSubmission_answersTheSubmissionWithoutTheCallersAccount() throws Exception {
+        UserAccount member = member("feedback-submitter");
+        member.setSteamPersonalToken("encrypted-secret");
+        member = users.save(member);
+        when(gitLab.createIssue(anyString(), anyString(), anyList()))
+                .thenReturn(new GitLabClient.CreatedIssue(43, "https://gitlab/issues/43",
+                        Instant.parse("2026-10-26T10:00:00Z")));
+
+        HttpResponse<String> response = send("POST", "/api/internal/users/" + member.getId() + "/feedback",
+                member, "{\"type\":\"bug\",\"title\":\"Crash\",\"description\":\"It crashed.\"}");
+
+        assertThat(response.statusCode()).as(response.body()).isEqualTo(201);
+        assertThat(response.body()).doesNotContain("steamPersonalToken", "encrypted-secret", "twitchId",
+                "boundaries-feedback-submitter", "widgetToken");
+        JsonNode body = JSON.readTree(response.body());
+        assertThat(body.has("user")).isFalse();
+        assertThat(body.propertyNames()).containsExactlyInAnyOrder("id", "type", "title", "description",
+                "gitlabIssueIid", "gitlabIssueUrl", "lastKnownUpdatedAt", "subscribed", "createdAt");
+        assertThat(body.path("title").asString()).isEqualTo("Crash");
+        assertThat(body.path("gitlabIssueIid").asInt()).isEqualTo(43);
+        assertThat(feedbackSubmissions.findById(UUID.fromString(body.path("id").asString())))
+                .isPresent();
     }
 
     @Test
