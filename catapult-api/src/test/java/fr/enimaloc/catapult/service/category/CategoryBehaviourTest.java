@@ -170,6 +170,17 @@ class CategoryBehaviourTest {
         }
 
         @Test
+        void incompleteLiveWithoutIncompleteCcls_sendsNoCclPayload() {
+            g1.setStatus(GameBinding.Status.INCOMPLETE);
+            f.settings.getIncompleteFallbackCcls().clear();
+            f.live(true);
+
+            f.detect(f.gameOf(g1), false);
+
+            assertBindingWrite(onlyWrite(), GameBinding.Status.MANUAL, Set.of(), false, false, false);
+        }
+
+        @Test
         void incompleteOffline_storesTheFallbackPending() {
             g1.setStatus(GameBinding.Status.INCOMPLETE);
 

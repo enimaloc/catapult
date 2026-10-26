@@ -196,6 +196,32 @@ class CategoryChainTest {
     }
 
     @Test
+    void gameDetected_incompleteLive_sendsTheIncompleteCcls() {
+        binding.setStatus(GameBinding.Status.INCOMPLETE);
+        withSettings();
+        live(true);
+
+        GameBinding sent = chain.decide(user, new GameDetected(binding)).binding();
+
+        assertThat(sent.getCcls()).containsExactly("ProfanityVulgarity");
+        assertThat(sent.isCclEnabled()).isTrue();
+    }
+
+    @Test
+    void gameDetected_incompleteLive_withoutIncompleteCcls_sendsNoCclPayload() {
+        binding.setStatus(GameBinding.Status.INCOMPLETE);
+        withSettings();
+        settings.getIncompleteFallbackCcls().clear();
+        live(true);
+
+        GameBinding sent = chain.decide(user, new GameDetected(binding)).binding();
+
+        // Like the reset and the no-game fallback: an empty set leaves the channel's CCLs as they are
+        assertThat(sent.getCcls()).isEmpty();
+        assertThat(sent.isCclEnabled()).isFalse();
+    }
+
+    @Test
     void gameDetected_incompleteOffline_storesTheFallback() {
         binding.setStatus(GameBinding.Status.INCOMPLETE);
         withSettings();
