@@ -210,7 +210,16 @@ public class AdminGameMappingService {
         int failed = 0;
         for (GameBinding binding : written.live()) {
             UserAccount user = binding.getUser();
-            CategoryOutcome outcome = categoryChain.apply(user, new MappingChanged(binding));
+            CategoryOutcome outcome;
+            try {
+                // The decision reads state too (activation, settings): a failure there counts like a Twitch one
+                outcome = categoryChain.apply(user, new MappingChanged(binding));
+            } catch (RuntimeException e) {
+                failed++;
+                log.warn("Live channel of user {} not updated after a game mapping change: {}",
+                        user.getId(), e.getMessage(), e);
+                continue;
+            }
             if (outcome.error() != null) {
                 failed++;
                 log.warn("Live channel of user {} not updated after a game mapping change: {}",
