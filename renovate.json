@@ -8,6 +8,9 @@
   "labels": ["dependencies"],
   "platformAutomerge": false,
   "automergeStrategy": "squash",
+  "prBodyNotes": [
+    "- [ ] <!-- merge-now --> **Fusionner maintenant** (squash, titre de la PR comme message, sans attendre les 7 jours)"
+  ],
   "packageRules": [
     {
       "description": "Open the PR as soon as a version is out, but keep its renovate/stability-days check pending for a week, so automerge waits: a hijacked or broken release is usually pulled within days",
