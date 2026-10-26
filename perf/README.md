@@ -96,9 +96,13 @@ Each run writes `perf/reports/<timestamp>/` (ignored by git):
 
 `report.md` has the thresholds, p50, p95 and errors per request group and per page, each container's
 average and peak CPU (in % of one core) and memory (RSS), each JVM's peak used memory, the machine that
-load takes (sustained CPU kept under 70 %, the JVMs' peak used memory plus the other containers' RSS
-under 75 %), and the differences with the latest earlier run under the same load that has a
+load takes, and the differences with the latest earlier run under the same load that has a
 `report.json` (`node perf/report.mjs <run dir> [<previous run dir>]` writes it again, against another run).
+
+The machine: vCPUs = the sustained CPU (p95 of the stack's samples after the first minute) / 70 %;
+RAM = the sum over the containers of, for a JVM, max(peak RSS, peak used heap + non-heap + its native
+overhead) and, for the others, their peak RSS, / 75 %. A JVM's native overhead (thread stacks, GC
+structures, malloc arenas) is the median of its RSS minus its used memory, 200 MiB when not measured.
 
 `outbound.txt` lists the log lines with a connection error (unknown host, refused, unreachable,
 timed out) towards a host outside the stack, or naming no host at all: some client is not faked.

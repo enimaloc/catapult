@@ -160,21 +160,68 @@ export function jvmStats(csv) {
     return { apps, usedPeakMiB: apps.length ? round(max([...byTime.values()])) : null };
 }
 
+/** A JVM's native memory (thread stacks, GC structures, malloc arenas) when it could not be measured. */
+export const DEFAULT_JVM_OVERHEAD_MIB = 200;
+
 /**
- * The machine that runs the stack with the headroom above, on its sustained CPU and on its memory: the JVMs'
- * peak used memory (heap and non-heap) plus the other containers' peak RSS when the JVMs were sampled, the
- * stack's peak RSS otherwise. vCPUs and GiB, whole.
+ * Each JVM's native overhead, in MiB: the median, over its samples, of its container's RSS minus its used
+ * heap and non-heap, each JVM sample paired with the docker stats sample of the same container nearest in
+ * time (within 5 s: both are taken in the same round of run.sh's sampler). Roughly fixed, it is what a JVM
+ * holds beyond what it reports used.
  */
-export function sizing(total, jvm = null, containers = []) {
+export function jvmOverhead(statsCsv, jvmCsv) {
+    const rss = new Map();
+    for (const line of statsCsv.split("\n")) {
+        const [time, container, , memoryText] = line.trim().split(",");
+        const memory = parseMemory(memoryText ?? "");
+        if (memory === null || !Number.isFinite(Number(time))) continue;
+        const name = shortName(container);
+        if (!rss.has(name)) rss.set(name, []);
+        rss.get(name).push({ time: Number(time), memory });
+    }
+    const overheads = new Map();
+    for (const line of jvmCsv.split("\n")) {
+        const [time, app, heap, nonHeap] = line.trim().split(",");
+        const used = (Number(heap) + Number(nonHeap)) / MIB;
+        if (!rss.has(app) || !Number.isFinite(used) || !Number.isFinite(Number(time))) continue;
+        const nearest = rss.get(app).reduce((best, sample) =>
+            (Math.abs(sample.time - time) < Math.abs(best.time - time) ? sample : best));
+        if (Math.abs(nearest.time - time) > 5) continue;
+        if (!overheads.has(app)) overheads.set(app, []);
+        overheads.get(app).push(nearest.memory - used);
+    }
+    return Object.fromEntries([...overheads.entries()].map(([app, values]) => [app, round(percentile(values, 50))]));
+}
+
+/**
+ * The machine that runs the stack with the headroom above: vCPUs on the sustained CPU, GiB on the sum over
+ * the containers of
+ *   a JVM:    max(peak RSS, peak used heap + non-heap + its native overhead), the overhead measured
+ *             (jvmOverhead), DEFAULT_JVM_OVERHEAD_MIB when not;
+ *   the rest: peak RSS;
+ * the stack's peak RSS when the JVMs were not sampled. `terms` gives each container's figure.
+ */
+export function sizing(total, jvm = null, containers = [], overhead = {}) {
     if (!total) return null;
-    const jvmNames = new Set((jvm?.apps ?? []).map((app) => app.name));
-    const memoryMiB = jvm?.usedPeakMiB == null ? total.memPeakMiB : jvm.usedPeakMiB
-        + containers.filter((c) => !jvmNames.has(c.name)).reduce((sum, c) => sum + c.memPeakMiB, 0);
+    const apps = new Map((jvm?.apps ?? []).map((app) => [app.name, app]));
+    const terms = containers.map((c) => {
+        const app = apps.get(c.name);
+        if (!app) return { name: c.name, rssPeakMiB: c.memPeakMiB, memoryMiB: c.memPeakMiB };
+        const nativeMiB = overhead[c.name] ?? DEFAULT_JVM_OVERHEAD_MIB;
+        return {
+            name: c.name, rssPeakMiB: c.memPeakMiB, usedPeakMiB: app.usedPeakMiB, overheadMiB: nativeMiB,
+            overheadMeasured: overhead[c.name] !== undefined,
+            memoryMiB: round(Math.max(c.memPeakMiB, app.usedPeakMiB + nativeMiB)),
+        };
+    });
+    const basis = apps.size ? "jvm" : "rss";
+    const memoryMiB = basis === "jvm" ? terms.reduce((sum, t) => sum + t.memoryMiB, 0) : total.memPeakMiB;
     return {
         vcpus: Math.max(1, Math.ceil(total.cpuSustained / 100 / CPU_TARGET)),
         ramGiB: Math.max(1, Math.ceil(memoryMiB / 1024 / MEMORY_TARGET)),
         memoryMiB: round(memoryMiB),
-        memoryBasis: jvm?.usedPeakMiB == null ? "rss" : "jvm",
+        memoryBasis: basis,
+        ...(basis === "jvm" ? { terms } : {}),
     };
 }
 
@@ -248,7 +295,8 @@ export function buildReport(runDir) {
         containers,
         total,
         jvm: jvm?.apps.length ? jvm : null,
-        sizing: sizing(total, jvm?.apps.length ? jvm : null, containers),
+        sizing: sizing(total, jvm?.apps.length ? jvm : null, containers,
+            stats !== null && jvmCsv !== null ? jvmOverhead(stats, jvmCsv) : {}),
         outbound: outboundLines === null ? null : { lines: outboundLines.length, first: outboundLines.slice(0, 20) },
     };
 }
@@ -402,9 +450,12 @@ export function renderMarkdown(report) {
                 ]),
                 "");
         }
+        const term = (t) => (t.usedPeakMiB === undefined ? `${t.name} ${t.memoryMiB} (peak RSS)`
+            : `${t.name} ${t.memoryMiB} = max(peak RSS ${t.rssPeakMiB}, peak used ${t.usedPeakMiB} + native `
+                + `${t.overheadMiB}${t.overheadMeasured ? "" : ", not measured"})`);
         const memory = report.sizing.memoryBasis === "jvm"
-            ? `${report.sizing.memoryMiB} MiB of memory at most (the JVMs' peak used heap and non-heap, `
-                + "plus the other containers' peak RSS)"
+            ? `${report.sizing.memoryMiB} MiB of memory (in MiB: ${report.sizing.terms.map(term).join("; ")}; `
+                + "a JVM's native overhead is the median of its RSS minus its used heap and non-heap)"
             : `${report.sizing.memoryMiB} MiB of memory at most (peak RSS: the JVMs were not sampled, and their `
                 + "RSS is the heap they grew to, not what they need)";
         out.push("## Machine for this load", "",
