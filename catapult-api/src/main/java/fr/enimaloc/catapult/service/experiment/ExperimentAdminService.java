@@ -52,7 +52,7 @@ import java.util.UUID;
 /**
  * The admin side of experiments: listing and detail (with the conversion and NPS statistics), the lifecycle rules,
  * manual assignment, weights, rules, overrides and participants. Each method keeps the transaction of the admin route
- * it serves, and none where the route had none ({@link #assign} included).
+ * it serves, and none where the route had none; {@link #assign} has one, as it reads the lazy variants.
  */
 @Service
 @RequiredArgsConstructor
@@ -198,6 +198,7 @@ public class ExperimentAdminService {
         experimentRepository.save(exp);
     }
 
+    @Transactional
     public void assign(UUID id, String twitchUsername) {
         Experiment exp = findOrThrow(id);
         if (exp.getStatus() != Experiment.Status.ACTIVE) {

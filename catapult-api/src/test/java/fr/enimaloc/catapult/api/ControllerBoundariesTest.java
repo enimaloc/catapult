@@ -83,6 +83,17 @@ class ControllerBoundariesTest extends FullContextTestBase {
         return users.save(member);
     }
 
+    /** An ACTIVE experiment with a control and a {@code treatment} variant. */
+    private Experiment activeExperiment(String key) {
+        Experiment experiment = new Experiment();
+        experiment.setKey(key);
+        experiment.setName(key);
+        experiment.setStatus(Experiment.Status.ACTIVE);
+        experiment.getVariants().add(variant(experiment, "control", true, 1));
+        experiment.getVariants().add(variant(experiment, "treatment", false, 2));
+        return experiments.save(experiment);
+    }
+
     private void assign(Experiment experiment, UserAccount member, String variantKey) {
         ExperimentAssignment assignment = new ExperimentAssignment();
         assignment.setExperiment(experiment);
@@ -214,5 +225,18 @@ class ControllerBoundariesTest extends FullContextTestBase {
             assertThat(entry.isExclusive()).isTrue();
         });
         assertThat(users.findById(member.getId()).orElseThrow().isSteamTokenShared()).isFalse();
+    }
+
+    @Test
+    void assigningAMemberToAnExperiment_givesThemTheControlVariant() throws Exception {
+        UserAccount member = member("manually-assigned");
+        Experiment experiment = activeExperiment("boundaries-assign");
+
+        HttpResponse<String> response = send("POST", "/api/internal/admin/experiments/" + experiment.getId()
+                + "/assign", null, "{\"twitchUsername\":\"manually-assigned\"}");
+
+        assertThat(response.statusCode()).as(response.body()).isEqualTo(204);
+        assertThat(response.body()).isEmpty();
+        assertThat(assignments.findByExperimentAndUser(experiment, member)).isPresent();
     }
 }
