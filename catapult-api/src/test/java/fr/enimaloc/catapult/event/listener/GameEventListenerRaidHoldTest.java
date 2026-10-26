@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.event.listener;
 
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.binding.CustomBindingActivations;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.account.UserSettings;
@@ -72,7 +73,7 @@ class GameEventListenerRaidHoldTest {
                 mock(CustomBindingActivations.class), hold);
         CustomBindingActivations activations = mock(CustomBindingActivations.class);
         CategoryChain chain = new CategoryChain(activations, streamStateService, userSettingsRepository, hold,
-                gameStateService, new CategoryApplier(twitchService, streamStateService));
+                gameStateService, mock(UserAccountRepository.class), new CategoryApplier(twitchService, streamStateService));
         listener = new GameEventListener(bindingService, streamStateService, channelEventPublisher, hold,
                 activations, chain);
         user = new UserAccount();

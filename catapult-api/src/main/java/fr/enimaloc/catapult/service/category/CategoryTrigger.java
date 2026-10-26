@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.category;
 
+import fr.enimaloc.catapult.domain.binding.CustomBinding;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 
 /**
@@ -40,4 +41,10 @@ public sealed interface CategoryTrigger {
      * only (nothing kept pending), skipped while a custom binding is active.
      */
     record MappingChanged(GameBinding binding) implements CategoryTrigger {}
+
+    /**
+     * A custom binding was triggered (or re-applied after an edit): its category is sent, live or not, unless the bot
+     * is off or the account inactive (then nothing is sent).
+     */
+    record CustomBindingTriggered(CustomBinding binding) implements CategoryTrigger {}
 }

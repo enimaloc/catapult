@@ -16,7 +16,6 @@ import fr.enimaloc.catapult.service.category.CategoryOutcome;
 import fr.enimaloc.catapult.service.category.CategoryRule;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.GameClosed;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.GameDetected;
-import fr.enimaloc.catapult.service.category.CategoryTrigger.NoGameAfterCustomBinding;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.StreamEnded;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.StreamStarted;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
@@ -104,10 +103,5 @@ public class GameEventListener {
         streamStateService.clearPending(user);
         raidRestoreHold.release(user);
         categoryChain.apply(user, new StreamEnded()).orThrow();
-    }
-
-    /** The usual "no game" category after a custom binding ended, applied when live and enabled in the settings. */
-    public CategoryOutcome applyNoGameFallback(UserAccount user) {
-        return categoryChain.apply(user, new NoGameAfterCustomBinding());
     }
 }

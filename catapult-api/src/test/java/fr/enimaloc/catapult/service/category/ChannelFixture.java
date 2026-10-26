@@ -208,7 +208,8 @@ public class ChannelFixture {
         gameStateService = new GameStateService(publisher);
         streamStateService = new StreamStateService(publisher, dispatcher);
         categoryChain = new CategoryChain(activations, streamStateService, settingsRepository,
-                raidRestoreHold, gameStateService, new CategoryApplier(twitch, streamStateService));
+                raidRestoreHold, gameStateService, accountRepository,
+                new CategoryApplier(twitch, streamStateService));
         bindingService = new BindingService(bindingRepository, igdbService, mock(IgdbGameDetailsService.class),
                 twitch, mock(TwResolverService.class), mock(GameMappingRepository.class), lookup, categoryChain);
         raidRestoreGameService = new RaidRestoreGameService(settingsRepository,
@@ -216,9 +217,9 @@ public class ChannelFixture {
                 raidRestoreHold);
         listener = new GameEventListener(bindingService, streamStateService, publisher,
                 raidRestoreHold, activations, categoryChain);
-        customBindingService = new CustomBindingService(customBindingRepository, activations, twitch,
-                experimentService, gameStateService, streamStateService, settingsRepository, accountRepository,
-                tokenRepository, listener, publisher);
+        customBindingService = new CustomBindingService(customBindingRepository, activations,
+                experimentService, gameStateService, streamStateService, accountRepository,
+                tokenRepository, listener, publisher, categoryChain);
         setGameFunction = new CatapultSetGameFunction(twitch, gameStateService, igdbService, activations);
         twitchatActionExecutor = new TwitchatActionExecutor(actionTokenService, accountRepository, twitch,
                 bindingService, mock(BotToggleService.class), activations);

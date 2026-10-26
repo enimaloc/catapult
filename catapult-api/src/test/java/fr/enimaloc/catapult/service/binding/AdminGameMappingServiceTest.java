@@ -85,7 +85,7 @@ class AdminGameMappingServiceTest {
         CustomBindingActivations activations = mock(CustomBindingActivations.class);
         chainActivations = activations;
         chain = spy(new CategoryChain(activations, streamStateService, userSettingsRepository,
-                raidRestoreHold, gameStateService, new CategoryApplier(twitchService, streamStateService)));
+                raidRestoreHold, gameStateService, mock(UserAccountRepository.class), new CategoryApplier(twitchService, streamStateService)));
         bindingService = spy(new BindingService(bindingRepo, igdbService, igdbGameDetailsService, twitchService,
                 twResolverService, mappingRepo, new GameBindingLookup(bindingRepo), chain));
         service = new AdminGameMappingService(mappingRepo, bindingRepo, userRepo, bindingService, gameStateService,

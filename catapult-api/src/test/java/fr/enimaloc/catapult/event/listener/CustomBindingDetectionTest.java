@@ -118,7 +118,7 @@ class CustomBindingDetectionTest {
         activations = new CustomBindingActivations(activationRepository, experimentService, channelEventPublisher);
         RaidRestoreHold hold = mock(RaidRestoreHold.class);
         chain = new CategoryChain(activations, streamStateService, userSettingsRepository, hold,
-                gameStateService, new CategoryApplier(twitchService, streamStateService));
+                gameStateService, mock(UserAccountRepository.class), new CategoryApplier(twitchService, streamStateService));
         listener = new GameEventListener(bindingService, streamStateService, channelEventPublisher, hold,
                 activations, chain);
     }
@@ -192,8 +192,8 @@ class CustomBindingDetectionTest {
 
         when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(game));
         CustomBindingService service = new CustomBindingService(mock(CustomBindingRepository.class), activations,
-                twitchService, experimentService, gameStateService, streamStateService, userSettingsRepository,
-                mock(UserAccountRepository.class), mock(OAuthTokenRepository.class), listener, channelEventPublisher);
+                experimentService, gameStateService, streamStateService, mock(UserAccountRepository.class),
+                mock(OAuthTokenRepository.class), listener, channelEventPublisher, chain);
 
         service.deactivate(user);
 
@@ -220,8 +220,8 @@ class CustomBindingDetectionTest {
 
         when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(game));
         CustomBindingService service = new CustomBindingService(mock(CustomBindingRepository.class), activations,
-                twitchService, experimentService, gameStateService, streamStateService, userSettingsRepository,
-                mock(UserAccountRepository.class), mock(OAuthTokenRepository.class), listener, channelEventPublisher);
+                experimentService, gameStateService, streamStateService, mock(UserAccountRepository.class),
+                mock(OAuthTokenRepository.class), listener, channelEventPublisher, chain);
 
         service.deactivate(user);
 
@@ -281,7 +281,7 @@ class CustomBindingDetectionTest {
         // The edited binding is the game being played: without an activation it would go to Twitch at once
         when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(game));
         CategoryChain realChain = new CategoryChain(activations, streamStateService, userSettingsRepository,
-                mock(RaidRestoreHold.class), gameStateService, new CategoryApplier(twitchService, streamStateService));
+                mock(RaidRestoreHold.class), gameStateService, mock(UserAccountRepository.class), new CategoryApplier(twitchService, streamStateService));
         BindingService realBindings = new BindingService(gameBindings, mock(IgdbService.class),
                 mock(IgdbGameDetailsService.class), twitchService, mock(TwResolverService.class),
                 mock(GameMappingRepository.class), new GameBindingLookup(gameBindings), realChain);
