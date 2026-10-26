@@ -80,8 +80,8 @@ public class RaidRestoreGameService {
         }
         log.info("Raid by user {}: putting {} back as the category", user.getId(), binding.get().getTwitchGameName());
         try {
-            // updateChannel records Catapult's own change, so the channel.update isn't taken for a manual one
-            twitchService.updateChannel(user, binding.get());
+            // updateChannelReporting records Catapult's own change, so the channel.update isn't taken for a manual one
+            twitchService.updateChannelReporting(user, binding.get());
         } catch (RuntimeException e) {
             holdingNoGameFallback.remove(user.getId());
             log.warn("Raid by user {}: could not put {} back: {}", user.getId(),

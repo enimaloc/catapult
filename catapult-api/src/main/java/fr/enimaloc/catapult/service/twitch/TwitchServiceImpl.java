@@ -49,11 +49,6 @@ public class TwitchServiceImpl implements TwitchService {
     private String twitchClientId;
 
     @Override
-    public void updateChannel(UserAccount user, GameBinding binding) {
-        updateChannelReporting(user, binding);
-    }
-
-    @Override
     public ChannelUpdateOutcome updateChannelReporting(UserAccount user, GameBinding binding) {
         if (!canActOnTwitch(user)) {
             log.debug("Skipping Twitch channel update for user {} — bot disabled or account not active", user.getId());
@@ -76,15 +71,14 @@ public class TwitchServiceImpl implements TwitchService {
     }
 
     @Override
-    public void setCategory(UserAccount user, String twitchGameId, String twitchGameName) {
+    public ChannelUpdateOutcome setCategory(UserAccount user, String twitchGameId, String twitchGameName) {
         if (!canActOnTwitch(user)) {
             log.debug("Skipping Twitch category set for user {} — bot disabled or account not active", user.getId());
-            return;
+            return ChannelUpdateOutcome.SKIPPED;
         }
-        apiObservations.observeRun("twitch", "set_category", () ->
+        return apiObservations.observe("twitch", "set_category", () ->
             oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
-                .ifPresentOrElse(
-                    token -> {
+                .map(token -> {
                         String accessToken = twitchTokenService.resolveAccessToken(token, user);
                         patchChannel(user, accessToken, Map.of("game_id", twitchGameId));
                         log.info("Twitch category set for user {} — game_id={} ({})",
@@ -93,9 +87,12 @@ public class TwitchServiceImpl implements TwitchService {
                         // this PATCH triggers would be reported to the streamer as a manual change
                         // (this path backs the Twitchat "Revert" buttons).
                         categoryChangeStateService.recordCatapultChangeAndReturnPrevious(user, twitchGameId);
-                    },
-                    () -> log.warn("No Twitch token found for user {}", user.getId())
-                )
+                        return ChannelUpdateOutcome.APPLIED;
+                    })
+                .orElseGet(() -> {
+                    log.warn("No Twitch token found for user {}", user.getId());
+                    return ChannelUpdateOutcome.FAILED;
+                })
         );
     }
 
@@ -264,27 +261,28 @@ public class TwitchServiceImpl implements TwitchService {
     }
 
     @Override
-    public void resetToDefault(UserAccount user) {
+    public ChannelUpdateOutcome resetToDefault(UserAccount user) {
         if (!canActOnTwitch(user)) {
             log.debug("Skipping Twitch channel reset for user {} — bot disabled or account not active", user.getId());
-            return;
+            return ChannelUpdateOutcome.SKIPPED;
         }
-        apiObservations.observeRun("twitch", "reset_to_default", () ->
-            userSettingsRepository.findById(user.getId()).ifPresent(settings -> {
+        return apiObservations.observe("twitch", "reset_to_default", () ->
+            userSettingsRepository.findById(user.getId()).map(settings -> {
                 if (settings.getNoGameTwitchGameId() == null || settings.getNoGameTwitchGameId().isBlank()) {
                     log.debug("No default category configured for user {} — skipping reset", user.getId());
-                    return;
+                    return ChannelUpdateOutcome.SKIPPED;
                 }
-                oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
-                    .ifPresentOrElse(
-                        token -> doResetToDefault(user, settings, token),
-                        () -> log.warn("No Twitch token for user {} during reset", user.getId())
-                    );
-            })
+                return oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
+                    .map(token -> doResetToDefault(user, settings, token))
+                    .orElseGet(() -> {
+                        log.warn("No Twitch token for user {} during reset", user.getId());
+                        return ChannelUpdateOutcome.FAILED;
+                    });
+            }).orElse(ChannelUpdateOutcome.SKIPPED)
         );
     }
 
-    private void doResetToDefault(UserAccount user, UserSettings settings, OAuthToken token) {
+    private ChannelUpdateOutcome doResetToDefault(UserAccount user, UserSettings settings, OAuthToken token) {
         String accessToken = twitchTokenService.resolveAccessToken(token, user);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("game_id", settings.getNoGameTwitchGameId());
@@ -295,30 +293,36 @@ public class TwitchServiceImpl implements TwitchService {
             patchChannel(user, accessToken, body);
             log.info("Twitch channel reset to default for user {} — game_id={}, ccls={}",
                 user.getId(), settings.getNoGameTwitchGameId(), settings.getNoGameCcls());
+            return ChannelUpdateOutcome.APPLIED;
         } catch (HttpClientErrorException e) {
             if (e.getStatusCode() == HttpStatus.UNAUTHORIZED) {
                 String refreshed = twitchTokenService.refreshAccessToken(token, user);
                 if (refreshed == null) {
                     log.warn("Twitch token invalid for user {} during reset — pausing bot", user.getId());
                     botToggleService.setBotEnabled(user, false);
-                    return;
+                    return ChannelUpdateOutcome.FAILED;
                 }
                 try {
                     patchChannel(user, refreshed, body);
                     log.info("Twitch channel reset to default for user {} after token refresh — game_id={}",
                         user.getId(), settings.getNoGameTwitchGameId());
+                    return ChannelUpdateOutcome.APPLIED;
                 } catch (Exception retryEx) {
                     log.warn("Twitch channel reset failed for user {} after token refresh — pausing bot: {}", user.getId(), retryEx.getMessage());
                     botToggleService.setBotEnabled(user, false);
+                    return ChannelUpdateOutcome.FAILED;
                 }
             } else if (e.getStatusCode() == HttpStatus.TOO_MANY_REQUESTS) {
                 log.warn("Twitch rate limit hit for user {} during reset — skipping", user.getId());
+                return ChannelUpdateOutcome.FAILED;
             } else {
                 log.error("Twitch API error during reset for user {}: {} {}",
                     user.getId(), e.getStatusCode(), e.getMessage());
+                return ChannelUpdateOutcome.FAILED;
             }
         } catch (Exception e) {
             log.error("Unexpected error resetting Twitch channel for user {}", user.getId(), e);
+            return ChannelUpdateOutcome.FAILED;
         }
     }
 

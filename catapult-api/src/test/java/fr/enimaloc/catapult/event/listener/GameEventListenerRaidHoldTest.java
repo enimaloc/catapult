@@ -99,14 +99,14 @@ class GameEventListenerRaidHoldTest {
     }
 
     private void verifyNoGameFallbackApplied(boolean applied) {
-        if (applied) verify(twitchService).updateChannel(eq(user), noGameFallback());
-        else verify(twitchService, never()).updateChannel(eq(user), noGameFallback());
+        if (applied) verify(twitchService).updateChannelReporting(eq(user), noGameFallback());
+        else verify(twitchService, never()).updateChannelReporting(eq(user), noGameFallback());
     }
 
     /** The streamer raids out while still playing Doom, the channel already on it, then closes the game. */
     private void raidWhilePlaying_thenCloseTheGame() {
         raidRestore.onRaidedOut(new ChannelRaidedOutEvent(this, user, DOOM_ID));
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
         listener.onNoGameDetected(new NoGameDetectedEvent(this, user));
     }
 
@@ -120,7 +120,7 @@ class GameEventListenerRaidHoldTest {
     @Test
     void categoryChangedSinceTheGameStarted_theRaidPutsTheCurrentGameBack_andHoldsItOnceClosed() {
         raidRestore.onRaidedOut(new ChannelRaidedOutEvent(this, user, "12345"));
-        verify(twitchService).updateChannel(user, doomBinding);
+        verify(twitchService).updateChannelReporting(user, doomBinding);
 
         listener.onNoGameDetected(new NoGameDetectedEvent(this, user));
 

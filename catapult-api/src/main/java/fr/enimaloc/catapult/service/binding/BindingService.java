@@ -56,7 +56,7 @@ public class BindingService {
             change.accept(binding);
             gameBindingRepository.save(binding);
             if (isActiveBinding(user, binding) && customBindingActivations.active(user).isEmpty()) {
-                twitchService.updateChannel(user, binding);
+                twitchService.updateChannelReporting(user, binding);
             }
         });
     }

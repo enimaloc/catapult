@@ -27,19 +27,15 @@ public class MockTwitchService implements TwitchService {
     private final TwitchCategoryService twitchCategoryService;
 
     @Override
-    public void updateChannel(UserAccount user, GameBinding binding) {
-        log.debug("[Mock Twitch] updateChannel() — no-op for user {}", user.getId());
-    }
-
-    @Override
     public ChannelUpdateOutcome updateChannelReporting(UserAccount user, GameBinding binding) {
         log.debug("[Mock Twitch] updateChannelReporting() — no-op for user {}", user.getId());
         return ChannelUpdateOutcome.APPLIED;
     }
 
     @Override
-    public void setCategory(UserAccount user, String twitchGameId, String twitchGameName) {
+    public ChannelUpdateOutcome setCategory(UserAccount user, String twitchGameId, String twitchGameName) {
         log.debug("[Mock Twitch] setCategory() — no-op for user {}", user.getId());
+        return ChannelUpdateOutcome.APPLIED;
     }
 
     @Override
@@ -53,8 +49,9 @@ public class MockTwitchService implements TwitchService {
     }
 
     @Override
-    public void resetToDefault(UserAccount user) {
+    public ChannelUpdateOutcome resetToDefault(UserAccount user) {
         log.debug("[Mock Twitch] resetToDefault() — no-op for user {}", user.getId());
+        return ChannelUpdateOutcome.APPLIED;
     }
 
     @Override

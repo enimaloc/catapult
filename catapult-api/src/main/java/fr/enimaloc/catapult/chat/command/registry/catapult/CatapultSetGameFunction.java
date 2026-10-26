@@ -24,7 +24,7 @@ import java.util.Set;
  * implement {@code !setgame}, now a fully data-driven command like any other (no more
  * Java-hardcoded {@code SetGameCommand} bean).
  *
- * <p>Always resolves a Twitch category id before calling {@link TwitchService#updateChannel}
+ * <p>Always resolves a Twitch category id before calling {@link TwitchService#updateChannelReporting}
  * (skipping this — sending {@code game_id: null} — is a silent no-op on Twitch's side): {@code
  * igdbId}, when given, maps to a Twitch id via {@link IgdbService#findTwitchGameId}; either way
  * (or as a fallback when that mapping is missing) it falls back to a live Twitch category name
@@ -91,7 +91,7 @@ public class CatapultSetGameFunction implements ServiceFunction {
             binding.setSourceId(igdbId);
         }
         binding.setTwitchGameId(resolveTwitchGameId(user, gameName, igdbId).orElse(null));
-        twitchService.updateChannel(user, binding);
+        twitchService.updateChannelReporting(user, binding);
         // A category chosen by hand ends the active custom binding, whatever its kind
         customBindingActivations.clear(user);
 

@@ -68,11 +68,11 @@ class BindingServiceEditsTest {
         playing(GameBinding.SourceType.STEAM, "999");
         edit.accept(service);
         verify(bindings).save(binding);
-        verify(twitch, never()).updateChannel(any(), any());
+        verify(twitch, never()).updateChannelReporting(any(), any());
 
         playing(GameBinding.SourceType.STEAM, "620");
         edit.accept(service);
-        verify(twitch).updateChannel(user, binding);
+        verify(twitch).updateChannelReporting(user, binding);
     }
 
     @Test
@@ -127,7 +127,7 @@ class BindingServiceEditsTest {
 
         service.toggleIgnored(user, binding.getId(), true);
 
-        verify(twitch, never()).updateChannel(any(), any());
+        verify(twitch, never()).updateChannelReporting(any(), any());
     }
 
     @Test
@@ -167,7 +167,7 @@ class BindingServiceEditsTest {
         verify(twResolver).suggest(input.capture());
         assertThat(input.getValue().steamAppId()).isEqualTo("620");
         verify(bindings).save(binding);
-        verify(twitch, never()).updateChannel(any(), any());
+        verify(twitch, never()).updateChannelReporting(any(), any());
     }
 
     @Test

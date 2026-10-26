@@ -152,7 +152,7 @@ class CustomBindingDetectionTest {
 
         verify(activationRepository).deleteById(user.getId());
         verify(channelEventPublisher).customBindingChanged(user.getId(), null);
-        verify(twitchService).updateChannel(user, gameBinding);
+        verify(twitchService).updateChannelReporting(user, gameBinding);
     }
 
     @Test
@@ -163,12 +163,12 @@ class CustomBindingDetectionTest {
         listener.onNoGameDetected(new NoGameDetectedEvent(this, user));
 
         verify(activationRepository, never()).deleteById(any());
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
 
         listener.onGameDetected(new GameDetectedEvent(this, user, game));
 
         verify(activationRepository).deleteById(user.getId());
-        verify(twitchService).updateChannel(user, gameBinding);
+        verify(twitchService).updateChannelReporting(user, gameBinding);
     }
 
     @Test
@@ -179,7 +179,7 @@ class CustomBindingDetectionTest {
         listener.onGameDetected(new GameDetectedEvent(this, user, game));
 
         verify(activationRepository, never()).deleteById(any());
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
         verify(streamStateService, never()).storePending(any(), any());
 
         when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(game));
@@ -190,7 +190,7 @@ class CustomBindingDetectionTest {
         service.deactivate(user);
 
         verify(activationRepository).deleteById(user.getId());
-        verify(twitchService).updateChannel(user, gameBinding);
+        verify(twitchService).updateChannelReporting(user, gameBinding);
     }
 
     @Test
@@ -202,12 +202,12 @@ class CustomBindingDetectionTest {
         listener.onGameDetected(new GameDetectedEvent(this, user, game));
 
         verify(streamStateService, never()).storePending(any(), any());
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
 
         live(true);
         listener.onStreamOnline(new StreamOnlineEvent(this, user));
 
-        verify(twitchService).updateChannel(eq(user), isArt());
+        verify(twitchService).updateChannelReporting(eq(user), isArt());
         verify(twitchService, never()).resetToDefault(any());
 
         when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(game));
@@ -218,7 +218,7 @@ class CustomBindingDetectionTest {
         service.deactivate(user);
 
         verify(activationRepository).deleteById(user.getId());
-        verify(twitchService).updateChannel(user, gameBinding);
+        verify(twitchService).updateChannelReporting(user, gameBinding);
     }
 
     @Test
@@ -231,7 +231,7 @@ class CustomBindingDetectionTest {
 
         verify(activationRepository, never()).deleteById(any());
         verify(channelEventPublisher, never()).customBindingChanged(any(), any());
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
     }
 
     @Test
@@ -243,9 +243,9 @@ class CustomBindingDetectionTest {
 
         listener.onStreamOnline(new StreamOnlineEvent(this, user));
 
-        verify(twitchService).updateChannel(eq(user), isArt());
+        verify(twitchService).updateChannelReporting(eq(user), isArt());
         verify(twitchService, never()).resetToDefault(any());
-        verify(twitchService, never()).updateChannel(user, pending);
+        verify(twitchService, never()).updateChannelReporting(user, pending);
         verify(streamStateService, never()).clearPending(any());
         verify(activationRepository, never()).deleteById(any());
     }
@@ -261,7 +261,7 @@ class CustomBindingDetectionTest {
         order.verify(activationRepository).deleteById(user.getId());
         order.verify(twitchService).resetToDefault(user);
         verify(channelEventPublisher).customBindingChanged(user.getId(), null);
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
     }
 
     @Test
@@ -279,7 +279,7 @@ class CustomBindingDetectionTest {
         realBindings.setTwitchGame(user, gameBinding.getId(), "1234", "Other");
 
         verify(gameBindings).save(argThat(saved -> "1234".equals(saved.getTwitchGameId())));
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
         verify(activationRepository, never()).deleteById(any());
     }
 
@@ -293,9 +293,9 @@ class CustomBindingDetectionTest {
         listener.onGameDetected(new GameDetectedEvent(this, user, game));
         listener.onStreamOnline(new StreamOnlineEvent(this, user));
 
-        verify(twitchService).updateChannel(user, gameBinding);
+        verify(twitchService).updateChannelReporting(user, gameBinding);
         verify(twitchService).resetToDefault(user);
-        verify(twitchService, never()).updateChannel(eq(user), isArt());
+        verify(twitchService, never()).updateChannelReporting(eq(user), isArt());
         verify(activationRepository, never()).deleteById(any());
     }
     // --- A restart of catapult-api: the game state kept in memory is lost, the activation is not ---
@@ -309,7 +309,7 @@ class CustomBindingDetectionTest {
 
         verify(activationRepository, never()).deleteById(any());
         verify(channelEventPublisher, never()).customBindingChanged(any(), any());
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
         verify(streamStateService, never()).storePending(any(), any());
         // The game's binding is still created or refreshed for the channel page
         verify(channelEventPublisher).bindingUpserted(user.getId(), gameBinding);
@@ -321,7 +321,7 @@ class CustomBindingDetectionTest {
 
         listener.onGameDetected(new GameDetectedEvent(this, user, game, true));
 
-        verify(twitchService).updateChannel(user, gameBinding);
+        verify(twitchService).updateChannelReporting(user, gameBinding);
     }
 
     /** The real detection cycle ({@link SchedulerService} + {@link GameStateService}) feeding the listener. */
@@ -352,12 +352,12 @@ class CustomBindingDetectionTest {
         scheduler.triggerManualCheck(user); // same game, no event
 
         verify(activationRepository, never()).deleteById(any());
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
 
         scheduler.triggerManualCheck(user); // another game: a real detection
 
         verify(activationRepository).deleteById(user.getId());
-        verify(twitchService).updateChannel(user, otherBinding);
+        verify(twitchService).updateChannelReporting(user, otherBinding);
     }
 
     @Test
@@ -372,12 +372,12 @@ class CustomBindingDetectionTest {
         scheduler.triggerManualCheck(user);
 
         verify(activationRepository, never()).deleteById(any());
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
 
         scheduler.triggerManualCheck(user);
 
         verify(activationRepository).deleteById(user.getId());
-        verify(twitchService).updateChannel(user, gameBinding);
+        verify(twitchService).updateChannelReporting(user, gameBinding);
     }
 
     @Test
@@ -392,6 +392,6 @@ class CustomBindingDetectionTest {
         scheduler.triggerManualCheck(user);
 
         verify(activationRepository).deleteById(user.getId());
-        verify(twitchService).updateChannel(user, gameBinding);
+        verify(twitchService).updateChannelReporting(user, gameBinding);
     }
 }

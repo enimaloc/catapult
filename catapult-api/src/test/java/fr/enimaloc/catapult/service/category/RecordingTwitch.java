@@ -78,27 +78,24 @@ public class RecordingTwitch implements TwitchService {
     }
 
     @Override
-    public void updateChannel(UserAccount user, GameBinding binding) {
-        update(binding);
-    }
-
-    @Override
     public ChannelUpdateOutcome updateChannelReporting(UserAccount user, GameBinding binding) {
         update(binding);
         return answer;
     }
 
     @Override
-    public void setCategory(UserAccount user, String twitchGameId, String twitchGameName) {
+    public ChannelUpdateOutcome setCategory(UserAccount user, String twitchGameId, String twitchGameName) {
         record(new Write(Kind.SET_CATEGORY, twitchGameId, twitchGameName, null, null, Set.of(), false, false, false,
                 DebugContext.subject()), "twitch:set " + twitchGameId);
+        return answer;
     }
 
     @Override
-    public void resetToDefault(UserAccount user) {
+    public ChannelUpdateOutcome resetToDefault(UserAccount user) {
         record(new Write(Kind.RESET, null, null, null, null, Set.of(), false, false, false,
                 DebugContext.subject()),
                 "twitch:reset");
+        return answer;
     }
 
     @Override

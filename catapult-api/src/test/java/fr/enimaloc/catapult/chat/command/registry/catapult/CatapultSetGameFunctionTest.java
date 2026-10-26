@@ -47,7 +47,7 @@ class CatapultSetGameFunctionTest {
 
         assertThat(result).isEqualTo("");
         var captor = org.mockito.ArgumentCaptor.forClass(GameBinding.class);
-        verify(twitchService).updateChannel(eq(user), captor.capture());
+        verify(twitchService).updateChannelReporting(eq(user), captor.capture());
         GameBinding binding = captor.getValue();
         assertThat(binding.getUser()).isEqualTo(user);
         assertThat(binding.getSourceType()).isEqualTo(GameBinding.SourceType.MANUAL);
@@ -74,7 +74,7 @@ class CatapultSetGameFunctionTest {
         fn.invoke(user, new Object[]{"Cyberpunk 2077", "1877"});
 
         var bindingCaptor = org.mockito.ArgumentCaptor.forClass(GameBinding.class);
-        verify(twitchService).updateChannel(eq(user), bindingCaptor.capture());
+        verify(twitchService).updateChannelReporting(eq(user), bindingCaptor.capture());
         GameBinding binding = bindingCaptor.getValue();
         assertThat(binding.getSourceId()).isEqualTo("1877");
         assertThat(binding.getTwitchGameId()).isEqualTo("1877");
@@ -102,7 +102,7 @@ class CatapultSetGameFunctionTest {
         fn.invoke(user, new Object[]{"Cyberpunk 2077", "1877"});
 
         var captor = org.mockito.ArgumentCaptor.forClass(GameBinding.class);
-        verify(twitchService).updateChannel(eq(user), captor.capture());
+        verify(twitchService).updateChannelReporting(eq(user), captor.capture());
         assertThat(captor.getValue().getTwitchGameId()).isEqualTo("1877");
     }
 
@@ -120,7 +120,7 @@ class CatapultSetGameFunctionTest {
         verifyNoInteractions(gameStateService);
         verifyNoInteractions(igdbService);
         var captor = org.mockito.ArgumentCaptor.forClass(GameBinding.class);
-        verify(twitchService).updateChannel(eq(user), captor.capture());
+        verify(twitchService).updateChannelReporting(eq(user), captor.capture());
         assertThat(captor.getValue().getSourceId()).isNull();
         assertThat(captor.getValue().getTwitchGameId()).isNull();
     }
@@ -137,7 +137,7 @@ class CatapultSetGameFunctionTest {
         fn.invoke(user, new Object[]{"Cyberpunk 2077"});
 
         var order = org.mockito.Mockito.inOrder(twitchService, activations);
-        order.verify(twitchService).updateChannel(eq(user), any());
+        order.verify(twitchService).updateChannelReporting(eq(user), any());
         order.verify(activations).clear(user);
     }
 }
