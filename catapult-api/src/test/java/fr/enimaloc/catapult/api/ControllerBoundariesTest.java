@@ -5,14 +5,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 import fr.enimaloc.catapult.FullContextContainers;
 import fr.enimaloc.catapult.FullContextTestBase;
 import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.chatcommand.ChatCommandSetting;
 import fr.enimaloc.catapult.domain.experiment.Experiment;
 import fr.enimaloc.catapult.domain.experiment.ExperimentAssignment;
 import fr.enimaloc.catapult.domain.experiment.ExperimentVariant;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.repository.chatcommand.ChatCommandSettingRepository;
 import fr.enimaloc.catapult.repository.experiment.ExperimentAssignmentRepository;
 import fr.enimaloc.catapult.repository.experiment.ExperimentRepository;
 import fr.enimaloc.catapult.security.JwtService;
 import fr.enimaloc.catapult.service.access.InviteService;
+import fr.enimaloc.catapult.service.chatcommand.ChatCommandGate;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -22,11 +25,14 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Import;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * On the whole application, the routes whose answer reads a lazy association: the read must stay inside the
- * transaction that loaded it, wherever the controller's work moves.
+ * On the whole application, the routes whose answer reads a lazy association, or whose write needs a transaction:
+ * the read must stay inside the transaction that loaded it, and the write must run in one, wherever the controller's
+ * work moves.
  */
 @Import(FullContextContainers.class)
 class ControllerBoundariesTest extends FullContextTestBase {
@@ -49,6 +55,12 @@ class ControllerBoundariesTest extends FullContextTestBase {
     @Autowired
     InviteService inviteService;
 
+    @Autowired
+    ChatCommandSettingRepository chatCommandSettings;
+
+    @Autowired
+    PlatformTransactionManager transactionManager;
+
     private static ExperimentVariant variant(Experiment experiment, String key, boolean control, int internalId) {
         ExperimentVariant variant = new ExperimentVariant();
         variant.setExperiment(experiment);
@@ -57,6 +69,58 @@ class ControllerBoundariesTest extends FullContextTestBase {
         variant.setControl(control);
         variant.setInternalId(internalId);
         return variant;
+    }
+
+    private UserAccount member(String name) {
+        UserAccount member = new UserAccount();
+        member.setTwitchId("boundaries-" + name);
+        member.setTwitchUsername(name);
+        return users.save(member);
+    }
+
+    private void assign(Experiment experiment, UserAccount member, String variantKey) {
+        ExperimentAssignment assignment = new ExperimentAssignment();
+        assignment.setExperiment(experiment);
+        assignment.setVariant(experiment.getVariants().stream()
+                .filter(v -> v.getKey().equals(variantKey)).findFirst().orElseThrow());
+        assignment.setUser(member);
+        assignments.save(assignment);
+    }
+
+    /** Activates the experiment {@code key} the application created at startup, and rolls {@code member} out to it. */
+    private void rollOut(String key, UserAccount member) {
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            Experiment experiment = experiments.findByKey(key).orElseThrow();
+            experiment.setStatus(Experiment.Status.ACTIVE);
+            ExperimentVariant on = experiment.getVariants().stream().filter(v -> !v.isControl()).findFirst()
+                    .orElseGet(() -> {
+                        ExperimentVariant added = variant(experiment, "enabled", false,
+                                experiment.getVariants().size() + 1);
+                        experiment.getVariants().add(added);
+                        return added;
+                    });
+            Experiment saved = experiments.save(experiment);
+            assign(saved, member, on.getKey());
+        });
+    }
+
+    private String jwt(UserAccount member) {
+        return jwtService.generateForUser(member, List.of("ROLE_USER"));
+    }
+
+    /** {@code method path} with {@code json} (or no body), as {@code member} when not null, else as loopback. */
+    private HttpResponse<String> send(String method, String path, UserAccount member, String json) throws Exception {
+        HttpRequest.Builder request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
+                .method(method, json == null
+                        ? HttpRequest.BodyPublishers.noBody()
+                        : HttpRequest.BodyPublishers.ofString(json));
+        if (json != null) {
+            request.header("Content-Type", "application/json");
+        }
+        if (member != null) {
+            request.header("Authorization", "Bearer " + jwt(member));
+        }
+        return HttpClient.newHttpClient().send(request.build(), HttpResponse.BodyHandlers.ofString());
     }
 
     @Test
@@ -106,5 +170,22 @@ class ControllerBoundariesTest extends FullContextTestBase {
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(JsonMapper.builder().build().readTree(response.body())
                 .path("invites").path(0).path("ownerUsername").asString()).isEqualTo("boundaries-inviter");
+    }
+
+    @Test
+    void deletingAChatCommandSetting_removesIt() throws Exception {
+        UserAccount member = member("setting-deleter");
+        rollOut(ChatCommandGate.EXPERIMENT_KEY, member);
+        ChatCommandSetting setting = new ChatCommandSetting();
+        setting.setUser(member);
+        setting.setKey("greeting");
+        setting.setValue("hello");
+        chatCommandSettings.save(setting);
+
+        HttpResponse<String> response = send("DELETE",
+                "/api/internal/users/" + member.getId() + "/chat-command-settings/greeting", member, null);
+
+        assertThat(response.statusCode()).as(response.body()).isEqualTo(204);
+        assertThat(chatCommandSettings.findByUserAndKey(member, "greeting")).isEmpty();
     }
 }

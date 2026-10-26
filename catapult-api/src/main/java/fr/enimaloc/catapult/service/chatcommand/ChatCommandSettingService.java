@@ -17,7 +17,8 @@ import java.util.regex.Pattern;
 /**
  * A streamer's own free-form {@code key=value} chat-command settings (see {@code ChatCommandSetting},
  * {@code SettingGetExpr}) — global to the user, not per-command. Gated by the {@code chat.commands} experiment, before
- * any key is looked at. Not transactional, as the handlers it serves were not.
+ * any key is looked at. Not transactional, so the gate's own transaction commits whatever it answers; the delete
+ * runs in the repository's transaction.
  */
 @Service
 @RequiredArgsConstructor
