@@ -21,7 +21,7 @@ configurations {
 }
 
 val chartjsVersion = "4.6.1"
-val htmxVersion = "2.0.11"
+val htmxVersion = "4.0.0"
 val blocklyVersion = "10.4.1" // latest version published on the webjars.npm mirror at time of writing
 
 dependencies {
