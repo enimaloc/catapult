@@ -503,7 +503,7 @@ public class MockData {
         widgetToken = UUID.randomUUID();
     }
 
-    /** What /api/channels/{u}/settings/twitchat answers. */
+    /** What GET /api/internal/users/{userId}/settings/twitchat answers. */
     public TwitchatSettingsResponse twitchatSettings() {
         ObsData obs = obsData == null ? DEFAULT_OBS : obsData;
         return new TwitchatSettingsResponse(obs.connected(), obs.host(), obs.port(), obs.hasPassword(), widgetToken.toString());
@@ -518,7 +518,7 @@ public class MockData {
     }
 
     /**
-     * What /api/me/obs would answer: null unless OBS is enabled. The presets' "has a password"
+     * What GET /api/internal/users/{userId}/obs would answer: null unless OBS is enabled. The presets' "has a password"
      * has no actual password behind it, so the password is null until one is saved.
      */
     public TwitchatWidgetConfig obsConnection() {
