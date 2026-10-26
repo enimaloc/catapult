@@ -23,9 +23,9 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Détecte le jeu en cours via l'API de présence Xbox Live, avec le token
- * XSTS de l'utilisateur (pas de compte de service : chaque utilisateur
- * interroge sa propre présence avec son propre token OAuth2 lié).
+ * Detects the current game through the Xbox Live presence API, with the user's
+ * XSTS token (no service account: each user queries their own presence
+ * with their own linked OAuth2 token).
  */
 @Slf4j
 @Component
@@ -34,11 +34,11 @@ import java.util.stream.Collectors;
 public class XboxGameGetter implements GameGetter {
 
     private static final String PRESENCE_URL = "https://userpresence.xboxlive.com/users/xuid({xuid})";
-    /** Titlehub (non documentée officiellement) : seule source du Product ID Store attendu par IGDB, le titleId de la présence n'étant pas cet identifiant. */
+    /** Titlehub (not officially documented): the only source of the Store Product ID IGDB expects, since the presence's titleId is not that identifier. */
     private static final String TITLE_DETAIL_URL = "https://titlehub.xboxlive.com/users/xuid({xuid})/titles/titleid({titleId})/decoration/detail";
-    /** Titre représentant le tableau de bord Xbox lui-même, jamais une partie en cours. */
+    /** Title standing for the Xbox dashboard itself, never a game in progress. */
     private static final String DASHBOARD_TITLE_NAME = "Home";
-    /** titleId Xbox Live de Minecraft (build Win32 legacy, sans Product ID Store) ; détecté séparément par {@link MinecraftPresenceGetter} quand actif. */
+    /** Xbox Live titleId of Minecraft (legacy Win32 build, with no Store Product ID); detected separately by {@link MinecraftPresenceGetter} when active. */
     private static final String MINECRAFT_XBOX_TITLE_ID = "1791712750";
 
     private final RestClient restClient;
@@ -123,7 +123,7 @@ public class XboxGameGetter implements GameGetter {
         return Optional.empty();
     }
 
-    /** Résout le Product ID Store (format attendu par IGDB) d'un titleId via Titlehub ; retombe sur le titleId si la résolution échoue. */
+    /** Resolves a titleId's Store Product ID (the format IGDB expects) through Titlehub; falls back to the titleId if the resolution fails. */
     @SuppressWarnings("unchecked")
     private Optional<String> resolveProductId(XboxUserTokenService.XstsSession session, String titleId) {
         return apiObservations.observe("xbox", "get_title_detail", () -> {
@@ -132,7 +132,7 @@ public class XboxGameGetter implements GameGetter {
                     .uri(TITLE_DETAIL_URL, session.xuid(), titleId)
                     .header("Authorization", "XBL3.0 x=" + session.userHash() + ";" + session.token())
                     .header("x-xbl-contract-version", "2")
-                    .header("Accept-Language", "en-US") // Requis par Titlehub (400 sans locale valide) ; ne conditionne aucun contenu affiché.
+                    .header("Accept-Language", "en-US") // Required by Titlehub (400 without a valid locale); determines no displayed content.
                     .retrieve()
                     .body(Map.class);
                 return extractProductId(response);

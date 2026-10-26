@@ -44,9 +44,9 @@ public class MinecraftServiceAccountAdmin {
         try {
             return msaAuthClient.startDeviceCode();
         } catch (HttpClientErrorException e) {
-            // ex. AADSTS70002 (app Azure non déclarée client public) : le message doit
-            // remonter jusqu'à l'UI admin au lieu de mourir en 500 dans les logs
-            log.warn("Device-code Microsoft refusé: {}", e.getResponseBodyAsString());
+            // e.g. AADSTS70002 (Azure app not declared as a public client): the message must
+            // reach the admin UI instead of dying as a 500 in the logs
+            log.warn("Microsoft refused the device code: {}", e.getResponseBodyAsString());
             throw new ApiProblem(ErrorCode.MINECRAFT_DEVICE_CODE_REFUSED, "Microsoft refused the device code",
                     Map.of("upstream", e.getResponseBodyAsString()));
         }
@@ -62,22 +62,22 @@ public class MinecraftServiceAccountAdmin {
         MinecraftServiceAccount account = new MinecraftServiceAccount();
         account.setLabel(label);
         account.setFillOrder((int) accountRepository.count());
-        account.setMinecraftUsername("(en attente)");
+        account.setMinecraftUsername("(pending)");
 
         ValidatedProfile profile = validateAndFetchProfile(encryption.encrypt(tokens.refreshToken()));
         account.setMsaRefreshToken(profile.rotatedRefreshTokenEncrypted());
         account.setMinecraftUsername(profile.minecraftUsername());
         account.setUpdatedAt(Instant.now());
         MinecraftServiceAccount saved = accountRepository.save(account);
-        log.info("Compte de service Minecraft enrôlé: {} ({})", saved.getLabel(), profile.minecraftUsername());
+        log.info("Minecraft service account enrolled: {} ({})", saved.getLabel(), profile.minecraftUsername());
         return toDto(saved, 0);
     }
 
     /**
-     * Point d'entrée pour un compte existant dont le refresh token MSA a expiré
-     * ({@code invalid_grant}) : redéroule le device-code flow et remplace le
-     * refresh token sans toucher à l'id ni aux liens ({@link #delete} est bloqué
-     * tant qu'un compte a des liens, donc c'est la seule voie de réparation).
+     * Entry point for an existing account whose MSA refresh token has expired
+     * ({@code invalid_grant}): runs the device-code flow again and replaces the
+     * refresh token without touching the id or the links ({@link #delete} is blocked
+     * while an account has links, so this is the only way to repair it).
      * Empty while the admin hasn't validated the code yet.
      */
     public Optional<AccountDto> reauth(UUID id, String deviceCode) {
@@ -92,20 +92,20 @@ public class MinecraftServiceAccountAdmin {
         account.setMinecraftUsername(profile.minecraftUsername());
         account.setEnabled(true);
         account.setUpdatedAt(Instant.now());
-        // purge le cache/état d'échec en mémoire : le prochain getToken() doit repartir
-        // sur la nouvelle chaîne plutôt que de retomber sur l'ancien état "en échec"
+        // purge the in-memory cache/failure state: the next getToken() must start over
+        // on the new chain rather than fall back on the old "failing" state
         tokenService.evict(account.getId());
         MinecraftServiceAccount saved = accountRepository.save(account);
-        log.info("Compte de service Minecraft ré-authentifié: {} ({})", saved.getLabel(), profile.minecraftUsername());
+        log.info("Minecraft service account re-authenticated: {} ({})", saved.getLabel(), profile.minecraftUsername());
         return toDto(saved);
     }
 
     private record ValidatedProfile(String rotatedRefreshTokenEncrypted, String minecraftUsername) {}
 
     /**
-     * Déroule la chaîne MSA → Xbox → Minecraft pour un refresh token chiffré et
-     * récupère le pseudo Minecraft associé. Lève 502 si la chaîne échoue ou si le
-     * profil Xbox/Minecraft est introuvable.
+     * Walks the MSA → Xbox → Minecraft chain for an encrypted refresh token and
+     * fetches the associated Minecraft player name. Throws 502 if the chain fails or
+     * the Xbox/Minecraft profile is missing.
      */
     private ValidatedProfile validateAndFetchProfile(String encryptedRefreshToken) {
         String username = null;
@@ -117,7 +117,7 @@ public class MinecraftServiceAccountAdmin {
                 username = minecraftService.getMinecraftProfileName(chain.get().minecraftToken());
             }
         } catch (RestClientException e) {
-            log.warn("Validation du compte de service Minecraft en échec: {}", e.getMessage());
+            log.warn("Minecraft service account validation failed: {}", e.getMessage());
         }
         if (username == null) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,

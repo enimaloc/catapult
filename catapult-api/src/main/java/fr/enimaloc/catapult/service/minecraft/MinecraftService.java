@@ -107,8 +107,8 @@ public class MinecraftService {
     }
 
     /**
-     * Déclare la présence du joueur et retourne en échange celles de ses amis
-     * (l'API n'expose pas de GET séparé, l'échange est bidirectionnel).
+     * Declares the player's presence and gets their friends' in return
+     * (the API has no separate GET, the exchange is bidirectional).
      */
     public PresenceList updatePresence(String token, PresenceUpdate update) {
         return restClient.post()
@@ -122,8 +122,8 @@ public class MinecraftService {
     }
 
     /**
-     * Normalise un identifiant de profil pour comparaison : les endpoints Mojang
-     * renvoient l'UUID tantôt avec tirets, tantôt sans, selon l'API.
+     * Normalizes a profile id for comparison: the Mojang endpoints
+     * return the UUID sometimes with dashes and sometimes without, depending on the API.
      */
     public static String normalizeProfileId(String profileId) {
         return profileId == null ? null : profileId.replace("-", "").toLowerCase();
@@ -145,7 +145,7 @@ public class MinecraftService {
         }
     }
 
-    /** Pseudo du compte authentifié (GET /minecraft/profile). */
+    /** Player name of the authenticated account (GET /minecraft/profile). */
     public String getMinecraftProfileName(String token) {
         Map<?, ?> profile = restClient.get()
                 .uri(URI.create(MINECRAFT_SERVICE_URL + "/minecraft/profile"))
@@ -207,7 +207,7 @@ public class MinecraftService {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record ProfileLookup(String id, String name) {
-        /** L'endpoint lookup renvoie l'UUID sans tirets ; l'API friends attend le format avec tirets. */
+        /** The lookup endpoint returns the UUID without dashes; the friends API expects the dashed format. */
         public String dashedId() {
             if (id.contains("-")) return id;
             return id.replaceFirst(

@@ -18,8 +18,8 @@ import java.net.URI;
 import java.util.Optional;
 
 /**
- * Client OAuth Microsoft (comptes personnels) pour les comptes de service Minecraft.
- * Deux flux : device-code (enrôlement one-shot en admin) et refresh_token (renouvellement).
+ * Microsoft OAuth client (personal accounts) for the Minecraft service accounts.
+ * Two flows: device-code (one-shot enrolment by an admin) and refresh_token (renewal).
  */
 @Slf4j
 @Service
@@ -49,7 +49,7 @@ public class MsaAuthClient {
     }
 
     public DeviceCodeStart startDeviceCode() {
-        log.debug("Device code flow démarré");
+        log.debug("Device code flow started");
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("client_id", clientId);
         form.add("scope", SCOPE);
@@ -63,8 +63,8 @@ public class MsaAuthClient {
     }
 
     /**
-     * Vide tant que l'utilisateur n'a pas validé le code ({@code authorization_pending}) ;
-     * {@link DeviceCodeExpiredException} une fois le code expiré ({@code expired_token}).
+     * Empty while the user hasn't validated the code ({@code authorization_pending});
+     * {@link DeviceCodeExpiredException} once the code has expired ({@code expired_token}).
      */
     public Optional<MsaTokens> pollDeviceCode(String deviceCode) {
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
@@ -116,7 +116,7 @@ public class MsaAuthClient {
         }
     }
 
-    /** Le device code a expiré avant d'être validé : 400, l'admin relance le flow. */
+    /** The device code expired before it was validated: 400, the admin restarts the flow. */
     @ResponseStatus(value = HttpStatus.BAD_REQUEST, reason = "Device code expired")
     public static class DeviceCodeExpiredException extends MsaAuthException {
         public DeviceCodeExpiredException(Throwable cause) {

@@ -18,14 +18,14 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Fournit un access token Minecraft valide par compte de service, en déroulant
- * la chaîne MSA refresh token → rpsTicket → Xbox user token → XSTS → Minecraft.
- * Le token (24 h) est caché en mémoire et renouvelé quand il reste moins
- * d'une heure de validité. Le refresh token MSA tourne à chaque renouvellement
- * et est re-persisté chiffré.
+ * Provides a valid Minecraft access token per service account, by walking
+ * the chain MSA refresh token → rpsTicket → Xbox user token → XSTS → Minecraft.
+ * The token (24 h) is cached in memory and renewed when less than an hour of
+ * validity remains. The MSA refresh token rotates on every renewal and is
+ * persisted again, encrypted.
  * <p>
- * Le verrou de rafraîchissement est par compte de service (clé = UUID) afin
- * qu'un refresh lent sur un compte ne bloque pas les autres.
+ * The refresh lock is per service account (key = UUID) so that a slow refresh
+ * on one account does not block the others.
  */
 @Slf4j
 @Service
@@ -41,7 +41,7 @@ public class MinecraftTokenService {
     private final MinecraftServiceAccountRepository accountRepository;
 
     private final Map<UUID, CachedToken> cache = new ConcurrentHashMap<>();
-    // 1 = token OK, 0 = chaîne en échec ; par UUID de compte
+    // 1 = token OK, 0 = chain failing; per account UUID
     private final Map<UUID, Integer> tokenState = new ConcurrentHashMap<>();
     private final Map<UUID, Object> refreshLocks = new ConcurrentHashMap<>();
 
@@ -58,13 +58,13 @@ public class MinecraftTokenService {
         this.accountRepository = accountRepository;
         Gauge.builder("catapult.minecraft.token.ok",
                         tokenState, m -> m.values().stream().mapToInt(Integer::intValue).sum())
-                .description("Nombre de comptes de service Minecraft avec un token valide")
+                .description("Number of Minecraft service accounts with a valid token")
                 .register(meterRegistry);
     }
 
     public Optional<String> getToken(MinecraftServiceAccount account) {
         if (account.getId() == null) {
-            // compte transient (validation d'enrôlement) : ni cache, ni verrou, ni persistance
+            // transient account (enrolment validation): no cache, no lock, no persistence
             return validateChain(account.getMsaRefreshToken()).map(ValidatedChain::minecraftToken);
         }
         CachedToken cached = cache.get(account.getId());
@@ -75,10 +75,9 @@ public class MinecraftTokenService {
     }
 
     /**
-     * Déroule la chaîne complète sans aucun effet de bord (pas de cache, pas de
-     * verrou, pas d'écriture en base) — utilisé pour valider un compte pas encore
-     * persisté à l'enrôlement. Le refresh token rotaté (chiffré) est retourné à
-     * l'appelant, à lui de le stocker.
+     * Walks the whole chain with no side effect (no cache, no lock, no DB write),
+     * to validate an account not yet persisted at enrolment. The rotated (encrypted)
+     * refresh token is returned to the caller, which has to store it.
      */
     public Optional<ValidatedChain> validateChain(String encryptedRefreshToken) {
         try {
@@ -89,7 +88,7 @@ public class MinecraftTokenService {
             return Optional.of(new ValidatedChain(
                     mc.accessToken(), encryption.encrypt(msa.refreshToken()), mc.expiresIn()));
         } catch (Exception e) {
-            log.warn("Chaîne d'auth Minecraft en échec: {}", e.getMessage());
+            log.warn("Minecraft auth chain failed: {}", e.getMessage());
             return Optional.empty();
         }
     }
@@ -104,7 +103,7 @@ public class MinecraftTokenService {
 
     private Optional<String> refreshChain(MinecraftServiceAccount account) {
         synchronized (refreshLocks.computeIfAbsent(account.getId(), id -> new Object())) {
-            // double-check après acquisition du lock : un autre thread a pu rafraîchir
+            // double-check after acquiring the lock: another thread may have refreshed
             CachedToken cached = cache.get(account.getId());
             if (cached != null && cached.expiry().isAfter(Instant.now().plus(RENEW_BEFORE_EXPIRY))) {
                 return Optional.of(cached.token());
@@ -112,11 +111,11 @@ public class MinecraftTokenService {
             Optional<ValidatedChain> chain = validateChain(account.getMsaRefreshToken());
             if (chain.isEmpty()) {
                 tokenState.put(account.getId(), 0);
-                log.warn("Chaîne d'auth Minecraft en échec pour le compte {}", account.getLabel());
+                log.warn("Minecraft auth chain failed for account {}", account.getLabel());
                 return Optional.empty();
             }
 
-            // rotation persistée après le succès de la chaîne complète
+            // the rotation is persisted once the whole chain has succeeded
             account.setMsaRefreshToken(chain.get().rotatedRefreshTokenEncrypted());
             account.setUpdatedAt(Instant.now());
             accountRepository.save(account);

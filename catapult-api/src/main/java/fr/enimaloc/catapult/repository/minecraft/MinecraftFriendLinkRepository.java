@@ -14,8 +14,8 @@ public interface MinecraftFriendLinkRepository extends JpaRepository<MinecraftFr
     Optional<MinecraftFriendLink> findByUser(UserAccount user);
 
     /**
-     * Variante avec le compte de service chargé (open-in-view désactivé : les
-     * lecteurs hors transaction — contrôleurs — ne peuvent pas initialiser le proxy LAZY).
+     * Variant with the service account loaded (open-in-view is disabled: readers
+     * outside a transaction, such as controllers, cannot initialize the LAZY proxy).
      */
     @EntityGraph(attributePaths = "serviceAccount")
     Optional<MinecraftFriendLink> findWithServiceAccountByUser(UserAccount user);
