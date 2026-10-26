@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import fr.enimaloc.catapult.api.ApiPaths;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
@@ -17,19 +18,27 @@ import org.springframework.core.type.filter.AnnotationTypeFilter;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Authorization conventions: access rules live in {@link Authz}, admin routes sit under /api/admin, and every channel
- * route asks {@link Authz} before its body runs.
+ * Authorization conventions: access rules live in {@link Authz}, admin routes sit under /api/admin or
+ * /api/internal/admin, and every channel or user route asks {@link Authz} before its body runs.
  */
 class AuthorizationConventionsTest {
 
   /** One {@link Authz} call whose arguments are method parameters, and nothing else: no {@code or}, no second rule. */
   private static final Pattern AUTHZ_CALL = Pattern.compile("^@authz\\.\\w+\\((#\\w+(\\s*,\\s*#\\w+)*)?\\)$");
+  /** A rule that decides on the route's owner, the {@code userId} path variable. */
+  private static final Pattern NAMES_USER_ID = Pattern.compile("#userId\\b");
+  private static final String CHANNELS = "/api/channels/{";
+  private static final String USERS = ApiPaths.INTERNAL + "/users/{";
+  /** The access probe: it answers {@code false} rather than refusing (see its javadoc), so it has no rule. */
+  private static final String CHANNEL_ACCESS_PROBE = ApiPaths.USER + "/channel-access";
 
   @ParameterizedTest
   @ValueSource(strings = {"@authz.ownsChannel(#username)", "@authz.canAccessChannel(#username)", "@authz.isAdmin()",
+      "@authz.isSelf(#userId)", "@authz.canAccessChannel(#userId)",
       "@authz.check(#a, #b)"})
   void aBareAuthzCallIsAccepted(String expression) {
     assertThat(AUTHZ_CALL.matcher(expression).matches()).as(expression).isTrue();
@@ -77,7 +86,7 @@ class AuthorizationConventionsTest {
         violations.add(type.getName() + " has no class-level @RequestMapping path");
       }
       for (String path : paths) {
-        if (!path.startsWith("/api/admin/")) {
+        if (!path.startsWith("/api/admin/") && !path.startsWith(ApiPaths.ADMIN + "/")) {
           violations.add(type.getName() + " maps " + path);
         }
       }
@@ -86,8 +95,9 @@ class AuthorizationConventionsTest {
   }
 
   /**
-   * Every handler under {@code /api/channels/{...}} carries its own {@code @PreAuthorize}. A class-level one is not
-   * enough and is refused: it would also guard the controller's {@code @ExceptionHandler}s.
+   * Every handler under {@code /api/channels/{...}} or {@code /api/internal/users/{...}} carries its own
+   * {@code @PreAuthorize}; under {@code /api/internal/users/{userId}} it decides on {@code #userId}. A class-level one
+   * is not enough and is refused: it would also guard the controller's {@code @ExceptionHandler}s.
    */
   @Test
   void channelRoutesAreAuthorized() throws ClassNotFoundException {
@@ -98,41 +108,51 @@ class AuthorizationConventionsTest {
       boolean channelController = false;
       for (Method method : type.getDeclaredMethods()) {
         RequestMapping mapping = AnnotatedElementUtils.findMergedAnnotation(method, RequestMapping.class);
-        if (mapping == null
-            || method.isAnnotationPresent(ExceptionHandler.class)
-            || !underChannel(type, mapping)) {
+        if (mapping == null || method.isAnnotationPresent(ExceptionHandler.class)) {
+          continue;
+        }
+        List<String> paths = paths(type, mapping);
+        boolean channel = paths.stream().anyMatch(p -> p.startsWith(CHANNELS));
+        boolean user = paths.stream().anyMatch(p -> p.startsWith(USERS));
+        if ((!channel && !user) || (user && isChannelAccessProbe(mapping, paths))) {
           continue;
         }
         channelController = true;
         String name = type.getName() + "#" + method.getName();
         handlers.add(name);
-        if (method.getAnnotation(PreAuthorize.class) == null) {
+        PreAuthorize rule = method.getAnnotation(PreAuthorize.class);
+        if (rule == null) {
           violations.add(name + " has no @PreAuthorize");
+        } else if (user && !NAMES_USER_ID.matcher(rule.value()).find()) {
+          violations.add(name + " @PreAuthorize(" + rule.value() + ") does not decide on #userId");
         }
       }
       if (channelController && classRule) {
         violations.add(type.getName() + " has a class-level @PreAuthorize, which also guards its @ExceptionHandler");
       }
     }
-    assertThat(handlers).as("handlers under /api/channels/{...}").isNotEmpty();
+    assertThat(handlers).as("handlers under /api/channels/{...} or /api/internal/users/{...}").isNotEmpty();
     assertThat(violations).isEmpty();
   }
 
-  /** {@code mapping}, joined to {@code type}'s own mapping as Spring joins them, is under {@code /api/channels/{...}}. */
-  private static boolean underChannel(Class<?> type, RequestMapping mapping) {
+  private static boolean isChannelAccessProbe(RequestMapping mapping, List<String> paths) {
+    return List.of(mapping.method()).equals(List.of(RequestMethod.GET)) && paths.equals(List.of(CHANNEL_ACCESS_PROBE));
+  }
+
+  /** {@code mapping}'s paths, each joined to {@code type}'s own mapping as Spring joins them. */
+  private static List<String> paths(Class<?> type, RequestMapping mapping) {
     RequestMapping classMapping = AnnotatedElementUtils.findMergedAnnotation(type, RequestMapping.class);
     List<String> prefixes = classMapping == null || classMapping.path().length == 0
         ? List.of("")
         : List.of(classMapping.path());
     List<String> suffixes = mapping.path().length == 0 ? List.of("") : List.of(mapping.path());
+    List<String> paths = new ArrayList<>();
     for (String prefix : prefixes) {
       for (String suffix : suffixes) {
-        if (join(prefix, suffix).startsWith("/api/channels/{")) {
-          return true;
-        }
+        paths.add(join(prefix, suffix));
       }
     }
-    return false;
+    return paths;
   }
 
   /** {@code prefix} then {@code suffix}, each led by exactly one slash, as Spring combines a class and method path. */

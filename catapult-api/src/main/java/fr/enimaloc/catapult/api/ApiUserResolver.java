@@ -11,9 +11,9 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.UUID;
 
 /**
- * Turns a request's JWT and {@code {username}} path variable into accounts, failing the
- * request the way every API controller does: 401 for an unknown caller, 404 for an unknown
- * channel. Who may reach a channel is {@link fr.enimaloc.catapult.security.Authz}'s call.
+ * Turns a request's JWT and {@code {username}} or {@code {userId}} path variable into accounts,
+ * failing the request the way every API controller does: 401 for an unknown caller, 404 for an
+ * unknown channel or account. Who may reach a channel is {@link fr.enimaloc.catapult.security.Authz}'s call.
  */
 @Component
 @RequiredArgsConstructor
@@ -41,6 +41,12 @@ public class ApiUserResolver {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "A token is required");
         }
         return jwt;
+    }
+
+    /** The account {@code userId} (a channel, or a member's own), or 404. */
+    public UserAccount user(UUID userId) {
+        return userAccountRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
 
     /** The channel named {@code username}. */

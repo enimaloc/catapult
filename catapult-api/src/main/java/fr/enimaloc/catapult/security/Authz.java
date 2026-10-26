@@ -18,6 +18,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.util.UUID;
+
 /**
  * The one definition of the request-level access rules: who is a member, an admin, a loopback caller or a personal
  * API token holder. The filter chains and {@link DebugSubjectFilter} use these, so the rules cannot drift apart.
@@ -28,8 +30,10 @@ import org.springframework.web.context.request.ServletRequestAttributes;
  * compose) are believed; from any other address the header is ignored and the peer's own address is what counts.
  * <p>
  * It also decides who reaches a channel, for {@code @PreAuthorize("@authz.canAccessChannel(#username)")} and
- * {@code @PreAuthorize("@authz.ownsChannel(#username)")}. Those keep the order every channel route answers in: 401 for
- * a caller without a JWT or with an unknown account, then 404 for an unknown channel (both thrown as
+ * {@code @PreAuthorize("@authz.ownsChannel(#username)")} (or {@code #userId}, the channel's account id), and whose own
+ * resources a route under {@code /api/internal/users/{userId}} serves ({@code @authz.isSelf(#userId)}). Those keep
+ * the order every channel route answers in: 401 for a caller without a JWT or with an unknown account, then 404 for an
+ * unknown channel or account (both thrown as
  * {@link org.springframework.web.server.ResponseStatusException}, which SpEL rethrows as is), then {@code false},
  * a 403, for a caller who may not see it.
  */
@@ -59,6 +63,33 @@ public class Authz {
     public boolean ownsChannel(String username) {
         UserAccount viewer = users.viewer(currentJwt());
         return viewer.getId().equals(users.channel(username).getId());
+    }
+
+    /**
+     * The current caller is the owner of the channel whose account is {@code userId}, or one of its Twitch
+     * moderators. 401, then 404, before deciding.
+     */
+    public boolean canAccessChannel(UUID userId) {
+        UserAccount viewer = users.viewer(currentJwt());
+        return canAccess(viewer, users.user(userId));
+    }
+
+    /**
+     * The current caller is the account {@code userId}, a channel's owner. 401, then 404, before deciding; never
+     * asks Twitch.
+     */
+    public boolean ownsChannel(UUID userId) {
+        UserAccount viewer = users.viewer(currentJwt());
+        return viewer.getId().equals(users.user(userId).getId());
+    }
+
+    /**
+     * The current caller is the account {@code userId}: a member's own resources. 401, then 404, before deciding.
+     * It needs the caller's JWT, so a token-less loopback call is a 401 here.
+     */
+    public boolean isSelf(UUID userId) {
+        UserAccount viewer = users.viewer(currentJwt());
+        return viewer.getId().equals(users.user(userId).getId());
     }
 
     /** {@code viewer} is {@code channel}'s owner or one of its Twitch moderators ({@link ChannelAccessService}). */

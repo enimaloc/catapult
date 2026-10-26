@@ -77,4 +77,13 @@ class ApiUserResolverTest {
     void channel_unknownIsNotFound() {
         assertStatus(() -> resolver.channel("nope"), HttpStatus.NOT_FOUND);
     }
+
+    @Test
+    void user_byAccountId_orNotFound() {
+        UserAccount someone = account("someone");
+        when(users.findById(someone.getId())).thenReturn(Optional.of(someone));
+
+        assertThat(resolver.user(someone.getId())).isSameAs(someone);
+        assertStatus(() -> resolver.user(UUID.randomUUID()), HttpStatus.NOT_FOUND);
+    }
 }

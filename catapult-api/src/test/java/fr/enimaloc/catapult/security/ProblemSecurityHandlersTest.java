@@ -107,6 +107,13 @@ class ProblemSecurityHandlersTest {
     }
 
     @Test
+    void memberOnInternalAdminIs403Problem() throws Exception {
+        mvc.perform(remote(get("/api/internal/admin/flags")).header("Authorization", memberJwt))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("forbidden"));
+    }
+
+    @Test
     void channelDenialIs403Problem() throws Exception {
         mvc.perform(remote(get("/api/channels/{u}/settings", owner.getTwitchUsername()))
                         .header("Authorization", memberJwt))

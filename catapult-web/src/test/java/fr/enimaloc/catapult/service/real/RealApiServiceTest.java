@@ -1372,6 +1372,31 @@ class RealApiServiceTest {
     }
 
     @Test
+    void apiKeyActions_reachEachProvidersRoute() {
+        expect(HttpMethod.POST, "/api/admin/dtdd-keys/add")
+                .andExpect(content().json("{\"apiKey\":\"k\"}", true)).andRespond(withNoContent());
+        expect(HttpMethod.POST, "/api/admin/steam-keys/delete")
+                .andExpect(content().json("{\"keyId\":\"k1\"}", true)).andRespond(withNoContent());
+        expectPost("/api/admin/steam-keys/refresh");
+
+        assertThat(service.adminAddApiKey(fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.DTDD, "k")).isEqualTo(204);
+        assertThat(service.adminDeleteApiKey(fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.STEAM, "k1")).isEqualTo(204);
+        assertThat(service.adminRefreshApiKeys(fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.STEAM)).isEqualTo(204);
+    }
+
+    @Test
+    void adminExperimentAction_reachesEachActionsRoute_andNoneForAnUnknownOne() {
+        for (String action : List.of("pause", "end", "assign", "reassign")) {
+            expectPost("/api/admin/experiments/" + NOTIF_ID + "/" + action);
+        }
+
+        for (String action : List.of("pause", "end", "assign", "reassign")) {
+            assertThat(service.adminExperimentAction(NOTIF_ID, action)).as(action).isEqualTo(204);
+        }
+        assertThat(service.adminExperimentAction(NOTIF_ID, "explode")).isEqualTo(404);
+    }
+
+    @Test
     void adminMinecraftAccounts_readCatapultApisAccountDto() {
         respond(HttpMethod.GET, "/api/admin/minecraft-accounts", "[{\"id\":\"00000000-0000-0000-0000-00000000000a\","
                 + "\"label\":\"Bot1\",\"minecraftUsername\":\"CatapultBot1\",\"fillOrder\":2,\"friendLimitReached\":true,"
