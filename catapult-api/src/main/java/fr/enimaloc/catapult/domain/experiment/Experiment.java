@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -47,10 +48,13 @@ public class Experiment {
     @Column(nullable = false)
     private int rolloutPercentage = 100;
 
+    // the experiment list reads every experiment's variants and rules in one query each, not one per experiment
     @OneToMany(mappedBy = "experiment", cascade = CascadeType.ALL, orphanRemoval = true)
+    @BatchSize(size = 100)
     private List<ExperimentVariant> variants = new ArrayList<>();
 
     @OneToMany(mappedBy = "experiment", cascade = CascadeType.ALL, orphanRemoval = true)
+    @BatchSize(size = 100)
     @OrderBy("priority ASC")
     private List<ExperimentAssignmentRule> rules = new ArrayList<>();
 
