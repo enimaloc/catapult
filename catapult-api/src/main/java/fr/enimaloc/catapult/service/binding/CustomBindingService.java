@@ -186,7 +186,7 @@ public class CustomBindingService {
      * {@link #activate(UserAccount, CustomBinding)} on the streamer's binding with that id or name (see
      * {@link #resolve}), or empty when there is none.
      */
-    public Optional<ActivationResult> activate(UserAccount user, String idOrName) {
+    public Optional<ActivationResult> activateByIdOrName(UserAccount user, String idOrName) {
         return resolve(user, idOrName).map(binding -> activate(user, binding));
     }
 

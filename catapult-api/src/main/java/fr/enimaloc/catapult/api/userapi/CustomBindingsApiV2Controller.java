@@ -47,7 +47,7 @@ public class CustomBindingsApiV2Controller {
     @Operation(summary = "Apply a custom binding now (204), live or not; 404 unknown, 409 Twitch link broken or "
             + "Catapult paused, 502 Twitch failed; errors are application/problem+json with a code")
     public ResponseEntity<Void> activate(@AuthenticationPrincipal UUID userId, @PathVariable String idOrName) {
-        return customBindingService.activate(userResolver.tokenOwner(userId), idOrName)
+        return customBindingService.activateByIdOrName(userResolver.tokenOwner(userId), idOrName)
                 .map(CustomBindingViews::activation)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown custom binding"));
     }

@@ -75,7 +75,7 @@ class CustomBindingsApiV2ControllerTest {
         when(accounts.findById(user.getId())).thenReturn(Optional.of(user));
         when(tokens.authenticate(TOKEN)).thenReturn(Optional.of(user));
         when(service.enabled(any())).thenReturn(true);
-        doCallRealMethod().when(service).activate(any(UserAccount.class), anyString());
+        doCallRealMethod().when(service).activateByIdOrName(any(UserAccount.class), anyString());
         art = new CustomBinding();
         art.setId(UUID.randomUUID());
         art.setUser(user);
@@ -153,7 +153,7 @@ class CustomBindingsApiV2ControllerTest {
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.code").value("not_found"));
 
-        verify(service, never()).activate(any(), any(CustomBinding.class));
+        verify(service, never()).activate(any(), any());
     }
 
     @Test
@@ -212,7 +212,7 @@ class CustomBindingsApiV2ControllerTest {
                 .andExpect(jsonPath("$.code").value("feature_disabled"));
         mvc.perform(withToken(post("/api/v2/custom-bindings/art/activate"))).andExpect(status().isForbidden());
         mvc.perform(withToken(post("/api/v2/custom-bindings/deactivate"))).andExpect(status().isForbidden());
-        verify(service, never()).activate(any(), any(CustomBinding.class));
+        verify(service, never()).activate(any(), any());
     }
 
     @Test
