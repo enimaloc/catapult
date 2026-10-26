@@ -275,6 +275,29 @@ class AdminGameMappingServiceTest {
     }
 
     @Test
+    void mappingChange_isAttributedToEachChannel() {
+        UserAccount first = user("first");
+        UserAccount second = user("second");
+        GameBinding firstBinding = binding(first, "730", Status.AUTO);
+        GameBinding secondBinding = binding(second, "730", Status.AUTO);
+        bindingsOfTheGame(firstBinding, secondBinding);
+        liveOn(first, "730");
+        liveOn(second, "730");
+        Map<UUID, UUID> subjects = new HashMap<>();
+        doAnswer(inv -> {
+            subjects.put(inv.<UserAccount>getArgument(0).getId(),
+                    fr.enimaloc.catapult.service.debug.DebugContext.subject().orElse(null));
+            return ChannelUpdateOutcome.APPLIED;
+        }).when(twitchService).updateChannelReporting(any(), any());
+
+        fr.enimaloc.catapult.service.debug.DebugContext.runAs(admin.getId(),
+                () -> service.create(request("730", "32399", true), admin));
+
+        assertThat(subjects).containsExactlyInAnyOrderEntriesOf(Map.of(
+                first.getId(), first.getId(), second.getId(), second.getId()));
+    }
+
+    @Test
     void applyLive_skipsChannelsOnAnotherGame() {
         UserAccount elsewhere = user("elsewhere");
         bindingsOfTheGame(binding(elsewhere, "730", Status.AUTO));

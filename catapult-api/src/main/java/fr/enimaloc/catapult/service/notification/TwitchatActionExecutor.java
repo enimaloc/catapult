@@ -8,6 +8,7 @@ import fr.enimaloc.catapult.service.binding.BindingService;
 import fr.enimaloc.catapult.service.binding.CustomBindingActivations;
 import fr.enimaloc.catapult.service.category.CategoryChain;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.RevertCategory;
+import fr.enimaloc.catapult.service.debug.DebugContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,7 +45,9 @@ public class TwitchatActionExecutor {
 
         switch (token.getActionType()) {
             case REVERT_CATEGORY, REVERT_TO_APP_CATEGORY -> {
-                categoryChain.apply(user, new RevertCategory(payload.get("gameId"), payload.get("gameName"))).orThrow();
+                // The widget route has no subject: the change is recorded in the channel's debug log
+                DebugContext.runAs(user.getId(), () -> categoryChain.apply(user,
+                        new RevertCategory(payload.get("gameId"), payload.get("gameName"))).orThrow());
                 // A category chosen by hand ends the active custom binding, whatever its kind
                 customBindingActivations.clear(user);
             }

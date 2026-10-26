@@ -510,6 +510,28 @@ class CategoryBehaviourTest {
         }
 
         @Test
+        void moderatorEdit_isAttributedToTheChannel() {
+            UUID moderator = UUID.randomUUID();
+            f.playing(f.gameOf(g1));
+            f.live(true);
+
+            DebugContext.runAs(moderator, () -> f.setTwitchGame(g1, "33214", "Fortnite"));
+
+            assertThat(onlyWrite().subject()).contains(f.user.getId());
+            assertThat(DebugContext.subject()).isEmpty();
+        }
+
+        @Test
+        void ownerEdit_staysAttributedToTheOwner() {
+            f.playing(f.gameOf(g1));
+            f.live(true);
+
+            DebugContext.runAs(f.user.getId(), () -> f.setTwitchGame(g1, "33214", "Fortnite"));
+
+            assertThat(onlyWrite().subject()).contains(f.user.getId());
+        }
+
+        @Test
         void editingAnotherBinding_onlySavesIt() {
             GameBinding other = f.binding("g2", GameBinding.Status.AUTO, "32982", "Grand Theft Auto V");
             f.playing(f.gameOf(other));
@@ -916,6 +938,29 @@ class CategoryBehaviourTest {
         }
 
         @Test
+        void twitchatAction_isAttributedToTheChannel() {
+            // The widget route runs without a subject
+            f.twitchat(TwitchatActionType.REVERT_CATEGORY, Map.of("gameId", "509658", "gameName", "Just Chatting"));
+
+            assertThat(onlyWrite().subject()).contains(f.user.getId());
+            assertThat(DebugContext.subject()).isEmpty();
+        }
+
+        @Test
+        void twitchatBindGameCategory_isAttributedToTheChannel() {
+            f.deactivate();
+            f.playing(f.gameOf(g1));
+            f.live(true);
+            int before = f.twitch.writes().size();
+
+            f.twitchat(TwitchatActionType.BIND_GAME_CATEGORY, Map.of(
+                    "bindingId", g1.getId().toString(), "newGameId", "33214", "newGameName", "Fortnite"));
+
+            assertThat(f.twitch.writes()).hasSize(before + 1);
+            assertThat(f.twitch.writes().getLast().subject()).contains(f.user.getId());
+        }
+
+        @Test
         void revert_twitchThrows_keepsTheCustomBinding() {
             f.twitch.throwNext(new IllegalStateException("Twitch refused"));
 
@@ -1094,6 +1139,15 @@ class CategoryBehaviourTest {
 
             assertThat(f.journal()).isEmpty();
             assertThat(f.activationReads() - before).isZero();
+        }
+
+        @Test
+        void savedByAModerator_isAttributedToTheChannel() {
+            f.live(true);
+
+            DebugContext.runAs(UUID.randomUUID(), f::noGameSettingsSaved);
+
+            assertThat(onlyWrite().subject()).contains(f.user.getId());
         }
 
         @Test

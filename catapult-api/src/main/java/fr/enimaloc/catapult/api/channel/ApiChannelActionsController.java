@@ -40,6 +40,7 @@ import fr.enimaloc.catapult.service.binding.RaidRestoreGateService;
 import fr.enimaloc.catapult.service.binding.SchedulerService;
 import fr.enimaloc.catapult.service.category.CategoryChain;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.NoGameSettingsSaved;
+import fr.enimaloc.catapult.service.debug.DebugContext;
 import fr.enimaloc.catapult.service.connections.ProviderConnectionsDto;
 import fr.enimaloc.catapult.service.connections.SteamProfileDiagnostics;
 import fr.enimaloc.catapult.service.connections.SteamProfileDto;
@@ -335,7 +336,9 @@ public class ApiChannelActionsController {
         });
         // Nothing detected right now: the new default category applies immediately, unless a custom binding holds
         // the channel
-        categoryChain.apply(channelUser, new NoGameSettingsSaved()).orThrow();
+        // Recorded in the channel's debug log, whoever saves the settings (a moderator, an admin)
+        DebugContext.runAs(channelUser.getId(),
+                () -> categoryChain.apply(channelUser, new NoGameSettingsSaved()).orThrow());
         publishSettings(channelUser, settings);
     }
 

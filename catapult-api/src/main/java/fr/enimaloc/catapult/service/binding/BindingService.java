@@ -51,7 +51,8 @@ public class BindingService {
         gameBindingRepository.findByIdAndUser(bindingId, user).ifPresent(binding -> {
             change.accept(binding);
             gameBindingRepository.save(binding);
-            categoryChain.apply(user, new BindingEdited(binding)).orThrow();
+            // Recorded in the channel's debug log, whoever edits it (a moderator, an admin, a Twitchat action)
+            DebugContext.runAs(user.getId(), () -> categoryChain.apply(user, new BindingEdited(binding)).orThrow());
         });
     }
 
@@ -317,7 +318,8 @@ public class BindingService {
             GameBinding resolved = updateWithIgdbResolution(user, detectedOf(binding), binding);
             // A new category is pushed like an edit (the played binding only)
             if (!before.equals(CategoryKey.of(resolved))) {
-                categoryChain.apply(user, new BindingEdited(resolved)).orThrow();
+                DebugContext.runAs(user.getId(),
+                        () -> categoryChain.apply(user, new BindingEdited(resolved)).orThrow());
             }
         });
     }

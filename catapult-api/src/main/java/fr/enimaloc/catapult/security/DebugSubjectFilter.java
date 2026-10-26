@@ -22,7 +22,9 @@ import java.util.regex.Pattern;
  * ({@code /api/internal/admin/members/{id}[/…]}), that member, so what an admin does to a member is attributed to the member.
  * "An admin" is {@link Authz#isAdmin}, the {@code /api/internal/admin/**} access rule; anyone else on that route (who gets a
  * 403) stays attributed to themself. Placed after the bearer-token authentication; requests with neither run without
- * a subject. Async dispatches (SSE) are not filtered and so stay unattributed.
+ * a subject. Async dispatches (SSE) are not filtered and so stay unattributed. A channel's Twitch category changed by
+ * someone else (a moderator's or admin's edit, an admin game mapping) is still attributed to the channel's owner, by
+ * the code that changes it.
  */
 public class DebugSubjectFilter extends OncePerRequestFilter {
 
