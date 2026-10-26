@@ -22,7 +22,7 @@ configurations {
     }
 }
 
-val igdbApiVersion = "1.3.2"
+val igdbApiVersion = "4-test"
 val unleashVersion = "9.3.2"
 val growthbookVersion = "0.11.3"
 val icuVersion = "76.1"
