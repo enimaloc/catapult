@@ -111,8 +111,10 @@ public class CategoryChain {
     }
 
     /**
-     * The edited binding as is, when it is the game played now and no custom binding is active (then it only applies
-     * once the custom binding is deactivated). The custom binding is read only for the game played now.
+     * The edited binding, when it is the game played now and no custom binding is active (then it only applies once
+     * the custom binding is deactivated), by the detection's rules: the binding when live, kept pending offline, the
+     * no-game fallback when ignored, the incomplete fallback when INCOMPLETE. The custom binding is read only for the
+     * game played now.
      */
     private CategoryDecision bindingEdited(UserAccount user, GameBinding binding) {
         if (!isActiveBinding(user, binding)) {
@@ -121,7 +123,7 @@ public class CategoryChain {
         if (customBindingActivations.active(user).isPresent()) {
             return CategoryDecision.none(CategoryRule.CUSTOM_BINDING, Reason.CUSTOM_BINDING_ACTIVE);
         }
-        return CategoryDecision.update(CategoryRule.GAME_BINDING, binding);
+        return gameBinding(user, binding, true);
     }
 
     private boolean isActiveBinding(UserAccount user, GameBinding binding) {

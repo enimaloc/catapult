@@ -463,8 +463,9 @@ class CategoryBehaviourTest {
     class BindingEdit {
 
         @Test
-        void editingThePlayedBinding_pushesItEvenOffline() {
+        void editingThePlayedBinding_live_pushesIt() {
             f.playing(f.gameOf(g1));
+            f.live(true);
 
             f.setTwitchGame(g1, "33214", "Fortnite");
 
@@ -473,16 +474,39 @@ class CategoryBehaviourTest {
         }
 
         @Test
-        void editingThePlayedIncompleteBinding_sendsItAsIs() {
+        void editingThePlayedBinding_offline_storesItPending() {
+            f.playing(f.gameOf(g1));
+
+            f.setTwitchGame(g1, "33214", "Fortnite");
+
+            assertThat(f.journal()).isEmpty();
+            assertThat(f.pending()).containsSame(g1);
+            assertThat(g1.getTwitchGameId()).isEqualTo("33214");
+        }
+
+        @Test
+        void editingThePlayedIncompleteBinding_appliesTheIncompleteFallback() {
             g1.setStatus(GameBinding.Status.INCOMPLETE);
             f.playing(f.gameOf(g1));
             f.live(true);
 
             f.toggleIgnored(g1, false);
 
-            assertThat(f.journal()).containsExactly("twitch:update 27471 Minecraft");
-            assertBindingWrite(onlyWrite(), GameBinding.Status.INCOMPLETE, Set.of("ViolentGraphic"), true, false,
-                    true);
+            assertThat(f.journal()).containsExactly("twitch:update 1469308723 incomplete-fallback");
+            assertBindingWrite(onlyWrite(), GameBinding.Status.MANUAL, Set.of("ProfanityVulgarity"), true, false,
+                    false);
+        }
+
+        @Test
+        void editingThePlayedIncompleteBinding_offline_storesTheFallbackPending() {
+            g1.setStatus(GameBinding.Status.INCOMPLETE);
+            f.playing(f.gameOf(g1));
+
+            f.toggleIgnored(g1, false);
+
+            assertThat(f.journal()).isEmpty();
+            assertThat(f.pending()).hasValueSatisfying(
+                    pending -> assertThat(pending.getSourceName()).isEqualTo("incomplete-fallback"));
         }
 
         @Test
@@ -499,16 +523,31 @@ class CategoryBehaviourTest {
         }
 
         @Test
-        void ignoringThePlayedBinding_sendsItAsIs() {
+        void ignoringThePlayedBinding_appliesTheNoGameFallback() {
             f.playing(f.gameOf(g1));
             f.live(true);
 
             f.toggleIgnored(g1, true);
 
             Write write = onlyWrite();
-            assertBindingWrite(write, GameBinding.Status.AUTO, Set.of("ViolentGraphic"), true, true, true);
-            assertThat(write.sourceName()).isEqualTo("Minecraft");
-            assertThat(f.journal()).containsExactly("twitch:update 27471 Minecraft");
+            assertBindingWrite(write, GameBinding.Status.MANUAL, Set.of("Gambling"), true, false, false);
+            assertThat(f.journal()).containsExactly("twitch:update 509658 no-game-fallback");
+        }
+
+        @Test
+        void ignoringThePlayedBinding_offlineOrDuringARaidHold_changesNothing() {
+            GameBinding older = f.binding("g0", GameBinding.Status.AUTO, "21779", "League of Legends");
+            f.pending(older);
+            f.playing(f.gameOf(g1));
+            f.toggleIgnored(g1, true);
+
+            f.live(true);
+            f.hold();
+            f.toggleIgnored(g1, true);
+
+            assertThat(f.journal()).isEmpty();
+            assertThat(f.pending()).containsSame(older);
+            assertThat(f.holding()).isTrue();
         }
 
         @Test
@@ -526,13 +565,61 @@ class CategoryBehaviourTest {
         }
 
         @Test
-        void resettingTws_neverPushes() {
+        void resettingTws_pushesThePlayedBinding() {
+            g1.setStatus(GameBinding.Status.MANUAL);
+            g1.setTwitchGameId("33214");
+            f.mapping(g1, "27471", "Minecraft");
+            f.playing(f.gameOf(g1));
+            f.live(true);
+
+            f.resetTws(g1);
+
+            assertThat(f.journal()).containsExactly("twitch:update 27471 Minecraft");
+            assertThat(onlyWrite().status()).isEqualTo(GameBinding.Status.MAPPED);
+            assertThat(onlyWrite().persisted()).isTrue();
+        }
+
+        @Test
+        void resettingTws_categoryUnchanged_doesNotPush() {
+            f.mapping(g1, "27471", "Minecraft");
             f.playing(f.gameOf(g1));
             f.live(true);
 
             f.resetTws(g1);
 
             assertThat(f.journal()).isEmpty();
+            assertThat(g1.getStatus()).isEqualTo(GameBinding.Status.MAPPED);
+        }
+
+        @Test
+        void resettingTwsOfAnotherBinding_onlySavesIt() {
+            GameBinding other = f.binding("g2", GameBinding.Status.MANUAL, "33214", "Fortnite");
+            f.mapping(other, "32982", "Grand Theft Auto V");
+            f.playing(f.gameOf(g1));
+            f.live(true);
+
+            f.resetTws(other);
+
+            assertThat(f.journal()).isEmpty();
+            assertThat(other.getTwitchGameId()).isEqualTo("32982");
+        }
+
+        @Test
+        void refreshingIncompleteBindings_pushesThePlayedOne_asItsChannel() {
+            g1.setStatus(GameBinding.Status.INCOMPLETE);
+            g1.setTwitchGameId(null);
+            f.mapping(g1, "27471", "Minecraft");
+            GameBinding other = f.binding("g2", GameBinding.Status.INCOMPLETE, null, "Grand Theft Auto V");
+            f.mapping(other, "32982", "Grand Theft Auto V");
+            f.playing(f.gameOf(g1));
+            f.live(true);
+
+            f.refreshIncompleteBindings();
+
+            assertThat(f.journal()).containsExactly("twitch:update 27471 Minecraft");
+            assertThat(onlyWrite().status()).isEqualTo(GameBinding.Status.MAPPED);
+            assertThat(onlyWrite().subject()).contains(f.user.getId());
+            assertThat(other.getStatus()).isEqualTo(GameBinding.Status.MAPPED);
         }
 
         @Test

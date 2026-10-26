@@ -31,8 +31,9 @@ public sealed interface CategoryTrigger {
     record StreamEnded() implements CategoryTrigger {}
 
     /**
-     * A game binding was edited (and saved): it is sent as is when it is the game played now and no custom binding is
-     * active. No live check and no fallback: an ignored or INCOMPLETE binding is skipped by Twitch itself.
+     * A game binding was edited (and saved), or re-resolved to another category: when it is the game played now and
+     * no custom binding is active, the detection's rules apply (the binding when live, kept pending offline, the
+     * ignored / incomplete fallback).
      */
     record BindingEdited(GameBinding binding) implements CategoryTrigger {}
 

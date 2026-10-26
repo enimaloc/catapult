@@ -13,6 +13,7 @@ import fr.enimaloc.catapult.domain.account.UserSettings;
 import fr.enimaloc.catapult.domain.binding.CustomBinding;
 import fr.enimaloc.catapult.domain.binding.CustomBindingActivation;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
+import fr.enimaloc.catapult.domain.binding.GameMapping;
 import fr.enimaloc.catapult.domain.twitchat.TwitchatActionToken;
 import fr.enimaloc.catapult.event.ChannelRaidedOutEvent;
 import fr.enimaloc.catapult.event.GameDetectedEvent;
@@ -92,6 +93,8 @@ public class ChannelFixture {
 
     private final Map<UUID, GameBinding> bindings = new HashMap<>();
     private final Map<UUID, CustomBinding> customBindings = new HashMap<>();
+    /** The admin game mappings, by STEAM source id. */
+    private final Map<String, GameMapping> mappings = new HashMap<>();
     private CustomBindingActivation activation;
     private final AtomicInteger activationReads = new AtomicInteger();
     private final AtomicInteger gateChecks = new AtomicInteger();
@@ -145,6 +148,9 @@ public class ChannelFixture {
                         .filter(b -> b.getSourceId() != null && b.getSourceId().equals(inv.getArgument(1))
                                 && b.getSourceType() == inv.getArgument(2))
                         .findFirst());
+        when(bindingRepository.findAllByStatusAndIgnoredFalse(any()))
+                .thenAnswer(inv -> bindings.values().stream()
+                        .filter(b -> b.getStatus() == inv.getArgument(0) && !b.isIgnored()).toList());
         when(bindingRepository.save(any())).thenAnswer(inv -> {
             GameBinding b = inv.getArgument(0);
             if (b.getId() == null) b.setId(UUID.randomUUID());
@@ -201,6 +207,10 @@ public class ChannelFixture {
         when(actionTokenService.consume(any())).thenAnswer(inv -> Optional.ofNullable(actionToken));
         when(actionTokenService.readPayload(any())).thenAnswer(inv -> actionPayload);
 
+        GameMappingRepository mappingRepository = mock(GameMappingRepository.class);
+        when(mappingRepository.findBySourceTypeAndSourceId(any(), any()))
+                .thenAnswer(inv -> Optional.ofNullable(mappings.get(inv.<String>getArgument(1))));
+
         IgdbService igdbService = mock(IgdbService.class);
         GameBindingLookup lookup = new GameBindingLookup(bindingRepository);
         CustomBindingActivations activations =
@@ -211,7 +221,7 @@ public class ChannelFixture {
                 raidRestoreHold, gameStateService, accountRepository,
                 new CategoryApplier(twitch, streamStateService), new RaidRestoreGateService(experimentService), lookup);
         bindingService = new BindingService(bindingRepository, igdbService, mock(IgdbGameDetailsService.class),
-                twitch, mock(TwResolverService.class), mock(GameMappingRepository.class), lookup, categoryChain);
+                twitch, mock(TwResolverService.class), mappingRepository, lookup, categoryChain);
         raidRestoreGameService = new RaidRestoreGameService(categoryChain, new CategoryApplier(twitch, streamStateService),
                 raidRestoreHold);
         listener = new GameEventListener(bindingService, streamStateService, publisher,
@@ -255,6 +265,19 @@ public class ChannelFixture {
         b.setStatus(status);
         bindings.put(b.getId(), b);
         return b;
+    }
+
+    /**
+     * An admin game mapping of {@code binding}'s game to this category (its CCLs not replaced): what a re-resolution
+     * of the binding finds (IGDB knows no game here).
+     */
+    public void mapping(GameBinding binding, String twitchId, String twitchName) {
+        GameMapping m = new GameMapping();
+        m.setSourceType(binding.getSourceType());
+        m.setSourceId(binding.getSourceId());
+        m.setTwitchGameId(twitchId);
+        m.setTwitchGameName(twitchName);
+        mappings.put(binding.getSourceId(), m);
     }
 
     /** The game a detection of {@code binding}'s game reports. */
@@ -370,6 +393,11 @@ public class ChannelFixture {
 
     public void resetTws(GameBinding binding) {
         bindingService.resetTws(user, binding.getId());
+    }
+
+    /** The scheduled re-resolution of every INCOMPLETE binding. */
+    public void refreshIncompleteBindings() {
+        bindingService.refreshIncompleteBindings();
     }
 
     /** An admin game mapping changed {@code binding}, the channel playing it. */
