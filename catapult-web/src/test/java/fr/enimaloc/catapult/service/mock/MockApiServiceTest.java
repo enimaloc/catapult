@@ -86,7 +86,7 @@ class MockApiServiceTest {
     void deleteAccount_onlyWhenTheNameMatches_ignoringCase() {
         assertThat(service.accountInfo().status()).isEqualTo("ACTIVE");
 
-        assertThat(service.deleteAccount(username, "WRONG")).isEqualTo(204);
+        assertThat(service.deleteAccount(username, "WRONG")).isEqualTo(400);
         assertThat(service.accountInfo().status()).isEqualTo("ACTIVE");
 
         assertThat(service.deleteAccount(username, username.toUpperCase())).isEqualTo(204);

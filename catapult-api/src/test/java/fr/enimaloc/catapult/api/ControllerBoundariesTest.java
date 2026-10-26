@@ -298,4 +298,22 @@ class ControllerBoundariesTest extends FullContextTestBase {
         assertThat(row.path("gitlabIssueIid").asInt()).isEqualTo(42);
         assertThat(row.path("subscribed").asBoolean()).isTrue();
     }
+
+    @Test
+    void deletionWithAWrongConfirmation_isRefusedAndDeletesNothing() throws Exception {
+        UserAccount member = member("careful-streamer");
+        String path = "/api/internal/users/" + member.getId() + "/deletion";
+
+        HttpResponse<String> mismatch = send("POST", path, member, "{\"confirmUsername\":\"careless-streamer\"}");
+
+        assertThat(mismatch.statusCode()).as(mismatch.body()).isEqualTo(400);
+        assertThat(JSON.readTree(mismatch.body()).path("code").asString()).isEqualTo("bad_request");
+        assertThat(users.findById(member.getId()).orElseThrow().getStatus()).isEqualTo(UserAccount.Status.ACTIVE);
+
+        HttpResponse<String> match = send("POST", path, member, "{\"confirmUsername\":\"Careful-Streamer\"}");
+
+        assertThat(match.statusCode()).as(match.body()).isEqualTo(204);
+        assertThat(users.findById(member.getId()).orElseThrow().getStatus())
+                .isEqualTo(UserAccount.Status.PENDING_DELETION);
+    }
 }

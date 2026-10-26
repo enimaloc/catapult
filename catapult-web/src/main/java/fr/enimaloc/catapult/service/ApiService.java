@@ -379,8 +379,8 @@ public interface ApiService {
     /** Days between a deletion request and the account's removal; 7 when catapult-api gives none. */
     int accountDeletionDelayDays();
     /**
-     * Asks for the channel's deletion: catapult-api's status (204, also when {@code confirmUsername} is not
-     * the channel's, which it then ignores; 403 not the caller's channel), 502 when unreachable.
+     * Asks for the channel's deletion: catapult-api's status (204; 400 when {@code confirmUsername} is not
+     * the channel's, deleting nothing; 403 not the caller's channel), 502 when unreachable.
      */
     int deleteAccount(String username, String confirmUsername);
     /** Cancels a pending deletion: catapult-api's status (204), 502 when unreachable. */
