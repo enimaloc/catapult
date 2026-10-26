@@ -90,9 +90,10 @@ const pick = (list) => list[Math.floor(Math.random() * list.length)];
 export function setup() {
     const res = http.get(`${API}/api/internal/perf/accounts`, { tags: { group: "setup", kind: "request" } });
     if (res.status !== 200) throw new Error(`GET /api/internal/perf/accounts: ${res.status}`);
-    const accounts = res.json();
+    // The service lists every perf-* account, perf-admin included: only the streamers are driven or watched
+    const accounts = res.json().filter((account) => account.username.startsWith("perf-streamer-"));
     if (accounts.length < STREAMERS) {
-        console.warn(`${accounts.length} perf accounts for ${STREAMERS} streamers: some are shared`);
+        throw new Error(`${accounts.length} perf-streamer-* accounts for ${STREAMERS} streamers`);
     }
     return { accounts };
 }
