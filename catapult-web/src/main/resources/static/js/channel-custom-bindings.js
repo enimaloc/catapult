@@ -185,6 +185,23 @@ window.CatapultCustomBindings = (function () {
         });
     }
 
+    // The promise of the last /me/api-token answer, kept for the page: /me is the logged-in member, not the
+    // channel, so SPA navigations reuse it. Null until fetched, and again after a failure so a later render retries.
+    let tokenStatus = null;
+
+    function fetchTokenStatus() {
+        if (!tokenStatus) {
+            const request = (async () => {
+                const response = await fetch("/me/api-token", { headers: { Accept: "application/json" } });
+                if (!response.ok) throw new Error(String(response.status));
+                return response.json();
+            })();
+            tokenStatus = request;
+            request.catch(() => { if (tokenStatus === request) tokenStatus = null; });
+        }
+        return tokenStatus;
+    }
+
     function attachToken(card) {
         const status = byId("api-token-status");
         const generate = byId("api-token-generate-btn");
@@ -225,7 +242,9 @@ window.CatapultCustomBindings = (function () {
             if (!response.ok) return CatapultChannel.showError(CatapultChannel.actionFailed(response.status));
             const created = await response.json();
             showToken(created.token);
-            render({ exists: true, createdAt: created.createdAt });
+            const generated = { exists: true, createdAt: created.createdAt };
+            tokenStatus = Promise.resolve(generated);
+            render(generated);
         }
 
         async function revokeToken() {
@@ -233,7 +252,9 @@ window.CatapultCustomBindings = (function () {
             if (!response) return;
             if (!response.ok) return CatapultChannel.showError(CatapultChannel.actionFailed(response.status));
             forget();
-            render({ exists: false });
+            const revoked = { exists: false };
+            tokenStatus = Promise.resolve(revoked);
+            render(revoked);
         }
 
         function confirm(action) {
@@ -264,9 +285,7 @@ window.CatapultCustomBindings = (function () {
         // The token itself is never part of the page: only whether one exists.
         (async () => {
             try {
-                const response = await fetch("/me/api-token", { headers: { Accept: "application/json" } });
-                if (!response.ok) throw new Error(String(response.status));
-                render(await response.json());
+                render(await fetchTokenStatus());
             } catch {
                 status.textContent = card.dataset.labelUnavailable ?? "";
             }
