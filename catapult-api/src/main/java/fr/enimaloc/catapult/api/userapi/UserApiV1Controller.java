@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.userapi;
 
+import fr.enimaloc.catapult.service.link.ExternalLinks;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.igdb.IgdbGameDetails;
@@ -121,7 +122,7 @@ public class UserApiV1Controller {
         return new GameInfoResponse(
                 detected.getSourceName(),
                 details.map(IgdbGameDetails::getSlug)
-                        .map(slug -> "https://www.igdb.com/games/" + slug)
+                        .map(ExternalLinks::igdbGame)
                         .orElse(null),
                 detected.getSourceType(),
                 storeName(detected.getSourceType(), locale),
@@ -181,7 +182,7 @@ public class UserApiV1Controller {
     // from the detected app id rather than trusting the cached website map.
     private static String storeUrl(DetectedGame detected, IgdbGameDetails details) {
         if (detected.getSourceType() == GameBinding.SourceType.STEAM && detected.getSourceId() != null) {
-            return "https://store.steampowered.com/app/" + detected.getSourceId();
+            return ExternalLinks.steamApp(detected.getSourceId());
         }
         return details == null ? null : details.getWebsites().get(storeWebsiteKey(detected.getSourceType()));
     }

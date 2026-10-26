@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.xbox;
 
+import fr.enimaloc.catapult.service.link.ExternalLinks;
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
@@ -62,7 +63,7 @@ public class XboxStoreServiceImpl implements XboxStoreService {
                         videos(props.cmsVideos()),
                         franchises(props.franchises()),
                         gamePassAffirmations(props.eligibilityProperties()),
-                        "https://www.microsoft.com/store/apps/" + productId));
+                        ExternalLinks.microsoftStoreProduct(productId)));
             } catch (Exception e) {
                 log.warn("Xbox store fetchProduct failed for productId={}: {}", productId, e.getMessage());
                 return Optional.empty();

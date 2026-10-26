@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.userapi;
 
+import fr.enimaloc.catapult.service.link.ExternalLinks;
 import com.fasterxml.jackson.annotation.JsonGetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
@@ -93,9 +94,9 @@ public record IgdbDetailResponse(@JsonIgnore String baseUrl, String slug, String
             String resolvedKey = fromCategoryNull ? resolveCategoryNullKey((String) value) : key;
             String id = (String) value;
             Object resolvedValue = fromCategoryNull ? value : switch (key) {
-                case "steam" -> new WebsiteLink("https://store.steampowered.com/app/" + id, baseUrl,
+                case "steam" -> new WebsiteLink(ExternalLinks.steamApp(id), baseUrl,
                         DETAIL_ROUTE_PATH_PREFIX.get("steam") + id);
-                case "microsoft" -> new WebsiteLink("https://www.microsoft.com/store/apps/" + id, baseUrl,
+                case "microsoft" -> new WebsiteLink(ExternalLinks.microsoftStoreProduct(id), baseUrl,
                         DETAIL_ROUTE_PATH_PREFIX.get("microsoft") + id);
                 case "twitch" -> value; // TODO: this is a Twitch game id, not a slug — need the slug to build a directory link
                 default -> value;

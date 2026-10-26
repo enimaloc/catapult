@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.userapi;
 
+import fr.enimaloc.catapult.service.link.ExternalLinks;
 import com.fasterxml.jackson.annotation.JsonGetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonView;
@@ -67,13 +68,13 @@ public record GameInfoResponse(@JsonView(Summary.class) boolean inGame, IgdbObje
     /** IGDB's page of the game, null when IGDB doesn't know it. */
     @JsonView(Summary.class)
     public String igdbUrl() {
-        return igdb == null || igdb.slug() == null ? null : igdb.url();
+        return igdb == null ? null : igdb.url();
     }
 
     /** The store page of the game played: Steam's, else the Xbox Store's; null for any other. */
     @JsonView(Summary.class)
     public String storeUrl() {
-        if (steam != null && steam.appId() != null) return "https://store.steampowered.com/app/" + steam.appId();
+        if (steam != null && steam.appId() != null) return ExternalLinks.steamApp(steam.appId());
         return xbox == null ? null : xbox.storeUrl();
     }
 
@@ -88,7 +89,7 @@ public record GameInfoResponse(@JsonView(Summary.class) boolean inGame, IgdbObje
             implements HasDescription, HasMore {
         @JsonGetter("url")
         public String url() {
-            return "https://www.igdb.com/game/" + slug;
+            return ExternalLinks.igdbGame(slug);
         }
 
         @Override

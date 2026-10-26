@@ -5,5 +5,5 @@
     "Content-Type" : [ "application/json" ],
     "Vary" : [ "Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers" ]
   },
-  "body" : "{\"inGame\":true,\"description\":\"A game kept for the contract tests\",\"ia\":null,\"igdbUrl\":\"https://www.igdb.com/game/frozen-game\",\"name\":null,\"releaseDate\":null,\"storeUrl\":null,\"tws\":\"flashing-lights\"}"
+  "body" : "{\"inGame\":true,\"description\":\"A game kept for the contract tests\",\"ia\":null,\"igdbUrl\":\"https://www.igdb.com/games/frozen-game\",\"name\":null,\"releaseDate\":null,\"storeUrl\":null,\"tws\":\"flashing-lights\"}"
 }
