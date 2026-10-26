@@ -59,7 +59,11 @@ export const options = {
     setupTimeout: "60s",
     summaryTrendStats: ["avg", "min", "med", "max", "p(90)", "p(95)", "p(99)", "count"],
     scenarios: {
-        streamers: { executor: "constant-vus", exec: "streamer", vus: STREAMERS, duration: DURATION },
+        // One iteration per VU, for the whole run: exec.scenario.iterationInTest is then 0..STREAMERS-1, one
+        // value per VU, which maps each streamer VU to its own account (see streamer()).
+        streamers: {
+            executor: "per-vu-iterations", exec: "streamer", vus: STREAMERS, iterations: 1, maxDuration: DURATION,
+        },
         viewers: { executor: "constant-vus", exec: "viewer", vus: VIEWERS, duration: DURATION },
     },
     thresholds: {
@@ -132,31 +136,31 @@ async function liveStream(path, end) {
     }
 }
 
-/** This VU's streamer (module state is per VU). */
-let streamerAccount;
-
-/** One streamer for the whole scenario (one iteration per VU). */
-export async function streamer(data) {
-    const end = deadline();
-    if (await over(end)) return;
-    // Chosen once per VU and kept: the first iterations of the scenario's VUs are its first STREAMERS ones,
-    // so no two VUs share a streamer, even when one signs in again after a failed login.
-    if (streamerAccount === undefined) {
-        streamerAccount = data.accounts[exec.scenario.iterationInTest % data.accounts.length];
-    }
-    const account = streamerAccount;
-    const user = encodeURIComponent(account.username);
-
+/** Signs `user` in (the session cookie lands in the VU's jar); true when it worked. */
+async function signIn(user) {
     const login = await http.asyncRequest("GET", `${WEB}/perf/login?username=${user}`, null, {
         redirects: 0, tags: { group: "login", name: "login", kind: "request" },
         responseCallback: http.expectedStatuses(302),
     });
-    const signedIn = check(login, {
+    return check(login, {
         "login: 302 with a session cookie": (r) => r.status === 302 && !!r.cookies.JSESSIONID?.length,
     });
-    if (!signedIn) {
-        await wait(Math.min(5_000, end - Date.now()));
-        return;
+}
+
+/**
+ * One streamer for the whole run. The scenario runs exactly one iteration per VU (per-vu-iterations), so
+ * exec.scenario.iterationInTest, unique per iteration, is unique per VU too and runs 0..STREAMERS-1: the
+ * account it picks is this VU's alone (exec.vu.idInTest would not do: the viewers' VUs share its numbering,
+ * in no set order). A failed login is retried within the iteration, never by a new one.
+ */
+export async function streamer(data) {
+    const end = deadline();
+    const account = data.accounts[exec.scenario.iterationInTest % data.accounts.length];
+    const user = encodeURIComponent(account.username);
+
+    while (!(await signIn(user))) {
+        if (Date.now() + 5_000 >= end) return;
+        await wait(5_000);
     }
 
     const streams = [liveStream("/events/nav", end), liveStream(`/events/channel/${user}`, end)];
@@ -184,7 +188,9 @@ export async function streamer(data) {
             const res = await http.asyncRequest("POST",
                 `${API}/api/internal/perf/users/${user}/game?name=${encodeURIComponent(pick(GAMES))}`, null,
                 { tags: { group: "game", name: "game", kind: "request" } });
-            check(res, { "game: 204": (r) => r.status === 204 });
+            if (!check(res, { "game: 204": (r) => r.status === 204 })) {
+                console.warn(`game change of ${account.username}: ${res.status} ${res.error || res.body || ""}`);
+            }
             nextGame = Date.now() + jittered(GAME_EVERY_MS, GAME_JITTER_MS);
         }
     }

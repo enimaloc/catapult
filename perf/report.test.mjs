@@ -6,7 +6,7 @@ import { dirname, join } from "node:path";
 import { after, describe, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import {
-    compare, containerStats, findPrevious, jvmStats, parseMemory, parsePercent, readPreviousReport, renderMarkdown,
+    compare, containerStats, findPrevious, jvmOverhead, jvmStats, parseMemory, parsePercent, readPreviousReport, renderMarkdown,
     requestGroups, sizing, thresholds, writeReport,
 } from "./report.mjs";
 
@@ -92,6 +92,17 @@ test("jvmStats gives each app's peak used heap and non-heap, and the apps' peak 
     assert.deepEqual(jvmStats("time,app,heapUsed,nonHeapUsed,heapMax\n"), { apps: [], usedPeakMiB: null });
 });
 
+test("jvmOverhead is the median of RSS minus used memory, on samples paired by time", () => {
+    const stats = ["time,container,cpu,memory", "100,catapult-verify-perf-api-1,1%,500MiB / 1GiB",
+        "105,catapult-verify-perf-api-1,1%,600MiB / 1GiB", "110,catapult-verify-perf-api-1,1%,700MiB / 1GiB",
+        "100,catapult-verify-perf-db-1,1%,50MiB / 1GiB"].join("\n");
+    const mib = 1024 * 1024;
+    const jvm = ["time,app,heapUsed,nonHeapUsed,heapMax", `101,api,${300 * mib},${100 * mib},0`,
+        `106,api,${350 * mib},${100 * mib},0`, `111,api,${400 * mib},${100 * mib},0`,
+        `200,api,${100 * mib},0,0`].join("\n"); // the last one has no docker stats sample near it
+    assert.deepEqual(jvmOverhead(stats, jvm), { api: 150 }); // 100, 150, 200
+});
+
 describe("sizing", () => {
     test("keeps the sustained CPU under 70 % and the peak RSS under 75 % without JVM figures", () => {
         assert.deepEqual(sizing({ cpuSustained: 70, memPeakMiB: 2304 }),
@@ -101,11 +112,32 @@ describe("sizing", () => {
         assert.equal(sizing(null), null);
     });
 
-    test("counts the JVMs' used memory instead of their RSS, and the other containers' RSS", () => {
-        const jvm = { apps: [{ name: "api" }], usedPeakMiB: 1000 };
-        const containers = [{ name: "api", memPeakMiB: 3000 }, { name: "db", memPeakMiB: 536 }];
-        assert.deepEqual(sizing({ cpuSustained: 70, memPeakMiB: 5000 }, jvm, containers),
-            { vcpus: 1, ramGiB: 2, memoryMiB: 1536, memoryBasis: "jvm" });
+    const containers = [{ name: "api", memPeakMiB: 600 }, { name: "db", memPeakMiB: 100 }];
+
+    test("a JVM counts its peak used memory plus its native overhead when that is over its RSS", () => {
+        const jvm = { apps: [{ name: "api", usedPeakMiB: 700 }], usedPeakMiB: 700 };
+        const result = sizing({ cpuSustained: 70, memPeakMiB: 5000 }, jvm, containers, { api: 180 });
+        assert.equal(result.memoryMiB, 980); // api max(600, 700 + 180), db 100
+        assert.equal(result.ramGiB, 2);
+        assert.equal(result.memoryBasis, "jvm");
+        assert.deepEqual(result.terms[0], { name: "api", rssPeakMiB: 600, usedPeakMiB: 700, overheadMiB: 180,
+            overheadMeasured: true, memoryMiB: 880 });
+        assert.deepEqual(result.terms[1], { name: "db", rssPeakMiB: 100, memoryMiB: 100 });
+    });
+
+    test("a JVM that uses little counts its RSS", () => {
+        const jvm = { apps: [{ name: "api", usedPeakMiB: 150 }], usedPeakMiB: 150 };
+        const result = sizing({ cpuSustained: 70, memPeakMiB: 5000 }, jvm, containers, { api: 180 });
+        assert.equal(result.terms[0].memoryMiB, 600); // max(600, 150 + 180)
+        assert.equal(result.memoryMiB, 700);
+        assert.equal(result.ramGiB, 1);
+    });
+
+    test("an overhead not measured is taken as 200 MiB", () => {
+        const jvm = { apps: [{ name: "api", usedPeakMiB: 500 }], usedPeakMiB: 500 };
+        const [api] = sizing({ cpuSustained: 70, memPeakMiB: 5000 }, jvm, containers).terms;
+        assert.equal(api.memoryMiB, 700);
+        assert.equal(api.overheadMeasured, false);
     });
 });
 
@@ -204,14 +236,16 @@ describe("writeReport", () => {
         assert.match(markdown, /\| `ws_unexpected_close` \| `count==0` \| \*\*FAIL\*\* \|/);
         assert.match(markdown, /\| widget \| 800 \| 12\.3 \| 30\.1 \| 2 \(0\.25 %\) \|/);
         assert.match(markdown, /\| channel \| lcp \| 3000 \| 3000 \| 2500 \| \*\*FAIL\*\* \(slow\) \|/);
-        assert.match(markdown, /\*\*1 vCPU and 1 GiB of RAM\*\*/);
-        assert.match(markdown, /510 MiB of memory at most \(the JVMs' peak used heap and non-heap/);
+        // api: overhead median of 512 - 300 and 1536 - 400, max(1536, 400 + 212); web: max(1024, 150 + 658)
+        assert.match(markdown, /\*\*1 vCPU and 4 GiB of RAM\*\*/);
+        assert.match(markdown, /2560 MiB of memory \(in MiB: api 1536 = max\(peak RSS 1536, peak used 400 \+ native 212\); /);
+        assert.match(markdown, /web 1024 = max\(peak RSS 1024, peak used 150 \+ native 658\)/);
         assert.match(markdown, /\| api \| 2 \| 300 MiB \| 100 MiB \| 400 MiB \| 1024 MiB \|/);
         assert.match(markdown, /`ws_unexpected_close` counts the live streams \(SSE/);
         assert.match(markdown, /## Outbound traffic\n\n1 line\(s\)[^\n]*\n\n```\napi-1 {2}\| java\.net\.UnknownHostException/);
         assert.match(markdown, /Run 20260101-000000 \(10 streamers, 100 viewers, 2m\)/);
         assert.match(markdown, /\| containers \| api \| avg CPU \(%\) \| 20 \| 30 \| \+10 \| \+50 % \|/);
-        assert.deepEqual(json.sizing, { vcpus: 1, ramGiB: 1, memoryMiB: 510, memoryBasis: "jvm" });
+        assert.equal(json.sizing.memoryBasis, "jvm");
         assert.equal(json.requests.unexpectedStreamCloses, 2);
     });
 
