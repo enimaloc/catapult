@@ -49,7 +49,7 @@ class ApiAdminTwControllerTest {
     @Test
     void rebuildForcePinned_delegatesToBackfillService() throws Exception {
         MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
-        mvc.perform(post("/api/admin/tw/rebuild/force-pinned").with(csrf()))
+        mvc.perform(post("/api/internal/admin/tws/rebuild/force-pinned").with(csrf()))
                 .andExpect(status().isAccepted());
         verify(twBackfillService).forceRebuildAllIncludingPinned();
     }
@@ -61,7 +61,7 @@ class ApiAdminTwControllerTest {
         d.setId("x");
         d.setLabel("X");
         when(adminTwService.list()).thenReturn(List.of(d));
-        mvc.perform(get("/api/admin/tw"))
+        mvc.perform(get("/api/internal/admin/tws"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value("x"));
     }
@@ -73,7 +73,7 @@ class ApiAdminTwControllerTest {
         d.setId("ok");
         d.setLabel("OK");
         when(adminTwService.create(any(), any(), any(), any(Integer.class))).thenReturn(d);
-        mvc.perform(post("/api/admin/tw").with(csrf())
+        mvc.perform(post("/api/internal/admin/tws").with(csrf())
                         .contentType("application/json")
                         .content("{\"id\":\"ok\",\"label\":\"OK\",\"sortOrder\":1}"))
                 .andExpect(status().isCreated())
@@ -84,7 +84,7 @@ class ApiAdminTwControllerTest {
     void get_returnsNotFoundWhenMissing() throws Exception {
         MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
         when(adminTwService.get("missing")).thenReturn(Optional.empty());
-        mvc.perform(get("/api/admin/tw/missing"))
+        mvc.perform(get("/api/internal/admin/tws/missing"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.detail").value("Unknown TW missing"));
     }
@@ -93,7 +93,7 @@ class ApiAdminTwControllerTest {
     void listSteamKeywords_returnsSavedKeywords() throws Exception {
         MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
         when(adminTwService.listSteamKeywords("gore")).thenReturn(List.of("blood", "gore"));
-        mvc.perform(get("/api/admin/tw/gore/steam-keywords"))
+        mvc.perform(get("/api/internal/admin/tws/gore/steam-keywords"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0]").value("blood"));
     }
@@ -101,7 +101,7 @@ class ApiAdminTwControllerTest {
     @Test
     void addSteamKeyword_delegatesToService() throws Exception {
         MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
-        mvc.perform(post("/api/admin/tw/gore/steam-keywords").with(csrf())
+        mvc.perform(post("/api/internal/admin/tws/gore/steam-keywords").with(csrf())
                         .contentType("application/json")
                         .content("{\"keyword\":\"blood\"}"))
                 .andExpect(status().isNoContent());
@@ -111,7 +111,7 @@ class ApiAdminTwControllerTest {
     @Test
     void removeSteamKeyword_delegatesToService() throws Exception {
         MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
-        mvc.perform(delete("/api/admin/tw/gore/steam-keywords/blood").with(csrf()))
+        mvc.perform(delete("/api/internal/admin/tws/gore/steam-keywords/blood").with(csrf()))
                 .andExpect(status().isNoContent());
         verify(adminTwService).removeSteamKeyword("gore", "blood");
     }
@@ -121,7 +121,7 @@ class ApiAdminTwControllerTest {
         MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
         when(adminTwService.testSteamSignals("gore", "730", "gore")).thenReturn(
                 new AdminTwService.SteamSignalTestResult("blood everywhere", List.of("blood"), true, Set.of(2)));
-        mvc.perform(post("/api/admin/tw/gore/steam-keywords/test").with(csrf())
+        mvc.perform(post("/api/internal/admin/tws/gore/steam-keywords/test").with(csrf())
                         .contentType("application/json")
                         .content("{\"appId\":\"730\",\"draftKeyword\":\"gore\"}"))
                 .andExpect(status().isOk())

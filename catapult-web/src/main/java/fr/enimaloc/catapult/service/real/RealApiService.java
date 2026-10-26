@@ -568,65 +568,65 @@ public class RealApiService implements ApiService {
 
     @Override
     public AdminCclPage adminCcl() {
-        return client.get("/api/admin/ccl", AdminCclPage.class);
+        return client.get("/api/internal/admin/ccls", AdminCclPage.class);
     }
 
     @Override
     public int adminRefreshCcl() {
-        return client.call(HttpMethod.POST, "/api/admin/ccl/refresh", null, Void.class).status();
+        return client.call(HttpMethod.POST, "/api/internal/admin/ccls/refresh", null, Void.class).status();
     }
 
     @Override
     public int adminSaveCclMappings(String cclId, Set<Long> igdbDescriptorIds) {
-        return client.call(HttpMethod.POST, "/api/admin/ccl/{id}/mappings",
+        return client.call(HttpMethod.PUT, "/api/internal/admin/ccls/{id}/mappings",
                 new SaveMappingsRequest(igdbDescriptorIds), Void.class, cclId).status();
     }
 
     @Override
     public List<CacheSummaryDto> adminCaches() {
-        CacheSummaryDto[] caches = client.get("/api/admin/caches", CacheSummaryDto[].class);
+        CacheSummaryDto[] caches = client.get("/api/internal/admin/caches", CacheSummaryDto[].class);
         return caches == null ? null : List.of(caches);
     }
 
     @Override
     public AdminPage<CacheEntryDto> adminCacheEntries(String name, String q, int page) {
-        return client.get("/api/admin/caches/{name}?q={q}&page={page}", CACHE_ENTRIES, name, q == null ? "" : q, page);
+        return client.get("/api/internal/admin/caches/{name}?q={q}&page={page}", CACHE_ENTRIES, name, q == null ? "" : q, page);
     }
 
     @Override
     public CacheEntryDetailDto adminCacheEntry(String name, String key) {
-        return client.get("/api/admin/caches/{name}/entry?key={key}", CacheEntryDetailDto.class, name, key);
+        return client.get("/api/internal/admin/caches/{name}/entry?key={key}", CacheEntryDetailDto.class, name, key);
     }
 
     @Override
     public int adminDeleteCacheEntry(String name, String key) {
-        return client.call(HttpMethod.DELETE, "/api/admin/caches/{name}?key={key}", null, Void.class, name, key).status();
+        return client.call(HttpMethod.DELETE, "/api/internal/admin/caches/{name}?key={key}", null, Void.class, name, key).status();
     }
 
     @Override
     public List<RepoSummaryDto> adminDataRepos() {
-        RepoSummaryDto[] repos = client.get("/api/admin/data", RepoSummaryDto[].class);
+        RepoSummaryDto[] repos = client.get("/api/internal/admin/data", RepoSummaryDto[].class);
         return repos == null ? null : List.of(repos);
     }
 
     @Override
     public AdminPage<Map<String, Object>> adminDataRows(String repo, String q, int page) {
-        return client.get("/api/admin/data/{repo}?q={q}&page={page}", DATA_ROWS, repo, q == null ? "" : q, page);
+        return client.get("/api/internal/admin/data/{repo}?q={q}&page={page}", DATA_ROWS, repo, q == null ? "" : q, page);
     }
 
     @Override
     public Map<String, Object> adminDataRow(String repo, String id) {
-        return client.get("/api/admin/data/{repo}/{id}", DATA_ROW, repo, id);
+        return client.get("/api/internal/admin/data/{repo}/{id}", DATA_ROW, repo, id);
     }
 
     @Override
     public int adminCreateDataRow(String repo, Map<String, String> fields) {
-        return client.call(HttpMethod.POST, "/api/admin/data/{repo}", fields, Void.class, repo).status();
+        return client.call(HttpMethod.POST, "/api/internal/admin/data/{repo}", fields, Void.class, repo).status();
     }
 
     @Override
     public int adminUpdateDataRow(String repo, String id, Map<String, String> fields) {
-        return client.call(HttpMethod.PUT, "/api/admin/data/{repo}/{id}", fields, Void.class, repo, id).status();
+        return client.call(HttpMethod.PUT, "/api/internal/admin/data/{repo}/{id}", fields, Void.class, repo, id).status();
     }
 
     @Override
@@ -639,37 +639,37 @@ public class RealApiService implements ApiService {
 
     @Override
     public String adminWellKnownSchema(String path) {
-        return client.get("/api/admin/well-known/schema?path={path}", String.class, path);
+        return client.get("/api/internal/admin/well-known-files/schema?path={path}", String.class, path);
     }
 
     @Override
     public List<WellKnownFileDto> adminWellKnownFiles() {
-        return client.get("/api/admin/well-known", WELL_KNOWN_FILES);
+        return client.get("/api/internal/admin/well-known-files", WELL_KNOWN_FILES);
     }
 
     @Override
     public WellKnownFileDetailDto adminWellKnownFile(long id) {
-        return client.get("/api/admin/well-known/{id}", WellKnownFileDetailDto.class, id);
+        return client.get("/api/internal/admin/well-known-files/{id}", WellKnownFileDetailDto.class, id);
     }
 
     @Override
     public IanaRegistryDto adminIanaRegistry() {
-        return client.get("/api/admin/well-known/iana", IanaRegistryDto.class);
+        return client.get("/api/internal/admin/well-known-files/iana", IanaRegistryDto.class);
     }
 
     @Override
     public int adminCreateWellKnownFile(WellKnownFileRequest request) {
-        return client.call(HttpMethod.POST, "/api/admin/well-known", request, Void.class).status();
+        return client.call(HttpMethod.POST, "/api/internal/admin/well-known-files", request, Void.class).status();
     }
 
     @Override
     public int adminUpdateWellKnownFile(long id, WellKnownFileRequest request) {
-        return client.call(HttpMethod.PUT, "/api/admin/well-known/{id}", request, Void.class, id).status();
+        return client.call(HttpMethod.PUT, "/api/internal/admin/well-known-files/{id}", request, Void.class, id).status();
     }
 
     @Override
     public int adminDeleteWellKnownFile(long id) {
-        return client.call(HttpMethod.DELETE, "/api/admin/well-known/{id}", null, Void.class, id).status();
+        return client.call(HttpMethod.DELETE, "/api/internal/admin/well-known-files/{id}", null, Void.class, id).status();
     }
 
     @Override
@@ -680,22 +680,22 @@ public class RealApiService implements ApiService {
 
     @Override
     public int adminCreateMetaTag(MetaTagRequest request) {
-        return client.call(HttpMethod.POST, "/api/admin/meta-tags", request, Void.class).status();
+        return client.call(HttpMethod.POST, "/api/internal/admin/meta-tags", request, Void.class).status();
     }
 
     @Override
     public int adminUpdateMetaTag(long id, MetaTagRequest request) {
-        return client.call(HttpMethod.PUT, "/api/admin/meta-tags/{id}", request, Void.class, id).status();
+        return client.call(HttpMethod.PUT, "/api/internal/admin/meta-tags/{id}", request, Void.class, id).status();
     }
 
     @Override
     public int adminDeleteMetaTag(long id) {
-        return client.call(HttpMethod.DELETE, "/api/admin/meta-tags/{id}", null, Void.class, id).status();
+        return client.call(HttpMethod.DELETE, "/api/internal/admin/meta-tags/{id}", null, Void.class, id).status();
     }
 
     @Override
     public int adminDeleteDataRow(String repo, String id) {
-        return client.call(HttpMethod.DELETE, "/api/admin/data/{repo}/{id}", null, Void.class, repo, id).status();
+        return client.call(HttpMethod.DELETE, "/api/internal/admin/data/{repo}/{id}", null, Void.class, repo, id).status();
     }
 
     /**
@@ -815,54 +815,54 @@ public class RealApiService implements ApiService {
 
     @Override
     public List<DtddProposalDto> adminDtddProposals(String status) {
-        return client.get("/api/admin/dtdd-mapping/proposals?status={status}", DTDD_PROPOSALS, status);
+        return client.get("/api/internal/admin/dtdd-mapping-proposals?status={status}", DTDD_PROPOSALS, status);
     }
 
     @Override
     public int adminApproveDtddProposal(UUID id) {
-        return client.call(HttpMethod.POST, "/api/admin/dtdd-mapping/proposals/{id}/approve", null, Void.class, id).status();
+        return client.call(HttpMethod.POST, "/api/internal/admin/dtdd-mapping-proposals/{id}/approve", null, Void.class, id).status();
     }
 
     @Override
     public int adminRejectDtddProposal(UUID id, String reason) {
         Map<String, String> body = reason == null || reason.isBlank() ? Map.of() : Map.of("reason", reason);
-        return client.call(HttpMethod.POST, "/api/admin/dtdd-mapping/proposals/{id}/reject", body, Void.class, id).status();
+        return client.call(HttpMethod.POST, "/api/internal/admin/dtdd-mapping-proposals/{id}/reject", body, Void.class, id).status();
     }
 
     @Override
     public AdminPage<GameMappingDto> adminGameMappings(int page) {
-        return client.get("/api/admin/game-mappings?page={page}&size=20", GAME_MAPPINGS, page);
+        return client.get("/api/internal/admin/game-mappings?page={page}&size=20", GAME_MAPPINGS, page);
     }
 
     @Override
     public AdminPage<DetectedGameDto> adminMissingGameMappings(int page) {
-        return client.get("/api/admin/game-mappings/missing?page={page}&size=20", MISSING_GAMES, page);
+        return client.get("/api/internal/admin/game-mappings/missing?page={page}&size=20", MISSING_GAMES, page);
     }
 
     @Override
     public List<DetectedGameDto> adminDetectedGames(String sourceType, String q) {
-        return client.get("/api/admin/game-mappings/detected?sourceType={sourceType}&q={q}", DETECTED_GAMES,
+        return client.get("/api/internal/admin/game-mappings/detected?sourceType={sourceType}&q={q}", DETECTED_GAMES,
                 sourceType, q == null ? "" : q);
     }
 
     @Override
     public List<TwitchCategoryDto> adminSearchCategories(String q) {
-        return client.get("/api/admin/game-mappings/categories?q={q}", CATEGORIES, q == null ? "" : q);
+        return client.get("/api/internal/admin/game-mappings/categories?q={q}", CATEGORIES, q == null ? "" : q);
     }
 
     @Override
     public ApiClient.Result<GameMappingResult> adminCreateGameMapping(GameMappingRequest request) {
-        return client.call(HttpMethod.POST, "/api/admin/game-mappings", request, GameMappingResult.class);
+        return client.call(HttpMethod.POST, "/api/internal/admin/game-mappings", request, GameMappingResult.class);
     }
 
     @Override
     public ApiClient.Result<GameMappingResult> adminUpdateGameMapping(UUID id, GameMappingRequest request) {
-        return client.call(HttpMethod.PUT, "/api/admin/game-mappings/{id}", request, GameMappingResult.class, id);
+        return client.call(HttpMethod.PUT, "/api/internal/admin/game-mappings/{id}", request, GameMappingResult.class, id);
     }
 
     @Override
     public ApiClient.Result<GameMappingResult> adminDeleteGameMapping(UUID id, boolean applyLive) {
-        return client.call(HttpMethod.DELETE, "/api/admin/game-mappings/{id}?applyLive={applyLive}", null,
+        return client.call(HttpMethod.DELETE, "/api/internal/admin/game-mappings/{id}?applyLive={applyLive}", null,
                 GameMappingResult.class, id, applyLive);
     }
 
@@ -1100,11 +1100,11 @@ public class RealApiService implements ApiService {
     public ApiKeysPageDto adminApiKeys(ApiKeyProvider provider) {
         return switch (provider) {
             case STEAM -> {
-                SteamKeysPageData page = client.get("/api/admin/steam-keys", SteamKeysPageData.class);
+                SteamKeysPageData page = client.get("/api/internal/admin/steam-keys", SteamKeysPageData.class);
                 yield page == null ? null : ApiKeysPageDto.of(page);
             }
             case DTDD -> {
-                DtddKeysPageData page = client.get("/api/admin/dtdd-keys", DtddKeysPageData.class);
+                DtddKeysPageData page = client.get("/api/internal/admin/dtdd-keys", DtddKeysPageData.class);
                 yield page == null ? null : ApiKeysPageDto.of(page);
             }
         };
@@ -1114,18 +1114,17 @@ public class RealApiService implements ApiService {
     public int adminAddApiKey(ApiKeyProvider provider, String apiKey) {
         Map<String, String> body = Map.of("apiKey", apiKey);
         ApiClient.Result<Void> result = switch (provider) {
-            case STEAM -> client.call(HttpMethod.POST, "/api/admin/steam-keys/add", body, Void.class);
-            case DTDD -> client.call(HttpMethod.POST, "/api/admin/dtdd-keys/add", body, Void.class);
+            case STEAM -> client.call(HttpMethod.POST, "/api/internal/admin/steam-keys", body, Void.class);
+            case DTDD -> client.call(HttpMethod.POST, "/api/internal/admin/dtdd-keys", body, Void.class);
         };
         return result.status();
     }
 
     @Override
     public int adminDeleteApiKey(ApiKeyProvider provider, String keyId) {
-        Map<String, String> body = Map.of("keyId", keyId);
         ApiClient.Result<Void> result = switch (provider) {
-            case STEAM -> client.call(HttpMethod.POST, "/api/admin/steam-keys/delete", body, Void.class);
-            case DTDD -> client.call(HttpMethod.POST, "/api/admin/dtdd-keys/delete", body, Void.class);
+            case STEAM -> client.call(HttpMethod.DELETE, "/api/internal/admin/steam-keys/{keyId}", null, Void.class, keyId);
+            case DTDD -> client.call(HttpMethod.DELETE, "/api/internal/admin/dtdd-keys/{keyId}", null, Void.class, keyId);
         };
         return result.status();
     }
@@ -1133,8 +1132,8 @@ public class RealApiService implements ApiService {
     @Override
     public int adminRefreshApiKeys(ApiKeyProvider provider) {
         ApiClient.Result<Void> result = switch (provider) {
-            case STEAM -> client.call(HttpMethod.POST, "/api/admin/steam-keys/refresh", null, Void.class);
-            case DTDD -> client.call(HttpMethod.POST, "/api/admin/dtdd-keys/refresh", null, Void.class);
+            case STEAM -> client.call(HttpMethod.POST, "/api/internal/admin/steam-keys/refresh", null, Void.class);
+            case DTDD -> client.call(HttpMethod.POST, "/api/internal/admin/dtdd-keys/refresh", null, Void.class);
         };
         return result.status();
     }
@@ -1142,25 +1141,25 @@ public class RealApiService implements ApiService {
     @Override
     public List<AccountDto> adminMinecraftAccounts() {
         // a 404 (Minecraft disabled in catapult-api) is null, like any failed read
-        AccountDto[] accounts = client.get("/api/admin/minecraft-accounts", AccountDto[].class);
+        AccountDto[] accounts = client.get("/api/internal/admin/minecraft-accounts", AccountDto[].class);
         return accounts == null ? null : List.of(accounts);
     }
 
     @Override
     public int adminPatchMinecraftAccount(UUID id, Map<String, Object> patch) {
-        return client.call(HttpMethod.PATCH, "/api/admin/minecraft-accounts/{id}", patch, Void.class, id).status();
+        return client.call(HttpMethod.PATCH, "/api/internal/admin/minecraft-accounts/{id}", patch, Void.class, id).status();
     }
 
     @Override
     public int adminDeleteMinecraftAccount(UUID id) {
-        return client.call(HttpMethod.DELETE, "/api/admin/minecraft-accounts/{id}", null, Void.class, id).status();
+        return client.call(HttpMethod.DELETE, "/api/internal/admin/minecraft-accounts/{id}", null, Void.class, id).status();
     }
 
     @Override
     public MinecraftDeviceCodeStart adminMinecraftDeviceCode() {
         // read as a map: the code on 200 (snake_case, Microsoft's own fields); a refusal is read as its problem
         @SuppressWarnings("rawtypes")
-        ApiClient.Result<Map> result = client.call(HttpMethod.POST, "/api/admin/minecraft-accounts/device-code", null, Map.class);
+        ApiClient.Result<Map> result = client.call(HttpMethod.POST, "/api/internal/admin/minecraft-accounts/device-code", null, Map.class);
         Map<?, ?> body = result.body() == null ? Map.of() : result.body();
         if (result.status() == 200) {
             if (!(body.get("device_code") instanceof String deviceCode) || deviceCode.isBlank()) {
@@ -1180,12 +1179,12 @@ public class RealApiService implements ApiService {
     @Override
     public ApiClient.Result<Map<String, Object>> adminCreateMinecraftAccount(String deviceCode, String label) {
         Map<String, String> body = label == null ? Map.of("deviceCode", deviceCode) : Map.of("deviceCode", deviceCode, "label", label);
-        return mapResult(client.call(HttpMethod.POST, "/api/admin/minecraft-accounts", body, Map.class));
+        return mapResult(client.call(HttpMethod.POST, "/api/internal/admin/minecraft-accounts", body, Map.class));
     }
 
     @Override
     public ApiClient.Result<Map<String, Object>> adminReauthMinecraftAccount(UUID id, String deviceCode) {
-        return mapResult(client.call(HttpMethod.POST, "/api/admin/minecraft-accounts/{id}/reauth", Map.of("deviceCode", deviceCode), Map.class, id));
+        return mapResult(client.call(HttpMethod.POST, "/api/internal/admin/minecraft-accounts/{id}/reauth", Map.of("deviceCode", deviceCode), Map.class, id));
     }
 
     @SuppressWarnings("unchecked")
@@ -1195,48 +1194,48 @@ public class RealApiService implements ApiService {
 
     @Override
     public List<TwDefinitionDto> adminTws() {
-        return client.get("/api/admin/tw", TWS);
+        return client.get("/api/internal/admin/tws", TWS);
     }
 
     @Override
     public TwDefinitionDto adminTw(String id) {
-        return client.get("/api/admin/tw/{id}", TwDefinitionDto.class, id);
+        return client.get("/api/internal/admin/tws/{id}", TwDefinitionDto.class, id);
     }
 
     @Override
     public int adminCreateTw(String id, String label, int sortOrder) {
-        return client.call(HttpMethod.POST, "/api/admin/tw", new AdminTwCreateBody(id, label, null, sortOrder), Void.class).status();
+        return client.call(HttpMethod.POST, "/api/internal/admin/tws", new AdminTwCreateBody(id, label, null, sortOrder), Void.class).status();
     }
 
     @Override
     public int adminRebuildTws(TwRebuild mode) {
         ApiClient.Result<Void> result = switch (mode) {
-            case NON_OVERRIDDEN -> client.call(HttpMethod.POST, "/api/admin/tw/rebuild", null, Void.class);
-            case UNTOUCHED -> client.call(HttpMethod.POST, "/api/admin/tw/rebuild/force", null, Void.class);
-            case FORCE_PINNED -> client.call(HttpMethod.POST, "/api/admin/tw/rebuild/force-pinned", null, Void.class);
+            case NON_OVERRIDDEN -> client.call(HttpMethod.POST, "/api/internal/admin/tws/rebuild", null, Void.class);
+            case UNTOUCHED -> client.call(HttpMethod.POST, "/api/internal/admin/tws/rebuild/force", null, Void.class);
+            case FORCE_PINNED -> client.call(HttpMethod.POST, "/api/internal/admin/tws/rebuild/force-pinned", null, Void.class);
         };
         return result.status();
     }
 
     @Override
     public List<String> adminTwKeywords(String id) {
-        return client.get("/api/admin/tw/{id}/steam-keywords", new ParameterizedTypeReference<List<String>>() {}, id);
+        return client.get("/api/internal/admin/tws/{id}/steam-keywords", new ParameterizedTypeReference<List<String>>() {}, id);
     }
 
     @Override
     public int adminAddTwKeyword(String id, String keyword) {
-        return client.call(HttpMethod.POST, "/api/admin/tw/{id}/steam-keywords", new SteamKeywordBody(keyword), Void.class, id).status();
+        return client.call(HttpMethod.POST, "/api/internal/admin/tws/{id}/steam-keywords", new SteamKeywordBody(keyword), Void.class, id).status();
     }
 
     @Override
     public int adminRemoveTwKeyword(String id, String keyword) {
         // free text: a URI variable, encoded as one segment
-        return client.call(HttpMethod.DELETE, "/api/admin/tw/{id}/steam-keywords/{keyword}", null, Void.class, id, keyword).status();
+        return client.call(HttpMethod.DELETE, "/api/internal/admin/tws/{id}/steam-keywords/{keyword}", null, Void.class, id, keyword).status();
     }
 
     @Override
     public TwKeywordTestDto adminTestTwKeyword(String id, String appId, String draftKeyword) {
-        var result = client.call(HttpMethod.POST, "/api/admin/tw/{id}/steam-keywords/test",
+        var result = client.call(HttpMethod.POST, "/api/internal/admin/tws/{id}/steam-keywords/test",
                 new SteamSignalTestBody(appId, draftKeyword), TwKeywordTestDto.class, id);
         return result.ok() ? result.body() : null;
     }

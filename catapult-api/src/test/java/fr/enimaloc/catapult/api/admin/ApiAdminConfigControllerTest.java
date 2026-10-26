@@ -62,7 +62,7 @@ class ApiAdminConfigControllerTest {
         when(catalogService.catalog()).thenReturn(List.of(
                 new ConfigEntry("app.foo", "1", false, false, false, false, false, "properties")
         ));
-        mvc.perform(get("/api/admin/config"))
+        mvc.perform(get("/api/internal/admin/config"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].key").value("app.foo"));
     }
@@ -74,7 +74,7 @@ class ApiAdminConfigControllerTest {
         user.setId(UUID.randomUUID());
         when(userRepo.findByTwitchId(any())).thenReturn(Optional.of(user));
 
-        mvc.perform(put("/api/admin/config/{k}", "app.foo")
+        mvc.perform(put("/api/internal/admin/config/{k}", "app.foo")
                         .with(jwt().jwt(j -> j.claim("twitchId", "123")).authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -91,7 +91,7 @@ class ApiAdminConfigControllerTest {
         user.setId(UUID.randomUUID());
         when(userRepo.findByTwitchId(any())).thenReturn(Optional.of(user));
 
-        mvc.perform(delete("/api/admin/config/{k}", "app.foo")
+        mvc.perform(delete("/api/internal/admin/config/{k}", "app.foo")
                         .with(jwt().jwt(j -> j.claim("twitchId", "123")).authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
                         .with(csrf()))
                 .andExpect(status().isNoContent());
@@ -103,13 +103,13 @@ class ApiAdminConfigControllerTest {
     @WithMockUser(roles = "ADMIN")
     void audit_returnsHistory() throws Exception {
         when(auditRepo.findByKeyOrderByChangedAtDesc("app.foo")).thenReturn(List.of(new ConfigAudit()));
-        mvc.perform(get("/api/admin/config/audit").param("key", "app.foo"))
+        mvc.perform(get("/api/internal/admin/config/audit").param("key", "app.foo"))
                 .andExpect(status().isOk());
     }
 
     @Test
     void unauthenticated_returns401Or403() throws Exception {
-        mvc.perform(get("/api/admin/config"))
+        mvc.perform(get("/api/internal/admin/config"))
                 .andExpect(status().is4xxClientError());
     }
 
@@ -125,7 +125,7 @@ class ApiAdminConfigControllerTest {
         o.setUpdatedBy(UUID.randomUUID());
         when(overrideRepo.findByIdModule("web")).thenReturn(List.of(o));
 
-        mvc.perform(get("/api/admin/config/module/{module}", "web"))
+        mvc.perform(get("/api/internal/admin/config/modules/{module}", "web"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].key").value("web.feature.foo"))
                 .andExpect(jsonPath("$[0].value").value("true"))
@@ -139,7 +139,7 @@ class ApiAdminConfigControllerTest {
         user.setId(UUID.randomUUID());
         when(userRepo.findByTwitchId(any())).thenReturn(Optional.of(user));
 
-        mvc.perform(put("/api/admin/config/module/{m}/{k}", "web", "web.feature.foo")
+        mvc.perform(put("/api/internal/admin/config/modules/{m}/{k}", "web", "web.feature.foo")
                         .with(jwt().jwt(j -> j.claim("twitchId", "123")).authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -156,7 +156,7 @@ class ApiAdminConfigControllerTest {
         user.setId(UUID.randomUUID());
         when(userRepo.findByTwitchId(any())).thenReturn(Optional.of(user));
 
-        mvc.perform(delete("/api/admin/config/module/{m}/{k}", "web", "web.feature.foo")
+        mvc.perform(delete("/api/internal/admin/config/modules/{m}/{k}", "web", "web.feature.foo")
                         .with(jwt().jwt(j -> j.claim("twitchId", "123")).authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
                         .with(csrf()))
                 .andExpect(status().isNoContent());
@@ -169,7 +169,7 @@ class ApiAdminConfigControllerTest {
     void moduleAudit_returnsHistoryScopedToModule() throws Exception {
         when(auditRepo.findByModuleAndKeyOrderByChangedAtDesc("web", "web.feature.foo"))
                 .thenReturn(List.of(new ConfigAudit()));
-        mvc.perform(get("/api/admin/config/module/{m}/audit", "web").param("key", "web.feature.foo"))
+        mvc.perform(get("/api/internal/admin/config/modules/{m}/audit", "web").param("key", "web.feature.foo"))
                 .andExpect(status().isOk());
     }
 }

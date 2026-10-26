@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.api.admin;
 
+import fr.enimaloc.catapult.api.ApiPaths;
 import fr.enimaloc.catapult.common.dto.admin.AddKeyRequest;
-import fr.enimaloc.catapult.common.dto.admin.DeleteKeyRequest;
 import fr.enimaloc.catapult.common.dto.admin.DtddKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.KeyStatus;
 import fr.enimaloc.catapult.domain.dtdd.DtddApiKeyEntry;
@@ -20,7 +20,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 @RestController
-@RequestMapping("/api/admin/dtdd-keys")
+@RequestMapping(ApiPaths.ADMIN + "/dtdd-keys")
 public class ApiAdminDtddKeysController {
 
     private static final Pattern KEY_PATTERN = Pattern.compile("ddd_[A-Za-z0-9]{16,128}");
@@ -62,7 +62,7 @@ public class ApiAdminDtddKeysController {
         return new DtddKeysPageData(keys, rotator.isPresent());
     }
 
-    @PostMapping("/add")
+    @PostMapping
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void add(@RequestBody AddKeyRequest body) {
         String trimmed = body.apiKey().trim();
@@ -77,19 +77,19 @@ public class ApiAdminDtddKeysController {
         }
     }
 
-    @PostMapping("/delete")
+    @DeleteMapping("/{keyId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@RequestBody DeleteKeyRequest body) {
+    public void delete(@PathVariable String keyId) {
         Optional<String> raw = repository.findByExclusiveFalse().stream()
             .map(DtddApiKeyEntry::getApiKey)
-            .filter(k -> ApiKeyHasher.id(k).equals(body.keyId()))
+            .filter(k -> ApiKeyHasher.id(k).equals(keyId))
             .findFirst();
         if (raw.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown keyId");
         }
         repository.deleteById(raw.get());
         rotator.ifPresent(DtddApiKeyRotator::refreshKeys);
-        events.keyDeleted(AdminEventPublisher.PROVIDER_DTDD, body.keyId());
+        events.keyDeleted(AdminEventPublisher.PROVIDER_DTDD, keyId);
     }
 
     @PostMapping("/refresh")

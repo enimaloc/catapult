@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.provider;
 
+import fr.enimaloc.catapult.api.ApiPaths;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.xbox.XboxUserTokenService;
@@ -20,7 +21,7 @@ import java.util.UUID;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/admin/providers/xbox")
+@RequestMapping(ApiPaths.ADMIN + "/providers/xbox")
 @RequiredArgsConstructor
 @ConditionalOnBooleanProperty("xbox.enabled")
 public class ApiAdminProviderXboxController {

@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.admin;
 
+import fr.enimaloc.catapult.api.ApiPaths;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.igdb.IgdbService.IgdbGame;
 import org.springframework.http.MediaType;
@@ -12,10 +13,10 @@ import java.util.List;
 
 /**
  * Admin-only IGDB game search, used by the members admin page to pick a game
- * for the mock Steam integration. Secured by the {@code /api/admin/**} rule, {@code Authz.admin()}.
+ * for the mock Steam integration. Secured by the {@code ApiPaths.ADMIN} URL rule, {@code Authz.admin()}.
  */
 @RestController
-@RequestMapping("/api/admin/igdb")
+@RequestMapping(ApiPaths.ADMIN + "/igdb-games")
 public class ApiAdminIgdbController {
 
     private final IgdbService igdbService;
@@ -24,7 +25,7 @@ public class ApiAdminIgdbController {
         this.igdbService = igdbService;
     }
 
-    @GetMapping(value = "/search", produces = MediaType.APPLICATION_JSON_VALUE)
+    @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     public List<IgdbGame> search(@RequestParam(defaultValue = "") String q) {
         if (q.isBlank()) return List.of();
         return igdbService.searchGames(q);

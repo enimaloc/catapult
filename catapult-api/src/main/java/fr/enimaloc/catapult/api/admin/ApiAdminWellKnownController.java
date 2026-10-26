@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.admin;
 
+import fr.enimaloc.catapult.api.ApiPaths;
 import fr.enimaloc.catapult.common.dto.admin.IanaRegistryDto;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownFileDetailDto;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownFileDto;
@@ -18,7 +19,7 @@ import java.util.List;
 
 /** The admin page's well-known files (served publicly through {@link fr.enimaloc.catapult.api.ApiWellKnownController}). */
 @RestController
-@RequestMapping("/api/admin/well-known")
+@RequestMapping(ApiPaths.ADMIN + "/well-known-files")
 @RequiredArgsConstructor
 public class ApiAdminWellKnownController {
     private final WellKnownFileService service;

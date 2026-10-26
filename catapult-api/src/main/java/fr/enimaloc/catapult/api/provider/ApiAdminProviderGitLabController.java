@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.provider;
 
+import fr.enimaloc.catapult.api.ApiPaths;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -11,7 +12,7 @@ import org.springframework.web.client.RestClient;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/admin/providers/gitlab")
+@RequestMapping(ApiPaths.ADMIN + "/providers/gitlab")
 @RequiredArgsConstructor
 public class ApiAdminProviderGitLabController {
 

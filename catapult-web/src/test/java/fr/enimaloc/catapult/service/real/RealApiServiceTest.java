@@ -864,7 +864,7 @@ class RealApiServiceTest {
 
     @Test
     void adminCcl_readsTheCclsWithTheirDescriptors() {
-        respond(HttpMethod.GET, "/api/admin/ccl", """
+        respond(HttpMethod.GET, "/api/internal/admin/ccls", """
                 {"ccls":[{"id":"Gambling","name":"Gambling","description":"d","mappedDescriptions":["Simulated Gambling"],
                   "igdbMappings":[{"id":6,"description":"Simulated Gambling","organizationId":1,"displayName":"ESRB — Simulated Gambling"},
                                   {"id":2,"description":"Blood","organizationId":1,"displayName":"ESRB — Blood"}]}],
@@ -881,8 +881,8 @@ class RealApiServiceTest {
 
     @Test
     void adminCclActions() {
-        expectPost("/api/admin/ccl/refresh");
-        expectPost("/api/admin/ccl/Gambling/mappings", "{\"igdbCategoryIds\":[6]}");
+        expectPost("/api/internal/admin/ccls/refresh");
+        expect(HttpMethod.PUT, "/api/internal/admin/ccls/Gambling/mappings").andExpect(content().json("{\"igdbCategoryIds\":[6]}", org.springframework.test.json.JsonCompareMode.STRICT)).andRespond(withNoContent());
 
         assertThat(service.adminRefreshCcl()).isEqualTo(204);
         assertThat(service.adminSaveCclMappings("Gambling", Set.of(6L))).isEqualTo(204);
@@ -890,8 +890,8 @@ class RealApiServiceTest {
 
     @Test
     void adminCclActions_relayAFailedStatus() {
-        expect(HttpMethod.POST, "/api/admin/ccl/refresh").andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
-        expect(HttpMethod.POST, "/api/admin/ccl/Gambling/mappings").andRespond(withStatus(HttpStatus.FORBIDDEN));
+        expect(HttpMethod.POST, "/api/internal/admin/ccls/refresh").andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
+        expect(HttpMethod.PUT, "/api/internal/admin/ccls/Gambling/mappings").andRespond(withStatus(HttpStatus.FORBIDDEN));
 
         assertThat(service.adminRefreshCcl()).isEqualTo(503);
         assertThat(service.adminSaveCclMappings("Gambling", Set.of(6L))).isEqualTo(403);
@@ -899,11 +899,11 @@ class RealApiServiceTest {
 
     @Test
     void adminCaches_readsTheListAPageAndAnEntry() {
-        respond(HttpMethod.GET, "/api/admin/caches", "[{\"name\":\"igdb-game-cache\",\"size\":30,\"deletable\":true}]");
-        respond(HttpMethod.GET, "/api/admin/caches/igdb-game-cache?q=doom&page=1", """
+        respond(HttpMethod.GET, "/api/internal/admin/caches", "[{\"name\":\"igdb-game-cache\",\"size\":30,\"deletable\":true}]");
+        respond(HttpMethod.GET, "/api/internal/admin/caches/igdb-game-cache?q=doom&page=1", """
                 {"content":[{"key":"1001","value":"Doom"}],"number":1,"size":25,"totalPages":2,
                  "totalElements":26,"first":false,"last":true,"empty":false}""");
-        respond(HttpMethod.GET, "/api/admin/caches/igdb-game-cache/entry?key=a%20b",
+        respond(HttpMethod.GET, "/api/internal/admin/caches/igdb-game-cache/entry?key=a%20b",
                 "{\"key\":\"a b\",\"detail\":{\"name\":\"Doom\"},\"expiresInSeconds\":60}");
 
         assertThat(service.adminCaches()).containsExactly(new CacheSummaryDto("igdb-game-cache", 30, true));
@@ -917,7 +917,7 @@ class RealApiServiceTest {
 
     @Test
     void adminCacheEntries_sendsABlankSearchWhenThereIsNone() {
-        respond(HttpMethod.GET, "/api/admin/caches/igdb-game-cache?q=&page=0",
+        respond(HttpMethod.GET, "/api/internal/admin/caches/igdb-game-cache?q=&page=0",
                 "{\"content\":[],\"number\":0,\"totalPages\":0,\"totalElements\":0}");
 
         assertThat(service.adminCacheEntries("igdb-game-cache", null, 0).content()).isEmpty();
@@ -925,8 +925,8 @@ class RealApiServiceTest {
 
     @Test
     void adminDeleteCacheEntry_relaysTheStatus() {
-        expect(HttpMethod.DELETE, "/api/admin/caches/igdb-game-cache?key=1001").andRespond(withNoContent());
-        expect(HttpMethod.DELETE, "/api/admin/caches/tw-known-paths?key=x").andRespond(withStatus(HttpStatus.BAD_REQUEST));
+        expect(HttpMethod.DELETE, "/api/internal/admin/caches/igdb-game-cache?key=1001").andRespond(withNoContent());
+        expect(HttpMethod.DELETE, "/api/internal/admin/caches/tw-known-paths?key=x").andRespond(withStatus(HttpStatus.BAD_REQUEST));
 
         assertThat(service.adminDeleteCacheEntry("igdb-game-cache", "1001")).isEqualTo(204);
         assertThat(service.adminDeleteCacheEntry("tw-known-paths", "x")).isEqualTo(400);
@@ -934,15 +934,15 @@ class RealApiServiceTest {
 
     @Test
     void adminData_readsAndWritesRows_relayingTheStatuses() {
-        respond(HttpMethod.GET, "/api/admin/data", "[{\"name\":\"chat-command\",\"size\":3}]");
-        respond(HttpMethod.GET, "/api/admin/data/chat-command?q=&page=0",
+        respond(HttpMethod.GET, "/api/internal/admin/data", "[{\"name\":\"chat-command\",\"size\":3}]");
+        respond(HttpMethod.GET, "/api/internal/admin/data/chat-command?q=&page=0",
                 "{\"content\":[{\"id\":\"1\",\"name\":\"!lurk\"}],\"number\":0,\"totalPages\":1,\"totalElements\":1}");
-        respond(HttpMethod.GET, "/api/admin/data/chat-command/1", "{\"id\":\"1\",\"name\":\"!lurk\",\"aliases\":[]}");
-        expect(HttpMethod.POST, "/api/admin/data/chat-command").andExpect(content().json("{\"name\":\"!hi\"}"))
+        respond(HttpMethod.GET, "/api/internal/admin/data/chat-command/1", "{\"id\":\"1\",\"name\":\"!lurk\",\"aliases\":[]}");
+        expect(HttpMethod.POST, "/api/internal/admin/data/chat-command").andExpect(content().json("{\"name\":\"!hi\"}"))
                 .andRespond(withStatus(HttpStatus.CREATED).contentType(MediaType.APPLICATION_JSON).body("{\"id\":\"4\"}"));
-        expect(HttpMethod.PUT, "/api/admin/data/chat-command/1").andExpect(content().json("{\"name\":\"!hey\"}"))
+        expect(HttpMethod.PUT, "/api/internal/admin/data/chat-command/1").andExpect(content().json("{\"name\":\"!hey\"}"))
                 .andRespond(withSuccess("{\"id\":\"1\"}", MediaType.APPLICATION_JSON));
-        expect(HttpMethod.DELETE, "/api/admin/data/chat-command/1").andRespond(withStatus(HttpStatus.CONFLICT));
+        expect(HttpMethod.DELETE, "/api/internal/admin/data/chat-command/1").andRespond(withStatus(HttpStatus.CONFLICT));
 
         assertThat(service.adminDataRepos()).containsExactly(new RepoSummaryDto("chat-command", 3));
         assertThat(service.adminDataRows("chat-command", null, 0).content()).containsExactly(Map.of("id", "1", "name", "!lurk"));
@@ -955,7 +955,7 @@ class RealApiServiceTest {
     @Test
     void adminDataRow_keepsAnEncodedIdAsOnePathSegment() {
         // IdCodec ids are already percent-encoded: catapult-api decodes the segment once, IdCodec once more.
-        respond(HttpMethod.GET, "/api/admin/data/twitch-ccl/a~b%2520c", "{\"id\":\"a~b%20c\"}");
+        respond(HttpMethod.GET, "/api/internal/admin/data/twitch-ccl/a~b%2520c", "{\"id\":\"a~b%20c\"}");
 
         assertThat(service.adminDataRow("twitch-ccl", "a~b%20c")).containsEntry("id", "a~b%20c");
     }
@@ -975,7 +975,7 @@ class RealApiServiceTest {
 
     @Test
     void adminWellKnownSchema_readsTheSchemaText() {
-        respond(HttpMethod.GET, "/api/admin/well-known/schema?path=gpc.json", "{\"type\":\"object\"}");
+        respond(HttpMethod.GET, "/api/internal/admin/well-known-files/schema?path=gpc.json", "{\"type\":\"object\"}");
 
         assertThat(service.adminWellKnownSchema("gpc.json")).isEqualTo("{\"type\":\"object\"}");
     }
@@ -1009,9 +1009,9 @@ class RealApiServiceTest {
         var request = new fr.enimaloc.catapult.common.dto.admin.MetaTagRequest(
                 fr.enimaloc.catapult.common.dto.admin.MetaTagAttribute.NAME, "theme-color", "#000");
         String json = "{\"attribute\":\"NAME\",\"key\":\"theme-color\",\"content\":\"#000\"}";
-        expect(HttpMethod.POST, "/api/admin/meta-tags").andExpect(content().json(json)).andRespond(withStatus(HttpStatus.CREATED));
-        expect(HttpMethod.PUT, "/api/admin/meta-tags/3").andExpect(content().json(json)).andRespond(withStatus(HttpStatus.CONFLICT));
-        expect(HttpMethod.DELETE, "/api/admin/meta-tags/3").andRespond(withNoContent());
+        expect(HttpMethod.POST, "/api/internal/admin/meta-tags").andExpect(content().json(json)).andRespond(withStatus(HttpStatus.CREATED));
+        expect(HttpMethod.PUT, "/api/internal/admin/meta-tags/3").andExpect(content().json(json)).andRespond(withStatus(HttpStatus.CONFLICT));
+        expect(HttpMethod.DELETE, "/api/internal/admin/meta-tags/3").andRespond(withNoContent());
 
         assertThat(service.adminCreateMetaTag(request)).isEqualTo(201);
         assertThat(service.adminUpdateMetaTag(3, request)).isEqualTo(409);
@@ -1031,15 +1031,15 @@ class RealApiServiceTest {
         var request = new fr.enimaloc.catapult.common.dto.admin.WellKnownFileRequest(
                 fr.enimaloc.catapult.common.dto.admin.WellKnownLocation.ROOT, "riot.txt", 200, java.util.List.of(), "text/plain", "code");
         String json = "{\"location\":\"ROOT\",\"path\":\"riot.txt\",\"status\":200,\"headers\":[],\"contentType\":\"text/plain\",\"content\":\"code\"}";
-        expect(HttpMethod.POST, "/api/admin/well-known").andExpect(content().json(json))
+        expect(HttpMethod.POST, "/api/internal/admin/well-known-files").andExpect(content().json(json))
                 .andRespond(withStatus(HttpStatus.CREATED));
-        expect(HttpMethod.PUT, "/api/admin/well-known/3").andExpect(content().json(json)).andRespond(withSuccess());
-        expect(HttpMethod.DELETE, "/api/admin/well-known/3").andRespond(withNoContent());
-        respond(HttpMethod.GET, "/api/admin/well-known", "[{\"id\":3,\"location\":\"ROOT\",\"path\":\"riot.txt\","
+        expect(HttpMethod.PUT, "/api/internal/admin/well-known-files/3").andExpect(content().json(json)).andRespond(withSuccess());
+        expect(HttpMethod.DELETE, "/api/internal/admin/well-known-files/3").andRespond(withNoContent());
+        respond(HttpMethod.GET, "/api/internal/admin/well-known-files", "[{\"id\":3,\"location\":\"ROOT\",\"path\":\"riot.txt\","
                 + "\"status\":200,\"contentType\":\"text/plain\",\"size\":4,\"updatedAt\":\"2026-10-16T00:00:00Z\"}]");
-        respond(HttpMethod.GET, "/api/admin/well-known/3", "{\"id\":3,\"location\":\"ROOT\",\"path\":\"riot.txt\","
+        respond(HttpMethod.GET, "/api/internal/admin/well-known-files/3", "{\"id\":3,\"location\":\"ROOT\",\"path\":\"riot.txt\","
                 + "\"status\":200,\"headers\":[],\"contentType\":\"text/plain\",\"content\":\"code\",\"updatedAt\":\"2026-10-16T00:00:00Z\"}");
-        respond(HttpMethod.GET, "/api/admin/well-known/iana", "{\"entries\":[{\"suffix\":\"security.txt\","
+        respond(HttpMethod.GET, "/api/internal/admin/well-known-files/iana", "{\"entries\":[{\"suffix\":\"security.txt\","
                 + "\"reference\":\"RFC 9116\",\"status\":\"permanent\",\"changeController\":\"IETF\"}],\"source\":\"LIVE\"}");
 
         assertThat(service.adminCreateWellKnownFile(request)).isEqualTo(201);
@@ -1183,7 +1183,7 @@ class RealApiServiceTest {
 
     @Test
     void adminDtddProposals_readsTheListOfTheStatus() {
-        respond(HttpMethod.GET, "/api/admin/dtdd-mapping/proposals?status=APPROVED", "[{\"id\":\"" + NOTIF_ID
+        respond(HttpMethod.GET, "/api/internal/admin/dtdd-mapping-proposals?status=APPROVED", "[{\"id\":\"" + NOTIF_ID
                 + "\",\"createdAt\":\"2026-10-18T10:00:00Z\",\"igdbId\":\"100\",\"proposedDtddId\":4521,"
                 + "\"proposer\":{\"id\":\"" + NOTIF_ID + "\",\"twitchUsername\":\"alice\"},\"reason\":\"r\",\"status\":\"APPROVED\"}]");
 
@@ -1197,7 +1197,7 @@ class RealApiServiceTest {
 
     @Test
     void adminApproveDtddProposal_postsAndReturnsTheStatus() {
-        expect(HttpMethod.POST, "/api/admin/dtdd-mapping/proposals/" + NOTIF_ID + "/approve")
+        expect(HttpMethod.POST, "/api/internal/admin/dtdd-mapping-proposals/" + NOTIF_ID + "/approve")
                 .andRespond(withStatus(HttpStatus.CONFLICT));
 
         assertThat(service.adminApproveDtddProposal(NOTIF_ID)).isEqualTo(409);
@@ -1205,11 +1205,11 @@ class RealApiServiceTest {
 
     @Test
     void adminRejectDtddProposal_sendsTheReasonOnlyWhenGiven() {
-        expect(HttpMethod.POST, "/api/admin/dtdd-mapping/proposals/" + NOTIF_ID + "/reject")
+        expect(HttpMethod.POST, "/api/internal/admin/dtdd-mapping-proposals/" + NOTIF_ID + "/reject")
                 .andExpect(content().json("{}", true)).andRespond(withNoContent());
-        expect(HttpMethod.POST, "/api/admin/dtdd-mapping/proposals/" + NOTIF_ID + "/reject")
+        expect(HttpMethod.POST, "/api/internal/admin/dtdd-mapping-proposals/" + NOTIF_ID + "/reject")
                 .andExpect(content().json("{}", true)).andRespond(withNoContent());
-        expect(HttpMethod.POST, "/api/admin/dtdd-mapping/proposals/" + NOTIF_ID + "/reject")
+        expect(HttpMethod.POST, "/api/internal/admin/dtdd-mapping-proposals/" + NOTIF_ID + "/reject")
                 .andExpect(content().json("{\"reason\":\"dup\"}", true)).andRespond(withNoContent());
 
         assertThat(service.adminRejectDtddProposal(NOTIF_ID, "")).isEqualTo(204);
@@ -1491,9 +1491,9 @@ class RealApiServiceTest {
 
     @Test
     void adminApiKeys_readEachProvidersPage() {
-        respond(HttpMethod.GET, "/api/admin/steam-keys", "{\"keys\":[{\"id\":\"k1\",\"masked\":\"abcd…wxyz\",\"owner\":null,"
+        respond(HttpMethod.GET, "/api/internal/admin/steam-keys", "{\"keys\":[{\"id\":\"k1\",\"masked\":\"abcd…wxyz\",\"owner\":null,"
                 + "\"blocked\":true,\"blockedForSeconds\":30}],\"steamEnabled\":true}");
-        respond(HttpMethod.GET, "/api/admin/dtdd-keys", "{\"keys\":[],\"dtddEnabled\":false}");
+        respond(HttpMethod.GET, "/api/internal/admin/dtdd-keys", "{\"keys\":[],\"dtddEnabled\":false}");
 
         var steam = service.adminApiKeys(fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.STEAM);
         var dtdd = service.adminApiKeys(fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.DTDD);
@@ -1512,11 +1512,10 @@ class RealApiServiceTest {
 
     @Test
     void apiKeyActions_postTheirShapes_andReturnTheStatus() {
-        expect(HttpMethod.POST, "/api/admin/steam-keys/add")
+        expect(HttpMethod.POST, "/api/internal/admin/steam-keys")
                 .andExpect(content().json("{\"apiKey\":\"abc\"}", true)).andRespond(withStatus(HttpStatus.BAD_REQUEST));
-        expect(HttpMethod.POST, "/api/admin/dtdd-keys/delete")
-                .andExpect(content().json("{\"keyId\":\"id/1 é\"}", true)).andRespond(withNoContent());
-        expect(HttpMethod.POST, "/api/admin/dtdd-keys/refresh").andRespond(withNoContent());
+        expect(HttpMethod.DELETE, "/api/internal/admin/dtdd-keys/id%2F1%20%C3%A9").andRespond(withNoContent());
+        expect(HttpMethod.POST, "/api/internal/admin/dtdd-keys/refresh").andRespond(withNoContent());
 
         var steam = fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.STEAM;
         var dtdd = fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.DTDD;
@@ -1527,11 +1526,10 @@ class RealApiServiceTest {
 
     @Test
     void apiKeyActions_reachEachProvidersRoute() {
-        expect(HttpMethod.POST, "/api/admin/dtdd-keys/add")
+        expect(HttpMethod.POST, "/api/internal/admin/dtdd-keys")
                 .andExpect(content().json("{\"apiKey\":\"k\"}", true)).andRespond(withNoContent());
-        expect(HttpMethod.POST, "/api/admin/steam-keys/delete")
-                .andExpect(content().json("{\"keyId\":\"k1\"}", true)).andRespond(withNoContent());
-        expectPost("/api/admin/steam-keys/refresh");
+        expect(HttpMethod.DELETE, "/api/internal/admin/steam-keys/k1").andRespond(withNoContent());
+        expectPost("/api/internal/admin/steam-keys/refresh");
 
         assertThat(service.adminAddApiKey(fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.DTDD, "k")).isEqualTo(204);
         assertThat(service.adminDeleteApiKey(fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.STEAM, "k1")).isEqualTo(204);
@@ -1552,7 +1550,7 @@ class RealApiServiceTest {
 
     @Test
     void adminMinecraftAccounts_readCatapultApisAccountDto() {
-        respond(HttpMethod.GET, "/api/admin/minecraft-accounts", "[{\"id\":\"00000000-0000-0000-0000-00000000000a\","
+        respond(HttpMethod.GET, "/api/internal/admin/minecraft-accounts", "[{\"id\":\"00000000-0000-0000-0000-00000000000a\","
                 + "\"label\":\"Bot1\",\"minecraftUsername\":\"CatapultBot1\",\"fillOrder\":2,\"friendLimitReached\":true,"
                 + "\"enabled\":false,\"linkCount\":7}]");
 
@@ -1569,7 +1567,7 @@ class RealApiServiceTest {
 
     @Test
     void adminMinecraftAccounts_isNullWhenTheApiFails() {
-        expect(HttpMethod.GET, "/api/admin/minecraft-accounts").andRespond(withStatus(HttpStatus.NOT_FOUND));
+        expect(HttpMethod.GET, "/api/internal/admin/minecraft-accounts").andRespond(withStatus(HttpStatus.NOT_FOUND));
 
         assertThat(service.adminMinecraftAccounts()).isNull();
     }
@@ -1577,10 +1575,10 @@ class RealApiServiceTest {
     @Test
     void minecraftAccountActions_sendTheirShapes_andReturnTheStatus() {
         UUID id = UUID.fromString("00000000-0000-0000-0000-00000000000a");
-        expect(HttpMethod.PATCH, "/api/admin/minecraft-accounts/" + id)
+        expect(HttpMethod.PATCH, "/api/internal/admin/minecraft-accounts/" + id)
                 .andExpect(content().json("{\"friendLimitReached\":false}", org.springframework.test.json.JsonCompareMode.STRICT))
                 .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
-        expect(HttpMethod.DELETE, "/api/admin/minecraft-accounts/" + id)
+        expect(HttpMethod.DELETE, "/api/internal/admin/minecraft-accounts/" + id)
                 .andRespond(withStatus(HttpStatus.CONFLICT).contentType(MediaType.APPLICATION_JSON).body("{\"error\":\"linked\"}"));
 
         assertThat(service.adminPatchMinecraftAccount(id, Map.of("friendLimitReached", false))).isEqualTo(200);
@@ -1589,14 +1587,14 @@ class RealApiServiceTest {
 
     @Test
     void adminMinecraftDeviceCode_readsTheSnakeCaseAnswer_andKeepsARefusalsStatusAndProblem() {
-        expect(HttpMethod.POST, "/api/admin/minecraft-accounts/device-code").andRespond(withSuccess(
+        expect(HttpMethod.POST, "/api/internal/admin/minecraft-accounts/device-code").andRespond(withSuccess(
                 "{\"device_code\":\"dc-1\",\"user_code\":\"ABCD-1234\",\"verification_uri\":\"https://www.microsoft.com/link\","
                         + "\"interval\":5,\"expires_in\":900}", MediaType.APPLICATION_JSON));
-        expect(HttpMethod.POST, "/api/admin/minecraft-accounts/device-code")
+        expect(HttpMethod.POST, "/api/internal/admin/minecraft-accounts/device-code")
                 .andRespond(withStatus(HttpStatus.BAD_GATEWAY).contentType(MediaType.APPLICATION_JSON)
                         .body("{\"status\":502,\"code\":\"minecraft_device_code_refused\",\"upstream\":\"AADSTS70002\"}"));
-        expect(HttpMethod.POST, "/api/admin/minecraft-accounts/device-code").andRespond(withStatus(HttpStatus.NOT_FOUND));
-        expect(HttpMethod.POST, "/api/admin/minecraft-accounts/device-code").andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+        expect(HttpMethod.POST, "/api/internal/admin/minecraft-accounts/device-code").andRespond(withStatus(HttpStatus.NOT_FOUND));
+        expect(HttpMethod.POST, "/api/internal/admin/minecraft-accounts/device-code").andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
 
         assertThat(service.adminMinecraftDeviceCode()).isEqualTo(new fr.enimaloc.catapult.service.ApiService.MinecraftDeviceCodeStart(200,
                 new fr.enimaloc.catapult.common.dto.admin.MinecraftDeviceCodeDto("dc-1", "ABCD-1234", "https://www.microsoft.com/link", 5, 900), null));
@@ -1613,13 +1611,13 @@ class RealApiServiceTest {
     @Test
     void createAndReauth_postTheDeviceCode_andKeepTheStatusAndBody() {
         UUID id = UUID.fromString("00000000-0000-0000-0000-00000000000a");
-        expect(HttpMethod.POST, "/api/admin/minecraft-accounts")
+        expect(HttpMethod.POST, "/api/internal/admin/minecraft-accounts")
                 .andExpect(content().json("{\"deviceCode\":\"dc-1\",\"label\":\"Bot1\"}", org.springframework.test.json.JsonCompareMode.STRICT))
                 .andRespond(withStatus(HttpStatus.ACCEPTED).contentType(MediaType.APPLICATION_JSON).body("{\"status\":\"PENDING\"}"));
-        expect(HttpMethod.POST, "/api/admin/minecraft-accounts")
+        expect(HttpMethod.POST, "/api/internal/admin/minecraft-accounts")
                 .andExpect(content().json("{\"deviceCode\":\"dc-1\"}", org.springframework.test.json.JsonCompareMode.STRICT))
                 .andRespond(withSuccess("{\"label\":\"Compte Minecraft\",\"minecraftUsername\":\"CatapultBot1\"}", MediaType.APPLICATION_JSON));
-        expect(HttpMethod.POST, "/api/admin/minecraft-accounts/" + id + "/reauth")
+        expect(HttpMethod.POST, "/api/internal/admin/minecraft-accounts/" + id + "/reauth")
                 .andExpect(content().json("{\"deviceCode\":\"dc-2\"}", org.springframework.test.json.JsonCompareMode.STRICT))
                 .andRespond(withStatus(HttpStatus.BAD_GATEWAY).contentType(MediaType.APPLICATION_JSON).body("{\"message\":\"chain failed\"}"));
 
@@ -1634,9 +1632,9 @@ class RealApiServiceTest {
 
     @Test
     void adminTws_readTheListAndOneDefinition_withTheIdAsAUriVariable() {
-        respond(HttpMethod.GET, "/api/admin/tw", "[{\"id\":\"gore\",\"label\":\"Gore\",\"description\":null,"
+        respond(HttpMethod.GET, "/api/internal/admin/tws", "[{\"id\":\"gore\",\"label\":\"Gore\",\"description\":null,"
                 + "\"enabled\":false,\"sortOrder\":7}]");
-        respond(HttpMethod.GET, "/api/admin/tw/a%2Fb%20%C3%A9", "{\"id\":\"a/b é\",\"label\":\"L\","
+        respond(HttpMethod.GET, "/api/internal/admin/tws/a%2Fb%20%C3%A9", "{\"id\":\"a/b é\",\"label\":\"L\","
                 + "\"description\":\"d\",\"enabled\":true,\"sortOrder\":0}");
 
         assertThat(service.adminTws()).singleElement().satisfies(d -> {
@@ -1651,7 +1649,7 @@ class RealApiServiceTest {
 
     @Test
     void adminCreateTw_postsTheDefinition_andReturnsTheStatus() {
-        expect(HttpMethod.POST, "/api/admin/tw")
+        expect(HttpMethod.POST, "/api/internal/admin/tws")
                 .andExpect(content().json("{\"id\":\"gore\",\"label\":\"Gore\",\"sortOrder\":3}"))
                 .andRespond(withStatus(HttpStatus.CREATED));
 
@@ -1660,9 +1658,9 @@ class RealApiServiceTest {
 
     @Test
     void rebuild_mapsEachModeToItsRoute() {
-        expectPost("/api/admin/tw/rebuild");
-        expectPost("/api/admin/tw/rebuild/force");
-        expect(HttpMethod.POST, "/api/admin/tw/rebuild/force-pinned").andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
+        expectPost("/api/internal/admin/tws/rebuild");
+        expectPost("/api/internal/admin/tws/rebuild/force");
+        expect(HttpMethod.POST, "/api/internal/admin/tws/rebuild/force-pinned").andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
 
         assertThat(service.adminRebuildTws(fr.enimaloc.catapult.common.dto.admin.TwRebuild.NON_OVERRIDDEN)).isEqualTo(204);
         assertThat(service.adminRebuildTws(fr.enimaloc.catapult.common.dto.admin.TwRebuild.UNTOUCHED)).isEqualTo(204);
@@ -1671,10 +1669,10 @@ class RealApiServiceTest {
 
     @Test
     void twKeywords_listAddAndTest_useTheSteamKeywordRoutes() {
-        respond(HttpMethod.GET, "/api/admin/tw/violence/steam-keywords", "[\"blood\",\"gore\"]");
-        expect(HttpMethod.POST, "/api/admin/tw/violence/steam-keywords")
+        respond(HttpMethod.GET, "/api/internal/admin/tws/violence/steam-keywords", "[\"blood\",\"gore\"]");
+        expect(HttpMethod.POST, "/api/internal/admin/tws/violence/steam-keywords")
                 .andExpect(content().json("{\"keyword\":\"blood\"}", true)).andRespond(withNoContent());
-        expect(HttpMethod.POST, "/api/admin/tw/violence/steam-keywords/test")
+        expect(HttpMethod.POST, "/api/internal/admin/tws/violence/steam-keywords/test")
                 .andExpect(content().json("{\"appId\":\"730\",\"draftKeyword\":\"gor\"}", true))
                 .andRespond(withSuccess("{\"notes\":\"gore\",\"matchedKeywords\":[\"gore\"],"
                         + "\"draftKeywordMatch\":null,\"matchedContentDescriptorIds\":[1,5]}", MediaType.APPLICATION_JSON));
@@ -1690,14 +1688,14 @@ class RealApiServiceTest {
 
     @Test
     void twTest_whenTheApiRefuses_isNull() {
-        expect(HttpMethod.POST, "/api/admin/tw/violence/steam-keywords/test").andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
+        expect(HttpMethod.POST, "/api/internal/admin/tws/violence/steam-keywords/test").andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
 
         assertThat(service.adminTestTwKeyword("violence", "730", null)).isNull();
     }
 
     @Test
     void removeKeyword_encodesIt() {
-        expect(HttpMethod.DELETE, "/api/admin/tw/violence/steam-keywords/gore%2Fblood%20%C3%A9").andRespond(withNoContent());
+        expect(HttpMethod.DELETE, "/api/internal/admin/tws/violence/steam-keywords/gore%2Fblood%20%C3%A9").andRespond(withNoContent());
 
         assertThat(service.adminRemoveTwKeyword("violence", "gore/blood é")).isEqualTo(204);
     }

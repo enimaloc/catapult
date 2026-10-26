@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.admin;
 
+import fr.enimaloc.catapult.api.ApiPaths;
 import fr.enimaloc.catapult.api.error.ApiProblem;
 import fr.enimaloc.catapult.common.dto.admin.AccountDto;
 import fr.enimaloc.catapult.common.error.ErrorCode;
@@ -27,7 +28,7 @@ import java.util.UUID;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/admin/minecraft-accounts")
+@RequestMapping(ApiPaths.ADMIN + "/minecraft-accounts")
 @RequiredArgsConstructor
 @ConditionalOnBooleanProperty("minecraft.enabled")
 public class ApiAdminMinecraftAccountsController {

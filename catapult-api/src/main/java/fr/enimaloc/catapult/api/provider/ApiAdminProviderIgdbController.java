@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.provider;
 
+import fr.enimaloc.catapult.api.ApiPaths;
 import fr.enimaloc.catapult.common.dto.admin.AdminProviderIgdbQueryRequest;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
 import lombok.RequiredArgsConstructor;
@@ -16,7 +17,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/admin/providers/igdb")
+@RequestMapping(ApiPaths.ADMIN + "/providers/igdb")
 @RequiredArgsConstructor
 public class ApiAdminProviderIgdbController {
 

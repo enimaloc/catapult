@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.admin;
 
+import fr.enimaloc.catapult.api.ApiPaths;
 import fr.enimaloc.catapult.admindata.AttributeClassifier;
 import fr.enimaloc.catapult.admindata.AttributeKind;
 import fr.enimaloc.catapult.admindata.DataRegistry;
@@ -45,7 +46,7 @@ import java.util.Map;
 import java.util.Optional;
 
 @RestController
-@RequestMapping("/api/admin/data")
+@RequestMapping(ApiPaths.ADMIN + "/data")
 @RequiredArgsConstructor
 @Slf4j
 public class ApiAdminDataController {

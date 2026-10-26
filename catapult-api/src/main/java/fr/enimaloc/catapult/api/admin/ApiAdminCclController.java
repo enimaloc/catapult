@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.admin;
 
+import fr.enimaloc.catapult.api.ApiPaths;
 import fr.enimaloc.catapult.common.dto.admin.SaveMappingsRequest;
 import fr.enimaloc.catapult.domain.igdb.IgdbRatingDescriptor;
 import fr.enimaloc.catapult.domain.twitch.TwitchCclDefinition;
@@ -10,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -22,7 +24,7 @@ import java.util.Map;
 import java.util.Set;
 
 @RestController
-@RequestMapping("/api/admin/ccl")
+@RequestMapping(ApiPaths.ADMIN + "/ccls")
 @RequiredArgsConstructor
 public class ApiAdminCclController {
 
@@ -44,7 +46,7 @@ public class ApiAdminCclController {
                 adminCclService.getAllIgdbDescriptors().stream().map(ApiAdminCclController::descriptorView).toList());
     }
 
-    @PostMapping("/{cclId}/mappings")
+    @PutMapping("/{cclId}/mappings")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void saveMappings(@PathVariable String cclId, @RequestBody SaveMappingsRequest body) {
         adminCclService.saveMappings(cclId, body.igdbCategoryIds() == null ? Set.of() : body.igdbCategoryIds());

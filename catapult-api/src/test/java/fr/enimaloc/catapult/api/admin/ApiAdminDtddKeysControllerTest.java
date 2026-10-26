@@ -1,7 +1,6 @@
 package fr.enimaloc.catapult.api.admin;
 
 import fr.enimaloc.catapult.common.dto.admin.AddKeyRequest;
-import fr.enimaloc.catapult.common.dto.admin.DeleteKeyRequest;
 import fr.enimaloc.catapult.domain.dtdd.DtddApiKeyEntry;
 import fr.enimaloc.catapult.getter.dtdd.DtddApiKeyRotator;
 import fr.enimaloc.catapult.repository.dtdd.DtddApiKeyRepository;
@@ -73,7 +72,7 @@ class ApiAdminDtddKeysControllerTest {
         ));
         String id = ApiKeyHasher.id("ABCDEFGHIJKLMNOP");
 
-        controller.delete(new DeleteKeyRequest(id));
+        controller.delete(id);
 
         verify(repository).deleteById("ABCDEFGHIJKLMNOP");
         verify(rotator).refreshKeys();
@@ -101,7 +100,7 @@ class ApiAdminDtddKeysControllerTest {
         when(repository.findByExclusiveFalseWithOwner()).thenReturn(List.of());
 
         bare.add(new AddKeyRequest("ddd_abcdef1234567890ABCD"));
-        bare.delete(new DeleteKeyRequest(ApiKeyHasher.id("ABCDEFGHIJKLMNOP")));
+        bare.delete(ApiKeyHasher.id("ABCDEFGHIJKLMNOP"));
         bare.refresh();
 
         verify(repository).save(any(DtddApiKeyEntry.class));
@@ -115,7 +114,7 @@ class ApiAdminDtddKeysControllerTest {
     void delete_unknownKeyId_throwsNotFound() {
         when(repository.findByExclusiveFalse()).thenReturn(List.of());
         assertThatThrownBy(() ->
-                controller.delete(new DeleteKeyRequest("0000000000000000")))
+                controller.delete("0000000000000000"))
             .isInstanceOf(ResponseStatusException.class);
         verify(repository, never()).deleteById(any());
     }

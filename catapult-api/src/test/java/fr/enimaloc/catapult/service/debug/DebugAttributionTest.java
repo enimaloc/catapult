@@ -207,7 +207,7 @@ class DebugAttributionTest {
         assertThat(seen).containsExactly(caller);
     }
 
-    /** Loopback passes the /api/admin/** rule without a JWT, like an admin. */
+    /** Loopback passes the ApiPaths.ADMIN rule without a JWT, like an admin. */
     @Test
     void loopbackOnAMembersAdminRoute_isAttributedToThatMember() throws Exception {
         UUID member = UUID.randomUUID();

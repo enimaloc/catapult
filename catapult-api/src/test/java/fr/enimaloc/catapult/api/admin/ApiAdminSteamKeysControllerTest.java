@@ -1,7 +1,6 @@
 package fr.enimaloc.catapult.api.admin;
 
 import fr.enimaloc.catapult.common.dto.admin.AddKeyRequest;
-import fr.enimaloc.catapult.common.dto.admin.DeleteKeyRequest;
 import fr.enimaloc.catapult.common.dto.admin.KeyStatus;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.steam.SteamApiKeyEntry;
@@ -84,7 +83,7 @@ class ApiAdminSteamKeysControllerTest {
 
         assertThat(bare.page().steamEnabled()).isFalse();
         bare.add(new AddKeyRequest(OTHER));
-        bare.delete(new DeleteKeyRequest(ApiKeyHasher.id(KEY)));
+        bare.delete(ApiKeyHasher.id(KEY));
         bare.refresh();
 
         verify(repository).deleteById(KEY);
@@ -121,7 +120,7 @@ class ApiAdminSteamKeysControllerTest {
     void delete_findsTheKeyByItsId() {
         when(repository.findByExclusiveFalse()).thenReturn(List.of(entry(OTHER, null), entry(KEY, null)));
 
-        controller.delete(new DeleteKeyRequest(ApiKeyHasher.id(KEY)));
+        controller.delete(ApiKeyHasher.id(KEY));
 
         verify(repository).deleteById(KEY);
         verify(rotator).refreshKeys();
@@ -132,7 +131,7 @@ class ApiAdminSteamKeysControllerTest {
     void delete_unknownIds_are404() {
         when(repository.findByExclusiveFalse()).thenReturn(List.of(entry(KEY, null)));
 
-        assertThatThrownBy(() -> controller.delete(new DeleteKeyRequest("nope")))
+        assertThatThrownBy(() -> controller.delete("nope"))
                 .isInstanceOfSatisfying(ResponseStatusException.class,
                         e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
     }

@@ -60,7 +60,7 @@ class ProblemContractTest extends FullContextTestBase {
     /** Replaces Task 1's pin of the dropped reason: the reason is now the problem's detail. */
     @Test
     void internalErrorIsAProblem() throws Exception {
-        String path = "/api/admin/caches/unknown";
+        String path = "/api/internal/admin/caches/unknown";
         HttpResponse<String> response = send(path, Map.of());
 
         assertThat(response.statusCode()).isEqualTo(404);
