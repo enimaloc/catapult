@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.userapi;
 
+import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.api.CustomBindingViews;
 import fr.enimaloc.catapult.api.error.ApiProblem;
 import fr.enimaloc.catapult.common.error.ErrorCode;
@@ -36,6 +37,7 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -50,7 +52,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         controllers = CustomBindingsApiV2Controller.class,
         excludeAutoConfiguration = ThymeleafAutoConfiguration.class,
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
-@Import({ApiSecurityConfig.class, CustomBindingsApiV2ControllerTest.Keys.class, CustomBindingViews.class})
+@Import({ApiSecurityConfig.class, CustomBindingsApiV2ControllerTest.Keys.class, CustomBindingViews.class,
+        ApiUserResolver.class})
 @ActiveProfiles("test")
 class CustomBindingsApiV2ControllerTest {
 
@@ -72,6 +75,7 @@ class CustomBindingsApiV2ControllerTest {
         when(accounts.findById(user.getId())).thenReturn(Optional.of(user));
         when(tokens.authenticate(TOKEN)).thenReturn(Optional.of(user));
         when(service.enabled(any())).thenReturn(true);
+        doCallRealMethod().when(service).activate(any(UserAccount.class), anyString());
         art = new CustomBinding();
         art.setId(UUID.randomUUID());
         art.setUser(user);
@@ -149,7 +153,7 @@ class CustomBindingsApiV2ControllerTest {
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.code").value("not_found"));
 
-        verify(service, never()).activate(any(), any());
+        verify(service, never()).activate(any(), any(CustomBinding.class));
     }
 
     @Test
@@ -208,7 +212,7 @@ class CustomBindingsApiV2ControllerTest {
                 .andExpect(jsonPath("$.code").value("feature_disabled"));
         mvc.perform(withToken(post("/api/v2/custom-bindings/art/activate"))).andExpect(status().isForbidden());
         mvc.perform(withToken(post("/api/v2/custom-bindings/deactivate"))).andExpect(status().isForbidden());
-        verify(service, never()).activate(any(), any());
+        verify(service, never()).activate(any(), any(CustomBinding.class));
     }
 
     @Test

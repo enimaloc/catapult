@@ -1,9 +1,8 @@
 package fr.enimaloc.catapult.api.userapi;
 
+import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.api.CustomBindingViews;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto;
-import fr.enimaloc.catapult.domain.account.UserAccount;
-import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.security.ApiSecurityConfig;
 import fr.enimaloc.catapult.service.binding.CustomBindingService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -36,21 +35,20 @@ public class CustomBindingsApiV2Controller {
 
     private final CustomBindingService customBindingService;
     private final CustomBindingViews views;
-    private final UserAccountRepository userAccountRepository;
+    private final ApiUserResolver userResolver;
 
     @GetMapping
     @Operation(summary = "The custom bindings and the active one")
     public CustomBindingsStateDto list(@AuthenticationPrincipal UUID userId) {
-        return views.state(member(userId));
+        return views.state(userResolver.tokenOwner(userId));
     }
 
     @PostMapping("/{idOrName}/activate")
     @Operation(summary = "Apply a custom binding now (204), live or not; 404 unknown, 409 Twitch link broken or "
             + "Catapult paused, 502 Twitch failed; errors are application/problem+json with a code")
     public ResponseEntity<Void> activate(@AuthenticationPrincipal UUID userId, @PathVariable String idOrName) {
-        UserAccount user = member(userId);
-        return customBindingService.resolve(user, idOrName)
-                .map(binding -> CustomBindingViews.activation(customBindingService.activate(user, binding)))
+        return customBindingService.activate(userResolver.tokenOwner(userId), idOrName)
+                .map(CustomBindingViews::activation)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown custom binding"));
     }
 
@@ -58,12 +56,6 @@ public class CustomBindingsApiV2Controller {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "End the active custom binding, if any: the game open now takes over")
     public void deactivate(@AuthenticationPrincipal UUID userId) {
-        customBindingService.deactivate(member(userId));
-    }
-
-    private UserAccount member(UUID userId) {
-        if (userId == null) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
-        return userAccountRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        customBindingService.deactivate(userResolver.tokenOwner(userId));
     }
 }

@@ -124,13 +124,7 @@ class ControllerConventionsTest {
           "ApiSteamConnectController depends on DebugRecording",
           "ApiSteamConnectController depends on RestClient",
           "ApiSteamConnectController depends on UserAccountRepository",
-          "ApiTwitchatWidgetController depends on TwitchatWidgetSettingsRepository",
-          "ApiUsersController depends on UserAccountRepository",
-          "CustomBindingsApiV2Controller depends on UserAccountRepository",
-          "UserApiV1Controller depends on GameBindingRepository",
-          "UserApiV2Controller depends on DtddApiClient",
-          "UserApiV2Controller depends on GameBindingRepository",
-          "UserApiV2Controller depends on TwDtddTopicMappingRepository");
+          "ApiUsersController depends on UserAccountRepository");
 
   @Test
   void controllersFollowTheConventions() throws Exception {

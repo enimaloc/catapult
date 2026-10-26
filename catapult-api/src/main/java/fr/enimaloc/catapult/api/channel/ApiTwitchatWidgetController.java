@@ -3,12 +3,8 @@ package fr.enimaloc.catapult.api.channel;
 import fr.enimaloc.catapult.common.dto.channel.ConfigResponse;
 import fr.enimaloc.catapult.common.dto.notification.NotificationFlushResultDto;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetAccessResponse;
-import fr.enimaloc.catapult.domain.twitchat.TwitchatWidgetSettings;
-import fr.enimaloc.catapult.repository.twitchat.TwitchatWidgetSettingsRepository;
-import fr.enimaloc.catapult.security.TokenEncryptionService;
-import fr.enimaloc.catapult.service.account.WidgetTokenService;
-import fr.enimaloc.catapult.service.notification.NotificationDeliveryDispatcher;
 import fr.enimaloc.catapult.service.notification.TwitchatActionExecutor;
+import fr.enimaloc.catapult.service.notification.TwitchatWidgetAccess;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -21,40 +17,28 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ApiTwitchatWidgetController {
 
-    private final TwitchatWidgetSettingsRepository widgetSettingsRepository;
-    private final WidgetTokenService widgetTokenService;
-    private final TokenEncryptionService tokenEncryptionService;
+    private final TwitchatWidgetAccess widgetAccess;
     private final TwitchatActionExecutor actionExecutor;
-    private final NotificationDeliveryDispatcher deliveryDispatcher;
 
     @GetMapping("/widget/{uuid}/access")
     public ResponseEntity<TwitchatWidgetAccessResponse> access(@PathVariable UUID uuid) {
-        return widgetTokenService.resolve(uuid)
-                .map(user -> ResponseEntity.ok(new TwitchatWidgetAccessResponse(user.getId().toString(),
-                        widgetSettingsRepository.findById(user.getId()).map(TwitchatWidgetSettings::isEnabled).orElse(false))))
+        return widgetAccess.access(uuid)
+                .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @GetMapping("/widget/{uuid}")
     public ResponseEntity<ConfigResponse> config(@PathVariable UUID uuid) {
-        // Disabling the widget must also stop handing out the OBS-websocket password,
-        // otherwise the "Activer" toggle revokes nothing (same check as access()).
-        return widgetTokenService.resolve(uuid)
-                .flatMap(user -> widgetSettingsRepository.findById(user.getId()))
-                .filter(TwitchatWidgetSettings::isEnabled)
-                .map(s -> ResponseEntity.ok(new ConfigResponse(s.getObsHost(), s.getObsPort(),
-                        s.getObsPasswordEncrypted() == null ? null : tokenEncryptionService.decrypt(s.getObsPasswordEncrypted()),
-                        s.getTwitchatBranch())))
+        return widgetAccess.config(uuid)
+                .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     /** The widget's owner's pending Twitchat notifications, sent once catapult-web has the OBS widget connected. */
     @PostMapping("/widget/{uuid}/notifications/flush")
     public ResponseEntity<NotificationFlushResultDto> flushNotifications(@PathVariable UUID uuid) {
-        // Like config(): a disabled widget is no widget, and its owner's deliveries stay pending
-        return widgetTokenService.resolve(uuid)
-                .filter(owner -> widgetSettingsRepository.findById(owner.getId()).map(TwitchatWidgetSettings::isEnabled).orElse(false))
-                .map(owner -> ResponseEntity.ok(new NotificationFlushResultDto(deliveryDispatcher.flushTwitchat(owner))))
+        return widgetAccess.flush(uuid)
+                .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 

@@ -182,6 +182,14 @@ public class CustomBindingService {
         return result;
     }
 
+    /**
+     * {@link #activate(UserAccount, CustomBinding)} on the streamer's binding with that id or name (see
+     * {@link #resolve}), or empty when there is none.
+     */
+    public Optional<ActivationResult> activate(UserAccount user, String idOrName) {
+        return resolve(user, idOrName).map(binding -> activate(user, binding));
+    }
+
     /** Ends the active binding, if any, as if the game open now had just been detected. */
     public void deactivate(UserAccount user) {
         requireEnabled(user);

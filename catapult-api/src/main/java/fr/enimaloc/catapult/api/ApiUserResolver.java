@@ -77,6 +77,12 @@ public class ApiUserResolver {
         return jwt;
     }
 
+    /** The owner of the personal API token, by its principal (their account id), or 401 when unknown. */
+    public UserAccount tokenOwner(UUID userId) {
+        if (userId == null) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+        return byId(userId).orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+    }
+
     /** The account {@code userId} (a channel, or a member's own), or 404. */
     public UserAccount user(UUID userId) {
         return byId(userId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
