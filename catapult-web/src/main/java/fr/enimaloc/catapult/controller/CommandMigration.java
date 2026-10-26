@@ -8,7 +8,7 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * The Integrations tab's card moving a streamer's catapult chat commands to another chat bot: for
+ * The Commands tab's card moving a streamer's catapult chat commands to another chat bot: for
  * each tool, what to set up for each command. Every command made from a preset becomes a read of
  * the user API's summary ({@code /api/user/summary/{token}}, relayed on this site's origin): the
  * field standing for what the preset said, read from the JSON by the tools that can, or asked for
