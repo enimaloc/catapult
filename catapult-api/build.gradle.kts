@@ -113,12 +113,30 @@ tasks.processResources {
 
 tasks.withType<Test> {
     useJUnitPlatform()
-    // EnglishConventionsTest reads the sibling modules' sources: a change there reruns the tests
+}
+
+tasks.test {
+    // EnglishConventionsTest has its own task: it reads the sibling modules' sources
+    filter.excludeTestsMatching("*EnglishConventionsTest")
+}
+
+// EnglishConventionsTest reads the sibling modules' sources: only this task reruns when they change
+val englishConventions = tasks.register<Test>("englishConventions") {
+    description = "Checks that the code, comments, logs and test names of every module are written in English."
+    group = "verification"
+    val testSourceSet = sourceSets.test.get()
+    testClassesDirs = testSourceSet.output.classesDirs
+    classpath = testSourceSet.runtimeClasspath
+    filter.includeTestsMatching("*EnglishConventionsTest")
     listOf("catapult-common", "catapult-web").forEach { module ->
         inputs.dir(rootProject.file("$module/src"))
             .withPropertyName("${module}Sources")
             .withPathSensitivity(PathSensitivity.RELATIVE)
     }
+}
+
+tasks.check {
+    dependsOn(englishConventions)
 }
 
 springBoot {
