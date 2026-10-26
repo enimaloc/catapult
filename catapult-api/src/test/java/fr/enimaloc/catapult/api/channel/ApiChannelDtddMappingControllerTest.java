@@ -13,6 +13,8 @@ import fr.enimaloc.catapult.repository.dtdd.DtddGameCacheRepository;
 import fr.enimaloc.catapult.repository.dtdd.DtddGameMappingRepository;
 import fr.enimaloc.catapult.repository.dtdd.DtddMappingProposalRepository;
 import fr.enimaloc.catapult.repository.dtdd.DtddSearchCacheRepository;
+import fr.enimaloc.catapult.service.dtdd.DtddGameSearchService;
+import fr.enimaloc.catapult.service.dtdd.DtddMappingProposalService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -37,6 +39,8 @@ class ApiChannelDtddMappingControllerTest {
     @Mock DtddSearchCacheRepository searchRepo;
     @Mock DtddMappingProposalRepository proposalRepo;
     @Mock DtddApiClient apiClient;
+    @Mock fr.enimaloc.catapult.repository.dtdd.DtddTopicsCacheRepository topicsRepo;
+    @Mock fr.enimaloc.catapult.service.notification.AdminEventPublisher events;
     @Mock fr.enimaloc.catapult.service.dtdd.DtddMappingEvents mappingEvents;
     @Mock fr.enimaloc.catapult.api.ApiUserResolver userResolver;
     @Mock org.springframework.security.oauth2.jwt.Jwt jwt;
@@ -46,7 +50,9 @@ class ApiChannelDtddMappingControllerTest {
 
     @BeforeEach
     void setUp() {
-        controller = new ApiChannelDtddMappingController(mappingRepo, gameRepo, searchRepo, proposalRepo, apiClient, mappingEvents, userResolver);
+        controller = new ApiChannelDtddMappingController(
+            new DtddMappingProposalService(mappingRepo, gameRepo, proposalRepo, topicsRepo, mappingEvents, events),
+            new DtddGameSearchService(gameRepo, searchRepo, apiClient), userResolver);
         user = new UserAccount();
         user.setId(UUID.randomUUID());
         lenient().when(userResolver.viewer(jwt)).thenReturn(user);
@@ -143,5 +149,20 @@ class ApiChannelDtddMappingControllerTest {
         var results = controller.search("stardew");
 
         assertThat(results.results()).extracting(SearchResultDto::dtddId).containsExactlyInAnyOrder(4521L, 7777L);
+    }
+
+    @Test
+    void search_cachedQuery_neverCallsDtdd() {
+        when(gameRepo.searchByNameLike(eq("stardew"), any(PageRequest.class))).thenReturn(List.of(
+            new DtddGameCache(4521L, "Stardew Valley", "s-v", "Video Game", null, Instant.now())));
+        when(searchRepo.findById("stardew")).thenReturn(Optional.of(
+            new fr.enimaloc.catapult.domain.dtdd.DtddSearchCache("stardew", List.of(4521L), Instant.now())));
+
+        var results = controller.search("Stardew");
+
+        assertThat(results.results()).extracting(SearchResultDto::dtddId).containsExactly(4521L);
+        verifyNoInteractions(apiClient);
+        verify(gameRepo, never()).save(any());
+        verify(searchRepo, never()).save(any());
     }
 }
