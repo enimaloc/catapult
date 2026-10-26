@@ -120,6 +120,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -857,7 +858,17 @@ public class RealApiService implements ApiService {
 
     @Override
     public int adminExperimentAction(UUID id, String action) {
-        return client.call(HttpMethod.POST, "/api/admin/experiments/{id}/{action}", null, Void.class, id, action).status();
+        // one literal per route, so catapult-web's calls can be checked against catapult-api's routes
+        ApiClient.Result<Void> result = switch (action) {
+            case "activate" -> client.call(HttpMethod.POST, "/api/admin/experiments/{id}/activate", null, Void.class, id);
+            case "pause" -> client.call(HttpMethod.POST, "/api/admin/experiments/{id}/pause", null, Void.class, id);
+            case "end" -> client.call(HttpMethod.POST, "/api/admin/experiments/{id}/end", null, Void.class, id);
+            case "assign" -> client.call(HttpMethod.POST, "/api/admin/experiments/{id}/assign", null, Void.class, id);
+            case "reassign" -> client.call(HttpMethod.POST, "/api/admin/experiments/{id}/reassign", null, Void.class, id);
+            // no such route: what catapult-api answers it
+            default -> new ApiClient.Result<>(HttpStatus.NOT_FOUND.value(), null);
+        };
+        return result.status();
     }
 
     @Override
@@ -1028,11 +1039,11 @@ public class RealApiService implements ApiService {
     public ApiKeysPageDto adminApiKeys(ApiKeyProvider provider) {
         return switch (provider) {
             case STEAM -> {
-                SteamKeysPageData page = client.get("/api/admin/{path}", SteamKeysPageData.class, provider.apiPath());
+                SteamKeysPageData page = client.get("/api/admin/steam-keys", SteamKeysPageData.class);
                 yield page == null ? null : ApiKeysPageDto.of(page);
             }
             case DTDD -> {
-                DtddKeysPageData page = client.get("/api/admin/{path}", DtddKeysPageData.class, provider.apiPath());
+                DtddKeysPageData page = client.get("/api/admin/dtdd-keys", DtddKeysPageData.class);
                 yield page == null ? null : ApiKeysPageDto.of(page);
             }
         };
@@ -1040,43 +1051,55 @@ public class RealApiService implements ApiService {
 
     @Override
     public int adminAddApiKey(ApiKeyProvider provider, String apiKey) {
-        return client.call(HttpMethod.POST, "/api/admin/{path}/add", Map.of("apiKey", apiKey), Void.class, provider.apiPath()).status();
+        Map<String, String> body = Map.of("apiKey", apiKey);
+        ApiClient.Result<Void> result = switch (provider) {
+            case STEAM -> client.call(HttpMethod.POST, "/api/admin/steam-keys/add", body, Void.class);
+            case DTDD -> client.call(HttpMethod.POST, "/api/admin/dtdd-keys/add", body, Void.class);
+        };
+        return result.status();
     }
 
     @Override
     public int adminDeleteApiKey(ApiKeyProvider provider, String keyId) {
-        return client.call(HttpMethod.POST, "/api/admin/{path}/delete", Map.of("keyId", keyId), Void.class, provider.apiPath()).status();
+        Map<String, String> body = Map.of("keyId", keyId);
+        ApiClient.Result<Void> result = switch (provider) {
+            case STEAM -> client.call(HttpMethod.POST, "/api/admin/steam-keys/delete", body, Void.class);
+            case DTDD -> client.call(HttpMethod.POST, "/api/admin/dtdd-keys/delete", body, Void.class);
+        };
+        return result.status();
     }
 
     @Override
     public int adminRefreshApiKeys(ApiKeyProvider provider) {
-        return client.call(HttpMethod.POST, "/api/admin/{path}/refresh", null, Void.class, provider.apiPath()).status();
+        ApiClient.Result<Void> result = switch (provider) {
+            case STEAM -> client.call(HttpMethod.POST, "/api/admin/steam-keys/refresh", null, Void.class);
+            case DTDD -> client.call(HttpMethod.POST, "/api/admin/dtdd-keys/refresh", null, Void.class);
+        };
+        return result.status();
     }
-
-    private static final String MINECRAFT_ACCOUNTS = "/api/admin/minecraft-accounts";
 
     @Override
     public List<AccountDto> adminMinecraftAccounts() {
         // a 404 (Minecraft disabled in catapult-api) is null, like any failed read
-        AccountDto[] accounts = client.get(MINECRAFT_ACCOUNTS, AccountDto[].class);
+        AccountDto[] accounts = client.get("/api/admin/minecraft-accounts", AccountDto[].class);
         return accounts == null ? null : List.of(accounts);
     }
 
     @Override
     public int adminPatchMinecraftAccount(UUID id, Map<String, Object> patch) {
-        return client.call(HttpMethod.PATCH, MINECRAFT_ACCOUNTS + "/{id}", patch, Void.class, id).status();
+        return client.call(HttpMethod.PATCH, "/api/admin/minecraft-accounts/{id}", patch, Void.class, id).status();
     }
 
     @Override
     public int adminDeleteMinecraftAccount(UUID id) {
-        return client.call(HttpMethod.DELETE, MINECRAFT_ACCOUNTS + "/{id}", null, Void.class, id).status();
+        return client.call(HttpMethod.DELETE, "/api/admin/minecraft-accounts/{id}", null, Void.class, id).status();
     }
 
     @Override
     public MinecraftDeviceCodeStart adminMinecraftDeviceCode() {
         // read as a map: the code on 200 (snake_case, Microsoft's own fields); a refusal is read as its problem
         @SuppressWarnings("rawtypes")
-        ApiClient.Result<Map> result = client.call(HttpMethod.POST, MINECRAFT_ACCOUNTS + "/device-code", null, Map.class);
+        ApiClient.Result<Map> result = client.call(HttpMethod.POST, "/api/admin/minecraft-accounts/device-code", null, Map.class);
         Map<?, ?> body = result.body() == null ? Map.of() : result.body();
         if (result.status() == 200) {
             if (!(body.get("device_code") instanceof String deviceCode) || deviceCode.isBlank()) {
@@ -1096,12 +1119,12 @@ public class RealApiService implements ApiService {
     @Override
     public ApiClient.Result<Map<String, Object>> adminCreateMinecraftAccount(String deviceCode, String label) {
         Map<String, String> body = label == null ? Map.of("deviceCode", deviceCode) : Map.of("deviceCode", deviceCode, "label", label);
-        return mapResult(client.call(HttpMethod.POST, MINECRAFT_ACCOUNTS, body, Map.class));
+        return mapResult(client.call(HttpMethod.POST, "/api/admin/minecraft-accounts", body, Map.class));
     }
 
     @Override
     public ApiClient.Result<Map<String, Object>> adminReauthMinecraftAccount(UUID id, String deviceCode) {
-        return mapResult(client.call(HttpMethod.POST, MINECRAFT_ACCOUNTS + "/{id}/reauth", Map.of("deviceCode", deviceCode), Map.class, id));
+        return mapResult(client.call(HttpMethod.POST, "/api/admin/minecraft-accounts/{id}/reauth", Map.of("deviceCode", deviceCode), Map.class, id));
     }
 
     @SuppressWarnings("unchecked")
@@ -1126,8 +1149,12 @@ public class RealApiService implements ApiService {
 
     @Override
     public int adminRebuildTws(TwRebuild mode) {
-        // the route is the enum's own constant, never user input
-        return client.call(HttpMethod.POST, "/api/admin/tw/" + mode.apiPath(), null, Void.class).status();
+        ApiClient.Result<Void> result = switch (mode) {
+            case NON_OVERRIDDEN -> client.call(HttpMethod.POST, "/api/admin/tw/rebuild", null, Void.class);
+            case UNTOUCHED -> client.call(HttpMethod.POST, "/api/admin/tw/rebuild/force", null, Void.class);
+            case FORCE_PINNED -> client.call(HttpMethod.POST, "/api/admin/tw/rebuild/force-pinned", null, Void.class);
+        };
+        return result.status();
     }
 
     @Override

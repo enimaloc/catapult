@@ -145,4 +145,70 @@ class AuthzChannelTest {
 
         verifyNoInteractions(channelAccessService);
     }
+
+    @Test
+    void canAccessChannelById_unknownViewerIs401_beforeUnknownChannel() {
+        signInAs(UUID.randomUUID());
+        UUID unknown = UUID.randomUUID();
+
+        assertStatus(() -> authz.canAccessChannel(unknown), HttpStatus.UNAUTHORIZED);
+        assertStatus(() -> authz.ownsChannel(unknown), HttpStatus.UNAUTHORIZED);
+        assertStatus(() -> authz.isSelf(unknown), HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void canAccessChannelById_unknownChannelIs404() {
+        signInAs(owner.getId());
+        UUID unknown = UUID.randomUUID();
+
+        assertStatus(() -> authz.canAccessChannel(unknown), HttpStatus.NOT_FOUND);
+        assertStatus(() -> authz.ownsChannel(unknown), HttpStatus.NOT_FOUND);
+        assertStatus(() -> authz.isSelf(unknown), HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void canAccessChannelById_moderatorIsTrue() {
+        when(channelAccessService.canAccess(moderator, owner)).thenReturn(true);
+        when(channelAccessService.canAccess(member, owner)).thenReturn(false);
+
+        signInAs(moderator.getId());
+        assertThat(authz.canAccessChannel(owner.getId())).isTrue();
+        signInAs(member.getId());
+        assertThat(authz.canAccessChannel(owner.getId())).isFalse();
+    }
+
+    @Test
+    void ownsChannelById_moderatorIsFalse() {
+        signInAs(moderator.getId());
+        assertThat(authz.ownsChannel(owner.getId())).isFalse();
+        signInAs(owner.getId());
+        assertThat(authz.ownsChannel(owner.getId())).isTrue();
+
+        verifyNoInteractions(channelAccessService);
+    }
+
+    @Test
+    void isSelf_sameAccountIsTrue() {
+        signInAs(member.getId());
+        assertThat(authz.isSelf(member.getId())).isTrue();
+    }
+
+    @Test
+    void isSelf_otherAccountIsFalse() {
+        signInAs(moderator.getId());
+        assertThat(authz.isSelf(owner.getId())).isFalse();
+
+        verifyNoInteractions(channelAccessService);
+    }
+
+    @Test
+    void isSelf_noJwtIs401() {
+        assertStatus(() -> authz.isSelf(member.getId()), HttpStatus.UNAUTHORIZED);
+
+        signIn(UsernamePasswordAuthenticationToken.authenticated(member.getId(), null,
+                AuthorityUtils.createAuthorityList(PersonalTokenAuthenticationFilter.AUTHORITY)));
+        assertStatus(() -> authz.isSelf(member.getId()), HttpStatus.UNAUTHORIZED);
+        assertStatus(() -> authz.canAccessChannel(owner.getId()), HttpStatus.UNAUTHORIZED);
+        assertStatus(() -> authz.ownsChannel(owner.getId()), HttpStatus.UNAUTHORIZED);
+    }
 }

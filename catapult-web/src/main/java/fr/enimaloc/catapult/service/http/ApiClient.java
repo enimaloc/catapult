@@ -207,6 +207,16 @@ public class ApiClient {
         return send(HttpMethod.POST, path, body, uriVars);
     }
 
+    /** PUT {@code body} (none when {@code null}) to {@code path}: catapult-api's status, its body ignored; 502 when unreachable. */
+    public int putVoid(String path, Object body, Object... uriVars) {
+        return send(HttpMethod.PUT, path, body, uriVars);
+    }
+
+    /** PATCH {@code body} (none when {@code null}) to {@code path}: catapult-api's status, its body ignored; 502 when unreachable. */
+    public int patchVoid(String path, Object body, Object... uriVars) {
+        return send(HttpMethod.PATCH, path, body, uriVars);
+    }
+
     /** DELETE {@code path}: catapult-api's status, its body ignored; 502 when unreachable. */
     public int delete(String path, Object... uriVars) {
         return send(HttpMethod.DELETE, path, null, uriVars);
@@ -284,7 +294,12 @@ public class ApiClient {
 
     /** The subject (account id) of the calling session's JWT; null without one. */
     public static UUID currentSubject() {
-        Map<?, ?> claims = currentClaims();
+        return subject(currentJwt());
+    }
+
+    /** The subject (account id) of {@code jwt}; null when it is null or unreadable. Read, not verified. */
+    public static UUID subject(String jwt) {
+        Map<?, ?> claims = claims(jwt);
         if (claims == null) return null;
         try {
             return UUID.fromString(String.valueOf(claims.get("sub")));

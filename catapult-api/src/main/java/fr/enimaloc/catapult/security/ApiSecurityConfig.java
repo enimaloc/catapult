@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.security;
 
+import fr.enimaloc.catapult.api.ApiPaths;
 import fr.enimaloc.catapult.service.account.UserApiTokenService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.Bean;
@@ -133,6 +134,7 @@ public class ApiSecurityConfig {
                         .requestMatchers("/api/auth/exchange").permitAll()
                         .requestMatchers("/api/connect/steam/callback").permitAll()
                         .requestMatchers("/api/admin/**").access(Authz.admin())
+                        .requestMatchers(ApiPaths.ADMIN + "/**").access(Authz.admin())
                         .anyRequest().access(Authz.memberOrLoopback())
                 )
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

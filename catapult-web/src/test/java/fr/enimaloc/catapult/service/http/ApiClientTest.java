@@ -147,6 +147,50 @@ class ApiClientTest {
     }
 
     @Test
+    void putVoid_sendsAPut() throws InterruptedException {
+        server.enqueue(new MockResponse().setResponseCode(204));
+
+        record Flag(boolean enabled) {}
+        int status = client.putVoid("/api/internal/users/{userId}/settings/{key}", new Flag(true), "u-1", "raid");
+
+        RecordedRequest recorded = server.takeRequest();
+        assertThat(status).isEqualTo(204);
+        assertThat(recorded.getMethod()).isEqualTo("PUT");
+        assertThat(recorded.getPath()).isEqualTo("/api/internal/users/u-1/settings/raid");
+        assertThat(recorded.getBody().readUtf8()).isEqualTo("{\"enabled\":true}");
+    }
+
+    @Test
+    void patchVoid_sendsAPatch() throws InterruptedException {
+        server.enqueue(new MockResponse().setResponseCode(409));
+
+        record Rename(String name) {}
+        int status = client.patchVoid("/api/internal/admin/groups/{id}", new Rename("beta"), "g-1");
+
+        RecordedRequest recorded = server.takeRequest();
+        assertThat(status).isEqualTo(409);
+        assertThat(recorded.getMethod()).isEqualTo("PATCH");
+        assertThat(recorded.getPath()).isEqualTo("/api/internal/admin/groups/g-1");
+        assertThat(recorded.getBody().readUtf8()).isEqualTo("{\"name\":\"beta\"}");
+    }
+
+    @Test
+    void subject_readsTheJwtSubject() {
+        java.util.UUID id = java.util.UUID.randomUUID();
+
+        assertThat(ApiClient.subject(jwtWithPayload("{\"sub\":\"" + id + "\"}"))).isEqualTo(id);
+    }
+
+    @Test
+    void subject_ofGarbageIsNull() {
+        assertThat(ApiClient.subject(null)).isNull();
+        assertThat(ApiClient.subject("not-a-jwt")).isNull();
+        assertThat(ApiClient.subject("a.!!!.c")).isNull();
+        assertThat(ApiClient.subject(jwtWithPayload("{\"sub\":\"nope\"}"))).isNull();
+        assertThat(ApiClient.subject(jwtWithPayload("{}"))).isNull();
+    }
+
+    @Test
     void forwardsTheSessionJwtAsBearerToken() throws InterruptedException {
         inSessionWithJwt("the-jwt");
         server.enqueue(new MockResponse().setResponseCode(204));

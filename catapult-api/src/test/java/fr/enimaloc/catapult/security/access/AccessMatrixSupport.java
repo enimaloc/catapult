@@ -154,10 +154,14 @@ abstract class AccessMatrixSupport {
             NoResourceFoundException.class,
             ServletRequestBindingException.class);
     /**
-     * Rows that address a route by a concrete URI rather than by its pattern ({@code /api/channels/nobody-here/…}, an
-     * unknown channel): Spring matches them to the pattern they fill, so they are not checked against their own.
+     * Rows that address a route by a concrete URI rather than by its pattern ({@code /api/channels/nobody-here/…},
+     * {@code /api/internal/users/<DEAD>/…}, an unknown channel): Spring matches them to the pattern they fill, so they
+     * are not checked against their own.
      */
-    private static final String LITERAL_PREFIX = "/api/channels/nobody-here/";
+    private static final List<String> LITERAL_PREFIXES =
+            List.of("/api/channels/nobody-here/", "/api/internal/users/" + DEAD + "/");
+    /** The {@code vars} value of {@code userId} that stands for each caller's own account id. */
+    private static final String SELF = "self";
     /** Rows a Spring Security filter answers before any handler: no handler mapping holds them. */
     private static final Set<String> FILTER_ROUTES = Set.of("GET /oauth2/authorization/twitch");
     private static final Pattern VARIABLE = Pattern.compile("\\{([^}:]+)(?::[^}]*)?}");
@@ -280,6 +284,18 @@ abstract class AccessMatrixSupport {
         return accounts.save(account);
     }
 
+    /** {@code caller}'s own account id, {@value #DEAD} for a caller whose JWT names none. */
+    private String accountOf(String caller) {
+        UserAccount account = switch (caller) {
+            case "member" -> member;
+            case "mod" -> mod;
+            case "owner" -> owner;
+            case "admin" -> admin;
+            default -> null;
+        };
+        return account == null ? DEAD : account.getId().toString();
+    }
+
     protected Stream<Row> rows() throws IOException {
         return matrixRows().stream();
     }
@@ -315,7 +331,7 @@ abstract class AccessMatrixSupport {
     }
 
     private Outcome run(Row row, String caller) {
-        MockHttpServletRequestBuilder builder = request(HttpMethod.valueOf(row.method()), row.uri(this));
+        MockHttpServletRequestBuilder builder = request(HttpMethod.valueOf(row.method()), row.uri(this, caller));
         String remote = "loop".equals(caller) ? LOOPBACK : REMOTE;
         builder.with(r -> {
             r.setRemoteAddr(remote);
@@ -480,7 +496,7 @@ abstract class AccessMatrixSupport {
 
         /** The row addresses its route by its own pattern, so the handler it reaches must be mapped to that pattern. */
         boolean routed() {
-            return !unmapped() && !pattern.startsWith(LITERAL_PREFIX);
+            return !unmapped() && LITERAL_PREFIXES.stream().noneMatch(pattern::startsWith);
         }
 
         String key() {
@@ -519,17 +535,26 @@ abstract class AccessMatrixSupport {
             return List.of(vars.split(";"));
         }
 
-        String uri(AccessMatrixSupport matrix) {
+        /**
+         * The URI {@code caller} sends: {@code vars}' values, else each variable's default ({@code {username}} the
+         * channel, {@code {userId}} the channel's account, anything else {@value #DEAD}). {@code userId=self} is the
+         * caller's own account, {@value #DEAD} for a caller without one in its JWT ({@code anon}, {@code loop},
+         * {@code ptoken}).
+         */
+        String uri(AccessMatrixSupport matrix, String caller) {
             Map<String, String> given = variables();
             Matcher matcher = VARIABLE.matcher(pattern);
             StringBuilder uri = new StringBuilder();
             while (matcher.find()) {
                 String name = matcher.group(1);
                 String value = given.get(name);
+                if ("userId".equals(name) && SELF.equals(value)) {
+                    value = matrix.accountOf(caller);
+                }
                 if (value == null) {
                     value = switch (name) {
                         case "username" -> OWNER;
-                        case "ownerId" -> matrix.owner.getId().toString();
+                        case "ownerId", "userId" -> matrix.owner.getId().toString();
                         case "uuid" -> matrix.widgetToken.toString();
                         default -> DEAD;
                     };
