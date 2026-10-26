@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.domain.account.UserAccount;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -43,12 +44,15 @@ public class CustomBinding {
     @Column(nullable = false)
     private boolean uninterruptible = false;
 
+    // a channel's bindings read their CCLs in one query, not one per binding
     @ElementCollection(fetch = FetchType.EAGER)
+    @BatchSize(size = 100)
     @CollectionTable(name = "custom_binding_ccl", joinColumns = @JoinColumn(name = "custom_binding_id"))
     @Column(name = "ccl")
     private Set<String> ccls = new HashSet<>();
 
     @ElementCollection(fetch = FetchType.EAGER)
+    @BatchSize(size = 100)
     @CollectionTable(name = "custom_binding_tw", joinColumns = @JoinColumn(name = "custom_binding_id"))
     @Column(name = "tw")
     private Set<String> tws = new HashSet<>();
