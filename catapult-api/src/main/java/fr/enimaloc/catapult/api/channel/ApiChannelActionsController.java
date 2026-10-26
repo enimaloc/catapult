@@ -2,7 +2,6 @@ package fr.enimaloc.catapult.api.channel;
 
 import fr.enimaloc.catapult.api.ApiPaths;
 import fr.enimaloc.catapult.api.ApiUserResolver;
-import fr.enimaloc.catapult.api.error.ApiProblem;
 import fr.enimaloc.catapult.common.dto.channel.CclSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.CclToggleRequest;
 import fr.enimaloc.catapult.common.dto.channel.DeleteAccountRequest;
@@ -19,28 +18,22 @@ import fr.enimaloc.catapult.common.dto.channel.UpdateBindingRequest;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatSettingsBody;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatSettingsResponse;
-import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
-import fr.enimaloc.catapult.domain.account.UserSettings;
 import fr.enimaloc.catapult.domain.steam.SteamApiKeyEntry;
 import fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType;
 import fr.enimaloc.catapult.domain.twitchat.TwitchatWidgetSettings;
 import fr.enimaloc.catapult.getter.steam.SteamApiKeyRotator;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
-import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
 import fr.enimaloc.catapult.repository.steam.SteamApiKeyRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.account.AccountService;
 import fr.enimaloc.catapult.service.account.BotToggleService;
+import fr.enimaloc.catapult.service.account.ChannelSettingsService;
 import fr.enimaloc.catapult.service.binding.BindingService;
 import fr.enimaloc.catapult.service.binding.GameStateService;
-import fr.enimaloc.catapult.service.binding.RaidRestoreGameService;
 import fr.enimaloc.catapult.service.binding.RaidRestoreGateService;
 import fr.enimaloc.catapult.service.binding.SchedulerService;
-import fr.enimaloc.catapult.service.category.CategoryChain;
-import fr.enimaloc.catapult.service.category.CategoryTrigger.NoGameSettingsSaved;
-import fr.enimaloc.catapult.service.debug.DebugContext;
 import fr.enimaloc.catapult.service.connections.ProviderConnectionsDto;
 import fr.enimaloc.catapult.service.connections.SteamProfileDiagnostics;
 import fr.enimaloc.catapult.service.connections.SteamProfileDto;
@@ -71,7 +64,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.function.Consumer;
 
 /**
  * What a channel's dashboard changes: its bindings and settings ({@code @authz.canAccessChannel}, the owner or one of
@@ -87,11 +79,10 @@ import java.util.function.Consumer;
 public class ApiChannelActionsController {
 
     private final UserAccountRepository userAccountRepository;
-    private final UserSettingsRepository userSettingsRepository;
     private final ApiUserResolver userResolver;
     private final BindingService bindingService;
     private final BotToggleService botToggleService;
-    private final CategoryChain categoryChain;
+    private final ChannelSettingsService settingsService;
     private final GameStateService gameStateService;
     private final AccountService accountService;
     private final SchedulerService schedulerService;
@@ -102,7 +93,6 @@ public class ApiChannelActionsController {
     private final TwitchatEventActionService twitchatEventActionService;
     private final TwitchatEventDispatcher twitchatEventDispatcher;
     private final SteamProfileDiagnostics steamDiagnostics;
-    private final RaidRestoreGateService raidRestoreGate;
 
     private final Optional<SteamApiKeyRotator> rotator;
 
@@ -295,12 +285,7 @@ public class ApiChannelActionsController {
             @PathVariable UUID userId,
             @RequestBody CclSettingsRequest body) {
 
-        UserAccount channelUser = userResolver.user(userId);
-        UserSettings settings = saveSettings(channelUser, s -> {
-            s.setCclFeatureEnabled(body.cclEnabled());
-            replace(s.getBlockedCcls(), body.blockedCcls());
-        });
-        publishSettings(channelUser, settings);
+        settingsService.saveCcl(userResolver.user(userId), body);
     }
 
     @PreAuthorize("@authz.canAccessChannel(#userId)")
@@ -310,12 +295,7 @@ public class ApiChannelActionsController {
             @PathVariable UUID userId,
             @RequestBody TwSettingsRequest body) {
 
-        UserAccount channelUser = userResolver.user(userId);
-        UserSettings settings = saveSettings(channelUser, s -> {
-            s.setTwFeatureEnabled(body.enabled());
-            replace(s.getBlockedTws(), body.blockedTws());
-        });
-        publishSettings(channelUser, settings);
+        settingsService.saveTws(userResolver.user(userId), body);
     }
 
     @PreAuthorize("@authz.canAccessChannel(#userId)")
@@ -325,21 +305,7 @@ public class ApiChannelActionsController {
             @PathVariable UUID userId,
             @RequestBody NoGameSettingsRequest body) {
 
-        UserAccount channelUser = userResolver.user(userId);
-        UserSettings settings = saveSettings(channelUser, s -> {
-            s.setNoGameTwitchGameId(body.twitchGameId());
-            s.setNoGameTwitchGameName(body.twitchGameName());
-            replace(s.getNoGameCcls(), body.ccls());
-            s.setApplyDefaultOnStreamStart(body.applyOnStreamStart());
-            s.setApplyDefaultOnNoGame(body.applyOnNoGame());
-            s.setApplyDefaultOnStreamEnd(body.applyOnStreamEnd());
-        });
-        // The new default category applies immediately when the "no game" fallback would apply now (nothing
-        // detected, no custom binding, live, enabled, no raid hold); otherwise the settings are only saved
-        // Recorded in the channel's debug log, whoever saves the settings (a moderator, an admin)
-        DebugContext.runAs(channelUser.getId(),
-                () -> categoryChain.apply(channelUser, new NoGameSettingsSaved(settings.isApplyDefaultOnNoGame())).orThrow());
-        publishSettings(channelUser, settings);
+        settingsService.saveNoGame(userResolver.user(userId), body);
     }
 
     @PreAuthorize("@authz.canAccessChannel(#userId)")
@@ -349,13 +315,7 @@ public class ApiChannelActionsController {
             @PathVariable UUID userId,
             @RequestBody IncompleteFallbackRequest body) {
 
-        UserAccount channelUser = userResolver.user(userId);
-        UserSettings settings = saveSettings(channelUser, s -> {
-            s.setIncompleteFallbackTwitchGameId(body.twitchGameId());
-            s.setIncompleteFallbackTwitchGameName(body.twitchGameName());
-            replace(s.getIncompleteFallbackCcls(), body.ccls());
-        });
-        publishSettings(channelUser, settings);
+        settingsService.saveIncompleteFallback(userResolver.user(userId), body);
     }
 
     /** 0 or null turns it off; refused (403) while the channel isn't in the {@value RaidRestoreGateService#EXPERIMENT_KEY} experiment. */
@@ -366,18 +326,7 @@ public class ApiChannelActionsController {
             @PathVariable UUID userId,
             @RequestBody RaidSettingsRequest body) {
 
-        UserAccount channelUser = userResolver.user(userId);
-        if (!raidRestoreGate.isAvailableFor(channelUser)) {
-            throw new ApiProblem(ErrorCode.FEATURE_DISABLED, "Raid settings not available for this channel");
-        }
-        Integer minutes = body.restoreGameMinutes();
-        if (minutes != null && minutes != 0
-                && (minutes < RaidRestoreGameService.MIN_MINUTES || minutes > RaidRestoreGameService.MAX_MINUTES)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "restoreGameMinutes must be 1..120, or 0/null for off");
-        }
-        UserSettings settings = saveSettings(channelUser,
-                s -> s.setRaidRestoreGameMinutes(minutes == null || minutes == 0 ? null : minutes));
-        publishSettings(channelUser, settings);
+        settingsService.saveRaid(userResolver.user(userId), body);
     }
 
     @PreAuthorize("@authz.ownsChannel(#userId)")
@@ -470,28 +419,6 @@ public class ApiChannelActionsController {
 
     private SteamProfileDto buildSteamProfile(UserAccount channelUser) {
         return steamDiagnostics.diagnose(channelUser);
-    }
-
-    /** Loads the channel's settings (new ones when it has none), applies {@code changes} and saves them. */
-    private UserSettings saveSettings(UserAccount channel, Consumer<UserSettings> changes) {
-        UserSettings settings = userSettingsRepository.findById(channel.getId()).orElseGet(() -> {
-            UserSettings created = new UserSettings();
-            created.setUser(channel);
-            return created;
-        });
-        changes.accept(settings);
-        userSettingsRepository.save(settings);
-        return settings;
-    }
-
-    /** Replaces {@code target}'s content with {@code values} (none when null). */
-    private static void replace(Set<String> target, Set<String> values) {
-        target.clear();
-        if (values != null) target.addAll(values);
-    }
-
-    private void publishSettings(UserAccount channel, UserSettings settings) {
-        channelEventPublisher.settingsUpdated(channel.getId(), settings);
     }
 
     /** Tells the channel's dashboards about a binding's new state (nothing if it's gone). */

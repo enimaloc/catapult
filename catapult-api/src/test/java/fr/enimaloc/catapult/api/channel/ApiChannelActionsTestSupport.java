@@ -9,6 +9,7 @@ import fr.enimaloc.catapult.security.Authz;
 import fr.enimaloc.catapult.security.MethodSecurityConfig;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.account.AccountService;
+import fr.enimaloc.catapult.service.account.ChannelSettingsService;
 import fr.enimaloc.catapult.service.account.BotToggleService;
 import fr.enimaloc.catapult.service.account.ChannelAccessService;
 import fr.enimaloc.catapult.service.binding.BindingService;
@@ -48,6 +49,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
         excludeAutoConfiguration = ThymeleafAutoConfiguration.class,
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
 @Import({ApiUserResolver.class, MethodSecurityConfig.class, Authz.class, CategoryChain.class, CategoryApplier.class,
+        ChannelSettingsService.class,
         RaidRestoreHold.class})
 abstract class ApiChannelActionsTestSupport {
 
