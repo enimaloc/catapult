@@ -91,6 +91,23 @@ class ProblemContractTest extends FullContextTestBase {
     }
 
     @Test
+    void deletedAccountIsUnauthorized() throws Exception {
+        UserAccount account = new UserAccount();
+        account.setTwitchUsername("problem-contract-gone");
+        account.setTwitchId("problem-contract-gone-twitch");
+        account.setStatus(UserAccount.Status.ACTIVE);
+        UserAccount saved = accounts.save(account);
+        String jwt = jwtService.generateForUser(saved, List.of("ROLE_USER"));
+        accounts.delete(saved);
+
+        HttpResponse<String> response = send("/api/auth/validate", Map.of("Authorization", "Bearer " + jwt));
+
+        assertThat(response.statusCode()).isEqualTo(401);
+        assertThat(response.headers().firstValue("Content-Type")).hasValue(PROBLEM_JSON);
+        assertThat(json.readTree(response.body()).path("code").asString()).isEqualTo("unauthorized");
+    }
+
+    @Test
     void unmappedInternalPathIsAProblem() throws Exception {
         HttpResponse<String> response = send("/api/nonexistent", Map.of());
 
