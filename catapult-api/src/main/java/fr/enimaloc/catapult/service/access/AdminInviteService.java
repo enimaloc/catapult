@@ -31,7 +31,8 @@ public class AdminInviteService {
     private final InviteService inviteService;
     private final UserAccountRepository userAccountRepository;
 
-    /** Every invite with its owner and redemptions, and the active human members who have none. */
+    /** Every invite with its (lazy) owner, read in here, and redemptions; and the active human members with none. */
+    @Transactional(readOnly = true)
     public AdminInvitePageData invitePage() {
         List<AlphaInvite> invites = inviteService.findAll();
         Set<UUID> ownersWithInvite = invites.stream()
