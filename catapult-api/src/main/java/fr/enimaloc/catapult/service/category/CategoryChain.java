@@ -40,7 +40,8 @@ import java.util.Optional;
  * in today's order and once: the state (live, custom binding, settings, raid hold) is read while deciding, and the
  * decision applied right after, never cached.
  *
- * <p>Never runs as anyone ({@code DebugContext}): the trigger's own attribution stays.</p>
+ * <p>Never runs as anyone ({@code DebugContext}): the trigger attributes the change, to the channel's owner when
+ * someone else acts for the channel (a moderator's or admin's edit, an admin mapping, a Twitchat action).</p>
  */
 @Slf4j
 @Component

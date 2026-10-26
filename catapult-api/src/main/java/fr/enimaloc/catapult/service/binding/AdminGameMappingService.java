@@ -17,6 +17,7 @@ import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import fr.enimaloc.catapult.service.category.CategoryChain;
 import fr.enimaloc.catapult.service.category.CategoryOutcome;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.MappingChanged;
+import fr.enimaloc.catapult.service.debug.DebugContext;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.Hibernate;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -213,7 +214,9 @@ public class AdminGameMappingService {
             CategoryOutcome outcome;
             try {
                 // The decision reads state too (activation, settings): a failure there counts like a Twitch one
-                outcome = categoryChain.apply(user, new MappingChanged(binding));
+                // Recorded in each channel's debug log, not the admin's
+                outcome = DebugContext.callAs(user.getId(),
+                        () -> categoryChain.apply(user, new MappingChanged(binding)));
             } catch (RuntimeException e) {
                 failed++;
                 log.warn("Live channel of user {} not updated after a game mapping change: {}",
