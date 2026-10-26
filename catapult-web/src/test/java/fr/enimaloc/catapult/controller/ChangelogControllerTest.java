@@ -6,11 +6,12 @@ import fr.enimaloc.catapult.dto.changelog.ChangelogSection;
 import fr.enimaloc.catapult.dto.changelog.ChangelogSection.Entry;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
 import fr.enimaloc.catapult.service.ApiService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -41,8 +42,15 @@ class ChangelogControllerTest {
     };
 
     @Autowired MockMvc mvc;
+    @Autowired ChangelogController controller;
     @MockitoBean ApiService apiService;
     @MockitoBean NavEventStreamController navEvents;
+
+    // The controller keeps the versions for a few minutes: start every test with nothing kept, whatever ran before.
+    @BeforeEach
+    void forgetTheKeptVersions() {
+        ReflectionTestUtils.setField(controller, "cached", null);
+    }
 
     @Test
     void servesTheVersions_fullAndAsAFragment_byKind() throws Exception {
@@ -63,9 +71,7 @@ class ChangelogControllerTest {
         assertThat(full).contains("<title>Changelog - ").contains("rel=\"canonical\"");
     }
 
-    // The controller keeps the versions for a few minutes: don't leave this section to the other tests.
     @Test
-    @DirtiesContext(methodMode = DirtiesContext.MethodMode.AFTER_METHOD)
     void anUnreleasedSection_isTitledInTheVisitorsLanguage() throws Exception {
         when(apiService.changelog()).thenReturn(List.of(
                 new ChangelogSection(null, List.of(new Entry("u1", "feat", null, "soon", false)))));
