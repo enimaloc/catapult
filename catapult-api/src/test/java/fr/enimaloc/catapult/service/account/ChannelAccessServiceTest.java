@@ -89,6 +89,60 @@ class ChannelAccessServiceTest {
         verify(twitchService, times(1)).getModeratedChannelIds(moderator);
     }
 
+    @SuppressWarnings("unchecked")
+    private java.util.Map<java.util.UUID, Object> cache() throws Exception {
+        java.lang.reflect.Field cacheField = ChannelAccessService.class.getDeclaredField("cache");
+        cacheField.setAccessible(true);
+        return (java.util.Map<java.util.UUID, Object>) cacheField.get(channelAccessService);
+    }
+
+    private void plant(java.time.Duration age, String... moderatedIds) throws Exception {
+        Class<?> type = Class.forName("fr.enimaloc.catapult.service.account.ChannelAccessService$CachedModStatus");
+        java.lang.reflect.Constructor<?> ctor = type.getDeclaredConstructor(java.util.Set.class, java.time.Instant.class);
+        ctor.setAccessible(true);
+        cache().put(moderator.getId(), ctor.newInstance(java.util.Set.of(moderatedIds), java.time.Instant.now().minus(age)));
+    }
+
+    @Test
+    void expired_cache_with_twitch_error_denies_access() throws Exception {
+        plant(java.time.Duration.ofHours(1), "owner-twitch-id");
+        when(twitchService.getModeratedChannelIds(moderator)).thenThrow(new RuntimeException("Twitch API down"));
+
+        assertThat(channelAccessService.canAccess(moderator, owner)).isFalse();
+    }
+
+    @Test
+    void expired_cache_with_twitch_error_is_forgotten() throws Exception {
+        plant(java.time.Duration.ofHours(1), "owner-twitch-id");
+        when(twitchService.getModeratedChannelIds(moderator)).thenThrow(new RuntimeException("Twitch API down"));
+
+        channelAccessService.canAccess(moderator, owner);
+
+        assertThat(cache()).doesNotContainKey(moderator.getId());
+        channelAccessService.canAccess(moderator, owner);
+        verify(twitchService, times(2)).getModeratedChannelIds(moderator);
+    }
+
+    @Test
+    void expired_cache_with_twitch_error_lists_only_own_channel() throws Exception {
+        plant(java.time.Duration.ofHours(1), "owner-twitch-id");
+        when(twitchService.getModeratedChannelIds(moderator)).thenThrow(new RuntimeException("Twitch API down"));
+
+        lenient().when(userAccountRepository.findByTwitchIdIn(java.util.Set.of("owner-twitch-id")))
+            .thenReturn(List.of(owner));
+
+        assertThat(channelAccessService.getAccessibleChannels(moderator)).containsExactly(moderator);
+    }
+
+    @Test
+    void fresh_cache_survives_a_twitch_outage() throws Exception {
+        plant(java.time.Duration.ofMinutes(-10), "owner-twitch-id");
+
+        assertThat(channelAccessService.canAccess(moderator, owner)).isTrue();
+
+        verifyNoInteractions(twitchService);
+    }
+
     @Test
     void twitch_api_error_denies_access_fail_closed() {
         when(twitchService.getModeratedChannelIds(moderator))

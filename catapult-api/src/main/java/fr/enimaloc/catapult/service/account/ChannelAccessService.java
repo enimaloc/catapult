@@ -48,7 +48,8 @@ public class ChannelAccessService {
                 return new CachedModStatus(ids, Instant.now().plus(TTL));
             } catch (Exception e) {
                 log.warn("Failed to fetch moderated channels for user {} — denying access", id, e);
-                return existing;
+                // Null drops the expired entry: the viewer moderates nothing until Twitch answers again
+                return null;
             }
         });
         return fresh != null ? fresh.moderatedIds() : Set.of();
