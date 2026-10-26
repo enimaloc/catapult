@@ -96,7 +96,7 @@ public class DebugCommand implements ChatCommand {
         if (!args.isEmpty()) {
             String path = args.getFirst();
             if (!knownPaths().contains(path)) {
-                return "Placeholder inconnu : " + path;
+                return "Unknown placeholder: " + path;
             }
             return path + "=" + resolveOrEmpty(ctx, path, locale);
         }

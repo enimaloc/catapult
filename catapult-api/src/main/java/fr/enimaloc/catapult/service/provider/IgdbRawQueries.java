@@ -18,6 +18,9 @@ import org.springframework.web.client.RestClient;
 @RequiredArgsConstructor
 public class IgdbRawQueries {
 
+    static final String TOKEN_UNAVAILABLE =
+            "IGDB token not available: check the IGDB client-id and secret configuration";
+
     private static final String IGDB_API_BASE = "https://api.igdb.com/v4/";
 
     @Value("${app.igdb.client-id:}")
@@ -32,7 +35,7 @@ public class IgdbRawQueries {
         String token = igdbService.getAppToken();
         if (token.isBlank()) {
             return new RawProviderResponseSupport.RawProviderResponse(
-                    502, null, "IGDB token not available — vérifiez la configuration client-id/secret");
+                    502, null, TOKEN_UNAVAILABLE);
         }
 
         return rawSupport.fetch(() -> post(body, token));
@@ -41,7 +44,7 @@ public class IgdbRawQueries {
     public QueryResult explorerQuery(AdminProviderIgdbQueryRequest body) {
         String token = igdbService.getAppToken();
         if (token.isBlank()) {
-            return new QueryResult(null, "IGDB token not available — vérifiez la configuration client-id/secret");
+            return new QueryResult(null, TOKEN_UNAVAILABLE);
         }
 
         try {
