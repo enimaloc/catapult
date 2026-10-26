@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.event.listener;
 
+import fr.enimaloc.catapult.service.binding.GameBindingLookup;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.binding.CustomBindingActivations;
 import fr.enimaloc.catapult.domain.account.UserAccount;
@@ -59,6 +60,7 @@ class GameEventListenerRaidHoldTest {
     @Mock private ChannelEventPublisher channelEventPublisher;
     @Mock private RaidRestoreGateService gate;
     @Mock private GameStateService gameStateService;
+    @Mock private GameBindingLookup bindingLookup;
 
     private RaidRestoreGameService raidRestore;
     private GameEventListener listener;
@@ -69,11 +71,10 @@ class GameEventListenerRaidHoldTest {
     @BeforeEach
     void setUp() {
         RaidRestoreHold hold = new RaidRestoreHold();
-        raidRestore = new RaidRestoreGameService(userSettingsRepository, gate, gameStateService, bindingService, twitchService,
-                mock(CustomBindingActivations.class), hold);
         CustomBindingActivations activations = mock(CustomBindingActivations.class);
         CategoryChain chain = new CategoryChain(activations, streamStateService, userSettingsRepository, hold,
-                gameStateService, mock(UserAccountRepository.class), new CategoryApplier(twitchService, streamStateService));
+                gameStateService, mock(UserAccountRepository.class), new CategoryApplier(twitchService, streamStateService), gate, bindingLookup);
+        raidRestore = new RaidRestoreGameService(chain, new CategoryApplier(twitchService, streamStateService), hold);
         listener = new GameEventListener(bindingService, streamStateService, channelEventPublisher, hold,
                 activations, chain);
         user = new UserAccount();
@@ -99,7 +100,7 @@ class GameEventListenerRaidHoldTest {
         doomBinding.setSourceName("DOOM");
         doomBinding.setTwitchGameId(DOOM_ID);
         doomBinding.setStatus(GameBinding.Status.AUTO);
-        when(bindingService.findBinding(user, doom)).thenReturn(Optional.of(doomBinding));
+        when(bindingLookup.findByDetectedGame(user, doom)).thenReturn(Optional.of(doomBinding));
     }
 
     private static GameBinding noGameFallback() {

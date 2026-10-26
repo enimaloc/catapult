@@ -1,6 +1,8 @@
 package fr.enimaloc.catapult.service.debug;
 
 import fr.enimaloc.catapult.service.category.CategoryChain;
+import fr.enimaloc.catapult.service.binding.StreamStateService;
+import fr.enimaloc.catapult.service.category.CategoryApplier;
 import fr.enimaloc.catapult.service.binding.CustomBindingActivations;
 import fr.enimaloc.catapult.api.connect.ApiSteamConnectController;
 import fr.enimaloc.catapult.chat.ChatCommandEvent;
@@ -415,9 +417,14 @@ class DebugAttributionTest {
             note();
             return Optional.of(new UserSettings());
         });
-        RaidRestoreGameService service = new RaidRestoreGameService(settings, mock(RaidRestoreGateService.class),
-                mock(GameStateService.class), mock(BindingService.class), mock(TwitchService.class),
-                mock(CustomBindingActivations.class), new RaidRestoreHold());
+        RaidRestoreHold hold = new RaidRestoreHold();
+        TwitchService twitch = mock(TwitchService.class);
+        StreamStateService streams = mock(StreamStateService.class);
+        CategoryApplier applier = new CategoryApplier(twitch, streams);
+        CategoryChain chain = new CategoryChain(mock(CustomBindingActivations.class), streams, settings, hold,
+                mock(GameStateService.class), mock(UserAccountRepository.class), applier,
+                mock(RaidRestoreGateService.class), mock(GameBindingLookup.class));
+        RaidRestoreGameService service = new RaidRestoreGameService(chain, applier, hold);
 
         service.onRaidedOut(new ChannelRaidedOutEvent(this, user, "509658"));
 

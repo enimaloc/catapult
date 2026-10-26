@@ -40,6 +40,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+import static org.mockito.Mockito.mock;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -78,7 +79,7 @@ class CustomBindingServiceTest {
         // The real chain and applier: the Twitch stubs below are what the category decision ends up calling
         CategoryChain chain = new CategoryChain(activations, streamStateService, userSettingsRepository,
                 new RaidRestoreHold(), gameStateService, userAccountRepository,
-                new CategoryApplier(twitchService, streamStateService));
+                new CategoryApplier(twitchService, streamStateService), mock(RaidRestoreGateService.class), mock(GameBindingLookup.class));
         service = new CustomBindingService(bindings, activations, experimentService, gameStateService,
                 streamStateService, userAccountRepository, oAuthTokenRepository, gameEventListener,
                 channelEventPublisher, chain);

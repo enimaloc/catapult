@@ -5,10 +5,14 @@ import fr.enimaloc.catapult.domain.account.UserSettings;
 import fr.enimaloc.catapult.domain.binding.CustomBinding;
 import fr.enimaloc.catapult.domain.binding.CustomBindingActivation;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
+import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
 import fr.enimaloc.catapult.service.binding.CustomBindingActivations;
+import fr.enimaloc.catapult.service.binding.GameBindingLookup;
 import fr.enimaloc.catapult.service.binding.GameStateService;
+import fr.enimaloc.catapult.service.binding.RaidRestoreGameService;
+import fr.enimaloc.catapult.service.binding.RaidRestoreGateService;
 import fr.enimaloc.catapult.service.binding.RaidRestoreHold;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
 import fr.enimaloc.catapult.service.category.CategoryOutcome.Reason;
@@ -20,6 +24,7 @@ import fr.enimaloc.catapult.service.category.CategoryTrigger.ManualCategory;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.MappingChanged;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.NoGameSettingsSaved;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.NoGameAfterCustomBinding;
+import fr.enimaloc.catapult.service.category.CategoryTrigger.RaidedOut;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.RevertCategory;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.StreamEnded;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.StreamStarted;
@@ -27,6 +32,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.util.Optional;
 
 /**
@@ -63,6 +69,8 @@ public class CategoryChain {
     private final GameStateService gameStateService;
     private final UserAccountRepository userAccountRepository;
     private final CategoryApplier applier;
+    private final RaidRestoreGateService raidRestoreGate;
+    private final GameBindingLookup gameBindingLookup;
 
     /** {@link #decide}, then applied right away. */
     public CategoryOutcome apply(UserAccount user, CategoryTrigger trigger) {
@@ -83,6 +91,7 @@ public class CategoryChain {
             case RevertCategory revert -> CategoryDecision.setCategory(CategoryRule.MANUAL_CHOICE,
                     revert.twitchGameId(), revert.twitchGameName());
             case NoGameSettingsSaved saved -> noGameSettingsSaved(user);
+            case RaidedOut raided -> raidedOut(user, raided.currentCategoryId());
         };
     }
 
@@ -149,6 +158,40 @@ public class CategoryChain {
             return CategoryDecision.none(CategoryRule.CUSTOM_BINDING, Reason.CUSTOM_BINDING_ACTIVE);
         }
         return CategoryDecision.reset(CategoryRule.DEFAULT_CATEGORY);
+    }
+
+    /**
+     * The game detected within the streamer's delay, put back. Takes no hold (the caller does, for an update and for
+     * an "already on it"); no live check. The binding is looked up read-only.
+     */
+    private CategoryDecision raidedOut(UserAccount user, String currentCategoryId) {
+        Integer minutes = userSettingsRepository.findById(user.getId())
+                .map(UserSettings::getRaidRestoreGameMinutes)
+                .filter(m -> m >= RaidRestoreGameService.MIN_MINUTES)
+                .orElse(null);
+        if (minutes == null || !raidRestoreGate.isAvailableReadOnly(user)) {
+            return CategoryDecision.none(CategoryRule.RAID_RESTORE, Reason.RAID_RESTORE_OFF);
+        }
+        if (customBindingActivations.active(user).isPresent()) {
+            // The channel is on the streamer's custom binding, not on the "no game" category: nothing to put back
+            log.debug("Raid by user {}: custom binding active, game not put back", user.getId());
+            return CategoryDecision.none(CategoryRule.CUSTOM_BINDING, Reason.CUSTOM_BINDING_ACTIVE);
+        }
+
+        Optional<DetectedGame> recent = gameStateService.recentlyDetectedGame(user, Duration.ofMinutes(minutes));
+        Optional<GameBinding> binding = recent
+                .flatMap(game -> gameBindingLookup.findByDetectedGame(user, game))
+                .filter(b -> !b.isIgnored() && b.getStatus() != GameBinding.Status.INCOMPLETE)
+                .filter(b -> b.getTwitchGameId() != null && !b.getTwitchGameId().isBlank());
+        if (binding.isEmpty()) {
+            log.debug("Raid by user {}: no game detected within {} min to put back", user.getId(), minutes);
+            return CategoryDecision.none(CategoryRule.RAID_RESTORE, Reason.NOTHING_TO_RESTORE);
+        }
+        if (binding.get().getTwitchGameId().equals(currentCategoryId)) {
+            log.debug("Raid by user {}: already on {}", user.getId(), binding.get().getTwitchGameName());
+            return CategoryDecision.none(CategoryRule.RAID_RESTORE, Reason.ALREADY_ON_CATEGORY);
+        }
+        return CategoryDecision.update(CategoryRule.RAID_RESTORE, binding.get());
     }
 
     private CategoryDecision streamStarted(UserAccount user) {

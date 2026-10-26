@@ -66,4 +66,10 @@ public sealed interface CategoryTrigger {
      * for it.
      */
     record NoGameSettingsSaved() implements CategoryTrigger {}
+
+    /**
+     * The channel raided out: the game detected within the streamer's delay put back, unless the channel is already
+     * on it. No live check. {@code currentCategoryId} is the category the channel is on, null when unknown.
+     */
+    record RaidedOut(String currentCategoryId) implements CategoryTrigger {}
 }

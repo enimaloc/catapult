@@ -5,7 +5,10 @@ import fr.enimaloc.catapult.domain.account.UserSettings;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.event.ChannelRaidedOutEvent;
 import fr.enimaloc.catapult.getter.DetectedGame;
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
+import fr.enimaloc.catapult.service.category.CategoryApplier;
+import fr.enimaloc.catapult.service.category.CategoryChain;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,8 +36,10 @@ class RaidRestoreGameServiceTest {
     @Mock private UserSettingsRepository userSettingsRepository;
     @Mock private RaidRestoreGateService gate;
     @Mock private GameStateService gameStateService;
-    @Mock private BindingService bindingService;
+    @Mock private GameBindingLookup bindingLookup;
     @Mock private TwitchService twitchService;
+    @Mock private StreamStateService streamStateService;
+    @Mock private UserAccountRepository userAccountRepository;
     @Mock private CustomBindingActivations customBindingActivations;
 
     private final RaidRestoreHold hold = new RaidRestoreHold();
@@ -46,8 +51,10 @@ class RaidRestoreGameServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new RaidRestoreGameService(userSettingsRepository, gate, gameStateService, bindingService, twitchService,
-                customBindingActivations, hold);
+        CategoryApplier applier = new CategoryApplier(twitchService, streamStateService);
+        CategoryChain chain = new CategoryChain(customBindingActivations, streamStateService, userSettingsRepository,
+                hold, gameStateService, userAccountRepository, applier, gate, bindingLookup);
+        service = new RaidRestoreGameService(chain, applier, hold);
         user = new UserAccount();
         user.setId(UUID.randomUUID());
 
@@ -67,7 +74,7 @@ class RaidRestoreGameServiceTest {
         binding.setTwitchGameId("517");
         binding.setTwitchGameName("DOOM");
         binding.setStatus(GameBinding.Status.AUTO);
-        lenient().when(bindingService.findBinding(user, doom)).thenReturn(Optional.of(binding));
+        lenient().when(bindingLookup.findByDetectedGame(user, doom)).thenReturn(Optional.of(binding));
     }
 
     private void raid(String currentCategoryId) {
@@ -176,7 +183,7 @@ class RaidRestoreGameServiceTest {
         binding.setIgnored(false);
         binding.setTwitchGameId(null);
         raid("509658");
-        when(bindingService.findBinding(user, doom)).thenReturn(Optional.empty());
+        when(bindingLookup.findByDetectedGame(user, doom)).thenReturn(Optional.empty());
         raid("509658");
 
         verify(twitchService, never()).updateChannelReporting(any(), any());
