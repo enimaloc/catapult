@@ -14,7 +14,7 @@ COPY catapult-api/src ./catapult-api/src
 COPY .git ./.git
 RUN ./gradlew :catapult-api:build -x test --no-daemon
 
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:25-jre-alpine
 
 WORKDIR /app
 
