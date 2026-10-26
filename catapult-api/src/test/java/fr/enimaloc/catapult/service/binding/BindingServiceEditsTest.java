@@ -261,6 +261,32 @@ class BindingServiceEditsTest {
     }
 
     @Test
+    void refreshingIncompleteBindings_aDecisionErrorDoesNotStopTheRefresh() {
+        GameBinding other = new GameBinding();
+        other.setId(UUID.randomUUID());
+        other.setUser(user);
+        other.setSourceType(GameBinding.SourceType.STEAM);
+        other.setSourceId("400");
+        other.setSourceName("Portal");
+        other.setStatus(GameBinding.Status.INCOMPLETE);
+        binding.setStatus(GameBinding.Status.INCOMPLETE);
+        when(bindings.findAllByStatusAndIgnoredFalse(GameBinding.Status.INCOMPLETE))
+                .thenReturn(List.of(binding, other));
+        when(igdb.findByExternalAppId(any(), anyString()))
+                .thenReturn(Optional.of(new IgdbService.IgdbGame("72", "Portal 2")));
+        when(igdbDetails.getDetails("72")).thenReturn(Optional.empty());
+        when(igdb.findTwitchGameId("72")).thenReturn(Optional.of("tw-72"));
+        when(igdb.suggestCcls("72")).thenReturn(Set.of());
+        when(gameState.getLastKnownGame(user)).thenThrow(new IllegalStateException("state unavailable"))
+                .thenReturn(Optional.empty());
+
+        service.refreshIncompleteBindings();
+
+        assertThat(other.getStatus()).isEqualTo(GameBinding.Status.AUTO);
+        verify(bindings).save(other);
+    }
+
+    @Test
     void previewTws_usesTheResolvedIgdbGame_andSteamSignalsOnlyForSteam() {
         binding.setSourceType(GameBinding.SourceType.XBOX);
         when(igdb.resolveIgdbIdForBinding(binding)).thenReturn(Optional.of("72"));

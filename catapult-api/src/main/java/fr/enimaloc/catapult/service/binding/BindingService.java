@@ -9,7 +9,6 @@ import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
 import fr.enimaloc.catapult.repository.binding.GameMappingRepository;
 import fr.enimaloc.catapult.service.category.CategoryChain;
-import fr.enimaloc.catapult.service.category.CategoryOutcome;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.BindingEdited;
 import fr.enimaloc.catapult.service.igdb.IgdbGameDetailsService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
@@ -95,11 +94,16 @@ public class BindingService {
                 CategoryKey before = CategoryKey.of(binding);
                 GameBinding refreshed = updateWithIgdbResolution(binding.getUser(), detectedOf(binding), binding);
                 if (!before.equals(CategoryKey.of(refreshed))) {
-                    // One channel's Twitch failure must not stop the refresh of the others
-                    CategoryOutcome outcome = categoryChain.apply(refreshed.getUser(), new BindingEdited(refreshed));
-                    if (outcome.error() != null) {
+                    // One channel's failure (deciding or on Twitch) must not stop the refresh of the others
+                    RuntimeException failure;
+                    try {
+                        failure = categoryChain.apply(refreshed.getUser(), new BindingEdited(refreshed)).error();
+                    } catch (RuntimeException e) {
+                        failure = e;
+                    }
+                    if (failure != null) {
                         log.warn("Refreshed binding {} could not be applied for user {}: {}", refreshed.getId(),
-                                refreshed.getUser().getId(), outcome.error().getMessage());
+                                refreshed.getUser().getId(), failure.getMessage());
                     }
                 }
                 return refreshed;
