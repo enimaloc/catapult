@@ -37,7 +37,7 @@ GET,/api/channel/bindings/{bindingId}/tws/suggest,,,401,401,PASS,PASS,PASS,PASS,
 GET,/api/channel/dtdd-mapping,?igdbId=1,,401,PASS,PASS,PASS,PASS,PASS,401
 POST,/api/channel/dtdd-mapping/propose,,,401,401,PASS,PASS,PASS,PASS,401
 GET,/api/channel/dtdd-mapping/search,?q=matrix,,401,PASS,PASS,PASS,PASS,PASS,401
-POST,/api/channel/dtdd-mapping/validate,,"{""igdbId"":""1""}",401,PASS,PASS,PASS,PASS,PASS,401
+POST,/api/channel/dtdd-mapping/validate,,"{""igdbId"":""1""}",401,PASS,403,403,403,PASS,401
 GET,/api/channels,,,401,401,PASS,PASS,PASS,PASS,401
 GET,/api/chat-command-settings,,,401,401,GATED,GATED,GATED,GATED,401
 DELETE,/api/chat-command-settings/{key},,,401,401,GATED,GATED,GATED,GATED,401

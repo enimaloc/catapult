@@ -14,7 +14,10 @@ import fr.enimaloc.catapult.service.twitch.TwitchService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import fr.enimaloc.catapult.security.Authz;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -105,9 +108,10 @@ public class ApiChannelDataController {
 
     @PreAuthorize("@authz.canAccessChannel(#username)")
     @GetMapping("/dtdd-mapping")
-    public DtddMappingStatusDto dtddMappingStatus(@PathVariable String username, @AuthenticationPrincipal Jwt jwt) {
+    public DtddMappingStatusDto dtddMappingStatus(@PathVariable String username, @AuthenticationPrincipal Jwt jwt,
+                                                 Authentication authentication, HttpServletRequest request) {
         UserAccount viewer = userResolver.viewer(jwt);
         UserAccount channel = userResolver.channel(username);
-        return dashboard.dtddMapping(viewer, channel);
+        return dashboard.dtddMapping(viewer, channel, Authz.isAdmin(authentication, request));
     }
 }

@@ -21,10 +21,14 @@ import fr.enimaloc.catapult.repository.dtdd.DtddGameMappingRepository;
 import fr.enimaloc.catapult.repository.dtdd.DtddMappingProposalRepository;
 import fr.enimaloc.catapult.repository.dtdd.DtddSearchCacheRepository;
 import fr.enimaloc.catapult.service.dtdd.DtddMappingEvents;
+import fr.enimaloc.catapult.security.Authz;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,13 +54,16 @@ public class ApiChannelDtddMappingController {
 
     @GetMapping
     public StatusResponse status(@RequestParam("igdbId") String igdbId,
-                                 @AuthenticationPrincipal Jwt jwt) {
+                                 @AuthenticationPrincipal Jwt jwt,
+                                 Authentication authentication,
+                                 HttpServletRequest request) {
         UserAccount user = jwt == null ? null : userResolver.viewer(jwt);
         Optional<DtddGameMapping> mappingOpt = mappingRepo.findById(igdbId);
         Optional<DtddMappingProposal> myProposal = user == null ? Optional.empty()
             : proposalRepo.findFirstByProposerAndIgdbIdAndStatus(user, igdbId, Status.PENDING);
         long otherPending = proposalRepo.countByIgdbIdAndStatus(igdbId, Status.PENDING);
-        boolean canValidate = mappingOpt.isPresent()
+        boolean canValidate = Authz.isAdmin(authentication, request)
+            && mappingOpt.isPresent()
             && !mappingOpt.get().isVerified()
             && otherPending == 0;
 
@@ -73,6 +80,7 @@ public class ApiChannelDtddMappingController {
         return new StatusResponse(current, pending, canValidate);
     }
 
+    @PreAuthorize("@authz.isAdmin()")
     @PostMapping("/validate")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Transactional

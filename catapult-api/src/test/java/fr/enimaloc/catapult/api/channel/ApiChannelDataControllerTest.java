@@ -70,8 +70,20 @@ class ApiChannelDataControllerTest {
     }
 
     private static RequestPostProcessor as(UserAccount account) {
+        return as(account, "ROLE_USER");
+    }
+
+    private static RequestPostProcessor as(UserAccount account, String role) {
         return jwt().jwt(j -> j.subject(account.getId().toString()))
-                .authorities(new SimpleGrantedAuthority("ROLE_USER"));
+                .authorities(new SimpleGrantedAuthority(role));
+    }
+
+    /** A request that is not from the loopback interface (MockMvc's default remote address is 127.0.0.1). */
+    private static RequestPostProcessor from(String remoteAddr) {
+        return request -> {
+            request.setRemoteAddr(remoteAddr);
+            return request;
+        };
     }
 
     @BeforeEach
@@ -113,10 +125,19 @@ class ApiChannelDataControllerTest {
 
     @Test
     void dtddMapping() throws Exception {
-        when(dashboard.dtddMapping(moderator, owner)).thenReturn(new DtddMappingStatusDto(null, null, true, "42"));
+        when(dashboard.dtddMapping(moderator, owner, false)).thenReturn(new DtddMappingStatusDto(null, null, false, "42"));
+        when(dashboard.dtddMapping(moderator, owner, true)).thenReturn(new DtddMappingStatusDto(null, null, true, "42"));
 
-        mvc.perform(get("/api/channels/streamer/dtdd-mapping").with(as(moderator)))
+        mvc.perform(get("/api/channels/streamer/dtdd-mapping").with(as(moderator)).with(from("203.0.113.7")))
                 .andExpect(jsonPath("$.igdbId").value("42"))
+                .andExpect(jsonPath("$.canValidateDirectly").value(false));
+    }
+
+    @Test
+    void dtddMapping_anAdminViewerMayValidate() throws Exception {
+        when(dashboard.dtddMapping(moderator, owner, true)).thenReturn(new DtddMappingStatusDto(null, null, true, "42"));
+
+        mvc.perform(get("/api/channels/streamer/dtdd-mapping").with(as(moderator, "ROLE_ADMIN")).with(from("203.0.113.7")))
                 .andExpect(jsonPath("$.canValidateDirectly").value(true));
     }
 
