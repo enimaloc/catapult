@@ -3,7 +3,6 @@ package fr.enimaloc.catapult.api;
 import fr.enimaloc.catapult.common.dto.TokenResponse;
 import fr.enimaloc.catapult.common.dto.UserInfoResponse;
 import fr.enimaloc.catapult.domain.account.UserAccount;
-import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.security.AuthCodeStore;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -15,7 +14,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 /**
  * REST endpoints for JWT-based authentication used by catapult-web.
@@ -26,8 +24,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ApiAuthController {
 
-    private final UserAccountRepository userAccountRepository;
     private final AuthCodeStore codeStore;
+    private final ApiUserResolver userResolver;
 
     /**
      * Single-use token exchange: catapult-web calls this server-to-server after receiving
@@ -42,9 +40,8 @@ public class ApiAuthController {
 
     @GetMapping("/validate")
     public UserInfoResponse validate(@AuthenticationPrincipal Jwt jwt) {
-        UUID userId = UUID.fromString(ApiUserResolver.requireJwt(jwt).getSubject());
-        UserAccount account = userAccountRepository.findById(userId)
-                .orElseThrow(() -> new IllegalStateException("User not found: " + userId));
+        // 401 for no JWT or an account deleted since the token was issued
+        UserAccount account = userResolver.viewer(jwt);
 
         List<String> roles = jwt.getClaim("roles");
 
