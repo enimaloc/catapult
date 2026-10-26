@@ -9,6 +9,7 @@ import fr.enimaloc.catapult.domain.chatcommand.ChatCommandSetting;
 import fr.enimaloc.catapult.domain.experiment.Experiment;
 import fr.enimaloc.catapult.domain.experiment.ExperimentAssignment;
 import fr.enimaloc.catapult.domain.experiment.ExperimentVariant;
+import fr.enimaloc.catapult.domain.feedback.FeedbackSubmission;
 import fr.enimaloc.catapult.domain.steam.SteamApiKeyEntry;
 import fr.enimaloc.catapult.domain.access.AlphaInvite;
 import fr.enimaloc.catapult.repository.access.AlphaInviteRepository;
@@ -16,6 +17,7 @@ import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.chatcommand.ChatCommandSettingRepository;
 import fr.enimaloc.catapult.repository.experiment.ExperimentAssignmentRepository;
 import fr.enimaloc.catapult.repository.experiment.ExperimentRepository;
+import fr.enimaloc.catapult.repository.feedback.FeedbackSubmissionRepository;
 import fr.enimaloc.catapult.repository.steam.SteamApiKeyRepository;
 import fr.enimaloc.catapult.security.JwtService;
 import fr.enimaloc.catapult.service.access.InviteService;
@@ -24,6 +26,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +34,7 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Import;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -66,6 +70,9 @@ class ControllerBoundariesTest extends FullContextTestBase {
 
     @Autowired
     SteamApiKeyRepository steamKeys;
+
+    @Autowired
+    FeedbackSubmissionRepository feedbackSubmissions;
 
     @Autowired
     AlphaInviteRepository invites;
@@ -263,5 +270,32 @@ class ControllerBoundariesTest extends FullContextTestBase {
         List<String> owners = JSON.readTree(response.body()).path("invites").valueStream()
                 .map(row -> row.path("ownerUsername").asString()).toList();
         assertThat(owners).contains("invites-page-owner");
+    }
+
+    @Test
+    void feedbackList_answersEachSubmissionWithoutItsMember() throws Exception {
+        UserAccount member = member("feedback-lister");
+        FeedbackSubmission submission = new FeedbackSubmission();
+        submission.setUser(member);
+        submission.setType(FeedbackSubmission.Type.BUG);
+        submission.setTitle("Crash");
+        submission.setDescription("It crashed.");
+        submission.setGitlabIssueIid(42);
+        submission.setGitlabIssueUrl("https://gitlab/issues/42");
+        submission.setLastKnownUpdatedAt(Instant.parse("2026-10-26T10:00:00Z"));
+        submission = feedbackSubmissions.save(submission);
+
+        HttpResponse<String> response = send("GET", "/api/internal/users/" + member.getId() + "/feedback",
+                member, null);
+
+        assertThat(response.statusCode()).as(response.body()).isEqualTo(200);
+        JsonNode row = JSON.readTree(response.body()).path(0);
+        assertThat(row.propertyNames()).containsExactlyInAnyOrder("id", "type", "title", "description",
+                "gitlabIssueIid", "gitlabIssueUrl", "lastKnownUpdatedAt", "subscribed", "createdAt");
+        assertThat(row.path("id").asString()).isEqualTo(submission.getId().toString());
+        assertThat(row.path("type").asString()).isEqualTo("BUG");
+        assertThat(row.path("title").asString()).isEqualTo("Crash");
+        assertThat(row.path("gitlabIssueIid").asInt()).isEqualTo(42);
+        assertThat(row.path("subscribed").asBoolean()).isTrue();
     }
 }

@@ -34,7 +34,7 @@ public class ApiFeedbackController {
 
     @PreAuthorize("@authz.isSelf(#userId)")
     @GetMapping
-    public List<FeedbackSubmission> list(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt) {
+    public List<FeedbackService.Submission> list(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt) {
         UserAccount user = userResolver.viewer(jwt);
         return feedback.list(user);
     }
