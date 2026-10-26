@@ -32,7 +32,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class WsOriginCheckIntegrationTest {
 
     @Container
-    static GenericContainer<?> redis = new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
+    static GenericContainer<?> redis = new GenericContainer<>("redis:8-alpine").withExposedPorts(6379);
 
     @DynamicPropertySource
     static void props(DynamicPropertyRegistry r) {
