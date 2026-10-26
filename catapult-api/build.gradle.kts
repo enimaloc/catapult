@@ -61,7 +61,7 @@ dependencies {
 
     // GraalJS sandbox for executing compiled chat-command JS
     implementation("org.graalvm.polyglot:polyglot:24.2.2")
-    implementation("org.graalvm.polyglot:js:24.2.2")
+    implementation("org.graalvm.polyglot:js:25.4.4.1.1")
 
     // JWT generation/validation
     implementation("io.jsonwebtoken:jjwt-api:$jjwtVersion")
