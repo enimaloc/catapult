@@ -59,13 +59,13 @@ class TrustedProxiesTest extends FullContextTestBase {
     @Test
     void privateClientForgingLoopbackIsNotAdmin() throws Exception {
         RawResponse response =
-                rawGet("127.0.0.2", "/api/admin/flags", Map.of("X-Forwarded-For", "127.0.0.1"));
+                rawGet("127.0.0.2", "/api/internal/admin/flags", Map.of("X-Forwarded-For", "127.0.0.1"));
         assertThat(response.status()).isEqualTo(401);
     }
 
     @Test
     void privateClientIsNotLoopback() throws Exception {
-        assertThat(rawGet("127.0.0.2", "/api/admin/flags", Map.of()).status()).isEqualTo(401);
+        assertThat(rawGet("127.0.0.2", "/api/internal/admin/flags", Map.of()).status()).isEqualTo(401);
     }
 
     @Test

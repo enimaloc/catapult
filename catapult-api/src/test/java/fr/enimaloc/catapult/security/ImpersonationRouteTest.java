@@ -76,7 +76,7 @@ class ImpersonationRouteTest {
 
     @Test
     void impersonatedTokenReachesTheTargetsChannelById() throws Exception {
-        String body = mvc.perform(remote(post("/api/admin/impersonate"))
+        String body = mvc.perform(remote(post("/api/internal/admin/impersonations"))
                         .header("Authorization", "Bearer " + adminJwt)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"username\":\"" + target.getTwitchUsername() + "\"}"))

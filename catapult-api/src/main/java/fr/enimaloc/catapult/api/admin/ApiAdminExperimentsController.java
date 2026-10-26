@@ -39,6 +39,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.transaction.annotation.Transactional;
+import fr.enimaloc.catapult.api.ApiPaths;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -62,7 +65,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/admin/experiments")
+@RequestMapping(ApiPaths.ADMIN + "/experiments")
 @RequiredArgsConstructor
 public class ApiAdminExperimentsController {
 
@@ -236,7 +239,7 @@ public class ApiAdminExperimentsController {
         }
     }
 
-    @PostMapping("/{id}/variants/weights")
+    @PutMapping("/{id}/variants/weights")
     @Transactional
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updateWeights(@PathVariable UUID id, @RequestBody Map<UUID, Integer> weights) {
@@ -293,7 +296,7 @@ public class ApiAdminExperimentsController {
         ruleRepository.save(rule);
     }
 
-    @PostMapping("/{id}/rules/{ruleId}/delete")
+    @DeleteMapping("/{id}/rules/{ruleId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteRule(@PathVariable UUID id, @PathVariable UUID ruleId) {
         findOrThrow(id);
@@ -345,7 +348,7 @@ public class ApiAdminExperimentsController {
         overrideRepository.save(override);
     }
 
-    @PostMapping("/{id}/overrides/{overrideId}/delete")
+    @DeleteMapping("/{id}/overrides/{overrideId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteOverride(@PathVariable UUID id, @PathVariable UUID overrideId) {
         findOrThrow(id);
@@ -404,10 +407,10 @@ public class ApiAdminExperimentsController {
      * Moves a participant to another variant: a USER FORCE_VARIANT override keeps them there on later
      * evaluations, and their assignment is corrected now so the list shows it at once.
      */
-    @PostMapping("/{id}/assignments/{userId}/variant")
+    @PutMapping("/{id}/assignments/{memberId}/variant")
     @Transactional
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void moveAssignment(@PathVariable UUID id, @PathVariable UUID userId,
+    public void moveAssignment(@PathVariable UUID id, @PathVariable UUID memberId,
                                @RequestBody MoveAssignmentRequest body) {
         Experiment exp = findOrThrow(id);
         if (body == null || body.variantId() == null) {
@@ -416,13 +419,13 @@ public class ApiAdminExperimentsController {
         if (exp.getStatus() == Experiment.Status.ENDED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Experiment ended");
         }
-        UserAccount user = userAccountRepository.findById(userId)
+        UserAccount user = userAccountRepository.findById(memberId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
         ExperimentVariant target = findVariantOf(exp, body.variantId());
 
         List<ExperimentOverride> mine = overrideRepository.findByExperimentOrderByPriorityAsc(exp).stream()
                 .filter(o -> o.getOverrideType() == ExperimentOverride.OverrideType.USER
-                        && o.getTargetUser() != null && o.getTargetUser().getId().equals(userId))
+                        && o.getTargetUser() != null && o.getTargetUser().getId().equals(memberId))
                 .toList();
         // Keep one override (preferably the FORCE_VARIANT one) and drop the others: a lower-priority
         // FORCE_EXCLUDE left behind would still win over the move.

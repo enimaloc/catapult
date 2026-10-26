@@ -77,20 +77,20 @@ class ProblemSecurityHandlersTest {
 
     @Test
     void bodyIsAProblemWithATopLevelCode() throws Exception {
-        mvc.perform(remote(get("/api/admin/flags")))
+        mvc.perform(remote(get("/api/internal/admin/flags")))
                 .andExpect(status().isUnauthorized())
                 .andExpect(header().string("WWW-Authenticate", startsWith("Bearer")))
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.code").value("unauthorized"))
                 .andExpect(jsonPath("$.status").value(401))
                 .andExpect(jsonPath("$.detail").value("Authentication required"))
-                .andExpect(jsonPath("$.instance").value("/api/admin/flags"))
+                .andExpect(jsonPath("$.instance").value("/api/internal/admin/flags"))
                 .andExpect(jsonPath("$.properties").doesNotExist());
     }
 
     @Test
     void badTokenKeepsTheBearerHeader() throws Exception {
-        mvc.perform(remote(get("/api/admin/flags")).header("Authorization", "Bearer not-a-jwt"))
+        mvc.perform(remote(get("/api/internal/admin/flags")).header("Authorization", "Bearer not-a-jwt"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(header().string("WWW-Authenticate", startsWith("Bearer error=\"invalid_token\"")))
                 .andExpect(jsonPath("$.code").value("unauthorized"));
@@ -98,7 +98,7 @@ class ProblemSecurityHandlersTest {
 
     @Test
     void memberOnAdminIs403Problem() throws Exception {
-        mvc.perform(remote(get("/api/admin/flags")).header("Authorization", memberJwt))
+        mvc.perform(remote(get("/api/internal/admin/flags")).header("Authorization", memberJwt))
                 .andExpect(status().isForbidden())
                 .andExpect(header().string("WWW-Authenticate", startsWith("Bearer error=\"insufficient_scope\"")))
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))

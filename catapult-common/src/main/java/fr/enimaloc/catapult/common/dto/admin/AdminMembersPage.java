@@ -5,7 +5,7 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * GET /api/admin/members: one page of members, and whether each one is live (a member missing
+ * GET /api/internal/admin/members: one page of members, and whether each one is live (a member missing
  * there isn't), with where that page sits among the matches.
  */
 public record AdminMembersPage(List<AdminMemberDto> members, Map<UUID, Boolean> liveStatus, boolean isMockProfile,

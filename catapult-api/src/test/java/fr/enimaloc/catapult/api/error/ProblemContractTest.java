@@ -73,7 +73,7 @@ class ProblemContractTest extends FullContextTestBase {
 
     @Test
     void detailIsEnglishWhateverTheLanguage() throws Exception {
-        HttpResponse<String> response = send("/api/admin/members/not-a-uuid", Map.of("Accept-Language", "fr"));
+        HttpResponse<String> response = send("/api/internal/admin/members/not-a-uuid", Map.of("Accept-Language", "fr"));
 
         assertThat(response.statusCode()).isEqualTo(400);
         JsonNode body = json.readTree(response.body());

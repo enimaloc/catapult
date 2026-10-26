@@ -13,6 +13,8 @@ import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.access.InviteService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import fr.enimaloc.catapult.api.ApiPaths;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -28,7 +30,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/api/admin/invite")
+@RequestMapping(ApiPaths.ADMIN + "/invites")
 @RequiredArgsConstructor
 public class ApiAdminInviteController {
 
@@ -77,7 +79,7 @@ public class ApiAdminInviteController {
         );
     }
 
-    @PostMapping("/settings")
+    @PutMapping("/settings")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updateSettings(@RequestBody InviteSettingsRequest body) {
         inviteService.setGlobalMaxMembers(body.globalMaxMembers());
@@ -85,16 +87,16 @@ public class ApiAdminInviteController {
         inviteService.setDefaultCanReinvite(body.defaultCanReinvite());
     }
 
-    @PostMapping("/{inviteId}/quota")
+    @PutMapping("/{inviteId}/quota")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updateQuota(@PathVariable UUID inviteId, @RequestBody AdminInviteQuotaRequest body) {
         inviteService.updateInviteQuota(inviteId, body.maxUses(), body.canReinvite());
     }
 
-    @PostMapping("/grant/{userId}")
+    @PostMapping("/grants/{memberId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void grantInvite(@PathVariable UUID userId) {
-        UserAccount user = userAccountRepository.findById(userId)
+    public void grantInvite(@PathVariable UUID memberId) {
+        UserAccount user = userAccountRepository.findById(memberId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         inviteService.grantInvite(user);
     }

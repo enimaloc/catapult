@@ -13,7 +13,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Sealed polymorphic request body for {@code POST /api/admin/broadcast}.
+ * Sealed polymorphic request body for {@code POST /api/internal/admin/broadcasts}.
  *
  * <p>Jackson resolves the concrete subtype from the {@code name} discriminator —
  * this matches the spec §8 «names whitelist», each name has a strict payload shape.

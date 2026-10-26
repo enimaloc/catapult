@@ -49,7 +49,7 @@ class ApiAdminMemberDebugSecurityTest {
     @MockitoBean DebugExchangeRepository exchanges;
     @MockitoBean UserAccountRepository users;
 
-    private final String base = "/api/admin/members/" + UUID.randomUUID() + "/debug";
+    private final String base = "/api/internal/admin/members/" + UUID.randomUUID() + "/debug";
 
     private static org.springframework.test.web.servlet.request.RequestPostProcessor remote() {
         return r -> { r.setRemoteAddr("203.0.113.9"); return r; };

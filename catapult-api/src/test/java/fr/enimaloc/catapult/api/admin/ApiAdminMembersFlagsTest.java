@@ -67,7 +67,7 @@ class ApiAdminMembersFlagsTest {
         when(userFlagRepository.findByUserAndFlagKey(user, "tier")).thenReturn(Optional.empty());
         when(userFlagRepository.save(any(UserFlag.class))).thenAnswer(i -> i.getArgument(0));
 
-        mvc.perform(post("/api/admin/members/" + userId + "/flags")
+        mvc.perform(post("/api/internal/admin/members/" + userId + "/flags")
                         .with(adminJwt())
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -83,7 +83,7 @@ class ApiAdminMembersFlagsTest {
         UserAccount user = new UserAccount();
         when(userAccountRepository.findById(userId)).thenReturn(Optional.of(user));
 
-        mvc.perform(post("/api/admin/members/" + userId + "/flags")
+        mvc.perform(post("/api/internal/admin/members/" + userId + "/flags")
                         .with(adminJwt())
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -96,7 +96,7 @@ class ApiAdminMembersFlagsTest {
         UUID userId = UUID.randomUUID();
         when(userAccountRepository.findById(userId)).thenReturn(Optional.empty());
 
-        mvc.perform(post("/api/admin/members/" + userId + "/flags")
+        mvc.perform(post("/api/internal/admin/members/" + userId + "/flags")
                         .with(adminJwt())
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -111,7 +111,7 @@ class ApiAdminMembersFlagsTest {
         when(userAccountRepository.findById(userId)).thenReturn(Optional.of(user));
         when(userGroupRepository.findByKey("missing-group")).thenReturn(Optional.empty());
 
-        mvc.perform(post("/api/admin/members/" + userId + "/groups")
+        mvc.perform(post("/api/internal/admin/members/" + userId + "/groups")
                         .with(adminJwt())
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -133,7 +133,7 @@ class ApiAdminMembersFlagsTest {
         when(userGroupRepository.findByKey("beta")).thenReturn(Optional.of(group));
         when(userGroupRepository.save(any(UserGroup.class))).thenAnswer(i -> i.getArgument(0));
 
-        mvc.perform(post("/api/admin/members/" + userId + "/groups")
+        mvc.perform(post("/api/internal/admin/members/" + userId + "/groups")
                         .with(adminJwt())
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -151,7 +151,7 @@ class ApiAdminMembersFlagsTest {
         user.setBotEnabled(true);
         when(userAccountRepository.findById(userId)).thenReturn(Optional.of(user));
 
-        mvc.perform(post("/api/admin/members/" + userId + "/bot/toggle")
+        mvc.perform(post("/api/internal/admin/members/" + userId + "/bot/toggle")
                         .with(adminJwt())
                         .with(csrf()))
                 .andExpect(status().isNoContent());
@@ -181,7 +181,7 @@ class ApiAdminMembersFlagsTest {
         when(userFlagRepository.findByUser(user)).thenReturn(List.of(flag));
         when(userGroupRepository.findAll()).thenReturn(List.of(group));
 
-        mvc.perform(get("/api/admin/members/" + userId + "/targeting")
+        mvc.perform(get("/api/internal/admin/members/" + userId + "/targeting")
                         .with(adminJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.flags[0].key").value("tier"))

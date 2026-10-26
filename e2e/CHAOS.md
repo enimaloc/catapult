@@ -118,7 +118,7 @@ fan-outés à tous les onglets.
 ```bash
 for i in $(seq 1 100); do
   curl -s -o /dev/null -w "%{http_code}\n" \
-    -X POST http://localhost/api/admin/broadcast \
+    -X POST http://localhost/api/internal/admin/broadcasts \
     -H 'Content-Type: application/json' \
     -b "JSESSIONID=$ADMIN_COOKIE" \
     -d '{"channel":"events.global","name":"alert.info",
@@ -135,7 +135,7 @@ done | sort | uniq -c
 client, pas `innerHTML`.
 
 ```bash
-curl -X POST http://localhost/api/admin/broadcast \
+curl -X POST http://localhost/api/internal/admin/broadcasts \
   -H 'Content-Type: application/json' \
   -b "JSESSIONID=$ADMIN_COOKIE" \
   -d '{"channel":"events.global","name":"alert.info",

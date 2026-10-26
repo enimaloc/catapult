@@ -18,6 +18,8 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import fr.enimaloc.catapult.api.ApiPaths;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -35,7 +37,7 @@ import java.util.UUID;
 
 /** An admin's switch for a member's debug mode, and the browsing of the exchanges it recorded. */
 @RestController
-@RequestMapping("/api/admin/members/{id}/debug")
+@RequestMapping(ApiPaths.ADMIN + "/members/{id}/debug")
 @RequiredArgsConstructor
 public class ApiAdminMemberDebugController {
 
@@ -67,7 +69,7 @@ public class ApiAdminMemberDebugController {
     }
 
     /** Deletes everything recorded for the member. */
-    @PostMapping("/clear")
+    @DeleteMapping("/exchanges")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void clear(@PathVariable UUID id) {
         requireMember(id);

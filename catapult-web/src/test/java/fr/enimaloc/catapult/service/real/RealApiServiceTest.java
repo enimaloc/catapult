@@ -806,7 +806,7 @@ class RealApiServiceTest {
 
     @Test
     void adminMembers_readsTheAccountsLeavingTheirSecretsOut() {
-        respond(HttpMethod.GET, "/api/admin/members?page=2&q=enim", """
+        respond(HttpMethod.GET, "/api/internal/admin/members?page=2&q=enim", """
                 {"members":[{"id":"00000000-0000-0000-0000-000000000001","twitchId":"1","twitchUsername":"enimaloc",
                   "profileImageUrl":"img","steamId":"765","steamPersonalToken":"secret","systemAccount":false,
                   "botEnabled":true,"status":"ACTIVE","createdAt":"2025-03-01T12:00:00Z"}],
@@ -826,14 +826,14 @@ class RealApiServiceTest {
 
     @Test
     void adminMembers_withoutASearch_asksForThePageAlone() {
-        respond(HttpMethod.GET, "/api/admin/members?page=0&q=", "{\"members\":[],\"liveStatus\":{},\"isMockProfile\":false,\"number\":0,\"totalPages\":0,\"totalElements\":0}");
+        respond(HttpMethod.GET, "/api/internal/admin/members?page=0&q=", "{\"members\":[],\"liveStatus\":{},\"isMockProfile\":false,\"number\":0,\"totalPages\":0,\"totalElements\":0}");
 
         assertThat(service.adminMembers(null, 0).members()).isEmpty();
     }
 
     @Test
     void adminSearchMembers_readsTheMatchesAndEscapesTheQuery() {
-        respond(HttpMethod.GET, "/api/admin/members/search?q=a%26b%20c",
+        respond(HttpMethod.GET, "/api/internal/admin/members/search?q=a%26b%20c",
                 "[{\"id\":\"00000000-0000-0000-0000-000000000001\",\"twitchId\":\"1\",\"twitchUsername\":\"enimaloc\","
                         + "\"systemAccount\":false,\"botEnabled\":true,\"status\":\"ACTIVE\"}]");
 
@@ -843,12 +843,12 @@ class RealApiServiceTest {
     @Test
     void adminMemberActions() {
         UUID id = UUID.fromString("00000000-0000-0000-0000-000000000001");
-        String base = "/api/admin/members/" + id;
+        String base = "/api/internal/admin/members/" + id;
         expectPost(base + "/bot/toggle");
-        expectPost(base + "/steam/unlink");
-        expectPost(base + "/twitch/unlink");
+        expectDelete(base + "/links/steam");
+        expectDelete(base + "/links/twitch");
         expectPost(base + "/promote-to-system");
-        expectPost(base + "/delete");
+        expectDelete(base);
         expectPost(base + "/migrate", """
                 {"targetId":"00000000-0000-0000-0000-000000000002","migrateSettings":true,"migrateGetters":false,"migrateBindings":true}""");
 
@@ -1116,7 +1116,7 @@ class RealApiServiceTest {
 
     @Test
     void adminNotifications_readsAPageOfAdminDtos() {
-        respond(HttpMethod.GET, "/api/admin/notifications?page=0&size=20", "{\"content\":[{\"id\":\"" + NOTIF_ID
+        respond(HttpMethod.GET, "/api/internal/admin/notifications?page=0&size=20", "{\"content\":[{\"id\":\"" + NOTIF_ID
                 + "\",\"title\":\"t\",\"body\":\"b\",\"bodyHtml\":\"<p>b</p>\",\"severity\":\"WARNING\",\"audience\":\"TARGETED\","
                 + "\"targetUserId\":\"" + NOTIF_ID + "\",\"targetLogin\":\"alice\",\"recipientCount\":1,"
                 + "\"createdAt\":\"2026-10-18T10:00:00Z\"}],\"number\":0,\"totalPages\":1,\"totalElements\":1}");
@@ -1133,7 +1133,7 @@ class RealApiServiceTest {
     void adminCreateNotification_postsTheBody() {
         var body = new fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody("t", "b",
                 fr.enimaloc.catapult.common.dto.notification.Severity.INFO, null, null, null, null);
-        expect(HttpMethod.POST, "/api/admin/notifications").andExpect(content().json("{\"title\":\"t\",\"body\":\"b\",\"severity\":\"INFO\"}"))
+        expect(HttpMethod.POST, "/api/internal/admin/notifications").andExpect(content().json("{\"title\":\"t\",\"body\":\"b\",\"severity\":\"INFO\"}"))
                 .andRespond(withStatus(HttpStatus.CREATED));
 
         assertThat(service.adminCreateNotification(body)).isEqualTo(201);
@@ -1145,7 +1145,7 @@ class RealApiServiceTest {
         UUID variant = UUID.randomUUID();
         var body = new fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody("t", "b",
                 fr.enimaloc.catapult.common.dto.notification.Severity.INFO, null, null, null, null, "EXPERIMENT", experiment, variant);
-        expect(HttpMethod.POST, "/api/admin/notifications")
+        expect(HttpMethod.POST, "/api/internal/admin/notifications")
                 .andExpect(content().json("{\"audience\":\"EXPERIMENT\",\"experimentId\":\"" + experiment + "\",\"variantId\":\"" + variant + "\"}"))
                 .andRespond(withStatus(HttpStatus.CREATED).contentType(MediaType.APPLICATION_JSON).body("{\"sent\":7}"));
 
@@ -1159,7 +1159,7 @@ class RealApiServiceTest {
     void adminSendNotification_ofASingleNotification_hasNoCount() {
         var body = new fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody("t", "b",
                 fr.enimaloc.catapult.common.dto.notification.Severity.INFO, null, null, null, null);
-        expect(HttpMethod.POST, "/api/admin/notifications").andRespond(withStatus(HttpStatus.CREATED)
+        expect(HttpMethod.POST, "/api/internal/admin/notifications").andRespond(withStatus(HttpStatus.CREATED)
                 .contentType(MediaType.APPLICATION_JSON).body("{\"id\":\"" + NOTIF_ID + "\",\"title\":\"t\"}"));
 
         var result = service.adminSendNotification(body);
@@ -1172,10 +1172,10 @@ class RealApiServiceTest {
     void adminNotificationAudienceCount_postsTheIds_andIsNullOnFailure() {
         UUID experiment = UUID.randomUUID();
         UUID variant = UUID.randomUUID();
-        expect(HttpMethod.POST, "/api/admin/notifications/audience-count")
+        expect(HttpMethod.POST, "/api/internal/admin/notifications/audience-count")
                 .andExpect(content().json("{\"audience\":\"EXPERIMENT\",\"experimentId\":\"" + experiment + "\",\"variantId\":\"" + variant + "\"}"))
                 .andRespond(withSuccess("{\"count\":12}", MediaType.APPLICATION_JSON));
-        expect(HttpMethod.POST, "/api/admin/notifications/audience-count").andRespond(withStatus(HttpStatus.NOT_FOUND));
+        expect(HttpMethod.POST, "/api/internal/admin/notifications/audience-count").andRespond(withStatus(HttpStatus.NOT_FOUND));
 
         assertThat(service.adminNotificationAudienceCount(experiment, variant)).isEqualTo(12L);
         assertThat(service.adminNotificationAudienceCount(experiment, null)).isNull();
@@ -1219,7 +1219,7 @@ class RealApiServiceTest {
 
     @Test
     void adminGroups_readsTheList() {
-        respond(HttpMethod.GET, "/api/admin/groups", "[{\"id\":\"" + NOTIF_ID
+        respond(HttpMethod.GET, "/api/internal/admin/groups", "[{\"id\":\"" + NOTIF_ID
                 + "\",\"key\":\"beta\",\"name\":\"Beta\",\"description\":null,\"memberCount\":3}]");
 
         var groups = service.adminGroups();
@@ -1231,14 +1231,14 @@ class RealApiServiceTest {
 
     @Test
     void adminGroupActions_postTheirShapes_andReturnTheStatus() {
-        expect(HttpMethod.POST, "/api/admin/groups")
+        expect(HttpMethod.POST, "/api/internal/admin/groups")
                 .andExpect(content().json("{\"key\":\"beta\",\"name\":\"Beta\",\"description\":\"d\"}", true))
                 .andRespond(withStatus(HttpStatus.CREATED));
-        expect(HttpMethod.POST, "/api/admin/groups/" + NOTIF_ID + "/rename")
+        expect(HttpMethod.PATCH, "/api/internal/admin/groups/" + NOTIF_ID)
                 .andExpect(content().json("{\"name\":\"N\",\"description\":\"D\"}", true)).andRespond(withNoContent());
-        expect(HttpMethod.POST, "/api/admin/groups/" + NOTIF_ID + "/members")
+        expect(HttpMethod.POST, "/api/internal/admin/groups/" + NOTIF_ID + "/members")
                 .andExpect(content().json("{\"twitchUsername\":\"alice\"}", true)).andRespond(withStatus(HttpStatus.NOT_FOUND));
-        expect(HttpMethod.POST, "/api/admin/groups/" + NOTIF_ID + "/delete").andRespond(withNoContent());
+        expect(HttpMethod.DELETE, "/api/internal/admin/groups/" + NOTIF_ID).andRespond(withNoContent());
 
         assertThat(service.adminCreateGroup("beta", "Beta", "d")).isEqualTo(201);
         assertThat(service.adminRenameGroup(NOTIF_ID, "N", "D")).isEqualTo(204);
@@ -1248,9 +1248,9 @@ class RealApiServiceTest {
 
     @Test
     void adminExperimentReads_hitTheirEndpoints() {
-        respond(HttpMethod.GET, "/api/admin/experiments", "[]");
-        respond(HttpMethod.GET, "/api/admin/flags", "[{\"key\":\"beta\",\"values\":[\"true\"]}]");
-        respond(HttpMethod.GET, "/api/admin/experiments/" + NOTIF_ID + "/settings",
+        respond(HttpMethod.GET, "/api/internal/admin/experiments", "[]");
+        respond(HttpMethod.GET, "/api/internal/admin/flags", "[{\"key\":\"beta\",\"values\":[\"true\"]}]");
+        respond(HttpMethod.GET, "/api/internal/admin/experiments/" + NOTIF_ID + "/settings",
                 "{\"id\":\"" + NOTIF_ID + "\",\"key\":\"exp\"}");
 
         assertThat(service.adminExperiments()).isEmpty();
@@ -1263,23 +1263,23 @@ class RealApiServiceTest {
 
     @Test
     void adminExperimentWrites_postTheirShapes_andReturnTheStatus() {
-        expect(HttpMethod.POST, "/api/admin/experiments/" + NOTIF_ID + "/activate").andRespond(withNoContent());
-        expect(HttpMethod.POST, "/api/admin/experiments/" + NOTIF_ID + "/variants/weights")
+        expect(HttpMethod.POST, "/api/internal/admin/experiments/" + NOTIF_ID + "/activate").andRespond(withNoContent());
+        expect(HttpMethod.PUT, "/api/internal/admin/experiments/" + NOTIF_ID + "/variants/weights")
                 .andExpect(content().json("{\"" + GROUP_ID + "\":40}", true)).andRespond(withNoContent());
-        expect(HttpMethod.POST, "/api/admin/experiments/" + NOTIF_ID + "/rules")
+        expect(HttpMethod.POST, "/api/internal/admin/experiments/" + NOTIF_ID + "/rules")
                 .andExpect(content().json("{\"ruleType\":\"RANDOM\",\"priority\":1,\"percentage\":50,"
                         + "\"attributeKey\":null,\"attributeOperator\":null,\"attributeValue\":null}", true))
                 .andRespond(withStatus(HttpStatus.CONFLICT));
-        expect(HttpMethod.POST, "/api/admin/experiments/" + NOTIF_ID + "/rules/" + GROUP_ID + "/delete")
+        expect(HttpMethod.DELETE, "/api/internal/admin/experiments/" + NOTIF_ID + "/rules/" + GROUP_ID)
                 .andRespond(withNoContent());
-        expect(HttpMethod.POST, "/api/admin/experiments/" + NOTIF_ID + "/overrides")
+        expect(HttpMethod.POST, "/api/internal/admin/experiments/" + NOTIF_ID + "/overrides")
                 .andExpect(content().json("{\"overrideType\":\"USER\",\"action\":\"EXCLUDE\",\"priority\":2,"
                         + "\"twitchUsername\":\"alice\",\"attributeKey\":null,\"attributeOp\":null,"
                         + "\"attributeVal\":null,\"targetVariantId\":null}", true))
                 .andRespond(withStatus(HttpStatus.NOT_FOUND));
-        expect(HttpMethod.POST, "/api/admin/experiments/" + NOTIF_ID + "/overrides/" + GROUP_ID + "/delete")
+        expect(HttpMethod.DELETE, "/api/internal/admin/experiments/" + NOTIF_ID + "/overrides/" + GROUP_ID)
                 .andRespond(withNoContent());
-        expect(HttpMethod.POST, "/api/admin/experiments/" + NOTIF_ID + "/assignments/" + GROUP_ID + "/variant")
+        expect(HttpMethod.PUT, "/api/internal/admin/experiments/" + NOTIF_ID + "/assignments/" + GROUP_ID + "/variant")
                 .andExpect(content().json("{\"variantId\":\"" + NOTIF_ID + "\"}", true)).andRespond(withNoContent());
 
         assertThat(service.adminExperimentAction(NOTIF_ID, "activate")).isEqualTo(204);
@@ -1297,10 +1297,10 @@ class RealApiServiceTest {
 
     @Test
     void adminExperimentWeightsPreview_returnsTheRebalance_orNullWhenRefused() {
-        expect(HttpMethod.POST, "/api/admin/experiments/" + NOTIF_ID + "/variants/weights/preview")
+        expect(HttpMethod.POST, "/api/internal/admin/experiments/" + NOTIF_ID + "/variants/weights/preview")
                 .andExpect(content().json("{\"" + GROUP_ID + "\":40}", true))
                 .andRespond(withSuccess("{\"moves\":[]}", MediaType.APPLICATION_JSON));
-        expect(HttpMethod.POST, "/api/admin/experiments/" + NOTIF_ID + "/variants/weights/preview")
+        expect(HttpMethod.POST, "/api/internal/admin/experiments/" + NOTIF_ID + "/variants/weights/preview")
                 .andRespond(withStatus(HttpStatus.NOT_FOUND));
 
         assertThat(service.adminExperimentWeightsPreview(NOTIF_ID, Map.of(GROUP_ID, 40))).isNotNull();
@@ -1309,9 +1309,9 @@ class RealApiServiceTest {
 
     @Test
     void adminExperimentAssignments_passTheFilters_andDefaultNullOnesToEmpty() {
-        respond(HttpMethod.GET, "/api/admin/experiments/" + NOTIF_ID + "/assignments?variant=" + GROUP_ID + "&q=ali&page=2",
+        respond(HttpMethod.GET, "/api/internal/admin/experiments/" + NOTIF_ID + "/assignments?variant=" + GROUP_ID + "&q=ali&page=2",
                 "{\"counts\":{\"" + GROUP_ID + "\":7}}");
-        respond(HttpMethod.GET, "/api/admin/experiments/" + NOTIF_ID + "/assignments?variant=&q=&page=0", "{\"counts\":{}}");
+        respond(HttpMethod.GET, "/api/internal/admin/experiments/" + NOTIF_ID + "/assignments?variant=&q=&page=0", "{\"counts\":{}}");
 
         assertThat(service.adminExperimentAssignments(NOTIF_ID, GROUP_ID, "ali", 2).counts()).containsEntry(GROUP_ID, 7L);
         assertThat(service.adminExperimentAssignments(NOTIF_ID, null, null, 0).counts()).isEmpty();
@@ -1319,7 +1319,7 @@ class RealApiServiceTest {
 
     @Test
     void adminWhitelist_readsThePage() {
-        respond(HttpMethod.GET, "/api/admin/whitelist", "{\"entries\":[{\"twitchId\":\"123\"}],\"resolvedUsernames\":{\"123\":\"alice\"},"
+        respond(HttpMethod.GET, "/api/internal/admin/whitelist", "{\"entries\":[{\"twitchId\":\"123\"}],\"resolvedUsernames\":{\"123\":\"alice\"},"
                 + "\"whitelistEnabled\":true,\"inviteEnabled\":true,\"globalMaxMembers\":null,\"defaultMaxUses\":3,"
                 + "\"defaultCanReinvite\":false,\"globalCapReached\":false,\"invites\":[{\"id\":\"" + NOTIF_ID
                 + "\",\"ownerId\":\"" + GROUP_ID + "\",\"ownerUsername\":\"bob\",\"code\":\"ABC234\",\"maxUses\":null,"
@@ -1338,11 +1338,11 @@ class RealApiServiceTest {
 
     @Test
     void whitelistActions_postTheirShapes_andReturnTheStatus() {
-        expect(HttpMethod.POST, "/api/admin/whitelist/toggle").andRespond(withNoContent());
-        expect(HttpMethod.POST, "/api/admin/whitelist/add")
+        expect(HttpMethod.POST, "/api/internal/admin/whitelist/toggle").andRespond(withNoContent());
+        expect(HttpMethod.POST, "/api/internal/admin/whitelist/entries")
                 .andExpect(content().json("{\"twitchId\":\"123\"}", true)).andRespond(withNoContent());
-        expect(HttpMethod.POST, "/api/admin/whitelist/123/delete").andRespond(withStatus(HttpStatus.NOT_FOUND));
-        expect(HttpMethod.POST, "/api/admin/whitelist/invite/toggle").andRespond(withNoContent());
+        expect(HttpMethod.DELETE, "/api/internal/admin/whitelist/entries/123").andRespond(withStatus(HttpStatus.NOT_FOUND));
+        expect(HttpMethod.POST, "/api/internal/admin/whitelist/invite/toggle").andRespond(withNoContent());
 
         assertThat(service.adminToggleWhitelist()).isEqualTo(204);
         assertThat(service.adminAddWhitelist("123")).isEqualTo(204);
@@ -1352,14 +1352,14 @@ class RealApiServiceTest {
 
     @Test
     void deleteWhitelist_encodesALegacyId() {
-        expect(HttpMethod.POST, "/api/admin/whitelist/old%20user%2F1/delete").andRespond(withNoContent());
+        expect(HttpMethod.DELETE, "/api/internal/admin/whitelist/entries/old%20user%2F1").andRespond(withNoContent());
 
         assertThat(service.adminDeleteWhitelist("old user/1")).isEqualTo(204);
     }
 
     @Test
     void settings_sendNullsForEmptyNumbers() {
-        expect(HttpMethod.POST, "/api/admin/whitelist/invite/settings")
+        expect(HttpMethod.PUT, "/api/internal/admin/whitelist/invite/settings")
                 .andExpect(content().json("{\"globalMaxMembers\":null,\"defaultMaxUses\":3,\"defaultCanReinvite\":false}", true))
                 .andRespond(withNoContent());
 
@@ -1368,7 +1368,7 @@ class RealApiServiceTest {
 
     @Test
     void quota_sendsNullsForTheDefault() {
-        expect(HttpMethod.POST, "/api/admin/whitelist/invite/" + NOTIF_ID + "/quota")
+        expect(HttpMethod.PUT, "/api/internal/admin/whitelist/invite/" + NOTIF_ID + "/quota")
                 .andExpect(content().json("{\"maxUses\":null,\"canReinvite\":true}", true)).andRespond(withNoContent());
 
         assertThat(service.adminSaveInviteQuota(NOTIF_ID, null, true)).isEqualTo(204);
@@ -1376,8 +1376,8 @@ class RealApiServiceTest {
 
     @Test
     void adminMember_andTargeting_readTheirEndpoints() {
-        respond(HttpMethod.GET, "/api/admin/members/" + NOTIF_ID, "{\"id\":\"" + NOTIF_ID + "\",\"twitchUsername\":\"alice\"}");
-        respond(HttpMethod.GET, "/api/admin/members/" + NOTIF_ID + "/targeting",
+        respond(HttpMethod.GET, "/api/internal/admin/members/" + NOTIF_ID, "{\"id\":\"" + NOTIF_ID + "\",\"twitchUsername\":\"alice\"}");
+        respond(HttpMethod.GET, "/api/internal/admin/members/" + NOTIF_ID + "/targeting",
                 "{\"flags\":[{\"key\":\"beta\",\"value\":null},{\"key\":\"tier\",\"value\":\"2\"}],\"groupKeys\":[\"staff\"]}");
 
         assertThat(service.adminMember(NOTIF_ID).twitchUsername()).isEqualTo("alice");
@@ -1388,12 +1388,12 @@ class RealApiServiceTest {
 
     @Test
     void adminMemberTargetingActions_postTheirShapes_andReturnTheStatus() {
-        expect(HttpMethod.POST, "/api/admin/members/" + NOTIF_ID + "/flags")
+        expect(HttpMethod.POST, "/api/internal/admin/members/" + NOTIF_ID + "/flags")
                 .andExpect(content().json("{\"key\":\"tier\",\"value\":\"2\"}", true)).andRespond(withNoContent());
-        expect(HttpMethod.POST, "/api/admin/members/" + NOTIF_ID + "/flags/tier/delete").andRespond(withNoContent());
-        expect(HttpMethod.POST, "/api/admin/members/" + NOTIF_ID + "/groups")
+        expect(HttpMethod.DELETE, "/api/internal/admin/members/" + NOTIF_ID + "/flags/tier").andRespond(withNoContent());
+        expect(HttpMethod.POST, "/api/internal/admin/members/" + NOTIF_ID + "/groups")
                 .andExpect(content().json("{\"groupKey\":\"staff\"}", true)).andRespond(withStatus(HttpStatus.NOT_FOUND));
-        expect(HttpMethod.POST, "/api/admin/members/" + NOTIF_ID + "/groups/" + GROUP_ID + "/delete").andRespond(withNoContent());
+        expect(HttpMethod.DELETE, "/api/internal/admin/members/" + NOTIF_ID + "/groups/" + GROUP_ID).andRespond(withNoContent());
 
         assertThat(service.adminSetMemberFlag(NOTIF_ID, "tier", "2")).isEqualTo(204);
         assertThat(service.adminDeleteMemberFlag(NOTIF_ID, "tier")).isEqualTo(204);
@@ -1403,14 +1403,14 @@ class RealApiServiceTest {
 
     @Test
     void deleteFlag_encodesTheKey() {
-        expect(HttpMethod.POST, "/api/admin/members/" + NOTIF_ID + "/flags/a%2Fb%20%25%C3%A9/delete").andRespond(withNoContent());
+        expect(HttpMethod.DELETE, "/api/internal/admin/members/" + NOTIF_ID + "/flags/a%2Fb%20%25%C3%A9").andRespond(withNoContent());
 
         assertThat(service.adminDeleteMemberFlag(NOTIF_ID, "a/b %é")).isEqualTo(204);
     }
 
     @Test
     void adminSetMemberFlag_withoutAValue_sendsANullOne() {
-        expect(HttpMethod.POST, "/api/admin/members/" + NOTIF_ID + "/flags")
+        expect(HttpMethod.POST, "/api/internal/admin/members/" + NOTIF_ID + "/flags")
                 .andExpect(content().json("{\"key\":\"beta\",\"value\":null}", true)).andRespond(withNoContent());
 
         assertThat(service.adminSetMemberFlag(NOTIF_ID, "beta", null)).isEqualTo(204);
@@ -1418,18 +1418,18 @@ class RealApiServiceTest {
 
     @Test
     void adminDeleteNotification_returnsTheStatus() {
-        expect(HttpMethod.DELETE, "/api/admin/notifications/" + NOTIF_ID).andRespond(withNoContent());
+        expect(HttpMethod.DELETE, "/api/internal/admin/notifications/" + NOTIF_ID).andRespond(withNoContent());
 
         assertThat(service.adminDeleteNotification(NOTIF_ID)).isEqualTo(204);
     }
 
     @Test
     void adminImpersonate_postsTheUsername_andReadsTheToken_keepingARefusalsStatus() {
-        expect(HttpMethod.POST, "/api/admin/impersonate")
+        expect(HttpMethod.POST, "/api/internal/admin/impersonations")
                 .andExpect(content().json("{\"username\":\"alice\"}", org.springframework.test.json.JsonCompareMode.STRICT))
                 .andRespond(withSuccess("{\"token\":\"target-token\"}", MediaType.APPLICATION_JSON));
-        expect(HttpMethod.POST, "/api/admin/impersonate").andRespond(withStatus(HttpStatus.FORBIDDEN));
-        expect(HttpMethod.POST, "/api/admin/impersonate").andRespond(withStatus(HttpStatus.NOT_FOUND));
+        expect(HttpMethod.POST, "/api/internal/admin/impersonations").andRespond(withStatus(HttpStatus.FORBIDDEN));
+        expect(HttpMethod.POST, "/api/internal/admin/impersonations").andRespond(withStatus(HttpStatus.NOT_FOUND));
 
         assertThat(service.adminImpersonate("alice")).isEqualTo(new ApiClient.Result<>(200, "target-token"));
         assertThat(service.adminImpersonate("alice")).isEqualTo(new ApiClient.Result<>(403, null));
@@ -1438,8 +1438,8 @@ class RealApiServiceTest {
 
     @Test
     void adminImpersonate_isBadGateway_withoutAToken() {
-        expect(HttpMethod.POST, "/api/admin/impersonate").andRespond(withSuccess("{\"token\":\" \"}", MediaType.APPLICATION_JSON));
-        expect(HttpMethod.POST, "/api/admin/impersonate").andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+        expect(HttpMethod.POST, "/api/internal/admin/impersonations").andRespond(withSuccess("{\"token\":\" \"}", MediaType.APPLICATION_JSON));
+        expect(HttpMethod.POST, "/api/internal/admin/impersonations").andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
 
         assertThat(service.adminImpersonate("alice")).isEqualTo(new ApiClient.Result<>(502, null));
         assertThat(service.adminImpersonate("alice")).isEqualTo(new ApiClient.Result<>(502, null));
@@ -1447,7 +1447,7 @@ class RealApiServiceTest {
 
     @Test
     void adminImpersonate_unreachable_is502() {
-        expect(HttpMethod.POST, "/api/admin/impersonate").andRespond(request -> {
+        expect(HttpMethod.POST, "/api/internal/admin/impersonations").andRespond(request -> {
             throw new java.io.IOException("connection refused");
         });
 
@@ -1456,7 +1456,7 @@ class RealApiServiceTest {
 
     @Test
     void adminPreviewNotification_returnsTheBodyHtml() {
-        expect(HttpMethod.POST, "/api/admin/notifications/preview").andExpect(content().json("{\"body\":\"**a**\"}"))
+        expect(HttpMethod.POST, "/api/internal/admin/notifications/preview").andExpect(content().json("{\"body\":\"**a**\"}"))
                 .andRespond(withSuccess("{\"bodyHtml\":\"<p><strong>a</strong></p>\"}", MediaType.APPLICATION_JSON));
 
         assertThat(service.adminPreviewNotification("**a**"))
@@ -1465,8 +1465,8 @@ class RealApiServiceTest {
 
     @Test
     void adminPreviewNotification_keepsTheRefusalsStatus() {
-        expect(HttpMethod.POST, "/api/admin/notifications/preview").andRespond(withStatus(HttpStatus.BAD_REQUEST));
-        expect(HttpMethod.POST, "/api/admin/notifications/preview").andRespond(withStatus(HttpStatus.NOT_FOUND));
+        expect(HttpMethod.POST, "/api/internal/admin/notifications/preview").andRespond(withStatus(HttpStatus.BAD_REQUEST));
+        expect(HttpMethod.POST, "/api/internal/admin/notifications/preview").andRespond(withStatus(HttpStatus.NOT_FOUND));
 
         assertThat(service.adminPreviewNotification("")).isEqualTo(new ApiClient.Result<>(400, null));
         assertThat(service.adminPreviewNotification("x")).isEqualTo(new ApiClient.Result<>(404, null));
@@ -1474,14 +1474,14 @@ class RealApiServiceTest {
 
     @Test
     void adminPreviewNotification_isBadGatewayWithoutHtml() {
-        expect(HttpMethod.POST, "/api/admin/notifications/preview").andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+        expect(HttpMethod.POST, "/api/internal/admin/notifications/preview").andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
 
         assertThat(service.adminPreviewNotification("x")).isEqualTo(new ApiClient.Result<>(502, null));
     }
 
     @Test
     void adminBroadcast_sendsTheNameDiscriminator_andRelaysA429() {
-        expect(HttpMethod.POST, "/api/admin/broadcast")
+        expect(HttpMethod.POST, "/api/internal/admin/broadcasts")
                 .andExpect(content().json("{\"name\":\"alert.info\",\"title\":\"t\",\"body\":\"b\",\"ttlSeconds\":0}"))
                 .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS));
 
@@ -1541,7 +1541,7 @@ class RealApiServiceTest {
     @Test
     void adminExperimentAction_reachesEachActionsRoute_andNoneForAnUnknownOne() {
         for (String action : List.of("pause", "end", "assign", "reassign")) {
-            expectPost("/api/admin/experiments/" + NOTIF_ID + "/" + action);
+            expectPost("/api/internal/admin/experiments/" + NOTIF_ID + "/" + action);
         }
 
         for (String action : List.of("pause", "end", "assign", "reassign")) {
@@ -1705,7 +1705,7 @@ class RealApiServiceTest {
     @Test
     void memberDebug_readsTheState() {
         UUID id = UUID.fromString("00000000-0000-0000-0000-000000000001");
-        respond(HttpMethod.GET, "/api/admin/members/" + id + "/debug",
+        respond(HttpMethod.GET, "/api/internal/admin/members/" + id + "/debug",
                 "{\"active\":true,\"revealSecrets\":false,\"enabledAt\":\"2026-10-24T10:00:00Z\",\"exchangeCount\":4}");
 
         var state = service.memberDebug(id);
@@ -1718,10 +1718,10 @@ class RealApiServiceTest {
     @Test
     void memberDebugActions_postToTheMemberAndRelayTheStatus() {
         UUID id = UUID.fromString("00000000-0000-0000-0000-000000000001");
-        String base = "/api/admin/members/" + id + "/debug";
+        String base = "/api/internal/admin/members/" + id + "/debug";
         expectPost(base + "/enable", "{\"revealSecrets\":true}");
         expectPost(base + "/disable");
-        expectPost(base + "/clear");
+        expectDelete(base + "/exchanges");
 
         assertThat(service.enableMemberDebug(id, true)).isEqualTo(204);
         assertThat(service.disableMemberDebug(id)).isEqualTo(204);
@@ -1733,7 +1733,7 @@ class RealApiServiceTest {
         UUID id = UUID.fromString("00000000-0000-0000-0000-000000000001");
         String page = "{\"content\":[{\"id\":\"00000000-0000-0000-0000-0000000000e1\",\"direction\":\"OUT\",\"service\":\"steam\","
                 + "\"error\":true,\"durationMs\":12,\"filtered\":false}],\"number\":1,\"totalPages\":2,\"totalElements\":6}";
-        String base = "/api/admin/members/" + id + "/debug/exchanges?";
+        String base = "/api/internal/admin/members/" + id + "/debug/exchanges?";
         respond(HttpMethod.GET, base + "service=steam&direction=OUT&outcome=error&from=2026-10-24T08%3A00%3A00Z&to=2026-10-24T09%3A00%3A00Z&page=1&size=50", page);
         respond(HttpMethod.GET, base + "service=&direction=&outcome=&from=&to=&page=0&size=50", page);
 
@@ -1750,7 +1750,7 @@ class RealApiServiceTest {
     void memberDebugExchange_readsOneExchangeInFull() {
         UUID id = UUID.fromString("00000000-0000-0000-0000-000000000001");
         UUID exchange = UUID.fromString("00000000-0000-0000-0000-0000000000e1");
-        respond(HttpMethod.GET, "/api/admin/members/" + id + "/debug/exchanges/" + exchange,
+        respond(HttpMethod.GET, "/api/internal/admin/members/" + id + "/debug/exchanges/" + exchange,
                 "{\"id\":\"" + exchange + "\",\"occurredAt\":\"2026-10-24T10:00:00Z\",\"direction\":\"OUT\",\"service\":\"steam\","
                         + "\"operation\":\"getOwnedGames\",\"method\":\"GET\",\"url\":\"https://x\",\"status\":500,\"error\":true,"
                         + "\"durationMs\":12,\"filtered\":false,\"responseBody\":\"<html/>\",\"traceId\":\"abc\"}");
@@ -1765,8 +1765,8 @@ class RealApiServiceTest {
     @Test
     void memberDebugServices_listsThem_orNothingWhenTheApiCouldNotAnswer() {
         UUID id = UUID.fromString("00000000-0000-0000-0000-000000000001");
-        respond(HttpMethod.GET, "/api/admin/members/" + id + "/debug/services", "[\"steam\",\"twitch\"]");
-        expect(HttpMethod.GET, "/api/admin/members/" + id + "/debug/services").andRespond(withStatus(HttpStatus.BAD_GATEWAY));
+        respond(HttpMethod.GET, "/api/internal/admin/members/" + id + "/debug/services", "[\"steam\",\"twitch\"]");
+        expect(HttpMethod.GET, "/api/internal/admin/members/" + id + "/debug/services").andRespond(withStatus(HttpStatus.BAD_GATEWAY));
 
         assertThat(service.memberDebugServices(id)).containsExactly("steam", "twitch");
         assertThat(service.memberDebugServices(id)).isEmpty();

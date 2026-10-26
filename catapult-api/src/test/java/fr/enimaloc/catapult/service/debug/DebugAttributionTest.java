@@ -188,9 +188,9 @@ class DebugAttributionTest {
         UUID member = UUID.randomUUID();
         authenticate(admin.toString(), "ROLE_ADMIN");
 
-        filter(remote("POST", "/api/admin/members/" + member + "/debug"));
-        filter(remote("GET", "/api/admin/members/" + member));
-        filter(remote("GET", "/api/admin/members"));
+        filter(remote("POST", "/api/internal/admin/members/" + member + "/debug"));
+        filter(remote("GET", "/api/internal/admin/members/" + member));
+        filter(remote("GET", "/api/internal/admin/members"));
 
         assertThat(seen).containsExactly(member, member, admin);
     }
@@ -202,7 +202,7 @@ class DebugAttributionTest {
         UUID member = UUID.randomUUID();
         authenticate(caller.toString(), "ROLE_USER");
 
-        filter(remote("POST", "/api/admin/members/" + member + "/debug"));
+        filter(remote("POST", "/api/internal/admin/members/" + member + "/debug"));
 
         assertThat(seen).containsExactly(caller);
     }
@@ -211,14 +211,14 @@ class DebugAttributionTest {
     @Test
     void loopbackOnAMembersAdminRoute_isAttributedToThatMember() throws Exception {
         UUID member = UUID.randomUUID();
-        MockHttpServletRequest v4 = new MockHttpServletRequest("POST", "/api/admin/members/" + member + "/debug");
+        MockHttpServletRequest v4 = new MockHttpServletRequest("POST", "/api/internal/admin/members/" + member + "/debug");
         v4.setRemoteAddr("127.0.0.1");
-        MockHttpServletRequest v6 = new MockHttpServletRequest("POST", "/api/admin/members/" + member + "/debug");
+        MockHttpServletRequest v6 = new MockHttpServletRequest("POST", "/api/internal/admin/members/" + member + "/debug");
         v6.setRemoteAddr("0:0:0:0:0:0:0:1");
 
         filter(v4);
         filter(v6);
-        filter(remote("POST", "/api/admin/members/" + member + "/debug"));
+        filter(remote("POST", "/api/internal/admin/members/" + member + "/debug"));
 
         assertThat(seen).containsExactly(member, member, null);
     }
