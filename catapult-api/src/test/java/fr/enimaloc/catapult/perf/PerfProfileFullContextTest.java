@@ -12,6 +12,7 @@ import fr.enimaloc.catapult.getter.steam.MockSteamApiClient;
 import fr.enimaloc.catapult.getter.steam.SteamApiClient;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
+import fr.enimaloc.catapult.repository.chatcommand.ChatCommandDefinitionRepository;
 import fr.enimaloc.catapult.repository.notification.NotificationRecipientRepository;
 import fr.enimaloc.catapult.security.JwtService;
 import fr.enimaloc.catapult.service.account.WidgetTokenService;
@@ -77,6 +78,9 @@ class PerfProfileFullContextTest extends FullContextTestBase {
     NotificationRecipientRepository notifications;
 
     @Autowired
+    ChatCommandDefinitionRepository chatCommands;
+
+    @Autowired
     NotificationDeliveryService deliveries;
 
     @Autowired
@@ -112,6 +116,9 @@ class PerfProfileFullContextTest extends FullContextTestBase {
             assertThat(deliveries.channels(streamer.getId())).hasSize(2);
             assertThat(notifications.countByUserIdAndReadAtIsNull(streamer.getId())).isEqualTo(5);
             assertThat(streamer.getWidgetToken()).isNotNull();
+            assertThat(chatCommands.findByUser(streamer))
+                    .filteredOn(c -> c.getName().equals(PerfDataSeeder.COMMAND_NAME))
+                    .singleElement().satisfies(c -> assertThat(c.isEnabled()).isTrue());
         }
     }
 
