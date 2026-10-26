@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.chatcommand;
 
+import fr.enimaloc.catapult.api.ApiPaths;
 import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.api.error.ApiProblem;
 import fr.enimaloc.catapult.common.dto.chatcommand.ChatCommandSettingUpsertRequest;
@@ -9,9 +10,11 @@ import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.chatcommand.ChatCommandSetting;
 import fr.enimaloc.catapult.repository.chatcommand.ChatCommandSettingRepository;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -34,7 +37,7 @@ import java.util.regex.Pattern;
  * Gated by the same {@code chat.commands} experiment as the rest of the chat-command API.
  */
 @RestController
-@RequestMapping("/api/chat-command-settings")
+@RequestMapping(ApiPaths.USER + "/chat-command-settings")
 @RequiredArgsConstructor
 public class ApiChatCommandSettingsController {
 
@@ -55,8 +58,9 @@ public class ApiChatCommandSettingsController {
     private final ApiUserResolver userResolver;
     private final ExperimentService experimentService;
 
+    @PreAuthorize("@authz.isSelf(#userId)")
     @GetMapping
-    public List<SettingDto> list(@AuthenticationPrincipal Jwt jwt, Locale locale) {
+    public List<SettingDto> list(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt, Locale locale) {
         UserAccount user = userResolver.viewerByTwitchId(jwt);
         gate(user);
         ensureDefaultLanguage(user, locale);
@@ -79,8 +83,9 @@ public class ApiChatCommandSettingsController {
         repository.save(setting);
     }
 
+    @PreAuthorize("@authz.isSelf(#userId)")
     @PutMapping("/{key}")
-    public ResponseEntity<Void> upsert(@AuthenticationPrincipal Jwt jwt, @PathVariable String key,
+    public ResponseEntity<Void> upsert(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt, @PathVariable String key,
                        @RequestBody ChatCommandSettingUpsertRequest body) {
         UserAccount user = userResolver.viewerByTwitchId(jwt);
         gate(user);
@@ -102,8 +107,9 @@ public class ApiChatCommandSettingsController {
         return ResponseEntity.noContent().build();
     }
 
+    @PreAuthorize("@authz.isSelf(#userId)")
     @DeleteMapping("/{key}")
-    public ResponseEntity<Void> delete(@AuthenticationPrincipal Jwt jwt, @PathVariable String key) {
+    public ResponseEntity<Void> delete(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt, @PathVariable String key) {
         UserAccount user = userResolver.viewerByTwitchId(jwt);
         gate(user);
         repository.deleteByUserAndKey(user, key);

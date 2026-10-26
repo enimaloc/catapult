@@ -53,7 +53,7 @@ class ApiFeedbackControllerTest {
 
     @Test
     void bugs_becomeLabelledIssues_signedByTheSubmitter() {
-        FeedbackSubmission submission = controller.submit(jwt, new SubmitRequest("bug", "  Crash  ", " It crashed. "));
+        FeedbackSubmission submission = controller.submit(UUID.randomUUID(), jwt, new SubmitRequest("bug", "  Crash  ", " It crashed. "));
 
         verify(gitLab).createIssue("Crash", "It crashed.\n\n---\n*Soumis par @streamer via Catapult*", List.of("bug", "user-submitted"));
         assertThat(submission.getTitle()).isEqualTo("Crash");
@@ -66,7 +66,7 @@ class ApiFeedbackControllerTest {
 
     @Test
     void featureRequests_withoutDescription() {
-        FeedbackSubmission submission = controller.submit(jwt, new SubmitRequest("Feature", "Dark mode", " "));
+        FeedbackSubmission submission = controller.submit(UUID.randomUUID(), jwt, new SubmitRequest("Feature", "Dark mode", " "));
 
         verify(gitLab).createIssue("Dark mode", "---\n*Soumis par @streamer via Catapult*", List.of("enhancement", "user-submitted"));
         assertThat(submission.getDescription()).isNull();
@@ -74,9 +74,9 @@ class ApiFeedbackControllerTest {
 
     @Test
     void submissions_needATitleAndAKnownType() {
-        assertStatus(() -> controller.submit(jwt, new SubmitRequest("bug", " ", null)), HttpStatus.BAD_REQUEST);
-        assertStatus(() -> controller.submit(jwt, new SubmitRequest("bug", null, null)), HttpStatus.BAD_REQUEST);
-        assertStatus(() -> controller.submit(jwt, new SubmitRequest("rant", "Title", null)), HttpStatus.BAD_REQUEST);
+        assertStatus(() -> controller.submit(UUID.randomUUID(), jwt, new SubmitRequest("bug", " ", null)), HttpStatus.BAD_REQUEST);
+        assertStatus(() -> controller.submit(UUID.randomUUID(), jwt, new SubmitRequest("bug", null, null)), HttpStatus.BAD_REQUEST);
+        assertStatus(() -> controller.submit(UUID.randomUUID(), jwt, new SubmitRequest("rant", "Title", null)), HttpStatus.BAD_REQUEST);
         verify(gitLab, never()).createIssue(anyString(), anyString(), anyList());
     }
 
@@ -85,7 +85,7 @@ class ApiFeedbackControllerTest {
         FeedbackSubmission mine = new FeedbackSubmission();
         when(repository.findByUserOrderByCreatedAtDesc(viewer)).thenReturn(List.of(mine));
 
-        assertThat(controller.list(jwt)).containsExactly(mine);
+        assertThat(controller.list(UUID.randomUUID(), jwt)).containsExactly(mine);
     }
 
     @Test
@@ -104,11 +104,11 @@ class ApiFeedbackControllerTest {
             return id.equals(mineId) ? Optional.of(mine) : id.equals(theirsId) ? Optional.of(theirs) : Optional.empty();
         });
 
-        controller.unsubscribe(jwt, mineId);
+        controller.unsubscribe(UUID.randomUUID(), jwt, mineId);
 
         assertThat(mine.isSubscribed()).isFalse();
         verify(repository).save(mine);
-        assertStatus(() -> controller.unsubscribe(jwt, theirsId), HttpStatus.FORBIDDEN);
-        assertStatus(() -> controller.unsubscribe(jwt, UUID.randomUUID()), HttpStatus.NOT_FOUND);
+        assertStatus(() -> controller.unsubscribe(UUID.randomUUID(), jwt, theirsId), HttpStatus.FORBIDDEN);
+        assertStatus(() -> controller.unsubscribe(UUID.randomUUID(), jwt, UUID.randomUUID()), HttpStatus.NOT_FOUND);
     }
 }

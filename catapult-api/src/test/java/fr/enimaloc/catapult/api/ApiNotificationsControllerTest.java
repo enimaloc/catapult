@@ -43,6 +43,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
 @Import(ApiUserResolver.class)
 class ApiNotificationsControllerTest {
+
+    private static final UUID SELF = UUID.randomUUID();
+    private static final String OWN = "/api/internal/users/" + SELF;
     @MockitoBean ChannelAccessService channelAccessService;
 
     @Autowired MockMvc mvc;
@@ -57,7 +60,7 @@ class ApiNotificationsControllerTest {
         Page<NotificationDto> emptyPage = new PageImpl<>(List.of());
         when(service.listForUser(eq(user.getId()), any(Pageable.class))).thenReturn(emptyPage);
 
-        mvc.perform(get("/api/notifications")
+        mvc.perform(get(OWN + "/notifications")
                         .with(jwt().jwt(j -> j.claim("twitchId", "123")).authorities(new SimpleGrantedAuthority("ROLE_USER")))
                         .with(csrf()))
                 .andExpect(status().isOk());
@@ -72,7 +75,7 @@ class ApiNotificationsControllerTest {
         when(userRepo.findByTwitchId(any())).thenReturn(Optional.of(user));
         UUID notifId = UUID.randomUUID();
 
-        mvc.perform(post("/api/notifications/{id}/read", notifId)
+        mvc.perform(post(OWN + "/notifications/{id}/read", notifId)
                         .with(jwt().jwt(j -> j.claim("twitchId", "123")).authorities(new SimpleGrantedAuthority("ROLE_USER")))
                         .with(csrf()))
                 .andExpect(status().isNoContent());
@@ -86,7 +89,7 @@ class ApiNotificationsControllerTest {
         user.setId(UUID.randomUUID());
         when(userRepo.findByTwitchId(any())).thenReturn(Optional.of(user));
         seedTenNotifications(user.getId());
-        mvc.perform(get("/api/notifications/snapshot")
+        mvc.perform(get(OWN + "/notifications/snapshot")
                         .with(jwt().jwt(j -> j.claim("twitchId", "123")).authorities(new SimpleGrantedAuthority("ROLE_USER"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items.length()").value(10))
@@ -95,7 +98,7 @@ class ApiNotificationsControllerTest {
 
     @Test
     void snapshot_anonymousIsRejected() throws Exception {
-        mvc.perform(get("/api/notifications/snapshot"))
+        mvc.perform(get(OWN + "/notifications/snapshot"))
                 .andExpect(status().isUnauthorized());
     }
 

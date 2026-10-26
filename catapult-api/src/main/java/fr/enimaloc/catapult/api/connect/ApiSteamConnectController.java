@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.connect;
 
+import fr.enimaloc.catapult.api.ApiPaths;
 import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.common.dto.connect.SteamStartResponse;
 import fr.enimaloc.catapult.domain.account.UserAccount;
@@ -15,13 +16,15 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -44,7 +47,6 @@ import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/connect/steam")
 @RequiredArgsConstructor
 public class ApiSteamConnectController {
 
@@ -71,11 +73,12 @@ public class ApiSteamConnectController {
 
     private final DebugRecording debug;
 
-    @GetMapping("/start")
-    public SteamStartResponse start(@AuthenticationPrincipal Jwt jwt) {
-        UUID userId = UUID.fromString(ApiUserResolver.requireJwt(jwt).getSubject());
+    @PreAuthorize("@authz.isSelf(#userId)")
+    @GetMapping(ApiPaths.USER + "/links/steam/start")
+    public SteamStartResponse start(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt) {
+        UUID caller = UUID.fromString(ApiUserResolver.requireJwt(jwt).getSubject());
         String nonce = generateNonce();
-        pendingNonces.put(nonce, userId);
+        pendingNonces.put(nonce, caller);
         scheduler.schedule(() -> pendingNonces.remove(nonce), 5, TimeUnit.MINUTES);
 
         String returnTo = apiBaseUrl + "/api/connect/steam/callback?nonce=" + nonce;
@@ -92,7 +95,7 @@ public class ApiSteamConnectController {
     }
 
     // This endpoint is called directly by Steam (browser redirect), not by catapult-web
-    @GetMapping("/callback")
+    @GetMapping("/api/connect/steam/callback")
     public ResponseEntity<Void> callback(@RequestParam Map<String, String> params) {
         String nonce = params.get("nonce");
         UUID userId = nonce != null ? pendingNonces.remove(nonce) : null;
@@ -156,11 +159,12 @@ public class ApiSteamConnectController {
                 .build();
     }
 
-    @PostMapping("/disconnect")
+    @PreAuthorize("@authz.isSelf(#userId)")
+    @DeleteMapping(ApiPaths.USER + "/links/steam")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void disconnect(@AuthenticationPrincipal Jwt jwt) {
-        UUID userId = UUID.fromString(ApiUserResolver.requireJwt(jwt).getSubject());
-        UserAccount account = findOrThrow(userId);
+    public void disconnect(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt) {
+        UUID caller = UUID.fromString(ApiUserResolver.requireJwt(jwt).getSubject());
+        UserAccount account = findOrThrow(caller);
         account.setSteamId(null);
         userAccountRepository.save(account);
         log.info("Steam disconnected for user {}", account.getId());

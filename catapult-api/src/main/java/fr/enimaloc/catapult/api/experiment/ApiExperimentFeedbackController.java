@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.experiment;
 
+import fr.enimaloc.catapult.api.ApiPaths;
 import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.common.dto.experiment.FeedbackRequest;
 import fr.enimaloc.catapult.domain.account.UserAccount;
@@ -9,10 +10,13 @@ import fr.enimaloc.catapult.domain.experiment.ExperimentFeedback;
 import fr.enimaloc.catapult.repository.experiment.ExperimentAssignmentRepository;
 import fr.enimaloc.catapult.repository.experiment.ExperimentFeedbackRepository;
 import fr.enimaloc.catapult.repository.experiment.ExperimentRepository;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -22,7 +26,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 
 @RestController
-@RequestMapping("/api/experiments")
+@RequestMapping(ApiPaths.USER)
 @RequiredArgsConstructor
 public class ApiExperimentFeedbackController {
 
@@ -31,9 +35,10 @@ public class ApiExperimentFeedbackController {
     private final ExperimentFeedbackRepository feedbackRepository;
     private final ApiUserResolver userResolver;
 
-    @PostMapping("/feedback")
+    @PreAuthorize("@authz.isSelf(#userId)")
+    @PostMapping("/experiment-feedback")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void submit(@AuthenticationPrincipal Jwt jwt, @RequestBody FeedbackRequest body) {
+    public void submit(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt, @RequestBody FeedbackRequest body) {
         UserAccount user = userResolver.viewer(jwt);
 
         Experiment experiment = experimentRepository.findById(body.experimentId())

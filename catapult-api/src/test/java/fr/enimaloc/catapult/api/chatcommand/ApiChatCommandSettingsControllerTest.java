@@ -37,6 +37,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(ApiChatCommandSettingsController.class)
 @Import(ApiUserResolver.class)
 class ApiChatCommandSettingsControllerTest {
+
+    private static final UUID SELF = UUID.randomUUID();
+    private static final String OWN = "/api/internal/users/" + SELF;
     @MockitoBean ChannelAccessService channelAccessService;
 
     @Autowired MockMvc mvc;
@@ -71,7 +74,7 @@ class ApiChatCommandSettingsControllerTest {
         setting.setValue("fr");
         when(repository.findByUser(user)).thenReturn(List.of(setting));
 
-        mvc.perform(withAdmin(get("/api/chat-command-settings")))
+        mvc.perform(withAdmin(get(OWN + "/chat-command-settings")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].key").value("language"))
                 .andExpect(jsonPath("$[0].value").value("fr"));
@@ -84,7 +87,7 @@ class ApiChatCommandSettingsControllerTest {
         when(repository.findByUserAndKey(user, "language")).thenReturn(Optional.empty());
         when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        mvc.perform(withAdmin(put("/api/chat-command-settings/{key}", "language"))
+        mvc.perform(withAdmin(put(OWN + "/chat-command-settings/{key}", "language"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(om.writeValueAsString(Map.of("value", "fr"))))
                 .andExpect(status().isNoContent());
@@ -97,7 +100,7 @@ class ApiChatCommandSettingsControllerTest {
         mockUser();
         when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
 
-        mvc.perform(withAdmin(put("/api/chat-command-settings/{key}", "not a valid key"))
+        mvc.perform(withAdmin(put(OWN + "/chat-command-settings/{key}", "not a valid key"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(om.writeValueAsString(Map.of("value", "fr"))))
                 .andExpect(status().isBadRequest());
@@ -112,7 +115,7 @@ class ApiChatCommandSettingsControllerTest {
         when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
 
         for (String reserved : new String[]{"__proto__", "constructor", "prototype"}) {
-            mvc.perform(withAdmin(put("/api/chat-command-settings/{key}", reserved))
+            mvc.perform(withAdmin(put(OWN + "/chat-command-settings/{key}", reserved))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(om.writeValueAsString(Map.of("value", "x"))))
                     .andExpect(status().isBadRequest());
@@ -124,7 +127,7 @@ class ApiChatCommandSettingsControllerTest {
         UserAccount user = mockUser();
         when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
 
-        mvc.perform(withAdmin(delete("/api/chat-command-settings/{key}", "language")))
+        mvc.perform(withAdmin(delete(OWN + "/chat-command-settings/{key}", "language")))
                 .andExpect(status().isNoContent());
 
         verify(repository).deleteByUserAndKey(user, "language");

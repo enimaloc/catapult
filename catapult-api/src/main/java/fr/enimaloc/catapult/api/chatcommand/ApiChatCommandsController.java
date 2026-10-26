@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.chatcommand;
 
+import fr.enimaloc.catapult.api.ApiPaths;
 import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.api.error.ApiProblem;
 import fr.enimaloc.catapult.chat.ChatCommandEvent;
@@ -33,6 +34,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.transaction.annotation.Transactional;
@@ -60,7 +62,7 @@ import java.util.UUID;
  * <p>All endpoints are gated by the {@code chat.commands} experiment.</p>
  */
 @RestController
-@RequestMapping("/api/chat-commands")
+@RequestMapping(ApiPaths.USER + "/chat-commands")
 @RequiredArgsConstructor
 public class ApiChatCommandsController {
 
@@ -128,9 +130,10 @@ public class ApiChatCommandsController {
         String ejectedJs
     ) {}
 
+    @PreAuthorize("@authz.isSelf(#userId)")
     @GetMapping
     @Transactional
-    public ListResponse list(@AuthenticationPrincipal Jwt jwt) {
+    public ListResponse list(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt) {
         UserAccount user = userResolver.viewerByTwitchId(jwt);
         gate(user);
         // Built-ins (e.g. !setgame) are always ensured — they evolve as new
@@ -158,8 +161,9 @@ public class ApiChatCommandsController {
      * The enabled commands, for the page moving them to another chat bot. Not behind the gate: it
      * is the way out of these commands, and stays open once the experiment is wound down.
      */
+    @PreAuthorize("@authz.isSelf(#userId)")
     @GetMapping("/enabled")
-    public List<EnabledChatCommandDto> enabled(@AuthenticationPrincipal Jwt jwt) {
+    public List<EnabledChatCommandDto> enabled(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt) {
         UserAccount user = userResolver.viewerByTwitchId(jwt);
         return repository.findByUser(user).stream()
             .filter(ChatCommandDefinition::isEnabled)
@@ -168,9 +172,11 @@ public class ApiChatCommandsController {
             .toList();
     }
 
+    @PreAuthorize("@authz.isSelf(#userId)")
     @PostMapping("/presets/{presetKey}")
     @Transactional
     public ResponseEntity<CommandDto> instantiatePreset(
+        @PathVariable UUID userId,
         @AuthenticationPrincipal Jwt jwt,
         @PathVariable String presetKey
     ) {
@@ -187,9 +193,11 @@ public class ApiChatCommandsController {
         }
     }
 
+    @PreAuthorize("@authz.isSelf(#userId)")
     @PostMapping
     @Transactional
     public ResponseEntity<CommandDto> create(
+        @PathVariable UUID userId,
         @AuthenticationPrincipal Jwt jwt,
         @Valid @RequestBody UpsertRequest req
     ) {
@@ -210,9 +218,11 @@ public class ApiChatCommandsController {
         return ResponseEntity.status(HttpStatus.CREATED).body(withMissingScopes(def, user));
     }
 
+    @PreAuthorize("@authz.isSelf(#userId)")
     @PutMapping("/{id}")
     @Transactional
     public CommandDto update(
+        @PathVariable UUID userId,
         @AuthenticationPrincipal Jwt jwt,
         @PathVariable UUID id,
         @Valid @RequestBody UpsertRequest req
@@ -229,9 +239,11 @@ public class ApiChatCommandsController {
         return withMissingScopes(def, user);
     }
 
+    @PreAuthorize("@authz.isSelf(#userId)")
     @DeleteMapping("/{id}")
     @Transactional
     public ResponseEntity<Void> delete(
+        @PathVariable UUID userId,
         @AuthenticationPrincipal Jwt jwt,
         @PathVariable UUID id
     ) {

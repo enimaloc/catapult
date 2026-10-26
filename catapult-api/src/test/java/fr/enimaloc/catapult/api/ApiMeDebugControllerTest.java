@@ -35,17 +35,15 @@ class ApiMeDebugControllerTest {
     void meDebug_reflectsTheCallersOwnState() {
         when(service.state(me)).thenReturn(Optional.of(session(true)));
 
-        assertThat(controller.debug(jwt())).isEqualTo(new MyDebugDto(true));
+        assertThat(controller.debug(UUID.randomUUID(), jwt())).isEqualTo(new MyDebugDto(true));
     }
 
     @Test
-    void meDebug_isOffWhenSwitchedOffNeverEnabledOrAnonymous() {
+    void meDebug_isOffWhenSwitchedOffOrNeverEnabled() {
         when(service.state(me)).thenReturn(Optional.of(session(false)));
-        assertThat(controller.debug(jwt())).isEqualTo(new MyDebugDto(false));
+        assertThat(controller.debug(UUID.randomUUID(), jwt())).isEqualTo(new MyDebugDto(false));
 
         when(service.state(me)).thenReturn(Optional.empty());
-        assertThat(controller.debug(jwt())).isEqualTo(new MyDebugDto(false));
-
-        assertThat(controller.debug(null)).isEqualTo(new MyDebugDto(false));
+        assertThat(controller.debug(UUID.randomUUID(), jwt())).isEqualTo(new MyDebugDto(false));
     }
 }

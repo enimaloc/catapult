@@ -40,6 +40,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import(ApiUserResolver.class)
 class ApiMeNotificationChannelsControllerTest {
 
+    private static final UUID SELF = UUID.randomUUID();
+    private static final String OWN = "/api/internal/users/" + SELF;
+
     @Autowired MockMvc mvc;
     @MockitoBean NotificationDeliveryService deliveryService;
     @MockitoBean NotificationDeliveryDispatcher deliveryDispatcher;
@@ -59,14 +62,14 @@ class ApiMeNotificationChannelsControllerTest {
     void get_returnsTheMembersChannels() throws Exception {
         when(deliveryService.channels(user.getId())).thenReturn(Set.of(TWITCHAT));
 
-        mvc.perform(get("/api/me/notification-channels").with(jwt().jwt(j -> j.subject(user.getId().toString()))))
+        mvc.perform(get(OWN + "/notification-channels").with(jwt().jwt(j -> j.subject(user.getId().toString()))))
                 .andExpect(status().isOk())
                 .andExpect(content().json("{\"channels\":[\"TWITCHAT\"]}"));
     }
 
     @Test
     void put_replacesThem() throws Exception {
-        mvc.perform(put("/api/me/notification-channels").with(jwt().jwt(j -> j.subject(user.getId().toString()))).with(csrf())
+        mvc.perform(put(OWN + "/notification-channels").with(jwt().jwt(j -> j.subject(user.getId().toString()))).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"channels\":[\"TWITCHAT\",\"STREAM_START_CHAT\"]}"))
                 .andExpect(status().isNoContent());
@@ -76,7 +79,7 @@ class ApiMeNotificationChannelsControllerTest {
 
     @Test
     void put_withoutChannels_clearsThem() throws Exception {
-        mvc.perform(put("/api/me/notification-channels").with(jwt().jwt(j -> j.subject(user.getId().toString()))).with(csrf())
+        mvc.perform(put(OWN + "/notification-channels").with(jwt().jwt(j -> j.subject(user.getId().toString()))).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isNoContent());
 
@@ -87,7 +90,7 @@ class ApiMeNotificationChannelsControllerTest {
     void flush_sendsTheOwnersPendingTwitchatNotifications() throws Exception {
         when(deliveryDispatcher.flushTwitchat(user)).thenReturn(2);
 
-        mvc.perform(post("/api/me/twitchat/notifications/flush").with(jwt().jwt(j -> j.subject(user.getId().toString()))).with(csrf()))
+        mvc.perform(post(OWN + "/twitchat-notifications/flush").with(jwt().jwt(j -> j.subject(user.getId().toString()))).with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(content().json("{\"delivered\":2}"));
     }
@@ -97,7 +100,7 @@ class ApiMeNotificationChannelsControllerTest {
         UUID unknown = UUID.randomUUID();
         when(userRepo.findById(unknown)).thenReturn(Optional.empty());
 
-        mvc.perform(post("/api/me/twitchat/notifications/flush").with(jwt().jwt(j -> j.subject(unknown.toString()))).with(csrf()))
+        mvc.perform(post(OWN + "/twitchat-notifications/flush").with(jwt().jwt(j -> j.subject(unknown.toString()))).with(csrf()))
                 .andExpect(status().isUnauthorized());
     }
 }

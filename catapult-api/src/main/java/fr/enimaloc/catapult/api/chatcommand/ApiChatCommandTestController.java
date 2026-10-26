@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.chatcommand;
 
+import fr.enimaloc.catapult.api.ApiPaths;
 import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.api.error.ApiProblem;
 import fr.enimaloc.catapult.chat.PlaceholderResolver;
@@ -19,6 +20,7 @@ import fr.enimaloc.catapult.repository.chatcommand.ChatCommandDefinitionReposito
 import fr.enimaloc.catapult.repository.chatcommand.ChatCommandSettingRepository;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -66,8 +68,9 @@ public class ApiChatCommandTestController {
     private final ChatCommandSettingRepository settingRepository;
     private final PlaceholderResolver placeholderResolver;
 
-    @PostMapping("/api/chat-commands/{id}/test")
-    public Map<String, Object> test(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+    @PreAuthorize("@authz.isSelf(#userId)")
+    @PostMapping(ApiPaths.USER + "/chat-commands/{id}/test")
+    public Map<String, Object> test(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
                                      @RequestBody Map<String, Object> body) {
         UserAccount user = userResolver.viewerByTwitchId(jwt);
         gate(user);

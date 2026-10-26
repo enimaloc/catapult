@@ -7,11 +7,15 @@ import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.service.account.UserApiTokenService;
 import fr.enimaloc.catapult.service.binding.CustomBindingService;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -23,7 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
  * outside it.
  */
 @RestController
-@RequestMapping("/api/me/api-token")
+@RequestMapping(ApiPaths.USER + "/api-token")
 @RequiredArgsConstructor
 public class ApiMeApiTokenController {
 
@@ -31,20 +35,23 @@ public class ApiMeApiTokenController {
     private final UserApiTokenService userApiTokenService;
     private final CustomBindingService customBindingService;
 
+    @PreAuthorize("@authz.isSelf(#userId)")
     @GetMapping
-    public ApiTokenStatusDto status(@AuthenticationPrincipal Jwt jwt) {
+    public ApiTokenStatusDto status(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt) {
         return userApiTokenService.status(enabledMember(jwt));
     }
 
     /** A new token, replacing the current one at once: the only time it is shown. */
+    @PreAuthorize("@authz.isSelf(#userId)")
     @PostMapping
-    public ApiTokenCreatedDto regenerate(@AuthenticationPrincipal Jwt jwt) {
+    public ApiTokenCreatedDto regenerate(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt) {
         return userApiTokenService.regenerate(enabledMember(jwt));
     }
 
-    @PostMapping("/delete")
+    @PreAuthorize("@authz.isSelf(#userId)")
+    @DeleteMapping
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void revoke(@AuthenticationPrincipal Jwt jwt) {
+    public void revoke(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt) {
         userApiTokenService.revoke(userResolver.viewer(jwt));
     }
 

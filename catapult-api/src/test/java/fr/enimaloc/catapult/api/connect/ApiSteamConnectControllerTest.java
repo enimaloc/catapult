@@ -70,7 +70,7 @@ class ApiSteamConnectControllerTest {
 
     /** Starts a link and returns the nonce Steam will hand back. */
     private String start() {
-        String redirect = controller.start(jwt()).redirectUrl();
+        String redirect = controller.start(UUID.randomUUID(), jwt()).redirectUrl();
         String returnTo = UriComponentsBuilder.fromUriString(redirect).build().getQueryParams().getFirst("openid.return_to");
         return returnTo.substring(returnTo.indexOf("nonce=") + "nonce=".length());
     }
@@ -97,7 +97,7 @@ class ApiSteamConnectControllerTest {
 
     @Test
     void start_redirectsToSteamWithAReturnUrlCarryingANonce() {
-        String redirect = controller.start(jwt()).redirectUrl();
+        String redirect = controller.start(UUID.randomUUID(), jwt()).redirectUrl();
 
         var query = UriComponentsBuilder.fromUriString(redirect).build().getQueryParams();
         assertThat(redirect).startsWith(OPENID + "?");
@@ -174,7 +174,7 @@ class ApiSteamConnectControllerTest {
     void disconnect_unlinksSteam() {
         account.setSteamId("1");
 
-        controller.disconnect(jwt());
+        controller.disconnect(UUID.randomUUID(), jwt());
 
         assertThat(account.getSteamId()).isNull();
         verify(accounts).save(account);

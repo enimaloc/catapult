@@ -224,7 +224,7 @@ class InboundDebugTest {
         ReflectionTestUtils.setField(controller, "apiBaseUrl", "http://api.test");
         ReflectionTestUtils.setField(controller, "webBaseUrl", "http://web.test");
         Jwt jwt = Jwt.withTokenValue("t").header("alg", "none").subject(user.getId().toString()).build();
-        String returnTo = UriComponentsBuilder.fromUriString(controller.start(jwt).redirectUrl()).build()
+        String returnTo = UriComponentsBuilder.fromUriString(controller.start(UUID.randomUUID(), jwt).redirectUrl()).build()
                 .getQueryParams().getFirst("openid.return_to");
         Map<String, String> params = new LinkedHashMap<>();
         params.put("nonce", returnTo.substring(returnTo.indexOf("nonce=") + "nonce=".length()));

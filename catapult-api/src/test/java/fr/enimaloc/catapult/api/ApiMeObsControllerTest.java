@@ -26,6 +26,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
 class ApiMeObsControllerTest {
 
+    private static final UUID SELF = UUID.randomUUID();
+    private static final String OWN = "/api/internal/users/" + SELF;
+
     @Autowired MockMvc mvc;
     @MockitoBean TwitchatWidgetSettingsService twitchatWidgetSettingsService;
 
@@ -36,7 +39,7 @@ class ApiMeObsControllerTest {
         when(twitchatWidgetSettingsService.enabledConfig(userId))
                 .thenReturn(Optional.of(new TwitchatWidgetConfig("10.0.0.2", 4456, "pw", "auto")));
 
-        mvc.perform(get("/api/me/obs").with(jwt().jwt(j -> j.subject(userId.toString()))))
+        mvc.perform(get(OWN + "/obs").with(jwt().jwt(j -> j.subject(userId.toString()))))
                 .andExpect(status().isOk())
                 .andExpect(content().json("{\"obsHost\":\"10.0.0.2\",\"obsPort\":4456,\"obsPassword\":\"pw\"}"));
     }
@@ -45,7 +48,7 @@ class ApiMeObsControllerTest {
     void disabledOrUnset_noContent() throws Exception {
         when(twitchatWidgetSettingsService.enabledConfig(userId)).thenReturn(Optional.empty());
 
-        mvc.perform(get("/api/me/obs").with(jwt().jwt(j -> j.subject(userId.toString()))))
+        mvc.perform(get(OWN + "/obs").with(jwt().jwt(j -> j.subject(userId.toString()))))
                 .andExpect(status().isNoContent());
     }
 }

@@ -29,6 +29,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -40,6 +41,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
 @Import(ApiUserResolver.class)
 class ApiMeApiTokenControllerTest {
+
+    private static final UUID SELF = UUID.randomUUID();
+    private static final String OWN = "/api/internal/users/" + SELF;
 
     @Autowired MockMvc mvc;
     @MockitoBean UserApiTokenService tokens;
@@ -65,7 +69,7 @@ class ApiMeApiTokenControllerTest {
     void status_neverShowsTheToken() throws Exception {
         when(tokens.status(user)).thenReturn(new ApiTokenStatusDto(true, Instant.parse("2026-10-24T10:00:00Z")));
 
-        mvc.perform(get("/api/me/api-token").with(me()))
+        mvc.perform(get(OWN + "/api-token").with(me()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.exists").value(true))
                 .andExpect(jsonPath("$.createdAt").value("2026-10-24T10:00:00Z"))
@@ -76,14 +80,14 @@ class ApiMeApiTokenControllerTest {
     void regenerate_showsTheNewTokenOnce() throws Exception {
         when(tokens.regenerate(user)).thenReturn(new ApiTokenCreatedDto("cat_abc", Instant.EPOCH));
 
-        mvc.perform(post("/api/me/api-token").with(me()).with(csrf()))
+        mvc.perform(post(OWN + "/api-token").with(me()).with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.token").value("cat_abc"));
     }
 
     @Test
     void delete_revokesIt() throws Exception {
-        mvc.perform(post("/api/me/api-token/delete").with(me()).with(csrf()))
+        mvc.perform(delete(OWN + "/api-token").with(me()).with(csrf()))
                 .andExpect(status().isNoContent());
         verify(tokens).revoke(user);
     }
@@ -92,13 +96,13 @@ class ApiMeApiTokenControllerTest {
     void gateClosed_noTokenToGetOrMake_butOneCanStillBeRevoked() throws Exception {
         when(customBindings.enabled(user)).thenReturn(false);
 
-        mvc.perform(get("/api/me/api-token").with(me()))
+        mvc.perform(get(OWN + "/api-token").with(me()))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("feature_disabled"));
-        mvc.perform(post("/api/me/api-token").with(me()).with(csrf()))
+        mvc.perform(post(OWN + "/api-token").with(me()).with(csrf()))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("feature_disabled"));
-        mvc.perform(post("/api/me/api-token/delete").with(me()).with(csrf())).andExpect(status().isNoContent());
+        mvc.perform(delete(OWN + "/api-token").with(me()).with(csrf())).andExpect(status().isNoContent());
         verify(tokens, never()).regenerate(any());
         verify(tokens).revoke(user);
     }

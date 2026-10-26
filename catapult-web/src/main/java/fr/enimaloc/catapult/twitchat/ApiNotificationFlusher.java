@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.service.http.ApiClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
 import java.util.UUID;
@@ -19,7 +20,10 @@ public class ApiNotificationFlusher implements NotificationFlusher {
 
     @Override
     public int flushPage(String jwt) {
-        return client.callAs(HttpMethod.POST, "/api/me/twitchat/notifications/flush", jwt, NotificationFlushResultDto.class).status();
+        UUID owner = ApiClient.subject(jwt);
+        if (owner == null) return HttpStatus.UNAUTHORIZED.value();
+        return client.callAs(HttpMethod.POST, "/api/internal/users/{userId}/twitchat-notifications/flush", jwt,
+                NotificationFlushResultDto.class, owner).status();
     }
 
     @Override
