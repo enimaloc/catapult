@@ -28,6 +28,14 @@ public class ChannelAccessService {
         return fetchModeratedIds(viewer).contains(channel.getTwitchId());
     }
 
+    /** {@link #canAccess(UserAccount, UserAccount)} for two account ids; either one unknown gives false. */
+    public boolean canAccess(UUID viewerId, UUID ownerId) {
+        UserAccount viewer = userAccountRepository.findById(viewerId).orElse(null);
+        UserAccount owner = userAccountRepository.findById(ownerId).orElse(null);
+        if (viewer == null || owner == null) return false;
+        return canAccess(viewer, owner);
+    }
+
     public List<UserAccount> getAccessibleChannels(UserAccount viewer) {
         Set<String> moderatedIds = fetchModeratedIds(viewer);
         List<UserAccount> result = new ArrayList<>();

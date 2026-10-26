@@ -67,6 +67,25 @@ class ApiUserResolverTest {
     }
 
     @Test
+    void byTwitchUsername_findsTheExactUsername() {
+        UserAccount streamer = account("streamer");
+        when(users.findByTwitchUsername("streamer")).thenReturn(Optional.of(streamer));
+
+        assertThat(resolver.byTwitchUsername("streamer")).isSameAs(streamer);
+    }
+
+    @Test
+    void byTwitchUsername_unknownIs404WithoutAReason() {
+        when(users.findByTwitchUsername("nobody")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> resolver.byTwitchUsername("nobody"))
+                .isInstanceOfSatisfying(ResponseStatusException.class, e -> {
+                    assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+                    assertThat(e.getReason()).isNull();
+                });
+    }
+
+    @Test
     void requireJwt_nullIs401() {
         assertStatus(() -> ApiUserResolver.requireJwt(null), HttpStatus.UNAUTHORIZED);
         Jwt jwt = jwtFor(account("me"));

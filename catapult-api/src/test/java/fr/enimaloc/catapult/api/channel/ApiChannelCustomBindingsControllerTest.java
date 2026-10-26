@@ -79,7 +79,7 @@ class ApiChannelCustomBindingsControllerTest {
         owner = registered("enimaloc");
         other = registered("someone");
         // A moderator of the channel, even: still not its owner
-        when(channelAccess.canAccess(any(), any())).thenReturn(true);
+        when(channelAccess.canAccess(any(UserAccount.class), any(UserAccount.class))).thenReturn(true);
         doCallRealMethod().when(service).activateByIdOrName(any(UserAccount.class), anyString());
         art = new CustomBinding();
         art.setId(UUID.randomUUID());

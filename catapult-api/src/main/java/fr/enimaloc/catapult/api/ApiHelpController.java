@@ -1,7 +1,6 @@
 package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.common.dto.HelpContent;
-import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.minecraft.MinecraftGateService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,7 +22,6 @@ public class ApiHelpController {
 
     private final MessageSource messageSource;
     private final MinecraftGateService gateService;
-    private final UserAccountRepository userAccountRepository;
 
     @Value("${app.account.deletion-delay-days:7}")
     private int accountDeletionDelayDays;
@@ -57,9 +55,7 @@ public class ApiHelpController {
     private boolean isMinecraftVisible(Jwt jwt) {
         if (jwt == null) return false;
         try {
-            return userAccountRepository.findById(UUID.fromString(jwt.getSubject()))
-                    .map(gateService::isAvailableFor)
-                    .orElse(false);
+            return gateService.isAvailableForAccount(UUID.fromString(jwt.getSubject()));
         } catch (IllegalArgumentException e) {
             return false;
         }

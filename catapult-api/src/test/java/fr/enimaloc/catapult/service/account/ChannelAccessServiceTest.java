@@ -55,6 +55,30 @@ class ChannelAccessServiceTest {
     }
 
     @Test
+    void canAccessById_decidesLikeTheAccountsDo() {
+        owner.setId(java.util.UUID.randomUUID());
+        moderator.setId(java.util.UUID.randomUUID());
+        when(userAccountRepository.findById(owner.getId())).thenReturn(java.util.Optional.of(owner));
+        when(userAccountRepository.findById(moderator.getId())).thenReturn(java.util.Optional.of(moderator));
+        when(twitchService.getModeratedChannelIds(moderator)).thenReturn(List.of("owner-twitch-id"));
+
+        assertThat(channelAccessService.canAccess(moderator.getId(), owner.getId())).isTrue();
+        assertThat(channelAccessService.canAccess(owner.getId(), owner.getId())).isTrue();
+    }
+
+    @Test
+    void canAccessById_anUnknownViewerOrOwnerIsDenied() {
+        owner.setId(java.util.UUID.randomUUID());
+        java.util.UUID unknown = java.util.UUID.randomUUID();
+        when(userAccountRepository.findById(owner.getId())).thenReturn(java.util.Optional.of(owner));
+        when(userAccountRepository.findById(unknown)).thenReturn(java.util.Optional.empty());
+
+        assertThat(channelAccessService.canAccess(unknown, owner.getId())).isFalse();
+        assertThat(channelAccessService.canAccess(owner.getId(), unknown)).isFalse();
+        verifyNoInteractions(twitchService);
+    }
+
+    @Test
     void cache_prevents_second_twitch_api_call_within_ttl() {
         when(twitchService.getModeratedChannelIds(moderator))
             .thenReturn(List.of("owner-twitch-id"));

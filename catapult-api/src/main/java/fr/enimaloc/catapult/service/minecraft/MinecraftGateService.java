@@ -1,11 +1,14 @@
 package fr.enimaloc.catapult.service.minecraft;
 
 import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+
+import java.util.UUID;
 
 /**
  * Décision centralisée de disponibilité de la feature Minecraft pour un
@@ -20,13 +23,16 @@ public class MinecraftGateService {
     public static final String EXPERIMENT_KEY = "minecraft.integration";
 
     private final ExperimentService experimentService;
+    private final UserAccountRepository userAccountRepository;
     private final boolean minecraftEnabled;
     private final String msaClientId;
 
     public MinecraftGateService(ExperimentService experimentService,
+                                UserAccountRepository userAccountRepository,
                                 @Value("${minecraft.enabled:false}") boolean minecraftEnabled,
                                 @Value("${minecraft.msa-client-id:}") String msaClientId) {
         this.experimentService = experimentService;
+        this.userAccountRepository = userAccountRepository;
         this.minecraftEnabled = minecraftEnabled;
         this.msaClientId = msaClientId == null ? "" : msaClientId.trim();
     }
@@ -45,6 +51,11 @@ public class MinecraftGateService {
     /** Chemins user-facing : déclenche l'assignation à l'experiment (visite de page). */
     public boolean isAvailableFor(UserAccount user) {
         return isConfigured() && experimentService.evaluateGate(user, EXPERIMENT_KEY);
+    }
+
+    /** Comme {@link #isAvailableFor(UserAccount)} pour le compte {@code userId} ; un compte inconnu donne false. */
+    public boolean isAvailableForAccount(UUID userId) {
+        return userAccountRepository.findById(userId).map(this::isAvailableFor).orElse(false);
     }
 
     /** Chemins background (scheduler/getter) : lecture seule, aucune assignation. */
