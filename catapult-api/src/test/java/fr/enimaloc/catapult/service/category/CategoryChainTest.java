@@ -461,28 +461,66 @@ class CategoryChainTest {
     }
 
     @Test
-    void bindingEdited_played_updatesItAsIs() {
+    void bindingEdited_playedLive_updatesIt() {
         playing(true);
         when(activations.active(user)).thenReturn(Optional.empty());
+        live(true);
 
         assertThat(chain.decide(user, new BindingEdited(binding)))
                 .isEqualTo(CategoryDecision.update(CategoryRule.GAME_BINDING, binding));
-        verifyNoInteractions(streamStateService);
     }
 
     @Test
-    void bindingEdited_playedIgnoredOrIncomplete_isStillUpdatedAsIs() {
+    void bindingEdited_playedOffline_storesItPending() {
+        playing(true);
+        when(activations.active(user)).thenReturn(Optional.empty());
+        live(false);
+
+        assertThat(chain.decide(user, new BindingEdited(binding)))
+                .isEqualTo(CategoryDecision.storePending(CategoryRule.GAME_BINDING, binding));
+    }
+
+    @Test
+    void bindingEdited_playedIgnored_isTheNoGameFallback() {
         playing(true);
         when(activations.active(user)).thenReturn(Optional.empty());
         binding.setIgnored(true);
-        assertThat(chain.decide(user, new BindingEdited(binding)))
-                .isEqualTo(CategoryDecision.update(CategoryRule.GAME_BINDING, binding));
+        live(true);
+        withSettings();
 
-        binding.setIgnored(false);
-        binding.setStatus(GameBinding.Status.INCOMPLETE);
+        CategoryDecision decision = chain.decide(user, new BindingEdited(binding));
+
+        assertThat(decision.rule()).isEqualTo(CategoryRule.NO_GAME_FALLBACK);
+        assertThat(decision.binding().getSourceName()).isEqualTo(CategoryChain.NO_GAME_FALLBACK_SOURCE);
+    }
+
+    @Test
+    void bindingEdited_playedIgnored_offline_changesNothing() {
+        playing(true);
+        when(activations.active(user)).thenReturn(Optional.empty());
+        binding.setIgnored(true);
+        live(false);
+
         assertThat(chain.decide(user, new BindingEdited(binding)))
-                .isEqualTo(CategoryDecision.update(CategoryRule.GAME_BINDING, binding));
-        verifyNoInteractions(streamStateService, settingsRepository);
+                .isEqualTo(CategoryDecision.none(CategoryRule.NO_GAME_FALLBACK, Reason.OFFLINE));
+    }
+
+    @Test
+    void bindingEdited_playedIncomplete_isTheIncompleteFallback_pendingWhenOffline() {
+        playing(true);
+        when(activations.active(user)).thenReturn(Optional.empty());
+        binding.setStatus(GameBinding.Status.INCOMPLETE);
+        withSettings();
+
+        live(true);
+        CategoryDecision liveDecision = chain.decide(user, new BindingEdited(binding));
+        assertThat(liveDecision.action()).isEqualTo(Action.UPDATE_CHANNEL);
+        assertThat(liveDecision.rule()).isEqualTo(CategoryRule.INCOMPLETE_FALLBACK);
+
+        live(false);
+        CategoryDecision offline = chain.decide(user, new BindingEdited(binding));
+        assertThat(offline.action()).isEqualTo(Action.STORE_PENDING);
+        assertThat(offline.rule()).isEqualTo(CategoryRule.INCOMPLETE_FALLBACK);
     }
 
     @Test

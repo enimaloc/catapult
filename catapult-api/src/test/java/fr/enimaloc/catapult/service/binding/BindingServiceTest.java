@@ -53,10 +53,13 @@ class BindingServiceTest {
 
     @BeforeEach
     void setup() {
+        // Live: an edit of the played binding is pushed (offline it is stored pending, as a detection does)
+        StreamStateService streamState = mock(StreamStateService.class);
+        when(streamState.isLive(any())).thenReturn(true);
         bindingService = new BindingService(gameBindingRepository, igdbService, igdbGameDetailsService, twitchService, twResolverService, gameMappingRepository, new GameBindingLookup(gameBindingRepository),
-                new CategoryChain(mock(CustomBindingActivations.class), mock(StreamStateService.class),
+                new CategoryChain(mock(CustomBindingActivations.class), streamState,
                         mock(UserSettingsRepository.class), new RaidRestoreHold(), gameStateService,
-                        mock(UserAccountRepository.class), new CategoryApplier(twitchService, mock(StreamStateService.class)), mock(RaidRestoreGateService.class), mock(GameBindingLookup.class)));
+                        mock(UserAccountRepository.class), new CategoryApplier(twitchService, streamState), mock(RaidRestoreGateService.class), mock(GameBindingLookup.class)));
 
         user = new UserAccount();
         bindingId = UUID.randomUUID();
@@ -183,13 +186,15 @@ class BindingServiceTest {
     }
 
     @Test
-    void toggleIgnored_updatesFieldAndCallsTwitch() {
+    void toggleIgnored_updatesField_andDoesNotSendTheBindingAsIs() {
+        user.setId(UUID.randomUUID());
         binding.setIgnored(false);
 
         bindingService.toggleIgnored(user, bindingId, true);
 
+        // The no-game fallback applies instead (none configured here)
         assertThat(binding.isIgnored()).isTrue();
-        verify(twitchService).updateChannelReporting(user, binding);
+        verify(twitchService, never()).updateChannelReporting(user, binding);
     }
 
     @Test
