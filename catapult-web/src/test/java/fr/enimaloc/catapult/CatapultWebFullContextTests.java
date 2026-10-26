@@ -33,6 +33,6 @@ class CatapultWebFullContextTests extends WebFullContextTestBase {
         assertThat(context.getBeanNamesForType(PerfLoginController.class)).isEmpty();
         var answer = get(port, "/perf/login?username=x");
         assertThat(answer.statusCode()).isEqualTo(404);
-        assertThat(answer.headers().allValues("Set-Cookie")).noneMatch(c -> c.startsWith("SESSION="));
+        assertThat(answer.headers().allValues("Set-Cookie")).noneMatch(c -> c.startsWith("JSESSIONID="));
     }
 }
