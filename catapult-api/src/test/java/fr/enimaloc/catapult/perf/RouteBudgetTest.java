@@ -68,7 +68,7 @@ import tools.jackson.databind.json.JsonMapper;
  * with {@value BudgetFixtures#SMALL} elements in every collection the routes show, then again with
  * {@value BudgetFixtures#LARGE} (see {@link BudgetFixtures}).
  *
- * <p>A row fails when its route answers anything but a 2xx or a redirect, takes more SQL statements than its
+ * <p>A row fails when its route answers anything but a 2xx, takes more SQL statements than its
  * {@code sql} budget (the count measured when the row was written: lower one that drops), takes more than
  * {@value #MAX_MILLIS} ms, or takes more statements at {@value BudgetFixtures#LARGE} elements than at
  * {@value BudgetFixtures#SMALL}: it then reads its collection one element at a time. A row whose {@code notes} is
@@ -256,10 +256,10 @@ class RouteBudgetTest {
         Measure atLarge = large.get(row);
         SoftAssertions softly = new SoftAssertions();
         for (Measure measure : List.of(atSmall, atLarge)) {
-            // a redirect is the answer of a route that redirects (the Steam OpenID callback)
+            // a redirect too would answer the same at both sizes while measuring nothing (a login redirect)
             softly.assertThat(measure.status())
                     .as("%s answered %d: %s", row.label(), measure.status(), measure.body())
-                    .isBetween(200, 399);
+                    .isBetween(200, 299);
             softly.assertThat(measure.millis())
                     .as("%s : %d ms, budget %d", row.label(), measure.millis(), MAX_MILLIS)
                     .isLessThanOrEqualTo(MAX_MILLIS);
@@ -273,8 +273,8 @@ class RouteBudgetTest {
         }
         if (!row.nPlusOne()) {
             softly.assertThat(atLarge.sql())
-                    .as("%s : %d SQL queries with %d elements, budget %d (its count with %d): it reads them one at a"
-                                    + " time; fix it, or note it n+1",
+                    .as("%s : %d SQL queries with %d elements, %d with %d: it reads them one at a time; fix it,"
+                                    + " or note it n+1",
                             row.label(), atLarge.sql(), BudgetFixtures.LARGE, atSmall.sql(), BudgetFixtures.SMALL)
                     .isEqualTo(atSmall.sql());
         }

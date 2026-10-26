@@ -26,11 +26,10 @@ GET,/api/internal/admin/experiments/{id}/settings,,admin,4,
 GET,/api/internal/admin/experiments/{id}/assignments,?page=0,admin,6,
 # personal API token
 GET,/api/v2/custom-bindings,,ptoken,19,n+1
-# public
+# public, but GET /api/connect/steam/callback: it only redirects (no SQL) and every row must answer 2xx
 GET,/api/internal/changelog,,anon,0,fixed:read from a file
 GET,/api/internal/config/app,,anon,0,fixed:configuration only
 GET,/api/internal/config/providers,,anon,0,fixed:configuration only
-GET,/api/connect/steam/callback,,anon,0,fixed:a redirect
 GET,/api/game/{uuid},,anon,5,fixed:the one game the channel plays
 GET,/api/internal/health,,anon,0,fixed:no data
 GET,/api/internal/meta-tags,,anon,1,
