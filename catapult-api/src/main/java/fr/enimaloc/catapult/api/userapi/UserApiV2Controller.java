@@ -188,13 +188,14 @@ public class UserApiV2Controller {
                 steamObject(detected, locale, base),
                 xboxObject(detected, locale, base),
                 resolveDtdd(detected, igdbId, locale, base),
-                user.flatMap(u -> catapultObject(u, detected, base)).orElse(null));
+                user.flatMap(u -> catapultObject(u, detected, locale, base)).orElse(null),
+                detected.getSourceName());
     }
 
     private Optional<GameInfoResponse.IgdbObject> igdbObject(String igdbId, String base) {
         return igdbGameDetailsService.getDetails(igdbId).map(details -> new GameInfoResponse.IgdbObject(igdbId,
                 details.getSlug(), details.getSummary(), normalizeProtocolRelative(details.getCoverUrl()),
-                details.getGenres(), moreUrl(base, "/igdb/" + igdbId)));
+                details.getGenres(), moreUrl(base, "/igdb/" + igdbId), details.getFirstReleaseDate()));
     }
 
     private GameInfoResponse.SteamObject steamObject(DetectedGame detected, Locale locale, String base) {
@@ -222,10 +223,12 @@ public class UserApiV2Controller {
     }
 
     /** The widget channel's own tw/ccl config for the game, when it has a binding for it. */
-    private Optional<GameInfoResponse.CatapultObject> catapultObject(UserAccount user, DetectedGame detected, String base) {
+    private Optional<GameInfoResponse.CatapultObject> catapultObject(UserAccount user, DetectedGame detected, Locale locale,
+                                                                              String base) {
         return gameBindingRepository.findByUserAndSourceIdAndSourceType(user, detected.getSourceId(), detected.getSourceType())
                 .map(binding -> new GameInfoResponse.CatapultObject(binding.getId(), binding.getCreatedAt(),
-                        binding.getTws(), binding.getCcls(), moreUrl(base, "/catapult/" + binding.getId())));
+                        binding.getTws(), binding.getCcls(), moreUrl(base, "/catapult/" + binding.getId()),
+                        localizeTws(binding.getTws(), locale)));
     }
 
     /** Whether the Steam store page declares AI-generated content, and the developer's note about it. */
