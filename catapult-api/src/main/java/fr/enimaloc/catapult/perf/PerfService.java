@@ -12,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -28,6 +29,8 @@ import java.util.UUID;
 public class PerfService {
 
     private static final String ACCOUNT_PREFIX = "perf-";
+    /** A perf token never outlives a run, whatever {@code app.jwt.expiry-hours} says. */
+    static final Duration TOKEN_VALIDITY = Duration.ofHours(12);
 
     private final UserAccountRepository accounts;
     private final JwtService jwtService;
@@ -54,7 +57,8 @@ public class PerfService {
 
     /**
      * The JWT the Twitch login would issue to {@code username}: {@code ROLE_USER}, and {@code ROLE_ADMIN} when its
-     * Twitch id is {@code app.owner-id}, the rule of {@code CatapultOAuth2UserService}. 404 for an unknown account.
+     * Twitch id is {@code app.owner-id}, the rule of {@code CatapultOAuth2UserService}; it expires after
+     * {@link #TOKEN_VALIDITY}. 404 for an unknown account.
      */
     public PerfToken login(String username) {
         UserAccount account = account(username);
@@ -62,7 +66,7 @@ public class PerfService {
         if (!ownerId.isBlank() && ownerId.equals(account.getTwitchId())) {
             roles.add("ROLE_ADMIN");
         }
-        return new PerfToken(jwtService.generateForUser(account, roles));
+        return new PerfToken(jwtService.generateForUser(account, roles, TOKEN_VALIDITY));
     }
 
     /** Every seeded account, by username. */

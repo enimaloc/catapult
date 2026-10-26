@@ -13,6 +13,7 @@ import fr.enimaloc.catapult.getter.steam.SteamApiClient;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
 import fr.enimaloc.catapult.repository.notification.NotificationRecipientRepository;
+import fr.enimaloc.catapult.security.JwtService;
 import fr.enimaloc.catapult.service.account.WidgetTokenService;
 import fr.enimaloc.catapult.service.igdb.IgdbClient;
 import fr.enimaloc.catapult.service.igdb.MockIgdbClient;
@@ -33,6 +34,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -80,6 +82,9 @@ class PerfProfileFullContextTest extends FullContextTestBase {
     @Autowired
     WidgetTokenService widgetTokens;
 
+    @Autowired
+    JwtService jwtService;
+
     @Test
     void sentryEnvironmentIsPerf() {
         assertThat(environment.getProperty("sentry.environment")).isEqualTo("perf");
@@ -118,6 +123,14 @@ class PerfProfileFullContextTest extends FullContextTestBase {
         assertThat(me.statusCode()).isEqualTo(200);
         assertThat(json.readTree(me.body()).get("username").asString()).isEqualTo("perf-streamer-001");
         assertThat(send("GET", "/api/internal/auth/me", null).statusCode()).isEqualTo(401);
+    }
+
+    @Test
+    void loginTokenExpires() throws Exception {
+        Date expiration = jwtService.validate(login("perf-streamer-001")).getExpiration();
+
+        assertThat(expiration).isNotNull()
+                .isBefore(new Date(System.currentTimeMillis() + PerfService.TOKEN_VALIDITY.toMillis() + 60_000));
     }
 
     @Test

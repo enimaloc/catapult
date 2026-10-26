@@ -4,6 +4,8 @@ import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.Test;
 
 import javax.crypto.SecretKey;
+import java.time.Duration;
+import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 
@@ -30,6 +32,17 @@ class JwtServiceTest {
         String token = service.generateForUser(user(), List.of("ROLE_USER"));
 
         assertThat(service.validate(token).getExpiration()).isNull();
+    }
+
+    @Test
+    void explicitExpiry_expiresEvenWhenTheConfiguredExpiryIsNever() {
+        JwtService service = new JwtService(KEY, -1);
+
+        String token = service.generateForUser(user(), List.of("ROLE_USER"), Duration.ofHours(2));
+
+        assertThat(service.validate(token).getExpiration())
+                .isBetween(new Date(System.currentTimeMillis() + Duration.ofMinutes(119).toMillis()),
+                        new Date(System.currentTimeMillis() + Duration.ofMinutes(121).toMillis()));
     }
 
     @Test
