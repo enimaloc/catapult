@@ -50,6 +50,13 @@
       "automerge": true
     },
     {
+      "description": "The Dockerfiles' JDK build stage follows the Gradle toolchain (Java 21): no major for the -jdk tags, the -jre runtime may move on",
+      "matchPackageNames": ["eclipse-temurin"],
+      "matchCurrentValue": "/-jdk/",
+      "matchUpdateTypes": ["major"],
+      "enabled": false
+    },
+    {
       "description": "No PostgreSQL major upgrade anywhere (compose, Dockerfiles, CI services): prod's data directory needs a manual pg_upgrade, and the tests must run on prod's major",
       "matchPackageNames": ["postgres"],
       "matchUpdateTypes": ["major"],
