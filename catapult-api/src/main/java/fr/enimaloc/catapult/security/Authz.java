@@ -15,6 +15,8 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.security.web.access.intercept.RequestAuthorizationContext;
 import org.springframework.security.web.util.matcher.IpAddressMatcher;
 import org.springframework.stereotype.Component;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
  * The one definition of the request-level access rules: who is a member, an admin, a loopback caller or a personal
@@ -82,6 +84,17 @@ public class Authz {
     /** {@code ROLE_ADMIN}, or a loopback caller. */
     public static boolean isAdmin(Authentication auth, HttpServletRequest request) {
         return hasAuthority(auth, ADMIN_AUTHORITY) || isLoopback(request);
+    }
+
+    /**
+     * The current caller is an admin ({@code ROLE_ADMIN}, or a loopback caller): {@link #isAdmin(Authentication,
+     * HttpServletRequest)} on the current authentication and request. {@code false} outside a request.
+     */
+    public boolean isAdmin() {
+        if (!(RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes)) {
+            return false;
+        }
+        return isAdmin(SecurityContextHolder.getContext().getAuthentication(), attributes.getRequest());
     }
 
     /** Authenticated by the personal API token. */

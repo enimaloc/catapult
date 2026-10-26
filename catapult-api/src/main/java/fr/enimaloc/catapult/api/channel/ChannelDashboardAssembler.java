@@ -264,9 +264,9 @@ public class ChannelDashboardAssembler {
     /**
      * The DTDD mapping of the game the channel is playing, as {@code viewer} sees it: the
      * current mapping, their own pending proposal, and whether they may validate it directly
-     * (an unverified mapping nobody else has a proposal pending on).
+     * (an admin, on an unverified mapping nobody else has a proposal pending on).
      */
-    public DtddMappingStatusDto dtddMapping(UserAccount viewer, UserAccount channel) {
+    public DtddMappingStatusDto dtddMapping(UserAccount viewer, UserAccount channel, boolean viewerIsAdmin) {
         Optional<String> igdbId = gameStateService.getLastKnownGame(channel)
                 .flatMap(this::igdbGame)
                 .map(IgdbService.IgdbGame::id);
@@ -279,7 +279,8 @@ public class ChannelDashboardAssembler {
         Optional<DtddMappingProposal> myProposal = dtddProposalRepo
                 .findFirstByProposerAndIgdbIdAndStatus(viewer, id, DtddMappingProposal.Status.PENDING);
         long pendingProposals = dtddProposalRepo.countByIgdbIdAndStatus(id, DtddMappingProposal.Status.PENDING);
-        boolean canValidate = mapping.isPresent() && !mapping.get().isVerified() && pendingProposals == 0;
+        boolean canValidate = viewerIsAdmin
+                && mapping.isPresent() && !mapping.get().isVerified() && pendingProposals == 0;
 
         DtddMappingCurrentDto current = mapping.map(m -> new DtddMappingCurrentDto(
                 m.getDtddId(), dtddName(m.getDtddId()), m.getConfidence(), m.isVerified())).orElse(null);

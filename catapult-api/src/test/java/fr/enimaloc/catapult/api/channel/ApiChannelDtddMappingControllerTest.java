@@ -53,6 +53,30 @@ class ApiChannelDtddMappingControllerTest {
         lenient().when(userResolver.viewer(jwt)).thenReturn(user);
     }
 
+    private static org.springframework.security.core.Authentication auth(String authority) {
+        return new org.springframework.security.authentication.TestingAuthenticationToken("u", "p", authority);
+    }
+
+    private static org.springframework.mock.web.MockHttpServletRequest remote(String addr) {
+        var request = new org.springframework.mock.web.MockHttpServletRequest();
+        request.setRemoteAddr(addr);
+        return request;
+    }
+
+    @Test
+    void status_memberCannotValidate() {
+        when(mappingRepo.findById("100")).thenReturn(Optional.of(
+            new DtddGameMapping("100", 4521L, 0.71, false, Instant.now())));
+        when(proposalRepo.countByIgdbIdAndStatus("100", Status.PENDING)).thenReturn(0L);
+        when(proposalRepo.findFirstByProposerAndIgdbIdAndStatus(user, "100", Status.PENDING))
+            .thenReturn(Optional.empty());
+        when(gameRepo.findById(4521L)).thenReturn(Optional.empty());
+
+        var status = controller.status("100", jwt, auth("ROLE_USER"), remote("203.0.113.7"));
+
+        assertThat(status.canValidateDirectly()).isFalse();
+    }
+
     @Test
     void status_canValidateDirectly_whenUnverifiedAndNoOtherProposals() {
         when(mappingRepo.findById("100")).thenReturn(Optional.of(
@@ -62,7 +86,7 @@ class ApiChannelDtddMappingControllerTest {
             .thenReturn(Optional.empty());
         when(gameRepo.findById(4521L)).thenReturn(Optional.empty());
 
-        var status = controller.status("100", jwt);
+        var status = controller.status("100", jwt, auth("ROLE_ADMIN"), remote("203.0.113.7"));
         assertThat(status.canValidateDirectly()).isTrue();
     }
 
@@ -71,7 +95,7 @@ class ApiChannelDtddMappingControllerTest {
         when(mappingRepo.findById("100")).thenReturn(Optional.of(
             new DtddGameMapping("100", 4521L, 0.92, true, Instant.now())));
         when(gameRepo.findById(4521L)).thenReturn(Optional.empty());
-        var status = controller.status("100", jwt);
+        var status = controller.status("100", jwt, auth("ROLE_ADMIN"), remote("203.0.113.7"));
         assertThat(status.canValidateDirectly()).isFalse();
     }
 

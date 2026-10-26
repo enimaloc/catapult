@@ -604,14 +604,14 @@ class ChannelDashboardAssemblerTest {
 
         @Test
         void nothingWithoutACurrentGame() {
-            assertThat(assembler().dtddMapping(moderator, owner)).isEqualTo(NONE);
+            assertThat(assembler().dtddMapping(moderator, owner, true)).isEqualTo(NONE);
         }
 
         @Test
         void nothingForGamesIgdbDoesntKnow() {
             playing(GameBinding.SourceType.XBOX, "1", "Halo");
 
-            assertThat(assembler().dtddMapping(moderator, owner)).isEqualTo(NONE);
+            assertThat(assembler().dtddMapping(moderator, owner, true)).isEqualTo(NONE);
             verify(igdb).findByName("Halo");
         }
 
@@ -629,7 +629,7 @@ class ChannelDashboardAssemblerTest {
             cached.setName("Valheim (2021)");
             when(dtddCache.findById(7L)).thenReturn(Optional.of(cached));
 
-            DtddMappingStatusDto status = assembler().dtddMapping(moderator, owner);
+            DtddMappingStatusDto status = assembler().dtddMapping(moderator, owner, true);
 
             assertThat(status.igdbId()).isEqualTo("42");
             assertThat(status.canValidateDirectly()).isTrue();
@@ -637,6 +637,33 @@ class ChannelDashboardAssemblerTest {
             assertThat(status.current().name()).isEqualTo("Valheim (2021)");
             assertThat(status.current().confidence()).isEqualTo(0.8);
             assertThat(status.myPendingProposal()).isNull();
+        }
+
+        @Test
+        void dtddMapping_memberCannotValidateDirectly() {
+            playing(GameBinding.SourceType.STEAM, "892970", "Valheim");
+            when(igdb.findBySteamAppId("892970")).thenReturn(Optional.of(new IgdbService.IgdbGame("42", "Valheim")));
+            DtddGameMapping mapping = new DtddGameMapping();
+            mapping.setIgdbId("42");
+            mapping.setDtddId(7L);
+            when(dtddMappings.findById("42")).thenReturn(Optional.of(mapping));
+
+            DtddMappingStatusDto status = assembler().dtddMapping(moderator, owner, false);
+
+            assertThat(status.canValidateDirectly()).isFalse();
+            assertThat(status.igdbId()).isEqualTo("42");
+        }
+
+        @Test
+        void dtddMapping_adminCanValidateDirectly() {
+            playing(GameBinding.SourceType.STEAM, "892970", "Valheim");
+            when(igdb.findBySteamAppId("892970")).thenReturn(Optional.of(new IgdbService.IgdbGame("42", "Valheim")));
+            DtddGameMapping mapping = new DtddGameMapping();
+            mapping.setIgdbId("42");
+            mapping.setDtddId(7L);
+            when(dtddMappings.findById("42")).thenReturn(Optional.of(mapping));
+
+            assertThat(assembler().dtddMapping(moderator, owner, true).canValidateDirectly()).isTrue();
         }
 
         @Test
@@ -652,14 +679,14 @@ class ChannelDashboardAssemblerTest {
             when(dtddProposals.findFirstByProposerAndIgdbIdAndStatus(moderator, "42", DtddMappingProposal.Status.PENDING))
                     .thenReturn(Optional.of(mine));
 
-            DtddMappingStatusDto status = assembler().dtddMapping(moderator, owner);
+            DtddMappingStatusDto status = assembler().dtddMapping(moderator, owner, true);
             assertThat(status.canValidateDirectly()).isFalse();
             assertThat(status.current().name()).isNull();
             assertThat(status.myPendingProposal().proposedDtddId()).isEqualTo(9L);
 
             when(dtddProposals.countByIgdbIdAndStatus("42", DtddMappingProposal.Status.PENDING)).thenReturn(0L);
             mapping.setVerified(true);
-            assertThat(assembler().dtddMapping(moderator, owner).canValidateDirectly()).isFalse();
+            assertThat(assembler().dtddMapping(moderator, owner, true).canValidateDirectly()).isFalse();
         }
 
         @Test
@@ -667,7 +694,7 @@ class ChannelDashboardAssemblerTest {
             playing(GameBinding.SourceType.STEAM, "1", "New");
             when(igdb.findBySteamAppId("1")).thenReturn(Optional.of(new IgdbService.IgdbGame("5", "New")));
 
-            DtddMappingStatusDto status = assembler().dtddMapping(moderator, owner);
+            DtddMappingStatusDto status = assembler().dtddMapping(moderator, owner, true);
 
             assertThat(status).isEqualTo(new DtddMappingStatusDto(null, null, false, "5"));
         }
