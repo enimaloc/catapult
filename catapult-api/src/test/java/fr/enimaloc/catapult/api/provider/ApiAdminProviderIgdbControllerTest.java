@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.api.provider;
 
+import fr.enimaloc.catapult.service.provider.RawProviderResponseSupport;
+import fr.enimaloc.catapult.service.provider.IgdbRawQueries;
 import fr.enimaloc.catapult.common.dto.admin.AdminProviderIgdbQueryRequest;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,14 +32,16 @@ class ApiAdminProviderIgdbControllerTest {
     @Mock private RestClient.RequestBodySpec bodySpec;
     @Mock private RestClient.ResponseSpec responseSpec;
 
-    @InjectMocks private ApiAdminProviderIgdbController controller;
+    @InjectMocks private IgdbRawQueries queries;
+    private ApiAdminProviderIgdbController controller;
     private final RawProviderResponseSupport rawSupport =
             new RawProviderResponseSupport(new com.fasterxml.jackson.databind.ObjectMapper());
 
     @BeforeEach
     void setup() {
-        ReflectionTestUtils.setField(controller, "rawSupport", rawSupport);
-        ReflectionTestUtils.setField(controller, "clientId", "test-client-id");
+        controller = new ApiAdminProviderIgdbController(queries);
+        ReflectionTestUtils.setField(queries, "rawSupport", rawSupport);
+        ReflectionTestUtils.setField(queries, "clientId", "test-client-id");
         doReturn(postSpec).when(restClient).post();
         doReturn(bodySpec).when(postSpec).uri(any(String.class));
         doReturn(bodySpec).when(bodySpec).header(any(), any());

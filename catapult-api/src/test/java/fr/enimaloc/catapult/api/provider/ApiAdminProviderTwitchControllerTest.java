@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.api.provider;
 
+import fr.enimaloc.catapult.service.provider.RawProviderResponseSupport;
+import fr.enimaloc.catapult.service.provider.TwitchRawQueries;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
@@ -39,14 +41,16 @@ class ApiAdminProviderTwitchControllerTest {
     @Mock private RestClient.RequestHeadersSpec headersSpec;
     @Mock private RestClient.ResponseSpec responseSpec;
 
-    @InjectMocks private ApiAdminProviderTwitchController controller;
+    @InjectMocks private TwitchRawQueries queries;
+    private ApiAdminProviderTwitchController controller;
     private final RawProviderResponseSupport rawSupport =
             new RawProviderResponseSupport(new com.fasterxml.jackson.databind.ObjectMapper());
 
     @BeforeEach
     void setup() {
-        ReflectionTestUtils.setField(controller, "rawSupport", rawSupport);
-        ReflectionTestUtils.setField(controller, "twitchClientId", "test-client-id");
+        controller = new ApiAdminProviderTwitchController(queries);
+        ReflectionTestUtils.setField(queries, "rawSupport", rawSupport);
+        ReflectionTestUtils.setField(queries, "twitchClientId", "test-client-id");
         doReturn(getSpec).when(restClient).get();
         doReturn(headersSpec).when(getSpec).uri(any(String.class));
         doReturn(headersSpec).when(headersSpec).header(any(), any());

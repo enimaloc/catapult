@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.api.provider;
 
+import fr.enimaloc.catapult.service.provider.RawProviderResponseSupport;
+import fr.enimaloc.catapult.service.provider.MinecraftRawQueries;
 import fr.enimaloc.catapult.domain.minecraft.MinecraftServiceAccount;
 import fr.enimaloc.catapult.repository.minecraft.MinecraftServiceAccountRepository;
 import fr.enimaloc.catapult.service.minecraft.MinecraftTokenService;
@@ -38,13 +40,15 @@ class ApiAdminProviderMinecraftControllerTest {
     @Mock private RestClient.RequestBodySpec postBodySpec;
     @Mock private RestClient.ResponseSpec responseSpec;
 
-    @InjectMocks private ApiAdminProviderMinecraftController controller;
+    @InjectMocks private MinecraftRawQueries queries;
+    private ApiAdminProviderMinecraftController controller;
     private final RawProviderResponseSupport rawSupport =
             new RawProviderResponseSupport(new com.fasterxml.jackson.databind.ObjectMapper());
 
     @BeforeEach
     void setup() {
-        ReflectionTestUtils.setField(controller, "rawSupport", rawSupport);
+        controller = new ApiAdminProviderMinecraftController(queries);
+        ReflectionTestUtils.setField(queries, "rawSupport", rawSupport);
         doReturn(getSpec).when(restClient).get();
         doReturn(headersSpec).when(getSpec).uri(any(java.net.URI.class));
         doReturn(headersSpec).when(headersSpec).header(any(), any());

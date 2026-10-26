@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.common.dto.SubmitRequest;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.feedback.FeedbackSubmission;
 import fr.enimaloc.catapult.repository.feedback.FeedbackSubmissionRepository;
+import fr.enimaloc.catapult.service.feedback.FeedbackService;
 import fr.enimaloc.catapult.service.feedback.GitLabClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -32,7 +33,7 @@ class ApiFeedbackControllerTest {
     private final FeedbackSubmissionRepository repository = mock(FeedbackSubmissionRepository.class);
     private final ApiUserResolver users = mock(ApiUserResolver.class);
     private final GitLabClient gitLab = mock(GitLabClient.class);
-    private final ApiFeedbackController controller = new ApiFeedbackController(repository, users, gitLab);
+    private final ApiFeedbackController controller = new ApiFeedbackController(new FeedbackService(repository, gitLab), users);
     private final Jwt jwt = Jwt.withTokenValue("t").header("alg", "none").subject("s").build();
     private UserAccount viewer;
 
