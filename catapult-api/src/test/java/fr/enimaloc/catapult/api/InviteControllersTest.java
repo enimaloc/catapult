@@ -8,7 +8,9 @@ import fr.enimaloc.catapult.domain.access.AlphaInvite;
 import fr.enimaloc.catapult.domain.access.AlphaInviteRedemption;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.service.access.AdminInviteService;
 import fr.enimaloc.catapult.service.access.InviteService;
+import fr.enimaloc.catapult.service.access.WhitelistService;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -111,7 +113,8 @@ class InviteControllersTest {
     @Nested
     class Admin {
         private final UserAccountRepository users = mock(UserAccountRepository.class);
-        private final ApiAdminInviteController controller = new ApiAdminInviteController(inviteService, users);
+        private final ApiAdminInviteController controller = new ApiAdminInviteController(inviteService,
+                new AdminInviteService(mock(WhitelistService.class), inviteService, users));
 
         @Test
         void page_listsInvites_andActiveHumanMembersWithoutOne() {

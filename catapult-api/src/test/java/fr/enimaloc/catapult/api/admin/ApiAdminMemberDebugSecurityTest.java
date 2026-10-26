@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.api.admin;
 
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.debug.DebugExchangeRepository;
+import fr.enimaloc.catapult.service.debug.MemberDebugAdmin;
 import fr.enimaloc.catapult.service.debug.MemberDebugService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,7 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         controllers = ApiAdminMemberDebugController.class,
         excludeAutoConfiguration = ThymeleafAutoConfiguration.class,
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
-@Import({ApiSecurityConfig.class, ApiAdminMemberDebugSecurityTest.Keys.class})
+@Import({ApiSecurityConfig.class, ApiAdminMemberDebugSecurityTest.Keys.class, MemberDebugAdmin.class})
 @ActiveProfiles("test")
 class ApiAdminMemberDebugSecurityTest {
     @MockitoBean fr.enimaloc.catapult.service.account.UserApiTokenService userApiTokenService;

@@ -9,6 +9,7 @@ import fr.enimaloc.catapult.domain.access.AlphaInviteRedemption;
 import fr.enimaloc.catapult.domain.access.WhitelistEntry;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.service.access.AdminInviteService;
 import fr.enimaloc.catapult.service.access.InviteService;
 import fr.enimaloc.catapult.service.access.WhitelistService;
 import org.junit.jupiter.api.Test;
@@ -29,7 +30,8 @@ class ApiAdminWhitelistControllerTest {
     private final WhitelistService whitelist = mock(WhitelistService.class);
     private final InviteService invites = mock(InviteService.class);
     private final UserAccountRepository accounts = mock(UserAccountRepository.class);
-    private final ApiAdminWhitelistController controller = new ApiAdminWhitelistController(whitelist, invites, accounts);
+    private final ApiAdminWhitelistController controller = new ApiAdminWhitelistController(whitelist, invites,
+            new AdminInviteService(whitelist, invites, accounts));
 
     private static WhitelistEntry entry(String twitchId) {
         WhitelistEntry entry = new WhitelistEntry();
@@ -62,7 +64,7 @@ class ApiAdminWhitelistControllerTest {
         when(invites.getGlobalMaxMembers()).thenReturn(Optional.of(50));
         when(invites.getDefaultMaxUses()).thenReturn(Optional.empty());
 
-        ApiAdminWhitelistController.WhitelistPageData page = controller.page();
+        AdminInviteService.WhitelistPageData page = controller.page();
 
         assertThat(page.resolvedUsernames()).containsEntry("tw-1", "known").containsEntry("tw-2", "—");
         assertThat(page.whitelistEnabled()).isTrue();
