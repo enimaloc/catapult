@@ -33,7 +33,7 @@ public class ApiAdminMinecraftAccountsController {
     /** 202 while the admin hasn't validated the code on microsoft.com/link; 200 + the created account afterwards. */
     @PostMapping
     public ResponseEntity<?> create(@RequestBody Map<String, String> body) {
-        return accounts.create(body.get("deviceCode"), body.getOrDefault("label", "Compte Minecraft"))
+        return accounts.create(body.get("deviceCode"), body.getOrDefault("label", "Minecraft account"))
                 .<ResponseEntity<?>>map(ResponseEntity::ok)
                 .orElseGet(ApiAdminMinecraftAccountsController::pending);
     }

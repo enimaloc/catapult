@@ -23,6 +23,7 @@ public class ChangelogService {
 
     public record ChangelogEntry(String hash, String type, String scope, String subject, boolean breaking) {}
 
+    /** {@code version} is null for the commits after the last tag. */
     public record ChangelogSection(String version, List<ChangelogEntry> entries) {}
 
     @Getter
@@ -61,9 +62,9 @@ public class ChangelogService {
         }
     }
 
-    private List<ChangelogSection> parse(List<String> lines) {
+    static List<ChangelogSection> parse(List<String> lines) {
         List<ChangelogSection> result = new ArrayList<>();
-        String currentVersion = "Dernières modifications";
+        String currentVersion = null;
         List<ChangelogEntry> currentEntries = new ArrayList<>();
 
         for (String line : lines) {
@@ -76,9 +77,11 @@ public class ChangelogService {
 
             // Detect version tag in refs (e.g. "tag: v1.0.0")
             String tag = extractTag(refs);
-            if (tag != null && !currentEntries.isEmpty()) {
-                result.add(new ChangelogSection(currentVersion, List.copyOf(currentEntries)));
-                currentEntries.clear();
+            if (tag != null) {
+                if (!currentEntries.isEmpty()) {
+                    result.add(new ChangelogSection(currentVersion, List.copyOf(currentEntries)));
+                    currentEntries.clear();
+                }
                 currentVersion = tag;
             }
 
@@ -98,7 +101,7 @@ public class ChangelogService {
         return Collections.unmodifiableList(result);
     }
 
-    private String extractTag(String refs) {
+    private static String extractTag(String refs) {
         if (refs.isBlank()) return null;
         for (String ref : refs.split(",")) {
             ref = ref.trim();

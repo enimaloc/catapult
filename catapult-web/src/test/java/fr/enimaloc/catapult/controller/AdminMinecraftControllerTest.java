@@ -40,11 +40,18 @@ class AdminMinecraftControllerTest {
     @TestConfiguration
     static class Texts {
         @Bean
-        ApiErrorText apiErrorText() {
+        StaticMessageSource messageSource() {
             StaticMessageSource messages = new StaticMessageSource();
+            messages.addMessage("admin.minecraft.default-label", Locale.FRENCH, "Compte Minecraft");
+            messages.addMessage("admin.minecraft.default-label", Locale.ENGLISH, "Minecraft account");
             messages.addMessage("api.error.minecraft_device_code_refused", Locale.FRENCH, "Device-code Microsoft refusé: {0}");
             messages.addMessage("api.error.minecraft_device_code_refused", Locale.ENGLISH, "Microsoft refused the device code: {0}");
-            return new ApiErrorText(messages);
+            return messages;
+        }
+
+        @Bean
+        ApiErrorText apiErrorText(StaticMessageSource messageSource) {
+            return new ApiErrorText(messageSource);
         }
     }
 
@@ -145,12 +152,25 @@ class AdminMinecraftControllerTest {
     @Test
     void create_anErrorIsRelayedAsItsStatusAlone_andABlankLabelIsLeftToTheApi() throws Exception {
         when(apiService.isAdmin()).thenReturn(true);
-        when(apiService.adminCreateMinecraftAccount("dc-1", null))
+        when(apiService.adminCreateMinecraftAccount("dc-1", "Minecraft account"))
                 .thenReturn(new ApiClient.Result<>(502, Map.of("message", "Xbox chain failed", "trace", "x")));
 
         mvc.perform(admin(post(BASE + "/create"), "{\"deviceCode\":\"dc-1\",\"label\":\"  \"}"))
                 .andExpect(status().isBadGateway())
                 .andExpect(content().json("{}", org.springframework.test.json.JsonCompareMode.STRICT));
+    }
+
+    @Test
+    void create_withoutALabel_sendsTheDefaultInTheAdminsLanguage() throws Exception {
+        when(apiService.isAdmin()).thenReturn(true);
+        when(apiService.adminCreateMinecraftAccount(any(), any())).thenReturn(new ApiClient.Result<>(202, null));
+
+        mvc.perform(admin(post(BASE + "/create"), "{\"deviceCode\":\"c\",\"label\":\"  \"}").locale(Locale.FRENCH))
+                .andExpect(status().isAccepted());
+        mvc.perform(admin(post(BASE + "/create"), "{\"deviceCode\":\"c\",\"label\":\"  \"}").locale(Locale.ENGLISH))
+                .andExpect(status().isAccepted());
+        verify(apiService).adminCreateMinecraftAccount("c", "Compte Minecraft");
+        verify(apiService).adminCreateMinecraftAccount("c", "Minecraft account");
     }
 
     @Test
