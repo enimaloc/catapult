@@ -13,7 +13,7 @@ import tools.jackson.databind.json.JsonMapper;
 class ProblemAuthenticationEntryPointTest {
 
     private final JsonMapper json = JsonMapper.builder().build();
-    private final MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/admin/flags");
+    private final MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/internal/admin/flags");
     private final MockHttpServletResponse response = new MockHttpServletResponse();
 
     private void commence(AuthenticationEntryPoint delegate) throws Exception {

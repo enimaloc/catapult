@@ -12,6 +12,9 @@ import fr.enimaloc.catapult.service.notification.AdminEventPublisher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.transaction.annotation.Transactional;
+import fr.enimaloc.catapult.api.ApiPaths;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -19,7 +22,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/admin/groups")
+@RequestMapping(ApiPaths.ADMIN + "/groups")
 @RequiredArgsConstructor
 public class ApiAdminGroupsController {
 
@@ -58,7 +61,7 @@ public class ApiAdminGroupsController {
         events.groupCreated(new GroupSummaryDto(saved.getId(), saved.getKey(), saved.getName(), saved.getDescription(), 0));
     }
 
-    @PostMapping("/{id}/rename")
+    @PatchMapping("/{id}")
     @Transactional
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void rename(@PathVariable UUID id, @RequestBody RenameRequest body) {
@@ -69,7 +72,7 @@ public class ApiAdminGroupsController {
         events.groupUpdated(summaryOf(group));
     }
 
-    @PostMapping("/{id}/delete")
+    @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable UUID id) {
         groupRepository.delete(findOrThrow(id));
@@ -88,12 +91,12 @@ public class ApiAdminGroupsController {
         events.groupUpdated(summaryOf(group));
     }
 
-    @PostMapping("/{id}/members/{userId}/delete")
+    @DeleteMapping("/{id}/members/{memberId}")
     @Transactional
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void removeMember(@PathVariable UUID id, @PathVariable UUID userId) {
+    public void removeMember(@PathVariable UUID id, @PathVariable UUID memberId) {
         UserGroup group = findOrThrow(id);
-        group.getMembers().removeIf(m -> m.getId().equals(userId));
+        group.getMembers().removeIf(m -> m.getId().equals(memberId));
         groupRepository.save(group);
         events.groupUpdated(summaryOf(group));
     }

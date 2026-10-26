@@ -14,6 +14,9 @@ import fr.enimaloc.catapult.service.access.WhitelistService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.transaction.annotation.Transactional;
+import fr.enimaloc.catapult.api.ApiPaths;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -28,7 +31,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/api/admin/whitelist")
+@RequestMapping(ApiPaths.ADMIN + "/whitelist")
 @RequiredArgsConstructor
 public class ApiAdminWhitelistController {
 
@@ -67,13 +70,13 @@ public class ApiAdminWhitelistController {
         whitelistService.toggle();
     }
 
-    @PostMapping("/add")
+    @PostMapping("/entries")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void add(@RequestBody AddRequest body) {
         whitelistService.add(body.twitchId().trim());
     }
 
-    @PostMapping("/{id}/delete")
+    @DeleteMapping("/entries/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable String id) {
         whitelistService.remove(id);
@@ -85,7 +88,7 @@ public class ApiAdminWhitelistController {
         inviteService.setInviteEnabled(!inviteService.isInviteEnabled());
     }
 
-    @PostMapping("/invite/settings")
+    @PutMapping("/invite/settings")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updateInviteSettings(@RequestBody InviteSettingsRequest body) {
         inviteService.setGlobalMaxMembers(body.globalMaxMembers());
@@ -93,7 +96,7 @@ public class ApiAdminWhitelistController {
         inviteService.setDefaultCanReinvite(body.defaultCanReinvite());
     }
 
-    @PostMapping("/invite/{inviteId}/quota")
+    @PutMapping("/invite/{inviteId}/quota")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updateInviteQuota(@PathVariable UUID inviteId, @RequestBody AdminInviteQuotaRequest body) {
         inviteService.updateInviteQuota(inviteId, body.maxUses(), body.canReinvite());

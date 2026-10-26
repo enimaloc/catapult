@@ -28,7 +28,7 @@ class ForwardedClientAccessTest extends FullContextTestBase {
 
     private HttpResponse<String> adminFlags(String forwardedFor) throws Exception {
         HttpRequest.Builder request =
-                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/admin/flags")).GET();
+                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/internal/admin/flags")).GET();
         if (forwardedFor != null) {
             request.header("X-Forwarded-For", forwardedFor);
         }

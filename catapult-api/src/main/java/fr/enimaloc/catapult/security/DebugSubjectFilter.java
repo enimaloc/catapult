@@ -19,14 +19,14 @@ import java.util.regex.Pattern;
 /**
  * Runs each API request as the member it is for (see {@link DebugContext}): the JWT subject (or the owner of the
  * personal API token on the custom bindings API), or, for an admin's request on a route about one member
- * ({@code /api/admin/members/{id}[/…]}), that member, so what an admin does to a member is attributed to the member.
- * "An admin" is {@link Authz#isAdmin}, the {@code /api/admin/**} access rule; anyone else on that route (who gets a
+ * ({@code /api/internal/admin/members/{id}[/…]}), that member, so what an admin does to a member is attributed to the member.
+ * "An admin" is {@link Authz#isAdmin}, the {@code /api/internal/admin/**} access rule; anyone else on that route (who gets a
  * 403) stays attributed to themself. Placed after the bearer-token authentication; requests with neither run without
  * a subject. Async dispatches (SSE) are not filtered and so stay unattributed.
  */
 public class DebugSubjectFilter extends OncePerRequestFilter {
 
-    private static final Pattern ADMIN_MEMBER_ROUTE = Pattern.compile("^/api/admin/members/([^/]+)(?:/.*)?$");
+    private static final Pattern ADMIN_MEMBER_ROUTE = Pattern.compile("^/api/internal/admin/members/([^/]+)(?:/.*)?$");
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)

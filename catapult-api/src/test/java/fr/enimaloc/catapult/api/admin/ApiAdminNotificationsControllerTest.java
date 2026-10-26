@@ -105,7 +105,7 @@ class ApiAdminNotificationsControllerTest {
         when(assignmentRepository.findNotifiableUsers(experiment)).thenReturn(members);
         when(service.createForAll(any(), any(), org.mockito.ArgumentMatchers.eq(members))).thenReturn(3);
 
-        postJson("/api/admin/notifications", experimentBody(experiment.getId(), null))
+        postJson("/api/internal/admin/notifications", experimentBody(experiment.getId(), null))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.sent").value(3));
 
@@ -121,7 +121,7 @@ class ApiAdminNotificationsControllerTest {
         when(assignmentRepository.findNotifiableUsersByVariant(experiment, variant.getId())).thenReturn(members);
         when(service.createForAll(any(), any(), org.mockito.ArgumentMatchers.eq(members))).thenReturn(1);
 
-        postJson("/api/admin/notifications", experimentBody(experiment.getId(), variant.getId()))
+        postJson("/api/internal/admin/notifications", experimentBody(experiment.getId(), variant.getId()))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.sent").value(1));
 
@@ -134,7 +134,7 @@ class ApiAdminNotificationsControllerTest {
         when(assignmentRepository.findNotifiableUsers(experiment)).thenReturn(List.of());
         when(service.createForAll(any(), any(), org.mockito.ArgumentMatchers.eq(List.of()))).thenReturn(0);
 
-        postJson("/api/admin/notifications", experimentBody(experiment.getId(), null))
+        postJson("/api/internal/admin/notifications", experimentBody(experiment.getId(), null))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.sent").value(0));
     }
@@ -146,7 +146,7 @@ class ApiAdminNotificationsControllerTest {
         other.setId(UUID.randomUUID());
         variant.setExperiment(other);
 
-        postJson("/api/admin/notifications", experimentBody(experiment.getId(), variant.getId()))
+        postJson("/api/internal/admin/notifications", experimentBody(experiment.getId(), variant.getId()))
                 .andExpect(status().isNotFound());
 
         verify(service, org.mockito.Mockito.never()).createForAll(any(), any(), any());
@@ -156,15 +156,15 @@ class ApiAdminNotificationsControllerTest {
     void create_forAnUnknownExperimentOrVariant_is404() throws Exception {
         experimentFixture();
 
-        postJson("/api/admin/notifications", experimentBody(UUID.randomUUID(), null)).andExpect(status().isNotFound());
-        postJson("/api/admin/notifications", experimentBody(experiment.getId(), UUID.randomUUID())).andExpect(status().isNotFound());
+        postJson("/api/internal/admin/notifications", experimentBody(UUID.randomUUID(), null)).andExpect(status().isNotFound());
+        postJson("/api/internal/admin/notifications", experimentBody(experiment.getId(), UUID.randomUUID())).andExpect(status().isNotFound());
     }
 
     @Test
     void create_forAnExperimentWithoutAnId_is400() throws Exception {
         experimentFixture();
 
-        postJson("/api/admin/notifications", experimentBody(null, null)).andExpect(status().isBadRequest());
+        postJson("/api/internal/admin/notifications", experimentBody(null, null)).andExpect(status().isBadRequest());
     }
 
     @Test
@@ -173,9 +173,9 @@ class ApiAdminNotificationsControllerTest {
         when(assignmentRepository.countNotifiableUsers(experiment)).thenReturn(12L);
         when(assignmentRepository.countNotifiableUsersByVariant(experiment, variant.getId())).thenReturn(5L);
 
-        postJson("/api/admin/notifications/audience-count", Map.of("audience", "EXPERIMENT", "experimentId", experiment.getId().toString()))
+        postJson("/api/internal/admin/notifications/audience-count", Map.of("audience", "EXPERIMENT", "experimentId", experiment.getId().toString()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.count").value(12));
-        postJson("/api/admin/notifications/audience-count", Map.of("audience", "EXPERIMENT",
+        postJson("/api/internal/admin/notifications/audience-count", Map.of("audience", "EXPERIMENT",
                 "experimentId", experiment.getId().toString(), "variantId", variant.getId().toString()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.count").value(5));
     }
@@ -183,14 +183,14 @@ class ApiAdminNotificationsControllerTest {
     @Test
     void audienceCount_rejectsOtherAudiencesMissingOrUnknownExperimentsAndForeignVariants() throws Exception {
         experimentFixture();
-        postJson("/api/admin/notifications/audience-count", Map.of("audience", "CHAT_COMMANDS")).andExpect(status().isBadRequest());
-        postJson("/api/admin/notifications/audience-count", Map.of("audience", "EXPERIMENT")).andExpect(status().isBadRequest());
-        postJson("/api/admin/notifications/audience-count", Map.of("audience", "EXPERIMENT",
+        postJson("/api/internal/admin/notifications/audience-count", Map.of("audience", "CHAT_COMMANDS")).andExpect(status().isBadRequest());
+        postJson("/api/internal/admin/notifications/audience-count", Map.of("audience", "EXPERIMENT")).andExpect(status().isBadRequest());
+        postJson("/api/internal/admin/notifications/audience-count", Map.of("audience", "EXPERIMENT",
                 "experimentId", UUID.randomUUID().toString())).andExpect(status().isNotFound());
         Experiment other = new Experiment();
         other.setId(UUID.randomUUID());
         variant.setExperiment(other);
-        postJson("/api/admin/notifications/audience-count", Map.of("audience", "EXPERIMENT",
+        postJson("/api/internal/admin/notifications/audience-count", Map.of("audience", "EXPERIMENT",
                 "experimentId", experiment.getId().toString(), "variantId", variant.getId().toString()))
                 .andExpect(status().isNotFound());
     }
@@ -204,7 +204,7 @@ class ApiAdminNotificationsControllerTest {
         when(commandRepository.findActiveUsersWithEnabledCommands()).thenReturn(streamers);
         when(service.createForEach(any(), any(), org.mockito.ArgumentMatchers.eq(streamers))).thenReturn(2);
 
-        mvc.perform(post("/api/admin/notifications")
+        mvc.perform(post("/api/internal/admin/notifications")
                         .with(jwt().jwt(j -> j.claim("twitchId", "123")).authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -227,7 +227,7 @@ class ApiAdminNotificationsControllerTest {
                 Severity.INFO, null, null, null, Instant.now(), false);
         when(service.create(any(), any())).thenReturn(dto);
 
-        mvc.perform(post("/api/admin/notifications")
+        mvc.perform(post("/api/internal/admin/notifications")
                         .with(jwt().jwt(j -> j.claim("twitchId", "123")).authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -247,7 +247,7 @@ class ApiAdminNotificationsControllerTest {
         existing.setId(id);
         when(repo.findById(id)).thenReturn(Optional.of(existing));
 
-        mvc.perform(delete("/api/admin/notifications/{id}", id)
+        mvc.perform(delete("/api/internal/admin/notifications/{id}", id)
                         .with(jwt().jwt(j -> j.claim("twitchId", "123")).authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
                         .with(csrf()))
                 .andExpect(status().isNoContent());
@@ -264,7 +264,7 @@ class ApiAdminNotificationsControllerTest {
                 Severity.WARNING, null, null, null, Instant.now().minusSeconds(60), "BROADCAST", null, null, 0);
         when(service.adminPage(any())).thenReturn(new PageImpl<>(List.of(targeted, broadcast)));
 
-        mvc.perform(get("/api/admin/notifications")
+        mvc.perform(get("/api/internal/admin/notifications")
                         .with(jwt().jwt(j -> j.claim("twitchId", "123")).authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].audience").value("TARGETED"))
@@ -281,7 +281,7 @@ class ApiAdminNotificationsControllerTest {
         when(service.preview("**hi** <script>x</script>"))
                 .thenReturn(new NotificationPreviewDto("<p><strong>hi</strong> </p>"));
 
-        mvc.perform(post("/api/admin/notifications/preview")
+        mvc.perform(post("/api/internal/admin/notifications/preview")
                         .with(jwt().jwt(j -> j.claim("twitchId", "123")).authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)

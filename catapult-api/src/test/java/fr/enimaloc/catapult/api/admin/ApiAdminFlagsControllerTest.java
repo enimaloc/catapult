@@ -33,7 +33,7 @@ class ApiAdminFlagsControllerTest {
         when(flags.findDistinctKeyValues()).thenReturn(List.of(
                 new Object[] {"beta", "off"}, new Object[] {"beta", "on"}, new Object[] {"tester", null}));
 
-        mvc.perform(get("/api/admin/flags"))
+        mvc.perform(get("/api/internal/admin/flags"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[0].key").value("beta"))

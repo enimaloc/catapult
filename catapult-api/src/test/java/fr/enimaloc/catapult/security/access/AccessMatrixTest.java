@@ -17,12 +17,12 @@ class AccessMatrixTest extends AccessMatrixSupport {
     /** The callers are who the matrix says: anon is remote, loop is loopback, and a JWT names its account. */
     @Test
     void callersAreWhoTheySayTheyAre() throws Exception {
-        mvc.perform(get("/api/admin/flags").with(r -> {
+        mvc.perform(get("/api/internal/admin/flags").with(r -> {
                     r.setRemoteAddr(REMOTE);
                     return r;
                 }))
                 .andExpect(status().isUnauthorized());
-        mvc.perform(get("/api/admin/flags").with(r -> {
+        mvc.perform(get("/api/internal/admin/flags").with(r -> {
                     r.setRemoteAddr(LOOPBACK);
                     return r;
                 }))

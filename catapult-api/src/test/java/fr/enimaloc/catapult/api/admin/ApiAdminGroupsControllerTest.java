@@ -26,6 +26,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -44,7 +45,7 @@ class ApiAdminGroupsControllerTest {
     @Test
     void createRejectsDuplicateKey() throws Exception {
         when(groupRepository.existsByKey("beta")).thenReturn(true);
-        mvc.perform(post("/api/admin/groups")
+        mvc.perform(post("/api/internal/admin/groups")
                         .with(adminJwt())
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -56,7 +57,7 @@ class ApiAdminGroupsControllerTest {
     void createPersistsNewGroup() throws Exception {
         when(groupRepository.existsByKey("beta")).thenReturn(false);
         when(groupRepository.save(any(UserGroup.class))).thenAnswer(i -> i.getArgument(0));
-        mvc.perform(post("/api/admin/groups")
+        mvc.perform(post("/api/internal/admin/groups")
                         .with(adminJwt())
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -68,7 +69,7 @@ class ApiAdminGroupsControllerTest {
 
     @Test
     void createRejectsBlankKey() throws Exception {
-        mvc.perform(post("/api/admin/groups")
+        mvc.perform(post("/api/internal/admin/groups")
                         .with(adminJwt())
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -84,7 +85,7 @@ class ApiAdminGroupsControllerTest {
         group.setMembers(new HashSet<>());
         when(groupRepository.findAll()).thenReturn(List.of(group));
 
-        mvc.perform(get("/api/admin/groups")
+        mvc.perform(get("/api/internal/admin/groups")
                         .with(adminJwt()))
                 .andExpect(status().isOk());
     }
@@ -92,7 +93,7 @@ class ApiAdminGroupsControllerTest {
     @Test
     void renameUnknownGroupReturns404() throws Exception {
         when(groupRepository.findById(any())).thenReturn(Optional.empty());
-        mvc.perform(post("/api/admin/groups/{id}/rename", UUID.randomUUID())
+        mvc.perform(patch("/api/internal/admin/groups/{id}", UUID.randomUUID())
                         .with(adminJwt())
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -109,7 +110,7 @@ class ApiAdminGroupsControllerTest {
         when(groupRepository.findById(any())).thenReturn(Optional.of(group));
         when(userAccountRepository.findByTwitchUsername(any())).thenReturn(Optional.empty());
 
-        mvc.perform(post("/api/admin/groups/{id}/members", UUID.randomUUID())
+        mvc.perform(post("/api/internal/admin/groups/{id}/members", UUID.randomUUID())
                         .with(adminJwt())
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -128,7 +129,7 @@ class ApiAdminGroupsControllerTest {
         when(userAccountRepository.findByTwitchUsername(any())).thenReturn(Optional.of(user));
         when(groupRepository.save(any(UserGroup.class))).thenAnswer(i -> i.getArgument(0));
 
-        mvc.perform(post("/api/admin/groups/{id}/members", UUID.randomUUID())
+        mvc.perform(post("/api/internal/admin/groups/{id}/members", UUID.randomUUID())
                         .with(adminJwt())
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)

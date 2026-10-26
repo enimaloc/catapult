@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The admin whitelist page as catapult-api's {@code GET /api/admin/whitelist} answers it: the
+ * The admin whitelist page as catapult-api's {@code GET /api/internal/admin/whitelist} answers it: the
  * entries (keyed by Twitch id) with the login each resolves to, the two switches, the invitation
  * settings ({@code null} caps mean unlimited) and every invite.
  */

@@ -69,7 +69,7 @@ class ApiAdminBroadcastControllerTest {
 
     @Test
     void valid_alert_info_returns_202_and_publishes_on_global_channel() throws Exception {
-        mvc.perform(post("/api/admin/broadcast")
+        mvc.perform(post("/api/internal/admin/broadcasts")
                         .with(adminJwt())
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -87,7 +87,7 @@ class ApiAdminBroadcastControllerTest {
 
     @Test
     void valid_maintenance_scheduled_publishes() throws Exception {
-        mvc.perform(post("/api/admin/broadcast")
+        mvc.perform(post("/api/internal/admin/broadcasts")
                         .with(adminJwt())
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -104,7 +104,7 @@ class ApiAdminBroadcastControllerTest {
     @Test
     void reserved_lifecycle_name_returns_400() throws Exception {
         // Jackson rejects unknown subtypes with 400 (no matching @JsonSubTypes entry).
-        mvc.perform(post("/api/admin/broadcast")
+        mvc.perform(post("/api/internal/admin/broadcasts")
                         .with(adminJwt())
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -118,7 +118,7 @@ class ApiAdminBroadcastControllerTest {
 
     @Test
     void unknown_name_returns_400() throws Exception {
-        mvc.perform(post("/api/admin/broadcast")
+        mvc.perform(post("/api/internal/admin/broadcasts")
                         .with(adminJwt())
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -132,7 +132,7 @@ class ApiAdminBroadcastControllerTest {
     @Test
     void missing_required_field_returns_400() throws Exception {
         // alert.info requires title/body/ttlSeconds — omit `body` to trigger @Valid.
-        mvc.perform(post("/api/admin/broadcast")
+        mvc.perform(post("/api/internal/admin/broadcasts")
                         .with(adminJwt())
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -151,7 +151,7 @@ class ApiAdminBroadcastControllerTest {
                 "name", "alert.info", "title", "t", "body", "b", "ttlSeconds", 1));
 
         for (int i = 0; i < BroadcastRateLimiter.PER_MINUTE; i++) {
-            mvc.perform(post("/api/admin/broadcast")
+            mvc.perform(post("/api/internal/admin/broadcasts")
                             .with(adminJwt())
                             .with(csrf())
                             .contentType(MediaType.APPLICATION_JSON)
@@ -159,7 +159,7 @@ class ApiAdminBroadcastControllerTest {
                     .andExpect(status().isAccepted());
         }
 
-        mvc.perform(post("/api/admin/broadcast")
+        mvc.perform(post("/api/internal/admin/broadcasts")
                         .with(adminJwt())
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)

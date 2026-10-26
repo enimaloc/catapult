@@ -30,6 +30,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.transaction.annotation.Transactional;
+import fr.enimaloc.catapult.api.ApiPaths;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -48,7 +50,7 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/admin/members")
+@RequestMapping(ApiPaths.ADMIN + "/members")
 @RequiredArgsConstructor
 public class ApiAdminMembersController {
 
@@ -115,7 +117,7 @@ public class ApiAdminMembersController {
         botToggleService.setBotEnabled(user, !user.isBotEnabled());
     }
 
-    @PostMapping("/{id}/delete")
+    @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteAccount(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
         UserAccount user = findOrThrow(id);
@@ -130,7 +132,7 @@ public class ApiAdminMembersController {
         accountService.deleteAccountImmediately(user);
     }
 
-    @PostMapping("/{id}/steam/unlink")
+    @DeleteMapping("/{id}/links/steam")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void unlinkSteam(@PathVariable UUID id) {
         UserAccount user = findOrThrow(id);
@@ -140,7 +142,7 @@ public class ApiAdminMembersController {
         accountService.disconnectProvider(user, OAuthToken.Provider.STEAM);
     }
 
-    @PostMapping("/{id}/twitch/unlink")
+    @DeleteMapping("/{id}/links/twitch")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void unlinkTwitch(@PathVariable UUID id) {
         UserAccount user = findOrThrow(id);
@@ -227,7 +229,7 @@ public class ApiAdminMembersController {
         userFlagRepository.save(flag);
     }
 
-    @PostMapping("/{id}/flags/{key}/delete")
+    @DeleteMapping("/{id}/flags/{key}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteFlag(@PathVariable UUID id, @PathVariable String key) {
         UserAccount user = findOrThrow(id);
@@ -245,7 +247,7 @@ public class ApiAdminMembersController {
         userGroupRepository.save(group);
     }
 
-    @PostMapping("/{id}/groups/{groupId}/delete")
+    @DeleteMapping("/{id}/groups/{groupId}")
     @Transactional
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void removeFromGroup(@PathVariable UUID id, @PathVariable UUID groupId) {

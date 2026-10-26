@@ -474,40 +474,40 @@ public class RealApiService implements ApiService {
 
     @Override
     public AdminMembersPage adminMembers(String q, int page) {
-        return client.get("/api/admin/members?page={page}&q={q}", AdminMembersPage.class, page, q == null ? "" : q);
+        return client.get("/api/internal/admin/members?page={page}&q={q}", AdminMembersPage.class, page, q == null ? "" : q);
     }
 
     @Override
     public List<AdminMemberDto> adminSearchMembers(String q) {
-        return client.get("/api/admin/members/search?q={q}", MEMBERS, q == null ? "" : q);
+        return client.get("/api/internal/admin/members/search?q={q}", MEMBERS, q == null ? "" : q);
     }
 
     @Override
     public fr.enimaloc.catapult.common.dto.admin.MemberDebugStateDto memberDebug(UUID memberId) {
-        return client.get("/api/admin/members/{id}/debug", fr.enimaloc.catapult.common.dto.admin.MemberDebugStateDto.class, memberId);
+        return client.get("/api/internal/admin/members/{id}/debug", fr.enimaloc.catapult.common.dto.admin.MemberDebugStateDto.class, memberId);
     }
 
     @Override
     public int enableMemberDebug(UUID memberId, boolean revealSecrets) {
-        return client.postVoid("/api/admin/members/{id}/debug/enable",
+        return client.postVoid("/api/internal/admin/members/{id}/debug/enable",
                 new fr.enimaloc.catapult.common.dto.admin.DebugEnableRequest(revealSecrets), memberId);
     }
 
     @Override
     public int disableMemberDebug(UUID memberId) {
-        return client.postVoid("/api/admin/members/{id}/debug/disable", null, memberId);
+        return client.postVoid("/api/internal/admin/members/{id}/debug/disable", null, memberId);
     }
 
     @Override
     public int clearMemberDebug(UUID memberId) {
-        return client.postVoid("/api/admin/members/{id}/debug/clear", null, memberId);
+        return client.delete("/api/internal/admin/members/{id}/debug/exchanges", memberId);
     }
 
     @Override
     public AdminPage<fr.enimaloc.catapult.common.dto.admin.DebugExchangeSummaryDto> memberDebugExchanges(
             UUID memberId, fr.enimaloc.catapult.service.DebugExchangeFilter filter, int page) {
         // Unset filters go as empty values, which catapult-api reads as absent
-        return client.get("/api/admin/members/{id}/debug/exchanges?service={service}&direction={direction}&outcome={outcome}&from={from}&to={to}&page={page}&size=50",
+        return client.get("/api/internal/admin/members/{id}/debug/exchanges?service={service}&direction={direction}&outcome={outcome}&from={from}&to={to}&page={page}&size=50",
                 DEBUG_EXCHANGES, memberId, text(filter.service()), text(filter.direction()), text(filter.outcome()),
                 filter.from() == null ? "" : filter.from().toString(), filter.to() == null ? "" : filter.to().toString(), page);
     }
@@ -518,13 +518,13 @@ public class RealApiService implements ApiService {
 
     @Override
     public fr.enimaloc.catapult.common.dto.admin.DebugExchangeDto memberDebugExchange(UUID memberId, UUID exchangeId) {
-        return client.get("/api/admin/members/{id}/debug/exchanges/{exchangeId}",
+        return client.get("/api/internal/admin/members/{id}/debug/exchanges/{exchangeId}",
                 fr.enimaloc.catapult.common.dto.admin.DebugExchangeDto.class, memberId, exchangeId);
     }
 
     @Override
     public List<String> memberDebugServices(UUID memberId) {
-        List<String> services = client.get("/api/admin/members/{id}/debug/services", DEBUG_SERVICES, memberId);
+        List<String> services = client.get("/api/internal/admin/members/{id}/debug/services", DEBUG_SERVICES, memberId);
         return services == null ? List.of() : services;
     }
 
@@ -538,32 +538,32 @@ public class RealApiService implements ApiService {
 
     @Override
     public int adminToggleMemberBot(UUID memberId) {
-        return client.postVoid("/api/admin/members/{id}/bot/toggle", null, memberId);
+        return client.postVoid("/api/internal/admin/members/{id}/bot/toggle", null, memberId);
     }
 
     @Override
     public int adminUnlinkMemberSteam(UUID memberId) {
-        return client.postVoid("/api/admin/members/{id}/steam/unlink", null, memberId);
+        return client.delete("/api/internal/admin/members/{id}/links/steam", memberId);
     }
 
     @Override
     public int adminUnlinkMemberTwitch(UUID memberId) {
-        return client.postVoid("/api/admin/members/{id}/twitch/unlink", null, memberId);
+        return client.delete("/api/internal/admin/members/{id}/links/twitch", memberId);
     }
 
     @Override
     public int adminPromoteMemberToSystem(UUID memberId) {
-        return client.postVoid("/api/admin/members/{id}/promote-to-system", null, memberId);
+        return client.postVoid("/api/internal/admin/members/{id}/promote-to-system", null, memberId);
     }
 
     @Override
     public int adminDeleteMember(UUID memberId) {
-        return client.postVoid("/api/admin/members/{id}/delete", null, memberId);
+        return client.delete("/api/internal/admin/members/{id}", memberId);
     }
 
     @Override
     public int adminMigrateMember(UUID memberId, UUID targetId, boolean settings, boolean getters, boolean bindings) {
-        return client.postVoid("/api/admin/members/{id}/migrate", new MigrateRequest(targetId, settings, getters, bindings), memberId);
+        return client.postVoid("/api/internal/admin/members/{id}/migrate", new MigrateRequest(targetId, settings, getters, bindings), memberId);
     }
 
     @Override
@@ -771,31 +771,31 @@ public class RealApiService implements ApiService {
 
     @Override
     public AdminPage<AdminNotificationDto> adminNotifications(int page) {
-        return client.get("/api/admin/notifications?page={page}&size=20", ADMIN_NOTIFICATIONS, page);
+        return client.get("/api/internal/admin/notifications?page={page}&size=20", ADMIN_NOTIFICATIONS, page);
     }
 
     @Override
     public ApiClient.Result<Integer> adminSendNotification(AdminNotificationCreateBody body) {
-        ApiClient.Result<NotificationSentDto> result = client.call(HttpMethod.POST, "/api/admin/notifications", body,
+        ApiClient.Result<NotificationSentDto> result = client.call(HttpMethod.POST, "/api/internal/admin/notifications", body,
                 NotificationSentDto.class);
         return new ApiClient.Result<>(result.status(), result.body() == null ? null : result.body().sent());
     }
 
     @Override
     public Long adminNotificationAudienceCount(UUID experimentId, UUID variantId) {
-        ApiClient.Result<AudienceCountDto> result = client.call(HttpMethod.POST, "/api/admin/notifications/audience-count",
+        ApiClient.Result<AudienceCountDto> result = client.call(HttpMethod.POST, "/api/internal/admin/notifications/audience-count",
                 new AudienceCountRequest(AdminNotificationCreateBody.EXPERIMENT, experimentId, variantId), AudienceCountDto.class);
         return result.ok() && result.body() != null ? result.body().count() : null;
     }
 
     @Override
     public int adminDeleteNotification(UUID id) {
-        return client.call(HttpMethod.DELETE, "/api/admin/notifications/{id}", null, Void.class, id).status();
+        return client.call(HttpMethod.DELETE, "/api/internal/admin/notifications/{id}", null, Void.class, id).status();
     }
 
     @Override
     public ApiClient.Result<String> adminPreviewNotification(String body) {
-        ApiClient.Result<NotificationPreviewDto> result = client.call(HttpMethod.POST, "/api/admin/notifications/preview",
+        ApiClient.Result<NotificationPreviewDto> result = client.call(HttpMethod.POST, "/api/internal/admin/notifications/preview",
                 new NotificationPreviewRequest(body), NotificationPreviewDto.class);
         if (!result.ok()) return new ApiClient.Result<>(result.status(), null);
         return result.body() != null && result.body().bodyHtml() != null
@@ -805,7 +805,7 @@ public class RealApiService implements ApiService {
 
     @Override
     public ApiClient.Result<String> adminImpersonate(String username) {
-        ApiClient.Result<ImpersonateResponse> result = client.call(HttpMethod.POST, "/api/admin/impersonate",
+        ApiClient.Result<ImpersonateResponse> result = client.call(HttpMethod.POST, "/api/internal/admin/impersonations",
                 new ImpersonateRequest(username), ImpersonateResponse.class);
         if (!result.ok()) return new ApiClient.Result<>(result.status(), null);
         return result.body() != null && result.body().token() != null && !result.body().token().isBlank()
@@ -868,7 +868,7 @@ public class RealApiService implements ApiService {
 
     @Override
     public List<GroupSummaryDto> adminGroups() {
-        return client.get("/api/admin/groups", GROUPS);
+        return client.get("/api/internal/admin/groups", GROUPS);
     }
 
     @Override
@@ -877,7 +877,7 @@ public class RealApiService implements ApiService {
         body.put("key", key);
         body.put("name", name);
         body.put("description", description);
-        return client.call(HttpMethod.POST, "/api/admin/groups", body, Void.class).status();
+        return client.call(HttpMethod.POST, "/api/internal/admin/groups", body, Void.class).status();
     }
 
     @Override
@@ -885,43 +885,43 @@ public class RealApiService implements ApiService {
         Map<String, String> body = new java.util.LinkedHashMap<>();
         body.put("name", name);
         body.put("description", description);
-        return client.call(HttpMethod.POST, "/api/admin/groups/{id}/rename", body, Void.class, id).status();
+        return client.call(HttpMethod.PATCH, "/api/internal/admin/groups/{id}", body, Void.class, id).status();
     }
 
     @Override
     public int adminDeleteGroup(UUID id) {
-        return client.call(HttpMethod.POST, "/api/admin/groups/{id}/delete", null, Void.class, id).status();
+        return client.delete("/api/internal/admin/groups/{id}", id);
     }
 
     @Override
     public int adminAddGroupMember(UUID id, String twitchUsername) {
-        return client.call(HttpMethod.POST, "/api/admin/groups/{id}/members", Map.of("twitchUsername", twitchUsername), Void.class, id).status();
+        return client.call(HttpMethod.POST, "/api/internal/admin/groups/{id}/members", Map.of("twitchUsername", twitchUsername), Void.class, id).status();
     }
 
     @Override
     public List<ExperimentSummaryDto> adminExperiments() {
-        return client.get("/api/admin/experiments", EXPERIMENTS);
+        return client.get("/api/internal/admin/experiments", EXPERIMENTS);
     }
 
     @Override
     public ExperimentSettingsDto adminExperiment(UUID id) {
-        return client.get("/api/admin/experiments/{id}/settings", ExperimentSettingsDto.class, id);
+        return client.get("/api/internal/admin/experiments/{id}/settings", ExperimentSettingsDto.class, id);
     }
 
     @Override
     public List<FlagKeyDto> adminFlagKeys() {
-        return client.get("/api/admin/flags", FLAG_KEYS);
+        return client.get("/api/internal/admin/flags", FLAG_KEYS);
     }
 
     @Override
     public int adminExperimentAction(UUID id, String action) {
         // one literal per route, so catapult-web's calls can be checked against catapult-api's routes
         ApiClient.Result<Void> result = switch (action) {
-            case "activate" -> client.call(HttpMethod.POST, "/api/admin/experiments/{id}/activate", null, Void.class, id);
-            case "pause" -> client.call(HttpMethod.POST, "/api/admin/experiments/{id}/pause", null, Void.class, id);
-            case "end" -> client.call(HttpMethod.POST, "/api/admin/experiments/{id}/end", null, Void.class, id);
-            case "assign" -> client.call(HttpMethod.POST, "/api/admin/experiments/{id}/assign", null, Void.class, id);
-            case "reassign" -> client.call(HttpMethod.POST, "/api/admin/experiments/{id}/reassign", null, Void.class, id);
+            case "activate" -> client.call(HttpMethod.POST, "/api/internal/admin/experiments/{id}/activate", null, Void.class, id);
+            case "pause" -> client.call(HttpMethod.POST, "/api/internal/admin/experiments/{id}/pause", null, Void.class, id);
+            case "end" -> client.call(HttpMethod.POST, "/api/internal/admin/experiments/{id}/end", null, Void.class, id);
+            case "assign" -> client.call(HttpMethod.POST, "/api/internal/admin/experiments/{id}/assign", null, Void.class, id);
+            case "reassign" -> client.call(HttpMethod.POST, "/api/internal/admin/experiments/{id}/reassign", null, Void.class, id);
             // no such route: what catapult-api answers it
             default -> new ApiClient.Result<>(HttpStatus.NOT_FOUND.value(), null);
         };
@@ -930,71 +930,71 @@ public class RealApiService implements ApiService {
 
     @Override
     public int adminExperimentWeights(UUID id, Map<UUID, Integer> weights) {
-        return client.call(HttpMethod.POST, "/api/admin/experiments/{id}/variants/weights", weights, Void.class, id).status();
+        return client.call(HttpMethod.PUT, "/api/internal/admin/experiments/{id}/variants/weights", weights, Void.class, id).status();
     }
 
     @Override
     public ExperimentRebalanceDto adminExperimentWeightsPreview(UUID id, Map<UUID, Integer> weights) {
         ApiClient.Result<ExperimentRebalanceDto> result = client.call(HttpMethod.POST,
-                "/api/admin/experiments/{id}/variants/weights/preview", weights, ExperimentRebalanceDto.class, id);
+                "/api/internal/admin/experiments/{id}/variants/weights/preview", weights, ExperimentRebalanceDto.class, id);
         return result.ok() ? result.body() : null;
     }
 
     @Override
     public int adminAddExperimentRule(UUID id, ExperimentRuleRequest rule) {
-        return client.call(HttpMethod.POST, "/api/admin/experiments/{id}/rules", rule, Void.class, id).status();
+        return client.call(HttpMethod.POST, "/api/internal/admin/experiments/{id}/rules", rule, Void.class, id).status();
     }
 
     @Override
     public int adminDeleteExperimentRule(UUID id, UUID ruleId) {
-        return client.call(HttpMethod.POST, "/api/admin/experiments/{id}/rules/{ruleId}/delete", null, Void.class, id, ruleId).status();
+        return client.delete("/api/internal/admin/experiments/{id}/rules/{ruleId}", id, ruleId);
     }
 
     @Override
     public int adminAddExperimentOverride(UUID id, ExperimentOverrideRequest override) {
-        return client.call(HttpMethod.POST, "/api/admin/experiments/{id}/overrides", override, Void.class, id).status();
+        return client.call(HttpMethod.POST, "/api/internal/admin/experiments/{id}/overrides", override, Void.class, id).status();
     }
 
     @Override
     public int adminDeleteExperimentOverride(UUID id, UUID overrideId) {
-        return client.call(HttpMethod.POST, "/api/admin/experiments/{id}/overrides/{overrideId}/delete", null, Void.class, id, overrideId).status();
+        return client.delete("/api/internal/admin/experiments/{id}/overrides/{overrideId}", id, overrideId);
     }
 
     @Override
     public ExperimentAssignmentsDto adminExperimentAssignments(UUID id, UUID variantId, String q, int page) {
-        return client.get("/api/admin/experiments/{id}/assignments?variant={variant}&q={q}&page={page}",
+        return client.get("/api/internal/admin/experiments/{id}/assignments?variant={variant}&q={q}&page={page}",
                 ExperimentAssignmentsDto.class, id, variantId == null ? "" : variantId, q == null ? "" : q, page);
     }
 
     @Override
     public int adminMoveExperimentAssignment(UUID id, UUID userId, UUID variantId) {
-        return client.call(HttpMethod.POST, "/api/admin/experiments/{id}/assignments/{userId}/variant",
+        return client.call(HttpMethod.PUT, "/api/internal/admin/experiments/{id}/assignments/{memberId}/variant",
                 new MoveAssignmentRequest(variantId), Void.class, id, userId).status();
     }
 
     @Override
     public WhitelistPageDto adminWhitelist() {
-        return client.get("/api/admin/whitelist", WhitelistPageDto.class);
+        return client.get("/api/internal/admin/whitelist", WhitelistPageDto.class);
     }
 
     @Override
     public int adminToggleWhitelist() {
-        return client.call(HttpMethod.POST, "/api/admin/whitelist/toggle", null, Void.class).status();
+        return client.call(HttpMethod.POST, "/api/internal/admin/whitelist/toggle", null, Void.class).status();
     }
 
     @Override
     public int adminAddWhitelist(String twitchId) {
-        return client.call(HttpMethod.POST, "/api/admin/whitelist/add", Map.of("twitchId", twitchId), Void.class).status();
+        return client.call(HttpMethod.POST, "/api/internal/admin/whitelist/entries", Map.of("twitchId", twitchId), Void.class).status();
     }
 
     @Override
     public int adminDeleteWhitelist(String twitchId) {
-        return client.call(HttpMethod.POST, "/api/admin/whitelist/{id}/delete", null, Void.class, twitchId).status();
+        return client.delete("/api/internal/admin/whitelist/entries/{id}", twitchId);
     }
 
     @Override
     public int adminToggleInvites() {
-        return client.call(HttpMethod.POST, "/api/admin/whitelist/invite/toggle", null, Void.class).status();
+        return client.call(HttpMethod.POST, "/api/internal/admin/whitelist/invite/toggle", null, Void.class).status();
     }
 
     @Override
@@ -1003,7 +1003,7 @@ public class RealApiService implements ApiService {
         body.put("globalMaxMembers", globalMaxMembers);
         body.put("defaultMaxUses", defaultMaxUses);
         body.put("defaultCanReinvite", defaultCanReinvite);
-        return client.call(HttpMethod.POST, "/api/admin/whitelist/invite/settings", body, Void.class).status();
+        return client.call(HttpMethod.PUT, "/api/internal/admin/whitelist/invite/settings", body, Void.class).status();
     }
 
     @Override
@@ -1011,17 +1011,17 @@ public class RealApiService implements ApiService {
         Map<String, Object> body = new java.util.LinkedHashMap<>();
         body.put("maxUses", maxUses);
         body.put("canReinvite", canReinvite);
-        return client.call(HttpMethod.POST, "/api/admin/whitelist/invite/{id}/quota", body, Void.class, inviteId).status();
+        return client.call(HttpMethod.PUT, "/api/internal/admin/whitelist/invite/{inviteId}/quota", body, Void.class, inviteId).status();
     }
 
     @Override
     public AdminMemberSummaryDto adminMember(UUID id) {
-        return client.get("/api/admin/members/{id}", AdminMemberSummaryDto.class, id);
+        return client.get("/api/internal/admin/members/{id}", AdminMemberSummaryDto.class, id);
     }
 
     @Override
     public MemberTargetingDto adminMemberTargeting(UUID id) {
-        return client.get("/api/admin/members/{id}/targeting", MemberTargetingDto.class, id);
+        return client.get("/api/internal/admin/members/{id}/targeting", MemberTargetingDto.class, id);
     }
 
     @Override
@@ -1030,28 +1030,28 @@ public class RealApiService implements ApiService {
         Map<String, String> body = new java.util.LinkedHashMap<>();
         body.put("key", key);
         body.put("value", value);
-        return client.call(HttpMethod.POST, "/api/admin/members/{id}/flags", body, Void.class, id).status();
+        return client.call(HttpMethod.POST, "/api/internal/admin/members/{id}/flags", body, Void.class, id).status();
     }
 
     @Override
     public int adminDeleteMemberFlag(UUID id, String key) {
         // the key is a URI variable, so a "/", "%" or space in it is encoded rather than read as part of the path
-        return client.call(HttpMethod.POST, "/api/admin/members/{id}/flags/{key}/delete", null, Void.class, id, key).status();
+        return client.delete("/api/internal/admin/members/{id}/flags/{key}", id, key);
     }
 
     @Override
     public int adminAddMemberToGroup(UUID id, String groupKey) {
-        return client.call(HttpMethod.POST, "/api/admin/members/{id}/groups", Map.of("groupKey", groupKey), Void.class, id).status();
+        return client.call(HttpMethod.POST, "/api/internal/admin/members/{id}/groups", Map.of("groupKey", groupKey), Void.class, id).status();
     }
 
     @Override
     public int adminRemoveMemberFromGroup(UUID id, UUID groupId) {
-        return client.call(HttpMethod.POST, "/api/admin/members/{id}/groups/{groupId}/delete", null, Void.class, id, groupId).status();
+        return client.delete("/api/internal/admin/members/{id}/groups/{groupId}", id, groupId);
     }
 
     @Override
     public int adminBroadcast(BroadcastRequestDto body) {
-        return client.call(HttpMethod.POST, "/api/admin/broadcast", body, Void.class).status();
+        return client.call(HttpMethod.POST, "/api/internal/admin/broadcasts", body, Void.class).status();
     }
 
     @Override

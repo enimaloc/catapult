@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.common.dto.admin.FlagKeyDto;
 import fr.enimaloc.catapult.repository.account.UserFlagRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.transaction.annotation.Transactional;
+import fr.enimaloc.catapult.api.ApiPaths;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -15,7 +16,7 @@ import java.util.Map;
 
 /** The targeting tags members carry, for the admin page's override form to propose. */
 @RestController
-@RequestMapping("/api/admin/flags")
+@RequestMapping(ApiPaths.ADMIN + "/flags")
 @RequiredArgsConstructor
 public class ApiAdminFlagsController {
     private final UserFlagRepository flags;
