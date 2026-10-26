@@ -1,0 +1,9 @@
+{
+  "status" : 200,
+  "headers" : {
+    "Cache-Control" : [ "no-cache, no-store, max-age=0, must-revalidate" ],
+    "Content-Type" : [ "application/json" ],
+    "Vary" : [ "Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers" ]
+  },
+  "body" : "{\"name\":\"Frozen Game\",\"igdbUrl\":\"https://www.igdb.com/games/frozen-game\",\"sourceType\":\"MANUAL\",\"storeName\":\"Manual\",\"storeUrl\":null,\"description\":\"A game kept for the contract tests\",\"twitchGameId\":\"12345\",\"twitchGameName\":\"Frozen Game\",\"tws\":[\"tw.flashing-lights.label\"],\"twsJoined\":\"tw.flashing-lights.label\",\"ccls\":[\"violence\"],\"cclsJoined\":\"violence\",\"platforms\":[\"PC (Microsoft Windows)\"],\"platformsJoined\":\"PC (Microsoft Windows)\",\"rating\":80.5,\"aggregatedRating\":null,\"releaseDate\":\"2020-01-01T00:00:00Z\",\"version\":1}"
+}

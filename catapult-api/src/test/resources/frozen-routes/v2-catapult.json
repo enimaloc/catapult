@@ -1,0 +1,8 @@
+{
+  "status" : 200,
+  "headers" : {
+    "Cache-Control" : [ "no-cache, no-store, max-age=0, must-revalidate" ],
+    "Content-Type" : [ "application/json" ]
+  },
+  "body" : "{\"createdAt\":\"2026-10-26T03:02:14.080548Z\",\"updatedAt\":\"2026-10-26T03:02:14.080553Z\",\"sourceType\":\"MANUAL\",\"sourceId\":\"frozen-game\",\"sourceName\":\"Frozen Game\",\"twitchGameId\":\"12345\",\"twitchGameName\":\"Frozen Game\",\"ignored\":false,\"cclEnabled\":true,\"ccls\":[\"violence\"],\"twEnabled\":true,\"twOverride\":false,\"tws\":[\"flashing-lights\"],\"twLabels\":[\"tw.flashing-lights.label\"]}"
+}
