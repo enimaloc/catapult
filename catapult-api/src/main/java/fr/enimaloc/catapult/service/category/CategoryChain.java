@@ -333,7 +333,10 @@ public class CategoryChain {
         fallback.setSourceName(INCOMPLETE_FALLBACK_SOURCE);
         fallback.setTwitchGameId(settings.getIncompleteFallbackTwitchGameId());
         fallback.setTwitchGameName(settings.getIncompleteFallbackTwitchGameName());
+        // Like the no-game fallback and the reset: CCLs are sent only when some are configured, otherwise the
+        // channel's CCLs are left as they are
         fallback.getCcls().addAll(settings.getIncompleteFallbackCcls());
+        fallback.setCclEnabled(!settings.getIncompleteFallbackCcls().isEmpty());
         fallback.setStatus(GameBinding.Status.MANUAL);
 
         if (streamStateService.isLive(user)) {
