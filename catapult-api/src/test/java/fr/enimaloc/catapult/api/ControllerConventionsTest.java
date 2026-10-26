@@ -1,0 +1,358 @@
+package fr.enimaloc.catapult.api;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import fr.enimaloc.catapult.getter.dtdd.DtddApiClient;
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.service.debug.DebugRecording;
+import jakarta.persistence.EntityManager;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.beans.factory.config.BeanDefinition;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
+import org.springframework.core.annotation.MergedAnnotations;
+import org.springframework.core.type.classreading.MetadataReader;
+import org.springframework.core.type.filter.AnnotationTypeFilter;
+import org.springframework.data.repository.Repository;
+import org.springframework.stereotype.Controller;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestTemplate;
+
+/**
+ * Controller conventions: a controller resolves the caller, validates the request and shapes the response; it holds no
+ * repository, entity manager, outbound client, event publisher or debug recorder, opens no transaction and does not
+ * scope debug attribution. {@link #LEGACY} lists the controllers not yet thinned; it can only shrink.
+ */
+class ControllerConventionsTest {
+
+  private static final Path SOURCES = Path.of("src/main/java");
+
+  /** Today's violations, to be emptied by moving the code into services. */
+  static final Set<String> LEGACY =
+      Set.of(
+          "ApiAdminCacheController depends on ChatCommandDefinitionRepository",
+          "ApiAdminCacheController depends on IgdbGameCclRepository",
+          "ApiAdminCacheController depends on IgdbGameDetailsRepository",
+          "ApiAdminCacheController depends on TwDefinitionRepository",
+          "ApiAdminCacheController depends on UserAccountRepository",
+          "ApiAdminConfigController depends on ConfigAuditRepository",
+          "ApiAdminConfigController depends on ConfigOverrideRepository",
+          "ApiAdminDataController depends on EntityManager",
+          "ApiAdminDataController#entityDetail is @Transactional",
+          "ApiAdminDataController#entityList is @Transactional",
+          "ApiAdminDtddKeysController depends on DtddApiKeyRepository",
+          "ApiAdminDtddMappingController depends on DtddGameMappingRepository",
+          "ApiAdminDtddMappingController depends on DtddMappingProposalRepository",
+          "ApiAdminDtddMappingController depends on DtddTopicsCacheRepository",
+          "ApiAdminDtddMappingController#approve is @Transactional",
+          "ApiAdminDtddMappingController#pending is @Transactional",
+          "ApiAdminDtddMappingController#reject is @Transactional",
+          "ApiAdminExperimentsController depends on ApplicationEventPublisher",
+          "ApiAdminExperimentsController depends on ExperimentAssignmentRepository",
+          "ApiAdminExperimentsController depends on ExperimentAssignmentRuleRepository",
+          "ApiAdminExperimentsController depends on ExperimentEventRepository",
+          "ApiAdminExperimentsController depends on ExperimentFeedbackRepository",
+          "ApiAdminExperimentsController depends on ExperimentOverrideRepository",
+          "ApiAdminExperimentsController depends on ExperimentRepository",
+          "ApiAdminExperimentsController depends on ExperimentVariantRepository",
+          "ApiAdminExperimentsController depends on UserAccountRepository",
+          "ApiAdminExperimentsController#assignments is @Transactional",
+          "ApiAdminExperimentsController#detail is @Transactional",
+          "ApiAdminExperimentsController#list is @Transactional",
+          "ApiAdminExperimentsController#moveAssignment is @Transactional",
+          "ApiAdminExperimentsController#previewWeights is @Transactional",
+          "ApiAdminExperimentsController#settings is @Transactional",
+          "ApiAdminExperimentsController#updateWeights is @Transactional",
+          "ApiAdminFlagsController depends on UserFlagRepository",
+          "ApiAdminFlagsController#list is @Transactional",
+          "ApiAdminGroupsController depends on UserAccountRepository",
+          "ApiAdminGroupsController depends on UserGroupRepository",
+          "ApiAdminGroupsController#addMember is @Transactional",
+          "ApiAdminGroupsController#list is @Transactional",
+          "ApiAdminGroupsController#removeMember is @Transactional",
+          "ApiAdminGroupsController#rename is @Transactional",
+          "ApiAdminImpersonateController depends on UserAccountRepository",
+          "ApiAdminInviteController depends on UserAccountRepository",
+          "ApiAdminMemberDebugController depends on DebugExchangeRepository",
+          "ApiAdminMemberDebugController depends on UserAccountRepository",
+          "ApiAdminMembersController depends on UserAccountRepository",
+          "ApiAdminMembersController depends on UserFlagRepository",
+          "ApiAdminMembersController depends on UserGroupRepository",
+          "ApiAdminMembersController#addToGroup is @Transactional",
+          "ApiAdminMembersController#promoteToSystem is @Transactional",
+          "ApiAdminMembersController#removeFromGroup is @Transactional",
+          "ApiAdminMembersController#targeting is @Transactional",
+          "ApiAdminMinecraftAccountsController depends on MinecraftFriendLinkRepository",
+          "ApiAdminMinecraftAccountsController depends on MinecraftServiceAccountRepository",
+          "ApiAdminMinecraftAccountsController depends on MsaAuthClient",
+          "ApiAdminNotificationsController depends on ChatCommandDefinitionRepository",
+          "ApiAdminNotificationsController depends on ExperimentAssignmentRepository",
+          "ApiAdminNotificationsController depends on ExperimentRepository",
+          "ApiAdminNotificationsController depends on ExperimentVariantRepository",
+          "ApiAdminNotificationsController depends on NotificationRepository",
+          "ApiAdminProviderGitLabController depends on RestClient",
+          "ApiAdminProviderIgdbController depends on RestClient",
+          "ApiAdminProviderMinecraftController depends on MinecraftServiceAccountRepository",
+          "ApiAdminProviderMinecraftController depends on RestClient",
+          "ApiAdminProviderSteamController depends on RestClient",
+          "ApiAdminProviderTwitchController depends on OAuthTokenRepository",
+          "ApiAdminProviderTwitchController depends on RestClient",
+          "ApiAdminProviderTwitchController depends on UserAccountRepository",
+          "ApiAdminProviderXboxController depends on RestClient",
+          "ApiAdminProviderXboxController depends on UserAccountRepository",
+          "ApiAdminSteamKeysController depends on SteamApiKeyRepository",
+          "ApiAdminWhitelistController depends on UserAccountRepository",
+          "ApiAdminWhitelistController#page is @Transactional",
+          "ApiChannelAccessController depends on UserAccountRepository",
+          "ApiChannelActionsController calls DebugContext",
+          "ApiChannelActionsController depends on SteamApiKeyRepository",
+          "ApiChannelActionsController depends on UserAccountRepository",
+          "ApiChannelActionsController depends on UserSettingsRepository",
+          "ApiChannelActionsController#deleteSteamPersonalToken is @Transactional",
+          "ApiChannelDtddMappingController depends on DtddApiClient",
+          "ApiChannelDtddMappingController depends on DtddGameCacheRepository",
+          "ApiChannelDtddMappingController depends on DtddGameMappingRepository",
+          "ApiChannelDtddMappingController depends on DtddMappingProposalRepository",
+          "ApiChannelDtddMappingController depends on DtddSearchCacheRepository",
+          "ApiChannelDtddMappingController#propose is @Transactional",
+          "ApiChannelDtddMappingController#validate is @Transactional",
+          "ApiChatCommandDslController depends on ChatCommandSettingRepository",
+          "ApiChatCommandDslController depends on TwDefinitionRepository",
+          "ApiChatCommandDslController depends on UserAccountRepository",
+          "ApiChatCommandSettingsController depends on ChatCommandSettingRepository",
+          "ApiChatCommandTestController depends on ChatCommandDefinitionRepository",
+          "ApiChatCommandTestController depends on ChatCommandSettingRepository",
+          "ApiChatCommandsController depends on ApplicationEventPublisher",
+          "ApiChatCommandsController depends on ChatCommandDefinitionRepository",
+          "ApiChatCommandsController depends on OAuthTokenRepository",
+          "ApiChatCommandsController#create is @Transactional",
+          "ApiChatCommandsController#delete is @Transactional",
+          "ApiChatCommandsController#instantiatePreset is @Transactional",
+          "ApiChatCommandsController#list is @Transactional",
+          "ApiChatCommandsController#update is @Transactional",
+          "ApiDevIgdbController depends on RestClient",
+          "ApiExperimentFeedbackController depends on ExperimentAssignmentRepository",
+          "ApiExperimentFeedbackController depends on ExperimentFeedbackRepository",
+          "ApiExperimentFeedbackController depends on ExperimentRepository",
+          "ApiFeedbackController depends on FeedbackSubmissionRepository",
+          "ApiFeedbackController depends on GitLabClient",
+          "ApiHelpController depends on UserAccountRepository",
+          "ApiMinecraftConnectController depends on UserAccountRepository",
+          "ApiSeenFeaturesController depends on SeenFeatureRepository",
+          "ApiSeenFeaturesController#markSeen is @Transactional",
+          "ApiSteamConnectController calls DebugContext",
+          "ApiSteamConnectController depends on ApplicationEventPublisher",
+          "ApiSteamConnectController depends on DebugRecording",
+          "ApiSteamConnectController depends on RestClient",
+          "ApiSteamConnectController depends on UserAccountRepository",
+          "ApiTwitchatWidgetController depends on TwitchatWidgetSettingsRepository",
+          "ApiUserExperimentsController#getVariant is @Transactional",
+          "ApiUsersController depends on UserAccountRepository",
+          "CustomBindingsApiV2Controller depends on UserAccountRepository",
+          "UserApiV1Controller depends on GameBindingRepository",
+          "UserApiV2Controller depends on DtddApiClient",
+          "UserApiV2Controller depends on GameBindingRepository",
+          "UserApiV2Controller depends on TwDtddTopicMappingRepository");
+
+  @Test
+  void controllersFollowTheConventions() throws Exception {
+    Set<String> violations = new TreeSet<>();
+    for (Class<?> controller : controllers()) {
+      violations.addAll(violations(controller, SOURCES));
+    }
+    violations.removeAll(LEGACY);
+    assertThat(violations).isEmpty();
+  }
+
+  @Test
+  void legacyOnlyListsRealViolations() throws Exception {
+    Set<String> violations = new TreeSet<>();
+    for (Class<?> controller : controllers()) {
+      violations.addAll(violations(controller, SOURCES));
+    }
+    Set<String> stale = new TreeSet<>(LEGACY);
+    stale.removeAll(violations);
+    assertThat(stale).isEmpty();
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      classes = {
+        WithRepository.class,
+        WithOptionalClient.class,
+        WithTransaction.class,
+        WithEventPublisher.class
+      })
+  void theRulesCatchWhatTheyName(Class<?> fixture) {
+    assertThat(violations(fixture, SOURCES)).hasSize(1);
+  }
+
+  @Test
+  void aThinControllerPasses() {
+    assertThat(violations(Thin.class, SOURCES)).isEmpty();
+  }
+
+  /** The violations of one controller, formatted as {@link #LEGACY} entries. */
+  static Set<String> violations(Class<?> controller, Path sources) {
+    String name = controller.getSimpleName();
+    Set<String> found = new TreeSet<>();
+    for (Type type : injectedTypes(controller)) {
+      Class<?> raw = rawClass(unwrap(type));
+      if (raw != null && isForbidden(raw)) {
+        found.add(name + " depends on " + raw.getSimpleName());
+      }
+    }
+    if (MergedAnnotations.from(controller).isPresent(Transactional.class)
+        || MergedAnnotations.from(controller).isPresent(jakarta.transaction.Transactional.class)) {
+      found.add(name + " is @Transactional");
+    }
+    for (Method method : controller.getDeclaredMethods()) {
+      if (MergedAnnotations.from(method).isPresent(Transactional.class)
+          || MergedAnnotations.from(method).isPresent(jakarta.transaction.Transactional.class)) {
+        found.add(name + "#" + method.getName() + " is @Transactional");
+      }
+    }
+    if (source(controller, sources).contains("DebugContext.")) {
+      found.add(name + " calls DebugContext");
+    }
+    return found;
+  }
+
+  private static List<Type> injectedTypes(Class<?> controller) {
+    List<Type> types = new ArrayList<>();
+    for (var field : controller.getDeclaredFields()) {
+      types.add(field.getGenericType());
+    }
+    for (Constructor<?> constructor : controller.getDeclaredConstructors()) {
+      for (var parameter : constructor.getParameters()) {
+        types.add(parameter.getParameterizedType());
+      }
+    }
+    return types;
+  }
+
+  /** {@code Optional<T>} and {@code List<T>} stand for their element. */
+  private static Type unwrap(Type type) {
+    if (type instanceof ParameterizedType parameterized
+        && (parameterized.getRawType() == Optional.class || parameterized.getRawType() == List.class)) {
+      return unwrap(parameterized.getActualTypeArguments()[0]);
+    }
+    return type;
+  }
+
+  private static Class<?> rawClass(Type type) {
+    if (type instanceof Class<?> clazz) {
+      return clazz;
+    }
+    if (type instanceof ParameterizedType parameterized && parameterized.getRawType() instanceof Class<?> clazz) {
+      return clazz;
+    }
+    return null;
+  }
+
+  private static boolean isForbidden(Class<?> type) {
+    return Repository.class.isAssignableFrom(type)
+        || type == EntityManager.class
+        || type == RestClient.class
+        || type.getName().equals("org.springframework.web.reactive.function.client.WebClient")
+        || type == RestTemplate.class
+        || type == ApplicationEventPublisher.class
+        || type == DebugRecording.class
+        || (type.getName().startsWith("fr.enimaloc.catapult.") && type.getSimpleName().endsWith("Client"));
+  }
+
+  private static String source(Class<?> controller, Path sources) {
+    Class<?> top = controller;
+    while (top.getEnclosingClass() != null) {
+      top = top.getEnclosingClass();
+    }
+    Path file = sources.resolve(top.getName().replace('.', '/') + ".java");
+    if (!Files.exists(file)) {
+      return "";
+    }
+    try {
+      return Files.readString(file);
+    } catch (IOException e) {
+      throw new IllegalStateException(file.toString(), e);
+    }
+  }
+
+  private static List<Class<?>> controllers() throws ClassNotFoundException {
+    // @Conditional* is not evaluated: a controller behind a disabled property is still a controller.
+    AnnotationTypeFilter filter = new AnnotationTypeFilter(Controller.class);
+    ClassPathScanningCandidateComponentProvider scanner =
+        new ClassPathScanningCandidateComponentProvider(false) {
+          @Override
+          protected boolean isCandidateComponent(MetadataReader reader) throws IOException {
+            return filter.match(reader, getMetadataReaderFactory());
+          }
+        };
+    List<Class<?>> controllers = new ArrayList<>();
+    for (BeanDefinition definition : scanner.findCandidateComponents("fr.enimaloc.catapult")) {
+      if (!definition.getBeanClassName().contains("ControllerConventionsTest$")) {
+        controllers.add(Class.forName(definition.getBeanClassName()));
+      }
+    }
+    return controllers;
+  }
+
+  @RestController
+  static class WithRepository {
+    private final UserAccountRepository r;
+
+    WithRepository(UserAccountRepository r) {
+      this.r = r;
+    }
+  }
+
+  @RestController
+  static class WithOptionalClient {
+    private final Optional<DtddApiClient> client;
+
+    WithOptionalClient(Optional<DtddApiClient> client) {
+      this.client = client;
+    }
+  }
+
+  @RestController
+  static class WithTransaction {
+    @Transactional
+    void write() {}
+  }
+
+  @RestController
+  static class WithEventPublisher {
+    private final ApplicationEventPublisher events;
+
+    WithEventPublisher(ApplicationEventPublisher events) {
+      this.events = events;
+    }
+  }
+
+  @RestController
+  static class Thin {
+    private final ApiUserResolver resolver;
+    private final Object service;
+
+    Thin(ApiUserResolver resolver, Object service) {
+      this.resolver = resolver;
+      this.service = service;
+    }
+  }
+}
