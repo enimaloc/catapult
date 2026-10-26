@@ -62,11 +62,11 @@ public sealed interface CategoryTrigger {
     record RevertCategory(String twitchGameId, String twitchGameName) implements CategoryTrigger {}
 
     /**
-     * The no-game settings were saved: the default category applies at once when no game is detected and no custom
-     * binding is active. No live check, no {@code applyDefaultOnNoGame} and no raid hold: the streamer just asked
-     * for it.
+     * The no-game settings were saved: the default category applies at once when the "no game" fallback would apply
+     * now: no game detected, no custom binding active, live, {@code applyDefaultOnNoGame} on (the value just saved)
+     * and no raid hold. Otherwise the settings are only saved.
      */
-    record NoGameSettingsSaved() implements CategoryTrigger {}
+    record NoGameSettingsSaved(boolean applyDefaultOnNoGame) implements CategoryTrigger {}
 
     /**
      * The channel raided out: the game detected within the streamer's delay put back, unless the channel is already

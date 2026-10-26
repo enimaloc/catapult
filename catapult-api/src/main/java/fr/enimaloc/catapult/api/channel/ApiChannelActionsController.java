@@ -334,11 +334,11 @@ public class ApiChannelActionsController {
             s.setApplyDefaultOnNoGame(body.applyOnNoGame());
             s.setApplyDefaultOnStreamEnd(body.applyOnStreamEnd());
         });
-        // Nothing detected right now: the new default category applies immediately, unless a custom binding holds
-        // the channel
+        // The new default category applies immediately when the "no game" fallback would apply now (nothing
+        // detected, no custom binding, live, enabled, no raid hold); otherwise the settings are only saved
         // Recorded in the channel's debug log, whoever saves the settings (a moderator, an admin)
         DebugContext.runAs(channelUser.getId(),
-                () -> categoryChain.apply(channelUser, new NoGameSettingsSaved()).orThrow());
+                () -> categoryChain.apply(channelUser, new NoGameSettingsSaved(settings.isApplyDefaultOnNoGame())).orThrow());
         publishSettings(channelUser, settings);
     }
 
