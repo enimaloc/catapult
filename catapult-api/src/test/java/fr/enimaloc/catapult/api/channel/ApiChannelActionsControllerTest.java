@@ -12,6 +12,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpMethod;
@@ -26,6 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -192,6 +194,21 @@ class ApiChannelActionsControllerTest extends ApiChannelActionsTestSupport {
         }
 
         @Test
+        void noGame_savesThenAppliesThenPublishes() throws Exception {
+            when(streamStateService.isLive(owner)).thenReturn(true);
+
+            mvc.perform(as(owner, HttpMethod.PUT, "/settings/no-game", """
+                            {"twitchGameId":"1","twitchGameName":"Just Chatting","ccls":null,
+                             "applyOnStreamStart":false,"applyOnNoGame":true,"applyOnStreamEnd":false}"""))
+                    .andExpect(status().isNoContent());
+
+            InOrder order = inOrder(userSettingsRepository, twitchService, channelEventPublisher);
+            order.verify(userSettingsRepository).save(any(UserSettings.class));
+            order.verify(twitchService).resetToDefault(owner);
+            order.verify(channelEventPublisher).settingsUpdated(eq(owner.getId()), any(UserSettings.class));
+        }
+
+        @Test
         void noGame_applyOnNoGameOff_onlySaves() throws Exception {
             when(streamStateService.isLive(owner)).thenReturn(true);
 
@@ -261,6 +278,17 @@ class ApiChannelActionsControllerTest extends ApiChannelActionsTestSupport {
                     .andExpect(status().isForbidden())
                     .andExpect(jsonPath("$.code").value("feature_disabled"))
                     .andExpect(jsonPath("$.detail").value("Raid settings not available for this channel"));
+            verify(userSettingsRepository, never()).save(any());
+        }
+
+        @Test
+        void raid_closedGateBeatsAnInvalidDelay() throws Exception {
+            when(raidRestoreGate.isAvailableFor(owner)).thenReturn(false);
+
+            mvc.perform(as(owner, HttpMethod.PUT, "/settings/raid", "{\"restoreGameMinutes\":500}"))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("feature_disabled"));
+
             verify(userSettingsRepository, never()).save(any());
         }
 
