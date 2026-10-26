@@ -55,12 +55,12 @@ JWT_SECRET="perf-$(random_secret)"
 export POSTGRES_PASSWORD TOKEN_ENCRYPTION_KEY JWT_SECRET
 
 COMPOSE=(docker compose -p "${PROJECT}" -f "${PERF_DIR}/compose.yml")
-SENTRY_HOST=""
-if [[ -n "${API_SENTRY_DSN}" ]]; then
-    COMPOSE+=(-f "${PERF_DIR}/compose.sentry.yml")
-    # https://key@host/project -> host
-    SENTRY_HOST="$(sed -E 's#^[a-z]+://([^@/]*@)?([^:/]+).*#\2#' <<<"${API_SENTRY_DSN}")"
-fi
+[[ -n "${API_SENTRY_DSN}" ]] && COMPOSE+=(-f "${PERF_DIR}/compose.sentry.yml")
+# The Sentry hosts of both DSNs (https://key@host/project -> host), the outbound scan's allowed ones
+SENTRY_HOSTS=()
+for dsn in "${API_SENTRY_DSN}" "${SENTRY_DSN}"; do
+    [[ -n "${dsn}" ]] && SENTRY_HOSTS+=("$(sed -E 's#^[a-z]+://([^@/]*@)?([^:/]+).*#\2#' <<<"${dsn}")")
+done
 
 REPORT_DIR="${PERF_DIR}/reports/$(date +%Y%m%d-%H%M%S)"
 export REPORT_DIR
@@ -71,12 +71,18 @@ mkdir -p "${REPORT_DIR}"
 # (not to its process group) is handled at once instead of after the command ends.
 child=""
 cleaned=0
+started=0
+scanned=0
 cleanup() {
     [[ "${cleaned}" == 1 ]] && return
     cleaned=1
     if [[ -n "${child}" ]] && kill -0 "${child}" 2>/dev/null; then
         kill "${child}" 2>/dev/null || true
         wait "${child}" 2>/dev/null || true
+    fi
+    # A run that failed or was interrupted keeps its logs: they say why
+    if [[ "${started}" == 1 && "${scanned}" == 0 && -d "${REPORT_DIR:-}" ]]; then
+        scan_outbound || true
     fi
     echo "Removing the ${PROJECT} stack"
     "${COMPOSE[@]}" down -v --remove-orphans >/dev/null 2>&1 \
@@ -102,18 +108,19 @@ run() {
 # ── Stack ────────────────────────────────────────────────────────────────
 start_stack() {
     echo "Building the images"
-    local started=${SECONDS}
+    local build_at=${SECONDS}
     run "${COMPOSE[@]}" build
-    echo "Built in $((SECONDS - started)) s"
+    echo "Built in $((SECONDS - build_at)) s"
     echo "Starting the ${PROJECT} stack (web on ${BASE_URL})"
-    started=${SECONDS}
+    started=1
+    local up_at=${SECONDS}
     run "${COMPOSE[@]}" up -d --wait
-    echo "Healthy in $((SECONDS - started)) s"
+    echo "Healthy in $((SECONDS - up_at)) s"
 }
 
 check_login() {
     local answer status location
-    answer="$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' \
+    answer="$(curl -s --max-time 10 -o /dev/null -w '%{http_code} %{redirect_url}' \
         "${BASE_URL}/perf/login?username=perf-streamer-001")"
     status="${answer%% *}"
     location="${answer#* }"
@@ -130,14 +137,57 @@ settle() {
 }
 
 # ── Outbound traffic ─────────────────────────────────────────────────────
-# A connection error towards any host but the stack's own (db, redis, api, the loopback; the Sentry host
-# when a DSN is set) means some client was not faked and tried the internet: the internal network refused it.
+# A connection error towards any host but the stack's own (db, redis, api, web, the loopback, the
+# perf-internal subnet; the Sentry hosts when a DSN is set) means some client was not faked and tried the
+# internet. api has no route out, so its attempts fail and show here; web has one (edge, for its published
+# port), so a non-faked web client that succeeds leaves no trace: the scan only catches failures.
+readonly OUTBOUND_ERRORS='UnknownHostException|UnresolvedAddressException|Failed to resolve|ConnectException'\
+'|ConnectTimeoutException|Connection refused|Network is unreachable|No route to host'\
+'|SocketTimeoutException|connect timed out'
+
+is_stack_host() {
+    case "$1" in
+        db | redis | api | web | localhost | 127.0.0.1 | 10.251.251.*) return 0 ;;
+    esac
+    local sentry
+    for sentry in "${SENTRY_HOSTS[@]+"${SENTRY_HOSTS[@]}"}"; do
+        if [[ "$1" == "${sentry}" ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+# The hosts a log line names: after "UnknownHostException:" or "Failed to resolve", in a URL, or as
+# host:port (host/1.2.3.4:port counts as host). The service prefix and the timestamp are left out first.
+line_hosts() {
+    sed -E -e 's/^[a-z]+-[0-9]+ +\| //' -e 's/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z?//' \
+        -e 's#([A-Za-z][A-Za-z0-9.-]*)/[0-9.]+:([0-9]+)#\1:\2#g' <<<"$1" \
+        | grep -oE "UnknownHostException: [A-Za-z0-9.-]+|Failed to resolve '[^']+'|://[A-Za-z0-9.-]+\
+|(^|[^A-Za-z0-9._-])[A-Za-z0-9][A-Za-z0-9.-]*:[0-9]+" \
+        | sed -E -e 's/^UnknownHostException: //' -e "s/^Failed to resolve '([^']+)'/\1/" \
+            -e 's#^://##' -e 's/^[^A-Za-z0-9]//' -e 's/:[0-9]+$//'
+}
+
+# A line is kept unless every host it names is the stack's own; a line naming no host is kept too.
 scan_outbound() {
-    "${COMPOSE[@]}" logs --no-color api web >"${REPORT_DIR}/logs.txt" 2>&1 || true
-    local allowed='db|redis|api|127\.0\.0\.1|localhost'
-    [[ -n "${SENTRY_HOST}" ]] && allowed="${allowed}|${SENTRY_HOST//./\\.}"
-    grep -E 'UnknownHostException|ConnectException|Connection refused' "${REPORT_DIR}/logs.txt" \
-        | grep -vE "(^|[^A-Za-z0-9.-])(${allowed})([:/ ]|$)" >"${REPORT_DIR}/outbound.txt" || true
+    scanned=1
+    "${COMPOSE[@]}" logs --no-color >"${REPORT_DIR}/logs.txt" 2>&1 || true
+    : >"${REPORT_DIR}/outbound.txt"
+    local line host hosts outside
+    while IFS= read -r line; do
+        hosts="$(line_hosts "${line}" || true)"
+        outside=1
+        if [[ -n "${hosts}" ]]; then
+            outside=0
+            while IFS= read -r host; do
+                is_stack_host "${host}" || outside=1
+            done <<<"${hosts}"
+        fi
+        if [[ "${outside}" == 1 ]]; then
+            printf '%s\n' "${line}" >>"${REPORT_DIR}/outbound.txt"
+        fi
+    done < <(grep -E "${OUTBOUND_ERRORS}" "${REPORT_DIR}/logs.txt" || true)
     if [[ -s "${REPORT_DIR}/outbound.txt" ]]; then
         echo "Outbound traffic: $(wc -l <"${REPORT_DIR}/outbound.txt") line(s), see ${REPORT_DIR}/outbound.txt"
     else

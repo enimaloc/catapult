@@ -6,8 +6,9 @@ Times catapult on a throwaway stack (`perf/compose.yml`): page timings in a head
 `catapult-verify-perf`, and always removed at the end, Ctrl-C included.
 
 It shares nothing with `docker-compose.yml`: no container name, named volume or network in common,
-and the only published port is the site's, on `127.0.0.1`. catapult-api, Postgres and Redis sit on an
-internal network with no route to the internet.
+and the only published port is the site's, on `127.0.0.1`. catapult-api, Postgres and Redis sit only on
+an internal network (`perf-internal`, `10.251.251.0/24`) with no route to the internet. catapult-web
+is also on `edge`, for its published port, and so does have a route out.
 
 ## Prerequisites
 
@@ -59,15 +60,24 @@ Each run writes `perf/reports/<timestamp>/` (ignored by git):
 
 | File                | Content                                                              |
 |---------------------|----------------------------------------------------------------------|
-| `logs.txt`          | catapult-api and catapult-web logs                                   |
+| `logs.txt`          | the stack's logs, kept also when the run fails or is interrupted     |
 | `outbound.txt`      | connection errors towards a host outside the stack (should be empty) |
 | `pages.json`        | page timings (Playwright)                                            |
 | `k6-summary.json`   | k6 summary of the load run                                           |
 | `docker-stats.csv`  | CPU and memory of each container during the load run                 |
 | `report.md`, `.json`| the report, with its "Outbound traffic" section                      |
 
-A line in `outbound.txt` means a client that is not faked tried to reach the internet: the internal
-network refused it, but the timings around it may include its timeout.
+`outbound.txt` lists the log lines with a connection error (unknown host, refused, unreachable,
+timed out) towards a host outside the stack, or naming no host at all: some client is not faked.
+The stack's own hosts are `db`, `redis`, `api`, `web`, `localhost`, `127.0.0.1`, `10.251.251.*` and
+the Sentry hosts of the DSNs. Only failures show: catapult-api has no route out, so its attempts
+always fail (and the timings around them may include the timeout), but catapult-web has one, so a
+web client that is not faked and reaches the internet succeeds silently and leaves no line here.
+
+catapult-api trusts the `X-Forwarded-*` headers of `perf-internal` (`API_TRUSTED_PROXIES`), as it
+trusts catapult-web's network in production: the links it builds point at the site, and on the
+requests catapult-web relays (`ApiRelayController`) the client address is the viewer's. The subnet is fixed for that; if it clashes with
+a network of yours, change it in `perf/compose.yml` together with `API_TRUSTED_PROXIES`.
 
 ## Cleaning up by hand
 
