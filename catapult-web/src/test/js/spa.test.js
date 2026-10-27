@@ -153,6 +153,131 @@ describe("navigate", () => {
     });
 });
 
+describe("the pages kept", () => {
+    let now;
+
+    beforeEach(() => {
+        now = 1_000_000;
+        vi.spyOn(Date, "now").mockImplementation(() => now);
+    });
+
+    afterEach(() => vi.restoreAllMocks());
+
+    /** A fetch answered only when `answer` is called, to see what shows meanwhile. */
+    function heldFetch(body) {
+        let answer;
+        fetchMock.mockImplementationOnce(() => new Promise(resolve => { answer = () => resolve(response(200, body)); }));
+        return () => answer();
+    }
+
+    it("shows a page just fetched again without asking the server", async () => {
+        await CatapultSpa.navigate("privacy");
+        await CatapultSpa.navigate("");
+        now += 5_000;
+
+        await CatapultSpa.navigate("privacy");
+
+        expect(fetchMock.mock.calls.filter(([url]) => url === "/spa/privacy")).toHaveLength(1);
+        expect(location.pathname).toBe("/privacy");
+    });
+
+    it("shows an older page at once, then the server's when it differs", async () => {
+        await CatapultSpa.navigate("privacy");
+        await CatapultSpa.navigate("");
+        now += 60_000;
+        const answer = heldFetch("<p>newer</p>");
+        const rendered = vi.fn();
+        document.addEventListener("catapult:render", rendered);
+
+        const navigation = CatapultSpa.navigate("privacy");
+        await flush();
+        expect(document.getElementById("app").innerHTML).toBe("<p>page</p>");
+        expect(document.getElementById("nav-progress").hidden).toBe(true);
+
+        answer();
+        await navigation;
+        expect(document.getElementById("app").innerHTML).toBe("<p>newer</p>");
+        expect(rendered).toHaveBeenCalledTimes(2);
+        document.removeEventListener("catapult:render", rendered);
+    });
+
+    it("renders once when the server's page is the same", async () => {
+        await CatapultSpa.navigate("privacy");
+        now += 60_000;
+        const rendered = vi.fn();
+        document.addEventListener("catapult:render", rendered);
+
+        await CatapultSpa.navigate("privacy");
+
+        expect(rendered).toHaveBeenCalledOnce();
+        document.removeEventListener("catapult:render", rendered);
+    });
+
+    it("leaves the older page to a member typing in it", async () => {
+        fetchMock.mockImplementationOnce(async () => response(200, "<input id='field'>"));
+        await CatapultSpa.navigate("privacy");
+        now += 60_000;
+        const answer = heldFetch("<p>newer</p>");
+
+        const navigation = CatapultSpa.navigate("privacy");
+        await flush();
+        document.getElementById("field").focus();
+        answer();
+        await navigation;
+
+        expect(document.getElementById("field")).not.toBeNull();
+    });
+
+    it("forgets them all after an action", async () => {
+        await CatapultSpa.navigate("privacy");
+
+        CatapultSpa.forget();
+        await CatapultSpa.navigate("privacy");
+
+        expect(fetchMock.mock.calls.filter(([url]) => url === "/spa/privacy")).toHaveLength(2);
+    });
+
+    it("never keeps a page fetched before an action", async () => {
+        const answer = heldFetch("<p>before</p>");
+        const navigation = CatapultSpa.navigate("privacy");
+        await flush();
+
+        CatapultSpa.forget();
+        answer();
+        await navigation;
+        await CatapultSpa.navigate("privacy");
+
+        expect(fetchMock.mock.calls.filter(([url]) => url === "/spa/privacy")).toHaveLength(2);
+    });
+
+    it("never keeps an error or a redirection", async () => {
+        fetchMock.mockImplementationOnce(async () => response(404, "<p>gone</p>"));
+        await CatapultSpa.navigate("privacy");
+        fetchMock.mockImplementationOnce(async () => ({ ...response(200, "<p>login</p>"), redirected: true }));
+        await CatapultSpa.navigate("privacy");
+
+        await CatapultSpa.navigate("privacy");
+
+        expect(fetchMock.mock.calls.filter(([url]) => url === "/spa/privacy")).toHaveLength(3);
+    });
+
+    it("asks the server first when told to", async () => {
+        await CatapultSpa.navigate("privacy");
+
+        await CatapultSpa.navigate("privacy", false, "", { fresh: true });
+
+        expect(fetchMock.mock.calls.filter(([url]) => url === "/spa/privacy")).toHaveLength(2);
+    });
+
+    it("keeps a page per query string", async () => {
+        await CatapultSpa.navigate("channel/a", true, "?page=1");
+
+        await CatapultSpa.navigate("channel/a", true, "?page=2");
+
+        expect(fetchMock).toHaveBeenCalledWith("/spa/channel/a?page=2");
+    });
+});
+
 describe("the navbar's channels", () => {
     const NAV = '<a id="c1" data-link class="nav-channel" href="/channel/enimaloc">e</a>'
         + '<a id="c2" data-link class="nav-channel" href="/channel/other">o</a>';

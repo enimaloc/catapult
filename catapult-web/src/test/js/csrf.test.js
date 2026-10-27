@@ -49,4 +49,14 @@ describe("postJson", () => {
         expect(options.headers["X-XSRF-TOKEN"]).toBe("");
         expect(options.body).toBe("{}");
     });
+
+    it("drops the pages the router kept once done, even when it failed", async () => {
+        window.CatapultSpa = { forget: vi.fn() };
+        vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("offline"); }));
+
+        await expect(CatapultCsrf.postJson("/x")).rejects.toThrow("offline");
+
+        expect(CatapultSpa.forget).toHaveBeenCalledOnce();
+        delete window.CatapultSpa;
+    });
 });

@@ -182,7 +182,7 @@ describe("refresh", () => {
         await vi.advanceTimersByTimeAsync(200);
 
         expect(CatapultSpa.navigate).toHaveBeenCalledTimes(1);
-        expect(CatapultSpa.navigate).toHaveBeenCalledWith("channel/enimaloc/dock", false, "");
+        expect(CatapultSpa.navigate).toHaveBeenCalledWith("channel/enimaloc/dock", false, "", { fresh: true });
         expect(scrollTo).toHaveBeenCalledWith({ top: 240, behavior: "instant" });
 
         CatapultDock.refresh();

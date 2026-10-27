@@ -171,7 +171,7 @@ describe("events the page catches up on", () => {
         CatapultDtdd.apply.mockReturnValue(false);
         current().emit("DtddMappingChangedEvent", { username: "enimaloc" });
         await flush();
-        expect(CatapultSpa.navigate).toHaveBeenCalledWith("channel/enimaloc", false, "");
+        expect(CatapultSpa.navigate).toHaveBeenCalledWith("channel/enimaloc", false, "", { fresh: true });
         delete window.CatapultDtdd;
     });
 
@@ -199,7 +199,7 @@ describe("events the page catches up on", () => {
         CatapultCustomBindings.apply.mockReturnValue(false);
         current().emit("CustomBindingsUpdatedEvent", { username: "enimaloc" });
         await flush();
-        expect(CatapultSpa.navigate).toHaveBeenCalledWith("channel/enimaloc", false, "");
+        expect(CatapultSpa.navigate).toHaveBeenCalledWith("channel/enimaloc", false, "", { fresh: true });
         delete window.CatapultCustomBindings;
     });
 
@@ -583,7 +583,7 @@ describe("catching up on the channel's state", () => {
         reopen();
         await flush();
 
-        expect(CatapultSpa.navigate).toHaveBeenCalledWith("channel/enimaloc", false, "");
+        expect(CatapultSpa.navigate).toHaveBeenCalledWith("channel/enimaloc", false, "", { fresh: true });
         expect(document.getElementById("bot").checked).not.toBe(true);
     });
 

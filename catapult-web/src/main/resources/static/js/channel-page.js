@@ -8,7 +8,7 @@
  * - username()/baseUrl(): a single place deriving the channel username from the
  *   URL, instead of every file re-deriving `location.pathname.split("/")[2]`.
  *   username() is null outside /channel/{username}.
- * - refresh(): re-renders the current fragment through the SPA router, preserving
+ * - refresh(): re-renders the current fragment, as the server has it now, through the SPA router, preserving
  *   the query string (page/status/source filters) instead of dropping it. No action
  *   of the page uses it: each patches the page itself or through its SSE echo. Only
  *   the mock profile's popout does, for the changes no event carries (mock-popout.js).
@@ -31,7 +31,7 @@ window.CatapultChannel = (function () {
 
     async function refresh() {
         // The query goes as the router's `search`: in the path, it would end up in the route's param.
-        await CatapultSpa.navigate(location.pathname.replace(/^\/+|\/+$/g, ""), false, location.search);
+        await CatapultSpa.navigate(location.pathname.replace(/^\/+|\/+$/g, ""), false, location.search, { fresh: true });
     }
 
     /** Shows `message` in a snackbar, removed from the page once it closes. */

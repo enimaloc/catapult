@@ -52,20 +52,105 @@ function urlOf(path, search = "") {
 // Bumped by every navigation: a slower earlier one never swaps its page over a later one's.
 let generation = 0;
 
-async function navigate(path, push = true, search = "") {
-    const current = ++generation;
+// The pages already fetched, by URL, the latest last: going back to one shows it at once, then checks it against
+// the server (see navigate). Bounded in count and in size, the channel page weighing far more than the others.
+const PAGES_KEPT = 20;
+const PAGES_KEPT_CHARS = 4_000_000;
+// A page fetched this recently (just visited, or prefetched) is shown without asking the server again.
+const PAGE_FRESH_MS = 10_000;
+const pages = new Map();
+// The fetches under way, by URL: a navigation joins the one a prefetch started.
+const loading = new Map();
+// Bumped by forget(): a page fetched before a change is never kept.
+let forgotten = 0;
+
+function keep(url, html) {
+    pages.delete(url);
+    pages.set(url, { html, at: Date.now() });
+    let chars = 0;
+    for (const page of pages.values()) chars += page.html.length;
+    for (const [oldest, page] of pages) {
+        if (pages.size <= PAGES_KEPT && chars <= PAGES_KEPT_CHARS) break;
+        pages.delete(oldest);
+        chars -= page.html.length;
+    }
+}
+
+/**
+ * Fetches the fragment at `url` (or joins the fetch under way), keeping it when it is a page the member may see
+ * again: answered, and not redirected (to the login page, say). Resolves to { response, html }.
+ */
+function fetchPage(url) {
+    let pending = loading.get(url);
+    if (!pending) {
+        const epoch = forgotten;
+        pending = fetch(url)
+            .then(async response => {
+                const html = await response.text();
+                if (response.ok && !response.redirected && epoch === forgotten) keep(url, html);
+                return { response, html };
+            })
+            .finally(() => {
+                if (loading.get(url) === pending) loading.delete(url);
+            });
+        loading.set(url, pending);
+    }
+    return pending;
+}
+
+/** Drops the pages kept: an action changed something any of them may show (csrf.js calls it after each one). */
+function forget() {
+    forgotten++;
+    pages.clear();
+    loading.clear();
+}
+
+/** The fragment URL of the SPA path `path`. */
+function fragmentUrl(path, search = "") {
     const { route, param } = resolveRoute(path);
     const templateUrl = route
         ? (param ? `${route.templateUrl}/${param}` : route.templateUrl)
         : `/spa/${path}`;
+    return templateUrl + search;
+}
+
+/** Whether the member is typing in the page: a newer version of it must not take that away. */
+function typing() {
+    const focused = document.activeElement;
+    return !!focused && app.contains(focused)
+        && focused.matches("input, textarea, select, [contenteditable], mdui-text-field, mdui-select");
+}
+
+/**
+ * Shows the SPA page `path`. One already kept is shown at once and, unless just fetched, replaced by the server's
+ * when that differs (the member left it typing aside). `fresh` asks the server first, never what was kept.
+ */
+async function navigate(path, push = true, search = "", { fresh = false } = {}) {
+    const current = ++generation;
+    const url = fragmentUrl(path, search);
+
+    const kept = fresh ? undefined : pages.get(url);
+    if (kept) {
+        show(path, push, search, kept.html, true);
+        if (Date.now() - kept.at < PAGE_FRESH_MS) return;
+        let page;
+        try {
+            page = await fetchPage(url);
+        } catch {
+            return; // what was kept stays
+        }
+        if (!page.response.ok) pages.delete(url);
+        if (current !== generation || page.html === kept.html || typing()) return;
+        app.innerHTML = page.html;
+        document.dispatchEvent(new CustomEvent("catapult:render"));
+        return;
+    }
 
     progress.hidden = false;
 
-    let response;
-    let html;
+    let page;
     try {
-        response = await fetch(templateUrl + search);
-        html = await response.text();
+        page = await fetchPage(url);
     } catch {
         // Network failure (offline, timeout, ...): fall back to a full
         // navigation so the browser's own error handling takes over.
@@ -76,6 +161,11 @@ async function navigate(path, push = true, search = "") {
     }
     if (current !== generation) return;
 
+    show(path, push, search, page.html, page.response.ok);
+}
+
+/** Swaps the page `path`'s `html` in, as the address bar's, and tells the fragment scripts. */
+function show(path, push, search, html, ok) {
     app.innerHTML = html;
 
     // Before the render: its listeners read the page's channel off location (CatapultChannel.username()).
@@ -91,7 +181,7 @@ async function navigate(path, push = true, search = "") {
     }
     document.dispatchEvent(new CustomEvent("catapult:render"));
 
-    if (!response.ok) {
+    if (!ok) {
         // Server-side error (unknown page or fragment failure): the
         // response body is the error fragment (see ErrorPageController
         // and SpaFragmentController#unknown), render it in place
@@ -100,6 +190,7 @@ async function navigate(path, push = true, search = "") {
     }
 
     // A dynamic page's title names its param (page.title.channel={0} - Catapult).
+    const { route, param } = resolveRoute(path);
     document.title = config.titles[route?.id]?.replace("{0}", param ?? "") ?? document.title;
     updateActiveLink(path);
 
@@ -173,7 +264,7 @@ function listenNavChannels() {
 }
 
 // The router's public surface, for the per-fragment scripts (channel-page.js's refresh()).
-window.CatapultSpa = { navigate, resolveRoute, loadNavChannels, urlOf };
+window.CatapultSpa = { navigate, resolveRoute, loadNavChannels, urlOf, forget };
 
 updateActiveLink(currentPath());
 loadNavChannels();
