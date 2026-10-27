@@ -76,11 +76,25 @@ window.CatapultCustomBindings = (function () {
             show(error, true);
         }
 
-        async function act(url, activeId) {
+        /** Runs `task` with `button` disabled, so a double click sends one request. */
+        async function busy(button, task) {
+            if (button.disabled) return;
+            button.disabled = true;
+            try {
+                await task();
+            } finally {
+                button.disabled = false;
+            }
+        }
+
+        async function act(item, url, activeId) {
+            const focused = item.contains(document.activeElement);
             const response = await post(url, {});
             if (!response) return tell(CatapultChannel.unreachable());
-            if (response.ok) return setActive(activeId);
-            tell(refusalText(list, await readCode(response), response.status));
+            if (!response.ok) return tell(refusalText(list, await readCode(response), response.status));
+            setActive(activeId);
+            // The clicked button is hidden now: keep the keyboard user in the row, on the one that took its place.
+            if (focused) item.querySelector(activeId ? ".custom-binding-stop" : ".custom-binding-activate")?.focus?.();
         }
 
         async function save(item, id, game) {
@@ -111,9 +125,6 @@ window.CatapultCustomBindings = (function () {
         // mdui-collapse fires open/close but doesn't reflect them on the item: mirror it as .is-open, which
         // the CSS shared with the associations list squares the joined header/body corners on.
         list.querySelectorAll(".custom-binding-item").forEach(item => {
-            item.addEventListener("open", () => item.classList.add("is-open"));
-            item.addEventListener("close", () => item.classList.remove("is-open"));
-
             const id = item.dataset.customBindingId ?? null;
             const gameInput = item.querySelector(".custom-binding-game-input");
             const gameId = item.querySelector(".custom-binding-game-id");
@@ -121,16 +132,33 @@ window.CatapultCustomBindings = (function () {
                 `${CatapultChannel.baseUrl()}/games/search`, picked => { gameId.value = picked.id; },
                 { initial: { id: gameId.value, name: gameInput.value } });
 
-            item.querySelector(".custom-binding-activate")
-                ?.addEventListener("click", () => act(`${base}/${id}/activate`, id));
-            item.querySelector(".custom-binding-stop")
-                ?.addEventListener("click", () => act(`${base}/deactivate`, null));
-            item.querySelector(".custom-binding-save")?.addEventListener("click", () => save(item, id, game));
+            item.addEventListener("open", event => { if (event.target === item) item.classList.add("is-open"); });
+            item.addEventListener("close", event => {
+                if (event.target !== item) return;
+                item.classList.remove("is-open");
+                if (item.classList.contains("custom-binding-new")) dismissNew(item, game);
+            });
+
+            const on = (selector, handler) => item.querySelector(selector)
+                ?.addEventListener("click", event => busy(event.currentTarget, handler));
+            on(".custom-binding-activate", () => act(item, `${base}/${id}/activate`, id));
+            on(".custom-binding-stop", () => act(item, `${base}/deactivate`, null));
+            on(".custom-binding-save", () => save(item, id, game));
             item.querySelector(".custom-binding-delete")?.addEventListener("click", () => {
                 deletingId = id;
                 dialog.open = true;
             });
         });
+
+        /** The closed "New" row goes away emptied; the empty notice comes back when no binding is listed. */
+        function dismissNew(fresh, game) {
+            show(fresh, false);
+            fresh.querySelector(".custom-binding-name").value = "";
+            fresh.querySelector(".custom-binding-game-id").value = "";
+            game.select(null);
+            fresh.querySelectorAll("mdui-switch").forEach(sw => { sw.checked = false; });
+            show(byId("channel-custom-bindings-empty"), !list.querySelector(".custom-binding-item[data-custom-binding-id]"));
+        }
 
         byId("custom-binding-new-btn")?.addEventListener("click", () => {
             const fresh = list.querySelector(".custom-binding-new");

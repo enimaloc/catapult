@@ -25,11 +25,11 @@ const isHidden = el => el.classList.contains("hidden");
 
 function form(binding) {
     const actions = binding
-        ? `<mdui-button class="custom-binding-activate${binding.active ? " hidden" : ""}"></mdui-button>
-           <mdui-button class="custom-binding-stop${binding.active ? "" : " hidden"}"></mdui-button>
-           <mdui-button class="custom-binding-save"></mdui-button>
-           <mdui-button class="custom-binding-delete"></mdui-button>`
-        : `<mdui-button class="custom-binding-save"></mdui-button>`;
+        ? `<mdui-button tabindex="0" class="custom-binding-activate${binding.active ? " hidden" : ""}"></mdui-button>
+           <mdui-button tabindex="0" class="custom-binding-stop${binding.active ? "" : " hidden"}"></mdui-button>
+           <mdui-button tabindex="0" class="custom-binding-save"></mdui-button>
+           <mdui-button tabindex="0" class="custom-binding-delete"></mdui-button>`
+        : `<mdui-button tabindex="0" class="custom-binding-save"></mdui-button>`;
     const on = (list, value) => (list?.includes(value) ? " checked" : "");
     return `
         <input class="custom-binding-name" type="text" value="${binding?.name ?? ""}"/>
@@ -43,7 +43,7 @@ function form(binding) {
         ${actions}`;
 }
 
-function overview({ empty = false } = {}) {
+function overview({ empty = false, extra = "" } = {}) {
     const rows = empty ? "" : `
         <mdui-collapse-item class="custom-binding-item is-active" data-custom-binding-id="${ART}" value="${ART}">
             <span class="custom-binding-active-chip"></span>
@@ -74,7 +74,8 @@ function overview({ empty = false } = {}) {
         <mdui-dialog id="custom-binding-delete-dialog">
             <mdui-button class="custom-binding-delete-dismiss"></mdui-button>
             <mdui-button class="custom-binding-delete-confirm"></mdui-button>
-        </mdui-dialog>`);
+        </mdui-dialog>
+        ${extra}`);
     // mdui-switch exposes its value/checked attributes as properties; jsdom knows no such element.
     document.querySelectorAll("mdui-switch").forEach(sw => {
         sw.value = sw.getAttribute("value");
@@ -208,6 +209,42 @@ describe("overview list: activation", () => {
         expect(document.querySelector(".custom-binding-item.is-active")).toBeNull();
     });
 
+    it("moves the focus to the button that replaced the clicked one", async () => {
+        overview();
+        activateBtn(DEV).focus();
+        activateBtn(DEV).click();
+        await flush();
+        expect(document.activeElement).toBe(stopBtn(DEV));
+
+        stopBtn(DEV).click();
+        await flush();
+        expect(document.activeElement).toBe(activateBtn(DEV));
+    });
+
+    it("leaves the focus alone when it was outside the row", async () => {
+        overview();
+        byId("custom-binding-new-btn").setAttribute("tabindex", "0");
+        byId("custom-binding-new-btn").focus();
+        activateBtn(DEV).click();
+        await flush();
+        expect(document.activeElement).toBe(byId("custom-binding-new-btn"));
+    });
+
+    it("disables the clicked button while its request is in flight", async () => {
+        overview();
+        let answer;
+        postJson.mockReturnValueOnce(new Promise(resolve => { answer = resolve; }));
+        activateBtn(DEV).click();
+        activateBtn(DEV).click();
+        await flush();
+
+        expect(activateBtn(DEV).disabled).toBe(true);
+        expect(postJson).toHaveBeenCalledTimes(1);
+        answer(response(204));
+        await flush();
+        expect(activateBtn(DEV).disabled).toBe(false);
+    });
+
     it("mirrors a row's open/close as .is-open", () => {
         overview();
         item(DEV).dispatchEvent(new Event("open"));
@@ -228,6 +265,42 @@ describe("overview list: create, edit, delete", () => {
         expect(fresh().classList.contains("is-open")).toBe(true);
         expect(document.querySelector("mdui-collapse").value).toBe("new");
         expect(isHidden(byId("channel-custom-bindings-empty"))).toBe(true);
+        expect(document.activeElement).toBe(fresh().querySelector(".custom-binding-name"));
+    });
+
+    it("hides and empties the New row once closed, the empty notice back when nothing is listed", () => {
+        overview({ empty: true });
+        byId("custom-binding-new-btn").click();
+        fresh().querySelector(".custom-binding-name").value = "Brouillon";
+        gameOf(fresh()).pick({ id: "26936", name: "Music" });
+        fresh().querySelector(".custom-binding-uninterruptible").checked = true;
+
+        fresh().dispatchEvent(new Event("close"));
+
+        expect(isHidden(fresh())).toBe(true);
+        expect(fresh().classList.contains("is-open")).toBe(false);
+        expect(fresh().querySelector(".custom-binding-name").value).toBe("");
+        expect(fresh().querySelector(".custom-binding-game-input").value).toBe("");
+        expect(fresh().querySelector(".custom-binding-game-id").value).toBe("");
+        expect(gameOf(fresh()).selected()).toBeNull();
+        expect(fresh().querySelector(".custom-binding-uninterruptible").checked).toBe(false);
+        expect(isHidden(byId("channel-custom-bindings-empty"))).toBe(false);
+    });
+
+    it("keeps the empty notice hidden when a closed New row leaves bindings listed", () => {
+        overview();
+        byId("custom-binding-new-btn").click();
+        fresh().dispatchEvent(new Event("close"));
+
+        expect(isHidden(fresh())).toBe(true);
+        expect(isHidden(byId("channel-custom-bindings-empty"))).toBe(true);
+    });
+
+    it("ignores a close bubbling from inside a row", () => {
+        overview();
+        byId("custom-binding-new-btn").click();
+        fresh().querySelector(".custom-binding-game-results").dispatchEvent(new Event("close", { bubbles: true }));
+        expect(isHidden(fresh())).toBe(false);
     });
 
     it("creates a binding from the New row", async () => {
@@ -248,6 +321,27 @@ describe("overview list: create, edit, delete", () => {
         });
         expect(fresh().querySelector(".custom-binding-game-id").value).toBe("26936");
         expect(refresh).toHaveBeenCalled();
+    });
+
+    it("creates once on a double click of Save", async () => {
+        overview();
+        byId("custom-binding-new-btn").click();
+        fresh().querySelector(".custom-binding-name").value = "Musique";
+        gameOf(fresh()).pick({ id: "26936", name: "Music" });
+        let answer;
+        postJson.mockReturnValueOnce(new Promise(resolve => { answer = resolve; }));
+        const save = fresh().querySelector(".custom-binding-save");
+
+        save.click();
+        save.click();
+        await flush();
+        expect(save.disabled).toBe(true);
+        answer(response(201, {}));
+        await flush();
+
+        expect(postJson).toHaveBeenCalledTimes(1);
+        expect(save.disabled).toBe(false);
+        expect(showError).not.toHaveBeenCalled();
     });
 
     it("saves a row's form to its id, with the values it was rendered with", async () => {
@@ -349,10 +443,21 @@ describe("overview list: create, edit, delete", () => {
         expect(refresh).not.toHaveBeenCalled();
     });
 
-    it("does not fetch the token status from the overview", async () => {
-        overview();
+    it("fetches the token status once per page, for the token card alone", async () => {
+        overview({ extra: `
+            <mdui-card id="channel-api-token-card" data-example-name="Art" data-label-none="Aucun jeton">
+                <span id="api-token-status"></span>
+                <mdui-button id="api-token-generate-btn"></mdui-button>
+                <mdui-button id="api-token-revoke-btn" class="hidden"></mdui-button>
+                <div id="api-token-reveal" class="hidden"><input id="api-token-value"/><pre id="api-token-curl"></pre></div>
+                <mdui-dialog id="api-token-confirm-dialog"></mdui-dialog>
+            </mdui-card>` });
         await flush();
-        expect(fetch).not.toHaveBeenCalledWith("/me/api-token", expect.anything());
+        activateBtn(DEV).click();
+        await flush();
+
+        expect(fetch.mock.calls.filter(([url]) => url === "/me/api-token")).toHaveLength(1);
+        expect(byId("api-token-status").textContent).toBe("Aucun jeton");
     });
 });
 
