@@ -78,6 +78,7 @@ public class ApiHealthProbe {
             log.debug("catapult-api health probe timed out");
             return false;
         } catch (InterruptedException e) {
+            call.cancel(true);
             Thread.currentThread().interrupt();
             return false;
         } catch (Exception e) {
