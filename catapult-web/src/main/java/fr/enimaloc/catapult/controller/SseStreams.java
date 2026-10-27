@@ -92,10 +92,15 @@ public class SseStreams implements DisposableBean {
     /**
      * Writes {@code emitter} from now on: a comment at once, then the events sent to it and the heartbeats.
      * {@code onClosed} runs once when it ends, whichever way (closed, timed out, failed, too slow).
+     * <p>
+     * Called by the request that opens the stream, before it returns {@code emitter}: the comment is handed
+     * to it on that request's thread, where Spring writes it, committing the response, once the request
+     * returns it (ResponseBodyEmitter#initialize). Only what follows is written off that thread: written
+     * from another, the first write could commit the response while the request's filters still set its
+     * headers (Spring Security's HeaderWriterFilter), and Tomcat's headers are not thread-safe.
      */
     public void open(SseEmitter emitter, Runnable onClosed) {
         Outbox outbox = new Outbox(emitter, onClosed);
-        open.put(emitter, outbox);
         emitter.onCompletion(outbox::closed);
         emitter.onError(e -> outbox.closed());
         // Ended, not failed: a timed-out stream's EventSource reconnects.
@@ -103,7 +108,16 @@ public class SseStreams implements DisposableBean {
             outbox.closed();
             emitter.complete();
         });
-        outbox.offer(SseEmitter.event().comment("open"));
+        try {
+            emitter.send(SseEmitter.event().comment("open"));
+        } catch (IOException | IllegalStateException e) {
+            // Gone, or completed meanwhile.
+            outbox.closed();
+            emitter.complete();
+            return;
+        }
+        // Only now: the comment comes before whatever is sent to it (a heartbeat, another thread's event).
+        open.put(emitter, outbox);
     }
 
     /** {@code event} to {@code emitter}, after those already sent to it; nothing once it is closed. */
