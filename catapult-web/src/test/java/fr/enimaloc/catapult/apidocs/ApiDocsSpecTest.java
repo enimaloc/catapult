@@ -270,6 +270,22 @@ class ApiDocsSpecTest {
     }
 
     @Test
+    @Timeout(10)
+    void withoutACopy_aViewerArrivingDuringTheFirstFetchWaitsForIt() throws Exception {
+        ApiDocsSpec spec = spec();
+        server.enqueue(ok(SPEC).setHeadersDelay(1, TimeUnit.SECONDS));
+
+        CompletableFuture<Optional<ApiDocsSpec.Cached>> first = CompletableFuture.supplyAsync(spec::current);
+        // The slow fetch has reached catapult-api: the second viewer comes while it is in flight.
+        assertThat(server.takeRequest(2, TimeUnit.SECONDS)).isNotNull();
+        Optional<ApiDocsSpec.Cached> second = spec.current();
+
+        assertThat(second).get().extracting(ApiDocsSpec.Cached::fromCache).isEqualTo(false);
+        assertThat(first.get()).isPresent();
+        assertThat(server.getRequestCount()).isEqualTo(1);
+    }
+
+    @Test
     void emptyWhenNothingWasEverFetched() throws IOException {
         server.shutdown();
 

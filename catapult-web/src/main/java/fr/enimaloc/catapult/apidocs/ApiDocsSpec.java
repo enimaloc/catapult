@@ -74,7 +74,8 @@ public class ApiDocsSpec {
     /**
      * The spec, fetched again when the last try is a minute old; the last valid copy when catapult-api fails
      * ({@code fromCache}); empty when none was ever had. While one visitor's page fetches it, the others get the
-     * copy already had (they wait for that fetch when there is none).
+     * copy already had (they wait for that fetch when there is none). The next try is only scheduled once the fetch
+     * is over, so a visitor arriving during the very first one waits for it rather than finding nothing.
      */
     public Optional<Cached> current() {
         if (clock.instant().isBefore(nextFetch)) return Optional.ofNullable(current);
@@ -83,7 +84,6 @@ public class ApiDocsSpec {
         try {
             Instant now = clock.instant();
             if (now.isBefore(nextFetch)) return Optional.ofNullable(current);
-            nextFetch = now.plus(REFRESH);
             String fetched = fetch();
             if (fetched != null) {
                 current = new Cached(fetched, now, false);
@@ -92,6 +92,7 @@ public class ApiDocsSpec {
                 Cached kept = current != null ? current : readDisk();
                 current = kept == null ? null : new Cached(kept.json(), kept.fetchedAt(), true);
             }
+            nextFetch = now.plus(REFRESH);
             return Optional.ofNullable(current);
         } finally {
             loading.unlock();
