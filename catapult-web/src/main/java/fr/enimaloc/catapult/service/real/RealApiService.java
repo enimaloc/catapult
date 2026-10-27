@@ -491,9 +491,9 @@ public class RealApiService implements ApiService {
     }
 
     @Override
-    public int enableMemberDebug(UUID memberId, boolean revealSecrets) {
+    public int enableMemberDebug(UUID memberId, boolean revealSecrets, double replayRate) {
         return client.postVoid("/api/internal/admin/members/{id}/debug/enable",
-                new fr.enimaloc.catapult.common.dto.admin.DebugEnableRequest(revealSecrets), memberId);
+                new fr.enimaloc.catapult.common.dto.admin.DebugEnableRequest(revealSecrets, replayRate), memberId);
     }
 
     @Override
@@ -532,11 +532,10 @@ public class RealApiService implements ApiService {
     }
 
     @Override
-    public Boolean myDebugActive() {
+    public fr.enimaloc.catapult.common.dto.MyDebugDto myDebug() {
         UUID me = me();
         if (me == null) return null;
-        fr.enimaloc.catapult.common.dto.MyDebugDto debug = client.get("/api/internal/users/{userId}/debug", fr.enimaloc.catapult.common.dto.MyDebugDto.class, me);
-        return debug == null ? null : debug.active();
+        return client.get("/api/internal/users/{userId}/debug", fr.enimaloc.catapult.common.dto.MyDebugDto.class, me);
     }
 
     @Override

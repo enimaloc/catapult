@@ -112,7 +112,7 @@ class RealApiServiceTest {
     void selfRoutesWithoutASessionDoNotCall() {
         org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes();
 
-        assertThat(service.myDebugActive()).isNull();
+        assertThat(service.myDebug()).isNull();
         assertThat(service.obsConnection()).isNull();
         assertThat(service.minecraftDisconnect("someone-else")).isEqualTo(401);
         assertThat(service.regenerateApiToken().status()).isEqualTo(401);
@@ -1751,12 +1751,13 @@ class RealApiServiceTest {
     void memberDebug_readsTheState() {
         UUID id = UUID.fromString("00000000-0000-0000-0000-000000000001");
         respond(HttpMethod.GET, "/api/internal/admin/members/" + id + "/debug",
-                "{\"active\":true,\"revealSecrets\":false,\"enabledAt\":\"2026-10-24T10:00:00Z\",\"exchangeCount\":4}");
+                "{\"active\":true,\"revealSecrets\":false,\"replayRate\":0.25,\"enabledAt\":\"2026-10-24T10:00:00Z\",\"exchangeCount\":4}");
 
         var state = service.memberDebug(id);
 
         assertThat(state.active()).isTrue();
         assertThat(state.revealSecrets()).isFalse();
+        assertThat(state.replayRate()).isEqualTo(0.25);
         assertThat(state.exchangeCount()).isEqualTo(4);
     }
 
@@ -1764,11 +1765,11 @@ class RealApiServiceTest {
     void memberDebugActions_postToTheMemberAndRelayTheStatus() {
         UUID id = UUID.fromString("00000000-0000-0000-0000-000000000001");
         String base = "/api/internal/admin/members/" + id + "/debug";
-        expectPost(base + "/enable", "{\"revealSecrets\":true}");
+        expectPost(base + "/enable", "{\"revealSecrets\":true,\"replayRate\":0.25}");
         expectPost(base + "/disable");
         expectDelete(base + "/exchanges");
 
-        assertThat(service.enableMemberDebug(id, true)).isEqualTo(204);
+        assertThat(service.enableMemberDebug(id, true, 0.25)).isEqualTo(204);
         assertThat(service.disableMemberDebug(id)).isEqualTo(204);
         assertThat(service.clearMemberDebug(id)).isEqualTo(204);
     }
@@ -1818,12 +1819,12 @@ class RealApiServiceTest {
     }
 
     @Test
-    void myDebugActive_readsTheCallersMode_orNullWhenTheApiCouldNotTell() {
-        respond(HttpMethod.GET, OWN + "/debug", "{\"active\":true}");
+    void myDebug_readsTheCallersModeAndReplayRate_orNullWhenTheApiCouldNotTell() {
+        respond(HttpMethod.GET, OWN + "/debug", "{\"active\":true,\"replayRate\":0.25}");
         expect(HttpMethod.GET, OWN + "/debug").andRespond(withStatus(HttpStatus.BAD_GATEWAY));
 
-        assertThat(service.myDebugActive()).isTrue();
-        assertThat(service.myDebugActive()).isNull();
+        assertThat(service.myDebug()).isEqualTo(new fr.enimaloc.catapult.common.dto.MyDebugDto(true, 0.25));
+        assertThat(service.myDebug()).isNull();
     }
 
     private static final UUID CB_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");

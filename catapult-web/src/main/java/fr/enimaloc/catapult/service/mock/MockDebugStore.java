@@ -1,6 +1,8 @@
 package fr.enimaloc.catapult.service.mock;
 
+import fr.enimaloc.catapult.common.dto.MyDebugDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
+import fr.enimaloc.catapult.common.dto.admin.DebugEnableRequest;
 import fr.enimaloc.catapult.common.dto.admin.DebugExchangeDto;
 import fr.enimaloc.catapult.common.dto.admin.DebugExchangeSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.MemberDebugStateDto;
@@ -27,7 +29,7 @@ class MockDebugStore {
     static final int PAGE_SIZE = 5;
     private static final long PURGE_DAYS = 30;
 
-    private record State(boolean revealSecrets, Instant enabledAt, Instant disabledAt) {}
+    private record State(boolean revealSecrets, double replayRate, Instant enabledAt, Instant disabledAt) {}
 
     private final Clock clock;
     private final Map<UUID, State> states = new HashMap<>();
@@ -36,7 +38,7 @@ class MockDebugStore {
     MockDebugStore(Clock clock, UUID seededMember) {
         this.clock = clock;
         Instant now = clock.instant();
-        states.put(seededMember, new State(false, now.minus(2, ChronoUnit.HOURS), null));
+        states.put(seededMember, new State(false, DebugEnableRequest.DEFAULT_REPLAY_RATE, now.minus(2, ChronoUnit.HOURS), null));
         List<DebugExchangeDto> seeded = new ArrayList<>();
         seeded.add(new DebugExchangeDto(UUID.randomUUID(), now.minus(90, ChronoUnit.MINUTES), "OUT", "twitch", "getChannel",
                 "GET", "https://api.twitch.tv/helix/channels?broadcaster_id=5000001", 200, false, 84, false,
@@ -88,7 +90,7 @@ class MockDebugStore {
         State state = states.get(member);
         if (state == null) return null;
         boolean active = state.disabledAt() == null;
-        return new MemberDebugStateDto(active, state.revealSecrets(), state.enabledAt(), null, state.disabledAt(),
+        return new MemberDebugStateDto(active, state.revealSecrets(), state.replayRate(), state.enabledAt(), null, state.disabledAt(),
                 active ? null : state.disabledAt().plus(PURGE_DAYS, ChronoUnit.DAYS), exchanges.getOrDefault(member, List.of()).size());
     }
 
@@ -97,10 +99,15 @@ class MockDebugStore {
         return state != null && state.disabledAt() == null;
     }
 
+    /** The member's own view of it, as catapult-api answers it: no replay while the mode is off. */
+    synchronized MyDebugDto mine(UUID member) {
+        return active(member) ? new MyDebugDto(true, states.get(member).replayRate()) : new MyDebugDto(false, 0);
+    }
+
     /** 204, or 409 when it is already on. */
-    synchronized int enable(UUID member, boolean revealSecrets) {
+    synchronized int enable(UUID member, boolean revealSecrets, double replayRate) {
         if (active(member)) return 409;
-        states.put(member, new State(revealSecrets, clock.instant(), null));
+        states.put(member, new State(revealSecrets, replayRate, clock.instant(), null));
         return 204;
     }
 
@@ -109,7 +116,7 @@ class MockDebugStore {
         State state = states.get(member);
         if (state == null) return 404;
         if (state.disabledAt() == null) {
-            states.put(member, new State(state.revealSecrets(), state.enabledAt(), clock.instant()));
+            states.put(member, new State(state.revealSecrets(), state.replayRate(), state.enabledAt(), clock.instant()));
         }
         return 204;
     }

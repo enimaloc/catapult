@@ -860,19 +860,20 @@ class MockApiServiceTest {
     void memberDebug_enableDisableAndClear_showInTheMembersListing() {
         UUID me = service.currentUserId();
         assertThat(service.memberDebug(me)).isNull();
-        assertThat(service.myDebugActive()).isFalse();
+        assertThat(service.myDebug().active()).isFalse();
 
-        assertThat(service.enableMemberDebug(me, true)).isEqualTo(204);
-        assertThat(service.enableMemberDebug(me, true)).isEqualTo(409);
-        assertThat(service.myDebugActive()).isTrue();
+        assertThat(service.enableMemberDebug(me, true, 0.25)).isEqualTo(204);
+        assertThat(service.enableMemberDebug(me, true, 0.25)).isEqualTo(409);
+        assertThat(service.myDebug()).isEqualTo(new fr.enimaloc.catapult.common.dto.MyDebugDto(true, 0.25));
         assertThat(service.memberDebug(me).revealSecrets()).isTrue();
+        assertThat(service.memberDebug(me).replayRate()).isEqualTo(0.25);
         assertThat(allMembers().stream().filter(m -> m.id().equals(me)).findFirst().orElseThrow().debug().active()).isTrue();
 
         assertThat(service.clearMemberDebug(me)).isEqualTo(204);
         assertThat(service.memberDebug(me).exchangeCount()).isZero();
 
         assertThat(service.disableMemberDebug(me)).isEqualTo(204);
-        assertThat(service.myDebugActive()).isFalse();
+        assertThat(service.myDebug()).isEqualTo(new fr.enimaloc.catapult.common.dto.MyDebugDto(false, 0));
         assertThat(service.memberDebug(me).active()).isFalse();
         assertThat(allMembers().stream().filter(m -> m.id().equals(me)).findFirst().orElseThrow().debug().active()).isFalse();
     }
@@ -892,10 +893,10 @@ class MockApiServiceTest {
     }
 
     @Test
-    void myDebugActive_isFalseForAVisitor() {
+    void myDebug_isOffForAVisitor() {
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(new MockHttpServletRequest()));
 
-        assertThat(service.myDebugActive()).isFalse();
+        assertThat(service.myDebug()).isEqualTo(new fr.enimaloc.catapult.common.dto.MyDebugDto(false, 0));
     }
 
     private static fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest customBinding(String name) {

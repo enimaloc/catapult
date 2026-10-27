@@ -28,6 +28,10 @@ public class MemberDebugSession {
     @Column(name = "reveal_secrets", nullable = false)
     private boolean revealSecrets;
 
+    /** The share of the member's pages the browser replays whole, from 0 to 1. */
+    @Column(name = "replay_rate", nullable = false)
+    private double replayRate = 1.0;
+
     @Column(name = "enabled_by")
     private UUID enabledBy;
 

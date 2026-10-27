@@ -49,7 +49,7 @@ public class MemberDebugService {
 
     /** Switches the mode on; the recorded exchanges of an earlier session are kept. 409 when already on. */
     @Transactional
-    public MemberDebugSession enable(UUID userId, boolean revealSecrets, UUID adminId) {
+    public MemberDebugSession enable(UUID userId, boolean revealSecrets, double replayRate, UUID adminId) {
         MemberDebugSession session = sessions.findById(userId).orElseGet(() -> {
             MemberDebugSession s = new MemberDebugSession();
             s.setUserId(userId);
@@ -60,6 +60,7 @@ public class MemberDebugService {
         }
         session.setActive(true);
         session.setRevealSecrets(revealSecrets);
+        session.setReplayRate(replayRate);
         session.setEnabledBy(adminId);
         session.setEnabledAt(Instant.now(clock));
         session.setDisabledAt(null);
@@ -133,7 +134,7 @@ public class MemberDebugService {
 
     private MemberDebugStateDto toDto(MemberDebugSession s) {
         Instant purgeAt = s.getDisabledAt() == null ? null : s.getDisabledAt().plus(RETENTION_AFTER_DISABLE);
-        return new MemberDebugStateDto(s.isActive(), s.isRevealSecrets(), s.getEnabledAt(), s.getEnabledBy(),
+        return new MemberDebugStateDto(s.isActive(), s.isRevealSecrets(), s.getReplayRate(), s.getEnabledAt(), s.getEnabledBy(),
                 s.getDisabledAt(), purgeAt, exchanges.countByUserId(s.getUserId()));
     }
 }

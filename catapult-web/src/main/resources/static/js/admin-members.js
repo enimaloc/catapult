@@ -13,7 +13,7 @@
  * listeners are delegated to the panel: the sub-view comes and goes inside it.
  *
  * Debug mode: "turn on" goes through its dialog (the secrets switch, off = masked, and the warning that comes with
- * turning it on); "turn off" and the recording's deletion (confirmed) are plain actions. The exchanges page is
+ * turning it on; the share of pages replayed, all by default); "turn off" and the recording's deletion (confirmed) are plain actions. The exchanges page is
  * admin-member-debug.js's.
  *
  * "Impersonate" logs the admin in as a member and opens their channel (see impersonate()).
@@ -141,13 +141,23 @@ window.CatapultAdminMembers = (function () {
         // masked unless chosen otherwise, every time
         document.getElementById("admin-debug-reveal").checked = false;
         document.getElementById("admin-debug-warning").hidden = true;
+        // every page replayed unless chosen otherwise, every time
+        document.getElementById("admin-debug-replay").value = 100;
+        showReplay();
         dialog.open = true;
+    }
+
+    /** Writes the replay slider's value, in percent, into its label. */
+    function showReplay() {
+        const label = document.getElementById("admin-debug-replay-label");
+        label.textContent = label.dataset.label.replace("{0}", String(document.getElementById("admin-debug-replay").value));
     }
 
     async function submitDebug(dialog, card) {
         const revealSecrets = document.getElementById("admin-debug-reveal").checked;
+        const replayRate = Number(document.getElementById("admin-debug-replay").value) / 100;
         // closed before the list is swapped: the dialog goes with it, and mdui can't close a detached one
-        await postThenRefresh(card, `/admin/members/${dialog.dataset.memberId}/debug/enable`, { revealSecrets },
+        await postThenRefresh(card, `/admin/members/${dialog.dataset.memberId}/debug/enable`, { revealSecrets, replayRate },
             () => { dialog.open = false; });
     }
 
@@ -310,6 +320,7 @@ window.CatapultAdminMembers = (function () {
         unbound(root, "#admin-debug-reveal").forEach(reveal => reveal.addEventListener("change", () => {
             document.getElementById("admin-debug-warning").hidden = !reveal.checked;
         }));
+        unbound(root, "#admin-debug-replay").forEach(slider => slider.addEventListener("input", showReplay));
         unbound(root, "#admin-debug-cancel").forEach(button => button.addEventListener("click", () => { debugDialog.open = false; }));
         unbound(root, "#admin-debug-submit").forEach(button => button.addEventListener("click", () => submitDebug(debugDialog, card)));
 

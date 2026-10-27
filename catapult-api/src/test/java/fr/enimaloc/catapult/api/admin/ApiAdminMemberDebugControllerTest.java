@@ -28,6 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -93,34 +94,43 @@ class ApiAdminMemberDebugControllerTest {
 
     @Test
     void enable_withoutJwt_isRejected() {
-        assertStatus(() -> controller.enable(member, new DebugEnableRequest(false), null), HttpStatus.UNAUTHORIZED);
+        assertStatus(() -> controller.enable(member, new DebugEnableRequest(false, 1), null), HttpStatus.UNAUTHORIZED);
 
-        verify(service, never()).enable(any(), anyBoolean(), any());
+        verify(service, never()).enable(any(), anyBoolean(), anyDouble(), any());
     }
 
     @Test
     void enable_recordsTheCallingAdmin_andAnswersTheState() {
-        MemberDebugStateDto state = new MemberDebugStateDto(true, true, at(0), admin, null, null, 0);
+        MemberDebugStateDto state = new MemberDebugStateDto(true, true, 0.25, at(0), admin, null, null, 0);
         when(service.stateDto(member)).thenReturn(Optional.of(state));
 
-        assertThat(controller.enable(member, new DebugEnableRequest(true), jwt(admin))).isEqualTo(state);
+        assertThat(controller.enable(member, new DebugEnableRequest(true, 0.25), jwt(admin))).isEqualTo(state);
 
-        verify(service).enable(member, true, admin);
+        verify(service).enable(member, true, 0.25, admin);
+    }
+
+    @Test
+    void enable_withoutBody_masksSecretsAndReplaysEveryPage() {
+        when(service.stateDto(member)).thenReturn(Optional.of(new MemberDebugStateDto(true, false, 1, at(0), admin, null, null, 0)));
+
+        controller.enable(member, null, jwt(admin));
+
+        verify(service).enable(member, false, 1.0, admin);
     }
 
     @Test
     void enable_whenActive_conflicts() {
-        when(service.enable(any(), anyBoolean(), any()))
+        when(service.enable(any(), anyBoolean(), anyDouble(), any()))
                 .thenThrow(new ResponseStatusException(HttpStatus.CONFLICT));
 
-        assertStatus(() -> controller.enable(member, new DebugEnableRequest(false), jwt(admin)), HttpStatus.CONFLICT);
+        assertStatus(() -> controller.enable(member, new DebugEnableRequest(false, 1), jwt(admin)), HttpStatus.CONFLICT);
     }
 
     @Test
     void enable_ofAnUnknownMember_is404() {
         when(users.existsById(member)).thenReturn(false);
 
-        assertStatus(() -> controller.enable(member, new DebugEnableRequest(false), jwt(admin)), HttpStatus.NOT_FOUND);
+        assertStatus(() -> controller.enable(member, new DebugEnableRequest(false, 1), jwt(admin)), HttpStatus.NOT_FOUND);
     }
 
     @Test

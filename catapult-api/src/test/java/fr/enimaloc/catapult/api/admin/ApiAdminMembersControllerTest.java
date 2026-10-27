@@ -131,9 +131,9 @@ class ApiAdminMembersControllerTest {
         UserAccount other = account("other", "tw-other");
         UserAccount disabled = account("disabled", "tw-disabled");
         var state = new fr.enimaloc.catapult.common.dto.admin.MemberDebugStateDto(
-                true, false, java.time.Instant.parse("2026-10-01T10:00:00Z"), null, null, null, 3);
+                true, false, 1, java.time.Instant.parse("2026-10-01T10:00:00Z"), null, null, null, 3);
         var off = new fr.enimaloc.catapult.common.dto.admin.MemberDebugStateDto(
-                false, false, java.time.Instant.parse("2026-09-01T10:00:00Z"), null,
+                false, false, 1, java.time.Instant.parse("2026-09-01T10:00:00Z"), null,
                 java.time.Instant.parse("2026-09-02T10:00:00Z"), java.time.Instant.parse("2026-10-02T10:00:00Z"), 7);
         when(accounts.findMembersPage(any())).thenReturn(pageOf(List.of(member, other, disabled), 0, 3));
         when(accounts.searchMembers(any(), any(), any())).thenReturn(List.of(member, other));

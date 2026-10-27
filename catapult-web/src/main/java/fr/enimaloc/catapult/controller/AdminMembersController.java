@@ -70,10 +70,14 @@ public class AdminMembersController {
         return ApiStatus.answer(apiService.adminMigrateMember(id, body.targetId(), body.migrateSettings(), body.migrateGetters(), body.migrateBindings()));
     }
 
-    /** The member's debug mode; {@code revealSecrets} (default false) unmasks the secrets in what is recorded. */
+    /**
+     * The member's debug mode; {@code revealSecrets} (default false) unmasks the secrets in what is recorded, and
+     * {@code replayRate} (default 1) is the share of their pages the browser replays whole.
+     */
     @PostMapping("/debug/enable")
     public ResponseEntity<Void> enableDebug(@PathVariable UUID id, @RequestBody(required = false) DebugEnableRequest body) {
-        return debugAction(id, () -> apiService.enableMemberDebug(id, body != null && body.revealSecrets()));
+        DebugEnableRequest request = body != null ? body : new DebugEnableRequest(false, DebugEnableRequest.DEFAULT_REPLAY_RATE);
+        return debugAction(id, () -> apiService.enableMemberDebug(id, request.revealSecrets(), request.replayRate()));
     }
 
     @PostMapping("/debug/disable")

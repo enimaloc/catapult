@@ -120,7 +120,7 @@ public final class FakeApi extends Dispatcher {
         route("/api/internal/config/app", caller -> new AppConfigResponse("Catapult", 7, List.of("steam")));
         route("/api/internal/users/{id}/dashboard", caller -> channelPage(OWNER.equals(caller)));
         route("/api/internal/users/{id}/seen-features", caller -> List.of());
-        route("/api/internal/users/{id}/debug", caller -> new MyDebugDto(false));
+        route("/api/internal/users/{id}/debug", caller -> new MyDebugDto(false, 0));
         route("/api/internal/users/{id}/settings", caller -> settings());
         route("/api/internal/users/{id}/dtdd-mapping", caller -> new DtddMappingStatusDto(
                 new DtddMappingCurrentDto(1L, "Budget DTDD game", 0.9, true), null, false, "1"));

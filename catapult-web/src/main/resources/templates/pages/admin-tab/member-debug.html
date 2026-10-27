@@ -33,6 +33,7 @@
                              ${debugState.purgeAt() == null ? '—' : #temporals.format(debugState.purgeAt(), #messages.msg('format.datetime'))})}">off</span>
             <mdui-chip th:text="${debugState.revealSecrets()} ? #{admin.debug.secrets.revealed} : #{admin.debug.secrets.masked}"
                        th:icon="${debugState.revealSecrets()} ? 'lock_open' : 'lock'">masked</mdui-chip>
+            <mdui-chip icon="videocam" th:text="#{admin.debug.replay(${#numbers.formatInteger(debugState.replayRate() * 100, 1)})}">replay</mdui-chip>
             <span th:text="#{admin.debug.count(${debugState.exchangeCount()})}">n</span>
         </mdui-card>
 

@@ -80,11 +80,13 @@ class MockDebugStoreTest {
     void enable_isRefusedWhileActive_andStartsAnotherMemberRevealingOrNot() {
         UUID other = UUID.randomUUID();
 
-        assertThat(store.enable(member, true)).isEqualTo(409);
-        assertThat(store.enable(other, true)).isEqualTo(204);
+        assertThat(store.enable(member, true, 0.25)).isEqualTo(409);
+        assertThat(store.enable(other, true, 0.25)).isEqualTo(204);
 
         assertThat(store.active(other)).isTrue();
         assertThat(store.state(other).revealSecrets()).isTrue();
+        assertThat(store.state(other).replayRate()).isEqualTo(0.25);
+        assertThat(store.mine(other)).isEqualTo(new fr.enimaloc.catapult.common.dto.MyDebugDto(true, 0.25));
         assertThat(store.state(other).exchangeCount()).isZero();
     }
 
@@ -102,7 +104,7 @@ class MockDebugStoreTest {
         assertThat(store.disable(member)).isEqualTo(204);
         assertThat(store.state(member)).isEqualTo(off);
         // switched on again, it is active with what was already recorded
-        assertThat(store.enable(member, false)).isEqualTo(204);
+        assertThat(store.enable(member, false, 1)).isEqualTo(204);
         assertThat(store.active(member)).isTrue();
         assertThat(store.state(member).exchangeCount()).isEqualTo(6);
     }

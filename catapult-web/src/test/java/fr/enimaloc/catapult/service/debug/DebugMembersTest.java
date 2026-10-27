@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.debug;
 
+import fr.enimaloc.catapult.common.dto.MyDebugDto;
 import fr.enimaloc.catapult.service.ApiService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
@@ -19,6 +20,8 @@ import static org.mockito.Mockito.when;
 
 class DebugMembersTest {
     private static final UUID MEMBER = UUID.randomUUID();
+    private static final MyDebugDto ON = new MyDebugDto(true, 1);
+    private static final MyDebugDto OFF = new MyDebugDto(false, 0);
 
     private final ApiService api = mock(ApiService.class);
     private final MutableClock clock = new MutableClock();
@@ -32,25 +35,25 @@ class DebugMembersTest {
 
     @Test
     void theAnswerIsRemembered_for30Seconds() {
-        when(api.myDebugActive()).thenReturn(true);
+        when(api.myDebug()).thenReturn(ON);
 
         assertThat(debug.isActive(MEMBER)).isTrue();
         clock.advance(Duration.ofSeconds(29));
         assertThat(debug.isActive(MEMBER)).isTrue();
-        verify(api, times(1)).myDebugActive();
+        verify(api, times(1)).myDebug();
 
-        when(api.myDebugActive()).thenReturn(false);
+        when(api.myDebug()).thenReturn(OFF);
         clock.advance(Duration.ofSeconds(2));
         assertThat(debug.isActive(MEMBER)).isFalse();
-        verify(api, times(2)).myDebugActive();
+        verify(api, times(2)).myDebug();
     }
 
     @Test
     void evict_makesTheNextAskReadItAgain() {
-        when(api.myDebugActive()).thenReturn(false);
+        when(api.myDebug()).thenReturn(OFF);
         assertThat(debug.isActive(MEMBER)).isFalse();
 
-        when(api.myDebugActive()).thenReturn(true);
+        when(api.myDebug()).thenReturn(ON);
         debug.evict(MEMBER);
 
         assertThat(debug.isActive(MEMBER)).isTrue();
@@ -58,27 +61,27 @@ class DebugMembersTest {
 
     @Test
     void aFailure_isNotDebugged_andIsRememberedBriefly() {
-        when(api.myDebugActive()).thenThrow(new IllegalStateException("down"));
+        when(api.myDebug()).thenThrow(new IllegalStateException("down"));
 
         assertThat(debug.isActive(MEMBER)).isFalse();
         assertThat(debug.isActive(MEMBER)).isFalse();
-        verify(api, times(1)).myDebugActive();
+        verify(api, times(1)).myDebug();
 
-        org.mockito.Mockito.doReturn(true).when(api).myDebugActive();
+        org.mockito.Mockito.doReturn(ON).when(api).myDebug();
         clock.advance(Duration.ofSeconds(6));
         assertThat(debug.isActive(MEMBER)).isTrue();
     }
 
     @Test
     void anApiThatCouldNotTell_returnsNull_isNotDebugged_andIsRememberedOnlyBriefly() {
-        when(api.myDebugActive()).thenReturn(null);
+        when(api.myDebug()).thenReturn(null);
 
         assertThat(debug.isActive(MEMBER)).isFalse();
         clock.advance(Duration.ofSeconds(4));
         assertThat(debug.isActive(MEMBER)).isFalse();
-        verify(api, times(1)).myDebugActive();
+        verify(api, times(1)).myDebug();
 
-        when(api.myDebugActive()).thenReturn(true);
+        when(api.myDebug()).thenReturn(ON);
         clock.advance(Duration.ofSeconds(2));
         assertThat(debug.isActive(MEMBER)).isTrue();
     }
@@ -86,6 +89,26 @@ class DebugMembersTest {
     @Test
     void nobody_isNotDebugged() {
         assertThat(debug.isActive(null)).isFalse();
+        assertThat(debug.replayRate(null)).isEmpty();
+    }
+
+    @Test
+    void replayRate_isTheDebuggedMembersOwn_fromTheSameRememberedAnswer() {
+        when(api.myDebug()).thenReturn(new MyDebugDto(true, 0.25));
+
+        assertThat(debug.replayRate(MEMBER)).hasValue(0.25);
+        assertThat(debug.isActive(MEMBER)).isTrue();
+        verify(api, times(1)).myDebug();
+    }
+
+    @Test
+    void replayRate_isEmpty_whenNotDebuggedOrOnFailure() {
+        when(api.myDebug()).thenReturn(OFF);
+        assertThat(debug.replayRate(MEMBER)).isEmpty();
+
+        debug.evict(MEMBER);
+        when(api.myDebug()).thenThrow(new IllegalStateException("down"));
+        assertThat(debug.replayRate(MEMBER)).isEmpty();
     }
 
     static final class MutableClock extends Clock {
@@ -117,7 +140,7 @@ class DebugMembersTest {
     @Test
     void isCurrentActive_asksAboutTheMemberOfTheRequest_andIsFalseWithoutOne() {
         when(api.currentUserId()).thenReturn(MEMBER);
-        when(api.myDebugActive()).thenReturn(true);
+        when(api.myDebug()).thenReturn(ON);
         assertThat(debug.isCurrentActive()).isTrue();
 
         when(api.currentUserId()).thenReturn(null);
@@ -130,7 +153,7 @@ class DebugMembersTest {
     @Test
     void isActiveOn_readsTheSessionsMember_andRestoresWhatWasBound() {
         when(api.currentUserId()).thenReturn(MEMBER);
-        when(api.myDebugActive()).thenReturn(true);
+        when(api.myDebug()).thenReturn(ON);
         org.springframework.web.context.request.RequestAttributes before =
                 org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
 
@@ -144,7 +167,7 @@ class DebugMembersTest {
         assertThat(debug.isActiveOn(null)).isFalse();
         assertThat(debug.isActiveOn(new org.springframework.mock.web.MockHttpServletRequest())).isFalse();
 
-        verify(api, org.mockito.Mockito.never()).myDebugActive();
+        verify(api, org.mockito.Mockito.never()).myDebug();
     }
 
     @Test

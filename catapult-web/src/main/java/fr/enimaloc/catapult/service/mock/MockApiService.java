@@ -934,9 +934,9 @@ public class MockApiService implements ApiService {
     }
 
     @Override
-    public int enableMemberDebug(UUID memberId, boolean revealSecrets) {
-        log.trace("enableMemberDebug({}, {})", memberId, revealSecrets);
-        return members.debugAction(memberId, store -> store.enable(memberId, revealSecrets));
+    public int enableMemberDebug(UUID memberId, boolean revealSecrets, double replayRate) {
+        log.trace("enableMemberDebug({}, {}, {})", memberId, revealSecrets, replayRate);
+        return members.debugAction(memberId, store -> store.enable(memberId, revealSecrets, replayRate));
     }
 
     @Override
@@ -971,9 +971,9 @@ public class MockApiService implements ApiService {
     }
 
     @Override
-    public Boolean myDebugActive() {
+    public fr.enimaloc.catapult.common.dto.MyDebugDto myDebug() {
         UUID account = currentUserId();
-        return account != null && members.debug().active(account);
+        return account == null ? new fr.enimaloc.catapult.common.dto.MyDebugDto(false, 0) : members.debug().mine(account);
     }
 
     @Override

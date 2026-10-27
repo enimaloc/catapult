@@ -39,14 +39,15 @@ public class ApiAdminMemberDebugController {
 
     private final MemberDebugAdmin debugAdmin;
 
-    /** 409 when already on. The JWT is required: it names the admin who switched the mode on. */
+    /** 409 when already on; no body: secrets masked, every page replayed. The JWT is required: it names the admin who switched the mode on. */
     @PostMapping("/enable")
     public MemberDebugStateDto enable(@PathVariable UUID id, @RequestBody(required = false) DebugEnableRequest body,
                                       @AuthenticationPrincipal Jwt jwt) {
         if (jwt == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
         }
-        return debugAdmin.enable(id, body != null && body.revealSecrets(), () -> UUID.fromString(jwt.getSubject()));
+        DebugEnableRequest request = body != null ? body : new DebugEnableRequest(false, DebugEnableRequest.DEFAULT_REPLAY_RATE);
+        return debugAdmin.enable(id, request.revealSecrets(), request.replayRate(), () -> UUID.fromString(jwt.getSubject()));
     }
 
     @PostMapping("/disable")

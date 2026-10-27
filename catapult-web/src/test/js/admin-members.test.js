@@ -32,6 +32,8 @@ function page() {
             <span id="admin-debug-headline"></span>
             <input type="checkbox" id="admin-debug-reveal">
             <p id="admin-debug-warning" hidden></p>
+            <label id="admin-debug-replay-label" data-label="Pages replayed: {0}%"></label>
+            <input type="range" id="admin-debug-replay" min="0" max="100" step="5" value="100">
             <button id="admin-debug-cancel"></button>
             <button id="admin-debug-submit"></button>
         </div>
@@ -191,7 +193,7 @@ describe("admin-members", () => {
             reveal.dispatchEvent(new Event("change"));
             await click("#admin-debug-submit");
 
-            expect(posts()).toEqual([[`/admin/members/${ID}/debug/enable`, { revealSecrets: false }]]);
+            expect(posts()).toEqual([[`/admin/members/${ID}/debug/enable`, { revealSecrets: false, replayRate: 1 }]]);
             expect(dialog.open).toBe(false);
             expect(refreshed()).toBe(1);
         });
@@ -216,8 +218,26 @@ describe("admin-members", () => {
             await click("#admin-debug-submit");
             await click('[data-action="debug-enable"]');
 
-            expect(posts()).toEqual([[`/admin/members/${ID}/debug/enable`, { revealSecrets: true }]]);
+            expect(posts()).toEqual([[`/admin/members/${ID}/debug/enable`, { revealSecrets: true, replayRate: 1 }]]);
             expect(reveal.checked).toBe(false);
+        });
+
+        it("sends the replay rate chosen on the slider, shows it as it moves, and starts at every page the next time", async () => {
+            page();
+            await click('[data-action="debug-enable"]');
+            const slider = document.getElementById("admin-debug-replay");
+            const label = document.getElementById("admin-debug-replay-label");
+            expect(label.textContent).toBe("Pages replayed: 100%");
+
+            slider.value = 25;
+            slider.dispatchEvent(new Event("input"));
+            expect(label.textContent).toBe("Pages replayed: 25%");
+            await click("#admin-debug-submit");
+            await click('[data-action="debug-enable"]');
+
+            expect(posts()).toEqual([[`/admin/members/${ID}/debug/enable`, { revealSecrets: false, replayRate: 0.25 }]]);
+            expect(Number(slider.value)).toBe(100);
+            expect(label.textContent).toBe("Pages replayed: 100%");
         });
 
         it("keeps the dialog open when the activation is refused, and closes it on cancel", async () => {

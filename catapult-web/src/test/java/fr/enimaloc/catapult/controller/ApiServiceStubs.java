@@ -27,6 +27,7 @@ public final class ApiServiceStubs {
                 matchers[i] = types[i] == boolean.class ? ArgumentMatchers.anyBoolean()
                         : types[i] == int.class ? ArgumentMatchers.anyInt()
                         : types[i] == long.class ? ArgumentMatchers.anyLong()
+                        : types[i] == double.class ? ArgumentMatchers.anyDouble()
                         : ArgumentMatchers.any();
             }
             try {

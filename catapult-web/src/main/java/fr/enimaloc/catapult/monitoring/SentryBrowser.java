@@ -17,6 +17,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalDouble;
 import java.util.UUID;
 
 /**
@@ -24,7 +25,8 @@ import java.util.UUID;
  * with it): the same DSN, environment and release as the server's, and the request's trace, which
  * the page's own then continues, and the member's account id (as SentryUserInterceptor names them).
  * Pages are replayed whole at {@code catapult.sentry.replays-session-sample-rate} (none by default),
- * and no others, not even on an error (see monitoring.js); a member in debug mode has every page replayed and traced. None without a DSN.
+ * and no others, not even on an error (see monitoring.js); a member in debug mode has every page traced, and replayed
+ * at the rate the admin chose when switching the mode on. None without a DSN.
  */
 @ControllerAdvice(assignableTypes = {IndexController.class, ErrorPageController.class})
 public class SentryBrowser {
@@ -99,11 +101,12 @@ public class SentryBrowser {
         BaggageHeader baggage = Sentry.getBaggage();
         ApiService api = apiService.getIfAvailable();
         UUID account = api == null ? null : api.currentUserId();
-        // A member in debug mode is replayed and traced in full, whatever the configured (or degraded) rates
+        // A member in debug mode is traced in full and replayed at the rate the admin chose, whatever the
+        // configured (or degraded) rates
         DebugMembers debug = debugMembers.getIfAvailable();
-        boolean debugged = account != null && debug != null && debug.isActive(account);
-        return new Config(dsn, environment, release.orElse(null), debugged ? 1.0 : tracesSampleRate,
-                debugged ? 1.0 : replaysSessionSampleRate,
+        OptionalDouble debugReplay = account == null || debug == null ? OptionalDouble.empty() : debug.replayRate(account);
+        return new Config(dsn, environment, release.orElse(null), debugReplay.isPresent() ? 1.0 : tracesSampleRate,
+                debugReplay.orElse(replaysSessionSampleRate),
                 account == null ? null : account.toString(),
                 trace == null ? null : trace.getValue(), baggage == null ? null : baggage.getValue(), SDK);
     }

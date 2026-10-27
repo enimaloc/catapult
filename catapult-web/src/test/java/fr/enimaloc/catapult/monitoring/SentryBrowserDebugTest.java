@@ -25,17 +25,18 @@ class SentryBrowserDebugTest {
         context.getBeanFactory().registerSingleton("api", api);
         ObjectProvider<ApiService> provider = context.getBeanProvider(ApiService.class);
         DebugMembers debug = mock(DebugMembers.class);
-        when(debug.isActive(DEBUGGED)).thenReturn(true);
+        when(debug.replayRate(DEBUGGED)).thenReturn(java.util.OptionalDouble.of(0.25));
         context.getBeanFactory().registerSingleton("debug", debug);
         return new SentryBrowser("https://key@sentry.test/1", "production", traces, replays, Optional.empty(), provider, context.getBeanProvider(DebugMembers.class));
     }
 
     @Test
-    void debuggedMember_getsFullReplayAndTraces() {
-        // 0.1 is what the degraded profile caps the traces to: the debug override wins over it
-        assertThat(browser(DEBUGGED, 0.1, 0).config().script())
+    void debuggedMember_getsFullTraces_andTheReplayRateTheAdminChose() {
+        // 0.1 is what the degraded profile caps the traces to: the debug override wins over it, and the
+        // admin's rate over the configured one
+        assertThat(browser(DEBUGGED, 0.1, 0.5).config().script())
                 .containsEntry("tracesSampleRate", 1.0)
-                .containsEntry("replaysSessionSampleRate", 1.0);
+                .containsEntry("replaysSessionSampleRate", 0.25);
     }
 
     @Test

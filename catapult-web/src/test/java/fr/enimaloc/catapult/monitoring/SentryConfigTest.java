@@ -96,7 +96,7 @@ class SentryConfigTest {
     static ApiService api() {
         ApiService api = mock(ApiService.class);
         when(api.currentUserId()).thenAnswer(inv -> ApiClient.currentSubject());
-        when(api.myDebugActive()).thenAnswer(inv -> DEBUGGED.equals(ApiClient.currentSubject()));
+        when(api.myDebug()).thenAnswer(inv -> new fr.enimaloc.catapult.common.dto.MyDebugDto(DEBUGGED.equals(ApiClient.currentSubject()), 1));
         return api;
     }
 
@@ -143,10 +143,10 @@ class SentryConfigTest {
             assertThat(sampleAs(sampler, "/dashboard", null, DEBUGGED)).isEqualTo(1.0);
             assertThat(sampleAs(sampler, "/dashboard", null, OTHER)).isEqualTo(0.2);
         }
-        verify(api, times(2)).myDebugActive();
+        verify(api, times(2)).myDebug();
         // nobody logged in: nothing to ask
         sampleAs(sampler, "/dashboard", null, null);
-        verify(api, times(2)).myDebugActive();
+        verify(api, times(2)).myDebug();
     }
 
     @Test

@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.debug;
 
+import fr.enimaloc.catapult.common.dto.MyDebugDto;
 import fr.enimaloc.catapult.service.ApiService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
@@ -15,11 +16,12 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
+import java.util.OptionalDouble;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Whether a member is in debug mode, as catapult-api answers for the logged-in member, remembered for
+ * Whether a member is in debug mode, and the share of their pages replayed, as catapult-api answers for the logged-in member, remembered for
  * {@link #TTL} so a page render does not call it every time. A member the admin toggles through this
  * instance is {@link #evict forgotten} at once. A failed call counts as "not debugged" (the page
  * must render) and is remembered only for {@link #FAILURE_TTL}, so a down catapult-api is not hammered.
@@ -30,7 +32,9 @@ public class DebugMembers {
     static final Duration FAILURE_TTL = Duration.ofSeconds(5);
     private static final Logger log = LoggerFactory.getLogger(DebugMembers.class);
 
-    private record Entry(boolean active, Instant expiresAt) {}
+    private record Entry(boolean active, double replayRate, Instant expiresAt) {}
+
+    private static final Entry OFF = new Entry(false, 0, Instant.MAX);
 
     // Kept lazy on purpose: SentryConfig.tracesSampler -> DebugMembers -> RealApiService -> ApiClient -> Sentry
     // RestClient customizer -> sentryHub is a cycle if ApiService is injected directly.
@@ -50,24 +54,35 @@ public class DebugMembers {
 
     /** Whether {@code member}, the logged-in one, is in debug mode. */
     public boolean isActive(UUID member) {
-        if (member == null) return false;
+        return lookup(member).active();
+    }
+
+    /** The share of {@code member}'s pages, the logged-in one's, replayed whole; empty when not in debug mode. */
+    public OptionalDouble replayRate(UUID member) {
+        Entry entry = lookup(member);
+        return entry.active() ? OptionalDouble.of(entry.replayRate()) : OptionalDouble.empty();
+    }
+
+    private Entry lookup(UUID member) {
+        if (member == null) return OFF;
         Instant now = clock.instant();
         Entry cached = cache.get(member);
         if (cached != null && now.isBefore(cached.expiresAt())) {
-            return cached.active();
+            return cached;
         }
         Entry fresh;
         try {
             ApiService api = apiService.getIfAvailable();
-            Boolean active = api == null ? null : api.myDebugActive();
+            MyDebugDto debug = api == null ? null : api.myDebug();
             // null: catapult-api could not tell, which is remembered only briefly
-            fresh = active == null ? new Entry(false, now.plus(FAILURE_TTL)) : new Entry(active, now.plus(TTL));
+            fresh = debug == null ? new Entry(false, 0, now.plus(FAILURE_TTL))
+                    : new Entry(debug.active(), debug.replayRate(), now.plus(TTL));
         } catch (RuntimeException e) {
             log.debug("Could not tell whether {} is in debug mode: {}", member, e.toString());
-            fresh = new Entry(false, now.plus(FAILURE_TTL));
+            fresh = new Entry(false, 0, now.plus(FAILURE_TTL));
         }
         cache.put(member, fresh);
-        return fresh.active();
+        return fresh;
     }
 
     /** Whether the member of the request being served is in debug mode; false when nobody is, or on any failure. */

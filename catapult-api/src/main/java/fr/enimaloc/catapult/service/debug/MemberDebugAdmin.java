@@ -33,9 +33,9 @@ public class MemberDebugAdmin {
     private final UserAccountRepository users;
 
     /** 409 when already on. The admin is only named once the member is known. */
-    public MemberDebugStateDto enable(UUID id, boolean revealSecrets, Supplier<UUID> adminId) {
+    public MemberDebugStateDto enable(UUID id, boolean revealSecrets, double replayRate, Supplier<UUID> adminId) {
         requireMember(id);
-        debugService.enable(id, revealSecrets, adminId.get());
+        debugService.enable(id, revealSecrets, replayRate, adminId.get());
         return state(id);
     }
 

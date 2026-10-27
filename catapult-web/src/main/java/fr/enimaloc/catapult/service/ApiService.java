@@ -158,7 +158,7 @@ public interface ApiService {
     /** The member's debug mode; null when it was never on or catapult-api fails. */
     fr.enimaloc.catapult.common.dto.admin.MemberDebugStateDto memberDebug(java.util.UUID memberId);
     /** Turns the member's debug mode on; {@code revealSecrets} false masks the secrets in what is recorded. */
-    int enableMemberDebug(java.util.UUID memberId, boolean revealSecrets);
+    int enableMemberDebug(java.util.UUID memberId, boolean revealSecrets, double replayRate);
     int disableMemberDebug(java.util.UUID memberId);
     /** Deletes everything recorded for the member. */
     int clearMemberDebug(java.util.UUID memberId);
@@ -167,8 +167,8 @@ public interface ApiService {
     fr.enimaloc.catapult.common.dto.admin.DebugExchangeDto memberDebugExchange(java.util.UUID memberId, java.util.UUID exchangeId);
     /** The services the member's exchanges were with, for the filter. */
     List<String> memberDebugServices(java.util.UUID memberId);
-    /** Whether the logged-in member is in debug mode; null when catapult-api could not tell. */
-    Boolean myDebugActive();
+    /** Whether the logged-in member is in debug mode, and their replay rate; null when catapult-api could not tell. */
+    fr.enimaloc.catapult.common.dto.MyDebugDto myDebug();
     /** Copies the chosen parts of a member's data onto another member. */
     int adminMigrateMember(java.util.UUID memberId, java.util.UUID targetId,
                             boolean settings, boolean getters, boolean bindings);

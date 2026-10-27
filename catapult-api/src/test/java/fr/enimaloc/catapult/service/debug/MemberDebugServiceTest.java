@@ -56,11 +56,12 @@ class MemberDebugServiceTest {
     void enable_makesTheMemberDebugged() {
         when(sessions.findById(member)).thenReturn(Optional.empty());
 
-        MemberDebugSession s = service.enable(member, true, admin);
+        MemberDebugSession s = service.enable(member, true, 0.25, admin);
 
         assertThat(registry.modeOf(member)).contains(new DebugMode(member, true));
         assertThat(s.isActive()).isTrue();
         assertThat(s.isRevealSecrets()).isTrue();
+        assertThat(s.getReplayRate()).isEqualTo(0.25);
         assertThat(s.getEnabledBy()).isEqualTo(admin);
         assertThat(s.getEnabledAt()).isEqualTo(NOW);
         assertThat(s.getDisabledAt()).isNull();
@@ -71,7 +72,7 @@ class MemberDebugServiceTest {
         stored(true, null);
         registry.activate(member, false);
 
-        assertThatThrownBy(() -> service.enable(member, false, admin))
+        assertThatThrownBy(() -> service.enable(member, false, 1, admin))
             .isInstanceOfSatisfying(ResponseStatusException.class,
                 e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
     }
@@ -93,7 +94,7 @@ class MemberDebugServiceTest {
     void reEnable_keepsExchanges_andClearsDisabledAt() {
         MemberDebugSession s = stored(false, NOW.minusSeconds(60));
 
-        service.enable(member, false, admin);
+        service.enable(member, false, 1, admin);
 
         assertThat(s.isActive()).isTrue();
         assertThat(s.getDisabledAt()).isNull();
@@ -161,7 +162,7 @@ class MemberDebugServiceTest {
         when(sessions.findById(member)).thenReturn(Optional.empty());
         TransactionSynchronizationManager.initSynchronization();
         try {
-            service.enable(member, false, admin);
+            service.enable(member, false, 1, admin);
             assertThat(registry.modeOf(member)).isEmpty();
 
             TransactionSynchronizationManager.getSynchronizations().forEach(TransactionSynchronization::afterCommit);

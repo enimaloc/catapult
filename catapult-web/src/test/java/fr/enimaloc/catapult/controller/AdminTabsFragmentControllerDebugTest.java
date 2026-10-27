@@ -70,7 +70,7 @@ class AdminTabsFragmentControllerDebugTest {
     }
 
     private static MemberDebugStateDto state(boolean active, boolean reveal) {
-        return new MemberDebugStateDto(active, reveal, NOW.minusSeconds(7200), ADMIN, active ? null : NOW,
+        return new MemberDebugStateDto(active, reveal, 0.25, NOW.minusSeconds(7200), ADMIN, active ? null : NOW,
                 active ? null : NOW.plusSeconds(30 * 86400L), 4);
     }
 

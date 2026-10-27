@@ -40,32 +40,45 @@ class AdminMembersControllerDebugTest {
 
     @Test
     void enable_forwardsRevealSecrets() throws Exception {
-        when(apiService.enableMemberDebug(ID, true)).thenReturn(204);
-        when(apiService.enableMemberDebug(ID, false)).thenReturn(204);
+        when(apiService.enableMemberDebug(ID, true, 1.0)).thenReturn(204);
+        when(apiService.enableMemberDebug(ID, false, 1.0)).thenReturn(204);
 
         mvc.perform(debugPost("enable", true).contentType(MediaType.APPLICATION_JSON).content("{\"revealSecrets\":true}"))
                 .andExpect(status().isNoContent());
-        verify(apiService).enableMemberDebug(ID, true);
+        verify(apiService).enableMemberDebug(ID, true, 1.0);
 
         mvc.perform(debugPost("enable", true).contentType(MediaType.APPLICATION_JSON).content("{\"revealSecrets\":false}"))
                 .andExpect(status().isNoContent());
-        verify(apiService).enableMemberDebug(ID, false);
+        verify(apiService).enableMemberDebug(ID, false, 1.0);
     }
 
     @Test
-    void anEmptyObjectOrNoBody_meansMasked() throws Exception {
-        when(apiService.enableMemberDebug(ID, false)).thenReturn(204);
+    void enable_forwardsTheReplayRate_andRefusesOneOutsideZeroToOne() throws Exception {
+        when(apiService.enableMemberDebug(ID, false, 0.25)).thenReturn(204);
+
+        mvc.perform(debugPost("enable", true).contentType(MediaType.APPLICATION_JSON).content("{\"replayRate\":0.25}"))
+                .andExpect(status().isNoContent());
+        verify(apiService).enableMemberDebug(ID, false, 0.25);
+
+        mvc.perform(debugPost("enable", true).contentType(MediaType.APPLICATION_JSON).content("{\"replayRate\":1.5}"))
+                .andExpect(status().isBadRequest());
+        verify(apiService, org.mockito.Mockito.never()).enableMemberDebug(ID, false, 1.5);
+    }
+
+    @Test
+    void anEmptyObjectOrNoBody_meansMaskedAndEveryPageReplayed() throws Exception {
+        when(apiService.enableMemberDebug(ID, false, 1.0)).thenReturn(204);
 
         mvc.perform(debugPost("enable", true).contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isNoContent());
         mvc.perform(debugPost("enable", true)).andExpect(status().isNoContent());
 
-        verify(apiService, org.mockito.Mockito.times(2)).enableMemberDebug(ID, false);
+        verify(apiService, org.mockito.Mockito.times(2)).enableMemberDebug(ID, false, 1.0);
     }
 
     @Test
     void notFoundAndUnreachable_areRelayed() throws Exception {
-        when(apiService.enableMemberDebug(ID, false)).thenReturn(404);
+        when(apiService.enableMemberDebug(ID, false, 1.0)).thenReturn(404);
         when(apiService.disableMemberDebug(ID)).thenReturn(404);
         when(apiService.clearMemberDebug(ID)).thenReturn(502);
 
@@ -73,7 +86,7 @@ class AdminMembersControllerDebugTest {
                 .andExpect(status().isNotFound());
         mvc.perform(debugPost("disable", true)).andExpect(status().isNotFound());
         mvc.perform(debugPost("clear", true)).andExpect(status().isBadGateway());
-        when(apiService.enableMemberDebug(ID, false)).thenReturn(502);
+        when(apiService.enableMemberDebug(ID, false, 1.0)).thenReturn(502);
         when(apiService.disableMemberDebug(ID)).thenReturn(502);
         mvc.perform(debugPost("enable", true)).andExpect(status().isBadGateway());
         mvc.perform(debugPost("disable", true)).andExpect(status().isBadGateway());
@@ -96,7 +109,7 @@ class AdminMembersControllerDebugTest {
 
     @Test
     void catapultApisRefusal_isAnswered() throws Exception {
-        when(apiService.enableMemberDebug(ID, false)).thenReturn(409);
+        when(apiService.enableMemberDebug(ID, false, 1.0)).thenReturn(409);
 
         mvc.perform(debugPost("enable", true).contentType(MediaType.APPLICATION_JSON).content("{\"revealSecrets\":false}"))
                 .andExpect(status().isConflict());
@@ -110,7 +123,7 @@ class AdminMembersControllerDebugTest {
         mvc.perform(debugPost("clear", false)).andExpect(status().is4xxClientError());
 
         org.mockito.Mockito.verify(apiService, org.mockito.Mockito.never()).enableMemberDebug(
-                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyBoolean());
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyBoolean(), org.mockito.ArgumentMatchers.anyDouble());
         verifyNoInteractions(debugMembers);
     }
 }
