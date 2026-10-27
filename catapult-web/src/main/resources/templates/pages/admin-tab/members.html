@@ -51,7 +51,7 @@
 
         <div class="admin-member" th:each="m : ${page.members()}"
              th:with="name=${m.twitchUsername() ?: '—'}, isSelf=${m.id() == currentUserId}"
-             th:attr="data-member-id=${m.id()},data-member-name=${name},data-admin-key=${m.id()}"
+             th:attr="data-member-id=${m.id()},data-admin-key=${m.id()},data-member-name=${name}"
              th:classappend="${m.systemAccount()} ? 'admin-member-system'">
             <div class="admin-member-identity">
                 <mdui-avatar th:src="${m.profileImageUrl()}" th:unless="${m.profileImageUrl() == null}"></mdui-avatar>
