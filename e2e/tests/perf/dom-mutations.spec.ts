@@ -275,10 +275,12 @@ test.describe("DOM mutations", () => {
       send("game.detected", detected(playing!)),
       send("bot.toggled", { enabled: false }),
       send("bot.toggled", { enabled: true }),
-      send("dtdd.mapping.changed"),
-      send("dtdd.mapping.changed"),
-      send("custom.bindings.updated"),
-      send("custom.bindings.updated"),
+      // The mapping of a game the page shows no card for (IGDB is off under perf): the page re-renders
+      send("dtdd.mapping.changed", { igdbId: "1", current: null, pendingProposals: 0 }),
+      send("dtdd.mapping.changed", { igdbId: "1", current: null, pendingProposals: 0 }),
+      // The streamer has no custom binding (custom-binding-crud leaves none)
+      send("custom.bindings.updated", { bindings: [], activeId: null }),
+      send("custom.bindings.updated", { bindings: [], activeId: null }),
       // A provider other than Steam: Xbox (off under perf), connected then disconnected again
       send("connection.changed", { provider: "XBOX", connected: true, profile: null }),
       send("connection.changed", { provider: "XBOX", connected: false, profile: null }),
