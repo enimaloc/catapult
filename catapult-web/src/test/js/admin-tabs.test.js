@@ -477,6 +477,22 @@ describe("admin-tabs", () => {
             expect(shown()).toBe("other");
         });
 
+        it("patches a searched or paged view from the results it shows, or from the URL a tab script gives", async () => {
+            served = view([["a", "A"]]);
+            fetched.mockImplementation(async () => response(200, served));
+            history.replaceState(null, "", "/admin#caches/igdb-game-cache");
+            page();
+            await flush();
+            panel().insertAdjacentHTML("beforeend", `<div data-admin-results></div><button data-admin-page="2"></button>`);
+            panel().querySelector('[data-admin-page="2"]').click();
+            await flush();
+
+            await CatapultAdminTabs.patch(panel());
+            await CatapultAdminTabs.patch(panel(), "/spa/admin/caches?status=OTHER");
+
+            expect(urls().slice(-2)).toEqual(["/spa/admin/caches/igdb-game-cache?q=&page=2", "/spa/admin/caches?status=OTHER"]);
+        });
+
         it("renders a view never shown as a whole", async () => {
             page("members");
             await flush();

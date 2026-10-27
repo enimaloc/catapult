@@ -216,13 +216,17 @@ window.CatapultAdminTabs = (function () {
     /**
      * Brings `panel`'s view up to date after an edit, patching only its marked parts the server now
      * renders differently (see the top). A view that can't be patched is rendered again as a whole.
+     * `from`: the URL of what the view shows, when a tab script fetched it itself (a filter of its own).
      */
-    async function patch(panel) {
+    async function patch(panel, from) {
         const state = stateOf(panel);
-        const url = state.view;
-        if (!url) return show(panel, true);
+        const { view, q, page } = state;
+        if (!view) return show(panel, true);
+        // a sub-view searched or paged is patched from the results it shows
+        const url = from ?? (q || page ? fragmentUrl(tabOf(panel), state.sub, { q, page }) : view);
         const html = await fetchHtml(url);
-        if (state.view !== url) return; // another view was asked for meanwhile
+        // another view, search or page was asked for meanwhile
+        if (state.view !== view || state.q !== q || state.page !== page) return;
         if (html === null) {
             CatapultChannel.showError(panel.dataset.unavailable);
             return;
@@ -269,7 +273,7 @@ window.CatapultAdminTabs = (function () {
         state.results = url;
         const html = await fetchHtml(url);
         if (state.results !== url) return;
-        const fresh = html === null ? null : new DOMParser().parseFromString(html, "text/html").querySelector("[data-admin-results]");
+        const fresh = html === null ? null : parse(html).querySelector("[data-admin-results]");
         const current = panel.querySelector("[data-admin-results]");
         if (!fresh || !current) {
             CatapultChannel.showError(panel.dataset.unavailable);

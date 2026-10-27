@@ -20,11 +20,13 @@
     </div>
 
     <th:block th:if="${proposals == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
-    <th:block th:if="${proposals != null and proposals.isEmpty()}">
+    <!--/* the list and its empty state both rendered, one hidden: admin-tabs.js patches them after an action */-->
+    <div data-admin-value="empty" th:if="${proposals != null}" th:hidden="${!proposals.isEmpty()}">
         <th:block th:replace="~{pages/admin-tab/common :: empty('inbox', #{admin.dtdd-mapping.empty})}"></th:block>
-    </th:block>
+    </div>
 
-    <mdui-card class="admin-table" variant="outlined" th:if="${proposals != null and !proposals.isEmpty()}">
+    <mdui-card class="admin-table" variant="outlined" data-admin-list="proposals" th:if="${proposals != null}"
+               th:hidden="${proposals.isEmpty()}">
         <div class="admin-row admin-dtdd-row admin-row-head" aria-hidden="true">
             <span th:text="#{admin.dtdd-mapping.column.created}">Created</span>
             <span th:text="#{admin.dtdd-mapping.column.igdb}">IGDB id</span>
@@ -33,7 +35,7 @@
             <span th:text="#{admin.dtdd-mapping.column.reason}">Reason</span>
             <span th:if="${status == 'PENDING'}"></span>
         </div>
-        <div class="admin-row admin-dtdd-row" th:each="p : ${proposals}" th:attr="data-id=${p.id()}">
+        <div class="admin-row admin-dtdd-row" th:each="p : ${proposals}" th:attr="data-id=${p.id()},data-admin-key=${p.id()}">
             <span class="admin-member-id" th:attr="data-label=#{admin.dtdd-mapping.column.created}"
                   th:text="${p.createdAt() == null ? '—' : #temporals.format(p.createdAt(), #messages.msg('format.datetime'))}">created</span>
             <span class="admin-cell" th:attr="data-label=#{admin.dtdd-mapping.column.igdb}" th:text="${p.igdbId()}">100</span>

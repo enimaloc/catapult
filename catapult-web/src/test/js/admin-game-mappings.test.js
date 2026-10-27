@@ -70,8 +70,9 @@ beforeEach(async () => {
     window.fetch = fetched;
     window.GameSearch = { attach: () => ({ select: () => {}, selected: () => null }) };
     window.CatapultCsrf = { readCookie: () => "" };
+    await load("admin-tabs", "admin-game-mappings");
     window.CatapultChannel = { showError: vi.fn() };
-    await load("admin-game-mappings");
+    window.CatapultAdminTabs.patch = vi.fn(async () => {});
     page();
 });
 
@@ -172,6 +173,8 @@ const q = selector => document.querySelector(selector);
 const click = selector => q(selector).click();
 const error = () => q(".admin-gm-error");
 const result = () => q(".admin-gm-result");
+const LISTS = "/spa/admin/game-mappings?page=1&missingPage=0";
+const panel = () => q('mdui-tab-panel[value="game-mappings"]');
 const fragment = rows => `<div class="admin-game-mappings" data-page="1" data-missing-page="0"><div data-gm-lists>${rows}</div></div>`;
 let selected;
 
@@ -254,9 +257,7 @@ describe("admin-game-mappings form and lists", () => {
         selected = { id: "9", name: "Portal TW" };
         q('[data-gm-override="ccls"] .admin-gm-override-switch').checked = true;
         q('[data-gm-override="ccls"] mdui-checkbox').checked = true;
-        fetched
-            .mockResolvedValueOnce(response(200, { mapping: { id: "88" }, bindingsUpdated: 2, liveChannelsUpdated: 1 }))
-            .mockResolvedValueOnce(response(200, fragment(ROW)));
+        fetched.mockResolvedValueOnce(response(200, { mapping: { id: "88" }, bindingsUpdated: 2, liveChannelsUpdated: 1 }));
 
         click(".admin-gm-save");
         await vi.advanceTimersByTimeAsync(0);
@@ -269,15 +270,17 @@ describe("admin-game-mappings form and lists", () => {
         });
         expect(result().textContent).toBe("B 2 L 1 F 0");
         expect(q(".admin-gm-form-title").textContent).toBe("Edit");
-        expect(fetched.mock.calls[1][0]).toBe("/spa/admin/game-mappings?page=1&missingPage=0");
+        // the pages shown patched (admin-tabs.js), the dialog left as it is
+        expect(CatapultAdminTabs.patch).toHaveBeenCalledWith(panel(), LISTS);
+        expect(fetched).toHaveBeenCalledTimes(1);
         expect(q(".admin-gm-save").disabled).toBe(false);
 
         selected = { id: "9", name: "Portal TW" };
-        fetched.mockResolvedValueOnce(response(200, {})).mockResolvedValueOnce(response(200, fragment(ROW)));
+        fetched.mockResolvedValueOnce(response(200, {}));
         click(".admin-gm-save");
         await vi.advanceTimersByTimeAsync(0);
-        expect(fetched.mock.calls[2][0]).toBe("/admin/game-mappings/88");
-        expect(fetched.mock.calls[2][1].method).toBe("PUT");
+        expect(fetched.mock.calls[1][0]).toBe("/admin/game-mappings/88");
+        expect(fetched.mock.calls[1][1].method).toBe("PUT");
     });
 
     it("keeps the override values that have no box on a save", async () => {
@@ -290,13 +293,13 @@ describe("admin-game-mappings form and lists", () => {
         expect(fetched.mock.calls[0][0]).toBe("/admin/game-mappings/7");
     });
 
-    it("tells a refusal by its status and reloads on a 404", async () => {
+    it("tells a refusal by its status and patches on a 404", async () => {
         fullPage();
         click("#admin-gm-new");
         sourceId().value = "s1";
         selected = { id: "9", name: "n" };
         fetched.mockResolvedValueOnce(response(409, "")).mockResolvedValueOnce(response(500, ""))
-            .mockResolvedValueOnce(response(404, "")).mockResolvedValueOnce(response(200, fragment(ROW)));
+            .mockResolvedValueOnce(response(404, ""));
 
         click(".admin-gm-save");
         await vi.advanceTimersByTimeAsync(0);
@@ -306,8 +309,9 @@ describe("admin-game-mappings form and lists", () => {
         expect(error().textContent).toBe("Unavailable");
         click(".admin-gm-save");
         await vi.advanceTimersByTimeAsync(0);
-        expect(fetched).toHaveBeenCalledTimes(4);
-        expect(fetched.mock.calls[3][0]).toContain("/spa/admin/game-mappings");
+        expect(fetched).toHaveBeenCalledTimes(3);
+        expect(CatapultAdminTabs.patch).toHaveBeenCalledTimes(1);
+        expect(CatapultAdminTabs.patch).toHaveBeenCalledWith(panel(), LISTS);
     });
 
     it("tells unavailable when the request cannot be sent", async () => {
@@ -364,7 +368,7 @@ describe("admin-game-mappings form and lists", () => {
         expect(window.CatapultChannel.showError).toHaveBeenCalledWith("Unavailable");
     });
 
-    it("asks before deleting, then deletes and reloads", async () => {
+    it("asks before deleting, then deletes and patches the lists", async () => {
         fullPage();
         click("[data-gm-delete]");
         const dialog = q("#admin-gm-delete-dialog");
@@ -373,7 +377,7 @@ describe("admin-game-mappings form and lists", () => {
         expect(dialog.dataset.id).toBe("7");
 
         dialog.querySelector('[name="applyLive"]').checked = true;
-        fetched.mockResolvedValueOnce(response(200, { bindingsUpdated: 1 })).mockResolvedValueOnce(response(200, fragment(ROW)));
+        fetched.mockResolvedValueOnce(response(200, { bindingsUpdated: 1 }));
         click(".admin-gm-confirm-delete");
         await vi.advanceTimersByTimeAsync(0);
 
@@ -381,15 +385,29 @@ describe("admin-game-mappings form and lists", () => {
         expect(fetched.mock.calls[0][1].method).toBe("DELETE");
         expect(dialog.open).toBe(false);
         expect(window.mdui.snackbar).toHaveBeenCalledWith({ message: "Deleted. B 1 L 0 F 0" });
-        expect(fetched).toHaveBeenCalledTimes(2);
+        expect(fetched).toHaveBeenCalledTimes(1);
+        expect(CatapultAdminTabs.patch).toHaveBeenCalledWith(panel(), LISTS);
     });
 
-    it("keeps the deletion dialog on a refusal, and closes it and reloads when the mapping is gone", async () => {
+    it("steps back a page a deletion emptied, once the lists are patched", async () => {
+        fullPage(`<div data-admin-list="mappings"><div class="admin-gm-row" data-admin-key="7" data-id="7"
+            data-source-name="Halo"><button data-gm-delete></button></div></div>`);
+        CatapultAdminTabs.patch.mockImplementation(async () => q('[data-admin-key="7"]').remove());
+        click("[data-gm-delete]");
+        fetched.mockResolvedValueOnce(response(200, {})).mockResolvedValueOnce(response(200, fragment(ROW)));
+
+        click(".admin-gm-confirm-delete");
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(fetched.mock.calls[1][0]).toBe("/spa/admin/game-mappings?page=0&missingPage=0");
+        expect(q(".admin-gm-row")).not.toBeNull();
+    });
+
+    it("keeps the deletion dialog on a refusal, and closes it and patches when the mapping is gone", async () => {
         fullPage();
         click("[data-gm-delete]");
         const dialog = q("#admin-gm-delete-dialog");
-        fetched.mockResolvedValueOnce(response(409, "")).mockResolvedValueOnce(response(404, ""))
-            .mockResolvedValueOnce(response(200, fragment(ROW)));
+        fetched.mockResolvedValueOnce(response(409, "")).mockResolvedValueOnce(response(404, ""));
 
         click(".admin-gm-confirm-delete");
         await vi.advanceTimersByTimeAsync(0);
@@ -400,7 +418,8 @@ describe("admin-game-mappings form and lists", () => {
         await vi.advanceTimersByTimeAsync(0);
         expect(window.CatapultChannel.showError).toHaveBeenLastCalledWith("Unavailable");
         expect(dialog.open).toBe(false);
-        expect(fetched).toHaveBeenCalledTimes(3);
+        expect(fetched).toHaveBeenCalledTimes(2);
+        expect(CatapultAdminTabs.patch).toHaveBeenCalledTimes(1);
     });
 
     it("fills a template, leaving unknown keys as they are", () => {

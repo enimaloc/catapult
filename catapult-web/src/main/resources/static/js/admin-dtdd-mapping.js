@@ -1,10 +1,11 @@
 /**
  * The admin DTDD mapping tab. The status chips load the list of that status (the chosen one stays
- * in the tab root's data-status, so a reload after an action keeps it). Approve posts at once;
+ * in the tab root's data-status, so a patch after an action keeps it). Approve posts at once;
  * Reject opens a small dialog asking an optional reason first. Both post to AdminDtddMappingController
  * with their button disabled meanwhile. A refusal is told by its status, never by catapult-api's
- * message: 409 (another admin resolved it first) and 404 (gone) say so and reload the list, which no
- * longer holds the proposal. Listeners are delegated to the panel: its content comes and goes.
+ * message: 409 (another admin resolved it first) and 404 (gone) say so. Either way the list is patched
+ * (admin-tabs.js), which removes the proposal's row. Listeners are delegated to the panel: its content
+ * comes and goes.
  */
 window.CatapultAdminDtddMapping = (function () {
     const ok = status => status >= 200 && status < 300;
@@ -21,13 +22,15 @@ window.CatapultAdminDtddMapping = (function () {
         }
     }
 
-    /** Swaps the panel's content for the list of `status`; left as is when it can't be fetched. */
+    const listUrl = status => `/spa/admin/dtdd-mapping?status=${encodeURIComponent(status)}`;
+
+    /** Swaps the panel's content for the list of `status` (another filter); left as is when it can't be fetched. */
     async function load(panel, status) {
         const root = panel.querySelector(".admin-dtdd-mapping");
         const unavailable = root?.dataset.labelUnavailable ?? panel.dataset.unavailable;
         let html = null;
         try {
-            const response = await fetch(`/spa/admin/dtdd-mapping?status=${encodeURIComponent(status)}`);
+            const response = await fetch(listUrl(status));
             if (response.ok) html = await response.text();
         } catch {
             // not fetched: told below
@@ -39,16 +42,16 @@ window.CatapultAdminDtddMapping = (function () {
         panel.innerHTML = html;
     }
 
-    /** Tells what happened to a resolution: done, already resolved, gone or unavailable; reloads unless unavailable. */
+    /** Tells what happened to a resolution: done, already resolved, gone or unavailable; patches unless unavailable. */
     async function settle(panel, root, status, doneLabel) {
-        const reload = () => load(panel, root.dataset.status);
+        const patch = () => CatapultAdminTabs.patch(panel, listUrl(root.dataset.status));
         if (ok(status)) {
             window.mdui?.snackbar?.({ message: root.dataset[doneLabel] });
-            return reload();
+            return patch();
         }
         if (status === 409 || status === 404) {
             CatapultChannel.showError(root.dataset[status === 409 ? "labelConflict" : "labelUnknown"]);
-            return reload();
+            return patch();
         }
         CatapultChannel.showError(root.dataset.labelUnavailable);
     }
@@ -57,7 +60,7 @@ window.CatapultAdminDtddMapping = (function () {
 
     async function approve(panel, root, button) {
         const status = await post(button, urlOf(button.dataset.approve, "approve"), {});
-        button.disabled = true; // post() re-enabled it; still busy until the list reloads
+        button.disabled = true; // post() re-enabled it; still busy until the list is patched
         try {
             await settle(panel, root, status, "labelApproved");
         } finally {

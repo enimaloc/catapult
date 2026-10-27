@@ -1,7 +1,7 @@
 /*
  * The admin Notifications tab: the create dialog checks its fields as catapult-api does before
  * posting, previews the Markdown through the server, targets everyone or one member; a notification
- * is deleted after a confirmation. Both reload the tab.
+ * is deleted after a confirmation. Both patch the list.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { flush, html, load, render, response } from "./helpers.js";
@@ -113,7 +113,7 @@ beforeEach(async () => {
     window.mdui = { confirm: vi.fn(() => (confirmAnswer ? Promise.resolve() : Promise.reject())), snackbar: vi.fn() };
     await load("admin-tabs", "admin-notifications");
     window.CatapultChannel = { showError: vi.fn() };
-    window.CatapultAdminTabs.reload = vi.fn(async () => {});
+    window.CatapultAdminTabs.patch = vi.fn(async () => {});
     page();
     await click("#admin-notifications-new");
 });
@@ -167,7 +167,7 @@ describe("admin-notifications", () => {
         expect(posted).not.toHaveBeenCalled();
     });
 
-    it("posts a valid form, then reloads the tab", async () => {
+    it("posts a valid form, then patches the list", async () => {
         valid();
         await click(".admin-notifications-save");
         expect(posted.mock.calls).toEqual([["/admin/notifications", {
@@ -175,7 +175,7 @@ describe("admin-notifications", () => {
             ctaUrl: null, ctaLabel: null, expiresAt: null, targetUserId: null, audience: null
         }]]);
         expect(dialog().open).toBe(false);
-        expect(CatapultAdminTabs.reload).toHaveBeenCalled();
+        expect(CatapultAdminTabs.patch).toHaveBeenCalled();
     });
 
     it("sends the call to action and the expiry as ISO", async () => {
@@ -280,7 +280,7 @@ describe("admin-notifications", () => {
         posted.mockResolvedValueOnce(response(502));
         await click(".admin-notifications-save");
         expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Down");
-        expect(CatapultAdminTabs.reload).not.toHaveBeenCalled();
+        expect(CatapultAdminTabs.patch).not.toHaveBeenCalled();
     });
 
     it("says unavailable when the request could not be sent", async () => {
@@ -324,7 +324,7 @@ describe("admin-notifications", () => {
         expect(field("mode").value).toBe("edit");
     });
 
-    it("deletes after a confirmation, the button disabled meanwhile, then reloads", async () => {
+    it("deletes after a confirmation, the button disabled meanwhile, then patches the list", async () => {
         let release;
         posted.mockImplementationOnce(() => new Promise(resolve => { release = () => resolve(response(204)); }));
         const button = document.querySelector(".admin-notification-delete");
@@ -335,7 +335,7 @@ describe("admin-notifications", () => {
         expect(posted).toHaveBeenCalledWith("/admin/notifications/n1/delete", {});
         release();
         await flush();
-        expect(CatapultAdminTabs.reload).toHaveBeenCalled();
+        expect(CatapultAdminTabs.patch).toHaveBeenCalled();
     });
 
     it("opens one confirmation and posts once on a double click", async () => {
@@ -364,7 +364,7 @@ describe("admin-notifications", () => {
         await click(".admin-notification-delete");
         expect(document.querySelector(".admin-notification-delete").disabled).toBe(false);
         expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Down");
-        expect(CatapultAdminTabs.reload).not.toHaveBeenCalled();
+        expect(CatapultAdminTabs.patch).not.toHaveBeenCalled();
     });
 
     it("opens the dialog empty each time", async () => {
@@ -462,7 +462,7 @@ describe("admin-notifications", () => {
             posted.mockImplementationOnce(async () => response(201, { sent: 12 }));
             await click(".admin-notifications-save");
             expect(mdui.snackbar).toHaveBeenLastCalledWith({ message: "Sent to 12" });
-            expect(CatapultAdminTabs.reload).toHaveBeenCalled();
+            expect(CatapultAdminTabs.patch).toHaveBeenCalled();
         });
 
         it("starts empty each time the dialog opens", async () => {

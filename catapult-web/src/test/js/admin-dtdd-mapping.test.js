@@ -1,6 +1,6 @@
 /*
  * The admin DTDD mapping tab: the status chips load their list, Approve posts at once, Reject asks
- * an optional reason in a dialog first; 409 / 404 are told as such and reload the list in the
+ * an optional reason in a dialog first; 409 / 404 are told as such; each patches the list in the
  * status being viewed.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -11,6 +11,7 @@ let fetched;
 
 const dialog = () => document.getElementById("admin-dtdd-dialog");
 const reason = () => dialog().querySelector('[name="reason"]');
+const panel = () => document.querySelector('mdui-tab-panel[value="dtdd-mapping"]');
 
 function page(status = "PENDING") {
     html(`
@@ -43,9 +44,10 @@ beforeEach(async () => {
     fetched = vi.fn(async () => response(200, '<div class="admin-dtdd-mapping" data-status="APPROVED">fresh</div>'));
     window.fetch = fetched;
     window.CatapultCsrf = { postJson: posted };
-    window.CatapultChannel = { showError: vi.fn() };
     window.mdui = { snackbar: vi.fn() };
-    await load("admin-dtdd-mapping");
+    await load("admin-tabs", "admin-dtdd-mapping");
+    window.CatapultChannel = { showError: vi.fn() };
+    window.CatapultAdminTabs.patch = vi.fn(async () => {});
     page();
 });
 
@@ -62,15 +64,16 @@ describe("admin-dtdd-mapping", () => {
         expect(fetched).not.toHaveBeenCalled();
     });
 
-    it("approves at once, then reloads the status being viewed", async () => {
+    it("approves at once, then patches the list of the status being viewed", async () => {
         await click("[data-approve]");
 
         expect(posted).toHaveBeenCalledWith("/admin/dtdd-mapping/proposals/p%2F1/approve", {});
-        expect(fetched).toHaveBeenCalledWith("/spa/admin/dtdd-mapping?status=PENDING");
+        expect(CatapultAdminTabs.patch).toHaveBeenCalledWith(panel(), "/spa/admin/dtdd-mapping?status=PENDING");
+        expect(fetched).not.toHaveBeenCalled();
         expect(window.mdui.snackbar).toHaveBeenCalledWith({ message: "Approved" });
     });
 
-    it("asks for an optional reason before rejecting, then reloads the tab", async () => {
+    it("asks for an optional reason before rejecting, then patches the list", async () => {
         await click("[data-reject]");
         expect(dialog().open).toBe(true);
         expect(posted).not.toHaveBeenCalled();
@@ -79,8 +82,8 @@ describe("admin-dtdd-mapping", () => {
         await click(".admin-dtdd-confirm-reject");
 
         expect(posted).toHaveBeenCalledWith("/admin/dtdd-mapping/proposals/p%2F1/reject", { reason: "duplicate" });
-        expect(dialog()?.open ?? false).toBe(false);
-        expect(fetched).toHaveBeenCalledWith("/spa/admin/dtdd-mapping?status=PENDING");
+        expect(dialog().open).toBe(false);
+        expect(CatapultAdminTabs.patch).toHaveBeenCalledWith(panel(), "/spa/admin/dtdd-mapping?status=PENDING");
     });
 
     it("rejects without a reason as an empty body", async () => {
@@ -99,32 +102,32 @@ describe("admin-dtdd-mapping", () => {
         expect(reason().value).toBe("");
     });
 
-    it("tells 409 as 'already resolved' and reloads", async () => {
+    it("tells 409 as 'already resolved' and patches the proposal away", async () => {
         posted.mockResolvedValue(response(409));
 
         await click("[data-approve]");
 
         expect(CatapultChannel.showError).toHaveBeenCalledWith("Already resolved");
-        expect(fetched).toHaveBeenCalledWith("/spa/admin/dtdd-mapping?status=PENDING");
+        expect(CatapultAdminTabs.patch).toHaveBeenCalledWith(panel(), "/spa/admin/dtdd-mapping?status=PENDING");
     });
 
-    it("tells 404 as gone and reloads", async () => {
+    it("tells 404 as gone and patches it away", async () => {
         posted.mockResolvedValue(response(404));
 
         await click("[data-approve]");
 
         expect(CatapultChannel.showError).toHaveBeenCalledWith("Gone");
-        expect(fetched).toHaveBeenCalled();
+        expect(CatapultAdminTabs.patch).toHaveBeenCalled();
     });
 
-    it("keeps the dialog open and does not reload when the rejection could not be sent", async () => {
+    it("keeps the dialog open and does not patch when the rejection could not be sent", async () => {
         posted.mockResolvedValue(response(502));
         await click("[data-reject]");
         await click(".admin-dtdd-confirm-reject");
 
         expect(CatapultChannel.showError).toHaveBeenCalledWith("Down");
         expect(dialog().open).toBe(true);
-        expect(fetched).not.toHaveBeenCalled();
+        expect(CatapultAdminTabs.patch).not.toHaveBeenCalled();
     });
 
     it("sends one request on a double click", async () => {

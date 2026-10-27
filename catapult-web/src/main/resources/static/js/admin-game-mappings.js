@@ -1,7 +1,8 @@
 /**
  * The admin game mappings tab. Its two lists page on their own (data-gm-page / data-gm-missing-page): a page
- * asked for, or a change made, re-fetches the fragment with both pages (kept on the tab root's data-page /
- * data-missing-page) and swaps only [data-gm-lists], so an open dialog stays as it is.
+ * asked for re-fetches the fragment with both pages (kept on the tab root's data-page / data-missing-page) and
+ * swaps only [data-gm-lists], so an open dialog stays as it is; a change made patches the pages shown
+ * (admin-tabs.js: the mapping's row inserted, updated or removed, a missing game's row gone once mapped).
  *
  * The form (a dialog) creates a mapping (new, or from a missing game's row: its platform and ID filled in) or
  * changes one (from its row). Its game field suggests the platform's detected games as the ID or name is typed
@@ -86,6 +87,23 @@ window.CatapultAdminGameMappings = (function () {
         current.replaceWith(fresh);
         root.dataset.page = freshRoot?.dataset.page ?? String(page);
         root.dataset.missingPage = freshRoot?.dataset.missingPage ?? String(missingPage);
+    }
+
+    /** Patches the pages shown after a change; one a deletion emptied steps back. */
+    async function patch(panel) {
+        const root = panel.querySelector(".admin-game-mappings");
+        if (!root) return;
+        const page = Number(root.dataset.page ?? 0);
+        const missingPage = Number(root.dataset.missingPage ?? 0);
+        await CatapultAdminTabs.patch(panel, `/spa/admin/game-mappings?page=${page}&missingPage=${missingPage}`);
+        const lists = panel.querySelector(".admin-game-mappings [data-gm-lists]");
+        if (!lists || lists.querySelector("[data-admin-retry]")) return;
+        const emptied = (name, number) => {
+            const list = lists.querySelector(`[data-admin-list="${name}"]`);
+            return number > 0 && list !== null && !list.querySelector("[data-admin-key]");
+        };
+        if (emptied("mappings", page)) await reload(panel, page - 1, missingPage);
+        else if (emptied("missing", missingPage)) await reload(panel, page, missingPage - 1);
     }
 
     /** The form's fields and its state (the mapping edited, the category picked), wired once per dialog. */
@@ -277,7 +295,7 @@ window.CatapultAdminGameMappings = (function () {
         form.save.disabled = false;
         if (!ok(status)) {
             tell(form.error, refusal(form.root, status));
-            if (status === 404) reload(panel);
+            if (status === 404) patch(panel);
             return;
         }
         tell(form.result, resultText(form.root, result));
@@ -287,7 +305,7 @@ window.CatapultAdminGameMappings = (function () {
             form.title.textContent = form.root.dataset.labelEditTitle;
         }
         form.applyLive.checked = false;
-        await reload(panel);
+        await patch(panel);
     }
 
     /** The deletion dialog, asking first (applyLive unchecked) for the row's mapping. */
@@ -311,12 +329,12 @@ window.CatapultAdminGameMappings = (function () {
         if (ok(status)) {
             dialog.open = false;
             window.mdui?.snackbar?.({ message: `${root.dataset.labelDeleted} ${resultText(root, body)}` });
-            return reload(panel);
+            return patch(panel);
         }
         CatapultChannel.showError(refusal(root, status));
         if (status === 404) {
             dialog.open = false;
-            reload(panel);
+            patch(panel);
         }
     }
 
