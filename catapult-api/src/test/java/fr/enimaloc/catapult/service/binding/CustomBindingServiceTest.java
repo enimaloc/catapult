@@ -560,7 +560,8 @@ class CustomBindingServiceTest {
         CustomBinding dev = binding("Dev");
         when(bindings.findByIdAndUser(art.getId(), user)).thenReturn(Optional.of(art));
         givenActive(dev);
-        when(bindings.findByUserOrderByCreatedAtAsc(user)).thenReturn(List.of(dev));
+        // A read that still sees the deleted one: it is left out all the same
+        when(bindings.findByUserOrderByCreatedAtAsc(user)).thenReturn(List.of(art, dev));
 
         service.delete(user, art.getId());
 

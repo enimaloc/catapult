@@ -33,6 +33,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -151,13 +152,23 @@ public class CustomBindingService {
                 .filter(activation -> activation.getCustomBinding().getId().equals(binding.getId()))
                 .ifPresent(activation -> doDeactivate(user));
         bindings.delete(binding);
-        publishList(user);
+        publishList(user, binding.getId());
     }
 
-    /** Tells the dashboards the streamer's bindings as they are now, and the active one. */
     private void publishList(UserAccount user) {
+        publishList(user, null);
+    }
+
+    /**
+     * Tells the dashboards the streamer's bindings as they are now, and the active one; never {@code deleted}, which
+     * a read made before its deletion is visible would still list.
+     */
+    private void publishList(UserAccount user, UUID deleted) {
         UUID activeId = activations.active(user).map(activation -> activation.getCustomBinding().getId()).orElse(null);
-        channelEventPublisher.customBindingsUpdated(user.getId(), bindings.findByUserOrderByCreatedAtAsc(user), activeId);
+        List<CustomBinding> listed = bindings.findByUserOrderByCreatedAtAsc(user).stream()
+                .filter(listedBinding -> !listedBinding.getId().equals(deleted)).toList();
+        channelEventPublisher.customBindingsUpdated(user.getId(), listed,
+                Objects.equals(deleted, activeId) ? null : activeId);
     }
 
     /** The streamer's binding with that id, or else that name whatever its case. */
