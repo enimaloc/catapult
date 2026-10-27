@@ -117,7 +117,7 @@ public class CustomBindingService {
         CustomBinding binding = new CustomBinding();
         binding.setUser(user);
         CustomBinding saved = save(fill(binding, name, request));
-        channelEventPublisher.customBindingsUpdated(user.getId());
+        publishList(user);
         return saved;
     }
 
@@ -136,7 +136,7 @@ public class CustomBindingService {
                     throw nameTaken();
                 });
         CustomBinding saved = save(fill(binding, name, request));
-        channelEventPublisher.customBindingsUpdated(user.getId());
+        publishList(user);
         boolean active = activations.active(user)
                 .filter(activation -> activation.getCustomBinding().getId().equals(saved.getId()))
                 .isPresent();
@@ -151,7 +151,13 @@ public class CustomBindingService {
                 .filter(activation -> activation.getCustomBinding().getId().equals(binding.getId()))
                 .ifPresent(activation -> doDeactivate(user));
         bindings.delete(binding);
-        channelEventPublisher.customBindingsUpdated(user.getId());
+        publishList(user);
+    }
+
+    /** Tells the dashboards the streamer's bindings as they are now, and the active one. */
+    private void publishList(UserAccount user) {
+        UUID activeId = activations.active(user).map(activation -> activation.getCustomBinding().getId()).orElse(null);
+        channelEventPublisher.customBindingsUpdated(user.getId(), bindings.findByUserOrderByCreatedAtAsc(user), activeId);
     }
 
     /** The streamer's binding with that id, or else that name whatever its case. */

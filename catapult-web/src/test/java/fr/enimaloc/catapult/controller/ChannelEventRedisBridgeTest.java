@@ -82,7 +82,7 @@ class ChannelEventRedisBridgeTest {
                 new ChannelEvents.CustomBindingChanged(owner.toString(), "Streamer", null))))
                 .containsExactly(new CustomBindingChangedEvent("streamer", null));
         assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.CUSTOM_BINDINGS_UPDATED,
-                new ChannelEvents.CustomBindingsUpdated(owner.toString(), "Streamer"))))
+                new ChannelEvents.CustomBindingsUpdated(owner.toString(), "Streamer", null, null))))
                 .containsExactly(new CustomBindingsUpdatedEvent("streamer"));
     }
 
@@ -134,7 +134,7 @@ class ChannelEventRedisBridgeTest {
                 new ChannelEvents.SettingsUpdated(owner.toString(), "streamer", settings))))
                 .containsExactly(new ChannelSettingsUpdatedEvent("streamer", settings));
         assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.DTDD_MAPPING_CHANGED,
-                new ChannelEvents.DtddMappingChanged(owner.toString(), "streamer"))))
+                new ChannelEvents.DtddMappingChanged(owner.toString(), "streamer", null, null, null))))
                 .containsExactly(new DtddMappingChangedEvent("streamer"));
     }
 
