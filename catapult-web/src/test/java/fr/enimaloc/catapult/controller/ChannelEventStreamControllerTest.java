@@ -2,7 +2,9 @@ package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.common.dto.channel.ChannelDto;
 import fr.enimaloc.catapult.common.dto.channel.ChannelListResponse;
+import fr.enimaloc.catapult.common.dto.binding.CustomBindingDto;
 import fr.enimaloc.catapult.event.BotStateChangedEvent;
+import fr.enimaloc.catapult.event.binding.CustomBindingsUpdatedEvent;
 import fr.enimaloc.catapult.event.binding.GameChangedEvent;
 import fr.enimaloc.catapult.monitoring.InteractionMetrics;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
@@ -20,6 +22,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 
@@ -76,6 +80,33 @@ class ChannelEventStreamControllerTest {
         assertThat(body)
                 .contains("event:GameChangedEvent\ndata:{\"username\":\"enimaloc\",\"bindingId\":\"b1\",\"sourceType\":\"STEAM\",\"sourceName\":\"Valheim\"}")
                 .contains("event:BotStateChangedEvent\ndata:{\"username\":\"enimaloc\",\"state\":false}");
+    }
+
+    /** A session whose JWT names its member's login, as catapult-api's do. */
+    private static MockHttpSession member(String login) {
+        MockHttpSession session = loggedIn("enimaloc");
+        Base64.Encoder encoder = Base64.getUrlEncoder().withoutPadding();
+        String claims = "{\"username\":\"" + login + "\"}";
+        session.setAttribute(ApiClient.SESSION_JWT_KEY, encoder.encodeToString("{}".getBytes(StandardCharsets.UTF_8))
+                + "." + encoder.encodeToString(claims.getBytes(StandardCharsets.UTF_8)) + ".sig");
+        return session;
+    }
+
+    @Test
+    void theCustomBindingsGoToTheOwnersStreams_aModeratorsGetTheEventWithoutThem() throws Exception {
+        MvcResult owner = subscribe("enimaloc", member("EnimaLoc"));
+        MvcResult moderator = subscribe("enimaloc", member("a-moderator"));
+        CustomBindingDto art = new CustomBindingDto(UUID.randomUUID(), "Art", "509660", "Art", List.of("Violence"),
+                List.of(), true);
+
+        controller.onChannelUpdated(new CustomBindingsUpdatedEvent("enimaloc", List.of(art), null));
+
+        assertThat(owner.getResponse().getContentAsString()).contains("event:CustomBindingsUpdatedEvent")
+                .contains("\"name\":\"Art\"");
+        assertThat(moderator.getResponse().getContentAsString())
+                .contains("event:CustomBindingsUpdatedEvent\ndata:{\"username\":\"enimaloc\",\"bindings\":null,"
+                        + "\"activeId\":null}")
+                .doesNotContain("Art");
     }
 
     @Test
