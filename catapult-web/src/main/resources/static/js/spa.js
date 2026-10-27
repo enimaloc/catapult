@@ -7,6 +7,8 @@ const NAV_REFRESH_MS = 5 * 60_000;
 const NAV_STALE_MS = 60_000;
 let navLoadedAt = 0;
 let navMarkup = null;
+// Bumped by each live patch: a response that began before one holds a stale ring.
+let navPatches = 0;
 
 const config = window.Catapult;
 
@@ -121,15 +123,18 @@ async function loadNavChannels(force = false) {
     if (!navChannels) {
         return;
     }
+    const patchesAtStart = navPatches;
     try {
         const response = await fetch("/spa/nav-channels");
         if (!response.ok) {
             return;
         }
         const markup = await response.text();
-        if (force || markup !== navMarkup) {
+        const stale = navPatches !== patchesAtStart;
+        if (force || (!stale && markup !== navMarkup)) {
             navChannels.innerHTML = markup;
-            navMarkup = markup;
+            // A stale response is never the reference: the next poll rewrites.
+            navMarkup = stale ? null : markup;
         }
         navLoadedAt = Date.now();
     } catch {
@@ -154,6 +159,7 @@ function listenNavChannels() {
     CatapultLive.on("NavChannelLive", ({ username, live }) => {
         // The ring is part of the markup: the DOM no longer matches what was last fetched.
         navMarkup = null;
+        navPatches++;
         [...navChannels.querySelectorAll(".nav-channel")]
             .find(a => a.getAttribute("href") === `/channel/${username}`)
             ?.classList.toggle("live", live);

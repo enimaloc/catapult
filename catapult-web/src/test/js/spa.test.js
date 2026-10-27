@@ -285,6 +285,20 @@ describe("the navbar's channels", () => {
             expect(document.getElementById("c2").classList.contains("live")).toBe(false);
         });
 
+        it("ignores a response that began before a live patch, then catches up", async () => {
+            let resolve;
+            fetchMock.mockImplementation(() => new Promise(r => { resolve = r; }));
+            const pending = CatapultSpa.loadNavChannels();
+            FakeEventSource.last.fire("NavChannelLive", { username: "other", live: true });
+            resolve(response(200, NAV));
+            await pending;
+            expect(document.getElementById("c2").classList.contains("live")).toBe(true);
+
+            fetchMock.mockImplementation(async () => response(200, NAV));
+            await CatapultSpa.loadNavChannels();
+            expect(document.getElementById("c2").classList.contains("live")).toBe(false);
+        });
+
         it("rewrites them on a reconnection even if the markup is unchanged", async () => {
             FakeEventSource.last.fire("open", {});
             FakeEventSource.last.fire("NavChannelLive", { username: "other", live: true });
