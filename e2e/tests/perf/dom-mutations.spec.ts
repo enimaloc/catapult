@@ -436,6 +436,8 @@ test.describe("DOM mutations", () => {
 
       // Groups: a group created
       await showTab(page, "groups");
+      // a lazy tab's first content may land after the network went idle: counted, it is no edit's
+      await expect(page.locator(".admin-groups-create")).toBeVisible();
       await startCounting(page);
       await type(page, ".admin-groups-create mdui-text-field[name=key]", "perf_dom");
       await type(page, ".admin-groups-create mdui-text-field[name=name]", "Perf DOM");
@@ -445,6 +447,7 @@ test.describe("DOM mutations", () => {
 
       // Meta: a meta tag added
       await showTab(page, "meta");
+      await expect(page.locator(".admin-meta-tags-form")).toBeVisible();
       await startCounting(page);
       await type(page, ".admin-meta-tags-form mdui-text-field[name=key]", "perf-dom");
       await type(page, ".admin-meta-tags-form mdui-text-field[name=content]", "1");
