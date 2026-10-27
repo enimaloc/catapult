@@ -1356,6 +1356,12 @@ a[data-link].active {
     margin-top: 16px;
 }
 
+/* A custom binding's form starts right under its header: no rule there, unlike an association's. */
+#channel-custom-bindings-list .binding-edit-panel {
+    margin-top: 0;
+    border-top: none;
+}
+
 #channel-custom-bindings-list mdui-list-item > span.custom-binding-active-chip {
     background-color: rgba(139, 92, 246, 0.16);
     color: var(--catapult-text);

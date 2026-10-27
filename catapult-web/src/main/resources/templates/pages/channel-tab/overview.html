@@ -221,57 +221,57 @@
          and for anyone but the owner): listed like the associations above, each row opening its edit form with
          activate/deactivate, save and delete; "New" opens an empty row. channel-custom-bindings.js. */-->
     <th:block th:if="${ch.isOwner() and ch.customBindings() != null}" th:with="cb=${ch.customBindings()}">
-    <div class="section-header" id="channel-custom-bindings-header">
-        <div class="title-row">
-            <h2 th:text="#{channel.custom_bindings.title}">Bindings personnalisés</h2>
+        <div class="section-header" id="channel-custom-bindings-header">
+            <div class="title-row">
+                <h2 th:text="#{channel.custom_bindings.title}">Bindings personnalisés</h2>
+            </div>
+            <p th:text="#{channel.custom_bindings.description}">Description</p>
+            <mdui-button id="custom-binding-new-btn" variant="tonal" icon="add"
+                         th:text="#{channel.custom_bindings.new}">Nouveau</mdui-button>
         </div>
-        <p th:text="#{channel.custom_bindings.description}">Description</p>
-        <mdui-button id="custom-binding-new-btn" variant="tonal" icon="add"
-                     th:text="#{channel.custom_bindings.new}">Nouveau</mdui-button>
-    </div>
 
-    <mdui-list id="channel-custom-bindings-list"
-               th:attr="data-error-twitch-unavailable=#{channel.custom_bindings.error.twitch_unavailable},data-error-bot-disabled=#{channel.custom_bindings.error.bot_disabled},data-error-twitch-failed=#{channel.custom_bindings.error.twitch_failed},data-error-name-taken=#{channel.custom_bindings.error.name_taken},data-error-limit-reached=#{channel.custom_bindings.error.limit_reached},data-error-invalid=#{channel.custom_bindings.error.invalid}">
-        <mdui-collapse accordion>
-            <!--/* A row per binding, then the hidden empty one "New" reveals (no data-custom-binding-id: a save creates). */-->
-            <mdui-collapse-item th:each="b : ${cb.bindings()}" class="custom-binding-item"
-                                th:with="active=${b.id() == cb.activeId()}"
-                                th:classappend="${active} ? 'is-active'"
-                                th:attr="data-custom-binding-id=${b.id()}" th:value="${b.id()}">
-                <mdui-list-item slot="header">
-                    <span class="custom-binding-name-label" th:text="${b.name()}">Binding</span>
-                    <span class="custom-binding-game-label" th:text="${b.twitchGameName() ?: '—'}">Game</span>
-                    <span class="custom-binding-active-chip" th:classappend="${active} ? '' : 'hidden'"
-                          th:text="#{channel.custom_bindings.active}">Actif</span>
-                    <span th:if="${b.uninterruptible()}" class="custom-binding-uninterruptible-chip"
-                          th:text="#{channel.custom_bindings.uninterruptible}">Ininterruptible</span>
-                </mdui-list-item>
-                <mdui-list-item>
-                    <th:block th:replace="~{pages/channel-tab/overview :: customBindingForm(${b}, ${active})}"></th:block>
-                </mdui-list-item>
-            </mdui-collapse-item>
-            <mdui-collapse-item class="custom-binding-item custom-binding-new hidden" value="new">
-                <mdui-list-item slot="header">
-                    <span th:text="#{channel.custom_bindings.new_title}">Nouveau binding</span>
-                </mdui-list-item>
-                <mdui-list-item>
-                    <th:block th:replace="~{pages/channel-tab/overview :: customBindingForm(null, false)}"></th:block>
-                </mdui-list-item>
-            </mdui-collapse-item>
-        </mdui-collapse>
-        <mdui-list-item id="channel-custom-bindings-empty" th:classappend="${cb.bindings().isEmpty()} ? '' : 'hidden'"
-                        th:text="#{channel.custom_bindings.empty}">Aucun binding personnalisé.</mdui-list-item>
-    </mdui-list>
-    <p id="custom-bindings-error" class="hidden" role="alert"></p>
+        <mdui-list id="channel-custom-bindings-list"
+                   th:attr="data-error-twitch-unavailable=#{channel.custom_bindings.error.twitch_unavailable},data-error-bot-disabled=#{channel.custom_bindings.error.bot_disabled},data-error-twitch-failed=#{channel.custom_bindings.error.twitch_failed},data-error-name-taken=#{channel.custom_bindings.error.name_taken},data-error-limit-reached=#{channel.custom_bindings.error.limit_reached},data-error-invalid=#{channel.custom_bindings.error.invalid}">
+            <mdui-collapse accordion>
+                <!--/* A row per binding, then the hidden empty one "New" reveals (no data-custom-binding-id: a save creates). */-->
+                <mdui-collapse-item th:each="b : ${cb.bindings()}" class="custom-binding-item"
+                                    th:with="active=${b.id() == cb.activeId()}"
+                                    th:classappend="${active} ? 'is-active'"
+                                    th:attr="data-custom-binding-id=${b.id()}" th:value="${b.id()}">
+                    <mdui-list-item slot="header">
+                        <span class="custom-binding-name-label" th:text="${b.name()}">Binding</span>
+                        <span class="custom-binding-game-label" th:text="${b.twitchGameName() ?: '—'}">Game</span>
+                        <span class="custom-binding-active-chip" th:classappend="${active} ? '' : 'hidden'"
+                              th:text="#{channel.custom_bindings.active}">Actif</span>
+                        <span th:if="${b.uninterruptible()}" class="custom-binding-uninterruptible-chip"
+                              th:text="#{channel.custom_bindings.uninterruptible}">Ininterruptible</span>
+                    </mdui-list-item>
+                    <mdui-list-item>
+                        <th:block th:replace="~{pages/channel-tab/overview :: customBindingForm(${b}, ${active})}"></th:block>
+                    </mdui-list-item>
+                </mdui-collapse-item>
+                <mdui-collapse-item class="custom-binding-item custom-binding-new hidden" value="new">
+                    <mdui-list-item slot="header">
+                        <span th:text="#{channel.custom_bindings.new_title}">Nouveau binding</span>
+                    </mdui-list-item>
+                    <mdui-list-item>
+                        <th:block th:replace="~{pages/channel-tab/overview :: customBindingForm(null, false)}"></th:block>
+                    </mdui-list-item>
+                </mdui-collapse-item>
+            </mdui-collapse>
+            <mdui-list-item id="channel-custom-bindings-empty" th:classappend="${cb.bindings().isEmpty()} ? '' : 'hidden'"
+                            th:text="#{channel.custom_bindings.empty}">Aucun binding personnalisé.</mdui-list-item>
+        </mdui-list>
+        <p id="custom-bindings-error" class="hidden" role="alert"></p>
 
-    <mdui-dialog id="custom-binding-delete-dialog" close-on-overlay-click
-                 th:attr="headline=#{channel.custom_bindings.settings.delete.title}">
-        <p th:text="#{channel.custom_bindings.settings.delete.prompt}">Un binding actif est d'abord désactivé.</p>
-        <mdui-button slot="action" variant="text" class="custom-binding-delete-dismiss"
-                     th:text="#{channel.custom_bindings.settings.delete.dismiss}">Le garder</mdui-button>
-        <mdui-button slot="action" variant="filled" class="custom-binding-delete-confirm"
-                     th:text="#{channel.custom_bindings.settings.delete.confirm}">Supprimer</mdui-button>
-    </mdui-dialog>
+        <mdui-dialog id="custom-binding-delete-dialog" close-on-overlay-click
+                     th:attr="headline=#{channel.custom_bindings.settings.delete.title}">
+            <p th:text="#{channel.custom_bindings.settings.delete.prompt}">Un binding actif est d'abord désactivé.</p>
+            <mdui-button slot="action" variant="text" class="custom-binding-delete-dismiss"
+                         th:text="#{channel.custom_bindings.settings.delete.dismiss}">Le garder</mdui-button>
+            <mdui-button slot="action" variant="filled" class="custom-binding-delete-confirm"
+                         th:text="#{channel.custom_bindings.settings.delete.confirm}">Supprimer</mdui-button>
+        </mdui-dialog>
     </th:block>
 </mdui-tab-panel>
 

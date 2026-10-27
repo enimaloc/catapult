@@ -20,9 +20,15 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Predicate;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -79,6 +85,46 @@ class ChannelCustomBindingsRenderingTest {
         return html.substring(start, end);
     }
 
+    private static final Pattern START_TAG = Pattern.compile("<([a-z][a-z0-9-]*)((?:\\s[^>]*)?)>([^<]*)");
+    private static final Pattern ATTRIBUTE = Pattern.compile("([a-zA-Z:_-]+)(?:=\"([^\"]*)\")?");
+
+    /** A start tag of the rendered markup: its attributes, whatever their order, and the text right after it. */
+    private record Tag(String name, Map<String, String> attributes, String text) {
+        String attr(String name) {
+            return attributes.get(name);
+        }
+
+        Set<String> classes() {
+            String value = attributes.getOrDefault("class", "");
+            return value.isBlank() ? Set.of() : Set.copyOf(Arrays.asList(value.trim().split("\\s+")));
+        }
+
+        boolean hasClass(String name) {
+            return classes().contains(name);
+        }
+    }
+
+    /** The first start tag of {@code html} matching {@code which}; fails the test when there is none. */
+    private static Tag tag(String html, Predicate<Tag> which) {
+        Matcher m = START_TAG.matcher(html);
+        while (m.find()) {
+            Map<String, String> attributes = new HashMap<>();
+            Matcher a = ATTRIBUTE.matcher(m.group(2));
+            while (a.find()) attributes.put(a.group(1), a.group(2) == null ? "" : a.group(2));
+            Tag tag = new Tag(m.group(1), attributes, m.group(3).trim());
+            if (which.test(tag)) return tag;
+        }
+        throw new AssertionError("no matching tag");
+    }
+
+    private static Tag byId(String html, String id) {
+        return tag(html, t -> id.equals(t.attr("id")));
+    }
+
+    private static Tag byClass(String html, String className) {
+        return tag(html, t -> t.hasClass(className));
+    }
+
     @Test
     void ownerWithTheExperimentOpen_getsTheListUnderTheAssociations() throws Exception {
         String overview = panel(render(true, state()), "overview");
@@ -87,17 +133,30 @@ class ChannelCustomBindingsRenderingTest {
         int list = overview.indexOf("id=\"channel-custom-bindings-list\"");
         assertThat(associations).isNotNegative();
         assertThat(list).isGreaterThan(associations);
-        assertThat(overview).contains("id=\"custom-binding-new-btn\"", "id=\"custom-bindings-error\"",
-                "id=\"custom-binding-delete-dialog\"", "custom-binding-new", "Custom bindings", "New");
+        assertThat(overview).contains("id=\"custom-bindings-error\"", "id=\"custom-binding-delete-dialog\"",
+                "Custom bindings");
+        Tag newButton = byId(overview, "custom-binding-new-btn");
+        assertThat(newButton.name()).isEqualTo("mdui-button");
+        assertThat(newButton.text()).isEqualTo("New");
+        Tag newRow = byClass(overview, "custom-binding-new");
+        assertThat(newRow.classes()).contains("custom-binding-item", "hidden");
+        assertThat(newRow.attr("value")).isEqualTo("new");
+        assertThat(newRow.attr("data-custom-binding-id")).isNull();
         assertThat(overview).contains("data-custom-binding-id=\"" + ART + "\"", "data-custom-binding-id=\"" + DEV + "\"");
         // Each row's form is pre-filled with the binding, with the category search of the associations.
-        assertThat(overview).contains("value=\"Développement\"", "value=\"1469308723\"",
-                "binding-edit-game-input custom-binding-game-input", "value=\"Software and Game Development\"");
+        String dev = row(overview, DEV);
+        assertThat(byClass(dev, "custom-binding-name").attr("value")).isEqualTo("Développement");
+        Tag game = byClass(dev, "custom-binding-game-input");
+        assertThat(game.classes()).contains("binding-edit-game-input");
+        assertThat(game.attr("value")).isEqualTo("Software and Game Development");
+        assertThat(byClass(dev, "custom-binding-game-id").attr("value")).isEqualTo("1469308723");
+        assertThat(byClass(dev, "custom-binding-uninterruptible").attr("checked")).isNotNull();
+        assertThat(byClass(row(overview, ART), "custom-binding-uninterruptible").attr("checked")).isNull();
         assertThat(overview).contains("Activate", "Deactivate", "Save", "Delete");
         assertThat(overview).contains("20 bindings maximum", "Twitch did not apply the category",
                 "Another custom binding already has this name");
         // The empty notice is hidden while bindings exist.
-        assertThat(overview).containsPattern("id=\"channel-custom-bindings-empty\"[^>]*class=\"hidden\"");
+        assertThat(byId(overview, "channel-custom-bindings-empty").hasClass("hidden")).isTrue();
     }
 
     @Test
@@ -106,16 +165,18 @@ class ChannelCustomBindingsRenderingTest {
         String art = row(overview, ART);
         String dev = row(overview, DEV);
 
-        assertThat(art).containsPattern("class=\"custom-binding-item is-active\"")
-                .contains("<span class=\"custom-binding-active-chip\">Active</span>")
-                .doesNotContain("custom-binding-uninterruptible-chip")
-                .containsPattern("class=\"custom-binding-activate hidden\"")
-                .containsPattern("class=\"custom-binding-stop\"");
-        assertThat(dev).doesNotContain("is-active")
-                .contains("<span class=\"custom-binding-active-chip hidden\">Active</span>")
-                .contains("custom-binding-uninterruptible-chip\">Uninterruptible</span>")
-                .containsPattern("class=\"custom-binding-activate\"")
-                .containsPattern("class=\"custom-binding-stop hidden\"");
+        assertThat(byClass(art, "custom-binding-item").classes()).contains("is-active");
+        assertThat(byClass(art, "custom-binding-active-chip").classes()).doesNotContain("hidden");
+        assertThat(byClass(art, "custom-binding-active-chip").text()).isEqualTo("Active");
+        assertThat(art).doesNotContain("custom-binding-uninterruptible-chip");
+        assertThat(byClass(art, "custom-binding-activate").classes()).contains("hidden");
+        assertThat(byClass(art, "custom-binding-stop").classes()).doesNotContain("hidden");
+
+        assertThat(byClass(dev, "custom-binding-item").classes()).doesNotContain("is-active");
+        assertThat(byClass(dev, "custom-binding-active-chip").classes()).contains("hidden");
+        assertThat(byClass(dev, "custom-binding-uninterruptible-chip").text()).isEqualTo("Uninterruptible");
+        assertThat(byClass(dev, "custom-binding-activate").classes()).doesNotContain("hidden");
+        assertThat(byClass(dev, "custom-binding-stop").classes()).contains("hidden");
     }
 
     private static String row(String overview, UUID id) {
@@ -128,8 +189,8 @@ class ChannelCustomBindingsRenderingTest {
         String overview = panel(render(true, new CustomBindingsStateDto(true, List.of(), null, null)), "overview");
 
         assertThat(overview).contains("id=\"channel-custom-bindings-list\"", "No custom bindings yet.")
-                .doesNotContain("data-custom-binding-id")
-                .doesNotContainPattern("id=\"channel-custom-bindings-empty\"[^>]*class=\"hidden\"");
+                .doesNotContain("data-custom-binding-id");
+        assertThat(byId(overview, "channel-custom-bindings-empty").hasClass("hidden")).isFalse();
     }
 
     @Test
