@@ -1,6 +1,5 @@
 package fr.enimaloc.catapult.apidocs;
 
-import fr.enimaloc.catapult.service.http.ApiClient;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -10,6 +9,10 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -21,8 +24,9 @@ import java.util.Optional;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
- * catapult-api's OpenAPI spec, for the site's documentation page (ApiDocsController): asked without the session's
- * bearer (it is public), at most once a minute, its {@code servers} rewritten to the site itself ({@code "/"}), so
+ * catapult-api's OpenAPI spec, for the site's documentation page (ApiDocsController): asked anonymously (it is
+ * public: no session, no bearer) with its own short timeout, so a hung catapult-api holds a page {@value
+ * #TIMEOUT_SECONDS} s at most, and at most once a minute, its {@code servers} rewritten to the site itself ({@code "/"}), so
  * that "Try it out" goes through catapult-web, which relays the documented paths. The last valid copy is kept in
  * memory and on disk ({@code catapult.api-docs.cache-file}): while catapult-api fails, even after a restart, the page
  * still shows it, marked as a cached copy. A disk copy that can't be read or written is logged and ignored.
@@ -31,13 +35,16 @@ import java.util.concurrent.locks.ReentrantLock;
 @Component
 public class ApiDocsSpec {
     static final Duration REFRESH = Duration.ofSeconds(60);
+    static final long TIMEOUT_SECONDS = 5;
     static final String SPEC_PATH = "/api/v3/api-docs";
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
     /** The spec as served ({@code json}), when it was fetched, and whether it is an older copy than the last try. */
     public record Cached(String json, Instant fetchedAt, boolean fromCache) {}
 
-    private final ApiClient client;
+    private final HttpClient http;
+    private final URI specUri;
+    private final Duration timeout;
     private final Path cacheFile;
     private final Clock clock;
     private final ReentrantLock loading = new ReentrantLock();
@@ -47,13 +54,19 @@ public class ApiDocsSpec {
     private boolean diskRead;
 
     @Autowired
-    public ApiDocsSpec(ApiClient client,
+    public ApiDocsSpec(@Value("${catapult.backend-url}") String apiUrl,
                        @Value("${catapult.api-docs.cache-file:./data/api-docs-cache.json}") String cacheFile) {
-        this(client, cacheFile, Clock.systemUTC());
+        this(apiUrl, cacheFile, Clock.systemUTC(), Duration.ofSeconds(TIMEOUT_SECONDS));
     }
 
-    ApiDocsSpec(ApiClient client, String cacheFile, Clock clock) {
-        this.client = client;
+    ApiDocsSpec(String apiUrl, String cacheFile, Clock clock, Duration timeout) {
+        this.http = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .followRedirects(HttpClient.Redirect.NEVER)
+                .connectTimeout(timeout)
+                .build();
+        this.specUri = URI.create(apiUrl.replaceAll("/+$", "") + SPEC_PATH);
+        this.timeout = timeout;
         this.cacheFile = Path.of(cacheFile);
         this.clock = clock;
     }
@@ -87,9 +100,19 @@ public class ApiDocsSpec {
 
     /** catapult-api's spec, its servers the site's; null when it answers none or something that is not one. */
     private String fetch() {
-        ApiClient.Result<String> answer = client.getAnonymous(SPEC_PATH, String.class);
-        if (answer.status() != 200 || answer.body() == null) {
-            log.warn("catapult-api's spec unavailable: HTTP {}", answer.status());
+        HttpResponse<String> answer;
+        try {
+            HttpRequest request = HttpRequest.newBuilder(specUri).timeout(timeout).GET().build();
+            answer = http.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return null;
+        } catch (IOException e) {
+            log.warn("catapult-api's spec unavailable: {}", e.toString());
+            return null;
+        }
+        if (answer.statusCode() != 200) {
+            log.warn("catapult-api's spec unavailable: HTTP {}", answer.statusCode());
             return null;
         }
         try {

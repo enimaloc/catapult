@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.apidocs;
 
 import fr.enimaloc.catapult.MutableClock;
 import fr.enimaloc.catapult.service.http.ApiClient;
+import org.junit.jupiter.api.Timeout;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
@@ -10,7 +11,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.mock.web.MockHttpServletRequest;
-import org.springframework.web.client.RestClient;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 import tools.jackson.databind.JsonNode;
@@ -21,6 +21,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -33,7 +40,6 @@ class ApiDocsSpecTest {
 
     @TempDir Path dir;
     MockWebServer server;
-    ApiClient client;
     MutableClock clock = new MutableClock(Instant.parse("2026-10-27T09:30:00Z"));
     Path cacheFile;
 
@@ -41,7 +47,6 @@ class ApiDocsSpecTest {
     void setUp() throws IOException {
         server = new MockWebServer();
         server.start();
-        client = new ApiClient(server.url("/").toString(), RestClient.builder());
         cacheFile = dir.resolve("data").resolve("api-docs-cache.json");
     }
 
@@ -52,7 +57,15 @@ class ApiDocsSpecTest {
     }
 
     ApiDocsSpec spec() {
-        return new ApiDocsSpec(client, cacheFile.toString(), clock);
+        return spec(Duration.ofSeconds(5));
+    }
+
+    ApiDocsSpec spec(Duration timeout) {
+        return new ApiDocsSpec(server.url("/").toString(), cacheFile.toString(), clock, timeout);
+    }
+
+    static MockResponse hung() {
+        return ok(SPEC).setHeadersDelay(30, TimeUnit.SECONDS);
     }
 
     static MockResponse ok(String body) {
@@ -71,8 +84,7 @@ class ApiDocsSpecTest {
         RecordedRequest recorded = server.takeRequest(1, TimeUnit.SECONDS);
         assertThat(recorded.getPath()).isEqualTo("/api/v3/api-docs");
         assertThat(recorded.getHeader("Authorization")).isNull();
-        // The marker is ApiClient's own, removed before the call leaves: no bearer was added either.
-        assertThat(recorded.getHeader("X-Catapult-Anonymous")).isNull();
+        assertThat(recorded.getHeader("Cookie")).isNull();
     }
 
     @Test
@@ -195,6 +207,57 @@ class ApiDocsSpecTest {
         server.enqueue(ok(SPEC));
 
         assertThat(spec().current()).get().extracting(ApiDocsSpec.Cached::fromCache).isEqualTo(false);
+    }
+
+    @Test
+    void aHungApiIsGivenUpOnAfterTheSpecsOwnTimeout() {
+        server.enqueue(hung());
+        long start = System.nanoTime();
+
+        assertThat(spec(Duration.ofMillis(300)).current()).isEmpty();
+
+        assertThat(Duration.ofNanos(System.nanoTime() - start)).isLessThan(Duration.ofSeconds(5));
+    }
+
+    @Test
+    @Timeout(10)
+    void withoutACopy_concurrentViewersShareOneFetchOfAHungApi() throws Exception {
+        ApiDocsSpec spec = spec(Duration.ofMillis(500));
+        for (int i = 0; i < 8; i++) server.enqueue(hung());
+        ExecutorService pool = Executors.newFixedThreadPool(8);
+        try {
+            long start = System.nanoTime();
+            List<Future<Optional<ApiDocsSpec.Cached>>> viewers = new ArrayList<>();
+            for (int i = 0; i < 8; i++) viewers.add(pool.submit(spec::current));
+            for (Future<Optional<ApiDocsSpec.Cached>> viewer : viewers) assertThat(viewer.get()).isEmpty();
+
+            // One fetch, given up on after the timeout: the others waited for it, none tried again.
+            assertThat(Duration.ofNanos(System.nanoTime() - start)).isLessThan(Duration.ofSeconds(3));
+            assertThat(server.getRequestCount()).isEqualTo(1);
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void withACopy_viewersGetItAtOnceWhileAHungApiIsAsked() throws Exception {
+        ApiDocsSpec spec = spec(Duration.ofSeconds(3));
+        server.enqueue(ok(SPEC));
+        spec.current();
+        clock.advance(Duration.ofMinutes(2));
+        server.enqueue(hung());
+
+        CompletableFuture<Optional<ApiDocsSpec.Cached>> fetching = CompletableFuture.supplyAsync(spec::current);
+        server.takeRequest(2, TimeUnit.SECONDS);
+        // The hung fetch has reached catapult-api: the lock is held.
+        assertThat(server.takeRequest(2, TimeUnit.SECONDS)).isNotNull();
+        long start = System.nanoTime();
+        Optional<ApiDocsSpec.Cached> meanwhile = spec.current();
+
+        assertThat(Duration.ofNanos(System.nanoTime() - start)).isLessThan(Duration.ofMillis(500));
+        assertThat(meanwhile).get().extracting(ApiDocsSpec.Cached::fromCache).isEqualTo(false);
+        assertThat(fetching.get()).get().extracting(ApiDocsSpec.Cached::fromCache).isEqualTo(true);
     }
 
     @Test
