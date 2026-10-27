@@ -17,6 +17,13 @@
  * [data-admin-value] (a count, an empty state) is patched the same way. Anything else (forms,
  * dialogs, what the admin is typing) stays as it is. A view whose marked parts don't match the new
  * one's (a list now unavailable, a member gone) is rendered again as a whole.
+ *
+ * Why not as the channel pages do (client patches from their live events' data, shown and hidden with
+ * the .hidden class): an admin edit has no live event carrying what the view now shows, and its rows
+ * hold texts, formats and links the templates alone render (escaping, messages, dates). So the server
+ * renders again and this morphs, one fragment GET per edit. What is shown or hidden is the server's
+ * too, told by the hidden attribute (th:hidden), which the morph sets like any other attribute: a
+ * class toggled here would be undone by the next morph of its element.
  */
 window.CatapultAdminTabs = (function () {
     const SEARCH_DELAY_MS = 300;
