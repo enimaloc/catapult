@@ -1,5 +1,11 @@
 package fr.enimaloc.catapult.service.binding;
 
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
+import fr.enimaloc.catapult.service.binding.StreamStateService;
+import fr.enimaloc.catapult.service.binding.RaidRestoreHold;
+import fr.enimaloc.catapult.service.category.CategoryApplier;
+import fr.enimaloc.catapult.service.category.CategoryChain;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.getter.DetectedGame;
@@ -38,7 +44,11 @@ class BindingServiceEditsTest {
     private final TwResolverService twResolver = mock(TwResolverService.class);
     private final GameStateService gameState = mock(GameStateService.class);
     private final GameMappingRepository mappings = mock(GameMappingRepository.class);
-    private final BindingService service = new BindingService(bindings, igdb, igdbDetails, twitch, twResolver, gameState, mappings);
+    private final StreamStateService streamState = mock(StreamStateService.class);
+    private final BindingService service = new BindingService(bindings, igdb, igdbDetails, twitch, twResolver, mappings,
+            new GameBindingLookup(bindings), new CategoryChain(mock(CustomBindingActivations.class),
+                    streamState, mock(UserSettingsRepository.class), new RaidRestoreHold(),
+                    gameState, mock(UserAccountRepository.class), new CategoryApplier(twitch, streamState), mock(RaidRestoreGateService.class), mock(GameBindingLookup.class)));
 
     private UserAccount user;
     private GameBinding binding;
@@ -57,6 +67,8 @@ class BindingServiceEditsTest {
         when(bindings.findByIdAndUser(binding.getId(), user)).thenReturn(Optional.of(binding));
         when(bindings.save(any())).thenAnswer(call -> call.getArgument(0));
         when(gameState.getLastKnownGame(user)).thenReturn(Optional.empty());
+        // Live: an edit of the played binding is pushed (offline it is stored pending, as a detection does)
+        when(streamState.isLive(user)).thenReturn(true);
     }
 
     private void playing(GameBinding.SourceType type, String sourceId) {
@@ -68,11 +80,11 @@ class BindingServiceEditsTest {
         playing(GameBinding.SourceType.STEAM, "999");
         edit.accept(service);
         verify(bindings).save(binding);
-        verify(twitch, never()).updateChannel(any(), any());
+        verify(twitch, never()).updateChannelReporting(any(), any());
 
         playing(GameBinding.SourceType.STEAM, "620");
         edit.accept(service);
-        verify(twitch).updateChannel(user, binding);
+        verify(twitch).updateChannelReporting(user, binding);
     }
 
     @Test
@@ -95,9 +107,26 @@ class BindingServiceEditsTest {
     }
 
     @Test
-    void ignoring() {
-        assertSavedAndPushedOnlyWhenActive(s -> s.toggleIgnored(user, binding.getId(), true));
+    void ignoring_isNotPushedAsIs() {
+        playing(GameBinding.SourceType.STEAM, "620");
+
+        service.toggleIgnored(user, binding.getId(), true);
+
+        // The no-game fallback instead, and here no settings: nothing sent
+        verify(bindings).save(binding);
         assertThat(binding.isIgnored()).isTrue();
+        verify(twitch, never()).updateChannelReporting(any(), any());
+    }
+
+    @Test
+    void editingThePlayedBindingOffline_storesItPending() {
+        when(streamState.isLive(user)).thenReturn(false);
+        playing(GameBinding.SourceType.STEAM, "620");
+
+        service.toggleCclEnabled(user, binding.getId(), false);
+
+        verify(streamState).storePending(user, binding);
+        verify(twitch, never()).updateChannelReporting(any(), any());
     }
 
     @Test
@@ -127,7 +156,7 @@ class BindingServiceEditsTest {
 
         service.toggleIgnored(user, binding.getId(), true);
 
-        verify(twitch, never()).updateChannel(any(), any());
+        verify(twitch, never()).updateChannelReporting(any(), any());
     }
 
     @Test
@@ -148,7 +177,7 @@ class BindingServiceEditsTest {
     }
 
     @Test
-    void resetTws_reResolvesTheSuggestion_withoutPushingToTwitch() {
+    void resetTws_reResolvesTheSuggestion_andPushesTheNewCategory() {
         binding.setTwOverride(true);
         playing(GameBinding.SourceType.STEAM, "620");
         when(igdb.findByExternalAppId(GameBinding.SourceType.STEAM, "620"))
@@ -167,7 +196,94 @@ class BindingServiceEditsTest {
         verify(twResolver).suggest(input.capture());
         assertThat(input.getValue().steamAppId()).isEqualTo("620");
         verify(bindings).save(binding);
-        verify(twitch, never()).updateChannel(any(), any());
+        // The played binding's category changed (none → tw-72): pushed like an edit
+        verify(twitch).updateChannelReporting(user, binding);
+    }
+
+    @Test
+    void resetTws_categoryUnchanged_isNotPushed() {
+        binding.setTwitchGameId("tw-72");
+        binding.setStatus(GameBinding.Status.MANUAL);
+        playing(GameBinding.SourceType.STEAM, "620");
+        when(igdb.findByExternalAppId(GameBinding.SourceType.STEAM, "620"))
+                .thenReturn(Optional.of(new IgdbService.IgdbGame("72", "Portal 2")));
+        when(igdbDetails.getDetails("72")).thenReturn(Optional.empty());
+        when(igdb.findTwitchGameId("72")).thenReturn(Optional.of("tw-72"));
+        when(igdb.suggestCcls("72")).thenReturn(Set.of());
+
+        service.resetTws(user, binding.getId());
+
+        assertThat(binding.getStatus()).isEqualTo(GameBinding.Status.AUTO);
+        verify(twitch, never()).updateChannelReporting(any(), any());
+    }
+
+    @Test
+    void refreshingIncompleteBindings_pushesAResolvedPlayedBinding() {
+        binding.setStatus(GameBinding.Status.INCOMPLETE);
+        playing(GameBinding.SourceType.STEAM, "620");
+        when(bindings.findAllByStatusAndIgnoredFalse(GameBinding.Status.INCOMPLETE)).thenReturn(List.of(binding));
+        when(igdb.findByExternalAppId(GameBinding.SourceType.STEAM, "620"))
+                .thenReturn(Optional.of(new IgdbService.IgdbGame("72", "Portal 2")));
+        when(igdbDetails.getDetails("72")).thenReturn(Optional.empty());
+        when(igdb.findTwitchGameId("72")).thenReturn(Optional.of("tw-72"));
+        when(igdb.suggestCcls("72")).thenReturn(Set.of());
+
+        service.refreshIncompleteBindings();
+
+        assertThat(binding.getStatus()).isEqualTo(GameBinding.Status.AUTO);
+        verify(twitch).updateChannelReporting(user, binding);
+    }
+
+    @Test
+    void refreshingIncompleteBindings_aTwitchErrorDoesNotStopTheRefresh() {
+        GameBinding other = new GameBinding();
+        other.setId(UUID.randomUUID());
+        other.setUser(user);
+        other.setSourceType(GameBinding.SourceType.STEAM);
+        other.setSourceId("400");
+        other.setSourceName("Portal");
+        other.setStatus(GameBinding.Status.INCOMPLETE);
+        binding.setStatus(GameBinding.Status.INCOMPLETE);
+        playing(GameBinding.SourceType.STEAM, "620");
+        when(bindings.findAllByStatusAndIgnoredFalse(GameBinding.Status.INCOMPLETE))
+                .thenReturn(List.of(binding, other));
+        when(igdb.findByExternalAppId(any(), anyString()))
+                .thenReturn(Optional.of(new IgdbService.IgdbGame("72", "Portal 2")));
+        when(igdbDetails.getDetails("72")).thenReturn(Optional.empty());
+        when(igdb.findTwitchGameId("72")).thenReturn(Optional.of("tw-72"));
+        when(igdb.suggestCcls("72")).thenReturn(Set.of());
+        when(twitch.updateChannelReporting(user, binding)).thenThrow(new IllegalStateException("database down"));
+
+        service.refreshIncompleteBindings();
+
+        assertThat(other.getStatus()).isEqualTo(GameBinding.Status.AUTO);
+        verify(bindings).save(other);
+    }
+
+    @Test
+    void refreshingIncompleteBindings_aDecisionErrorDoesNotStopTheRefresh() {
+        GameBinding other = new GameBinding();
+        other.setId(UUID.randomUUID());
+        other.setUser(user);
+        other.setSourceType(GameBinding.SourceType.STEAM);
+        other.setSourceId("400");
+        other.setSourceName("Portal");
+        other.setStatus(GameBinding.Status.INCOMPLETE);
+        binding.setStatus(GameBinding.Status.INCOMPLETE);
+        when(bindings.findAllByStatusAndIgnoredFalse(GameBinding.Status.INCOMPLETE))
+                .thenReturn(List.of(binding, other));
+        when(igdb.findByExternalAppId(any(), anyString()))
+                .thenReturn(Optional.of(new IgdbService.IgdbGame("72", "Portal 2")));
+        when(igdbDetails.getDetails("72")).thenReturn(Optional.empty());
+        when(igdb.findTwitchGameId("72")).thenReturn(Optional.of("tw-72"));
+        when(igdb.suggestCcls("72")).thenReturn(Set.of());
+        when(gameState.getLastKnownGame(user)).thenThrow(new IllegalStateException("state unavailable"))
+                .thenReturn(Optional.empty());
+
+        service.refreshIncompleteBindings();
+
+        assertThat(other.getStatus()).isEqualTo(GameBinding.Status.AUTO);
+        verify(bindings).save(other);
     }
 
     @Test

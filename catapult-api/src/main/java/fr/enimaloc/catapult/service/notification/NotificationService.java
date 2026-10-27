@@ -18,7 +18,6 @@ import fr.enimaloc.catapult.repository.notification.NotificationRecipientReposit
 import fr.enimaloc.catapult.repository.notification.NotificationRepository;
 import fr.enimaloc.catapult.service.metrics.CatapultApiMetrics;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -46,8 +45,7 @@ public class NotificationService {
     private final ApplicationEventPublisher publisher;
     private final NotificationDeliveryService deliveries;
 
-    @Autowired(required = false)
-    private CatapultApiMetrics apiMetrics;
+    private final CatapultApiMetrics apiMetrics;
 
     @Transactional
     public NotificationDto create(CreateRequest req, UserAccount actor) {
@@ -136,7 +134,7 @@ public class NotificationService {
         NotificationDto dto = toDto(n, false);
         List<UUID> ids = recipients.stream().map(UserAccount::getId).toList();
         publisher.publishEvent(new NotificationCreatedEvent(this, ids, dto));
-        if (apiMetrics != null) apiMetrics.recordNotificationAction("created");
+        apiMetrics.recordNotificationAction("created");
         return dto;
     }
 
@@ -163,7 +161,7 @@ public class NotificationService {
         deliveries.cancel(userId, notificationId);
         long unread = recipientRepo.countByUserIdAndReadAtIsNull(userId);
         publisher.publishEvent(new NotificationReadEvent(userId, notificationId, unread));
-        if (apiMetrics != null) apiMetrics.recordNotificationAction("read");
+        apiMetrics.recordNotificationAction("read");
     }
 
     @Transactional
@@ -171,7 +169,7 @@ public class NotificationService {
         recipientRepo.markAllReadForUser(userId, Instant.now());
         deliveries.cancelAll(userId);
         publisher.publishEvent(new NotificationAllReadEvent(userId));
-        if (apiMetrics != null) apiMetrics.recordNotificationAction("markAllRead");
+        apiMetrics.recordNotificationAction("markAllRead");
     }
 
     @Transactional
@@ -181,7 +179,7 @@ public class NotificationService {
         deliveries.cancel(userId, notificationId);
         long unread = recipientRepo.countByUserIdAndReadAtIsNull(userId);
         publisher.publishEvent(new NotificationDeletedEvent(userId, notificationId, unread));
-        if (apiMetrics != null) apiMetrics.recordNotificationAction("deleted");
+        apiMetrics.recordNotificationAction("deleted");
     }
 
     public long unreadCount(UUID userId) {

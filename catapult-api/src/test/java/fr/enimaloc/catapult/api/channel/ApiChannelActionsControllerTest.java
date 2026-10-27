@@ -5,12 +5,17 @@ import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.account.UserSettings;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.steam.SteamApiKeyEntry;
+import fr.enimaloc.catapult.getter.steam.SteamApiKeyRotator;
 import fr.enimaloc.catapult.service.connections.ProviderConnectionsDto;
 import fr.enimaloc.catapult.service.connections.SteamProfileDto;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
@@ -22,16 +27,21 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /** The binding, settings, Steam token and account actions (see the sibling classes for the rest). */
 class ApiChannelActionsControllerTest extends ApiChannelActionsTestSupport {
+
+    @Autowired ObjectProvider<SteamApiKeyRotator> rotators;
 
     private UserAccount owner;
     private UserAccount moderator;
@@ -44,8 +54,9 @@ class ApiChannelActionsControllerTest extends ApiChannelActionsTestSupport {
         when(channelAccessService.canAccess(any(), eq(owner))).thenReturn(true);
     }
 
-    private MockHttpServletRequestBuilder postAs(UserAccount user, String path, String json) {
-        MockHttpServletRequestBuilder request = post("/api/channels/streamer" + path)
+    /** {@code method} {@code path} under the channel's routes, as {@code user}, with {@code json} as its body. */
+    private MockHttpServletRequestBuilder as(UserAccount user, HttpMethod method, String path, String json) {
+        MockHttpServletRequestBuilder request = request(method, "/api/internal/users/" + owner.getId() + path)
                 .with(userJwt(user.getId())).with(csrf());
         return json == null ? request : request.contentType(MediaType.APPLICATION_JSON).content(json);
     }
@@ -67,7 +78,7 @@ class ApiChannelActionsControllerTest extends ApiChannelActionsTestSupport {
         void cclToggle_byAModerator_isAppliedAndPublished() throws Exception {
             GameBinding binding = storedBinding();
 
-            mvc.perform(postAs(moderator, "/bindings/" + bindingId + "/ccl-toggle", "{\"enabled\":false}"))
+            mvc.perform(as(moderator, HttpMethod.PUT, "/bindings/" + bindingId + "/ccl-enabled", "{\"enabled\":false}"))
                     .andExpect(status().isNoContent());
 
             verify(bindingService).toggleCclEnabled(owner, bindingId, false);
@@ -75,10 +86,23 @@ class ApiChannelActionsControllerTest extends ApiChannelActionsTestSupport {
         }
 
         @Test
+        void toggleCcl_publishesAfterTheWrite() throws Exception {
+            GameBinding binding = storedBinding();
+
+            mvc.perform(as(moderator, HttpMethod.PUT, "/bindings/" + bindingId + "/ccl-enabled", "{\"enabled\":false}"))
+                    .andExpect(status().isNoContent());
+
+            InOrder order = inOrder(bindingService, channelEventPublisher);
+            order.verify(bindingService).toggleCclEnabled(owner, bindingId, false);
+            order.verify(bindingService).findBinding(owner, bindingId);
+            order.verify(channelEventPublisher).bindingUpserted(owner.getId(), binding);
+        }
+
+        @Test
         void ignoredToggle() throws Exception {
             storedBinding();
 
-            mvc.perform(postAs(moderator, "/bindings/" + bindingId + "/ignored-toggle", "{\"ignored\":true}"))
+            mvc.perform(as(moderator, HttpMethod.PUT, "/bindings/" + bindingId + "/ignored", "{\"ignored\":true}"))
                     .andExpect(status().isNoContent());
 
             verify(bindingService).toggleIgnored(owner, bindingId, true);
@@ -87,7 +111,7 @@ class ApiChannelActionsControllerTest extends ApiChannelActionsTestSupport {
 
         @Test
         void vanishedBinding_isNotPublished() throws Exception {
-            mvc.perform(postAs(moderator, "/bindings/" + bindingId + "/ignored-toggle", "{\"ignored\":true}"))
+            mvc.perform(as(moderator, HttpMethod.PUT, "/bindings/" + bindingId + "/ignored", "{\"ignored\":true}"))
                     .andExpect(status().isNoContent());
 
             verify(channelEventPublisher, never()).bindingUpserted(any(), any());
@@ -97,7 +121,7 @@ class ApiChannelActionsControllerTest extends ApiChannelActionsTestSupport {
         void update_defaultsMissingCclsToNone() throws Exception {
             storedBinding();
 
-            mvc.perform(postAs(moderator, "/bindings/" + bindingId, "{\"twitchGameId\":\"7\",\"twitchGameName\":\"Doom\"}"))
+            mvc.perform(as(moderator, HttpMethod.PATCH, "/bindings/" + bindingId, "{\"twitchGameId\":\"7\",\"twitchGameName\":\"Doom\"}"))
                     .andExpect(status().isNoContent());
 
             verify(bindingService).updateBinding(owner, bindingId, "7", "Doom", Set.of(), false);
@@ -105,7 +129,7 @@ class ApiChannelActionsControllerTest extends ApiChannelActionsTestSupport {
 
         @Test
         void update_withCcls() throws Exception {
-            mvc.perform(postAs(moderator, "/bindings/" + bindingId,
+            mvc.perform(as(moderator, HttpMethod.PATCH, "/bindings/" + bindingId,
                             "{\"twitchGameId\":\"7\",\"twitchGameName\":\"Doom\",\"ccls\":[\"Gore\"]}"))
                     .andExpect(status().isNoContent());
 
@@ -114,7 +138,7 @@ class ApiChannelActionsControllerTest extends ApiChannelActionsTestSupport {
 
         @Test
         void delete_isPublished() throws Exception {
-            mvc.perform(postAs(moderator, "/bindings/" + bindingId + "/delete", null)).andExpect(status().isNoContent());
+            mvc.perform(as(moderator, HttpMethod.DELETE, "/bindings/" + bindingId, null)).andExpect(status().isNoContent());
 
             verify(bindingService).deleteBinding(owner, bindingId);
             verify(channelEventPublisher).bindingDeleted(owner.getId(), bindingId);
@@ -124,7 +148,7 @@ class ApiChannelActionsControllerTest extends ApiChannelActionsTestSupport {
         void inaccessibleChannel_isForbidden() throws Exception {
             when(channelAccessService.canAccess(moderator, owner)).thenReturn(false);
 
-            mvc.perform(postAs(moderator, "/bindings/" + bindingId + "/delete", null)).andExpect(status().isForbidden());
+            mvc.perform(as(moderator, HttpMethod.DELETE, "/bindings/" + bindingId, null)).andExpect(status().isForbidden());
 
             verifyNoInteractions(bindingService);
         }
@@ -144,7 +168,7 @@ class ApiChannelActionsControllerTest extends ApiChannelActionsTestSupport {
             existing.setBlockedCcls(new java.util.HashSet<>(Set.of("Old")));
             when(userSettingsRepository.findById(owner.getId())).thenReturn(Optional.of(existing));
 
-            mvc.perform(postAs(moderator, "/settings/ccl", "{\"cclEnabled\":false,\"blockedCcls\":[\"Gore\"]}"))
+            mvc.perform(as(moderator, HttpMethod.PUT, "/settings/ccl", "{\"cclEnabled\":false,\"blockedCcls\":[\"Gore\"]}"))
                     .andExpect(status().isNoContent());
 
             assertThat(saved()).isSameAs(existing);
@@ -155,7 +179,7 @@ class ApiChannelActionsControllerTest extends ApiChannelActionsTestSupport {
 
         @Test
         void tws_createsSettingsForAChannelWithoutAny() throws Exception {
-            mvc.perform(postAs(owner, "/settings/tws", "{\"enabled\":true,\"blockedTws\":null}"))
+            mvc.perform(as(owner, HttpMethod.PUT, "/settings/tws", "{\"enabled\":true,\"blockedTws\":null}"))
                     .andExpect(status().isNoContent());
 
             UserSettings created = saved();
@@ -166,18 +190,73 @@ class ApiChannelActionsControllerTest extends ApiChannelActionsTestSupport {
 
         @Test
         void noGame_appliesTheDefaultRightAwayWhenNothingIsDetected() throws Exception {
-            mvc.perform(postAs(owner, "/settings/no-game", """
+            when(streamStateService.isLive(owner)).thenReturn(true);
+
+            mvc.perform(as(owner, HttpMethod.PUT, "/settings/no-game", """
                             {"twitchGameId":"1","twitchGameName":"Just Chatting","ccls":["Gore"],
-                             "applyOnStreamStart":true,"applyOnNoGame":false,"applyOnStreamEnd":true}"""))
+                             "applyOnStreamStart":true,"applyOnNoGame":true,"applyOnStreamEnd":false}"""))
                     .andExpect(status().isNoContent());
 
             UserSettings settings = saved();
             assertThat(settings.getNoGameTwitchGameName()).isEqualTo("Just Chatting");
             assertThat(settings.getNoGameCcls()).containsExactly("Gore");
             assertThat(settings.isApplyDefaultOnStreamStart()).isTrue();
-            assertThat(settings.isApplyDefaultOnNoGame()).isFalse();
-            assertThat(settings.isApplyDefaultOnStreamEnd()).isTrue();
+            assertThat(settings.isApplyDefaultOnNoGame()).isTrue();
+            assertThat(settings.isApplyDefaultOnStreamEnd()).isFalse();
             verify(twitchService).resetToDefault(owner);
+        }
+
+        @Test
+        void noGame_savesThenAppliesThenPublishes() throws Exception {
+            when(streamStateService.isLive(owner)).thenReturn(true);
+
+            mvc.perform(as(owner, HttpMethod.PUT, "/settings/no-game", """
+                            {"twitchGameId":"1","twitchGameName":"Just Chatting","ccls":null,
+                             "applyOnStreamStart":false,"applyOnNoGame":true,"applyOnStreamEnd":false}"""))
+                    .andExpect(status().isNoContent());
+
+            InOrder order = inOrder(userSettingsRepository, twitchService, channelEventPublisher);
+            order.verify(userSettingsRepository).save(any(UserSettings.class));
+            order.verify(twitchService).resetToDefault(owner);
+            order.verify(channelEventPublisher).settingsUpdated(eq(owner.getId()), any(UserSettings.class));
+        }
+
+        @Test
+        void noGame_applyOnNoGameOff_onlySaves() throws Exception {
+            when(streamStateService.isLive(owner)).thenReturn(true);
+
+            mvc.perform(as(owner, HttpMethod.PUT, "/settings/no-game", """
+                            {"twitchGameId":"1","twitchGameName":"Just Chatting","ccls":null,
+                             "applyOnStreamStart":false,"applyOnNoGame":false,"applyOnStreamEnd":false}"""))
+                    .andExpect(status().isNoContent());
+
+            assertThat(saved().isApplyDefaultOnNoGame()).isFalse();
+            verify(twitchService, never()).resetToDefault(any());
+        }
+
+        @Test
+        void noGame_offline_onlySaves() throws Exception {
+            mvc.perform(as(owner, HttpMethod.PUT, "/settings/no-game", """
+                            {"twitchGameId":"1","twitchGameName":"Just Chatting","ccls":null,
+                             "applyOnStreamStart":false,"applyOnNoGame":true,"applyOnStreamEnd":false}"""))
+                    .andExpect(status().isNoContent());
+
+            assertThat(saved().getNoGameTwitchGameId()).isEqualTo("1");
+            verify(twitchService, never()).resetToDefault(any());
+        }
+
+        @Test
+        void noGame_readsTheCustomBindingOnlyWhenNothingIsDetected() throws Exception {
+            when(gameStateService.getLastKnownGame(owner)).thenReturn(Optional.of(
+                    new fr.enimaloc.catapult.getter.DetectedGame("1", GameBinding.SourceType.STEAM, "Doom")));
+
+            mvc.perform(as(owner, HttpMethod.PUT, "/settings/no-game", """
+                            {"twitchGameId":"1","twitchGameName":"Just Chatting","ccls":null,
+                             "applyOnStreamStart":true,"applyOnNoGame":true,"applyOnStreamEnd":true}"""))
+                    .andExpect(status().isNoContent());
+
+            verify(customBindingActivations, never()).active(any());
+            verify(twitchService, never()).resetToDefault(any());
         }
 
         @Test
@@ -185,7 +264,7 @@ class ApiChannelActionsControllerTest extends ApiChannelActionsTestSupport {
             when(gameStateService.getLastKnownGame(owner)).thenReturn(Optional.of(
                     new fr.enimaloc.catapult.getter.DetectedGame("1", GameBinding.SourceType.STEAM, "Doom")));
 
-            mvc.perform(postAs(owner, "/settings/no-game", """
+            mvc.perform(as(owner, HttpMethod.PUT, "/settings/no-game", """
                             {"ccls":null,"applyOnStreamStart":false,"applyOnNoGame":false,"applyOnStreamEnd":false}"""))
                     .andExpect(status().isNoContent());
 
@@ -196,12 +275,34 @@ class ApiChannelActionsControllerTest extends ApiChannelActionsTestSupport {
         void raid_savesHowRecentAGameIsPutBack() throws Exception {
             when(raidRestoreGate.isAvailableFor(owner)).thenReturn(true);
 
-            mvc.perform(postAs(moderator, "/settings/raid", "{\"restoreGameMinutes\":15}"))
+            mvc.perform(as(moderator, HttpMethod.PUT, "/settings/raid", "{\"restoreGameMinutes\":15}"))
                     .andExpect(status().isNoContent());
 
             UserSettings settings = saved();
             assertThat(settings.getRaidRestoreGameMinutes()).isEqualTo(15);
             verify(channelEventPublisher).settingsUpdated(owner.getId(), settings);
+        }
+
+        @Test
+        void raid_isAFeatureGate() throws Exception {
+            when(raidRestoreGate.isAvailableFor(owner)).thenReturn(false);
+
+            mvc.perform(as(owner, HttpMethod.PUT, "/settings/raid", "{\"restoreGameMinutes\":15}"))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("feature_disabled"))
+                    .andExpect(jsonPath("$.detail").value("Raid settings not available for this channel"));
+            verify(userSettingsRepository, never()).save(any());
+        }
+
+        @Test
+        void raid_closedGateBeatsAnInvalidDelay() throws Exception {
+            when(raidRestoreGate.isAvailableFor(owner)).thenReturn(false);
+
+            mvc.perform(as(owner, HttpMethod.PUT, "/settings/raid", "{\"restoreGameMinutes\":500}"))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("feature_disabled"));
+
+            verify(userSettingsRepository, never()).save(any());
         }
 
         @Test
@@ -211,12 +312,12 @@ class ApiChannelActionsControllerTest extends ApiChannelActionsTestSupport {
             existing.setRaidRestoreGameMinutes(30);
             when(userSettingsRepository.findById(owner.getId())).thenReturn(Optional.of(existing));
 
-            mvc.perform(postAs(owner, "/settings/raid", "{\"restoreGameMinutes\":0}"))
+            mvc.perform(as(owner, HttpMethod.PUT, "/settings/raid", "{\"restoreGameMinutes\":0}"))
                     .andExpect(status().isNoContent());
             assertThat(existing.getRaidRestoreGameMinutes()).isNull();
 
             existing.setRaidRestoreGameMinutes(30);
-            mvc.perform(postAs(owner, "/settings/raid", "{\"restoreGameMinutes\":null}"))
+            mvc.perform(as(owner, HttpMethod.PUT, "/settings/raid", "{\"restoreGameMinutes\":null}"))
                     .andExpect(status().isNoContent());
             assertThat(existing.getRaidRestoreGameMinutes()).isNull();
         }
@@ -225,9 +326,9 @@ class ApiChannelActionsControllerTest extends ApiChannelActionsTestSupport {
         void raid_refusesADelayOutsideOneToHundredTwentyMinutes() throws Exception {
             when(raidRestoreGate.isAvailableFor(owner)).thenReturn(true);
 
-            mvc.perform(postAs(owner, "/settings/raid", "{\"restoreGameMinutes\":121}"))
+            mvc.perform(as(owner, HttpMethod.PUT, "/settings/raid", "{\"restoreGameMinutes\":121}"))
                     .andExpect(status().isBadRequest());
-            mvc.perform(postAs(owner, "/settings/raid", "{\"restoreGameMinutes\":-5}"))
+            mvc.perform(as(owner, HttpMethod.PUT, "/settings/raid", "{\"restoreGameMinutes\":-5}"))
                     .andExpect(status().isBadRequest());
 
             verify(userSettingsRepository, never()).save(any());
@@ -237,15 +338,33 @@ class ApiChannelActionsControllerTest extends ApiChannelActionsTestSupport {
         void raid_refusedWhileTheExperimentIsOffForTheChannel() throws Exception {
             when(raidRestoreGate.isAvailableFor(owner)).thenReturn(false);
 
-            mvc.perform(postAs(owner, "/settings/raid", "{\"restoreGameMinutes\":15}"))
+            mvc.perform(as(owner, HttpMethod.PUT, "/settings/raid", "{\"restoreGameMinutes\":15}"))
                     .andExpect(status().isForbidden());
 
             verify(userSettingsRepository, never()).save(any());
         }
 
         @Test
+        void noGame_leavesTheCategoryAloneWhileACustomBindingIsActive() throws Exception {
+            fr.enimaloc.catapult.domain.binding.CustomBinding art = new fr.enimaloc.catapult.domain.binding.CustomBinding();
+            art.setId(UUID.randomUUID());
+            art.setName("Art");
+            when(customBindingActivations.active(owner)).thenReturn(Optional.of(
+                    new fr.enimaloc.catapult.domain.binding.CustomBindingActivation(owner.getId(), art,
+                            java.time.Instant.now())));
+
+            mvc.perform(as(owner, HttpMethod.PUT, "/settings/no-game", """
+                            {"twitchGameId":"1","twitchGameName":"Just Chatting","ccls":null,
+                             "applyOnStreamStart":false,"applyOnNoGame":true,"applyOnStreamEnd":false}"""))
+                    .andExpect(status().isNoContent());
+
+            assertThat(saved().getNoGameTwitchGameId()).isEqualTo("1");
+            verify(twitchService, never()).resetToDefault(any());
+        }
+
+        @Test
         void incompleteFallback() throws Exception {
-            mvc.perform(postAs(owner, "/settings/incomplete-fallback",
+            mvc.perform(as(owner, HttpMethod.PUT, "/settings/incomplete-fallback",
                             "{\"twitchGameId\":\"2\",\"twitchGameName\":\"Other\",\"ccls\":[\"Drugs\"]}"))
                     .andExpect(status().isNoContent());
 
@@ -268,7 +387,7 @@ class ApiChannelActionsControllerTest extends ApiChannelActionsTestSupport {
 
         @Test
         void save_encryptsAndPoolsTheTrimmedToken() throws Exception {
-            mvc.perform(postAs(owner, "/settings/steam-personal-token", "{\"token\":\"  KEY  \",\"shared\":false}"))
+            mvc.perform(as(owner, HttpMethod.PUT, "/settings/steam-personal-token", "{\"token\":\"  KEY  \",\"shared\":false}"))
                     .andExpect(status().isNoContent());
 
             assertThat(owner.getSteamPersonalToken()).isEqualTo("enc");
@@ -284,7 +403,7 @@ class ApiChannelActionsControllerTest extends ApiChannelActionsTestSupport {
         void save_keyAlreadyPooled_isntPooledTwice() throws Exception {
             when(steamApiKeyRepository.existsById("KEY")).thenReturn(true);
 
-            mvc.perform(postAs(owner, "/settings/steam-personal-token", "{\"token\":\"KEY\",\"shared\":true}"))
+            mvc.perform(as(owner, HttpMethod.PUT, "/settings/steam-personal-token", "{\"token\":\"KEY\",\"shared\":true}"))
                     .andExpect(status().isNoContent());
 
             verify(steamApiKeyRepository, never()).save(any());
@@ -292,7 +411,7 @@ class ApiChannelActionsControllerTest extends ApiChannelActionsTestSupport {
 
         @Test
         void save_blankToken_isIgnored() throws Exception {
-            mvc.perform(postAs(owner, "/settings/steam-personal-token", "{\"token\":\"  \",\"shared\":true}"))
+            mvc.perform(as(owner, HttpMethod.PUT, "/settings/steam-personal-token", "{\"token\":\"  \",\"shared\":true}"))
                     .andExpect(status().isNoContent());
 
             verify(userAccountRepository, never()).save(any());
@@ -301,13 +420,13 @@ class ApiChannelActionsControllerTest extends ApiChannelActionsTestSupport {
 
         @Test
         void save_isOwnerOnly() throws Exception {
-            mvc.perform(postAs(moderator, "/settings/steam-personal-token", "{\"token\":\"KEY\",\"shared\":true}"))
+            mvc.perform(as(moderator, HttpMethod.PUT, "/settings/steam-personal-token", "{\"token\":\"KEY\",\"shared\":true}"))
                     .andExpect(status().isForbidden());
         }
 
         @Test
         void sharing_requiresAToken() throws Exception {
-            mvc.perform(postAs(owner, "/settings/steam-personal-token/sharing", "{\"shared\":true}"))
+            mvc.perform(as(owner, HttpMethod.PUT, "/settings/steam-personal-token/sharing", "{\"shared\":true}"))
                     .andExpect(status().isNoContent());
 
             verify(userAccountRepository, never()).save(any());
@@ -317,7 +436,7 @@ class ApiChannelActionsControllerTest extends ApiChannelActionsTestSupport {
         void sharing_repoolsTheKeyWithItsNewSharing() throws Exception {
             owner.setSteamPersonalToken("enc");
 
-            mvc.perform(postAs(owner, "/settings/steam-personal-token/sharing", "{\"shared\":true}"))
+            mvc.perform(as(owner, HttpMethod.PUT, "/settings/steam-personal-token/sharing", "{\"shared\":true}"))
                     .andExpect(status().isNoContent());
 
             assertThat(owner.isSteamTokenShared()).isTrue();
@@ -330,12 +449,35 @@ class ApiChannelActionsControllerTest extends ApiChannelActionsTestSupport {
             owner.setSteamPersonalToken("enc");
             owner.setSteamTokenShared(true);
 
-            mvc.perform(postAs(owner, "/settings/steam-personal-token/delete", null)).andExpect(status().isNoContent());
+            mvc.perform(as(owner, HttpMethod.DELETE, "/settings/steam-personal-token", null)).andExpect(status().isNoContent());
 
             assertThat(owner.getSteamPersonalToken()).isNull();
             assertThat(owner.isSteamTokenShared()).isFalse();
             verify(steamApiKeyRepository).deleteByOwner(owner);
             verify(channelEventPublisher).steamProfileChanged(owner.getId(), profile);
+        }
+
+        @Test
+        void save_withoutRotator_stillPoolsTheKeyAndAnswers204() throws Exception {
+            assertThat(rotators.getIfAvailable()).isNull();
+
+            mvc.perform(as(owner, HttpMethod.PUT, "/settings/steam-personal-token", "{\"token\":\"KEY\",\"shared\":true}"))
+                    .andExpect(status().isNoContent())
+                    .andExpect(content().string(""));
+
+            verify(steamApiKeyRepository).save(argThat((SteamApiKeyEntry key) -> key.getOwner() == owner));
+        }
+
+        @Test
+        void delete_withoutRotator_stillUnpoolsTheKeyAndAnswers204() throws Exception {
+            assertThat(rotators.getIfAvailable()).isNull();
+            owner.setSteamPersonalToken("enc");
+
+            mvc.perform(as(owner, HttpMethod.DELETE, "/settings/steam-personal-token", null))
+                    .andExpect(status().isNoContent())
+                    .andExpect(content().string(""));
+
+            verify(steamApiKeyRepository).deleteByOwner(owner);
         }
     }
 
@@ -343,31 +485,31 @@ class ApiChannelActionsControllerTest extends ApiChannelActionsTestSupport {
     class Account {
         @Test
         void deletion_needsTheUsernameTyped_caseInsensitive() throws Exception {
-            mvc.perform(postAs(owner, "/settings/delete-account", "{\"confirmUsername\":\"wrong\"}"))
-                    .andExpect(status().isNoContent());
+            mvc.perform(as(owner, HttpMethod.POST, "/deletion", "{\"confirmUsername\":\"wrong\"}"))
+                    .andExpect(status().isBadRequest());
             verify(accountService, never()).initiateAccountDeletion(any());
 
-            mvc.perform(postAs(owner, "/settings/delete-account", "{\"confirmUsername\":\"STREAMER\"}"))
+            mvc.perform(as(owner, HttpMethod.POST, "/deletion", "{\"confirmUsername\":\"STREAMER\"}"))
                     .andExpect(status().isNoContent());
             verify(accountService).initiateAccountDeletion(owner);
         }
 
         @Test
         void deletion_isOwnerOnly() throws Exception {
-            mvc.perform(postAs(moderator, "/settings/delete-account", "{\"confirmUsername\":\"streamer\"}"))
+            mvc.perform(as(moderator, HttpMethod.POST, "/deletion", "{\"confirmUsername\":\"streamer\"}"))
                     .andExpect(status().isForbidden());
         }
 
         @Test
         void cancelDeletion() throws Exception {
-            mvc.perform(postAs(owner, "/settings/cancel-deletion", null)).andExpect(status().isNoContent());
+            mvc.perform(as(owner, HttpMethod.DELETE, "/deletion", null)).andExpect(status().isNoContent());
 
             verify(accountService).cancelAccountDeletion(owner);
         }
 
         @Test
         void disconnect_providerIsCaseInsensitive_andPublished() throws Exception {
-            mvc.perform(postAs(owner, "/settings/disconnect", "{\"provider\":\"xbox\"}")).andExpect(status().isNoContent());
+            mvc.perform(as(owner, HttpMethod.DELETE, "/oauth-tokens/xbox", null)).andExpect(status().isNoContent());
 
             verify(accountService).disconnectProvider(owner, OAuthToken.Provider.XBOX);
             verify(channelEventPublisher).connectionChanged(owner.getId(), new ProviderConnectionsDto("XBOX", false, null));

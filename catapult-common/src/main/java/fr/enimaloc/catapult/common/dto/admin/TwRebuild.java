@@ -2,7 +2,7 @@ package fr.enimaloc.catapult.common.dto.admin;
 
 /**
  * The three ways an admin can rebuild the trigger warning mappings: the route under catapult-api's
- * {@code /api/admin/tw/}, and the {@code non-overridden} / {@code untouched} / {@code force-pinned} name catapult-web uses.
+ * {@code /api/internal/admin/tws/}, and the {@code non-overridden} / {@code untouched} / {@code force-pinned} name catapult-web uses.
  */
 public enum TwRebuild {
     NON_OVERRIDDEN("rebuild", "non-overridden"),

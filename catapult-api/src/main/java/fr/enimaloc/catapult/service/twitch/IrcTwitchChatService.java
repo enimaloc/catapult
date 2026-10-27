@@ -59,7 +59,7 @@ public class IrcTwitchChatService implements TwitchChatService {
 
     @PostConstruct
     public void init() {
-        // Pré-enregistre le compteur pour qu'il soit exporté à 0 avant le premier message
+        // Pre-registers the counter so it is exported as 0 before the first message
         meterRegistry.counter("catapult.chat.messages", "transport", "irc");
         userAccountRepository.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE)
             .forEach(this::connect);
@@ -183,6 +183,7 @@ public class IrcTwitchChatService implements TwitchChatService {
         String command = "!" + parts[0];
         List<String> args = parts.length > 1 ? List.of(parts[1].split(" ")) : List.of();
 
+        // The chat command system is retired: no listener consumes this event any more.
         eventPublisher.publishEvent(
             new ChatCommandEvent(this, user, command, args, extractRole(tags), extractSenderId(tags)));
     }

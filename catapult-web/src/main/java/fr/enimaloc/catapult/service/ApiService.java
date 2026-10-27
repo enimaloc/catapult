@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import fr.enimaloc.catapult.service.http.ApiClient;
+import fr.enimaloc.catapult.service.http.ApiError;
 import fr.enimaloc.catapult.common.dto.*;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
@@ -378,8 +379,8 @@ public interface ApiService {
     /** Days between a deletion request and the account's removal; 7 when catapult-api gives none. */
     int accountDeletionDelayDays();
     /**
-     * Asks for the channel's deletion: catapult-api's status (204, also when {@code confirmUsername} is not
-     * the channel's, which it then ignores; 403 not the caller's channel), 502 when unreachable.
+     * Asks for the channel's deletion: catapult-api's status (204; 400 when {@code confirmUsername} is not
+     * the channel's, deleting nothing; 403 not the caller's channel), 502 when unreachable.
      */
     int deleteAccount(String username, String confirmUsername);
     /** Cancels a pending deletion: catapult-api's status (204), 502 when unreachable. */
@@ -408,13 +409,13 @@ public interface ApiService {
     /** Deletes an account; catapult-api's status (204; 409 while users are linked to it; 404 unknown), 502 when unreachable. */
     int adminDeleteMinecraftAccount(UUID id);
     /**
-     * Starts a Microsoft device-code flow: status 200 with the code, else catapult-api's status and the
-     * refusal's message when it gave one (e.g. Microsoft's AADSTS error), 502 when unreachable.
+     * Starts a Microsoft device-code flow: status 200 with the code, else catapult-api's status and its
+     * problem when it gave one (Microsoft's AADSTS answer is the {@code upstream} of a refusal), 502 when unreachable.
      */
     MinecraftDeviceCodeStart adminMinecraftDeviceCode();
 
-    /** A device-code start: the code when {@code status} is 200, else null and catapult-api's message (may be null). */
-    record MinecraftDeviceCodeStart(int status, MinecraftDeviceCodeDto code, String message) {}
+    /** A device-code start: the code when {@code status} is 200, else null and catapult-api's problem (may be null). */
+    record MinecraftDeviceCodeStart(int status, MinecraftDeviceCodeDto code, ApiError error) {}
     /**
      * Polls the device code to enrol a new account ({@code label} null: catapult-api's default):
      * 202 while it isn't confirmed yet, 200 with the account once it is, else the error; 502 when unreachable.
@@ -456,4 +457,25 @@ public interface ApiService {
     DegradedStatusDto degradedStatus();
     /** Whether catapult-api answers and reports itself up (its health, asked without the session's bearer). */
     boolean apiAvailable();
+
+    /** The owner's custom bindings; null when catapult-api fails or refuses (experiment closed to the channel). */
+    fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto customBindings(String username);
+    /** Creates one; catapult-api's status (201, or 400/403/409) with the created binding on success. */
+    CustomBindingSave<fr.enimaloc.catapult.common.dto.binding.CustomBindingDto> createCustomBinding(
+            String username, fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest request);
+    /** Saves an edit; catapult-api's status with how re-applying the active binding went on success. */
+    CustomBindingSave<fr.enimaloc.catapult.common.dto.binding.CustomBindingSaveResult> updateCustomBinding(
+            String username, UUID id, fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest request);
+    /** catapult-api's status (204), 502 when unreachable. */
+    int deleteCustomBinding(String username, UUID id);
+    /** Makes the binding the active one, applying its category on Twitch. */
+    ActivationOutcome activateCustomBinding(String username, UUID id);
+    /** catapult-api's status (204), 502 when unreachable. */
+    int deactivateCustomBinding(String username);
+    /** Whether the logged-in member has a personal API token; null when catapult-api fails or refuses. */
+    fr.enimaloc.catapult.common.dto.account.ApiTokenStatusDto apiTokenStatus();
+    /** Replaces the personal API token; the body carries the new one, shown once, never logged or kept. */
+    ApiClient.Result<fr.enimaloc.catapult.common.dto.account.ApiTokenCreatedDto> regenerateApiToken();
+    /** catapult-api's status (204), 502 when unreachable. */
+    int revokeApiToken();
 }

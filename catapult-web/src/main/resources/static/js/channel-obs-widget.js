@@ -7,7 +7,7 @@
  * The card is replaced by each render: listeners go on its elements.
  */
 window.CatapultObsWidget = (function () {
-    // Same source as the old page's "Créer la source dans OBS".
+    // Same source as the old page's button (bundle key channel.connections.obs.widget.source.create).
     const SOURCE_NAME = "Catapult — Relais Twitchat";
     const SOURCE_SIZE = 100;
     const CONNECT_WAIT_MS = 5000;

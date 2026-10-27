@@ -1,6 +1,8 @@
 package fr.enimaloc.catapult.api.channel;
 
+import fr.enimaloc.catapult.api.error.ApiProblem;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
+import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatValidationError;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.twitchat.TwitchatEventAction;
@@ -40,7 +42,6 @@ class ApiChannelActionsTwitchatEventsTest extends ApiChannelActionsTestSupport {
         user.setId(userId);
         user.setTwitchUsername("streamer");
         when(userAccountRepository.findById(userId)).thenReturn(Optional.of(user));
-        when(userAccountRepository.findByTwitchUsername("streamer")).thenReturn(Optional.of(user));
         when(channelAccessService.canAccess(user, user)).thenReturn(true);
         return user;
     }
@@ -59,7 +60,7 @@ class ApiChannelActionsTwitchatEventsTest extends ApiChannelActionsTestSupport {
         all.get(TwitchatNotificationEventType.STREAM_STARTED).add(action);
         when(twitchatEventActionService.all(user)).thenReturn(all);
 
-        mvc.perform(get("/api/channels/streamer/twitchat/events").with(userJwt(userId)))
+        mvc.perform(get("/api/internal/users/{userId}/twitchat-events", user.getId()).with(userJwt(userId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.NO_GAME_DETECTED").isEmpty())
                 .andExpect(jsonPath("$.STREAM_STARTED[0].mode").value("RAW"))
@@ -71,7 +72,7 @@ class ApiChannelActionsTwitchatEventsTest extends ApiChannelActionsTestSupport {
         UUID userId = UUID.randomUUID();
         UserAccount user = stubOwner(userId);
 
-        mvc.perform(put("/api/channels/streamer/twitchat/events/STREAM_STARTED/actions")
+        mvc.perform(put("/api/internal/users/{userId}/twitchat-events/STREAM_STARTED/actions", user.getId())
                         .with(userJwt(userId)).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isNoContent());
 
@@ -85,18 +86,32 @@ class ApiChannelActionsTwitchatEventsTest extends ApiChannelActionsTestSupport {
         doThrow(new TwitchatValidationException(List.of(new TwitchatValidationError(0, "message", "Required"))))
                 .when(twitchatEventActionService).replace(eq(user), any(), any());
 
-        mvc.perform(put("/api/channels/streamer/twitchat/events/STREAM_STARTED/actions")
+        mvc.perform(put("/api/internal/users/{userId}/twitchat-events/STREAM_STARTED/actions", user.getId())
                         .with(userJwt(userId)).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$[0].index").value(0))
-                .andExpect(jsonPath("$[0].field").value("message"));
+                .andExpect(jsonPath("$.code").value("twitchat_invalid_payload"))
+                .andExpect(jsonPath("$.errors[0].index").value(0))
+                .andExpect(jsonPath("$.errors[0].field").value("message"));
+    }
+
+    @Test
+    void testWithTheWidgetDisabled_isAProblem() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UserAccount user = stubOwner(userId);
+        doThrow(new ApiProblem(ErrorCode.TWITCHAT_WIDGET_DISABLED, "The Twitchat widget is disabled: enable it to test"))
+                .when(twitchatEventDispatcher).sendTest(eq(user), any(), any());
+
+        mvc.perform(post("/api/internal/users/{userId}/twitchat-events/NO_GAME_DETECTED/test", user.getId())
+                        .with(userJwt(userId)).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(BODY))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("twitchat_widget_disabled"));
     }
 
     @Test
     void unknownEvent_is400() throws Exception {
         UUID userId = UUID.randomUUID();
         stubOwner(userId);
-        mvc.perform(put("/api/channels/streamer/twitchat/events/NOPE/actions")
+        mvc.perform(put("/api/internal/users/{userId}/twitchat-events/NOPE/actions", userId)
                         .with(userJwt(userId)).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("[]"))
                 .andExpect(status().isBadRequest());
     }
@@ -106,7 +121,7 @@ class ApiChannelActionsTwitchatEventsTest extends ApiChannelActionsTestSupport {
         UUID userId = UUID.randomUUID();
         UserAccount user = stubOwner(userId);
 
-        mvc.perform(post("/api/channels/streamer/twitchat/events/NO_GAME_DETECTED/test")
+        mvc.perform(post("/api/internal/users/{userId}/twitchat-events/NO_GAME_DETECTED/test", user.getId())
                         .with(userJwt(userId)).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isNoContent());
 

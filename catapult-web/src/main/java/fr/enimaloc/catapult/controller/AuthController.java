@@ -4,8 +4,8 @@ import fr.enimaloc.catapult.common.dto.TokenResponse;
 import fr.enimaloc.catapult.common.dto.channel.ChannelDto;
 import fr.enimaloc.catapult.common.dto.channel.ChannelListResponse;
 import fr.enimaloc.catapult.monitoring.InteractionMetrics;
+import fr.enimaloc.catapult.security.SessionLogin;
 import fr.enimaloc.catapult.service.ApiService;
-import fr.enimaloc.catapult.service.http.ApiClient;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
@@ -29,8 +29,7 @@ import java.util.Base64;
  * only for the session that started it ({@code state}, which catapult-api sends back, matching the one
  * kept, which is used up; a callback without one is refused): a code an attacker got for their own account cannot log a victim into it
  * (login CSRF). It trades the OAuth code for a catapult-api JWT kept in the session, then opens the
- * member's channel. The session then gets a new id (a session id known before the login is worth nothing
- * after it), what was kept for a former login is dropped, and that login's streams close on every instance.
+ * member's channel, the session opened by {@link SessionLogin}.
  * The mock profile's codes log into nothing real: its callback takes them without a state.
  */
 @Slf4j
@@ -39,7 +38,7 @@ import java.util.Base64;
 public class AuthController {
     private final ApiService apiService;
     private final InteractionMetrics metrics;
-    private final SseStreams sse;
+    private final SessionLogin sessionLogin;
     private final Environment environment;
 
     static final String STATE_KEY = "loginState";
@@ -73,13 +72,7 @@ public class AuthController {
             log.warn("Auth code exchange failed or expired");
             return "redirect:/login?error";
         }
-        HttpSession session = request.getSession();
-        if (session.getAttribute(ApiClient.SESSION_JWT_KEY) != null) sse.closeSession(session.getId());
-        request.changeSessionId();
-        SessionChannels.forget(session);
-        session.setAttribute(ApiClient.SESSION_JWT_KEY, jwt.token());
-        // A new login ends any impersonation: "Back to admin" mustn't restore an older admin session.
-        session.removeAttribute(ImpersonationController.ORIGINAL_JWT_KEY);
+        sessionLogin.establish(request, jwt.token());
         return "redirect:" + home(apiService.channelList());
     }
 

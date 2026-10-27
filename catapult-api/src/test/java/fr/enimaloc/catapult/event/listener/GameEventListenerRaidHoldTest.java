@@ -1,5 +1,8 @@
 package fr.enimaloc.catapult.event.listener;
 
+import fr.enimaloc.catapult.service.binding.GameBindingLookup;
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.service.binding.CustomBindingActivations;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.account.UserSettings;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
@@ -13,8 +16,12 @@ import fr.enimaloc.catapult.service.binding.BindingService;
 import fr.enimaloc.catapult.service.binding.GameStateService;
 import fr.enimaloc.catapult.service.binding.RaidRestoreGameService;
 import fr.enimaloc.catapult.service.binding.RaidRestoreGateService;
+import fr.enimaloc.catapult.service.binding.RaidRestoreHold;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
+import fr.enimaloc.catapult.service.category.CategoryApplier;
+import fr.enimaloc.catapult.service.category.CategoryChain;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
+import fr.enimaloc.catapult.service.twitch.ChannelUpdateOutcome;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,6 +33,7 @@ import java.time.Duration;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.mockito.Mockito.mock;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -53,6 +61,7 @@ class GameEventListenerRaidHoldTest {
     @Mock private ChannelEventPublisher channelEventPublisher;
     @Mock private RaidRestoreGateService gate;
     @Mock private GameStateService gameStateService;
+    @Mock private GameBindingLookup bindingLookup;
 
     private RaidRestoreGameService raidRestore;
     private GameEventListener listener;
@@ -62,9 +71,13 @@ class GameEventListenerRaidHoldTest {
 
     @BeforeEach
     void setUp() {
-        raidRestore = new RaidRestoreGameService(userSettingsRepository, gate, gameStateService, bindingService, twitchService);
-        listener = new GameEventListener(bindingService, twitchService, userSettingsRepository, streamStateService,
-                channelEventPublisher, raidRestore);
+        RaidRestoreHold hold = new RaidRestoreHold();
+        CustomBindingActivations activations = mock(CustomBindingActivations.class);
+        CategoryChain chain = new CategoryChain(activations, streamStateService, userSettingsRepository, hold,
+                gameStateService, mock(UserAccountRepository.class), new CategoryApplier(twitchService, streamStateService), gate, bindingLookup);
+        raidRestore = new RaidRestoreGameService(chain, new CategoryApplier(twitchService, streamStateService), hold);
+        listener = new GameEventListener(bindingService, streamStateService, channelEventPublisher, hold,
+                activations, chain);
         user = new UserAccount();
         user.setId(UUID.randomUUID());
 
@@ -88,7 +101,9 @@ class GameEventListenerRaidHoldTest {
         doomBinding.setSourceName("DOOM");
         doomBinding.setTwitchGameId(DOOM_ID);
         doomBinding.setStatus(GameBinding.Status.AUTO);
-        when(bindingService.findBinding(user, doom)).thenReturn(Optional.of(doomBinding));
+        when(bindingLookup.findByDetectedGame(user, doom)).thenReturn(Optional.of(doomBinding));
+        // Twitch accepts the restore (a restore it does not apply releases the hold)
+        lenient().when(twitchService.updateChannelReporting(user, doomBinding)).thenReturn(ChannelUpdateOutcome.APPLIED);
     }
 
     private static GameBinding noGameFallback() {
@@ -96,14 +111,14 @@ class GameEventListenerRaidHoldTest {
     }
 
     private void verifyNoGameFallbackApplied(boolean applied) {
-        if (applied) verify(twitchService).updateChannel(eq(user), noGameFallback());
-        else verify(twitchService, never()).updateChannel(eq(user), noGameFallback());
+        if (applied) verify(twitchService).updateChannelReporting(eq(user), noGameFallback());
+        else verify(twitchService, never()).updateChannelReporting(eq(user), noGameFallback());
     }
 
     /** The streamer raids out while still playing Doom, the channel already on it, then closes the game. */
     private void raidWhilePlaying_thenCloseTheGame() {
         raidRestore.onRaidedOut(new ChannelRaidedOutEvent(this, user, DOOM_ID));
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
         listener.onNoGameDetected(new NoGameDetectedEvent(this, user));
     }
 
@@ -117,7 +132,7 @@ class GameEventListenerRaidHoldTest {
     @Test
     void categoryChangedSinceTheGameStarted_theRaidPutsTheCurrentGameBack_andHoldsItOnceClosed() {
         raidRestore.onRaidedOut(new ChannelRaidedOutEvent(this, user, "12345"));
-        verify(twitchService).updateChannel(user, doomBinding);
+        verify(twitchService).updateChannelReporting(user, doomBinding);
 
         listener.onNoGameDetected(new NoGameDetectedEvent(this, user));
 

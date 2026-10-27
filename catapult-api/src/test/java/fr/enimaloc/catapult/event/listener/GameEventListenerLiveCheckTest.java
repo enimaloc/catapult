@@ -1,5 +1,10 @@
 package fr.enimaloc.catapult.event.listener;
 
+import fr.enimaloc.catapult.service.binding.GameBindingLookup;
+import fr.enimaloc.catapult.service.binding.RaidRestoreGateService;
+import static org.mockito.Mockito.mock;
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.service.binding.GameStateService;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.account.UserSettings;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
@@ -10,15 +15,16 @@ import fr.enimaloc.catapult.event.StreamOnlineEvent;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
 import fr.enimaloc.catapult.service.binding.BindingService;
-import fr.enimaloc.catapult.service.binding.RaidRestoreGameService;
+import fr.enimaloc.catapult.service.binding.RaidRestoreHold;
+import fr.enimaloc.catapult.service.binding.CustomBindingActivations;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
+import fr.enimaloc.catapult.service.category.CategoryApplier;
+import fr.enimaloc.catapult.service.category.CategoryChain;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
-import fr.enimaloc.catapult.service.twitch.ChannelUpdateOutcome;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -36,15 +42,20 @@ class GameEventListenerLiveCheckTest {
     @Mock private StreamStateService streamStateService;
     @Mock private UserSettingsRepository userSettingsRepository;
     @Mock private ChannelEventPublisher channelEventPublisher;
-    @Mock private RaidRestoreGameService raidRestoreGameService;
+    @Mock private RaidRestoreHold raidRestoreHold;
+    @Mock private CustomBindingActivations customBindingActivations;
 
-    @InjectMocks private GameEventListener listener;
+    private GameEventListener listener;
 
     private UserAccount user;
     private GameBinding binding;
 
     @BeforeEach
     void setUp() {
+        CategoryChain chain = new CategoryChain(customBindingActivations, streamStateService, userSettingsRepository,
+                raidRestoreHold, mock(GameStateService.class), mock(UserAccountRepository.class), new CategoryApplier(twitchService, streamStateService), mock(RaidRestoreGateService.class), mock(GameBindingLookup.class));
+        listener = new GameEventListener(bindingService, streamStateService, channelEventPublisher,
+                raidRestoreHold, customBindingActivations, chain);
         user = new UserAccount();
         user.setId(UUID.randomUUID());
 
@@ -64,7 +75,7 @@ class GameEventListenerLiveCheckTest {
 
         listener.onGameDetected(new GameDetectedEvent(this, user, game));
 
-        verify(twitchService).updateChannel(user, binding);
+        verify(twitchService).updateChannelReporting(user, binding);
         verify(streamStateService, never()).storePending(any(), any());
     }
 
@@ -77,7 +88,7 @@ class GameEventListenerLiveCheckTest {
         listener.onGameDetected(new GameDetectedEvent(this, user, game));
 
         verify(streamStateService).storePending(user, binding);
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
     }
 
     @Test
@@ -86,7 +97,7 @@ class GameEventListenerLiveCheckTest {
 
         listener.onStreamOnline(new StreamOnlineEvent(this, user));
 
-        verify(twitchService).updateChannel(user, binding);
+        verify(twitchService).updateChannelReporting(user, binding);
         verify(streamStateService).clearPending(user);
     }
 
@@ -97,7 +108,7 @@ class GameEventListenerLiveCheckTest {
 
         listener.onStreamOnline(new StreamOnlineEvent(this, user));
 
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
         verify(twitchService, never()).resetToDefault(any());
     }
 
@@ -110,7 +121,7 @@ class GameEventListenerLiveCheckTest {
         listener.onStreamOnline(new StreamOnlineEvent(this, user));
 
         verify(twitchService).resetToDefault(user);
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
         verify(streamStateService).clearPending(user);
     }
 
@@ -125,7 +136,7 @@ class GameEventListenerLiveCheckTest {
         listener.onStreamOnline(new StreamOnlineEvent(this, user));
 
         verify(twitchService, never()).resetToDefault(any());
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
     }
 
     @Test
@@ -137,7 +148,7 @@ class GameEventListenerLiveCheckTest {
         listener.onStreamOnline(new StreamOnlineEvent(this, user));
 
         verify(twitchService).resetToDefault(user);
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
         verify(streamStateService).clearPending(user);
     }
 
@@ -150,7 +161,7 @@ class GameEventListenerLiveCheckTest {
 
         listener.onStreamOnline(new StreamOnlineEvent(this, user));
 
-        verify(twitchService).updateChannel(user, binding);
+        verify(twitchService).updateChannelReporting(user, binding);
         verify(twitchService, never()).resetToDefault(any());
         verify(streamStateService).clearPending(user);
     }
@@ -196,7 +207,7 @@ class GameEventListenerLiveCheckTest {
         listener.onNoGameDetected(new NoGameDetectedEvent(this, user));
 
         verify(userSettingsRepository, never()).findById(any());
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
     }
 
     @Test
@@ -219,7 +230,7 @@ class GameEventListenerLiveCheckTest {
 
         listener.onNoGameDetected(new NoGameDetectedEvent(this, user));
 
-        verify(twitchService).updateChannel(eq(user), any(GameBinding.class));
+        verify(twitchService).updateChannelReporting(eq(user), any(GameBinding.class));
     }
 
     @Test
@@ -234,7 +245,7 @@ class GameEventListenerLiveCheckTest {
 
         listener.onNoGameDetected(new NoGameDetectedEvent(this, user));
 
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
     }
 
     @Test
@@ -251,7 +262,7 @@ class GameEventListenerLiveCheckTest {
         DetectedGame game = new DetectedGame("g1", GameBinding.SourceType.STEAM, "Unknown Game");
         listener.onGameDetected(new GameDetectedEvent(this, user, game));
 
-        verify(twitchService).updateChannel(eq(user), any(GameBinding.class));
+        verify(twitchService).updateChannelReporting(eq(user), any(GameBinding.class));
         verify(streamStateService, never()).storePending(any(), any());
     }
 
@@ -270,7 +281,7 @@ class GameEventListenerLiveCheckTest {
         listener.onGameDetected(new GameDetectedEvent(this, user, game));
 
         verify(streamStateService).storePending(eq(user), any(GameBinding.class));
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
     }
 
     @Test
@@ -285,7 +296,7 @@ class GameEventListenerLiveCheckTest {
         DetectedGame game = new DetectedGame("g1", GameBinding.SourceType.STEAM, "Unknown Game");
         listener.onGameDetected(new GameDetectedEvent(this, user, game));
 
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
         verify(streamStateService, never()).storePending(any(), any());
     }
 
@@ -298,7 +309,7 @@ class GameEventListenerLiveCheckTest {
         DetectedGame game = new DetectedGame("g1", GameBinding.SourceType.STEAM, "Unknown Game");
         listener.onGameDetected(new GameDetectedEvent(this, user, game));
 
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
         verify(streamStateService, never()).storePending(any(), any());
     }
 
@@ -315,7 +326,7 @@ class GameEventListenerLiveCheckTest {
 
         listener.onGameDetected(new GameDetectedEvent(this, user, new DetectedGame("g1", GameBinding.SourceType.STEAM, "Ignored Game")));
 
-        verify(twitchService).updateChannel(eq(user), any(GameBinding.class));
+        verify(twitchService).updateChannelReporting(eq(user), any(GameBinding.class));
     }
 
     @Test
@@ -331,7 +342,7 @@ class GameEventListenerLiveCheckTest {
 
         listener.onGameDetected(new GameDetectedEvent(this, user, new DetectedGame("g1", GameBinding.SourceType.STEAM, "Ignored Game")));
 
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
     }
 
     @Test
@@ -346,7 +357,7 @@ class GameEventListenerLiveCheckTest {
 
         listener.onGameDetected(new GameDetectedEvent(this, user, new DetectedGame("g1", GameBinding.SourceType.STEAM, "Ignored Game")));
 
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
     }
 
     @Test
@@ -358,7 +369,7 @@ class GameEventListenerLiveCheckTest {
         listener.onGameDetected(new GameDetectedEvent(this, user, new DetectedGame("g1", GameBinding.SourceType.STEAM, "Ignored Game")));
 
         verify(userSettingsRepository, never()).findById(any());
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
     }
 
     @Test
@@ -370,7 +381,7 @@ class GameEventListenerLiveCheckTest {
 
         listener.onGameDetected(new GameDetectedEvent(this, user, new DetectedGame("g1", GameBinding.SourceType.STEAM, "Ignored Game")));
 
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
     }
 
     @Test
@@ -381,51 +392,10 @@ class GameEventListenerLiveCheckTest {
         when(streamStateService.isLive(user)).thenReturn(true);
         when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
         // A raid takes the hold between the first check and the PATCH
-        when(raidRestoreGameService.isHoldingNoGameFallback(user)).thenReturn(false, true);
+        when(raidRestoreHold.isHolding(user)).thenReturn(false, true);
 
         listener.onNoGameDetected(new NoGameDetectedEvent(this, user));
 
-        verify(twitchService, never()).updateChannel(any(), any());
-    }
-
-    @Test
-    void applyBindingIfLive_reportsTwitchsOutcome() {
-        when(streamStateService.isLive(user)).thenReturn(true);
-        when(twitchService.updateChannelReporting(user, binding)).thenReturn(ChannelUpdateOutcome.FAILED);
-
-        assertThat(listener.applyBindingIfLive(user, binding)).isEqualTo(ChannelUpdateOutcome.FAILED);
-        verify(twitchService, never()).updateChannel(any(), any());
-    }
-
-    @Test
-    void applyBindingIfLive_offline_isSkipped() {
-        when(streamStateService.isLive(user)).thenReturn(false);
-
-        assertThat(listener.applyBindingIfLive(user, binding)).isEqualTo(ChannelUpdateOutcome.SKIPPED);
-        verifyNoInteractions(twitchService);
-        verify(streamStateService, never()).storePending(any(), any());
-    }
-
-    @Test
-    void applyBindingIfLive_incompleteWithoutFallback_isSkipped() {
-        binding.setStatus(GameBinding.Status.INCOMPLETE);
-        when(streamStateService.isLive(user)).thenReturn(true);
-        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(new UserSettings()));
-
-        assertThat(listener.applyBindingIfLive(user, binding)).isEqualTo(ChannelUpdateOutcome.SKIPPED);
-        verifyNoInteractions(twitchService);
-    }
-
-    @Test
-    void applyBindingIfLive_incompleteWithFallback_reportsTwitchsOutcome() {
-        binding.setStatus(GameBinding.Status.INCOMPLETE);
-        when(streamStateService.isLive(user)).thenReturn(true);
-        UserSettings settings = new UserSettings();
-        settings.setIncompleteFallbackTwitchGameId("509658");
-        settings.setIncompleteFallbackTwitchGameName("Just Chatting");
-        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
-        when(twitchService.updateChannelReporting(eq(user), any())).thenReturn(ChannelUpdateOutcome.APPLIED);
-
-        assertThat(listener.applyBindingIfLive(user, binding)).isEqualTo(ChannelUpdateOutcome.APPLIED);
+        verify(twitchService, never()).updateChannelReporting(any(), any());
     }
 }

@@ -8,7 +8,9 @@ import fr.enimaloc.catapult.domain.access.AlphaInvite;
 import fr.enimaloc.catapult.domain.access.AlphaInviteRedemption;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.service.access.AdminInviteService;
 import fr.enimaloc.catapult.service.access.InviteService;
+import fr.enimaloc.catapult.service.access.WhitelistService;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -74,7 +76,7 @@ class InviteControllersTest {
             when(inviteService.getInvite(me)).thenReturn(Optional.of(invite));
             when(inviteService.getRedemptions(invite)).thenReturn(List.of(redemption("friend")));
 
-            var page = controller.page(jwt);
+            var page = controller.page(UUID.randomUUID(), jwt);
 
             assertThat(page.canInvite()).isTrue();
             assertThat(page.inviteUrl()).isEqualTo("https://catapult.example/join?invite=ABCDEFGHJK");
@@ -86,14 +88,14 @@ class InviteControllersTest {
         void page_withoutWebUrl_isRelative() {
             when(inviteService.getInvite(me)).thenReturn(Optional.of(inviteOf(me)));
 
-            assertThat(controller.page(jwt).inviteUrl()).isEqualTo("/join?invite=ABCDEFGHJK");
+            assertThat(controller.page(UUID.randomUUID(), jwt).inviteUrl()).isEqualTo("/join?invite=ABCDEFGHJK");
         }
 
         @Test
         void page_withoutInvite() {
             when(inviteService.getInvite(me)).thenReturn(Optional.empty());
 
-            var page = controller.page(jwt);
+            var page = controller.page(UUID.randomUUID(), jwt);
 
             assertThat(page.canInvite()).isFalse();
             assertThat(page.redemptions()).isEmpty();
@@ -101,7 +103,7 @@ class InviteControllersTest {
 
         @Test
         void regenerate_isTracked() {
-            controller.regenerate(jwt);
+            controller.regenerate(UUID.randomUUID(), jwt);
 
             verify(inviteService).regenerateCode(me);
             verify(experiments).track(me, ApiInviteController.EXPERIMENT_KEY, ApiInviteController.EVENT_LINK_REGENERATED);
@@ -111,7 +113,8 @@ class InviteControllersTest {
     @Nested
     class Admin {
         private final UserAccountRepository users = mock(UserAccountRepository.class);
-        private final ApiAdminInviteController controller = new ApiAdminInviteController(inviteService, users);
+        private final ApiAdminInviteController controller = new ApiAdminInviteController(inviteService,
+                new AdminInviteService(mock(WhitelistService.class), inviteService, users));
 
         @Test
         void page_listsInvites_andActiveHumanMembersWithoutOne() {

@@ -93,7 +93,7 @@ class DebugCommandTest {
 
         String result = (String) command.execute(user, List.of("game#nope"));
 
-        assertThat(result).isEqualTo("Placeholder inconnu : game#nope");
+        assertThat(result).isEqualTo("Unknown placeholder: game#nope");
     }
 
     @Test

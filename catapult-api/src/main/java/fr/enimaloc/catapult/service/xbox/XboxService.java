@@ -73,7 +73,7 @@ public class XboxService {
                 .body(Token.class);
     }
 
-    // L'API Xbox Live exige des clés JSON en PascalCase, sauf xui/uhs (minuscules)
+    // The Xbox Live API requires PascalCase JSON keys, except xui/uhs (lowercase)
     public record UserAuthXboxServicePayload(
                 @JsonProperty("AuthMethod") String authMethod,
                 @JsonProperty("SiteName") String siteName,
@@ -103,7 +103,7 @@ public class XboxService {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record DisplayClaims(Xui[] xui) {
-        // xid absent des réponses scopées Minecraft, présent pour la relying party Xbox Live
+        // xid is absent from the Minecraft-scoped responses, present for the Xbox Live relying party
         @JsonIgnoreProperties(ignoreUnknown = true)
         public record Xui(String uhs, String xid) {}
     }

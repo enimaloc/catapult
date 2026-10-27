@@ -7,7 +7,8 @@ import org.springframework.context.ApplicationEvent;
 import java.util.List;
 
 /**
- * Publié lorsqu'une commande valide est reconnue dans le chat Twitch.
+ * Published when a valid command is recognised in the Twitch chat. The chat command system is
+ * retired: this event has no consumer, and nothing answers it in chat.
  */
 @Getter
 public class ChatCommandEvent extends ApplicationEvent {
@@ -22,7 +23,7 @@ public class ChatCommandEvent extends ApplicationEvent {
     private final String command;
     private final List<String> args;
     private final SenderRole senderRole;
-    /** Twitch ID du chatteur (nullable : rewards, transports legacy). */
+    /** Chatter's Twitch ID (nullable: rewards, legacy transports). */
     private final String senderTwitchId;
 
     public ChatCommandEvent(Object source, UserAccount user, String command,

@@ -11,10 +11,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 /**
- * Instrumentation centralisée des appels aux API externes (Twitch, IGDB, DtDD,
- * Steam, GitLab). Chaque appel produit un timer {@code catapult.external.api}
- * taggé api/operation/outcome/error/status. Basé sur l'Observation API : brancher un
- * TracingObservationHandler suffira plus tard pour produire des spans.
+ * Centralised instrumentation of the calls to external APIs (Twitch, IGDB, DtDD,
+ * Steam, GitLab). Each call produces a {@code catapult.external.api} timer
+ * tagged api/operation/outcome/error/status. Based on the Observation API: plugging in a
+ * TracingObservationHandler will later be enough to produce spans.
  */
 @Component
 public class ExternalApiObservations {
@@ -30,11 +30,11 @@ public class ExternalApiObservations {
     }
 
     /**
-     * Exécute {@code call} en l'observant. L'exception éventuelle est
-     * repropagée telle quelle après enregistrement.
+     * Runs {@code call} under observation. Any exception is
+     * rethrown as is after being recorded.
      *
-     * @param api       nom court de l'API externe ({@code twitch}, {@code igdb}, …)
-     * @param operation nom court de l'appel ({@code search_by_name}, …) — vocabulaire fermé
+     * @param api       short name of the external API ({@code twitch}, {@code igdb}, …)
+     * @param operation short name of the call ({@code search_by_name}, …) — closed vocabulary
      */
     public <T> T observe(String api, String operation, Supplier<T> call) {
         Observation observation = Observation.createNotStarted(METRIC, registry)
@@ -66,8 +66,8 @@ public class ExternalApiObservations {
     }
 
     /**
-     * Code HTTP porté par l'exception ({@code 429}, {@code 404}, …), ou
-     * {@code none} si l'échec n'est pas une réponse HTTP (timeout, réseau, …).
+     * HTTP code carried by the exception ({@code 429}, {@code 404}, …), or
+     * {@code none} if the failure is not an HTTP response (timeout, network, …).
      */
     public static String statusOf(Throwable e) {
         if (e instanceof RestClientResponseException http) {
@@ -77,14 +77,14 @@ public class ExternalApiObservations {
     }
 
     /**
-     * Enregistrement manuel pour les méthodes à checked exceptions.
-     * Utilise directement le Timer pour conserver la durée réelle.
+     * Manual recording for methods that throw checked exceptions.
+     * Uses the Timer directly to keep the real duration.
      */
     public void record(String api, String operation, String outcome, String error, long durationNanos) {
         record(api, operation, outcome, error, "success".equals(outcome) ? "2xx" : "none", durationNanos);
     }
 
-    /** Variante avec code HTTP explicite (clients java.net.http qui connaissent le status). */
+    /** Variant with an explicit HTTP code (java.net.http clients that know the status). */
     public void record(String api, String operation, String outcome, String error, String status, long durationNanos) {
         Timer.builder(METRIC)
                 .tags("api", api, "operation", operation, "outcome", outcome, "error", error, "status", status)

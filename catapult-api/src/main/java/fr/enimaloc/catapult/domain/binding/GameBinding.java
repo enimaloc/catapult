@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.domain.account.UserAccount;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -63,7 +64,9 @@ public class GameBinding {
     @Column(name = "ccl_enabled", nullable = false)
     private boolean cclEnabled = true;
 
+    // a page of bindings reads every binding's CCLs in one query, not one per binding
     @ElementCollection(fetch = FetchType.EAGER)
+    @BatchSize(size = 100)
     @CollectionTable(
         name = "binding_ccl",
         joinColumns = @JoinColumn(name = "binding_id")
@@ -78,6 +81,7 @@ public class GameBinding {
     private boolean twOverride = false;
 
     @ElementCollection(fetch = FetchType.EAGER)
+    @BatchSize(size = 100)
     @CollectionTable(
         name = "binding_tw",
         joinColumns = @JoinColumn(name = "binding_id")

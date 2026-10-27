@@ -16,7 +16,6 @@ import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationEventPublisher;
@@ -64,13 +63,7 @@ public class EventSubTwitchChatService implements TwitchChatService {
 
     private final EventSubConnections connections;
 
-    private DebugRecording debug = DebugRecording.OFF;
-
-    /** Records this class's grouped calls and incoming messages for the members in debug mode. */
-    @Autowired(required = false)
-    public void setDebugRecording(DebugRecording debug) {
-        this.debug = debug == null ? DebugRecording.OFF : debug;
-    }
+    private final DebugRecording debug;
 
     public EventSubTwitchChatService(OAuthTokenRepository oAuthTokenRepository,
                                      UserAccountRepository userAccountRepository,
@@ -82,7 +75,8 @@ public class EventSubTwitchChatService implements TwitchChatService {
                                      SystemTwitchAccountService systemTwitchAccountService,
                                      MeterRegistry meterRegistry,
                                      ExternalApiObservations apiObservations,
-                                     TwitchChatRateLimiter chatRateLimiter) {
+                                     TwitchChatRateLimiter chatRateLimiter,
+                                     DebugRecording debug) {
         this.oAuthTokenRepository = oAuthTokenRepository;
         this.userAccountRepository = userAccountRepository;
         this.twitchTokenService = twitchTokenService;
@@ -94,6 +88,7 @@ public class EventSubTwitchChatService implements TwitchChatService {
         this.meterRegistry = meterRegistry;
         this.apiObservations = apiObservations;
         this.chatRateLimiter = chatRateLimiter;
+        this.debug = debug;
         this.connections = new EventSubConnections(
             "[EventSub Chat]", "twitch-chat-watchdog", oAuthTokenRepository, this::handleMessage);
     }
@@ -104,7 +99,7 @@ public class EventSubTwitchChatService implements TwitchChatService {
 
     @PostConstruct
     public void init() {
-        // Pré-enregistre le compteur pour qu'il soit exporté à 0 avant le premier message
+        // Pre-registers the counter so it is exported as 0 before the first message
         meterRegistry.counter("catapult.chat.messages", "transport", "eventsub");
         var users = userAccountRepository.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE);
         log.info("[EventSub Chat] Bootstrapping connections for {} active bot-enabled user(s)", users.size());
@@ -288,13 +283,13 @@ public class EventSubTwitchChatService implements TwitchChatService {
         List<String> parts = ChatMessageSplitter.split(message);
         if (parts.isEmpty()) return;
 
-        // 1. Si un compte système est configuré (i.e. promu via /admin/members
-        //    et donc présent dans oauth_token), on envoie via lui. Le bot peut
-        //    poster même sans être mod du canal — Twitch ne bloque pas
-        //    l'envoi, il applique simplement un rate-limit plus strict pour
-        //    les non-mods. La décision bot-ou-streamer est prise sur le 1er
-        //    part : si le bot l'envoie OK, on garde le bot pour la suite
-        //    (ordre garanti par les appels synchrones via RestClient).
+        // 1. If a system account is configured (i.e. promoted via /admin/members
+        //    and therefore present in oauth_token), send through it. The bot can
+        //    post even without being a mod of the channel — Twitch does not block
+        //    the send, it just applies a stricter rate limit to non-mods. The
+        //    bot-or-streamer decision is made on the first part: if the bot sends
+        //    it OK, the bot is kept for the rest (order guaranteed by the
+        //    synchronous RestClient calls).
         String botAccess = systemTwitchAccountService.getAccessToken();
         String botTwitchId = systemTwitchAccountService.getSystemTwitchId();
         if (botAccess != null && botTwitchId != null
@@ -305,8 +300,8 @@ public class EventSubTwitchChatService implements TwitchChatService {
             return;
         }
 
-        // 2. Fallback : pas de compte système OU l'envoi via bot a échoué.
-        //    On utilise le token Twitch du streamer pour tous les parts.
+        // 2. Fallback: no system account OR the send through the bot failed.
+        //    Use the streamer's Twitch token for all the parts.
         Optional<OAuthToken> streamerToken = oAuthTokenRepository
             .findByUserAndProvider(user, OAuthToken.Provider.TWITCH);
         if (streamerToken.isEmpty()) {

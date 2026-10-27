@@ -4,6 +4,12 @@ import fr.enimaloc.catapult.common.dto.admin.MinecraftDeviceCodeDto;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
+import fr.enimaloc.catapult.service.http.ApiError;
+import fr.enimaloc.catapult.service.http.ApiErrorText;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.support.StaticMessageSource;
+import java.util.Locale;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -26,10 +32,34 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = AdminMinecraftController.class)
-@Import({WebSecurityConfig.class, ModelFiller.class})
+@Import({WebSecurityConfig.class, ModelFiller.class, AdminMinecraftControllerTest.Texts.class})
 class AdminMinecraftControllerTest {
     static final UUID ID = UUID.fromString("00000000-0000-0000-0000-00000000000a");
     static final String BASE = "/admin/minecraft-accounts";
+
+    @TestConfiguration
+    static class Texts {
+        @Bean
+        StaticMessageSource messageSource() {
+            StaticMessageSource messages = new StaticMessageSource();
+            messages.addMessage("admin.minecraft.default-label", Locale.FRENCH, "Compte Minecraft");
+            messages.addMessage("admin.minecraft.default-label", Locale.ENGLISH, "Minecraft account");
+            messages.addMessage("api.error.minecraft_device_code_refused", Locale.FRENCH, "Device-code Microsoft refusé: {0}");
+            messages.addMessage("api.error.minecraft_device_code_refused", Locale.ENGLISH, "Microsoft refused the device code: {0}");
+            return messages;
+        }
+
+        @Bean
+        ApiErrorText apiErrorText(StaticMessageSource messageSource) {
+            return new ApiErrorText(messageSource);
+        }
+    }
+
+    private static ApiError problem(String json) throws Exception {
+        tools.jackson.databind.JsonNode node = tools.jackson.databind.json.JsonMapper.builder().build().readTree(json);
+        return new ApiError(fr.enimaloc.catapult.common.error.ErrorCode.fromCode(node.get("code").stringValue()).orElse(null),
+                null, node);
+    }
 
     @Autowired MockMvc mvc;
     @MockitoBean ApiService apiService;
@@ -62,12 +92,11 @@ class AdminMinecraftControllerTest {
     }
 
     @Test
-    void deviceCode_isAnsweredAsJson_orRelaysTheRefusalWithItsMessage() throws Exception {
+    void deviceCode_isAnsweredAsJson_orRelaysTheStatus() throws Exception {
         when(apiService.isAdmin()).thenReturn(true);
         when(apiService.adminMinecraftDeviceCode())
                 .thenReturn(new ApiService.MinecraftDeviceCodeStart(200,
                         new MinecraftDeviceCodeDto("dc-1", "ABCD-1234", "https://www.microsoft.com/link", 5, 900), null))
-                .thenReturn(new ApiService.MinecraftDeviceCodeStart(502, null, "Device-code Microsoft refusé: AADSTS70002"))
                 .thenReturn(new ApiService.MinecraftDeviceCodeStart(502, null, null))
                 .thenReturn(new ApiService.MinecraftDeviceCodeStart(200, null, null));
 
@@ -75,10 +104,33 @@ class AdminMinecraftControllerTest {
                 .andExpect(content().json("{\"deviceCode\":\"dc-1\",\"userCode\":\"ABCD-1234\","
                         + "\"verificationUri\":\"https://www.microsoft.com/link\",\"interval\":5,\"expiresIn\":900}", org.springframework.test.json.JsonCompareMode.STRICT));
         mvc.perform(admin(post(BASE + "/device-code"), "{}")).andExpect(status().isBadGateway())
-                .andExpect(content().json("{\"message\":\"Device-code Microsoft refusé: AADSTS70002\"}", org.springframework.test.json.JsonCompareMode.STRICT));
-        mvc.perform(admin(post(BASE + "/device-code"), "{}")).andExpect(status().isBadGateway())
                 .andExpect(content().json("{}", org.springframework.test.json.JsonCompareMode.STRICT));
         mvc.perform(admin(post(BASE + "/device-code"), "{}")).andExpect(status().isBadGateway());
+    }
+
+    @Test
+    void deviceCodeRefused_showsTheSameFrenchLine() throws Exception {
+        when(apiService.isAdmin()).thenReturn(true);
+        when(apiService.adminMinecraftDeviceCode()).thenReturn(new ApiService.MinecraftDeviceCodeStart(502, null,
+                problem("{\"code\":\"minecraft_device_code_refused\",\"upstream\":\"AADSTS70002\"}")));
+
+        mvc.perform(admin(post(BASE + "/device-code"), "{}").locale(Locale.FRENCH)).andExpect(status().isBadGateway())
+                .andExpect(content().json("{\"message\":\"Device-code Microsoft refusé: AADSTS70002\"}", org.springframework.test.json.JsonCompareMode.STRICT));
+        mvc.perform(admin(post(BASE + "/device-code"), "{}").locale(Locale.ENGLISH)).andExpect(status().isBadGateway())
+                .andExpect(content().json("{\"message\":\"Microsoft refused the device code: AADSTS70002\"}", org.springframework.test.json.JsonCompareMode.STRICT));
+    }
+
+    @Test
+    void deviceCodeOtherError_hasNoMessage() throws Exception {
+        when(apiService.isAdmin()).thenReturn(true);
+        when(apiService.adminMinecraftDeviceCode())
+                .thenReturn(new ApiService.MinecraftDeviceCodeStart(404, null, problem("{\"code\":\"not_found\"}")))
+                .thenReturn(new ApiService.MinecraftDeviceCodeStart(502, null, null));
+
+        mvc.perform(admin(post(BASE + "/device-code"), "{}").locale(Locale.FRENCH)).andExpect(status().isNotFound())
+                .andExpect(content().json("{}", org.springframework.test.json.JsonCompareMode.STRICT));
+        mvc.perform(admin(post(BASE + "/device-code"), "{}").locale(Locale.FRENCH)).andExpect(status().isBadGateway())
+                .andExpect(content().json("{}", org.springframework.test.json.JsonCompareMode.STRICT));
     }
 
     @Test
@@ -98,14 +150,27 @@ class AdminMinecraftControllerTest {
     }
 
     @Test
-    void create_anErrorIsRelayedWithItsMessage_andABlankLabelIsLeftToTheApi() throws Exception {
+    void create_anErrorIsRelayedAsItsStatusAlone_andABlankLabelIsFilledWithTheBundlesDefault() throws Exception {
         when(apiService.isAdmin()).thenReturn(true);
-        when(apiService.adminCreateMinecraftAccount("dc-1", null))
+        when(apiService.adminCreateMinecraftAccount("dc-1", "Minecraft account"))
                 .thenReturn(new ApiClient.Result<>(502, Map.of("message", "Xbox chain failed", "trace", "x")));
 
         mvc.perform(admin(post(BASE + "/create"), "{\"deviceCode\":\"dc-1\",\"label\":\"  \"}"))
                 .andExpect(status().isBadGateway())
-                .andExpect(content().json("{\"message\":\"Xbox chain failed\"}", org.springframework.test.json.JsonCompareMode.STRICT));
+                .andExpect(content().json("{}", org.springframework.test.json.JsonCompareMode.STRICT));
+    }
+
+    @Test
+    void create_withoutALabel_sendsTheDefaultInTheAdminsLanguage() throws Exception {
+        when(apiService.isAdmin()).thenReturn(true);
+        when(apiService.adminCreateMinecraftAccount(any(), any())).thenReturn(new ApiClient.Result<>(202, null));
+
+        mvc.perform(admin(post(BASE + "/create"), "{\"deviceCode\":\"c\",\"label\":\"  \"}").locale(Locale.FRENCH))
+                .andExpect(status().isAccepted());
+        mvc.perform(admin(post(BASE + "/create"), "{\"deviceCode\":\"c\",\"label\":\"  \"}").locale(Locale.ENGLISH))
+                .andExpect(status().isAccepted());
+        verify(apiService).adminCreateMinecraftAccount("c", "Compte Minecraft");
+        verify(apiService).adminCreateMinecraftAccount("c", "Minecraft account");
     }
 
     @Test

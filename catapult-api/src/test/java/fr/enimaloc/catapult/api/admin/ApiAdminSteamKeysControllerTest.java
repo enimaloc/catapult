@@ -1,12 +1,13 @@
 package fr.enimaloc.catapult.api.admin;
 
 import fr.enimaloc.catapult.common.dto.admin.AddKeyRequest;
-import fr.enimaloc.catapult.common.dto.admin.DeleteKeyRequest;
 import fr.enimaloc.catapult.common.dto.admin.KeyStatus;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.steam.SteamApiKeyEntry;
 import fr.enimaloc.catapult.getter.steam.SteamApiKeyRotator;
 import fr.enimaloc.catapult.repository.steam.SteamApiKeyRepository;
+import fr.enimaloc.catapult.service.ApiKeyHasher;
+import fr.enimaloc.catapult.service.steam.SteamKeyPoolService;
 import fr.enimaloc.catapult.service.notification.AdminEventPublisher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,6 +17,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -36,7 +38,7 @@ class ApiAdminSteamKeysControllerTest {
     private final SteamApiKeyRepository repository = mock(SteamApiKeyRepository.class);
     private final SteamApiKeyRotator rotator = mock(SteamApiKeyRotator.class);
     private final AdminEventPublisher events = mock(AdminEventPublisher.class);
-    private final ApiAdminSteamKeysController controller = new ApiAdminSteamKeysController(repository, rotator, events);
+    private final ApiAdminSteamKeysController controller = new ApiAdminSteamKeysController(new SteamKeyPoolService(repository, Optional.of(rotator), events));
 
     @BeforeEach
     void setUp() {
@@ -76,17 +78,20 @@ class ApiAdminSteamKeysControllerTest {
     }
 
     @Test
-    void withoutRotatorOrEvents_steamIsReportedDisabled_andEditsStillWork() {
-        ApiAdminSteamKeysController bare = new ApiAdminSteamKeysController(repository, null, null);
+    void withoutRotator_steamIsReportedDisabled_andEditsStillWork() {
+        ApiAdminSteamKeysController bare = new ApiAdminSteamKeysController(new SteamKeyPoolService(repository, Optional.empty(), events));
         when(repository.findByExclusiveFalseWithOwner()).thenReturn(List.of(entry(KEY, null)));
         when(repository.findByExclusiveFalse()).thenReturn(List.of(entry(KEY, null)));
 
         assertThat(bare.page().steamEnabled()).isFalse();
         bare.add(new AddKeyRequest(OTHER));
-        bare.delete(new DeleteKeyRequest(ApiKeyHasher.id(KEY)));
+        bare.delete(ApiKeyHasher.id(KEY));
         bare.refresh();
 
         verify(repository).deleteById(KEY);
+        verify(events).keyAdded(eq(AdminEventPublisher.PROVIDER_STEAM), any());
+        verify(events).keyDeleted(AdminEventPublisher.PROVIDER_STEAM, ApiKeyHasher.id(KEY));
+        verify(events).keysRefreshed(eq(AdminEventPublisher.PROVIDER_STEAM), anyList());
     }
 
     @Test
@@ -117,7 +122,7 @@ class ApiAdminSteamKeysControllerTest {
     void delete_findsTheKeyByItsId() {
         when(repository.findByExclusiveFalse()).thenReturn(List.of(entry(OTHER, null), entry(KEY, null)));
 
-        controller.delete(new DeleteKeyRequest(ApiKeyHasher.id(KEY)));
+        controller.delete(ApiKeyHasher.id(KEY));
 
         verify(repository).deleteById(KEY);
         verify(rotator).refreshKeys();
@@ -128,7 +133,7 @@ class ApiAdminSteamKeysControllerTest {
     void delete_unknownIds_are404() {
         when(repository.findByExclusiveFalse()).thenReturn(List.of(entry(KEY, null)));
 
-        assertThatThrownBy(() -> controller.delete(new DeleteKeyRequest("nope")))
+        assertThatThrownBy(() -> controller.delete("nope"))
                 .isInstanceOfSatisfying(ResponseStatusException.class,
                         e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
     }

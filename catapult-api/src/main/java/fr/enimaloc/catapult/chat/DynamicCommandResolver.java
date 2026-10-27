@@ -74,8 +74,8 @@ public class DynamicCommandResolver {
         return repository.findByUserAndName(user, name)
             .filter(ChatCommandDefinition::isEnabled)
             .map(def -> {
-                // Si la ligne est un built-in renommé, on route vers le bean
-                // Java statique correspondant (sinon l'action serait perdue).
+                // If the row is a renamed built-in, route it to the matching static
+                // Java bean (otherwise the action would be lost).
                 if (ChatCommandPresetCatalog.isBuiltin(def)) {
                     ChatCommand bean = staticByPresetKey.get(def.getPresetKey());
                     if (bean != null) return bean;

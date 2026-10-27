@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.service.minecraft;
 
 import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,13 +20,14 @@ import static org.mockito.Mockito.when;
 class MinecraftGateServiceTest {
 
     @Mock private ExperimentService experimentService;
+    @Mock private UserAccountRepository userAccountRepository;
 
     private final UserAccount user = new UserAccount();
 
     private MinecraftGateService gate(boolean enabled, String clientId, boolean inExperiment) {
         when(experimentService.evaluateGate(any(), eq(MinecraftGateService.EXPERIMENT_KEY))).thenReturn(inExperiment);
         when(experimentService.isRolledOut(any(), eq(MinecraftGateService.EXPERIMENT_KEY))).thenReturn(inExperiment);
-        return new MinecraftGateService(experimentService, enabled, clientId);
+        return new MinecraftGateService(experimentService, userAccountRepository, enabled, clientId);
     }
 
     @Test
@@ -42,6 +44,23 @@ class MinecraftGateServiceTest {
         assertThat(gate(true, "client-id", false).isAvailableFor(user)).isFalse();
         assertThat(gate(false, "client-id", true).isAvailableFor(user)).isFalse();
         assertThat(gate(true, "", true).isAvailableFor(user)).isFalse();
+    }
+
+    @Test
+    void isAvailableForAccount_asksTheGateAboutTheAccount() {
+        java.util.UUID id = java.util.UUID.randomUUID();
+        when(userAccountRepository.findById(id)).thenReturn(java.util.Optional.of(user));
+
+        assertThat(gate(true, "client-id", true).isAvailableForAccount(id)).isTrue();
+        assertThat(gate(true, "client-id", false).isAvailableForAccount(id)).isFalse();
+    }
+
+    @Test
+    void isAvailableForAccount_unknownAccountIsUnavailable() {
+        MinecraftGateService gate = gate(true, "client-id", true);
+
+        assertThat(gate.isAvailableForAccount(java.util.UUID.randomUUID())).isFalse();
+        org.mockito.Mockito.verify(experimentService, org.mockito.Mockito.never()).evaluateGate(any(), any());
     }
 
     @Test

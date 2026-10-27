@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.domain.notification.NotificationRecipient;
 import fr.enimaloc.catapult.domain.notification.NotificationRecipientId;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -13,6 +14,8 @@ import java.util.List;
 import java.util.UUID;
 
 public interface NotificationRecipientRepository extends JpaRepository<NotificationRecipient, NotificationRecipientId> {
+    /** The page's notifications come in the same query, not one query per recipient row. */
+    @EntityGraph(attributePaths = "notification")
     Page<NotificationRecipient> findByUserIdOrderByNotificationCreatedAtDesc(UUID userId, Pageable pageable);
     List<NotificationRecipient> findByIdNotificationId(UUID notificationId);
     long countByIdNotificationId(UUID notificationId);

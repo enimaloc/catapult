@@ -4,20 +4,20 @@ import fr.enimaloc.catapult.common.dto.AppConfigResponse;
 import fr.enimaloc.catapult.common.dto.ProvidersResponse;
 import fr.enimaloc.catapult.getter.GameGetter;
 import fr.enimaloc.catapult.getter.steam.SteamApiKeyRotator;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Public configuration endpoints consumed by catapult-web.
  * No authentication required — only exposes non-sensitive feature flags.
  */
 @RestController
-@RequestMapping("/api/config")
+@RequestMapping(ApiPaths.INTERNAL + "/config")
 public class ApiConfigController {
 
     @Value("${minecraft.enabled:false}")         private boolean minecraftEnabled;
@@ -28,13 +28,12 @@ public class ApiConfigController {
     @Value("${app.account.deletion-delay-days:7}") private int deletionDelayDays;
     @Value("${spring.application.name}")     private String appName;
 
-    @Autowired(required = false)
-    private SteamApiKeyRotator rotator;
-
     private final List<GameGetter> availableGetters;
+    private final Optional<SteamApiKeyRotator> rotator;
 
-    public ApiConfigController(List<GameGetter> availableGetters) {
+    public ApiConfigController(List<GameGetter> availableGetters, Optional<SteamApiKeyRotator> rotator) {
         this.availableGetters = availableGetters;
+        this.rotator = rotator;
     }
 
     @GetMapping("/providers")
@@ -52,7 +51,6 @@ public class ApiConfigController {
     }
 
     private boolean steamKeyAvailable() {
-        if (rotator != null) return rotator.nextKey().isPresent();
-        return !steamApiKey.isBlank();
+        return rotator.map(r -> r.nextKey().isPresent()).orElseGet(() -> !steamApiKey.isBlank());
     }
 }

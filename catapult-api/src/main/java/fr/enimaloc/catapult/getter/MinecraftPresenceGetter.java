@@ -13,7 +13,6 @@ import fr.enimaloc.catapult.service.minecraft.MinecraftService;
 import fr.enimaloc.catapult.service.minecraft.MinecraftTokenService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.stereotype.Component;
@@ -26,12 +25,12 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Détecte si un utilisateur joue à Minecraft via la présence de ses amis
- * comptes de service. Un POST /presence par compte et par cycle couvre tous
- * les amis du compte (coût O(comptes), pas O(utilisateurs)).
- * Tout statut sauf OFFLINE compte comme « en jeu » — à condition que la
- * présence soit fraîche : un jeu fermé brutalement ne publie pas OFFLINE et
- * l'API continue de renvoyer le dernier statut connu (voir lastUpdated).
+ * Detects whether a user is playing Minecraft through the presence of their
+ * service-account friends. One POST /presence per account and per cycle covers all
+ * the account's friends (cost O(accounts), not O(users)).
+ * Any status except OFFLINE counts as "in game", provided the
+ * presence is fresh: a game closed abruptly does not publish OFFLINE and
+ * the API keeps returning the last known status (see lastUpdated).
  */
 @Slf4j
 @Component
@@ -45,7 +44,7 @@ public class MinecraftPresenceGetter implements GameGetter {
     private final MinecraftFriendLinkRepository linkRepository;
     private final MinecraftGateService gateService;
 
-    /** Au-delà de cet âge, une présence est considérée périmée (jeu fermé sans OFFLINE). */
+    /** Past this age, a presence is considered stale (game closed without OFFLINE). */
     @Value("${minecraft.presence-max-age-seconds:120}")
     long presenceMaxAgeSeconds = 120;
 
@@ -53,13 +52,7 @@ public class MinecraftPresenceGetter implements GameGetter {
 
     private volatile Map<String, MinecraftService.PresenceStatus> cycleCache = Map.of();
 
-    private DebugRecording debug = DebugRecording.OFF;
-
-    /** Records this class's grouped calls and incoming messages for the members in debug mode. */
-    @Autowired(required = false)
-    public void setDebugRecording(DebugRecording debug) {
-        this.debug = debug == null ? DebugRecording.OFF : debug;
-    }
+    private final DebugRecording debug;
 
     @Override
     public String name() {
@@ -81,13 +74,13 @@ public class MinecraftPresenceGetter implements GameGetter {
                         Instant staleBefore = Instant.now().minusSeconds(presenceMaxAgeSeconds);
                         for (MinecraftService.PresenceList.Presence presence : presences.presence()) {
                             if (presence.lastUpdated() != null && presence.lastUpdated().isBefore(staleBefore)) {
-                                continue; // présence périmée : le jeu ne la rafraîchit plus
+                                continue; // stale presence: the game no longer refreshes it
                             }
-                            // clé normalisée : le format d'UUID varie selon les endpoints Mojang
+                            // normalized key: the UUID format varies across the Mojang endpoints
                             cache.put(MinecraftService.normalizeProfileId(presence.profileId()), presence.status());
                         }
                     } catch (Exception e) {
-                        log.warn("Presence Minecraft en échec pour {}: {}", account.getLabel(), e.getMessage());
+                        log.warn("Minecraft presence failed for {}: {}", account.getLabel(), e.getMessage());
                     }
                 });
             }

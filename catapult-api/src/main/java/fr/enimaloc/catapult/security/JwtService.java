@@ -8,6 +8,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
+import java.time.Duration;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -35,14 +36,24 @@ public class JwtService {
     }
 
     public String generateForUser(UserAccount account, List<String> roles) {
+        return generate(account, roles, expiryMillis);
+    }
+
+    /** {@link #generateForUser(UserAccount, List)}, expiring after {@code expiry} whatever the configured expiry. */
+    public String generateForUser(UserAccount account, List<String> roles, Duration expiry) {
+        return generate(account, roles, expiry.toMillis());
+    }
+
+    /** A negative {@code validityMillis} means no expiration. */
+    private String generate(UserAccount account, List<String> roles, long validityMillis) {
         var builder = Jwts.builder()
                 .subject(account.getId().toString())
                 .claim("twitchId", account.getTwitchId())
                 .claim("username", account.getTwitchUsername())
                 .claim("roles", roles)
                 .issuedAt(new Date());
-        if (expiryMillis >= 0) {
-            builder.expiration(new Date(System.currentTimeMillis() + expiryMillis));
+        if (validityMillis >= 0) {
+            builder.expiration(new Date(System.currentTimeMillis() + validityMillis));
         }
         return builder.signWith(key).compact();
     }

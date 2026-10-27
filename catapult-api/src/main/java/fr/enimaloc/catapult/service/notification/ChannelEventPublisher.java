@@ -108,6 +108,18 @@ public class ChannelEventPublisher {
                 (id, login) -> new ChannelEvents.MinecraftLinkChanged(id, login, status, minecraftName));
     }
 
+    /** The channel's active custom binding is now {@code activeId}; null once deactivated. */
+    public void customBindingChanged(UUID channelOwnerId, UUID activeId) {
+        String active = activeId == null ? null : activeId.toString();
+        publish(channelOwnerId, ChannelEvents.CUSTOM_BINDING_CHANGED,
+                (id, login) -> new ChannelEvents.CustomBindingChanged(id, login, active));
+    }
+
+    /** The channel's custom bindings were created, changed or deleted. */
+    public void customBindingsUpdated(UUID channelOwnerId) {
+        publish(channelOwnerId, ChannelEvents.CUSTOM_BINDINGS_UPDATED, ChannelEvents.CustomBindingsUpdated::new);
+    }
+
     public void twitchatDispatch(UUID channelOwnerId, TwitchatDispatch dispatch) {
         redisPublisher.publishTwitchat(channelOwnerId, "twitchat.dispatch", dispatch);
     }

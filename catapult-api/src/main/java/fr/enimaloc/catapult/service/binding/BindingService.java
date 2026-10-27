@@ -8,6 +8,8 @@ import fr.enimaloc.catapult.domain.igdb.IgdbGameDetails;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
 import fr.enimaloc.catapult.repository.binding.GameMappingRepository;
+import fr.enimaloc.catapult.service.category.CategoryChain;
+import fr.enimaloc.catapult.service.category.CategoryTrigger.BindingEdited;
 import fr.enimaloc.catapult.service.igdb.IgdbGameDetailsService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.tw.TwResolverService;
@@ -34,27 +36,22 @@ public class BindingService {
     private final IgdbGameDetailsService igdbGameDetailsService;
     private final TwitchService twitchService;
     private final TwResolverService twResolverService;
-    private final GameStateService gameStateService;
     private final GameMappingRepository gameMappingRepository;
-
-    private boolean isActiveBinding(UserAccount user, GameBinding binding) {
-        return gameStateService.getLastKnownGame(user)
-                .map(active -> active.getSourceType() == binding.getSourceType()
-                        && active.getSourceId().equals(binding.getSourceId()))
-                .orElse(false);
-    }
+    private final GameBindingLookup gameBindingLookup;
+    private final CategoryChain categoryChain;
 
     /**
-     * Applies {@code change} to the user's binding (if it exists), saves it, and pushes it to
-     * Twitch right away when it is the game currently being played.
+     * Applies {@code change} to the user's binding (if it exists), saves it, and applies it when it is the game
+     * currently being played, as a detection would (sent when live, kept pending offline, the ignored / incomplete
+     * fallback) — unless a custom binding is active: then it is only saved, and applies when that binding is
+     * deactivated.
      */
     private void editBinding(UserAccount user, UUID bindingId, Consumer<GameBinding> change) {
         gameBindingRepository.findByIdAndUser(bindingId, user).ifPresent(binding -> {
             change.accept(binding);
             gameBindingRepository.save(binding);
-            if (isActiveBinding(user, binding)) {
-                twitchService.updateChannel(user, binding);
-            }
+            // Recorded in the channel's debug log, whoever edits it (a moderator, an admin, a Twitchat action)
+            DebugContext.runAs(user.getId(), () -> categoryChain.apply(user, new BindingEdited(binding)).orThrow());
         });
     }
 
@@ -93,8 +90,24 @@ public class BindingService {
         log.info("Refreshing {} INCOMPLETE binding(s)", incomplete.size());
         int resolved = 0;
         for (GameBinding binding : incomplete) {
-            GameBinding updated = DebugContext.callAs(binding.getUser().getId(),
-                    () -> updateWithIgdbResolution(binding.getUser(), detectedOf(binding), binding));
+            GameBinding updated = DebugContext.callAs(binding.getUser().getId(), () -> {
+                CategoryKey before = CategoryKey.of(binding);
+                GameBinding refreshed = updateWithIgdbResolution(binding.getUser(), detectedOf(binding), binding);
+                if (!before.equals(CategoryKey.of(refreshed))) {
+                    // One channel's failure (deciding or on Twitch) must not stop the refresh of the others
+                    RuntimeException failure;
+                    try {
+                        failure = categoryChain.apply(refreshed.getUser(), new BindingEdited(refreshed)).error();
+                    } catch (RuntimeException e) {
+                        failure = e;
+                    }
+                    if (failure != null) {
+                        log.warn("Refreshed binding {} could not be applied for user {}: {}", refreshed.getId(),
+                                refreshed.getUser().getId(), failure.getMessage());
+                    }
+                }
+                return refreshed;
+            });
             if (updated.getStatus() != GameBinding.Status.INCOMPLETE) resolved++;
         }
         log.info("INCOMPLETE binding refresh complete: {}/{} resolved", resolved, incomplete.size());
@@ -305,8 +318,24 @@ public class BindingService {
             // Resetting the TWs hands a MANUAL binding back to the automatic resolution: its game's admin mapping
             // when there is one, else IGDB (which sets the status itself).
             if (binding.getStatus() == GameBinding.Status.MANUAL) binding.setStatus(GameBinding.Status.AUTO);
-            updateWithIgdbResolution(user, detectedOf(binding), binding);
+            CategoryKey before = CategoryKey.of(binding);
+            GameBinding resolved = updateWithIgdbResolution(user, detectedOf(binding), binding);
+            // A new category is pushed like an edit (the played binding only)
+            if (!before.equals(CategoryKey.of(resolved))) {
+                DebugContext.runAs(user.getId(),
+                        () -> categoryChain.apply(user, new BindingEdited(resolved)).orThrow());
+            }
         });
+    }
+
+    /**
+     * What a binding makes of the channel's category: its Twitch category, or the incomplete fallback when it is
+     * INCOMPLETE. A re-resolution that changes it is pushed like an edit.
+     */
+    private record CategoryKey(String twitchGameId, boolean incomplete) {
+        static CategoryKey of(GameBinding binding) {
+            return new CategoryKey(binding.getTwitchGameId(), binding.getStatus() == GameBinding.Status.INCOMPLETE);
+        }
     }
 
     @Transactional
@@ -340,13 +369,8 @@ public class BindingService {
         return gameBindingRepository.findByIdAndUser(bindingId, user);
     }
 
-    /**
-     * Read-only counterpart to {@link #resolveOrCreate}: the existing binding for a detected
-     * game, or empty when there is none. Creates and mutates nothing, so callers that merely
-     * describe the current state (notifications, read views) can't cause a write.
-     */
+    /** Delegates to {@link GameBindingLookup#findByDetectedGame}: read-only, creates nothing. */
     public Optional<GameBinding> findBinding(UserAccount user, DetectedGame detectedGame) {
-        return gameBindingRepository.findByUserAndSourceIdAndSourceType(
-            user, detectedGame.getSourceId(), detectedGame.getSourceType());
+        return gameBindingLookup.findByDetectedGame(user, detectedGame);
     }
 }

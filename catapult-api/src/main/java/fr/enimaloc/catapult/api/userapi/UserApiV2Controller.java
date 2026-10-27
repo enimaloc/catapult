@@ -1,24 +1,6 @@
 package fr.enimaloc.catapult.api.userapi;
 
 import com.fasterxml.jackson.annotation.JsonView;
-import fr.enimaloc.catapult.domain.account.UserAccount;
-import fr.enimaloc.catapult.domain.binding.GameBinding;
-import fr.enimaloc.catapult.domain.dtdd.DtddGameMapping;
-import fr.enimaloc.catapult.domain.igdb.IgdbGameDetails;
-import fr.enimaloc.catapult.getter.DetectedGame;
-import fr.enimaloc.catapult.getter.dtdd.DtddApiClient;
-import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
-import fr.enimaloc.catapult.repository.tw.TwDtddTopicMappingRepository;
-import fr.enimaloc.catapult.service.account.WidgetTokenService;
-import fr.enimaloc.catapult.service.binding.GameStateService;
-import fr.enimaloc.catapult.service.dtdd.DtddMappingService;
-import fr.enimaloc.catapult.service.dtdd.DtddService;
-import fr.enimaloc.catapult.service.dtdd.DtddSignalService;
-import fr.enimaloc.catapult.service.igdb.IgdbGameDetailsService;
-import fr.enimaloc.catapult.service.igdb.IgdbService;
-import fr.enimaloc.catapult.service.steam.SteamIADisclosure;
-import fr.enimaloc.catapult.service.steam.SteamStoreService;
-import fr.enimaloc.catapult.service.tw.TwLabelService;
 import fr.enimaloc.catapult.service.xbox.XboxStoreService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -28,7 +10,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import tools.jackson.databind.json.JsonMapper;
@@ -36,7 +17,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.nio.charset.StandardCharsets;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 @RestController
@@ -64,29 +44,8 @@ public class UserApiV2Controller {
             + "custom headers, hence \"lang\" taking priority). The highest-quality (\"q=\") tag "
             + "is used; unparseable values are ignored.";
 
-    private final WidgetTokenService widgetTokenService;
-    private final GameStateService gameStateService;
-    private final GameBindingRepository gameBindingRepository;
-    private final IgdbService igdbService;
-    private final IgdbGameDetailsService igdbGameDetailsService;
-    private final SteamStoreService steamStoreService;
-    private final XboxStoreService xboxStoreService;
-    private final TwLabelService twLabelService;
-    private final TwDtddTopicMappingRepository twDtddTopicMappingRepository;
-    private final DevBackdoorResolver devBackdoorResolver;
+    private final GameInfoAssembler gameInfoAssembler;
     private final JsonMapper jsonMapper;
-
-    // DTDD support is conditional on "dtdd.enabled" (see DtddService) — injected as Optional so
-    // this controller degrades to dtdd=null/404 rather than failing to start when it's off.
-    private final Optional<DtddMappingService> dtddMappingService;
-    private final Optional<DtddSignalService> dtddSignalService;
-    private final Optional<DtddService> dtddService;
-    private final Optional<DtddApiClient> dtddApiClient;
-
-    // Same convention as ApiSteamConnectController for building absolute URLs behind the reverse
-    // proxy — "more" needs to be a full URL the client can follow directly, not a relative path.
-    @Value("${app.base-url:http://localhost:8080}")
-    private String baseUrl;
 
     // "lang" is a query param rather than relying on Accept-Language: this route is meant to be
     // pasted as a plain URL into an OBS browser source / overlay, which sends no such header.
@@ -166,76 +125,9 @@ public class UserApiV2Controller {
      * token, inGame=false while the widget's channel plays nothing detected.
      */
     private ResponseEntity<GameInfoResponse> gameInfoFor(UUID uuid, Locale locale) {
-        Optional<DetectedGame> backdoor = devBackdoorResolver.resolve(uuid);
-        if (backdoor.isPresent()) {
-            return ResponseEntity.ok(aggregate(backdoor.get(), Optional.empty(), locale));
-        }
-        Optional<UserAccount> user = widgetTokenService.resolve(uuid);
-        if (user.isEmpty()) {
-            return ResponseEntity.notFound().build();
-        }
-        return ResponseEntity.ok(gameStateService.getLastKnownGame(user.get())
-                .map(detected -> aggregate(detected, user, locale))
-                .orElseGet(() -> new GameInfoResponse(false)));
-    }
-
-    /** Every platform object resolvable for {@code detected}, each null when unavailable. */
-    private GameInfoResponse aggregate(DetectedGame detected, Optional<UserAccount> user, Locale locale) {
-        Optional<String> igdbId = resolveIgdbId(detected);
-        return new GameInfoResponse(true,
-                igdbId.flatMap(this::igdbObject).orElse(null),
-                steamObject(detected, locale),
-                xboxObject(detected, locale),
-                resolveDtdd(detected, igdbId, locale),
-                user.flatMap(u -> catapultObject(u, detected)).orElse(null));
-    }
-
-    private Optional<GameInfoResponse.IgdbObject> igdbObject(String igdbId) {
-        return igdbGameDetailsService.getDetails(igdbId).map(details -> new GameInfoResponse.IgdbObject(igdbId,
-                details.getSlug(), details.getSummary(), normalizeProtocolRelative(details.getCoverUrl()),
-                details.getGenres(), moreUrl("/igdb/" + igdbId)));
-    }
-
-    private GameInfoResponse.SteamObject steamObject(DetectedGame detected, Locale locale) {
-        if (detected.getSourceType() != GameBinding.SourceType.STEAM || detected.getSourceId() == null) {
-            return null;
-        }
-        String appId = detected.getSourceId();
-        return steamStoreService.fetchData(appId, locale)
-                .map(page -> new GameInfoResponse.SteamObject(appId, page.name(), page.shortDescription(),
-                        page.categories(), page.developers(), page.legalNotice(), page.headerImage(),
-                        page.releaseDate(), page.contentDescriptors(), iaDisclosure(appId, locale), locale,
-                        moreUrl("/steam/" + appId)))
-                .orElse(null);
-    }
-
-    private GameInfoResponse.XboxObject xboxObject(DetectedGame detected, Locale locale) {
-        if (detected.getSourceType() != GameBinding.SourceType.XBOX || detected.getSourceId() == null) {
-            return null;
-        }
-        String productId = detected.getSourceId();
-        return xboxStoreService.fetchProduct(productId, locale)
-                .map(p -> new GameInfoResponse.XboxObject(productId, p.title(), p.description(), p.publisherName(),
-                        p.developerName(), p.coverImage(), p.storeUrl(), moreUrl("/xbox/" + productId)))
-                .orElse(null);
-    }
-
-    /** The widget channel's own tw/ccl config for the game, when it has a binding for it. */
-    private Optional<GameInfoResponse.CatapultObject> catapultObject(UserAccount user, DetectedGame detected) {
-        return gameBindingRepository.findByUserAndSourceIdAndSourceType(user, detected.getSourceId(), detected.getSourceType())
-                .map(binding -> new GameInfoResponse.CatapultObject(binding.getId(), binding.getCreatedAt(),
-                        binding.getTws(), binding.getCcls(), moreUrl("/catapult/" + binding.getId())));
-    }
-
-    /** Whether the Steam store page declares AI-generated content, and the developer's note about it. */
-    private GameInfoResponse.IaDisclosure iaDisclosure(String appId, Locale locale) {
-        return steamStoreService.fetchIADisclosure(appId, locale)
-                .map(html -> {
-                    boolean hasDisclosure = SteamIADisclosure.hasDisclosure(html);
-                    String note = hasDisclosure ? SteamIADisclosure.extractDeveloperDescription(html).orElse(null) : null;
-                    return new GameInfoResponse.IaDisclosure(hasDisclosure, note);
-                })
-                .orElse(new GameInfoResponse.IaDisclosure(false, null));
+        return gameInfoAssembler.gameInfo(uuid, locale)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     // These "more" routes are keyed directly by the platform's own public id (igdb id, Steam
@@ -253,23 +145,9 @@ public class UserApiV2Controller {
     public ResponseEntity<IgdbDetailResponse> igdbDetail(
             @Parameter(description = "IGDB game id.", in = ParameterIn.PATH, example = "1234")
             @PathVariable String igdbId) {
-        Optional<IgdbGameDetails> details = igdbGameDetailsService.getDetails(igdbId);
-        if (details.isEmpty()) {
-            return ResponseEntity.notFound().build();
-        }
-        IgdbGameDetails d = details.get();
-        List<String> videoUrls = d.getVideoIds().stream().map(id -> "https://www.youtube.com/watch?v=" + id).toList();
-        return ResponseEntity.ok(new IgdbDetailResponse(baseUrl, d.getSlug(),
-                "https://www.igdb.com/games/" + d.getSlug(),
-                d.getSummary(), d.getStoryline(), d.getPlatforms(), d.getRating(), d.getAggregatedRating(),
-                d.getTotalRating(), d.getTotalRatingCount(), d.getFirstReleaseDate(), new HashMap<>(d.getWebsites()),
-                IgdbDetailResponse.zipRefs(d.getDlcIds(), d.getDlcNames(), baseUrl),
-                IgdbDetailResponse.zipRefs(d.getSimilarGameIds(), d.getSimilarGameNames(), baseUrl),
-                d.getGenres(), d.getGameModes(), d.getThemes(),
-                d.getPlayerPerspectives(), d.getKeywords(), d.getFranchiseNames(),
-                normalizeProtocolRelative(d.getCoverUrl()),
-                d.getScreenshotUrls().stream().map(UserApiV2Controller::normalizeProtocolRelative).toList(),
-                videoUrls));
+        return gameInfoAssembler.igdb(igdbId)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @Operation(summary = "Get full Steam store detail for an app", description = "Public lookup "
@@ -295,17 +173,9 @@ public class UserApiV2Controller {
             @RequestParam(name = "lang", required = false) String lang,
             @Parameter(description = ACCEPT_LANGUAGE_DESCRIPTION, in = ParameterIn.HEADER, example = "fr-FR,fr;q=0.9")
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
-        Locale steamLocale = RequestLocale.parse(lang, acceptLanguage);
-        Optional<SteamStoreService.SteamStorePage> page = steamStoreService.fetchData(appId, steamLocale, false);
-        if (page.isEmpty()) {
-            return ResponseEntity.notFound().build();
-        }
-        Set<String> ccls = steamStoreService.fetchCcls(List.of(appId)).getOrDefault(appId, Set.of());
-        SteamStoreService.ResolvedParentApp parentApp = steamStoreService.resolveEffectiveApp(appId).orElse(null);
-        GameInfoResponse.IaDisclosure ia = iaDisclosure(appId, steamLocale);
-        return ResponseEntity.ok(new SteamDetailResponse("https://store.steampowered.com/app/" + appId,
-                ccls, ia, parentApp == null ? null : new SteamDetailResponse.ParentApp(baseUrl, parentApp),
-                new SteamDetailResponse.Page(baseUrl, steamLocale, page.get())));
+        return gameInfoAssembler.steam(appId, RequestLocale.parse(lang, acceptLanguage))
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @Operation(summary = "Get full Microsoft Store detail for a product", description = "Public "
@@ -322,11 +192,9 @@ public class UserApiV2Controller {
             @RequestParam(name = "lang", required = false) String lang,
             @Parameter(description = ACCEPT_LANGUAGE_DESCRIPTION, in = ParameterIn.HEADER, example = "fr-FR,fr;q=0.9")
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
-        Optional<XboxStoreService.XboxProduct> product = xboxStoreService.fetchProduct(productId, RequestLocale.parse(lang, acceptLanguage));
-        if (product.isEmpty()) {
-            return ResponseEntity.notFound().build();
-        }
-        return ResponseEntity.ok(product.get());
+        return gameInfoAssembler.xbox(productId, RequestLocale.parse(lang, acceptLanguage))
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @Operation(summary = "Get full \"Does the Dog Die\" content-warning detail for a title",
@@ -341,28 +209,9 @@ public class UserApiV2Controller {
     public ResponseEntity<DtddDetailResponse> dtddDetail(
             @Parameter(description = "DTDD (doesthedogdie.com) numeric item id.", in = ParameterIn.PATH, example = "16758")
             @PathVariable long dtddId) {
-        if (dtddService.isEmpty()) {
-            return ResponseEntity.notFound().build();
-        }
-        Optional<DtddApiClient.DtddTopics> topics = dtddService.get().getTopics(dtddId);
-        Optional<DtddApiClient.DtddItem> item = dtddApiClient.flatMap(c -> c.item(dtddId));
-        if (topics.isEmpty() && item.isEmpty()) {
-            return ResponseEntity.notFound().build();
-        }
-        return ResponseEntity.ok(new DtddDetailResponse(
-                "https://www.doesthedogdie.com/media/" + dtddId,
-                topics.map(DtddApiClient.DtddTopics::yesTopics).orElse(List.of()),
-                topics.map(DtddApiClient.DtddTopics::noTopics).orElse(List.of()),
-                topics.map(DtddApiClient.DtddTopics::mostlyTopics).orElse(List.of()),
-                item.map(DtddApiClient.DtddItem::overview).orElse(null),
-                item.map(DtddApiClient.DtddItem::genres).orElse(null),
-                item.map(DtddApiClient.DtddItem::releaseYear).orElse(0L),
-                item.map(DtddApiClient.DtddItem::itemTypeName).orElse(null),
-                item.map(DtddApiClient.DtddItem::tmdbId).orElse(0L),
-                item.map(DtddApiClient.DtddItem::imdbId).orElse(null),
-                item.map(DtddApiClient.DtddItem::posterImage).orElse(null),
-                item.map(DtddApiClient.DtddItem::backgroundImage).orElse(null),
-                item.map(DtddApiClient.DtddItem::topicItemStats).orElse(null)));
+        return gameInfoAssembler.dtdd(dtddId)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     // Catapult data has no platform-side id — it's this app's own per-binding tw/ccl config —
@@ -386,54 +235,8 @@ public class UserApiV2Controller {
             @RequestParam(name = "lang", required = false) String lang,
             @Parameter(description = ACCEPT_LANGUAGE_DESCRIPTION, in = ParameterIn.HEADER, example = "fr-FR,fr;q=0.9")
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
-        Optional<GameBinding> binding = gameBindingRepository.findById(bindingId);
-        if (binding.isEmpty()) {
-            return ResponseEntity.notFound().build();
-        }
-        GameBinding b = binding.get();
-        return ResponseEntity.ok(new CatapultDetailResponse(b.getCreatedAt(), b.getUpdatedAt(), b.getSourceType(),
-                b.getSourceId(), b.getSourceName(), b.getTwitchGameId(), b.getTwitchGameName(), b.isIgnored(),
-                b.isCclEnabled(), b.getCcls(), b.isTwEnabled(), b.isTwOverride(), b.getTws(),
-                localizeTws(b.getTws(), RequestLocale.parse(lang, acceptLanguage))));
-    }
-
-    private GameInfoResponse.DtddObject resolveDtdd(DetectedGame detected, Optional<String> igdbId, Locale locale) {
-        if (dtddMappingService.isEmpty() || dtddSignalService.isEmpty() || igdbId.isEmpty()) {
-            return null;
-        }
-        DtddGameMapping mapping = dtddMappingService.get().resolve(igdbId.get(), detected.getSourceName());
-        if (mapping.getDtddId() == null) {
-            return null;
-        }
-        Set<String> topics = dtddSignalService.get().getYesMostlyTopics(igdbId.get(), detected.getSourceName());
-        Set<String> twIds = topics.isEmpty() ? Set.of() : twDtddTopicMappingRepository.findTwIdsByDtddTopicNameInIgnoreCase(
-                topics.stream().map(t -> t.toLowerCase(Locale.ROOT)).collect(Collectors.toSet()));
-        return new GameInfoResponse.DtddObject(mapping.getDtddId(),
-                "https://www.doesthedogdie.com/media/" + mapping.getDtddId(), twIds, localizeTws(twIds, locale),
-                moreUrl("/dtdd/" + mapping.getDtddId()));
-    }
-
-    // IGDB image URLs (cover, screenshots) come back protocol-relative ("//images.igdb.com/...").
-    // The persist path (IgdbGameDetailsService) normalizes this for freshly-fetched entries, but
-    // an already-cached entry can still carry the old raw form until its TTL forces a refresh —
-    // normalize defensively here too so a stale cache row doesn't leak a broken URL to callers.
-    private static String normalizeProtocolRelative(String url) {
-        return url != null && url.startsWith("//") ? "https:" + url : url;
-    }
-
-    private String moreUrl(String path) {
-        return baseUrl + ApiV2.PATH + path;
-    }
-
-    private Set<String> localizeTws(Set<String> tws, Locale locale) {
-        return tws.stream().map(id -> twLabelService.resolve(id, locale)).collect(Collectors.toSet());
-    }
-
-    private Optional<String> resolveIgdbId(DetectedGame detected) {
-        return (detected.getSourceId() != null
-                ? igdbService.findByExternalAppId(detected.getSourceType(), detected.getSourceId())
-                .or(() -> igdbService.findByName(detected.getSourceName()))
-                : igdbService.findByName(detected.getSourceName()))
-                .map(IgdbService.IgdbGame::id);
+        return gameInfoAssembler.catapult(bindingId, RequestLocale.parse(lang, acceptLanguage))
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 }

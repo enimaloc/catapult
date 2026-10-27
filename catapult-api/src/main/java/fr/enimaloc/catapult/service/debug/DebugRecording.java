@@ -25,7 +25,7 @@ import java.util.function.Supplier;
 @Component
 public class DebugRecording {
 
-    /** Records nothing: what a class uses until (or unless) the real bean is injected. */
+    /** Records nothing: for code and tests that build these classes by hand. */
     public static final DebugRecording OFF = new DebugRecording(null, null);
 
     private static final JsonMapper JSON = JsonMapper.builder().build();

@@ -6,11 +6,11 @@ import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 import proto.Franchise;
 import proto.Game;
 import proto.GameMode;
@@ -41,7 +41,7 @@ public class IgdbGameDetailsService {
     private final IgdbService igdbService;
     private final MeterRegistry meterRegistry;
     private final Executor refreshExecutor;
-    private final IgdbGameDetailsService self;
+    private final TransactionTemplate insertTransaction;
 
     @Value("${app.igdb.details-cache-ttl-hours:168}")
     private int cacheTtlHours;
@@ -51,13 +51,14 @@ public class IgdbGameDetailsService {
                                   IgdbService igdbService,
                                   MeterRegistry meterRegistry,
                                   @Qualifier("igdbRefreshExecutor") Executor refreshExecutor,
-                                  @Lazy IgdbGameDetailsService self) {
+                                  PlatformTransactionManager transactionManager) {
         this.repository = repository;
         this.igdbClient = igdbClient;
         this.igdbService = igdbService;
         this.meterRegistry = meterRegistry;
         this.refreshExecutor = refreshExecutor;
-        this.self = self;
+        this.insertTransaction = new TransactionTemplate(transactionManager);
+        this.insertTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
     /**
@@ -138,7 +139,7 @@ public class IgdbGameDetailsService {
         entity.setTotalRating(game.getTotalRating() > 0 ? game.getTotalRating() : null);
         entity.setTotalRatingCount(game.getTotalRatingCount() > 0 ? game.getTotalRatingCount() : null);
         entity.setFetchedAt(Instant.now());
-        return self.saveOrGetExisting(entity);
+        return saveOrGetExisting(entity);
     }
 
     /**
@@ -148,10 +149,9 @@ public class IgdbGameDetailsService {
      * so its abort on conflict can't poison the caller's transaction) fails on the
      * unique constraint, and we fall back to the row the winner already saved.
      */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public IgdbGameDetails saveOrGetExisting(IgdbGameDetails entity) {
+    private IgdbGameDetails saveOrGetExisting(IgdbGameDetails entity) {
         try {
-            return repository.saveAndFlush(entity);
+            return insertTransaction.execute(status -> repository.saveAndFlush(entity));
         } catch (DataIntegrityViolationException e) {
             return repository.findById(entity.getIgdbId()).orElseThrow(() -> e);
         }

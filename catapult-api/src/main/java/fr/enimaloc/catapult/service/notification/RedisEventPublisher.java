@@ -3,11 +3,9 @@ package fr.enimaloc.catapult.service.notification;
 import fr.enimaloc.catapult.common.event.ChannelEvents;
 import fr.enimaloc.catapult.service.metrics.CatapultApiMetrics;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.json.JsonMapper;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -38,17 +36,12 @@ public class RedisEventPublisher {
     private final StringRedisTemplate redis;
     private final ObjectMapper jackson;
 
-    @Autowired(required = false)
-    private CatapultApiMetrics apiMetrics;
+    private final CatapultApiMetrics apiMetrics;
 
-    public RedisEventPublisher(StringRedisTemplate redis) {
-        this(redis, JsonMapper.builder().build());
-    }
-
-    @Autowired(required = false)
-    public RedisEventPublisher(StringRedisTemplate redis, ObjectMapper jackson) {
+    public RedisEventPublisher(StringRedisTemplate redis, ObjectMapper jackson, CatapultApiMetrics apiMetrics) {
         this.redis = redis;
-        this.jackson = jackson != null ? jackson : JsonMapper.builder().build();
+        this.jackson = jackson;
+        this.apiMetrics = apiMetrics;
     }
 
     public void publishGlobal(String name, Object data) {
@@ -85,7 +78,7 @@ public class RedisEventPublisher {
             envelope.put("ts", System.currentTimeMillis());
             String json = jackson.writeValueAsString(envelope);
             redis.convertAndSend(channel, json);
-            if (apiMetrics != null) apiMetrics.recordRedisPublished(channel);
+            apiMetrics.recordRedisPublished(channel);
         } catch (Exception e) {
             log.error("Failed to publish event '{}' to {}: {}", name, channel, e.getMessage(), e);
         }

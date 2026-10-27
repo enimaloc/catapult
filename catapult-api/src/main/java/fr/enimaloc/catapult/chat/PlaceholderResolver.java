@@ -19,8 +19,8 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class PlaceholderResolver {
 
-    // Séparateur '#' (et non '.') pour que Twitch ne détecte pas les
-    // placeholders non résolus comme des liens (ex: "game.name" ≈ domaine).
+    // '#' separator (not '.') so Twitch does not detect unresolved
+    // placeholders as links (e.g. "game.name" looks like a domain).
     public static final Set<String> KNOWN_PATHS = Set.of(
         "game#name",
         "game#summary",
@@ -113,7 +113,7 @@ public class PlaceholderResolver {
         }
     }
 
-    /** Valeur brute d'un path unique (null si absente) — utilisé par !debug. */
+    /** Raw value of a single path (null when absent) — used by !debug. */
     public String lookupRaw(GameContext ctx, String path, Locale locale) {
         return lookup(ctx, path, locale);
     }
@@ -167,7 +167,7 @@ public class PlaceholderResolver {
         return twPlaceholderRegistry.getAllOptions();
     }
 
-    /** Paths inconnus présents dans un template (pour validation à l'écriture). */
+    /** Unknown paths present in a template (for validation on write). */
     public Set<String> findUnknownPaths(String template) {
         Set<String> declaredNames = new HashSet<>();
         collectDeclaredNames(template, 0, template.length(), declaredNames);

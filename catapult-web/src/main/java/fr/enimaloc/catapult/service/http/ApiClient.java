@@ -7,6 +7,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.ResponseEntity;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -15,12 +16,14 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 
 import tools.jackson.databind.json.JsonMapper;
 
+import java.io.IOException;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 /**
  * Calls catapult-api on behalf of the current browser session, authenticated with the JWT
@@ -34,10 +37,10 @@ import java.util.UUID;
 public class ApiClient {
     public static final String SESSION_JWT_KEY = "jwt";
 
-    private static final JsonMapper JSON = JsonMapper.builder().build();
+    private static final JsonMapper JSON = ApiError.JSON;
     /** Marks a call that must go out without the session's bearer; the interceptor removes it. */
     private static final String ANONYMOUS_HEADER = "X-Catapult-Anonymous";
-    private static final String AUTH_VALIDATE_PATH = "/api/auth/validate";
+    private static final String AUTH_VALIDATE_PATH = "/api/internal/auth/validate";
 
     private final RestClient client;
 
@@ -76,6 +79,31 @@ public class ApiClient {
     }
 
     /**
+     * GET {@code path}, keeping the status: its body read as {@code type} on a 2xx (null when empty), none on an error
+     * answer (logged as {@link #get} logs it); 502 when the call itself failed.
+     */
+    public <T> Result<T> getResult(String path, Class<T> type, Object... uriVars) {
+        return read(path, () -> client.get().uri(path, uriVars).retrieve().toEntity(type));
+    }
+
+    /** {@link #getResult(String, Class, Object...)}, its body read as the generic {@code type}. */
+    public <T> Result<T> getResult(String path, ParameterizedTypeReference<T> type, Object... uriVars) {
+        return read(path, () -> client.get().uri(path, uriVars).retrieve().toEntity(type));
+    }
+
+    private <T> Result<T> read(String path, Supplier<ResponseEntity<T>> call) {
+        try {
+            ResponseEntity<T> answer = call.get();
+            return new Result<>(answer.getStatusCode().value(), answer.getBody());
+        } catch (ApiErrorException e) {
+            return new Result<>(e.status(), null);
+        } catch (Exception e) {
+            logFailure(HttpMethod.GET, path, e);
+            return new Result<>(HttpStatus.BAD_GATEWAY.value(), null);
+        }
+    }
+
+    /**
      * GET {@code path} in {@code locale}'s language (sent as {@code Accept-Language}, which catapult-api
      * answers its own messages by), its body read as {@code type}; {@code null} when the call fails.
      */
@@ -110,8 +138,15 @@ public class ApiClient {
         }
     }
 
-    /** A call's HTTP status and its body read as {@code type} (null when empty); status 502 when the call itself failed. */
-    public record Result<T>(int status, T body) {
+    /**
+     * A call's HTTP status and its body read as {@code type} (null when empty); status 502 when the call itself
+     * failed. {@code error} is catapult-api's problem on an error answer that holds one, else null.
+     */
+    public record Result<T>(int status, T body, ApiError error) {
+        public Result(int status, T body) {
+            this(status, body, null);
+        }
+
         public boolean ok() {
             return status >= 200 && status < 300;
         }
@@ -119,7 +154,8 @@ public class ApiClient {
 
     /**
      * {@code method} {@code body} (none when null) to {@code path}, keeping the status and body
-     * of a 4xx answer instead of dropping them, for callers that relay validation errors.
+     * of a 4xx answer instead of dropping them, for callers that relay validation errors. An error answer's
+     * problem, whatever its content type, is kept as the result's {@link ApiError}.
      */
     public <T> Result<T> call(HttpMethod method, String path, Object body, Class<T> type, Object... uriVars) {
         try {
@@ -127,6 +163,16 @@ public class ApiClient {
             if (body != null) spec.body(body);
             return spec.exchange((request, response) -> {
                 int status = response.getStatusCode().value();
+                if (response.getStatusCode().isError()) {
+                    byte[] bytes;
+                    try {
+                        bytes = response.getBody().readAllBytes();
+                    } catch (IOException e) {
+                        // The body is lost, not the status.
+                        bytes = new byte[0];
+                    }
+                    return new Result<>(status, errorBody(bytes, type), ApiError.parse(bytes));
+                }
                 try {
                     return new Result<>(status, response.bodyTo(type));
                 } catch (Exception e) {
@@ -137,6 +183,16 @@ public class ApiClient {
         } catch (Exception e) {
             logFailure(method, path, e);
             return new Result<>(502, null);
+        }
+    }
+
+    /** An error answer's {@code bytes} read as {@code type}, as a 2xx's would be; null when they are not one. */
+    private static <T> T errorBody(byte[] bytes, Class<T> type) {
+        if (bytes.length == 0) return null;
+        try {
+            return JSON.readValue(bytes, type);
+        } catch (RuntimeException e) {
+            return null;
         }
     }
 
@@ -176,6 +232,16 @@ public class ApiClient {
     /** POST {@code body} (none when {@code null}) to {@code path}: catapult-api's status, its body ignored; 502 when unreachable. */
     public int postVoid(String path, Object body, Object... uriVars) {
         return send(HttpMethod.POST, path, body, uriVars);
+    }
+
+    /** PUT {@code body} (none when {@code null}) to {@code path}: catapult-api's status, its body ignored; 502 when unreachable. */
+    public int putVoid(String path, Object body, Object... uriVars) {
+        return send(HttpMethod.PUT, path, body, uriVars);
+    }
+
+    /** PATCH {@code body} (none when {@code null}) to {@code path}: catapult-api's status, its body ignored; 502 when unreachable. */
+    public int patchVoid(String path, Object body, Object... uriVars) {
+        return send(HttpMethod.PATCH, path, body, uriVars);
     }
 
     /** DELETE {@code path}: catapult-api's status, its body ignored; 502 when unreachable. */
@@ -255,7 +321,12 @@ public class ApiClient {
 
     /** The subject (account id) of the calling session's JWT; null without one. */
     public static UUID currentSubject() {
-        Map<?, ?> claims = currentClaims();
+        return subject(currentJwt());
+    }
+
+    /** The subject (account id) of {@code jwt}; null when it is null or unreadable. Read, not verified. */
+    public static UUID subject(String jwt) {
+        Map<?, ?> claims = claims(jwt);
         if (claims == null) return null;
         try {
             return UUID.fromString(String.valueOf(claims.get("sub")));

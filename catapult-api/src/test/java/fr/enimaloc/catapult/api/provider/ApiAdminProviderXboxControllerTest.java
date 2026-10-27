@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.api.provider;
 
+import fr.enimaloc.catapult.service.provider.RawProviderResponseSupport;
+import fr.enimaloc.catapult.service.provider.XboxRawQueries;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.xbox.XboxUserTokenService;
@@ -36,13 +38,15 @@ class ApiAdminProviderXboxControllerTest {
     @Mock private RestClient.RequestHeadersSpec headersSpec;
     @Mock private RestClient.ResponseSpec responseSpec;
 
-    @InjectMocks private ApiAdminProviderXboxController controller;
+    @InjectMocks private XboxRawQueries queries;
+    private ApiAdminProviderXboxController controller;
     private final RawProviderResponseSupport rawSupport =
             new RawProviderResponseSupport(new com.fasterxml.jackson.databind.ObjectMapper());
 
     @BeforeEach
     void setup() {
-        ReflectionTestUtils.setField(controller, "rawSupport", rawSupport);
+        controller = new ApiAdminProviderXboxController(queries);
+        ReflectionTestUtils.setField(queries, "rawSupport", rawSupport);
         doReturn(getSpec).when(restClient).get();
         doReturn(headersSpec).when(getSpec).uri(any(java.net.URI.class));
         doReturn(headersSpec).when(headersSpec).header(any(), any());
@@ -56,7 +60,8 @@ class ApiAdminProviderXboxControllerTest {
 
         assertThatThrownBy(() -> controller.presence(userId, "all"))
                 .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("404");
+                .hasMessageContaining("404")
+                .hasMessageContaining("Unknown user");
     }
 
     @Test
@@ -69,7 +74,8 @@ class ApiAdminProviderXboxControllerTest {
 
         assertThatThrownBy(() -> controller.presence(userId, "all"))
                 .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("404");
+                .hasMessageContaining("404")
+                .hasMessageContaining("No Xbox session for this user");
     }
 
     @Test
@@ -99,7 +105,8 @@ class ApiAdminProviderXboxControllerTest {
 
         assertThatThrownBy(() -> controller.presence(userId, "not_a_level"))
                 .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("400");
+                .hasMessageContaining("400")
+                .hasMessageContaining("Invalid Xbox level: not_a_level");
     }
 
     @Test

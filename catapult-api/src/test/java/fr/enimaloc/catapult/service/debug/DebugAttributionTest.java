@@ -1,9 +1,11 @@
 package fr.enimaloc.catapult.service.debug;
 
+import fr.enimaloc.catapult.service.category.CategoryChain;
+import fr.enimaloc.catapult.service.binding.StreamStateService;
+import fr.enimaloc.catapult.service.category.CategoryApplier;
+import fr.enimaloc.catapult.service.binding.CustomBindingActivations;
 import fr.enimaloc.catapult.api.connect.ApiSteamConnectController;
-import fr.enimaloc.catapult.chat.ChatCommandEvent;
-import fr.enimaloc.catapult.chat.ChatCommandListener;
-import fr.enimaloc.catapult.chat.CommandRegistry;
+import fr.enimaloc.catapult.service.steam.SteamOpenIdLinkService;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunction;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
 import fr.enimaloc.catapult.chat.command.js.SandboxExecutor;
@@ -31,11 +33,12 @@ import fr.enimaloc.catapult.security.DebugSubjectFilter;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.ActivityLogService;
 import fr.enimaloc.catapult.service.binding.BindingService;
+import fr.enimaloc.catapult.service.binding.GameBindingLookup;
 import fr.enimaloc.catapult.service.binding.GameStateService;
 import fr.enimaloc.catapult.service.binding.RaidRestoreGameService;
+import fr.enimaloc.catapult.service.binding.RaidRestoreHold;
 import fr.enimaloc.catapult.service.binding.RaidRestoreGateService;
 import fr.enimaloc.catapult.service.binding.SchedulerService;
-import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import fr.enimaloc.catapult.service.feedback.FeedbackNotificationService;
 import fr.enimaloc.catapult.service.feedback.GitLabClient;
 import fr.enimaloc.catapult.service.igdb.IgdbGameDetailsService;
@@ -137,6 +140,31 @@ class DebugAttributionTest {
     }
 
     @Test
+    void request_withAPersonalApiToken_isAttributedToItsOwner() throws Exception {
+        UUID member = UUID.randomUUID();
+        SecurityContextHolder.getContext().setAuthentication(
+                org.springframework.security.authentication.UsernamePasswordAuthenticationToken.authenticated(member,
+                        null, org.springframework.security.core.authority.AuthorityUtils.createAuthorityList(
+                                fr.enimaloc.catapult.security.PersonalTokenAuthenticationFilter.AUTHORITY)));
+
+        filter(new MockHttpServletRequest("POST", "/api/v2/custom-bindings/Art/activate"));
+
+        assertThat(seen).containsExactly(member);
+    }
+
+    @Test
+    void request_withAnotherUuidPrincipal_isNotAttributed() throws Exception {
+        SecurityContextHolder.getContext().setAuthentication(
+                org.springframework.security.authentication.UsernamePasswordAuthenticationToken.authenticated(
+                        UUID.randomUUID(), null,
+                        org.springframework.security.core.authority.AuthorityUtils.createAuthorityList("ROLE_USER")));
+
+        filter(new MockHttpServletRequest("GET", "/api/channel/settings"));
+
+        assertThat(seen).containsExactly((UUID) null);
+    }
+
+    @Test
     void request_isAttributedToTheJwtSubject() throws Exception {
         UUID member = UUID.randomUUID();
         authenticate(member.toString());
@@ -161,9 +189,9 @@ class DebugAttributionTest {
         UUID member = UUID.randomUUID();
         authenticate(admin.toString(), "ROLE_ADMIN");
 
-        filter(remote("POST", "/api/admin/members/" + member + "/debug"));
-        filter(remote("GET", "/api/admin/members/" + member));
-        filter(remote("GET", "/api/admin/members"));
+        filter(remote("POST", "/api/internal/admin/members/" + member + "/debug"));
+        filter(remote("GET", "/api/internal/admin/members/" + member));
+        filter(remote("GET", "/api/internal/admin/members"));
 
         assertThat(seen).containsExactly(member, member, admin);
     }
@@ -175,23 +203,23 @@ class DebugAttributionTest {
         UUID member = UUID.randomUUID();
         authenticate(caller.toString(), "ROLE_USER");
 
-        filter(remote("POST", "/api/admin/members/" + member + "/debug"));
+        filter(remote("POST", "/api/internal/admin/members/" + member + "/debug"));
 
         assertThat(seen).containsExactly(caller);
     }
 
-    /** Loopback passes the /api/admin/** rule without a JWT, like an admin. */
+    /** Loopback passes the ApiPaths.ADMIN rule without a JWT, like an admin. */
     @Test
     void loopbackOnAMembersAdminRoute_isAttributedToThatMember() throws Exception {
         UUID member = UUID.randomUUID();
-        MockHttpServletRequest v4 = new MockHttpServletRequest("POST", "/api/admin/members/" + member + "/debug");
+        MockHttpServletRequest v4 = new MockHttpServletRequest("POST", "/api/internal/admin/members/" + member + "/debug");
         v4.setRemoteAddr("127.0.0.1");
-        MockHttpServletRequest v6 = new MockHttpServletRequest("POST", "/api/admin/members/" + member + "/debug");
+        MockHttpServletRequest v6 = new MockHttpServletRequest("POST", "/api/internal/admin/members/" + member + "/debug");
         v6.setRemoteAddr("0:0:0:0:0:0:0:1");
 
         filter(v4);
         filter(v6);
-        filter(remote("POST", "/api/admin/members/" + member + "/debug"));
+        filter(remote("POST", "/api/internal/admin/members/" + member + "/debug"));
 
         assertThat(seen).containsExactly(member, member, null);
     }
@@ -208,12 +236,14 @@ class DebugAttributionTest {
         MockRestServiceServer steam = MockRestServiceServer.bindTo(builder).build();
         steam.expect(requestTo("https://steamcommunity.com/openid/login"))
                 .andRespond(withSuccess("is_valid:true\n", MediaType.TEXT_PLAIN));
-        ApiSteamConnectController controller = new ApiSteamConnectController(accounts,
-                mock(ApplicationEventPublisher.class), mock(ChannelEventPublisher.class), builder.build());
-        ReflectionTestUtils.setField(controller, "apiBaseUrl", "http://api.test");
+        SteamOpenIdLinkService links = new SteamOpenIdLinkService(accounts,
+                mock(ApplicationEventPublisher.class), mock(ChannelEventPublisher.class), builder.build(),
+                DebugRecording.OFF);
+        ReflectionTestUtils.setField(links, "apiBaseUrl", "http://api.test");
+        ApiSteamConnectController controller = new ApiSteamConnectController(links);
         ReflectionTestUtils.setField(controller, "webBaseUrl", "http://web.test");
         Jwt jwt = Jwt.withTokenValue("t").header("alg", "none").subject(user.getId().toString()).build();
-        String returnTo = UriComponentsBuilder.fromUriString(controller.start(jwt).redirectUrl()).build()
+        String returnTo = UriComponentsBuilder.fromUriString(controller.start(UUID.randomUUID(), jwt).redirectUrl()).build()
                 .getQueryParams().getFirst("openid.return_to");
         Map<String, String> params = new HashMap<>();
         params.put("nonce", returnTo.substring(returnTo.indexOf("nonce=") + "nonce=".length()));
@@ -280,7 +310,7 @@ class DebugAttributionTest {
         });
         BindingService service = new BindingService(bindings, mock(IgdbService.class),
                 mock(IgdbGameDetailsService.class), mock(TwitchService.class), mock(TwResolverService.class),
-                mock(GameStateService.class), mappings);
+                mappings, new GameBindingLookup(bindings), mock(CategoryChain.class));
 
         service.refreshIncompleteBindings();
 
@@ -363,21 +393,6 @@ class DebugAttributionTest {
     // --- Events --------------------------------------------------------------------------------------
 
     @Test
-    void chatCommand_isAttributedToTheChannelOwner() {
-        UserAccount owner = member();
-        CommandRegistry registry = mock(CommandRegistry.class);
-        doAnswer(inv -> {
-            note();
-            return null;
-        }).when(registry).dispatch(any(), any(Boolean.class));
-
-        new ChatCommandListener(registry, mock(ExperimentService.class))
-                .onChatCommand(new ChatCommandEvent(this, owner, "!game", List.of(), ChatCommandEvent.SenderRole.VIEWERS));
-
-        assertThat(seen).containsExactly(owner.getId());
-    }
-
-    @Test
     void raidRestore_isAttributedToTheRaidingMember() {
         UserAccount user = member();
         UserSettingsRepository settings = mock(UserSettingsRepository.class);
@@ -385,8 +400,14 @@ class DebugAttributionTest {
             note();
             return Optional.of(new UserSettings());
         });
-        RaidRestoreGameService service = new RaidRestoreGameService(settings, mock(RaidRestoreGateService.class),
-                mock(GameStateService.class), mock(BindingService.class), mock(TwitchService.class));
+        RaidRestoreHold hold = new RaidRestoreHold();
+        TwitchService twitch = mock(TwitchService.class);
+        StreamStateService streams = mock(StreamStateService.class);
+        CategoryApplier applier = new CategoryApplier(twitch, streams);
+        CategoryChain chain = new CategoryChain(mock(CustomBindingActivations.class), streams, settings, hold,
+                mock(GameStateService.class), mock(UserAccountRepository.class), applier,
+                mock(RaidRestoreGateService.class), mock(GameBindingLookup.class));
+        RaidRestoreGameService service = new RaidRestoreGameService(chain, applier, hold);
 
         service.onRaidedOut(new ChannelRaidedOutEvent(this, user, "509658"));
 

@@ -8,10 +8,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionOperations;
 import org.springframework.web.client.RestClient;
 
 import java.util.*;
@@ -19,8 +19,8 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * Gestion de la configuration admin des CCLs.
- * Au démarrage, synchronise les CCLs Twitch et les descripteurs de contenu IGDB depuis leurs APIs.
+ * Admin configuration of the CCLs.
+ * At startup, syncs the Twitch CCLs and the IGDB content descriptors from their APIs.
  */
 @Slf4j
 @Service
@@ -37,7 +37,7 @@ public class AdminCclService {
     private final RestClient restClient;
     private final TwitchCclDefinitionRepository twitchCclRepo;
     private final IgdbRatingDescriptorRepository igdbDescriptorRepo;
-    private final AdminCclService self;
+    private final TransactionOperations transactions;
 
     @Value("${twitch.client-id:}")
     private String twitchClientId;
@@ -49,8 +49,8 @@ public class AdminCclService {
     private String igdbClientId;
 
     /**
-     * Mots-clés partagés entre les descriptions IGDB et les CCL Twitch.
-     * Utilisés pour le seeding automatique des mappings au premier démarrage.
+     * Keywords shared between the IGDB descriptions and the Twitch CCLs.
+     * Used to seed the mappings automatically on first startup.
      */
     private static final Map<String, Set<String>> DEFAULT_KEYWORDS = Map.of(
         "ViolentGraphic",    Set.of("blood", "gore", "violence", "violent", "killing", "combat", "death", "injury"),
@@ -61,25 +61,25 @@ public class AdminCclService {
     );
 
     @Autowired
-    public AdminCclService(RestClient restClient, TwitchCclDefinitionRepository twitchCclRepo, IgdbRatingDescriptorRepository igdbDescriptorRepo, @Lazy AdminCclService self) {
+    public AdminCclService(RestClient restClient, TwitchCclDefinitionRepository twitchCclRepo, IgdbRatingDescriptorRepository igdbDescriptorRepo, TransactionOperations transactions) {
         this.restClient = restClient;
         this.twitchCclRepo = twitchCclRepo;
         this.igdbDescriptorRepo = igdbDescriptorRepo;
-        this.self = self;
+        this.transactions = transactions;
     }
 
     /**
-     * Once the context is ready: during its own construction, the {@code @Lazy} self proxy can't be
-     * resolved yet, so a {@code @PostConstruct} sync always failed.
+     * Once the context is ready, so the repositories and the transaction manager are fully usable.
+     * Each sync runs in its own transaction, in order; the first failure stops the later ones.
      */
     @EventListener(ApplicationReadyEvent.class)
     public void init() {
         try {
             String appToken = fetchAppToken();
             if (appToken != null) {
-                self.syncTwitchCcls(appToken);
-                self.syncIgdbDescriptors(appToken);
-                self.applyDefaultMappings();
+                transactions.executeWithoutResult(status -> syncTwitchCcls(appToken));
+                transactions.executeWithoutResult(status -> syncIgdbDescriptors(appToken));
+                transactions.executeWithoutResult(status -> applyDefaultMappings());
             }
         } catch (Exception e) {
             log.warn("AdminCclService startup sync failed — admin CCL data may be stale: {}", e.getMessage());
@@ -144,7 +144,6 @@ public class AdminCclService {
     }
 
     @SuppressWarnings("unchecked")
-    @Transactional
     void syncTwitchCcls(String appToken) {
         Map<String, Object> response = restClient.get()
             .uri(TWITCH_CCL_URL)
@@ -174,7 +173,6 @@ public class AdminCclService {
      * rating_content_descriptions (with their organization context) for display.
      */
     @SuppressWarnings("unchecked")
-    @Transactional
     void syncIgdbDescriptors(String appToken) {
         String clientIdToUse = igdbClientId.isBlank() ? twitchClientId : igdbClientId;
         if (clientIdToUse.isBlank()) return;
@@ -219,7 +217,6 @@ public class AdminCclService {
      * Only runs when all CCLs have empty mappings (i.e. never configured before).
      * Safe to re-run — skips CCLs that already have mappings.
      */
-    @Transactional
     void applyDefaultMappings() {
         List<TwitchCclDefinition> ccls = twitchCclRepo.findAll();
         List<IgdbRatingDescriptor> allDescriptors = igdbDescriptorRepo.findAll();

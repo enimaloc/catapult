@@ -1,12 +1,15 @@
 package fr.enimaloc.catapult.api.connect;
 
+import fr.enimaloc.catapult.service.debug.DebugRecording;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.event.SteamLinkedEvent;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.connections.ProviderConnectionsDto;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
+import fr.enimaloc.catapult.service.steam.SteamOpenIdLinkService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -27,6 +30,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -54,8 +58,10 @@ class ApiSteamConnectControllerTest {
     void setUp() {
         RestClient.Builder builder = RestClient.builder();
         steam = MockRestServiceServer.bindTo(builder).build();
-        controller = new ApiSteamConnectController(accounts, events, channelEvents, builder.build());
-        ReflectionTestUtils.setField(controller, "apiBaseUrl", "http://api.test");
+        SteamOpenIdLinkService links = new SteamOpenIdLinkService(accounts, events, channelEvents, builder.build(),
+                DebugRecording.OFF);
+        ReflectionTestUtils.setField(links, "apiBaseUrl", "http://api.test");
+        controller = new ApiSteamConnectController(links);
         ReflectionTestUtils.setField(controller, "webBaseUrl", "http://web.test");
         account = new UserAccount();
         account.setId(UUID.randomUUID());
@@ -68,7 +74,7 @@ class ApiSteamConnectControllerTest {
 
     /** Starts a link and returns the nonce Steam will hand back. */
     private String start() {
-        String redirect = controller.start(jwt()).redirectUrl();
+        String redirect = controller.start(UUID.randomUUID(), jwt()).redirectUrl();
         String returnTo = UriComponentsBuilder.fromUriString(redirect).build().getQueryParams().getFirst("openid.return_to");
         return returnTo.substring(returnTo.indexOf("nonce=") + "nonce=".length());
     }
@@ -95,7 +101,7 @@ class ApiSteamConnectControllerTest {
 
     @Test
     void start_redirectsToSteamWithAReturnUrlCarryingANonce() {
-        String redirect = controller.start(jwt()).redirectUrl();
+        String redirect = controller.start(UUID.randomUUID(), jwt()).redirectUrl();
 
         var query = UriComponentsBuilder.fromUriString(redirect).build().getQueryParams();
         assertThat(redirect).startsWith(OPENID + "?");
@@ -117,6 +123,19 @@ class ApiSteamConnectControllerTest {
         verify(accounts).save(account);
         verify(events).publishEvent(any(SteamLinkedEvent.class));
         verify(channelEvents).connectionChanged(account.getId(), new ProviderConnectionsDto("STEAM", true, null));
+    }
+
+    @Test
+    void verifiedCallback_savesThenAnnouncesThenTellsTheDashboards() {
+        String nonce = start();
+        steamSays("is_valid:true");
+
+        controller.callback(callback(nonce, "id_res", "https://steamcommunity.com/openid/id/76561198000000000"));
+
+        InOrder order = inOrder(accounts, events, channelEvents);
+        order.verify(accounts).save(account);
+        order.verify(events).publishEvent(any(SteamLinkedEvent.class));
+        order.verify(channelEvents).connectionChanged(account.getId(), new ProviderConnectionsDto("STEAM", true, null));
     }
 
     @Test
@@ -172,7 +191,7 @@ class ApiSteamConnectControllerTest {
     void disconnect_unlinksSteam() {
         account.setSteamId("1");
 
-        controller.disconnect(jwt());
+        controller.disconnect(UUID.randomUUID(), jwt());
 
         assertThat(account.getSteamId()).isNull();
         verify(accounts).save(account);

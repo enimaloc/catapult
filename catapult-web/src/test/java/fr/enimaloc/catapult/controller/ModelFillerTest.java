@@ -79,7 +79,7 @@ class ModelFillerTest {
     private static ChannelPageData page(boolean owner) {
         return new ChannelPageData(new ChannelUserDto("1", "2", "enimaloc", "img"), "enimaloc", owner, false, true,
                 null, new PagedBindings(0, 1, 0, List.of()), List.of(), Set.of(), List.of(), Set.of(),
-                null, null, null, null, null, null, null, "uuid");
+                null, null, null, null, null, null, null, "uuid", null);
     }
 
     @Test
@@ -363,7 +363,7 @@ class ModelFillerTest {
     private static ChannelPageData playing(GameDto game) {
         return new ChannelPageData(new ChannelUserDto("1", "2", "enimaloc", "img"), "enimaloc", true, false, true,
                 game, new PagedBindings(0, 1, 0, List.of()), List.of(), Set.of(), List.of(), Set.of(),
-                null, null, null, null, null, null, null, "uuid");
+                null, null, null, null, null, null, null, "uuid", null);
     }
 
     /** The dock has no app bar to log in from: a visitor gets its own login prompt, not the 401 page. */

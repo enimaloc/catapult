@@ -29,7 +29,7 @@ public class MetricsEventListener {
     private final MeterRegistry registry;
     private final Map<UUID, Instant> streamStartTimes = new ConcurrentHashMap<>();
 
-    // Meters à tags fixes, pré-enregistrés pour être exportés à 0 dès le démarrage
+    // Meters with fixed tags, pre-registered so they are exported at 0 from startup
     private final Counter noGameDetected;
     private final Counter streamOnline;
     private final Counter streamOffline;
@@ -47,7 +47,7 @@ public class MetricsEventListener {
                 .tag("provider", "twitch")
                 .register(registry);
         this.streamDuration = Timer.builder("catapult.stream.duration")
-                .description("Durée d'un stream, de online à offline")
+                .description("Duration of a stream, from online to offline")
                 .publishPercentileHistogram()
                 .minimumExpectedValue(Duration.ofMinutes(10))
                 .maximumExpectedValue(Duration.ofHours(12))

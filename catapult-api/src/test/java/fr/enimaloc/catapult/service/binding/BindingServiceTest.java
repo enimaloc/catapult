@@ -1,5 +1,11 @@
 package fr.enimaloc.catapult.service.binding;
 
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
+import fr.enimaloc.catapult.service.binding.StreamStateService;
+import fr.enimaloc.catapult.service.binding.RaidRestoreHold;
+import fr.enimaloc.catapult.service.category.CategoryApplier;
+import fr.enimaloc.catapult.service.category.CategoryChain;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.igdb.IgdbGameDetails;
@@ -47,7 +53,13 @@ class BindingServiceTest {
 
     @BeforeEach
     void setup() {
-        bindingService = new BindingService(gameBindingRepository, igdbService, igdbGameDetailsService, twitchService, twResolverService, gameStateService, gameMappingRepository);
+        // Live: an edit of the played binding is pushed (offline it is stored pending, as a detection does)
+        StreamStateService streamState = mock(StreamStateService.class);
+        when(streamState.isLive(any())).thenReturn(true);
+        bindingService = new BindingService(gameBindingRepository, igdbService, igdbGameDetailsService, twitchService, twResolverService, gameMappingRepository, new GameBindingLookup(gameBindingRepository),
+                new CategoryChain(mock(CustomBindingActivations.class), streamState,
+                        mock(UserSettingsRepository.class), new RaidRestoreHold(), gameStateService,
+                        mock(UserAccountRepository.class), new CategoryApplier(twitchService, streamState), mock(RaidRestoreGateService.class), mock(GameBindingLookup.class)));
 
         user = new UserAccount();
         bindingId = UUID.randomUUID();
@@ -98,7 +110,7 @@ class BindingServiceTest {
     void updateBinding_callsTwitchUpdateChannel() {
         bindingService.updateBinding(user, bindingId, "new-id", "New Game", Set.of(), false);
 
-        verify(twitchService).updateChannel(user, binding);
+        verify(twitchService).updateChannelReporting(user, binding);
     }
 
     @Test
@@ -138,7 +150,7 @@ class BindingServiceTest {
         assertThat(binding.getTwitchGameName()).isEqualTo("New Game");
         assertThat(binding.getStatus()).isEqualTo(GameBinding.Status.MANUAL);
         verify(gameBindingRepository).save(binding);
-        verify(twitchService).updateChannel(user, binding);
+        verify(twitchService).updateChannelReporting(user, binding);
     }
 
     @Test
@@ -170,17 +182,19 @@ class BindingServiceTest {
         bindingService.toggleCclEnabled(user, bindingId, false);
 
         assertThat(binding.isCclEnabled()).isFalse();
-        verify(twitchService).updateChannel(user, binding);
+        verify(twitchService).updateChannelReporting(user, binding);
     }
 
     @Test
-    void toggleIgnored_updatesFieldAndCallsTwitch() {
+    void toggleIgnored_updatesField_andDoesNotSendTheBindingAsIs() {
+        user.setId(UUID.randomUUID());
         binding.setIgnored(false);
 
         bindingService.toggleIgnored(user, bindingId, true);
 
+        // The no-game fallback applies instead (none configured here)
         assertThat(binding.isIgnored()).isTrue();
-        verify(twitchService).updateChannel(user, binding);
+        verify(twitchService, never()).updateChannelReporting(user, binding);
     }
 
     @Test
@@ -426,6 +440,6 @@ class BindingServiceTest {
         assertThat(binding.getTws()).containsExactly("violence_graphic");
         assertThat(binding.isTwOverride()).isTrue();
         verify(gameBindingRepository).save(binding);
-        verify(twitchService).updateChannel(user, binding);
+        verify(twitchService).updateChannelReporting(user, binding);
     }
 }

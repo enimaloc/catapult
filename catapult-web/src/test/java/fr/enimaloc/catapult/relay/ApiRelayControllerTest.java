@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import jakarta.servlet.http.Cookie;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -27,6 +28,7 @@ import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -34,7 +36,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /** catapult-api's public paths, relayed by catapult-web; a local HTTP server stands in for catapult-api. */
 @WebMvcTest(ApiRelayController.class)
-@Import(WebSecurityConfig.class)
+@Import({WebSecurityConfig.class, CustomBindingsCorsConfig.class})
 class ApiRelayControllerTest {
 
     /** What the stand-in catapult-api received last. */
@@ -150,6 +152,104 @@ class ApiRelayControllerTest {
             mvc.perform(get(path)).andExpect(status().isOk());
             assertThat(RECEIVED.get().uri()).isEqualTo(path);
         }
+    }
+
+    /**
+     * A Stream Deck or a script reaches the custom bindings API through the site: its token-only POST needs no
+     * CSRF token or session here (catapult-api's own chain authenticates the Bearer), and catapult-api's answer,
+     * a refusal included, comes back as is.
+     */
+    @Test
+    void relaysTheCustomBindingsApi_aTokenOnlyPostWithoutCsrf_andItsStatus() throws Exception {
+        answer = exchange -> respond(exchange, 204, "", Map.of());
+
+        mvc.perform(post("/api/v2/custom-bindings/Art/activate").header("Authorization", "Bearer cat_TOKEN"))
+                .andExpect(status().isNoContent());
+
+        Received received = RECEIVED.get();
+        assertThat(received.method()).isEqualTo("POST");
+        assertThat(received.uri()).isEqualTo("/api/v2/custom-bindings/Art/activate");
+        assertThat(received.header("Authorization")).isEqualTo("Bearer cat_TOKEN");
+
+        answer = exchange -> respond(exchange, 401, "", Map.of());
+        mvc.perform(post("/api/v2/custom-bindings/deactivate")).andExpect(status().isUnauthorized());
+        assertThat(RECEIVED.get().uri()).isEqualTo("/api/v2/custom-bindings/deactivate");
+
+        answer = exchange -> respond(exchange, 200, "{\"bindings\":[]}", Map.of("Content-Type", List.of("application/json")));
+        mvc.perform(get("/api/v2/custom-bindings").header("Authorization", "Bearer cat_TOKEN"))
+                .andExpect(status().isOk()).andExpect(content().string("{\"bindings\":[]}"));
+        assertThat(RECEIVED.get().uri()).isEqualTo("/api/v2/custom-bindings");
+    }
+
+    // --- CORS on the custom bindings API: a page of any origin (Twitchat) calls it with its token alone ---
+
+    private static final String ORIGIN = "https://example.org";
+
+    @Test
+    void customBindingsPreflight_isAnsweredHere_withoutAuthentication() throws Exception {
+        for (String path : List.of("/api/v2/custom-bindings", "/api/v2/custom-bindings/Art/activate")) {
+            mvc.perform(options(path)
+                            .header("Origin", ORIGIN)
+                            .header("Access-Control-Request-Method", "POST")
+                            .header("Access-Control-Request-Headers", "authorization, content-type"))
+                    .andExpect(status().is2xxSuccessful())
+                    .andExpect(header().string("Access-Control-Allow-Origin", "*"))
+                    .andExpect(header().string("Access-Control-Allow-Methods", "GET,POST,OPTIONS"))
+                    .andExpect(header().string("Access-Control-Allow-Headers",
+                            org.hamcrest.Matchers.containsStringIgnoringCase("authorization")))
+                    .andExpect(header().doesNotExist("Access-Control-Allow-Credentials"));
+        }
+        assertThat(RECEIVED.get()).isNull();
+    }
+
+    /** catapult-api answers with its own CORS headers too: the browser must see Allow-Origin once only. */
+    @Test
+    void customBindingsAnswers_carryTheCorsHeadersOnce_refusalsIncluded() throws Exception {
+        answer = exchange -> respond(exchange, 401, "", Map.of(
+                "Access-Control-Allow-Origin", List.of("*"), "Vary", List.of("Origin")));
+
+        MockHttpServletResponse response = mvc.perform(post("/api/v2/custom-bindings/Art/activate")
+                        .header("Origin", ORIGIN).header("Authorization", "Bearer cat_BAD"))
+                .andExpect(status().isUnauthorized())
+                .andReturn().getResponse();
+
+        assertThat(response.getHeaders("Access-Control-Allow-Origin")).containsExactly("*");
+        assertThat(response.getHeader("Access-Control-Allow-Credentials")).isNull();
+        assertThat(RECEIVED.get().header("Authorization")).isEqualTo("Bearer cat_BAD");
+    }
+
+    @Test
+    void customBindingsWithASessionCookieOnly_getCatapultApis401() throws Exception {
+        answer = exchange -> respond(exchange, 401, "", Map.of());
+
+        mvc.perform(post("/api/v2/custom-bindings/Art/activate").header("Origin", ORIGIN)
+                        .cookie(new Cookie("SESSION", "web-session")))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string("Access-Control-Allow-Origin", "*"));
+        assertThat(RECEIVED.get().header("Authorization")).isNull();
+    }
+
+    @Test
+    void otherRelayedPaths_getNoCorsFromCatapultWeb() throws Exception {
+        mvc.perform(get("/api/game/1").header("Origin", ORIGIN))
+                .andExpect(status().isOk())
+                .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
+        mvc.perform(options("/api/user/abc")
+                        .header("Origin", ORIGIN)
+                        .header("Access-Control-Request-Method", "POST")
+                        .header("Access-Control-Request-Headers", "authorization"))
+                .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
+    }
+
+    /** A relayed path whose CORS is catapult-api's own (its @CrossOrigin): its headers still come through. */
+    @Test
+    void otherRelayedPaths_keepCatapultApisOwnCorsHeaders() throws Exception {
+        answer = exchange -> respond(exchange, 200, "ok", Map.of("Access-Control-Allow-Origin", List.of("*")));
+
+        MockHttpServletResponse response = mvc.perform(get("/api/user/abc").header("Origin", ORIGIN))
+                .andExpect(status().isOk()).andReturn().getResponse();
+
+        assertThat(response.getHeaders("Access-Control-Allow-Origin")).containsExactly("*");
     }
 
     @Test

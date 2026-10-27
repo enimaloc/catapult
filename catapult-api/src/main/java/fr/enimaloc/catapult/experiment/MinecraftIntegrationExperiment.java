@@ -3,9 +3,9 @@ package fr.enimaloc.catapult.experiment;
 import fr.enimaloc.catapult.domain.experiment.ExperimentAssignmentRule.RuleType;
 
 /**
- * Gate de la feature Minecraft (liaison de compte + détection de présence).
- * Control 0 % / enabled 100 % : une fois ACTIVE, tout le monde est dans
- * enabled — l'activation en admin sert d'interrupteur de la feature.
+ * Gate of the Minecraft feature (account linking + presence detection).
+ * Control 0 % / enabled 100 %: once ACTIVE, everyone is in
+ * enabled, so activating it in the admin works as the feature's switch.
  */
 @ExperimentSpec(
         key         = "minecraft.integration",

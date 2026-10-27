@@ -19,7 +19,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.*;
 
@@ -69,7 +68,6 @@ class ExperimentServiceTest {
         variantB.setExperiment(experiment);
 
         lenient().when(overrideRepository.findByExperimentOrderByPriorityAsc(any())).thenReturn(List.of());
-        ReflectionTestUtils.setField(experimentService, "self", experimentService);
     }
 
     @Test

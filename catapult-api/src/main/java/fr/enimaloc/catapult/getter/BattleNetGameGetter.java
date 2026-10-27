@@ -7,11 +7,11 @@ import org.springframework.stereotype.Component;
 import java.util.Optional;
 
 /**
- * Détecte le jeu en cours via Battle.net (Blizzard).
- * TODO: implémenter via Blizzard OAuth2 API
- *   - OAuth2 scopes : openid
- *   - Endpoint : {@code https://oauth.battle.net/userinfo} (identité uniquement)
- *   - Détection du jeu actif nécessite les APIs par jeu (WoW, Overwatch, etc.)
+ * Detects the current game via Battle.net (Blizzard).
+ * TODO: implement through the Blizzard OAuth2 API
+ *   - OAuth2 scopes: openid
+ *   - Endpoint: {@code https://oauth.battle.net/userinfo} (identity only)
+ *   - Detecting the active game needs the per-game APIs (WoW, Overwatch, etc.)
  */
 @Component
 @ConditionalOnBooleanProperty("battlenet.enabled")

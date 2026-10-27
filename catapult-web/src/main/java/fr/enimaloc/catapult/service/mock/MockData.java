@@ -76,6 +76,7 @@ public class MockData {
     private boolean hasSteamProvider;
     @Getter
     private boolean hasSteam;
+    private final MockCustomBindings customBindings = new MockCustomBindings();
     @Getter
     private boolean hasSteamPersonalToken;
     @Getter
@@ -283,6 +284,11 @@ public class MockData {
         return adminData;
     }
 
+    /** The member's custom bindings and personal API token. */
+    MockCustomBindings customBindings() {
+        return customBindings;
+    }
+
     public ChannelListResponse getChannelList() {
         return new ChannelListResponse(channelDto.twitchId(), withFirst(channelDto, moderatedChannels));
     }
@@ -304,7 +310,8 @@ public class MockData {
                 new PagedBindings(0, bindings.isEmpty() ? 0 : 1, bindings.size(), bindings),
                 AVAILABLE_CCLS, userSettingsDto.blockedCcls(), AVAILABLE_TWS, userSettingsDto.blockedTws(),
                 status, source, steamData(), hasXboxProvider ? new XboxData(hasXbox) : null, minecraftData(), obsData,
-                obsData == null ? null : TwitchatData.of(twitchatBranch), EXAMPLE_UUID);
+                obsData == null ? null : TwitchatData.of(twitchatBranch), EXAMPLE_UUID,
+                username.equals(channelDto.twitchUsername()) ? customBindings.state() : null);
     }
 
     private SteamData steamData() {
@@ -470,11 +477,12 @@ public class MockData {
         return code.toString();
     }
 
-    /** Mirrors catapult-api: only the channel's own name (case-insensitive) starts the deletion, anything else is ignored. */
-    public void requestAccountDeletion(String confirmUsername) {
-        if (!channelDto.twitchUsername().equalsIgnoreCase(confirmUsername)) return;
+    /** Mirrors catapult-api: only the channel's own name (case-insensitive) starts the deletion; false otherwise. */
+    public boolean requestAccountDeletion(String confirmUsername) {
+        if (!channelDto.twitchUsername().equalsIgnoreCase(confirmUsername)) return false;
         accountStatus = "PENDING_DELETION";
         deletionRequestedAt = Instant.now();
+        return true;
     }
 
     public void cancelAccountDeletion() {
@@ -496,7 +504,7 @@ public class MockData {
         widgetToken = UUID.randomUUID();
     }
 
-    /** What /api/channels/{u}/settings/twitchat answers. */
+    /** What GET /api/internal/users/{userId}/settings/twitchat answers. */
     public TwitchatSettingsResponse twitchatSettings() {
         ObsData obs = obsData == null ? DEFAULT_OBS : obsData;
         return new TwitchatSettingsResponse(obs.connected(), obs.host(), obs.port(), obs.hasPassword(), widgetToken.toString());
@@ -511,7 +519,7 @@ public class MockData {
     }
 
     /**
-     * What /api/me/obs would answer: null unless OBS is enabled. The presets' "has a password"
+     * What GET /api/internal/users/{userId}/obs would answer: null unless OBS is enabled. The presets' "has a password"
      * has no actual password behind it, so the password is null until one is saved.
      */
     public TwitchatWidgetConfig obsConnection() {

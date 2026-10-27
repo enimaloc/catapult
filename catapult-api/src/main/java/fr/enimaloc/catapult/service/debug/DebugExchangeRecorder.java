@@ -5,12 +5,12 @@ import fr.enimaloc.catapult.domain.debug.DebugExchange.Direction;
 import fr.enimaloc.catapult.repository.debug.DebugExchangeRepository;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.Executor;
@@ -57,12 +57,9 @@ public class DebugExchangeRecorder {
     @Autowired
     public DebugExchangeRecorder(DebugMemberRegistry registry, DebugRedactor redactor, OtherMemberMasker masker,
                                  DebugExchangeRepository repository, ExternalServices services,
-                                 ObjectProvider<DebugExchangeListener> listeners,
-                                 ObjectProvider<TraceIdSource> traceIds) {
-        this(registry, redactor, masker, repository, services, listeners, () -> {
-            TraceIdSource source = traceIds.getIfAvailable();
-            return source == null ? null : source.currentTraceId();
-        }, boundedExecutor(WORKERS, QUEUE_CAPACITY));
+                                 List<DebugExchangeListener> listeners, TraceIdSource traceIds) {
+        this(registry, redactor, masker, repository, services, listeners, traceIds,
+                boundedExecutor(WORKERS, QUEUE_CAPACITY));
     }
 
     DebugExchangeRecorder(DebugMemberRegistry registry, DebugRedactor redactor, OtherMemberMasker masker,
@@ -176,16 +173,12 @@ public class DebugExchangeRecorder {
     }
 
     private void notifyListeners(UUID userId, DebugExchange saved) {
-        try {
-            for (DebugExchangeListener listener : listeners) {
-                try {
-                    listener.onRecorded(userId, saved);
-                } catch (RuntimeException ex) {
-                    log.warn("Debug exchange listener {} failed: {}", listener.getClass().getName(), ex.toString());
-                }
+        for (DebugExchangeListener listener : listeners) {
+            try {
+                listener.onRecorded(userId, saved);
+            } catch (RuntimeException ex) {
+                log.warn("Debug exchange listener {} failed: {}", listener.getClass().getName(), ex.toString());
             }
-        } catch (RuntimeException ex) {
-            log.warn("Could not look up the debug exchange listeners: {}", ex.toString());
         }
     }
 

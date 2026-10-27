@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.api.userapi;
 
 import com.fasterxml.jackson.annotation.JsonGetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import fr.enimaloc.catapult.service.link.ExternalLinks;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -72,7 +73,7 @@ public record IgdbDetailResponse(@JsonIgnore String baseUrl, String slug, String
     public record WebsiteLink(String url, @JsonIgnore String baseUrl, @JsonIgnore String path) {
         @JsonGetter
         public String more() {
-            return baseUrl + ApiV2.PATH + path;
+            return path == null ? null : baseUrl + ApiV2.PATH + path;
         }
     }
 
@@ -82,6 +83,8 @@ public record IgdbDetailResponse(@JsonIgnore String baseUrl, String slug, String
         // back into the cached entity. A plain forEach + put on the same map would also throw
         // ConcurrentModificationException the moment a new key (not already present) is added.
         Map<String, Object> normalized = new LinkedHashMap<>();
+        // A typed entry always wins its key and an untyped one only fills a free key, so the
+        // result does not depend on the (arbitrary) order of the incoming map.
         websites.forEach((key, value) -> {
             // external_games-sourced entries (see IgdbService#init — "Steam", "Microsoft",
             // "Twitch") have a reliable key but a raw id as the value, not a URL, unlike the
@@ -93,14 +96,20 @@ public record IgdbDetailResponse(@JsonIgnore String baseUrl, String slug, String
             String resolvedKey = fromCategoryNull ? resolveCategoryNullKey((String) value) : key;
             String id = (String) value;
             Object resolvedValue = fromCategoryNull ? value : switch (key) {
-                case "steam" -> new WebsiteLink("https://store.steampowered.com/app/" + id, baseUrl,
-                        DETAIL_ROUTE_PATH_PREFIX.get("steam") + id);
-                case "microsoft" -> new WebsiteLink("https://www.microsoft.com/store/apps/" + id, baseUrl,
+                case "steam" -> ExternalLinks.steamAppId(id)
+                        .map(appId -> new WebsiteLink(ExternalLinks.steamApp(appId), baseUrl,
+                                DETAIL_ROUTE_PATH_PREFIX.get("steam") + appId))
+                        .orElseGet(() -> new WebsiteLink(id, baseUrl, null));
+                case "microsoft" -> new WebsiteLink(ExternalLinks.microsoftStoreProduct(id), baseUrl,
                         DETAIL_ROUTE_PATH_PREFIX.get("microsoft") + id);
                 case "twitch" -> value; // TODO: this is a Twitch game id, not a slug — need the slug to build a directory link
                 default -> value;
             };
-            normalized.put(resolvedKey, resolvedValue);
+            if (fromCategoryNull) {
+                normalized.putIfAbsent(resolvedKey, resolvedValue);
+            } else {
+                normalized.put(resolvedKey, resolvedValue);
+            }
         });
         websites = normalized;
     }

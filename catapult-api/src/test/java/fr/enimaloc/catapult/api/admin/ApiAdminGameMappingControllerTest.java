@@ -1,12 +1,12 @@
 package fr.enimaloc.catapult.api.admin;
 
+import fr.enimaloc.catapult.service.category.CategoryChain;
 import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingRequest;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingResult;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.binding.GameMapping;
-import fr.enimaloc.catapult.event.listener.GameEventListener;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
 import fr.enimaloc.catapult.repository.binding.GameMappingRepository;
@@ -52,10 +52,11 @@ class ApiAdminGameMappingControllerTest {
     @Mock GameStateService gameStateService;
     @Mock StreamStateService streamStateService;
     @Mock ChannelEventPublisher channelEventPublisher;
-    @Mock GameEventListener gameEventListener;
+    @Mock CategoryChain categoryChain;
     @Mock PlatformTransactionManager transactionManager;
     @Mock TwitchCategoryService categories;
     @Mock ApiUserResolver userResolver;
+    @Mock fr.enimaloc.catapult.service.notification.AdminEventPublisher events;
     @Mock Jwt jwt;
 
     ApiAdminGameMappingController controller;
@@ -64,9 +65,9 @@ class ApiAdminGameMappingControllerTest {
     @BeforeEach
     void setUp() {
         AdminGameMappingService service = new AdminGameMappingService(mappingRepo, bindingRepo, userRepo,
-                bindingService, gameStateService, streamStateService, channelEventPublisher, gameEventListener,
+                bindingService, gameStateService, streamStateService, channelEventPublisher, categoryChain,
                 transactionManager);
-        controller = new ApiAdminGameMappingController(service, categories, userResolver);
+        controller = new ApiAdminGameMappingController(service, categories, userResolver, events);
         admin = new UserAccount();
         admin.setId(UUID.randomUUID());
         when(userResolver.viewer(jwt)).thenReturn(admin);

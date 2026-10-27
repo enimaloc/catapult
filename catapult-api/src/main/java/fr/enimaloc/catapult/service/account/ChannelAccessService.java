@@ -28,6 +28,14 @@ public class ChannelAccessService {
         return fetchModeratedIds(viewer).contains(channel.getTwitchId());
     }
 
+    /** {@link #canAccess(UserAccount, UserAccount)} for two account ids; either one unknown gives false. */
+    public boolean canAccess(UUID viewerId, UUID ownerId) {
+        UserAccount viewer = userAccountRepository.findById(viewerId).orElse(null);
+        UserAccount owner = userAccountRepository.findById(ownerId).orElse(null);
+        if (viewer == null || owner == null) return false;
+        return canAccess(viewer, owner);
+    }
+
     public List<UserAccount> getAccessibleChannels(UserAccount viewer) {
         Set<String> moderatedIds = fetchModeratedIds(viewer);
         List<UserAccount> result = new ArrayList<>();
@@ -48,7 +56,8 @@ public class ChannelAccessService {
                 return new CachedModStatus(ids, Instant.now().plus(TTL));
             } catch (Exception e) {
                 log.warn("Failed to fetch moderated channels for user {} — denying access", id, e);
-                return existing;
+                // Null drops the expired entry: the viewer moderates nothing until Twitch answers again
+                return null;
             }
         });
         return fresh != null ? fresh.moderatedIds() : Set.of();

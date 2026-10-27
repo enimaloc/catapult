@@ -5,7 +5,11 @@ import fr.enimaloc.catapult.domain.account.UserSettings;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.event.ChannelRaidedOutEvent;
 import fr.enimaloc.catapult.getter.DetectedGame;
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
+import fr.enimaloc.catapult.service.category.CategoryApplier;
+import fr.enimaloc.catapult.service.category.CategoryChain;
+import fr.enimaloc.catapult.service.twitch.ChannelUpdateOutcome;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,6 +21,7 @@ import java.time.Duration;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.mockito.Mockito.mock;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
@@ -32,9 +37,13 @@ class RaidRestoreGameServiceTest {
     @Mock private UserSettingsRepository userSettingsRepository;
     @Mock private RaidRestoreGateService gate;
     @Mock private GameStateService gameStateService;
-    @Mock private BindingService bindingService;
+    @Mock private GameBindingLookup bindingLookup;
     @Mock private TwitchService twitchService;
+    @Mock private StreamStateService streamStateService;
+    @Mock private UserAccountRepository userAccountRepository;
+    @Mock private CustomBindingActivations customBindingActivations;
 
+    private final RaidRestoreHold hold = new RaidRestoreHold();
     private RaidRestoreGameService service;
     private UserAccount user;
     private UserSettings settings;
@@ -43,7 +52,10 @@ class RaidRestoreGameServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new RaidRestoreGameService(userSettingsRepository, gate, gameStateService, bindingService, twitchService);
+        CategoryApplier applier = new CategoryApplier(twitchService, streamStateService);
+        CategoryChain chain = new CategoryChain(customBindingActivations, streamStateService, userSettingsRepository,
+                hold, gameStateService, userAccountRepository, applier, gate, bindingLookup);
+        service = new RaidRestoreGameService(chain, applier, hold);
         user = new UserAccount();
         user.setId(UUID.randomUUID());
 
@@ -63,7 +75,8 @@ class RaidRestoreGameServiceTest {
         binding.setTwitchGameId("517");
         binding.setTwitchGameName("DOOM");
         binding.setStatus(GameBinding.Status.AUTO);
-        lenient().when(bindingService.findBinding(user, doom)).thenReturn(Optional.of(binding));
+        lenient().when(bindingLookup.findByDetectedGame(user, doom)).thenReturn(Optional.of(binding));
+        lenient().when(twitchService.updateChannelReporting(user, binding)).thenReturn(ChannelUpdateOutcome.APPLIED);
     }
 
     private void raid(String currentCategoryId) {
@@ -76,15 +89,26 @@ class RaidRestoreGameServiceTest {
 
         // updateChannel records the Catapult self-change marker (TwitchServiceImpl), so the
         // resulting channel.update is reported as Catapult's, never as a manual change.
-        verify(twitchService).updateChannel(user, binding);
-        assertThat(service.isHoldingNoGameFallback(user)).isTrue();
+        verify(twitchService).updateChannelReporting(user, binding);
+        assertThat(hold.isHolding(user)).isTrue();
+    }
+
+    @Test
+    void doesNothingWhileACustomBindingIsActive() {
+        when(customBindingActivations.active(user))
+                .thenReturn(Optional.of(new fr.enimaloc.catapult.domain.binding.CustomBindingActivation()));
+
+        raid("509658");
+
+        verify(twitchService, never()).updateChannelReporting(any(), any());
+        assertThat(hold.isHolding(user)).isFalse();
     }
 
     @Test
     void restoresWhenTheCurrentCategoryIsUnknown() {
         raid(null);
 
-        verify(twitchService).updateChannel(user, binding);
+        verify(twitchService).updateChannelReporting(user, binding);
     }
 
     @Test
@@ -93,8 +117,8 @@ class RaidRestoreGameServiceTest {
 
         raid("509658");
 
-        verify(twitchService, never()).updateChannel(any(), any());
-        assertThat(service.isHoldingNoGameFallback(user)).isFalse();
+        verify(twitchService, never()).updateChannelReporting(any(), any());
+        assertThat(hold.isHolding(user)).isFalse();
     }
 
     @Test
@@ -103,7 +127,7 @@ class RaidRestoreGameServiceTest {
 
         raid("509658");
 
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
         verify(gate, never()).isAvailableReadOnly(any());
     }
 
@@ -113,7 +137,7 @@ class RaidRestoreGameServiceTest {
 
         raid("509658");
 
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
     }
 
     @Test
@@ -122,23 +146,23 @@ class RaidRestoreGameServiceTest {
 
         raid("509658");
 
-        verify(twitchService, never()).updateChannel(any(), any());
-        assertThat(service.isHoldingNoGameFallback(user)).isFalse();
+        verify(twitchService, never()).updateChannelReporting(any(), any());
+        assertThat(hold.isHolding(user)).isFalse();
     }
 
     @Test
     void alreadyOnThatGame_changesNothingButStillHoldsTheNoGameFallback() {
         raid("517");
 
-        verify(twitchService, never()).updateChannel(any(), any());
-        assertThat(service.isHoldingNoGameFallback(user)).isTrue();
+        verify(twitchService, never()).updateChannelReporting(any(), any());
+        assertThat(hold.isHolding(user)).isTrue();
     }
 
     @Test
     void theHoldIsTakenBeforeTheCategoryIsChanged() {
         boolean[] holdingDuringTheChange = new boolean[1];
-        doAnswer(invocation -> holdingDuringTheChange[0] = service.isHoldingNoGameFallback(user))
-                .when(twitchService).updateChannel(user, binding);
+        doAnswer(invocation -> holdingDuringTheChange[0] = hold.isHolding(user))
+                .when(twitchService).updateChannelReporting(user, binding);
 
         raid("509658");
 
@@ -147,11 +171,29 @@ class RaidRestoreGameServiceTest {
 
     @Test
     void aFailedRestoreReleasesTheHold() {
-        doThrow(new IllegalStateException("Twitch down")).when(twitchService).updateChannel(user, binding);
+        doThrow(new IllegalStateException("Twitch down")).when(twitchService).updateChannelReporting(user, binding);
 
         raid("509658");
 
-        assertThat(service.isHoldingNoGameFallback(user)).isFalse();
+        assertThat(hold.isHolding(user)).isFalse();
+    }
+
+    @Test
+    void aRestoreTwitchRefusedReleasesTheHold() {
+        when(twitchService.updateChannelReporting(user, binding)).thenReturn(ChannelUpdateOutcome.FAILED);
+
+        raid("509658");
+
+        assertThat(hold.isHolding(user)).isFalse();
+    }
+
+    @Test
+    void aRestoreTwitchSkippedReleasesTheHold() {
+        when(twitchService.updateChannelReporting(user, binding)).thenReturn(ChannelUpdateOutcome.SKIPPED);
+
+        raid("509658");
+
+        assertThat(hold.isHolding(user)).isFalse();
     }
 
     @Test
@@ -161,18 +203,18 @@ class RaidRestoreGameServiceTest {
         binding.setIgnored(false);
         binding.setTwitchGameId(null);
         raid("509658");
-        when(bindingService.findBinding(user, doom)).thenReturn(Optional.empty());
+        when(bindingLookup.findByDetectedGame(user, doom)).thenReturn(Optional.empty());
         raid("509658");
 
-        verify(twitchService, never()).updateChannel(any(), any());
+        verify(twitchService, never()).updateChannelReporting(any(), any());
     }
 
     @Test
     void releaseHold_endsTheHold() {
         raid("509658");
 
-        service.releaseHold(user);
+        hold.release(user);
 
-        assertThat(service.isHoldingNoGameFallback(user)).isFalse();
+        assertThat(hold.isHolding(user)).isFalse();
     }
 }

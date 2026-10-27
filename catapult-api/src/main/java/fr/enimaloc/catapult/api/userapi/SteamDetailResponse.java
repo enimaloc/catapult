@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.userapi;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonGetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -22,6 +23,13 @@ public record SteamDetailResponse(String storeUrl, Set<String> ccls, GameInfoRes
 
     public record Page(@JsonIgnore String baseUrl, @JsonIgnore Locale locale,
                       @JsonUnwrapped @JsonIgnoreProperties({"fullgame", "dlc", "releaseDate"}) SteamStoreService.SteamStorePage page) {
+        // Written, never read: no creator, so Jackson 3.1 keeps the alphabetical order the v2 steam
+        // answer always had (demo, dlc, fullgame, the page, releaseDate) instead of putting the
+        // unwrapped page first. A @JsonPropertyOrder would also reshape the OpenAPI schema.
+        @JsonCreator(mode = JsonCreator.Mode.DISABLED)
+        public Page {
+        }
+
         // Steam's own release_date.date is a raw, locale-formatted display string (e.g.
         // "10 Oct, 2007") — replace it with a parsed Instant, same as GameInfoResponse.SteamObject.
         public record ReleaseDate(Instant releaseDate, boolean comingSoon) {}
@@ -60,7 +68,7 @@ public record SteamDetailResponse(String storeUrl, Set<String> ccls, GameInfoRes
         public record FullGame(@JsonIgnore String baseUrl, @JsonUnwrapped SteamStoreService.SteamStorePage.FullGame fullGame) {
             @JsonGetter
             public String more() {
-                return baseUrl + ApiV2.PATH + "/steam/" + fullGame.appid();
+                return fullGame.appid() == null ? null : baseUrl + ApiV2.PATH + "/steam/" + fullGame.appid();
             }
         }
 

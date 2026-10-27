@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.api.chatcommand;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.chat.command.js.JsCompiler;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunction;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
@@ -9,12 +10,14 @@ import fr.enimaloc.catapult.domain.chatcommand.ChatCommandSetting;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.chatcommand.ChatCommandSettingRepository;
 import fr.enimaloc.catapult.repository.tw.TwDefinitionRepository;
+import fr.enimaloc.catapult.service.chatcommand.ChatCommandDslCatalog;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.thymeleaf.autoconfigure.ThymeleafAutoConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -35,6 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         controllers = ApiChatCommandDslController.class,
         excludeAutoConfiguration = ThymeleafAutoConfiguration.class,
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
+@Import({ApiUserResolver.class, ChatCommandDslCatalog.class})
 class ApiChatCommandDslControllerTest {
 
     @Autowired MockMvc mvc;
@@ -61,7 +65,7 @@ class ApiChatCommandDslControllerTest {
                 fn("twitch", "getUser", List.of())));
         when(twDefinitionRepository.findAllByEnabledTrueOrderBySortOrderAscIdAsc()).thenReturn(List.of());
 
-        mvc.perform(get("/api/chat-commands/dsl/catalog").with(jwt()))
+        mvc.perform(get("/api/internal/chat-command-dsl/catalog").with(jwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.contextPaths").isArray())
                 .andExpect(jsonPath("$.contextPaths", org.hamcrest.Matchers.hasItem("game#name")))
@@ -84,7 +88,7 @@ class ApiChatCommandDslControllerTest {
         when(settingRepository.findByUser(user)).thenReturn(List.of(region, language));
         when(twDefinitionRepository.findAllByEnabledTrueOrderBySortOrderAscIdAsc()).thenReturn(List.of());
 
-        mvc.perform(get("/api/chat-commands/dsl/catalog")
+        mvc.perform(get("/api/internal/chat-command-dsl/catalog")
                         .with(jwt().jwt(j -> j.claim("twitchId", "99"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.settingKeys[0]").value("language"))
@@ -95,7 +99,7 @@ class ApiChatCommandDslControllerTest {
     void catalogReturnsEmptySettingKeysWhenTheJwtDoesNotMatchAnAccount() throws Exception {
         when(twDefinitionRepository.findAllByEnabledTrueOrderBySortOrderAscIdAsc()).thenReturn(List.of());
 
-        mvc.perform(get("/api/chat-commands/dsl/catalog").with(jwt()))
+        mvc.perform(get("/api/internal/chat-command-dsl/catalog").with(jwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.settingKeys").isEmpty());
     }
@@ -108,7 +112,7 @@ class ApiChatCommandDslControllerTest {
         def.setEnabled(false);
         when(twDefinitionRepository.findAllByOrderBySortOrderAscIdAsc()).thenReturn(List.of(def));
 
-        mvc.perform(get("/api/chat-commands/dsl/catalog").with(jwt()))
+        mvc.perform(get("/api/internal/chat-command-dsl/catalog").with(jwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.knownTws[0].id").value("violence_graphic"))
                 .andExpect(jsonPath("$.knownTws[0].label").value("Violence (graphic)"));
@@ -116,7 +120,7 @@ class ApiChatCommandDslControllerTest {
 
     @Test
     void textToAstReturnsBadRequestNotAServerErrorForMalformedDslText() throws Exception {
-        mvc.perform(post("/api/chat-commands/dsl/text-to-ast").with(jwt()).with(csrf())
+        mvc.perform(post("/api/internal/chat-command-dsl/text-to-ast").with(jwt()).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(om.writeValueAsString(Map.of("text", "{if x}no operator{/if}"))))
                 .andExpect(status().isBadRequest())
@@ -125,7 +129,7 @@ class ApiChatCommandDslControllerTest {
 
     @Test
     void textToAstReturnsAstForValidDslText() throws Exception {
-        mvc.perform(post("/api/chat-commands/dsl/text-to-ast").with(jwt()).with(csrf())
+        mvc.perform(post("/api/internal/chat-command-dsl/text-to-ast").with(jwt()).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(om.writeValueAsString(Map.of("text", "{game#name}"))))
                 .andExpect(status().isOk())
@@ -136,7 +140,7 @@ class ApiChatCommandDslControllerTest {
     void textToAstAcceptsLegacyDotSeparatedContextPathsInsteadOfFailing() throws Exception {
         // Pre-V59__placeholder_hash_separator.sql templates used '.' (e.g. {game.name});
         // the parser normalizes it rather than rejecting still-legacy-shaped commands.
-        mvc.perform(post("/api/chat-commands/dsl/text-to-ast").with(jwt()).with(csrf())
+        mvc.perform(post("/api/internal/chat-command-dsl/text-to-ast").with(jwt()).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(om.writeValueAsString(Map.of("text", "{game.name}"))))
                 .andExpect(status().isOk())
@@ -145,7 +149,7 @@ class ApiChatCommandDslControllerTest {
 
     @Test
     void astToTextReturnsBadRequestNotAServerErrorForMalformedAstJson() throws Exception {
-        mvc.perform(post("/api/chat-commands/dsl/ast-to-text").with(jwt()).with(csrf())
+        mvc.perform(post("/api/internal/chat-command-dsl/ast-to-text").with(jwt()).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(om.writeValueAsString(Map.of("ast", "not json"))))
                 .andExpect(status().isBadRequest())
@@ -157,7 +161,7 @@ class ApiChatCommandDslControllerTest {
         when(jsCompiler.compile(org.mockito.ArgumentMatchers.any()))
                 .thenReturn("let __output = \"\";\n__output += (\"hi\");\nreturn __output;\n");
 
-        mvc.perform(post("/api/chat-commands/dsl/ast-to-js").with(jwt()).with(csrf())
+        mvc.perform(post("/api/internal/chat-command-dsl/ast-to-js").with(jwt()).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(om.writeValueAsString(Map.of("ast", "{\"statements\":[]}"))))
                 .andExpect(status().isOk())
@@ -166,7 +170,7 @@ class ApiChatCommandDslControllerTest {
 
     @Test
     void astToJsReturnsBadRequestNotAServerErrorForMalformedAstJson() throws Exception {
-        mvc.perform(post("/api/chat-commands/dsl/ast-to-js").with(jwt()).with(csrf())
+        mvc.perform(post("/api/internal/chat-command-dsl/ast-to-js").with(jwt()).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(om.writeValueAsString(Map.of("ast", "not json"))))
                 .andExpect(status().isBadRequest())

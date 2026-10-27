@@ -7,7 +7,6 @@ import fr.enimaloc.catapult.repository.steam.SteamApiKeyRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
@@ -27,9 +26,7 @@ public class SteamPersonalTokenMigrationService implements ApplicationRunner {
     private final UserAccountRepository userAccountRepository;
     private final SteamApiKeyRepository steamApiKeyRepository;
     private final TokenEncryptionService tokenEncryptionService;
-
-    @Autowired(required = false)
-    private SteamApiKeyRotator rotator;
+    private final SteamApiKeyRotator rotator;
 
     @Override
     @Transactional
@@ -53,7 +50,7 @@ public class SteamPersonalTokenMigrationService implements ApplicationRunner {
         }
         if (migrated > 0) {
             log.info("Migrated {} user Steam personal token(s) into steam_api_key", migrated);
-            if (rotator != null) rotator.refreshKeys();
+            rotator.refreshKeys();
         }
     }
 }

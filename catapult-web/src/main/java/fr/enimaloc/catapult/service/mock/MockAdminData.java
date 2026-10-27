@@ -130,7 +130,7 @@ public class MockAdminData {
                 .toList(), page);
     }
 
-    /** The row with its collections, as GET /api/admin/data/{repo}/{id} gives it; null when there is none. */
+    /** The row with its collections, as GET /api/internal/admin/data/{repo}/{id} gives it; null when there is none. */
     public Map<String, Object> row(String repo, String id) {
         Map<String, Object> row = find(repo, id);
         if (row == null) return null;

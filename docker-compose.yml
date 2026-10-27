@@ -3,6 +3,11 @@ services:
     build:
       context: .
       dockerfile: catapult-api/Dockerfile
+    networks:
+      default:
+      api-internal:
+        aliases:
+          - catapult-api-internal
     environment:
       - DB_URL=jdbc:postgresql://catapult-db:5432/${POSTGRES_DB}
       - DB_USERNAME=${POSTGRES_USER}
@@ -23,6 +28,11 @@ services:
       # Empty = Sentry off (only members in debug mode are ever sent)
       - API_SENTRY_DSN=${API_SENTRY_DSN:-}
       - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-production}
+      # Who may relay X-Forwarded-* (a Java regex on the peer address): catapult-web, on api-internal only.
+      # Must describe the same subnet as API_NETWORK_SUBNET below, minus its .1: Docker gives that address to the
+      # host-side bridge, so the Docker host must not be trusted. No braces: Compose would end the interpolation
+      # at the first one.
+      - API_TRUSTED_PROXIES=${API_TRUSTED_PROXIES:-10\.250\.250\.([2-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-4])}
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8080/actuator/health || exit 1"]
       interval: 10s
@@ -44,20 +54,31 @@ services:
     # Several instances can run behind the TLS proxy in front (sessions and browser events go through
     # Redis): raise CATAPULT_WEB_REPLICAS, or `docker compose up --scale catapult-web=N`, and give
     # WEB_PORTS one host port per instance (e.g. 8081-8083) for the proxy to balance across. No fixed
-    # container_name, so the replicas don't collide. Published on the loopback only (WEB_BIND): catapult-web
-    # trusts the X-Forwarded-* of private addresses, which only the TLS proxy in front may send it.
+    # container_name, so the replicas don't collide. Published on the loopback only (WEB_BIND), so the TLS
+    # proxy arrives from the `default` network's gateway, which is what WEB_TRUSTED_PROXIES trusts (the
+    # gateways Docker's default address pools give). With custom `default-address-pools` in the Docker daemon,
+    # set it to that gateway: docker network inspect <project>_default -f '{{(index .IPAM.Config 0).Gateway}}'
+    networks:
+      - default
+      - api-internal
     deploy:
       replicas: ${CATAPULT_WEB_REPLICAS:-1}
     ports:
       - "${WEB_BIND:-127.0.0.1}:${WEB_PORTS:-80}:8081"
     environment:
-      - CATAPULT_API_URL=${CATAPULT_API_URL:-http://catapult-api:8080}
+      # An existing .env that sets CATAPULT_API_URL overrides this: it must point at catapult-api-internal too.
+      # The alias exists on api-internal only, so catapult-web always reaches catapult-api from the trusted
+      # network (on `default` its X-Forwarded-Host would be ignored and the login's redirect_uri wrong).
+      - CATAPULT_API_URL=${CATAPULT_API_URL:-http://catapult-api-internal:8080}
+      # Who may relay X-Forwarded-* (a Java regex on the peer address). No braces: Compose would end the
+      # interpolation at the first one.
+      - WEB_TRUSTED_PROXIES=${WEB_TRUSTED_PROXIES:-172\.(1[6-9]|2[0-9]|3[01])\.0\.1|192\.168\.(0|16|32|48|64|80|96|112|128|144|160|176|192|208|224|240)\.1}
       - REDIS_HOST=catapult-redis
       # Empty = no profile; "degraded" on the backup server
       - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-}
       # Empty = Sentry off
       - SENTRY_DSN=${SENTRY_DSN:-}
-      - SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE:-1.0}
+      - SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE:-0.1}
       # Empty = no link to the status page in the degraded banner
       - INSTATUS_PAGE_URL=${INSTATUS_PAGE_URL:-}
     healthcheck:
@@ -94,6 +115,15 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+
+networks:
+  # catapult-api <-> catapult-web only. internal: no route to or from the outside. The Docker host still holds
+  # the subnet's .1 (the bridge), which API_TRUSTED_PROXIES therefore leaves out. API_NETWORK_SUBNET and API_TRUSTED_PROXIES must describe the same subnet.
+  api-internal:
+    internal: true
+    ipam:
+      config:
+        - subnet: ${API_NETWORK_SUBNET:-10.250.250.0/24}
 
 volumes:
   postgres_data:

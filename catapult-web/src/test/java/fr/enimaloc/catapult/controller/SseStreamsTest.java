@@ -14,6 +14,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -44,15 +46,67 @@ class SseStreamsTest {
         List<Runnable> tasks = new ArrayList<>();
         SseStreams sse = new SseStreams(metrics, InstanceBus.local(), tasks::add);
         SseEmitter emitter = mock(SseEmitter.class);
-
         sse.open(emitter, closed::incrementAndGet);
+        clearInvocations(emitter);
+
         sse.send(emitter, "A", "1");
         sse.send(emitter, "B", "2");
 
         verify(emitter, never()).send(any(SseEmitter.SseEventBuilder.class));
         assertThat(tasks).hasSize(1);
         tasks.getFirst().run();
-        verify(emitter, times(3)).send(any(SseEmitter.SseEventBuilder.class));
+        verify(emitter, times(2)).send(any(SseEmitter.SseEventBuilder.class));
+    }
+
+    /*
+     * The opening comment is handed to the emitter on the opening request's thread, before the
+     * controller returns it: Spring then writes it, and so commits the response, on that thread
+     * (ResponseBodyEmitter#initialize). Written by the outbox's thread instead, it could commit the
+     * response while the request's filters still set headers on it (Spring Security's
+     * HeaderWriterFilter), and Tomcat's headers, not thread-safe, broke the stream (a 500, its EOF).
+     */
+    @Test
+    void theOpeningComment_isSentOnTheCallersThread() throws IOException {
+        List<Runnable> tasks = new ArrayList<>();
+        SseStreams sse = new SseStreams(metrics, InstanceBus.local(), tasks::add);
+        SseEmitter emitter = mock(SseEmitter.class);
+
+        sse.open(emitter, closed::incrementAndGet);
+
+        verify(emitter).send(any(SseEmitter.SseEventBuilder.class));
+        assertThat(tasks).isEmpty();
+        assertThat(sse.openCount()).isEqualTo(1);
+    }
+
+    /* Registered only once the comment is sent: no heartbeat or other thread's event can come before it. */
+    @Test
+    void aStream_isRegisteredOnlyAfterItsOpeningComment() throws IOException {
+        List<Runnable> tasks = new ArrayList<>();
+        SseStreams sse = new SseStreams(metrics, InstanceBus.local(), tasks::add);
+        SseEmitter emitter = mock(SseEmitter.class);
+        List<Integer> openWhenSent = new ArrayList<>();
+        doAnswer(invocation -> openWhenSent.add(sse.openCount()))
+                .when(emitter).send(any(SseEmitter.SseEventBuilder.class));
+
+        sse.open(emitter, closed::incrementAndGet);
+
+        assertThat(openWhenSent).containsExactly(0);
+        assertThat(sse.openCount()).isEqualTo(1);
+    }
+
+    @Test
+    void aStreamThatFailsOnOpening_isClosedAndForgotten() throws IOException {
+        SseStreams sse = new SseStreams(metrics, InstanceBus.local(), Runnable::run);
+        SseEmitter emitter = mock(SseEmitter.class);
+        doThrow(new IllegalStateException("completed")).when(emitter).send(any(SseEmitter.SseEventBuilder.class));
+
+        sse.open(emitter, closed::incrementAndGet);
+        sse.send(emitter, "A", "1");
+
+        verify(emitter).send(any(SseEmitter.SseEventBuilder.class));
+        verify(emitter).complete();
+        assertThat(closed).hasValue(1);
+        assertThat(sse.openCount()).isZero();
     }
 
     @Test
@@ -77,7 +131,7 @@ class SseStreamsTest {
         SseEmitter emitter = mock(SseEmitter.class);
         sse.open(emitter, closed::incrementAndGet);
 
-        for (int i = 0; i < SseStreams.MAX_PENDING; i++) sse.send(emitter, "A", i);
+        for (int i = 0; i <= SseStreams.MAX_PENDING; i++) sse.send(emitter, "A", i);
 
         verify(emitter).complete();
         assertThat(closed).hasValue(1);

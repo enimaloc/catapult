@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.service.debug;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.enimaloc.catapult.api.connect.ApiSteamConnectController;
+import fr.enimaloc.catapult.service.steam.SteamOpenIdLinkService;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.debug.DebugExchange;
@@ -106,8 +107,7 @@ class InboundDebugTest {
         eventSub = new TwitchEventSubService(mock(OAuthTokenRepository.class), mock(UserAccountRepository.class),
                 mock(TwitchTokenService.class), streamState, mock(ApplicationEventPublisher.class),
                 RestClient.create(), new ObjectMapper(), mock(TwitchatEventDispatcher.class),
-                mock(CatapultCategoryChangeStateService.class));
-        eventSub.setDebugRecording(new DebugRecording(registry, recorder));
+                mock(CatapultCategoryChangeStateService.class), new DebugRecording(registry, recorder));
         return eventSub;
     }
 
@@ -117,8 +117,8 @@ class InboundDebugTest {
                 mock(TwitchTokenService.class), mock(ApplicationEventPublisher.class),
                 mock(TwitchHelixChannelClient.class), RestClient.create(), new ObjectMapper(),
                 mock(SystemTwitchAccountService.class), meters,
-                new ExternalApiObservations(ObservationRegistry.NOOP, meters), mock(TwitchChatRateLimiter.class));
-        chat.setDebugRecording(new DebugRecording(registry, recorder));
+                new ExternalApiObservations(ObservationRegistry.NOOP, meters), mock(TwitchChatRateLimiter.class),
+                new DebugRecording(registry, recorder));
         return chat;
     }
 
@@ -219,13 +219,14 @@ class InboundDebugTest {
         MockRestServiceServer steam = MockRestServiceServer.bindTo(builder).build();
         steam.expect(requestTo("https://steamcommunity.com/openid/login"))
                 .andRespond(withSuccess("is_valid:true\n", MediaType.TEXT_PLAIN));
-        ApiSteamConnectController controller = new ApiSteamConnectController(accounts,
-                mock(ApplicationEventPublisher.class), mock(ChannelEventPublisher.class), builder.build());
-        ReflectionTestUtils.setField(controller, "apiBaseUrl", "http://api.test");
+        SteamOpenIdLinkService links = new SteamOpenIdLinkService(accounts,
+                mock(ApplicationEventPublisher.class), mock(ChannelEventPublisher.class), builder.build(),
+                new DebugRecording(registry, realRecorder()));
+        ReflectionTestUtils.setField(links, "apiBaseUrl", "http://api.test");
+        ApiSteamConnectController controller = new ApiSteamConnectController(links);
         ReflectionTestUtils.setField(controller, "webBaseUrl", "http://web.test");
-        controller.setDebugRecording(new DebugRecording(registry, realRecorder()));
         Jwt jwt = Jwt.withTokenValue("t").header("alg", "none").subject(user.getId().toString()).build();
-        String returnTo = UriComponentsBuilder.fromUriString(controller.start(jwt).redirectUrl()).build()
+        String returnTo = UriComponentsBuilder.fromUriString(controller.start(UUID.randomUUID(), jwt).redirectUrl()).build()
                 .getQueryParams().getFirst("openid.return_to");
         Map<String, String> params = new LinkedHashMap<>();
         params.put("nonce", returnTo.substring(returnTo.indexOf("nonce=") + "nonce=".length()));

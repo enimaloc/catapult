@@ -14,7 +14,7 @@ import java.util.Base64;
 import java.util.Random;
 
 /**
- * Chiffrement AES-256-GCM des tokens OAuth2 stockés en base.
+ * AES-256-GCM encryption of the OAuth2 tokens stored in the database.
  */
 @Service
 public class TokenEncryptionService {
@@ -28,7 +28,7 @@ public class TokenEncryptionService {
 
     public TokenEncryptionService(@Value("${app.security.token-encryption-key}") String encryptionKey) {
         byte[] keyBytes = encryptionKey.getBytes(StandardCharsets.UTF_8);
-        // On attend une clé de 32 bytes (256 bits)
+        // Expects a 32-byte (256-bit) key
         byte[] paddedKey = new byte[32];
         System.arraycopy(keyBytes, 0, paddedKey, 0, Math.min(keyBytes.length, 32));
         this.secretKey = new SecretKeySpec(paddedKey, "AES");

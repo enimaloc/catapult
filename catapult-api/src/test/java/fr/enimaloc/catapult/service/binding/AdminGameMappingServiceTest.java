@@ -8,12 +8,16 @@ import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.binding.GameBinding.SourceType;
 import fr.enimaloc.catapult.domain.binding.GameBinding.Status;
 import fr.enimaloc.catapult.domain.binding.GameMapping;
-import fr.enimaloc.catapult.event.listener.GameEventListener;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
 import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
 import fr.enimaloc.catapult.repository.binding.GameMappingRepository;
+import fr.enimaloc.catapult.service.category.CategoryApplier;
+import fr.enimaloc.catapult.service.category.CategoryChain;
+import fr.enimaloc.catapult.service.category.CategoryOutcome;
+import fr.enimaloc.catapult.service.category.CategoryRule;
+import fr.enimaloc.catapult.service.category.CategoryTrigger.MappingChanged;
 import fr.enimaloc.catapult.service.igdb.IgdbGameDetailsService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
@@ -65,10 +69,12 @@ class AdminGameMappingServiceTest {
     @Mock StreamStateService streamStateService;
     @Mock ChannelEventPublisher channelEventPublisher;
     @Mock UserSettingsRepository userSettingsRepository;
-    @Mock RaidRestoreGameService raidRestoreGameService;
+    @Mock RaidRestoreHold raidRestoreHold;
     @Mock PlatformTransactionManager transactionManager;
 
     BindingService bindingService;
+    CategoryChain chain;
+    CustomBindingActivations chainActivations;
     AdminGameMappingService service;
     UserAccount admin;
     final AtomicBoolean committed = new AtomicBoolean();
@@ -76,12 +82,14 @@ class AdminGameMappingServiceTest {
 
     @BeforeEach
     void setUp() {
+        CustomBindingActivations activations = mock(CustomBindingActivations.class);
+        chainActivations = activations;
+        chain = spy(new CategoryChain(activations, streamStateService, userSettingsRepository,
+                raidRestoreHold, gameStateService, mock(UserAccountRepository.class), new CategoryApplier(twitchService, streamStateService), mock(RaidRestoreGateService.class), mock(GameBindingLookup.class)));
         bindingService = spy(new BindingService(bindingRepo, igdbService, igdbGameDetailsService, twitchService,
-                twResolverService, gameStateService, mappingRepo));
-        GameEventListener listener = new GameEventListener(bindingService, twitchService, userSettingsRepository,
-                streamStateService, channelEventPublisher, raidRestoreGameService);
+                twResolverService, mappingRepo, new GameBindingLookup(bindingRepo), chain));
         service = new AdminGameMappingService(mappingRepo, bindingRepo, userRepo, bindingService, gameStateService,
-                streamStateService, channelEventPublisher, listener, transactionManager);
+                streamStateService, channelEventPublisher, chain, transactionManager);
 
         admin = user("admin");
         doAnswer(inv -> { committed.set(true); return null; }).when(transactionManager).commit(any());
@@ -267,6 +275,29 @@ class AdminGameMappingServiceTest {
     }
 
     @Test
+    void mappingChange_isAttributedToEachChannel() {
+        UserAccount first = user("first");
+        UserAccount second = user("second");
+        GameBinding firstBinding = binding(first, "730", Status.AUTO);
+        GameBinding secondBinding = binding(second, "730", Status.AUTO);
+        bindingsOfTheGame(firstBinding, secondBinding);
+        liveOn(first, "730");
+        liveOn(second, "730");
+        Map<UUID, UUID> subjects = new HashMap<>();
+        doAnswer(inv -> {
+            subjects.put(inv.<UserAccount>getArgument(0).getId(),
+                    fr.enimaloc.catapult.service.debug.DebugContext.subject().orElse(null));
+            return ChannelUpdateOutcome.APPLIED;
+        }).when(twitchService).updateChannelReporting(any(), any());
+
+        fr.enimaloc.catapult.service.debug.DebugContext.runAs(admin.getId(),
+                () -> service.create(request("730", "32399", true), admin));
+
+        assertThat(subjects).containsExactlyInAnyOrderEntriesOf(Map.of(
+                first.getId(), first.getId(), second.getId(), second.getId()));
+    }
+
+    @Test
     void applyLive_skipsChannelsOnAnotherGame() {
         UserAccount elsewhere = user("elsewhere");
         bindingsOfTheGame(binding(elsewhere, "730", Status.AUTO));
@@ -334,6 +365,42 @@ class AdminGameMappingServiceTest {
         assertThat(result.liveChannelsFailed()).isEqualTo(1);
         assertThat(result.liveChannelsUpdated()).isZero();
         verify(transactionManager, never()).rollback(any());
+    }
+
+    @Test
+    void aCarriedErrorCountsAsFailed() {
+        UserAccount onIt = user("on-it");
+        bindingsOfTheGame(binding(onIt, "730", Status.AUTO));
+        liveOn(onIt, "730");
+        doReturn(CategoryOutcome.error(CategoryRule.GAME_BINDING, new IllegalStateException("boom")))
+                .when(chain).apply(any(), any(MappingChanged.class));
+
+        GameMappingResult result = service.create(request("730", "32399", true), admin);
+
+        assertThat(result.liveChannelsUpdated()).isZero();
+        assertThat(result.liveChannelsFailed()).isEqualTo(1);
+        assertThat(result.mapping()).isNotNull();
+    }
+
+    @Test
+    void aDecisionErrorCountsAsFailed_andTheLoopContinues() {
+        UserAccount first = user("first");
+        UserAccount second = user("second");
+        bindingsOfTheGame(binding(first, "730", Status.AUTO), binding(second, "730", Status.AUTO));
+        liveOn(first, "730");
+        liveOn(second, "730");
+        when(gameStateService.lastKnownGames()).thenReturn(Map.of(
+                first.getId(), new DetectedGame("730", SourceType.STEAM, "CS2"),
+                second.getId(), new DetectedGame("730", SourceType.STEAM, "CS2")));
+        when(chainActivations.active(first)).thenThrow(new IllegalStateException("db down"));
+        when(chainActivations.active(second)).thenReturn(Optional.empty());
+
+        GameMappingResult result = service.create(request("730", "32399", true), admin);
+
+        assertThat(result.liveChannelsUpdated()).isEqualTo(1);
+        assertThat(result.liveChannelsFailed()).isEqualTo(1);
+        verify(twitchService, never()).updateChannelReporting(eq(first), any());
+        verify(twitchService).updateChannelReporting(eq(second), any());
     }
 
     @Test

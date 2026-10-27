@@ -5,14 +5,25 @@ import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
 import fr.enimaloc.catapult.repository.steam.SteamApiKeyRepository;
+import fr.enimaloc.catapult.security.Authz;
+import fr.enimaloc.catapult.security.MethodSecurityConfig;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.account.AccountService;
+import fr.enimaloc.catapult.service.account.ChannelAccountActions;
+import fr.enimaloc.catapult.service.account.ChannelSettingsService;
+import fr.enimaloc.catapult.service.binding.ChannelDashboardActions;
+import fr.enimaloc.catapult.service.steam.SteamPersonalTokenService;
+import fr.enimaloc.catapult.service.steam.SteamPersonalTokenStore;
 import fr.enimaloc.catapult.service.account.BotToggleService;
 import fr.enimaloc.catapult.service.account.ChannelAccessService;
 import fr.enimaloc.catapult.service.binding.BindingService;
 import fr.enimaloc.catapult.service.binding.GameStateService;
 import fr.enimaloc.catapult.service.binding.RaidRestoreGateService;
+import fr.enimaloc.catapult.service.binding.RaidRestoreHold;
 import fr.enimaloc.catapult.service.binding.SchedulerService;
+import fr.enimaloc.catapult.service.binding.StreamStateService;
+import fr.enimaloc.catapult.service.category.CategoryApplier;
+import fr.enimaloc.catapult.service.category.CategoryChain;
 import fr.enimaloc.catapult.service.connections.SteamProfileDiagnostics;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import fr.enimaloc.catapult.service.notification.TwitchatEventDispatcher;
@@ -41,7 +52,10 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
         controllers = ApiChannelActionsController.class,
         excludeAutoConfiguration = ThymeleafAutoConfiguration.class,
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
-@Import(ApiUserResolver.class)
+@Import({ApiUserResolver.class, MethodSecurityConfig.class, Authz.class, CategoryChain.class, CategoryApplier.class,
+        ChannelSettingsService.class, ChannelDashboardActions.class, SteamPersonalTokenService.class,
+        SteamPersonalTokenStore.class, ChannelAccountActions.class,
+        RaidRestoreHold.class})
 abstract class ApiChannelActionsTestSupport {
 
     @Autowired MockMvc mvc;
@@ -53,6 +67,7 @@ abstract class ApiChannelActionsTestSupport {
     @MockitoBean BotToggleService botToggleService;
     @MockitoBean TwitchService twitchService;
     @MockitoBean GameStateService gameStateService;
+    @MockitoBean StreamStateService streamStateService;
     @MockitoBean AccountService accountService;
     @MockitoBean TokenEncryptionService tokenEncryptionService;
     @MockitoBean SteamApiKeyRepository steamApiKeyRepository;
@@ -63,6 +78,8 @@ abstract class ApiChannelActionsTestSupport {
     @MockitoBean TwitchatEventDispatcher twitchatEventDispatcher;
     @MockitoBean SteamProfileDiagnostics steamProfileDiagnostics;
     @MockitoBean RaidRestoreGateService raidRestoreGate;
+    @MockitoBean fr.enimaloc.catapult.service.binding.GameBindingLookup gameBindingLookup;
+    @MockitoBean fr.enimaloc.catapult.service.binding.CustomBindingActivations customBindingActivations;
 
     static RequestPostProcessor userJwt(UUID id) {
         return jwt().jwt(j -> j.subject(id.toString()).claim("twitchId", "123"))

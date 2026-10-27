@@ -36,6 +36,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import({ApiSecurityConfig.class, ApiSecurityConfigWellKnownTest.Keys.class})
 @ActiveProfiles("test")
 class ApiSecurityConfigWellKnownTest {
+    @MockitoBean fr.enimaloc.catapult.service.account.UserApiTokenService userApiTokenService;
     @org.springframework.boot.test.context.TestConfiguration
     static class Keys {
         @org.springframework.context.annotation.Bean
@@ -53,23 +54,23 @@ class ApiSecurityConfigWellKnownTest {
     @Test
     void theServeRouteIsPublic() throws Exception {
         when(service.find(any(), any())).thenReturn(Optional.empty());
-        mvc.perform(get("/api/well-known/serve").param("location", "WELL_KNOWN").param("path", "x.txt")
+        mvc.perform(get("/api/internal/well-known-files").param("location", "WELL_KNOWN").param("path", "x.txt")
                         .with(r -> { r.setRemoteAddr("203.0.113.9"); return r; }))
                 .andExpect(status().isNotFound());
     }
 
     @Test
     void theAdminRoutesRefuseAnAnonymousVisitor() throws Exception {
-        mvc.perform(get("/api/admin/well-known").with(r -> { r.setRemoteAddr("203.0.113.9"); return r; }))
+        mvc.perform(get("/api/internal/admin/well-known-files").with(r -> { r.setRemoteAddr("203.0.113.9"); return r; }))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
     void theMetaTagsAreReadPublicly_butAdministeredByAnAdminOnly() throws Exception {
         when(metaTags.list()).thenReturn(java.util.List.of());
-        mvc.perform(get("/api/meta-tags").with(r -> { r.setRemoteAddr("203.0.113.9"); return r; }))
+        mvc.perform(get("/api/internal/meta-tags").with(r -> { r.setRemoteAddr("203.0.113.9"); return r; }))
                 .andExpect(status().isOk());
-        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/admin/meta-tags")
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/internal/admin/meta-tags")
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content("{}")
                         .with(r -> { r.setRemoteAddr("203.0.113.9"); return r; }))
                 .andExpect(status().isUnauthorized());

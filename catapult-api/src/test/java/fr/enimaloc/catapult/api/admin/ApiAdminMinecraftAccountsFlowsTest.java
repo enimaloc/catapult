@@ -7,13 +7,20 @@ import fr.enimaloc.catapult.repository.minecraft.MinecraftFriendLinkRepository;
 import fr.enimaloc.catapult.repository.minecraft.MinecraftServiceAccountRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.minecraft.MinecraftService;
+import fr.enimaloc.catapult.service.minecraft.MinecraftServiceAccountAdmin;
 import fr.enimaloc.catapult.service.minecraft.MinecraftTokenService;
 import fr.enimaloc.catapult.service.minecraft.MsaAuthClient;
+import fr.enimaloc.catapult.api.error.ApiProblem;
+import fr.enimaloc.catapult.api.error.ProblemAdvice;
+import fr.enimaloc.catapult.common.error.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.server.ResponseStatusException;
@@ -31,6 +38,11 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /** The admin's Minecraft service-account pool: device-code enrolment, re-auth, edits and removal. */
 class ApiAdminMinecraftAccountsFlowsTest {
@@ -41,8 +53,8 @@ class ApiAdminMinecraftAccountsFlowsTest {
     private final MinecraftServiceAccountRepository accounts = mock(MinecraftServiceAccountRepository.class);
     private final MinecraftFriendLinkRepository links = mock(MinecraftFriendLinkRepository.class);
     private final TokenEncryptionService encryption = mock(TokenEncryptionService.class);
-    private final ApiAdminMinecraftAccountsController controller =
-            new ApiAdminMinecraftAccountsController(msa, tokens, minecraft, accounts, links, encryption);
+    private final ApiAdminMinecraftAccountsController controller = new ApiAdminMinecraftAccountsController(
+            new MinecraftServiceAccountAdmin(msa, tokens, minecraft, accounts, links, encryption));
 
     private MinecraftServiceAccount account;
 
@@ -75,6 +87,25 @@ class ApiAdminMinecraftAccountsFlowsTest {
                 e -> assertThat(e.getStatusCode()).isEqualTo(status));
     }
 
+    /** admin-minecraft.js tells an expired device code by its 400: the advice must keep the declared status. */
+    @Test
+    void expiredDeviceCode_is400_onCreateAndReauth() throws Exception {
+        when(msa.pollDeviceCode("dc"))
+                .thenThrow(new MsaAuthClient.DeviceCodeExpiredException(new IllegalStateException("expired_token")));
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
+                .setControllerAdvice(new ProblemAdvice())
+                .build();
+
+        for (String path : List.of("/api/internal/admin/minecraft-accounts",
+                "/api/internal/admin/minecraft-accounts/" + account.getId() + "/reauth")) {
+            mvc.perform(post(path).contentType(MediaType.APPLICATION_JSON).content("{\"deviceCode\":\"dc\"}"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                    .andExpect(jsonPath("$.code").value("minecraft_device_code_expired"))
+                    .andExpect(jsonPath("$.detail").value("The device code expired"));
+        }
+    }
+
     @Test
     void list_includesEachAccountsLinkCount() {
         when(accounts.findAll()).thenReturn(List.of(account));
@@ -91,9 +122,53 @@ class ApiAdminMinecraftAccountsFlowsTest {
                         "AADSTS70002".getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8));
 
         assertThat(controller.startDeviceCode().getBody()).isEqualTo(start);
-        ResponseEntity<?> refused = controller.startDeviceCode();
-        assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY);
-        assertThat(refused.getBody()).isEqualTo(Map.of("message", "Device-code Microsoft refusé: AADSTS70002"));
+        assertThatThrownBy(controller::startDeviceCode).isInstanceOfSatisfying(ApiProblem.class, e -> {
+            assertThat(e.getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY);
+            assertThat(e.code()).isEqualTo(ErrorCode.MINECRAFT_DEVICE_CODE_REFUSED);
+        });
+    }
+
+    @Test
+    void deviceCodeRefused_isAProblemWithMicrosoftsAnswer() throws Exception {
+        when(msa.startDeviceCode()).thenThrow(HttpClientErrorException.create(HttpStatus.BAD_REQUEST, "Bad Request",
+                new HttpHeaders(), "AADSTS70002".getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8));
+
+        mvc().perform(post("/api/internal/admin/minecraft-accounts/device-code"))
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.code").value("minecraft_device_code_refused"))
+                .andExpect(jsonPath("$.detail").value("Microsoft refused the device code"))
+                .andExpect(jsonPath("$.upstream").value("AADSTS70002"));
+    }
+
+    @Test
+    void deleteWithLinks_isAccountInUse() throws Exception {
+        when(links.findByServiceAccount(account)).thenReturn(List.of(new MinecraftFriendLink()));
+
+        mvc().perform(delete("/api/internal/admin/minecraft-accounts/" + account.getId()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("minecraft_account_in_use"))
+                .andExpect(jsonPath("$.detail").value("Members are linked to this account"));
+    }
+
+    @Test
+    void theReasonsAreEnglish() {
+        when(tokens.validateChain("enc-refresh")).thenReturn(Optional.empty());
+        when(msa.pollDeviceCode("dc")).thenReturn(Optional.of(msaTokens()));
+
+        assertReason(() -> controller.create(Map.of("deviceCode", "dc")),
+                "The Xbox/Minecraft auth chain failed for this account (missing Xbox or Minecraft profile?)");
+        assertReason(() -> controller.create(Map.of()), "deviceCode is required");
+        assertReason(() -> controller.update(UUID.randomUUID(), Map.of()), "Unknown account");
+        assertReason(() -> controller.update(account.getId(), Map.of("enabled", "yes")), "Invalid type for enabled");
+    }
+
+    private static void assertReason(Runnable call, String reason) {
+        assertThatThrownBy(call::run).isInstanceOfSatisfying(ResponseStatusException.class,
+                e -> assertThat(e.getReason()).isEqualTo(reason));
+    }
+
+    private MockMvc mvc() {
+        return MockMvcBuilders.standaloneSetup(controller).setControllerAdvice(new ProblemAdvice()).build();
     }
 
     @Test
@@ -111,7 +186,7 @@ class ApiAdminMinecraftAccountsFlowsTest {
         ResponseEntity<?> created = controller.create(Map.of("deviceCode", "dc"));
 
         assertThat(created.getBody()).isInstanceOfSatisfying(AccountDto.class, dto -> {
-            assertThat(dto.label()).isEqualTo("Compte Minecraft");
+            assertThat(dto.label()).isEqualTo("Minecraft account");
             assertThat(dto.minecraftUsername()).isEqualTo("Alex");
             assertThat(dto.fillOrder()).isEqualTo(2);
             assertThat(dto.linkCount()).isZero();
@@ -175,6 +250,12 @@ class ApiAdminMinecraftAccountsFlowsTest {
     }
 
     @Test
+    void update_unknownAccountWithABadType_is404() {
+        assertStatus(() -> controller.update(UUID.randomUUID(), Map.of("enabled", "yes")), HttpStatus.NOT_FOUND);
+        verify(accounts, never()).save(any());
+    }
+
+    @Test
     void delete_unlinkedAccounts() {
         when(links.findByServiceAccount(account)).thenReturn(List.of());
 
@@ -183,7 +264,7 @@ class ApiAdminMinecraftAccountsFlowsTest {
         verify(accounts).delete(account);
 
         when(links.findByServiceAccount(account)).thenReturn(List.of(new MinecraftFriendLink()));
-        assertThat(controller.delete(account.getId()).getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThatThrownBy(() -> controller.delete(account.getId())).isInstanceOf(ApiProblem.class);
         assertStatus(() -> controller.delete(UUID.randomUUID()), HttpStatus.NOT_FOUND);
     }
 }

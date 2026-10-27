@@ -14,7 +14,7 @@ import java.util.List;
 public class ApiMetaTagsController {
     private final MetaTagService service;
 
-    @GetMapping("/api/meta-tags")
+    @GetMapping(ApiPaths.INTERNAL + "/meta-tags")
     public List<MetaTagDto> list() {
         return service.list();
     }

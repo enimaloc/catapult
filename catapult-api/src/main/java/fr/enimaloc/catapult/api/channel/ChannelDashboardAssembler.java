@@ -43,6 +43,7 @@ import fr.enimaloc.catapult.service.binding.StreamStateService;
 import fr.enimaloc.catapult.service.connections.SteamProfileDiagnostics;
 import fr.enimaloc.catapult.service.connections.SteamProfileDto;
 import fr.enimaloc.catapult.service.igdb.AdminCclService;
+import fr.enimaloc.catapult.api.CustomBindingViews;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.minecraft.MinecraftLinkStateService;
 import fr.enimaloc.catapult.service.notification.TwitchatWidgetSettingsService;
@@ -88,6 +89,7 @@ public class ChannelDashboardAssembler {
     private final Optional<MinecraftLinkStateService> minecraftLinkStates;
     private final TwitchatWidgetSettingsService twitchatWidgetSettingsService;
     private final RaidRestoreGateService raidRestoreGate;
+    private final CustomBindingViews customBindingViews;
 
     @Value("${xbox.enabled:false}")
     private boolean xboxEnabled;
@@ -102,7 +104,7 @@ public class ChannelDashboardAssembler {
     // --- dashboard page --------------------------------------------------------------------------
 
     /**
-     * The whole dashboard. Connection details (Steam diagnostics, Minecraft link, OBS) are only
+     * The whole dashboard. Connection details (Steam diagnostics, Minecraft link, OBS) and the custom bindings are only
      * filled in for the channel's owner; a provider that isn't available at all is null.
      */
     public ChannelPageData page(UserAccount viewer, UserAccount channel, String username,
@@ -132,7 +134,8 @@ public class ChannelDashboardAssembler {
                 owner ? minecraftData(channel) : null,
                 owner ? obsData(widget) : null,
                 owner ? TwitchatData.of(widget.getTwitchatBranch()) : null,
-                exampleUuid(channel, owner, detected));
+                exampleUuid(channel, owner, detected),
+                owner ? customBindingViews.stateIfEnabled(channel) : null);
     }
 
     private static ChannelUserDto channelUser(UserAccount channel) {
@@ -261,9 +264,9 @@ public class ChannelDashboardAssembler {
     /**
      * The DTDD mapping of the game the channel is playing, as {@code viewer} sees it: the
      * current mapping, their own pending proposal, and whether they may validate it directly
-     * (an unverified mapping nobody else has a proposal pending on).
+     * (an admin, on an unverified mapping nobody else has a proposal pending on).
      */
-    public DtddMappingStatusDto dtddMapping(UserAccount viewer, UserAccount channel) {
+    public DtddMappingStatusDto dtddMapping(UserAccount viewer, UserAccount channel, boolean viewerIsAdmin) {
         Optional<String> igdbId = gameStateService.getLastKnownGame(channel)
                 .flatMap(this::igdbGame)
                 .map(IgdbService.IgdbGame::id);
@@ -276,7 +279,8 @@ public class ChannelDashboardAssembler {
         Optional<DtddMappingProposal> myProposal = dtddProposalRepo
                 .findFirstByProposerAndIgdbIdAndStatus(viewer, id, DtddMappingProposal.Status.PENDING);
         long pendingProposals = dtddProposalRepo.countByIgdbIdAndStatus(id, DtddMappingProposal.Status.PENDING);
-        boolean canValidate = mapping.isPresent() && !mapping.get().isVerified() && pendingProposals == 0;
+        boolean canValidate = viewerIsAdmin
+                && mapping.isPresent() && !mapping.get().isVerified() && pendingProposals == 0;
 
         DtddMappingCurrentDto current = mapping.map(m -> new DtddMappingCurrentDto(
                 m.getDtddId(), dtddName(m.getDtddId()), m.getConfidence(), m.isVerified())).orElse(null);

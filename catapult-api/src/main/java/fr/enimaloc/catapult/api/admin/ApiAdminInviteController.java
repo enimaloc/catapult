@@ -2,18 +2,13 @@ package fr.enimaloc.catapult.api.admin;
 
 import fr.enimaloc.catapult.common.dto.admin.AdminInvitePageData;
 import fr.enimaloc.catapult.common.dto.admin.AdminInviteQuotaRequest;
-import fr.enimaloc.catapult.common.dto.admin.AdminWhitelistRedemptionDto;
-import fr.enimaloc.catapult.common.dto.admin.AdminInviteRow;
 import fr.enimaloc.catapult.common.dto.admin.InviteSettingsRequest;
-import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
-import fr.enimaloc.catapult.domain.access.AlphaInvite;
-import fr.enimaloc.catapult.domain.access.AlphaInviteRedemption;
-import fr.enimaloc.catapult.domain.account.UserAccount;
-import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.service.access.AdminInviteService;
 import fr.enimaloc.catapult.service.access.InviteService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.access.prepost.PreAuthorize;
+import fr.enimaloc.catapult.api.ApiPaths;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,65 +16,23 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
-import java.util.List;
-import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/api/admin/invite")
-@PreAuthorize("hasRole('ADMIN') or hasIpAddress('127.0.0.1') or hasIpAddress('::1')")
+@RequestMapping(ApiPaths.ADMIN + "/invites")
 @RequiredArgsConstructor
 public class ApiAdminInviteController {
 
     private final InviteService inviteService;
-    private final UserAccountRepository userAccountRepository;
+    private final AdminInviteService adminInvites;
 
     @GetMapping
     public AdminInvitePageData page() {
-        List<AlphaInvite> invites = inviteService.findAll();
-        Set<UUID> ownersWithInvite = invites.stream()
-            .map(inv -> inv.getOwner().getId())
-            .collect(Collectors.toSet());
-
-        List<AdminInviteRow> rows = invites.stream().map(inv -> {
-            UserAccount owner = inv.getOwner();
-            List<AlphaInviteRedemption> redemptions = inviteService.getRedemptions(inv);
-            return new AdminInviteRow(
-                inv.getId(),
-                owner.getId(),
-                owner.getTwitchUsername(),
-                inv.getCode(),
-                inv.getMaxUses(),
-                inv.getUseCount(),
-                inv.getCanReinvite(),
-                inv.getCreatedAt(),
-                inv.getRegeneratedAt(),
-                redemptions.stream()
-                    .map(r -> new AdminWhitelistRedemptionDto(r.getInviteeTwitchId(), r.getRedeemedAt()))
-                    .toList()
-            );
-        }).toList();
-
-        List<AdminMemberSummaryDto> membersWithoutInvite = userAccountRepository.findAll().stream()
-            .filter(u -> !u.isSystemAccount() && u.getStatus() == UserAccount.Status.ACTIVE)
-            .filter(u -> !ownersWithInvite.contains(u.getId()))
-            .map(u -> new AdminMemberSummaryDto(u.getId(), u.getTwitchUsername()))
-            .toList();
-
-        return new AdminInvitePageData(
-            rows,
-            membersWithoutInvite,
-            inviteService.getGlobalMaxMembers().orElse(null),
-            inviteService.getDefaultMaxUses().orElse(null),
-            inviteService.getDefaultCanReinvite(),
-            inviteService.isGlobalCapReached()
-        );
+        return adminInvites.invitePage();
     }
 
-    @PostMapping("/settings")
+    @PutMapping("/settings")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updateSettings(@RequestBody InviteSettingsRequest body) {
         inviteService.setGlobalMaxMembers(body.globalMaxMembers());
@@ -87,17 +40,15 @@ public class ApiAdminInviteController {
         inviteService.setDefaultCanReinvite(body.defaultCanReinvite());
     }
 
-    @PostMapping("/{inviteId}/quota")
+    @PutMapping("/{inviteId}/quota")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updateQuota(@PathVariable UUID inviteId, @RequestBody AdminInviteQuotaRequest body) {
         inviteService.updateInviteQuota(inviteId, body.maxUses(), body.canReinvite());
     }
 
-    @PostMapping("/grant/{userId}")
+    @PostMapping("/grants/{memberId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void grantInvite(@PathVariable UUID userId) {
-        UserAccount user = userAccountRepository.findById(userId)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        inviteService.grantInvite(user);
+    public void grantInvite(@PathVariable UUID memberId) {
+        adminInvites.grant(memberId);
     }
 }

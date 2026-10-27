@@ -22,12 +22,14 @@ import java.util.UUID;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
@@ -55,8 +57,8 @@ class ApiChannelTwControllerTest {
         UserAccount user = seededUser();
 
         UUID bindingId = UUID.randomUUID();
-        mvc.perform(post("/api/channel/bindings/{id}/tws", bindingId)
-                        .with(jwt().jwt(j -> j.claim("twitchId", user.getTwitchId())))
+        mvc.perform(put("/api/internal/users/{userId}/bindings/{bindingId}/tws", user.getId(), bindingId)
+                        .with(jwt().jwt(j -> j.subject(user.getId().toString()).claim("twitchId", user.getTwitchId())))
                         .with(csrf())
                         .contentType("application/json")
                         .content("{\"tws\":[\"violence_graphic\",\"vomit\"]}"))
@@ -71,8 +73,8 @@ class ApiChannelTwControllerTest {
         UserAccount user = seededUser();
 
         UUID bindingId = UUID.randomUUID();
-        mvc.perform(post("/api/channel/bindings/{id}/tws/reset", bindingId)
-                        .with(jwt().jwt(j -> j.claim("twitchId", user.getTwitchId())))
+        mvc.perform(delete("/api/internal/users/{userId}/bindings/{bindingId}/tws", user.getId(), bindingId)
+                        .with(jwt().jwt(j -> j.subject(user.getId().toString()).claim("twitchId", user.getTwitchId())))
                         .with(csrf()))
                 .andExpect(status().isNoContent());
 
@@ -85,8 +87,8 @@ class ApiChannelTwControllerTest {
         UserAccount user = seededUser();
 
         UUID bindingId = UUID.randomUUID();
-        mvc.perform(post("/api/channel/bindings/{id}/tw-enabled", bindingId)
-                        .with(jwt().jwt(j -> j.claim("twitchId", user.getTwitchId())))
+        mvc.perform(put("/api/internal/users/{userId}/bindings/{bindingId}/tw-enabled", user.getId(), bindingId)
+                        .with(jwt().jwt(j -> j.subject(user.getId().toString()).claim("twitchId", user.getTwitchId())))
                         .with(csrf())
                         .contentType("application/json")
                         .content("{\"enabled\":false}"))
@@ -104,8 +106,25 @@ class ApiChannelTwControllerTest {
         when(bindingService.previewTws(any(UserAccount.class), eq(bindingId)))
                 .thenReturn(Set.of("violence_graphic"));
 
-        mvc.perform(get("/api/channel/bindings/{id}/tws/suggest", bindingId)
-                        .with(jwt().jwt(j -> j.claim("twitchId", user.getTwitchId()))))
+        mvc.perform(get("/api/internal/users/{userId}/bindings/{bindingId}/tws/suggestions", user.getId(), bindingId)
+                        .with(jwt().jwt(j -> j.subject(user.getId().toString()).claim("twitchId", user.getTwitchId()))))
                 .andExpect(status().isOk());
+    }
+
+    /** A self route: another member's account (a channel they moderate, even) is refused, its TWs untouched. */
+    @Test
+    void anotherMembersBindings_areForbidden() throws Exception {
+        MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).apply(springSecurity()).build();
+        UserAccount user = seededUser();
+        UserAccount other = userAccountRepository.findByTwitchId("mock-admin").orElseThrow();
+
+        mvc.perform(put("/api/internal/users/{userId}/bindings/{bindingId}/tws", other.getId(), UUID.randomUUID())
+                        .with(jwt().jwt(j -> j.subject(user.getId().toString()).claim("twitchId", user.getTwitchId())))
+                        .with(csrf())
+                        .contentType("application/json")
+                        .content("{\"tws\":[]}"))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(bindingService);
     }
 }

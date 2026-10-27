@@ -6,6 +6,8 @@ import fr.enimaloc.catapult.domain.chatcommand.ChatCommandSetting;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.chatcommand.ChatCommandSettingRepository;
 import fr.enimaloc.catapult.service.account.ChannelAccessService;
+import fr.enimaloc.catapult.service.chatcommand.ChatCommandGate;
+import fr.enimaloc.catapult.service.chatcommand.ChatCommandSettingService;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -35,8 +37,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(ApiChatCommandSettingsController.class)
-@Import(ApiUserResolver.class)
+@Import({ApiUserResolver.class, ChatCommandSettingService.class, ChatCommandGate.class})
 class ApiChatCommandSettingsControllerTest {
+
+    private static final UUID SELF = UUID.randomUUID();
+    private static final String OWN = "/api/internal/users/" + SELF;
     @MockitoBean ChannelAccessService channelAccessService;
 
     @Autowired MockMvc mvc;
@@ -71,7 +76,7 @@ class ApiChatCommandSettingsControllerTest {
         setting.setValue("fr");
         when(repository.findByUser(user)).thenReturn(List.of(setting));
 
-        mvc.perform(withAdmin(get("/api/chat-command-settings")))
+        mvc.perform(withAdmin(get(OWN + "/chat-command-settings")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].key").value("language"))
                 .andExpect(jsonPath("$[0].value").value("fr"));
@@ -84,7 +89,7 @@ class ApiChatCommandSettingsControllerTest {
         when(repository.findByUserAndKey(user, "language")).thenReturn(Optional.empty());
         when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        mvc.perform(withAdmin(put("/api/chat-command-settings/{key}", "language"))
+        mvc.perform(withAdmin(put(OWN + "/chat-command-settings/{key}", "language"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(om.writeValueAsString(Map.of("value", "fr"))))
                 .andExpect(status().isNoContent());
@@ -97,7 +102,7 @@ class ApiChatCommandSettingsControllerTest {
         mockUser();
         when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
 
-        mvc.perform(withAdmin(put("/api/chat-command-settings/{key}", "not a valid key"))
+        mvc.perform(withAdmin(put(OWN + "/chat-command-settings/{key}", "not a valid key"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(om.writeValueAsString(Map.of("value", "fr"))))
                 .andExpect(status().isBadRequest());
@@ -112,7 +117,7 @@ class ApiChatCommandSettingsControllerTest {
         when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
 
         for (String reserved : new String[]{"__proto__", "constructor", "prototype"}) {
-            mvc.perform(withAdmin(put("/api/chat-command-settings/{key}", reserved))
+            mvc.perform(withAdmin(put(OWN + "/chat-command-settings/{key}", reserved))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(om.writeValueAsString(Map.of("value", "x"))))
                     .andExpect(status().isBadRequest());
@@ -124,9 +129,21 @@ class ApiChatCommandSettingsControllerTest {
         UserAccount user = mockUser();
         when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(true);
 
-        mvc.perform(withAdmin(delete("/api/chat-command-settings/{key}", "language")))
+        mvc.perform(withAdmin(delete(OWN + "/chat-command-settings/{key}", "language")))
                 .andExpect(status().isNoContent());
 
         verify(repository).deleteByUserAndKey(user, "language");
+    }
+
+    @Test
+    void upsert_closedGateBeatsAnInvalidKey() throws Exception {
+        mockUser();
+        when(experimentService.evaluateGate(any(), eq("chat.commands"))).thenReturn(false);
+
+        mvc.perform(withAdmin(put(OWN + "/chat-command-settings/{key}", "not a valid key"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(om.writeValueAsString(Map.of("value", "fr"))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("feature_disabled"));
     }
 }

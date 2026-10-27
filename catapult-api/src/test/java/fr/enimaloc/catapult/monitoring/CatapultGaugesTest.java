@@ -3,7 +3,6 @@ package fr.enimaloc.catapult.monitoring;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
-import fr.enimaloc.catapult.repository.chatcommand.ChatCommandDefinitionRepository;
 import fr.enimaloc.catapult.repository.minecraft.MinecraftServiceAccountRepository;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
@@ -32,17 +31,16 @@ class CatapultGaugesTest {
     @Mock StreamStateService streamStateService;
     @Mock ObjectProvider<EventSubTwitchChatService> eventSubChatProvider;
     @Mock ObjectProvider<IrcTwitchChatService> ircChatProvider;
-    @Mock ChatCommandDefinitionRepository chatCommandDefinitionRepository;
     @Mock OAuthTokenRepository oAuthTokenRepository;
-    @Mock ObjectProvider<IgdbService> igdbServiceProvider;
+    @Mock IgdbService igdbService;
     @Mock SystemTwitchAccountService systemTwitchAccountService;
     @Mock EventSubTwitchChatService eventSubTwitchChatService;
     @Mock MinecraftServiceAccountRepository minecraftServiceAccountRepository;
 
     private CatapultGauges gauges() {
         return new CatapultGauges(userAccountRepository, streamStateService,
-                eventSubChatProvider, ircChatProvider, chatCommandDefinitionRepository,
-                oAuthTokenRepository, igdbServiceProvider, systemTwitchAccountService,
+                eventSubChatProvider, ircChatProvider,
+                oAuthTokenRepository, igdbService, systemTwitchAccountService,
                 minecraftServiceAccountRepository);
     }
 
@@ -71,14 +69,12 @@ class CatapultGaugesTest {
         when(eventSubChatProvider.getIfAvailable()).thenReturn(eventSubTwitchChatService);
         when(eventSubTwitchChatService.connectionCount()).thenReturn(2);
         when(ircChatProvider.getIfAvailable()).thenReturn(null);
-        when(chatCommandDefinitionRepository.count()).thenReturn(5L);
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
 
         gauges().bindTo(registry);
 
         assertThat(registry.get("catapult.chat.connections").tag("transport", "eventsub").gauge().value()).isEqualTo(2.0);
         assertThat(registry.get("catapult.chat.connections").tag("transport", "irc").gauge().value()).isEqualTo(0.0);
-        assertThat(registry.get("catapult.commands.registered").gauge().value()).isEqualTo(5.0);
     }
 
     @Test
@@ -96,14 +92,26 @@ class CatapultGaugesTest {
     }
 
     @Test
+    void igdbTokenExpiryGauge_readsTheService() {
+        when(igdbService.getTokenExpiresAt()).thenReturn(Instant.now().plusSeconds(120));
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+
+        gauges().bindTo(registry);
+
+        assertThat(registry.get("catapult.token.expiry.seconds").tag("service", "igdb").gauge().value())
+                .isBetween(110.0, 120.0);
+    }
+
+    @Test
     void token_expiry_gauges_registered() {
-        when(igdbServiceProvider.getIfAvailable()).thenReturn(null);
+        when(igdbService.getTokenExpiresAt()).thenReturn(Instant.now().plusSeconds(300));
         when(systemTwitchAccountService.tokenExpiry()).thenReturn(Optional.of(Instant.now().plusSeconds(600)));
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
 
         gauges().bindTo(registry);
 
-        assertThat(registry.get("catapult.token.expiry.seconds").tag("service", "igdb").gauge().value()).isNaN();
+        assertThat(registry.get("catapult.token.expiry.seconds").tag("service", "igdb").gauge().value())
+                .isCloseTo(300.0, within(5.0));
         assertThat(registry.get("catapult.token.expiry.seconds").tag("service", "twitch_bot").gauge().value())
                 .isCloseTo(600.0, within(5.0));
     }

@@ -5,7 +5,6 @@ import fr.enimaloc.catapult.getter.dtdd.DtddApiKeyRotator;
 import fr.enimaloc.catapult.repository.dtdd.DtddApiKeyRepository;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -26,11 +25,10 @@ public class DtddApiKeyMigrationService implements ApplicationRunner {
 
     private final DtddApiKeyRepository repository;
 
-    @Setter
-    private DtddApiKeyRotator rotator;
+    private final DtddApiKeyRotator rotator;
 
     public DtddApiKeyMigrationService(DtddApiKeyRepository repository,
-                                      @Autowired(required = false) DtddApiKeyRotator rotator) {
+                                      DtddApiKeyRotator rotator) {
         this.repository = repository;
         this.rotator = rotator;
     }
@@ -61,7 +59,7 @@ public class DtddApiKeyMigrationService implements ApplicationRunner {
 
         if (imported > 0) {
             log.info("Imported {} DoesTheDogDie API key(s) from config into DB", imported);
-            if (rotator != null) rotator.refreshKeys();
+            rotator.refreshKeys();
         }
     }
 }

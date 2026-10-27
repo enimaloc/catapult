@@ -24,7 +24,8 @@ public interface TwitchChatService {
     /**
      * Same as {@link #getFollowedAt(UserAccount, String)} but keyed by an already-known Twitch
      * user id instead of a login — used by {@link fr.enimaloc.catapult.chat.CommandRegistry}'s
-     * FOLLOWERS permission check, which only has the chat sender's id (from the message's own
+     * FOLLOWERS permission check (the chat command system is retired: only its test route reaches
+     * it now), which only has the chat sender's id (from the message's own
      * tags/badges), not their login, and would otherwise need an extra id-resolution round trip.
      */
     Optional<Instant> getFollowedAtById(UserAccount user, String targetTwitchId);

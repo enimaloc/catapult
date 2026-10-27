@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.service.twitch;
 
-/** What {@link TwitchService#updateChannelReporting} did with a channel. */
+/** What a {@link TwitchService} category call did: {@code updateChannelReporting}, {@code setCategory}, {@code resetToDefault}. */
 public enum ChannelUpdateOutcome {
     /** Twitch accepted the new category. */
     APPLIED,

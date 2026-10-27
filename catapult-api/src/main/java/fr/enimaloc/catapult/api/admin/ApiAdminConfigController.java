@@ -1,17 +1,15 @@
 package fr.enimaloc.catapult.api.admin;
 
+import fr.enimaloc.catapult.api.ApiPaths;
 import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.common.dto.admin.ApplyRequest;
 import fr.enimaloc.catapult.common.dto.admin.ModuleOverrideDto;
 import fr.enimaloc.catapult.domain.config.ConfigAudit;
-import fr.enimaloc.catapult.repository.config.ConfigAuditRepository;
-import fr.enimaloc.catapult.repository.config.ConfigOverrideRepository;
 import fr.enimaloc.catapult.service.config.ConfigCatalogService;
 import fr.enimaloc.catapult.service.config.ConfigEntry;
 import fr.enimaloc.catapult.service.config.ConfigOverrideService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -27,16 +25,13 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/admin/config")
-@PreAuthorize("hasRole('ADMIN') or hasIpAddress('127.0.0.1') or hasIpAddress('::1')")
+@RequestMapping(ApiPaths.ADMIN + "/config")
 @RequiredArgsConstructor
 public class ApiAdminConfigController {
 
     private final ConfigCatalogService catalogService;
     private final ConfigOverrideService overrideService;
     private final ApiUserResolver userResolver;
-    private final ConfigAuditRepository auditRepo;
-    private final ConfigOverrideRepository overrideRepo;
 
     @GetMapping
     public List<ConfigEntry> catalog() {
@@ -57,22 +52,15 @@ public class ApiAdminConfigController {
 
     @GetMapping("/audit")
     public List<ConfigAudit> audit(@RequestParam String key) {
-        return auditRepo.findByKeyOrderByChangedAtDesc(key);
+        return overrideService.audit(key);
     }
 
-    @GetMapping("/module/{module}")
+    @GetMapping("/modules/{module}")
     public List<ModuleOverrideDto> moduleOverrides(@PathVariable String module) {
-        return overrideRepo.findByIdModule(module).stream()
-                .map(o -> new ModuleOverrideDto(
-                        o.getKey(),
-                        o.isSecret() ? null : o.getValue(),
-                        o.isSecret(),
-                        o.getUpdatedAt(),
-                        o.getUpdatedBy()))
-                .toList();
+        return overrideService.moduleOverrides(module);
     }
 
-    @PutMapping("/module/{module}/{key}")
+    @PutMapping("/modules/{module}/{key}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void applyForModule(@PathVariable String module,
                                @PathVariable String key,
@@ -81,7 +69,7 @@ public class ApiAdminConfigController {
         overrideService.apply(module, key, body.value(), userResolver.viewerByTwitchId(jwt));
     }
 
-    @DeleteMapping("/module/{module}/{key}")
+    @DeleteMapping("/modules/{module}/{key}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void clearForModule(@PathVariable String module,
                                @PathVariable String key,
@@ -89,9 +77,9 @@ public class ApiAdminConfigController {
         overrideService.clear(module, key, userResolver.viewerByTwitchId(jwt));
     }
 
-    @GetMapping("/module/{module}/audit")
+    @GetMapping("/modules/{module}/audit")
     public List<ConfigAudit> moduleAudit(@PathVariable String module, @RequestParam String key) {
-        return auditRepo.findByModuleAndKeyOrderByChangedAtDesc(module, key);
+        return overrideService.audit(module, key);
     }
 
 }

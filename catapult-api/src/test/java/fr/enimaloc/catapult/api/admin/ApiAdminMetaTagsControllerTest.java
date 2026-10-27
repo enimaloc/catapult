@@ -35,6 +35,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
 @AutoConfigureMockMvc(addFilters = false) // the admin guard is ApiSecurityConfig's, tested with it
 class ApiAdminMetaTagsControllerTest {
+    @MockitoBean fr.enimaloc.catapult.service.account.UserApiTokenService userApiTokenService;
     @Autowired MockMvc mvc;
     @MockitoBean MetaTagService service;
 
@@ -45,7 +46,7 @@ class ApiAdminMetaTagsControllerTest {
     @Test
     void createAnswers201WithTheTag() throws Exception {
         when(service.create(any())).thenReturn(TAG);
-        mvc.perform(post("/api/admin/meta-tags").contentType(MediaType.APPLICATION_JSON).content(BODY))
+        mvc.perform(post("/api/internal/admin/meta-tags").contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(3))
                 .andExpect(jsonPath("$.attribute").value("PROPERTY"));
@@ -56,18 +57,18 @@ class ApiAdminMetaTagsControllerTest {
     void listPubliclyUpdateAndDelete() throws Exception {
         when(service.list()).thenReturn(List.of(TAG));
         when(service.update(eq(3L), any())).thenReturn(TAG);
-        mvc.perform(get("/api/meta-tags")).andExpect(jsonPath("$[0].content").value("https://x/y.png"));
-        mvc.perform(put("/api/admin/meta-tags/3").contentType(MediaType.APPLICATION_JSON).content(BODY))
+        mvc.perform(get("/api/internal/meta-tags")).andExpect(jsonPath("$[0].content").value("https://x/y.png"));
+        mvc.perform(put("/api/internal/admin/meta-tags/3").contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isOk());
         verify(service).update(3L, REQUEST);
-        mvc.perform(delete("/api/admin/meta-tags/3")).andExpect(status().isNoContent());
+        mvc.perform(delete("/api/internal/admin/meta-tags/3")).andExpect(status().isNoContent());
         verify(service).delete(3L);
     }
 
     @Test
     void aRefusalKeepsItsStatus() throws Exception {
         when(service.create(any())).thenThrow(new ResponseStatusException(HttpStatus.CONFLICT));
-        mvc.perform(post("/api/admin/meta-tags").contentType(MediaType.APPLICATION_JSON).content(BODY))
+        mvc.perform(post("/api/internal/admin/meta-tags").contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isConflict());
     }
 }

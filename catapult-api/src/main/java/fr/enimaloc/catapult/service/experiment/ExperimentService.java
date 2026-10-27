@@ -15,7 +15,6 @@ import fr.enimaloc.catapult.repository.experiment.ExperimentOverrideRepository;
 import fr.enimaloc.catapult.repository.experiment.ExperimentRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,7 +33,6 @@ public class ExperimentService {
     private final ExperimentAssignmentRepository assignmentRepository;
     private final ExperimentEventRepository eventRepository;
     private final ExperimentOverrideRepository overrideRepository;
-    private final ExperimentService self;
     private final AttributeEvaluator attributeEvaluator;
     private final UserGroupRepository userGroupRepository;
 
@@ -42,12 +40,11 @@ public class ExperimentService {
     private final Set<String> knownKeys = ConcurrentHashMap.newKeySet();
 
     @Autowired
-    public ExperimentService(ExperimentRepository experimentRepository, ExperimentAssignmentRepository assignmentRepository, ExperimentEventRepository eventRepository, ExperimentOverrideRepository overrideRepository, @Lazy ExperimentService self, AttributeEvaluator attributeEvaluator, UserGroupRepository userGroupRepository) {
+    public ExperimentService(ExperimentRepository experimentRepository, ExperimentAssignmentRepository assignmentRepository, ExperimentEventRepository eventRepository, ExperimentOverrideRepository overrideRepository, AttributeEvaluator attributeEvaluator, UserGroupRepository userGroupRepository) {
         this.experimentRepository = experimentRepository;
         this.assignmentRepository = assignmentRepository;
         this.eventRepository = eventRepository;
         this.overrideRepository = overrideRepository;
-        this.self = self;
         this.attributeEvaluator = attributeEvaluator;
         this.userGroupRepository = userGroupRepository;
     }
@@ -76,6 +73,12 @@ public class ExperimentService {
         return Optional.of(persistAssignment(weightedRandom(experiment.getVariants(), user, experimentKey), user, experiment));
     }
 
+    /** The key of {@link #getVariant}'s variant, read inside its transaction (the variant may be a lazy proxy). */
+    @Transactional
+    public Optional<String> getVariantKey(UserAccount user, String experimentKey) {
+        return getVariant(user, experimentKey).map(ExperimentVariant::getKey);
+    }
+
     @Transactional
     public void track(UserAccount user, String experimentKey, String eventKey) {
         Optional<Experiment> opt = experimentRepository.findByKey(experimentKey);
@@ -98,7 +101,7 @@ public class ExperimentService {
         List<UserAccount> users = assignmentRepository.findAllByExperiment(experiment)
             .stream().map(ExperimentAssignment::getUser).toList();
         assignmentRepository.deleteAllByExperiment(experiment);
-        users.forEach(u -> self.getVariant(u, experiment.getKey()));
+        users.forEach(u -> getVariant(u, experiment.getKey()));
     }
 
     public List<ExperimentAssignment> getActiveAssignments(UserAccount user) {
@@ -119,18 +122,18 @@ public class ExperimentService {
     }
 
     /**
-     * Évalue le gate "rolled out" pour {@code experimentKey}, en déclenchant la
-     * création de l'assignation depuis un éventuel override admin si l'experiment
-     * est ACTIVE. Contrairement à {@link #isRolledOut}, lit pas seulement les
-     * assignations existantes.
+     * Evaluates the "rolled out" gate for {@code experimentKey}, triggering the
+     * creation of the assignment from a possible admin override if the experiment
+     * is ACTIVE. Unlike {@link #isRolledOut}, it does not only read the existing
+     * assignments.
      * <p>
-     * Encapsule l'accès au {@code variant.isControl} dans la même transaction
-     * que {@code getVariant} pour éviter les {@code LazyInitializationException}
-     * sur les proxys Hibernate côté caller.
+     * Wraps the access to {@code variant.isControl} in the same transaction
+     * as {@code getVariant} to avoid {@code LazyInitializationException}
+     * on the Hibernate proxies on the caller's side.
      */
     @Transactional
     public boolean evaluateGate(UserAccount user, String experimentKey) {
-        return self.getVariant(user, experimentKey)
+        return getVariant(user, experimentKey)
             .map(v -> !v.isControl())
             .orElse(false);
     }

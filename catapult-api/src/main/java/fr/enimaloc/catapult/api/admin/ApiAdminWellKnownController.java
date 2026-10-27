@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.admin;
 
+import fr.enimaloc.catapult.api.ApiPaths;
 import fr.enimaloc.catapult.common.dto.admin.IanaRegistryDto;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownFileDetailDto;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownFileDto;
@@ -11,15 +12,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
 /** The admin page's well-known files (served publicly through {@link fr.enimaloc.catapult.api.ApiWellKnownController}). */
 @RestController
-@RequestMapping("/api/admin/well-known")
-@PreAuthorize("hasRole('ADMIN') or hasIpAddress('127.0.0.1') or hasIpAddress('::1')")
+@RequestMapping(ApiPaths.ADMIN + "/well-known-files")
 @RequiredArgsConstructor
 public class ApiAdminWellKnownController {
     private final WellKnownFileService service;
@@ -40,7 +40,9 @@ public class ApiAdminWellKnownController {
     /** SchemaStore's JSON Schema for {@code path}, for the admin's generated form; 404 when there is none. */
     @GetMapping(value = "/schema", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<String> schema(@RequestParam String path) {
-        return schemas.schemaFor(path).map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
+        return schemas.schemaFor(path)
+                .map(ResponseEntity::ok)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No schema for this path"));
     }
 
     @GetMapping("/{id}")

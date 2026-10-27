@@ -23,7 +23,7 @@ public class MinecraftServiceAccount {
     @Column(nullable = false)
     private String minecraftUsername;
 
-    /** Refresh token MSA, chiffré via TokenEncryptionService. */
+    /** MSA refresh token, encrypted through TokenEncryptionService. */
     @Column(nullable = false, columnDefinition = "text")
     private String msaRefreshToken;
 

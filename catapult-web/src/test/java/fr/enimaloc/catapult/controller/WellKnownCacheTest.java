@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.MutableClock;
+import fr.enimaloc.catapult.cluster.InstanceBus;
 import fr.enimaloc.catapult.service.WellKnownContent;
 import org.junit.jupiter.api.Test;
 
@@ -13,7 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class WellKnownCacheTest {
 
     private final MutableClock clock = new MutableClock(Instant.parse("2026-10-16T00:00:00Z"));
-    private final WellKnownCache cache = new WellKnownCache(clock);
+    private final WellKnownCache cache = new WellKnownCache(clock, InstanceBus.local());
     private final AtomicInteger loads = new AtomicInteger();
 
     private WellKnownContent load(int status) {

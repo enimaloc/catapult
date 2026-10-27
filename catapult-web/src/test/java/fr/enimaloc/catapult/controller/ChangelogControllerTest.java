@@ -6,10 +6,12 @@ import fr.enimaloc.catapult.dto.changelog.ChangelogSection;
 import fr.enimaloc.catapult.dto.changelog.ChangelogSection.Entry;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
 import fr.enimaloc.catapult.service.ApiService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -29,7 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 @WebMvcTest(controllers = ChangelogController.class)
-@Import({ModelFiller.class, SiteMetaTags.class, WebSecurityConfig.class, TwitchatCatalogConfig.class, I18nConfiguration.class})
+@Import({ModelFiller.class, SiteMetaTags.class, LocalInstanceBusConfig.class, WebSecurityConfig.class, TwitchatCatalogConfig.class, I18nConfiguration.class})
 class ChangelogControllerTest {
     static final ChangelogSection[] SECTIONS = {
             new ChangelogSection("0.3.7", List.of(
@@ -40,8 +42,15 @@ class ChangelogControllerTest {
     };
 
     @Autowired MockMvc mvc;
+    @Autowired ChangelogController controller;
     @MockitoBean ApiService apiService;
     @MockitoBean NavEventStreamController navEvents;
+
+    // The controller keeps the versions for a few minutes: start every test with nothing kept, whatever ran before.
+    @BeforeEach
+    void forgetTheKeptVersions() {
+        ReflectionTestUtils.setField(controller, "cached", null);
+    }
 
     @Test
     void servesTheVersions_fullAndAsAFragment_byKind() throws Exception {
@@ -60,6 +69,20 @@ class ChangelogControllerTest {
             assertThat(html.indexOf("a feature")).isLessThan(html.indexOf("escaped")).isLessThan(html.indexOf("bump"));
         }
         assertThat(full).contains("<title>Changelog - ").contains("rel=\"canonical\"");
+    }
+
+    @Test
+    void anUnreleasedSection_isTitledInTheVisitorsLanguage() throws Exception {
+        when(apiService.changelog()).thenReturn(List.of(
+                new ChangelogSection(null, List.of(new Entry("u1", "feat", null, "soon", false)))));
+
+        String french = mvc.perform(get("/spa/changelog").locale(Locale.FRENCH)).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String english = mvc.perform(get("/spa/changelog").locale(Locale.ENGLISH)).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(french).contains("Dernières modifications").doesNotContain("null");
+        assertThat(english).contains("Latest changes").doesNotContain("null");
     }
 
     @Test

@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.feature.SeenFeatureRepository;
+import fr.enimaloc.catapult.service.account.SeenFeatureService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,6 +10,7 @@ import org.springframework.boot.thymeleaf.autoconfigure.ThymeleafAutoConfigurati
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -28,11 +30,15 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@Import(SeenFeatureService.class)
 @WebMvcTest(
         controllers = ApiSeenFeaturesController.class,
         excludeAutoConfiguration = ThymeleafAutoConfiguration.class,
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
 class ApiSeenFeaturesControllerTest {
+
+    private static final UUID SELF = UUID.randomUUID();
+    private static final String OWN = "/api/internal/users/" + SELF;
 
     @Autowired MockMvc mvc;
     @MockitoBean SeenFeatureRepository seenFeatureRepository;
@@ -51,14 +57,14 @@ class ApiSeenFeaturesControllerTest {
     void seen_listsTheViewersKeys() throws Exception {
         when(seenFeatureRepository.findFeatureKeysByUserId(userId)).thenReturn(List.of("channel.commands"));
 
-        mvc.perform(get("/api/me/seen-features").with(jwt().jwt(j -> j.subject(userId.toString()))))
+        mvc.perform(get(OWN + "/seen-features").with(jwt().jwt(j -> j.subject(userId.toString()))))
                 .andExpect(status().isOk())
                 .andExpect(content().json("[\"channel.commands\"]"));
     }
 
     @Test
     void markSeen_recordsTheKeyForTheViewer() throws Exception {
-        mvc.perform(put("/api/me/seen-features/channel.commands").with(csrf())
+        mvc.perform(put(OWN + "/seen-features/channel.commands").with(csrf())
                         .with(jwt().jwt(j -> j.subject(userId.toString()))))
                 .andExpect(status().isNoContent());
 
@@ -67,7 +73,7 @@ class ApiSeenFeaturesControllerTest {
 
     @Test
     void markSeen_refusesAKeyCatapultWebWouldNeverWrite() throws Exception {
-        mvc.perform(put("/api/me/seen-features/Not A Key").with(csrf())
+        mvc.perform(put(OWN + "/seen-features/Not A Key").with(csrf())
                         .with(jwt().jwt(j -> j.subject(userId.toString()))))
                 .andExpect(status().isBadRequest());
 

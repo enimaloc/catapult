@@ -1,142 +1,64 @@
 package fr.enimaloc.catapult.api.channel;
 
+import fr.enimaloc.catapult.api.ApiPaths;
 import fr.enimaloc.catapult.api.ApiUserResolver;
-import fr.enimaloc.catapult.common.dto.channel.DtddMappingCurrentDto;
-import fr.enimaloc.catapult.common.dto.channel.DtddMappingProposalDto;
-import fr.enimaloc.catapult.common.dto.channel.ProposeRequest;
+import fr.enimaloc.catapult.common.dto.channel.DtddProposalRequest;
 import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
-import fr.enimaloc.catapult.common.dto.channel.SearchResultDto;
 import fr.enimaloc.catapult.common.dto.channel.StatusResponse;
-import fr.enimaloc.catapult.common.dto.channel.ValidateRequest;
 import fr.enimaloc.catapult.domain.account.UserAccount;
-import fr.enimaloc.catapult.domain.dtdd.DtddGameCache;
-import fr.enimaloc.catapult.domain.dtdd.DtddGameMapping;
-import fr.enimaloc.catapult.domain.dtdd.DtddMappingProposal;
-import fr.enimaloc.catapult.domain.dtdd.DtddMappingProposal.Status;
-import fr.enimaloc.catapult.domain.dtdd.DtddSearchCache;
-import fr.enimaloc.catapult.getter.dtdd.DtddApiClient;
-import fr.enimaloc.catapult.getter.dtdd.DtddApiClient.DtddSearchResult;
-import fr.enimaloc.catapult.repository.dtdd.DtddGameCacheRepository;
-import fr.enimaloc.catapult.repository.dtdd.DtddGameMappingRepository;
-import fr.enimaloc.catapult.repository.dtdd.DtddMappingProposalRepository;
-import fr.enimaloc.catapult.repository.dtdd.DtddSearchCacheRepository;
-import fr.enimaloc.catapult.service.dtdd.DtddMappingEvents;
+import fr.enimaloc.catapult.security.Authz;
+import fr.enimaloc.catapult.service.dtdd.DtddGameSearchService;
+import fr.enimaloc.catapult.service.dtdd.DtddMappingProposalService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.time.Instant;
-import java.util.*;
+import java.util.List;
 
 @RestController
-@RequestMapping("/api/channel/dtdd-mapping")
 @RequiredArgsConstructor
 @ConditionalOnBooleanProperty("dtdd.enabled")
 public class ApiChannelDtddMappingController {
 
-    private final DtddGameMappingRepository mappingRepo;
-    private final DtddGameCacheRepository gameRepo;
-    private final DtddSearchCacheRepository searchRepo;
-    private final DtddMappingProposalRepository proposalRepo;
-    private final DtddApiClient apiClient;
-    private final DtddMappingEvents mappingEvents;
+    private final DtddMappingProposalService proposals;
+    private final DtddGameSearchService gameSearch;
     private final ApiUserResolver userResolver;
 
-    @GetMapping
-    public StatusResponse status(@RequestParam("igdbId") String igdbId,
-                                 @AuthenticationPrincipal Jwt jwt) {
+    @GetMapping(ApiPaths.INTERNAL + "/dtdd-mappings/{igdbId}")
+    public StatusResponse status(@PathVariable("igdbId") String igdbId,
+                                 @AuthenticationPrincipal Jwt jwt,
+                                 Authentication authentication,
+                                 HttpServletRequest request) {
         UserAccount user = jwt == null ? null : userResolver.viewer(jwt);
-        Optional<DtddGameMapping> mappingOpt = mappingRepo.findById(igdbId);
-        Optional<DtddMappingProposal> myProposal = user == null ? Optional.empty()
-            : proposalRepo.findFirstByProposerAndIgdbIdAndStatus(user, igdbId, Status.PENDING);
-        long otherPending = proposalRepo.countByIgdbIdAndStatus(igdbId, Status.PENDING);
-        boolean canValidate = mappingOpt.isPresent()
-            && !mappingOpt.get().isVerified()
-            && otherPending == 0;
-
-        DtddMappingCurrentDto current = mappingOpt.map(m -> {
-            String name = null;
-            if (m.getDtddId() != null) {
-                name = gameRepo.findById(m.getDtddId()).map(DtddGameCache::getName).orElse(null);
-            }
-            return new DtddMappingCurrentDto(m.getDtddId(), name, m.getConfidence(), m.isVerified());
-        }).orElse(null);
-
-        DtddMappingProposalDto pending = myProposal.map(p ->
-            new DtddMappingProposalDto(p.getId(), p.getProposedDtddId(), p.getReason())).orElse(null);
-        return new StatusResponse(current, pending, canValidate);
+        return proposals.status(igdbId, user, Authz.isAdmin(authentication, request));
     }
 
-    @PostMapping("/validate")
+    @PreAuthorize("@authz.isAdmin()")
+    @PostMapping(ApiPaths.ADMIN + "/dtdd-mappings/{igdbId}/validate")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @Transactional
-    public void validate(@RequestBody ValidateRequest body) {
-        DtddGameMapping mapping = mappingRepo.findById(body.igdbId())
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        if (mapping.isVerified()) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Mapping already verified");
-        }
-        if (proposalRepo.countByIgdbIdAndStatus(body.igdbId(), Status.PENDING) > 0) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Pending proposals exist");
-        }
-        mapping.setVerified(true);
-        mapping.setConfidence(1.0);
-        mappingRepo.save(mapping);
-        mappingEvents.mappingChanged(body.igdbId());
+    public void validate(@PathVariable("igdbId") String igdbId) {
+        proposals.validate(igdbId);
     }
 
-    @PostMapping("/propose")
+    @PostMapping(ApiPaths.INTERNAL + "/dtdd-mappings/{igdbId}/proposals")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @Transactional
-    public void propose(@RequestBody ProposeRequest body, @AuthenticationPrincipal Jwt jwt) {
-        UserAccount user = userResolver.viewer(jwt);
-        DtddMappingProposal p = new DtddMappingProposal();
-        p.setId(UUID.randomUUID());
-        p.setIgdbId(body.igdbId());
-        p.setProposedDtddId(body.dtddId());
-        p.setProposer(user);
-        p.setReason(body.reason());
-        p.setStatus(Status.PENDING);
-        p.setCreatedAt(Instant.now());
-        proposalRepo.save(p);
-        // A pending proposal is part of the mapping's state: nobody may validate it directly meanwhile
-        mappingEvents.mappingChanged(body.igdbId());
+    public void propose(@PathVariable("igdbId") String igdbId, @RequestBody DtddProposalRequest body,
+                        @AuthenticationPrincipal Jwt jwt) {
+        proposals.propose(igdbId, body, userResolver.viewer(jwt));
     }
 
-    @GetMapping("/search")
+    @GetMapping(ApiPaths.INTERNAL + "/dtdd-games")
     public SearchResponse search(@RequestParam("q") String q) {
         if (q == null || q.isBlank()) return new SearchResponse(List.of());
         if (q.length() > 200) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Query too long");
-
-        String norm = q.toLowerCase(Locale.ROOT).trim();
-        Map<Long, SearchResultDto> dedup = new LinkedHashMap<>();
-
-        for (DtddGameCache g : gameRepo.searchByNameLike(norm, PageRequest.of(0, 20))) {
-            dedup.put(g.getDtddId(),
-                new SearchResultDto(g.getDtddId(), g.getName(), g.getMediaType(), g.getPosterUrl()));
-        }
-
-        Optional<DtddSearchCache> sc = searchRepo.findById(norm);
-        if (sc.isEmpty()) {
-            apiClient.search(q).ifPresent(remote -> {
-                Instant now = Instant.now();
-                for (DtddSearchResult r : remote) {
-                    gameRepo.save(new DtddGameCache(r.dtddId(), r.name(), r.slug(), r.mediaType(), r.posterUrl(), now));
-                    dedup.putIfAbsent(r.dtddId(),
-                        new SearchResultDto(r.dtddId(), r.name(), r.mediaType(), r.posterUrl()));
-                }
-                searchRepo.save(new DtddSearchCache(norm,
-                    remote.stream().map(DtddSearchResult::dtddId).toList(), now));
-            });
-        }
-
-        return new SearchResponse(new ArrayList<>(dedup.values()));
+        return gameSearch.search(q);
     }
 
 }

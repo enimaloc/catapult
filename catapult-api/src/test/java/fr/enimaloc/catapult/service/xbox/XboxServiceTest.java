@@ -25,7 +25,7 @@ import static org.mockito.Mockito.verify;
 @MockitoSettings(strictness = Strictness.LENIENT)
 class XboxServiceTest {
 
-    // Jackson 3, comme les converters HTTP de Boot 4 : valide le contrat JSON réel
+    // Jackson 3, like Boot 4's HTTP converters: validates the real JSON contract
     private final JsonMapper mapper = JsonMapper.builder().build();
 
     @Mock private RestClient restClient;
@@ -39,7 +39,7 @@ class XboxServiceTest {
     void setupRestClientChain() {
         doReturn(postSpec).when(restClient).post();
         doReturn(bodySpec).when(postSpec).uri(any(URI.class));
-        // body(Object) : matcher explicite sinon Mockito choisit l'overload body(Class) -> NPE
+        // body(Object): explicit matcher, otherwise Mockito picks the body(Class) overload -> NPE
         doReturn(bodySpec).when(bodySpec).body(any(Object.class));
         doReturn(bodySpec).when(bodySpec).contentType(any(MediaType.class));
         doReturn(bodySpec).when(bodySpec).accept(any(MediaType.class));
@@ -87,7 +87,7 @@ class XboxServiceTest {
 
     @Test
     void xboxToken_deserializesFromRealXboxResponseShape() throws Exception {
-        // Forme documentée de la réponse user.auth.xboxlive.com : PascalCase sauf xui/uhs
+        // Documented shape of the user.auth.xboxlive.com response: PascalCase except xui/uhs
         var json = """
                 {
                   "IssueInstant": "2026-07-07T19:52:08.4463796Z",

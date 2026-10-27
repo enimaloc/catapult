@@ -49,7 +49,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = NavEventStreamController.class)
-@Import({WebSecurityConfig.class, InteractionMetrics.class, SimpleMeterRegistry.class, BroadcastState.class, DirectSse.class})
+@Import({WebSecurityConfig.class, InteractionMetrics.class, SimpleMeterRegistry.class, BroadcastState.class, DirectSse.class, LocalInstanceBusConfig.class})
 class NavEventStreamControllerTest {
 
     private static final ChannelDto OWN = new ChannelDto(UUID.randomUUID(), "1", "enimaloc", "img", false);
@@ -348,6 +348,14 @@ class NavEventStreamControllerTest {
         String sent = sent(memberStream(loggedIn(), UUID.randomUUID()));
 
         assertThat(sent).contains("event:Degraded").contains("\"degraded\":false");
+    }
+
+    @Test
+    void navStream_whenNoDegradedView_sendsNoDegradedEvent() throws Exception {
+        when(degradedState.current()).thenReturn(null);
+
+        assertThat(sent(anonymous("1.2.3.22"))).doesNotContain("event:Degraded");
+        assertThat(sent(memberStream(loggedIn(), UUID.randomUUID()))).doesNotContain("event:Degraded");
     }
 
     @Test

@@ -1,5 +1,11 @@
 package fr.enimaloc.catapult.service.binding;
 
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
+import fr.enimaloc.catapult.service.binding.StreamStateService;
+import fr.enimaloc.catapult.service.binding.RaidRestoreHold;
+import fr.enimaloc.catapult.service.category.CategoryApplier;
+import fr.enimaloc.catapult.service.category.CategoryChain;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.binding.GameMapping;
@@ -37,7 +43,10 @@ class BindingServiceMappingTest {
     private final TwResolverService twResolver = mock(TwResolverService.class);
     private final GameStateService gameState = mock(GameStateService.class);
     private final BindingService service =
-            new BindingService(bindings, igdb, igdbDetails, twitch, twResolver, gameState, mappings);
+            new BindingService(bindings, igdb, igdbDetails, twitch, twResolver, mappings,
+                    new GameBindingLookup(bindings), new CategoryChain(mock(CustomBindingActivations.class),
+                    mock(StreamStateService.class), mock(UserSettingsRepository.class), new RaidRestoreHold(),
+                    gameState, mock(UserAccountRepository.class), new CategoryApplier(twitch, mock(StreamStateService.class)), mock(RaidRestoreGateService.class), mock(GameBindingLookup.class)));
 
     private final DetectedGame cs2 = new DetectedGame("730", GameBinding.SourceType.STEAM, "Counter-Strike 2");
     private UserAccount user;

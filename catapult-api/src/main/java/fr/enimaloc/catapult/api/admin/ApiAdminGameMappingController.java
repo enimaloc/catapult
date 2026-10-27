@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.admin;
 
+import fr.enimaloc.catapult.api.ApiPaths;
 import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.common.dto.admin.DetectedGameDto;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingDto;
@@ -10,11 +11,9 @@ import fr.enimaloc.catapult.service.notification.AdminEventPublisher;
 import fr.enimaloc.catapult.service.twitch.TwitchCategory;
 import fr.enimaloc.catapult.service.twitch.TwitchCategoryService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
@@ -27,8 +26,7 @@ import java.util.UUID;
  * detected games still missing one, and the lookups of the mapping form (detected games, Twitch categories).
  */
 @RestController
-@RequestMapping("/api/admin/game-mappings")
-@PreAuthorize("hasRole('ADMIN') or hasIpAddress('127.0.0.1') or hasIpAddress('::1')")
+@RequestMapping(ApiPaths.ADMIN + "/game-mappings")
 @RequiredArgsConstructor
 public class ApiAdminGameMappingController {
 
@@ -36,8 +34,7 @@ public class ApiAdminGameMappingController {
     private final TwitchCategoryService categoryService;
     private final ApiUserResolver userResolver;
 
-    @Autowired(required = false)
-    private AdminEventPublisher events;
+    private final AdminEventPublisher events;
 
     /** The mappings, last changed first. */
     @GetMapping
@@ -50,7 +47,7 @@ public class ApiAdminGameMappingController {
     public ResponseEntity<GameMappingResult> create(@RequestBody(required = false) GameMappingRequest body,
                                                     @AuthenticationPrincipal Jwt jwt) {
         GameMappingResult result = service.create(body, userResolver.viewer(jwt));
-        if (events != null) events.gameMappingCreated(result.mapping());
+        events.gameMappingCreated(result.mapping());
         return ResponseEntity.status(HttpStatus.CREATED).body(result);
     }
 
@@ -58,14 +55,14 @@ public class ApiAdminGameMappingController {
     public GameMappingResult update(@PathVariable UUID id, @RequestBody(required = false) GameMappingRequest body,
                                     @AuthenticationPrincipal Jwt jwt) {
         GameMappingResult result = service.update(id, body, userResolver.viewer(jwt));
-        if (events != null) events.gameMappingUpdated(result.mapping());
+        events.gameMappingUpdated(result.mapping());
         return result;
     }
 
     @DeleteMapping("/{id}")
     public GameMappingResult delete(@PathVariable UUID id, @RequestParam(defaultValue = "false") boolean applyLive) {
         GameMappingResult result = service.delete(id, applyLive);
-        if (events != null) events.gameMappingDeleted(id.toString());
+        events.gameMappingDeleted(id.toString());
         return result;
     }
 

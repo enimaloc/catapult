@@ -19,6 +19,7 @@ import jakarta.persistence.UniqueConstraint;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -85,6 +86,8 @@ public class ChatCommandDefinition {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    // a channel's commands read their fallbacks in one query, not one per command
     @OneToMany(mappedBy = "command", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @BatchSize(size = 100)
     private Set<ChatCommandFallback> fallbacks = new HashSet<>();
 }

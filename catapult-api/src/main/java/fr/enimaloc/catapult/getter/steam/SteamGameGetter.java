@@ -11,7 +11,6 @@ import fr.enimaloc.catapult.service.debug.DebugRecording;
 import fr.enimaloc.catapult.service.steam.SteamStoreService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.stereotype.Component;
 
@@ -40,13 +39,7 @@ public class SteamGameGetter implements GameGetter {
 
     private volatile Map<String, Optional<SteamApiClient.PlayerSummary>> cycleCache = Map.of();
 
-    private DebugRecording debug = DebugRecording.OFF;
-
-    /** Records this class's grouped calls and incoming messages for the members in debug mode. */
-    @Autowired(required = false)
-    public void setDebugRecording(DebugRecording debug) {
-        this.debug = debug == null ? DebugRecording.OFF : debug;
-    }
+    private final DebugRecording debug;
 
     @Override
     public String name() {

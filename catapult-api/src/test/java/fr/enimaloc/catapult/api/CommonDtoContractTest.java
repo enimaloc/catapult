@@ -81,10 +81,11 @@ class CommonDtoContractTest {
                 List.of(member), org.springframework.data.domain.PageRequest.of(0, 50), 1));
         when(streams.isLive(member)).thenReturn(true);
         when(environment.getActiveProfiles()).thenReturn(new String[0]);
-        ApiAdminMembersController controller = new ApiAdminMembersController(accounts, streams,
-                mock(AccountService.class), mock(BotToggleService.class), mock(AdminMigrationService.class),
-                environment, mock(UserFlagRepository.class), mock(UserGroupRepository.class),
-                mock(fr.enimaloc.catapult.service.debug.MemberDebugService.class));
+        ApiAdminMembersController controller = new ApiAdminMembersController(
+                new fr.enimaloc.catapult.service.account.AdminMemberService(accounts, streams,
+                        mock(AccountService.class), mock(BotToggleService.class), mock(AdminMigrationService.class),
+                        environment, mock(UserFlagRepository.class), mock(UserGroupRepository.class),
+                        mock(fr.enimaloc.catapult.service.debug.MemberDebugService.class)));
 
         AdminMembersPage produced = controller.page(0, null);
         String json = JSON.writeValueAsString(produced);
@@ -112,9 +113,14 @@ class CommonDtoContractTest {
         proposal.setStatus(DtddMappingProposal.Status.PENDING);
         proposal.setCreatedAt(Instant.parse("2026-10-16T10:00:00Z"));
         when(proposals.findByStatusOrderByCreatedAtAsc(DtddMappingProposal.Status.PENDING)).thenReturn(List.of(proposal));
-        ApiAdminDtddMappingController controller = new ApiAdminDtddMappingController(proposals,
-                mock(DtddGameMappingRepository.class), mock(DtddTopicsCacheRepository.class),
-                mock(fr.enimaloc.catapult.service.dtdd.DtddMappingEvents.class), mock(ApiUserResolver.class));
+        ApiAdminDtddMappingController controller = new ApiAdminDtddMappingController(
+                new fr.enimaloc.catapult.service.dtdd.DtddMappingProposalService(
+                        mock(DtddGameMappingRepository.class),
+                        mock(fr.enimaloc.catapult.repository.dtdd.DtddGameCacheRepository.class), proposals,
+                        mock(DtddTopicsCacheRepository.class),
+                        mock(fr.enimaloc.catapult.service.dtdd.DtddMappingEvents.class),
+                        mock(fr.enimaloc.catapult.service.notification.AdminEventPublisher.class)),
+                mock(ApiUserResolver.class));
 
         List<DtddProposalDto> produced = controller.pending("PENDING");
         List<DtddProposalDto> read = JSON.readValue(JSON.writeValueAsString(produced), new TypeReference<>() {});
@@ -137,9 +143,11 @@ class CommonDtoContractTest {
         settings.setTwitchatBranch("beta");
         when(tokens.resolve(token)).thenReturn(Optional.of(owner));
         when(settingsRepository.findById(owner.getId())).thenReturn(Optional.of(settings));
-        ApiTwitchatWidgetController controller = new ApiTwitchatWidgetController(settingsRepository, tokens,
-                mock(TokenEncryptionService.class), mock(TwitchatActionExecutor.class),
-                mock(fr.enimaloc.catapult.service.notification.NotificationDeliveryDispatcher.class));
+        ApiTwitchatWidgetController controller = new ApiTwitchatWidgetController(
+                new fr.enimaloc.catapult.service.notification.TwitchatWidgetAccess(settingsRepository, tokens,
+                        mock(TokenEncryptionService.class),
+                        mock(fr.enimaloc.catapult.service.notification.NotificationDeliveryDispatcher.class)),
+                mock(TwitchatActionExecutor.class));
 
         ConfigResponse produced = controller.config(token).getBody();
 
@@ -164,9 +172,10 @@ class CommonDtoContractTest {
         when(experiments.findAll()).thenReturn(List.of(experiment));
         when(experiments.findById(experiment.getId())).thenReturn(Optional.of(experiment));
         when(overrides.findByExperimentOrderByPriorityAsc(experiment)).thenReturn(List.of());
-        ApiAdminExperimentsController controller = new ApiAdminExperimentsController(experiments,
+        ApiAdminExperimentsController controller = new ApiAdminExperimentsController(
+                new fr.enimaloc.catapult.service.experiment.ExperimentAdminService(experiments,
                 null, null, null, null, null, overrides, null, null, null, null, null,
-                mock(fr.enimaloc.catapult.service.experiment.ForcedMembers.class));
+                mock(fr.enimaloc.catapult.service.experiment.ForcedMembers.class)));
 
         List<ExperimentSummaryDto> summaries = controller.list();
         ExperimentSettingsDto settings = controller.settings(experiment.getId());
@@ -183,7 +192,12 @@ class CommonDtoContractTest {
         when(flags.findDistinctKeyValues()).thenReturn(List.of(
                 new Object[] {"beta", "on"}, new Object[] {"tester", null}));
 
-        List<FlagKeyDto> produced = new ApiAdminFlagsController(flags).list();
+        List<FlagKeyDto> produced = new ApiAdminFlagsController(
+                new fr.enimaloc.catapult.service.account.AdminMemberService(mock(UserAccountRepository.class),
+                        mock(StreamStateService.class), mock(AccountService.class), mock(BotToggleService.class),
+                        mock(AdminMigrationService.class), mock(Environment.class), flags,
+                        mock(UserGroupRepository.class),
+                        mock(fr.enimaloc.catapult.service.debug.MemberDebugService.class))).list();
 
         assertThat(JSON.readValue(JSON.writeValueAsString(produced), new TypeReference<List<FlagKeyDto>>() {}))
                 .containsExactly(new FlagKeyDto("beta", List.of("on")), new FlagKeyDto("tester", List.of()));
@@ -216,9 +230,10 @@ class CommonDtoContractTest {
                 new Object[] {control.getId(), 41L}));
         experiment.setVariants(new java.util.ArrayList<>(List.of(control)));
         when(overrides.findByExperimentOrderByPriorityAsc(experiment)).thenReturn(List.of());
-        ApiAdminExperimentsController controller = new ApiAdminExperimentsController(experiments,
+        ApiAdminExperimentsController controller = new ApiAdminExperimentsController(
+                new fr.enimaloc.catapult.service.experiment.ExperimentAdminService(experiments,
                 null, null, assignments, null, null, overrides, null, null, null, null, null,
-                mock(fr.enimaloc.catapult.service.experiment.ForcedMembers.class));
+                mock(fr.enimaloc.catapult.service.experiment.ForcedMembers.class)));
 
         ExperimentAssignmentsDto produced = controller.assignments(experiment.getId(), null, null, 0);
 

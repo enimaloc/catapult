@@ -4,9 +4,11 @@ import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig;
 import fr.enimaloc.catapult.service.notification.TwitchatWidgetSettingsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
@@ -22,12 +24,9 @@ public class ApiMeObsController {
 
     private final TwitchatWidgetSettingsService twitchatWidgetSettingsService;
 
-    @GetMapping("/api/me/obs")
-    public ResponseEntity<TwitchatWidgetConfig> obs(@AuthenticationPrincipal Jwt jwt) {
-        // No JWT on the unauthenticated localhost calls the security config lets through.
-        if (jwt == null) {
-            return ResponseEntity.noContent().build();
-        }
+    @PreAuthorize("@authz.isSelf(#userId)")
+    @GetMapping(ApiPaths.USER + "/obs")
+    public ResponseEntity<TwitchatWidgetConfig> obs(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt) {
         return twitchatWidgetSettingsService.enabledConfig(UUID.fromString(jwt.getSubject()))
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.noContent().build());

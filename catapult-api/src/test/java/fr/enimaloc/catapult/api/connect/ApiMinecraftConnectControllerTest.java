@@ -1,10 +1,13 @@
 package fr.enimaloc.catapult.api.connect;
 
+import fr.enimaloc.catapult.api.error.ApiProblem;
+import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.minecraft.MinecraftFriendLink;
 import fr.enimaloc.catapult.domain.minecraft.MinecraftServiceAccount;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.minecraft.MinecraftServiceAccountRepository;
+import fr.enimaloc.catapult.service.minecraft.MinecraftConnectService;
 import fr.enimaloc.catapult.service.minecraft.MinecraftFriendService;
 import fr.enimaloc.catapult.service.minecraft.MinecraftGateService;
 import fr.enimaloc.catapult.service.minecraft.MinecraftLinkStateService;
@@ -44,8 +47,9 @@ class ApiMinecraftConnectControllerTest {
 
     @BeforeEach
     void setup() {
-        controller = new ApiMinecraftConnectController(friendService, userAccountRepository, gateService,
-                new MinecraftLinkStateService(friendService, gateService, accountRepository), channelEventPublisher);
+        controller = new ApiMinecraftConnectController(new MinecraftConnectService(friendService, userAccountRepository,
+                gateService, new MinecraftLinkStateService(friendService, gateService, accountRepository),
+                channelEventPublisher));
         user = new UserAccount();
         UUID userId = UUID.randomUUID();
         when(jwt.getSubject()).thenReturn(userId.toString());
@@ -70,7 +74,7 @@ class ApiMinecraftConnectControllerTest {
     void get_noLink_returnsStatusNone() {
         when(friendService.getLink(user)).thenReturn(Optional.empty());
 
-        var response = controller.status(jwt);
+        var response = controller.status(UUID.randomUUID(), jwt);
 
         assertThat(response.status()).isEqualTo("NONE");
     }
@@ -79,7 +83,7 @@ class ApiMinecraftConnectControllerTest {
     void get_pendingLink_exposesServiceAccountUsername() {
         when(friendService.getLink(user)).thenReturn(Optional.of(link(MinecraftFriendLink.Status.PENDING)));
 
-        var response = controller.status(jwt);
+        var response = controller.status(UUID.randomUUID(), jwt);
 
         assertThat(response.status()).isEqualTo("PENDING");
         assertThat(response.minecraftName()).isEqualTo("jeb_");
@@ -90,7 +94,7 @@ class ApiMinecraftConnectControllerTest {
     void post_enrolls_andReturnsLinkState() {
         when(friendService.enroll(user, "jeb_")).thenReturn(link(MinecraftFriendLink.Status.PENDING));
 
-        var response = controller.enroll(jwt, Map.of("name", "jeb_"));
+        var response = controller.enroll(UUID.randomUUID(), jwt, Map.of("name", "jeb_"));
 
         assertThat(response.status()).isEqualTo("PENDING");
         verify(channelEventPublisher).minecraftLinkChanged(user.getId(), "PENDING", "jeb_");
@@ -98,7 +102,7 @@ class ApiMinecraftConnectControllerTest {
 
     @Test
     void delete_unenrolls_andTellsTheDashboards() {
-        controller.unenroll(jwt);
+        controller.unenroll(UUID.randomUUID(), jwt);
 
         verify(friendService).unenroll(user);
         verify(channelEventPublisher).minecraftLinkChanged(user.getId(), "NONE", null);
@@ -110,9 +114,10 @@ class ApiMinecraftConnectControllerTest {
                 new MinecraftFriendService.MinecraftEnrollmentException(
                         MinecraftFriendService.MinecraftEnrollmentException.Reason.UNKNOWN_PLAYER, "introuvable"));
 
-        assertThatThrownBy(() -> controller.enroll(jwt, Map.of("name", "nexistepas")))
+        assertThatThrownBy(() -> controller.enroll(UUID.randomUUID(), jwt, Map.of("name", "nexistepas")))
                 .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("404");
+                .hasMessageContaining("404")
+                .hasMessageContaining("Unknown Minecraft player");
     }
 
     @Test
@@ -121,16 +126,18 @@ class ApiMinecraftConnectControllerTest {
                 new MinecraftFriendService.MinecraftEnrollmentException(
                         MinecraftFriendService.MinecraftEnrollmentException.Reason.NO_CAPACITY, "plein"));
 
-        assertThatThrownBy(() -> controller.enroll(jwt, Map.of("name", "jeb_")))
+        assertThatThrownBy(() -> controller.enroll(UUID.randomUUID(), jwt, Map.of("name", "jeb_")))
                 .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("503");
+                .hasMessageContaining("503")
+                .hasMessageContaining("No Minecraft service account has room left, contact an administrator");
     }
 
     @Test
     void post_blankName_maps400() {
-        assertThatThrownBy(() -> controller.enroll(jwt, Map.of("name", "   ")))
+        assertThatThrownBy(() -> controller.enroll(UUID.randomUUID(), jwt, Map.of("name", "   ")))
                 .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("400");
+                .hasMessageContaining("400")
+                .hasMessageContaining("A Minecraft username is required");
     }
 
     @Test
@@ -139,14 +146,14 @@ class ApiMinecraftConnectControllerTest {
                 new MinecraftFriendService.MinecraftEnrollmentException(
                         MinecraftFriendService.MinecraftEnrollmentException.Reason.NO_ACCOUNT_AVAILABLE, "aucun"));
 
-        assertThatThrownBy(() -> controller.enroll(jwt, Map.of("name", "jeb_")))
+        assertThatThrownBy(() -> controller.enroll(UUID.randomUUID(), jwt, Map.of("name", "jeb_")))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("503");
     }
 
     @Test
     void delete_callsUnenroll() {
-        controller.unenroll(jwt);
+        controller.unenroll(UUID.randomUUID(), jwt);
 
         org.mockito.Mockito.verify(friendService).unenroll(user);
     }
@@ -156,7 +163,7 @@ class ApiMinecraftConnectControllerTest {
         when(accountRepository.countByEnabledTrue()).thenReturn(0L);
         when(friendService.getLink(user)).thenReturn(Optional.of(link(MinecraftFriendLink.Status.ACCEPTED)));
 
-        var response = controller.status(jwt);
+        var response = controller.status(UUID.randomUUID(), jwt);
 
         assertThat(response.status()).isEqualTo("UNAVAILABLE");
     }
@@ -166,7 +173,7 @@ class ApiMinecraftConnectControllerTest {
         when(accountRepository.countByEnabledTrueAndFriendLimitReachedFalse()).thenReturn(0L);
         when(friendService.getLink(user)).thenReturn(Optional.empty());
 
-        var response = controller.status(jwt);
+        var response = controller.status(UUID.randomUUID(), jwt);
 
         assertThat(response.status()).isEqualTo("FULL");
     }
@@ -176,7 +183,7 @@ class ApiMinecraftConnectControllerTest {
         when(accountRepository.countByEnabledTrueAndFriendLimitReachedFalse()).thenReturn(0L);
         when(friendService.getLink(user)).thenReturn(Optional.of(link(MinecraftFriendLink.Status.ACCEPTED)));
 
-        var response = controller.status(jwt);
+        var response = controller.status(UUID.randomUUID(), jwt);
 
         assertThat(response.status()).isEqualTo("ACCEPTED");
     }
@@ -185,7 +192,7 @@ class ApiMinecraftConnectControllerTest {
     void get_inviteRejectedLink_exposesStatusAndServiceAccountUsername() {
         when(friendService.getLink(user)).thenReturn(Optional.of(link(MinecraftFriendLink.Status.INVITE_REJECTED)));
 
-        var response = controller.status(jwt);
+        var response = controller.status(UUID.randomUUID(), jwt);
 
         assertThat(response.status()).isEqualTo("INVITE_REJECTED");
         assertThat(response.serviceAccountUsername()).isEqualTo("CatapultBot1");
@@ -195,7 +202,7 @@ class ApiMinecraftConnectControllerTest {
     void get_gateClosed_returnsUnavailable() {
         when(gateService.isAvailableFor(user)).thenReturn(false);
 
-        var response = controller.status(jwt);
+        var response = controller.status(UUID.randomUUID(), jwt);
 
         assertThat(response.status()).isEqualTo("UNAVAILABLE");
         org.mockito.Mockito.verifyNoInteractions(friendService);
@@ -205,26 +212,26 @@ class ApiMinecraftConnectControllerTest {
     void post_gateClosed_maps403() {
         when(gateService.isAvailableFor(user)).thenReturn(false);
 
-        assertThatThrownBy(() -> controller.enroll(jwt, Map.of("name", "jeb_")))
-                .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("403");
+        assertThatThrownBy(() -> controller.enroll(UUID.randomUUID(), jwt, Map.of("name", "jeb_")))
+                .isInstanceOfSatisfying(ApiProblem.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.FEATURE_DISABLED))
+                .hasMessageContaining("Minecraft is not available for this account");
     }
 
     @Test
     void sync_gateClosed_maps403() {
         when(gateService.isAvailableFor(user)).thenReturn(false);
 
-        assertThatThrownBy(() -> controller.syncNow(jwt))
-                .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("403");
+        assertThatThrownBy(() -> controller.syncNow(UUID.randomUUID(), jwt))
+                .isInstanceOfSatisfying(ApiProblem.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.FEATURE_DISABLED))
+                .hasMessageContaining("Minecraft is not available for this account");
     }
 
     @Test
     void delete_gateClosed_maps403() {
         when(gateService.isAvailableFor(user)).thenReturn(false);
 
-        assertThatThrownBy(() -> controller.unenroll(jwt))
-                .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("403");
+        assertThatThrownBy(() -> controller.unenroll(UUID.randomUUID(), jwt))
+                .isInstanceOfSatisfying(ApiProblem.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.FEATURE_DISABLED))
+                .hasMessageContaining("Minecraft is not available for this account");
     }
 }

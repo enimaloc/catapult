@@ -12,6 +12,7 @@ import fr.enimaloc.catapult.event.NotificationReadEvent;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.notification.NotificationRecipientRepository;
 import fr.enimaloc.catapult.repository.notification.NotificationRepository;
+import fr.enimaloc.catapult.service.metrics.CatapultApiMetrics;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -43,13 +44,14 @@ class NotificationServiceTest {
     @Mock ApplicationEventPublisher publisher;
     @Mock NotificationRenderer renderer;
     @Mock NotificationDeliveryService deliveries;
+    @Mock CatapultApiMetrics apiMetrics;
 
     NotificationService service;
     UserAccount admin;
 
     @BeforeEach
     void setUp() {
-        service = new NotificationService(notifRepo, recipientRepo, userRepo, renderer, publisher, deliveries);
+        service = new NotificationService(notifRepo, recipientRepo, userRepo, renderer, publisher, deliveries, apiMetrics);
         admin = new UserAccount();
         admin.setId(UUID.randomUUID());
         lenient().when(renderer.render(any())).thenAnswer(inv -> "<p>" + inv.getArgument(0) + "</p>");

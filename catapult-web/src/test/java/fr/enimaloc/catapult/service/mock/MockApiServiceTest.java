@@ -86,7 +86,7 @@ class MockApiServiceTest {
     void deleteAccount_onlyWhenTheNameMatches_ignoringCase() {
         assertThat(service.accountInfo().status()).isEqualTo("ACTIVE");
 
-        assertThat(service.deleteAccount(username, "WRONG")).isEqualTo(204);
+        assertThat(service.deleteAccount(username, "WRONG")).isEqualTo(400);
         assertThat(service.accountInfo().status()).isEqualTo("ACTIVE");
 
         assertThat(service.deleteAccount(username, username.toUpperCase())).isEqualTo(204);
@@ -894,5 +894,94 @@ class MockApiServiceTest {
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(new MockHttpServletRequest()));
 
         assertThat(service.myDebugActive()).isFalse();
+    }
+
+    private static fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest customBinding(String name) {
+        return new fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest(name, "509660", "Art", Set.of("Violence"), Set.of(), false);
+    }
+
+    @Test
+    void customBindings_startWithArtActiveAndDeveloppement_andShowOnTheOwnersPage() {
+        var state = service.customBindings(username);
+
+        assertThat(state.enabled()).isTrue();
+        assertThat(state.bindings()).extracting(b -> b.name()).containsExactly("Art", "Développement");
+        assertThat(state.activeId()).isEqualTo(state.bindings().get(0).id());
+        assertThat(state.activatedAt()).isNotNull();
+        assertThat(service.channelPage(username, 0, null, null).customBindings()).isEqualTo(state);
+    }
+
+    @Test
+    void customBindings_createValidatesLikeCatapultApi_andTellsThePage() {
+        events.clear();
+        var created = service.createCustomBinding(username, customBinding("  Musique "));
+        assertThat(created.status()).isEqualTo(201);
+        assertThat(created.body().name()).isEqualTo("Musique");
+        assertThat(events).contains(new fr.enimaloc.catapult.event.binding.CustomBindingsUpdatedEvent(username));
+
+        assertThat(service.createCustomBinding(username, customBinding("musique")).code()).isEqualTo(fr.enimaloc.catapult.common.error.ErrorCode.NAME_TAKEN);
+        assertThat(service.createCustomBinding(username, customBinding("   ")).code()).isEqualTo(fr.enimaloc.catapult.common.error.ErrorCode.INVALID);
+        assertThat(service.createCustomBinding(username, customBinding("x".repeat(41))).status()).isEqualTo(400);
+        assertThat(service.createCustomBinding(username, new fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest(
+                "No category", null, null, Set.of(), Set.of(), false)).status()).isEqualTo(400);
+        for (int i = 0; i < 17; i++) assertThat(service.createCustomBinding(username, customBinding("n" + i)).status()).isEqualTo(201);
+        assertThat(service.customBindings(username).bindings()).hasSize(20);
+        assertThat(service.createCustomBinding(username, customBinding("one more")).code()).isEqualTo(fr.enimaloc.catapult.common.error.ErrorCode.LIMIT_REACHED);
+    }
+
+    @Test
+    void customBindings_updateReappliesTheActiveOneOnly() {
+        var state = service.customBindings(username);
+        var art = state.bindings().get(0);
+        var dev = state.bindings().get(1);
+
+        var active = service.updateCustomBinding(username, art.id(), customBinding("Art 2"));
+        assertThat(active.status()).isEqualTo(200);
+        assertThat(active.body().binding().name()).isEqualTo("Art 2");
+        assertThat(active.body().reapplyOutcome()).isEqualTo("applied");
+
+        assertThat(service.updateCustomBinding(username, dev.id(), customBinding("Dev 2")).body().reapplyOutcome()).isNull();
+        assertThat(service.updateCustomBinding(username, UUID.randomUUID(), customBinding("Nope")).status()).isEqualTo(404);
+        assertThat(service.updateCustomBinding(username, dev.id(), customBinding("art 2")).code()).isEqualTo(fr.enimaloc.catapult.common.error.ErrorCode.NAME_TAKEN);
+    }
+
+    @Test
+    void customBindings_activateReplaces_deactivateAndDeleteClearIt() {
+        var dev = service.customBindings(username).bindings().get(1);
+        events.clear();
+
+        assertThat(service.activateCustomBinding(username, dev.id())).isEqualTo(fr.enimaloc.catapult.service.ActivationOutcome.APPLIED);
+        assertThat(service.customBindings(username).activeId()).isEqualTo(dev.id());
+        assertThat(events).contains(new fr.enimaloc.catapult.event.binding.CustomBindingChangedEvent(username, dev.id().toString()));
+        assertThat(service.activateCustomBinding(username, UUID.randomUUID())).isEqualTo(fr.enimaloc.catapult.service.ActivationOutcome.NOT_FOUND);
+
+        // Deleting the active one deactivates it first.
+        assertThat(service.deleteCustomBinding(username, dev.id())).isEqualTo(204);
+        assertThat(service.customBindings(username).activeId()).isNull();
+        assertThat(service.customBindings(username).bindings()).hasSize(1);
+        assertThat(events).contains(new fr.enimaloc.catapult.event.binding.CustomBindingChangedEvent(username, null),
+                new fr.enimaloc.catapult.event.binding.CustomBindingsUpdatedEvent(username));
+        assertThat(service.deleteCustomBinding(username, dev.id())).isEqualTo(404);
+
+        var art = service.customBindings(username).bindings().get(0);
+        service.activateCustomBinding(username, art.id());
+        assertThat(service.deactivateCustomBinding(username)).isEqualTo(204);
+        assertThat(service.customBindings(username).activeId()).isNull();
+    }
+
+    @Test
+    void apiToken_isShownOnceAtGeneration_andReplacedOrRevoked() {
+        assertThat(service.apiTokenStatus().exists()).isFalse();
+
+        var first = service.regenerateApiToken();
+        assertThat(first.status()).isEqualTo(200);
+        assertThat(first.body().token()).startsWith("cat_");
+        assertThat(service.apiTokenStatus().exists()).isTrue();
+        assertThat(service.apiTokenStatus().createdAt()).isNotNull();
+
+        assertThat(service.regenerateApiToken().body().token()).isNotEqualTo(first.body().token());
+
+        assertThat(service.revokeApiToken()).isEqualTo(204);
+        assertThat(service.apiTokenStatus().exists()).isFalse();
     }
 }

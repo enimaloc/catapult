@@ -7,6 +7,8 @@ import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
 import fr.enimaloc.catapult.common.dto.channel.StatusData;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.security.Authz;
+import fr.enimaloc.catapult.security.MethodSecurityConfig;
 import fr.enimaloc.catapult.service.ActivityLogService;
 import fr.enimaloc.catapult.service.account.ChannelAccessService;
 import fr.enimaloc.catapult.service.connections.ConnectionEventService;
@@ -45,7 +47,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         controllers = ApiChannelDataController.class,
         excludeAutoConfiguration = ThymeleafAutoConfiguration.class,
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
-@Import(ApiUserResolver.class)
+@Import({ApiUserResolver.class, MethodSecurityConfig.class, Authz.class})
 class ApiChannelDataControllerTest {
 
     @Autowired MockMvc mvc;
@@ -68,8 +70,25 @@ class ApiChannelDataControllerTest {
     }
 
     private static RequestPostProcessor as(UserAccount account) {
+        return as(account, "ROLE_USER");
+    }
+
+    private static RequestPostProcessor as(UserAccount account, String role) {
         return jwt().jwt(j -> j.subject(account.getId().toString()))
-                .authorities(new SimpleGrantedAuthority("ROLE_USER"));
+                .authorities(new SimpleGrantedAuthority(role));
+    }
+
+    /** A request that is not from the loopback interface (MockMvc's default remote address is 127.0.0.1). */
+    private static RequestPostProcessor from(String remoteAddr) {
+        return request -> {
+            request.setRemoteAddr(remoteAddr);
+            return request;
+        };
+    }
+
+    /** {@code path} under the owner's channel routes. */
+    private String channel(String path) {
+        return "/api/internal/users/" + owner.getId() + path;
     }
 
     @BeforeEach
@@ -79,16 +98,15 @@ class ApiChannelDataControllerTest {
         for (UserAccount account : List.of(owner, moderator)) {
             when(userAccountRepository.findById(account.getId())).thenReturn(Optional.of(account));
         }
-        when(userAccountRepository.findByTwitchUsername("streamer")).thenReturn(Optional.of(owner));
-        when(channelAccessService.canAccess(any(), any())).thenReturn(true);
+        when(channelAccessService.canAccess(any(UserAccount.class), any(UserAccount.class))).thenReturn(true);
     }
 
     @Test
-    void status_delegatesWithThePathUsername() throws Exception {
+    void status_delegatesWithTheChannelsUsername() throws Exception {
         when(dashboard.status(moderator, owner, "streamer"))
                 .thenReturn(new StatusData("streamer", false, true, true, null));
 
-        mvc.perform(get("/api/channels/streamer/status").with(as(moderator)))
+        mvc.perform(get(channel("/status")).with(as(moderator)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.channelUsername").value("streamer"))
                 .andExpect(jsonPath("$.isLive").value(true));
@@ -96,7 +114,7 @@ class ApiChannelDataControllerTest {
 
     @Test
     void page_passesPagingAndFilters() throws Exception {
-        mvc.perform(get("/api/channels/streamer").param("page", "3").param("status", "AUTO").with(as(owner)))
+        mvc.perform(get(channel("/dashboard")).param("page", "3").param("status", "AUTO").with(as(owner)))
                 .andExpect(status().isOk());
 
         verify(dashboard).page(owner, owner, "streamer", 3, "AUTO", null);
@@ -104,17 +122,26 @@ class ApiChannelDataControllerTest {
 
     @Test
     void settings() throws Exception {
-        mvc.perform(get("/api/channels/streamer/settings").with(as(moderator))).andExpect(status().isOk());
+        mvc.perform(get(channel("/settings")).with(as(moderator))).andExpect(status().isOk());
 
         verify(dashboard).settings(owner);
     }
 
     @Test
     void dtddMapping() throws Exception {
-        when(dashboard.dtddMapping(moderator, owner)).thenReturn(new DtddMappingStatusDto(null, null, true, "42"));
+        when(dashboard.dtddMapping(moderator, owner, false)).thenReturn(new DtddMappingStatusDto(null, null, false, "42"));
+        when(dashboard.dtddMapping(moderator, owner, true)).thenReturn(new DtddMappingStatusDto(null, null, true, "42"));
 
-        mvc.perform(get("/api/channels/streamer/dtdd-mapping").with(as(moderator)))
+        mvc.perform(get(channel("/dtdd-mapping")).with(as(moderator)).with(from("203.0.113.7")))
                 .andExpect(jsonPath("$.igdbId").value("42"))
+                .andExpect(jsonPath("$.canValidateDirectly").value(false));
+    }
+
+    @Test
+    void dtddMapping_anAdminViewerMayValidate() throws Exception {
+        when(dashboard.dtddMapping(moderator, owner, true)).thenReturn(new DtddMappingStatusDto(null, null, true, "42"));
+
+        mvc.perform(get(channel("/dtdd-mapping")).with(as(moderator, "ROLE_ADMIN")).with(from("203.0.113.7")))
                 .andExpect(jsonPath("$.canValidateDirectly").value(true));
     }
 
@@ -123,13 +150,13 @@ class ApiChannelDataControllerTest {
         BindingDto binding = new BindingDto("b1", "AUTO", "STEAM", "Valheim", "1", "Valheim",
                 false, true, Set.of("Gore"), true, false, Set.of());
         when(dashboard.currentBinding(owner)).thenReturn(Optional.of(binding));
-        mvc.perform(get("/api/channels/streamer/bindings/current").with(as(moderator)))
+        mvc.perform(get(channel("/bindings/current")).with(as(moderator)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("b1"))
                 .andExpect(jsonPath("$.ccls[0]").value("Gore"));
 
         when(dashboard.currentBinding(owner)).thenReturn(Optional.empty());
-        mvc.perform(get("/api/channels/streamer/bindings/current").with(as(moderator)))
+        mvc.perform(get(channel("/bindings/current")).with(as(moderator)))
                 .andExpect(status().isNoContent());
     }
 
@@ -137,13 +164,13 @@ class ApiChannelDataControllerTest {
     void searchGames_asksTwitchAsTheViewer() throws Exception {
         when(twitchService.searchCategories(moderator, "doom")).thenReturn(List.of(new TwitchCategory("1", "Doom", null)));
 
-        mvc.perform(get("/api/channels/streamer/games/search").param("q", "doom").with(as(moderator)))
+        mvc.perform(get(channel("/games")).param("q", "doom").with(as(moderator)))
                 .andExpect(jsonPath("$[0].name").value("Doom"));
     }
 
     @Test
     void searchGames_blankQueryReturnsNothing() throws Exception {
-        mvc.perform(get("/api/channels/streamer/games/search").with(as(moderator)))
+        mvc.perform(get(channel("/games")).with(as(moderator)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isEmpty());
 
@@ -152,11 +179,11 @@ class ApiChannelDataControllerTest {
 
     @Test
     void refreshProfileCache_isOwnerOnly() throws Exception {
-        mvc.perform(post("/api/channels/streamer/steam/refresh-profile-cache").with(as(owner)).with(csrf()))
+        mvc.perform(post(channel("/steam-profile/refresh")).with(as(owner)).with(csrf()))
                 .andExpect(status().isNoContent());
         verify(dashboard).refreshSteamProfileCache(owner);
 
-        mvc.perform(post("/api/channels/streamer/steam/refresh-profile-cache").with(as(moderator)).with(csrf()))
+        mvc.perform(post(channel("/steam-profile/refresh")).with(as(moderator)).with(csrf()))
                 .andExpect(status().isForbidden());
     }
 
@@ -165,8 +192,8 @@ class ApiChannelDataControllerTest {
         when(activityLogService.subscribe(owner.getId())).thenReturn(new SseEmitter());
         when(connectionEventService.subscribe(owner.getId())).thenReturn(new SseEmitter());
 
-        mvc.perform(get("/api/channels/streamer/logs").with(as(moderator))).andExpect(status().isOk());
-        mvc.perform(get("/api/channels/streamer/connections").with(as(moderator))).andExpect(status().isOk());
+        mvc.perform(get(channel("/logs")).with(as(moderator))).andExpect(status().isOk());
+        mvc.perform(get(channel("/connections")).with(as(moderator))).andExpect(status().isOk());
 
         verify(activityLogService).subscribe(owner.getId());
         verify(connectionEventService).subscribe(owner.getId());
@@ -176,19 +203,19 @@ class ApiChannelDataControllerTest {
     void inaccessibleChannel_isForbidden() throws Exception {
         when(channelAccessService.canAccess(moderator, owner)).thenReturn(false);
 
-        for (String path : List.of("", "/status", "/settings", "/dtdd-mapping", "/bindings/current", "/games/search", "/logs")) {
-            mvc.perform(get("/api/channels/streamer" + path).with(as(moderator))).andExpect(status().isForbidden());
+        for (String path : List.of("/dashboard", "/status", "/settings", "/dtdd-mapping", "/bindings/current", "/games", "/logs")) {
+            mvc.perform(get(channel(path)).with(as(moderator))).andExpect(status().isForbidden());
         }
         verifyNoInteractions(dashboard);
     }
 
     @Test
     void unknownChannel_isNotFound() throws Exception {
-        mvc.perform(get("/api/channels/nobody").with(as(owner))).andExpect(status().isNotFound());
+        mvc.perform(get("/api/internal/users/{userId}/dashboard", UUID.randomUUID()).with(as(owner))).andExpect(status().isNotFound());
     }
 
     @Test
     void unknownCaller_isUnauthorized() throws Exception {
-        mvc.perform(get("/api/channels/streamer").with(as(account("ghost")))).andExpect(status().isUnauthorized());
+        mvc.perform(get(channel("/dashboard")).with(as(account("ghost")))).andExpect(status().isUnauthorized());
     }
 }

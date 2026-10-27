@@ -3,28 +3,26 @@ package fr.enimaloc.catapult.service.binding;
 import fr.enimaloc.catapult.service.debug.DebugContext;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.account.UserSettings;
-import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.event.ChannelRaidedOutEvent;
-import fr.enimaloc.catapult.getter.DetectedGame;
-import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
-import fr.enimaloc.catapult.service.twitch.TwitchService;
+import fr.enimaloc.catapult.service.category.CategoryApplier;
+import fr.enimaloc.catapult.service.category.CategoryChain;
+import fr.enimaloc.catapult.service.category.CategoryDecision;
+import fr.enimaloc.catapult.service.category.CategoryOutcome;
+import fr.enimaloc.catapult.service.category.CategoryRule;
+import fr.enimaloc.catapult.service.category.CategoryTrigger.RaidedOut;
+import fr.enimaloc.catapult.service.twitch.ChannelUpdateOutcome;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
-
-import java.time.Duration;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * A streamer who closes their game gets the "no game" category; raiding out minutes later would then
  * leave from it. With the channel's {@link UserSettings#getRaidRestoreGameMinutes() delay} set (and the
  * {@value RaidRestoreGateService#EXPERIMENT_KEY} gate on), an outgoing raid puts the game detected within
  * that delay back (unless the channel is already on it), and the "no game" fallback then holds off until the
- * stream ends or a new game is detected, so a later detection doesn't undo it.
+ * stream ends or a new game is detected ({@link RaidRestoreHold}), so a later detection doesn't undo it. A restore
+ * Twitch did not apply (refused, skipped, or an error) releases the hold at once.
  */
 @Slf4j
 @Service
@@ -34,14 +32,9 @@ public class RaidRestoreGameService {
     public static final int MIN_MINUTES = 1;
     public static final int MAX_MINUTES = 120;
 
-    private final UserSettingsRepository userSettingsRepository;
-    private final RaidRestoreGateService gate;
-    private final GameStateService gameStateService;
-    private final BindingService bindingService;
-    private final TwitchService twitchService;
-
-    /** Channels whose game a raid put back: no "no game" fallback for them until released. In memory, like the game state. */
-    private final Set<UUID> holdingNoGameFallback = ConcurrentHashMap.newKeySet();
+    private final CategoryChain categoryChain;
+    private final CategoryApplier categoryApplier;
+    private final RaidRestoreHold raidRestoreHold;
 
     @EventListener
     public void onRaidedOut(ChannelRaidedOutEvent event) {
@@ -50,46 +43,30 @@ public class RaidRestoreGameService {
 
     private void restore(ChannelRaidedOutEvent event) {
         UserAccount user = event.getUser();
-        Integer minutes = userSettingsRepository.findById(user.getId())
-                .map(UserSettings::getRaidRestoreGameMinutes)
-                .filter(m -> m >= MIN_MINUTES)
-                .orElse(null);
-        if (minutes == null || !gate.isAvailableReadOnly(user)) return;
-
-        Optional<DetectedGame> recent = gameStateService.recentlyDetectedGame(user, Duration.ofMinutes(minutes));
-        Optional<GameBinding> binding = recent
-                .flatMap(game -> bindingService.findBinding(user, game))
-                .filter(b -> !b.isIgnored() && b.getStatus() != GameBinding.Status.INCOMPLETE)
-                .filter(b -> b.getTwitchGameId() != null && !b.getTwitchGameId().isBlank());
-        if (binding.isEmpty()) {
-            log.debug("Raid by user {}: no game detected within {} min to put back", user.getId(), minutes);
-            return;
+        CategoryDecision decision = categoryChain.decide(user, new RaidedOut(event.getCurrentCategoryId()));
+        if (decision.rule() == CategoryRule.RAID_RESTORE
+                && (decision.reason() == CategoryOutcome.Reason.NONE
+                || decision.reason() == CategoryOutcome.Reason.ALREADY_ON_CATEGORY)) {
+            // Held first, so a detection tick running meanwhile can't put the "no game" category back after us;
+            // also when already on the game, which may still be closed before the stream ends.
+            raidRestoreHold.hold(user);
         }
-        // Held first, so a detection tick running meanwhile can't put the "no game" category back after us;
-        // also when already on the game, which may still be closed before the stream ends.
-        holdingNoGameFallback.add(user.getId());
-        if (binding.get().getTwitchGameId().equals(event.getCurrentCategoryId())) {
-            log.debug("Raid by user {}: already on {}", user.getId(), binding.get().getTwitchGameName());
-            return;
+        if (decision.action() == CategoryDecision.Action.UPDATE_CHANNEL) {
+            log.info("Raid by user {}: putting {} back as the category", user.getId(),
+                    decision.binding().getTwitchGameName());
         }
-        log.info("Raid by user {}: putting {} back as the category", user.getId(), binding.get().getTwitchGameName());
-        try {
-            // updateChannel records Catapult's own change, so the channel.update isn't taken for a manual one
-            twitchService.updateChannel(user, binding.get());
-        } catch (RuntimeException e) {
-            holdingNoGameFallback.remove(user.getId());
+        // Applying records Catapult's own change, so the channel.update isn't taken for a manual one
+        CategoryOutcome outcome = categoryApplier.apply(user, decision);
+        if (outcome.error() != null) {
+            raidRestoreHold.release(user);
             log.warn("Raid by user {}: could not put {} back: {}", user.getId(),
-                    binding.get().getTwitchGameName(), e.getMessage());
+                    decision.binding().getTwitchGameName(), outcome.error().getMessage());
+        } else if (decision.action() == CategoryDecision.Action.UPDATE_CHANNEL
+                && outcome.status() != ChannelUpdateOutcome.APPLIED) {
+            // Twitch refused or skipped it: the game is not back, so the "no game" fallback must not stay off
+            raidRestoreHold.release(user);
+            log.info("Raid by user {}: {} not put back ({})", user.getId(),
+                    decision.binding().getTwitchGameName(), outcome.status());
         }
-    }
-
-    /** True while a raid's restored game must not be replaced by the "no game" category. */
-    public boolean isHoldingNoGameFallback(UserAccount user) {
-        return holdingNoGameFallback.contains(user.getId());
-    }
-
-    /** Ends the hold: the stream ended or a new game was detected. */
-    public void releaseHold(UserAccount user) {
-        holdingNoGameFallback.remove(user.getId());
     }
 }

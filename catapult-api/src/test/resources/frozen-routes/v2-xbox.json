@@ -1,0 +1,8 @@
+{
+  "status" : 200,
+  "headers" : {
+    "Cache-Control" : [ "no-cache, no-store, max-age=0, must-revalidate" ],
+    "Content-Type" : [ "application/json" ]
+  },
+  "body" : "{\"title\":\"Frozen Product\",\"description\":\"A test product\",\"publisherName\":\"Frozen Publisher\",\"developerName\":\"Frozen Developer\",\"publisherAddress\":null,\"publisherWebsiteUri\":null,\"supportUri\":null,\"supportPhone\":null,\"lastModifiedDate\":\"2026-01-01T00:00:00Z\",\"images\":[{\"uri\":\"https://example.test/box.png\",\"imagePurpose\":\"boxart\",\"width\":10,\"height\":10,\"caption\":null}],\"videos\":[],\"franchises\":[],\"gamePassAffirmations\":[],\"storeUrl\":\"https://www.xbox.com/games/store/frozen/9NBLGGH2JHXJ\"}"
+}

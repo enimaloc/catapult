@@ -89,7 +89,9 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
     testImplementation("org.testcontainers:testcontainers-junit-jupiter")
+    testImplementation("org.testcontainers:testcontainers-postgresql")
     testImplementation("com.squareup.okhttp3:mockwebserver:5.4.0")
+    testImplementation("net.ttddyy:datasource-proxy:1.11.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
@@ -112,6 +114,30 @@ tasks.processResources {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+}
+
+tasks.test {
+    // EnglishConventionsTest has its own task: it reads the sibling modules' sources
+    filter.excludeTestsMatching("*EnglishConventionsTest")
+}
+
+// EnglishConventionsTest reads the sibling modules' sources: only this task reruns when they change
+val englishConventions = tasks.register<Test>("englishConventions") {
+    description = "Checks that the code, comments, logs and test names of every module are written in English."
+    group = "verification"
+    val testSourceSet = sourceSets.test.get()
+    testClassesDirs = testSourceSet.output.classesDirs
+    classpath = testSourceSet.runtimeClasspath
+    filter.includeTestsMatching("*EnglishConventionsTest")
+    listOf("catapult-common", "catapult-web").forEach { module ->
+        inputs.dir(rootProject.file("$module/src"))
+            .withPropertyName("${module}Sources")
+            .withPathSensitivity(PathSensitivity.RELATIVE)
+    }
+}
+
+tasks.check {
+    dependsOn(englishConventions)
 }
 
 springBoot {

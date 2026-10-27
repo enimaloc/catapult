@@ -40,7 +40,7 @@ class ApiWellKnownControllerTest {
         f.setContent("");
         when(service.find(WELL_KNOWN, "change-password")).thenReturn(Optional.of(f));
 
-        mvc.perform(get("/api/well-known/serve").param("location", "WELL_KNOWN").param("path", "change-password"))
+        mvc.perform(get("/api/internal/well-known-files").param("location", "WELL_KNOWN").param("path", "change-password"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value(302))
                 .andExpect(jsonPath("$.contentType").value("text/plain; charset=utf-8"))
@@ -52,11 +52,14 @@ class ApiWellKnownControllerTest {
     @Test
     void answers404WhenAbsentOrUnreadable() throws Exception {
         when(service.find(any(), any())).thenReturn(Optional.empty());
-        mvc.perform(get("/api/well-known/serve").param("location", "ROOT").param("path", "riot.txt"))
-                .andExpect(status().isNotFound());
-        mvc.perform(get("/api/well-known/serve").param("location", "NOPE").param("path", "riot.txt"))
-                .andExpect(status().isNotFound());
-        mvc.perform(get("/api/well-known/serve").param("location", "ROOT"))
+        mvc.perform(get("/api/internal/well-known-files").param("location", "ROOT").param("path", "riot.txt"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("not_found"))
+                .andExpect(jsonPath("$.detail").value("Unknown well-known file"));
+        mvc.perform(get("/api/internal/well-known-files").param("location", "NOPE").param("path", "riot.txt"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value("Unknown well-known file"));
+        mvc.perform(get("/api/internal/well-known-files").param("location", "ROOT"))
                 .andExpect(status().isNotFound());
     }
 }

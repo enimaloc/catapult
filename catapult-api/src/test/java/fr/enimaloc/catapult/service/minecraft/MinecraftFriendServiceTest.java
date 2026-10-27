@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.minecraft;
 
+import fr.enimaloc.catapult.service.debug.DebugRecording;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.minecraft.MinecraftFriendLink;
@@ -11,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -39,6 +41,7 @@ class MinecraftFriendServiceTest {
     @Mock private fr.enimaloc.catapult.repository.binding.GetterConfigRepository getterConfigRepository;
     @Mock private fr.enimaloc.catapult.service.notification.ChannelEventPublisher channelEventPublisher;
 
+    @Spy private DebugRecording debug = DebugRecording.OFF;
     @InjectMocks private MinecraftFriendService service;
 
     private UserAccount user;
@@ -280,7 +283,7 @@ class MinecraftFriendServiceTest {
 
     @Test
     void sync_matchesProfileIdsRegardlessOfDashes() {
-        // lien stocké avec tirets (lookup), friends list sans tirets : doit matcher quand même
+        // link stored with dashes (lookup), friends list without dashes: must still match
         var link = pendingLink("069a79f4-44e9-4726-a5be-fca90e38aaf5", "jeb_");
         when(linkRepository.findByServiceAccount(bot1)).thenReturn(List.of(link));
         when(linkRepository.findByServiceAccount(bot2)).thenReturn(List.of());

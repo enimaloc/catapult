@@ -6,12 +6,15 @@ import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.igdb.IgdbGameDetails;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
+import fr.enimaloc.catapult.repository.tw.TwDtddTopicMappingRepository;
 import fr.enimaloc.catapult.service.account.WidgetTokenService;
 import fr.enimaloc.catapult.service.binding.GameStateService;
 import fr.enimaloc.catapult.service.igdb.IgdbGameDetailsService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.steam.SteamStoreService;
 import fr.enimaloc.catapult.service.tw.TwLabelService;
+import fr.enimaloc.catapult.service.xbox.XboxStoreService;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.thymeleaf.autoconfigure.ThymeleafAutoConfiguration;
@@ -27,6 +30,8 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.hamcrest.Matchers.hasKey;
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -39,8 +44,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 // /api/game/** is permitAll (widget-token authenticated, no JWT) in ApiSecurityConfig,
 // so disabling filters here does not hide an auth regression.
 @AutoConfigureMockMvc(addFilters = false)
-@Import(I18nConfig.class)
+@Import({I18nConfig.class, PublicBaseUrl.class, GameInfoAssembler.class})
 class UserApiV1ControllerTest {
+    @MockitoBean fr.enimaloc.catapult.service.account.UserApiTokenService userApiTokenService;
 
     @Autowired MockMvc mvc;
 
@@ -51,6 +57,9 @@ class UserApiV1ControllerTest {
     @MockitoBean IgdbGameDetailsService igdbGameDetailsService;
     @MockitoBean SteamStoreService steamStoreService;
     @MockitoBean TwLabelService twLabelService;
+    @MockitoBean XboxStoreService xboxStoreService;
+    @MockitoBean TwDtddTopicMappingRepository twDtddTopicMappingRepository;
+    @MockitoBean DevBackdoorResolver devBackdoorResolver;
 
     @Test
     void gameInfo_unknownToken_returns404() throws Exception {
@@ -251,5 +260,27 @@ class UserApiV1ControllerTest {
         mvc.perform(get("/api/game/{uuid}", token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.version").value(1));
+    }
+
+    /** An IGDB game without a slug has no IGDB page: null, not a link ending at /games/. */
+    @Test
+    void gameInfo_blankSlug_hasNullIgdbUrl() throws Exception {
+        UUID token = UUID.randomUUID();
+        UserAccount user = new UserAccount();
+        user.setId(UUID.randomUUID());
+        IgdbGameDetails details = new IgdbGameDetails();
+        details.setIgdbId("1234");
+        details.setSlug("");
+        when(widgetTokenService.resolve(token)).thenReturn(Optional.of(user));
+        when(gameStateService.getLastKnownGame(user))
+                .thenReturn(Optional.of(new DetectedGame("440", GameBinding.SourceType.STEAM, "Team Fortress 2")));
+        when(igdbService.findByExternalAppId(GameBinding.SourceType.STEAM, "440"))
+                .thenReturn(Optional.of(new IgdbService.IgdbGame("1234", "Team Fortress 2")));
+        when(igdbGameDetailsService.getDetails("1234")).thenReturn(Optional.of(details));
+
+        mvc.perform(get("/api/game/{uuid}", token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").value(hasKey("igdbUrl")))
+                .andExpect(jsonPath("$.igdbUrl").value(nullValue()));
     }
 }

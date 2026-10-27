@@ -40,6 +40,9 @@
         BindingDeletedEvent: data => CatapultChannel.removeBinding(data.bindingId),
         ChannelSettingsUpdatedEvent: data => window.CatapultSettings?.apply(data.settings),
         DtddMappingChangedEvent: () => catchUp(),
+        // The active custom binding is highlighted in place; their list changing (create, edit, delete) re-renders.
+        CustomBindingChangedEvent: data => window.CatapultCustomBindings?.setActive(data.activeId ?? null),
+        CustomBindingsUpdatedEvent: () => catchUp(),
         ChannelConnectionChangedEvent: data => {
             if (data.provider !== "STEAM") catchUp();
         },

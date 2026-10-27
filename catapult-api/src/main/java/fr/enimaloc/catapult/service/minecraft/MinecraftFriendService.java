@@ -15,7 +15,6 @@ import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -33,9 +32,9 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Cycle de vie des liens d'amitié entre utilisateurs et comptes de service.
- * Remplissage séquentiel : la limite d'amis (inconnue) est découverte à la
- * première erreur d'ajout, le compte est alors marqué plein (réversible en admin).
+ * Lifecycle of the friend links between users and service accounts.
+ * Accounts are filled in sequence: the (unknown) friend limit is discovered at the
+ * first failed add, and the account is then marked full (reversible by an admin).
  */
 @Slf4j
 @Service
@@ -55,25 +54,19 @@ public class MinecraftFriendService {
     static final String FRIENDS_OPERATION = "minecraft.friends";
     static final String MANAGE_FRIENDS_OPERATION = "minecraft.manage_friends";
 
-    private DebugRecording debug = DebugRecording.OFF;
-
-    /** Records this class's grouped calls and incoming messages for the members in debug mode. */
-    @Autowired(required = false)
-    public void setDebugRecording(DebugRecording debug) {
-        this.debug = debug == null ? DebugRecording.OFF : debug;
-    }
+    private final DebugRecording debug;
 
     @Transactional
-    public MinecraftFriendLink enroll(UserAccount user, String pseudo) {
-        MinecraftService.ProfileLookup profile = minecraftService.lookupProfile(pseudo)
+    public MinecraftFriendLink enroll(UserAccount user, String playerName) {
+        MinecraftService.ProfileLookup profile = minecraftService.lookupProfile(playerName)
                 .orElseThrow(() -> new MinecraftEnrollmentException(
-                        MinecraftEnrollmentException.Reason.UNKNOWN_PLAYER, "Pseudo introuvable: " + pseudo));
+                        MinecraftEnrollmentException.Reason.UNKNOWN_PLAYER, "Unknown Minecraft player: " + playerName));
 
-        // Récupère le lien existant sans le supprimer — réutilisation in-place pour éviter
-        // la violation de contrainte unique user_id (Hibernate ordonne INSERT avant DELETE à la flush).
+        // Fetch the existing link without deleting it and reuse it in place, to avoid violating the
+        // unique user_id constraint (Hibernate orders INSERT before DELETE on flush).
         MinecraftFriendLink existing = linkRepository.findByUser(user).orElse(null);
         if (existing != null) {
-            // Suppression best-effort côté API avec le token du compte de service actuel.
+            // Best-effort removal on the API side, with the current service account's token.
             Optional<String> existingToken = tokenService.getToken(existing.getServiceAccount());
             if (existingToken.isPresent()) {
                 try {
@@ -81,10 +74,10 @@ public class MinecraftFriendService {
                             () -> minecraftService.removeFriend(existingToken.get(), null,
                                     existing.getMinecraftProfileId()));
                 } catch (Exception e) {
-                    log.warn("removeFriend en échec pour {}: {}", existing.getMinecraftProfileId(), e.getMessage());
+                    log.warn("removeFriend failed for {}: {}", existing.getMinecraftProfileId(), e.getMessage());
                 }
             } else {
-                log.warn("Pas de token pour {} — ré-enrôlement sans removeFriend côté API",
+                log.warn("No token for {} — re-enrolling without removeFriend on the API side",
                         existing.getServiceAccount().getLabel());
             }
         }
@@ -92,14 +85,14 @@ public class MinecraftFriendService {
         for (MinecraftServiceAccount account : accountRepository.findByEnabledTrueOrderByFillOrderAsc()) {
             if (account.isFriendLimitReached()) continue;
             Optional<String> token = tokenService.getToken(account);
-            if (token.isEmpty()) continue; // compte en échec d'auth : on tente le suivant
+            if (token.isEmpty()) continue; // account failing auth: try the next one
 
             try {
                 friendsCall(user, profile.dashedId(),
                         () -> minecraftService.addFriend(token.get(), null, profile.dashedId()));
             } catch (HttpClientErrorException e) {
                 if (isInviteRejected(e)) {
-                    log.info("Invite Minecraft rejetée par le joueur (confidentialité) pour {} via {}",
+                    log.info("Minecraft invite rejected by the player (privacy) for {} via {}",
                             profile.name(), account.getLabel());
                     MinecraftFriendLink link = existing != null ? existing : new MinecraftFriendLink();
                     link.setUser(user);
@@ -112,15 +105,15 @@ public class MinecraftFriendService {
                     enableMinecraftGetter(user);
                     return linkRepository.save(link);
                 }
-                // Code d'erreur de limite non documenté : tout 4xx (hors INVITE_REJECTED) sur
-                // l'ajout est traité comme limite atteinte, body loggé pour affiner.
-                log.warn("addFriend refusé pour {} ({}): {}", account.getLabel(),
+                // The limit error code is undocumented: any 4xx (other than INVITE_REJECTED) on the
+                // add is treated as the limit being reached, and the body is logged to refine this.
+                log.warn("addFriend refused for {} ({}): {}", account.getLabel(),
                         e.getStatusCode(), e.getResponseBodyAsString());
                 limitMarker.markFull(account);
                 continue;
             }
 
-            // Réutilise l'instance existante si disponible pour conserver la même ligne BD.
+            // Reuse the existing instance when there is one, to keep the same DB row.
             MinecraftFriendLink link = existing != null ? existing : new MinecraftFriendLink();
             link.setUser(user);
             link.setServiceAccount(account);
@@ -135,7 +128,7 @@ public class MinecraftFriendService {
 
         throw new MinecraftEnrollmentException(
                 MinecraftEnrollmentException.Reason.NO_CAPACITY,
-                "Aucun compte de service disponible pour un nouvel ami");
+                "No service account has room for a new friend");
     }
 
     @Transactional
@@ -149,9 +142,9 @@ public class MinecraftFriendService {
     }
 
     /**
-     * La chaîne de détection ne consulte que les providers ayant une ligne
-     * GetterConfig : l'enrôlement crée/active celle de MINECRAFT (les comptes
-     * créés avant l'ajout du provider n'en ont pas).
+     * The detection chain only consults providers that have a GetterConfig
+     * row: enrolment creates/enables the MINECRAFT one (accounts created before
+     * the provider was added have none).
      */
     private void enableMinecraftGetter(UserAccount user) {
         GetterConfig config = getterConfigRepository.findByUserAndProvider(user, GetterConfig.Provider.MINECRAFT)
@@ -167,17 +160,17 @@ public class MinecraftFriendService {
     }
 
     public Optional<MinecraftFriendLink> getLink(UserAccount user) {
-        // fetch du compte de service inclus : le contrôleur lit son pseudo hors session (OSIV désactivé)
+        // includes a fetch of the service account: the controller reads its name outside the session (OSIV disabled)
         return linkRepository.findWithServiceAccountByUser(user);
     }
 
     /**
-     * Réconcilie les liens locaux avec la friends list réelle de chaque compte :
-     * PENDING accepté en jeu → ACCEPTED ; ACCEPTED disparu → REMOVED ; pseudo rafraîchi.
-     * Chaque lien modifié est annoncé aux dashboards de sa chaîne.
+     * Reconciles the local links with each account's real friends list:
+     * PENDING accepted in game → ACCEPTED; ACCEPTED gone → REMOVED; player name refreshed.
+     * Every modified link is announced to its channel's dashboards.
      */
-    // Pas de @Transactional : évite de tenir une connexion BD pendant les appels HTTP getFriends ;
-    // chaque save() porte sa propre transaction et la réconciliation est idempotente.
+    // No @Transactional: avoids holding a DB connection during the getFriends HTTP calls;
+    // each save() runs in its own transaction and the reconciliation is idempotent.
     @Scheduled(fixedRateString = "${minecraft.friends-sync-interval-ms:300000}")
     public void syncFriendLinks() {
         for (MinecraftServiceAccount account : accountRepository.findByEnabledTrueOrderByFillOrderAsc()) {
@@ -185,7 +178,7 @@ public class MinecraftFriendService {
             if (links.isEmpty()) continue;
 
             Optional<String> token = tokenService.getToken(account);
-            if (token.isEmpty()) continue; // compte en échec : on ne touche pas aux liens
+            if (token.isEmpty()) continue; // failing account: leave its links alone
 
             MinecraftService.FriendsList friendsList;
             try {
@@ -193,11 +186,11 @@ public class MinecraftFriendService {
                 friendsList = debug.batch(FRIENDS_OPERATION, membersOf(links), BatchDebugFilter::minecraftFriends,
                         () -> minecraftService.getFriends(accessToken));
             } catch (Exception e) {
-                log.warn("getFriends en échec pour {}: {}", account.getLabel(), e.getMessage());
+                log.warn("getFriends failed for {}: {}", account.getLabel(), e.getMessage());
                 continue;
             }
 
-            // matching insensible au format d'UUID (avec/sans tirets selon les endpoints)
+            // match regardless of the UUID format (with/without dashes depending on the endpoint)
             Map<String, MinecraftService.FriendsList.Friend> byProfileId =
                     Arrays.stream(friendsList.friends())
                             .collect(Collectors.toMap(
@@ -220,17 +213,17 @@ public class MinecraftFriendService {
                 if (friend != null && link.getStatus() == MinecraftFriendLink.Status.PENDING) {
                     link.setStatus(MinecraftFriendLink.Status.ACCEPTED);
                     link.setAcceptedAt(Instant.now());
-                    log.info("Lien Minecraft accepté: {} via {}", link.getMinecraftName(), account.getLabel());
+                    log.info("Minecraft link accepted: {} via {}", link.getMinecraftName(), account.getLabel());
                     changed = true;
                 } else if (friend == null && link.getStatus() == MinecraftFriendLink.Status.ACCEPTED) {
                     link.setStatus(MinecraftFriendLink.Status.REMOVED);
-                    log.info("Lien Minecraft retiré côté joueur: {} via {}", link.getMinecraftName(), account.getLabel());
+                    log.info("Minecraft link removed by the player: {} via {}", link.getMinecraftName(), account.getLabel());
                     changed = true;
                 } else if (link.getStatus() == MinecraftFriendLink.Status.INVITE_REJECTED) {
                     if (friend != null) {
                         link.setStatus(MinecraftFriendLink.Status.ACCEPTED);
                         link.setAcceptedAt(Instant.now());
-                        log.info("Lien Minecraft accepté (après rejet initial): {} via {}",
+                        log.info("Minecraft link accepted (after an initial rejection): {} via {}",
                                 link.getMinecraftName(), account.getLabel());
                         changed = true;
                     } else {
@@ -242,11 +235,11 @@ public class MinecraftFriendService {
                                         () -> minecraftService.addFriend(token.get(), null, link.getMinecraftProfileId()));
                                 link.setStatus(MinecraftFriendLink.Status.ACCEPTED);
                                 link.setAcceptedAt(Instant.now());
-                                log.info("Lien Minecraft accepté (retry après invite manuelle): {} via {}",
+                                log.info("Minecraft link accepted (retry after a manual invite): {} via {}",
                                         link.getMinecraftName(), account.getLabel());
                                 changed = true;
                             } catch (Exception retryFailure) {
-                                log.info("Retry addFriend toujours refusé pour {} via {}: {}",
+                                log.info("addFriend retry still refused for {} via {}: {}",
                                         link.getMinecraftName(), account.getLabel(), retryFailure.getMessage());
                             }
                         }
@@ -292,20 +285,20 @@ public class MinecraftFriendService {
                 friendsCall(link.getUser(), link.getMinecraftProfileId(),
                         () -> minecraftService.removeFriend(token.get(), null, link.getMinecraftProfileId()));
             } catch (Exception e) {
-                // best effort : le lien local est supprimé même si l'API refuse
-                log.warn("removeFriend en échec pour {}: {}", link.getMinecraftProfileId(), e.getMessage());
+                // best effort: the local link is deleted even if the API refuses
+                log.warn("removeFriend failed for {}: {}", link.getMinecraftProfileId(), e.getMessage());
             }
         } else {
-            log.warn("Pas de token pour {} — lien {} supprimé sans removeFriend côté API",
+            log.warn("No token for {} — link {} deleted without removeFriend on the API side",
                     link.getServiceAccount().getLabel(), link.getMinecraftProfileId());
         }
         linkRepository.delete(link);
     }
 
     /**
-     * Distingue un rejet par confidentialité (le joueur bloque les demandes
-     * externes) d'une vraie limite d'amis atteinte côté compte de service.
-     * Parsing défensif : tout échec retombe sur le comportement "compte plein".
+     * Tells a privacy rejection (the player blocks external requests) apart
+     * from a real friend limit reached on the service account.
+     * Defensive parsing: any failure falls back to the "account full" behaviour.
      */
     private boolean isInviteRejected(HttpClientErrorException e) {
         if (e.getStatusCode().value() != 403) return false;

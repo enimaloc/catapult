@@ -7,12 +7,15 @@ import fr.enimaloc.catapult.domain.access.AlphaInviteRedemption;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.service.access.InviteService;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -22,7 +25,7 @@ import java.util.List;
 import java.util.Optional;
 
 @RestController
-@RequestMapping("/api/invite")
+@RequestMapping(ApiPaths.USER + "/invite")
 @RequiredArgsConstructor
 public class ApiInviteController {
 
@@ -37,8 +40,9 @@ public class ApiInviteController {
     @Value("${app.web-url:}")
     private String webUrl;
 
+    @PreAuthorize("@authz.isSelf(#userId)")
     @GetMapping
-    public InvitePageData page(@AuthenticationPrincipal Jwt jwt) {
+    public InvitePageData page(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt) {
         UserAccount user = userResolver.viewer(jwt);
         experimentService.track(user, EXPERIMENT_KEY, EVENT_PAGE_VIEW);
         Optional<AlphaInvite> inviteOpt = inviteService.getInvite(user);
@@ -54,9 +58,10 @@ public class ApiInviteController {
                 .toList());
     }
 
+    @PreAuthorize("@authz.isSelf(#userId)")
     @PostMapping("/regenerate")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void regenerate(@AuthenticationPrincipal Jwt jwt) {
+    public void regenerate(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt) {
         UserAccount user = userResolver.viewer(jwt);
         inviteService.regenerateCode(user);
         experimentService.track(user, EXPERIMENT_KEY, EVENT_LINK_REGENERATED);

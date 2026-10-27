@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.api.provider;
 
+import fr.enimaloc.catapult.service.provider.RawProviderResponseSupport;
+import fr.enimaloc.catapult.service.provider.MinecraftRawQueries;
 import fr.enimaloc.catapult.domain.minecraft.MinecraftServiceAccount;
 import fr.enimaloc.catapult.repository.minecraft.MinecraftServiceAccountRepository;
 import fr.enimaloc.catapult.service.minecraft.MinecraftTokenService;
@@ -38,13 +40,15 @@ class ApiAdminProviderMinecraftControllerTest {
     @Mock private RestClient.RequestBodySpec postBodySpec;
     @Mock private RestClient.ResponseSpec responseSpec;
 
-    @InjectMocks private ApiAdminProviderMinecraftController controller;
+    @InjectMocks private MinecraftRawQueries queries;
+    private ApiAdminProviderMinecraftController controller;
     private final RawProviderResponseSupport rawSupport =
             new RawProviderResponseSupport(new com.fasterxml.jackson.databind.ObjectMapper());
 
     @BeforeEach
     void setup() {
-        ReflectionTestUtils.setField(controller, "rawSupport", rawSupport);
+        controller = new ApiAdminProviderMinecraftController(queries);
+        ReflectionTestUtils.setField(queries, "rawSupport", rawSupport);
         doReturn(getSpec).when(restClient).get();
         doReturn(headersSpec).when(getSpec).uri(any(java.net.URI.class));
         doReturn(headersSpec).when(headersSpec).header(any(), any());
@@ -78,7 +82,8 @@ class ApiAdminProviderMinecraftControllerTest {
 
         assertThatThrownBy(() -> controller.friends(accountId))
                 .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("404");
+                .hasMessageContaining("404")
+                .hasMessageContaining("Unknown Minecraft service account");
     }
 
     @Test
@@ -90,7 +95,8 @@ class ApiAdminProviderMinecraftControllerTest {
 
         assertThatThrownBy(() -> controller.friends(accountId))
                 .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("404");
+                .hasMessageContaining("404")
+                .hasMessageContaining("No Minecraft token for this account");
     }
 
     @Test
@@ -130,7 +136,8 @@ class ApiAdminProviderMinecraftControllerTest {
 
         assertThatThrownBy(() -> controller.presence(accountId, "NOT_A_STATUS", null))
                 .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("400");
+                .hasMessageContaining("400")
+                .hasMessageContaining("Invalid presence status: NOT_A_STATUS");
     }
 
     @Test

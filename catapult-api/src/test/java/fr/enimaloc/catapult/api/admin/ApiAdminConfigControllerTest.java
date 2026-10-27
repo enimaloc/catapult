@@ -2,12 +2,10 @@ package fr.enimaloc.catapult.api.admin;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.enimaloc.catapult.api.ApiUserResolver;
+import fr.enimaloc.catapult.common.dto.admin.ModuleOverrideDto;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.config.ConfigAudit;
-import fr.enimaloc.catapult.domain.config.ConfigOverride;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
-import fr.enimaloc.catapult.repository.config.ConfigAuditRepository;
-import fr.enimaloc.catapult.repository.config.ConfigOverrideRepository;
 import fr.enimaloc.catapult.service.account.ChannelAccessService;
 import fr.enimaloc.catapult.service.config.ConfigCatalogService;
 import fr.enimaloc.catapult.service.config.ConfigEntry;
@@ -53,8 +51,6 @@ class ApiAdminConfigControllerTest {
     @MockitoBean ConfigCatalogService catalogService;
     @MockitoBean ConfigOverrideService overrideService;
     @MockitoBean UserAccountRepository userRepo;
-    @MockitoBean ConfigAuditRepository auditRepo;
-    @MockitoBean ConfigOverrideRepository overrideRepo;
 
     @Test
     @WithMockUser(roles = "ADMIN")
@@ -62,7 +58,7 @@ class ApiAdminConfigControllerTest {
         when(catalogService.catalog()).thenReturn(List.of(
                 new ConfigEntry("app.foo", "1", false, false, false, false, false, "properties")
         ));
-        mvc.perform(get("/api/admin/config"))
+        mvc.perform(get("/api/internal/admin/config"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].key").value("app.foo"));
     }
@@ -74,7 +70,7 @@ class ApiAdminConfigControllerTest {
         user.setId(UUID.randomUUID());
         when(userRepo.findByTwitchId(any())).thenReturn(Optional.of(user));
 
-        mvc.perform(put("/api/admin/config/{k}", "app.foo")
+        mvc.perform(put("/api/internal/admin/config/{k}", "app.foo")
                         .with(jwt().jwt(j -> j.claim("twitchId", "123")).authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -91,7 +87,7 @@ class ApiAdminConfigControllerTest {
         user.setId(UUID.randomUUID());
         when(userRepo.findByTwitchId(any())).thenReturn(Optional.of(user));
 
-        mvc.perform(delete("/api/admin/config/{k}", "app.foo")
+        mvc.perform(delete("/api/internal/admin/config/{k}", "app.foo")
                         .with(jwt().jwt(j -> j.claim("twitchId", "123")).authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
                         .with(csrf()))
                 .andExpect(status().isNoContent());
@@ -102,30 +98,24 @@ class ApiAdminConfigControllerTest {
     @Test
     @WithMockUser(roles = "ADMIN")
     void audit_returnsHistory() throws Exception {
-        when(auditRepo.findByKeyOrderByChangedAtDesc("app.foo")).thenReturn(List.of(new ConfigAudit()));
-        mvc.perform(get("/api/admin/config/audit").param("key", "app.foo"))
+        when(overrideService.audit("app.foo")).thenReturn(List.of(new ConfigAudit()));
+        mvc.perform(get("/api/internal/admin/config/audit").param("key", "app.foo"))
                 .andExpect(status().isOk());
     }
 
     @Test
     void unauthenticated_returns401Or403() throws Exception {
-        mvc.perform(get("/api/admin/config"))
+        mvc.perform(get("/api/internal/admin/config"))
                 .andExpect(status().is4xxClientError());
     }
 
     @Test
     @WithMockUser(roles = "ADMIN")
     void getModuleOverrides_returnsList() throws Exception {
-        ConfigOverride o = new ConfigOverride();
-        o.setModule("web");
-        o.setKey("web.feature.foo");
-        o.setValue("true");
-        o.setSecret(false);
-        o.setUpdatedAt(Instant.parse("2026-01-01T00:00:00Z"));
-        o.setUpdatedBy(UUID.randomUUID());
-        when(overrideRepo.findByIdModule("web")).thenReturn(List.of(o));
+        when(overrideService.moduleOverrides("web")).thenReturn(List.of(new ModuleOverrideDto(
+                "web.feature.foo", "true", false, Instant.parse("2026-01-01T00:00:00Z"), UUID.randomUUID())));
 
-        mvc.perform(get("/api/admin/config/module/{module}", "web"))
+        mvc.perform(get("/api/internal/admin/config/modules/{module}", "web"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].key").value("web.feature.foo"))
                 .andExpect(jsonPath("$[0].value").value("true"))
@@ -139,7 +129,7 @@ class ApiAdminConfigControllerTest {
         user.setId(UUID.randomUUID());
         when(userRepo.findByTwitchId(any())).thenReturn(Optional.of(user));
 
-        mvc.perform(put("/api/admin/config/module/{m}/{k}", "web", "web.feature.foo")
+        mvc.perform(put("/api/internal/admin/config/modules/{m}/{k}", "web", "web.feature.foo")
                         .with(jwt().jwt(j -> j.claim("twitchId", "123")).authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -156,7 +146,7 @@ class ApiAdminConfigControllerTest {
         user.setId(UUID.randomUUID());
         when(userRepo.findByTwitchId(any())).thenReturn(Optional.of(user));
 
-        mvc.perform(delete("/api/admin/config/module/{m}/{k}", "web", "web.feature.foo")
+        mvc.perform(delete("/api/internal/admin/config/modules/{m}/{k}", "web", "web.feature.foo")
                         .with(jwt().jwt(j -> j.claim("twitchId", "123")).authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
                         .with(csrf()))
                 .andExpect(status().isNoContent());
@@ -167,9 +157,9 @@ class ApiAdminConfigControllerTest {
     @Test
     @WithMockUser(roles = "ADMIN")
     void moduleAudit_returnsHistoryScopedToModule() throws Exception {
-        when(auditRepo.findByModuleAndKeyOrderByChangedAtDesc("web", "web.feature.foo"))
+        when(overrideService.audit("web", "web.feature.foo"))
                 .thenReturn(List.of(new ConfigAudit()));
-        mvc.perform(get("/api/admin/config/module/{m}/audit", "web").param("key", "web.feature.foo"))
+        mvc.perform(get("/api/internal/admin/config/modules/{m}/audit", "web").param("key", "web.feature.foo"))
                 .andExpect(status().isOk());
     }
 }

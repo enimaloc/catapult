@@ -44,7 +44,7 @@ class MockMinecraftAccountsStore {
     synchronized ApiClient.Result<Map<String, Object>> create(String deviceCode, String label) {
         ApiClient.Result<Map<String, Object>> pending = poll(deviceCode);
         if (pending != null) return pending;
-        String name = label == null || label.isBlank() ? "Compte Minecraft" : label;
+        String name = label == null || label.isBlank() ? "Minecraft account" : label;
         Account account = new Account(UUID.randomUUID(), name, "CatapultBot" + (accounts.size() + 1), accounts.size(), 0, true, false);
         accounts.add(account);
         return done(account);
@@ -52,7 +52,7 @@ class MockMinecraftAccountsStore {
 
     synchronized ApiClient.Result<Map<String, Object>> reauth(UUID id, String deviceCode) {
         int index = indexOf(id);
-        if (index < 0) return new ApiClient.Result<>(404, Map.of("message", "Compte inconnu"));
+        if (index < 0) return new ApiClient.Result<>(404, Map.of("message", "Unknown account"));
         ApiClient.Result<Map<String, Object>> pending = poll(deviceCode);
         if (pending != null) return pending;
         Account a = accounts.get(index);
@@ -82,7 +82,7 @@ class MockMinecraftAccountsStore {
     /** 202 for a code's first poll, 400 for an unknown or spent one; null once it is confirmed (and now spent). */
     private ApiClient.Result<Map<String, Object>> poll(String deviceCode) {
         Integer count = deviceCode == null ? null : polls.get(deviceCode);
-        if (count == null) return new ApiClient.Result<>(400, Map.of("message", "Device code inconnu ou expiré"));
+        if (count == null) return new ApiClient.Result<>(400, Map.of("message", "Device code expired"));
         if (count == 0) {
             polls.put(deviceCode, 1);
             return new ApiClient.Result<>(202, Map.of("status", "PENDING"));

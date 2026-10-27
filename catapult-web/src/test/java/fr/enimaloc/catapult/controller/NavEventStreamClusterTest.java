@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.cluster.InstanceBus;
+import fr.enimaloc.catapult.service.degraded.DegradedState;
 import fr.enimaloc.catapult.common.dto.channel.ChannelDto;
 import fr.enimaloc.catapult.event.ChannelLiveStateEvent;
 import fr.enimaloc.catapult.monitoring.InteractionMetrics;
@@ -32,7 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @WebMvcTest(controllers = NavEventStreamController.class)
 @Import({WebSecurityConfig.class, InteractionMetrics.class, SimpleMeterRegistry.class, BroadcastState.class, DirectSse.class,
-        InstanceBus.class})
+        LocalInstanceBusConfig.class})
 class NavEventStreamClusterTest {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
@@ -42,6 +43,7 @@ class NavEventStreamClusterTest {
     @Autowired NavEventStreamController controller;
     @Autowired InstanceBus bus;
     @MockitoBean ApiService apiService;
+    @MockitoBean DegradedState degradedState;
 
     private static MockHttpSession loggedIn() {
         MockHttpSession session = new MockHttpSession();

@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.userapi;
 
+import com.jayway.jsonpath.JsonPath;
 import fr.enimaloc.catapult.config.I18nConfig;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
@@ -31,9 +32,11 @@ import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -42,7 +45,12 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.hasKey;
+import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
@@ -59,11 +67,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
 // /api/user/** is public (widget-token authenticated) in ApiSecurityConfig.
 @AutoConfigureMockMvc(addFilters = false)
-@Import(I18nConfig.class)
+@Import({I18nConfig.class, PublicBaseUrl.class, GameInfoAssembler.class})
 class UserApiV2ControllerTest {
+    @MockitoBean fr.enimaloc.catapult.service.account.UserApiTokenService userApiTokenService;
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
-    private static final String BASE = "http://localhost:8080/api/user";
+    private static final String BASE = "http://localhost/api/user";
 
     @Autowired MockMvc mvc;
 
@@ -269,8 +278,7 @@ class UserApiV2ControllerTest {
         when(igdbGameDetailsService.getDetails("42")).thenReturn(Optional.of(details));
 
         mvc.perform(get("/api/user/summary/{uuid}", token))
-                .andExpect(jsonPath("$.storeUrl").value("https://store.steampowered.com/app/892970"))
-                .andExpect(jsonPath("$.igdbUrl").value("https://www.igdb.com/game/valheim"));
+                .andExpect(jsonPath("$.storeUrl").value("https://store.steampowered.com/app/892970"));
     }
 
     /** For the chat bots that can't read JSON: one field, as plain text. */
@@ -407,6 +415,320 @@ class UserApiV2ControllerTest {
             verify(twLabelService).resolve("spiders", Locale.forLanguageTag("fr"));
 
             mvc.perform(get("/api/user/catapult/{id}", UUID.randomUUID())).andExpect(status().isNotFound());
+        }
+    }
+
+    /**
+     * Every link the public game routes answer, against the real format of its target. The wrong values
+     * are pinned too, each disabled until the task that fixes it.
+     */
+    @Nested
+    class LinkFormats {
+        // IGDB API, "url" field of a game: the game page lives under /games/.
+        private static final String IGDB_GAMES = "https://www.igdb.com/games/";
+        // Steamworks store link of an app.
+        private static final String STEAM_APP = "https://store.steampowered.com/app/";
+        // Microsoft Store link of a product, as the code builds it today.
+        private static final String MICROSOFT_STORE = "https://www.microsoft.com/store/apps/";
+        // DoesTheDogDie page of a media, as RealDtddApiClient reads it.
+        private static final String DTDD_MEDIA = "https://www.doesthedogdie.com/media/";
+
+        private IgdbGameDetails details(String slug) {
+            IgdbGameDetails details = new IgdbGameDetails();
+            details.setSlug(slug);
+            return details;
+        }
+
+        private IgdbGameDetails igdbWith(Map<String, String> websites) {
+            IgdbGameDetails details = details("valheim");
+            details.setWebsites(websites);
+            when(igdbGameDetailsService.getDetails("42")).thenReturn(Optional.of(details));
+            return details;
+        }
+
+        /** A Steam game IGDB knows as 42, with the given IGDB details. */
+        private void steamGameWithIgdb(IgdbGameDetails details) {
+            playing(GameBinding.SourceType.STEAM, "892970", "Valheim");
+            when(igdbService.findByExternalAppId(GameBinding.SourceType.STEAM, "892970"))
+                    .thenReturn(Optional.of(new IgdbService.IgdbGame("42", "Valheim")));
+            when(igdbGameDetailsService.getDetails("42")).thenReturn(Optional.of(details));
+            when(steamStoreService.fetchData(any(), any())).thenReturn(Optional.of(VALHEIM));
+            when(steamStoreService.fetchIADisclosure(any(), any())).thenReturn(Optional.empty());
+        }
+
+        /** A manually set game IGDB knows by name as 42, with the given IGDB details only. */
+        private void manualGameWithIgdb(IgdbGameDetails details) {
+            // A null summary makes the summary's description lookup throw (findFirst on a null): out of this task.
+            details.setSummary("Viking survival.");
+            playing(GameBinding.SourceType.MANUAL, "m1", "Valheim");
+            when(igdbService.findByName("Valheim")).thenReturn(Optional.of(new IgdbService.IgdbGame("42", "Valheim")));
+            when(igdbGameDetailsService.getDetails("42")).thenReturn(Optional.of(details));
+        }
+
+        @Test
+        void igdbWebsitesLinkTheSteamStoreAndItsDetailRoute() throws Exception {
+            igdbWith(Map.of("steam", "892970"));
+
+            mvc.perform(get("/api/user/igdb/42"))
+                    .andExpect(jsonPath("$.websites.steam.url").value(STEAM_APP + "892970"))
+                    .andExpect(jsonPath("$.websites.steam.more").value(BASE + "/steam/892970"));
+        }
+
+        @Test
+        void igdbWebsitesLinkTheMicrosoftStoreAndTheXboxRoute() throws Exception {
+            igdbWith(Map.of("microsoft", "9NBLGGH2JHXJ"));
+
+            mvc.perform(get("/api/user/igdb/42"))
+                    .andExpect(jsonPath("$.websites.microsoft.url").value(MICROSOFT_STORE + "9NBLGGH2JHXJ"))
+                    .andExpect(jsonPath("$.websites.microsoft.more").value(BASE + "/xbox/9NBLGGH2JHXJ"));
+        }
+
+        /** A Twitch category id, which BindingService reads: no Twitch link is built. */
+        @Test
+        void igdbTwitchWebsiteIsPassedThrough() throws Exception {
+            igdbWith(Map.of("twitch", "21779"));
+
+            mvc.perform(get("/api/user/igdb/42")).andExpect(jsonPath("$.websites.twitch").value("21779"));
+        }
+
+        @Test
+        void igdbRefsLinkTheirOwnDetailRoute() throws Exception {
+            IgdbGameDetails details = details("valheim");
+            details.setDlcIds(List.of("7"));
+            details.setDlcNames(List.of("DLC"));
+            details.setSimilarGameIds(List.of("8"));
+            details.setSimilarGameNames(List.of("Other"));
+            when(igdbGameDetailsService.getDetails("42")).thenReturn(Optional.of(details));
+
+            mvc.perform(get("/api/user/igdb/42"))
+                    .andExpect(jsonPath("$.dlcs[0].more").value(BASE + "/igdb/7"))
+                    .andExpect(jsonPath("$.similarGames[0].more").value(BASE + "/igdb/8"));
+        }
+
+        @Test
+        void steamRelatedAppsLinkTheirDetailRoute() throws Exception {
+            when(steamStoreService.fetchData("892970", Locale.ENGLISH, false)).thenReturn(Optional.of(steamPage("""
+                    {"type": "game", "name": "Valheim", "steam_appid": 892970, "required_age": 0, "is_free": false,
+                     "fullgame": {"appid": "10", "name": "Full"},
+                     "demos": [{"appid": 11, "description": ""}], "dlc": [12]}""")));
+            when(steamStoreService.fetchIADisclosure(any(), any())).thenReturn(Optional.empty());
+            when(steamStoreService.resolveEffectiveApp("892970"))
+                    .thenReturn(Optional.of(new SteamStoreService.ResolvedParentApp("13", "Parent")));
+
+            mvc.perform(get("/api/user/steam/892970"))
+                    .andExpect(jsonPath("$.page.fullgame.more").value(BASE + "/steam/10"))
+                    .andExpect(jsonPath("$.page.demo[0].more").value(BASE + "/steam/11"))
+                    .andExpect(jsonPath("$.page.dlc[0].more").value(BASE + "/steam/12"))
+                    .andExpect(jsonPath("$.parentApp.more").value(BASE + "/steam/13"));
+        }
+
+        @Test
+        void dtddObjectLinksItsMediaPageAndDetailRoute() throws Exception {
+            playing(GameBinding.SourceType.MINECRAFT, null, "Minecraft");
+            when(igdbService.findByName("Minecraft")).thenReturn(Optional.of(new IgdbService.IgdbGame("7", "Minecraft")));
+            DtddGameMapping mapping = new DtddGameMapping();
+            mapping.setDtddId(99L);
+            when(dtddMappingService.resolve("7", "Minecraft")).thenReturn(mapping);
+
+            mvc.perform(get("/api/user/game/{uuid}", token))
+                    .andExpect(jsonPath("$.dtdd.url").value(DTDD_MEDIA + "99"))
+                    .andExpect(jsonPath("$.dtdd.more").value(BASE + "/dtdd/99"));
+        }
+
+        @Test
+        void everyMoreLinkNamesARealRoute() throws Exception {
+            IgdbGameDetails details = details("valheim");
+            details.setDlcIds(List.of("7"));
+            details.setDlcNames(List.of("DLC"));
+            details.setSimilarGameIds(List.of("8"));
+            details.setSimilarGameNames(List.of("Other"));
+            details.setWebsites(Map.of("steam", "892970", "microsoft", "9NBLGGH2JHXJ"));
+            steamGameWithIgdb(details);
+            DtddGameMapping mapping = new DtddGameMapping();
+            mapping.setDtddId(99L);
+            when(dtddMappingService.resolve("42", "Valheim")).thenReturn(mapping);
+            GameBinding binding = new GameBinding();
+            binding.setId(UUID.randomUUID());
+            when(gameBindingRepository.findByUserAndSourceIdAndSourceType(user, "892970", GameBinding.SourceType.STEAM))
+                    .thenReturn(Optional.of(binding));
+
+            List<String> links = new ArrayList<>();
+            for (MvcResult result : List.of(
+                    mvc.perform(get("/api/user/game/{uuid}", token)).andReturn(),
+                    mvc.perform(get("/api/user/igdb/42")).andReturn())) {
+                links.addAll(JsonPath.read(result.getResponse().getContentAsString(), "$..more"));
+            }
+
+            // game: igdb, steam, dtdd, catapult; igdb: 2 refs + 2 websites
+            assertEquals(8, links.size(), links.toString());
+            for (String link : links) {
+                assertTrue(link.startsWith(BASE), link);
+                assertTrue(link.substring(BASE.length()).matches("/(igdb|steam|xbox|dtdd|catapult)/[^/]+"), link);
+            }
+        }
+
+        // ---- the IGDB page lives under /games/ ----
+
+        @Test
+        void igdbObjectLinksTheIgdbGamesPage() throws Exception {
+            steamGameWithIgdb(details("valheim"));
+
+            mvc.perform(get("/api/user/game/{uuid}", token))
+                    .andExpect(jsonPath("$.igdb.url").value(IGDB_GAMES + "valheim"));
+        }
+
+        @Test
+        void summaryIgdbUrlIsTheIgdbGamesPage() throws Exception {
+            steamGameWithIgdb(details("valheim"));
+
+            mvc.perform(get("/api/user/summary/{uuid}", token))
+                    .andExpect(jsonPath("$.igdbUrl").value(IGDB_GAMES + "valheim"));
+        }
+
+        @Test
+        void blankSlugHasNoIgdbPage() throws Exception {
+            steamGameWithIgdb(details(""));
+
+            mvc.perform(get("/api/user/game/{uuid}", token))
+                    .andExpect(jsonPath("$.igdb").value(hasKey("url")))
+                    .andExpect(jsonPath("$.igdb.url").value(nullValue()));
+            mvc.perform(get("/api/user/summary/{uuid}", token))
+                    .andExpect(jsonPath("$").value(hasKey("igdbUrl")))
+                    .andExpect(jsonPath("$.igdbUrl").value(nullValue()));
+            mvc.perform(get("/api/user/igdb/42"))
+                    .andExpect(jsonPath("$").value(hasKey("url")))
+                    .andExpect(jsonPath("$.url").value(nullValue()));
+        }
+
+        // ---- a Steam link needs an app id ----
+
+        @Test
+        void igdbSteamWebsiteGivenAsAStoreUrlKeepsOneStoreLink() throws Exception {
+            igdbWith(Map.of("steam", "https://store.steampowered.com/app/892970/Valheim/"));
+
+            mvc.perform(get("/api/user/igdb/42"))
+                    .andExpect(jsonPath("$.websites.steam.url").value(STEAM_APP + "892970"))
+                    .andExpect(jsonPath("$.websites.steam.more").value(BASE + "/steam/892970"));
+        }
+
+        @Test
+        void igdbSteamWebsiteWithoutAnAppIdHasNoDetailRoute() throws Exception {
+            igdbWith(Map.of("steam", "https://example.com/valheim"));
+
+            mvc.perform(get("/api/user/igdb/42"))
+                    .andExpect(jsonPath("$.websites.steam.url").value("https://example.com/valheim"))
+                    .andExpect(jsonPath("$.websites.steam").value(hasKey("more")))
+                    .andExpect(jsonPath("$.websites.steam.more").value(nullValue()));
+        }
+
+        @Test
+        void steamFullGameWithoutAnAppIdHasNoMoreLink() throws Exception {
+            when(steamStoreService.fetchData("892970", Locale.ENGLISH, false)).thenReturn(Optional.of(steamPage("""
+                    {"type": "game", "name": "Valheim", "steam_appid": 892970, "required_age": 0, "is_free": false,
+                     "fullgame": {"name": "Full"}}""")));
+            when(steamStoreService.fetchIADisclosure(any(), any())).thenReturn(Optional.empty());
+
+            mvc.perform(get("/api/user/steam/892970"))
+                    .andExpect(jsonPath("$.page.fullgame").value(hasKey("more")))
+                    .andExpect(jsonPath("$.page.fullgame.more").value(nullValue()));
+        }
+
+        // ---- the links use the request's origin ----
+
+        @Test
+        void moreLinksUseTheRequestsOrigin() throws Exception {
+            steamGameWithIgdb(details("valheim"));
+
+            mvc.perform(get("/api/user/game/{uuid}", token).with(r -> {
+                        r.setScheme("https");
+                        r.setServerName("catapult.example");
+                        r.setServerPort(443);
+                        return r;
+                    }))
+                    .andExpect(jsonPath("$.igdb.more").value("https://catapult.example/api/user/igdb/42"))
+                    .andExpect(jsonPath("$.steam.more").value("https://catapult.example/api/user/steam/892970"));
+        }
+
+        // ---- the summary's name, release date and trigger warnings ----
+
+        @Test
+        void summaryNameFallsBackToTheDetectedName() throws Exception {
+            manualGameWithIgdb(details("valheim"));
+
+            mvc.perform(get("/api/user/summary/{uuid}", token)).andExpect(jsonPath("$.name").value("Valheim"));
+        }
+
+        @Test
+        void summaryReleaseDateFallsBackToIgdb() throws Exception {
+            IgdbGameDetails details = details("valheim");
+            details.setFirstReleaseDate(Instant.parse("2021-02-02T00:00:00Z"));
+            manualGameWithIgdb(details);
+
+            mvc.perform(get("/api/user/summary/{uuid}", token))
+                    .andExpect(jsonPath("$.releaseDate").value(notNullValue()))
+                    .andExpect(jsonPath("$.releaseDate.releaseDate").value("2021-02-02T00:00:00Z"))
+                    .andExpect(jsonPath("$.releaseDate.comingSoon").value(false));
+        }
+
+        @Test
+        void summaryTwsAreLabelsOnceEachInOrder() throws Exception {
+            manualGameWithIgdb(details("valheim"));
+            DtddGameMapping mapping = new DtddGameMapping();
+            mapping.setDtddId(99L);
+            when(dtddMappingService.resolve("42", "Valheim")).thenReturn(mapping);
+            when(dtddSignalService.getYesMostlyTopics("42", "Valheim")).thenReturn(Set.of("Gore"));
+            when(twDtddTopicMappingRepository.findTwIdsByDtddTopicNameInIgnoreCase(Set.of("gore")))
+                    .thenReturn(Set.of("gore"));
+            GameBinding binding = new GameBinding();
+            binding.setId(UUID.randomUUID());
+            binding.setTws(Set.of("gore", "flashing"));
+            when(gameBindingRepository.findByUserAndSourceIdAndSourceType(user, "m1", GameBinding.SourceType.MANUAL))
+                    .thenReturn(Optional.of(binding));
+
+            mvc.perform(get("/api/user/summary/{uuid}", token))
+                    .andExpect(jsonPath("$.tws").value("flashing-label, gore-label"));
+        }
+
+        @Test
+        void summaryOfAnIgdbOnlyGameWithoutSummaryIsNotAnError() throws Exception {
+            playing(GameBinding.SourceType.MANUAL, "m1", "Valheim");
+            when(igdbService.findByName("Valheim")).thenReturn(Optional.of(new IgdbService.IgdbGame("42", "Valheim")));
+            when(igdbGameDetailsService.getDetails("42")).thenReturn(Optional.of(details("valheim")));
+
+            mvc.perform(get("/api/user/summary/{uuid}", token))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$").value(hasKey("description")))
+                    .andExpect(jsonPath("$.description").value(nullValue()));
+        }
+
+        @Test
+        void igdbAndCatapultObjectsKeepTheirMembers() throws Exception {
+            steamGameWithIgdb(details("valheim"));
+            GameBinding binding = new GameBinding();
+            binding.setId(UUID.randomUUID());
+            binding.setTws(Set.of("flashing"));
+            when(gameBindingRepository.findByUserAndSourceIdAndSourceType(user, "892970", GameBinding.SourceType.STEAM))
+                    .thenReturn(Optional.of(binding));
+
+            String body = mvc.perform(get("/api/user/game/{uuid}", token)).andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+            var tree = JSON.readTree(body);
+            assertEquals(List.of("igdbId", "slug", "summary", "coverUrl", "genres", "more", "url"),
+                    List.copyOf(tree.get("igdb").propertyNames()));
+            assertEquals(List.of("bindingId", "createdAt", "tws", "ccls", "more"),
+                    List.copyOf(tree.get("catapult").propertyNames()));
+        }
+
+        @Test
+        void summaryKeepsSteamsReleaseDateFirst() throws Exception {
+            IgdbGameDetails details = details("valheim");
+            details.setFirstReleaseDate(Instant.parse("1999-01-01T00:00:00Z"));
+            steamGameWithIgdb(details);
+            String steams = SteamReleaseDate.parse(VALHEIM.releaseDate(), Locale.ENGLISH).toString();
+            assertFalse(steams.startsWith("1999"), steams);
+
+            mvc.perform(get("/api/user/summary/{uuid}", token))
+                    .andExpect(jsonPath("$.releaseDate.releaseDate").value(steams));
         }
     }
 }

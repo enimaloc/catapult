@@ -1,39 +1,31 @@
 package fr.enimaloc.catapult.api.provider;
 
-import fr.enimaloc.catapult.domain.account.UserAccount;
-import fr.enimaloc.catapult.repository.account.UserAccountRepository;
-import fr.enimaloc.catapult.service.xbox.XboxUserTokenService;
+import fr.enimaloc.catapult.api.ApiPaths;
+import fr.enimaloc.catapult.service.provider.RawProviderResponseSupport;
+import fr.enimaloc.catapult.service.provider.XboxRawQueries;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.client.RestClient;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.net.URI;
 import java.util.Set;
 import java.util.UUID;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/admin/providers/xbox")
-@PreAuthorize("hasRole('ADMIN') or hasIpAddress('127.0.0.1') or hasIpAddress('::1')")
+@RequestMapping(ApiPaths.ADMIN + "/providers/xbox")
 @RequiredArgsConstructor
 @ConditionalOnBooleanProperty("xbox.enabled")
 public class ApiAdminProviderXboxController {
 
-    private static final String PRESENCE_URL = "https://userpresence.xboxlive.com/users/xuid(";
     private static final Set<String> VALID_LEVELS = Set.of("user", "device", "title", "all");
 
-    private final XboxUserTokenService tokenService;
-    private final UserAccountRepository userAccountRepository;
-    private final RestClient restClient;
-    private final RawProviderResponseSupport rawSupport;
+    private final XboxRawQueries queries;
 
     @GetMapping("/presence")
     public RawProviderResponseSupport.RawProviderResponse presence(
@@ -41,19 +33,8 @@ public class ApiAdminProviderXboxController {
             @RequestParam(defaultValue = "all") String level) {
         String normalizedLevel = level.toLowerCase();
         if (!VALID_LEVELS.contains(normalizedLevel)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Level Xbox invalide: " + level);
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid Xbox level: " + level);
         }
-
-        UserAccount user = userAccountRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Utilisateur inconnu"));
-        XboxUserTokenService.XstsSession session = tokenService.getToken(user)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Session Xbox indisponible pour cet utilisateur"));
-
-        return rawSupport.fetch(() -> restClient.get()
-                .uri(URI.create(PRESENCE_URL + session.xuid() + ")?level=" + normalizedLevel))
-                .header("Authorization", "XBL3.0 x=" + session.userHash() + ";" + session.token())
-                .header("x-xbl-contract-version", "3")
-                .retrieve()
-                .body(String.class));
+        return queries.presence(userId, normalizedLevel);
     }
 }

@@ -13,6 +13,7 @@ import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.account.UserFlagRepository;
 import fr.enimaloc.catapult.repository.account.UserGroupRepository;
 import fr.enimaloc.catapult.service.account.AccountService;
+import fr.enimaloc.catapult.service.account.AdminMemberService;
 import fr.enimaloc.catapult.service.account.AdminMigrationService;
 import fr.enimaloc.catapult.service.account.BotToggleService;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
@@ -51,8 +52,8 @@ class ApiAdminMembersControllerTest {
     private final UserGroupRepository groups = mock(UserGroupRepository.class);
     private final fr.enimaloc.catapult.service.debug.MemberDebugService debug =
             mock(fr.enimaloc.catapult.service.debug.MemberDebugService.class);
-    private final ApiAdminMembersController controller = new ApiAdminMembersController(
-            accounts, streamState, accountService, botToggle, migrations, environment, flags, groups, debug);
+    private final ApiAdminMembersController controller = new ApiAdminMembersController(new AdminMemberService(
+            accounts, streamState, accountService, botToggle, migrations, environment, flags, groups, debug));
 
     private UserAccount member;
 
@@ -225,6 +226,12 @@ class ApiAdminMembersControllerTest {
             controller.deleteAccount(member.getId(), jwt("tw-admin"));
 
             verify(accountService).deleteAccountImmediately(member);
+        }
+
+        @Test
+        void delete_unknownMemberWithoutJwt_is404() {
+            assertStatus(() -> controller.deleteAccount(UUID.randomUUID(), null), HttpStatus.NOT_FOUND);
+            verify(accountService, never()).deleteAccountImmediately(any());
         }
 
         @Test

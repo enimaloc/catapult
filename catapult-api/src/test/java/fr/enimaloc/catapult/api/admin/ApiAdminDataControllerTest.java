@@ -50,7 +50,7 @@ class ApiAdminDataControllerTest {
     @Test
     void listRepositories_includesKnownRepos() throws Exception {
         MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
-        mvc.perform(get("/api/admin/data"))
+        mvc.perform(get("/api/internal/admin/data"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[?(@.name=='tw-definition')]").exists());
     }
@@ -66,12 +66,12 @@ class ApiAdminDataControllerTest {
         }
 
         MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
-        mvc.perform(get("/api/admin/data/tw-definition").param("size", "2"))
+        mvc.perform(get("/api/internal/admin/data/tw-definition").param("size", "2"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(2))
                 .andExpect(jsonPath("$.totalElements").value(3));
 
-        mvc.perform(get("/api/admin/data/tw-definition").param("q", "flashing"))
+        mvc.perform(get("/api/internal/admin/data/tw-definition").param("q", "flashing"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].id").value("tw-1"));
@@ -86,7 +86,7 @@ class ApiAdminDataControllerTest {
         twDefinitionRepository.save(d);
 
         MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
-        mvc.perform(get("/api/admin/data/tw-definition"))
+        mvc.perform(get("/api/internal/admin/data/tw-definition"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].id").value("solo-row"))
                 .andExpect(jsonPath("$.content[0].label").value("Solo row"));
@@ -114,7 +114,7 @@ class ApiAdminDataControllerTest {
         // Hibernate proxy at read time. Without @Transactional(readOnly = true) on entityList and
         // proxy-safe label resolution, this used to throw LazyInitializationException /
         // IllegalArgumentException instead of returning 200.
-        mvc.perform(get("/api/admin/data/chat-command-definition"))
+        mvc.perform(get("/api/internal/admin/data/chat-command-definition"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].user").exists())
                 .andExpect(jsonPath("$.content[0].user_label").value(
@@ -124,7 +124,7 @@ class ApiAdminDataControllerTest {
     @Test
     void unknownRepo_returns404() throws Exception {
         MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
-        mvc.perform(get("/api/admin/data/does-not-exist"))
+        mvc.perform(get("/api/internal/admin/data/does-not-exist"))
                 .andExpect(status().isNotFound());
     }
 
@@ -138,7 +138,7 @@ class ApiAdminDataControllerTest {
         twDefinitionRepository.save(d);
 
         MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
-        mvc.perform(get("/api/admin/data/tw-definition/detail-row"))
+        mvc.perform(get("/api/internal/admin/data/tw-definition/detail-row"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("detail-row"))
                 .andExpect(jsonPath("$.description").value("A description"));
@@ -147,7 +147,7 @@ class ApiAdminDataControllerTest {
     @Test
     void entityDetail_unknownId_returns404() throws Exception {
         MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
-        mvc.perform(get("/api/admin/data/tw-definition/does-not-exist"))
+        mvc.perform(get("/api/internal/admin/data/tw-definition/does-not-exist"))
                 .andExpect(status().isNotFound());
     }
 
@@ -155,13 +155,13 @@ class ApiAdminDataControllerTest {
     void create_savesNewRow() throws Exception {
         twDefinitionRepository.deleteAll();
         MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
-        mvc.perform(post("/api/admin/data/tw-definition").with(csrf())
+        mvc.perform(post("/api/internal/admin/data/tw-definition").with(csrf())
                         .contentType("application/json")
                         .content("{\"id\":\"new-row\",\"label\":\"New row\",\"enabled\":\"true\",\"sortOrder\":\"1\"}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value("new-row"));
 
-        mvc.perform(get("/api/admin/data/tw-definition/new-row"))
+        mvc.perform(get("/api/internal/admin/data/tw-definition/new-row"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.label").value("New row"));
     }
@@ -175,7 +175,7 @@ class ApiAdminDataControllerTest {
         twDefinitionRepository.save(d);
 
         MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
-        mvc.perform(put("/api/admin/data/tw-definition/update-row").with(csrf())
+        mvc.perform(put("/api/internal/admin/data/tw-definition/update-row").with(csrf())
                         .contentType("application/json")
                         .content("{\"label\":\"New label\"}"))
                 .andExpect(status().isOk())
@@ -191,7 +191,7 @@ class ApiAdminDataControllerTest {
         twDefinitionRepository.save(d);
 
         MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
-        mvc.perform(put("/api/admin/data/tw-definition/bad-update").with(csrf())
+        mvc.perform(put("/api/internal/admin/data/tw-definition/bad-update").with(csrf())
                         .contentType("application/json")
                         .content("{\"sortOrder\":\"not-a-number\"}"))
                 .andExpect(status().isBadRequest());
@@ -212,7 +212,7 @@ class ApiAdminDataControllerTest {
         group = userGroupRepository.save(group);
 
         MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
-        mvc.perform(get("/api/admin/data/user-group/" + group.getId()))
+        mvc.perform(get("/api/internal/admin/data/user-group/" + group.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.members.length()").value(1))
                 .andExpect(jsonPath("$.members[0].id").exists())
@@ -238,7 +238,7 @@ class ApiAdminDataControllerTest {
         String nonexistentUserId = java.util.UUID.randomUUID().toString();
 
         MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
-        mvc.perform(put("/api/admin/data/chat-command-definition/" + definition.getId()).with(csrf())
+        mvc.perform(put("/api/internal/admin/data/chat-command-definition/" + definition.getId()).with(csrf())
                         .contentType("application/json")
                         .content("{\"user\":\"" + nonexistentUserId + "\"}"))
                 .andExpect(status().isBadRequest());
@@ -253,29 +253,51 @@ class ApiAdminDataControllerTest {
         twDefinitionRepository.save(d);
 
         MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
-        mvc.perform(delete("/api/admin/data/tw-definition/delete-row").with(csrf()))
+        mvc.perform(delete("/api/internal/admin/data/tw-definition/delete-row").with(csrf()))
                 .andExpect(status().isNoContent());
 
-        mvc.perform(get("/api/admin/data/tw-definition/delete-row"))
+        mvc.perform(get("/api/internal/admin/data/tw-definition/delete-row"))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void delete_referencedRow_returns409WithoutDatabaseText() throws Exception {
+        chatCommandDefinitionRepository.deleteAll();
+
+        UserAccount owner = new UserAccount();
+        owner.setTwitchUsername("cmd-owner-" + java.util.UUID.randomUUID());
+        owner = userAccountRepository.save(owner);
+
+        ChatCommandDefinition definition = new ChatCommandDefinition();
+        definition.setUser(owner);
+        definition.setName("greet");
+        definition.setTemplate("Hello!");
+        definition.setPermission(ChatCommandEvent.SenderRole.VIEWERS);
+        chatCommandDefinitionRepository.save(definition);
+
+        MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
+        mvc.perform(delete("/api/internal/admin/data/user-account/" + owner.getId()).with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("conflict"))
+                .andExpect(jsonPath("$.detail").value("Cannot delete: referenced by other data"));
     }
 
     @Test
     void delete_unknownId_returns404() throws Exception {
         MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
-        mvc.perform(delete("/api/admin/data/tw-definition/does-not-exist").with(csrf()))
+        mvc.perform(delete("/api/internal/admin/data/tw-definition/does-not-exist").with(csrf()))
                 .andExpect(status().isNotFound());
     }
 
     @Test
     void dtddMappingEdits_tellTheGamesDashboards() throws Exception {
         MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
-        mvc.perform(post("/api/admin/data/dtdd-game-mapping").with(csrf())
+        mvc.perform(post("/api/internal/admin/data/dtdd-game-mapping").with(csrf())
                         .contentType("application/json")
                         .content("{\"igdbId\":\"4242\",\"dtddId\":\"7\",\"confidence\":\"1.0\",\"verified\":\"true\","
                                 + "\"resolvedAt\":\"2026-10-20T08:00:00Z\"}"))
                 .andExpect(status().isCreated());
-        mvc.perform(delete("/api/admin/data/dtdd-game-mapping/4242").with(csrf()))
+        mvc.perform(delete("/api/internal/admin/data/dtdd-game-mapping/4242").with(csrf()))
                 .andExpect(status().isNoContent());
 
         verify(dtddMappingEvents, times(2)).mappingChanged("4242");

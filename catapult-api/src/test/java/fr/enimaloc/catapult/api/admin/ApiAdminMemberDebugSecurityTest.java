@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.api.admin;
 
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.debug.DebugExchangeRepository;
+import fr.enimaloc.catapult.service.debug.MemberDebugAdmin;
 import fr.enimaloc.catapult.service.debug.MemberDebugService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,9 +32,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         controllers = ApiAdminMemberDebugController.class,
         excludeAutoConfiguration = ThymeleafAutoConfiguration.class,
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
-@Import({ApiSecurityConfig.class, ApiAdminMemberDebugSecurityTest.Keys.class})
+@Import({ApiSecurityConfig.class, ApiAdminMemberDebugSecurityTest.Keys.class, MemberDebugAdmin.class})
 @ActiveProfiles("test")
 class ApiAdminMemberDebugSecurityTest {
+    @MockitoBean fr.enimaloc.catapult.service.account.UserApiTokenService userApiTokenService;
     @org.springframework.boot.test.context.TestConfiguration
     static class Keys {
         @org.springframework.context.annotation.Bean
@@ -48,7 +50,7 @@ class ApiAdminMemberDebugSecurityTest {
     @MockitoBean DebugExchangeRepository exchanges;
     @MockitoBean UserAccountRepository users;
 
-    private final String base = "/api/admin/members/" + UUID.randomUUID() + "/debug";
+    private final String base = "/api/internal/admin/members/" + UUID.randomUUID() + "/debug";
 
     private static org.springframework.test.web.servlet.request.RequestPostProcessor remote() {
         return r -> { r.setRemoteAddr("203.0.113.9"); return r; };

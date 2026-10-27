@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.admin;
 
+import fr.enimaloc.catapult.api.ApiPaths;
 import fr.enimaloc.catapult.common.dto.admin.AdminTwCreateBody;
 import fr.enimaloc.catapult.common.dto.admin.DtddTopicsBody;
 import fr.enimaloc.catapult.common.dto.admin.IgdbDescriptorsBody;
@@ -13,12 +14,11 @@ import fr.enimaloc.catapult.service.notification.AdminEventPublisher;
 import fr.enimaloc.catapult.service.tw.AdminTwService;
 import fr.enimaloc.catapult.service.tw.TwBackfillService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.Map;
+import java.util.Optional;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -28,26 +28,24 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Set;
 
 @RestController
-@RequestMapping("/api/admin/tw")
-@PreAuthorize("hasRole('ADMIN') or hasIpAddress('127.0.0.1') or hasIpAddress('::1')")
+@RequestMapping(ApiPaths.ADMIN + "/tws")
 @RequiredArgsConstructor
 public class ApiAdminTwController {
 
     private final AdminTwService service;
 
     // Optional so the controller still loads when tw.enabled=false disables
-    // the backfill bean — the rebuild endpoint then 404s rather than crashing
-    // wiring.
-    @Autowired(required = false)
-    private TwBackfillService backfillService;
+    // the backfill bean — the rebuild endpoints then answer 503 rather than
+    // crashing wiring.
+    private final Optional<TwBackfillService> backfillService;
 
-    @Autowired(required = false)
-    private AdminEventPublisher events;
+    private final AdminEventPublisher events;
 
     @GetMapping
     public List<TwDefinition> list() {
@@ -56,20 +54,20 @@ public class ApiAdminTwController {
 
     @GetMapping("/{id}")
     public ResponseEntity<TwDefinition> get(@PathVariable String id) {
-        return service.get(id).map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
+        return service.get(id)
+                .map(ResponseEntity::ok)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown TW " + id));
     }
 
     @PostMapping
     public ResponseEntity<TwDefinition> create(@RequestBody AdminTwCreateBody b) {
         TwDefinition d = service.create(b.id(), b.label(), b.description(),
                 b.sortOrder() == null ? 0 : b.sortOrder());
-        if (events != null) {
-            events.twDefinitionAdded(Map.of(
-                    "id", d.getId(),
-                    "label", d.getLabel(),
-                    "enabled", d.isEnabled(),
-                    "sortOrder", d.getSortOrder()));
-        }
+        events.twDefinitionAdded(Map.of(
+                "id", d.getId(),
+                "label", d.getLabel(),
+                "enabled", d.isEnabled(),
+                "sortOrder", d.getSortOrder()));
         return ResponseEntity.status(201).body(d);
     }
 
@@ -132,28 +130,31 @@ public class ApiAdminTwController {
 
     @PostMapping("/rebuild")
     public ResponseEntity<Void> rebuildNonOverriddenMappings() {
-        if (backfillService == null) {
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
-        }
-        backfillService.rebuildAllNonOverridden();
-        return ResponseEntity.accepted().build();
+        return backfillService
+                .map(backfill -> {
+                    backfill.rebuildAllNonOverridden();
+                    return ResponseEntity.accepted().<Void>build();
+                })
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "The TW backfill is not available"));
     }
 
     @PostMapping("/rebuild/force")
     public ResponseEntity<Void> rebuildMappings() {
-        if (backfillService == null) {
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
-        }
-        backfillService.rebuildAll();
-        return ResponseEntity.accepted().build();
+        return backfillService
+                .map(backfill -> {
+                    backfill.rebuildAll();
+                    return ResponseEntity.accepted().<Void>build();
+                })
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "The TW backfill is not available"));
     }
 
     @PostMapping("/rebuild/force-pinned")
     public ResponseEntity<Void> rebuildMappingsIncludingPinned() {
-        if (backfillService == null) {
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
-        }
-        backfillService.forceRebuildAllIncludingPinned();
-        return ResponseEntity.accepted().build();
+        return backfillService
+                .map(backfill -> {
+                    backfill.forceRebuildAllIncludingPinned();
+                    return ResponseEntity.accepted().<Void>build();
+                })
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "The TW backfill is not available"));
     }
 }

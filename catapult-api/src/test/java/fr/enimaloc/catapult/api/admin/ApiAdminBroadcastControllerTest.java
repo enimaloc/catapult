@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.ActivityLogService;
 import fr.enimaloc.catapult.service.account.ChannelAccessService;
+import fr.enimaloc.catapult.service.notification.AdminBroadcastService;
 import fr.enimaloc.catapult.service.notification.BroadcastRateLimiter;
 import fr.enimaloc.catapult.service.notification.BroadcastValidator;
 import fr.enimaloc.catapult.service.notification.RedisEventPublisher;
@@ -41,8 +42,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         controllers = ApiAdminBroadcastController.class,
         excludeAutoConfiguration = ThymeleafAutoConfiguration.class,
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
-@Import({BroadcastValidator.class, BroadcastRateLimiter.class, ApiUserResolver.class})
+@Import({BroadcastValidator.class, BroadcastRateLimiter.class, ApiUserResolver.class, AdminBroadcastService.class})
 class ApiAdminBroadcastControllerTest {
+    @MockitoBean fr.enimaloc.catapult.service.account.UserApiTokenService userApiTokenService;
     @MockitoBean ChannelAccessService channelAccessService;
 
     @Autowired MockMvc mvc;
@@ -51,6 +53,7 @@ class ApiAdminBroadcastControllerTest {
     @MockitoBean RedisEventPublisher publisher;
     @MockitoBean ActivityLogService activityLog;
     @MockitoBean UserAccountRepository userRepo;
+    @MockitoBean fr.enimaloc.catapult.service.metrics.CatapultApiMetrics apiMetrics;
 
     UserAccount admin;
 
@@ -61,14 +64,13 @@ class ApiAdminBroadcastControllerTest {
         when(userRepo.findByTwitchId(any())).thenReturn(Optional.of(admin));
     }
 
-    // Non-admin access is enforced by the path matcher in ApiSecurityConfig
-    // (.requestMatchers("/api/admin/**").hasRole("ADMIN")), which lives outside
-    // the @WebMvcTest slice. The @PreAuthorize annotation on the controller is
-    // a defence-in-depth marker; covered by the broader security integration tests.
+    // Admin access is enforced by the /api/internal/admin/** URL rule (Authz.admin()) in ApiSecurityConfig,
+    // which lives outside the @WebMvcTest slice. It is the only admin gate: the controller carries
+    // no annotation. The access matrix covers it.
 
     @Test
     void valid_alert_info_returns_202_and_publishes_on_global_channel() throws Exception {
-        mvc.perform(post("/api/admin/broadcast")
+        mvc.perform(post("/api/internal/admin/broadcasts")
                         .with(adminJwt())
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -86,7 +88,7 @@ class ApiAdminBroadcastControllerTest {
 
     @Test
     void valid_maintenance_scheduled_publishes() throws Exception {
-        mvc.perform(post("/api/admin/broadcast")
+        mvc.perform(post("/api/internal/admin/broadcasts")
                         .with(adminJwt())
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -103,7 +105,7 @@ class ApiAdminBroadcastControllerTest {
     @Test
     void reserved_lifecycle_name_returns_400() throws Exception {
         // Jackson rejects unknown subtypes with 400 (no matching @JsonSubTypes entry).
-        mvc.perform(post("/api/admin/broadcast")
+        mvc.perform(post("/api/internal/admin/broadcasts")
                         .with(adminJwt())
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -117,7 +119,7 @@ class ApiAdminBroadcastControllerTest {
 
     @Test
     void unknown_name_returns_400() throws Exception {
-        mvc.perform(post("/api/admin/broadcast")
+        mvc.perform(post("/api/internal/admin/broadcasts")
                         .with(adminJwt())
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -131,7 +133,7 @@ class ApiAdminBroadcastControllerTest {
     @Test
     void missing_required_field_returns_400() throws Exception {
         // alert.info requires title/body/ttlSeconds — omit `body` to trigger @Valid.
-        mvc.perform(post("/api/admin/broadcast")
+        mvc.perform(post("/api/internal/admin/broadcasts")
                         .with(adminJwt())
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -150,7 +152,7 @@ class ApiAdminBroadcastControllerTest {
                 "name", "alert.info", "title", "t", "body", "b", "ttlSeconds", 1));
 
         for (int i = 0; i < BroadcastRateLimiter.PER_MINUTE; i++) {
-            mvc.perform(post("/api/admin/broadcast")
+            mvc.perform(post("/api/internal/admin/broadcasts")
                             .with(adminJwt())
                             .with(csrf())
                             .contentType(MediaType.APPLICATION_JSON)
@@ -158,12 +160,31 @@ class ApiAdminBroadcastControllerTest {
                     .andExpect(status().isAccepted());
         }
 
-        mvc.perform(post("/api/admin/broadcast")
+        mvc.perform(post("/api/internal/admin/broadcasts")
                         .with(adminJwt())
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isTooManyRequests());
+    }
+
+    @Test
+    void broadcast_rateLimited_recordsAFailedAttemptAndAuditsNothing() throws Exception {
+        String body = om.writeValueAsString(Map.of(
+                "name", "alert.info", "title", "t", "body", "b", "ttlSeconds", 1));
+        for (int i = 0; i < BroadcastRateLimiter.PER_MINUTE; i++) {
+            mvc.perform(post("/api/internal/admin/broadcasts").with(adminJwt()).with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isAccepted());
+        }
+        org.mockito.Mockito.clearInvocations(publisher, activityLog, apiMetrics);
+
+        mvc.perform(post("/api/internal/admin/broadcasts").with(adminJwt()).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isTooManyRequests());
+
+        verify(apiMetrics).recordBroadcastAttempt("alert.info", false);
+        verify(apiMetrics, org.mockito.Mockito.never()).recordBroadcastAttempt(eq("alert.info"), eq(true));
+        verifyNoInteractions(publisher, activityLog);
     }
 
     private static org.springframework.test.web.servlet.request.RequestPostProcessor adminJwt() {

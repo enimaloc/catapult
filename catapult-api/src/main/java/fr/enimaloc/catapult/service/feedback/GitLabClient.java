@@ -3,7 +3,6 @@ package fr.enimaloc.catapult.service.feedback;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
@@ -13,7 +12,6 @@ import java.util.Map;
 
 @Slf4j
 @Service
-@ConditionalOnProperty(value = "gitlab.token", havingValue = "")
 public class GitLabClient {
 
     @Value("${gitlab.base-url:https://git.enimaloc.fr}")

@@ -31,7 +31,7 @@ public class MinecraftFriendLink {
     @JoinColumn(name = "service_account_id", nullable = false)
     private MinecraftServiceAccount serviceAccount;
 
-    /** UUID Mojang (format avec tirets). */
+    /** Mojang UUID (dashed format). */
     @Column(nullable = false)
     private String minecraftProfileId;
 

@@ -31,15 +31,15 @@ public class DtddApiKeyRotator {
     public DtddApiKeyRotator(DtddApiKeyRepository repository, MeterRegistry meterRegistry) {
         this.repository = repository;
         this.meterRegistry = meterRegistry;
-        // Pré-enregistre le compteur pour qu'il soit exporté à 0 avant le premier événement
+        // Pre-registers the counter so it is exported at 0 before the first event
         meterRegistry.counter("catapult.external.rate_limited", "api", "dtdd", "scope", "key");
         Gauge.builder("catapult.external.keys", this, DtddApiKeyRotator::availableKeyCount)
             .tag("api", "dtdd").tag("state", "available")
-            .description("Clés DTDD utilisables (pool partagé, hors rate limit)")
+            .description("Usable DTDD keys (shared pool, not rate-limited)")
             .register(meterRegistry);
         Gauge.builder("catapult.external.keys", this, DtddApiKeyRotator::blockedKeyCount)
             .tag("api", "dtdd").tag("state", "blocked")
-            .description("Clés DTDD bloquées par rate limit")
+            .description("DTDD keys blocked by rate limit")
             .register(meterRegistry);
         refreshKeys();
     }

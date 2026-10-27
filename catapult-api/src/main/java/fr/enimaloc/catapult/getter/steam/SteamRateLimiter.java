@@ -41,17 +41,17 @@ public class SteamRateLimiter {
         this.maxWaitMs = maxWaitMs;
         this.windowMs = windowMs;
         this.meterRegistry = meterRegistry;
-        // Pré-enregistre les compteurs pour qu'ils soient exportés à 0 avant le premier événement
+        // Pre-registers the counters so they are exported at 0 before the first event
         meterRegistry.counter("catapult.external.rate_limited", "api", "steam", "scope", "key");
         meterRegistry.counter("catapult.external.rate_limited", "api", "steam", "scope", "global");
         Gauge.builder("catapult.external.keys", this, SteamRateLimiter::blockedKeyCount)
             .tag("api", "steam").tag("state", "blocked")
-            .description("Clés Steam bloquées par rate limit")
+            .description("Steam keys blocked by rate limit")
             .register(meterRegistry);
         Gauge.builder("catapult.external.blocked", this,
                 l -> l.globalBlockedUntil > System.currentTimeMillis() ? 1 : 0)
             .tag("api", "steam").tag("scope", "global")
-            .description("1 si la pénalité globale Steam est active")
+            .description("1 if the global Steam penalty is active")
             .register(meterRegistry);
     }
 

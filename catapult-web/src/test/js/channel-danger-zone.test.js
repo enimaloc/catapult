@@ -98,6 +98,7 @@ describe("channel-danger-zone", () => {
     it.each([
         [403, "refused"],
         [401, "refused"],
+        [400, "down"],
         [502, "down"],
     ])("keeps the page, frees the button and shows a localized message on %i", async (status, label) => {
         postJson.mockImplementation(async () => response(status));

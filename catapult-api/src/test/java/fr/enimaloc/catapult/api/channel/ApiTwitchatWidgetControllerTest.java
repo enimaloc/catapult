@@ -8,6 +8,7 @@ import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.account.WidgetTokenService;
 import fr.enimaloc.catapult.service.notification.NotificationDeliveryDispatcher;
 import fr.enimaloc.catapult.service.notification.TwitchatActionExecutor;
+import fr.enimaloc.catapult.service.notification.TwitchatWidgetAccess;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.thymeleaf.autoconfigure.ThymeleafAutoConfiguration;
@@ -38,8 +39,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 // class needs to assert permitAll/auth behavior itself, scope addFilters=false to a narrower
 // @Nested class instead of widening it here.
 @AutoConfigureMockMvc(addFilters = false)
-@Import(I18nConfig.class)
+@Import({I18nConfig.class, TwitchatWidgetAccess.class})
 class ApiTwitchatWidgetControllerTest {
+    @MockitoBean fr.enimaloc.catapult.service.account.UserApiTokenService userApiTokenService;
 
     @Autowired MockMvc mvc;
 

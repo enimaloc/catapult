@@ -173,7 +173,7 @@
 <!--/*
   A member's targeting (#members/{id}): their custom flags (key / value, delete, add) and their groups
   (remove, add through a select of the groups they aren't in). A group key catapult-api lists but
-  /api/admin/groups doesn't (a race) is shown without a remove button. Driven by admin-members.js.
+  /api/internal/admin/groups doesn't (a race) is shown without a remove button. Driven by admin-members.js.
 */-->
 <div th:fragment="targeting" class="admin-view admin-targeting" th:attr="data-member-id=${member.id()},
         data-confirm-text=#{admin.confirm},data-cancel-text=#{admin.cancel},

@@ -12,6 +12,8 @@ import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.context.ApplicationEvent;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.List;
@@ -22,6 +24,7 @@ import java.util.concurrent.CompletableFuture;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -62,6 +65,22 @@ class SchedulerServiceCycleTest {
         verify(events).publishEvent(any(GameDetectedEvent.class));
         verify(steam).clearCycleCache();
         verify(minecraft).clearCycleCache();
+    }
+
+    @Test
+    void aDetection_tellsWhetherItIsTheFirstObservationSinceStart() {
+        when(chain.resolve(user)).thenReturn(Optional.of(portal));
+        when(gameState.hasChanged(user, portal)).thenReturn(true);
+        when(gameState.markObserved(user)).thenReturn(true, false);
+
+        scheduler.triggerManualCheck(user);
+        scheduler.triggerManualCheck(user);
+
+        ArgumentCaptor<ApplicationEvent> published = ArgumentCaptor.forClass(ApplicationEvent.class);
+        verify(events, times(2)).publishEvent(published.capture());
+        assertThat(published.getAllValues())
+                .map(e -> ((GameDetectedEvent) e).isFirstSinceStart())
+                .containsExactly(true, false);
     }
 
     @Test

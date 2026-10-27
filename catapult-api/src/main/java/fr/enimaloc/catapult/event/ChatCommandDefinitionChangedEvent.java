@@ -5,7 +5,7 @@ import org.springframework.context.ApplicationEvent;
 
 import java.util.UUID;
 
-/** Émis après création/édition/suppression d'une ChatCommandDefinition pour invalider les caches. */
+/** Emitted after a ChatCommandDefinition is created, edited or deleted, to invalidate the caches. */
 @Getter
 public class ChatCommandDefinitionChangedEvent extends ApplicationEvent {
     private final UUID userId;
