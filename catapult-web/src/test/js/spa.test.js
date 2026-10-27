@@ -246,6 +246,35 @@ describe("the navbar's channels", () => {
             expect(navFetches()).toBe(before + 1);
         });
 
+        it("rewrites them only when the polled list differs from the last one", async () => {
+            const nav = document.getElementById("nav-channels");
+            const writes = [];
+            const observer = new MutationObserver(records => writes.push(...records));
+            observer.observe(nav, { childList: true, subtree: true });
+
+            await CatapultSpa.loadNavChannels();
+            await flush();
+            expect(writes).toHaveLength(0);
+
+            fetchMock.mockImplementation(async () => response(200, NAV + '<a class="nav-channel" href="/channel/x">x</a>'));
+            await CatapultSpa.loadNavChannels();
+            await flush();
+            expect(writes.length).toBeGreaterThan(0);
+            expect(nav.querySelectorAll("a")).toHaveLength(3);
+            observer.disconnect();
+        });
+
+        it("rewrites them when told the list changed, even if the markup is the same", async () => {
+            const nav = document.getElementById("nav-channels");
+            const writes = [];
+            const observer = new MutationObserver(records => writes.push(...records));
+            observer.observe(nav, { childList: true, subtree: true });
+            FakeEventSource.last.fire("NavChannelsChanged", {});
+            await flush();
+            expect(writes.length).toBeGreaterThan(0);
+            observer.disconnect();
+        });
+
         it("reloads them on a reconnection, not on the first connection", async () => {
             const before = navFetches();
             FakeEventSource.last.fire("open", {});
