@@ -39,11 +39,20 @@ const FRAGMENT_DELAY_MS = 1000;
 const budgetsFile = join(__dirname, "dom-budgets.json");
 const resultsDir = process.env.PERF_RESULTS_DIR || join(__dirname, "..", "..", "perf-results");
 const resultsFile = join(resultsDir, "dom-mutations.json");
+/** DOM_MUTATIONS_SCREENSHOTS=dir: where to save how the dock and the channel page look after their event bursts. */
+const screenshotsDir = process.env.DOM_MUTATIONS_SCREENSHOTS;
 const COMPOSE = ["compose", "-p", "catapult-verify-perf", "-f", resolve(__dirname, "..", "..", "..", "perf", "compose.yml")];
 
 interface Result extends MutationCounts {
   scenario: string;
   budget: number | null;
+}
+
+/** Saves the page as dom-final-{name}.png in DOM_MUTATIONS_SCREENSHOTS, when set (after counting: never counted). */
+async function screenshot(page: Page, name: string) {
+  if (!screenshotsDir) return;
+  mkdirSync(screenshotsDir, { recursive: true });
+  await page.screenshot({ path: join(screenshotsDir, `dom-final-${name}.png`), fullPage: true });
 }
 
 /** Writes the scenario's counts to dom-mutations.json, then judges its nodes on its budget. */
@@ -257,7 +266,9 @@ test.describe("DOM mutations", () => {
       ];
       await startCounting(page);
       await oneByOne(page, events);
-      judge("dock-events", await stopCounting(page, EVENTS_WINDOW_MS));
+      const counts = await stopCounting(page, EVENTS_WINDOW_MS);
+      await screenshot(page, "dock");
+      judge("dock-events", counts);
     } finally {
       await device.dispose();
     }
@@ -296,7 +307,9 @@ test.describe("DOM mutations", () => {
     ];
     await startCounting(page);
     await oneByOne(page, events);
-    judge("channel-live-events", await stopCounting(page, EVENTS_WINDOW_MS));
+    const counts = await stopCounting(page, EVENTS_WINDOW_MS);
+    await screenshot(page, "channel");
+    judge("channel-live-events", counts);
   });
 
   test("@perf dom channel-reconnect", async ({ page }) => {
