@@ -15,6 +15,8 @@ import fr.enimaloc.catapult.common.dto.admin.FlagKeyDto;
 import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.MetaTagAttribute;
 import fr.enimaloc.catapult.common.dto.admin.MetaTagDto;
+import fr.enimaloc.catapult.common.dto.admin.SocialLinkDto;
+import fr.enimaloc.catapult.common.dto.admin.SocialPlatform;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingDto;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto;
 import fr.enimaloc.catapult.common.dto.channel.BindingDto;
@@ -110,6 +112,8 @@ public final class FakeApi extends Dispatcher {
         route(DEGRADED, caller -> new DegradedStatusDto(false, List.of()));
         route("/api/internal/meta-tags", caller -> list(i -> new MetaTagDto(i + 1, MetaTagAttribute.NAME,
                 "budget-tag-" + i, "Budget content " + i, AT)));
+        route("/api/internal/social-links", caller -> list(i -> new SocialLinkDto(i + 1, SocialPlatform.OTHER,
+                "Budget link " + i, "https://budget.example/" + i, true, i)));
         route("/api/internal/users", caller -> new UserRefDto(OWNER, OWNER_LOGIN));
         route("/api/internal/auth/validate", caller -> new UserInfoResponse(caller, twitchId(caller),
                 login(caller), avatar(caller), "ACTIVE", roles(caller), null));

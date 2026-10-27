@@ -51,6 +51,7 @@ class ModelFillerTest {
     private final ApiService api = mock(ApiService.class);
     private final StaticMessageSource messages = new StaticMessageSource();
     private final SiteMetaTags siteMetaTags = mock(SiteMetaTags.class);
+    private final SiteSocialLinks siteSocialLinks = mock(SiteSocialLinks.class);
     /** No DegradedState unless a test gives one (getIfAvailable answers null). */
     @SuppressWarnings("unchecked")
     private final ObjectProvider<DegradedState> degradedState = mock(ObjectProvider.class);
@@ -63,8 +64,11 @@ class ModelFillerTest {
         @SuppressWarnings("unchecked")
         ObjectProvider<SiteMetaTags> metaTags = mock(ObjectProvider.class);
         when(metaTags.getIfAvailable()).thenReturn(siteMetaTags);
+        @SuppressWarnings("unchecked")
+        ObjectProvider<SiteSocialLinks> socialLinksProvider = mock(ObjectProvider.class);
+        when(socialLinksProvider.getIfAvailable()).thenReturn(siteSocialLinks);
         return new ModelFiller(buildProperties, messages, api, new TwitchatEventForms(TwitchatCatalog.load()), metaTags,
-                degradedState, degradedLabels);
+                socialLinksProvider, degradedState, degradedLabels);
     }
 
     private ModelFiller filler() {
