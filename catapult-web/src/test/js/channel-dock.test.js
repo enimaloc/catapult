@@ -316,6 +316,8 @@ describe("live events", () => {
         ["TwUpdatedEvent", { bindingId: "b1" }],
         ["TwEnabledStateEvent", { bindingId: "b1" }],
         ["ChannelSettingsUpdatedEvent", { settings: { ccl: { enabled: true, blockedCcls: [] } } }],
+        ["ChannelSettingsUpdatedEvent", { settings: { ccl: { enabled: true }, tw: { enabled: true, blockedTws: [] } } }],
+        ["ChannelSettingsUpdatedEvent", { settings: { ccl: { enabled: true, blockedCcls: [] }, tw: { enabled: true } } }],
         ["TwResetEvent", null],
     ])("re-renders for a %s lacking a field it patches with", async (eventName, data) => {
         dock();
@@ -333,6 +335,34 @@ describe("live events", () => {
         dock(false);
         await apply("GameChangedEvent", { bindingId: "b3", sourceType: "STEAM", sourceName: "Bound" });
         expect(CatapultSpa.navigate).toHaveBeenCalledTimes(2);
+    });
+
+    it("re-renders for a binding coming for the game it shows unbound", async () => {
+        dock(false);
+        await apply("GameChangedEvent", { bindingId: null, sourceType: "STEAM", sourceName: "Unbound" });
+        expect(CatapultSpa.navigate).not.toHaveBeenCalled();
+
+        await apply("BindingUpdatedEvent", { bindingId: "b9", twitchGameId: "1", twitchGameName: "Unbound", ccls: [] });
+        expect(CatapultSpa.navigate).toHaveBeenCalledTimes(1);
+    });
+
+    it("leaves a binding coming while no game is played", async () => {
+        dock(false);
+        await apply("BindingUpdatedEvent", { bindingId: "b9", twitchGameId: "1", twitchGameName: "Other", ccls: [] });
+
+        expect(CatapultSpa.navigate).not.toHaveBeenCalled();
+    });
+
+    it("leaves another binding's update alone while it shows one", async () => {
+        dock();
+        const observer = new MutationObserver(() => {});
+        observer.observe(document.body, { childList: true, subtree: true, attributes: true });
+        await apply("BindingUpdatedEvent", { bindingId: "b2", twitchGameId: "1", twitchGameName: "Other", ccls: ["ccl-d"] });
+
+        const records = observer.takeRecords();
+        observer.disconnect();
+        expect(records).toHaveLength(0);
+        expect(CatapultSpa.navigate).not.toHaveBeenCalled();
     });
 
     it("re-renders once more for an event arriving while a re-render is under way", async () => {

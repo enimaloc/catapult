@@ -6,7 +6,8 @@
  * Its live events update it in place (channel-events.js hands them to apply(), not to the full page's
  * handlers, which expect its bindings list): the template's spa:* rules through Visibility, as on the
  * full page, and the few patches below for the rest. It is re-rendered only for what it can't patch:
- * the game played now going to another binding (whose switches it hasn't), an event lacking a field
+ * the game played now going to another binding (whose switches it hasn't), a binding coming for the
+ * game it shows unbound, an event lacking a field
  * its patch reads (sent by an older catapult-web during a deployment), or one arriving while a
  * re-render is under way. Those come in bursts (a game change and its binding's events), so they are
  * coalesced into one re-render.
@@ -67,7 +68,9 @@ window.CatapultDock = (function () {
     function complete(eventName, data) {
         if (!data || typeof data !== "object") return false;
         if (!FIELDS[eventName].every(field => field in data)) return false;
-        return eventName !== "ChannelSettingsUpdatedEvent" || (!!data.settings?.ccl && !!data.settings?.tw);
+        if (eventName !== "ChannelSettingsUpdatedEvent") return true;
+        const { ccl, tw } = data.settings ?? {};
+        return Array.isArray(ccl?.blockedCcls) && Array.isArray(tw?.blockedTws);
     }
 
     /** Sets a channel-wide switch to the feature's state and the blocked list it sends back. */
@@ -106,13 +109,23 @@ window.CatapultDock = (function () {
         },
     };
 
+    /** Whether the dock shows a game played now, which has no binding it shows. */
+    function unboundGame() {
+        const game = byId("channel-current-game");
+        return bindingId() === "" && !!game && !game.classList.contains("hidden");
+    }
+
     /** Brings the dock up to one of its live events: in place when it can, by a re-render otherwise. */
     function apply(eventName, data) {
         if (!EVENTS.includes(eventName) || !active()) return;
-        const elsewhere = eventName === "GameChangedEvent" && complete(eventName, data)
-            && (data.bindingId ?? "") !== bindingId();
+        const known = complete(eventName, data);
+        const elsewhere = known && eventName === "GameChangedEvent" && (data.bindingId ?? "") !== bindingId();
+        // A binding created (or re-pointed) for the game played now: its event doesn't say which game
+        // is its, so a dock showing that game unbound re-renders to find out. With a binding shown,
+        // another one's events are someone else's.
+        const created = known && eventName === "BindingUpdatedEvent" && unboundGame();
         // A re-render already asked for (or under way) may predate this event: one more catches it.
-        if (pending !== null || rendering || elsewhere || !complete(eventName, data)) {
+        if (pending !== null || rendering || elsewhere || created || !known) {
             refresh();
             return;
         }
