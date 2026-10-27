@@ -3,10 +3,13 @@
  * which channel-status.js wires; this wires the CCL and TW switches: the channel-wide ones (sent with
  * the blocked lists they leave untouched) and those of the binding of the game played now.
  *
- * The dock has none of the full page's per-element live rules: every event changing what it shows
- * re-renders it instead (channel-events.js hands those to refresh(), before its own handlers, which
- * expect the full page's bindings list). The events of one change come in bursts (a CCL switch's
- * BindingUpdatedEvent and CclStateEvent), so they are coalesced into one re-render.
+ * Its live events update it in place (channel-events.js hands them to apply(), not to the full page's
+ * handlers, which expect its bindings list): the template's spa:* rules through Visibility, as on the
+ * full page, and the few patches below for the rest. It is re-rendered only for what it can't patch:
+ * the game played now going to another binding (whose switches it hasn't), an event lacking a field
+ * its patch reads (sent by an older catapult-web during a deployment), or one arriving while a
+ * re-render is under way. Those come in bursts (a game change and its binding's events), so they are
+ * coalesced into one re-render.
  */
 window.CatapultDock = (function () {
     const EVENTS = [
@@ -14,11 +17,26 @@ window.CatapultDock = (function () {
         "BindingDeletedEvent", "TwUpdatedEvent", "TwResetEvent", "TwEnabledStateEvent",
         "ChannelSettingsUpdatedEvent",
     ];
+    // The payload fields each event's patch reads.
+    const FIELDS = {
+        GameChangedEvent: ["bindingId", "sourceName"],
+        BotStateChangedEvent: ["state"],
+        CclStateEvent: ["bindingId", "enabled"],
+        BindingUpdatedEvent: ["bindingId", "twitchGameId", "twitchGameName", "ccls"],
+        BindingDeletedEvent: ["bindingId"],
+        TwUpdatedEvent: ["bindingId", "tws"],
+        TwResetEvent: ["bindingId"],
+        TwEnabledStateEvent: ["bindingId", "enabled"],
+        ChannelSettingsUpdatedEvent: ["settings"],
+    };
     const COALESCE_MS = 150;
     let pending = null;
+    let rendering = false;
+
+    const byId = id => document.getElementById(id);
 
     function active() {
-        return document.getElementById("obs-dock") !== null;
+        return byId("obs-dock") !== null;
     }
 
     function refresh() {
@@ -26,10 +44,80 @@ window.CatapultDock = (function () {
         // spa.js scrolls a render to the top: a dock scrolled down to its TW must stay there.
         pending = setTimeout(async () => {
             pending = null;
+            rendering = true;
             const top = window.scrollY;
-            await CatapultChannel.refresh();
+            try {
+                await CatapultChannel.refresh();
+            } finally {
+                rendering = false;
+            }
             window.scrollTo({ top, behavior: "instant" });
         }, COALESCE_MS);
+    }
+
+    /** The element holding the binding of the game played now, and its id ("" for none). */
+    function binding() {
+        return document.querySelector("#obs-dock .obs-dock-binding");
+    }
+
+    function bindingId() {
+        return binding()?.dataset.bindingId ?? "";
+    }
+
+    function complete(eventName, data) {
+        if (!data || typeof data !== "object") return false;
+        if (!FIELDS[eventName].every(field => field in data)) return false;
+        return eventName !== "ChannelSettingsUpdatedEvent" || (!!data.settings?.ccl && !!data.settings?.tw);
+    }
+
+    /** Sets a channel-wide switch to the feature's state and the blocked list it sends back. */
+    function setGlobal(id, enabled, blockedIds) {
+        const sw = byId(id);
+        if (!sw) return;
+        sw.checked = !!enabled;
+        sw.dataset.blocked = (blockedIds ?? []).join(",");
+    }
+
+    // What the spa:* rules can't do: the binding's game (sent back with its CCL), its removal, and the
+    // channel-wide switches, whose state comes nested in the settings.
+    const patches = {
+        BindingUpdatedEvent(data) {
+            const el = binding();
+            if (!el || data.bindingId !== bindingId()) return;
+            el.dataset.gameId = data.twitchGameId ?? "";
+            el.dataset.gameName = data.twitchGameName ?? "";
+        },
+        BindingDeletedEvent(data) {
+            const el = binding();
+            if (!el || data.bindingId !== bindingId()) return;
+            el.querySelectorAll(".obs-dock-binding-part").forEach(part => part.remove());
+            el.querySelectorAll(".obs-dock-no-binding").forEach(p => p.classList.remove("hidden"));
+            delete el.dataset.bindingId;
+            delete el.dataset.gameId;
+            delete el.dataset.gameName;
+        },
+        ChannelSettingsUpdatedEvent({ settings: { ccl, tw } }) {
+            setGlobal("obs-dock-ccl-enabled", ccl.enabled, ccl.blockedCcls);
+            setGlobal("obs-dock-tw-enabled", tw.enabled, tw.blockedTws);
+            const blockedCcls = new Set(ccl.blockedCcls ?? []);
+            binding()?.querySelectorAll(".obs-dock-binding-ccl").forEach(sw => {
+                sw.disabled = blockedCcls.has(sw.value);
+            });
+        },
+    };
+
+    /** Brings the dock up to one of its live events: in place when it can, by a re-render otherwise. */
+    function apply(eventName, data) {
+        if (!EVENTS.includes(eventName) || !active()) return;
+        const elsewhere = eventName === "GameChangedEvent" && complete(eventName, data)
+            && (data.bindingId ?? "") !== bindingId();
+        // A re-render already asked for (or under way) may predate this event: one more catches it.
+        if (pending !== null || rendering || elsewhere || !complete(eventName, data)) {
+            refresh();
+            return;
+        }
+        Visibility.dispatch(eventName, data);
+        patches[eventName]?.(data);
     }
 
     /** The ids a switch's data-blocked carries ("" for none). */
@@ -74,5 +162,5 @@ window.CatapultDock = (function () {
 
     document.addEventListener("catapult:render", wire);
 
-    return { EVENTS, active, refresh };
+    return { EVENTS, active, apply, refresh };
 })();

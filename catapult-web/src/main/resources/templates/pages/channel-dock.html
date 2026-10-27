@@ -1,7 +1,8 @@
 <!--/*
   The channel page as an OBS dock (ObsDock): what a streamer checks and flips during a live, in a
   narrow column. The game and bot rows keep the full page's ids, so channel-status.js wires them as
-  it does there; channel-dock.js wires the rest and re-renders the dock on the events changing it.
+  it does there; channel-dock.js wires the rest. The live events update it in place, through the
+  same spa:* rules as the full page's (visibility.js) and channel-dock.js for the rest.
 */-->
 <!--/*@thymesVar id="channelPage" type="fr.enimaloc.catapult.common.dto.channel.ChannelPageData"*/-->
 <!--/*@thymesVar id="channelSettings" type="fr.enimaloc.catapult.common.dto.channel.UserSettingsDto"*/-->
@@ -16,19 +17,24 @@
     <th:block th:unless="${dockLogin}" th:with="ch=${channelPage}, settings=${channelSettings}, b=${currentBinding}">
         <div class="obs-dock-row obs-dock-game">
             <mdui-icon name="sports_esports"></mdui-icon>
-            <span id="channel-current-game" class="obs-dock-game-name" th:if="${ch.currentGame() != null}"
-                  th:text="${ch.currentGame().sourceName()}">Game</span>
-            <span id="channel-no-game" class="obs-dock-muted" th:if="${ch.currentGame() == null}"
+            <span id="channel-current-game" class="obs-dock-game-name"
+                  spa:if="hasGame:${ch.currentGame() != null}" spa:on="hasGame:GameChangedEvent.sourceName"
+                  spa:value="textContent:GameChangedEvent.sourceName"
+                  th:text="${ch.currentGame() != null ? ch.currentGame().sourceName() : ''}">Game</span>
+            <span id="channel-no-game" class="obs-dock-muted" spa:if="noGame:${ch.currentGame() == null}"
+                  spa:on="noGame:GameChangedEvent.!sourceName"
                   th:text="#{channel.status.no_game}">Aucun jeu détecté</span>
         </div>
 
         <label class="obs-dock-row" th:if="${ch.isOwner()}">
             <mdui-switch id="channel-bot-toggle" th:checked="${ch.botEnabled()}"
+                         spa:value="checked:BotStateChangedEvent.state"
                          th:attr="data-toggle-url=@{/channel/{u}/settings/bot(u=${ch.channelUsername()})}"></mdui-switch>
             <span th:text="#{channel.status.bot_enabled}">Bot activé</span>
         </label>
 
-        <!--/* The game now played: its binding's own CCL and TW, under the channel-wide switches. */-->
+        <!--/* The game now played: its binding's own CCL and TW, under the channel-wide switches. Its
+             rows (obs-dock-binding-part) go when it is deleted, which shows obs-dock-no-binding. */-->
         <div class="obs-dock-binding" th:attr="data-binding-id=${b?.id()},data-game-id=${b?.twitchGameId()},
                 data-game-name=${b?.twitchGameName()}">
             <mdui-card variant="outlined" class="obs-dock-card" id="obs-dock-ccl">
@@ -39,20 +45,23 @@
                     <span th:text="#{channel.dock.all_channel}">Toute la chaîne</span>
                 </label>
                 <th:block th:if="${b != null}">
-                    <label class="obs-dock-row">
-                        <mdui-switch id="obs-dock-binding-ccl-enabled" th:checked="${b.cclEnabled()}"></mdui-switch>
+                    <label class="obs-dock-row obs-dock-binding-part">
+                        <mdui-switch id="obs-dock-binding-ccl-enabled" th:checked="${b.cclEnabled()}"
+                                     spa:value="checked:CclStateEvent.enabled"></mdui-switch>
                         <span th:text="#{channel.dock.this_game}">Ce jeu</span>
                     </label>
-                    <div class="obs-dock-items">
+                    <div class="obs-dock-items obs-dock-binding-part">
                         <label th:each="ccl : ${ch.availableCcls()}">
                             <mdui-switch class="obs-dock-binding-ccl" th:value="${ccl.id()}"
+                                         spa:in="checked:BindingUpdatedEvent.ccls"
                                          th:checked="${b.ccls().contains(ccl.id())}"
                                          th:disabled="${ch.blockedCcls().contains(ccl.id())}"></mdui-switch>
                             <span th:text="${ccl.name()}">ccl</span>
                         </label>
                     </div>
                 </th:block>
-                <p th:if="${b == null}" class="obs-dock-muted" th:text="#{channel.dock.no_binding}">
+                <p class="obs-dock-muted obs-dock-no-binding" th:classappend="${b != null} ? 'hidden'"
+                   th:text="#{channel.dock.no_binding}">
                     Aucune association pour le jeu en cours.
                 </p>
             </mdui-card>
@@ -66,19 +75,22 @@
                 </label>
                 <!--/* A binding's TW are its owner's to change, as on the full page. */-->
                 <th:block th:if="${b != null and ch.isOwner()}">
-                    <label class="obs-dock-row">
-                        <mdui-switch id="obs-dock-binding-tw-enabled" th:checked="${b.twEnabled()}"></mdui-switch>
+                    <label class="obs-dock-row obs-dock-binding-part">
+                        <mdui-switch id="obs-dock-binding-tw-enabled" th:checked="${b.twEnabled()}"
+                                     spa:value="checked:TwEnabledStateEvent.enabled"></mdui-switch>
                         <span th:text="#{channel.dock.this_game}">Ce jeu</span>
                     </label>
-                    <div class="obs-dock-items">
+                    <div class="obs-dock-items obs-dock-binding-part">
                         <label th:each="tw : ${ch.availableTws()}">
                             <mdui-switch class="obs-dock-binding-tw" th:value="${tw.id()}"
+                                         spa:in="checked:TwUpdatedEvent.tws,checked:TwResetEvent.tws"
                                          th:checked="${b.tws().contains(tw.id())}"></mdui-switch>
                             <span th:text="${tw.label()}">tw</span>
                         </label>
                     </div>
                 </th:block>
-                <p th:if="${b == null}" class="obs-dock-muted" th:text="#{channel.dock.no_binding}">
+                <p class="obs-dock-muted obs-dock-no-binding" th:classappend="${b != null} ? 'hidden'"
+                   th:text="#{channel.dock.no_binding}">
                     Aucune association pour le jeu en cours.
                 </p>
             </mdui-card>

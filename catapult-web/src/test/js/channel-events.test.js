@@ -300,11 +300,11 @@ describe("reconnection", () => {
 });
 
 describe("in the OBS dock", () => {
-    let refresh;
+    let apply;
 
     beforeEach(() => {
-        refresh = vi.fn();
-        window.CatapultDock = { active: () => true, EVENTS: ["GameChangedEvent", "TwUpdatedEvent"], refresh };
+        apply = vi.fn();
+        window.CatapultDock = { active: () => true, EVENTS: ["GameChangedEvent", "TwUpdatedEvent"], apply };
         history.replaceState(null, "", "/channel/enimaloc/dock");
     });
 
@@ -328,7 +328,8 @@ describe("in the OBS dock", () => {
         current().emit("BindingDeletedEvent", { bindingId: "b1" });
         current().emit("ChannelLiveStateEvent", { state: true });
 
-        expect(refresh).toHaveBeenCalledTimes(1);
+        expect(apply).toHaveBeenCalledTimes(1);
+        expect(apply).toHaveBeenCalledWith("GameChangedEvent", { bindingId: "b7", sourceName: "X" });
         expect(document.getElementById("live").classList.contains("hidden")).toBe(true);
     });
 });

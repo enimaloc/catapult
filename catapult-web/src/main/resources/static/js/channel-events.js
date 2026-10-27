@@ -67,13 +67,13 @@
         }
         registeredEvents.add(eventName);
         source.addEventListener(eventName, event => {
-            // The OBS dock re-renders itself on what changes it (channel-dock.js): the handlers below
-            // patch the full page, whose elements it doesn't have.
+            const data = JSON.parse(event.data);
+            // The OBS dock applies its own events (channel-dock.js): the handlers below patch the
+            // full page, whose elements it doesn't have.
             if (window.CatapultDock?.active()) {
-                if (CatapultDock.EVENTS.includes(eventName)) CatapultDock.refresh();
+                if (CatapultDock.EVENTS.includes(eventName)) CatapultDock.apply(eventName, data);
                 return;
             }
-            const data = JSON.parse(event.data);
             Visibility.dispatch(eventName, data);
             const handler = customHandlers[eventName];
             if (handler) {

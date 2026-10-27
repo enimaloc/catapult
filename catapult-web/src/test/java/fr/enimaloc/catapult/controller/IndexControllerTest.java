@@ -736,7 +736,28 @@ class IndexControllerTest {
                 .contains("id=\"obs-dock-ccl-enabled\"").contains("data-blocked=\"ccl-b\"")
                 .contains("id=\"obs-dock-binding-ccl-enabled\"").contains("id=\"obs-dock-binding-tw-enabled\"")
                 .containsPattern("class=\"obs-dock-binding-ccl\" value=\"ccl-b\"[^>]*disabled")
-                .doesNotContain("id=\"channel-no-game\"");
+                .containsPattern("id=\"channel-no-game\" class=\"obs-dock-muted hidden\"")
+                .containsPattern("class=\"obs-dock-muted obs-dock-no-binding hidden\"");
+    }
+
+    /** Its live events patch it in place: it carries the full page's spa:* rules for them. */
+    @Test
+    void dock_carriesTheLiveRulesOfWhatItShows() throws Exception {
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(playingValheim());
+        when(apiService.currentBinding("enimaloc")).thenReturn(new BindingDto("b1", "AUTO", "STEAM", "Valheim",
+                "508455", "Valheim", false, true, java.util.Set.of("ccl-a"), true, false, java.util.Set.of("tw-a")));
+
+        String html = mvc.perform(get("/spa/channel/enimaloc/dock").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+
+        assertThat(html).contains("data-value=\"textContent:GameChangedEvent.sourceName\"")
+                .contains("data-on=\"noGame:GameChangedEvent.!sourceName\"")
+                .contains("data-value=\"checked:BotStateChangedEvent.state\"")
+                .contains("data-value=\"checked:CclStateEvent.enabled\"")
+                .contains("data-in=\"checked:BindingUpdatedEvent.ccls\"")
+                .contains("data-value=\"checked:TwEnabledStateEvent.enabled\"")
+                .contains("data-in=\"checked:TwUpdatedEvent.tws,checked:TwResetEvent.tws\"")
+                .contains("class=\"obs-dock-row obs-dock-binding-part\"");
     }
 
     @Test
@@ -745,7 +766,9 @@ class IndexControllerTest {
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
 
         assertThat(html).contains("id=\"channel-no-game\"").contains("id=\"obs-dock-ccl-enabled\"")
-                .contains("id=\"obs-dock-tw-enabled\"").doesNotContain("id=\"obs-dock-binding-ccl-enabled\"");
+                .contains("id=\"obs-dock-tw-enabled\"").doesNotContain("id=\"obs-dock-binding-ccl-enabled\"")
+                .contains("class=\"obs-dock-muted obs-dock-no-binding\"")
+                .containsPattern("id=\"channel-current-game\" class=\"obs-dock-game-name hidden\"");
         verify(apiService, never()).currentBinding(any());
     }
 }
