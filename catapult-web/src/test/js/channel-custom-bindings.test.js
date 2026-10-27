@@ -221,6 +221,30 @@ describe("overview list: activation", () => {
         expect(document.activeElement).toBe(activateBtn(DEV));
     });
 
+    it("still moves the focus when disabling the clicked button blurs it, as a browser may", async () => {
+        overview();
+        // A disabled mdui-button whose inner <button> gets disabled loses the focus in Chrome.
+        [activateBtn(DEV), stopBtn(DEV)].forEach(button => {
+            let disabled = false;
+            Object.defineProperty(button, "disabled", {
+                configurable: true,
+                get: () => disabled,
+                set: value => {
+                    disabled = value;
+                    if (value) button.blur();
+                }
+            });
+        });
+        activateBtn(DEV).focus();
+        activateBtn(DEV).click();
+        await flush();
+        expect(document.activeElement).toBe(stopBtn(DEV));
+
+        stopBtn(DEV).click();
+        await flush();
+        expect(document.activeElement).toBe(activateBtn(DEV));
+    });
+
     it("leaves the focus alone when it was outside the row", async () => {
         overview();
         byId("custom-binding-new-btn").setAttribute("tabindex", "0");

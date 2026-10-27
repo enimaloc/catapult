@@ -76,19 +76,22 @@ window.CatapultCustomBindings = (function () {
             show(error, true);
         }
 
-        /** Runs `task` with `button` disabled, so a double click sends one request. */
+        /**
+         * Runs `task` with `button` disabled, so a double click sends one request. `task` is told whether the
+         * focus was in the button's row beforehand: disabling a focused button may blur it.
+         */
         async function busy(button, task) {
             if (button.disabled) return;
+            const focused = !!button.closest(".custom-binding-item")?.contains(document.activeElement);
             button.disabled = true;
             try {
-                await task();
+                await task(focused);
             } finally {
                 button.disabled = false;
             }
         }
 
-        async function act(item, url, activeId) {
-            const focused = item.contains(document.activeElement);
+        async function act(item, url, activeId, focused) {
             const response = await post(url, {});
             if (!response) return tell(CatapultChannel.unreachable());
             if (!response.ok) return tell(refusalText(list, await readCode(response), response.status));
@@ -141,8 +144,8 @@ window.CatapultCustomBindings = (function () {
 
             const on = (selector, handler) => item.querySelector(selector)
                 ?.addEventListener("click", event => busy(event.currentTarget, handler));
-            on(".custom-binding-activate", () => act(item, `${base}/${id}/activate`, id));
-            on(".custom-binding-stop", () => act(item, `${base}/deactivate`, null));
+            on(".custom-binding-activate", focused => act(item, `${base}/${id}/activate`, id, focused));
+            on(".custom-binding-stop", focused => act(item, `${base}/deactivate`, null, focused));
             on(".custom-binding-save", () => save(item, id, game));
             item.querySelector(".custom-binding-delete")?.addEventListener("click", () => {
                 deletingId = id;

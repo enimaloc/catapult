@@ -19,9 +19,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -104,8 +104,8 @@ class ChannelCustomBindingsRenderingTest {
         }
     }
 
-    /** The first start tag of {@code html} matching {@code which}; fails the test when there is none. */
-    private static Tag tag(String html, Predicate<Tag> which) {
+    /** The first start tag of {@code html} matching {@code which} (told as {@code what}), else the test fails. */
+    private static Tag tag(String html, String what, Predicate<Tag> which) {
         Matcher m = START_TAG.matcher(html);
         while (m.find()) {
             Map<String, String> attributes = new HashMap<>();
@@ -114,15 +114,15 @@ class ChannelCustomBindingsRenderingTest {
             Tag tag = new Tag(m.group(1), attributes, m.group(3).trim());
             if (which.test(tag)) return tag;
         }
-        throw new AssertionError("no matching tag");
+        throw new AssertionError("no tag with " + what);
     }
 
     private static Tag byId(String html, String id) {
-        return tag(html, t -> id.equals(t.attr("id")));
+        return tag(html, "id=\"" + id + "\"", t -> id.equals(t.attr("id")));
     }
 
     private static Tag byClass(String html, String className) {
-        return tag(html, t -> t.hasClass(className));
+        return tag(html, "class " + className, t -> t.hasClass(className));
     }
 
     @Test
