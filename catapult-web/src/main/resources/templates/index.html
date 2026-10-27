@@ -127,8 +127,17 @@
         <div class="footer-links">
             <a data-link href="/privacy" th:text="#{footer.privacy}">footer.privacy</a>
             <a data-link href="/changelog" th:text="#{footer.changelog}">footer.changelog</a>
-            <a href="https://github.com/enimaloc/catapult" target="_blank" rel="noopener noreferrer"
-               th:text="#{footer.github}">footer.github</a>
+            <a data-link href="/docs/api" th:text="#{footer.api}">footer.api</a>
+            <!--/* Only https links are rendered, whatever catapult-api answered. */-->
+            <th:block th:each="socialLink : ${socialLinks}">
+                <a th:if="${#strings.startsWith(#strings.toLowerCase(socialLink.url), 'https://')}" class="footer-social"
+                   th:with="name=${socialLink.label != null and !#strings.isEmpty(socialLink.label)} ? ${socialLink.label} : #{'social.platform.' + ${socialLink.platform}}"
+                   th:href="${socialLink.url}" th:title="${name}" th:attr="data-platform=${socialLink.platform}"
+                   target="_blank" rel="noopener noreferrer">
+                    <th:block th:replace="~{fragments/social-icon :: icon(${socialLink.platform})}"></th:block>
+                    <span class="footer-social-name" th:text="${name}">social</span>
+                </a>
+            </th:block>
             <!--/* See BuildVersionAdvice: absent when the build wrote no version. */-->
             <span th:if="${appVersion != null}" class="version" th:text="#{footer.version(${appVersion})}">footer.version</span>
         </div>
@@ -194,6 +203,7 @@
 <script src="/js/channel-invite.js"></script>
 <script src="/js/channel-obs-widget.js"></script>
 <script src="/js/channel-command-migration.js"></script>
+<script src="/js/api-docs.js"></script>
 <script src="/js/admin-members.js"></script>
 <script src="/js/admin-tabs.js"></script>
 <script src="/js/admin-member-debug.js"></script>
@@ -203,6 +213,7 @@
 <script src="/js/well-known-forms.js"></script>
 <script src="/js/admin-well-known.js"></script>
 <script src="/js/admin-meta-tags.js"></script>
+<script src="/js/admin-social-links.js"></script>
 <script src="/js/admin-notifications.js"></script>
 <script src="/js/admin-dtdd-mapping.js"></script>
 <script src="/js/admin-game-mappings.js"></script>

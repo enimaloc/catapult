@@ -38,6 +38,9 @@ import fr.enimaloc.catapult.common.dto.admin.TwRebuild;
 import fr.enimaloc.catapult.common.dto.admin.AccountDto;
 import fr.enimaloc.catapult.common.dto.admin.MetaTagDto;
 import fr.enimaloc.catapult.common.dto.admin.MetaTagRequest;
+import fr.enimaloc.catapult.common.dto.admin.SocialLinkDto;
+import fr.enimaloc.catapult.common.dto.admin.SocialLinkOrderRequest;
+import fr.enimaloc.catapult.common.dto.admin.SocialLinkRequest;
 import fr.enimaloc.catapult.common.dto.admin.MinecraftDeviceCodeDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.SteamKeysPageData;
@@ -691,6 +694,39 @@ public class RealApiService implements ApiService {
     @Override
     public int adminDeleteMetaTag(long id) {
         return client.call(HttpMethod.DELETE, "/api/internal/admin/meta-tags/{id}", null, Void.class, id).status();
+    }
+
+    @Override
+    public List<SocialLinkDto> socialLinks() {
+        ApiClient.Result<SocialLinkDto[]> result = client.getAnonymous("/api/internal/social-links", SocialLinkDto[].class);
+        return result.status() == 200 && result.body() != null ? List.of(result.body()) : null;
+    }
+
+    @Override
+    public List<SocialLinkDto> adminSocialLinks() {
+        ApiClient.Result<SocialLinkDto[]> result = client.getResult("/api/internal/admin/social-links", SocialLinkDto[].class);
+        return result.status() == 200 && result.body() != null ? List.of(result.body()) : null;
+    }
+
+    @Override
+    public int adminCreateSocialLink(SocialLinkRequest request) {
+        return client.call(HttpMethod.POST, "/api/internal/admin/social-links", request, Void.class).status();
+    }
+
+    @Override
+    public int adminUpdateSocialLink(long id, SocialLinkRequest request) {
+        return client.call(HttpMethod.PUT, "/api/internal/admin/social-links/{id}", request, Void.class, id).status();
+    }
+
+    @Override
+    public int adminDeleteSocialLink(long id) {
+        return client.call(HttpMethod.DELETE, "/api/internal/admin/social-links/{id}", null, Void.class, id).status();
+    }
+
+    @Override
+    public int adminOrderSocialLinks(List<Long> ids) {
+        return client.call(HttpMethod.PUT, "/api/internal/admin/social-links/order", new SocialLinkOrderRequest(ids),
+                Void.class).status();
     }
 
     @Override

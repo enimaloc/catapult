@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import fr.enimaloc.catapult.controller.SiteMetaTags;
 import fr.enimaloc.catapult.controller.SiteMetaTagsTestAccess;
+import fr.enimaloc.catapult.controller.SiteSocialLinks;
+import fr.enimaloc.catapult.controller.SiteSocialLinksTestAccess;
 import fr.enimaloc.catapult.perf.FakeApi;
 import fr.enimaloc.catapult.service.debug.DebugMembers;
 import fr.enimaloc.catapult.service.http.ApiClient;
@@ -104,6 +106,9 @@ class WebPageBudgetTest extends WebFullContextTestBase {
 
     @Autowired
     SiteMetaTags metaTags;
+
+    @Autowired
+    SiteSocialLinks socialLinks;
 
     private final HttpClient http = HttpClient.newHttpClient();
     private final Map<Row, Measure> small = new HashMap<>();
@@ -288,6 +293,7 @@ class WebPageBudgetTest extends WebFullContextTestBase {
             debugMembers.evict(member);
         }
         SiteMetaTagsTestAccess.clearLocally(metaTags);
+        SiteSocialLinksTestAccess.clearLocally(socialLinks);
     }
 
     /** A new session in Redis, logged in as {@code caller}: the cookie that names it. */

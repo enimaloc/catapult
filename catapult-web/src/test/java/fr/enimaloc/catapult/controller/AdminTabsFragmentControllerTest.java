@@ -70,7 +70,7 @@ class AdminTabsFragmentControllerTest {
         for (String url : List.of("/spa/admin/ccl", "/spa/admin/caches", "/spa/admin/caches/igdb-game-cache",
                 "/spa/admin/caches/igdb-game-cache/entry?key=1",
                 "/spa/admin/data", "/spa/admin/data/chat-command", "/spa/admin/data/chat-command/row?id=1",
-                "/spa/admin/members?q=a&page=1", "/spa/admin/members/search?q=a", "/spa/admin/meta", "/spa/admin/meta/file?id=1", "/spa/admin/notifications?page=1", "/spa/admin/broadcast", "/spa/admin/dtdd-mapping", "/spa/admin/game-mappings?page=1&missingPage=1", "/spa/admin/groups", "/spa/admin/whitelist", "/spa/admin/keys", "/spa/admin/tw", "/spa/admin/tw/gore",
+                "/spa/admin/members?q=a&page=1", "/spa/admin/members/search?q=a", "/spa/admin/meta", "/spa/admin/meta/file?id=1", "/spa/admin/links", "/spa/admin/notifications?page=1", "/spa/admin/broadcast", "/spa/admin/dtdd-mapping", "/spa/admin/game-mappings?page=1&missingPage=1", "/spa/admin/groups", "/spa/admin/whitelist", "/spa/admin/keys", "/spa/admin/tw", "/spa/admin/tw/gore",
                 "/spa/admin/members", "/spa/admin/members/00000000-0000-0000-0000-000000000001",
                 "/spa/admin/experiments", "/spa/admin/experiments/00000000-0000-0000-0000-000000000001",
                 "/spa/admin/experiments/00000000-0000-0000-0000-000000000001/participants?variant=&q=x&page=1")) {
@@ -297,6 +297,46 @@ class AdminTabsFragmentControllerTest {
                         "data-key=\"og:image\"", "data-content=\"https://x/y.png\"", ">property</span>", "admin-meta-tag-edit",
                         "data-confirm=\"Delete the meta tag og:image?\"", "admin-meta-tags-form", "data-label-save=\"Save\"",
                         "data-error-409=\"A meta tag of this type already has this name.\"", "Well-known files");
+    }
+
+    @Test
+    void links_listsTheSocialLinks_withTheirFormAndErrors() throws Exception {
+        when(apiService.adminSocialLinks()).thenReturn(List.of(
+                new fr.enimaloc.catapult.common.dto.admin.SocialLinkDto(7,
+                        fr.enimaloc.catapult.common.dto.admin.SocialPlatform.GITHUB, "Code", "https://github.com/x", true, 0),
+                new fr.enimaloc.catapult.common.dto.admin.SocialLinkDto(8,
+                        fr.enimaloc.catapult.common.dto.admin.SocialPlatform.OTHER, null, "https://example.org", false, 1)));
+
+        String html = asAdmin("/spa/admin/links");
+
+        assertThat(html).contains("class=\"admin-social-links\"", "2 links", "data-id=\"7\"", "data-platform=\"GITHUB\"",
+                "data-label=\"Code\"", "data-url=\"https://github.com/x\"", "data-visible=\"true\"", "data-visible=\"false\"",
+                "admin-social-link-edit", "admin-social-link-up", "admin-social-link-down", "class=\"social-icon\"",
+                "target=\"_blank\"", "rel=\"noopener noreferrer\"", "admin-social-links-form", "data-label-save=\"Save\"",
+                "data-error-400=", "data-confirm=\"Delete the social link Code?\"", "Discord", "Bluesky");
+    }
+
+    @Test
+    void links_doesNotLinkAnUnsafeUrl() throws Exception {
+        when(apiService.adminSocialLinks()).thenReturn(List.of(new fr.enimaloc.catapult.common.dto.admin.SocialLinkDto(
+                7, fr.enimaloc.catapult.common.dto.admin.SocialPlatform.OTHER, null, "javascript:alert(1)", true, 0)));
+
+        assertThat(asAdmin("/spa/admin/links")).doesNotContain("href=\"javascript:");
+    }
+
+    @Test
+    void links_saysWhenTheyAreUnavailable_andHasNoFormThen() throws Exception {
+        when(apiService.adminSocialLinks()).thenReturn(null);
+
+        assertThat(asAdmin("/spa/admin/links")).contains("class=\"admin-social-links\"", "Unable to load this section right now.", "data-admin-retry")
+                .doesNotContain("admin-social-links-form", "admin-social-link-row");
+    }
+
+    @Test
+    void links_saysWhenThereAreNone() throws Exception {
+        when(apiService.adminSocialLinks()).thenReturn(List.of());
+
+        assertThat(asAdmin("/spa/admin/links")).contains("No social link configured.", "admin-social-links-form");
     }
 
     @Test

@@ -20,9 +20,10 @@ import java.nio.charset.StandardCharsets;
 /**
  * Swaps the generic backdoor "uuid" example for the caller's own widget token, entirely
  * client-side: the dashboard (twitchat-settings.html) already writes it to
- * {@code localStorage['catapult_widget_uuid']} for a logged-in user, and this page is same-origin
- * with it (both are served on the same host, catapult-web relaying Swagger) — no server round-trip, no auth token of any
- * kind ever touches this feature.
+ * {@code localStorage['catapult_widget_uuid']} for a logged-in user, which this page reads only when
+ * it shares the dashboard's origin (catapult-web no longer relays it: the site's own /docs/api does
+ * the same swap, in api-docs.js) — no server round-trip, no auth token of any kind ever touches
+ * this feature.
  *
  * <p>Registering this as a bean overrides springdoc's own {@code SwaggerIndexTransformer}
  * (it's declared {@code @ConditionalOnMissingBean}) — everything not touched here (css, other

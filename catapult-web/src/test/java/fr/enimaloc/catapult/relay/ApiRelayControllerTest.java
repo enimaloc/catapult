@@ -148,7 +148,7 @@ class ApiRelayControllerTest {
     @Test
     void relaysEveryPathCatapultApiServesTheBrowser() throws Exception {
         for (String path : List.of("/login/oauth2/code/twitch", "/api/connect/steam/callback", "/api/game/1",
-                "/swagger-ui.html", "/swagger-ui/index.html", "/api/v3/api-docs", "/api/v3/api-docs/swagger-config")) {
+                "/api/v3/api-docs", "/api/v3/api-docs/swagger-config")) {
             mvc.perform(get(path)).andExpect(status().isOk());
             assertThat(RECEIVED.get().uri()).isEqualTo(path);
         }

@@ -260,6 +260,14 @@ public class AdminTabsFragmentController {
         return rows.content().isEmpty() ? Map.of("id", "") : rows.content().getFirst();
     }
 
+    @GetMapping("/links")
+    String links(Model model, HttpServletResponse response) {
+        return guarded(model, response, () -> {
+            model.addAttribute("links", apiService.adminSocialLinks());
+            return "pages/admin-tab/links :: content";
+        });
+    }
+
     @GetMapping("/meta")
     String wellKnown(Model model, HttpServletResponse response) {
         return guarded(model, response, () -> {

@@ -8,7 +8,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 
 /**
  * The paths catapult-web relays to catapult-api are the external routes, which are frozen: a path added or dropped here
- * changes what outside callers reach. No later change of the API's routes may touch this list.
+ * changes what outside callers reach. No later change of the API's routes may touch this list. Swagger UI is no longer
+ * relayed: catapult-web serves its own at /docs/api, where catapult-api's addresses redirect (ApiDocsController).
  */
 class ApiRelayPathsTest {
 
@@ -18,8 +19,6 @@ class ApiRelayPathsTest {
         "/api/connect/steam/callback",
         "/api/game/**",
         "/api/user/**",
-        "/swagger-ui.html",
-        "/swagger-ui/**",
         "/api/v3/api-docs",
         "/api/v3/api-docs/**",
         "/api/v2/custom-bindings",

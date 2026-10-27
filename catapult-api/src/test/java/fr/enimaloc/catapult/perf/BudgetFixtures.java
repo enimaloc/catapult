@@ -3,6 +3,8 @@ package fr.enimaloc.catapult.perf;
 import fr.enimaloc.catapult.chat.ChatCommandEvent;
 import fr.enimaloc.catapult.common.dto.admin.MetaTagAttribute;
 import fr.enimaloc.catapult.common.dto.admin.MetaTagRequest;
+import fr.enimaloc.catapult.common.dto.admin.SocialLinkRequest;
+import fr.enimaloc.catapult.common.dto.admin.SocialPlatform;
 import fr.enimaloc.catapult.common.dto.notification.NotificationChannel;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownFileRequest;
 import fr.enimaloc.catapult.common.dto.admin.WellKnownLocation;
@@ -45,6 +47,7 @@ import fr.enimaloc.catapult.service.account.UserApiTokenService;
 import fr.enimaloc.catapult.service.account.WidgetTokenService;
 import fr.enimaloc.catapult.service.binding.CustomBindingService;
 import fr.enimaloc.catapult.service.meta.MetaTagService;
+import fr.enimaloc.catapult.service.social.SocialLinkService;
 import fr.enimaloc.catapult.service.notification.NotificationDeliveryService;
 import fr.enimaloc.catapult.service.notification.NotificationService;
 import fr.enimaloc.catapult.service.notification.TwitchatWidgetSettingsService;
@@ -67,7 +70,7 @@ import org.springframework.transaction.support.TransactionOperations;
  *
  * <p>Collections: the owner's game bindings, custom bindings, notifications, invite redemptions, Twitchat event
  * actions, chat commands and seen features; the channels the owner moderates (members too, all named
- * {@value #PREFIX}…); the {@value #PREFIX} experiments, the first one's rules and assignments; the meta tags. Only
+ * {@value #PREFIX}…); the {@value #PREFIX} experiments, the first one's rules and assignments; the meta tags; the social links. Only
  * the notification channels stay as they are: there are only two.
  */
 @TestComponent
@@ -99,6 +102,7 @@ public class BudgetFixtures {
     private final ChatCommandDefinitionRepository chatCommands;
     private final SeenFeatureService seenFeatures;
     private final MetaTagService metaTags;
+    private final SocialLinkService socialLinks;
     private final UserApiTokenService userApiTokens;
     private final WidgetTokenService widgetTokens;
     private final DtddGameCacheRepository dtddGames;
@@ -124,6 +128,7 @@ public class BudgetFixtures {
             ChatCommandDefinitionRepository chatCommands,
             SeenFeatureService seenFeatures,
             MetaTagService metaTags,
+            SocialLinkService socialLinks,
             UserApiTokenService userApiTokens,
             WidgetTokenService widgetTokens,
             DtddGameCacheRepository dtddGames,
@@ -147,6 +152,7 @@ public class BudgetFixtures {
         this.chatCommands = chatCommands;
         this.seenFeatures = seenFeatures;
         this.metaTags = metaTags;
+        this.socialLinks = socialLinks;
         this.userApiTokens = userApiTokens;
         this.widgetTokens = widgetTokens;
         this.dtddGames = dtddGames;
@@ -256,6 +262,7 @@ public class BudgetFixtures {
             chatCommands.save(chatCommand(owner, i));
             seenFeatures.markSeen(owner.getId(), PREFIX + ".feature-" + i);
             metaTags.create(new MetaTagRequest(MetaTagAttribute.NAME, PREFIX + "-key-" + i, "Budget content " + i));
+            socialLinks.create(new SocialLinkRequest(SocialPlatform.OTHER, "Budget " + i, "https://budget.example/" + i, true));
             UserAccount channel = account(PREFIX + "-channel-" + i, channelTwitchId(i));
             if (i > 0) {
                 experiment(i);

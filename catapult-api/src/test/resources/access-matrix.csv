@@ -8,6 +8,7 @@ GET,/api/connect/steam/callback,,,PASS,PASS,PASS,PASS,PASS,PASS,401
 GET,/api/game/{uuid},,,PASS,PASS,PASS,PASS,PASS,PASS,401
 GET,/api/internal/health,,,PASS,PASS,PASS,PASS,PASS,PASS,401
 GET,/api/internal/meta-tags,,,PASS,PASS,PASS,PASS,PASS,PASS,401
+GET,/api/internal/social-links,,,PASS,PASS,PASS,PASS,PASS,PASS,401
 GET,/api/internal/status/degraded,,,PASS,PASS,PASS,PASS,PASS,PASS,401
 POST,/api/twitchat/actions/{token},,,PASS,PASS,PASS,PASS,PASS,PASS,401
 GET,/api/twitchat/widget/{uuid},,,PASS,PASS,PASS,PASS,PASS,PASS,401
@@ -258,6 +259,11 @@ DELETE,/api/internal/admin/members/{id}/links/twitch,,,401,PASS,403,403,403,PASS
 POST,/api/internal/admin/meta-tags,,,401,PASS,403,403,403,PASS,401
 DELETE,/api/internal/admin/meta-tags/{id},id=1,,401,PASS,403,403,403,PASS,401
 PUT,/api/internal/admin/meta-tags/{id},id=1,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/social-links,,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/social-links,,"{""platform"":""DISCORD"",""url"":""https://matrix.example"",""visible"":true}",401,PASS,403,403,403,PASS,401
+PUT,/api/internal/admin/social-links/order,,,401,PASS,403,403,403,PASS,401
+DELETE,/api/internal/admin/social-links/{id},id=1,,401,PASS,403,403,403,PASS,401
+PUT,/api/internal/admin/social-links/{id},id=1,"{""platform"":""DISCORD"",""url"":""https://matrix.example"",""visible"":true}",401,PASS,403,403,403,PASS,401
 GET,/api/internal/admin/minecraft-accounts,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/minecraft-accounts,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/minecraft-accounts/device-code,,,401,PASS,403,403,403,PASS,401

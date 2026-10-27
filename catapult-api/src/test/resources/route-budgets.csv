@@ -33,6 +33,7 @@ GET,/api/internal/config/providers,,anon,0,fixed:configuration only
 GET,/api/game/{uuid},,anon,5,fixed:the one game the channel plays
 GET,/api/internal/health,,anon,0,fixed:no data
 GET,/api/internal/meta-tags,,anon,1,
+GET,/api/internal/social-links,,anon,1,
 GET,/api/internal/status/degraded,,anon,0,fixed:no data
 GET,/api/twitchat/widget/{uuid},,anon,2,fixed:one widget
 GET,/api/twitchat/widget/{uuid}/access,,anon,2,fixed:one widget

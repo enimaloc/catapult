@@ -81,6 +81,10 @@ services:
       - SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE:-0.1}
       # Empty = no link to the status page in the degraded banner
       - INSTATUS_PAGE_URL=${INSTATUS_PAGE_URL:-}
+    # The last API spec obtained (ApiDocsSpec), shown on /docs/api while catapult-api is down, across
+    # redeploys. Shared by the replicas: each one writes it whole, through a rename.
+    volumes:
+      - catapult_web_data:/app/data
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8092/actuator/health || exit 1"]
       interval: 10s
@@ -127,3 +131,4 @@ networks:
 
 volumes:
   postgres_data:
+  catapult_web_data:

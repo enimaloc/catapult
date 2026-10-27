@@ -27,6 +27,8 @@ RUN addgroup -S catapult && adduser -S catapult -G catapult
 COPY --from=builder /app/catapult-web/build/libs/*.jar app.jar
 
 RUN chown catapult:catapult app.jar
+# The last API spec obtained (ApiDocsSpec, catapult.api-docs.cache-file), kept for when catapult-api is down.
+RUN mkdir -p /app/data && chown catapult:catapult /app/data
 
 USER catapult
 
