@@ -1032,6 +1032,40 @@ class RealApiServiceTest {
     }
 
     @Test
+    void socialLinks_areReadWithoutTheBearer_andNullWhenCatapultApiFails() {
+        expect(HttpMethod.GET, "/api/internal/social-links")
+                .andExpect(org.springframework.test.web.client.match.MockRestRequestMatchers.headerDoesNotExist("Authorization"))
+                .andRespond(withSuccess("[{\"id\":1,\"platform\":\"GITHUB\",\"label\":null,"
+                        + "\"url\":\"https://github.com/x\",\"visible\":true,\"position\":0}]", MediaType.APPLICATION_JSON));
+        expect(HttpMethod.GET, "/api/internal/social-links").andRespond(withStatus(HttpStatus.BAD_GATEWAY));
+
+        assertThat(service.socialLinks()).containsExactly(new fr.enimaloc.catapult.common.dto.admin.SocialLinkDto(1,
+                fr.enimaloc.catapult.common.dto.admin.SocialPlatform.GITHUB, null, "https://github.com/x", true, 0));
+        assertThat(service.socialLinks()).isNull();
+    }
+
+    @Test
+    void adminSocialLinks_areReadAndWrittenWithTheirStatus() {
+        var request = new fr.enimaloc.catapult.common.dto.admin.SocialLinkRequest(
+                fr.enimaloc.catapult.common.dto.admin.SocialPlatform.X, "Us", "https://x.com/a", true);
+        String json = "{\"platform\":\"X\",\"label\":\"Us\",\"url\":\"https://x.com/a\",\"visible\":true}";
+        expect(HttpMethod.GET, "/api/internal/admin/social-links").andRespond(withSuccess("[]", MediaType.APPLICATION_JSON));
+        expect(HttpMethod.GET, "/api/internal/admin/social-links").andRespond(withStatus(HttpStatus.BAD_GATEWAY));
+        expect(HttpMethod.POST, "/api/internal/admin/social-links").andExpect(content().json(json)).andRespond(withStatus(HttpStatus.CREATED));
+        expect(HttpMethod.PUT, "/api/internal/admin/social-links/3").andExpect(content().json(json)).andRespond(withStatus(HttpStatus.NOT_FOUND));
+        expect(HttpMethod.DELETE, "/api/internal/admin/social-links/3").andRespond(withNoContent());
+        expect(HttpMethod.PUT, "/api/internal/admin/social-links/order").andExpect(content().json("{\"ids\":[2,1]}"))
+                .andRespond(withSuccess("[]", MediaType.APPLICATION_JSON));
+
+        assertThat(service.adminSocialLinks()).isEmpty();
+        assertThat(service.adminSocialLinks()).isNull();
+        assertThat(service.adminCreateSocialLink(request)).isEqualTo(201);
+        assertThat(service.adminUpdateSocialLink(3, request)).isEqualTo(404);
+        assertThat(service.adminDeleteSocialLink(3)).isEqualTo(204);
+        assertThat(service.adminOrderSocialLinks(java.util.List.of(2L, 1L))).isEqualTo(200);
+    }
+
+    @Test
     void wellKnown_relaysA404() {
         expect(HttpMethod.GET, "/api/internal/well-known-files?location=ROOT&path=nope.txt").andRespond(withStatus(HttpStatus.NOT_FOUND));
 

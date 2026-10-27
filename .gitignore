@@ -63,6 +63,7 @@ catapult_obs_local.py
 ### Local artifacts ###
 .run/
 /*.sql
+/data/
 catapult-api/src/test/java/Tmp.java
 docs/
 scripts/*

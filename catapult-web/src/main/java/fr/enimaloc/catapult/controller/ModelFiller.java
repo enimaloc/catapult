@@ -66,6 +66,7 @@ public class ModelFiller {
     private final ApiService apiService;
     private final TwitchatEventForms twitchatEventForms;
     private final ObjectProvider<SiteMetaTags> siteMetaTags;
+    private final ObjectProvider<SiteSocialLinks> siteSocialLinks;
     private final ObjectProvider<DegradedState> degradedState;
     private final ObjectProvider<DegradedLabels> degradedLabels;
 
@@ -86,6 +87,8 @@ public class ModelFiller {
         model.addAttribute("seo", seo(model, page == null ? "" : page, locale));
         SiteMetaTags metaTags = siteMetaTags.getIfAvailable();
         model.addAttribute("metaTags", metaTags == null ? List.of() : metaTags.tags());
+        SiteSocialLinks socialLinks = siteSocialLinks.getIfAvailable();
+        model.addAttribute("socialLinks", socialLinks == null ? SiteSocialLinks.FALLBACK : socialLinks.links());
         DegradedView degraded = degradedView();
         DegradedLabels labels = degradedLabels.getIfAvailable();
         Map<String, String> effectLabels = labels == null ? Map.of() : labels.labels(locale);

@@ -7,6 +7,8 @@ import fr.enimaloc.catapult.common.dto.UserInfoResponse;
 import fr.enimaloc.catapult.common.dto.TokenResponse;
 import fr.enimaloc.catapult.common.dto.admin.MetaTagDto;
 import fr.enimaloc.catapult.common.dto.admin.MetaTagRequest;
+import fr.enimaloc.catapult.common.dto.admin.SocialLinkDto;
+import fr.enimaloc.catapult.common.dto.admin.SocialLinkRequest;
 import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminCclPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody;
@@ -158,6 +160,7 @@ public class MockApiService implements ApiService {
     private final MockWellKnownStore wellKnown = new MockWellKnownStore();
     /** Application-wide too: every page shows them, logged in or not. */
     private final MockMetaTagStore metaTags = new MockMetaTagStore();
+    private final MockSocialLinkStore socialLinks = new MockSocialLinkStore();
     /** Application-wide, like the well-known files: a notification sent in one session reaches the others. */
     private MockNotificationStore notifications;
     private final MockDtddProposalsStore dtddProposals = new MockDtddProposalsStore();
@@ -1164,6 +1167,42 @@ public class MockApiService implements ApiService {
     public int adminDeleteMetaTag(long id) {
         log.trace("adminDeleteMetaTag({})", id);
         return metaTags.delete(id);
+    }
+
+    @Override
+    public List<SocialLinkDto> socialLinks() {
+        log.trace("socialLinks()");
+        return socialLinks.list().stream().filter(SocialLinkDto::visible).toList();
+    }
+
+    @Override
+    public List<SocialLinkDto> adminSocialLinks() {
+        log.trace("adminSocialLinks()");
+        return socialLinks.list();
+    }
+
+    @Override
+    public int adminCreateSocialLink(SocialLinkRequest request) {
+        log.trace("adminCreateSocialLink({})", request);
+        return socialLinks.create(request);
+    }
+
+    @Override
+    public int adminUpdateSocialLink(long id, SocialLinkRequest request) {
+        log.trace("adminUpdateSocialLink({}, {})", id, request);
+        return socialLinks.update(id, request);
+    }
+
+    @Override
+    public int adminDeleteSocialLink(long id) {
+        log.trace("adminDeleteSocialLink({})", id);
+        return socialLinks.delete(id);
+    }
+
+    @Override
+    public int adminOrderSocialLinks(List<Long> ids) {
+        log.trace("adminOrderSocialLinks({})", ids);
+        return socialLinks.order(ids);
     }
 
     @Override
