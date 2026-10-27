@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import java.io.IOException;
+import java.net.URI;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
@@ -70,10 +71,10 @@ public class ApiDocsController {
                         .build());
     }
 
-    /** catapult-api's own Swagger UI, which links and bookmarks still name. */
+    /** catapult-api's own Swagger UI, which links and bookmarks still name: moved here for good. */
     @GetMapping({"/swagger-ui.html", "/swagger-ui/index.html"})
-    String swaggerUi() {
-        return "redirect:/docs/api";
+    ResponseEntity<Void> swaggerUi() {
+        return ResponseEntity.status(HttpStatus.MOVED_PERMANENTLY).location(URI.create("/" + PAGE)).build();
     }
 
     private void docs(Model model) {

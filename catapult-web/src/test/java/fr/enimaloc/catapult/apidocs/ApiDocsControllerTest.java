@@ -119,7 +119,7 @@ class ApiDocsControllerTest {
     @Test
     void redirectsCatapultApisSwaggerUiToThePage() throws Exception {
         for (String path : List.of("/swagger-ui.html", "/swagger-ui/index.html")) {
-            mvc.perform(get(path)).andExpect(status().isFound()).andExpect(header().string("Location", "/docs/api"));
+            mvc.perform(get(path)).andExpect(status().isMovedPermanently()).andExpect(header().string("Location", "/docs/api"));
         }
     }
 
