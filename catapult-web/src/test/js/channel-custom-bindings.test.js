@@ -624,6 +624,19 @@ describe("overview list: live updates", () => {
         expect(isActive(DEV)).toBe(true);
     });
 
+    it("leaves a refusal told under the list for the owner to read", async () => {
+        overview({ extra: TEMPLATE });
+        postJson.mockResolvedValueOnce(response(409, { code: "bot_disabled" }));
+        activateBtn(DEV).click();
+        await flush();
+        expect(isHidden(errorLine())).toBe(false);
+
+        apply([art, dev], ART);
+
+        expect(isHidden(errorLine())).toBe(false);
+        expect(errorLine().textContent).toBe("Catapult est en pause sur cette chaîne");
+    });
+
     it("can't add a binding without the row template, nor take a list it isn't given", () => {
         overview();
 

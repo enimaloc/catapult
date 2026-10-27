@@ -55,8 +55,20 @@ window.CatapultCustomBindings = (function () {
         }
     }
 
-    /** Marks the active binding (null: none) and offers to deactivate it, the others to activate. */
+    /**
+     * Marks the active binding (null: none) and offers to deactivate it, the others to activate. An activation
+     * (made here or elsewhere) also takes away a refusal told under the list; the list's own update (apply) leaves it.
+     */
     function setActive(activeId) {
+        markActive(activeId);
+        const error = byId("custom-bindings-error");
+        if (error) {
+            error.textContent = "";
+            show(error, false);
+        }
+    }
+
+    function markActive(activeId) {
         document.querySelectorAll(".custom-binding-item[data-custom-binding-id]").forEach(item => {
             const active = !!activeId && item.dataset.customBindingId === activeId;
             item.classList.toggle("is-active", active);
@@ -64,11 +76,6 @@ window.CatapultCustomBindings = (function () {
             show(item.querySelector(".custom-binding-activate"), !active);
             show(item.querySelector(".custom-binding-stop"), active);
         });
-        const error = byId("custom-bindings-error");
-        if (error) {
-            error.textContent = "";
-            show(error, false);
-        }
     }
 
     function attachList(list) {
@@ -278,7 +285,8 @@ window.CatapultCustomBindings = (function () {
             next = row;
         }
         show(byId("channel-custom-bindings-empty"), bindings.length === 0 && (!fresh || fresh.classList.contains("hidden")));
-        setActive(activeId ?? null);
+        // A refusal under the list stays: the owner may be reading it.
+        markActive(activeId ?? null);
         return true;
     }
 
