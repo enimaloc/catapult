@@ -80,11 +80,11 @@ public final class ChannelEvents {
 
     /**
      * The DoesTheDogDie mapping of IGDB game {@code igdbId}, the one the channel plays, changed: the mapping now
-     * ({@code current}, null when it has none) and how many proposals are pending on it. The last three are null
+     * ({@code current}, null when it has none) and whether a proposal is pending on it. The last three are null
      * from a catapult-api that predates them: the dashboard then reads the mapping again.
      */
     public record DtddMappingChanged(String channelId, String channelLogin, String igdbId, DtddMappingCurrentDto current,
-                                     Long pendingProposals) {}
+                                     Boolean hasPending) {}
 
     /** The channel's Minecraft link changed: its status ({@code NONE} once gone) and player name. */
     public record MinecraftLinkChanged(String channelId, String channelLogin, String status, String minecraftName) {}

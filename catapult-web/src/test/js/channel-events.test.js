@@ -161,7 +161,7 @@ describe("events the page catches up on", () => {
     it("hands a DTDD mapping's change to its card, re-rendering the page when the card can't show it", async () => {
         window.CatapultDtdd = { apply: vi.fn(() => true) };
         render();
-        const change = { username: "enimaloc", igdbId: "42", current: null, pendingProposals: 0 };
+        const change = { username: "enimaloc", igdbId: "42", current: null, hasPending: false };
 
         current().emit("DtddMappingChangedEvent", change);
         await flush();
@@ -237,7 +237,7 @@ describe("events patched in place by their cards", () => {
             <mdui-button id="xbox-connect-btn"></mdui-button><mdui-button id="xbox-disconnect-btn" class="hidden"></mdui-button>
         </mdui-card></div>`;
     const hidden = id => document.getElementById(id).classList.contains("hidden");
-    const mapping = (current, pendingProposals) => ({ username: "enimaloc", igdbId: "42", current, pendingProposals });
+    const mapping = (current, hasPending) => ({ username: "enimaloc", igdbId: "42", current, hasPending });
 
     beforeEach(async () => {
         window.CatapultSpa = { navigate: vi.fn(async () => {}) };
@@ -291,7 +291,7 @@ describe("events patched in place by their cards", () => {
         html(DTDD);
         render();
 
-        current().emit("DtddMappingChangedEvent", mapping({ dtddId: 9, name: "Valheim (2021)", confidence: 1, verified: true }, 0));
+        current().emit("DtddMappingChangedEvent", mapping({ dtddId: 9, name: "Valheim (2021)", confidence: 1, verified: true }, false));
         await flush();
 
         expect(CatapultSpa.navigate).not.toHaveBeenCalled();
@@ -301,7 +301,7 @@ describe("events patched in place by their cards", () => {
         expect(hidden("dtdd-validate-btn")).toBe(true);
         expect(hidden("dtdd-proposed")).toBe(true);
 
-        current().emit("DtddMappingChangedEvent", mapping(null, 0));
+        current().emit("DtddMappingChangedEvent", mapping(null, false));
         await flush();
         expect(hidden("dtdd-current")).toBe(true);
         expect(hidden("dtdd-no-mapping")).toBe(false);
@@ -313,7 +313,7 @@ describe("events patched in place by their cards", () => {
         document.getElementById("dtdd-validate-btn").classList.add("hidden");
         render();
 
-        current().emit("DtddMappingChangedEvent", mapping({ dtddId: 9, name: "Valheim", confidence: 0.8, verified: false }, 0));
+        current().emit("DtddMappingChangedEvent", mapping({ dtddId: 9, name: "Valheim", confidence: 0.8, verified: false }, false));
         await flush();
 
         expect(hidden("dtdd-validate-btn")).toBe(false);
@@ -334,9 +334,9 @@ describe("events patched in place by their cards", () => {
 
     it.each([
         ["carries nothing but the channel (an older catapult-api)", { username: "enimaloc" }, DTDD],
-        ["is for another game than the card's", { ...mapping(null, 0), igdbId: "7" }, DTDD],
-        ["finds no card", mapping(null, 0), ""],
-        ["leaves proposals pending, maybe the viewer's", mapping(null, 2), DTDD],
+        ["is for another game than the card's", { ...mapping(null, false), igdbId: "7" }, DTDD],
+        ["finds no card", mapping(null, false), ""],
+        ["leaves proposals pending, maybe the viewer's", mapping(null, true), DTDD],
     ])("re-renders the page for a DTDD change that %s", async (_, data, page) => {
         html(page);
         render();

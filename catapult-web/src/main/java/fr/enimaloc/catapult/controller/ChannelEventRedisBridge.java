@@ -131,7 +131,7 @@ public class ChannelEventRedisBridge {
             case ChannelEvents.DTDD_MAPPING_CHANGED -> {
                 var mapping = read(data, ChannelEvents.DtddMappingChanged.class);
                 yield List.of(new DtddMappingChangedEvent(login, mapping.igdbId(), mapping.current(),
-                        mapping.pendingProposals(), null, null));
+                        mapping.hasPending(), null, null));
             }
             case ChannelEvents.MINECRAFT_LINK_CHANGED -> {
                 var link = read(data, ChannelEvents.MinecraftLinkChanged.class);

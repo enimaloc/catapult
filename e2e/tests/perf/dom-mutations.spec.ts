@@ -276,8 +276,8 @@ test.describe("DOM mutations", () => {
       send("bot.toggled", { enabled: false }),
       send("bot.toggled", { enabled: true }),
       // The mapping of a game the page shows no card for (IGDB is off under perf): the page re-renders
-      send("dtdd.mapping.changed", { igdbId: "1", current: null, pendingProposals: 0 }),
-      send("dtdd.mapping.changed", { igdbId: "1", current: null, pendingProposals: 0 }),
+      send("dtdd.mapping.changed", { igdbId: "1", current: null, hasPending: false }),
+      send("dtdd.mapping.changed", { igdbId: "1", current: null, hasPending: false }),
       // The streamer has no custom binding (custom-binding-crud leaves none)
       send("custom.bindings.updated", { bindings: [], activeId: null }),
       send("custom.bindings.updated", { bindings: [], activeId: null }),

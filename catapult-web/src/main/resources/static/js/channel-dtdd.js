@@ -10,7 +10,7 @@ window.CatapultDtdd = (function () {
 
     /**
      * Shows the mapping a DtddMappingChangedEvent carries: as the event tells it (the live event's
-     * pendingProposals) or as the viewer sees it (the page state's proposed and validatable). False
+     * hasPending) or as the viewer sees it (the page state's proposed and validatable). False
      * when the card can't show it in place, for the page to be re-rendered: the event is for another
      * game than the card's (or the page has no card), it lacks the mapping (an older catapult-api),
      * or proposals are pending (whether the viewer's own is among them, only the page knows).
@@ -19,9 +19,9 @@ window.CatapultDtdd = (function () {
         const card = byId("channel-dtdd-mapping-card");
         if (!data?.igdbId || !card || card.dataset.igdbId !== String(data.igdbId)) return false;
         const current = data.current ?? null;
-        const pending = data.pendingProposals;
+        const pending = data.hasPending;
         const note = byId("dtdd-proposed");
-        const proposed = typeof data.proposed === "boolean" ? data.proposed : pending === 0 ? false : null;
+        const proposed = typeof data.proposed === "boolean" ? data.proposed : pending === false ? false : null;
         if (proposed === null) return false;
 
         show(byId("dtdd-current"), !!current);
@@ -33,7 +33,7 @@ window.CatapultDtdd = (function () {
         }
         // Rendered for admins alone: a mapping nobody verified, with no proposal pending.
         const validatable = typeof data.validatable === "boolean" ? data.validatable
-            : !!current && !current.verified && pending === 0;
+            : !!current && !current.verified && pending === false;
         show(byId("dtdd-validate-btn"), validatable);
         show(note, proposed);
         return true;

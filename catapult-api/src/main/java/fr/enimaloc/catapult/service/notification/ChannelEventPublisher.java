@@ -98,12 +98,12 @@ public class ChannelEventPublisher {
 
     /**
      * The mapping of IGDB game {@code igdbId}, the one the channel plays, is now {@code current} (null: none), with
-     * {@code pendingProposals} proposals pending on it.
+     * whether a proposal is pending on it ({@code hasPending}).
      */
     public void dtddMappingChanged(UUID channelOwnerId, String igdbId, DtddMappingCurrentDto current,
-                                   long pendingProposals) {
+                                   boolean hasPending) {
         publish(channelOwnerId, ChannelEvents.DTDD_MAPPING_CHANGED,
-                (id, login) -> new ChannelEvents.DtddMappingChanged(id, login, igdbId, current, pendingProposals));
+                (id, login) -> new ChannelEvents.DtddMappingChanged(id, login, igdbId, current, hasPending));
     }
 
     public void connectionChanged(UUID channelOwnerId, ProviderConnectionsDto provider) {

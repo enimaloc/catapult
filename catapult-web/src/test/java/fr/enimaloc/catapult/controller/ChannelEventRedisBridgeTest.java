@@ -100,12 +100,12 @@ class ChannelEventRedisBridgeTest {
     }
 
     @Test
-    void dtddMapping_theMappingAndItsPendingProposals() {
+    void dtddMapping_theMappingAndWhetherAProposalIsPending() {
         DtddMappingCurrentDto current = new DtddMappingCurrentDto(7L, "Valheim", 0.8, false);
 
         assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.DTDD_MAPPING_CHANGED,
-                new ChannelEvents.DtddMappingChanged(owner.toString(), "streamer", "42", current, 2L))))
-                .containsExactly(new DtddMappingChangedEvent("streamer", "42", current, 2L, null, null));
+                new ChannelEvents.DtddMappingChanged(owner.toString(), "streamer", "42", current, true))))
+                .containsExactly(new DtddMappingChangedEvent("streamer", "42", current, true, null, null));
     }
 
     @Test

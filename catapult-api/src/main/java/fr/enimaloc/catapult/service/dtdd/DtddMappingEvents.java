@@ -25,8 +25,8 @@ import java.util.UUID;
  * Tells the dashboards that a game's DTDD mapping changed (validated, proposed, a proposal approved or
  * rejected). A mapping belongs to an IGDB game, not to a channel: every channel whose last known game is
  * that one hears of it, the way the dashboard finds the game it shows the mapping of
- * (ChannelDashboardAssembler#dtddMapping). The event carries the mapping as it is now and how many
- * proposals are pending on it, read once for all those channels: inside a transaction it waits for the
+ * (ChannelDashboardAssembler#dtddMapping). The event carries the mapping as it is now and whether a
+ * proposal is pending on it, read once for all those channels: inside a transaction it waits for the
  * commit, to read the new one.
  */
 @Slf4j
@@ -58,14 +58,14 @@ public class DtddMappingEvents {
 
     private void publish(String igdbId) {
         DtddMappingCurrentDto current = null;
-        long pending = 0;
+        boolean pending = false;
         boolean read = false;
         for (Map.Entry<UUID, DetectedGame> entry : gameStateService.lastKnownGames().entrySet()) {
             try {
                 if (igdbGameId(entry.getValue()).filter(igdbId::equals).isPresent()) {
                     if (!read) {
                         current = current(igdbId);
-                        pending = proposals.countByIgdbIdAndStatus(igdbId, DtddMappingProposal.Status.PENDING);
+                        pending = proposals.countByIgdbIdAndStatus(igdbId, DtddMappingProposal.Status.PENDING) > 0;
                         read = true;
                     }
                     channelEventPublisher.dtddMappingChanged(entry.getKey(), igdbId, current, pending);

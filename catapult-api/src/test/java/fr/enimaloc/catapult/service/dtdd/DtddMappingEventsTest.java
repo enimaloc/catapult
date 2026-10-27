@@ -71,9 +71,9 @@ class DtddMappingEventsTest {
         events.mappingChanged("100");
 
         DtddMappingCurrentDto current = new DtddMappingCurrentDto(7L, "Stardew Valley (2016)", 0.8, true);
-        verify(publisher).dtddMappingChanged(steamPlayer, "100", current, 2L);
-        verify(publisher).dtddMappingChanged(namedPlayer, "100", current, 2L);
-        verify(publisher, never()).dtddMappingChanged(eq(otherPlayer), any(), any(), anyLong());
+        verify(publisher).dtddMappingChanged(steamPlayer, "100", current, true);
+        verify(publisher).dtddMappingChanged(namedPlayer, "100", current, true);
+        verify(publisher, never()).dtddMappingChanged(eq(otherPlayer), any(), any(), anyBoolean());
         // Read once for every channel playing it
         verify(mappings).findById("100");
         verify(proposals).countByIgdbIdAndStatus("100", DtddMappingProposal.Status.PENDING);
@@ -89,9 +89,9 @@ class DtddMappingEventsTest {
         when(mappings.findById("100")).thenReturn(Optional.of(unnamed));
         events.mappingChanged("100");
 
-        verify(publisher).dtddMappingChanged(otherPlayer, "200", null, 0L);
+        verify(publisher).dtddMappingChanged(otherPlayer, "200", null, false);
         verify(publisher).dtddMappingChanged(eq(steamPlayer), eq("100"),
-                eq(new DtddMappingCurrentDto(null, null, unnamed.getConfidence(), false)), eq(0L));
+                eq(new DtddMappingCurrentDto(null, null, unnamed.getConfidence(), false)), eq(false));
         verifyNoInteractions(games);
     }
 
@@ -104,7 +104,7 @@ class DtddMappingEventsTest {
         verifyNoInteractions(publisher);
 
         TransactionSynchronizationManager.getSynchronizations().forEach(TransactionSynchronization::afterCommit);
-        verify(publisher).dtddMappingChanged(otherPlayer, "200", null, 0L);
+        verify(publisher).dtddMappingChanged(otherPlayer, "200", null, false);
         verifyNoMoreInteractions(publisher);
     }
 

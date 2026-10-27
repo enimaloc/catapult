@@ -197,12 +197,12 @@ class ChannelEventPublisherTest {
     }
 
     @Test
-    void dtddMappingChanged_publishesTheMappingAndItsPendingProposals() {
+    void dtddMappingChanged_publishesTheMappingAndWhetherAProposalIsPending() {
         DtddMappingCurrentDto current = new DtddMappingCurrentDto(7L, "Valheim", 0.8, false);
 
-        publisher.dtddMappingChanged(ownerId, "42", current, 3);
+        publisher.dtddMappingChanged(ownerId, "42", current, true);
 
         assertThat(published(ChannelEvents.DTDD_MAPPING_CHANGED)).isEqualTo(
-                new ChannelEvents.DtddMappingChanged(ownerId.toString(), "streamername", "42", current, 3L));
+                new ChannelEvents.DtddMappingChanged(ownerId.toString(), "streamername", "42", current, true));
     }
 }
