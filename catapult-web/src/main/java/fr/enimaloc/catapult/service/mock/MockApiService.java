@@ -84,9 +84,9 @@ import fr.enimaloc.catapult.event.minecraft.MinecraftSyncEvent;
 import fr.enimaloc.catapult.event.steam.SteamTokenDeletedEvent;
 import fr.enimaloc.catapult.event.steam.SteamConnectionStateEvent;
 import fr.enimaloc.catapult.event.ChannelConnectionChangedEvent;
+import fr.enimaloc.catapult.controller.ChannelState;
 import fr.enimaloc.catapult.event.ChannelSettingsUpdatedEvent;
 import fr.enimaloc.catapult.event.DtddMappingChangedEvent;
-import fr.enimaloc.catapult.common.event.ChannelEvents;
 import fr.enimaloc.catapult.dto.changelog.ChangelogSection;
 import fr.enimaloc.catapult.event.steam.SteamTokenSavedEvent;
 import fr.enimaloc.catapult.event.steam.SteamTokenSharedStateEvent;
@@ -544,14 +544,7 @@ public class MockApiService implements ApiService {
     /** The settings cards' whole state, as ChannelEventRedisBridge relays catapult-api's settings.updated. */
     private void publishSettings(String username) {
         UserSettingsDto s = currentData().getUserSettings();
-        eventPublisher.publishEvent(new ChannelSettingsUpdatedEvent(username, new ChannelEvents.Settings(
-                new ChannelEvents.Settings.Ccl(s.cclFeatureEnabled(), s.blockedCcls()),
-                new ChannelEvents.Settings.Tw(s.twFeatureEnabled(), s.blockedTws()),
-                new ChannelEvents.Settings.NoGame(s.noGameTwitchGameId(), s.noGameTwitchGameName(), s.noGameCcls(),
-                        s.applyDefaultOnStreamStart(), s.applyDefaultOnNoGame(), s.applyDefaultOnStreamEnd()),
-                new ChannelEvents.Settings.IncompleteFallback(s.incompleteFallbackTwitchGameId(),
-                        s.incompleteFallbackTwitchGameName(), s.incompleteFallbackCcls()),
-                new ChannelEvents.Settings.Raid(s.raidRestoreGameMinutes()))));
+        eventPublisher.publishEvent(new ChannelSettingsUpdatedEvent(username, ChannelState.settings(s)));
     }
 
     @Override

@@ -8,7 +8,10 @@
  *   empty row whose save creates. Activation applies the Twitch category at once, live or not; its refusal
  *   is told in a line under the list, in its own text per catapult-api code (data-error-* on the list). The
  *   active binding follows the CustomBindingChangedEvent of the channel stream (setActive, see
- *   channel-events.js). A save or a deletion re-renders the page, which lists the result.
+ *   channel-events.js), the list its CustomBindingsUpdatedEvent (apply): a binding it no longer lists
+ *   loses its row, one it newly lists gets a copy of the page's row template, the others are brought up
+ *   to date in place (but for the form of an open row, which the owner may be editing). A save or a
+ *   deletion re-renders the page, which lists the result.
  * - API token card (Account tab): since when a token exists, generate/regenerate (regeneration confirmed: it
  *   invalidates the old token) and revoke. A generated token is shown once, in a read-only field with
  *   a copy button and a curl example on the site's own address (catapult-web relays /api/v2/custom-bindings
@@ -19,6 +22,10 @@
 window.CatapultCustomBindings = (function () {
     const byId = id => document.getElementById(id);
     const show = (el, visible) => el?.classList.toggle("hidden", !visible);
+    // Properties only written when they change: an equal write still counts as a change of the page.
+    const set = (el, property, value) => { if (el && el[property] !== value) el[property] = value; };
+    // The list wired last (attachList): its rows' wiring, for the rows apply() adds.
+    let wired = null;
 
     /** "twitch_unavailable" -> "errorTwitchUnavailable": the data-error-twitch-unavailable of the list. */
     function errorKey(code) {
@@ -70,6 +77,8 @@ window.CatapultCustomBindings = (function () {
         const dialog = byId("custom-binding-delete-dialog");
         const collapse = list.querySelector("mdui-collapse");
         let deletingId = null;
+        // Each row's category search, for apply() to show another category in.
+        const games = new WeakMap();
 
         function tell(message) {
             error.textContent = message;
@@ -127,13 +136,14 @@ window.CatapultCustomBindings = (function () {
 
         // mdui-collapse fires open/close but doesn't reflect them on the item: mirror it as .is-open, which
         // the CSS shared with the associations list squares the joined header/body corners on.
-        list.querySelectorAll(".custom-binding-item").forEach(item => {
+        function attachItem(item) {
             const id = item.dataset.customBindingId ?? null;
             const gameInput = item.querySelector(".custom-binding-game-input");
             const gameId = item.querySelector(".custom-binding-game-id");
             const game = GameSearch.attach(gameInput, item.querySelector(".custom-binding-game-results"),
                 `${CatapultChannel.baseUrl()}/games/search`, picked => { gameId.value = picked.id; },
                 { initial: { id: gameId.value, name: gameInput.value } });
+            games.set(item, game);
 
             item.addEventListener("open", event => { if (event.target === item) item.classList.add("is-open"); });
             item.addEventListener("close", event => {
@@ -151,7 +161,18 @@ window.CatapultCustomBindings = (function () {
                 deletingId = id;
                 dialog.open = true;
             });
-        });
+        }
+
+        list.querySelectorAll(".custom-binding-item").forEach(attachItem);
+        wired = {
+            list, attachItem, games,
+            /** A row gone: the deletion it was being confirmed for has nothing left to delete. */
+            removed(id) {
+                if (deletingId !== id) return;
+                deletingId = null;
+                if (dialog) dialog.open = false;
+            },
+        };
 
         /** The closed "New" row goes away emptied; the empty notice comes back when no binding is listed. */
         function dismissNew(fresh, game) {
@@ -183,6 +204,82 @@ window.CatapultCustomBindings = (function () {
             if (response.ok) return CatapultChannel.refresh();
             CatapultChannel.showError(refusalText(list, await readCode(response), response.status));
         });
+    }
+
+    /** Shows `binding` in its row's header. */
+    function showHeader(item, binding) {
+        set(item.querySelector(".custom-binding-name-label"), "textContent", binding.name ?? "");
+        set(item.querySelector(".custom-binding-game-label"), "textContent", binding.twitchGameName || "—");
+        show(item.querySelector(".custom-binding-uninterruptible-chip"), !!binding.uninterruptible);
+    }
+
+    /** Puts `binding` in its row's form; `game`, its category search once wired. */
+    function fillForm(item, binding, game) {
+        set(item.querySelector(".custom-binding-name"), "value", binding.name ?? "");
+        set(item.querySelector(".custom-binding-game-id"), "value", binding.twitchGameId ?? "");
+        const category = { id: binding.twitchGameId, name: binding.twitchGameName ?? "" };
+        if (game) {
+            if (game.selected()?.id !== category.id || game.selected()?.name !== category.name) game.select(category);
+        } else {
+            set(item.querySelector(".custom-binding-game-input"), "value", binding.twitchGameName ?? "");
+        }
+        const ccls = binding.ccls ?? [];
+        const tws = binding.tws ?? [];
+        const value = sw => sw.value ?? sw.getAttribute("value");
+        item.querySelectorAll(".custom-binding-ccl-checkbox").forEach(sw => set(sw, "checked", ccls.includes(value(sw))));
+        item.querySelectorAll(".custom-binding-tw-checkbox").forEach(sw => set(sw, "checked", tws.includes(value(sw))));
+        set(item.querySelector(".custom-binding-uninterruptible"), "checked", !!binding.uninterruptible);
+    }
+
+    /**
+     * Brings the list to `bindings` (all of them, oldest first, as a CustomBindingsUpdatedEvent carries them) and
+     * `activeId`. False when it can't be done in place, for the page to be re-rendered: no bindings (an older
+     * catapult-api), the list not wired yet, or no row template to add one from. A page without the list (anyone but
+     * the owner, or the experiment closed to the channel) has nothing to update.
+     */
+    function apply(bindings, activeId) {
+        const list = byId("channel-custom-bindings-list");
+        if (!list) return true;
+        if (!Array.isArray(bindings) || wired?.list !== list) return false;
+        const rows = new Map(Array.from(list.querySelectorAll(".custom-binding-item[data-custom-binding-id]"),
+            row => [row.dataset.customBindingId, row]));
+        const template = byId("custom-binding-item-template");
+        if (bindings.some(binding => !rows.has(binding.id)) && !template) return false;
+
+        const listed = new Set(bindings.map(binding => binding.id));
+        rows.forEach((row, id) => {
+            if (listed.has(id)) return;
+            row.remove();
+            wired.removed(id);
+        });
+        // Added in the list's order, before the next one listed (the "New" row for the last ones).
+        const fresh = list.querySelector(".custom-binding-new");
+        const parent = fresh?.parentElement ?? list.querySelector("mdui-collapse");
+        let next = fresh;
+        for (let i = bindings.length - 1; i >= 0; i--) {
+            const binding = bindings[i];
+            let row = rows.get(binding.id);
+            if (row) {
+                showHeader(row, binding);
+                // The owner may be editing an open row: its form keeps what they typed.
+                if (!row.classList.contains("is-open") && !row.contains(document.activeElement)) {
+                    fillForm(row, binding, wired.games.get(row));
+                }
+            } else {
+                row = template.content.firstElementChild.cloneNode(true);
+                row.dataset.customBindingId = binding.id;
+                row.setAttribute("value", binding.id);
+                showHeader(row, binding);
+                parent.insertBefore(row, next && next.parentElement === parent ? next : null);
+                // Once in the page, its switches and fields are upgraded: their properties are theirs.
+                fillForm(row, binding, null);
+                wired.attachItem(row);
+            }
+            next = row;
+        }
+        show(byId("channel-custom-bindings-empty"), bindings.length === 0 && (!fresh || fresh.classList.contains("hidden")));
+        setActive(activeId ?? null);
+        return true;
     }
 
     // The promise of the last /me/api-token answer, kept for the page: /me is the logged-in member, not the
@@ -299,5 +396,5 @@ window.CatapultCustomBindings = (function () {
         if (token) attachToken(token);
     });
 
-    return { setActive };
+    return { setActive, apply };
 })();

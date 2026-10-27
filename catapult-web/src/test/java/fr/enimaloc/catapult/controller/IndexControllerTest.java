@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.common.dto.channel.BindingDto;
 import fr.enimaloc.catapult.common.dto.channel.CclDto;
 import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.channel.ChannelUserDto;
+import fr.enimaloc.catapult.common.dto.channel.DtddMappingCurrentDto;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
 import fr.enimaloc.catapult.common.dto.channel.GameDto;
 import fr.enimaloc.catapult.common.dto.channel.PagedBindings;
@@ -738,6 +739,47 @@ class IndexControllerTest {
                 .containsPattern("class=\"obs-dock-binding-ccl\" value=\"ccl-b\"[^>]*disabled")
                 .containsPattern("id=\"channel-no-game\" class=\"obs-dock-muted hidden\"")
                 .containsPattern("class=\"obs-dock-muted obs-dock-no-binding hidden\"");
+    }
+
+    /** The tag of the element with that id (its opening tag alone). */
+    private static String tagOf(String html, String id) {
+        int at = html.indexOf("id=\"" + id + "\"");
+        assertThat(at).as("element #%s", id).isNotNegative();
+        return html.substring(html.lastIndexOf('<', at), html.indexOf('>', at) + 1);
+    }
+
+    /** Every outcome of the DTDD card is rendered, the others hidden, for its live event to switch between them. */
+    @Test
+    void dtddCard_rendersEveryOutcome_andTheValidationForAnAdmin() throws Exception {
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(playingValheim());
+        when(apiService.dtddMappingStatus("enimaloc")).thenReturn(new DtddMappingStatusDto(
+                new DtddMappingCurrentDto(7L, "Valheim (2021)", 0.8, true), null, false, "42", true));
+
+        String html = mvc.perform(get("/spa/channel/enimaloc").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+
+        assertThat(tagOf(html, "channel-dtdd-mapping-card")).contains("data-igdb-id=\"42\"");
+        assertThat(tagOf(html, "dtdd-current")).doesNotContain("hidden");
+        assertThat(html).contains(">Valheim (2021)</span>").contains(">80%</mdui-chip>");
+        assertThat(tagOf(html, "dtdd-verified")).doesNotContain("hidden");
+        assertThat(tagOf(html, "dtdd-no-mapping")).contains("hidden");
+        // An admin's: rendered, hidden while the mapping can't be validated
+        assertThat(tagOf(html, "dtdd-validate-btn")).contains("hidden");
+        assertThat(tagOf(html, "dtdd-proposed")).contains("hidden");
+    }
+
+    @Test
+    void dtddCard_withoutMapping_andForAMember() throws Exception {
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(playingValheim());
+        when(apiService.dtddMappingStatus("enimaloc")).thenReturn(new DtddMappingStatusDto(null, null, false, "42"));
+
+        String html = mvc.perform(get("/spa/channel/enimaloc").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+
+        assertThat(tagOf(html, "dtdd-current")).contains("hidden");
+        assertThat(tagOf(html, "dtdd-no-mapping")).doesNotContain("hidden");
+        assertThat(tagOf(html, "dtdd-verified")).contains("hidden");
+        assertThat(html).doesNotContain("id=\"dtdd-validate-btn\"");
     }
 
     /** Its live events patch it in place: it carries the full page's spa:* rules for them. */

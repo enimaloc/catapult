@@ -109,6 +109,27 @@ describe("dispatch", () => {
         expect(hidden($("#off"))).toBe(true);
     });
 
+    it("leaves a property alone when the event carries its value already", () => {
+        html(`<span id="game" data-value="textContent:GameChangedEvent.sourceName">Valheim</span>
+              <i id="sw" data-in="checked:BindingUpdatedEvent.ccls"></i>`);
+        const text = $("#game").firstChild;
+        const sw = $("#sw");
+        sw.value = "Violence";
+        sw.checked = true;
+        const writes = [];
+        Object.defineProperty(sw, "checked", { get: () => true, set: v => writes.push(v) });
+
+        Visibility.dispatch("GameChangedEvent", { sourceName: "Valheim" });
+        Visibility.dispatch("BindingUpdatedEvent", { ccls: ["Violence"] });
+        expect($("#game").firstChild).toBe(text);
+        expect(writes).toEqual([]);
+
+        Visibility.dispatch("GameChangedEvent", { sourceName: "Portal 2" });
+        Visibility.dispatch("BindingUpdatedEvent", { ccls: [] });
+        expect($("#game").textContent).toBe("Portal 2");
+        expect(writes).toEqual([false]);
+    });
+
     it("ignores events no breadcrumb names", () => {
         html(`<span id="live" data-if="live" data-on="live:ChannelLiveStateEvent.state" class="hidden"></span>`);
 

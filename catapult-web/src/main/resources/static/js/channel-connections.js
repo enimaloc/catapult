@@ -1,10 +1,12 @@
 /**
- * Handlers for the Steam/Minecraft/OBS connection cards. The Steam/Minecraft cards' elements are all
+ * Handlers for the Steam/Minecraft/Xbox/OBS connection cards. The Steam/Minecraft cards' elements are all
  * pre-rendered and only toggled via the `hidden` class (spa:if/spa:switch, see
  * channel.html) instead of being created/destroyed per SSE event, so handlers only
  * need attaching once, at render — no refresh() either: the SSE echo updates the cards.
+ * The Xbox card's are too, flipped by showXboxConnected() on its ChannelConnectionChangedEvent
+ * (channel-events.js): that event names any provider, which a spa:* rule can't tell apart.
  */
-(function () {
+window.CatapultConnections = (function () {
     // Twitchat's chips: whether a Twitchat answers is only known here, by twitchat.js through OBS.
     function showTwitchatPresence() {
         const connected = window.CatapultTwitchat?.isTwitchatConnected() ?? false;
@@ -21,6 +23,15 @@
         toggle(".obs-not-connected-chip", enabled);
         toggle("#obs-connect-btn", enabled);
         toggle("#obs-disconnect-btn", !enabled);
+    }
+
+    // The Xbox card's chips and buttons, as IntegrationCards renders them for that state (none without the card).
+    function showXboxConnected(connected) {
+        const toggle = (selector, hidden) => document.querySelector(selector)?.classList.toggle("hidden", hidden);
+        toggle(".xbox-connected-chip", !connected);
+        toggle(".xbox-not-connected-chip", connected);
+        toggle("#xbox-connect-btn", connected);
+        toggle("#xbox-disconnect-btn", !connected);
     }
 
     document.addEventListener("catapult:render", function () {
@@ -92,4 +103,6 @@
             await window.CatapultObsSession?.refresh();
         });
     });
+
+    return { showXboxConnected };
 })();

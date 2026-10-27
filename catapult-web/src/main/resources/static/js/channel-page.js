@@ -99,8 +99,16 @@ window.CatapultChannel = (function () {
     // channel.html). Only the accordion's own selected-item binding is left to do by
     // hand, since mdui-collapse's `value` isn't a plain element property Visibility
     // could target with a stable selector (it's the list's first, unlabelled child).
+    //
+    // Only when the game played now goes to another binding: the same game told again (by a repeated
+    // detection, or the state a reconnected stream catches up on) leaves the row the visitor opened open.
+    // The list's data-current-game (rendered with the page) is the binding last moved to.
     function setCurrentGame(bindingId) {
-        const bindingList = document.getElementById("channel-bindings-list").children[0];
+        const list = document.getElementById("channel-bindings-list");
+        const id = bindingId ?? "";
+        if (list.dataset.currentGame === id) return;
+        list.dataset.currentGame = id;
+        const bindingList = list.children[0];
         if (bindingList) bindingList.value = bindingId;
     }
 

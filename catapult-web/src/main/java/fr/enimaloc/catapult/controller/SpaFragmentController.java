@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.common.dto.HelpContent;
 import fr.enimaloc.catapult.common.dto.channel.ChannelDto;
+import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import jakarta.servlet.http.HttpServletRequest;
@@ -10,6 +11,8 @@ import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,6 +20,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 
 import java.io.IOException;
 import java.util.List;
@@ -80,6 +84,25 @@ public class SpaFragmentController {
         }
         filler.defaultAttr(model, "channel");
         return "pages/channel :: channel";
+    }
+
+    /**
+     * The channel page's state as its live events (see {@link ChannelState}), which channel-events.js applies when
+     * its stream opens again instead of re-rendering the page; the page's own query, for the bindings it lists.
+     * 401 for a visitor, 404 when catapult-api answers nothing, as the page.
+     */
+    @GetMapping(value = "/channel/{username}/state", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    ResponseEntity<List<ChannelState.Entry>> channelState(@PathVariable String username,
+                                                          @RequestParam(defaultValue = "0") int page,
+                                                          @RequestParam(required = false) String status,
+                                                          @RequestParam(required = false) String source) {
+        ChannelPageData channelPage = apiService.channelPage(username, page, status, source);
+        if (channelPage == null) {
+            return ResponseEntity.status(ApiClient.hasSession() ? HttpStatus.NOT_FOUND : HttpStatus.UNAUTHORIZED).build();
+        }
+        return ResponseEntity.ok(ChannelState.of(channelPage, apiService.channelSettings(username),
+                apiService.dtddMappingStatus(username)));
     }
 
     @GetMapping("/channel/{username}/dock")

@@ -3,11 +3,13 @@ method,path,caller,api_calls,notes
 GET,/,owner,0,
 GET,/channel/budget-owner,owner,11,
 GET,/spa/channel/budget-owner,owner,11,
+GET,/spa/channel/budget-owner/state,owner,3,
 GET,/channel/budget-owner/dock,owner,3,
 GET,/spa/nav-channels,owner,1,
 GET,/me/api-token,owner,1,fixed:one token status
 # visitor
 GET,/channel/budget-owner,visitor,4,
+GET,/spa/channel/budget-owner/state,visitor,3,
 # admin
 GET,/admin,admin,2,
 GET,/spa/admin/members?q=&page=0,admin,2,

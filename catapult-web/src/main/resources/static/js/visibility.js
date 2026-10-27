@@ -174,7 +174,9 @@ window.Visibility = {
                 return;
             }
             Visibility._entriesFor(el, "value", eventName).forEach(([property, spec]) => {
-                el[property] = Visibility._resolve(data, spec);
+                // An unchanged value is left alone: setting textContent again replaces the text node.
+                const value = Visibility._resolve(data, spec);
+                if (el[property] !== value) el[property] = value;
             });
         });
 
@@ -186,7 +188,8 @@ window.Visibility = {
                 const dot = spec.indexOf(".");
                 const field = dot === -1 ? null : spec.slice(dot + 1);
                 const array = field && data ? data[field] : undefined;
-                el[property] = Array.isArray(array) && array.includes(el.value);
+                const member = Array.isArray(array) && array.includes(el.value);
+                if (el[property] !== member) el[property] = member;
             });
         });
     }

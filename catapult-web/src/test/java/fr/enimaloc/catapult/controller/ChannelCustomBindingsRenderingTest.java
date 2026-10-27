@@ -168,13 +168,14 @@ class ChannelCustomBindingsRenderingTest {
         assertThat(byClass(art, "custom-binding-item").classes()).contains("is-active");
         assertThat(byClass(art, "custom-binding-active-chip").classes()).doesNotContain("hidden");
         assertThat(byClass(art, "custom-binding-active-chip").text()).isEqualTo("Active");
-        assertThat(art).doesNotContain("custom-binding-uninterruptible-chip");
+        assertThat(byClass(art, "custom-binding-uninterruptible-chip").classes()).contains("hidden");
         assertThat(byClass(art, "custom-binding-activate").classes()).contains("hidden");
         assertThat(byClass(art, "custom-binding-stop").classes()).doesNotContain("hidden");
 
         assertThat(byClass(dev, "custom-binding-item").classes()).doesNotContain("is-active");
         assertThat(byClass(dev, "custom-binding-active-chip").classes()).contains("hidden");
         assertThat(byClass(dev, "custom-binding-uninterruptible-chip").text()).isEqualTo("Uninterruptible");
+        assertThat(byClass(dev, "custom-binding-uninterruptible-chip").classes()).doesNotContain("hidden");
         assertThat(byClass(dev, "custom-binding-activate").classes()).doesNotContain("hidden");
         assertThat(byClass(dev, "custom-binding-stop").classes()).contains("hidden");
     }
@@ -182,6 +183,22 @@ class ChannelCustomBindingsRenderingTest {
     private static String row(String overview, UUID id) {
         int start = overview.lastIndexOf("<mdui-collapse-item", overview.indexOf("data-custom-binding-id=\"" + id + "\""));
         return overview.substring(start, overview.indexOf("</mdui-collapse-item>", start));
+    }
+
+    /** The row a live event's newly listed binding gets: a saved one's, empty, its texts translated. */
+    @Test
+    void aSavedRowTemplate_forTheBindingsALiveEventAdds() throws Exception {
+        String overview = panel(render(true, state()), "overview");
+        int start = overview.indexOf("<template id=\"custom-binding-item-template\">");
+        assertThat(start).isNotNegative();
+        String template = overview.substring(start, overview.indexOf("</template>", start));
+
+        assertThat(template).doesNotContain("data-custom-binding-id").doesNotContain("custom-binding-new")
+                .contains("custom-binding-activate", "custom-binding-stop", "custom-binding-delete", "custom-binding-save");
+        assertThat(byClass(template, "custom-binding-active-chip").text()).isEqualTo("Active");
+        assertThat(byClass(template, "custom-binding-active-chip").classes()).contains("hidden");
+        assertThat(byClass(template, "custom-binding-uninterruptible-chip").classes()).contains("hidden");
+        assertThat(byClass(template, "custom-binding-stop").classes()).contains("hidden");
     }
 
     @Test

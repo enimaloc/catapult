@@ -46,11 +46,14 @@ function form(binding) {
 function overview({ empty = false, extra = "" } = {}) {
     const rows = empty ? "" : `
         <mdui-collapse-item class="custom-binding-item is-active" data-custom-binding-id="${ART}" value="${ART}">
-            <span class="custom-binding-active-chip"></span>
+            <span class="custom-binding-name-label">Art</span><span class="custom-binding-game-label">Art</span>
+            <span class="custom-binding-active-chip"></span><span class="custom-binding-uninterruptible-chip hidden"></span>
             ${form({ name: "Art", gameId: "509660", gameName: "Art", ccls: ["Violence"], tws: ["spoiler"], active: true })}
         </mdui-collapse-item>
         <mdui-collapse-item class="custom-binding-item" data-custom-binding-id="${DEV}" value="${DEV}">
-            <span class="custom-binding-active-chip hidden"></span>
+            <span class="custom-binding-name-label">Développement</span>
+            <span class="custom-binding-game-label">Software and Game Development</span>
+            <span class="custom-binding-active-chip hidden"></span><span class="custom-binding-uninterruptible-chip"></span>
             ${form({ name: "Développement", gameId: "1469308723", gameName: "Software and Game Development",
                      uninterruptible: true })}
         </mdui-collapse-item>`;
@@ -482,6 +485,157 @@ describe("overview list: create, edit, delete", () => {
 
         expect(fetch.mock.calls.filter(([url]) => url === "/me/api-token")).toHaveLength(1);
         expect(byId("api-token-status").textContent).toBe("Aucun jeton");
+    });
+});
+
+describe("overview list: live updates", () => {
+    const GAMES = "33333333-3333-3333-3333-333333333333";
+    const TEMPLATE = `
+        <template id="custom-binding-item-template">
+            <mdui-collapse-item class="custom-binding-item">
+                <span class="custom-binding-name-label"></span><span class="custom-binding-game-label">—</span>
+                <span class="custom-binding-active-chip hidden"></span>
+                <span class="custom-binding-uninterruptible-chip hidden"></span>
+                ${form({ name: "", gameId: "", gameName: "" })}
+            </mdui-collapse-item>
+        </template>`;
+    const art = { id: ART, name: "Art", twitchGameId: "509660", twitchGameName: "Art", ccls: ["Violence"],
+        tws: ["spoiler"], uninterruptible: false };
+    const dev = { id: DEV, name: "Développement", twitchGameId: "1469308723",
+        twitchGameName: "Software and Game Development", ccls: [], tws: [], uninterruptible: true };
+    const games = { id: GAMES, name: "Jeux", twitchGameId: "66082", twitchGameName: "Games + Demos", ccls: ["Drugs"],
+        tws: ["spoiler"], uninterruptible: true };
+    const apply = (bindings, activeId = null) => window.CatapultCustomBindings.apply(bindings, activeId);
+    const ids = () => Array.from(document.querySelectorAll(".custom-binding-item[data-custom-binding-id]"),
+        row => row.dataset.customBindingId);
+    const checked = (row, selector) => Array.from(row.querySelectorAll(selector)).filter(sw => sw.checked)
+        .map(sw => sw.value ?? sw.getAttribute("value"));
+
+    function counting() {
+        const nodes = [];
+        new MutationObserver(records => records.forEach(r => nodes.push(...r.addedNodes, ...r.removedNodes)))
+            .observe(document.body, { childList: true, subtree: true });
+        return nodes;
+    }
+
+    it("adds a newly listed binding from the page's row template, wired like the others, before the New row", async () => {
+        overview({ extra: TEMPLATE });
+
+        expect(apply([art, dev, games], GAMES)).toBe(true);
+
+        expect(ids()).toEqual([ART, DEV, GAMES]);
+        const row = item(GAMES);
+        expect(row.nextElementSibling).toBe(fresh());
+        expect(row.getAttribute("value")).toBe(GAMES);
+        expect(row.querySelector(".custom-binding-name-label").textContent).toBe("Jeux");
+        expect(row.querySelector(".custom-binding-game-label").textContent).toBe("Games + Demos");
+        expect(isHidden(row.querySelector(".custom-binding-uninterruptible-chip"))).toBe(false);
+        expect(row.querySelector(".custom-binding-name").value).toBe("Jeux");
+        expect(row.querySelector(".custom-binding-game-id").value).toBe("66082");
+        expect(checked(row, ".custom-binding-ccl-checkbox")).toEqual(["Drugs"]);
+        expect(checked(row, ".custom-binding-tw-checkbox")).toEqual(["spoiler"]);
+        expect(row.querySelector(".custom-binding-uninterruptible").checked).toBe(true);
+        expect(isActive(GAMES)).toBe(true);
+        expect(isActive(ART)).toBe(false);
+        expect(gameOf(row).selected()).toEqual({ id: "66082", name: "Games + Demos" });
+
+        row.querySelector(".custom-binding-stop").click();
+        await flush();
+        expect(postJson).toHaveBeenCalledWith("/channel/enimaloc/custom-bindings/deactivate", {});
+        expect(refresh).not.toHaveBeenCalled();
+    });
+
+    it("removes the row of a binding no longer listed, the empty notice back once none is", () => {
+        overview({ extra: TEMPLATE });
+
+        apply([dev], null);
+        expect(ids()).toEqual([DEV]);
+        expect(isHidden(byId("channel-custom-bindings-empty"))).toBe(true);
+
+        apply([], null);
+        expect(ids()).toEqual([]);
+        expect(isHidden(byId("channel-custom-bindings-empty"))).toBe(false);
+    });
+
+    it("brings a closed row up to date, header and form", () => {
+        overview({ extra: TEMPLATE });
+
+        apply([{ ...art, name: "Arts", twitchGameId: "1", twitchGameName: "Just Chatting", ccls: ["Drugs"], tws: [],
+            uninterruptible: true }, dev], ART);
+
+        const row = item(ART);
+        expect(row.querySelector(".custom-binding-name-label").textContent).toBe("Arts");
+        expect(row.querySelector(".custom-binding-game-label").textContent).toBe("Just Chatting");
+        expect(isHidden(row.querySelector(".custom-binding-uninterruptible-chip"))).toBe(false);
+        expect(row.querySelector(".custom-binding-name").value).toBe("Arts");
+        expect(row.querySelector(".custom-binding-game-id").value).toBe("1");
+        expect(gameOf(row).selected()).toEqual({ id: "1", name: "Just Chatting" });
+        expect(checked(row, ".custom-binding-ccl-checkbox")).toEqual(["Drugs"]);
+        expect(checked(row, ".custom-binding-tw-checkbox")).toEqual([]);
+        expect(row.querySelector(".custom-binding-uninterruptible").checked).toBe(true);
+    });
+
+    it("keeps what the owner is typing in an open row, and an open dialog open", () => {
+        overview({ extra: TEMPLATE });
+        const row = item(DEV);
+        row.classList.add("is-open");
+        row.querySelector(".custom-binding-name").value = "Dév en cours";
+        item(ART).querySelector(".custom-binding-delete").click();
+        expect(byId("custom-binding-delete-dialog").open).toBe(true);
+
+        apply([art, { ...dev, name: "Dev" }, games], null);
+
+        expect(row.querySelector(".custom-binding-name").value).toBe("Dév en cours");
+        expect(row.querySelector(".custom-binding-name-label").textContent).toBe("Dev");
+        expect(byId("custom-binding-delete-dialog").open).toBe(true);
+        expect(item(DEV)).toBe(row);
+    });
+
+    it("closes the deletion dialog of a binding that went away", async () => {
+        overview({ extra: TEMPLATE });
+        item(ART).querySelector(".custom-binding-delete").click();
+
+        apply([dev], null);
+        byId("custom-binding-delete-dialog").querySelector(".custom-binding-delete-confirm").click();
+        await flush();
+
+        expect(byId("custom-binding-delete-dialog").open).toBe(false);
+        expect(postJson).not.toHaveBeenCalled();
+    });
+
+    it("changes nothing for a list it already shows, however many times it comes", () => {
+        overview({ extra: TEMPLATE });
+        const nodes = counting();
+
+        for (let i = 0; i < 20; i++) apply([{ ...art, ccls: ["Violence"] }, dev], ART);
+
+        expect(nodes).toHaveLength(0);
+        expect(ids()).toEqual([ART, DEV]);
+        expect(isActive(ART)).toBe(true);
+    });
+
+    it("ends on the last of a burst of lists", () => {
+        overview({ extra: TEMPLATE });
+
+        for (let i = 0; i < 20; i++) apply([art, { ...dev, name: `Dev ${i}` }, ...(i % 2 ? [] : [games])], i % 2 ? DEV : null);
+
+        expect(ids()).toEqual([ART, DEV]);
+        expect(item(DEV).querySelector(".custom-binding-name-label").textContent).toBe("Dev 19");
+        expect(isActive(DEV)).toBe(true);
+    });
+
+    it("can't add a binding without the row template, nor take a list it isn't given", () => {
+        overview();
+
+        expect(apply([art, dev, games])).toBe(false);
+        expect(apply(undefined)).toBe(false);
+        expect(ids()).toEqual([ART, DEV]);
+    });
+
+    it("has nothing to update on a page without the list", () => {
+        html("<p></p>");
+
+        expect(apply([art])).toBe(true);
     });
 });
 
