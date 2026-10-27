@@ -1,13 +1,16 @@
 /*
  * Reports the page's errors to Sentry, its own and the 5xx catapult-web answers it with, along with
  * what led to them, so a bug can be replayed step by step: the clicks, SPA navigations and fetches (Sentry's own breadcrumbs), the live update events
- * received (below), the trace that follows each fetch into catapult-web and catapult-api, and the
- * last minute of the page as a replay. Loaded with the SDK only when a DSN is set (see SentryBrowser).
+ * received (below), and the trace that follows each fetch into catapult-web and catapult-api. Loaded
+ * with the SDK only when a DSN is set (see SentryBrowser).
  *
+ * Only the pages the config asks for are replayed whole (replaysSessionSampleRate), none on error
+ * alone: buffering the last minute of every page keeps a MutationObserver on each web component's
+ * shadow root, which SPA navigations never let go of, so each page left stays in memory whole (the
+ * channel page's 3,000 components: +16 MB and 3x the CPU per navigation).
  * Replays show the page's text, which is the member's own dashboard, but never what is typed in a
  * field (a Steam token...), nor what grants access (the OBS widget's link, invitation codes: the
- * templates mark them .sentry-block, recorded as an empty box), nor anything of a page without an
- * error, but where the config asks for whole sessions (replaysSessionSampleRate: dev only).
+ * templates mark them .sentry-block, recorded as an empty box).
  */
 (function () {
     const config = window.Catapult?.sentry;
@@ -31,8 +34,8 @@
             Sentry.replayIntegration({
                 maskAllText: false, maskAllInputs: true, blockAllMedia: false, block: [".darkreader", ".sentry-block"],
             }),
-            // A request to catapult-web answered with a 5xx is an error of the page too, so the
-            // replay of what led to it comes along with the server's own report, on the same trace.
+            // A request to catapult-web answered with a 5xx is an error of the page too, so what
+            // led to it comes along with the server's own report, on the same trace.
             Sentry.httpClientIntegration({
                 failedRequestStatusCodes: [[500, 599]],
                 failedRequestTargets: [window.location.origin],
@@ -40,7 +43,7 @@
         ],
         tracesSampleRate: config.tracesSampleRate,
         replaysSessionSampleRate: config.replaysSessionSampleRate ?? 0,
-        replaysOnErrorSampleRate: 1.0,
+        replaysOnErrorSampleRate: 0,
     });
     if (config.user) {
         Sentry.setUser({ id: config.user });

@@ -39,13 +39,13 @@ beforeEach(() => {
 });
 
 describe("with a DSN", () => {
-    it("reports through catapult-web, replaying only pages with an error, inputs masked", async () => {
+    it("reports through catapult-web, replaying no page on an error alone, inputs masked", async () => {
         await load("monitoring");
 
         expect(Sentry.init).toHaveBeenCalledWith(expect.objectContaining({
             dsn: CONFIG.dsn, environment: "test", release: "catapult-web@abc", tracesSampleRate: 0.5,
             tunnel: "/monitoring/tunnel", sendDefaultPii: false,
-            replaysSessionSampleRate: 0, replaysOnErrorSampleRate: 1.0,
+            replaysSessionSampleRate: 0, replaysOnErrorSampleRate: 0,
             integrations: ["tracing", "replay", "httpClient"],
         }));
         expect(Sentry.replayIntegration).toHaveBeenCalledWith(expect.objectContaining({

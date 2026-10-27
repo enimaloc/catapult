@@ -23,8 +23,8 @@ import java.util.UUID;
  * The browser's Sentry setup, for the full pages (index.html loads the SDK and monitoring.js only
  * with it): the same DSN, environment and release as the server's, and the request's trace, which
  * the page's own then continues, and the member's account id (as SentryUserInterceptor names them).
- * Pages are replayed whole at {@code catapult.sentry.replays-session-sample-rate} (none by default,
- * all of them in dev), else only those with an error; a member in debug mode has every page replayed and traced. None without a DSN.
+ * Pages are replayed whole at {@code catapult.sentry.replays-session-sample-rate} (none by default),
+ * and no others, not even on an error (see monitoring.js); a member in debug mode has every page replayed and traced. None without a DSN.
  */
 @ControllerAdvice(assignableTypes = {IndexController.class, ErrorPageController.class})
 public class SentryBrowser {
