@@ -2387,6 +2387,9 @@ mdui-snackbar.broadcast-warning { --mdui-color-inverse-surface: var(--mdui-color
     background: #fff;
     color: #3b4151;
     overflow-x: auto;
+    /* The site's dark color-scheme would give Swagger UI's buttons and fields (the schemas' names among them)
+       the browser's dark backgrounds, under its dark text: the card is light, so are its native controls. */
+    color-scheme: light;
 }
 
 /* ── OBS dock (pages/channel-dock.html) ───────────────────────────────────
