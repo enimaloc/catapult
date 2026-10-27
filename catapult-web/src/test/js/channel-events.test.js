@@ -381,6 +381,7 @@ describe("events patched in place by their cards", () => {
 describe("reconnection", () => {
     beforeEach(() => {
         vi.useFakeTimers();
+        vi.spyOn(Math, "random").mockReturnValue(0.5); // no jitter
         window.CatapultSpa = { navigate: vi.fn(async () => {}) };
         window.scrollTo = vi.fn();
         vi.stubGlobal("fetch", vi.fn(async () => response(200, [])));
@@ -402,6 +403,23 @@ describe("reconnection", () => {
 
         closeByServer(current());
         vi.advanceTimersByTime(9999);
+        expect(sources()).toHaveLength(2);
+        vi.advanceTimersByTime(1);
+        expect(sources()).toHaveLength(3);
+    });
+
+    it("reopens up to 2 s earlier or later at random, so that the pages closed together don't reopen together", () => {
+        Math.random.mockReturnValue(0);
+        render();
+        closeByServer(current());
+        vi.advanceTimersByTime(2999);
+        expect(sources()).toHaveLength(1);
+        vi.advanceTimersByTime(1);
+        expect(sources()).toHaveLength(2);
+
+        Math.random.mockReturnValue(0.999);
+        closeByServer(current());
+        vi.advanceTimersByTime(11995);
         expect(sources()).toHaveLength(2);
         vi.advanceTimersByTime(1);
         expect(sources()).toHaveLength(3);

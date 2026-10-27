@@ -10,7 +10,8 @@
  * EventSource reconnects on its own, except when a reconnect is answered with something other
  * than a stream (a maintenance page during a restart, a refusal): it then stops for good,
  * so a closed stream is reopened after a backoff (5 s, doubling up to 60 s, back to 5 s once a
- * stream opens), as live.js does. Events sent while the stream was down are lost: every time it
+ * stream opens), as live.js does, each wait 2 s shorter or longer at random: the pages a restart
+ * of catapult-web closed all at once then don't all reopen, and ask /state, at the same moment. Events sent while the stream was down are lost: every time it
  * opens again (by itself or reopened), the page catches up on the channel's state as events
  * (GET /spa/channel/{username}/state, see ChannelState.java), applied as if the stream had sent them;
  * an answer arriving after that of a later ask is dropped.
@@ -21,6 +22,7 @@
 (function () {
     const FIRST_DELAY = 5000;
     const MAX_DELAY = 60000;
+    const JITTER = 2000;
     let source = null;
     let sourceUsername = null;
     let registeredEvents = new Set();
@@ -172,10 +174,12 @@
     function scheduleReopen() {
         if (retry !== null) return;
         const username = sourceUsername;
+        // up to JITTER earlier or later
+        const wait = delay + Math.round((Math.random() * 2 - 1) * JITTER);
         retry = setTimeout(() => {
             retry = null;
             if (sourceUsername === username) open(username);
-        }, delay);
+        }, wait);
         delay = Math.min(delay * 2, MAX_DELAY);
     }
 

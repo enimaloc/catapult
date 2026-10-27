@@ -307,7 +307,7 @@ test.describe("DOM mutations", () => {
     await open(page, STREAMER, `/channel/${STREAMER}`);
     await startCounting(page);
     // The channel's stream ends for good, as when its reconnection is answered by a maintenance page:
-    // channel-events.js opens it again after its first backoff (5 s), then catches up on what it missed.
+    // channel-events.js opens it again after its first backoff (5 s ± 2 s), then catches up on what it missed.
     await page.evaluate(() => {
       const sources = (window as unknown as { __eventSources: EventSource[] }).__eventSources;
       const channel = sources.find((s) => s.url.includes("/events/channel/") && s.readyState !== EventSource.CLOSED);
