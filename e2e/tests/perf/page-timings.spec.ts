@@ -1,6 +1,7 @@
-import { expect, request, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { loginAs, openCustomBindingsExperiment } from "./session";
 import { measureNavigation, measureTab } from "./vitals";
 
 /**
@@ -52,45 +53,6 @@ function record(name: string, metric: string, samples: number[], budget: number)
     JSON.stringify([...known.filter((r) => r.name !== name || r.metric !== metric), result], null, 2),
   );
   return result;
-}
-
-async function loginAs(page: Page, username: string) {
-  const response = await page.goto(`/perf/login?username=${username}`);
-  expect(response?.ok()).toBeTruthy();
-}
-
-/**
- * Opens the custom bindings experiment to every member, as an admin would from the admin screen: it is
- * closed by default, which hides the API token card (and the /me/api-token request) from the channel page.
- */
-async function openCustomBindingsExperiment() {
-  const api = await request.newContext({ baseURL: process.env.PERF_BASE_URL });
-  try {
-    expect((await api.get("/perf/login?username=perf-admin")).ok()).toBeTruthy();
-    expect((await api.get("/admin")).ok()).toBeTruthy();
-    const xsrf = (await api.storageState()).cookies.find((c) => c.name === "XSRF-TOKEN")?.value ?? "";
-    const post = async (path: string, data: object = {}) => {
-      const response = await api.post(path, { data, headers: { "X-XSRF-TOKEN": xsrf } });
-      expect(response.ok(), `POST ${path}: ${response.status()}`).toBeTruthy();
-    };
-    const list = await (await api.get("/spa/admin/experiments")).text();
-    const row = list.split('data-admin-open="').find((chunk) => chunk.includes(">custom.bindings<"));
-    const id = row?.slice(0, 36);
-    expect(id, "custom.bindings experiment in the admin list").toBeTruthy();
-    const detail = await (await api.get(`/spa/admin/experiments/${id}`)).text();
-    // Already open (the worker restarts after a failed test and runs this again): activating again answers 409.
-    if (/data-status="ACTIVE"/.test(detail)) return;
-    const weights: Record<string, number> = {};
-    for (const [, variant, key] of detail.matchAll(/data-variant="([0-9a-f-]{36})"[^>]*data-variant-key="([^"]+)"/g)) {
-      weights[variant] = key === "control" ? 0 : 1;
-    }
-    expect(Object.keys(weights).length).toBeGreaterThan(1);
-    await post(`/admin/experiments/${id}/weights`, weights);
-    await post(`/admin/experiments/${id}/rules`, { type: "RANDOM", percentage: 100 });
-    await post(`/admin/experiments/${id}/activate`);
-  } finally {
-    await api.dispose();
-  }
 }
 
 function pageTest(user: string, name: string, url: string) {
