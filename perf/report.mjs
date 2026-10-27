@@ -451,10 +451,11 @@ export function renderMarkdown(report) {
             + "removed (each with its descendants) against the budget, the attribute and text changes as "
             + "reported. Δ nodes: against the previous run.", "",
             table(["Scenario", "Nodes", "Attributes", "Text", "Budget (nodes)", "Δ nodes", "Result"],
-                report.dom.map((d) => [d.scenario, show(d.nodes), show(d.attributes), show(d.text), show(d.budget),
-                    change(d.scenario) ? `${signed(change(d.scenario).delta)} (${signed(change(d.scenario).pct, " %")})`
-                        : "–",
-                    d.ok ? "pass" : "**FAIL**"])),
+                report.dom.map((d) => {
+                    const delta = change(d.scenario);
+                    return [d.scenario, show(d.nodes), show(d.attributes), show(d.text), show(d.budget),
+                        delta ? `${signed(delta.delta)} (${signed(delta.pct, " %")})` : "–", d.ok ? "pass" : "**FAIL**"];
+                })),
             "");
     }
 

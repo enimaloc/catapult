@@ -79,8 +79,12 @@ budget with the change that lowers the count. Attributes and text are reported, 
 They run as `perf-streamer-002` (and `perf-admin`), leaving `perf-streamer-001` to the page timings,
 and put back what they change. A live event comes from catapult-api itself when a web action makes
 it (signed in apart, as another device), else is published on the channel's Redis channel in
-catapult-api's envelope. Counts are meant to be the same on every run: each window has a fixed length
-and starts right after a tick of the page's clocks, which rewrite their text every second.
+catapult-api's envelope. Counts are meant to be the same on every run: each step waits for the page
+to be quiet (no mutation, no request in flight, for 750 ms, and the OBS card's check over) before the
+next, each window has a fixed length, and the clocks are frozen (`Date.now()`) but in `idle-60s`, where
+they run from 10 min after the notifications they show. `DOM_MUTATIONS_TRACE=1 perf/run.sh --dom-only`
+also writes each scenario's mutations, one line per record (`dom-trace-<scenario>.txt`), to compare
+two runs.
 
 ## The load run
 

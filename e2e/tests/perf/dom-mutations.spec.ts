@@ -1,8 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { startCounting, stopCounting, type MutationCounts } from "./dom-mutations";
+import {
+  liveEvents, startCounting, stopCounting, trackLiveEvents, waitForLiveEvent, waitForQuiet, type MutationCounts,
+} from "./dom-mutations";
 import { loginAs, openCustomBindingsExperiment, signIn, type Member } from "./session";
 
 /**
@@ -20,12 +22,18 @@ import { loginAs, openCustomBindingsExperiment, signIn, type Member } from "./se
 
 const STREAMER = "perf-streamer-002";
 const ADMIN = "perf-admin";
-/** Between two live events: each one's re-render (or patch) is done before the next. */
-const EVENT_GAP_MS = 2000;
-/** After a user action: its request, the re-render and the live event it causes are done. */
-const ACTION_SETTLE_MS = 3000;
-/** The window of one user action: typing, its request and ACTION_SETTLE_MS. */
-const ACTION_WINDOW_MS = 9000;
+/**
+ * The windows of the scenarios' steps: what a step does, then until the page is quiet (waitForQuiet).
+ * Fixed, and failing when overrun, so that every run counts over the same length of time.
+ */
+const ACTION_WINDOW_MS = 18_000;
+const EVENTS_WINDOW_MS = 80_000;
+/**
+ * custom-binding-crud: how much later the channel's fragment answers. A save re-renders the page itself
+ * and its live event (CustomBindingsUpdatedEvent) re-renders it again; delayed, the two always overlap and
+ * spa.js always applies only the later one, instead of one or both depending on which comes first.
+ */
+const FRAGMENT_DELAY_MS = 1000;
 
 const budgetsFile = join(__dirname, "dom-budgets.json");
 const resultsDir = process.env.PERF_RESULTS_DIR || join(__dirname, "..", "..", "perf-results");
@@ -42,13 +50,15 @@ function judge(scenario: string, counts: MutationCounts) {
   const budgets: Record<string, { nodes: number }> = JSON.parse(readFileSync(budgetsFile, "utf8"));
   const budget = budgets[scenario]?.nodes ?? null;
   // Rewritten at each record: a failed test restarts the worker, which must not lose the earlier ones.
+  const { trace, ...measured } = counts;
   const known: Result[] = existsSync(resultsFile) ? JSON.parse(readFileSync(resultsFile, "utf8")) : [];
   mkdirSync(resultsDir, { recursive: true });
   writeFileSync(
     resultsFile,
-    JSON.stringify([...known.filter((r) => r.scenario !== scenario), { scenario, ...counts, budget }], null, 2),
+    JSON.stringify([...known.filter((r) => r.scenario !== scenario), { scenario, ...measured, budget }], null, 2),
   );
-  console.log(`${scenario}: ${JSON.stringify(counts)}, budget ${budget}`);
+  if (trace) writeFileSync(join(resultsDir, `dom-trace-${scenario}.txt`), `${trace.join("\n")}\n`);
+  console.log(`${scenario}: ${JSON.stringify(measured)}, budget ${budget}`);
   expect(budget, `${scenario}: no budget in dom-budgets.json (measured ${counts.nodes} nodes)`).not.toBeNull();
   expect(counts.nodes, `${scenario} nodes added and removed`).toBeLessThanOrEqual(budget as number);
 }
@@ -57,6 +67,7 @@ const sum = (all: MutationCounts[]): MutationCounts => ({
   nodes: all.reduce((n, c) => n + c.nodes, 0),
   attributes: all.reduce((n, c) => n + c.attributes, 0),
   text: all.reduce((n, c) => n + c.text, 0),
+  ...(all.some((c) => c.trace) ? { trace: all.flatMap((c, i) => [`-- step ${i + 1}`, ...(c.trace ?? [])]) } : {}),
 });
 
 function docker(args: string[]): string {
@@ -104,23 +115,56 @@ async function bindings(page: Page, login: string): Promise<Binding[]> {
 /** The game.detected payload of `binding`. */
 const detected = ({ id, sourceName, sourceType }: Binding) => ({ bindingId: id, sourceName, sourceType });
 
+/** How long channel-obs-widget.js waits for OBS before its check says it is unreachable (CONNECT_WAIT_MS). */
+const OBS_CHECK_MS = 5000;
+
+/** Whether the OBS card's source check (if the page has the card and checks) is over: no longer "checking". */
+const obsChecked = () => {
+  const status = document.getElementById("obs-widget-source-status");
+  return !status || status.textContent !== status.dataset.labelChecking;
+};
+
 /**
- * Sends `events` EVENT_GAP_MS apart (from the first one's start, whatever each one takes to send), then
- * waits EVENT_GAP_MS more: the window it needs is events.length * EVENT_GAP_MS.
+ * Waits for the page to be quiet (waitForQuiet), including the OBS card's source check of a render: without
+ * OBS, it shows "unreachable" OBS_CHECK_MS after it starts, which a quiet period alone does not wait for.
  */
-async function paced(page: Page, events: Array<() => unknown>) {
-  const start = Date.now();
-  for (let i = 0; i < events.length; i++) {
-    await page.waitForTimeout(Math.max(0, start + i * EVENT_GAP_MS - Date.now()));
-    await events[i]();
-  }
-  await page.waitForTimeout(Math.max(0, start + events.length * EVENT_GAP_MS - Date.now()));
+async function settled(page: Page) {
+  await waitForQuiet(page);
+  if (await page.evaluate(obsChecked)) return;
+  await page.waitForFunction(obsChecked, undefined, { timeout: OBS_CHECK_MS * 3 });
+  await waitForQuiet(page);
 }
 
-/** Opens `url` as `username` and waits for its first render to settle. */
-async function open(page: Page, username: string, url: string) {
+/**
+ * Runs each step in turn, each followed by the live event it causes (when `live`) and by the page settling
+ * down (settled).
+ */
+async function oneByOne(page: Page, steps: Array<() => unknown>, live = true) {
+  for (const step of steps) {
+    const seen = await liveEvents(page);
+    await step();
+    if (live) await waitForLiveEvent(page, seen);
+    await settled(page);
+  }
+}
+
+/**
+ * Opens `url` as `username`, its live events tracked (trackLiveEvents), and waits for its first render to
+ * settle. Unless `clocks`, the page's Date.now() is frozen at its load (what the clocks of time.js read): the
+ * clocks, the subject of idle-60s, would otherwise change text whenever a minute turns, which a window may
+ * or may not hold. Only Date.now(): the page's timers and new Date() are left alone.
+ */
+async function open(page: Page, username: string, url: string, { clocks = false } = {}) {
+  if (!clocks) {
+    await page.addInitScript(() => {
+      const loaded = Date.now();
+      Date.now = () => loaded;
+    });
+  }
+  await trackLiveEvents(page);
   await loginAs(page, username);
   await page.goto(url, { waitUntil: "networkidle" });
+  await page.waitForFunction(obsChecked, undefined, { timeout: OBS_CHECK_MS * 3 });
 }
 
 /** Clicks the tab `value` of the page's tabs and waits for its requests. */
@@ -149,12 +193,27 @@ test.skip(!process.env.PERF_BASE_URL, "perf/run.sh only: needs a perf stack (PER
 test.describe("DOM mutations", () => {
   // Both change the channel page every scenario renders: done first, whatever the order the scenarios run in.
   test.beforeAll(async () => {
+    // A new run starts a new file; a worker restarted after a failed test (index > 0) adds to it.
+    if (test.info().workerIndex === 0) rmSync(resultsFile, { force: true });
     await openCustomBindingsExperiment();
     await grantInvite(STREAMER);
   });
 
   test("@perf dom idle-60s", async ({ page }) => {
-    await open(page, STREAMER, `/channel/${STREAMER}`);
+    // The clocks are the notifications' ages, seeded at the stack's start: a few seconds or minutes old
+    // depending on how fast it came up, so they change every second or once a minute. The page's Date.now()
+    // runs on from 10 min after the newest of them: each one then changes once in the 60 s, half way.
+    await loginAs(page, STREAMER);
+    const menu = await (await page.request.get("/spa/notifications/menu")).text();
+    const created = [...menu.matchAll(/data-live-time="relative"[^>]*datetime="([^"]+)"|datetime="([^"]+)"[^>]*data-live-time="relative"/g)]
+      .map(([, a, b]) => Date.parse(a ?? b)).filter(Number.isFinite);
+    expect(created.length, "notifications with an age in the menu").toBeGreaterThan(0);
+    const offset = Math.max(...created) + 10 * 60_000 - Date.now();
+    await page.addInitScript((offset) => {
+      const now = Date.now;
+      Date.now = () => now() + offset;
+    }, offset);
+    await open(page, STREAMER, `/channel/${STREAMER}`, { clocks: true });
     await startCounting(page);
     judge("idle-60s", await stopCounting(page, 60_000));
   });
@@ -165,7 +224,8 @@ test.describe("DOM mutations", () => {
     // What the 5 min timer, a tab shown again and a reopened navbar stream do, the list unchanged
     await page.evaluate(() => (window as unknown as { CatapultSpa: { loadNavChannels(): Promise<void> } })
       .CatapultSpa.loadNavChannels());
-    judge("nav-refresh", await stopCounting(page, 3000));
+    await settled(page);
+    judge("nav-refresh", await stopCounting(page, 5000));
   });
 
   test("@perf dom dock-events", async ({ page }) => {
@@ -195,8 +255,8 @@ test.describe("DOM mutations", () => {
         () => device.post(`/channel/bindings/${playing!.id}/tw-enabled`, { enabled: true }),
       ];
       await startCounting(page);
-      await paced(page, events);
-      judge("dock-events", await stopCounting(page, events.length * EVENT_GAP_MS + 2000));
+      await oneByOne(page, events);
+      judge("dock-events", await stopCounting(page, EVENTS_WINDOW_MS));
     } finally {
       await device.dispose();
     }
@@ -224,8 +284,8 @@ test.describe("DOM mutations", () => {
       send("connection.changed", { provider: "XBOX", connected: false, profile: null }),
     ];
     await startCounting(page);
-    await paced(page, events);
-    judge("channel-live-events", await stopCounting(page, events.length * EVENT_GAP_MS + 2000));
+    await oneByOne(page, events);
+    judge("channel-live-events", await stopCounting(page, EVENTS_WINDOW_MS));
   });
 
   test("@perf dom channel-reconnect", async ({ page }) => {
@@ -255,16 +315,21 @@ test.describe("DOM mutations", () => {
     await expect.poll(() => page.evaluate(() => (window as unknown as { __eventSources: EventSource[] }).__eventSources
       .filter((s) => s.url.includes("/events/channel/") && s.readyState === EventSource.OPEN).length), { timeout: 10_000 })
       .toBe(1);
-    await page.waitForTimeout(ACTION_SETTLE_MS);
-    judge("channel-reconnect", await stopCounting(page, 12_000));
+    await settled(page);
+    judge("channel-reconnect", await stopCounting(page, ACTION_WINDOW_MS));
   });
 
   test("@perf dom custom-binding-crud", async ({ page }) => {
     await deleteCustomBindings(STREAMER); // those an interrupted run left
     await open(page, STREAMER, `/channel/${STREAMER}`);
+    await page.route("**/spa/channel/**", async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, FRAGMENT_DELAY_MS));
+      await route.continue();
+    });
     try {
       judge("custom-binding-crud", await customBindingCrud(page));
     } finally {
+      await page.unrouteAll({ behavior: "ignoreErrors" });
       await deleteCustomBindings(STREAMER);
     }
   });
@@ -275,8 +340,15 @@ test.describe("DOM mutations", () => {
     const saved = () => list.locator(".custom-binding-item[data-custom-binding-id]");
     await expect(saved()).toHaveCount(0);
 
+    // Each step: its save re-renders the page, then its live event does too (FRAGMENT_DELAY_MS)
+    const settle = async (seen: number) => {
+      await waitForLiveEvent(page, seen);
+      await settled(page);
+    };
+
     // Create: "New", a name, a category picked from the search, save
     await startCounting(page);
+    let seen = await liveEvents(page);
     await page.locator("#custom-binding-new-btn").click();
     const fresh = list.locator(".custom-binding-new");
     await type(page, "#channel-custom-bindings-list .custom-binding-new mdui-text-field.custom-binding-name", "Perf DOM");
@@ -284,29 +356,31 @@ test.describe("DOM mutations", () => {
     await fresh.locator(".custom-binding-game-results mdui-list-item").first().click();
     await posting(page, `/channel/${STREAMER}/custom-bindings`, () => fresh.locator(".custom-binding-save").click());
     await expect(saved()).toHaveCount(1);
-    await page.waitForTimeout(ACTION_SETTLE_MS);
+    await settle(seen);
     steps.push(await stopCounting(page, ACTION_WINDOW_MS));
 
     const id = await saved().first().getAttribute("data-custom-binding-id");
 
     // Edit: open it, rename it, save
     await startCounting(page);
+    seen = await liveEvents(page);
     await saved().first().locator("[slot=header]").click();
     await type(page, "#channel-custom-bindings-list .custom-binding-item[data-custom-binding-id] mdui-text-field.custom-binding-name", "Perf DOM 2");
     await posting(page, `/channel/${STREAMER}/custom-bindings/${id}`,
       () => saved().first().locator(".custom-binding-save").click());
     await expect(saved().first().locator(".custom-binding-name-label")).toHaveText("Perf DOM 2");
-    await page.waitForTimeout(ACTION_SETTLE_MS);
+    await settle(seen);
     steps.push(await stopCounting(page, ACTION_WINDOW_MS));
 
     // Delete: open it, delete, confirm
     await startCounting(page);
+    seen = await liveEvents(page);
     await saved().first().locator("[slot=header]").click();
     await saved().first().locator(".custom-binding-delete").click();
     await posting(page, `/channel/${STREAMER}/custom-bindings/${id}/delete`,
       () => page.locator("#custom-binding-delete-dialog .custom-binding-delete-confirm").click());
     await expect(saved()).toHaveCount(0);
-    await page.waitForTimeout(ACTION_SETTLE_MS);
+    await settle(seen);
     steps.push(await stopCounting(page, ACTION_WINDOW_MS));
     return sum(steps);
   }
@@ -321,7 +395,7 @@ test.describe("DOM mutations", () => {
     await page.locator("#invite-regenerate-btn").click();
     await posting(page, "/invite/regenerate",
       () => page.locator("#invite-regenerate-dialog .invite-regenerate-confirm").click());
-    await page.waitForTimeout(ACTION_SETTLE_MS);
+    await settled(page);
     steps.push(await stopCounting(page, ACTION_WINDOW_MS));
 
     // Regenerate the OBS widget link, confirmed
@@ -331,7 +405,7 @@ test.describe("DOM mutations", () => {
     await page.locator("#obs-widget-regenerate-btn").click();
     await posting(page, `/channel/${STREAMER}/settings/twitchat/regenerate`,
       () => page.locator("#obs-widget-regenerate-dialog .obs-widget-regenerate-confirm").click());
-    await page.waitForTimeout(ACTION_SETTLE_MS);
+    await settled(page);
     steps.push(await stopCounting(page, ACTION_WINDOW_MS));
 
     judge("channel-actions", sum(steps));
@@ -352,7 +426,7 @@ test.describe("DOM mutations", () => {
       await type(page, ".admin-targeting-form mdui-text-field[name=key]", "perf-dom");
       await type(page, ".admin-targeting-form mdui-text-field[name=value]", "1");
       await posting(page, `/admin/members/${memberId}/flags`, () => targeting.locator(".admin-targeting-flag-save").click());
-      await page.waitForTimeout(ACTION_SETTLE_MS);
+      await settled(page);
       steps.push(await stopCounting(page, ACTION_WINDOW_MS));
 
       // Groups: a group created
@@ -361,7 +435,7 @@ test.describe("DOM mutations", () => {
       await type(page, ".admin-groups-create mdui-text-field[name=key]", "perf_dom");
       await type(page, ".admin-groups-create mdui-text-field[name=name]", "Perf DOM");
       await posting(page, "/admin/groups", () => page.locator(".admin-groups-create-save").click());
-      await page.waitForTimeout(ACTION_SETTLE_MS);
+      await settled(page);
       steps.push(await stopCounting(page, ACTION_WINDOW_MS));
 
       // Meta: a meta tag added
@@ -370,7 +444,7 @@ test.describe("DOM mutations", () => {
       await type(page, ".admin-meta-tags-form mdui-text-field[name=key]", "perf-dom");
       await type(page, ".admin-meta-tags-form mdui-text-field[name=content]", "1");
       await posting(page, "/admin/meta/tags", () => page.locator(".admin-meta-tag-save").click());
-      await page.waitForTimeout(ACTION_SETTLE_MS);
+      await settled(page);
       steps.push(await stopCounting(page, ACTION_WINDOW_MS));
     } finally {
       await undoAdminEdits(admin, memberId!);
@@ -387,16 +461,23 @@ test.describe("DOM mutations", () => {
 async function grantInvite(username: string) {
   const admin = await signIn(ADMIN, "/admin");
   const member = await signIn(username, `/channel/${username}`);
+  let whitelistOn = false;
+  let invitesOn = false;
   try {
     const page = async () => (await admin.api.get("/spa/admin/whitelist")).text();
-    const whitelistOff = (await page()).includes("data-whitelist-toggle>Enable");
-    if (whitelistOff) await admin.post("/admin/whitelist/toggle");
-    const invitesOff = (await page()).includes("data-invites-toggle>Enable");
-    if (invitesOff) await admin.post("/admin/whitelist/invite/toggle");
+    if ((await page()).includes("data-whitelist-toggle>Enable")) {
+      await admin.post("/admin/whitelist/toggle");
+      whitelistOn = true;
+    }
+    if ((await page()).includes("data-invites-toggle>Enable")) {
+      await admin.post("/admin/whitelist/invite/toggle");
+      invitesOn = true;
+    }
     expect((await member.api.get(`/spa/channel/${username}`)).ok()).toBeTruthy();
-    if (invitesOff) await admin.post("/admin/whitelist/invite/toggle");
-    if (whitelistOff) await admin.post("/admin/whitelist/toggle");
   } finally {
+    // Put back as found, whatever failed
+    if (invitesOn) await admin.post("/admin/whitelist/invite/toggle");
+    if (whitelistOn) await admin.post("/admin/whitelist/toggle");
     await admin.dispose();
     await member.dispose();
   }
