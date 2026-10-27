@@ -19,6 +19,7 @@ import fr.enimaloc.catapult.common.dto.channel.TwSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.UpdateBindingRequest;
 import fr.enimaloc.catapult.common.dto.channel.ValidateRequest;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatSettingsResponse;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import lombok.RequiredArgsConstructor;
@@ -187,11 +188,24 @@ public class ChannelActionsController {
         return ApiStatus.answer(apiService.saveTwitchatBranch(username, body.branch()));
     }
 
-    /** Replaces the OBS widget link: 204 (the page re-reads the new link), else catapult-api's status, 502 when unreachable. */
+    /**
+     * Replaces the OBS widget link: the new links built on its token, for the page to show them in place
+     * (204 when catapult-api tells no token), else catapult-api's status, 502 when unreachable.
+     */
     @PostMapping("/channel/{username}/settings/twitchat/regenerate")
-    public ResponseEntity<Void> regenerateTwitchatWidget(@PathVariable String username) {
-        return ApiStatus.answer(apiService.regenerateTwitchatWidget(username).status());
+    public ResponseEntity<WidgetLinks> regenerateTwitchatWidget(@PathVariable String username) {
+        ApiClient.Result<TwitchatSettingsResponse> result = apiService.regenerateTwitchatWidget(username);
+        String token = result.ok() && result.body() != null ? result.body().widgetToken() : null;
+        if (token == null) {
+            return ResponseEntity.status(ApiStatus.answer(result.status()).getStatusCode()).build();
+        }
+        // The token is a capability: in the links only, never logged.
+        return ResponseEntity.ok(new WidgetLinks(ModelFiller.absoluteUrl("/widget/obs/" + token),
+                ModelFiller.absoluteUrl("/api/user/summary/" + token)));
     }
+
+    /** The OBS widget's link and the user API summary's, both carrying the widget's token. */
+    public record WidgetLinks(String widgetUrl, String summaryUrl) {}
 
     @PostMapping("/channel/{username}/settings/ccl")
     public ResponseEntity<Void> saveCclSettings(@PathVariable String username, @RequestBody CclSettingsRequest body) {

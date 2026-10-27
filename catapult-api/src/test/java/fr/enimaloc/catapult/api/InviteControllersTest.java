@@ -27,6 +27,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -107,6 +108,26 @@ class InviteControllersTest {
 
             verify(inviteService).regenerateCode(me);
             verify(experiments).track(me, ApiInviteController.EXPERIMENT_KEY, ApiInviteController.EVENT_LINK_REGENERATED);
+        }
+
+        @Test
+        void regenerate_answersTheNewCodeAndLink_withoutCountingAPageView() {
+            ReflectionTestUtils.setField(controller, "webUrl", "https://catapult.example");
+            AlphaInvite invite = inviteOf(me);
+            invite.setCode("NEWCODE234");
+            when(inviteService.regenerateCode(me)).thenReturn(Optional.of(invite));
+
+            var page = controller.regenerate(UUID.randomUUID(), jwt);
+
+            assertThat(page.canInvite()).isTrue();
+            assertThat(page.code()).isEqualTo("NEWCODE234");
+            assertThat(page.inviteUrl()).isEqualTo("https://catapult.example/join?invite=NEWCODE234");
+            verify(experiments, never()).track(me, ApiInviteController.EXPERIMENT_KEY, ApiInviteController.EVENT_PAGE_VIEW);
+        }
+
+        @Test
+        void regenerate_withoutInvite_answersNoCode() {
+            assertThat(controller.regenerate(UUID.randomUUID(), jwt).canInvite()).isFalse();
         }
     }
 

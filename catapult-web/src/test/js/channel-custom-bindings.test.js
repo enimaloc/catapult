@@ -23,6 +23,26 @@ const errorLine = () => byId("custom-bindings-error");
 const isActive = id => item(id).classList.contains("is-active");
 const isHidden = el => el.classList.contains("hidden");
 
+const GAMES = "33333333-3333-3333-3333-333333333333";
+const TEMPLATE = `
+    <template id="custom-binding-item-template">
+        <mdui-collapse-item class="custom-binding-item">
+            <mdui-list-item slot="header" tabindex="0"></mdui-list-item>
+            <span class="custom-binding-name-label"></span><span class="custom-binding-game-label">—</span>
+            <span class="custom-binding-active-chip hidden"></span>
+            <span class="custom-binding-uninterruptible-chip hidden"></span>
+            ${form({ name: "", gameId: "", gameName: "" })}
+        </mdui-collapse-item>
+    </template>`;
+const art = { id: ART, name: "Art", twitchGameId: "509660", twitchGameName: "Art", ccls: ["Violence"],
+    tws: ["spoiler"], uninterruptible: false };
+const dev = { id: DEV, name: "Développement", twitchGameId: "1469308723",
+    twitchGameName: "Software and Game Development", ccls: [], tws: [], uninterruptible: true };
+const games = { id: GAMES, name: "Jeux", twitchGameId: "66082", twitchGameName: "Games + Demos", ccls: ["Drugs"],
+    tws: ["spoiler"], uninterruptible: true };
+const checked = (row, selector) => Array.from(row.querySelectorAll(selector)).filter(sw => sw.checked)
+    .map(sw => sw.value ?? sw.getAttribute("value"));
+
 function form(binding) {
     const actions = binding
         ? `<mdui-button tabindex="0" class="custom-binding-activate${binding.active ? " hidden" : ""}"></mdui-button>
@@ -347,7 +367,76 @@ describe("overview list: create, edit, delete", () => {
             ccls: ["Drugs"], tws: [], uninterruptible: true
         });
         expect(fresh().querySelector(".custom-binding-game-id").value).toBe("26936");
-        expect(refresh).toHaveBeenCalled();
+        expect(refresh).not.toHaveBeenCalled();
+    });
+
+    it("shows the created binding at once, before the New row, which closes emptied", async () => {
+        overview({ extra: TEMPLATE });
+        byId("custom-binding-new-btn").click();
+        fresh().querySelector(".custom-binding-name").value = "Jeux";
+        gameOf(fresh()).pick({ id: "66082", name: "Games + Demos" });
+        const save = fresh().querySelector(".custom-binding-save");
+        save.focus();
+        postJson.mockResolvedValueOnce(response(201, games));
+
+        save.click();
+        await flush();
+
+        const row = item(GAMES);
+        expect(row.nextElementSibling).toBe(fresh());
+        expect(row.querySelector(".custom-binding-name-label").textContent).toBe("Jeux");
+        expect(row.querySelector(".custom-binding-game-label").textContent).toBe("Games + Demos");
+        expect(row.querySelector(".custom-binding-name").value).toBe("Jeux");
+        expect(gameOf(row).selected()).toEqual({ id: "66082", name: "Games + Demos" });
+        expect(isHidden(fresh())).toBe(true);
+        expect(fresh().classList.contains("is-open")).toBe(false);
+        expect(fresh().querySelector(".custom-binding-name").value).toBe("");
+        expect(gameOf(fresh()).selected()).toBeNull();
+        expect(document.querySelector("mdui-collapse").value).toBeUndefined();
+        expect(document.activeElement).toBe(row.querySelector("[slot=header]"));
+        expect(refresh).not.toHaveBeenCalled();
+
+        // Its live event, the list with it, then changes nothing
+        const nodes = [];
+        new MutationObserver(records => records.forEach(r => nodes.push(...r.addedNodes, ...r.removedNodes)))
+            .observe(document.body, { childList: true, subtree: true });
+        window.CatapultCustomBindings.apply([art, dev, games], ART);
+        await flush();
+        expect(nodes).toHaveLength(0);
+        expect(document.querySelectorAll(`[data-custom-binding-id="${GAMES}"]`)).toHaveLength(1);
+    });
+
+    it("adds no second row when the live event listed the created binding first", async () => {
+        overview({ extra: TEMPLATE });
+        byId("custom-binding-new-btn").click();
+        fresh().querySelector(".custom-binding-name").value = "Jeux";
+        gameOf(fresh()).pick({ id: "66082", name: "Games + Demos" });
+        let answer;
+        postJson.mockReturnValueOnce(new Promise(resolve => { answer = resolve; }));
+        fresh().querySelector(".custom-binding-save").click();
+        await flush();
+
+        window.CatapultCustomBindings.apply([art, dev, games], ART);
+        answer(response(201, games));
+        await flush();
+
+        expect(document.querySelectorAll(`[data-custom-binding-id="${GAMES}"]`)).toHaveLength(1);
+        expect(isHidden(fresh())).toBe(true);
+    });
+
+    it("leaves the created binding to its live event without the row template", async () => {
+        overview();
+        byId("custom-binding-new-btn").click();
+        fresh().querySelector(".custom-binding-name").value = "Jeux";
+        gameOf(fresh()).pick({ id: "66082", name: "Games + Demos" });
+        postJson.mockResolvedValueOnce(response(201, games));
+
+        fresh().querySelector(".custom-binding-save").click();
+        await flush();
+
+        expect(item(GAMES)).toBeNull();
+        expect(isHidden(fresh())).toBe(false);
+        expect(refresh).not.toHaveBeenCalled();
     });
 
     it("creates once on a double click of Save", async () => {
@@ -383,7 +472,28 @@ describe("overview list: create, edit, delete", () => {
             name: "Dessin", twitchGameId: "509660", twitchGameName: "Art",
             ccls: ["Violence"], tws: ["spoiler"], uninterruptible: false
         });
-        expect(refresh).toHaveBeenCalled();
+        expect(refresh).not.toHaveBeenCalled();
+    });
+
+    it("shows the saved binding in its row at once, which stays open, the focus in it", async () => {
+        overview();
+        const row = item(ART);
+        row.dispatchEvent(new Event("open"));
+        row.querySelector(".custom-binding-name").value = " Dessin ";
+        const save = row.querySelector(".custom-binding-save");
+        save.focus();
+        postJson.mockResolvedValueOnce(response(200, { binding: { ...art, name: "Dessin", tws: [] }, reapplyOutcome: null }));
+
+        save.click();
+        await flush();
+
+        expect(row.querySelector(".custom-binding-name-label").textContent).toBe("Dessin");
+        expect(row.querySelector(".custom-binding-name").value).toBe("Dessin");
+        expect(checked(row, ".custom-binding-tw-checkbox")).toEqual([]);
+        expect(row.classList.contains("is-open")).toBe(true);
+        expect(document.activeElement).toBe(save);
+        expect(item(ART)).toBe(row);
+        expect(refresh).not.toHaveBeenCalled();
     });
 
     it("saves only the row's own switches", async () => {
@@ -407,7 +517,7 @@ describe("overview list: create, edit, delete", () => {
         await flush();
 
         expect(showError).toHaveBeenCalledWith("Twitch n'a pas appliqué la catégorie");
-        expect(refresh).toHaveBeenCalled();
+        expect(refresh).not.toHaveBeenCalled();
     });
 
     it.each([
@@ -456,7 +566,23 @@ describe("overview list: create, edit, delete", () => {
 
         expect(postJson).toHaveBeenCalledWith(`/channel/enimaloc/custom-bindings/${DEV}/delete`, {});
         expect(byId("custom-binding-delete-dialog").open).toBe(false);
-        expect(refresh).toHaveBeenCalled();
+        expect(item(DEV)).toBeNull();
+        expect(item(ART)).not.toBeNull();
+        expect(isHidden(byId("channel-custom-bindings-empty"))).toBe(true);
+        expect(refresh).not.toHaveBeenCalled();
+    });
+
+    it("tells nothing is listed once the last binding is deleted", async () => {
+        overview();
+        for (const id of [ART, DEV]) {
+            item(id).querySelector(".custom-binding-delete").click();
+            document.querySelector(".custom-binding-delete-confirm").click();
+            await flush();
+        }
+
+        expect(document.querySelector("[data-custom-binding-id]")).toBeNull();
+        expect(isHidden(byId("channel-custom-bindings-empty"))).toBe(false);
+        expect(refresh).not.toHaveBeenCalled();
     });
 
     it("tells a refused deletion and does not re-render", async () => {
@@ -467,6 +593,7 @@ describe("overview list: create, edit, delete", () => {
         await flush();
 
         expect(showError).toHaveBeenCalledWith("Twitch n'a pas appliqué la catégorie");
+        expect(item(ART)).not.toBeNull();
         expect(refresh).not.toHaveBeenCalled();
     });
 
@@ -489,27 +616,9 @@ describe("overview list: create, edit, delete", () => {
 });
 
 describe("overview list: live updates", () => {
-    const GAMES = "33333333-3333-3333-3333-333333333333";
-    const TEMPLATE = `
-        <template id="custom-binding-item-template">
-            <mdui-collapse-item class="custom-binding-item">
-                <span class="custom-binding-name-label"></span><span class="custom-binding-game-label">—</span>
-                <span class="custom-binding-active-chip hidden"></span>
-                <span class="custom-binding-uninterruptible-chip hidden"></span>
-                ${form({ name: "", gameId: "", gameName: "" })}
-            </mdui-collapse-item>
-        </template>`;
-    const art = { id: ART, name: "Art", twitchGameId: "509660", twitchGameName: "Art", ccls: ["Violence"],
-        tws: ["spoiler"], uninterruptible: false };
-    const dev = { id: DEV, name: "Développement", twitchGameId: "1469308723",
-        twitchGameName: "Software and Game Development", ccls: [], tws: [], uninterruptible: true };
-    const games = { id: GAMES, name: "Jeux", twitchGameId: "66082", twitchGameName: "Games + Demos", ccls: ["Drugs"],
-        tws: ["spoiler"], uninterruptible: true };
     const apply = (bindings, activeId = null) => window.CatapultCustomBindings.apply(bindings, activeId);
     const ids = () => Array.from(document.querySelectorAll(".custom-binding-item[data-custom-binding-id]"),
         row => row.dataset.customBindingId);
-    const checked = (row, selector) => Array.from(row.querySelectorAll(selector)).filter(sw => sw.checked)
-        .map(sw => sw.value ?? sw.getAttribute("value"));
 
     function counting() {
         const nodes = [];

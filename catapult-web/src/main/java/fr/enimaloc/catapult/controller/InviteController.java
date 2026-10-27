@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.controller;
 
+import fr.enimaloc.catapult.common.dto.InvitePageData;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import lombok.RequiredArgsConstructor;
@@ -29,12 +30,23 @@ public class InviteController {
         return "redirect:/channel/" + login + "#invitations";
     }
 
-    /** Answered with catapult-api's status (204; 403 without the right to invite), 502 when unreachable. */
+    /**
+     * The new code and link, for the page to show them in place (204 when catapult-api tells none); else
+     * catapult-api's status (403 without the right to invite), 502 when unreachable.
+     */
     @PostMapping("/invite/regenerate")
-    public ResponseEntity<Void> regenerate() {
+    public ResponseEntity<InviteCode> regenerate() {
         if (!ApiClient.hasSession()) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
         }
-        return ResponseEntity.status(apiService.regenerateInvite()).build();
+        ApiClient.Result<InvitePageData> result = apiService.regenerateInvite();
+        InvitePageData page = result.body();
+        if (!result.ok() || page == null || !page.canInvite()) {
+            return ResponseEntity.status(result.ok() ? HttpStatus.NO_CONTENT.value() : result.status()).build();
+        }
+        return ResponseEntity.ok(new InviteCode(page.code(), page.inviteUrl()));
     }
+
+    /** A regenerated invitation: its code and the join link built on it. */
+    public record InviteCode(String code, String inviteUrl) {}
 }

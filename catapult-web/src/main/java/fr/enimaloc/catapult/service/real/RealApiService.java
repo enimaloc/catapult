@@ -1090,10 +1090,10 @@ public class RealApiService implements ApiService {
     }
 
     @Override
-    public int regenerateInvite() {
+    public ApiClient.Result<InvitePageData> regenerateInvite() {
         UUID me = me();
-        if (me == null) return HttpStatus.UNAUTHORIZED.value();
-        return client.call(HttpMethod.POST, "/api/internal/users/{userId}/invite/regenerate", null, Void.class, me).status();
+        if (me == null) return new ApiClient.Result<>(HttpStatus.UNAUTHORIZED.value(), null);
+        return client.call(HttpMethod.POST, "/api/internal/users/{userId}/invite/regenerate", null, InvitePageData.class, me);
     }
 
     @Override

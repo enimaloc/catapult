@@ -173,8 +173,11 @@ class ChannelVisibilityRenderingTest {
         String active = mvc.perform(get("/spa/channel/enimaloc")).andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
-        assertThat(active).contains("id=\"channel-danger-zone\"", "id=\"danger-zone-delete-dialog\"")
-                .doesNotContain("danger-zone-cancel-btn");
+        // Both states rendered, for channel-danger-zone.js to swap in place: the pending one hidden
+        assertThat(active).contains("id=\"channel-danger-zone\"", "id=\"danger-zone-delete-dialog\"",
+                        "data-delay-days=\"7\"", "id=\"danger-zone-request\">",
+                        "id=\"danger-zone-pending\" class=\"hidden\"", "danger-zone-cancel-btn",
+                        "data-label=\"");
 
         when(apiService.accountInfo()).thenReturn(new fr.enimaloc.catapult.common.dto.UserInfoResponse(
                 null, "1", "enimaloc", null, "PENDING_DELETION", List.of(), "2026-10-01T10:00:00Z"));
@@ -185,7 +188,8 @@ class ChannelVisibilityRenderingTest {
         assertThat(pending).contains("id=\"channel-danger-zone\"", "danger-zone-cancel-btn")
                 .containsAnyOf("08/10/2026", "10/08/2026")
                 .contains("data-live-time=\"countdown\" datetime=\"2026-10-08T10:00:00Z\"")
-                .doesNotContain("danger-zone-delete-btn");
+                .contains("id=\"danger-zone-pending\">", "id=\"danger-zone-request\" class=\"hidden\"",
+                        "danger-zone-delete-btn");
 
         BindingDto binding = new BindingDto("binding-1", "AUTO", "STEAM", "Game A", null, "Game A",
                 false, true, Set.of(), true, false, Set.of());
@@ -279,6 +283,23 @@ class ChannelVisibilityRenderingTest {
         String noObs = mvc.perform(get("/spa/channel/enimaloc")).andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         assertThat(noObs).doesNotContain("obs-widget", "11111111-2222-3333-4444-555555555555");
+    }
+
+    @Test
+    void commandsCard_carriesTheSummaryLinkItsFieldsAreBuiltOn() throws Exception {
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(channelPageData(true));
+        when(apiService.enabledChatCommands()).thenReturn(List.of(
+                new fr.enimaloc.catapult.common.dto.chatcommand.EnabledChatCommandDto("!game", "VIEWERS", "game")));
+        when(apiService.twitchatSettings("enimaloc")).thenReturn(new fr.enimaloc.catapult.common.dto.twitchat.TwitchatSettingsResponse(
+                true, "localhost", 4455, true, "11111111-2222-3333-4444-555555555555"));
+
+        String owner = mvc.perform(get("/spa/channel/enimaloc")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        // channel-obs-widget.js swaps it in the fields for a regenerated one
+        assertThat(owner).contains("id=\"command-migration\"",
+                "data-summary-url=\"http://localhost/api/user/summary/11111111-2222-3333-4444-555555555555\"",
+                "value=\"http://localhost/api/user/summary/11111111-2222-3333-4444-555555555555");
     }
 
     @Test

@@ -1423,12 +1423,12 @@ public class MockApiService implements ApiService {
     }
 
     @Override
-    public int regenerateInvite() {
+    public ApiClient.Result<InvitePageData> regenerateInvite() {
         log.trace("regenerateInvite()");
         MockData current = currentData();
-        if (current == null) return 401;
+        if (current == null) return new ApiClient.Result<>(401, null);
         current.regenerateInvite();
-        return 204;
+        return new ApiClient.Result<>(200, current.invitePage());
     }
 
     // The key itself is never logged, only the provider.

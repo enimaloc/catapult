@@ -20,6 +20,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = ChannelActionsController.class)
@@ -293,14 +294,26 @@ class ChannelActionsControllerTest {
     }
 
     @Test
-    void regenerateTwitchatWidget_relaysAndAnswersNoContent() throws Exception {
+    void regenerateTwitchatWidget_answersTheNewLinks() throws Exception {
         when(apiService.regenerateTwitchatWidget("enimaloc")).thenReturn(new fr.enimaloc.catapult.service.http.ApiClient.Result<>(200,
                 new fr.enimaloc.catapult.common.dto.twitchat.TwitchatSettingsResponse(true, "h", 4455, true, "11111111-2222-3333-4444-555555555555")));
 
         mvc.perform(post("/channel/enimaloc/settings/twitchat/regenerate").with(csrf()))
-                .andExpect(status().isNoContent());
+                .andExpect(status().isOk())
+                .andExpect(content().json("{\"widgetUrl\":\"http://localhost/widget/obs/11111111-2222-3333-4444-555555555555\","
+                        + "\"summaryUrl\":\"http://localhost/api/user/summary/11111111-2222-3333-4444-555555555555\"}",
+                        org.springframework.test.json.JsonCompareMode.STRICT));
 
         verify(apiService).regenerateTwitchatWidget("enimaloc");
+    }
+
+    @Test
+    void regenerateTwitchatWidget_withoutAToken_answersNoContent() throws Exception {
+        when(apiService.regenerateTwitchatWidget("enimaloc")).thenReturn(new fr.enimaloc.catapult.service.http.ApiClient.Result<>(200,
+                new fr.enimaloc.catapult.common.dto.twitchat.TwitchatSettingsResponse(true, "h", 4455, true, null)));
+
+        mvc.perform(post("/channel/enimaloc/settings/twitchat/regenerate").with(csrf()))
+                .andExpect(status().isNoContent());
     }
 
     @Test

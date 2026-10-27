@@ -390,8 +390,11 @@ public interface ApiService {
 
     /** The member's invite code, link and redemptions (canInvite false without the right); null when catapult-api fails. */
     InvitePageData invitePage();
-    /** Replaces the member's invite code: catapult-api's status (204), 502 when unreachable. */
-    int regenerateInvite();
+    /**
+     * Replaces the member's invite code: catapult-api's status, with the page holding the new code (no body
+     * from a catapult-api that answers 204), 502 when unreachable.
+     */
+    ApiClient.Result<InvitePageData> regenerateInvite();
 
     /** A provider's shared API keys, masked; null when catapult-api fails. */
     ApiKeysPageDto adminApiKeys(ApiKeyProvider provider);

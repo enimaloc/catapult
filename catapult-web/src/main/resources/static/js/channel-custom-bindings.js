@@ -11,7 +11,8 @@
  *   channel-events.js), the list its CustomBindingsUpdatedEvent (apply): a binding it no longer lists
  *   loses its row, one it newly lists gets a copy of the page's row template, the others are brought up
  *   to date in place (but for the form of an open row, which the owner may be editing). A save or a
- *   deletion re-renders the page, which lists the result.
+ *   deletion shows its result at once from its answer (the created row added from the same template, the
+ *   edited one brought up to date, the deleted one removed): its live event then finds nothing to change.
  * - API token card (Account tab): since when a token exists, generate/regenerate (regeneration confirmed: it
  *   invalidates the old token) and revoke. A generated token is shown once, in a read-only field with
  *   a copy button and a curl example on the site's own address (catapult-web relays /api/v2/custom-bindings
@@ -116,7 +117,7 @@ window.CatapultCustomBindings = (function () {
             if (focused) item.querySelector(activeId ? ".custom-binding-stop" : ".custom-binding-activate")?.focus?.();
         }
 
-        async function save(item, id, game) {
+        async function save(item, id, game, focused) {
             const selected = game.selected();
             const trimmed = (item.querySelector(".custom-binding-name").value ?? "").trim();
             if (!trimmed || !selected?.id) return CatapultChannel.showError(list.dataset.errorInvalid);
@@ -132,13 +133,24 @@ window.CatapultCustomBindings = (function () {
             if (!response.ok) {
                 return CatapultChannel.showError(refusalText(list, await readCode(response), response.status));
             }
-            // An edit of the active binding is re-applied on Twitch: its outcome, when it failed, is told.
-            let reapply = null;
+            let answer = null;
             try {
-                reapply = (await response.json())?.reapplyOutcome ?? null;
-            } catch { /* a creation answers the binding alone */ }
+                answer = await response.json();
+            } catch { /* no binding to show: its live event will */ }
+            // An edit of the active binding is re-applied on Twitch: its outcome, when it failed, is told.
+            const reapply = answer?.reapplyOutcome ?? null;
             if (reapply && reapply !== "applied") CatapultChannel.showError(refusalText(list, reapply, response.status));
-            await CatapultChannel.refresh();
+            // A creation answers the binding alone, an edit the binding and its re-application.
+            const binding = id ? answer?.binding : answer;
+            if (!binding?.id) return;
+            if (id) return updateRow(item, binding, wired.games.get(item));
+            const row = rowOf(list, binding.id) ?? addRow(list, binding, item);
+            if (!row) return;
+            // The "New" row closes, emptied; the keyboard user goes on from the created row.
+            if (collapse && collapse.value === item.getAttribute("value")) collapse.value = undefined;
+            item.classList.remove("is-open");
+            dismissNew(item, game);
+            if (focused) row.querySelector("[slot=header]")?.focus?.();
         }
 
         // mdui-collapse fires open/close but doesn't reflect them on the item: mirror it as .is-open, which
@@ -163,7 +175,7 @@ window.CatapultCustomBindings = (function () {
                 ?.addEventListener("click", event => busy(event.currentTarget, handler));
             on(".custom-binding-activate", focused => act(item, `${base}/${id}/activate`, id, focused));
             on(".custom-binding-stop", focused => act(item, `${base}/deactivate`, null, focused));
-            on(".custom-binding-save", () => save(item, id, game));
+            on(".custom-binding-save", focused => save(item, id, game, focused));
             item.querySelector(".custom-binding-delete")?.addEventListener("click", () => {
                 deletingId = id;
                 dialog.open = true;
@@ -188,7 +200,7 @@ window.CatapultCustomBindings = (function () {
             fresh.querySelector(".custom-binding-game-id").value = "";
             game.select(null);
             fresh.querySelectorAll("mdui-switch").forEach(sw => { sw.checked = false; });
-            show(byId("channel-custom-bindings-empty"), !list.querySelector(".custom-binding-item[data-custom-binding-id]"));
+            showEmpty(list);
         }
 
         byId("custom-binding-new-btn")?.addEventListener("click", () => {
@@ -208,9 +220,48 @@ window.CatapultCustomBindings = (function () {
             if (!id) return;
             const response = await post(`${base}/${id}/delete`, {});
             if (!response) return;
-            if (response.ok) return CatapultChannel.refresh();
-            CatapultChannel.showError(refusalText(list, await readCode(response), response.status));
+            if (!response.ok) return CatapultChannel.showError(refusalText(list, await readCode(response), response.status));
+            rowOf(list, id)?.remove();
+            showEmpty(list);
         });
+    }
+
+    /** The row of the saved binding `id` in `list`, if it has one. */
+    function rowOf(list, id) {
+        return Array.from(list.querySelectorAll(".custom-binding-item[data-custom-binding-id]"))
+            .find(row => row.dataset.customBindingId === id) ?? null;
+    }
+
+    /** The empty notice, shown when no binding is listed and the "New" row isn't open in its place. */
+    function showEmpty(list) {
+        const fresh = list.querySelector(".custom-binding-new");
+        show(byId("channel-custom-bindings-empty"), !list.querySelector(".custom-binding-item[data-custom-binding-id]")
+            && (!fresh || fresh.classList.contains("hidden")));
+    }
+
+    /**
+     * Adds a row for `binding`, a copy of the page's row template, before `before` (null: last), wired like
+     * the others. Null without the template.
+     */
+    function addRow(list, binding, before) {
+        const template = byId("custom-binding-item-template");
+        if (!template || wired?.list !== list) return null;
+        const parent = before?.parentElement ?? list.querySelector("mdui-collapse");
+        const row = template.content.firstElementChild.cloneNode(true);
+        row.dataset.customBindingId = binding.id;
+        row.setAttribute("value", binding.id);
+        showHeader(row, binding);
+        parent.insertBefore(row, before && before.parentElement === parent ? before : null);
+        // Once in the page, its switches and fields are upgraded: their properties are theirs.
+        fillForm(row, binding, null);
+        wired.attachItem(row);
+        return row;
+    }
+
+    /** Brings `row` to `binding`, header and form; `game`, its category search. */
+    function updateRow(row, binding, game) {
+        showHeader(row, binding);
+        fillForm(row, binding, game);
     }
 
     /** Shows `binding` in its row's header. */
@@ -273,18 +324,11 @@ window.CatapultCustomBindings = (function () {
                     fillForm(row, binding, wired.games.get(row));
                 }
             } else {
-                row = template.content.firstElementChild.cloneNode(true);
-                row.dataset.customBindingId = binding.id;
-                row.setAttribute("value", binding.id);
-                showHeader(row, binding);
-                parent.insertBefore(row, next && next.parentElement === parent ? next : null);
-                // Once in the page, its switches and fields are upgraded: their properties are theirs.
-                fillForm(row, binding, null);
-                wired.attachItem(row);
+                row = addRow(list, binding, next && next.parentElement === parent ? next : null);
             }
             next = row;
         }
-        show(byId("channel-custom-bindings-empty"), bindings.length === 0 && (!fresh || fresh.classList.contains("hidden")));
+        showEmpty(list);
         // A refusal under the list stays: the owner may be reading it.
         markActive(activeId ?? null);
         return true;
