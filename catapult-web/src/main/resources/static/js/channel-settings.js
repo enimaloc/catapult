@@ -2,13 +2,17 @@
  * Settings tab. Each card's fields already show what it saves, so a save only posts: no
  * re-render, which would lose the scroll position and any card being edited.
  *
- * A save made elsewhere (another tab, a moderator) comes back as ChannelSettingsUpdatedEvent:
- * channel-events.js hands its settings to CatapultSettings.apply(), which sets every card's
- * fields to them.
+ * A save made elsewhere (another tab, a moderator) comes back as ChannelSettingsUpdatedEvent,
+ * and so does the state a reconnected stream catches up on: channel-events.js hands its settings
+ * to CatapultSettings.apply(), which sets the cards' fields to them, but for those the visitor
+ * changed and hasn't saved yet (their edit is kept until their card is saved, or the server's
+ * value comes back to what they set).
  */
 window.CatapultSettings = (function () {
     // The current render's game pickers, by card prefix.
     let games = {};
+    // The fields the visitor changed since their card was last saved (the game pickers by their text field).
+    let dirty = new WeakSet();
 
     const RAID_DEFAULT_MINUTES = 15;
     const RAID_MIN_MINUTES = 1;
@@ -16,27 +20,70 @@ window.CatapultSettings = (function () {
 
     const byId = id => document.getElementById(id);
 
+    /** Sets switch `sw` to `checked`, unless the visitor changed it (until it holds that value again). */
+    function check(sw, checked) {
+        if (!sw) return;
+        if (sw.checked === checked) {
+            dirty.delete(sw);
+        } else if (!dirty.has(sw)) {
+            sw.checked = checked;
+        }
+    }
+
     function setChecked(id, checked) {
-        const sw = byId(id);
-        if (sw) sw.checked = !!checked;
+        check(byId(id), !!checked);
     }
 
     /** Checks the switches of class `switchClass` under the card `formId` whose value is in `values`. */
     function setGrid(formId, switchClass, values) {
         const wanted = new Set(values ?? []);
-        byId(formId)?.querySelectorAll(`.${switchClass}`).forEach(sw => { sw.checked = wanted.has(sw.value); });
+        byId(formId)?.querySelectorAll(`.${switchClass}`).forEach(sw => check(sw, wanted.has(sw.value)));
     }
 
     function setGame(prefix, id, name) {
         const game = id ? { id, name } : null;
+        const input = byId(`${prefix}-game-input`);
         const idInput = byId(`${prefix}-game-id`);
-        if (idInput) idInput.value = game?.id ?? "";
-        if (games[prefix]) {
-            games[prefix].select(game);
-        } else {
-            const input = byId(`${prefix}-game-input`);
-            if (input) input.value = game?.name ?? "";
+        if (input && dirty.has(input)) {
+            // Kept until it shows that game again: picked, or typed back to it.
+            const shown = games[prefix] ? games[prefix].selected()?.id : idInput?.value || undefined;
+            if (shown !== game?.id || input.value !== (game?.name ?? "")) return;
+            dirty.delete(input);
         }
+        if (idInput && idInput.value !== (game?.id ?? "")) idInput.value = game?.id ?? "";
+        if (games[prefix]) {
+            const selected = games[prefix].selected();
+            if (selected?.id !== game?.id || (game && selected.name !== game.name)) games[prefix].select(game);
+        } else if (input && input.value !== (game?.name ?? "")) {
+            input.value = game?.name ?? "";
+        }
+    }
+
+    /** The raid card set to the server's `minutes`, unless the visitor changed its switch or delay. */
+    function applyRaid(minutes) {
+        const sw = byId("raid-restore-enabled");
+        const field = byId("raid-restore-minutes");
+        const same = sw?.checked === (minutes != null) && (minutes == null || field?.value === String(minutes));
+        if (same) {
+            dirty.delete(sw);
+            dirty.delete(field);
+        } else if (!dirty.has(sw) && !dirty.has(field)) {
+            setRaid(minutes);
+        }
+    }
+
+    /** What the visitor changes in a settings card: kept from the server's settings until saved. */
+    document.addEventListener("input", markDirty, true);
+    document.addEventListener("change", markDirty, true);
+
+    function markDirty(event) {
+        const target = event.target;
+        if (target?.closest?.('[id^="channel-"][id$="-settings-form"]')) dirty.add(target);
+    }
+
+    /** The card `formId` was saved: its fields take the server's settings again. */
+    function saved(formId) {
+        byId(formId)?.querySelectorAll("*").forEach(el => dirty.delete(el));
     }
 
     /**
@@ -87,7 +134,7 @@ window.CatapultSettings = (function () {
             setGrid("channel-incomplete-fallback-settings-form", "incomplete-fallback-ccl-checkbox",
                 incompleteFallback.ccls);
         }
-        if (raid) setRaid(raid.restoreGameMinutes ?? null);
+        if (raid) applyRaid(raid.restoreGameMinutes ?? null);
     }
 
     function track(prefix, game) {
@@ -96,9 +143,10 @@ window.CatapultSettings = (function () {
 
     function reset() {
         games = {};
+        dirty = new WeakSet();
     }
 
-    return { apply, track, reset, setRaid, raidMinutes, RAID_DEFAULT_MINUTES };
+    return { apply, track, reset, saved, setRaid, raidMinutes, RAID_DEFAULT_MINUTES };
 })();
 
 document.addEventListener("catapult:render", function () {
@@ -109,7 +157,14 @@ document.addEventListener("catapult:render", function () {
     const baseUrl = CatapultChannel.baseUrl();
     const byId = id => document.getElementById(id);
 
-    on("ccl-settings-save-btn", "click", () => postJson(`${baseUrl}/settings/ccl`, {
+    // A save that went through: its card's fields follow the server's settings again.
+    const save = async (formId, url, body) => {
+        const response = await postJson(url, body);
+        if (response.ok) CatapultSettings.saved(formId);
+        return response;
+    };
+
+    on("ccl-settings-save-btn", "click", () => save("channel-ccl-settings-form", `${baseUrl}/settings/ccl`, {
         cclEnabled: byId("ccl-enabled-checkbox").checked,
         blockedCcls: checkedValues(byId("channel-ccl-settings-form"), ".ccl-block-checkbox")
     }));
@@ -117,11 +172,11 @@ document.addEventListener("catapult:render", function () {
     // Only offered while the channel is in the raid.restore-game experiment: absent otherwise.
     on("raid-restore-enabled", "change", event => CatapultSettings.setRaid(
         event.target.checked ? (byId("raid-restore-minutes")?.value || CatapultSettings.RAID_DEFAULT_MINUTES) : null));
-    on("raid-settings-save-btn", "click", () => postJson(`${baseUrl}/settings/raid`, {
+    on("raid-settings-save-btn", "click", () => save("channel-raid-settings-form", `${baseUrl}/settings/raid`, {
         restoreGameMinutes: CatapultSettings.raidMinutes()
     }));
 
-    on("tw-settings-save-btn", "click", () => postJson(`${baseUrl}/settings/tws`, {
+    on("tw-settings-save-btn", "click", () => save("channel-tw-settings-form", `${baseUrl}/settings/tws`, {
         enabled: byId("tw-enabled-checkbox").checked,
         blockedTws: checkedValues(byId("channel-tw-settings-form"), ".tw-block-checkbox")
     }));
@@ -137,7 +192,7 @@ document.addEventListener("catapult:render", function () {
             { initial: { id: gameIdInput.value, name: gameInput.value } });
         CatapultSettings.track(prefix, game);
 
-        on(`${prefix}-settings-save-btn`, "click", () => postJson(`${baseUrl}/settings/${endpoint}`, {
+        on(`${prefix}-settings-save-btn`, "click", () => save(`channel-${prefix}-settings-form`, `${baseUrl}/settings/${endpoint}`, {
             twitchGameId: game.selected()?.id ?? null,
             twitchGameName: game.selected()?.name ?? null,
             ccls: checkedValues(byId(`channel-${prefix}-settings-form`), `.${prefix}-ccl-checkbox`),
