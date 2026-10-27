@@ -1,8 +1,6 @@
 package fr.enimaloc.catapult.api;
 
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.UserAccountRepository;
-import fr.enimaloc.catapult.service.MinecraftGateService;
+import fr.enimaloc.catapult.service.minecraft.MinecraftGateService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,7 +13,6 @@ import org.springframework.context.MessageSource;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 import java.util.Locale;
-import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -29,19 +26,17 @@ class ApiHelpControllerTest {
 
     @Mock private MessageSource messageSource;
     @Mock private MinecraftGateService gateService;
-    @Mock private UserAccountRepository userAccountRepository;
     @Mock private Jwt jwt;
 
     @InjectMocks private ApiHelpController controller;
 
-    private final UserAccount user = new UserAccount();
+    private final UUID userId = UUID.randomUUID();
     private final Locale locale = Locale.FRENCH;
 
     @BeforeEach
     void setup() {
-        UUID userId = UUID.randomUUID();
         when(jwt.getSubject()).thenReturn(userId.toString());
-        when(userAccountRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(gateService.isAvailableForAccount(userId)).thenReturn(false);
         when(messageSource.getMessage(eq("help.connections.title"), any(), any(), eq(locale)))
                 .thenReturn("Connexions");
         when(messageSource.getMessage(eq("help.connections.body"), any(), any(), eq(locale)))
@@ -54,7 +49,7 @@ class ApiHelpControllerTest {
 
     @Test
     void connections_gateOpen_appendsMinecraftSection() {
-        when(gateService.isAvailableFor(user)).thenReturn(true);
+        when(gateService.isAvailableForAccount(userId)).thenReturn(true);
 
         var content = controller.help("connections", locale, jwt);
 
@@ -63,7 +58,7 @@ class ApiHelpControllerTest {
 
     @Test
     void connections_gateClosed_omitsMinecraftSection() {
-        when(gateService.isAvailableFor(user)).thenReturn(false);
+        when(gateService.isAvailableForAccount(userId)).thenReturn(false);
 
         var content = controller.help("connections", locale, jwt);
 
@@ -99,7 +94,7 @@ class ApiHelpControllerTest {
 
     @Test
     void connections_unknownUser_omitsMinecraftSection() {
-        when(userAccountRepository.findById(any())).thenReturn(Optional.empty());
+        when(gateService.isAvailableForAccount(any())).thenReturn(false);
 
         var content = controller.help("connections", locale, jwt);
 
@@ -109,7 +104,7 @@ class ApiHelpControllerTest {
     @Test
     void connections_xboxEnabled_appendsXboxSection() {
         org.springframework.test.util.ReflectionTestUtils.setField(controller, "xboxEnabled", true);
-        when(gateService.isAvailableFor(user)).thenReturn(false);
+        when(gateService.isAvailableForAccount(userId)).thenReturn(false);
 
         var content = controller.help("connections", locale, jwt);
 
@@ -119,7 +114,7 @@ class ApiHelpControllerTest {
     @Test
     void connections_xboxDisabled_omitsXboxSection() {
         org.springframework.test.util.ReflectionTestUtils.setField(controller, "xboxEnabled", false);
-        when(gateService.isAvailableFor(user)).thenReturn(false);
+        when(gateService.isAvailableForAccount(userId)).thenReturn(false);
 
         var content = controller.help("connections", locale, jwt);
 

@@ -1,0 +1,83 @@
+<!--/*@thymesVar id="groups" type="java.util.List<fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto>"*/-->
+<!--/*
+  The member groups: a card creating one (key and name required), then the list with, per group, Rename
+  and Add member (small dialogs) and Delete (confirmed with the group's name). catapult-api lists no members
+  per group, so neither does this tab. Driven by admin-groups.js.
+*/-->
+<div th:fragment="content" class="admin-view admin-groups"
+     th:attr="data-confirm-text=#{admin.confirm},data-cancel-text=#{admin.cancel},
+              data-label-invalid=#{admin.groups.invalid},data-label-conflict=#{admin.groups.conflict},
+              data-label-unknown=#{admin.groups.unknown},data-label-member-unknown=#{admin.groups.member-unknown},
+              data-label-unavailable=#{admin.groups.unavailable},data-label-created=#{admin.groups.created},
+              data-label-renamed=#{admin.groups.renamed},data-label-member-added=#{admin.groups.member-added},
+              data-label-deleted=#{admin.groups.deleted}">
+    <div class="section-header">
+        <h2 th:text="#{admin.tab.groups}">Groups</h2>
+    </div>
+
+    <mdui-card class="admin-groups-create" variant="outlined">
+        <h3 th:text="#{admin.groups.create.title}">Create a group</h3>
+        <div class="admin-groups-create-fields">
+            <mdui-text-field name="key" variant="outlined" required maxlength="64" th:attr="label=#{admin.groups.column.key},helper=#{admin.groups.create.key-helper}"></mdui-text-field>
+            <mdui-text-field name="name" variant="outlined" required maxlength="255" th:attr="label=#{admin.groups.column.name}"></mdui-text-field>
+            <mdui-text-field name="description" variant="outlined" maxlength="500" th:attr="label=#{admin.groups.column.description}"></mdui-text-field>
+            <mdui-button variant="filled" icon="add" class="admin-groups-create-save" th:text="#{admin.groups.create.button}">Create</mdui-button>
+        </div>
+    </mdui-card>
+
+    <th:block th:if="${groups == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
+    <th:block th:if="${groups != null and groups.isEmpty()}">
+        <th:block th:replace="~{pages/admin-tab/common :: empty('group', #{admin.groups.empty})}"></th:block>
+    </th:block>
+
+    <mdui-card class="admin-table" variant="outlined" th:if="${groups != null and !groups.isEmpty()}">
+        <div class="admin-row admin-groups-row admin-row-head" aria-hidden="true">
+            <span th:text="#{admin.groups.column.key}">Key</span>
+            <span th:text="#{admin.groups.column.name}">Name</span>
+            <span th:text="#{admin.groups.column.description}">Description</span>
+            <span th:text="#{admin.groups.column.member-count}">Members</span>
+            <span></span>
+        </div>
+        <div class="admin-row admin-groups-row" th:each="g : ${groups}" th:attr="data-id=${g.id()}">
+            <span class="admin-member-id" th:attr="data-label=#{admin.groups.column.key}" th:text="${g.key()}">key</span>
+            <span class="admin-cell" th:attr="data-label=#{admin.groups.column.name}" th:text="${g.name()}">name</span>
+            <span class="admin-groups-description admin-cell-muted" th:attr="data-label=#{admin.groups.column.description}"
+                  th:text="${g.description() == null or g.description().isBlank() ? '—' : g.description()}">description</span>
+            <span class="admin-cell" th:attr="data-label=#{admin.groups.column.member-count}" th:text="${g.memberCount()}">3</span>
+            <span class="admin-row-actions">
+                <mdui-button variant="text" class="admin-groups-rename"
+                             th:attr="data-rename=${g.id()},data-name=${g.name()},data-description=${g.description()}"
+                             th:text="#{admin.groups.action.rename}">Rename</mdui-button>
+                <mdui-button variant="text" class="admin-groups-add-member" th:attr="data-add-member=${g.id()}"
+                             th:text="#{admin.groups.action.add-member}">Add member</mdui-button>
+                <mdui-button-icon icon="delete" class="admin-groups-delete"
+                                  th:attr="data-delete=${g.id()},aria-label=#{admin.groups.action.delete},
+                                  data-confirm=#{admin.groups.action.delete-confirm(${g.name()})}"></mdui-button-icon>
+            </span>
+        </div>
+    </mdui-card>
+
+    <mdui-dialog id="admin-groups-rename-dialog" class="admin-dialog" close-on-overlay-click>
+        <div class="admin-groups-form">
+            <h3 th:text="#{admin.groups.action.rename}">Rename</h3>
+            <mdui-text-field name="name" variant="outlined" required maxlength="255" th:attr="label=#{admin.groups.column.name}"></mdui-text-field>
+            <mdui-text-field name="description" variant="outlined" maxlength="500" th:attr="label=#{admin.groups.column.description}"></mdui-text-field>
+            <div class="admin-data-actions">
+                <mdui-button variant="text" class="admin-dialog-close" th:text="#{admin.cancel}">Cancel</mdui-button>
+                <mdui-button variant="filled" class="admin-groups-rename-save" th:text="#{admin.groups.action.rename-save}">Save</mdui-button>
+            </div>
+        </div>
+    </mdui-dialog>
+
+    <mdui-dialog id="admin-groups-member-dialog" class="admin-dialog" close-on-overlay-click>
+        <div class="admin-groups-form">
+            <h3 th:text="#{admin.groups.action.add-member}">Add member</h3>
+            <mdui-text-field name="twitchUsername" variant="outlined" required maxlength="64"
+                             th:attr="label=#{admin.groups.add-member.label},placeholder=#{admin.groups.add-member.placeholder}"></mdui-text-field>
+            <div class="admin-data-actions">
+                <mdui-button variant="text" class="admin-dialog-close" th:text="#{admin.cancel}">Cancel</mdui-button>
+                <mdui-button variant="filled" class="admin-groups-member-save" th:text="#{admin.groups.action.add-member-submit}">Add</mdui-button>
+            </div>
+        </div>
+    </mdui-dialog>
+</div>

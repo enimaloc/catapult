@@ -1,0 +1,89 @@
+<!--/*@thymesVar id="channelPage" type="fr.enimaloc.catapult.common.dto.channel.ChannelPageData"*/-->
+<!--/*@thymesVar id="channelSettings" type="fr.enimaloc.catapult.common.dto.channel.UserSettingsDto"*/-->
+<!--/* The channel's owner and its moderators alike: catapult-api lets both change these. */-->
+<mdui-tab-panel slot="panel" value="settings" th:with="settings=${channelSettings}" th:fragment="panel" xmlns:spa="urn:fr.enimaloc.catapult:spa">
+    <div class="section-header">
+        <h2 th:text="#{channel.settings.title}">Paramètres</h2>
+    </div>
+
+    <!--/* catapult-api failed to give the settings: the tab says so instead of failing the whole page. */-->
+    <p th:if="${settings == null}" id="channel-settings-unavailable" class="settings-unavailable"
+       th:text="#{channel.settings.unavailable}">Paramètres indisponibles.</p>
+
+    <th:block th:if="${settings != null}">
+    <mdui-card id="channel-ccl-settings-form" class="settings-card" variant="outlined">
+        <div class="title-row">
+            <h3 th:text="#{channel.settings.ccl.title}">Filtres de contenu</h3>
+            <mdui-button-icon th:replace="~{fragments/controls :: helpButton('ccl-settings')}"></mdui-button-icon>
+        </div>
+        <label th:replace="~{fragments/controls :: labelledSwitch('ccl-enabled-checkbox',
+                ${settings.cclFeatureEnabled()}, 'channel.settings.ccl.enable', 'settings-master-toggle')}"></label>
+        <span class="eyebrow" th:text="#{channel.settings.ccl.select_disable}"></span>
+        <div th:replace="~{fragments/controls :: switchGrid(${settings.availableCcls()}, 'ccl-block-checkbox',
+                ${settings.blockedCcls()}, 'name')}"></div>
+        <mdui-button id="ccl-settings-save-btn" th:text="#{channel.settings.save}">Enregistrer</mdui-button>
+    </mdui-card>
+
+    <mdui-card id="channel-tw-settings-form" class="settings-card" variant="outlined">
+        <div class="title-row">
+            <h3 th:text="#{channel.settings.tw.title}">Avertissements</h3>
+            <mdui-button-icon th:replace="~{fragments/controls :: helpButton('tw-settings')}"></mdui-button-icon>
+        </div>
+        <label th:replace="~{fragments/controls :: labelledSwitch('tw-enabled-checkbox',
+                ${settings.twFeatureEnabled()}, 'channel.settings.tw.enable', 'settings-master-toggle')}"></label>
+        <span class="eyebrow" th:text="#{channel.settings.tw.select_disable}"></span>
+        <div th:replace="~{fragments/controls :: switchGrid(${settings.availableTws()}, 'tw-block-checkbox',
+                ${settings.blockedTws()}, 'label')}"></div>
+        <mdui-button id="tw-settings-save-btn" th:text="#{channel.settings.save}">Enregistrer</mdui-button>
+    </mdui-card>
+
+    <mdui-card id="channel-no-game-settings-form" class="settings-card" variant="outlined">
+        <div class="title-row">
+            <h3 th:text="#{channel.settings.no_game.title}">Aucun jeu détecté</h3>
+            <mdui-button-icon th:replace="~{fragments/controls :: helpButton('no-game')}"></mdui-button-icon>
+        </div>
+        <th:block th:replace="~{fragments/controls :: gamePicker('no-game',
+                ${settings.noGameTwitchGameId()}, ${settings.noGameTwitchGameName()})}"></th:block>
+        <div th:replace="~{fragments/controls :: switchGrid(${settings.availableCcls()}, 'no-game-ccl-checkbox',
+                ${settings.noGameCcls()}, 'name')}"></div>
+        <div class="settings-switch-grid settings-switch-group">
+            <label th:replace="~{fragments/controls :: labelledSwitch('no-game-apply-start',
+                    ${settings.applyDefaultOnStreamStart()}, 'channel.settings.no_game.apply_start', null)}"></label>
+            <label th:replace="~{fragments/controls :: labelledSwitch('no-game-apply-no-game',
+                    ${settings.applyDefaultOnNoGame()}, 'channel.settings.no_game.apply_no_game', null)}"></label>
+            <label th:replace="~{fragments/controls :: labelledSwitch('no-game-apply-end',
+                    ${settings.applyDefaultOnStreamEnd()}, 'channel.settings.no_game.apply_end', null)}"></label>
+        </div>
+        <mdui-button id="no-game-settings-save-btn" th:text="#{channel.settings.save}">Enregistrer</mdui-button>
+    </mdui-card>
+
+    <mdui-card id="channel-incomplete-fallback-settings-form" class="settings-card" variant="outlined">
+        <div class="title-row">
+            <h3 th:text="#{channel.settings.incomplete_fallback.title}">Jeu incomplet</h3>
+            <mdui-button-icon th:replace="~{fragments/controls :: helpButton('incomplete-fallback')}"></mdui-button-icon>
+        </div>
+        <th:block th:replace="~{fragments/controls :: gamePicker('incomplete-fallback',
+                ${settings.incompleteFallbackTwitchGameId()}, ${settings.incompleteFallbackTwitchGameName()})}"></th:block>
+        <div th:replace="~{fragments/controls :: switchGrid(${settings.availableCcls()},
+                'incomplete-fallback-ccl-checkbox', ${settings.incompleteFallbackCcls()}, 'name')}"></div>
+        <mdui-button id="incomplete-fallback-settings-save-btn" th:text="#{channel.settings.save}">Enregistrer</mdui-button>
+    </mdui-card>
+
+    <!--/* Only while the channel is in the raid.restore-game experiment (catapult-api says so). Off: the delay
+         is greyed out, showing the 15 minutes suggested once switched on. */-->
+    <mdui-card id="channel-raid-settings-form" class="settings-card" variant="outlined"
+               th:if="${settings.raidRestoreGameAvailable()}">
+        <div class="title-row">
+            <h3 th:text="#{channel.settings.raid.title}">Raid</h3>
+        </div>
+        <label th:replace="~{fragments/controls :: labelledSwitch('raid-restore-enabled',
+                ${settings.raidRestoreGameMinutes() != null}, 'channel.settings.raid.restore_game', 'settings-master-toggle')}"></label>
+        <mdui-text-field id="raid-restore-minutes" type="number" min="1" max="120" variant="outlined"
+                         th:value="${settings.raidRestoreGameMinutes() ?: 15}"
+                         th:disabled="${settings.raidRestoreGameMinutes() == null}"
+                         th:attr="label=#{channel.settings.raid.minutes},helper=#{channel.settings.raid.minutes_helper}"></mdui-text-field>
+        <mdui-button id="raid-settings-save-btn" th:text="#{channel.settings.save}">Enregistrer</mdui-button>
+    </mdui-card>
+    </th:block>
+
+</mdui-tab-panel>

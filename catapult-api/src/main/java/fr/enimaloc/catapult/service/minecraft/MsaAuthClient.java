@@ -1,0 +1,126 @@
+package fr.enimaloc.catapult.service.minecraft;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.stereotype.Service;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RestClient;
+
+import java.net.URI;
+import java.util.Optional;
+
+/**
+ * Microsoft OAuth client (personal accounts) for the Minecraft service accounts.
+ * Two flows: device-code (one-shot enrolment by an admin) and refresh_token (renewal).
+ */
+@Slf4j
+@Service
+@ConditionalOnBooleanProperty("minecraft.enabled")
+public class MsaAuthClient {
+
+    public static final String TOKEN_URL = "https://login.live.com/oauth20_token.srf";
+    public static final String DEVICE_CODE_URL = "https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode";
+    public static final String DEVICE_TOKEN_URL = "https://login.microsoftonline.com/consumers/oauth2/v2.0/token";
+    public static final String SCOPE = "XboxLive.signin offline_access";
+
+    private final RestClient restClient;
+    private final String clientId;
+
+    public MsaAuthClient(RestClient restClient, @Value("${minecraft.msa-client-id:}") String clientId) {
+        this.restClient = restClient;
+        this.clientId = clientId;
+    }
+
+    public MsaTokens refresh(String refreshToken) {
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("client_id", clientId);
+        form.add("grant_type", "refresh_token");
+        form.add("refresh_token", refreshToken);
+        form.add("scope", SCOPE);
+        return postForm(URI.create(TOKEN_URL), form);
+    }
+
+    public DeviceCodeStart startDeviceCode() {
+        log.debug("Device code flow started");
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("client_id", clientId);
+        form.add("scope", SCOPE);
+        return restClient.post()
+                .uri(URI.create(DEVICE_CODE_URL))
+                .body(form)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .accept(MediaType.APPLICATION_JSON)
+                .retrieve()
+                .body(DeviceCodeStart.class);
+    }
+
+    /**
+     * Empty while the user hasn't validated the code ({@code authorization_pending});
+     * {@link DeviceCodeExpiredException} once the code has expired ({@code expired_token}).
+     */
+    public Optional<MsaTokens> pollDeviceCode(String deviceCode) {
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("client_id", clientId);
+        form.add("grant_type", "urn:ietf:params:oauth:grant-type:device_code");
+        form.add("device_code", deviceCode);
+        try {
+            return Optional.of(postForm(URI.create(DEVICE_TOKEN_URL), form));
+        } catch (HttpClientErrorException e) {
+            if (e.getResponseBodyAsString().matches("(?s).*\"error\"\\s*:\\s*\"authorization_pending\".*")) {
+                return Optional.empty();
+            }
+            if (e.getResponseBodyAsString().matches("(?s).*\"error\"\\s*:\\s*\"expired_token\".*")) {
+                throw new DeviceCodeExpiredException(e);
+            }
+            throw new MsaAuthException("Device code flow failed: " + e.getResponseBodyAsString(), e);
+        }
+    }
+
+    private MsaTokens postForm(URI uri, MultiValueMap<String, String> form) {
+        return restClient.post()
+                .uri(uri)
+                .body(form)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .accept(MediaType.APPLICATION_JSON)
+                .retrieve()
+                .body(MsaTokens.class);
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record MsaTokens(
+            @JsonProperty("access_token") String accessToken,
+            @JsonProperty("refresh_token") String refreshToken,
+            @JsonProperty("expires_in") long expiresIn
+    ) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record DeviceCodeStart(
+            @JsonProperty("device_code") String deviceCode,
+            @JsonProperty("user_code") String userCode,
+            @JsonProperty("verification_uri") String verificationUri,
+            int interval,
+            @JsonProperty("expires_in") int expiresIn
+    ) {}
+
+    public static class MsaAuthException extends RuntimeException {
+        public MsaAuthException(String message, Throwable cause) {
+            super(message, cause);
+        }
+    }
+
+    /** The device code expired before it was validated: 400, the admin restarts the flow. */
+    @ResponseStatus(value = HttpStatus.BAD_REQUEST, reason = "Device code expired")
+    public static class DeviceCodeExpiredException extends MsaAuthException {
+        public DeviceCodeExpiredException(Throwable cause) {
+            super("Device code expired", cause);
+        }
+    }
+}

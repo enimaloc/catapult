@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.experiment.provider;
 
 import fr.enimaloc.catapult.config.ExperimentProviderProperties;
-import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserAccount;
 import io.getunleash.FakeUnleash;
 import io.getunleash.variant.Payload;
 import io.getunleash.Variant;
@@ -54,7 +54,7 @@ class UnleashExperimentProviderTest {
         UserAccount user = new UserAccount();
         user.setId(UUID.randomUUID());
 
-        Optional<fr.enimaloc.catapult.domain.ExperimentVariant> result = provider.getVariant(user, "my-toggle");
+        Optional<fr.enimaloc.catapult.domain.experiment.ExperimentVariant> result = provider.getVariant(user, "my-toggle");
 
         assertThat(result).isPresent();
         assertThat(result.get().getKey()).isEqualTo("b");

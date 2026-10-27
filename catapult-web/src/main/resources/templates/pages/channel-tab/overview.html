@@ -1,0 +1,327 @@
+<!--/*@thymesVar id="channelPage" type="fr.enimaloc.catapult.common.dto.channel.ChannelPageData"*/-->
+<!--/*@thymesVar id="app" type="fr.enimaloc.catapult.controller.ModelFiller$AppModel"*/-->
+<mdui-tab-panel slot="panel" value="overview" th:with="ch=${channelPage}" th:fragment="panel" xmlns:spa="urn:fr.enimaloc.catapult:spa">
+    <div class="section-header">
+        <div class="title-row">
+            <h2 th:text="#{channel.status.title}">Statut</h2>
+            <mdui-button-icon th:replace="~{fragments/controls :: helpButton('status')}"></mdui-button-icon>
+        </div>
+    </div>
+
+    <mdui-card class="status-card" variant="outlined">
+        <div class="status-row">
+            <mdui-chip id="channel-state-live" spa:if="live:${ch.isLive()}"
+                       spa:on="live:ChannelLiveStateEvent.state"
+                       th:text="#{channel.status.live}">channel.status.live
+            </mdui-chip>
+            <mdui-chip id="channel-state-offline" spa:if="offline:${!ch.isLive()}"
+                       spa:on="offline:ChannelLiveStateEvent.!state"
+                       th:text="#{channel.status.offline}">channel.status.offline
+            </mdui-chip>
+
+            <span id="channel-current-game" spa:if="hasGame:${ch.currentGame() != null}"
+                  spa:on="hasGame:GameChangedEvent.sourceName"
+                  spa:value="textContent:GameChangedEvent.sourceName"
+                  th:text="${ch.currentGame() != null ? ch.currentGame().sourceName() : ''}">Game</span>
+            <mdui-chip id="channel-current-platform" spa:if="hasGame:${ch.currentGame() != null}"
+                       spa:on="hasGame:GameChangedEvent.sourceName"
+                       spa:value="textContent:GameChangedEvent.sourceType"
+                       th:text="${ch.currentGame() != null ? ch.currentGame().sourceType() : ''}">Game
+            </mdui-chip>
+            <!-- A GameChangedEvent without a sourceName says no game is detected any more. -->
+            <span id="channel-no-game" spa:if="noGame:${ch.currentGame() == null}"
+                  spa:on="noGame:GameChangedEvent.!sourceName"
+                  th:text="#{channel.status.no_game}">Aucun jeu détecté</span>
+
+            <mdui-button-icon icon="refresh" th:if="${ch.isOwner()}"
+                              th:attr="data-recheck-url=@{/channel/{u}/game/recheck(u=${ch.channelUsername()})}"
+                              id="channel-recheck-game"></mdui-button-icon>
+        </div>
+
+        <div class="bot-toggle-row" th:if="${ch.isOwner()}">
+            <mdui-switch th:checked="${ch.botEnabled()}"
+                         th:attr="data-toggle-url=@{/channel/{u}/settings/bot(u=${ch.channelUsername()})}"
+                         spa:value="checked:BotStateChangedEvent.state"
+                         id="channel-bot-toggle"></mdui-switch>
+            <label for="channel-bot-toggle" th:text="#{channel.status.bot_enabled}">Bot activé</label>
+        </div>
+    </mdui-card>
+
+    <mdui-card id="channel-dtdd-mapping-card" class="settings-card" variant="outlined"
+               th:if="${dtddMapping != null and dtddMapping.igdbId() != null}"
+               th:attr="data-igdb-id=${dtddMapping.igdbId()}">
+        <div class="title-row">
+            <h3 th:text="#{channel.dtdd.title}">Association DTDD</h3>
+            <mdui-button-icon th:replace="~{fragments/controls :: helpButton('dtdd')}"></mdui-button-icon>
+        </div>
+
+        <!--/* The verified chip and the proposal note are always rendered: channel-dtdd.js reveals
+             them once validated or proposed, instead of re-rendering the page. */-->
+        <div th:if="${dtddMapping.current() != null}">
+            <span th:text="${dtddMapping.current().name() ?: '—'}">DTDD name</span>
+            <mdui-chip id="dtdd-confidence" th:text="${#numbers.formatDecimal(dtddMapping.current().confidence() * 100, 1, 0)} + '%'">confidence</mdui-chip>
+            <mdui-chip id="dtdd-verified" th:classappend="${dtddMapping.current().verified()} ? '' : 'hidden'"
+                       th:text="#{channel.dtdd.verified}">
+                Vérifié
+            </mdui-chip>
+        </div>
+        <div th:unless="${dtddMapping.current() != null}" th:text="#{channel.dtdd.no_mapping}">
+            Aucune association DTDD.
+        </div>
+
+        <mdui-button th:if="${dtddMapping.canValidateDirectly()}" id="dtdd-validate-btn"
+                     th:text="#{channel.dtdd.validate}">
+            Valider
+        </mdui-button>
+        <mdui-button id="dtdd-correct-btn" th:text="#{channel.dtdd.correct}">Corriger</mdui-button>
+        <p id="dtdd-proposed" th:classappend="${dtddMapping.myPendingProposal() != null} ? '' : 'hidden'"
+           th:text="#{channel.dtdd.proposed}">Correction proposée, en attente de validation.</p>
+
+        <div id="dtdd-search-dialog" hidden>
+            <input type="text" id="dtdd-search-input" th:placeholder="#{channel.dtdd.search_placeholder}"
+                   th:aria-label="#{channel.dtdd.search_placeholder}"/>
+            <mdui-list id="dtdd-search-results"></mdui-list>
+        </div>
+    </mdui-card>
+
+    <div class="section-header">
+        <div class="title-row">
+            <h2 th:text="#{channel.bindings.title}">Associations</h2>
+            <mdui-button-icon th:replace="~{fragments/controls :: helpButton('bindings')}"></mdui-button-icon>
+        </div>
+        <mdui-segmented-button-group class="bindings-filters">
+            <mdui-segmented-button data-link th:href="@{/channel/{u}(u=${ch.channelUsername()})}"
+                                   th:classappend="${ch.filterStatus() == null and ch.filterSource() == null} ? 'filter-active'"
+                                   th:text="#{channel.bindings.filter.all}">Toutes
+            </mdui-segmented-button>
+            <mdui-segmented-button data-link
+                                   th:each="status : ${ {'AUTO', 'MANUAL', 'INCOMPLETE'} }"
+                                   th:href="@{/channel/{u}(u=${ch.channelUsername()},status=${status})}"
+                                   th:classappend="${ch.filterStatus() == status} ? 'filter-active'"
+                                   th:text="#{${'channel.bindings.filter.' + #strings.toLowerCase(status)}}">Auto
+            </mdui-segmented-button>
+            <mdui-segmented-button data-link
+                                   th:each="platform : ${app.platforms}"
+                                   th:href="@{/channel/{u}(u=${ch.channelUsername()},source=${platform.id().toUpperCase()})}"
+                                   th:classappend="${ch.filterSource() == platform.id().toUpperCase()} ? 'filter-active'"
+                                   th:text="#{${platform.titleKey()}}">platform
+            </mdui-segmented-button>
+        </mdui-segmented-button-group>
+    </div>
+
+    <mdui-list id="channel-bindings-list">
+        <mdui-collapse accordion th:if="${!ch.bindings().content().isEmpty()}"
+                       th:value="${ch.currentGame()?.bindingId()}">
+            <mdui-collapse-item th:each="b : ${ch.bindings().content()}"
+                                th:attr="data-binding-id=${b.id()}"
+                                th:value="${b.id()}"
+                                th:class="${ch.currentGame()?.bindingId() == b.id() ? 'is-open' : ''}">
+                <mdui-list-item slot="header">
+                    <!-- spa:value only mirrors the twitchGameName branch: BindingUpdatedEvent
+                         never carries sourceName (ApiChannelActionsController's update action
+                         only ever touches twitchGameName/ccls), so there's nothing to keep a
+                         sourceName-primary live update in sync with — same limitation the
+                         hand-written updateBindingGame() already had. -->
+                    <span class="binding-game-name"
+                          spa:value="textContent:BindingUpdatedEvent.twitchGameName|—"
+                          th:text="${b.sourceName() ?: b.twitchGameName() ?: '—'}"></span>
+                    <span class="binding-platform-chips" th:text="${b.sourceType()}"></span>
+                    <!--/* MAPPED is an automatic binding whose category an admin mapping set. */-->
+                    <span th:text="${b.status() == 'MAPPED' ? 'AUTO' : b.status()}"></span>
+                    <span class="binding-mapped-note" th:if="${b.status() == 'MAPPED'}"
+                          th:text="#{binding.mapped}">Catégorie fixée par l'admin</span>
+                </mdui-list-item>
+                <!--/* The owner and moderators alike, but for the TWs (see below). */-->
+                <mdui-list-item>
+                    <div class="binding-toggle">
+                        <mdui-switch th:id="'binding-ignored-toggle-' + ${b.id()}"
+                                     class="binding-ignored-toggle"
+                                     data-post="ignored-toggle" data-key="ignored"
+                                     spa:value="checked:BindingIgnoredStateEvent.ignored"
+                                     th:checked="${b.ignored()}"></mdui-switch>
+                        <label th:for="'binding-ignored-toggle-' + ${b.id()}"
+                               th:text="#{channel.bindings.ignored}">Ignoré</label>
+                    </div>
+                    <mdui-button-icon icon="delete" data-post="delete"
+                                      class="binding-delete-btn"></mdui-button-icon>
+
+                    <div class="binding-edit-panel">
+                        <input type="text" class="binding-edit-game-input"
+                               th:placeholder="#{channel.bindings.edit.game_placeholder}"
+                               th:aria-label="#{channel.bindings.edit.game_placeholder}"
+                               th:value="${b.twitchGameName()}"/>
+                        <input type="hidden" class="binding-edit-game-id" th:value="${b.twitchGameId()}"/>
+                        <mdui-list class="binding-edit-game-results"></mdui-list>
+                    </div>
+
+                    <div class="binding-ccl-panel">
+                        <label class="binding-toggle">
+                            <mdui-switch class="binding-ccl-enabled"
+                                         th:id="'binding-ccl-toggle-' + ${b.id()}"
+                                         th:checked="${b.cclEnabled()}"
+                                         spa:value="checked:CclStateEvent.enabled"
+                                         data-post="ccl-toggle" data-key="enabled"></mdui-switch>
+                            <span th:text="#{channel.bindings.ccl.enabled}">Activer les CCL</span>
+                        </label>
+                        <label th:each="ccl : ${ch.availableCcls()}">
+                            <mdui-switch class="binding-edit-ccl-checkbox" th:value="${ccl.id()}"
+                                         spa:in="checked:BindingUpdatedEvent.ccls"
+                                         th:checked="${b.ccls().contains(ccl.id())}"
+                                         th:disabled="${ch.blockedCcls().contains(ccl.id())}"></mdui-switch>
+                            <span th:text="${ccl.name()}">ccl name</span>
+                        </label>
+                    </div>
+
+                    <!--/* Owner only: catapult-api applies a binding's TWs to the caller's own channel. */-->
+                    <div class="binding-tw-panel" th:if="${ch.isOwner()}">
+                        <label>
+                            <mdui-switch class="binding-tw-enabled-checkbox"
+                                         spa:value="checked:TwEnabledStateEvent.enabled"
+                                         th:checked="${b.twEnabled()}"></mdui-switch>
+                            <span th:text="#{channel.bindings.tw.enabled}">Activer les avertissements</span>
+                        </label>
+                        <label th:each="tw : ${ch.availableTws()}">
+                            <!-- TwResetEvent carries no `tws` field at all; looking it up as the
+                                 array source still works here because an absent field resolves
+                                 to "not a member" (false) — exactly what a reset should do. -->
+                            <mdui-switch class="binding-tw-checkbox" th:value="${tw.id()}"
+                                         spa:in="checked:TwUpdatedEvent.tws,checked:TwResetEvent.tws"
+                                         th:checked="${b.tws().contains(tw.id())}"></mdui-switch>
+                            <span th:text="${tw.label()}">tw label</span>
+                        </label>
+                        <mdui-button spa:if="hasOverride:${b.twOverride()}" class="binding-tw-reset-btn"
+                                     spa:on="hasOverride:TwUpdatedEvent.tws,hasOverride:!TwResetEvent"
+                                     th:text="#{channel.bindings.tw.reset}">Réinitialiser
+                        </mdui-button>
+                    </div>
+                </mdui-list-item>
+            </mdui-collapse-item>
+        </mdui-collapse>
+        <!-- Always rendered (instead of created on demand) so removeBinding() only ever
+             reveals an already-translated element — no translated label needs stashing
+             in a data-* attribute for JS to read, unlike the old data-empty-text. -->
+        <mdui-list-item id="channel-bindings-empty"
+                        th:class="${!ch.bindings().content().isEmpty()} ? 'hidden' : ''"
+                        th:text="#{channel.bindings.empty}">
+            Aucune association.
+        </mdui-list-item>
+    </mdui-list>
+
+    <div class="bindings-pagination" th:if="${ch.bindings().totalPages() > 1}">
+        <a data-link th:unless="${ch.bindings().first()}"
+           th:href="@{/channel/{u}(u=${ch.channelUsername()},page=${ch.bindings().number()-1},status=${ch.filterStatus()},source=${ch.filterSource()})}"
+           th:text="#{channel.bindings.prev}">Précédent</a>
+        <span th:text="${ch.bindings().number()+1} + ' / ' + ${ch.bindings().totalPages()}">1 / 1</span>
+        <a data-link th:unless="${ch.bindings().last()}"
+           th:href="@{/channel/{u}(u=${ch.channelUsername()},page=${ch.bindings().number()+1},status=${ch.filterStatus()},source=${ch.filterSource()})}"
+           th:text="#{channel.bindings.next}">Suivant</a>
+    </div>
+
+    <!--/* The owner's custom bindings, while the experiment is open to the channel (customBindings is null otherwise,
+         and for anyone but the owner): listed like the associations above, each row opening its edit form with
+         activate/deactivate, save and delete; "New" opens an empty row. channel-custom-bindings.js. */-->
+    <th:block th:if="${ch.isOwner() and ch.customBindings() != null}" th:with="cb=${ch.customBindings()}">
+        <div class="section-header" id="channel-custom-bindings-header">
+            <div class="title-row">
+                <h2 th:text="#{channel.custom_bindings.title}">Bindings personnalisés</h2>
+            </div>
+            <p th:text="#{channel.custom_bindings.description}">Description</p>
+            <mdui-button id="custom-binding-new-btn" variant="tonal" icon="add"
+                         th:text="#{channel.custom_bindings.new}">Nouveau</mdui-button>
+        </div>
+
+        <mdui-list id="channel-custom-bindings-list"
+                   th:attr="data-error-twitch-unavailable=#{channel.custom_bindings.error.twitch_unavailable},data-error-bot-disabled=#{channel.custom_bindings.error.bot_disabled},data-error-twitch-failed=#{channel.custom_bindings.error.twitch_failed},data-error-name-taken=#{channel.custom_bindings.error.name_taken},data-error-limit-reached=#{channel.custom_bindings.error.limit_reached},data-error-invalid=#{channel.custom_bindings.error.invalid}">
+            <mdui-collapse accordion>
+                <!--/* A row per binding, then the hidden empty one "New" reveals (no data-custom-binding-id: a save creates). */-->
+                <mdui-collapse-item th:each="b : ${cb.bindings()}" class="custom-binding-item"
+                                    th:with="active=${b.id() == cb.activeId()}"
+                                    th:classappend="${active} ? 'is-active'"
+                                    th:attr="data-custom-binding-id=${b.id()}" th:value="${b.id()}">
+                    <mdui-list-item slot="header">
+                        <span class="custom-binding-name-label" th:text="${b.name()}">Binding</span>
+                        <span class="custom-binding-game-label" th:text="${b.twitchGameName() ?: '—'}">Game</span>
+                        <span class="custom-binding-active-chip" th:classappend="${active} ? '' : 'hidden'"
+                              th:text="#{channel.custom_bindings.active}">Actif</span>
+                        <span th:if="${b.uninterruptible()}" class="custom-binding-uninterruptible-chip"
+                              th:text="#{channel.custom_bindings.uninterruptible}">Ininterruptible</span>
+                    </mdui-list-item>
+                    <mdui-list-item>
+                        <th:block th:replace="~{pages/channel-tab/overview :: customBindingForm(${b}, ${active})}"></th:block>
+                    </mdui-list-item>
+                </mdui-collapse-item>
+                <mdui-collapse-item class="custom-binding-item custom-binding-new hidden" value="new">
+                    <mdui-list-item slot="header">
+                        <span th:text="#{channel.custom_bindings.new_title}">Nouveau binding</span>
+                    </mdui-list-item>
+                    <mdui-list-item>
+                        <th:block th:replace="~{pages/channel-tab/overview :: customBindingForm(null, false)}"></th:block>
+                    </mdui-list-item>
+                </mdui-collapse-item>
+            </mdui-collapse>
+            <mdui-list-item id="channel-custom-bindings-empty" th:classappend="${cb.bindings().isEmpty()} ? '' : 'hidden'"
+                            th:text="#{channel.custom_bindings.empty}">Aucun binding personnalisé.</mdui-list-item>
+        </mdui-list>
+        <p id="custom-bindings-error" class="hidden" role="alert"></p>
+
+        <mdui-dialog id="custom-binding-delete-dialog" close-on-overlay-click
+                     th:attr="headline=#{channel.custom_bindings.settings.delete.title}">
+            <p th:text="#{channel.custom_bindings.settings.delete.prompt}">Un binding actif est d'abord désactivé.</p>
+            <mdui-button slot="action" variant="text" class="custom-binding-delete-dismiss"
+                         th:text="#{channel.custom_bindings.settings.delete.dismiss}">Le garder</mdui-button>
+            <mdui-button slot="action" variant="filled" class="custom-binding-delete-confirm"
+                         th:text="#{channel.custom_bindings.settings.delete.confirm}">Supprimer</mdui-button>
+        </mdui-dialog>
+    </th:block>
+</mdui-tab-panel>
+
+<!--/* A custom binding's edit form (b null: the empty one creating a binding), in the same panels as an
+     association's: the name and Twitch category, its CCLs, its TWs, uninterruptible, then the actions. */-->
+<th:block th:fragment="customBindingForm(b, active)">
+    <div class="binding-edit-panel">
+        <mdui-text-field class="custom-binding-name" variant="outlined" maxlength="40" autocomplete="off"
+                         th:value="${b?.name()}"
+                         th:attr="label=#{channel.custom_bindings.settings.name}"></mdui-text-field>
+        <input type="text" class="binding-edit-game-input custom-binding-game-input"
+               th:placeholder="#{channel.bindings.edit.game_placeholder}"
+               th:aria-label="#{channel.bindings.edit.game_placeholder}"
+               th:value="${b?.twitchGameName()}"/>
+        <input type="hidden" class="custom-binding-game-id" th:value="${b?.twitchGameId()}"/>
+        <mdui-list class="binding-edit-game-results custom-binding-game-results"></mdui-list>
+    </div>
+
+    <div class="binding-ccl-panel">
+        <span class="eyebrow custom-binding-panel-title" th:text="#{channel.custom_bindings.settings.ccl}">CCL</span>
+        <label th:each="ccl : ${channelPage.availableCcls()}">
+            <mdui-switch class="custom-binding-ccl-checkbox" th:value="${ccl.id()}"
+                         th:checked="${b != null and b.ccls().contains(ccl.id())}"></mdui-switch>
+            <span th:text="${ccl.name()}">ccl name</span>
+        </label>
+    </div>
+
+    <div class="binding-tw-panel">
+        <span class="eyebrow custom-binding-panel-title" th:text="#{channel.custom_bindings.settings.tw}">TW</span>
+        <label th:each="tw : ${channelPage.availableTws()}">
+            <mdui-switch class="custom-binding-tw-checkbox" th:value="${tw.id()}"
+                         th:checked="${b != null and b.tws().contains(tw.id())}"></mdui-switch>
+            <span th:text="${tw.label()}">tw label</span>
+        </label>
+        <label class="custom-binding-panel-title">
+            <mdui-switch class="custom-binding-uninterruptible" th:checked="${b != null and b.uninterruptible()}"></mdui-switch>
+            <span th:text="#{channel.custom_bindings.settings.uninterruptible}">Ininterruptible</span>
+        </label>
+    </div>
+
+    <div class="custom-binding-actions">
+        <th:block th:if="${b != null}">
+            <mdui-button class="custom-binding-activate" variant="filled" th:classappend="${active} ? 'hidden'"
+                         th:text="#{channel.custom_bindings.activate}">Activer</mdui-button>
+            <mdui-button class="custom-binding-stop" variant="tonal" th:classappend="${active} ? '' : 'hidden'"
+                         th:text="#{channel.custom_bindings.stop}">Désactiver</mdui-button>
+        </th:block>
+        <mdui-button class="custom-binding-save" variant="outlined"
+                     th:text="#{channel.custom_bindings.settings.save}">Enregistrer</mdui-button>
+        <mdui-button th:if="${b != null}" class="custom-binding-delete" variant="text" icon="delete"
+                     th:text="#{channel.custom_bindings.settings.delete}">Supprimer</mdui-button>
+    </div>
+</th:block>

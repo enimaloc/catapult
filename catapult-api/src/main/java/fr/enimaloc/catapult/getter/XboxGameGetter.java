@@ -1,11 +1,11 @@
 package fr.enimaloc.catapult.getter;
 
-import fr.enimaloc.catapult.domain.GameBinding;
-import fr.enimaloc.catapult.domain.OAuthToken;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.OAuthTokenRepository;
-import fr.enimaloc.catapult.service.XboxUserTokenService;
+import fr.enimaloc.catapult.domain.account.OAuthToken;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.binding.GameBinding;
+import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
+import fr.enimaloc.catapult.service.xbox.XboxUserTokenService;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,9 +23,9 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Détecte le jeu en cours via l'API de présence Xbox Live, avec le token
- * XSTS de l'utilisateur (pas de compte de service : chaque utilisateur
- * interroge sa propre présence avec son propre token OAuth2 lié).
+ * Detects the current game through the Xbox Live presence API, with the user's
+ * XSTS token (no service account: each user queries their own presence
+ * with their own linked OAuth2 token).
  */
 @Slf4j
 @Component
@@ -34,15 +34,15 @@ import java.util.stream.Collectors;
 public class XboxGameGetter implements GameGetter {
 
     private static final String PRESENCE_URL = "https://userpresence.xboxlive.com/users/xuid({xuid})";
-    /** Titlehub (non documentée officiellement) : seule source du Product ID Store attendu par IGDB, le titleId de la présence n'étant pas cet identifiant. */
+    /** Titlehub (not officially documented): the only source of the Store Product ID IGDB expects, since the presence's titleId is not that identifier. */
     private static final String TITLE_DETAIL_URL = "https://titlehub.xboxlive.com/users/xuid({xuid})/titles/titleid({titleId})/decoration/detail";
     /**
-     * Titres correspondant à l'app/le shell Xbox lui-même (pas une partie en cours) : "Home" sur console,
-     * "Online" pour l'app Xbox sur PC/mobile/companion. Leur titleId varie selon la plateforme (contrairement
-     * à {@link #titleIdBlacklist} qui ne couvre que le dashboard console), donc on filtre aussi par nom.
+     * Titles standing for the Xbox app/shell itself (not a game in progress): "Home" on console,
+     * "Online" for the Xbox app on PC/mobile/companion. Their titleId varies by platform (unlike
+     * {@link #titleIdBlacklist}, which only covers the console dashboard), so they are also filtered by name.
      */
     private static final Set<String> DASHBOARD_TITLE_NAMES = Set.of("Home", "Online");
-    /** titleId Xbox Live de Minecraft (build Win32 legacy, sans Product ID Store) ; détecté séparément par {@link MinecraftPresenceGetter} quand actif. */
+    /** Xbox Live titleId of Minecraft (legacy Win32 build, with no Store Product ID); detected separately by {@link MinecraftPresenceGetter} when active. */
     private static final String MINECRAFT_XBOX_TITLE_ID = "1791712750";
 
     private final RestClient restClient;
@@ -100,7 +100,7 @@ public class XboxGameGetter implements GameGetter {
                 return extractCurrentTitle(response);
             } catch (Exception e) {
                 log.warn("Failed to fetch Xbox presence for user {}: {}", user.getId(), e.getMessage());
-                return Optional.<TitlePresence>empty();
+                return Optional.empty();
             }
         });
     }
@@ -127,7 +127,7 @@ public class XboxGameGetter implements GameGetter {
         return Optional.empty();
     }
 
-    /** Résout le Product ID Store (format attendu par IGDB) d'un titleId via Titlehub ; retombe sur le titleId si la résolution échoue. */
+    /** Resolves a titleId's Store Product ID (the format IGDB expects) through Titlehub; falls back to the titleId if the resolution fails. */
     @SuppressWarnings("unchecked")
     private Optional<String> resolveProductId(XboxUserTokenService.XstsSession session, String titleId) {
         return apiObservations.observe("xbox", "get_title_detail", () -> {
@@ -136,13 +136,13 @@ public class XboxGameGetter implements GameGetter {
                     .uri(TITLE_DETAIL_URL, session.xuid(), titleId)
                     .header("Authorization", "XBL3.0 x=" + session.userHash() + ";" + session.token())
                     .header("x-xbl-contract-version", "2")
-                    .header("Accept-Language", "en-US") // Requis par Titlehub (400 sans locale valide) ; ne conditionne aucun contenu affiché.
+                    .header("Accept-Language", "en-US") // Required by Titlehub (400 without a valid locale); determines no displayed content.
                     .retrieve()
                     .body(Map.class);
                 return extractProductId(response);
             } catch (Exception e) {
                 log.warn("Failed to fetch Xbox title detail for titleId {}: {}", titleId, e.getMessage());
-                return Optional.<String>empty();
+                return Optional.empty();
             }
         });
     }
@@ -152,11 +152,11 @@ public class XboxGameGetter implements GameGetter {
         if (response == null) return Optional.empty();
         List<Map<String, Object>> titles = (List<Map<String, Object>>) response.get("titles");
         if (titles == null || titles.isEmpty()) return Optional.empty();
-        Map<String, Object> detail = (Map<String, Object>) titles.get(0).get("detail");
+        Map<String, Object> detail = (Map<String, Object>) titles.getFirst().get("detail");
         if (detail == null) return Optional.empty();
         List<Map<String, Object>> availabilities = (List<Map<String, Object>>) detail.get("availabilities");
         if (availabilities == null || availabilities.isEmpty()) return Optional.empty();
-        Object availabilityId = availabilities.get(0).get("AvailabilityId");
+        Object availabilityId = availabilities.getFirst().get("AvailabilityId");
         return availabilityId == null ? Optional.empty() : Optional.of(String.valueOf(availabilityId));
     }
 

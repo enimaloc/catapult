@@ -1,12 +1,15 @@
 package fr.enimaloc.catapult.chat.command.registry.catapult;
 
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunction;
-import fr.enimaloc.catapult.domain.GameBinding;
-import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.getter.DetectedGame;
-import fr.enimaloc.catapult.service.GameStateService;
-import fr.enimaloc.catapult.service.IgdbService;
-import fr.enimaloc.catapult.service.TwitchService;
+import fr.enimaloc.catapult.service.binding.CustomBindingActivations;
+import fr.enimaloc.catapult.service.binding.GameStateService;
+import fr.enimaloc.catapult.service.category.CategoryChain;
+import fr.enimaloc.catapult.service.category.CategoryTrigger.ManualCategory;
+import fr.enimaloc.catapult.service.igdb.IgdbService;
+import fr.enimaloc.catapult.service.twitch.TwitchService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -23,12 +26,12 @@ import java.util.Set;
  * implement {@code !setgame}, now a fully data-driven command like any other (no more
  * Java-hardcoded {@code SetGameCommand} bean).
  *
- * <p>Always resolves a Twitch category id before calling {@link TwitchService#updateChannel}
+ * <p>Always resolves a Twitch category id before sending it through {@link CategoryChain}
  * (skipping this — sending {@code game_id: null} — is a silent no-op on Twitch's side): {@code
  * igdbId}, when given, maps to a Twitch id via {@link IgdbService#findTwitchGameId}; either way
  * (or as a fallback when that mapping is missing) it falls back to a live Twitch category name
- * search ({@link TwitchService#findCategoryIdByName}) — the same two-step resolution {@link
- * fr.enimaloc.catapult.service.BindingService#updateWithIgdbResolution} already uses for
+ * search ({@link TwitchService#findCategoryIdByName}) — the same two-step resolution {@code
+ * BindingService#updateWithIgdbResolution} already uses for
  * auto-detected games, which a MANUAL binding built this way never went through before.
  *
  * <p>The optional {@code igdbId} also lets the streamer pin the exact IGDB game instead of
@@ -45,8 +48,10 @@ import java.util.Set;
 public class CatapultSetGameFunction implements ServiceFunction {
 
     private final TwitchService twitchService;
+    private final CategoryChain categoryChain;
     private final GameStateService gameStateService;
     private final IgdbService igdbService;
+    private final CustomBindingActivations customBindingActivations;
 
     @Override
     public String namespace() {
@@ -89,7 +94,9 @@ public class CatapultSetGameFunction implements ServiceFunction {
             binding.setSourceId(igdbId);
         }
         binding.setTwitchGameId(resolveTwitchGameId(user, gameName, igdbId).orElse(null));
-        twitchService.updateChannel(user, binding);
+        categoryChain.apply(user, new ManualCategory(binding)).orThrow();
+        // A category chosen by hand ends the active custom binding, whatever its kind
+        customBindingActivations.clear(user);
 
         if (igdbId != null && !igdbId.isBlank()) {
             gameStateService.updateState(user,

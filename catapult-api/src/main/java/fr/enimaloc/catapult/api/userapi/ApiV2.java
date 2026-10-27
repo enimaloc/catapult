@@ -11,6 +11,9 @@ public final class ApiV2 {
     // versioning scheme at all — it's a separate, unversioned controller by design.
     static final String VERSION = "2";
 
+    // Request header carrying the version (see ApiVersioningConfig).
+    static final String VERSION_HEADER = "X-API-Version";
+
     // Stable, version-neutral mount point for the v2 controller and all its "more" links.
     static final String PATH = "/api/user";
 

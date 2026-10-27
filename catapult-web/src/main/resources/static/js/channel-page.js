@@ -1,173 +1,180 @@
-/*
- * channel-page.js — subscribes to `channel.viewed.<ownerId>` and dispatches
- * server-pushed events to per-domain handlers that mutate the page in place
- * (no reload). Loaded only on the channel page (template gates the script
- * tag on a non-null channelUser).
+/**
+ * Shared helpers for the /channel/{username} dashboard fragment scripts
+ * (channel-status.js, channel-bindings.js, channel-connections.js,
+ * channel-settings.js, channel-dtdd.js) and for channel-events.js, which
+ * patches the DOM in place as each SSE event arrives instead of re-fetching
+ * the whole fragment.
  *
- * Two flavours of handler:
- *
- *  - Pure client-side (event data is enough): bot.toggled, stream.state.changed,
- *    game.detected, game.cleared, binding.deleted. The status fragment renders
- *    both states of each toggleable block with hidden=true on the inactive
- *    one; handlers flip visibility on event.
- *
- *  - Pure client-side (event data enriched with full DTO snapshots):
- *    steam.profile.changed + connection.changed. The CatapultConnections helper
- *    (channel-handlers/connections.js) toggles the connections panel in-place.
- *
- * Event envelope (S → C):
- *   { type:"event", channel:"channel.viewed.<uuid>", name:"...",
- *     data:{ channelId:"<uuid>", ... } }
+ * - username()/baseUrl(): a single place deriving the channel username from the
+ *   URL, instead of every file re-deriving `location.pathname.split("/")[2]`.
+ *   username() is null outside /channel/{username}.
+ * - refresh(): re-renders the current fragment through the SPA router, preserving
+ *   the query string (page/status/source filters) instead of dropping it. No action
+ *   of the page uses it: each patches the page itself or through its SSE echo. Only
+ *   the mock profile's popout does, for the changes no event carries (mock-popout.js).
+ * - postJson(): wraps CatapultCsrf.postJson and surfaces a visible error (in the page's
+ *   language) when the mutation didn't succeed or couldn't be sent; postSwitch() also puts
+ *   the switch that triggered it back as it was.
+ * - on(): the null-guarded addEventListener every optional control needs (owner-only
+ *   and provider-dependent elements simply aren't rendered for everyone).
+ * - checkedValues(): values of the checked switches under a root.
  */
-(function () {
-  "use strict";
-
-  var subscriptions = [];
-
-  function init() {
-    // Tear down previous WS subscriptions
-    subscriptions.forEach(function (unsub) { try { unsub(); } catch (e) {} });
-    subscriptions.length = 0;
-
-    // Re-read the meta on every init: channel-owner-id changes across channel pages.
-    var meta = document.querySelector('meta[name="channel-owner-id"]');
-    if (!meta || !meta.content) return; // not on a channel page
-    var channelOwnerId = meta.content;
-    var publicChannel = "channel.viewed." + channelOwnerId;
-
-    // ── Pure client-side handlers ─────────────────────────────────────────────
-
-    function setHidden(id, hidden) {
-      var el = document.getElementById(id);
-      if (el) el.hidden = !!hidden;
+window.CatapultChannel = (function () {
+    function username() {
+        const segments = location.pathname.split("/");
+        return segments[1] === "channel" && segments[2] ? segments[2] : null;
     }
 
-    function onBotToggled(data) {
-      setHidden("bot-status-active", !data.enabled);
-      setHidden("bot-status-inactive", data.enabled);
+    function baseUrl() {
+        return `/channel/${username()}`;
     }
 
-    function onStreamStateChanged(data) {
-      setHidden("stream-status-live", !data.isLive);
-      setHidden("stream-status-offline", data.isLive);
+    async function refresh() {
+        // The query goes as the router's `search`: in the path, it would end up in the route's param.
+        await CatapultSpa.navigate(location.pathname.replace(/^\/+|\/+$/g, ""), false, location.search);
     }
 
-    function onGameDetected(data) {
-      var name = document.getElementById("current-game-name");
-      var src = document.getElementById("current-game-source");
-      if (name) name.textContent = data.sourceName || "";
-      if (src) src.textContent = data.sourceType || "";
-      setHidden("current-game-info", false);
-      setHidden("current-game-none", true);
+    /** Shows `message` in a snackbar, removed from the page once it closes. */
+    function showError(message) {
+        const snackbar = document.createElement("mdui-snackbar");
+        snackbar.textContent = message;
+        snackbar.addEventListener("closed", () => snackbar.remove());
+        snackbar.open = true;
+        document.body.appendChild(snackbar);
     }
 
-    function onGameCleared() {
-      setHidden("current-game-info", true);
-      setHidden("current-game-none", false);
+    /** What a refused action says (index.html's body carries it in the page's language), with its status. */
+    function actionFailed(status) {
+        return (document.body.dataset.labelActionFailed ?? "Action failed ({0})").replace("{0}", status);
     }
 
-    function onBindingDeleted(data) {
-      if (!data || !data.bindingId) return;
-      var row = document.querySelector(
-          'tbody[data-binding-id="' + cssEscape(data.bindingId) + '"]');
-      if (row) row.remove();
+    /** What an action that could not reach the server says. */
+    function unreachable() {
+        return document.body.dataset.labelActionUnreachable ?? "Catapult could not be reached";
     }
 
-    // ── Composite handlers (delegate to per-domain helpers) ───────────────────
-
-    function onBindingUpserted(data) {
-      if (!data || !data.binding) return;
-      var bindingId = data.binding.id;
-      var existing = document.querySelector(
-          'tbody[data-binding-id="' + cssEscape(bindingId) + '"]');
-      var fresh = window.CatapultBindings.renderBindingRow(data.binding);
-      if (existing) {
-        // Preserve hidden edit rows — they contain server-rendered CCL checkboxes
-        // that we don't reconstruct from the event payload.
-        Array.from(existing.querySelectorAll("tr.edit-row")).forEach(function (r) {
-          fresh.appendChild(r);
-        });
-        existing.replaceWith(fresh);
-      } else {
-        var table = document.querySelector("#bindings-card table");
-        if (table) table.appendChild(fresh);
-      }
+    /**
+     * Posts through CatapultCsrf and tells a failure in a snackbar. Never rejects: a request that
+     * could not be sent at all resolves to a not-ok answer with status 0.
+     */
+    async function postJson(url, body) {
+        let response;
+        try {
+            response = await CatapultCsrf.postJson(url, body);
+        } catch {
+            showError(unreachable());
+            return { ok: false, status: 0 };
+        }
+        if (!response.ok) {
+            showError(actionFailed(response.status));
+        }
+        return response;
     }
 
-    function onSettingsUpdated(data) {
-      if (!data || !data.settings) return;
-      if (window.CatapultSettings) window.CatapultSettings.applySettings(data.settings);
+    /**
+     * Posts the change of switch `sw` (already flipped by the user): when it doesn't go through,
+     * the switch is put back as it was, so it never shows a state the server doesn't have.
+     */
+    async function postSwitch(sw, url, body) {
+        const wanted = sw.checked;
+        const response = await postJson(url, body);
+        if (!response.ok) sw.checked = !wanted;
+        return response;
     }
 
-    function onSteamProfileChanged(data) {
-      if (!data || !data.profile) return;
-      if (window.CatapultConnections) window.CatapultConnections.applySteamProfile(data.profile);
+    function on(id, type, handler) {
+        const el = document.getElementById(id);
+        el?.addEventListener(type, handler);
+        return el;
     }
 
-    function onConnectionChanged(data) {
-      if (!data || !data.provider) return;
-      if (window.CatapultConnections) window.CatapultConnections.applyProvider(data.provider);
+    // These are mdui-switch elements, not native checkboxes: the :checked pseudo-class
+    // never matches them, so the checked state has to be read off the property.
+    function checkedValues(root, selector) {
+        return Array.from(root.querySelectorAll(selector)).filter(sw => sw.checked).map(sw => sw.value);
     }
 
-    // ── Dispatch ──────────────────────────────────────────────────────────────
+    // GameChangedEvent's visibility (hasGame) and text (#channel-current-game's
+    // textContent) are both driven generically now by spa:on/spa:value (see
+    // channel.html). Only the accordion's own selected-item binding is left to do by
+    // hand, since mdui-collapse's `value` isn't a plain element property Visibility
+    // could target with a stable selector (it's the list's first, unlabelled child).
+    function setCurrentGame(bindingId) {
+        const bindingList = document.getElementById("channel-bindings-list").children[0];
+        if (bindingList) bindingList.value = bindingId;
+    }
 
-    var HANDLERS = {
-      "bot.toggled":           onBotToggled,
-      "stream.state.changed":  onStreamStateChanged,
-      "game.detected":         onGameDetected,
-      "game.cleared":          onGameCleared,
-      "binding.deleted":       onBindingDeleted,
-      "binding.upserted":      onBindingUpserted,
-      "settings.updated":      onSettingsUpdated,
-      "steam.profile.changed": onSteamProfileChanged,
-      "connection.changed":    onConnectionChanged
+    function getBindingsElements() {
+        return Array.from(document.getElementById("channel-bindings-list").querySelectorAll("[data-binding-id]"));
+    }
+
+    function getBindingElement(id) {
+        return getBindingsElements().filter(el => el.dataset.bindingId === id).at(0);
+    }
+
+    function removeBinding(id) {
+        const row = getBindingElement(id);
+        if (!row) return;
+        row.remove();
+        if (getBindingsElements().length === 0) {
+            // #channel-bindings-empty is already server-rendered (hidden) with the right
+            // translation; nothing left to build or translate by hand here.
+            document.getElementById("channel-bindings-list").querySelector("mdui-collapse")?.remove();
+            document.getElementById("channel-bindings-empty")?.classList.remove("hidden");
+        }
+    }
+
+    // The Steam card always renders every sub-view (connected/not-connected chip,
+    // has-token/no-token body, save/delete buttons, shared-token checkbox) for the
+    // owner, and the Minecraft card every status sub-view (NONE/PENDING/INVITE_REJECTED/
+    // ACCEPTED/REMOVED), all toggled generically by each element's own spa:on/spa:
+    // switch/spa:value (see channel.html) instead of being created/destroyed per event.
+    // No handler is needed here for any Steam or Minecraft event.
+
+    return {
+        username, baseUrl, refresh, postJson, postSwitch, showError, actionFailed, unreachable,
+        on, checkedValues,
+        getBindingsElements, getBindingElement,
+        setCurrentGame,
+        removeBinding
     };
+})();
 
-    function onEvent(msg) {
-      if (!msg || msg.channel !== publicChannel) return;
-      var fn = HANDLERS[msg.name];
-      if (fn) {
-        try { fn(msg.data || {}); }
-        catch (e) { /* swallow — handler error shouldn't crash the dispatcher */ }
-      }
+// Keeps the active tab of a page's hash-mirrored tabs (data-hash-tabs: the channel's, the admin
+// page's) in location.hash. refresh() re-renders the whole fragment without pushing a history
+// entry, so the hash survives it and the restore below lands back on the tab the user was on
+// (e.g. after the mock popout's re-render) instead of resetting to the first one. Also makes
+// each tab directly linkable. A hash may go on with a sub-view after a slash (#caches/<name>, see
+// admin-tabs.js); picking another tab drops it.
+document.addEventListener("catapult:render", function () {
+    const tabs = document.querySelector("mdui-tabs[data-hash-tabs]");
+    if (!tabs) return;
+    const first = tabs.value;
+
+    // "#caches/igdb-game-cache": the tab, then the sub-view admin-tabs.js opens in it.
+    const wanted = location.hash.slice(1).split("/")[0];
+    // Non-owners only get the overview tab: ignore a hash naming one they don't have.
+    if (wanted && tabs.querySelector(`mdui-tab[value="${CSS.escape(wanted)}"]`)) {
+        tabs.value = wanted;
     }
 
-    var subscribed = false;
-    function subscribe() {
-      if (subscribed || !window.catapultWs) return;
-      subscribed = true;
-      window.catapultWs.subscribe(publicChannel, onEvent);
-      subscriptions.push(function () {
-        window.catapultWs.unsubscribe(publicChannel, onEvent);
-        subscribed = false;
-      });
+    // The tab now shown loses its "new" dot (fragments/new-feature), and catapult-web keeps that
+    // per account so it stays gone on every device. Best effort: a failed call brings the dot
+    // back on the next render, nothing worse.
+    function markSeen() {
+        const dot = tabs.querySelector(`mdui-tab[value="${CSS.escape(tabs.value)}"] [data-new-feature]`);
+        if (!dot) return;
+        dot.remove();
+        CatapultCsrf.postJson(`/spa/seen-features/${encodeURIComponent(dot.dataset.newFeature)}`).catch(() => {});
     }
+    markSeen();
 
-    // Wait for ws:auth.ok before subscribing — channel.viewed.* is auth-gated
-    // (ChannelResolver calls /api/users/.../channel-access). Subscribing before
-    // auth.ok would get sub.denied.
-    var onAuthOk = function () { subscribe(); };
-    document.addEventListener("ws:auth.ok", onAuthOk, { once: true });
-    subscriptions.push(function () { document.removeEventListener("ws:auth.ok", onAuthOk); });
-
-    // Immediate subscribe if WS is already connected and authenticated
-    subscribe();
-  }
-
-  // CSS.escape polyfill for older browsers — needed when building the
-  // attribute selector for data-binding-id (UUIDs contain hyphens which
-  // are fine, but be defensive).
-  function cssEscape(s) {
-    if (window.CSS && CSS.escape) return CSS.escape(s);
-    return String(s).replace(/[^a-zA-Z0-9_-]/g, function (c) {
-      return "\\" + c.charCodeAt(0).toString(16) + " ";
+    // mdui's change events bubble (composed): only the tabs' own is a tab switch, not one of a
+    // field or select inside a panel, which would drop the sub-view from the hash.
+    tabs.addEventListener("change", event => {
+        if (event.target !== tabs) return;
+        const hash = tabs.value === first ? "" : `#${tabs.value}`;
+        history.replaceState(history.state, "", location.pathname + location.search + hash);
+        markSeen();
     });
-  }
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init);
-  } else {
-    init();
-  }
-  document.addEventListener("page:loaded", init);
-}());
+});

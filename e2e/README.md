@@ -90,9 +90,7 @@ They will be skipped instead of failing.
   the `catapult-web` / `catapult-redis` services are running
   (`docker compose ps`).
 - **Overlay never appears**: check the WS handshake reached
-  `catapult-web` (`docker compose logs catapult-web | grep WsHub`) and
-  that nginx-router has the `/ws` upgrade block (see
-  `nginx-router/nginx.conf.template`).
+  `catapult-web` (`docker compose logs catapult-web | grep WsHub`).
 - **Tests time out around scenario 3**: bumping the `waitForHealthy`
   budget helps on slower hosts — edit `e2e/tests/helpers/compose.ts`.
 

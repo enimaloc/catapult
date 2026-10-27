@@ -1,0 +1,9 @@
+{
+  "status" : 200,
+  "headers" : {
+    "Cache-Control" : [ "no-cache, no-store, max-age=0, must-revalidate" ],
+    "Content-Type" : [ "application/json" ],
+    "Vary" : [ "Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers" ]
+  },
+  "body" : "{\"enabled\":true,\"bindings\":[{\"id\":\"bbc8cb68-4bf4-40d0-89af-af6fc2c8cd8f\",\"name\":\"Art\",\"twitchGameId\":\"509660\",\"twitchGameName\":\"Art\",\"ccls\":[],\"tws\":[\"Flashing\"],\"uninterruptible\":false}],\"activeId\":null,\"activatedAt\":null}"
+}

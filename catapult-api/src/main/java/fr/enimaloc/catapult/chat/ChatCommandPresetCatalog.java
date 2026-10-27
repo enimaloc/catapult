@@ -1,8 +1,8 @@
 package fr.enimaloc.catapult.chat;
 
-import fr.enimaloc.catapult.domain.ChatCommandDefinition;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.chatcommand.ChatCommandDefinition;
+import fr.enimaloc.catapult.repository.chatcommand.ChatCommandDefinitionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Component;
@@ -43,8 +43,8 @@ public class ChatCommandPresetCatalog {
     }
 
     /**
-     * Identifiant i18n associé à une commande Java. La clé résolue est
-     * {@code chat.builtin.<commande-sans-bang>.template}.
+     * The i18n identifier tied to a Java command. The resolved key is
+     * {@code chat.builtin.<command-without-bang>.template}.
      */
     private static String builtinTemplateKey(String commandName) {
         String stripped = commandName.startsWith("!") ? commandName.substring(1) : commandName;
@@ -78,17 +78,12 @@ public class ChatCommandPresetCatalog {
     }
 
     /**
-     * Pré-enregistre tous les presets pour {@code user}, désactivés par défaut.
-     * Idempotent : ignore les presets qui ont déjà une définition (même nom).
-     * Appelé au premier affichage de la page côté liste afin que l'utilisateur
-     * voie d'emblée toutes les commandes pré-configurées et n'ait qu'à les
-     * activer.
-     */
-    /**
-     * Pré-enregistre les presets data-driven (game, description, store...) pour
-     * {@code user}, désactivés par défaut. À n'appeler que lors du tout premier
-     * affichage de la page (liste vide) pour respecter une éventuelle
-     * suppression manuelle ultérieure.
+     * Pre-registers the data-driven presets (game, description, store...) for {@code user},
+     * disabled by default, so the user sees every preconfigured command right away and only
+     * has to enable them.
+     * Idempotent: skips the presets that already have a definition (same name).
+     * Call it only on the very first display of the page (empty list), to respect any
+     * manual deletion afterwards.
      */
     public void bootstrapPresetsDisabled(UserAccount user, Locale locale) {
         for (Map.Entry<String, Preset> entry : PRESETS.entrySet()) {
@@ -110,16 +105,15 @@ public class ChatCommandPresetCatalog {
     }
 
     /**
-     * Garantit qu'une ligne ChatCommandDefinition existe pour chaque commande
-     * Java (built-in) pour {@code user}. À appeler à chaque visite : les
-     * built-ins évoluent quand de nouveaux beans {@link ChatCommand} sont
-     * ajoutés au code, et la suppression d'une built-in n'a pas de sens
-     * (l'action Java reste).
+     * Makes sure a ChatCommandDefinition row exists for each Java (built-in) command of
+     * {@code user}. Call it on every visit: the built-ins evolve as new {@link ChatCommand}
+     * beans are added to the code, and deleting a built-in makes no sense (the Java action
+     * stays).
      */
     public void ensureBuiltins(UserAccount user, Locale locale) {
         for (ChatCommand cmd : staticCommands) {
-            // Les commandes owner-only (ex: !debug) restent hors UI streamer :
-            // pas de définition = ni visible, ni désactivable.
+            // Owner-only commands (e.g. !debug) stay out of the streamer UI:
+            // no definition = neither visible nor disableable.
             if (cmd.isOwnerOnly()) continue;
             String name = cmd.getName();
             if (repository.existsByUserAndName(user, name)) continue;
@@ -129,7 +123,7 @@ public class ChatCommandPresetCatalog {
             def.setName(name);
             def.setTemplate(template);
             def.setPermission(cmd.getRequiredPermission());
-            def.setEnabled(false); // désactivé par défaut comme les presets
+            def.setEnabled(false); // disabled by default, like the presets
             def.setPresetKey(BUILTIN_PRESET_KEY_PREFIX + name.replaceFirst("^!", ""));
             repository.save(def);
         }

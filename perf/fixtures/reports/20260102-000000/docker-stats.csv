@@ -1,0 +1,7 @@
+time,container,cpu,memory
+1000,catapult-verify-perf-api-1,10.00%,512MiB / 31.2GiB
+1000,catapult-verify-perf-web-1,30.00%,1GiB / 31.2GiB
+1005,catapult-verify-perf-api-1,50.00%,1.5GiB / 31.2GiB
+1005,catapult-verify-perf-web-1,20.00%,768MiB / 31.2GiB
+1010,catapult-verify-perf-api-1,30.00%,1GiB / 31.2GiB
+1010,catapult-verify-perf-web-1,--,-- / --

@@ -1,8 +1,8 @@
 package fr.enimaloc.catapult.security;
 
-import fr.enimaloc.catapult.domain.OAuthToken;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.OAuthTokenRepository;
+import fr.enimaloc.catapult.domain.account.OAuthToken;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -14,6 +14,8 @@ import org.mockito.quality.Strictness;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.mock.web.MockHttpSession;
+import jakarta.servlet.http.Cookie;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
@@ -27,7 +29,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -38,6 +39,8 @@ class TwitchLoginSuccessHandlerTest {
     @Mock OAuthTokenRepository oAuthTokenRepository;
     @Mock TokenEncryptionService tokenEncryptionService;
     @Mock ApplicationEventPublisher eventPublisher;
+    @Mock JwtService jwtService;
+    @Mock AuthCodeStore codeStore;
 
     @InjectMocks TwitchLoginSuccessHandler handler;
 
@@ -212,6 +215,52 @@ class TwitchLoginSuccessHandlerTest {
 
         handler.onAuthenticationSuccess(request, response, authToken);
 
-        assertThat(response.getRedirectedUrl()).isEqualTo("https://web.example.com/channels/jeb_");
+        assertThat(response.getRedirectedUrl()).isEqualTo("https://web.example.com/channel/jeb_#integrations");
+    }
+
+    @Test
+    void twitchToken_withWebUrl_sendsCatapultWebsStateBackAndForgetsIt() throws Exception {
+        ReflectionTestUtils.setField(handler, "webUrl", "https://web.example.com");
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute(InviteCodeRelayFilter.WEB_STATE_SESSION_KEY, "st-123_x");
+        request.setSession(session);
+        var authToken = twitchLogin();
+
+        handler.onAuthenticationSuccess(request, response, authToken);
+
+        assertThat(response.getRedirectedUrl()).isEqualTo("https://web.example.com/auth/callback?code=one-time&state=st-123_x");
+        assertThat(session.getAttribute(InviteCodeRelayFilter.WEB_STATE_SESSION_KEY)).isNull();
+        assertThat(response.getCookie(InviteCodeRelayFilter.WEB_STATE_COOKIE_NAME).getMaxAge()).isZero();
+    }
+
+    @Test
+    void twitchToken_withWebUrl_takesTheStateFromTheCookieAfterARetry() throws Exception {
+        ReflectionTestUtils.setField(handler, "webUrl", "https://web.example.com");
+        request.setCookies(new Cookie(InviteCodeRelayFilter.WEB_STATE_COOKIE_NAME, "from-cookie"));
+        var authToken = twitchLogin();
+
+        handler.onAuthenticationSuccess(request, response, authToken);
+
+        assertThat(response.getRedirectedUrl()).isEqualTo("https://web.example.com/auth/callback?code=one-time&state=from-cookie");
+    }
+
+    @Test
+    void twitchToken_withWebUrl_withoutState_sendsTheCodeAlone() throws Exception {
+        ReflectionTestUtils.setField(handler, "webUrl", "https://web.example.com");
+        var authToken = twitchLogin();
+
+        handler.onAuthenticationSuccess(request, response, authToken);
+
+        assertThat(response.getRedirectedUrl()).isEqualTo("https://web.example.com/auth/callback?code=one-time");
+    }
+
+    private OAuth2AuthenticationToken twitchLogin() {
+        var authToken = mock(OAuth2AuthenticationToken.class);
+        when(authToken.getAuthorizedClientRegistrationId()).thenReturn("twitch");
+        when(authToken.getPrincipal()).thenReturn(catapultUser);
+        when(authorizedClientRepository.loadAuthorizedClient("twitch", authToken, request)).thenReturn(null);
+        when(jwtService.generate(catapultUser)).thenReturn("jwt");
+        when(codeStore.issue("jwt")).thenReturn("one-time");
+        return authToken;
     }
 }

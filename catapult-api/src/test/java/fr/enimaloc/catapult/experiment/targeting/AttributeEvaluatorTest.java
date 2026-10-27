@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.experiment.targeting;
 
-import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserAccount;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

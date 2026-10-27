@@ -1,10 +1,11 @@
 package fr.enimaloc.catapult.chat.command.js;
 
+import fr.enimaloc.catapult.service.debug.DebugContext;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunction;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
 import fr.enimaloc.catapult.chat.command.trace.ExecutionTrace;
 import fr.enimaloc.catapult.chat.command.trace.TraceEntry;
-import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserAccount;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -33,6 +34,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
@@ -117,7 +119,9 @@ public class SandboxExecutor {
         ExecutorService executor = Executors.newSingleThreadExecutor();
         Context context = buildContext();
         try {
-            Future<String> future = executor.submit(() -> runInContext(context, compiledJs, placeholders, lists, registry, user, settings));
+            Supplier<String> run = DebugContext.wrap(
+                    () -> runInContext(context, compiledJs, placeholders, lists, registry, user, settings));
+            Future<String> future = executor.submit(run::get);
             try {
                 String result = future.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
                 outcome = "success";
@@ -142,7 +146,7 @@ public class SandboxExecutor {
     }
 
     /**
-     * Same as {@link #execute(String, PlaceholderContext, ListContext, ServiceFunctionRegistry, UserAccount, Duration)}
+     * Same as {@link #execute(String, PlaceholderContext, ListContext, ServiceFunctionRegistry, UserAccount, SettingContext, Duration)}
      * but also records a step-by-step {@link ExecutionTrace} of every placeholder resolution,
      * list iteration and service call made during the run — used by the command editor's
      * "Tester" button so authors can see why a command produced (or failed to produce) a
@@ -155,8 +159,9 @@ public class SandboxExecutor {
         ExecutorService executor = Executors.newSingleThreadExecutor();
         Context context = buildContext();
         try {
-            Future<String> future = executor.submit(() ->
+            Supplier<String> run = DebugContext.wrap(() ->
                 runInContextWithTrace(context, compiledJs, placeholders, lists, registry, user, settings, trace));
+            Future<String> future = executor.submit(run::get);
             try {
                 String output = future.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
                 trace.finish(output);
@@ -341,7 +346,7 @@ public class SandboxExecutor {
             Value ctx = context.eval("js", "({})");
             ctx.putMember("placeholder", (ProxyExecutable) args -> placeholders.resolve(args[0].asString()));
             ctx.putMember("list", (ProxyExecutable) args ->
-                boundedListProxyArray(new ArrayList<Object>(lists.resolveList(args[0].asString()))));
+                boundedListProxyArray(new ArrayList<>(lists.resolveList(args[0].asString()))));
             ctx.putMember("setting", (ProxyExecutable) args -> settings == null ? null : settings.resolve(args[0].asString()));
             ctx.putMember("call", (ProxyExecutable) args -> {
                 if (args.length < 2) {
@@ -378,7 +383,7 @@ public class SandboxExecutor {
                 List<Object> values = lists.resolveList(name);
                 String preview = values.stream().map(String::valueOf).collect(Collectors.joining(", "));
                 trace.record(new TraceEntry("for-each", "iterate " + name, preview, false));
-                return boundedListProxyArray(new ArrayList<Object>(values));
+                return boundedListProxyArray(new ArrayList<>(values));
             });
             ctx.putMember("setting", (ProxyExecutable) args -> {
                 String key = args[0].asString();

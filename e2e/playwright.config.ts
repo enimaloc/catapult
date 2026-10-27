@@ -4,7 +4,7 @@ import { defineConfig, devices } from "@playwright/test";
  * Playwright config for the catapult WebSocket E2E suite.
  *
  * Assumes the docker compose stack is up and reachable at `BASE_URL`
- * (default: http://localhost, the nginx-router published port).
+ * (default: http://localhost, catapult-web's published port, WEB_PORTS).
  *
  *   docker compose up -d
  *   cd e2e && npx playwright test
@@ -34,6 +34,19 @@ export default defineConfig({
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
+      testIgnore: "perf/**",
     },
+    // Timing run under the perf profile: perf/run.sh --pages-only. Only declared when PERF_BASE_URL
+    // names a perf stack, so that the default run never measures (or fails against) a real one.
+    ...(process.env.PERF_BASE_URL
+      ? [
+          {
+            name: "perf",
+            testDir: "./tests/perf",
+            timeout: 600_000, // 21 page loads per tab
+            use: { ...devices["Desktop Chrome"], baseURL: process.env.PERF_BASE_URL },
+          },
+        ]
+      : []),
   ],
 });

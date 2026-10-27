@@ -1,8 +1,9 @@
 package fr.enimaloc.catapult.experiment.targeting.resolver;
 
-import fr.enimaloc.catapult.domain.*;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.experiment.ExperimentAssignment;
 import fr.enimaloc.catapult.experiment.targeting.AttributeValue;
-import fr.enimaloc.catapult.repository.ExperimentAssignmentRepository;
+import fr.enimaloc.catapult.repository.experiment.ExperimentAssignmentRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

@@ -1,0 +1,1 @@
+{ "streamers": 10, "viewers": 100, "duration": "2m", "k6Image": "grafana/k6:1.8.1" }

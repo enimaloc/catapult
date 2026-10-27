@@ -1,0 +1,318 @@
+<!--/*@thymesVar id="experiments" type="java.util.List<fr.enimaloc.catapult.common.dto.experiment.ExperimentSummaryDto>"*/-->
+<!--/*@thymesVar id="experiment" type="fr.enimaloc.catapult.common.dto.experiment.ExperimentSettingsDto"*/-->
+<!--/*
+  The experiments: a list (key, name, status, weights, a warning when no rule makes anyone eligible), and per
+  experiment a detail sub-view (#experiments/{id}) to change its status, weights, assignment rules and overrides.
+  An ended experiment is read-only. The forms are driven by admin-experiments.js.
+*/-->
+<div th:fragment="content" class="admin-view admin-experiments">
+    <div class="section-header">
+        <h2 th:text="#{admin.tab.experiments}">Experiments</h2>
+    </div>
+
+    <th:block th:if="${experiments == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
+    <th:block th:if="${experiments != null and experiments.isEmpty()}">
+        <th:block th:replace="~{pages/admin-tab/common :: empty('science', #{admin.experiments.empty})}"></th:block>
+    </th:block>
+
+    <mdui-card class="admin-targeting-card" variant="outlined" th:if="${experiments != null and !experiments.isEmpty()}">
+        <div class="admin-targeting-rows">
+            <div class="admin-experiments-row" th:each="e : ${experiments}" th:attr="data-admin-open=${e.id()}">
+                <div>
+                    <strong class="admin-member-id" th:text="${e.key()}">key</strong>
+                    <span class="admin-cell-muted" th:text="${e.name()}">name</span>
+                </div>
+                <div th:replace="~{pages/admin-tab/experiments :: weightBar(${e.variants()}, false, true)}"></div>
+                <span class="admin-experiments-chips">
+                    <mdui-chip class="admin-experiments-norule" icon="warning" th:if="${e.ruleCount() == 0}"
+                               th:text="#{admin.experiments.norule}">aucune règle</mdui-chip>
+                    <mdui-chip th:text="#{|admin.experiments.status.${e.status()}|}">ACTIVE</mdui-chip>
+                </span>
+            </div>
+        </div>
+    </mdui-card>
+</div>
+
+<!--/* One experiment (#experiments/{id}); every control is absent once it has ended. */-->
+<div th:fragment="detail" class="admin-view admin-experiment-detail"
+     th:with="editable=${experiment.status().name() != 'ENDED'}, status=${experiment.status().name()}"
+     th:attr="data-experiment=${experiment.id()},data-status=${status},
+        data-confirm-text=#{admin.confirm},data-cancel-text=#{admin.cancel},
+        data-label-invalid=#{admin.experiments.invalid},data-label-unknown=#{admin.experiments.unknown},
+        data-label-account-unknown=#{admin.experiments.account-unknown},
+        data-label-unavailable=#{admin.experiments.unavailable},data-label-saved=#{admin.experiments.saved},
+        data-label-end-confirm=#{admin.experiments.end-confirm(${experiment.key()})},
+        data-label-reassign-confirm=#{admin.experiments.reassign-confirm(${experiment.key()})},
+        data-label-rebalance-confirm=#{admin.experiments.rebalance-confirm},data-label-rebalance-move=#{admin.experiments.rebalance-move}">
+    <div class="section-header admin-subheader">
+        <mdui-button-icon icon="arrow_back" data-admin-back th:attr="aria-label=#{admin.back}"></mdui-button-icon>
+        <h2 th:text="${experiment.key()}">key</h2>
+        <mdui-chip th:text="#{|admin.experiments.status.${status}|}">ACTIVE</mdui-chip>
+    </div>
+    <p>
+        <strong th:text="${experiment.name()}">name</strong>
+        <span class="admin-cell-muted" th:if="${experiment.description() != null and !experiment.description().isBlank()}"
+              th:text="${experiment.description()}">description</span>
+    </p>
+
+    <mdui-card class="admin-targeting-card" variant="outlined" th:if="${editable}">
+        <h3 th:text="#{admin.experiments.status.title}">Statut</h3>
+        <div class="admin-experiments-actions">
+            <mdui-button variant="filled" icon="play_arrow" data-experiment-action="activate"
+                         th:if="${status == 'DRAFT'}" th:text="#{admin.experiments.action.activate}">Activer</mdui-button>
+            <mdui-button variant="filled" icon="play_arrow" data-experiment-action="activate"
+                         th:if="${status == 'PAUSED'}" th:text="#{admin.experiments.action.reactivate}">Réactiver</mdui-button>
+            <mdui-button variant="tonal" icon="pause" data-experiment-action="pause"
+                         th:if="${status == 'ACTIVE'}" th:text="#{admin.experiments.action.pause}">Désactiver</mdui-button>
+            <mdui-button variant="tonal" icon="stop" data-experiment-action="end"
+                         th:if="${status == 'ACTIVE' or status == 'PAUSED'}" th:text="#{admin.experiments.action.end}">Terminer</mdui-button>
+            <mdui-button variant="outlined" icon="shuffle" data-experiment-action="reassign" th:if="${status == 'ACTIVE'}"
+                         th:text="#{admin.experiments.action.reassign}">Réassigner tout le monde</mdui-button>
+        </div>
+    </mdui-card>
+
+    <mdui-card class="admin-targeting-card" variant="outlined">
+        <h3 th:text="#{admin.experiments.weights.title}">Poids</h3>
+        <form id="experiment-weights" th:if="${editable}" class="admin-experiments-form">
+            <div th:replace="~{pages/admin-tab/experiments :: weightBar(${experiment.variants()}, true, false)}"></div>
+            <div class="admin-experiments-weight" th:each="v, it : ${experiment.variants()}">
+                <span class="experiment-weight-swatch" aria-hidden="true"
+                      th:style="|--variant-color: var(--catapult-variant-${v.control() ? 'control' : (it.index - experiment.variants().subList(0, it.index).?[control()].size()) % 4 + 1})|"></span>
+                <mdui-text-field type="number" min="0" variant="outlined" required th:value="${v.weight()}"
+                                 th:attr="data-variant=${v.id()},data-variant-key=${v.key()},name=${'weight-' + v.key()},
+                                          label=${v.control() ? #messages.msg('admin.experiments.weights.control', v.key()) : v.key()}"></mdui-text-field>
+                <span class="admin-cell-muted" data-weight-share></span>
+            </div>
+            <mdui-button variant="filled" type="submit" icon="save" th:text="#{admin.experiments.weights.save}">Enregistrer</mdui-button>
+        </form>
+        <th:block th:unless="${editable}"><div th:replace="~{pages/admin-tab/experiments :: weightBar(${experiment.variants()}, false, false)}"></div></th:block>
+    </mdui-card>
+
+    <mdui-card class="admin-targeting-card" variant="outlined">
+        <h3 th:text="#{admin.experiments.rules.title}">Attribution</h3>
+        <p class="admin-experiments-rule-warning experiment-rule-warning" th:if="${experiment.rules().isEmpty()}">
+            <mdui-icon name="warning"></mdui-icon>
+            <span th:text="#{admin.experiments.rules.none}">Aucune règle : personne n'est éligible.</span>
+        </p>
+        <div class="admin-targeting-rows" th:unless="${experiment.rules().isEmpty()}">
+            <div class="admin-targeting-row" th:each="r : ${experiment.rules()}" th:attr="data-rule=${r.id()}"
+                 th:with="isTag=${r.attributeKey() != null and r.attributeKey().startsWith('flag:')},
+                          tag=${isTag ? r.attributeKey().substring(5) : r.attributeKey()}">
+                <span th:switch="${r.type()}">
+                    <th:block th:case="'RANDOM'" th:text="#{admin.experiments.rule.random(${r.percentage()})}">Aléatoire 100 %</th:block>
+                    <th:block th:case="'GROUP'" th:text="#{admin.experiments.rule.group(${r.attributeValue()})}">Groupe beta</th:block>
+                    <th:block th:case="'EXPERIMENT'" th:text="#{admin.experiments.rule.experiment(${r.attributeKey()},${r.attributeValue()})}">Expérience x = enabled</th:block>
+                    <th:block th:case="'MANUAL'" th:text="#{admin.experiments.rule.manual}">Manuel</th:block>
+                    <th:block th:case="*">
+                        <th:block th:if="${isTag and r.attributeValue() == null}" th:text="#{admin.experiments.rule.tag(${tag})}">Tag beta</th:block>
+                        <th:block th:if="${isTag and r.attributeValue() != null}" th:text="#{admin.experiments.rule.tag-value(${tag},${r.attributeValue()})}">Tag beta = on</th:block>
+                        <th:block th:unless="${isTag}" th:text="|${r.attributeKey()} ${r.attributeOperator()} ${r.attributeValue() ?: ''}|">attr</th:block>
+                    </th:block>
+                </span>
+                <span></span>
+                <mdui-button-icon icon="delete" th:if="${editable}"
+                                  th:attr="data-rule-delete=${r.id()},aria-label=#{admin.experiments.rules.delete},
+                                  data-confirm=#{admin.experiments.rules.delete-confirm}"></mdui-button-icon>
+            </div>
+        </div>
+        <th:block th:if="${editable}">
+            <h4 th:text="#{admin.experiments.rules.add.title}">Ajouter une règle</h4>
+            <form id="experiment-rule-form" class="admin-experiments-form">
+                <mdui-select name="type" value="RANDOM" variant="outlined" th:attr="label=#{admin.experiments.rules.type}">
+                    <mdui-menu-item value="RANDOM" th:text="#{admin.experiments.rules.type.random}">Aléatoire</mdui-menu-item>
+                    <mdui-menu-item value="GROUP" th:text="#{admin.experiments.rules.type.group}">Groupe</mdui-menu-item>
+                    <mdui-menu-item value="ATTRIBUTE" th:text="#{admin.experiments.rules.type.tag}">Tag</mdui-menu-item>
+                    <mdui-menu-item value="EXPERIMENT" th:text="#{admin.experiments.rules.type.experiment}">Expérience</mdui-menu-item>
+                    <mdui-menu-item value="MANUAL" th:text="#{admin.experiments.rules.type.manual}">Manuel</mdui-menu-item>
+                </mdui-select>
+                <!--/* One block per rule type; admin-experiments.js shows the one matching the type. */-->
+                <div data-rule-fields="RANDOM">
+                    <mdui-text-field type="number" name="percentage" min="0" max="100" value="100" variant="outlined"
+                                     th:attr="label=#{admin.experiments.rules.percentage}"></mdui-text-field>
+                </div>
+                <div data-rule-fields="GROUP" hidden>
+                    <mdui-select name="groupKey" variant="outlined" th:attr="label=#{admin.experiments.rules.group}">
+                        <mdui-menu-item th:each="g : ${groups}" th:value="${g.key()}" th:text="${g.key()}">group</mdui-menu-item>
+                    </mdui-select>
+                </div>
+                <div data-rule-fields="ATTRIBUTE" hidden>
+                    <mdui-text-field name="attributeKey" variant="outlined" maxlength="255" th:attr="label=#{admin.experiments.rules.tag}"></mdui-text-field>
+                    <mdui-select name="attributeOperator" value="exists" variant="outlined" th:attr="label=#{admin.experiments.rules.operator}">
+                        <mdui-menu-item value="exists" th:text="#{admin.experiments.rules.operator.exists}">possède le tag</mdui-menu-item>
+                        <mdui-menu-item value="eq" th:text="#{admin.experiments.rules.operator.eq}">a la valeur</mdui-menu-item>
+                    </mdui-select>
+                    <mdui-text-field name="attributeValue" variant="outlined" maxlength="1024" th:attr="label=#{admin.experiments.rules.value}"></mdui-text-field>
+                </div>
+                <div data-rule-fields="EXPERIMENT" hidden>
+                    <mdui-text-field name="experimentKey" variant="outlined" maxlength="100" th:attr="label=#{admin.experiments.rules.experiment}"></mdui-text-field>
+                    <mdui-text-field name="variantKey" variant="outlined" maxlength="255" th:attr="label=#{admin.experiments.rules.variant}"></mdui-text-field>
+                </div>
+                <mdui-button variant="filled" type="submit" icon="add" th:text="#{admin.experiments.add}">Ajouter</mdui-button>
+            </form>
+        </th:block>
+    </mdui-card>
+
+    <mdui-card id="experiment-participants" class="admin-targeting-card" variant="outlined">
+        <h3 th:text="#{admin.experiments.participants.title}">Participants</h3>
+        <div th:replace="~{pages/admin-tab/experiments :: participants}"></div>
+    </mdui-card>
+
+    <mdui-card id="experiment-overrides" class="admin-targeting-card" variant="outlined">
+        <h3 th:text="#{admin.experiments.overrides.title}">Dérogations</h3>
+        <p class="admin-cell-muted" th:if="${experiment.overrides().isEmpty()}" th:text="#{admin.experiments.overrides.empty}">Aucune dérogation.</p>
+        <div class="admin-targeting-rows" th:unless="${experiment.overrides().isEmpty()}">
+            <div class="admin-targeting-row" th:each="o : ${experiment.overrides()}" th:attr="data-override=${o.id()}"
+                 th:with="isTag=${o.attributeKey() != null and o.attributeKey().startsWith('flag:')},
+                          tag=${isTag ? o.attributeKey().substring(5) : o.attributeKey()}">
+                <span>
+                    <th:block th:if="${o.type() == 'USER'}" th:text="#{admin.experiments.override.user(${o.twitchUsername()})}">Compte enimaloc</th:block>
+                    <th:block th:if="${o.type() != 'USER'}">
+                        <th:block th:if="${isTag and o.attributeVal() == null}" th:text="#{admin.experiments.override.tag(${tag})}">Tag beta</th:block>
+                        <th:block th:if="${isTag and o.attributeVal() != null}" th:text="#{admin.experiments.override.tag-value(${tag},${o.attributeVal()})}">Tag beta = on</th:block>
+                        <th:block th:if="${!isTag and o.attributeKey() == 'group'}" th:text="#{admin.experiments.override.group(${o.attributeVal()})}">Groupe beta</th:block>
+                        <th:block th:if="${!isTag and o.attributeKey() != 'group'}" th:text="|${o.attributeKey()} ${o.attributeOp()} ${o.attributeVal() ?: ''}|">attr</th:block>
+                    </th:block>
+                </span>
+                <span class="admin-cell-muted" th:switch="${o.action()}">
+                    <th:block th:case="'FORCE_INCLUDE'" th:text="#{admin.experiments.override.include}">Inclure</th:block>
+                    <th:block th:case="'FORCE_EXCLUDE'" th:text="#{admin.experiments.override.exclude}">Exclure</th:block>
+                    <th:block th:case="*"
+                              th:text="#{admin.experiments.override.variant(${variantKeys.get(o.targetVariantId())})}">Forcer « enabled »</th:block>
+                    <th:block th:text="|(${o.priority()})|"></th:block>
+                </span>
+                <mdui-button-icon icon="delete" th:if="${editable}"
+                                  th:attr="data-override-delete=${o.id()},aria-label=#{admin.experiments.overrides.delete},
+                                  data-confirm=#{admin.experiments.overrides.delete-confirm}"></mdui-button-icon>
+            </div>
+        </div>
+        <th:block th:if="${editable}">
+            <h4 th:text="#{admin.experiments.overrides.add.title}">Ajouter une dérogation</h4>
+            <p class="admin-cell-muted" th:text="#{admin.experiments.overrides.help}">Inclure fait entrer le membre malgré les règles, les poids choisissent ensuite sa variante ; Forcer une variante l'impose.</p>
+            <form id="experiment-override-form" class="admin-experiments-form">
+                <mdui-select name="target" value="USER" variant="outlined" th:attr="label=#{admin.experiments.overrides.target}">
+                    <mdui-menu-item value="USER" th:text="#{admin.experiments.overrides.target.user}">Compte</mdui-menu-item>
+                    <mdui-menu-item value="TAG" th:text="#{admin.experiments.overrides.target.tag}">Tag</mdui-menu-item>
+                    <mdui-menu-item value="GROUP" th:text="#{admin.experiments.overrides.target.group}">Groupe</mdui-menu-item>
+                </mdui-select>
+                <div data-override-fields="USER">
+                    <mdui-text-field name="twitchUsername" variant="outlined" maxlength="64" th:attr="label=#{admin.experiments.overrides.username}"></mdui-text-field>
+                </div>
+                <div data-override-fields="TAG" hidden>
+                    <mdui-text-field name="tagKey" variant="outlined" maxlength="255" data-list="experiment-flag-keys"
+                                     th:attr="label=#{admin.experiments.overrides.tag-key}"></mdui-text-field>
+                    <mdui-text-field name="tagValue" variant="outlined" maxlength="1024"
+                                     th:attr="label=#{admin.experiments.overrides.tag-value},helper=#{admin.experiments.overrides.tag-value-helper}"></mdui-text-field>
+                    <datalist id="experiment-flag-keys">
+                        <option th:each="f : ${flagKeys}" th:value="${f.key()}" th:attr="data-values=${#strings.listJoin(f.values(), ',')}"></option>
+                    </datalist>
+                </div>
+                <div data-override-fields="GROUP" hidden>
+                    <mdui-select name="groupKey" variant="outlined" th:attr="label=#{admin.experiments.rules.group}">
+                        <mdui-menu-item th:each="g : ${groups}" th:value="${g.key()}" th:text="${g.key()}">group</mdui-menu-item>
+                    </mdui-select>
+                </div>
+                <mdui-select name="action" value="FORCE_INCLUDE" variant="outlined" th:attr="label=#{admin.experiments.overrides.action}">
+                    <mdui-menu-item value="FORCE_INCLUDE" th:text="#{admin.experiments.override.include}">Inclure</mdui-menu-item>
+                    <mdui-menu-item value="FORCE_EXCLUDE" th:text="#{admin.experiments.override.exclude}">Exclure</mdui-menu-item>
+                    <mdui-menu-item value="FORCE_VARIANT" th:text="#{admin.experiments.overrides.action.variant}">Forcer une variante</mdui-menu-item>
+                </mdui-select>
+                <mdui-select name="variantId" variant="outlined" th:attr="label=#{admin.experiments.overrides.variant}">
+                    <mdui-menu-item th:each="v : ${experiment.variants()}" th:value="${v.id()}" th:text="${v.key()}">variant</mdui-menu-item>
+                </mdui-select>
+                <mdui-text-field type="number" name="priority" value="10" variant="outlined"
+                                 th:attr="label=#{admin.experiments.overrides.priority},helper=#{admin.experiments.overrides.priority-helper}"></mdui-text-field>
+                <mdui-button variant="filled" type="submit" icon="add" th:text="#{admin.experiments.add}">Ajouter</mdui-button>
+            </form>
+        </th:block>
+    </mdui-card>
+</div>
+
+<!--/* Who is assigned to which variant: the variants as filter chips (with how many each holds), a login search,
+     a page of rows (each with a select to move the member to another variant, unless the experiment has ended)
+     and the pager. The root carries the state admin-experiments.js reloads from; it swaps the chips and the
+     list only, so the search field keeps its focus. data-variant / data-q are absent (not empty) when there is no
+     filter / search: Thymeleaf drops an empty attribute. A variant's colour is the weight bar's (variantColors). */-->
+<div th:fragment="participants" data-participants class="admin-participants"
+     th:attr="data-variant=${selectedVariant != null ? selectedVariant : ''},data-q=${participantsQ},data-page=${assignments != null ? assignments.page().number() : 0}">
+    <div data-participants-chips class="admin-participants-chips" th:if="${assignments != null}"
+         th:with="total=${#aggregates.sum(assignments.counts().values()).longValue()}">
+        <mdui-chip variant="filter" data-participants-variant=""
+                   th:attr="selected=${selectedVariant == null ? '' : null},aria-pressed=${selectedVariant == null}"
+                   th:text="#{admin.experiments.participants.all(${total})}">Toutes</mdui-chip>
+        <mdui-chip variant="filter" th:each="v : ${experiment.variants()}"
+                   th:attr="data-participants-variant=${v.id()},selected=${v.id().equals(selectedVariant) ? '' : null},aria-pressed=${v.id().equals(selectedVariant)}">
+            <span slot="icon" class="experiment-weight-swatch" aria-hidden="true"
+                  th:style="|--variant-color: var(--catapult-variant-${variantColors.get(v.id())})|"></span>
+            <th:block th:text="|${v.key()} (${assignments.counts().getOrDefault(v.id(), 0L)})|">key (0)</th:block>
+        </mdui-chip>
+    </div>
+    <mdui-text-field class="admin-search" data-participants-search variant="outlined" clearable icon="search"
+                     th:attr="label=#{admin.search},value=${participantsQ}"></mdui-text-field>
+    <div data-participants-list>
+        <p class="admin-cell-muted" th:if="${assignments == null}" th:text="#{admin.unavailable}">Indisponible</p>
+        <th:block th:if="${assignments != null}">
+            <p class="admin-cell-muted" th:if="${assignments.page().content().isEmpty() and selectedVariant == null and participantsQ.isBlank()}"
+               th:text="#{admin.experiments.participants.none}">Personne n'a encore été assigné.</p>
+            <p class="admin-cell-muted" th:if="${assignments.page().content().isEmpty() and (selectedVariant != null or !participantsQ.isBlank())}"
+               th:text="#{admin.experiments.participants.nomatch}">Aucun participant ne correspond.</p>
+            <div class="admin-targeting-rows" th:unless="${assignments.page().content().isEmpty()}">
+                <div class="admin-targeting-row admin-participants-row" th:each="a : ${assignments.page().content()}"
+                     th:attr="data-participant=${a.userId()}">
+                    <strong class="admin-member-id" th:text="${a.twitchUsername()}">login</strong>
+                    <span class="admin-participants-variant">
+                        <span class="experiment-weight-swatch" aria-hidden="true"
+                              th:style="|--variant-color: var(--catapult-variant-${variantColors.get(a.variantId())})|"></span>
+                        <span th:text="${variantKeys.get(a.variantId())}">variant</span>
+                    </span>
+                    <span class="admin-cell-muted"
+                          th:text="${a.assignedAt() == null ? '—' : #temporals.format(a.assignedAt(), #messages.msg('format.date'))}">01/01/2025</span>
+                    <span class="admin-participants-actions">
+                        <mdui-chip class="admin-participants-forced" icon="lock" th:if="${a.forced()}"
+                                   th:text="#{admin.experiments.participants.forced}">forcé</mdui-chip>
+                        <mdui-select variant="outlined" th:if="${editable}"
+                                     th:attr="data-participants-move=${a.userId()},label=#{admin.experiments.participants.move}">
+                            <th:block th:each="v : ${experiment.variants()}">
+                                <mdui-menu-item th:unless="${v.id().equals(a.variantId())}" th:value="${v.id()}" th:text="${v.key()}">variant</mdui-menu-item>
+                            </th:block>
+                        </mdui-select>
+                    </span>
+                </div>
+            </div>
+            <div class="admin-pagination" th:if="${assignments.page().totalPages() > 1}" th:with="page=${assignments.page()}">
+                <mdui-button-icon icon="chevron_left" th:disabled="${page.first()}"
+                                  th:attr="data-participants-page=${page.number() - 1},aria-label=#{admin.pagination.previous}"></mdui-button-icon>
+                <span th:text="|${page.number() + 1} / ${page.totalPages()}|">1 / 1</span>
+                <mdui-button-icon icon="chevron_right" th:disabled="${page.last()}"
+                                  th:attr="data-participants-page=${page.number() + 1},aria-label=#{admin.pagination.next}"></mdui-button-icon>
+            </div>
+        </th:block>
+    </div>
+</div>
+
+<div th:fragment="missing" class="admin-view">
+    <div class="section-header admin-subheader">
+        <mdui-button-icon icon="arrow_back" data-admin-back th:attr="aria-label=#{admin.back}"></mdui-button-icon>
+    </div>
+    <p class="admin-placeholder" th:text="#{admin.experiments.missing}">Cette expérience n'existe plus.</p>
+</div>
+
+<!--/* The variants' weights as one bar, a segment per variant as wide as its share, coloured from the
+     brand's palette (the control in the muted grey: the feature is off for whoever lands there).
+     Editable: a slider handle between two neighbours moves points from one to the other
+     (admin-experiments.js keeps the segments and the number fields in step). Mini: the list's. */-->
+<div th:fragment="weightBar(variants, editable, mini)" class="experiment-weight-bar"
+     th:classappend="${editable ? 'is-editable' : (mini ? 'is-mini' : '')}"
+     th:with="total=${#aggregates.sum(variants.![weight]).longValue()}">
+    <th:block th:each="v, it : ${variants}"
+              th:with="share=${total == 0 ? 0 : (v.weight() * 200L + total) / (2 * total)},
+                       slot=${(it.index - variants.subList(0, it.index).?[control()].size()) % 4 + 1}">
+        <span th:if="${editable and !it.first}" class="experiment-weight-handle" role="slider" tabindex="0"
+              aria-valuemin="0" aria-valuemax="100"
+              th:attr="data-handle=${it.index},aria-label=#{admin.experiments.weights.handle(${variants[it.index - 1].key()}, ${v.key()})}"></span>
+        <div class="experiment-weight-segment"
+             th:style="|flex-grow: ${v.weight()}; --variant-color: var(--catapult-variant-${v.control() ? 'control' : slot})|"
+             th:attr="data-segment=${v.id()},title=|${v.key()} ${share} %|">
+            <span class="experiment-weight-label" th:unless="${mini}"><span th:text="${v.key()}">key</span> <b th:text="|${share} %|">0 %</b></span>
+        </div>
+    </th:block>
+</div>

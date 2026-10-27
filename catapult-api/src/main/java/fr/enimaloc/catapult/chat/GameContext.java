@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.chat;
 
-import fr.enimaloc.catapult.domain.GameBinding;
+import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.getter.DetectedGame;
 
 import java.time.LocalDate;
@@ -10,8 +10,8 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Snapshot du jeu en cours pour un user, hydraté par GameContextService et lu par PlaceholderResolver.
- * Tous les champs sauf `detected`/`name` peuvent être null.
+ * Snapshot of a user's current game, hydrated by GameContextService and read by PlaceholderResolver.
+ * Every field except `detected`/`name` may be null.
  */
 public record GameContext(
     DetectedGame detected,

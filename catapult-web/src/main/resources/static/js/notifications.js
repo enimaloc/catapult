@@ -1,139 +1,210 @@
-(function () {
-  var subscriptions = [];
+/*
+ * The top bar's notification bell: its dropdown is the menu fragment (NotificationsController),
+ * refetched whenever the live stream reopens, and the stream's events keep it and the badge current
+ * in between. Clicks are delegated to the document, as the dropdown's content comes and goes; the
+ * /notifications page's #notifications-page list shares them, and the item builder.
+ */
+window.CatapultNotifications = (function () {
+    const MENU_SIZE = 10;
+    const PAGE_SIZE = 20;
+    const CONTAINERS = "#notifications-dropdown, #notifications-page";
+    const ICONS = { INFO: "info", WARNING: "warning", ERROR: "error" };
+    let unread = -1;
 
-  function init() {
-    // Tear down previous DOM listeners and WS subscriptions
-    subscriptions.forEach(function (unsub) { try { unsub(); } catch (e) {} });
-    subscriptions.length = 0;
+    const bell = () => document.getElementById("notifications-bell");
+    const badge = () => document.getElementById("notifications-badge");
+    const list = () => document.querySelector("#notifications-dropdown .notification-list");
 
-    var bell = document.getElementById('notif-bell');
-    if (!bell) return;
-    bell.hidden = false;
-
-    var btn = document.getElementById('notif-bell-btn');
-    var dropdown = document.getElementById('notif-dropdown');
-    var list = document.getElementById('notif-list');
-    var badge = document.getElementById('notif-badge');
-    var markAll = document.getElementById('notif-mark-all');
-    var unread = 0;
-
-    function setUnread(n) {
-      unread = Math.max(0, n);
-      if (unread === 0) { badge.hidden = true; }
-      else { badge.hidden = false; badge.textContent = unread > 99 ? '99+' : String(unread); }
+    /** The badge for a count: hidden at zero, "99+" beyond 99; -1 (catapult-api unreachable) hides the bell too. */
+    function setUnread(count) {
+        unread = Number.isFinite(count) ? count : -1;
+        const el = badge();
+        if (bell()) bell().hidden = unread < 0;
+        if (!el) return;
+        el.hidden = unread <= 0;
+        el.textContent = unread > 99 ? "99+" : String(Math.max(unread, 0));
     }
 
-    function cssEscape(s) {
-      if (window.CSS && CSS.escape) return CSS.escape(s);
-      return String(s).replace(/[^a-zA-Z0-9_-]/g, function (c) { return '\\' + c.charCodeAt(0).toString(16) + ' '; });
+    /** An ISO time in words relative to now (time.js); empty when it isn't one. */
+    function formatRelative(iso) {
+        const at = Date.parse(iso);
+        return Number.isNaN(at) ? "" : CatapultTime.relative(at - Date.now());
     }
 
-    function prependNotif(n) {
-      if (list.querySelector('li[data-id="' + cssEscape(n.id) + '"]')) return; // idempotent
-      var li = document.createElement('li');
-      li.dataset.id = n.id;
-      li.className = 'sev-' + (n.severity || 'INFO').toLowerCase();
-      // Trust contract: n.bodyHtml is HTML pre-sanitized server-side by jsoup Safelist.basic()
-      // (see NotificationRenderer). All other dynamic fields MUST go through textContent.
-      // Do NOT replace bodyHtml with textContent — markdown formatting would be lost.
-      var titleEl = document.createElement('strong');
-      titleEl.textContent = n.title;
-      var bodyEl = document.createElement('div');
-      bodyEl.className = 'body';
-      bodyEl.innerHTML = n.bodyHtml; // intentional: pre-sanitized
-      li.appendChild(titleEl);
-      li.appendChild(bodyEl);
-      if (n.ctaUrl && n.ctaLabel && /^https?:\/\//.test(n.ctaUrl)) {
-        var a = document.createElement('a');
-        a.className = 'cta';
-        a.href = n.ctaUrl; a.rel = 'noopener'; a.textContent = n.ctaLabel;
-        li.appendChild(a);
-      }
-      var readBtn = document.createElement('button');
-      readBtn.dataset.action = 'read';
-      readBtn.type = 'button';
-      readBtn.textContent = '✓';
-      li.appendChild(readBtn);
-      list.prepend(li);
+    /** Writes the relative text of every `<time datetime>` under root at once; time.js then keeps it current. */
+    function fillDates(root = document) {
+        root.querySelectorAll(".notification-date[datetime]").forEach(time => {
+            time.textContent = formatRelative(time.getAttribute("datetime"));
+        });
     }
 
-    function populateSnapshot(data) {
-      while (list.firstChild) list.removeChild(list.firstChild);
-      (data.items || []).forEach(prependNotif);
-      setUnread(data.unreadCount || 0);
+    /**
+     * An item node for a NotificationDto (as the stream carries it) from the menu's template, or the
+     * /notifications page's own when the menu has not loaded. Title and label are text; bodyHtml is
+     * markup, sanitized by catapult-api.
+     */
+    function buildItem(dto) {
+        const template = document.getElementById("notification-item-template")
+            ?? document.getElementById("notification-page-item-template");
+        if (!template) return null;
+        const node = template.content.firstElementChild.cloneNode(true);
+        node.dataset.id = dto.id;
+        node.tabIndex = 0;
+        node.dataset.read = String(Boolean(dto.read));
+        node.dataset.severity = dto.severity;
+        const icon = node.querySelector(".notification-icon");
+        icon.setAttribute("name", ICONS[dto.severity] ?? "info");
+        const label = icon.getAttribute(`data-label-${String(dto.severity).toLowerCase()}`);
+        if (label) icon.setAttribute("title", label);
+        node.querySelector(".notification-title").textContent = dto.title;
+        node.querySelector(".notification-body").innerHTML = dto.bodyHtml ?? "";
+        const time = node.querySelector(".notification-date");
+        time.setAttribute("datetime", dto.createdAt);
+        time.textContent = formatRelative(dto.createdAt);
+        const cta = node.querySelector(".notification-cta");
+        if (dto.ctaUrl) {
+            cta.setAttribute("href", dto.ctaUrl);
+            cta.textContent = dto.ctaLabel || dto.ctaUrl;
+            cta.hidden = false;
+        } else {
+            cta.remove();
+        }
+        return node;
     }
 
-    function markReadInDom(notifId) {
-      var li = list.querySelector('li[data-id="' + cssEscape(notifId) + '"]');
-      if (li) li.classList.add('read');
+    const itemsOf = id => Array.from(document.querySelectorAll(".notification-item[data-id]")).filter(n => n.dataset.id === id);
+
+    /** Shows each list's empty text only while the list has no item. */
+    function syncEmpty() {
+        document.querySelectorAll(CONTAINERS).forEach(container => {
+            const empty = container.querySelector(".notification-empty");
+            if (empty) empty.hidden = container.querySelectorAll(".notification-item").length > 0;
+        });
     }
 
-    function markAllReadInDom() {
-      list.querySelectorAll('li').forEach(function (li) { li.classList.add('read'); });
+    function showSnackbar(text) {
+        const snackbar = document.createElement("mdui-snackbar");
+        snackbar.textContent = text;
+        snackbar.open = true;
+        snackbar.addEventListener("closed", () => snackbar.remove());
+        document.body.appendChild(snackbar);
     }
 
-    function removeFromDom(notifId) {
-      var li = list.querySelector('li[data-id="' + cssEscape(notifId) + '"]');
-      if (li) li.remove();
+    async function refresh() {
+        let response;
+        try {
+            response = await fetch("/spa/notifications/menu", { headers: { Accept: "text/html" } });
+        } catch {
+            return;
+        }
+        const target = document.getElementById("notifications-dropdown");
+        if (!response.ok || !target) return;
+        target.innerHTML = await response.text();
+        fillDates(target);
+        setUnread(Number(target.querySelector("#notifications-menu")?.dataset.unread ?? -1));
     }
 
-    function onEvent(msg) {
-      if (!msg) return;
-      switch (msg.name) {
-        case 'notification.snapshot':     populateSnapshot(msg.data); break;
-        case 'notification.created':      prependNotif(msg.data); setUnread(unread + 1); break;
-        case 'notification.read.changed': markReadInDom(msg.data.notificationId); setUnread(msg.data.unreadCount); break;
-        case 'notification.all.read':     markAllReadInDom(); setUnread(0); break;
-        case 'notification.deleted':      removeFromDom(msg.data.notificationId);
-                                          if (typeof msg.data.unreadCount === 'number') setUnread(msg.data.unreadCount);
-                                          break;
-      }
+    async function post(url) {
+        try {
+            const response = await CatapultCsrf.postJson(url);
+            if (!response.ok) refresh();
+        } catch {
+            refresh();
+        }
     }
 
-    var onBtnClick = function () { dropdown.hidden = !dropdown.hidden; };
-    var onMarkAllClick = function () {
-      if (window.catapultWs) window.catapultWs.command('notification.markAll');
-    };
-    var onListClick = function (ev) {
-      var b = ev.target.closest('button[data-action="read"]');
-      if (!b) return;
-      var id = b.parentElement.dataset.id;
-      if (window.catapultWs) window.catapultWs.command('notification.read', { notificationId: id });
-    };
-
-    btn.addEventListener('click', onBtnClick);
-    markAll.addEventListener('click', onMarkAllClick);
-    list.addEventListener('click', onListClick);
-
-    subscriptions.push(function () {
-      btn.removeEventListener('click', onBtnClick);
-      markAll.removeEventListener('click', onMarkAllClick);
-      list.removeEventListener('click', onListClick);
-    });
-
-    var subscribed = false;
-    function subscribe() {
-      if (subscribed || !window.catapultWs) return;
-      subscribed = true;
-      window.catapultWs.subscribe('notifications.user', onEvent);
-      subscriptions.push(function () {
-        window.catapultWs.unsubscribe('notifications.user', onEvent);
-        subscribed = false;
-      });
+    function markRead(id) {
+        itemsOf(id).forEach(n => { n.dataset.read = "true"; });
     }
 
-    var onAuthOk = function () { subscribe(); };
-    document.addEventListener('ws:auth.ok', onAuthOk, { once: true });
-    subscriptions.push(function () { document.removeEventListener('ws:auth.ok', onAuthOk); });
+    /** Marks an item read (once) and tells catapult-api. */
+    function read(node) {
+        if (node.dataset.read === "true") return;
+        markRead(node.dataset.id);
+        if (unread > 0) setUnread(unread - 1);
+        post(`/spa/notifications/${encodeURIComponent(node.dataset.id)}/read`);
+    }
 
-    // Immediate subscribe if WS is already connected and authenticated
-    subscribe();
-  }
+    /** Opens the item's CTA like its button does (new tab, noopener) unless the click was on the button itself. */
+    function followCta(node, target) {
+        const cta = node.querySelector(".notification-cta[href]");
+        if (cta && !target.closest(".notification-cta")) {
+            window.open(cta.getAttribute("href"), "_blank", "noopener");
+        }
+    }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
-  }
-  document.addEventListener('page:loaded', init);
-}());
+    function onClick(event) {
+        if (!(event.target instanceof Element)) return;
+        // The page's button sits in its header, outside the list: it works wherever it is.
+        if (event.target.closest("[data-notifications-read-all]")) {
+            document.querySelectorAll(".notification-item").forEach(n => { n.dataset.read = "true"; });
+            setUnread(0);
+            post("/spa/notifications/read-all");
+            return;
+        }
+        if (!event.target.closest(CONTAINERS)) return;
+        const node = event.target.closest(".notification-item");
+        if (event.target.closest("[data-link]") && bell()) bell().open = false;
+        if (!node) return;
+        read(node);
+        followCta(node, event.target);
+    }
+
+    function onKeydown(event) {
+        if ((event.key !== "Enter" && event.key !== " ") || !(event.target instanceof Element)) return;
+        const node = event.target.closest(CONTAINERS) && event.target.closest(".notification-item");
+        if (!node || event.target !== node) return;
+        event.preventDefault();
+        read(node);
+        followCta(node, node);
+    }
+
+    /** Puts a live item on top of a list (the menu keeps its newest MENU_SIZE), unless the list already shows it. */
+    function prepend(container, dto, max = Infinity) {
+        if (!container || Array.from(container.querySelectorAll(".notification-item")).some(n => n.dataset.id === dto.id)) return false;
+        const node = buildItem(dto);
+        if (!node) return false;
+        container.prepend(node);
+        container.querySelectorAll(".notification-item").forEach((n, i) => { if (i >= max) n.remove(); });
+        return true;
+    }
+
+    function onCreated(dto) {
+        // The page lists the newest first: a notification only belongs on top of its first page.
+        const page = document.getElementById("notifications-page");
+        const onPage = page?.dataset.page === "0" ? prepend(page, dto, PAGE_SIZE) : false;
+        const inMenu = prepend(list(), dto, MENU_SIZE);
+        if (!onPage && !inMenu && itemsOf(dto.id).length) return;
+        syncEmpty();
+        if (!dto.read && unread >= 0) setUnread(unread + 1);
+        const template = document.getElementById("notifications-menu")?.dataset.new;
+        showSnackbar(template ? template.replace("{0}", () => dto.title ?? "") : dto.title);
+    }
+
+    if (document.getElementById("notifications-dropdown")) {
+        document.addEventListener("click", onClick);
+        document.addEventListener("keydown", onKeydown);
+        CatapultLive.on("NotificationCreated", onCreated);
+        CatapultLive.on("NotificationRead", data => {
+            markRead(data.notificationId);
+            setUnread(data.unreadCount);
+        });
+        CatapultLive.on("NotificationDeleted", data => {
+            itemsOf(data.notificationId).forEach(n => n.remove());
+            syncEmpty();
+            setUnread(data.unreadCount);
+        });
+        CatapultLive.on("NotificationsAllRead", () => {
+            document.querySelectorAll(".notification-item").forEach(n => { n.dataset.read = "true"; });
+            setUnread(0);
+        });
+        document.addEventListener("catapult:render", () => {
+            const page = document.getElementById("notifications-page");
+            if (page) fillDates(page);
+        });
+        CatapultLive.onReopen(refresh);
+        refresh();
+    }
+
+    return { refresh, buildItem, fillDates, formatRelative, setUnread, showSnackbar };
+})();

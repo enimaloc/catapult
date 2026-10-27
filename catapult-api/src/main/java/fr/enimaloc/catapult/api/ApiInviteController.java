@@ -1,30 +1,31 @@
 package fr.enimaloc.catapult.api;
 
-import fr.enimaloc.catapult.domain.AlphaInvite;
-import fr.enimaloc.catapult.domain.AlphaInviteRedemption;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.UserAccountRepository;
-import fr.enimaloc.catapult.service.ExperimentService;
-import fr.enimaloc.catapult.service.InviteService;
+import fr.enimaloc.catapult.common.dto.InvitePageData;
+import fr.enimaloc.catapult.common.dto.InviteRedemptionDto;
+import fr.enimaloc.catapult.domain.access.AlphaInvite;
+import fr.enimaloc.catapult.domain.access.AlphaInviteRedemption;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.service.access.InviteService;
+import fr.enimaloc.catapult.service.experiment.ExperimentService;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/invite")
+@RequestMapping(ApiPaths.USER + "/invite")
 @RequiredArgsConstructor
 public class ApiInviteController {
 
@@ -33,15 +34,16 @@ public class ApiInviteController {
     static final String EVENT_LINK_REGENERATED = "invite_link_regenerated";
 
     private final InviteService inviteService;
-    private final UserAccountRepository userAccountRepository;
+    private final ApiUserResolver userResolver;
     private final ExperimentService experimentService;
 
     @Value("${app.web-url:}")
     private String webUrl;
 
+    @PreAuthorize("@authz.isSelf(#userId)")
     @GetMapping
-    public InvitePageData page(@AuthenticationPrincipal Jwt jwt) {
-        UserAccount user = resolveUser(jwt);
+    public InvitePageData page(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt) {
+        UserAccount user = userResolver.viewer(jwt);
         experimentService.track(user, EXPERIMENT_KEY, EVENT_PAGE_VIEW);
         Optional<AlphaInvite> inviteOpt = inviteService.getInvite(user);
         if (inviteOpt.isEmpty()) {
@@ -52,25 +54,17 @@ public class ApiInviteController {
         String inviteUrl = (webUrl != null && !webUrl.isBlank() ? webUrl : "") + "/join?invite=" + invite.getCode();
         return new InvitePageData(true, invite.getId(), invite.getCode(), inviteUrl,
             invite.getRegeneratedAt(), redemptions.stream()
-                .map(r -> new RedemptionDto(r.getInviteeTwitchId(), r.getRedeemedAt()))
+                .map(r -> new InviteRedemptionDto(r.getInviteeTwitchId(), r.getRedeemedAt()))
                 .toList());
     }
 
+    @PreAuthorize("@authz.isSelf(#userId)")
     @PostMapping("/regenerate")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void regenerate(@AuthenticationPrincipal Jwt jwt) {
-        UserAccount user = resolveUser(jwt);
+    public void regenerate(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt) {
+        UserAccount user = userResolver.viewer(jwt);
         inviteService.regenerateCode(user);
         experimentService.track(user, EXPERIMENT_KEY, EVENT_LINK_REGENERATED);
     }
 
-    private UserAccount resolveUser(Jwt jwt) {
-        return userAccountRepository.findById(UUID.fromString(jwt.getSubject()))
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
-    }
-
-    public record InvitePageData(boolean canInvite, UUID inviteId, String code, String inviteUrl,
-                                 Instant regeneratedAt, List<RedemptionDto> redemptions) {}
-
-    public record RedemptionDto(String inviteeTwitchId, Instant redeemedAt) {}
 }

@@ -7,12 +7,13 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.session.HttpSessionEventPublisher;
 
 /**
  * Handles the Twitch OAuth2 login flow for catapult-api.
- * Only /oauth2/** and /login/oauth2/** reach this filter chain (nginx routes them here).
+ * Only /oauth2/** and /login/oauth2/** reach this filter chain (catapult-web relays them here).
  * Everything else is handled by ApiSecurityConfig (/api/**) or catapult-web.
  */
 @Slf4j
@@ -43,8 +44,8 @@ public class SecurityConfig {
                         .userInfoEndpoint(userInfo -> userInfo.userService(oAuth2UserService))
                         .failureHandler(loginFailureHandler)
                 )
-                .csrf(csrf -> csrf.disable())
-                .logout(logout -> logout.disable());
+                .csrf(AbstractHttpConfigurer::disable)
+                .logout(AbstractHttpConfigurer::disable);
 
         return http.build();
     }

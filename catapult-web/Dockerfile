@@ -4,15 +4,19 @@ WORKDIR /app
 
 RUN apk add --no-cache git
 
-COPY gradlew settings.gradle.kts build.gradle.kts ./
+COPY gradlew settings.gradle.kts build.gradle.kts gradle.properties ./
 COPY gradle ./gradle
+COPY catapult-common/build.gradle.kts ./catapult-common/
 COPY catapult-api/build.gradle.kts ./catapult-api/
 COPY catapult-web/build.gradle.kts ./catapult-web/
 RUN ./gradlew :catapult-web:dependencies --no-daemon -q
 
+COPY catapult-common/src ./catapult-common/src
 COPY catapult-web/src ./catapult-web/src
 COPY .git ./.git
-RUN ./gradlew :catapult-web:build -x test --no-daemon
+# bootJar alone: the image has no Node, and `build` would run `check`, hence the Vitest suite (jsTest),
+# besides leaving a second (-plain) jar for the COPY below. The tests run in CI, not here.
+RUN ./gradlew :catapult-web:bootJar --no-daemon
 
 FROM eclipse-temurin:25-jre-alpine
 
@@ -26,6 +30,7 @@ RUN chown catapult:catapult app.jar
 
 USER catapult
 
-EXPOSE 8081
+# 8081: the site, 8092: the management port (actuator, Prometheus, the compose healthcheck)
+EXPOSE 8081 8092
 
 ENTRYPOINT ["java", "-jar", "app.jar"]

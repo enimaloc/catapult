@@ -1,14 +1,16 @@
 package fr.enimaloc.catapult.getter;
 
-import fr.enimaloc.catapult.domain.GameBinding;
-import fr.enimaloc.catapult.domain.MinecraftFriendLink;
-import fr.enimaloc.catapult.domain.MinecraftServiceAccount;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.MinecraftFriendLinkRepository;
-import fr.enimaloc.catapult.repository.MinecraftServiceAccountRepository;
-import fr.enimaloc.catapult.service.MinecraftGateService;
-import fr.enimaloc.catapult.service.MinecraftService;
-import fr.enimaloc.catapult.service.MinecraftTokenService;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.binding.GameBinding;
+import fr.enimaloc.catapult.domain.minecraft.MinecraftFriendLink;
+import fr.enimaloc.catapult.domain.minecraft.MinecraftServiceAccount;
+import fr.enimaloc.catapult.repository.minecraft.MinecraftFriendLinkRepository;
+import fr.enimaloc.catapult.repository.minecraft.MinecraftServiceAccountRepository;
+import fr.enimaloc.catapult.service.debug.BatchDebugFilter;
+import fr.enimaloc.catapult.service.debug.DebugRecording;
+import fr.enimaloc.catapult.service.minecraft.MinecraftGateService;
+import fr.enimaloc.catapult.service.minecraft.MinecraftService;
+import fr.enimaloc.catapult.service.minecraft.MinecraftTokenService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,17 +19,18 @@ import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Détecte si un utilisateur joue à Minecraft via la présence de ses amis
- * comptes de service. Un POST /presence par compte et par cycle couvre tous
- * les amis du compte (coût O(comptes), pas O(utilisateurs)).
- * Tout statut sauf OFFLINE compte comme « en jeu » — à condition que la
- * présence soit fraîche : un jeu fermé brutalement ne publie pas OFFLINE et
- * l'API continue de renvoyer le dernier statut connu (voir lastUpdated).
+ * Detects whether a user is playing Minecraft through the presence of their
+ * service-account friends. One POST /presence per account and per cycle covers all
+ * the account's friends (cost O(accounts), not O(users)).
+ * Any status except OFFLINE counts as "in game", provided the
+ * presence is fresh: a game closed abruptly does not publish OFFLINE and
+ * the API keeps returning the last known status (see lastUpdated).
  */
 @Slf4j
 @Component
@@ -41,11 +44,15 @@ public class MinecraftPresenceGetter implements GameGetter {
     private final MinecraftFriendLinkRepository linkRepository;
     private final MinecraftGateService gateService;
 
-    /** Au-delà de cet âge, une présence est considérée périmée (jeu fermé sans OFFLINE). */
+    /** Past this age, a presence is considered stale (game closed without OFFLINE). */
     @Value("${minecraft.presence-max-age-seconds:120}")
     long presenceMaxAgeSeconds = 120;
 
+    static final String PRESENCE_OPERATION = "minecraft.presence";
+
     private volatile Map<String, MinecraftService.PresenceStatus> cycleCache = Map.of();
+
+    private final DebugRecording debug;
 
     @Override
     public String name() {
@@ -61,23 +68,44 @@ public class MinecraftPresenceGetter implements GameGetter {
                 }
                 tokenService.getToken(account).ifPresent(token -> {
                     try {
-                        MinecraftService.PresenceList presences =
-                                minecraftService.updatePresence(token, MinecraftService.PresenceStatus.ONLINE);
+                        MinecraftService.PresenceList presences = debug.batch(PRESENCE_OPERATION,
+                                membersOf(account), BatchDebugFilter::minecraftPresence,
+                                () -> minecraftService.updatePresence(token, MinecraftService.PresenceStatus.ONLINE));
                         Instant staleBefore = Instant.now().minusSeconds(presenceMaxAgeSeconds);
                         for (MinecraftService.PresenceList.Presence presence : presences.presence()) {
                             if (presence.lastUpdated() != null && presence.lastUpdated().isBefore(staleBefore)) {
-                                continue; // présence périmée : le jeu ne la rafraîchit plus
+                                continue; // stale presence: the game no longer refreshes it
                             }
-                            // clé normalisée : le format d'UUID varie selon les endpoints Mojang
+                            // normalized key: the UUID format varies across the Mojang endpoints
                             cache.put(MinecraftService.normalizeProfileId(presence.profileId()), presence.status());
                         }
                     } catch (Exception e) {
-                        log.warn("Presence Minecraft en échec pour {}: {}", account.getLabel(), e.getMessage());
+                        log.warn("Minecraft presence failed for {}: {}", account.getLabel(), e.getMessage());
                     }
                 });
             }
             cycleCache = Map.copyOf(cache);
         });
+    }
+
+    /**
+     * The members befriended by {@code account}, known to its presence list by their profile id. Looked up only
+     * when someone is in debug mode: otherwise the poll does exactly what it did without it.
+     */
+    private List<DebugRecording.Member> membersOf(MinecraftServiceAccount account) {
+        if (!debug.anyMemberInDebug()) {
+            return List.of();
+        }
+        try {
+            return linkRepository.findByServiceAccount(account).stream()
+                    .filter(link -> link.getUser() != null && link.getMinecraftProfileId() != null)
+                    .map(link -> new DebugRecording.Member(link.getUser().getId(), link.getMinecraftProfileId()))
+                    .toList();
+        } catch (RuntimeException e) {
+            // the presence call goes on, unrecorded
+            log.warn("Could not list the members of {} for the debug recording: {}", account.getLabel(), e.toString());
+            return List.of();
+        }
     }
 
     public void clearCycleCache() {

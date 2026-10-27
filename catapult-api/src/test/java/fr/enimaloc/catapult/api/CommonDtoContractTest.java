@@ -1,0 +1,283 @@
+package fr.enimaloc.catapult.api;
+
+import fr.enimaloc.catapult.api.admin.ApiAdminDtddMappingController;
+import fr.enimaloc.catapult.api.admin.ApiAdminExperimentsController;
+import fr.enimaloc.catapult.api.admin.ApiAdminFlagsController;
+import fr.enimaloc.catapult.api.admin.ApiAdminMembersController;
+import fr.enimaloc.catapult.api.channel.ApiTwitchatWidgetController;
+import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
+import fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody;
+import fr.enimaloc.catapult.common.dto.admin.AudienceCountDto;
+import fr.enimaloc.catapult.common.dto.admin.AudienceCountRequest;
+import fr.enimaloc.catapult.common.dto.admin.DtddProposalDto;
+import fr.enimaloc.catapult.common.dto.admin.FlagKeyDto;
+import fr.enimaloc.catapult.common.dto.channel.ConfigResponse;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentAssignmentsDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentRebalanceDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentSettingsDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentSummaryDto;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.dtdd.DtddMappingProposal;
+import fr.enimaloc.catapult.domain.experiment.Experiment;
+import fr.enimaloc.catapult.domain.experiment.ExperimentVariant;
+import fr.enimaloc.catapult.repository.experiment.ExperimentOverrideRepository;
+import fr.enimaloc.catapult.repository.experiment.ExperimentRepository;
+import fr.enimaloc.catapult.domain.twitchat.TwitchatWidgetSettings;
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.repository.account.UserFlagRepository;
+import fr.enimaloc.catapult.repository.account.UserGroupRepository;
+import fr.enimaloc.catapult.repository.dtdd.DtddGameMappingRepository;
+import fr.enimaloc.catapult.repository.dtdd.DtddMappingProposalRepository;
+import fr.enimaloc.catapult.repository.dtdd.DtddTopicsCacheRepository;
+import fr.enimaloc.catapult.repository.twitchat.TwitchatWidgetSettingsRepository;
+import fr.enimaloc.catapult.security.TokenEncryptionService;
+import fr.enimaloc.catapult.service.account.AccountService;
+import fr.enimaloc.catapult.service.account.AdminMigrationService;
+import fr.enimaloc.catapult.service.account.BotToggleService;
+import fr.enimaloc.catapult.service.account.WidgetTokenService;
+import fr.enimaloc.catapult.service.binding.StreamStateService;
+import fr.enimaloc.catapult.service.notification.TwitchatActionExecutor;
+import org.junit.jupiter.api.Test;
+import org.springframework.core.env.Environment;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.json.JsonMapper;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+/**
+ * What catapult-api answers, once on the wire, reads back as the catapult-common type catapult-web
+ * deserializes it into, nothing lost: these endpoints used to answer JPA entities or look-alike
+ * records whose fields catapult-web's DTOs didn't match.
+ */
+class CommonDtoContractTest {
+
+    private static final JsonMapper JSON = JsonMapper.builder().build();
+
+    private static <T> T roundTrip(Object produced, Class<T> consumed) {
+        return JSON.readValue(JSON.writeValueAsString(produced), consumed);
+    }
+
+    @Test
+    void adminMembers_readAsAdminMembersPage() {
+        UserAccountRepository accounts = mock(UserAccountRepository.class);
+        StreamStateService streams = mock(StreamStateService.class);
+        Environment environment = mock(Environment.class);
+        UserAccount member = new UserAccount();
+        member.setId(UUID.randomUUID());
+        member.setTwitchId("42");
+        member.setTwitchUsername("streamer");
+        member.setProfileImageUrl("https://img/streamer");
+        member.setSteamId("7656");
+        member.setWidgetToken(UUID.randomUUID());
+        member.setCreatedAt(Instant.parse("2026-10-16T10:00:00Z"));
+        when(accounts.findMembersPage(org.mockito.ArgumentMatchers.any())).thenReturn(new org.springframework.data.domain.PageImpl<>(
+                List.of(member), org.springframework.data.domain.PageRequest.of(0, 50), 1));
+        when(streams.isLive(member)).thenReturn(true);
+        when(environment.getActiveProfiles()).thenReturn(new String[0]);
+        ApiAdminMembersController controller = new ApiAdminMembersController(
+                new fr.enimaloc.catapult.service.account.AdminMemberService(accounts, streams,
+                        mock(AccountService.class), mock(BotToggleService.class), mock(AdminMigrationService.class),
+                        environment, mock(UserFlagRepository.class), mock(UserGroupRepository.class),
+                        mock(fr.enimaloc.catapult.service.debug.MemberDebugService.class)));
+
+        AdminMembersPage produced = controller.page(0, null);
+        String json = JSON.writeValueAsString(produced);
+        AdminMembersPage read = JSON.readValue(json, AdminMembersPage.class);
+
+        assertThat(read).isEqualTo(produced);
+        assertThat(read.members().getFirst().twitchUsername()).isEqualTo("streamer");
+        assertThat(read.isLive(member.getId())).isTrue();
+        assertThat(read.totalElements()).isEqualTo(1);
+        assertThat(read.totalPages()).isEqualTo(1);
+        assertThat(json).doesNotContain(member.getWidgetToken().toString());
+    }
+
+    @Test
+    void dtddProposals_readAsDtddProposalDtos() {
+        DtddMappingProposalRepository proposals = mock(DtddMappingProposalRepository.class);
+        UserAccount proposer = new UserAccount();
+        proposer.setTwitchUsername("viewer");
+        DtddMappingProposal proposal = new DtddMappingProposal();
+        proposal.setId(UUID.randomUUID());
+        proposal.setIgdbId("100");
+        proposal.setProposedDtddId(1287L);
+        proposal.setProposer(proposer);
+        proposal.setReason("same game");
+        proposal.setStatus(DtddMappingProposal.Status.PENDING);
+        proposal.setCreatedAt(Instant.parse("2026-10-16T10:00:00Z"));
+        when(proposals.findByStatusOrderByCreatedAtAsc(DtddMappingProposal.Status.PENDING)).thenReturn(List.of(proposal));
+        ApiAdminDtddMappingController controller = new ApiAdminDtddMappingController(
+                new fr.enimaloc.catapult.service.dtdd.DtddMappingProposalService(
+                        mock(DtddGameMappingRepository.class),
+                        mock(fr.enimaloc.catapult.repository.dtdd.DtddGameCacheRepository.class), proposals,
+                        mock(DtddTopicsCacheRepository.class),
+                        mock(fr.enimaloc.catapult.service.dtdd.DtddMappingEvents.class),
+                        mock(fr.enimaloc.catapult.service.notification.AdminEventPublisher.class)),
+                mock(ApiUserResolver.class));
+
+        List<DtddProposalDto> produced = controller.pending("PENDING");
+        List<DtddProposalDto> read = JSON.readValue(JSON.writeValueAsString(produced), new TypeReference<>() {});
+
+        assertThat(read).isEqualTo(produced);
+        assertThat(read.getFirst().proposer().twitchUsername()).isEqualTo("viewer");
+    }
+
+    @Test
+    void twitchatWidgetConfig_readAsConfigResponse_branchIncluded() {
+        TwitchatWidgetSettingsRepository settingsRepository = mock(TwitchatWidgetSettingsRepository.class);
+        WidgetTokenService tokens = mock(WidgetTokenService.class);
+        UUID token = UUID.randomUUID();
+        UserAccount owner = new UserAccount();
+        owner.setId(UUID.randomUUID());
+        TwitchatWidgetSettings settings = new TwitchatWidgetSettings();
+        settings.setEnabled(true);
+        settings.setObsHost("127.0.0.1");
+        settings.setObsPort(4455);
+        settings.setTwitchatBranch("beta");
+        when(tokens.resolve(token)).thenReturn(Optional.of(owner));
+        when(settingsRepository.findById(owner.getId())).thenReturn(Optional.of(settings));
+        ApiTwitchatWidgetController controller = new ApiTwitchatWidgetController(
+                new fr.enimaloc.catapult.service.notification.TwitchatWidgetAccess(settingsRepository, tokens,
+                        mock(TokenEncryptionService.class),
+                        mock(fr.enimaloc.catapult.service.notification.NotificationDeliveryDispatcher.class)),
+                mock(TwitchatActionExecutor.class));
+
+        ConfigResponse produced = controller.config(token).getBody();
+
+        assertThat(roundTrip(produced, ConfigResponse.class))
+                .isEqualTo(new ConfigResponse("127.0.0.1", 4455, null, "beta"));
+    }
+
+    @Test
+    void adminExperiments_readAsSummaryAndSettingsDtos() {
+        ExperimentRepository experiments = mock(ExperimentRepository.class);
+        ExperimentOverrideRepository overrides = mock(ExperimentOverrideRepository.class);
+        Experiment experiment = new Experiment();
+        experiment.setId(UUID.randomUUID());
+        experiment.setKey("new-dashboard");
+        experiment.setName("New dashboard");
+        ExperimentVariant control = new ExperimentVariant();
+        control.setId(UUID.randomUUID());
+        control.setKey("old");
+        control.setName("Old");
+        control.setControl(true);
+        experiment.setVariants(new java.util.ArrayList<>(List.of(control)));
+        when(experiments.findAll()).thenReturn(List.of(experiment));
+        when(experiments.findById(experiment.getId())).thenReturn(Optional.of(experiment));
+        when(overrides.findByExperimentOrderByPriorityAsc(experiment)).thenReturn(List.of());
+        ApiAdminExperimentsController controller = new ApiAdminExperimentsController(
+                new fr.enimaloc.catapult.service.experiment.ExperimentAdminService(experiments,
+                null, null, null, null, null, overrides, null, null, null, null, null,
+                mock(fr.enimaloc.catapult.service.experiment.ForcedMembers.class)));
+
+        List<ExperimentSummaryDto> summaries = controller.list();
+        ExperimentSettingsDto settings = controller.settings(experiment.getId());
+
+        assertThat(JSON.readValue(JSON.writeValueAsString(summaries), new TypeReference<List<ExperimentSummaryDto>>() {}))
+                .isEqualTo(summaries);
+        assertThat(roundTrip(settings, ExperimentSettingsDto.class)).isEqualTo(settings);
+        assertThat(settings.variants().getFirst().control()).isTrue();
+    }
+
+    @Test
+    void adminFlags_readAsFlagKeyDtos() {
+        UserFlagRepository flags = mock(UserFlagRepository.class);
+        when(flags.findDistinctKeyValues()).thenReturn(List.of(
+                new Object[] {"beta", "on"}, new Object[] {"tester", null}));
+
+        List<FlagKeyDto> produced = new ApiAdminFlagsController(
+                new fr.enimaloc.catapult.service.account.AdminMemberService(mock(UserAccountRepository.class),
+                        mock(StreamStateService.class), mock(AccountService.class), mock(BotToggleService.class),
+                        mock(AdminMigrationService.class), mock(Environment.class), flags,
+                        mock(UserGroupRepository.class),
+                        mock(fr.enimaloc.catapult.service.debug.MemberDebugService.class))).list();
+
+        assertThat(JSON.readValue(JSON.writeValueAsString(produced), new TypeReference<List<FlagKeyDto>>() {}))
+                .containsExactly(new FlagKeyDto("beta", List.of("on")), new FlagKeyDto("tester", List.of()));
+    }
+
+    @Test
+    void experimentAssignments_readAsExperimentAssignmentsDto() {
+        Experiment experiment = new Experiment();
+        experiment.setId(UUID.randomUUID());
+        ExperimentVariant control = new ExperimentVariant();
+        control.setId(UUID.randomUUID());
+        control.setKey("old");
+        UserAccount member = new UserAccount();
+        member.setId(UUID.randomUUID());
+        member.setTwitchUsername("viewer");
+        fr.enimaloc.catapult.domain.experiment.ExperimentAssignment assignment =
+                new fr.enimaloc.catapult.domain.experiment.ExperimentAssignment();
+        assignment.setUser(member);
+        assignment.setVariant(control);
+        assignment.setAssignedAt(Instant.parse("2026-10-22T10:00:00Z"));
+        fr.enimaloc.catapult.repository.experiment.ExperimentAssignmentRepository assignments =
+                mock(fr.enimaloc.catapult.repository.experiment.ExperimentAssignmentRepository.class);
+        ExperimentRepository experiments = mock(ExperimentRepository.class);
+        ExperimentOverrideRepository overrides = mock(ExperimentOverrideRepository.class);
+        when(experiments.findById(experiment.getId())).thenReturn(Optional.of(experiment));
+        when(assignments.searchAll(org.mockito.ArgumentMatchers.eq(experiment), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(assignment),
+                        org.springframework.data.domain.PageRequest.of(0, 20), 41));
+        when(assignments.countByVariant(experiment)).thenReturn(java.util.Collections.singletonList(
+                new Object[] {control.getId(), 41L}));
+        experiment.setVariants(new java.util.ArrayList<>(List.of(control)));
+        when(overrides.findByExperimentOrderByPriorityAsc(experiment)).thenReturn(List.of());
+        ApiAdminExperimentsController controller = new ApiAdminExperimentsController(
+                new fr.enimaloc.catapult.service.experiment.ExperimentAdminService(experiments,
+                null, null, assignments, null, null, overrides, null, null, null, null, null,
+                mock(fr.enimaloc.catapult.service.experiment.ForcedMembers.class)));
+
+        ExperimentAssignmentsDto produced = controller.assignments(experiment.getId(), null, null, 0);
+
+        ExperimentAssignmentsDto read = roundTrip(produced, ExperimentAssignmentsDto.class);
+        assertThat(read).isEqualTo(produced);
+        assertThat(read.page().content()).singleElement().satisfies(a -> {
+            assertThat(a.twitchUsername()).isEqualTo("viewer");
+            assertThat(a.assignedAt()).isEqualTo(Instant.parse("2026-10-22T10:00:00Z"));
+        });
+        assertThat(read.page().totalElements()).isEqualTo(41);
+        assertThat(read.page().totalPages()).isEqualTo(3);
+        assertThat(read.counts()).containsEntry(control.getId(), 41L);
+    }
+
+    @Test
+    void experimentRebalance_readsAsExperimentRebalanceDto() {
+        ExperimentRebalanceDto produced = new ExperimentRebalanceDto(List.of(
+                new ExperimentRebalanceDto.Move(UUID.randomUUID(), UUID.randomUUID(), 100)));
+
+        assertThat(roundTrip(produced, ExperimentRebalanceDto.class)).isEqualTo(produced);
+        assertThat(roundTrip(new ExperimentRebalanceDto(List.of()), ExperimentRebalanceDto.class).moves()).isEmpty();
+    }
+
+    @Test
+    void notificationAudienceDtos_readBackWithTheirIds() {
+        UUID experiment = UUID.randomUUID();
+        UUID variant = UUID.randomUUID();
+
+        AudienceCountRequest request = new AudienceCountRequest(AdminNotificationCreateBody.EXPERIMENT, experiment, variant);
+        assertThat(roundTrip(request, AudienceCountRequest.class)).isEqualTo(request);
+        assertThat(roundTrip(new AudienceCountDto(42), AudienceCountDto.class)).isEqualTo(new AudienceCountDto(42));
+
+        AdminNotificationCreateBody body = new AdminNotificationCreateBody("T", "B",
+                fr.enimaloc.catapult.common.dto.notification.Severity.INFO, null, null, null, null,
+                AdminNotificationCreateBody.EXPERIMENT, experiment, null);
+        assertThat(roundTrip(body, AdminNotificationCreateBody.class)).isEqualTo(body);
+    }
+
+    @Test
+    void adminNotification_readsBackWithItsRecipientCount() {
+        var produced = new fr.enimaloc.catapult.common.dto.notification.AdminNotificationDto(UUID.randomUUID(), "T", "b", "<p>b</p>",
+                fr.enimaloc.catapult.common.dto.notification.Severity.INFO, null, null, null,
+                Instant.parse("2026-10-22T10:00:00Z"), "TARGETED", null, null, 3);
+
+        assertThat(roundTrip(produced, fr.enimaloc.catapult.common.dto.notification.AdminNotificationDto.class)).isEqualTo(produced);
+    }
+}

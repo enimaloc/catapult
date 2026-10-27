@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.service.notification;
 
-import fr.enimaloc.catapult.domain.Notification;
-import fr.enimaloc.catapult.repository.NotificationRepository;
+import fr.enimaloc.catapult.domain.notification.Notification;
+import fr.enimaloc.catapult.repository.notification.NotificationRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;

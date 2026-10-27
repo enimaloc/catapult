@@ -1,8 +1,8 @@
 package fr.enimaloc.catapult.experiment.provider;
 
-import fr.enimaloc.catapult.domain.Experiment;
-import fr.enimaloc.catapult.domain.ExperimentVariant;
-import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.experiment.Experiment;
+import fr.enimaloc.catapult.domain.experiment.ExperimentVariant;
 
 import java.util.List;
 import java.util.Optional;

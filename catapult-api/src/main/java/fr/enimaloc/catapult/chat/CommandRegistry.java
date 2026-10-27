@@ -1,10 +1,10 @@
 package fr.enimaloc.catapult.chat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import fr.enimaloc.catapult.domain.ChatCommandDefinition;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository;
-import fr.enimaloc.catapult.service.TwitchChatService;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.chatcommand.ChatCommandDefinition;
+import fr.enimaloc.catapult.repository.chatcommand.ChatCommandDefinitionRepository;
+import fr.enimaloc.catapult.service.twitch.TwitchChatService;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,9 +16,13 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Registre centralisé des commandes chat disponibles.
- * Toutes les implémentations de ChatCommand sont auto-découvertes par Spring.
- * Les commandes statiques sont prioritaires sur les commandes dynamiques (data-driven).
+ * Central registry of the available chat commands.
+ * Every ChatCommand implementation is auto-discovered by Spring.
+ * Static commands take priority over dynamic (data-driven) ones.
+ * <p>
+ * The chat command system is retired: no listener consumes {@link ChatCommandEvent} any more, so
+ * nothing calls {@link #dispatch} from chat. It is kept for the editor's test route until the
+ * system is removed.
  */
 @Slf4j
 @Component

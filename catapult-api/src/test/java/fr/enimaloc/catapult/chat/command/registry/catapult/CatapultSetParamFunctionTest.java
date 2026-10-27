@@ -1,8 +1,8 @@
 package fr.enimaloc.catapult.chat.command.registry.catapult;
 
-import fr.enimaloc.catapult.domain.ChatCommandSetting;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.ChatCommandSettingRepository;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.chatcommand.ChatCommandSetting;
+import fr.enimaloc.catapult.repository.chatcommand.ChatCommandSettingRepository;
 import org.junit.jupiter.api.Test;
 
 import java.util.Optional;

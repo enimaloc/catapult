@@ -1,9 +1,9 @@
 package fr.enimaloc.catapult.chat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository;
-import fr.enimaloc.catapult.service.TwitchChatService;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.repository.chatcommand.ChatCommandDefinitionRepository;
+import fr.enimaloc.catapult.service.twitch.TwitchChatService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -12,8 +12,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 class CommandRegistryTest {
@@ -223,7 +221,7 @@ class CommandRegistryTest {
     void builtin_commandUsesTheStreamerConfiguredPermissionInsteadOfTheHardcodedDefault() {
         // staticCmd's own hardcoded default is VIEWERS, but the streamer raised it to
         // BROADCASTER via the editor — CommandRegistry must read that override.
-        fr.enimaloc.catapult.domain.ChatCommandDefinition def = new fr.enimaloc.catapult.domain.ChatCommandDefinition();
+        fr.enimaloc.catapult.domain.chatcommand.ChatCommandDefinition def = new fr.enimaloc.catapult.domain.chatcommand.ChatCommandDefinition();
         def.setPermission(ChatCommandEvent.SenderRole.BROADCASTER);
         when(definitionRepository.findByUserAndPresetKey(user, "builtin:static")).thenReturn(Optional.of(def));
 

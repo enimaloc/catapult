@@ -1,0 +1,10 @@
+<!--/*@thymesVar id="navChannels" type="java.util.List<fr.enimaloc.catapult.common.dto.channel.ChannelDto>"*/-->
+<!--/* The navbar's channels (ModelFiller#navChannels); spa.js marks the open one active. */-->
+<th:block th:fragment="channels">
+    <a th:each="channel : ${navChannels}" data-link class="nav-channel"
+       th:href="|/channel/${channel.twitchUsername()}|" th:title="${channel.twitchUsername()}"
+       th:classappend="${channel.live()} ? 'live'">
+        <mdui-avatar th:src="${channel.profileImageUrl()}"></mdui-avatar>
+        <span th:text="${channel.twitchUsername()}">username</span>
+    </a>
+</th:block>

@@ -84,7 +84,7 @@ un ping passe dans la fenêtre 45s.
 
 ```bash
 # Sur Linux avec tc-netem :
-docker compose exec --user root catapult-router \
+docker compose exec --user root catapult-web \
   tc qdisc add dev eth0 root netem delay 5000ms
 ```
 
@@ -93,7 +93,7 @@ docker compose exec --user root catapult-router \
 - [ ] Cleanup :
 
   ```bash
-  docker compose exec --user root catapult-router \
+  docker compose exec --user root catapult-web \
     tc qdisc del dev eth0 root netem
   ```
 
@@ -113,14 +113,18 @@ fan-outés à tous les onglets.
 
 ## 7. Spam broadcast 100×
 
+catapult-web ne sert pas `/api/internal/**` : les appels visent catapult-api,
+depuis le réseau interne (par ex. `docker compose exec catapult-web curl …`),
+avec le JWT d'un admin dans `$ADMIN_JWT`.
+
 **But** : le rate limit admin (10/min) rejette les excédents avec 429.
 
 ```bash
 for i in $(seq 1 100); do
   curl -s -o /dev/null -w "%{http_code}\n" \
-    -X POST http://localhost/api/admin/broadcast \
+    -X POST http://catapult-api-internal:8080/api/internal/admin/broadcasts \
     -H 'Content-Type: application/json' \
-    -b "JSESSIONID=$ADMIN_COOKIE" \
+    -H "Authorization: Bearer $ADMIN_JWT" \
     -d '{"channel":"events.global","name":"alert.info",
          "data":{"title":"spam","body":"x","ttlSeconds":10}}'
 done | sort | uniq -c
@@ -135,9 +139,9 @@ done | sort | uniq -c
 client, pas `innerHTML`.
 
 ```bash
-curl -X POST http://localhost/api/admin/broadcast \
+curl -X POST http://catapult-api-internal:8080/api/internal/admin/broadcasts \
   -H 'Content-Type: application/json' \
-  -b "JSESSIONID=$ADMIN_COOKIE" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
   -d '{"channel":"events.global","name":"alert.info",
        "data":{"title":"<script>alert(1)</script>",
                "body":"<img src=x onerror=alert(2)>","ttlSeconds":10}}'

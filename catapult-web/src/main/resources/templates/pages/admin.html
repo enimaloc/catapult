@@ -1,0 +1,25 @@
+<!--/* Laid out like a channel's dashboard: a header, then one tab per admin section (mirrored in the hash). Members comes with the page; the other tabs load when first shown (admin-tabs.js). */-->
+<mdui-layout-main th:fragment="admin">
+    <section class="section channel-section">
+        <div class="section-header channel-header">
+            <div>
+                <span class="eyebrow" th:text="#{admin.eyebrow}">admin.eyebrow</span>
+                <h1 th:text="#{admin.title}">admin.title</h1>
+            </div>
+        </div>
+
+        <mdui-tabs id="admin-tabs" class="channel-tabs" value="members" placement="top" data-hash-tabs>
+            <th:block th:each="tab : ${ {'members', 'ccl', 'caches', 'data', 'meta', 'notifications', 'dtdd-mapping', 'game-mappings', 'groups', 'experiments', 'whitelist', 'keys', 'tw', 'broadcast'} }">
+                <mdui-tab th:value="${tab}"><th:block th:text="#{|admin.tab.${tab}|}">admin.tab</th:block><th:block th:replace="~{fragments/new-feature :: dot(|admin.${tab}|)}"></th:block></mdui-tab>
+            </th:block>
+
+            <th:block th:replace="~{pages/admin-tab/members::panel}"></th:block>
+
+            <!--/* Filled by admin-tabs.js from /spa/admin/{tab} the first time the tab is shown. */-->
+            <mdui-tab-panel slot="panel" th:each="tab : ${ {'ccl', 'caches', 'data', 'meta', 'notifications', 'dtdd-mapping', 'game-mappings', 'groups', 'experiments', 'whitelist', 'keys', 'tw', 'broadcast'} }" th:value="${tab}"
+                            data-admin-lazy th:attr="data-unavailable=#{admin.unavailable}">
+                <div class="admin-loading"><mdui-circular-progress></mdui-circular-progress></div>
+            </mdui-tab-panel>
+        </mdui-tabs>
+    </section>
+</mdui-layout-main>

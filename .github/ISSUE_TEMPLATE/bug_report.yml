@@ -28,8 +28,6 @@ body:
       options:
         - catapult-api
         - catapult-web
-        - catapult-maintenance
-        - nginx-router
         - Chat commands
         - Admin / CCL
         - Autre / inconnu

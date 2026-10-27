@@ -1,8 +1,9 @@
 package fr.enimaloc.catapult.getter;
 
-import fr.enimaloc.catapult.domain.GetterConfig;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.GetterConfigRepository;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.binding.GetterConfig;
+import fr.enimaloc.catapult.getter.steam.SteamGameGetter;
+import fr.enimaloc.catapult.repository.binding.GetterConfigRepository;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
@@ -15,9 +16,9 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Orchestre la chaîne de game getters selon l'ordre de priorité de l'utilisateur.
- * S'arrête au premier getter retournant un résultat.
- * En cas d'erreur sur un getter, passe au suivant sans interrompre le cycle.
+ * Runs the chain of game getters in the user's priority order.
+ * Stops at the first getter that returns a result.
+ * When a getter fails, moves on to the next without interrupting the cycle.
  */
 @Slf4j
 @Service
@@ -59,7 +60,7 @@ public class GameGetterChain {
 
     private void stopSample(Timer.Sample sample, String resolvedBy) {
         sample.stop(Timer.builder("catapult.game.detection.duration")
-                .description("Durée de la chaîne de détection de jeu")
+                .description("Duration of the game detection chain")
                 .tag("resolved_by", resolvedBy)
                 .register(meterRegistry));
     }

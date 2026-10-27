@@ -1,12 +1,11 @@
 package fr.enimaloc.catapult.service.notification;
 
+import fr.enimaloc.catapult.common.event.ChannelEvents;
 import fr.enimaloc.catapult.service.metrics.CatapultApiMetrics;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.json.JsonMapper;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -16,11 +15,12 @@ import java.util.UUID;
  * Publishes events to Redis pub/sub channels consumed by catapult-web's
  * {@code RedisEventSubscriber} and fanned out to WebSocket sessions.
  *
- * Channels:
+ * <p>Channels:
  * <ul>
  *   <li>{@code catapult:events:global} — broadcast to every connected client</li>
  *   <li>{@code catapult:events:user:{uuid}} — targeted to a single user's sessions</li>
  *   <li>{@code catapult:events:admin} — broadcast restricted to admin role</li>
+ *   <li>{@code catapult:events:notification-delivery} — members with Twitchat notifications waiting</li>
  * </ul>
  */
 @Slf4j
@@ -36,17 +36,12 @@ public class RedisEventPublisher {
     private final StringRedisTemplate redis;
     private final ObjectMapper jackson;
 
-    @Autowired(required = false)
-    private CatapultApiMetrics apiMetrics;
+    private final CatapultApiMetrics apiMetrics;
 
-    public RedisEventPublisher(StringRedisTemplate redis) {
-        this(redis, JsonMapper.builder().build());
-    }
-
-    @Autowired(required = false)
-    public RedisEventPublisher(StringRedisTemplate redis, ObjectMapper jackson) {
+    public RedisEventPublisher(StringRedisTemplate redis, ObjectMapper jackson, CatapultApiMetrics apiMetrics) {
         this.redis = redis;
-        this.jackson = jackson != null ? jackson : JsonMapper.builder().build();
+        this.jackson = jackson;
+        this.apiMetrics = apiMetrics;
     }
 
     public void publishGlobal(String name, Object data) {
@@ -69,6 +64,11 @@ public class RedisEventPublisher {
         publish(CHANNEL_TWITCHAT_PREFIX + channelOwnerId, name, data);
     }
 
+    /** Members whose Twitchat has notifications waiting: one channel for all of them (see ChannelEvents). */
+    public void publishNotificationDelivery(String name, Object data) {
+        publish(ChannelEvents.NOTIFICATION_DELIVERY_REDIS_CHANNEL, name, data);
+    }
+
     private void publish(String channel, String name, Object data) {
         try {
             // LinkedHashMap so the JSON keeps a stable order: {name, data, ts}
@@ -78,7 +78,7 @@ public class RedisEventPublisher {
             envelope.put("ts", System.currentTimeMillis());
             String json = jackson.writeValueAsString(envelope);
             redis.convertAndSend(channel, json);
-            if (apiMetrics != null) apiMetrics.recordRedisPublished(channel);
+            apiMetrics.recordRedisPublished(channel);
         } catch (Exception e) {
             log.error("Failed to publish event '{}' to {}: {}", name, channel, e.getMessage(), e);
         }

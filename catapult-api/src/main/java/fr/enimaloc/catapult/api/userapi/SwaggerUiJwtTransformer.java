@@ -6,6 +6,7 @@ import org.springdoc.core.properties.SwaggerUiOAuthProperties;
 import org.springdoc.core.providers.ObjectMapperProvider;
 import org.springdoc.webmvc.ui.SwaggerIndexPageTransformer;
 import org.springdoc.webmvc.ui.SwaggerWelcomeCommon;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
@@ -20,15 +21,20 @@ import java.nio.charset.StandardCharsets;
  * Swaps the generic backdoor "uuid" example for the caller's own widget token, entirely
  * client-side: the dashboard (twitchat-settings.html) already writes it to
  * {@code localStorage['catapult_widget_uuid']} for a logged-in user, and this page is same-origin
- * with it (both sit behind nginx on the same host) — no server round-trip, no auth token of any
+ * with it (both are served on the same host, catapult-web relaying Swagger) — no server round-trip, no auth token of any
  * kind ever touches this feature.
  *
  * <p>Registering this as a bean overrides springdoc's own {@code SwaggerIndexTransformer}
  * (it's declared {@code @ConditionalOnMissingBean}) — everything not touched here (css, other
  * assets, oauth2-redirect handling, ...) still goes through the inherited default behavior.
+ *
+ * <p>Same activation conditions as springdoc's own SwaggerConfig: outside a servlet web
+ * application (e.g. a {@code webEnvironment = NONE} test context) or with Swagger UI disabled,
+ * the properties beans this extends aren't registered at all.
  */
 @Component
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
+@ConditionalOnProperty(name = "springdoc.swagger-ui.enabled", matchIfMissing = true)
 public class SwaggerUiJwtTransformer extends SwaggerIndexPageTransformer {
 
     private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();

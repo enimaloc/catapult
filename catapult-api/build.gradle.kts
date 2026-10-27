@@ -2,9 +2,8 @@ import java.time.Instant
 
 plugins {
     java
-    jacoco
-    id("org.springframework.boot") version "4.1.2"
-    id("io.spring.dependency-management") version "1.1.7"
+    id("org.springframework.boot")
+    id("io.spring.dependency-management")
     id("org.sonarqube") version "7.5.0.8588"
 }
 
@@ -32,6 +31,8 @@ val commonmarkVersion = "0.31.0"
 val springCloudContextVersion = "5.0.4"
 
 dependencies {
+    implementation(project(":catapult-common"))
+
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
@@ -55,6 +56,10 @@ dependencies {
     implementation("com.github.growthbook:growthbook-sdk-java:$growthbookVersion")
     implementation("com.ibm.icu:icu4j:$icuVersion")
     implementation("io.micrometer:micrometer-registry-prometheus")
+    // Sentry, only for the members in debug mode (see DebugSentryConfig)
+    implementation(platform("io.sentry:sentry-bom:8.60.0"))
+    implementation("io.sentry:sentry-spring-boot-4-starter")
+    implementation("io.sentry:sentry-logback")
     implementation("org.jsoup:jsoup:$jsoupVersion")
     implementation("org.commonmark:commonmark:$commonmarkVersion")
     implementation("org.springframework.cloud:spring-cloud-context:$springCloudContextVersion")
@@ -84,7 +89,9 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
     testImplementation("org.testcontainers:testcontainers-junit-jupiter")
+    testImplementation("org.testcontainers:testcontainers-postgresql")
     testImplementation("com.squareup.okhttp3:mockwebserver:5.4.0")
+    testImplementation("net.ttddyy:datasource-proxy:1.11.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
@@ -107,15 +114,30 @@ tasks.processResources {
 
 tasks.withType<Test> {
     useJUnitPlatform()
-    finalizedBy(tasks.jacocoTestReport)
 }
 
-tasks.jacocoTestReport {
-    dependsOn(tasks.withType<Test>())
-    reports {
-        xml.required = true
-        html.required = true
+tasks.test {
+    // EnglishConventionsTest has its own task: it reads the sibling modules' sources
+    filter.excludeTestsMatching("*EnglishConventionsTest")
+}
+
+// EnglishConventionsTest reads the sibling modules' sources: only this task reruns when they change
+val englishConventions = tasks.register<Test>("englishConventions") {
+    description = "Checks that the code, comments, logs and test names of every module are written in English."
+    group = "verification"
+    val testSourceSet = sourceSets.test.get()
+    testClassesDirs = testSourceSet.output.classesDirs
+    classpath = testSourceSet.runtimeClasspath
+    filter.includeTestsMatching("*EnglishConventionsTest")
+    listOf("catapult-common", "catapult-web").forEach { module ->
+        inputs.dir(rootProject.file("$module/src"))
+            .withPropertyName("${module}Sources")
+            .withPathSensitivity(PathSensitivity.RELATIVE)
     }
+}
+
+tasks.check {
+    dependsOn(englishConventions)
 }
 
 springBoot {

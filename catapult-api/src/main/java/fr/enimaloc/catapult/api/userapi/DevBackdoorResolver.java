@@ -1,9 +1,9 @@
 package fr.enimaloc.catapult.api.userapi;
 
-import fr.enimaloc.catapult.domain.GameBinding;
+import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.getter.DetectedGame;
-import fr.enimaloc.catapult.service.SteamStoreService;
-import fr.enimaloc.catapult.service.XboxStoreService;
+import fr.enimaloc.catapult.service.steam.SteamStoreService;
+import fr.enimaloc.catapult.service.xbox.XboxStoreService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -36,8 +36,8 @@ public class DevBackdoorResolver {
     private final SteamStoreService steamStoreService;
     private final XboxStoreService xboxStoreService;
 
-    private static final long BACKDOOR_MASK_PREMIER_ENTIER = 0x000F000000000000L;
-    private static final long BACKDOOR_MASK_SECOND_ENTIER = 0x0000FFFFFFFFFFFFL;
+    private static final long BACKDOOR_MASK_SOURCE_TYPE = 0x000F000000000000L;
+    private static final long BACKDOOR_MASK_LSB_PAYLOAD = 0x0000FFFFFFFFFFFFL;
     private static final long BACKDOOR_MASK_VALIDATION = 0xFFF0000000000000L;
     private static final long BACKDOOR_MASK_MSB_VALIDATION = 0xFFFFFFFFFFFF8000L;
     private static final long BACKDOOR_MASK_MSB_PAYLOAD = 0x0000000000007FFFL;
@@ -47,12 +47,12 @@ public class DevBackdoorResolver {
                 || (uuid.getLeastSignificantBits() & BACKDOOR_MASK_VALIDATION) != 0L) {
             return Optional.empty();
         }
-        GameBinding.SourceType type = switch ((int) ((uuid.getLeastSignificantBits() & BACKDOOR_MASK_PREMIER_ENTIER) >>> 48)) {
+        GameBinding.SourceType type = switch ((int) ((uuid.getLeastSignificantBits() & BACKDOOR_MASK_SOURCE_TYPE) >>> 48)) {
             case 1 -> GameBinding.SourceType.STEAM;
             case 2 -> GameBinding.SourceType.XBOX;
             default -> GameBinding.SourceType.MANUAL;
         };
-        long lowPayload = uuid.getLeastSignificantBits() & BACKDOOR_MASK_SECOND_ENTIER;
+        long lowPayload = uuid.getLeastSignificantBits() & BACKDOOR_MASK_LSB_PAYLOAD;
         String sourceId;
         if (type == GameBinding.SourceType.XBOX) {
             long highPayload = uuid.getMostSignificantBits() & BACKDOOR_MASK_MSB_PAYLOAD;
@@ -86,7 +86,7 @@ public class DevBackdoorResolver {
             return switch (type) {
                 case STEAM -> {
                     long payload = Long.parseLong(sourceId);
-                    if (payload < 0 || (payload & ~BACKDOOR_MASK_SECOND_ENTIER) != 0) {
+                    if (payload < 0 || (payload & ~BACKDOOR_MASK_LSB_PAYLOAD) != 0) {
                         yield Optional.empty(); // negative, or doesn't fit the 48-bit low payload
                     }
                     yield Optional.of(new UUID(0L, (1L << 48) | payload));
@@ -96,7 +96,7 @@ public class DevBackdoorResolver {
                     if (payload < 0) {
                         yield Optional.empty(); // shouldn't happen: 36^12 < 2^63, see class javadoc
                     }
-                    long lowPayload = payload & BACKDOOR_MASK_SECOND_ENTIER;
+                    long lowPayload = payload & BACKDOOR_MASK_LSB_PAYLOAD;
                     long highPayload = (payload >>> 48) & BACKDOOR_MASK_MSB_PAYLOAD;
                     yield Optional.of(new UUID(highPayload, (2L << 48) | lowPayload));
                 }

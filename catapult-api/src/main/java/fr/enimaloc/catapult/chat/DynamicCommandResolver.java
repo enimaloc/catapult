@@ -3,12 +3,12 @@ package fr.enimaloc.catapult.chat;
 import fr.enimaloc.catapult.chat.command.js.JsCompiler;
 import fr.enimaloc.catapult.chat.command.js.SandboxExecutor;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
-import fr.enimaloc.catapult.domain.ChatCommandDefinition;
-import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.chatcommand.ChatCommandDefinition;
 import fr.enimaloc.catapult.event.ChatCommandDefinitionChangedEvent;
-import fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository;
-import fr.enimaloc.catapult.repository.ChatCommandSettingRepository;
-import fr.enimaloc.catapult.service.GameContextService;
+import fr.enimaloc.catapult.repository.chatcommand.ChatCommandDefinitionRepository;
+import fr.enimaloc.catapult.repository.chatcommand.ChatCommandSettingRepository;
+import fr.enimaloc.catapult.service.binding.GameContextService;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
@@ -74,13 +74,13 @@ public class DynamicCommandResolver {
         return repository.findByUserAndName(user, name)
             .filter(ChatCommandDefinition::isEnabled)
             .map(def -> {
-                // Si la ligne est un built-in renommé, on route vers le bean
-                // Java statique correspondant (sinon l'action serait perdue).
+                // If the row is a renamed built-in, route it to the matching static
+                // Java bean (otherwise the action would be lost).
                 if (ChatCommandPresetCatalog.isBuiltin(def)) {
                     ChatCommand bean = staticByPresetKey.get(def.getPresetKey());
                     if (bean != null) return bean;
                 }
-                return (ChatCommand) new DynamicChatCommand(
+                return new DynamicChatCommand(
                     def, jsCompiler, sandboxExecutor, serviceFunctionRegistry,
                     gameContextService, placeholderResolver, resolveLocale(user), settingRepository,
                     repository, meterRegistry);

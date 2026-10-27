@@ -11,7 +11,7 @@ import java.util.List;
 /**
  * Pins the OpenAPI "servers" entry (and so Swagger UI's "Try it out" target and the base URL
  * shown in /v3/api-docs) to {@code app.base-url} instead of springdoc's default of deriving it
- * from the incoming request's Host header — the app sits behind an nginx router forwarding
+ * from the incoming request's Host header — the app sits behind catapult-web's relay and a TLS proxy forwarding
  * multiple hostnames/paths, so the request-derived guess doesn't reliably match the public URL.
  *
  * <p>See {@link SwaggerUiJwtTransformer} for how the "uuid" example is personalized for a logged-in
