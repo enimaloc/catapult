@@ -1163,14 +1163,6 @@ a[data-link].active {
     gap: 14px;
 }
 
-/* Custom bindings: a binding's button, its badge and its "Deactivate"; the active one is told by its filled button. */
-.custom-binding-row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px;
-}
-
 #custom-bindings-error {
     margin: 0;
     color: rgb(var(--mdui-color-error));
@@ -1264,7 +1256,7 @@ a[data-link].active {
 
 /* Bindings list */
 
-#channel-bindings-list {
+:is(#channel-bindings-list, #channel-custom-bindings-list) {
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -1273,7 +1265,7 @@ a[data-link].active {
     list-style: none;
 }
 
-#channel-bindings-list mdui-list-item {
+:is(#channel-bindings-list, #channel-custom-bindings-list) mdui-list-item {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
@@ -1285,18 +1277,18 @@ a[data-link].active {
     transition: border-color 150ms ease;
 }
 
-#channel-bindings-list mdui-list-item:hover {
+:is(#channel-bindings-list, #channel-custom-bindings-list) mdui-list-item:hover {
     border-color: var(--catapult-border-hover);
 }
 
 /* An open row's header and body read as one card: square their joined corners.
  * .is-open is set by the server (current game) and by channel-bindings.js. */
-#channel-bindings-list mdui-collapse-item.is-open > mdui-list-item[slot="header"] {
+:is(#channel-bindings-list, #channel-custom-bindings-list) mdui-collapse-item.is-open > mdui-list-item[slot="header"] {
     border-bottom-left-radius: 0;
     border-bottom-right-radius: 0;
 }
 
-#channel-bindings-list mdui-collapse-item.is-open > mdui-list-item:not([slot="header"]) {
+:is(#channel-bindings-list, #channel-custom-bindings-list) mdui-collapse-item.is-open > mdui-list-item:not([slot="header"]) {
     border-top-left-radius: 0;
     border-top-right-radius: 0;
 }
@@ -1310,17 +1302,17 @@ a[data-link].active {
  * edit/tw grids below — stays only as wide as its content instead of filling
  * the card.
  */
-#channel-bindings-list mdui-list-item::part(container) {
+:is(#channel-bindings-list, #channel-custom-bindings-list) mdui-list-item::part(container) {
     width: 100%;
 }
 
-#channel-bindings-list mdui-list-item > span:first-child {
+:is(#channel-bindings-list, #channel-custom-bindings-list) mdui-list-item > span:first-child {
     color: var(--catapult-text);
     font-weight: 600;
     margin-right: auto;
 }
 
-#channel-bindings-list mdui-list-item > span:not(:first-child) {
+:is(#channel-bindings-list, #channel-custom-bindings-list) mdui-list-item > span:not(:first-child) {
     padding: 3px 10px;
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.05);
@@ -1347,6 +1339,30 @@ a[data-link].active {
 .binding-tw-panel > label:first-child,
 .binding-tw-panel .binding-tw-reset-btn {
     grid-column: 1 / -1;
+}
+
+/* Custom bindings: the associations' list and panels, plus a name field, panel titles and the actions row
+ * spanning the whole width; the active binding's pill is tinted. */
+.binding-edit-panel .custom-binding-name,
+.custom-binding-panel-title,
+.custom-binding-actions {
+    grid-column: 1 / -1;
+}
+
+.custom-binding-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+#channel-custom-bindings-list mdui-list-item > span.custom-binding-active-chip {
+    background-color: rgba(139, 92, 246, 0.16);
+    color: var(--catapult-text);
+}
+
+#custom-binding-new-btn {
+    margin-top: 14px;
 }
 
 /* Bindings pagination */
@@ -1686,7 +1702,7 @@ mdui-select::part(menu) {
         padding: 20px;
     }
 
-    #channel-bindings-list mdui-list-item {
+    :is(#channel-bindings-list, #channel-custom-bindings-list) mdui-list-item {
         padding: 14px 16px;
     }
 

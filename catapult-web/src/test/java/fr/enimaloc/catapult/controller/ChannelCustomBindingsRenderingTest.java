@@ -33,8 +33,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * The custom bindings cards of the channel page: the overview's buttons and the settings' management and API token
- * cards exist for the owner while the experiment is open to the channel, and nowhere else.
+ * The custom bindings of the channel page: the overview's list (under the associations, shaped like them) and the
+ * Account tab's API token card exist for the owner while the experiment is open to the channel, and nowhere else.
  */
 @WebMvcTest(controllers = {IndexController.class, SpaFragmentController.class})
 @Import({ModelFiller.class, WebSecurityConfig.class, TwitchatCatalogConfig.class})
@@ -72,46 +72,93 @@ class ChannelCustomBindingsRenderingTest {
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
     }
 
-    @Test
-    void ownerWithTheExperimentOpen_getsTheButtonsTheManagementAndTheTokenCard() throws Exception {
-        String html = render(true, state());
-
-        assertThat(html).contains("id=\"channel-custom-bindings-card\"", "id=\"channel-custom-bindings-settings\"",
-                "id=\"channel-api-token-card\"", "id=\"custom-bindings-error\"");
-        assertThat(html).contains("data-custom-binding-id=\"" + ART + "\"", "data-custom-binding-id=\"" + DEV + "\"");
-        assertThat(html).contains("Développement", "Uninterruptible", "Deactivate");
-        // The active binding is the highlighted one, the other one is not.
-        assertThat(html).containsPattern("custom-binding-row is-active[^>]*data-custom-binding-id=\"" + ART)
-                .doesNotContainPattern("custom-binding-row is-active[^>]*data-custom-binding-id=\"" + DEV);
-        assertThat(html).contains("20 bindings maximum", "Twitch did not apply the category");
+    private static String panel(String html, String tab) {
+        int start = html.indexOf("<mdui-tab-panel slot=\"panel\" value=\"" + tab + "\"");
+        assertThat(start).as("%s panel", tab).isNotNegative();
+        int end = html.indexOf("</mdui-tab-panel>", start);
+        return html.substring(start, end);
     }
 
     @Test
-    void theTokenCardIsInTheAccountTab_andNoLongerInTheSettingsTab() throws Exception {
+    void ownerWithTheExperimentOpen_getsTheListUnderTheAssociations() throws Exception {
+        String overview = panel(render(true, state()), "overview");
+
+        int associations = overview.indexOf("id=\"channel-bindings-list\"");
+        int list = overview.indexOf("id=\"channel-custom-bindings-list\"");
+        assertThat(associations).isNotNegative();
+        assertThat(list).isGreaterThan(associations);
+        assertThat(overview).contains("id=\"custom-binding-new-btn\"", "id=\"custom-bindings-error\"",
+                "id=\"custom-binding-delete-dialog\"", "custom-binding-new", "Custom bindings", "New");
+        assertThat(overview).contains("data-custom-binding-id=\"" + ART + "\"", "data-custom-binding-id=\"" + DEV + "\"");
+        // Each row's form is pre-filled with the binding, with the category search of the associations.
+        assertThat(overview).contains("value=\"Développement\"", "value=\"1469308723\"",
+                "binding-edit-game-input custom-binding-game-input", "value=\"Software and Game Development\"");
+        assertThat(overview).contains("Activate", "Deactivate", "Save", "Delete");
+        assertThat(overview).contains("20 bindings maximum", "Twitch did not apply the category",
+                "Another custom binding already has this name");
+        // The empty notice is hidden while bindings exist.
+        assertThat(overview).containsPattern("id=\"channel-custom-bindings-empty\"[^>]*class=\"hidden\"");
+    }
+
+    @Test
+    void theActiveRowIsMarked_andOnlyTheUninterruptibleOneHasTheChip() throws Exception {
+        String overview = panel(render(true, state()), "overview");
+        String art = row(overview, ART);
+        String dev = row(overview, DEV);
+
+        assertThat(art).containsPattern("class=\"custom-binding-item is-active\"")
+                .contains("<span class=\"custom-binding-active-chip\">Active</span>")
+                .doesNotContain("custom-binding-uninterruptible-chip")
+                .containsPattern("class=\"custom-binding-activate hidden\"")
+                .containsPattern("class=\"custom-binding-stop\"");
+        assertThat(dev).doesNotContain("is-active")
+                .contains("<span class=\"custom-binding-active-chip hidden\">Active</span>")
+                .contains("custom-binding-uninterruptible-chip\">Uninterruptible</span>")
+                .containsPattern("class=\"custom-binding-activate\"")
+                .containsPattern("class=\"custom-binding-stop hidden\"");
+    }
+
+    private static String row(String overview, UUID id) {
+        int start = overview.lastIndexOf("<mdui-collapse-item", overview.indexOf("data-custom-binding-id=\"" + id + "\""));
+        return overview.substring(start, overview.indexOf("</mdui-collapse-item>", start));
+    }
+
+    @Test
+    void noBindingsYet_showsTheEmptyNoticeAndTheNewRowOnly() throws Exception {
+        String overview = panel(render(true, new CustomBindingsStateDto(true, List.of(), null, null)), "overview");
+
+        assertThat(overview).contains("id=\"channel-custom-bindings-list\"", "No custom bindings yet.")
+                .doesNotContain("data-custom-binding-id")
+                .doesNotContainPattern("id=\"channel-custom-bindings-empty\"[^>]*class=\"hidden\"");
+    }
+
+    @Test
+    void theOldCardsAreGone_andTheTokenCardStaysInTheAccountTab() throws Exception {
         String html = render(true, state());
-        int account = html.indexOf("<mdui-tab-panel slot=\"panel\" value=\"account\"");
-        int settings = html.indexOf("<mdui-tab-panel slot=\"panel\" value=\"settings\"");
+
+        assertThat(html).doesNotContain("channel-custom-bindings-card", "channel-custom-bindings-settings",
+                "custom-binding-row", "custom-binding-trigger");
+        assertThat(panel(html, "settings")).doesNotContain("custom-binding");
+        assertThat(panel(html, "account")).contains("id=\"channel-api-token-card\"");
         int token = html.indexOf("id=\"channel-api-token-card\"");
-
-        assertThat(account).isPositive();
-        assertThat(settings).isNotNegative();
-        assertThat(token).isGreaterThan(account);
         assertThat(html.indexOf("id=\"channel-api-token-card\"", token + 1)).isNegative();
-        // The settings panel keeps the management card but not the token one.
-        assertThat(html.substring(settings, account)).contains("channel-custom-bindings-settings")
-                .doesNotContain("channel-api-token-card");
     }
 
     @Test
-    void experimentClosed_hidesEveryCard() throws Exception {
+    void experimentClosed_hidesEverything() throws Exception {
         assertThat(render(true, null))
-                .doesNotContain("channel-custom-bindings-card").doesNotContain("channel-custom-bindings-settings")
+                .doesNotContain("channel-custom-bindings-list").doesNotContain("custom-binding-new-btn")
                 .doesNotContain("channel-api-token-card").doesNotContain("custom-binding");
     }
 
     @Test
-    void aModerator_getsNoCard() throws Exception {
-        assertThat(render(false, null)).doesNotContain("channel-custom-bindings-card").doesNotContain("channel-api-token-card");
+    void aModerator_getsNothing() throws Exception {
+        assertThat(render(false, null)).doesNotContain("channel-custom-bindings-list").doesNotContain("channel-api-token-card");
+    }
+
+    @Test
+    void aModeratorIsShownNothing_evenWhenGivenTheBindings() throws Exception {
+        assertThat(render(false, state())).doesNotContain("channel-custom-bindings-list");
     }
 
     @Test
@@ -124,6 +171,7 @@ class ChannelCustomBindingsRenderingTest {
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
 
         assertThat(html).contains("Reconnecte ton compte Twitch", "Catapult est en pause sur cette chaîne",
-                "20 bindings maximum", "Twitch n&#39;a pas appliqué la catégorie");
+                "20 bindings maximum", "Twitch n&#39;a pas appliqué la catégorie", "Nouveau", "Activer",
+                "Bindings personnalisés");
     }
 }
