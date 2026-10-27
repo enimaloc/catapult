@@ -113,6 +113,18 @@ class IgdbServiceTest {
     }
 
     @Test
+    void findBySteamAppId_noSecret_answersFromTheDbCacheAlone_withoutAskingForAToken() {
+        ReflectionTestUtils.setField(igdbService, "clientSecret", "");
+        when(steamStoreService.resolveEffectiveApp(any())).thenReturn(Optional.empty());
+        when(cacheRepository.findById("steam:504230"))
+                .thenReturn(Optional.of(new IgdbGameCacheEntry("steam:504230", "26226", "Celeste")));
+
+        assertThat(igdbService.findBySteamAppId("504230")).contains(new IgdbService.IgdbGame("26226", "Celeste"));
+        assertThat(igdbService.findBySteamAppId("1")).isEmpty();
+        verifyNoInteractions(restClient, igdbClient);
+    }
+
+    @Test
     void findTwitchGameId_noTwitchSource_returnsEmpty() {
         ReflectionTestUtils.setField(igdbService, "twitchSourceId", -1L);
 

@@ -583,6 +583,8 @@ public class IgdbService {
         if (appAccessToken != null && Instant.now().isBefore(tokenExpiresAt.minusSeconds(60))) {
             return appAccessToken;
         }
+        // without a secret no token can be had: only the DB cache answers (the perf profile's)
+        if (clientSecret.isBlank()) return "";
         try {
             Map<String, Object> response = restClient.post()
                 .uri(TWITCH_TOKEN_URL + "?client_id={clientId}&client_secret={clientSecret}&grant_type=client_credentials",
