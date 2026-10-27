@@ -1,8 +1,8 @@
 /**
  * The Invitations tab: "Copy the link" puts the invite link on the clipboard; "Regenerate the code"
  * opens a confirmation, whose confirm posts once (the button is disabled while the request runs), then
- * re-renders the channel page, which shows the new code. The card is replaced by each render:
- * listeners go on its elements.
+ * shows the new code and link the answer gives in place (a catapult-api answering none: the page is
+ * re-rendered). The card is replaced by each render: listeners go on its elements.
  */
 window.CatapultInvite = (function () {
     function attach(card) {
@@ -24,9 +24,11 @@ window.CatapultInvite = (function () {
             if (confirm.disabled) return;
             confirm.disabled = true;
             let succeeded = false;
+            let invite = null;
             try {
                 const response = await CatapultCsrf.postJson("/invite/regenerate", {});
                 succeeded = response.ok;
+                if (succeeded && response.status !== 204) invite = await response.json().catch(() => null);
                 if (!succeeded) {
                     // Closed, so the message isn't hidden behind it; the button is free for the next try.
                     dialog.open = false;
@@ -37,9 +39,15 @@ window.CatapultInvite = (function () {
                 dialog.open = false;
                 CatapultChannel.showError(card.dataset.labelUnavailable);
             } finally {
-                if (!succeeded) confirm.disabled = false;
+                confirm.disabled = false;
             }
-            if (succeeded) await CatapultChannel.refresh();
+            if (!succeeded) return;
+            if (!invite?.code) return CatapultChannel.refresh();
+            dialog.open = false;
+            const code = card.querySelector(".invite-code");
+            if (code && code.textContent !== invite.code) code.textContent = invite.code;
+            const field = card.querySelector("#invite-link");
+            if (field) field.value = invite.inviteUrl ?? "";
         });
     }
 

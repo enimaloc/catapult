@@ -8,6 +8,8 @@
   for the reloads after an action): the mappings, edited or deleted from their row, and the detected games still
   missing one, each a button opening the form filled with its platform and ID. The form and the deletion's
   confirmation are dialogs outside [data-gm-lists], so a reload of the lists leaves an open one (and its result) as is.
+  Each list, its empty state and its pager are all rendered (the unneeded ones hidden), so that admin-tabs.js
+  patches them after an action.
   Driven by admin-game-mappings.js.
 */-->
 <div th:fragment="content" class="admin-view admin-game-mappings"
@@ -27,11 +29,12 @@
 
     <div data-gm-lists>
         <th:block th:if="${mappings == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
-        <th:block th:if="${mappings != null and mappings.content().isEmpty()}">
+        <div data-admin-value="mappings-empty" th:if="${mappings != null}" th:hidden="${!mappings.content().isEmpty()}">
             <th:block th:replace="~{pages/admin-tab/common :: empty('sports_esports', #{admin.game-mappings.empty})}"></th:block>
-        </th:block>
+        </div>
 
-        <mdui-card class="admin-table admin-gm-mappings" variant="outlined" th:if="${mappings != null and !mappings.content().isEmpty()}">
+        <mdui-card class="admin-table admin-gm-mappings" variant="outlined" data-admin-list="mappings" th:if="${mappings != null}"
+                   th:hidden="${mappings.content().isEmpty()}">
             <div class="admin-row admin-gm-row admin-row-head" aria-hidden="true">
                 <span th:text="#{admin.game-mappings.column.platform}">Platform</span>
                 <span th:text="#{admin.game-mappings.column.id}">ID</span>
@@ -44,7 +47,7 @@
                 <span></span>
             </div>
             <div class="admin-row admin-gm-row" th:each="m : ${mappings.content()}"
-                 th:attr="data-id=${m.id()},data-source-type=${m.sourceType()},data-source-id=${m.sourceId()},
+                 th:attr="data-id=${m.id()},data-admin-key=${m.id()},data-source-type=${m.sourceType()},data-source-id=${m.sourceId()},
                           data-source-name=${m.sourceName()},data-twitch-game-id=${m.twitchGameId()},
                           data-twitch-game-name=${m.twitchGameName()},
                           data-ccls-override=${m.ccls() == null ? null : 'true'},data-ccls=${m.ccls() == null ? null : #strings.setJoin(m.ccls(), ',')},
@@ -78,17 +81,20 @@
                 </span>
             </div>
         </mdui-card>
-        <th:block th:if="${mappings != null}"><th:block th:replace="~{pages/admin-tab/game-mappings :: pager(${mappings}, 'data-gm-page')}"></th:block></th:block>
+        <div data-admin-value="mappings-pager" th:if="${mappings != null}">
+            <th:block th:replace="~{pages/admin-tab/game-mappings :: pager(${mappings}, 'data-gm-page')}"></th:block>
+        </div>
 
         <div class="section-header admin-gm-missing-header">
             <h3 th:text="#{admin.game-mappings.missing.title}">Missing mappings</h3>
         </div>
         <p class="admin-cell-muted admin-gm-hint" th:text="#{admin.game-mappings.missing.hint}">hint</p>
         <th:block th:if="${missing == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
-        <th:block th:if="${missing != null and missing.content().isEmpty()}">
+        <div data-admin-value="missing-empty" th:if="${missing != null}" th:hidden="${!missing.content().isEmpty()}">
             <th:block th:replace="~{pages/admin-tab/common :: empty('task_alt', #{admin.game-mappings.missing.empty})}"></th:block>
-        </th:block>
-        <mdui-card class="admin-table admin-gm-missing" variant="outlined" th:if="${missing != null and !missing.content().isEmpty()}">
+        </div>
+        <mdui-card class="admin-table admin-gm-missing" variant="outlined" data-admin-list="missing" th:if="${missing != null}"
+                   th:hidden="${missing.content().isEmpty()}">
             <div class="admin-row admin-gm-missing-row admin-row-head" aria-hidden="true">
                 <span th:text="#{admin.game-mappings.column.platform}">Platform</span>
                 <span th:text="#{admin.game-mappings.column.id}">ID</span>
@@ -96,7 +102,8 @@
                 <span th:text="#{admin.game-mappings.column.streamers}">Streamers</span>
                 <span></span>
             </div>
-            <div class="admin-row admin-gm-missing-row" th:each="g : ${missing.content()}">
+            <div class="admin-row admin-gm-missing-row" th:each="g : ${missing.content()}"
+                 th:attr="data-admin-key=|${g.sourceType()}:${g.sourceId()}|">
                 <span class="admin-cell" th:attr="data-label=#{admin.game-mappings.column.platform}"
                       th:text="#{|admin.game-mappings.platform.${#strings.toLowerCase(g.sourceType())}|}">Steam</span>
                 <span class="admin-cell admin-member-id" th:attr="data-label=#{admin.game-mappings.column.id}" th:text="${g.sourceId()}">730</span>
@@ -108,7 +115,9 @@
                 </span>
             </div>
         </mdui-card>
-        <th:block th:if="${missing != null}"><th:block th:replace="~{pages/admin-tab/game-mappings :: pager(${missing}, 'data-gm-missing-page')}"></th:block></th:block>
+        <div data-admin-value="missing-pager" th:if="${missing != null}">
+            <th:block th:replace="~{pages/admin-tab/game-mappings :: pager(${missing}, 'data-gm-missing-page')}"></th:block>
+        </div>
     </div>
 
     <mdui-dialog id="admin-gm-dialog" class="admin-dialog" close-on-overlay-click>

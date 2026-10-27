@@ -1,7 +1,8 @@
 /*
  * The admin Links tab's social links: the form adds one, a row's edit button loads it into the form
  * (saved in place, or cancelled back to adding), its delete button removes it once confirmed and its
- * arrows send the whole order; a refusal is told by its status and leaves the tab as it is.
+ * arrows send the whole order; a success patches the tab (and empties the form back to adding), a
+ * refusal is told by its status and leaves the tab as it is.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { flush, html, load, render, response } from "./helpers.js";
@@ -64,12 +65,13 @@ beforeEach(async () => {
     window.mdui = { confirm: vi.fn(() => (confirmAnswer ? Promise.resolve() : Promise.reject())) };
     await load("admin-tabs", "admin-social-links");
     window.CatapultChannel = { showError: vi.fn() };
+    window.CatapultAdminTabs.patch = vi.fn(async () => {});
     window.CatapultAdminTabs.reload = vi.fn(async () => {});
     page();
 });
 
 describe("admin-social-links", () => {
-    it("adds a link from the form, trimmed, then reloads the tab", async () => {
+    it("adds a link from the form, trimmed, then patches the tab and empties the form", async () => {
         field("platform").value = "X";
         field("label").value = " Follow ";
         field("url").value = " https://x.com/me ";
@@ -79,7 +81,12 @@ describe("admin-social-links", () => {
 
         expect(posted).toHaveBeenCalledWith("/admin/social-links",
                 { platform: "X", label: "Follow", url: "https://x.com/me", visible: false });
-        expect(CatapultAdminTabs.reload).toHaveBeenCalledWith(document.querySelector('mdui-tab-panel[value="links"]'));
+        expect(CatapultAdminTabs.patch).toHaveBeenCalledWith(document.querySelector('mdui-tab-panel[value="links"]'));
+        expect(CatapultAdminTabs.reload).not.toHaveBeenCalled();
+        expect(field("platform").value).toBe("OTHER");
+        expect(field("label").value).toBe("");
+        expect(field("url").value).toBe("");
+        expect(field("visible").checked).toBe(true);
     });
 
     it("loads a row into the form, saves it in place, and cancels back to adding", async () => {
@@ -94,7 +101,12 @@ describe("admin-social-links", () => {
         await click(save());
         expect(posted).toHaveBeenCalledWith("/admin/social-links/6",
                 { platform: "OTHER", label: "", url: "https://example.org/new", visible: false });
+        expect(CatapultAdminTabs.patch).toHaveBeenCalled();
+        expect(form().dataset.id).toBeUndefined(); // saved: back to adding
+        expect(save().textContent).toBe("Add");
 
+        await click(row(5).querySelector(".admin-social-link-edit"));
+        expect(field("url").value).toBe("https://github.com/x");
         await click(cancel());
         expect(field("url").value).toBe("");
         expect(field("platform").value).toBe("OTHER");
@@ -113,7 +125,18 @@ describe("admin-social-links", () => {
         confirmAnswer = true;
         await click(row(5).querySelector(".admin-social-link-delete"));
         expect(posted).toHaveBeenCalledWith("/admin/social-links/5/delete", {});
-        expect(CatapultAdminTabs.reload).toHaveBeenCalled();
+        expect(CatapultAdminTabs.patch).toHaveBeenCalled();
+    });
+
+    it("empties the form back to adding when the link it edits is deleted, not another one", async () => {
+        await click(row(6).querySelector(".admin-social-link-edit"));
+        await click(row(5).querySelector(".admin-social-link-delete"));
+        expect(form().dataset.id).toBe("6");
+
+        await click(row(6).querySelector(".admin-social-link-delete"));
+        expect(form().dataset.id).toBeUndefined();
+        expect(field("url").value).toBe("");
+        expect(CatapultAdminTabs.patch).toHaveBeenCalledTimes(2);
     });
 
     it("asks once for a delete clicked twice before the confirmation shows", async () => {
@@ -130,13 +153,13 @@ describe("admin-social-links", () => {
         expect(posted).toHaveBeenCalledTimes(1);
     });
 
-    it("sends the whole order when a link goes up or down, then reloads the tab", async () => {
+    it("sends the whole order when a link goes up or down, then patches the tab", async () => {
         await click(row(7).querySelector(".admin-social-link-up"));
         expect(posted).toHaveBeenLastCalledWith("/admin/social-links/order", { ids: [5, 7, 6] });
 
         await click(row(5).querySelector(".admin-social-link-down"));
         expect(posted).toHaveBeenLastCalledWith("/admin/social-links/order", { ids: [6, 5, 7] });
-        expect(CatapultAdminTabs.reload).toHaveBeenCalledTimes(2);
+        expect(CatapultAdminTabs.patch).toHaveBeenCalledTimes(2);
     });
 
     it("sends nothing for the first link going up or the last going down", async () => {
@@ -156,24 +179,24 @@ describe("admin-social-links", () => {
         await click(save());
         expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Failed (—)");
 
-        expect(CatapultAdminTabs.reload).not.toHaveBeenCalled();
+        expect(CatapultAdminTabs.patch).not.toHaveBeenCalled();
         expect(field("url").value).toBe("javascript:alert(1)");
         expect(save().disabled).toBe(false);
     });
 
-    it("tells a refused order and reloads the tab so the list shows the real order", async () => {
+    it("tells a refused order and patches the tab so the list shows the real order", async () => {
         posted.mockResolvedValueOnce(response(400));
         await click(row(7).querySelector(".admin-social-link-up"));
         expect(CatapultChannel.showError).toHaveBeenCalledWith("Invalid");
-        expect(CatapultAdminTabs.reload).toHaveBeenCalled();
+        expect(CatapultAdminTabs.patch).toHaveBeenCalled();
     });
 
-    it("reloads the tab when the link edited is already gone", async () => {
+    it("patches the tab when the link edited is already gone", async () => {
         posted.mockResolvedValueOnce(response(404));
         await click(row(5).querySelector(".admin-social-link-edit"));
         await click(save());
         expect(CatapultChannel.showError).toHaveBeenCalledWith("Gone");
-        expect(CatapultAdminTabs.reload).toHaveBeenCalled();
+        expect(CatapultAdminTabs.patch).toHaveBeenCalled();
     });
 
     it("saves with Enter in a field, except the one confirming an IME's conversion", async () => {

@@ -313,7 +313,10 @@ class AdminTabsFragmentControllerTest {
                 "data-label=\"Code\"", "data-url=\"https://github.com/x\"", "data-visible=\"true\"", "data-visible=\"false\"",
                 "admin-social-link-edit", "admin-social-link-up", "admin-social-link-down", "class=\"social-icon\"",
                 "target=\"_blank\"", "rel=\"noopener noreferrer\"", "admin-social-links-form", "data-label-save=\"Save\"",
-                "data-error-400=", "data-confirm=\"Delete the social link Code?\"", "Discord", "Bluesky");
+                "data-error-400=", "data-confirm=\"Delete the social link Code?\"", "Discord", "Bluesky",
+                "data-admin-list=\"links\"", "data-admin-key=\"7\"", "data-admin-key=\"8\"", "data-admin-value=\"links-count\"")
+                // the list and its empty state both rendered, one hidden, for admin-tabs.js to patch
+                .containsPattern("data-admin-value=\"links-empty\"\\s+hidden");
     }
 
     @Test
@@ -336,7 +339,8 @@ class AdminTabsFragmentControllerTest {
     void links_saysWhenThereAreNone() throws Exception {
         when(apiService.adminSocialLinks()).thenReturn(List.of());
 
-        assertThat(asAdmin("/spa/admin/links")).contains("No social link configured.", "admin-social-links-form");
+        assertThat(asAdmin("/spa/admin/links")).contains("No social link configured.", "admin-social-links-form")
+                .containsPattern("data-admin-list=\"links\"\\s+hidden").doesNotContain("data-admin-key=");
     }
 
     @Test
@@ -658,6 +662,9 @@ class AdminTabsFragmentControllerTest {
                 "data-rename=\"00000000-0000-0000-0000-000000000042\"", "data-add-member=\"00000000-0000-0000-0000-000000000042\"",
                 "data-delete=\"00000000-0000-0000-0000-000000000042\"", "admin-groups-rename-dialog",
                 "admin-groups-member-dialog", "data-label-conflict=\"");
+        // the list and its empty state both rendered, one hidden, for admin-tabs.js to patch
+        assertThat(html).contains("data-admin-list=\"groups\"", "data-admin-key=\"00000000-0000-0000-0000-000000000042\"")
+                .containsPattern("data-admin-value=\"groups-empty\"\\s+hidden");
 
         when(apiService.adminGroups()).thenReturn(List.of());
         assertThat(asAdmin("/spa/admin/groups")).contains("No group").doesNotContain("data-rename=");
@@ -775,6 +782,9 @@ class AdminTabsFragmentControllerTest {
 
         assertThat(html).doesNotContain("<mdui-tab-panel").contains("id=\"admin-members\"", "data-admin-open=\"" + other + "\"")
                 .doesNotContain("data-admin-open=\"" + MEMBER + "\"");
+        // keyed for admin-tabs.js, which patches a member's row after an action
+        assertThat(html).contains("data-admin-list=\"members\"", "data-admin-key=\"" + other + "\"",
+                "data-admin-list=\"migrate-targets\"");
     }
 
     @Test
@@ -1300,7 +1310,9 @@ class AdminTabsFragmentControllerTest {
         assertThat(html).contains("Random 100 %", "Group beta", "Tag beta = on", "Experiment other = enabled", "Manual",
                         "Account enimaloc", "Include", "Exclude", "Force \u00ab enabled \u00bb")
                 .contains("data-rule-delete=\"" + ruleIds[0] + "\"", "data-override-delete=\"" + overrideIds[3] + "\"")
-                .doesNotContain("experiment-rule-warning");
+                // the warning stays rendered, hidden, for admin-tabs.js to show once the last rule is deleted
+                .containsPattern("experiment-rule-warning\" data-admin-value=\"rules-empty\"\\s+hidden")
+                .contains("data-admin-list=\"rules\"", "data-admin-key=\"" + ruleIds[0] + "\"");
         assertThat(html).containsSubsequence("Account enimaloc", "Tag beta", "Tag beta = on", "Group beta");
     }
 

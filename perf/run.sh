@@ -4,9 +4,11 @@
 # (containers, networks, anonymous volumes), on success, failure or Ctrl-C alike.
 #
 # Usage:
-#   perf/run.sh                full run: page timings (Playwright) then load (k6), then the report
+#   perf/run.sh                full run: page timings and DOM mutations (Playwright) then load (k6),
+#                              then the report
 #   perf/run.sh --smoke        start the stack, check the perf login, stop: no measurement
-#   perf/run.sh --pages-only   page timings only
+#   perf/run.sh --pages-only   page timings and DOM mutations only
+#   perf/run.sh --dom-only     DOM mutations only
 #   perf/run.sh --load-only    load only
 #
 # Environment:
@@ -37,8 +39,9 @@ case "${1:-}" in
     "") ;;
     --smoke) MODE=smoke ;;
     --pages-only) MODE=pages ;;
+    --dom-only) MODE=dom ;;
     --load-only) MODE=load ;;
-    *) echo "Usage: $0 [--smoke|--pages-only|--load-only]" >&2; exit 2 ;;
+    *) echo "Usage: $0 [--smoke|--pages-only|--dom-only|--load-only]" >&2; exit 2 ;;
 esac
 
 export STREAMERS="${STREAMERS:-100}"
@@ -205,20 +208,22 @@ scan_outbound() {
 }
 
 # ── Measurement hooks ────────────────────────────────────────────────────
-# Page timings (Playwright, e2e/tests/perf): writes ${REPORT_DIR}/pages.json.
+# Page timings and DOM mutations (Playwright, e2e/tests/perf): writes ${REPORT_DIR}/pages.json and
+# dom-mutations.json. Arguments: the spec files to run, all of e2e/tests/perf without any.
 run_pages() {
-    echo "Page timings (headless Chromium)"
+    echo "Page timings and DOM mutations (headless Chromium)${1:+: $*}"
     [[ -d "${REPO_DIR}/e2e/node_modules" ]] || run npm --prefix "${REPO_DIR}/e2e" install
     local status=0
     (
         cd "${REPO_DIR}/e2e"
         PERF_BASE_URL="${BASE_URL}" PERF_RESULTS_DIR="${REPORT_DIR}" \
-            exec npx playwright test --project=perf
+            exec npx playwright test --project=perf "$@"
     ) &
     child=$!
     wait "${child}" || status=$?
     child=""
     [[ -f "${REPORT_DIR}/pages.json" ]] && echo "Wrote ${REPORT_DIR}/pages.json"
+    [[ -f "${REPORT_DIR}/dom-mutations.json" ]] && echo "Wrote ${REPORT_DIR}/dom-mutations.json"
     return "${status}"
 }
 
@@ -295,13 +300,15 @@ check_login
 if [[ "${MODE}" != smoke ]]; then
     settle
     if [[ "${MODE}" == full || "${MODE}" == pages ]]; then run_pages || pages_status=$?; fi
+    if [[ "${MODE}" == dom ]]; then run_pages tests/perf/dom-mutations.spec.ts || pages_status=$?; fi
     if [[ "${MODE}" == full || "${MODE}" == load ]]; then run_load; fi
 fi
 scan_outbound
 [[ "${MODE}" != smoke ]] && write_report
 echo "Done: ${REPORT_DIR}"
 if [[ "${pages_status}" != 0 ]]; then
-    echo "FAIL: the page timings exited with ${pages_status} (a budget failed, or Playwright itself did)" >&2
+    echo "FAIL: Playwright exited with ${pages_status} (a timing or DOM mutation budget failed, or" \
+        "Playwright itself did)" >&2
 fi
 if [[ "${load_status}" != 0 ]]; then
     echo "FAIL: k6 exited with ${load_status} (a threshold failed, or k6 itself did)" >&2

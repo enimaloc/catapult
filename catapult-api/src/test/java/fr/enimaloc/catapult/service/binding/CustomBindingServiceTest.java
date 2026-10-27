@@ -147,7 +147,7 @@ class CustomBindingServiceTest {
         assertThat(created.getCcls()).containsExactly("ProfanityVulgarity");
         assertThat(created.getTws()).containsExactly("chill");
         assertThat(created.isUninterruptible()).isFalse();
-        verify(channelEventPublisher).customBindingsUpdated(user.getId());
+        verify(channelEventPublisher).customBindingsUpdated(user.getId(), List.of(), null);
 
         CustomBinding existing = binding("Art");
         when(bindings.findByUserAndNameIgnoreCase(user, "ART")).thenReturn(Optional.of(existing));
@@ -204,7 +204,7 @@ class CustomBindingServiceTest {
         assertThat(updated.getTwitchGameId()).isEqualTo("1469308723");
         assertThat(updated.getCcls()).isEmpty();
         assertThat(updated.isUninterruptible()).isTrue();
-        verify(channelEventPublisher).customBindingsUpdated(user.getId());
+        verify(channelEventPublisher).customBindingsUpdated(user.getId(), List.of(), null);
         // Not the active one: saved only
         assertThat(result.reapplied()).isNull();
         verifyNoInteractions(twitchService);
@@ -551,7 +551,7 @@ class CustomBindingServiceTest {
         order.verify(twitchService).updateChannelReporting(eq(user), argThat(sent ->
                 "no-game-fallback".equals(sent.getSourceName())));
         order.verify(bindings).delete(art);
-        order.verify(channelEventPublisher).customBindingsUpdated(user.getId());
+        order.verify(channelEventPublisher).customBindingsUpdated(eq(user.getId()), eq(List.of()), any());
     }
 
     @Test
@@ -560,13 +560,16 @@ class CustomBindingServiceTest {
         CustomBinding dev = binding("Dev");
         when(bindings.findByIdAndUser(art.getId(), user)).thenReturn(Optional.of(art));
         givenActive(dev);
+        // A read that still sees the deleted one: it is left out all the same
+        when(bindings.findByUserOrderByCreatedAtAsc(user)).thenReturn(List.of(art, dev));
 
         service.delete(user, art.getId());
 
         verify(bindings).delete(art);
         verify(activations, never()).clear(any());
         verifyNoInteractions(gameEventListener, twitchService);
-        verify(channelEventPublisher).customBindingsUpdated(user.getId());
+        // The bindings left, and the active one
+        verify(channelEventPublisher).customBindingsUpdated(user.getId(), List.of(dev), dev.getId());
     }
 
     @Test

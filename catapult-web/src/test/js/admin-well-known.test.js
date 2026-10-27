@@ -110,7 +110,7 @@ beforeEach(async () => {
     window.mdui = { confirm: vi.fn(() => (confirmAnswer ? Promise.resolve() : Promise.reject())) };
     await load("admin-tabs", "well-known-forms", "admin-well-known");
     window.CatapultChannel = { showError: vi.fn() }; // after load: channel-page.js isn't loaded, nothing overrides it
-    window.CatapultAdminTabs.reload = vi.fn(async () => {});
+    window.CatapultAdminTabs.patch = vi.fn(async () => {});
 });
 
 describe("admin-well-known", () => {
@@ -175,7 +175,7 @@ describe("admin-well-known", () => {
         expect(field("content").value).toBe("kept");
     });
 
-    it("creates a file then reloads the tab", async () => {
+    it("creates a file then patches the tab", async () => {
         page();
         await click("#admin-well-known-new");
         type("path", "riot.txt");
@@ -186,7 +186,7 @@ describe("admin-well-known", () => {
         expect(posted.mock.calls).toEqual([["/admin/meta/files",
             { location: "ROOT", path: "riot.txt", status: 200, headers: [], contentType: "text/plain; charset=utf-8", content: "code" }]]);
         expect(dialog().open).toBe(false);
-        expect(CatapultAdminTabs.reload).toHaveBeenCalled();
+        expect(CatapultAdminTabs.patch).toHaveBeenCalled();
     });
 
     it("updates an existing file at its own route", async () => {
@@ -225,7 +225,7 @@ describe("admin-well-known", () => {
         posted.mockResolvedValue(response(204));
         await click(".admin-well-known-delete");
         expect(posted.mock.calls).toEqual([["/admin/meta/files/4/delete", {}]]);
-        expect(CatapultAdminTabs.reload).toHaveBeenCalled();
+        expect(CatapultAdminTabs.patch).toHaveBeenCalled();
     });
 
     it("filters the registry as typed", async () => {
@@ -237,24 +237,39 @@ describe("admin-well-known", () => {
         expect(rows.map(r => r.hidden)).toEqual([true, false]);
     });
 
+    it("keeps the registry filtered across a patch that shows a row again", async () => {
+        page();
+        const filter = document.querySelector("[data-well-known-filter]");
+        filter.value = "ACME";
+        filter.dispatchEvent(new Event("input", { bubbles: true }));
+        CatapultAdminTabs.patch.mockImplementation(async () => {
+            document.querySelectorAll(".admin-iana-row").forEach(row => row.removeAttribute("hidden"));
+        });
+        posted.mockResolvedValue(response(204));
+
+        await click(".admin-well-known-delete");
+
+        expect([...document.querySelectorAll(".admin-iana-row")].map(r => r.hidden)).toEqual([true, false]);
+    });
+
     it("reports an opened file that no longer exists", async () => {
         fetched.mockResolvedValueOnce(response(404, "<p>gone</p>"));
         page();
         await click(".admin-well-known-edit");
         expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Gone");
-        expect(CatapultAdminTabs.reload).toHaveBeenCalled();
+        expect(CatapultAdminTabs.patch).toHaveBeenCalled();
     });
 
-    it("reloads the tab when a save or a delete finds the file gone", async () => {
+    it("patches the tab when a save or a delete finds the file gone", async () => {
         page();
         await click(".admin-well-known-edit");
         posted.mockResolvedValue(response(404));
         await click(".admin-well-known-save");
-        await vi.waitFor(() => expect(CatapultAdminTabs.reload).toHaveBeenCalledTimes(1));
+        await vi.waitFor(() => expect(CatapultAdminTabs.patch).toHaveBeenCalledTimes(1));
         expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Gone");
 
         await click(".admin-well-known-delete");
-        await vi.waitFor(() => expect(CatapultAdminTabs.reload).toHaveBeenCalledTimes(2));
+        await vi.waitFor(() => expect(CatapultAdminTabs.patch).toHaveBeenCalledTimes(2));
         expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Gone");
     });
 });

@@ -1,7 +1,7 @@
 # Catapult timing runs
 
-Times catapult on a throwaway stack (`perf/compose.yml`): page timings in a headless browser
-(Playwright) and a load run (k6), with seeded fake accounts and every outbound client faked
+Times catapult on a throwaway stack (`perf/compose.yml`): page timings and DOM mutation counts in a
+headless browser (Playwright) and a load run (k6), with seeded fake accounts and every outbound client faked
 (`perf` profile). The stack is built from the working tree, started under the Compose project
 `catapult-verify-perf`, and always removed at the end, Ctrl-C included.
 
@@ -22,8 +22,9 @@ is also on `edge`, for its published port, and so does have a route out.
 ```bash
 # from the project root
 perf/run.sh --smoke        # start the stack, check the perf login, stop: no measurement
-perf/run.sh                # full run: page timings, then load, then the report
-perf/run.sh --pages-only   # page timings only
+perf/run.sh                # full run: page timings and DOM mutations, then load, then the report
+perf/run.sh --pages-only   # page timings and DOM mutations only
+perf/run.sh --dom-only     # DOM mutations only
 perf/run.sh --load-only    # load only
 
 STREAMERS=50 VIEWERS=200 DURATION=5m perf/run.sh --load-only
@@ -54,6 +55,36 @@ The secrets (database password, token encryption key, `perf-` JWT key) are gener
 - Load: `DURATION`, 30 min by default.
 
 `--smoke` takes about 2 min in all.
+
+## DOM mutations
+
+`e2e/tests/perf/dom-mutations.spec.ts` counts what eight scenarios do to the page, through a
+`MutationObserver` on `document.body` (`e2e/tests/perf/dom-mutations.ts`): the nodes added and removed,
+each with its descendants (a panel swapped by `innerHTML` counts every node it held and brings), the
+attribute changes and the text changes. Each scenario fails when its nodes exceed its budget in
+`e2e/tests/perf/dom-budgets.json`, the count measured on the code the budget was set on: lower the
+budget with the change that lowers the count. Attributes and text are reported, never judged.
+
+| Scenario              | What it does                                                                  |
+|-----------------------|-------------------------------------------------------------------------------|
+| `idle-60s`            | the channel page left open 60 s (its 1 s clocks)                              |
+| `nav-refresh`         | the navbar's channels reloaded, unchanged (its 5 min refresh)                 |
+| `dock-events`         | the OBS dock open, 10 live events: game, bot, CCL, binding CCL, binding TW    |
+| `channel-live-events` | the channel page, 10 live events: game, bot, DTDD, custom bindings, Xbox      |
+| `channel-reconnect`   | the channel page's live stream ended, reopened after its backoff              |
+| `custom-binding-crud` | a custom binding created, edited and deleted from the channel page            |
+| `channel-actions`     | the invite code and the OBS widget link regenerated                           |
+| `admin-edit`          | a flag, a group and a meta tag added in the Members, Groups and Meta tabs     |
+
+They run as `perf-streamer-002` (and `perf-admin`), leaving `perf-streamer-001` to the page timings,
+and put back what they change. A live event comes from catapult-api itself when a web action makes
+it (signed in apart, as another device), else is published on the channel's Redis channel in
+catapult-api's envelope. Counts are meant to be the same on every run: each step waits for the page
+to be quiet (no mutation, no request in flight, for 750 ms, and the OBS card's check over) before the
+next, each window has a fixed length, and the clocks are frozen (`Date.now()`) but in `idle-60s`, where
+they run from 10 min after the notifications they show. `DOM_MUTATIONS_TRACE=1 perf/run.sh --dom-only`
+also writes each scenario's mutations, one line per record (`dom-trace-<scenario>.txt`), to compare
+two runs.
 
 ## The load run
 
@@ -88,13 +119,15 @@ Each run writes `perf/reports/<timestamp>/` (ignored by git):
 | `logs.txt`          | the stack's logs, kept also when the run fails or is interrupted     |
 | `outbound.txt`      | connection errors towards a host outside the stack (should be empty) |
 | `pages.json`        | page timings (Playwright)                                            |
+| `dom-mutations.json`| DOM mutations per scenario, with their budgets (Playwright)          |
 | `load.json`         | the load run's streamers, viewers, duration and k6 image             |
 | `k6-summary.json`   | k6 summary of the load run                                           |
 | `docker-stats.csv`  | CPU and memory of each container during the load run                 |
 | `jvm-memory.csv`    | used heap, used non-heap and max heap of each JVM during the load run |
 | `report.md`, `.json`| the report, with its "Outbound traffic" section                      |
 
-`report.md` has the thresholds, p50, p95 and errors per request group and per page, each container's
+`report.md` has the thresholds, p50, p95 and errors per request group and per page, the DOM
+mutations per scenario, each container's
 average and peak CPU (in % of one core) and memory (RSS), each JVM's peak used memory, the machine that
 load takes, and the differences with the latest earlier run under the same load that has a
 `report.json` (`node perf/report.mjs <run dir> [<previous run dir>]` writes it again, against another run).

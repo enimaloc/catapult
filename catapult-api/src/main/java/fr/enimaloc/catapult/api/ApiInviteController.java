@@ -10,7 +10,6 @@ import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -18,7 +17,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -45,7 +43,20 @@ public class ApiInviteController {
     public InvitePageData page(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt) {
         UserAccount user = userResolver.viewer(jwt);
         experimentService.track(user, EXPERIMENT_KEY, EVENT_PAGE_VIEW);
-        Optional<AlphaInvite> inviteOpt = inviteService.getInvite(user);
+        return pageOf(user, inviteService.getInvite(user));
+    }
+
+    /** The page with its new code, for the member's page to show it without reading the page again. */
+    @PreAuthorize("@authz.isSelf(#userId)")
+    @PostMapping("/regenerate")
+    public InvitePageData regenerate(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt) {
+        UserAccount user = userResolver.viewer(jwt);
+        Optional<AlphaInvite> invite = inviteService.regenerateCode(user);
+        experimentService.track(user, EXPERIMENT_KEY, EVENT_LINK_REGENERATED);
+        return pageOf(user, invite);
+    }
+
+    private InvitePageData pageOf(UserAccount user, Optional<AlphaInvite> inviteOpt) {
         if (inviteOpt.isEmpty()) {
             return new InvitePageData(false, null, null, null, null, List.of());
         }
@@ -56,15 +67,6 @@ public class ApiInviteController {
             invite.getRegeneratedAt(), redemptions.stream()
                 .map(r -> new InviteRedemptionDto(r.getInviteeTwitchId(), r.getRedeemedAt()))
                 .toList());
-    }
-
-    @PreAuthorize("@authz.isSelf(#userId)")
-    @PostMapping("/regenerate")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void regenerate(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt) {
-        UserAccount user = userResolver.viewer(jwt);
-        inviteService.regenerateCode(user);
-        experimentService.track(user, EXPERIMENT_KEY, EVENT_LINK_REGENERATED);
     }
 
 }

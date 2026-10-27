@@ -5,6 +5,7 @@
   The shared API keys: one card for Steam and one for DTDD (a disabled provider shows only its note; an enabled one
   the add field, Refresh and the keys, masked only: the raw key is never rendered), then the Minecraft service
   accounts card. Driven by admin-keys.js (the provider is on each card's data-provider) and admin-minecraft.js.
+  Each list and its empty state are both rendered, one hidden, so that admin-tabs.js patches them after an edit.
 */-->
 <div th:fragment="content" class="admin-view admin-keys"
      th:attr="data-confirm-text=#{admin.confirm},data-cancel-text=#{admin.cancel},
@@ -36,15 +37,16 @@
                         <mdui-button variant="filled" icon="add" class="admin-keys-add-save" th:text="#{admin.keys.add.button}">Add</mdui-button>
                     </div>
 
-                    <p class="admin-cell-muted" th:if="${keys.keys().isEmpty()}" th:text="#{|admin.keys.${provider}.empty|}">None.</p>
-                    <div class="admin-table" th:unless="${keys.keys().isEmpty()}">
+                    <p class="admin-cell-muted" th:attr="data-admin-value=|${provider}-empty|" th:hidden="${!keys.keys().isEmpty()}"
+                       th:text="#{|admin.keys.${provider}.empty|}">None.</p>
+                    <div class="admin-table" th:attr="data-admin-list=${provider}" th:hidden="${keys.keys().isEmpty()}">
                         <div class="admin-row admin-keys-row admin-row-head" aria-hidden="true">
                             <span th:text="#{admin.keys.column.key}">Key</span>
                             <span th:text="#{admin.keys.column.owner}">Owner</span>
                             <span th:text="#{admin.keys.column.status}">Status</span>
                             <span></span>
                         </div>
-                        <div class="admin-row admin-keys-row" th:each="key : ${keys.keys()}">
+                        <div class="admin-row admin-keys-row" th:each="key : ${keys.keys()}" th:attr="data-admin-key=${key.id()}">
                             <span class="admin-member-id" th:attr="data-label=#{admin.keys.column.key}" th:text="${key.masked()}">abcd…wxyz</span>
                             <span class="admin-cell" th:attr="data-label=#{admin.keys.column.owner}">
                                 <span th:if="${key.owner() != null}" th:text="${key.owner()}">owner</span>
@@ -92,8 +94,9 @@
                th:text="#{admin.minecraft.unavailable}">Unavailable.</p>
 
             <th:block th:if="${minecraft != null}">
-                <p class="admin-cell-muted" th:if="${minecraft.isEmpty()}" th:text="#{admin.minecraft.empty}">None.</p>
-                <div class="admin-table" th:unless="${minecraft.isEmpty()}">
+                <p class="admin-cell-muted" data-admin-value="minecraft-empty" th:hidden="${!minecraft.isEmpty()}"
+                   th:text="#{admin.minecraft.empty}">None.</p>
+                <div class="admin-table" data-admin-list="minecraft" th:hidden="${minecraft.isEmpty()}">
                     <div class="admin-row admin-minecraft-row admin-row-head" aria-hidden="true">
                         <span th:text="#{admin.minecraft.col.label}">Label</span>
                         <span th:text="#{admin.minecraft.col.username}">Username</span>
@@ -102,7 +105,7 @@
                         <span th:text="#{admin.minecraft.col.state}">State</span>
                         <span></span>
                     </div>
-                    <div class="admin-row admin-minecraft-row" th:each="a : ${minecraft}">
+                    <div class="admin-row admin-minecraft-row" th:each="a : ${minecraft}" th:attr="data-admin-key=${a.id()}">
                         <span class="admin-cell" th:attr="data-label=#{admin.minecraft.col.label}" th:text="${a.label()}">Bot1</span>
                         <span class="admin-cell" th:attr="data-label=#{admin.minecraft.col.username}" th:text="${a.minecraftUsername()}">CatapultBot1</span>
                         <span class="admin-cell" th:attr="data-label=#{admin.minecraft.col.order}" th:text="${a.fillOrder()}">0</span>

@@ -10,6 +10,7 @@ import fr.enimaloc.catapult.domain.binding.GetterConfig;
 import fr.enimaloc.catapult.domain.chatcommand.ChatCommandDefinition;
 import fr.enimaloc.catapult.domain.experiment.Experiment;
 import fr.enimaloc.catapult.domain.experiment.ExperimentVariant;
+import fr.enimaloc.catapult.domain.igdb.IgdbGameCacheEntry;
 import fr.enimaloc.catapult.getter.steam.MockSteamApiClient;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
@@ -17,8 +18,10 @@ import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
 import fr.enimaloc.catapult.repository.binding.GetterConfigRepository;
 import fr.enimaloc.catapult.repository.chatcommand.ChatCommandDefinitionRepository;
 import fr.enimaloc.catapult.repository.experiment.ExperimentRepository;
+import fr.enimaloc.catapult.repository.igdb.IgdbGameCacheRepository;
 import fr.enimaloc.catapult.service.account.WidgetTokenService;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
+import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.notification.NotificationDeliveryService;
 import fr.enimaloc.catapult.service.notification.NotificationService;
 import lombok.extern.slf4j.Slf4j;
@@ -63,22 +66,23 @@ public class PerfDataSeeder implements ApplicationRunner {
     static final String COMMAND_NAME = "!perf";
 
     /**
-     * A game the streamers play: its Steam app, the Twitch category their binding puts the channel on, and its
-     * trigger warnings (set, so the startup TW backfill skips the seeded bindings instead of resolving them all).
+     * A game the streamers play: its Steam app, the Twitch category their binding puts the channel on, its
+     * trigger warnings (set, so the startup TW backfill skips the seeded bindings instead of resolving them all)
+     * and its IGDB id (in IGDB's cache: what shows the channel page's DTDD card).
      */
     public record PerfGame(String name, String steamAppId, String twitchGameId, String twitchGameName,
-                           Set<String> tws) {}
+                           Set<String> tws, String igdbId) {}
 
     /**
-     * The games every streamer has a binding for; the first one is the game they play at startup. The Twitch ids
-     * are stand-ins: nothing reaches Twitch under {@code perf}.
+     * The games every streamer has a binding for; the first one is the game they play at startup. The Twitch and
+     * IGDB ids are stand-ins: nothing reaches Twitch nor IGDB under {@code perf}.
      */
     public static final List<PerfGame> GAMES = List.of(
-            new PerfGame("Celeste", "504230", "491447", "Celeste", Set.of("suicide")),
-            new PerfGame("Hades", "1145360", "510577", "Hades", Set.of("violence_graphic")),
-            new PerfGame("Hollow Knight", "367520", "490147", "Hollow Knight", Set.of("violence_graphic")),
-            new PerfGame("Stardew Valley", "413150", "490744", "Stardew Valley", Set.of("death_of_animal")),
-            new PerfGame("Factorio", "427520", "490550", "Factorio", Set.of("violence_graphic")));
+            new PerfGame("Celeste", "504230", "491447", "Celeste", Set.of("suicide"), "26226"),
+            new PerfGame("Hades", "1145360", "510577", "Hades", Set.of("violence_graphic"), "113112"),
+            new PerfGame("Hollow Knight", "367520", "490147", "Hollow Knight", Set.of("violence_graphic"), "14593"),
+            new PerfGame("Stardew Valley", "413150", "490744", "Stardew Valley", Set.of("death_of_animal"), "17000"),
+            new PerfGame("Factorio", "427520", "490550", "Factorio", Set.of("violence_graphic"), "7046"));
 
     private final int accountCount;
     private final TransactionOperations transactions;
@@ -93,6 +97,7 @@ public class PerfDataSeeder implements ApplicationRunner {
     private final WidgetTokenService widgetTokens;
     private final StreamStateService streamStates;
     private final MockSteamApiClient steam;
+    private final IgdbGameCacheRepository igdbCache;
 
     public PerfDataSeeder(
             @Value("${catapult.perf.accounts:100}") int accountCount,
@@ -107,7 +112,8 @@ public class PerfDataSeeder implements ApplicationRunner {
             NotificationDeliveryService deliveries,
             WidgetTokenService widgetTokens,
             StreamStateService streamStates,
-            MockSteamApiClient steam) {
+            MockSteamApiClient steam,
+            IgdbGameCacheRepository igdbCache) {
         this.accountCount = accountCount;
         this.transactions = transactions;
         this.accounts = accounts;
@@ -121,6 +127,7 @@ public class PerfDataSeeder implements ApplicationRunner {
         this.widgetTokens = widgetTokens;
         this.streamStates = streamStates;
         this.steam = steam;
+        this.igdbCache = igdbCache;
     }
 
     /** The username of the {@code n}th streamer (from 1). */
@@ -136,6 +143,7 @@ public class PerfDataSeeder implements ApplicationRunner {
     @Override
     @SuppressWarnings("NullableProblems")
     public void run(ApplicationArguments args) {
+        transactions.executeWithoutResult(status -> igdbCache());
         UserAccount admin = transactions.execute(status -> admin());
         int created = 0;
         for (int n = 1; n <= accountCount; n++) {
@@ -178,6 +186,17 @@ public class PerfDataSeeder implements ApplicationRunner {
         }
         widgetTokens.getOrCreate(streamer);
         return accounts.findById(streamer.getId()).orElseThrow();
+    }
+
+    /**
+     * IGDB's cache entry of each game's Steam app, written again on every start (it expires): with no IGDB to ask
+     * under {@code perf}, it is what tells the channel page the IGDB id of the game played (its DTDD card).
+     */
+    private void igdbCache() {
+        for (PerfGame game : GAMES) {
+            igdbCache.save(new IgdbGameCacheEntry(IgdbService.KEY_STEAM_PREFIX + game.steamAppId(), game.igdbId(),
+                    game.name()));
+        }
     }
 
     private void command(UserAccount streamer) {

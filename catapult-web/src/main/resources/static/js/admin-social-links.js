@@ -2,9 +2,10 @@
  * The admin Links tab's social links. The form below the list adds a link; a row's edit button loads
  * that link into it (Save, or Cancel to go back to adding), its delete button removes it after a
  * confirmation and its arrows move it, sending the whole order. Each action posts to
- * AdminSocialLinksController, the button held disabled until it is answered; a success reloads the tab,
- * a refusal is told by its status (400, 404, else generic). Listeners are delegated to the panel: its
- * content comes and goes.
+ * AdminSocialLinksController, the button held disabled until it is answered; a success patches the
+ * list (admin-tabs.js: the link's row inserted, updated, moved or removed) and empties the form back to
+ * adding, a refusal is told by its status (400, 404, else generic). Listeners are delegated to the
+ * panel: its content comes and goes.
  */
 window.CatapultAdminSocialLinks = (function () {
     const BASE = "/admin/social-links";
@@ -49,7 +50,7 @@ window.CatapultAdminSocialLinks = (function () {
             if (!ids) return;
             const sent = await CatapultAdminTabs.post(root, target, `${BASE}/order`, { ids });
             // a refused order (a link added or removed meanwhile) shows the list as it is now
-            if (sent === "ok" || sent === 400 || sent === 404) await CatapultAdminTabs.reload(panel);
+            if (sent === "ok" || sent === 400 || sent === 404) await CatapultAdminTabs.patch(panel);
             return;
         }
         if (target.matches(".admin-social-link-delete")) {
@@ -59,7 +60,9 @@ window.CatapultAdminSocialLinks = (function () {
                 return;
             }
             const sent = await CatapultAdminTabs.post(root, target, `${BASE}/${encodeURIComponent(row.dataset.id)}/delete`, {});
-            if (sent === "ok" || sent === 404) await CatapultAdminTabs.reload(panel);
+            if (sent !== "ok" && sent !== 404) return;
+            if (form.dataset.id === row.dataset.id) edit(form, null); // the link being edited is gone
+            await CatapultAdminTabs.patch(panel);
             return;
         }
         if (target.matches(".admin-social-link-save")) {
@@ -71,7 +74,9 @@ window.CatapultAdminSocialLinks = (function () {
                 visible: field(form, "visible").checked
             };
             const sent = await CatapultAdminTabs.post(root, target, id ? `${BASE}/${encodeURIComponent(id)}` : BASE, body);
-            if (sent === "ok" || sent === 404) await CatapultAdminTabs.reload(panel);
+            if (sent !== "ok" && sent !== 404) return;
+            edit(form, null);
+            await CatapultAdminTabs.patch(panel);
         }
     }
 

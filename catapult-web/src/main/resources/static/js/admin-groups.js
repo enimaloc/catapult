@@ -1,7 +1,8 @@
 /**
  * The admin Groups tab. The create card needs a key and a name; Rename (prefilled) and Add member
  * (a Twitch username) go through their dialogs; Delete confirms with the group's name first. All post
- * to AdminGroupsController with their button disabled meanwhile, and a success reloads the tab. A
+ * to AdminGroupsController with their button disabled meanwhile, and a success patches the list
+ * (admin-tabs.js: the group's row inserted, updated or removed; the create card emptied). A
  * refusal is told by its status, never by catapult-api's message: 409 (key taken), 404 (group gone,
  * or unknown login when adding a member), else unavailable. Listeners are delegated to the panel:
  * its content comes and goes.
@@ -36,15 +37,16 @@ window.CatapultAdminGroups = (function () {
         return status === 400 ? root.dataset.labelInvalid : root.dataset.labelUnavailable;
     }
 
-    /** Tells the outcome of `status`: done (snackbar, reload) or refused; a vanished group also reloads. */
+    /** Tells the outcome of `status`: done (snackbar, patch) or refused; a vanished group is patched away. */
     async function settle(panel, root, status, notFound, doneLabel) {
         if (ok(status)) {
             window.mdui?.snackbar?.({ message: root.dataset[doneLabel] });
-            await CatapultAdminTabs.reload(panel);
-            return;
+            await CatapultAdminTabs.patch(panel);
+            return true;
         }
         CatapultChannel.showError(refusal(root, status, notFound));
-        if (status === 404 && notFound === "labelUnknown") await CatapultAdminTabs.reload(panel);
+        if (status === 404 && notFound === "labelUnknown") await CatapultAdminTabs.patch(panel);
+        return false;
     }
 
     async function createGroup(panel, root, button) {
@@ -58,9 +60,9 @@ window.CatapultAdminGroups = (function () {
         }
         const description = valueOf(card, "description");
         const status = await post(button, "/admin/groups", { key, name, description: description || null });
-        button.disabled = true; // post() re-enabled it; still busy until the tab reloads
+        button.disabled = true; // post() re-enabled it; still busy until the list is patched
         try {
-            await settle(panel, root, status, "labelUnknown", "labelCreated");
+            if (await settle(panel, root, status, "labelUnknown", "labelCreated")) CatapultAdminTabs.reset(card);
         } finally {
             button.disabled = false;
         }
@@ -107,7 +109,7 @@ window.CatapultAdminGroups = (function () {
         try {
             if (!await CatapultAdminTabs.confirmed(root, button.dataset.confirm)) return;
             const status = await post(button, urlOf(button.dataset.delete, "delete"), {});
-            button.disabled = true; // post() re-enabled it; still busy until the tab reloads
+            button.disabled = true; // post() re-enabled it; still busy until the list is patched
             await settle(panel, root, status, "labelUnknown", "labelDeleted");
         } finally {
             button.disabled = false;

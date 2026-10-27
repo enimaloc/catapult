@@ -10,12 +10,19 @@
  * EventSource reconnects on its own, except when a reconnect is answered with something other
  * than a stream (a maintenance page during a restart, a refusal): it then stops for good,
  * so a closed stream is reopened after a backoff (5 s, doubling up to 60 s, back to 5 s once a
- * stream opens), as live.js does. Events sent while the stream was down are lost: every time it
- * opens again (by itself or reopened), the page is re-rendered to catch up.
+ * stream opens), as live.js does, each wait 2 s shorter or longer at random: the pages a restart
+ * of catapult-web closed all at once then don't all reopen, and ask /state, at the same moment. Events sent while the stream was down are lost: every time it
+ * opens again (by itself or reopened), the page catches up on the channel's state as events
+ * (GET /spa/channel/{username}/state, see ChannelState.java), applied as if the stream had sent them;
+ * an answer arriving after that of a later ask is dropped.
+ * It is re-rendered instead only when that state can't be applied in place: it lists other bindings
+ * than the page does, or a DTDD mapping card the page doesn't have (or the other way round), or it
+ * can't be read. The OBS dock, which shows the binding of the game played now, is re-rendered.
  */
 (function () {
     const FIRST_DELAY = 5000;
     const MAX_DELAY = 60000;
+    const JITTER = 2000;
     let source = null;
     let sourceUsername = null;
     let registeredEvents = new Set();
@@ -23,6 +30,10 @@
     let retry = null;
     // Whether the channel's stream opened before: an open after that is a reconnection.
     let opened = false;
+    // The /state asks made (each one's number) and the last one whose answer was applied: an answer to an
+    // older ask, arriving after a newer one's, is dropped (it shows the channel as it was before).
+    let stateAsks = 0;
+    let stateApplied = 0;
 
     // The handful of events that need more than Visibility.dispatch's generic handling —
     // BindingDeletedEvent actually removes a row (not a class toggle or property sync, so
@@ -32,19 +43,30 @@
     // is what a genuinely new concern (not just a new use of an already-wired event) would
     // ever need a line added to.
     //
-    // The settings come whole, for channel-settings.js to set its cards to. A DTDD mapping's change
-    // carries nothing, and a connection other than Steam's (whose card follows SteamConnectionStateEvent)
-    // has no live state on its card: the page is re-rendered for those.
+    // The settings come whole, for channel-settings.js to set its cards to. A DTDD mapping's change and the
+    // custom bindings' list are applied in place by their cards' scripts, which tell when they can't (an
+    // event from an older catapult-api, which carries nothing but the channel): the page is re-rendered then.
+    // Of the connections, Steam's card follows SteamConnectionStateEvent and Xbox's is flipped here; any
+    // other's change re-renders the page.
     const customHandlers = {
         GameChangedEvent: data => CatapultChannel.setCurrentGame(data.bindingId),
         BindingDeletedEvent: data => CatapultChannel.removeBinding(data.bindingId),
         ChannelSettingsUpdatedEvent: data => window.CatapultSettings?.apply(data.settings),
-        DtddMappingChangedEvent: () => catchUp(),
-        // The active custom binding is highlighted in place; their list changing (create, edit, delete) re-renders.
-        CustomBindingChangedEvent: data => window.CatapultCustomBindings?.setActive(data.activeId ?? null),
-        CustomBindingsUpdatedEvent: () => catchUp(),
+        DtddMappingChangedEvent: data => {
+            if (!window.CatapultDtdd?.apply(data)) catchUp();
+        },
+        // The active custom binding is highlighted in place, their list (create, edit, delete) patched in place.
+        CustomBindingChangedEvent: data => window.CatapultCustomBindings?.setActive(data.activeId ?? null, data.ts),
+        CustomBindingsUpdatedEvent: data => {
+            if (!window.CatapultCustomBindings?.apply(data.bindings, data.activeId, data.ts)) catchUp();
+        },
         ChannelConnectionChangedEvent: data => {
-            if (data.provider !== "STEAM") catchUp();
+            if (data.provider === "STEAM") return;
+            if (data.provider === "XBOX" && typeof data.connected === "boolean") {
+                window.CatapultConnections?.showXboxConnected(data.connected);
+                return;
+            }
+            catchUp();
         },
     };
 
@@ -66,20 +88,22 @@
             return;
         }
         registeredEvents.add(eventName);
-        source.addEventListener(eventName, event => {
-            // The OBS dock re-renders itself on what changes it (channel-dock.js): the handlers below
-            // patch the full page, whose elements it doesn't have.
-            if (window.CatapultDock?.active()) {
-                if (CatapultDock.EVENTS.includes(eventName)) CatapultDock.refresh();
-                return;
-            }
-            const data = JSON.parse(event.data);
-            Visibility.dispatch(eventName, data);
-            const handler = customHandlers[eventName];
-            if (handler) {
-                handler(data);
-            }
-        });
+        source.addEventListener(eventName, event => handle(eventName, JSON.parse(event.data)));
+    }
+
+    /** Applies one of the channel's events to the page, sent by its stream or caught up on. */
+    function handle(eventName, data) {
+        // The OBS dock applies its own events (channel-dock.js): the handlers below patch the
+        // full page, whose elements it doesn't have.
+        if (window.CatapultDock?.active()) {
+            if (CatapultDock.EVENTS.includes(eventName)) CatapultDock.apply(eventName, data);
+            return;
+        }
+        Visibility.dispatch(eventName, data);
+        const handler = customHandlers[eventName];
+        if (handler) {
+            handler(data);
+        }
     }
 
     // Subscribes to every event name the current DOM's spa:on/spa:switch/spa:value/
@@ -99,6 +123,37 @@
         window.scrollTo({ top, behavior: "instant" });
     }
 
+    /** Whether the page shows what `state` covers: the same bindings, a DTDD mapping card alike. */
+    function fits(state) {
+        const listed = new Set(state.filter(entry => entry.name === "BindingUpdatedEvent")
+            .map(entry => entry.data?.bindingId));
+        const shown = document.getElementById("channel-bindings-list") ? CatapultChannel.getBindingsElements() : [];
+        if (shown.length !== listed.size || shown.some(row => !listed.has(row.dataset.bindingId))) return false;
+        const dtdd = state.some(entry => entry.name === "DtddMappingChangedEvent");
+        return dtdd === !!document.getElementById("channel-dtdd-mapping-card");
+    }
+
+    /** Catches up on the channel's state after its stream was down: in place when it fits the page. */
+    async function catchUpState(username) {
+        if (window.CatapultDock?.active()) return catchUp();
+        const ask = ++stateAsks;
+        let state;
+        try {
+            const response = await fetch(`/spa/channel/${encodeURIComponent(username)}/state${location.search}`,
+                { headers: { Accept: "application/json" } });
+            if (!response.ok) throw new Error(String(response.status));
+            state = await response.json();
+        } catch {
+            state = null;
+        }
+        // The visitor moved to another channel meanwhile: its own page is fresh.
+        if (sourceUsername !== username) return;
+        if (ask < stateApplied) return;
+        stateApplied = ask;
+        if (!Array.isArray(state) || !fits(state)) return catchUp();
+        state.forEach(entry => handle(entry.name, entry.data));
+    }
+
     function open(username) {
         const current = new EventSource(`/events/channel/${username}`);
         source = current;
@@ -106,7 +161,7 @@
         current.addEventListener("open", () => {
             if (current !== source) return;
             delay = FIRST_DELAY;
-            if (opened) catchUp();
+            if (opened) catchUpState(username);
             opened = true;
         });
         current.addEventListener("error", () => {
@@ -119,10 +174,12 @@
     function scheduleReopen() {
         if (retry !== null) return;
         const username = sourceUsername;
+        // up to JITTER earlier or later
+        const wait = delay + Math.round((Math.random() * 2 - 1) * JITTER);
         retry = setTimeout(() => {
             retry = null;
             if (sourceUsername === username) open(username);
-        }, delay);
+        }, wait);
         delay = Math.min(delay * 2, MAX_DELAY);
     }
 

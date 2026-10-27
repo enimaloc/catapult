@@ -17,6 +17,7 @@ import fr.enimaloc.catapult.repository.notification.NotificationRecipientReposit
 import fr.enimaloc.catapult.security.JwtService;
 import fr.enimaloc.catapult.service.account.WidgetTokenService;
 import fr.enimaloc.catapult.service.igdb.IgdbClient;
+import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.igdb.MockIgdbClient;
 import fr.enimaloc.catapult.service.notification.NotificationDeliveryService;
 import fr.enimaloc.catapult.service.steam.MockSteamStoreService;
@@ -54,7 +55,8 @@ import tools.jackson.databind.json.JsonMapper;
  */
 @Import(FullContextContainers.class)
 @ActiveProfiles("perf")
-@TestPropertySource(properties = {"catapult.perf.enabled=true", "catapult.perf.accounts=3"})
+// app.igdb.client-id: the perf profile's, which full-context.properties blanks
+@TestPropertySource(properties = {"catapult.perf.enabled=true", "catapult.perf.accounts=3", "app.igdb.client-id=perf"})
 class PerfProfileFullContextTest extends FullContextTestBase {
 
     private static final String REMOTE_CLIENT = "203.0.113.7";
@@ -166,6 +168,19 @@ class PerfProfileFullContextTest extends FullContextTestBase {
             assertThat(widgetTokens.resolve(widgetToken)).map(UserAccount::getId).contains(userId);
             assertThat(account.get("username").asString()).startsWith("perf-");
         }
+    }
+
+    @Test
+    void igdbKnowsThePerfGames_fromItsCacheAlone() {
+        IgdbService igdb = context.getBean(IgdbService.class);
+
+        for (PerfDataSeeder.PerfGame game : PerfDataSeeder.GAMES) {
+            assertThat(igdb.findBySteamAppId(game.steamAppId())).contains(new IgdbService.IgdbGame(game.igdbId(),
+                    game.name()));
+        }
+        // a game it has no entry for: no IGDB to ask, nor a token to ask it with
+        assertThat(igdb.findBySteamAppId("1")).isEmpty();
+        assertThat(igdb.getAppToken()).isEmpty();
     }
 
     @Test

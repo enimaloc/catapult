@@ -287,7 +287,7 @@ public class ChannelDashboardAssembler {
         DtddMappingProposalDto pending = myProposal.map(p ->
                 new DtddMappingProposalDto(p.getId(), p.getProposedDtddId(), p.getReason())).orElse(null);
 
-        return new DtddMappingStatusDto(current, pending, canValidate, id);
+        return new DtddMappingStatusDto(current, pending, canValidate, id, viewerIsAdmin);
     }
 
     /** IGDB entry of a detected game: by app id for Steam games, by name otherwise. */

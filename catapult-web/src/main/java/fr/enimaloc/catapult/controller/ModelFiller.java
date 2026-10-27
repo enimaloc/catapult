@@ -261,8 +261,10 @@ public class ModelFiller {
                     model.addAttribute("widgetUnavailable", true);
                 }
             }
-            model.addAttribute("commandMigration", CommandMigration.of(commands,
-                    token == null ? null : absoluteUrl("/api/user/summary/" + token),
+            String summaryUrl = token == null ? null : absoluteUrl("/api/user/summary/" + token);
+            // The card's links carry it: channel-obs-widget.js swaps it for a regenerated one.
+            model.addAttribute("summaryUrl", summaryUrl);
+            model.addAttribute("commandMigration", CommandMigration.of(commands, summaryUrl,
                     message("channel.commands.migration.empty", null, LocaleContextHolder.getLocale())));
             model.addAttribute("integrations", IntegrationCards.of(channelPage, twitchatEvents, twitchatEventForms));
             model.addAttribute("notificationChannels", apiService.notificationChannels());

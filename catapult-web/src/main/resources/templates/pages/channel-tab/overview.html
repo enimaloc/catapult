@@ -55,21 +55,25 @@
             <mdui-button-icon th:replace="~{fragments/controls :: helpButton('dtdd')}"></mdui-button-icon>
         </div>
 
-        <!--/* The verified chip and the proposal note are always rendered: channel-dtdd.js reveals
-             them once validated or proposed, instead of re-rendering the page. */-->
-        <div th:if="${dtddMapping.current() != null}">
-            <span th:text="${dtddMapping.current().name() ?: '—'}">DTDD name</span>
-            <mdui-chip id="dtdd-confidence" th:text="${#numbers.formatDecimal(dtddMapping.current().confidence() * 100, 1, 0)} + '%'">confidence</mdui-chip>
-            <mdui-chip id="dtdd-verified" th:classappend="${dtddMapping.current().verified()} ? '' : 'hidden'"
+        <!--/* Every outcome is always rendered, hidden when it isn't the mapping's: channel-dtdd.js reveals them once
+             validated or proposed, and follows the mapping's DtddMappingChangedEvent, instead of re-rendering the
+             page. The validation is an admin's alone: rendered for them, hidden while it isn't possible. */-->
+        <div id="dtdd-current" th:with="current=${dtddMapping.current()}" th:classappend="${current == null} ? 'hidden'">
+            <span id="dtdd-name" th:text="${current?.name() ?: '—'}">DTDD name</span>
+            <mdui-chip id="dtdd-confidence"
+                       th:text="${current == null} ? '' : ${#numbers.formatDecimal(current.confidence() * 100, 1, 0)} + '%'">confidence</mdui-chip>
+            <mdui-chip id="dtdd-verified" th:classappend="${current != null and current.verified()} ? '' : 'hidden'"
                        th:text="#{channel.dtdd.verified}">
                 Vérifié
             </mdui-chip>
         </div>
-        <div th:unless="${dtddMapping.current() != null}" th:text="#{channel.dtdd.no_mapping}">
+        <div id="dtdd-no-mapping" th:classappend="${dtddMapping.current() != null} ? 'hidden'"
+             th:text="#{channel.dtdd.no_mapping}">
             Aucune association DTDD.
         </div>
 
-        <mdui-button th:if="${dtddMapping.canValidateDirectly()}" id="dtdd-validate-btn"
+        <mdui-button th:if="${dtddMapping.canValidateDirectly() or dtddMapping.viewerIsAdmin() == true}" id="dtdd-validate-btn"
+                     th:classappend="${dtddMapping.canValidateDirectly()} ? '' : 'hidden'"
                      th:text="#{channel.dtdd.validate}">
             Valider
         </mdui-button>
@@ -109,7 +113,7 @@
         </mdui-segmented-button-group>
     </div>
 
-    <mdui-list id="channel-bindings-list">
+    <mdui-list id="channel-bindings-list" th:data-current-game="${ch.currentGame()?.bindingId() ?: ''}">
         <mdui-collapse accordion th:if="${!ch.bindings().content().isEmpty()}"
                        th:value="${ch.currentGame()?.bindingId()}">
             <mdui-collapse-item th:each="b : ${ch.bindings().content()}"
@@ -243,11 +247,11 @@
                         <span class="custom-binding-game-label" th:text="${b.twitchGameName() ?: '—'}">Game</span>
                         <span class="custom-binding-active-chip" th:classappend="${active} ? '' : 'hidden'"
                               th:text="#{channel.custom_bindings.active}">Actif</span>
-                        <span th:if="${b.uninterruptible()}" class="custom-binding-uninterruptible-chip"
+                        <span class="custom-binding-uninterruptible-chip" th:classappend="${b.uninterruptible()} ? '' : 'hidden'"
                               th:text="#{channel.custom_bindings.uninterruptible}">Ininterruptible</span>
                     </mdui-list-item>
                     <mdui-list-item>
-                        <th:block th:replace="~{pages/channel-tab/overview :: customBindingForm(${b}, ${active})}"></th:block>
+                        <th:block th:replace="~{pages/channel-tab/overview :: customBindingForm(${b}, ${active}, true)}"></th:block>
                     </mdui-list-item>
                 </mdui-collapse-item>
                 <mdui-collapse-item class="custom-binding-item custom-binding-new hidden" value="new">
@@ -255,7 +259,7 @@
                         <span th:text="#{channel.custom_bindings.new_title}">Nouveau binding</span>
                     </mdui-list-item>
                     <mdui-list-item>
-                        <th:block th:replace="~{pages/channel-tab/overview :: customBindingForm(null, false)}"></th:block>
+                        <th:block th:replace="~{pages/channel-tab/overview :: customBindingForm(null, false, false)}"></th:block>
                     </mdui-list-item>
                 </mdui-collapse-item>
             </mdui-collapse>
@@ -263,6 +267,22 @@
                             th:text="#{channel.custom_bindings.empty}">Aucun binding personnalisé.</mdui-list-item>
         </mdui-list>
         <p id="custom-bindings-error" class="hidden" role="alert"></p>
+        <!--/* A saved binding's row, empty: channel-custom-bindings.js fills a copy for a binding a live event lists
+             and the page doesn't (CustomBindingsUpdatedEvent). */-->
+        <template id="custom-binding-item-template">
+            <mdui-collapse-item class="custom-binding-item">
+                <mdui-list-item slot="header">
+                    <span class="custom-binding-name-label"></span>
+                    <span class="custom-binding-game-label">—</span>
+                    <span class="custom-binding-active-chip hidden" th:text="#{channel.custom_bindings.active}">Actif</span>
+                    <span class="custom-binding-uninterruptible-chip hidden"
+                          th:text="#{channel.custom_bindings.uninterruptible}">Ininterruptible</span>
+                </mdui-list-item>
+                <mdui-list-item>
+                    <th:block th:replace="~{pages/channel-tab/overview :: customBindingForm(null, false, true)}"></th:block>
+                </mdui-list-item>
+            </mdui-collapse-item>
+        </template>
 
         <mdui-dialog id="custom-binding-delete-dialog" close-on-overlay-click
                      th:attr="headline=#{channel.custom_bindings.settings.delete.title}">
@@ -275,9 +295,10 @@
     </th:block>
 </mdui-tab-panel>
 
-<!--/* A custom binding's edit form (b null: the empty one creating a binding), in the same panels as an
-     association's: the name and Twitch category, its CCLs, its TWs, uninterruptible, then the actions. */-->
-<th:block th:fragment="customBindingForm(b, active)">
+<!--/* A custom binding's edit form (b null: an empty one), in the same panels as an association's: the name and
+     Twitch category, its CCLs, its TWs, uninterruptible, then the actions; activating and deleting only for a saved
+     binding (saved), the "New" row's form creating one. */-->
+<th:block th:fragment="customBindingForm(b, active, saved)">
     <div class="binding-edit-panel">
         <mdui-text-field class="custom-binding-name" variant="outlined" maxlength="40" autocomplete="off"
                          th:value="${b?.name()}"
@@ -313,7 +334,7 @@
     </div>
 
     <div class="custom-binding-actions">
-        <th:block th:if="${b != null}">
+        <th:block th:if="${saved}">
             <mdui-button class="custom-binding-activate" variant="filled" th:classappend="${active} ? 'hidden'"
                          th:text="#{channel.custom_bindings.activate}">Activer</mdui-button>
             <mdui-button class="custom-binding-stop" variant="tonal" th:classappend="${active} ? '' : 'hidden'"
@@ -321,7 +342,7 @@
         </th:block>
         <mdui-button class="custom-binding-save" variant="outlined"
                      th:text="#{channel.custom_bindings.settings.save}">Enregistrer</mdui-button>
-        <mdui-button th:if="${b != null}" class="custom-binding-delete" variant="text" icon="delete"
+        <mdui-button th:if="${saved}" class="custom-binding-delete" variant="text" icon="delete"
                      th:text="#{channel.custom_bindings.settings.delete}">Supprimer</mdui-button>
     </div>
 </th:block>

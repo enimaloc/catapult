@@ -476,6 +476,75 @@ describe("channel-settings", () => {
         ]);
     });
 
+    const ALL = {
+        ccl: { enabled: true, blockedCcls: ["Drugs"] },
+        tw: { enabled: false, blockedTws: ["flashing"] },
+        noGame: { twitchGameId: "509658", twitchGameName: "Just Chatting", ccls: ["Gore"],
+            applyOnStreamStart: true, applyOnNoGame: false, applyOnStreamEnd: true },
+        incompleteFallback: { twitchGameId: null, twitchGameName: null, ccls: [] },
+    };
+    const byId = id => document.getElementById(id);
+    const edit = (el, checked) => {
+        el.checked = checked;
+        el.dispatchEvent(new Event("change", { bubbles: true }));
+    };
+    const type = (el, value) => {
+        el.value = value;
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+    };
+
+    it("keeps an unsaved edit when the same settings come again (a reconnection's catch-up)", () => {
+        edit(byId("ccl-enabled-checkbox"), false);
+        edit(document.querySelector(".tw-block-checkbox[value=spiders]"), true);
+        type(byId("no-game-game-input"), "Fortn");
+
+        CatapultSettings.apply(ALL);
+
+        expect(byId("ccl-enabled-checkbox").checked).toBe(false);
+        expect(document.querySelector(".tw-block-checkbox[value=spiders]").checked).toBe(true);
+        expect(byId("no-game-game-input").value).toBe("Fortn");
+    });
+
+    it("keeps an unsaved edit while another field takes the server's new value", () => {
+        edit(byId("ccl-enabled-checkbox"), false);
+        type(byId("no-game-game-input"), "Fortn");
+
+        CatapultSettings.apply({ ...ALL, ccl: { enabled: true, blockedCcls: ["Gore"] },
+            noGame: { ...ALL.noGame, twitchGameId: "33214", twitchGameName: "Fortnite", applyOnNoGame: true } });
+
+        expect(byId("ccl-enabled-checkbox").checked).toBe(false);
+        expect(document.querySelector(".ccl-block-checkbox[value=Gore]").checked).toBe(true);
+        expect(document.querySelector(".ccl-block-checkbox[value=Drugs]").checked).toBe(false);
+        expect(byId("no-game-game-input").value).toBe("Fortn");
+        expect(byId("no-game-game-id").value).toBe("509658");
+        expect(byId("no-game-apply-no-game").checked).toBe(true);
+    });
+
+    it("takes the server's settings again once the card is saved, or back to what was set", async () => {
+        edit(byId("ccl-enabled-checkbox"), false);
+        edit(byId("tw-enabled-checkbox"), true);
+        await click("#ccl-settings-save-btn");
+
+        CatapultSettings.apply(ALL);
+        expect(byId("ccl-enabled-checkbox").checked).toBe(true);
+        expect(byId("tw-enabled-checkbox").checked).toBe(true);
+
+        // The server now holds what the visitor set: their switch follows it from then on
+        CatapultSettings.apply({ ...ALL, tw: { enabled: true, blockedTws: ["flashing"] } });
+        CatapultSettings.apply(ALL);
+        expect(byId("tw-enabled-checkbox").checked).toBe(false);
+    });
+
+    it("keeps a refused save's edit", async () => {
+        posted.mockResolvedValueOnce(response(500));
+        edit(byId("ccl-enabled-checkbox"), false);
+        await click("#ccl-settings-save-btn");
+
+        CatapultSettings.apply(ALL);
+
+        expect(byId("ccl-enabled-checkbox").checked).toBe(false);
+    });
+
     it("ignores settings when the tab isn't there", () => {
         html("");
         render();
@@ -552,6 +621,20 @@ describe("channel-settings raid card", () => {
 
         CatapultSettings.apply({ raid: { restoreGameMinutes: null } });
         expect([enabled().checked, minutes().value, minutes().disabled]).toEqual([false, "45", true]);
+    });
+
+    it("keeps an unsaved delay or switch, until the card is saved", async () => {
+        renderRaidCard({ on: true, value: "30" });
+        minutes().value = "50";
+        minutes().dispatchEvent(new Event("input", { bubbles: true }));
+
+        CatapultSettings.apply({ raid: { restoreGameMinutes: 30 } });
+        CatapultSettings.apply({ raid: { restoreGameMinutes: 45 } });
+        expect([enabled().checked, minutes().value]).toEqual([true, "50"]);
+
+        await click("#raid-settings-save-btn");
+        CatapultSettings.apply({ raid: { restoreGameMinutes: 45 } });
+        expect(minutes().value).toBe("45");
     });
 
     it("leaves pages without the card alone", () => {

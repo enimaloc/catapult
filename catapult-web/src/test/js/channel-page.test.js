@@ -157,6 +157,20 @@ describe("bindings list helpers", () => {
         expect(document.querySelector("mdui-collapse").value).toBe("b2");
     });
 
+    it("leaves the row the visitor opened open when the game played now is told again", () => {
+        document.getElementById("channel-bindings-list").dataset.currentGame = "b1";
+        const accordion = document.querySelector("mdui-collapse");
+        accordion.value = "b2";
+
+        CatapultChannel.setCurrentGame("b1");
+        expect(accordion.value).toBe("b2");
+
+        CatapultChannel.setCurrentGame(null);
+        expect(accordion.value).toBeNull();
+        CatapultChannel.setCurrentGame("b1");
+        expect(accordion.value).toBe("b1");
+    });
+
     it("removes a row and reveals the empty state once the last one is gone", () => {
         CatapultChannel.removeBinding("b1");
         expect(CatapultChannel.getBindingsElements()).toHaveLength(1);

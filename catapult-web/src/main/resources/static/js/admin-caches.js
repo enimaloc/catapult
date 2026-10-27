@@ -1,7 +1,7 @@
 /**
  * The admin caches tab's entries: the detail button fetches the record behind an entry into the
- * dialog, the delete button evicts it once confirmed (AdminCachesController) and reloads the
- * results as they were. A failure is told with the view's data-error ({0}: the status, "—" when the
+ * dialog, the delete button evicts it once confirmed (AdminCachesController) and patches the
+ * results as they are shown (admin-tabs.js: the entry's row removed, same search, same page). A failure is told with the view's data-error ({0}: the status, "—" when the
  * request couldn't be sent). Listeners are delegated to the panel: its content comes and goes.
  */
 window.CatapultAdminCaches = (function () {
@@ -36,7 +36,7 @@ window.CatapultAdminCaches = (function () {
     async function evict(panel, root, button, name, query) {
         if (!await CatapultAdminTabs.confirmed(root, button.dataset.confirm)) return;
         const response = await attempt(root, () => CatapultCsrf.postJson(`/admin/caches/${name}/delete?${query}`, {}));
-        if (response) await CatapultAdminTabs.reloadResults(panel);
+        if (response) await CatapultAdminTabs.patch(panel);
     }
 
     function attach() {

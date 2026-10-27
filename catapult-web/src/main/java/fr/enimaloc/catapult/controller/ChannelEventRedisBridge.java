@@ -97,14 +97,17 @@ public class ChannelEventRedisBridge {
             if (name == null || data == null || !data.isObject()) throw new IllegalArgumentException("no name or data");
             String login = data.path("channelLogin").asString(null);
             if (login == null || login.isBlank()) throw new IllegalArgumentException("no channelLogin");
-            return events(name, login.toLowerCase(Locale.ROOT), data);
+            // when catapult-api published it, for a page to drop what arrives after something newer
+            JsonNode ts = envelope.get("ts");
+            Long publishedAt = ts != null && ts.isIntegralNumber() ? ts.asLong() : null;
+            return events(name, login.toLowerCase(Locale.ROOT), data, publishedAt);
         } catch (RuntimeException e) {
             log.warn("Dropped a malformed channel event on {}: {}", channel, e.getMessage());
             return List.of();
         }
     }
 
-    private static List<ChannelUpdatedEvent> events(String name, String login, JsonNode data) {
+    private static List<ChannelUpdatedEvent> events(String name, String login, JsonNode data, Long ts) {
         return switch (name) {
             case ChannelEvents.BOT_TOGGLED -> List.of(new BotStateChangedEvent(login,
                     read(data, ChannelEvents.BotToggled.class).enabled()));
@@ -119,13 +122,20 @@ public class ChannelEventRedisBridge {
             case ChannelEvents.BINDING_DELETED -> List.of(new BindingDeletedEvent(login,
                     read(data, ChannelEvents.BindingDeleted.class).bindingId()));
             case ChannelEvents.CUSTOM_BINDING_CHANGED -> List.of(new CustomBindingChangedEvent(login,
-                    read(data, ChannelEvents.CustomBindingChanged.class).activeId()));
-            case ChannelEvents.CUSTOM_BINDINGS_UPDATED -> List.of(new CustomBindingsUpdatedEvent(login));
+                    read(data, ChannelEvents.CustomBindingChanged.class).activeId(), ts));
+            case ChannelEvents.CUSTOM_BINDINGS_UPDATED -> {
+                var updated = read(data, ChannelEvents.CustomBindingsUpdated.class);
+                yield List.of(new CustomBindingsUpdatedEvent(login, updated.bindings(), updated.activeId(), ts));
+            }
             case ChannelEvents.SETTINGS_UPDATED -> List.of(new ChannelSettingsUpdatedEvent(login,
                     read(data, ChannelEvents.SettingsUpdated.class).settings()));
             case ChannelEvents.STEAM_PROFILE_CHANGED -> steam(login, read(data, ChannelEvents.SteamProfileChanged.class).profile());
             case ChannelEvents.CONNECTION_CHANGED -> connection(login, read(data, ChannelEvents.ConnectionChanged.class));
-            case ChannelEvents.DTDD_MAPPING_CHANGED -> List.of(new DtddMappingChangedEvent(login));
+            case ChannelEvents.DTDD_MAPPING_CHANGED -> {
+                var mapping = read(data, ChannelEvents.DtddMappingChanged.class);
+                yield List.of(new DtddMappingChangedEvent(login, mapping.igdbId(), mapping.current(),
+                        mapping.hasPending(), null, null));
+            }
             case ChannelEvents.MINECRAFT_LINK_CHANGED -> {
                 var link = read(data, ChannelEvents.MinecraftLinkChanged.class);
                 yield "NONE".equals(link.status()) ? List.of(new MinecraftDisconnectedEvent(login))
@@ -136,7 +146,7 @@ public class ChannelEventRedisBridge {
     }
 
     /** A binding's whole state, as each of the dashboard's binding events. */
-    private static List<ChannelUpdatedEvent> binding(String login, BindingDto binding) {
+    static List<ChannelUpdatedEvent> binding(String login, BindingDto binding) {
         if (binding == null || binding.id() == null) throw new IllegalArgumentException("no binding");
         String id = binding.id();
         Set<String> ccls = binding.ccls() == null ? Set.of() : binding.ccls();

@@ -71,10 +71,11 @@ beforeEach(async () => {
     window.CatapultSpa = { navigate: vi.fn(async () => {}) };
     window.mdui = { confirm: vi.fn(() => (confirmAnswer ? Promise.resolve() : Promise.reject())) };
     await load("channel-page", "admin-tabs", "admin-data");
+    window.CatapultAdminTabs.patch = vi.fn(async () => {});
 });
 
 describe("admin-data", () => {
-    it("opens a row's dialog, then saves the fields changed, then reloads the results", async () => {
+    it("opens a row's dialog, then saves the fields changed, then patches the results shown", async () => {
         page();
         await click(".admin-data-row .cell");
         expect(fetchedUrls()).toEqual([`/spa/admin/data/chat-command/row?id=${encodeURIComponent(ID)}`]);
@@ -89,7 +90,8 @@ describe("admin-data", () => {
         expect(posted.mock.calls).toEqual([[`/admin/data/chat-command/update?id=${encodeURIComponent(ID)}`,
             { name: "!lurker", template: "" }]]);
         expect(dialog().open).toBe(false);
-        expect(fetchedUrls().at(-1)).toBe("/spa/admin/data/chat-command?q=&page=0");
+        expect(CatapultAdminTabs.patch).toHaveBeenCalledWith(document.querySelector('mdui-tab-panel[value="data"]'));
+        expect(fetchedUrls()).toHaveLength(1); // the row's dialog only: the results are patched, not swapped
     });
 
     it("sends no field left as it was", async () => {

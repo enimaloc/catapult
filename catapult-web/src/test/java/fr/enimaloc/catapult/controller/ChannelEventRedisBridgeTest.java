@@ -1,6 +1,8 @@
 package fr.enimaloc.catapult.controller;
 
+import fr.enimaloc.catapult.common.dto.binding.CustomBindingDto;
 import fr.enimaloc.catapult.common.dto.channel.BindingDto;
+import fr.enimaloc.catapult.common.dto.channel.DtddMappingCurrentDto;
 import fr.enimaloc.catapult.common.event.ChannelEvents;
 import fr.enimaloc.catapult.event.BotStateChangedEvent;
 import fr.enimaloc.catapult.event.ChannelConnectionChangedEvent;
@@ -33,6 +35,7 @@ import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -77,13 +80,41 @@ class ChannelEventRedisBridgeTest {
     void customBindings_theActiveOneChanged_andTheListUpdated() {
         assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.CUSTOM_BINDING_CHANGED,
                 new ChannelEvents.CustomBindingChanged(owner.toString(), "Streamer", "b-1"))))
-                .containsExactly(new CustomBindingChangedEvent("streamer", "b-1"));
+                .containsExactly(new CustomBindingChangedEvent("streamer", "b-1", 1L));
         assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.CUSTOM_BINDING_CHANGED,
                 new ChannelEvents.CustomBindingChanged(owner.toString(), "Streamer", null))))
-                .containsExactly(new CustomBindingChangedEvent("streamer", null));
+                .containsExactly(new CustomBindingChangedEvent("streamer", null, 1L));
         assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.CUSTOM_BINDINGS_UPDATED,
-                new ChannelEvents.CustomBindingsUpdated(owner.toString(), "Streamer"))))
-                .containsExactly(new CustomBindingsUpdatedEvent("streamer"));
+                new ChannelEvents.CustomBindingsUpdated(owner.toString(), "Streamer", null, null))))
+                .containsExactly(new CustomBindingsUpdatedEvent("streamer", null, null, 1L));
+    }
+
+    @Test
+    void customBindings_withoutTheEnvelopesTime_atNoKnownTime() {
+        String body = JSON.writeValueAsString(Map.of("name", ChannelEvents.CUSTOM_BINDING_CHANGED,
+                "data", new ChannelEvents.CustomBindingChanged(owner.toString(), "Streamer", "b-1")));
+
+        assertThat(ChannelEventRedisBridge.events(channel, body))
+                .containsExactly(new CustomBindingChangedEvent("streamer", "b-1", null));
+    }
+
+    @Test
+    void customBindings_theListCarriesEveryBindingAndTheActiveOne() {
+        CustomBindingDto art = new CustomBindingDto(UUID.randomUUID(), "Art", "509660", "Art", List.of("Violence"),
+                List.of(), true);
+
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.CUSTOM_BINDINGS_UPDATED,
+                new ChannelEvents.CustomBindingsUpdated(owner.toString(), "Streamer", List.of(art), art.id().toString()))))
+                .containsExactly(new CustomBindingsUpdatedEvent("streamer", List.of(art), art.id().toString(), 1L));
+    }
+
+    @Test
+    void dtddMapping_theMappingAndWhetherAProposalIsPending() {
+        DtddMappingCurrentDto current = new DtddMappingCurrentDto(7L, "Valheim", 0.8, false);
+
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.DTDD_MAPPING_CHANGED,
+                new ChannelEvents.DtddMappingChanged(owner.toString(), "streamer", "42", current, true))))
+                .containsExactly(new DtddMappingChangedEvent("streamer", "42", current, true, null, null));
     }
 
     @Test
@@ -134,7 +165,7 @@ class ChannelEventRedisBridgeTest {
                 new ChannelEvents.SettingsUpdated(owner.toString(), "streamer", settings))))
                 .containsExactly(new ChannelSettingsUpdatedEvent("streamer", settings));
         assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.DTDD_MAPPING_CHANGED,
-                new ChannelEvents.DtddMappingChanged(owner.toString(), "streamer"))))
+                new ChannelEvents.DtddMappingChanged(owner.toString(), "streamer", null, null, null))))
                 .containsExactly(new DtddMappingChangedEvent("streamer"));
     }
 

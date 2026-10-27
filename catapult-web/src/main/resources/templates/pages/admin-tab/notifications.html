@@ -19,12 +19,15 @@
 
     <div data-admin-results>
         <th:block th:if="${notifications == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
-        <th:block th:if="${notifications != null and notifications.content().isEmpty()}">
+        <!--/* the list and its empty state both rendered, one hidden: admin-tabs.js patches them after an edit */-->
+        <div data-admin-value="empty" th:if="${notifications != null}" th:hidden="${!notifications.content().isEmpty()}">
             <th:block th:replace="~{pages/admin-tab/common :: empty('notifications_off', #{admin.notifications.empty})}"></th:block>
-        </th:block>
+        </div>
 
-        <mdui-card class="admin-table" variant="outlined" th:if="${notifications != null and !notifications.content().isEmpty()}">
-            <div class="admin-row admin-notification-row" th:each="n : ${notifications.content()}" th:attr="data-id=${n.id()}">
+        <mdui-card class="admin-table" variant="outlined" data-admin-list="notifications" th:if="${notifications != null}"
+                   th:hidden="${notifications.content().isEmpty()}">
+            <div class="admin-row admin-notification-row" th:each="n : ${notifications.content()}"
+                 th:attr="data-id=${n.id()},data-admin-key=${n.id()}">
                 <mdui-icon class="admin-notification-severity" th:attr="data-severity=${n.severity()},
                            name=${n.severity().name() == 'ERROR' ? 'error' : (n.severity().name() == 'WARNING' ? 'warning' : 'info')},
                            title=#{${'notifications.severity.' + #strings.toLowerCase(n.severity().name())}}"></mdui-icon>
@@ -41,7 +44,9 @@
             </div>
         </mdui-card>
 
-        <th:block th:if="${notifications != null}"><th:block th:replace="~{pages/admin-tab/common :: pagination(${notifications})}"></th:block></th:block>
+        <div data-admin-value="pagination" th:if="${notifications != null}">
+            <th:block th:replace="~{pages/admin-tab/common :: pagination(${notifications})}"></th:block>
+        </div>
     </div>
 
     <mdui-dialog id="admin-notifications-dialog" class="admin-dialog" close-on-overlay-click>

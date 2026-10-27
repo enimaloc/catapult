@@ -1,7 +1,9 @@
 package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.event.ChannelUpdatedEvent;
+import fr.enimaloc.catapult.event.binding.CustomBindingsUpdatedEvent;
 import fr.enimaloc.catapult.service.ApiService;
+import fr.enimaloc.catapult.service.http.ApiClient;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +21,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -30,7 +33,9 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * only, a few streams each (see {@link SessionStreams}), and only for a channel their member owns
  * or moderates (see {@link SessionChannels}): its events tell what the dashboard does. A channel is
  * named by its login, whatever its case. The streams are written by {@link SseStreams}, which also
- * closes them after a while and when their session logs out.
+ * closes them after a while and when their session logs out. What only the channel's owner sees
+ * (the custom bindings' list) goes to the streams its owner opened alone: a moderator's get the
+ * event without it ({@link #forModerators}).
  */
 @Slf4j
 @RestController
@@ -39,6 +44,8 @@ public class ChannelEventStreamController {
     private final SseStreams sse;
     /** The open streams by channel login, lower case; a channel without any is not kept. */
     private final Map<String, List<SseEmitter>> emittersByUsername = new ConcurrentHashMap<>();
+    /** The streams opened by the channel's owner, as their session's login told when subscribing. */
+    private final Set<SseEmitter> ownerEmitters = ConcurrentHashMap.newKeySet();
     private final SessionStreams streams;
 
     public ChannelEventStreamController(ApiService apiService, SseStreams sse) {
@@ -61,6 +68,10 @@ public class ChannelEventStreamController {
         String sessionId = session.getId();
         String channel = key(username);
         SseEmitter emitter = SseStreams.emitter();
+        String login = ApiClient.currentLogin();
+        if (login != null && channel.equals(key(login))) {
+            ownerEmitters.add(emitter);
+        }
         // Added within compute: remove() drops an emptied list atomically too.
         emittersByUsername.compute(channel, (name, list) -> {
             List<SseEmitter> emitters = list == null ? new CopyOnWriteArrayList<>() : list;
@@ -76,9 +87,19 @@ public class ChannelEventStreamController {
     public void onChannelUpdated(ChannelUpdatedEvent event) {
         if (event.username() == null) return;
         String name = event.getClass().getSimpleName();
+        ChannelUpdatedEvent forModerators = forModerators(event);
         for (SseEmitter emitter : emittersByUsername.getOrDefault(key(event.username()), List.of())) {
-            sse.send(emitter, name, event);
+            sse.send(emitter, name, ownerEmitters.contains(emitter) ? event : forModerators);
         }
+    }
+
+    /**
+     * {@code event} as a moderator's stream gets it: without the custom bindings, which catapult-api shows the
+     * owner alone (their page has no list to update).
+     */
+    static ChannelUpdatedEvent forModerators(ChannelUpdatedEvent event) {
+        return event instanceof CustomBindingsUpdatedEvent updated ? new CustomBindingsUpdatedEvent(updated.username())
+                : event;
     }
 
     private static String key(String username) {
@@ -87,6 +108,7 @@ public class ChannelEventStreamController {
 
     private void remove(String sessionId, String channel, SseEmitter emitter) {
         streams.closed(sessionId, emitter);
+        ownerEmitters.remove(emitter);
         emittersByUsername.computeIfPresent(channel, (name, list) -> {
             list.remove(emitter);
             return list.isEmpty() ? null : list;

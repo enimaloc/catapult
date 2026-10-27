@@ -1,6 +1,6 @@
 /*
  * The admin Trigger warnings tab: the three rebuilds (each confirmed with its own text), adding a
- * definition (checked before posting, reloads), and the double click that posts once.
+ * definition (checked before posting, patching the list), and the double click that posts once.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { flush, html, load, render, response } from "./helpers.js";
@@ -46,7 +46,7 @@ beforeEach(async () => {
     window.mdui = { confirm: vi.fn(() => (confirmAnswer ? Promise.resolve() : Promise.reject())), snackbar: vi.fn() };
     await load("admin-tabs", "admin-tw");
     window.CatapultChannel = { showError: vi.fn() };
-    window.CatapultAdminTabs.reload = vi.fn(async () => {});
+    window.CatapultAdminTabs.patch = vi.fn(async () => {});
     page();
 });
 
@@ -65,7 +65,7 @@ describe("admin-tw", () => {
             expect(rebuildButton(mode).disabled).toBe(false);
         }
         expect(posted).toHaveBeenCalledTimes(3);
-        expect(CatapultAdminTabs.reload).not.toHaveBeenCalled();
+        expect(CatapultAdminTabs.patch).not.toHaveBeenCalled();
     });
 
     it("does not rebuild when the confirmation is declined", async () => {
@@ -87,7 +87,7 @@ describe("admin-tw", () => {
         expect(window.mdui.snackbar).not.toHaveBeenCalled();
     });
 
-    it("adds a definition and reloads", async () => {
+    it("adds a definition, empties the card and patches the list", async () => {
         fill(field("id"), "gore");
         fill(field("label"), " Gore ");
         fill(field("sortOrder"), "5");
@@ -96,7 +96,8 @@ describe("admin-tw", () => {
         expect(posted).toHaveBeenCalledTimes(1);
         expect(posted).toHaveBeenLastCalledWith("/admin/tw", { id: "gore", label: "Gore", sortOrder: 5 });
         expect(window.mdui.snackbar).toHaveBeenLastCalledWith({ message: "Created" });
-        expect(CatapultAdminTabs.reload).toHaveBeenCalledTimes(1);
+        expect(CatapultAdminTabs.patch).toHaveBeenCalledTimes(1);
+        expect([field("id").value, field("label").value]).toEqual(["", ""]);
     });
 
     it("does not post a bad id, an empty or long label, or a fractional order", async () => {
@@ -120,7 +121,7 @@ describe("admin-tw", () => {
         await click(".admin-tw-add-save");
         expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Taken");
         expect(field("id").value).toBe("gore");
-        expect(CatapultAdminTabs.reload).not.toHaveBeenCalled();
+        expect(CatapultAdminTabs.patch).not.toHaveBeenCalled();
 
         posted.mockClear();
         const button = document.querySelector(".admin-tw-add-save");
@@ -216,10 +217,10 @@ describe("admin-tw keywords", () => {
         expect(mdui.confirm).toHaveBeenLastCalledWith(expect.objectContaining({ headline: "Remove it?" }));
         expect(posted).toHaveBeenCalledWith("/admin/tw/violence/keywords/remove", { keyword: "gore/blood é" });
         expect(window.mdui.snackbar).toHaveBeenLastCalledWith({ message: "Removed" });
-        expect(CatapultAdminTabs.reload).toHaveBeenCalledTimes(1);
+        expect(CatapultAdminTabs.patch).toHaveBeenCalledTimes(1);
     });
 
-    it("adds a keyword of 2 to 50 characters and reloads; refuses others without posting", async () => {
+    it("adds a keyword of 2 to 50 characters and patches the list; refuses others without posting", async () => {
         for (const bad of ["a", " a ", "x".repeat(51), ""]) {
             fill(kw("keyword"), bad);
             await click(".admin-tw-keyword-add");
@@ -232,7 +233,8 @@ describe("admin-tw keywords", () => {
         await click(".admin-tw-keyword-add");
         expect(posted).toHaveBeenCalledWith("/admin/tw/violence/keywords", { keyword: "blood" });
         expect(window.mdui.snackbar).toHaveBeenLastCalledWith({ message: "Added" });
-        expect(CatapultAdminTabs.reload).toHaveBeenCalledTimes(1);
+        expect(CatapultAdminTabs.patch).toHaveBeenCalledTimes(1);
+        expect(kw("keyword").value).toBe("");
     });
 
     it("tells the refusal by status and posts once on a double click", async () => {
@@ -240,7 +242,7 @@ describe("admin-tw keywords", () => {
         fill(kw("keyword"), "blood");
         await click(".admin-tw-keyword-add");
         expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Gone");
-        expect(CatapultAdminTabs.reload).not.toHaveBeenCalled();
+        expect(CatapultAdminTabs.patch).not.toHaveBeenCalled();
 
         posted.mockClear();
         const button = document.querySelector(".admin-tw-keyword-add");

@@ -6,6 +6,9 @@ const navChannels = document.querySelector("#nav-channels");
 const NAV_REFRESH_MS = 5 * 60_000;
 const NAV_STALE_MS = 60_000;
 let navLoadedAt = 0;
+let navMarkup = null;
+// Bumped by each live patch: a response that began before one holds a stale ring.
+let navPatches = 0;
 
 const config = window.Catapult;
 
@@ -113,17 +116,26 @@ function currentPath() {
 /**
  * Fills the navbar with the member's channels (absent when logged out). Fetched once the page
  * is on its way rather than rendered with it: the page never waits on catapult-api for them.
+ * The list is only rewritten when it differs from what was last fetched, unless {@code force}d
+ * (the server said it changed).
  */
-async function loadNavChannels() {
+async function loadNavChannels(force = false) {
     if (!navChannels) {
         return;
     }
+    const patchesAtStart = navPatches;
     try {
         const response = await fetch("/spa/nav-channels");
         if (!response.ok) {
             return;
         }
-        navChannels.innerHTML = await response.text();
+        const markup = await response.text();
+        const stale = navPatches !== patchesAtStart;
+        if (force || (!stale && markup !== navMarkup)) {
+            navChannels.innerHTML = markup;
+            // A stale response is never the reference: the next poll rewrites.
+            navMarkup = stale ? null : markup;
+        }
         navLoadedAt = Date.now();
     } catch {
         return; // the navbar just stays without them
@@ -142,9 +154,12 @@ function listenNavChannels() {
     }
     // A reconnection (e.g. the server restarted) may have missed events, and the server
     // its record of this navbar: reloading it catches up on both.
-    CatapultLive.onReopen(loadNavChannels);
-    CatapultLive.on("NavChannelsChanged", () => loadNavChannels());
+    CatapultLive.onReopen(() => loadNavChannels(true));
+    CatapultLive.on("NavChannelsChanged", () => loadNavChannels(true));
     CatapultLive.on("NavChannelLive", ({ username, live }) => {
+        // The ring is part of the markup: the DOM no longer matches what was last fetched.
+        navMarkup = null;
+        navPatches++;
         [...navChannels.querySelectorAll(".nav-channel")]
             .find(a => a.getAttribute("href") === `/channel/${username}`)
             ?.classList.toggle("live", live);

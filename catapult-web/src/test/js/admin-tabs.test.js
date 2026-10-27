@@ -335,4 +335,272 @@ describe("admin-tabs", () => {
         expect(shown()).toBe("/spa/admin/caches");
         expect(location.hash).toBe("#caches");
     });
+
+    describe("patching a view after an edit", () => {
+        /** The caches tab as the server renders it with `rows` ([key, text]) and a create form. */
+        const view = (rows, { count = rows.length, at = "2026-01-01T00:00:00Z" } = {}) => `
+            <div class="view-root">
+                <span data-admin-value="count">${count} rows</span>
+                <div data-admin-value="empty" ${rows.length ? "hidden" : ""}>None</div>
+                <div data-admin-list="rows" ${rows.length ? "" : "hidden"}>
+                    <div class="head">Head</div>
+                    ${rows.map(([key, text]) => `<div class="row" data-admin-key="${key}"><b>${text}</b>
+                        <time data-live-time="${at}">rendered</time><button data-x="${text}"></button></div>`).join("")}
+                </div>
+                <form class="create"><input name="key"><input name="mode" value="NAME"></form>
+            </div>`;
+
+        let served;
+        const rowOf = key => panel().querySelector(`[data-admin-key="${key}"]`);
+        const keys = () => Array.from(panel().querySelectorAll("[data-admin-key]")).map(row => row.dataset.adminKey);
+
+        async function shownWith(rows) {
+            served = view(rows);
+            fetched.mockImplementation(async () => response(200, served));
+            page("caches");
+            await flush();
+        }
+
+        it("inserts a new row at its place, removes a gone one and patches a changed one, leaving the rest", async () => {
+            await shownWith([["a", "A"], ["b", "B"], ["c", "C"]]);
+            const a = rowOf("a");
+            const b = rowOf("b");
+            const field = panel().querySelector('[name="key"]');
+            field.value = "typing";
+            served = view([["a", "A"], ["new", "New"], ["b", "B2"]]);
+
+            await CatapultAdminTabs.patch(panel());
+
+            expect(keys()).toEqual(["a", "new", "b"]);
+            expect(rowOf("a")).toBe(a);
+            expect(rowOf("b")).toBe(b);
+            expect(b.querySelector("b").textContent).toBe("B2");
+            expect(b.querySelector("button").dataset.x).toBe("B2");
+            expect(panel().querySelector('[data-admin-value="count"]').textContent).toBe("3 rows");
+            expect(panel().querySelector(".head").textContent).toBe("Head");
+            expect(panel().querySelector('[name="key"]')).toBe(field);
+            expect(field.value).toBe("typing");
+            expect(urls()).toEqual(["/spa/admin/caches", "/spa/admin/caches"]);
+        });
+
+        it("shows the empty state, then the list again, by their hidden attribute", async () => {
+            await shownWith([["a", "A"]]);
+            const list = panel().querySelector("[data-admin-list]");
+            served = view([]);
+
+            await CatapultAdminTabs.patch(panel());
+            expect(keys()).toEqual([]);
+            expect(list.hidden).toBe(true);
+            expect(panel().querySelector('[data-admin-value="empty"]').hidden).toBe(false);
+
+            served = view([["z", "Z"]]);
+            await CatapultAdminTabs.patch(panel());
+            expect(panel().querySelector("[data-admin-list]")).toBe(list);
+            expect(list.hidden).toBe(false);
+            expect(keys()).toEqual(["z"]);
+        });
+
+        it("leaves a row the server renders the same alone, whatever a script did to it", async () => {
+            await shownWith([["a", "A"]]);
+            const time = rowOf("a").querySelector("time");
+            time.textContent = "3 minutes ago";
+            rowOf("a").setAttribute("data-busy", "");
+
+            await CatapultAdminTabs.patch(panel());
+
+            expect(time.textContent).toBe("3 minutes ago");
+            expect(rowOf("a").hasAttribute("data-busy")).toBe(true);
+        });
+
+        it("keeps a live time's text in a patched row unless its time changed", async () => {
+            await shownWith([["a", "A"]]);
+            const time = rowOf("a").querySelector("time");
+            time.textContent = "3 minutes ago";
+            served = view([["a", "A2"]]);
+            await CatapultAdminTabs.patch(panel());
+            expect(rowOf("a").querySelector("time")).toBe(time);
+            expect(time.textContent).toBe("3 minutes ago");
+
+            served = view([["a", "A2"]], { at: "2026-02-01T00:00:00Z" });
+            await CatapultAdminTabs.patch(panel());
+            expect(rowOf("a").querySelector("time")).not.toBe(time);
+            expect(rowOf("a").querySelector("time").dataset.liveTime).toBe("2026-02-01T00:00:00Z");
+        });
+
+        it("announces the inserted rows only", async () => {
+            await shownWith([["a", "A"]]);
+            const announced = [];
+            document.addEventListener("catapult:admin-panel", event => announced.push(event.detail));
+            served = view([["a", "A"], ["b", "B"]]);
+
+            await CatapultAdminTabs.patch(panel());
+
+            expect(announced).toHaveLength(1);
+            expect(announced[0].tab).toBe("caches");
+            expect(announced[0].panel).toBe(panel());
+            expect(announced[0].root).toBe(rowOf("b"));
+        });
+
+        it("renders the whole view again when its marked parts no longer match (a list now unavailable)", async () => {
+            await shownWith([["a", "A"]]);
+            const announced = vi.fn();
+            document.addEventListener("catapult:admin-panel", event => announced(event.detail.root));
+            served = `<p class="view">unavailable</p>`;
+
+            await CatapultAdminTabs.patch(panel());
+
+            expect(shown()).toBe("unavailable");
+            expect(announced).toHaveBeenCalledWith(panel());
+        });
+
+        it("says so when the view can't be fetched again, leaving it as it was", async () => {
+            await shownWith([["a", "A"]]);
+            fetched.mockRejectedValueOnce(new TypeError("offline"));
+
+            await CatapultAdminTabs.patch(panel());
+
+            expect(document.querySelector("mdui-snackbar").textContent).toBe("Unavailable");
+            expect(keys()).toEqual(["a"]);
+        });
+
+        it("drops the answer of a view the admin left meanwhile", async () => {
+            await shownWith([["a", "A"]]);
+            let answer;
+            fetched.mockImplementationOnce(() => new Promise(resolve => { answer = () => resolve(response(200, view([]))); }));
+            const patching = CatapultAdminTabs.patch(panel());
+            served = `<p class="view">other</p>`;
+            history.replaceState(null, "", "/admin#caches/other");
+            await CatapultAdminTabs.show(panel());
+            answer();
+            await patching;
+
+            expect(shown()).toBe("other");
+        });
+
+        it("patches a searched or paged view from the results it shows, or from the URL a tab script gives", async () => {
+            served = view([["a", "A"]]);
+            fetched.mockImplementation(async () => response(200, served));
+            history.replaceState(null, "", "/admin#caches/igdb-game-cache");
+            page();
+            await flush();
+            panel().insertAdjacentHTML("beforeend", `<div data-admin-results></div><button data-admin-page="2"></button>`);
+            panel().querySelector('[data-admin-page="2"]').click();
+            await flush();
+
+            await CatapultAdminTabs.patch(panel());
+            await CatapultAdminTabs.patch(panel(), "/spa/admin/caches?status=OTHER");
+
+            expect(urls().slice(-2)).toEqual(["/spa/admin/caches/igdb-game-cache?q=&page=2", "/spa/admin/caches?status=OTHER"]);
+        });
+
+        it("keeps an attribute a component reflected onto itself in a morphed row, removes one the server dropped", async () => {
+            if (!customElements.get("x-reflecting")) {
+                customElements.define("x-reflecting", class extends HTMLElement {
+                    static elementProperties = new Map([["variant", { reflect: true }], ["placement", { reflect: true, attribute: "placement" }]]);
+                    connectedCallback() {
+                        if (!this.hasAttribute("variant")) this.setAttribute("variant", "assist");
+                    }
+                });
+            }
+            const row = (text, extra) => `<div data-admin-list="rows"><div data-admin-key="a"><x-reflecting ${extra}>${text}</x-reflecting></div></div>`;
+            served = row("A", 'data-old="1"');
+            fetched.mockImplementation(async () => response(200, served));
+            page("caches");
+            await flush();
+            const chip = panel().querySelector("x-reflecting");
+            expect(chip.getAttribute("variant")).toBe("assist");
+
+            served = row("A2", "");
+            await CatapultAdminTabs.patch(panel());
+
+            expect(panel().querySelector("x-reflecting")).toBe(chip);
+            expect(chip.textContent).toBe("A2");
+            expect(chip.getAttribute("variant")).toBe("assist");
+            expect(chip.hasAttribute("data-old")).toBe(false);
+        });
+
+        it("without the server's previous render of a row, removes only attributes no component reflects", async () => {
+            await shownWith([["a", "A"]]);
+            const list = panel().querySelector("[data-admin-list]");
+            list.insertAdjacentHTML("beforeend", `<div class="row" data-admin-key="z"><x-reflecting variant="assist" data-stale="1">Z</x-reflecting></div>`);
+            served = view([["a", "A"]]).replace("</div>\n                <form", `<div class="row" data-admin-key="z"><x-reflecting>Z2</x-reflecting></div></div>\n                <form`);
+            customElements.get("x-reflecting") ?? customElements.define("x-reflecting", class extends HTMLElement {
+                static elementProperties = new Map([["variant", { reflect: true }]]);
+            });
+
+            await CatapultAdminTabs.patch(panel());
+
+            const chip = rowOf("z").querySelector("x-reflecting");
+            expect(chip.textContent).toBe("Z2");
+            expect(chip.getAttribute("variant")).toBe("assist");
+            expect(chip.hasAttribute("data-stale")).toBe(false);
+        });
+
+        it("leaves the list's own element alone while the server renders it the same", async () => {
+            await shownWith([["a", "A"]]);
+            const list = panel().querySelector("[data-admin-list]");
+            list.setAttribute("data-busy", "");
+            served = view([["a", "A"], ["b", "B"]]);
+
+            await CatapultAdminTabs.patch(panel());
+
+            expect(list.hasAttribute("data-busy")).toBe(true);
+            expect(keys()).toEqual(["a", "b"]);
+        });
+
+        it("reorders kept rows without patching them, and keeps a plain row between keyed ones in its place", async () => {
+            const sorted = order => `<div data-admin-list="rows">
+                <div class="head">Head</div>
+                ${order.map(key => key === "-" ? `<div class="divider">-</div>` : `<div data-admin-key="${key}">${key}</div>`).join("")}
+            </div>`;
+            served = sorted(["a", "-", "b", "c"]);
+            fetched.mockImplementation(async () => response(200, served));
+            page("caches");
+            await flush();
+            const [a, b, c] = ["a", "b", "c"].map(rowOf);
+            served = sorted(["c", "-", "a", "b"]);
+
+            await CatapultAdminTabs.patch(panel());
+
+            const children = Array.from(panel().querySelector("[data-admin-list]").children);
+            expect(children.map(child => child.dataset.adminKey ?? child.className)).toEqual(["head", "c", "divider", "a", "b"]);
+            expect([rowOf("a"), rowOf("b"), rowOf("c")]).toEqual([a, b, c]);
+        });
+
+        it("drops a patch's answer once a newer patch started after it", async () => {
+            await shownWith([["a", "A"]]);
+            let answerOld;
+            fetched.mockImplementationOnce(() => new Promise(resolve => { answerOld = () => resolve(response(200, view([["old", "Old"]]))); }));
+            const older = CatapultAdminTabs.patch(panel());
+            served = view([["a", "A"], ["new", "New"]]);
+            await CatapultAdminTabs.patch(panel());
+            answerOld();
+            await older;
+
+            expect(keys()).toEqual(["a", "new"]);
+        });
+
+        it("renders a view never shown as a whole", async () => {
+            page("members");
+            await flush();
+
+            await CatapultAdminTabs.patch(panel());
+
+            expect(shown()).toBe("/spa/admin/caches");
+        });
+
+        it("empties a form's fields back to their rendered value", async () => {
+            await shownWith([]);
+            const form = panel().querySelector(".create");
+            form.querySelector('[name="key"]').value = "typed";
+            form.querySelector('[name="key"]').setAttribute("invalid", "");
+            form.querySelector('[name="mode"]').value = "PROPERTY";
+
+            CatapultAdminTabs.reset(form);
+
+            expect(form.querySelector('[name="key"]').value).toBe("");
+            expect(form.querySelector('[name="key"]').hasAttribute("invalid")).toBe(false);
+            expect(form.querySelector('[name="mode"]').value).toBe("NAME");
+        });
+    });
 });

@@ -2,7 +2,7 @@
  * The admin CCL tab. A card's descriptors come selected from its data-saved (mdui-select only
  * takes a multiple value from JS), its Save is enabled while the selection differs from them,
  * and posts it to AdminCclController. Refresh asks catapult-api to reload the CCLs from Twitch,
- * then reloads the tab. A failure is told with the view's data-error ({0}: the status, "—" when the
+ * then renders the tab again (every card may have changed). A failure is told with the view's data-error ({0}: the status, "—" when the
  * request couldn't be sent). Listeners are delegated to the panel: its content comes and goes.
  */
 window.CatapultAdminCcl = (function () {
@@ -10,8 +10,9 @@ window.CatapultAdminCcl = (function () {
     const selected = select => (Array.isArray(select.value) ? select.value : []);
     const same = (a, b) => a.length === b.length && a.every(value => b.includes(value));
 
-    function selectSaved(panel) {
-        panel.querySelectorAll("[data-ccl-id]").forEach(card => {
+    /** Selects the saved descriptors of each card in `root` (the panel, or a card inserted into it). */
+    function selectSaved(root) {
+        [root, ...root.querySelectorAll("[data-ccl-id]")].filter(card => card.matches("[data-ccl-id]")).forEach(card => {
             card.querySelector(".admin-ccl-select").value = saved(card);
         });
     }
@@ -42,6 +43,7 @@ window.CatapultAdminCcl = (function () {
         button.disabled = true;
         button.loading = true;
         if (await post(panel, "/admin/ccl/refresh", {})) {
+            // a refresh from Twitch may change, add or drop every card: the tab is rendered again
             await CatapultAdminTabs.reload(panel);
         } else {
             button.disabled = false;
@@ -69,7 +71,7 @@ window.CatapultAdminCcl = (function () {
 
     document.addEventListener("catapult:render", attach);
     document.addEventListener("catapult:admin-panel", event => {
-        if (event.detail.tab === "ccl") selectSaved(event.detail.panel);
+        if (event.detail.tab === "ccl") selectSaved(event.detail.root ?? event.detail.panel);
     });
 
     return { attach };

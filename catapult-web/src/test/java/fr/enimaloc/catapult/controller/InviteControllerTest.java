@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.controller;
 
+import fr.enimaloc.catapult.common.dto.InvitePageData;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
@@ -19,6 +20,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -58,7 +60,7 @@ class InviteControllerTest {
 
     @Test
     void regenerate_needsLoginAndCsrf() throws Exception {
-        when(apiService.regenerateInvite()).thenReturn(204);
+        when(apiService.regenerateInvite()).thenReturn(new ApiClient.Result<>(204, null));
 
         mvc.perform(post("/invite/regenerate").session(member()).with(csrf()))
                 .andExpect(status().isNoContent());
@@ -72,9 +74,30 @@ class InviteControllerTest {
 
     @Test
     void regenerate_relaysCatapultApisRefusal() throws Exception {
-        when(apiService.regenerateInvite()).thenReturn(403);
+        when(apiService.regenerateInvite()).thenReturn(new ApiClient.Result<>(403, null));
 
         mvc.perform(post("/invite/regenerate").session(member()).with(csrf()))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void regenerate_answersTheNewCodeAndLink() throws Exception {
+        when(apiService.regenerateInvite()).thenReturn(new ApiClient.Result<>(200, new InvitePageData(true,
+                java.util.UUID.randomUUID(), "NEWCODE2", "https://catapult.example/join?invite=NEWCODE2", null,
+                java.util.List.of(new fr.enimaloc.catapult.common.dto.InviteRedemptionDto("friend", null)))));
+
+        mvc.perform(post("/invite/regenerate").session(member()).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(content().json("{\"code\":\"NEWCODE2\","
+                        + "\"inviteUrl\":\"https://catapult.example/join?invite=NEWCODE2\"}", org.springframework.test.json.JsonCompareMode.STRICT));
+    }
+
+    @Test
+    void regenerate_withoutAnInviteAnymore_answersNoContent() throws Exception {
+        when(apiService.regenerateInvite()).thenReturn(new ApiClient.Result<>(200,
+                new InvitePageData(false, null, null, null, null, java.util.List.of())));
+
+        mvc.perform(post("/invite/regenerate").session(member()).with(csrf()))
+                .andExpect(status().isNoContent());
     }
 }

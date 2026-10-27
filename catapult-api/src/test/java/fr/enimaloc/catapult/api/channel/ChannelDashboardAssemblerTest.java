@@ -633,6 +633,7 @@ class ChannelDashboardAssemblerTest {
 
             assertThat(status.igdbId()).isEqualTo("42");
             assertThat(status.canValidateDirectly()).isTrue();
+            assertThat(status.viewerIsAdmin()).isTrue();
             assertThat(status.current().dtddId()).isEqualTo(7L);
             assertThat(status.current().name()).isEqualTo("Valheim (2021)");
             assertThat(status.current().confidence()).isEqualTo(0.8);
@@ -651,6 +652,7 @@ class ChannelDashboardAssemblerTest {
             DtddMappingStatusDto status = assembler().dtddMapping(moderator, owner, false);
 
             assertThat(status.canValidateDirectly()).isFalse();
+            assertThat(status.viewerIsAdmin()).isFalse();
             assertThat(status.igdbId()).isEqualTo("42");
         }
 
@@ -696,7 +698,7 @@ class ChannelDashboardAssemblerTest {
 
             DtddMappingStatusDto status = assembler().dtddMapping(moderator, owner, true);
 
-            assertThat(status).isEqualTo(new DtddMappingStatusDto(null, null, false, "5"));
+            assertThat(status).isEqualTo(new DtddMappingStatusDto(null, null, false, "5", true));
         }
     }
 

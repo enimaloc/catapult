@@ -246,6 +246,67 @@ describe("the navbar's channels", () => {
             expect(navFetches()).toBe(before + 1);
         });
 
+        it("rewrites them only when the polled list differs from the last one", async () => {
+            const nav = document.getElementById("nav-channels");
+            const writes = [];
+            const observer = new MutationObserver(records => writes.push(...records));
+            observer.observe(nav, { childList: true, subtree: true });
+
+            fetchMock.mockImplementation(async () => response(200, NAV)); // same markup again
+            await CatapultSpa.loadNavChannels();
+            await flush();
+            expect(writes).toHaveLength(0);
+
+            fetchMock.mockImplementation(async () => response(200, NAV + '<a class="nav-channel" href="/channel/x">x</a>'));
+            await CatapultSpa.loadNavChannels();
+            await flush();
+            expect(writes.length).toBeGreaterThan(0);
+            expect(nav.querySelectorAll("a")).toHaveLength(3);
+            observer.disconnect();
+        });
+
+        it("rewrites them when told the list changed, even if the markup is the same", async () => {
+            const nav = document.getElementById("nav-channels");
+            const writes = [];
+            const observer = new MutationObserver(records => writes.push(...records));
+            observer.observe(nav, { childList: true, subtree: true });
+            FakeEventSource.last.fire("NavChannelsChanged", {});
+            await flush();
+            expect(writes.length).toBeGreaterThan(0);
+            observer.disconnect();
+        });
+
+        it("restores a ring patched live when the next poll brings the original markup", async () => {
+            FakeEventSource.last.fire("NavChannelLive", { username: "other", live: true });
+            expect(document.getElementById("c2").classList.contains("live")).toBe(true);
+
+            await CatapultSpa.loadNavChannels();
+            await flush();
+            expect(document.getElementById("c2").classList.contains("live")).toBe(false);
+        });
+
+        it("ignores a response that began before a live patch, then catches up", async () => {
+            let resolve;
+            fetchMock.mockImplementation(() => new Promise(r => { resolve = r; }));
+            const pending = CatapultSpa.loadNavChannels();
+            FakeEventSource.last.fire("NavChannelLive", { username: "other", live: true });
+            resolve(response(200, NAV));
+            await pending;
+            expect(document.getElementById("c2").classList.contains("live")).toBe(true);
+
+            fetchMock.mockImplementation(async () => response(200, NAV));
+            await CatapultSpa.loadNavChannels();
+            expect(document.getElementById("c2").classList.contains("live")).toBe(false);
+        });
+
+        it("rewrites them on a reconnection even if the markup is unchanged", async () => {
+            FakeEventSource.last.fire("open", {});
+            FakeEventSource.last.fire("NavChannelLive", { username: "other", live: true });
+            FakeEventSource.last.fire("open", {});
+            await flush();
+            expect(document.getElementById("c2").classList.contains("live")).toBe(false);
+        });
+
         it("reloads them on a reconnection, not on the first connection", async () => {
             const before = navFetches();
             FakeEventSource.last.fire("open", {});

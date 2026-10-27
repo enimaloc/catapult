@@ -1,9 +1,12 @@
 package fr.enimaloc.catapult.service.notification;
 
+import fr.enimaloc.catapult.common.dto.binding.CustomBindingDto;
 import fr.enimaloc.catapult.common.dto.channel.BindingDto;
+import fr.enimaloc.catapult.common.dto.channel.DtddMappingCurrentDto;
 import fr.enimaloc.catapult.common.event.ChannelEvents;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.account.UserSettings;
+import fr.enimaloc.catapult.domain.binding.CustomBinding;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
@@ -14,6 +17,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -164,9 +169,40 @@ class ChannelEventPublisherTest {
     }
 
     @Test
-    void customBindingsUpdated_namesTheChannel() {
-        publisher.customBindingsUpdated(ownerId);
+    void customBindingsUpdated_publishesTheBindingsAndTheActiveOne() {
+        CustomBinding art = new CustomBinding();
+        art.setId(UUID.randomUUID());
+        art.setName("Art");
+        art.setTwitchGameId("509660");
+        art.setTwitchGameName("Art");
+        art.setCcls(new HashSet<>(Set.of("ProfanityVulgarity", "DrugsIntoxication")));
+        art.setTws(new HashSet<>(Set.of("chill", "calm")));
+        art.setUninterruptible(true);
+
+        publisher.customBindingsUpdated(ownerId, List.of(art), art.getId());
+
         assertThat(published(ChannelEvents.CUSTOM_BINDINGS_UPDATED)).isEqualTo(
-                new ChannelEvents.CustomBindingsUpdated(ownerId.toString(), "streamername"));
+                new ChannelEvents.CustomBindingsUpdated(ownerId.toString(), "streamername", List.of(
+                        new CustomBindingDto(art.getId(), "Art", "509660", "Art",
+                                List.of("DrugsIntoxication", "ProfanityVulgarity"), List.of("calm", "chill"), true)),
+                        art.getId().toString()));
+    }
+
+    @Test
+    void customBindingsUpdated_withoutActiveOne() {
+        publisher.customBindingsUpdated(ownerId, List.of(), null);
+
+        assertThat(published(ChannelEvents.CUSTOM_BINDINGS_UPDATED)).isEqualTo(
+                new ChannelEvents.CustomBindingsUpdated(ownerId.toString(), "streamername", List.of(), null));
+    }
+
+    @Test
+    void dtddMappingChanged_publishesTheMappingAndWhetherAProposalIsPending() {
+        DtddMappingCurrentDto current = new DtddMappingCurrentDto(7L, "Valheim", 0.8, false);
+
+        publisher.dtddMappingChanged(ownerId, "42", current, true);
+
+        assertThat(published(ChannelEvents.DTDD_MAPPING_CHANGED)).isEqualTo(
+                new ChannelEvents.DtddMappingChanged(ownerId.toString(), "streamername", "42", current, true));
     }
 }

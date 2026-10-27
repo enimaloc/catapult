@@ -1,7 +1,7 @@
 /**
  * The admin data tab's rows: a row (or "New") fetches its dialog, Save posts its fields to
- * AdminDataController (create or update), Delete removes it once confirmed; then the results are
- * reloaded as they were. A refusal is told by its status (data-error-400/404/409 on the view,
+ * AdminDataController (create or update), Delete removes it once confirmed; then the results shown
+ * are patched (admin-tabs.js: the row inserted, updated or removed, same search, same page). A refusal is told by its status (data-error-400/404/409 on the view,
  * data-error for any other, its {0} "—" when the request couldn't be sent) and leaves the dialog
  * open. Listeners are delegated to the panel.
  */
@@ -56,7 +56,7 @@ window.CatapultAdminData = (function () {
             return;
         }
         dialog.open = false;
-        await CatapultAdminTabs.reloadResults(panel);
+        await CatapultAdminTabs.patch(panel);
     }
 
     async function onClick(panel, target) {

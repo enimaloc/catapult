@@ -12,6 +12,7 @@
 //   docker-stats.csv  time,container,cpu,memory lines (docker stats every 5 s)
 //   jvm-memory.csv    time,app,heapUsed,nonHeapUsed,heapMax lines in bytes (actuator metrics every 5 s)
 //   pages.json        the page timings: [{name, metric, samples, p50, p95, budget, note?}]
+//   dom-mutations.json  the DOM mutations per scenario: [{scenario, nodes, attributes, text, budget}]
 //   outbound.txt      log lines with a connection error towards a host outside the stack
 
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -267,6 +268,17 @@ export function pageTimings(pages) {
     }));
 }
 
+/**
+ * The DOM mutations per scenario, judged as dom-mutations.spec.ts does: nodes (added and removed) within
+ * the budget, attributes and text reported only. A scenario without a budget fails.
+ */
+export function domMutations(results) {
+    return (results ?? []).map(({ scenario, nodes, attributes, text, budget }) => ({
+        scenario, nodes, attributes, text, budget: budget ?? null,
+        ok: typeof budget === "number" && nodes <= budget,
+    }));
+}
+
 /** Everything a report says, from the files of `runDir`. */
 export function buildReport(runDir) {
     const read = (file) => (existsSync(join(runDir, file)) ? readFileSync(join(runDir, file), "utf8") : null);
@@ -292,6 +304,7 @@ export function buildReport(runDir) {
             groups: requestGroups(summary),
         } : null,
         pages: pageTimings(json("pages.json")),
+        dom: domMutations(json("dom-mutations.json")),
         containers,
         total,
         jvm: jvm?.apps.length ? jvm : null,
@@ -356,6 +369,7 @@ export function compare(current, previous) {
     };
     pairs("requests", (r) => r.requests?.groups, (g) => g.name, ["p50", "p95", "errorRate"]);
     pairs("pages", (r) => r.pages, (p) => `${p.name} (${p.metric})`, ["p50", "p95"]);
+    pairs("dom", (r) => r.dom, (d) => d.scenario, ["nodes", "attributes", "text"]);
     pairs("containers", (r) => r.containers, (c) => c.name, ["cpuAvg", "cpuPeak", "memAvgMiB", "memPeakMiB"]);
     if (current.total && previous.total) {
         for (const field of ["cpuAvg", "cpuPeak", "cpuSustained", "memAvgMiB", "memPeakMiB"]) {
@@ -376,6 +390,7 @@ const FIELD_LABELS = {
     cpuSustained: "sustained CPU (%)",
     memAvgMiB: "avg RSS (MiB)", memPeakMiB: "peak RSS (MiB)", heapPeakMiB: "peak used heap (MiB)",
     nonHeapPeakMiB: "peak used non-heap (MiB)", usedPeakMiB: "peak used heap + non-heap (MiB)",
+    nodes: "nodes added and removed", attributes: "attribute changes", text: "text changes",
 };
 
 const show = (value, suffix = "") => (value === null || value === undefined ? "–" : `${value}${suffix}`);
@@ -425,6 +440,22 @@ export function renderMarkdown(report) {
             table(["Page", "Metric", "p50 (ms)", "p95 (ms)", "Budget (ms)", "Result"],
                 report.pages.map((p) => [p.name, p.metric, show(p.p50), show(p.p95), show(p.budget),
                     (p.ok ? "pass" : "**FAIL**") + (p.note ? ` (${p.note})` : "")])),
+            "");
+    }
+
+    if (report.dom?.length) {
+        const change = (scenario) => report.previous?.deltas.find((d) => d.section === "dom" && d.name === scenario
+            && d.field === "nodes") ?? null;
+        out.push("## DOM mutations", "",
+            "Per scenario (dom-mutations.spec.ts), a MutationObserver on the page's body: the nodes added and "
+            + "removed (each with its descendants) against the budget, the attribute and text changes as "
+            + "reported. Δ nodes: against the previous run.", "",
+            table(["Scenario", "Nodes", "Attributes", "Text", "Budget (nodes)", "Δ nodes", "Result"],
+                report.dom.map((d) => {
+                    const delta = change(d.scenario);
+                    return [d.scenario, show(d.nodes), show(d.attributes), show(d.text), show(d.budget),
+                        delta ? `${signed(delta.delta)} (${signed(delta.pct, " %")})` : "–", d.ok ? "pass" : "**FAIL**"];
+                })),
             "");
     }
 

@@ -2,7 +2,8 @@
 <!--/*
   The social links shown in the footer of every page, in the order of this list (admin-social-links.js:
   the arrows send the whole order, the form below the list adds a link or saves the one picked with its
-  edit button). An address that isn't https is listed as text, never as a link.
+  edit button). An address that isn't https is listed as text, never as a link. The list and its empty
+  state are both rendered, one hidden, so that admin-tabs.js patches them after an edit (data-admin-*).
 */-->
 <div th:fragment="content" class="admin-view">
     <section class="admin-social-links"
@@ -12,17 +13,19 @@
         <div class="section-header">
             <div>
                 <h2 th:text="#{admin.social-links.title}">Social links</h2>
-                <span class="eyebrow" th:if="${links != null}" th:text="#{admin.social-links.count(${links.size()})}">0 links</span>
+                <span class="eyebrow" data-admin-value="links-count" th:if="${links != null}"
+                      th:text="#{admin.social-links.count(${links.size()})}">0 links</span>
             </div>
         </div>
         <p class="admin-cell-muted" th:text="#{admin.social-links.hint}">Shown in the footer.</p>
 
         <th:block th:if="${links == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
-        <th:block th:if="${links != null and links.isEmpty()}">
+        <div data-admin-value="links-empty" th:if="${links != null}" th:hidden="${!links.isEmpty()}">
             <th:block th:replace="~{pages/admin-tab/common :: empty('share', #{admin.social-links.empty})}"></th:block>
-        </th:block>
+        </div>
 
-        <mdui-card class="admin-table" variant="outlined" th:if="${links != null and !links.isEmpty()}">
+        <mdui-card class="admin-table" variant="outlined" data-admin-list="links" th:if="${links != null}"
+                   th:hidden="${links.isEmpty()}">
             <div class="admin-row admin-social-link-row admin-row-head" aria-hidden="true">
                 <span th:text="#{admin.social-links.column.platform}">Platform</span>
                 <span th:text="#{admin.social-links.column.label}">Label</span>
@@ -31,7 +34,7 @@
             </div>
             <div class="admin-row admin-social-link-row" th:each="l : ${links}"
                  th:with="name=${l.label() != null and !#strings.isEmpty(l.label())} ? ${l.label()} : #{'social.platform.' + ${l.platform()}}"
-                 th:attr="data-id=${l.id()},data-platform=${l.platform()},data-label=${l.label()},data-url=${l.url()},data-visible=${l.visible()}">
+                 th:attr="data-id=${l.id()},data-admin-key=${l.id()},data-platform=${l.platform()},data-label=${l.label()},data-url=${l.url()},data-visible=${l.visible()}">
                 <span class="admin-social-link-platform">
                     <th:block th:replace="~{fragments/social-icon :: icon(${l.platform()})}"></th:block>
                     <span th:text="#{'social.platform.' + ${l.platform()}}">GitHub</span>

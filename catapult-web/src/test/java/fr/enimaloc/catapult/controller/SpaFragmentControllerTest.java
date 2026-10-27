@@ -1,7 +1,14 @@
 package fr.enimaloc.catapult.controller;
 
+import fr.enimaloc.catapult.common.dto.channel.BindingDto;
 import fr.enimaloc.catapult.common.dto.channel.ChannelDto;
 import fr.enimaloc.catapult.common.dto.channel.ChannelListResponse;
+import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
+import fr.enimaloc.catapult.common.dto.channel.ChannelUserDto;
+import fr.enimaloc.catapult.common.dto.channel.DtddMappingCurrentDto;
+import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
+import fr.enimaloc.catapult.common.dto.channel.GameDto;
+import fr.enimaloc.catapult.common.dto.channel.PagedBindings;
 import fr.enimaloc.catapult.config.TwitchatCatalogConfig;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
 import fr.enimaloc.catapult.service.ApiService;
@@ -13,9 +20,12 @@ import org.springframework.context.annotation.Import;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -136,5 +146,41 @@ class SpaFragmentControllerTest {
         }
         mvc.perform(get("/spa/help/..%2Fx")).andExpect(status().is4xxClientError());
         verify(apiService, never()).help(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void channelState_isThePagesStateAsItsEvents_forThePagesOwnQuery() throws Exception {
+        when(apiService.channelPage("enimaloc", 2, "AUTO", null)).thenReturn(new ChannelPageData(
+                new ChannelUserDto("1", "2", "enimaloc", "img"), "enimaloc", true, true, false,
+                new GameDto("b1", "Valheim", "STEAM"), new PagedBindings(2, 3, 1, List.of(new BindingDto("b1", "AUTO",
+                        "STEAM", "Valheim", "1", "Valheim", false, true, Set.of(), true, false, Set.of()))),
+                List.of(), Set.of(), List.of(), Set.of(), "AUTO", null, null, null, null, null, null, "uuid", null));
+        when(apiService.dtddMappingStatus("enimaloc")).thenReturn(new DtddMappingStatusDto(
+                new DtddMappingCurrentDto(7L, "Valheim", 0.8, true), null, false, "42", false));
+
+        String json = mvc.perform(get("/spa/channel/enimaloc/state").param("page", "2").param("status", "AUTO")
+                        .sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        JsonNode state = JsonMapper.builder().build().readTree(json);
+        assertThat(java.util.stream.IntStream.range(0, state.size()).mapToObj(i -> state.get(i).get("name").asString()))
+                .containsExactly("ChannelLiveStateEvent", "BotStateChangedEvent",
+                "GameChangedEvent", "BindingUpdatedEvent", "CclStateEvent", "BindingIgnoredStateEvent",
+                "TwEnabledStateEvent", "TwResetEvent", "DtddMappingChangedEvent");
+        assertThat(state.get(0).get("data").get("state").asBoolean()).isTrue();
+        assertThat(state.get(2).get("data").get("bindingId").asString()).isEqualTo("b1");
+        JsonNode dtdd = state.get(8).get("data");
+        assertThat(dtdd.get("igdbId").asString()).isEqualTo("42");
+        assertThat(dtdd.get("current").get("verified").asBoolean()).isTrue();
+        assertThat(dtdd.get("proposed").asBoolean()).isFalse();
+        assertThat(dtdd.get("validatable").asBoolean()).isFalse();
+    }
+
+    @Test
+    void channelState_refusesAVisitor_andAChannelCatapultApiDoesntGive() throws Exception {
+        mvc.perform(get("/spa/channel/enimaloc/state")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/spa/channel/enimaloc/state").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+                .andExpect(status().isNotFound());
     }
 }

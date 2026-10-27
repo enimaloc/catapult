@@ -108,9 +108,11 @@ class MockApiServiceTest {
         assertThat(before.inviteUrl()).endsWith("/join?invite=" + before.code());
         assertThat(before.redemptions()).isNotNull();
 
-        assertThat(service.regenerateInvite()).isEqualTo(204);
+        var regenerated = service.regenerateInvite();
+        assertThat(regenerated.status()).isEqualTo(200);
 
         var after = service.invitePage();
+        assertThat(regenerated.body().code()).isEqualTo(after.code());
         assertThat(after.code()).isNotEqualTo(before.code());
         assertThat(after.inviteUrl()).endsWith("/join?invite=" + after.code());
     }
@@ -120,7 +122,7 @@ class MockApiServiceTest {
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(new MockHttpServletRequest()));
 
         assertThat(service.invitePage()).isNull();
-        assertThat(service.regenerateInvite()).isEqualTo(401);
+        assertThat(service.regenerateInvite().status()).isEqualTo(401);
     }
 
     @Test

@@ -304,7 +304,20 @@ class RealApiServiceTest {
     void regenerateInvite_posts() {
         expectPost(OWN + "/invite/regenerate");
 
-        assertThat(service.regenerateInvite()).isEqualTo(204);
+        assertThat(service.regenerateInvite().status()).isEqualTo(204);
+    }
+
+    @Test
+    void regenerateInvite_readsTheNewCode() {
+        expect(HttpMethod.POST, OWN + "/invite/regenerate").andExpect(content().string(""))
+                .andRespond(withSuccess("{\"canInvite\":true,\"code\":\"NEWCODE2\","
+                        + "\"inviteUrl\":\"/join?invite=NEWCODE2\",\"redemptions\":[]}", MediaType.APPLICATION_JSON));
+
+        var result = service.regenerateInvite();
+
+        assertThat(result.status()).isEqualTo(200);
+        assertThat(result.body().code()).isEqualTo("NEWCODE2");
+        assertThat(result.body().inviteUrl()).isEqualTo("/join?invite=NEWCODE2");
     }
 
     @Test

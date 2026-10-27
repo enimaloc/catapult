@@ -8,11 +8,13 @@ import fr.enimaloc.catapult.common.dto.admin.DtddKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.KeyStatus;
 import fr.enimaloc.catapult.common.dto.admin.SteamKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
+import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
 import fr.enimaloc.catapult.common.dto.channel.MinecraftData;
 import fr.enimaloc.catapult.common.dto.channel.PagedBindings;
 import fr.enimaloc.catapult.common.dto.channel.TwitchatData;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatDispatch;
 import fr.enimaloc.catapult.common.dto.notification.BroadcastRequestDto;
+import fr.enimaloc.catapult.common.event.ChannelEvents;
 
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -239,6 +241,26 @@ class DtoBehaviourTest {
     @Test
     void broadcasts_dataAcceptsNullValues() {
         assertThat(new BroadcastRequestDto.AlertInfo(null, null, 0).data()).containsEntry("title", null);
+    }
+
+    @Nested
+    class OlderPayloads {
+        private final JsonMapper json = JsonMapper.builder().build();
+
+        @Test
+        void aDtddStatusWithoutTheViewersRole_leavesItUnknown() {
+            assertThat(new DtddMappingStatusDto(null, null, true, "42").viewerIsAdmin()).isNull();
+            assertThat(json.readValue("{\"canValidateDirectly\":true,\"igdbId\":\"42\"}", DtddMappingStatusDto.class))
+                    .isEqualTo(new DtddMappingStatusDto(null, null, true, "42", null));
+        }
+
+        @Test
+        void channelEventsWithoutTheirData_readTheirNewFieldsAsNull() {
+            assertThat(json.readValue("{\"channelId\":\"c\",\"channelLogin\":\"l\"}", ChannelEvents.DtddMappingChanged.class))
+                    .isEqualTo(new ChannelEvents.DtddMappingChanged("c", "l", null, null, null));
+            assertThat(json.readValue("{\"channelId\":\"c\",\"channelLogin\":\"l\"}", ChannelEvents.CustomBindingsUpdated.class))
+                    .isEqualTo(new ChannelEvents.CustomBindingsUpdated("c", "l", null, null));
+        }
     }
 
     private static java.util.Map.Entry<String, Object> entry(String key, Object value) {

@@ -10,6 +10,7 @@ import fr.enimaloc.catapult.domain.binding.CustomBinding;
 import fr.enimaloc.catapult.domain.binding.CustomBindingActivation;
 import fr.enimaloc.catapult.service.binding.CustomBindingService;
 import fr.enimaloc.catapult.service.binding.CustomBindingService.ActivationResult;
+import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
@@ -43,9 +44,7 @@ public class CustomBindingViews {
     }
 
     public static CustomBindingDto toDto(CustomBinding binding) {
-        return new CustomBindingDto(binding.getId(), binding.getName(), binding.getTwitchGameId(),
-                binding.getTwitchGameName(), binding.getCcls().stream().sorted().toList(),
-                binding.getTws().stream().sorted().toList(), binding.isUninterruptible());
+        return ChannelEventPublisher.toDto(binding);
     }
 
     public static CustomBindingSaveResult saved(CustomBindingService.UpdateResult result) {

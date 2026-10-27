@@ -1,7 +1,14 @@
 package fr.enimaloc.catapult.service.dtdd;
 
+import fr.enimaloc.catapult.common.dto.channel.DtddMappingCurrentDto;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
+import fr.enimaloc.catapult.domain.dtdd.DtddGameCache;
+import fr.enimaloc.catapult.domain.dtdd.DtddGameMapping;
+import fr.enimaloc.catapult.domain.dtdd.DtddMappingProposal;
 import fr.enimaloc.catapult.getter.DetectedGame;
+import fr.enimaloc.catapult.repository.dtdd.DtddGameCacheRepository;
+import fr.enimaloc.catapult.repository.dtdd.DtddGameMappingRepository;
+import fr.enimaloc.catapult.repository.dtdd.DtddMappingProposalRepository;
 import fr.enimaloc.catapult.service.binding.GameStateService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
@@ -22,7 +29,10 @@ class DtddMappingEventsTest {
     private final GameStateService gameState = mock(GameStateService.class);
     private final IgdbService igdb = mock(IgdbService.class);
     private final ChannelEventPublisher publisher = mock(ChannelEventPublisher.class);
-    private final DtddMappingEvents events = new DtddMappingEvents(gameState, igdb, publisher);
+    private final DtddGameMappingRepository mappings = mock(DtddGameMappingRepository.class);
+    private final DtddGameCacheRepository games = mock(DtddGameCacheRepository.class);
+    private final DtddMappingProposalRepository proposals = mock(DtddMappingProposalRepository.class);
+    private final DtddMappingEvents events = new DtddMappingEvents(gameState, igdb, publisher, mappings, games, proposals);
 
     private final UUID steamPlayer = UUID.randomUUID();
     private final UUID namedPlayer = UUID.randomUUID();
@@ -44,14 +54,45 @@ class DtddMappingEventsTest {
     }
 
     @Test
-    void tellsEveryChannelPlayingTheGame_andOnlyThem() {
+    void tellsEveryChannelPlayingTheGame_andOnlyThem_theMappingAsItIsNow() {
         playing();
+        DtddGameMapping mapping = new DtddGameMapping();
+        mapping.setIgdbId("100");
+        mapping.setDtddId(7L);
+        mapping.setConfidence(0.8);
+        mapping.setVerified(true);
+        when(mappings.findById("100")).thenReturn(Optional.of(mapping));
+        DtddGameCache cached = new DtddGameCache();
+        cached.setDtddId(7L);
+        cached.setName("Stardew Valley (2016)");
+        when(games.findById(7L)).thenReturn(Optional.of(cached));
+        when(proposals.countByIgdbIdAndStatus("100", DtddMappingProposal.Status.PENDING)).thenReturn(2L);
 
         events.mappingChanged("100");
 
-        verify(publisher).dtddMappingChanged(steamPlayer);
-        verify(publisher).dtddMappingChanged(namedPlayer);
-        verify(publisher, never()).dtddMappingChanged(otherPlayer);
+        DtddMappingCurrentDto current = new DtddMappingCurrentDto(7L, "Stardew Valley (2016)", 0.8, true);
+        verify(publisher).dtddMappingChanged(steamPlayer, "100", current, true);
+        verify(publisher).dtddMappingChanged(namedPlayer, "100", current, true);
+        verify(publisher, never()).dtddMappingChanged(eq(otherPlayer), any(), any(), anyBoolean());
+        // Read once for every channel playing it
+        verify(mappings).findById("100");
+        verify(proposals).countByIgdbIdAndStatus("100", DtddMappingProposal.Status.PENDING);
+    }
+
+    @Test
+    void aGameWithoutMapping_orAMappingWithoutDtddGame_isToldAsSuch() {
+        playing();
+
+        events.mappingChanged("200");
+        DtddGameMapping unnamed = new DtddGameMapping();
+        unnamed.setIgdbId("100");
+        when(mappings.findById("100")).thenReturn(Optional.of(unnamed));
+        events.mappingChanged("100");
+
+        verify(publisher).dtddMappingChanged(otherPlayer, "200", null, false);
+        verify(publisher).dtddMappingChanged(eq(steamPlayer), eq("100"),
+                eq(new DtddMappingCurrentDto(null, null, unnamed.getConfidence(), false)), eq(false));
+        verifyNoInteractions(games);
     }
 
     @Test
@@ -63,7 +104,7 @@ class DtddMappingEventsTest {
         verifyNoInteractions(publisher);
 
         TransactionSynchronizationManager.getSynchronizations().forEach(TransactionSynchronization::afterCommit);
-        verify(publisher).dtddMappingChanged(otherPlayer);
+        verify(publisher).dtddMappingChanged(otherPlayer, "200", null, false);
         verifyNoMoreInteractions(publisher);
     }
 

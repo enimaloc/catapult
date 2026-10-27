@@ -1,5 +1,6 @@
 /*
- * The OBS card's widget link: Copy, Regenerate (asks first, posts once, then refreshes the page) and the
+ * The OBS card's widget link: Copy, Regenerate (asks first, posts once, then shows the new link in place,
+ * the Commands tab's links too; the page refreshed only for an answer without it) and the
  * browser-source check / creation through the page's own OBS connection (CatapultObs, stubbed here).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -42,7 +43,7 @@ beforeEach(async () => {
     vi.useFakeTimers();
     connected = true;
     showError = vi.fn();
-    postJson = vi.fn(() => new Promise(resolve => { release = () => resolve(response(204)); }));
+    postJson = vi.fn(() => new Promise(resolve => { release = (answer = response(204)) => resolve(answer); }));
     refresh = vi.fn(async () => {});
     writeText = vi.fn(async () => {});
     requests = {
@@ -61,7 +62,85 @@ beforeEach(async () => {
 afterEach(() => vi.useRealTimers());
 
 describe("channel-obs-widget link", () => {
-    it("copies the link; asks before regenerating, then refreshes", async () => {
+    const NEW_TOKEN = "99999999-8888-7777-6666-555555555555";
+    const NEW_URL = `https://catapult.test/widget/obs/${NEW_TOKEN}`;
+    const OLD_SUMMARY = "https://catapult.test/api/user/summary/11111111-2222-3333-4444-555555555555";
+    const NEW_SUMMARY = `https://catapult.test/api/user/summary/${NEW_TOKEN}`;
+    const MIGRATION = `
+        <mdui-card id="command-migration" data-summary-url="${OLD_SUMMARY}">
+            <mdui-text-field readonly value="${OLD_SUMMARY}?f=name">
+                <mdui-button-icon class="command-migration-copy" data-copy="${OLD_SUMMARY}?f=name"></mdui-button-icon>
+            </mdui-text-field>
+            <mdui-text-field readonly value="$.name">
+                <mdui-button-icon class="command-migration-copy" data-copy="$.name"></mdui-button-icon>
+            </mdui-text-field>
+        </mdui-card>`;
+
+    it("shows the regenerated link in place, the Commands tab's links and the source check following it", async () => {
+        page();
+        document.body.insertAdjacentHTML("beforeend", MIGRATION);
+        await vi.advanceTimersByTimeAsync(0);
+        const nodes = [];
+        new MutationObserver(records => records.forEach(r => nodes.push(...[...r.addedNodes, ...r.removedNodes]
+            .filter(node => node.nodeType === 1)))).observe(document.body, { childList: true, subtree: true });
+        requests.getInputList.mockResolvedValue({ inputs: [{ inputName: "Relay", inputKind: "browser_source" }] });
+        requests.getInputSettings.mockResolvedValue({ inputSettings: { url: NEW_URL } });
+
+        document.getElementById("obs-widget-regenerate-btn").click();
+        confirm().click();
+        release(response(200, { widgetUrl: NEW_URL, summaryUrl: NEW_SUMMARY }));
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(refresh).not.toHaveBeenCalled();
+        expect(nodes).toHaveLength(0);
+        expect(dialog().open).toBe(false);
+        expect(confirm().disabled).toBe(false);
+        expect(document.getElementById("obs-widget-link").value).toBe(NEW_URL);
+        expect(document.getElementById("obs-widget").dataset.widgetUrl).toBe(NEW_URL);
+        const [link, path] = document.querySelectorAll("#command-migration mdui-text-field");
+        expect(link.value).toBe(`${NEW_SUMMARY}?f=name`);
+        expect(link.querySelector("[data-copy]").dataset.copy).toBe(`${NEW_SUMMARY}?f=name`);
+        expect(path.value).toBeUndefined();
+        expect(path.querySelector("[data-copy]").dataset.copy).toBe("$.name");
+        expect(document.getElementById("command-migration").dataset.summaryUrl).toBe(NEW_SUMMARY);
+        expect(status().textContent).toBe("found");
+
+        document.getElementById("obs-widget-copy-btn").click();
+        await vi.advanceTimersByTimeAsync(0);
+        expect(writeText).toHaveBeenCalledWith(NEW_URL);
+    });
+
+    it("creates the source on the regenerated link", async () => {
+        page();
+        await vi.advanceTimersByTimeAsync(0);
+        document.getElementById("obs-widget-regenerate-btn").click();
+        confirm().click();
+        release(response(200, { widgetUrl: NEW_URL, summaryUrl: NEW_SUMMARY }));
+        await vi.advanceTimersByTimeAsync(0);
+
+        createBtn().click();
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(requests.createInput).toHaveBeenCalledWith(expect.objectContaining({
+            inputSettings: expect.objectContaining({ url: NEW_URL }) }));
+    });
+
+    it("leaves the source check alone without OBS, which re-checks once connected", async () => {
+        connected = false;
+        page();
+        await vi.advanceTimersByTimeAsync(6000);
+        expect(status().textContent).toBe("unreachable");
+
+        document.getElementById("obs-widget-regenerate-btn").click();
+        confirm().click();
+        release(response(200, { widgetUrl: NEW_URL, summaryUrl: NEW_SUMMARY }));
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(status().textContent).toBe("unreachable");
+        expect(requests.getInputList).not.toHaveBeenCalled();
+    });
+
+    it("copies the link; asks before regenerating, then refreshes for an answer without the link", async () => {
         page();
 
         document.getElementById("obs-widget-copy-btn").click();

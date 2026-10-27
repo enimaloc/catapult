@@ -47,18 +47,18 @@ beforeEach(async () => {
     window.mdui = { confirm: vi.fn(() => (confirmAnswer ? Promise.resolve() : Promise.reject())), snackbar: vi.fn() };
     await load("admin-tabs", "admin-keys");
     window.CatapultChannel = { showError: vi.fn() };
-    window.CatapultAdminTabs.reload = vi.fn(async () => {});
+    window.CatapultAdminTabs.patch = vi.fn(async () => {});
     page();
 });
 
 describe("admin-keys", () => {
-    it("adds a key, clears the field and reloads; 400 says 'invalid key format'", async () => {
+    it("adds a key, clears the field and patches; 400 says 'invalid key format'", async () => {
         fill(field("steam"), " 0123 ");
         await click('[data-provider="steam"] .admin-keys-add-save');
         expect(posted).toHaveBeenLastCalledWith("/admin/keys/steam/add", { apiKey: "0123" });
         expect(field("steam").value).toBe("");
         expect(window.mdui.snackbar).toHaveBeenLastCalledWith({ message: "Added" });
-        expect(CatapultAdminTabs.reload).toHaveBeenCalledTimes(1);
+        expect(CatapultAdminTabs.patch).toHaveBeenCalledTimes(1);
 
         posted.mockResolvedValueOnce(response(400));
         fill(field("dtdd"), "nope");
@@ -66,7 +66,7 @@ describe("admin-keys", () => {
         expect(posted).toHaveBeenLastCalledWith("/admin/keys/dtdd/add", { apiKey: "nope" });
         expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Invalid DTDD key");
         expect(field("dtdd").value).toBe("nope");
-        expect(CatapultAdminTabs.reload).toHaveBeenCalledTimes(1);
+        expect(CatapultAdminTabs.patch).toHaveBeenCalledTimes(1);
     });
 
     it("posts once on a double click", async () => {
@@ -94,7 +94,7 @@ describe("admin-keys", () => {
         await click(".admin-keys-delete");
         expect(mdui.confirm).toHaveBeenCalledWith(expect.objectContaining({ headline: "Delete abcd…wxyz?" }));
         expect(posted).toHaveBeenLastCalledWith("/admin/keys/steam/delete", { keyId: "id/1 é" });
-        expect(CatapultAdminTabs.reload).toHaveBeenCalledTimes(2);
+        expect(CatapultAdminTabs.patch).toHaveBeenCalledTimes(2);
     });
 
     it("does not delete when the confirmation is declined", async () => {
@@ -104,16 +104,16 @@ describe("admin-keys", () => {
         expect(posted).not.toHaveBeenCalled();
     });
 
-    it("tells a vanished key and an unreachable api apart, and reloads on a vanished one", async () => {
+    it("tells a vanished key and an unreachable api apart, and patches on a vanished one", async () => {
         posted.mockResolvedValueOnce(response(404));
         await click(".admin-keys-delete");
         expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Gone");
-        expect(CatapultAdminTabs.reload).toHaveBeenCalledTimes(1);
+        expect(CatapultAdminTabs.patch).toHaveBeenCalledTimes(1);
 
         posted.mockResolvedValueOnce(response(502));
         await click('[data-provider="steam"] .admin-keys-refresh');
         expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Down");
-        expect(CatapultAdminTabs.reload).toHaveBeenCalledTimes(1);
+        expect(CatapultAdminTabs.patch).toHaveBeenCalledTimes(1);
         expect(card("steam").querySelector(".admin-keys-refresh").disabled).toBe(false);
     });
 });

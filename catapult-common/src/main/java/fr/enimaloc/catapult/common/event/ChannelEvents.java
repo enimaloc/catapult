@@ -1,6 +1,8 @@
 package fr.enimaloc.catapult.common.event;
 
+import fr.enimaloc.catapult.common.dto.binding.CustomBindingDto;
 import fr.enimaloc.catapult.common.dto.channel.BindingDto;
+import fr.enimaloc.catapult.common.dto.channel.DtddMappingCurrentDto;
 
 import java.util.List;
 import java.util.Set;
@@ -76,8 +78,13 @@ public final class ChannelEvents {
     public record ConnectionChanged(String channelId, String channelLogin, String provider, boolean connected,
                                     SteamProfile profile) {}
 
-    /** The DoesTheDogDie mapping of the channel's games changed. */
-    public record DtddMappingChanged(String channelId, String channelLogin) {}
+    /**
+     * The DoesTheDogDie mapping of IGDB game {@code igdbId}, the one the channel plays, changed: the mapping now
+     * ({@code current}, null when it has none) and whether a proposal is pending on it. The last three are null
+     * from a catapult-api that predates them: the dashboard then reads the mapping again.
+     */
+    public record DtddMappingChanged(String channelId, String channelLogin, String igdbId, DtddMappingCurrentDto current,
+                                     Boolean hasPending) {}
 
     /** The channel's Minecraft link changed: its status ({@code NONE} once gone) and player name. */
     public record MinecraftLinkChanged(String channelId, String channelLogin, String status, String minecraftName) {}
@@ -92,8 +99,13 @@ public final class ChannelEvents {
     /** The channel's active custom binding changed: {@code activeId} is the one now active, null once deactivated. */
     public record CustomBindingChanged(String channelId, String channelLogin, String activeId) {}
 
-    /** The channel's custom bindings were created, changed or deleted: the dashboard reloads their list. */
-    public record CustomBindingsUpdated(String channelId, String channelLogin) {}
+    /**
+     * The channel's custom bindings were created, changed or deleted: all of them now, oldest first, and the active
+     * one ({@code activeId}, null when none is). {@code bindings} is null from a catapult-api that predates it: the
+     * dashboard then reloads their list.
+     */
+    public record CustomBindingsUpdated(String channelId, String channelLogin, List<CustomBindingDto> bindings,
+                                        String activeId) {}
 
     /** A channel's Steam profile state, as the dashboard shows it. */
     public record SteamProfile(boolean hasSteam, boolean profilePrivate, boolean offlineMode, boolean rateLimited,

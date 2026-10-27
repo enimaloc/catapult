@@ -6,7 +6,7 @@ import { dirname, join } from "node:path";
 import { after, describe, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import {
-    compare, containerStats, findPrevious, jvmOverhead, jvmStats, parseMemory, parsePercent, readPreviousReport, renderMarkdown,
+    compare, containerStats, domMutations, findPrevious, jvmOverhead, jvmStats, parseMemory, parsePercent, readPreviousReport, renderMarkdown,
     requestGroups, sizing, thresholds, writeReport,
 } from "./report.mjs";
 
@@ -160,6 +160,19 @@ describe("k6 summary", () => {
     });
 });
 
+test("domMutations judges the nodes on the budget, and fails a scenario without one", () => {
+    assert.deepEqual(domMutations([
+        { scenario: "a", nodes: 10, attributes: 50, text: 5, budget: 10 },
+        { scenario: "b", nodes: 11, attributes: 0, text: 0, budget: 10 },
+        { scenario: "c", nodes: 1, attributes: 0, text: 0, budget: null },
+    ]).map(({ scenario, budget, ok }) => ({ scenario, budget, ok })), [
+        { scenario: "a", budget: 10, ok: true },
+        { scenario: "b", budget: 10, ok: false },
+        { scenario: "c", budget: null, ok: false },
+    ]);
+    assert.deepEqual(domMutations(null), []);
+});
+
 describe("findPrevious", () => {
     test("is the latest earlier run with a report", () => {
         const dir = runs(PREVIOUS, CURRENT, LATER);
@@ -208,6 +221,10 @@ describe("compare", () => {
         assert.equal(find("pages", "home (ttfb)", "p95").pct, -12.5);
         assert.equal(find("containers", "api", "cpuAvg").pct, 50);
         assert.equal(find("containers", "total", "cpuPeak").delta, 10);
+        assert.deepEqual(find("dom", "dock-events", "nodes"),
+            { section: "dom", name: "dock-events", field: "nodes", before: 9282, after: 9300, delta: 18, pct: 0.2 });
+        assert.equal(find("dom", "dock-events", "text").pct, null);
+        assert.equal(find("dom", "idle-60s", "nodes"), undefined);
         // Measured in one run only
         assert.equal(find("requests", "channel", "p95"), undefined);
         assert.equal(find("containers", "web", "cpuAvg"), undefined);
@@ -245,6 +262,10 @@ describe("writeReport", () => {
         assert.match(markdown, /## Outbound traffic\n\n1 line\(s\)[^\n]*\n\n```\napi-1 {2}\| java\.net\.UnknownHostException/);
         assert.match(markdown, /Run 20260101-000000 \(10 streamers, 100 viewers, 2m\)/);
         assert.match(markdown, /\| containers \| api \| avg CPU \(%\) \| 20 \| 30 \| \+10 \| \+50 % \|/);
+        assert.match(markdown, /## DOM mutations\n/);
+        assert.match(markdown, /\| idle-60s \| 600 \| 0 \| 0 \| 600 \| – \| pass \|/);
+        assert.match(markdown, /\| dock-events \| 9300 \| 1300 \| 2 \| 9282 \| \+18 \(\+0\.2 %\) \| \*\*FAIL\*\* \|/);
+        assert.match(markdown, /\| dom \| dock-events \| nodes added and removed \| 9282 \| 9300 \| \+18 \| \+0\.2 % \|/);
         assert.equal(json.sizing.memoryBasis, "jvm");
         assert.equal(json.requests.unexpectedStreamCloses, 2);
     });

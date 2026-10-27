@@ -1,11 +1,14 @@
 package fr.enimaloc.catapult.service.notification;
 
+import fr.enimaloc.catapult.common.dto.binding.CustomBindingDto;
 import fr.enimaloc.catapult.common.dto.channel.BindingDto;
+import fr.enimaloc.catapult.common.dto.channel.DtddMappingCurrentDto;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatDispatch;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig;
 import fr.enimaloc.catapult.common.event.ChannelEvents;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.account.UserSettings;
+import fr.enimaloc.catapult.domain.binding.CustomBinding;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
@@ -16,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
@@ -92,8 +96,14 @@ public class ChannelEventPublisher {
                 (id, login) -> new ChannelEvents.SteamProfileChanged(id, login, dto));
     }
 
-    public void dtddMappingChanged(UUID channelOwnerId) {
-        publish(channelOwnerId, ChannelEvents.DTDD_MAPPING_CHANGED, ChannelEvents.DtddMappingChanged::new);
+    /**
+     * The mapping of IGDB game {@code igdbId}, the one the channel plays, is now {@code current} (null: none), with
+     * whether a proposal is pending on it ({@code hasPending}).
+     */
+    public void dtddMappingChanged(UUID channelOwnerId, String igdbId, DtddMappingCurrentDto current,
+                                   boolean hasPending) {
+        publish(channelOwnerId, ChannelEvents.DTDD_MAPPING_CHANGED,
+                (id, login) -> new ChannelEvents.DtddMappingChanged(id, login, igdbId, current, hasPending));
     }
 
     public void connectionChanged(UUID channelOwnerId, ProviderConnectionsDto provider) {
@@ -115,9 +125,15 @@ public class ChannelEventPublisher {
                 (id, login) -> new ChannelEvents.CustomBindingChanged(id, login, active));
     }
 
-    /** The channel's custom bindings were created, changed or deleted. */
-    public void customBindingsUpdated(UUID channelOwnerId) {
-        publish(channelOwnerId, ChannelEvents.CUSTOM_BINDINGS_UPDATED, ChannelEvents.CustomBindingsUpdated::new);
+    /**
+     * The channel's custom bindings were created, changed or deleted: {@code bindings} are all of them now, oldest
+     * first, {@code activeId} the active one (null: none).
+     */
+    public void customBindingsUpdated(UUID channelOwnerId, List<CustomBinding> bindings, UUID activeId) {
+        List<CustomBindingDto> dtos = bindings.stream().map(ChannelEventPublisher::toDto).toList();
+        String active = activeId == null ? null : activeId.toString();
+        publish(channelOwnerId, ChannelEvents.CUSTOM_BINDINGS_UPDATED,
+                (id, login) -> new ChannelEvents.CustomBindingsUpdated(id, login, dtos, active));
     }
 
     public void twitchatDispatch(UUID channelOwnerId, TwitchatDispatch dispatch) {
@@ -148,6 +164,13 @@ public class ChannelEventPublisher {
                 binding.getSourceName(), binding.getTwitchGameId(), binding.getTwitchGameName(), binding.isIgnored(),
                 binding.isCclEnabled(), Set.copyOf(binding.getCcls()), binding.isTwEnabled(), binding.isTwOverride(),
                 Set.copyOf(binding.getTws()));
+    }
+
+    /** A custom binding as the API answers it, CCLs and TWs sorted. */
+    public static CustomBindingDto toDto(CustomBinding binding) {
+        return new CustomBindingDto(binding.getId(), binding.getName(), binding.getTwitchGameId(),
+                binding.getTwitchGameName(), binding.getCcls().stream().sorted().toList(),
+                binding.getTws().stream().sorted().toList(), binding.isUninterruptible());
     }
 
     static ChannelEvents.Settings toDto(UserSettings s) {

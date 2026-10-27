@@ -2,7 +2,8 @@
  * The admin Meta tab's meta tags. The form below the list adds a tag; a row's edit button loads that
  * tag into it (Save, or Cancel to go back to adding) and its delete button removes it after a
  * confirmation. Each action posts to AdminMetaTagsController, the button held disabled until it is
- * answered; a success reloads the tab, a refusal is told by its status (400, 404, 409, else generic).
+ * answered; a success patches the list (admin-tabs.js: the tag's row inserted, updated or removed)
+ * and empties the form back to adding, a refusal is told by its status (400, 404, 409, else generic).
  * Listeners are delegated to the panel: its content comes and goes.
  */
 window.CatapultAdminMetaTags = (function () {
@@ -39,7 +40,9 @@ window.CatapultAdminMetaTags = (function () {
                 return;
             }
             const sent = await CatapultAdminTabs.post(root, target, `${BASE}/${encodeURIComponent(row.dataset.id)}/delete`, {});
-            if (sent === "ok" || sent === 404) await CatapultAdminTabs.reload(panel);
+            if (sent !== "ok" && sent !== 404) return;
+            if (form.dataset.id === row.dataset.id) edit(form, null); // the tag being edited is gone
+            await CatapultAdminTabs.patch(panel);
             return;
         }
         if (target.matches(".admin-meta-tag-save")) {
@@ -50,7 +53,9 @@ window.CatapultAdminMetaTags = (function () {
                 content: (field(form, "content").value ?? "").trim()
             };
             const sent = await CatapultAdminTabs.post(root, target, id ? `${BASE}/${encodeURIComponent(id)}` : BASE, body);
-            if (sent === "ok" || sent === 404) await CatapultAdminTabs.reload(panel);
+            if (sent !== "ok" && sent !== 404) return;
+            edit(form, null);
+            await CatapultAdminTabs.patch(panel);
         }
     }
 

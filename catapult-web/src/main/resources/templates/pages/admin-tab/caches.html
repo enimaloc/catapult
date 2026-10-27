@@ -32,17 +32,18 @@
      th:attr="data-name=${name},data-confirm-text=#{admin.confirm},data-cancel-text=#{admin.cancel},data-error=#{admin.error.generic}">
     <th:block th:replace="~{pages/admin-tab/common :: subheader(${name}, ${q})}"></th:block>
     <th:block th:if="${entries == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
+    <!--/* swapped by a search or a page; an eviction patches it (admin-tabs.js, data-admin-*) */-->
     <div data-admin-results th:if="${entries != null}">
-        <th:block th:if="${entries.content().isEmpty()}">
+        <div data-admin-value="empty" th:hidden="${!entries.content().isEmpty()}">
             <th:block th:replace="~{pages/admin-tab/common :: empty('inbox', ${#strings.isEmpty(q)} ? #{admin.caches.empty} : #{admin.no_match})}"></th:block>
-        </th:block>
-        <mdui-card class="admin-table" variant="outlined" th:unless="${entries.content().isEmpty()}">
+        </div>
+        <mdui-card class="admin-table" variant="outlined" data-admin-list="entries" th:hidden="${entries.content().isEmpty()}">
             <div class="admin-row admin-row-head" aria-hidden="true">
                 <span th:text="#{admin.caches.column.key}">Key</span>
                 <span th:text="#{admin.caches.column.value}">Value</span>
                 <span></span>
             </div>
-            <div class="admin-row" th:each="e : ${entries.content()}" th:attr="data-key=${e.key()}">
+            <div class="admin-row" th:each="e : ${entries.content()}" th:attr="data-key=${e.key()},data-admin-key=${e.key()}">
                 <span class="admin-cell" th:text="${e.key()}" th:title="${e.key()}">key</span>
                 <span class="admin-cell admin-cell-muted" th:text="${e.value()}" th:title="${e.value()}">value</span>
                 <span class="admin-row-actions">
@@ -52,7 +53,7 @@
                 </span>
             </div>
         </mdui-card>
-        <th:block th:replace="~{pages/admin-tab/common :: pagination(${entries})}"></th:block>
+        <div data-admin-value="pagination"><th:block th:replace="~{pages/admin-tab/common :: pagination(${entries})}"></th:block></div>
     </div>
     <mdui-dialog id="admin-cache-dialog" class="admin-dialog" close-on-overlay-click>
         <div class="admin-dialog-body"></div>

@@ -4,7 +4,7 @@
  * to action's label and http(s) URL both or neither, an expiry in the future, a member chosen for
  * "One member") before posting to AdminNotificationsController; a refusal is told by its status
  * (400: data-label-invalid, 404: data-label-unknown-member, else data-label-unavailable) and leaves the dialog open, a success
- * closes it and reloads the tab. The Preview toggle renders the Markdown through the server
+ * closes it and patches the list (admin-tabs.js: the notification's row inserted, the page shown kept). The Preview toggle renders the Markdown through the server
  * (catapult-api sanitizes it), shown as HTML in .notification-preview. Delete asks first.
  * "Experiment participants" picks an experiment and, optionally, one of its variants (the options come
  * from the fragment's .admin-notifications-variants-of lists), shows how many members that reaches
@@ -197,7 +197,7 @@ window.CatapultAdminNotifications = (function () {
         dialog.open = false;
         const message = Number.isInteger(data?.sent) ? root.dataset.labelSent.replace("{n}", data.sent) : root.dataset.labelCreated;
         window.mdui?.snackbar?.({ message });
-        await CatapultAdminTabs.reload(panel);
+        await CatapultAdminTabs.patch(panel);
     }
 
     async function remove(panel, root, button) {
@@ -205,8 +205,8 @@ window.CatapultAdminNotifications = (function () {
         try {
             if (!await CatapultAdminTabs.confirmed(root, button.dataset.confirm)) return;
             const { status } = await post(button, `/admin/notifications/${encodeURIComponent(button.dataset.delete)}/delete`, {});
-            button.disabled = true; // post() re-enabled it; still busy until the tab reloads
-            if (ok(status)) await CatapultAdminTabs.reload(panel);
+            button.disabled = true; // post() re-enabled it; still busy until the list is patched
+            if (ok(status)) await CatapultAdminTabs.patch(panel);
             else CatapultChannel.showError(refusal(root, status));
         } finally {
             button.disabled = false;

@@ -98,11 +98,25 @@ beforeEach(async () => {
     await load("admin-tabs", "admin-experiments");
     window.CatapultChannel = { showError: vi.fn() };
     window.CatapultAdminTabs.reload = vi.fn(async () => {});
+    window.CatapultAdminTabs.patch = vi.fn(async () => {});
     page();
 });
 
 describe("admin-experiments", () => {
-    it("posts the lifecycle action to its route and reloads the view", async () => {
+    it("syncs only the form an edit inserted, the others left as the admin set them", () => {
+        page();
+        const rule = document.getElementById("experiment-rule-form");
+        const override = document.getElementById("experiment-override-form");
+        rule.querySelector('[name="type"]').value = "GROUP";
+        override.querySelector('[name="target"]').value = "TAG";
+
+        document.dispatchEvent(new CustomEvent("catapult:admin-panel", { detail: { tab: "experiments", panel: panel(), root: rule } }));
+
+        expect(rule.querySelector('[data-rule-fields="GROUP"]').hidden).toBe(false);
+        expect(override.querySelector('[data-override-fields="TAG"]').hidden).toBe(true);
+    });
+
+    it("posts the lifecycle action to its route and renders the view again: the status decides its cards", async () => {
         await click('[data-experiment-action="activate"]');
 
         expect(posted).toHaveBeenCalledWith(`/admin/experiments/${EXP}/activate`, {});
@@ -135,7 +149,10 @@ describe("admin-experiments", () => {
         await submit("weights-save");
         expect(posted).toHaveBeenCalledWith(`/admin/experiments/${EXP}/weights/preview`, { [V1]: 30, [V2]: 10 });
         expect(posted).toHaveBeenLastCalledWith(`/admin/experiments/${EXP}/weights`, { [V1]: 30, [V2]: 10 });
-        expect(CatapultAdminTabs.reload).toHaveBeenCalled();
+        // the fields already show what was saved: neither patched nor rendered again
+        expect(CatapultAdminTabs.reload).not.toHaveBeenCalled();
+        expect(CatapultAdminTabs.patch).not.toHaveBeenCalled();
+        expect(window.mdui.snackbar).toHaveBeenCalledWith({ message: "Saved" });
     });
 
     describe("saving weights previews who moves", () => {
@@ -158,7 +175,7 @@ describe("admin-experiments", () => {
                 description: "6 move from control to enabled\n1 move from enabled to control"
             }));
             expect(posted).toHaveBeenLastCalledWith(`/admin/experiments/${EXP}/weights`, WEIGHTS);
-            expect(CatapultAdminTabs.reload).toHaveBeenCalled();
+            expect(window.mdui.snackbar).toHaveBeenCalledWith({ message: "Saved" });
         });
 
         it("posts nothing more when the confirmation is cancelled", async () => {
@@ -209,7 +226,13 @@ describe("admin-experiments", () => {
         expect(posted).toHaveBeenCalledWith(`/admin/experiments/${EXP}/overrides`, {
             target: "tag", tagKey: "beta", tagValue: null, action: "FORCE_INCLUDE", priority: 10,
         });
-        expect(CatapultAdminTabs.reload).toHaveBeenCalled();
+        expect(CatapultAdminTabs.patch).toHaveBeenCalledWith(panel());
+        expect(CatapultAdminTabs.reload).not.toHaveBeenCalled();
+        // emptied back to its defaults, its blocks shown to match
+        expect(field("experiment-override-form", "target").value).toBe("USER");
+        expect(field("experiment-override-form", "tagKey").value).toBe("");
+        expect(block("override", "USER").hidden).toBe(false);
+        expect(block("override", "TAG").hidden).toBe(true);
     });
 
     it("posts the account and group targets, and the variant only when forced", async () => {
@@ -269,6 +292,8 @@ describe("admin-experiments", () => {
         await set(field(form, "percentage"), "40");
         await submit("rule-save");
         expect(posted).toHaveBeenLastCalledWith(`/admin/experiments/${EXP}/rules`, { type: "RANDOM", percentage: 40 });
+        expect(CatapultAdminTabs.patch).toHaveBeenCalledTimes(1);
+        expect(field(form, "percentage").value).toBe("100"); // emptied back to its default
 
         await set(field(form, "type"), "GROUP", "change");
         await submit("rule-save");
@@ -303,6 +328,7 @@ describe("admin-experiments", () => {
         await click("[data-override-delete]");
         expect(window.mdui.confirm).toHaveBeenLastCalledWith(expect.objectContaining({ headline: "Delete override?" }));
         expect(posted).toHaveBeenLastCalledWith(`/admin/experiments/${EXP}/overrides/ov-1/delete`, {});
+        expect(CatapultAdminTabs.patch).toHaveBeenCalledTimes(2);
     });
 
     it("tells a 400, a 404 and a 409 (both reload), and an unreachable api", async () => {
@@ -339,6 +365,7 @@ describe("admin-experiments", () => {
 
         expect(CatapultChannel.showError).toHaveBeenLastCalledWith("No such account");
         expect(CatapultAdminTabs.reload).not.toHaveBeenCalled();
+        expect(CatapultAdminTabs.patch).not.toHaveBeenCalled();
         expect(field(form, "twitchUsername").value).toBe("ghost");
     });
 
@@ -515,6 +542,16 @@ describe("admin-experiments participants", () => {
         select.dispatchEvent(new Event("change", { bubbles: true }));
         await settle();
     }
+
+    it("loads the participants again as filtered after a rule is saved", async () => {
+        document.querySelector("[data-participants]").dataset.variant = V1;
+
+        document.getElementById("rule-save").form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+        await settle();
+
+        expect(CatapultAdminTabs.patch).toHaveBeenCalledTimes(1);
+        expect(urls()).toEqual([`${base}/participants?variant=${V1}&q=&page=0`]);
+    });
 
     it("reloads the list on a variant chip, from page 0 and with the search kept", async () => {
         document.querySelector("[data-participants]").dataset.q = "al";
