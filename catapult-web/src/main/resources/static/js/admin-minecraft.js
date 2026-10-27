@@ -1,19 +1,19 @@
 /**
  * The admin Keys tab's Minecraft service accounts card. Enable / disable, reset the friend limit and
  * delete (after a confirmation) post to AdminMinecraftController with the button disabled until the
- * tab has reloaded; a refusal is told by its status: 409 (users are linked to it), 404 (gone: reloads),
- * else unavailable.
+ * list is patched (admin-tabs.js: the account's row updated or removed); a refusal is told by its
+ * status: 409 (users are linked to it), 404 (gone: patched away), else unavailable.
  *
  * "Add an account" and "Re-authenticate" run catapult-api's Microsoft device-code flow: get a device
  * code, show its user code, its verification link and the time left before it expires (counted down
  * by time.js), then poll the create / reauth route every max(3, interval) s: 202 → poll again, 200 →
- * done (the tab reloads), anything else → the error, stop. The countdown only shows the time left:
+ * done (the list patched, the enroll form emptied), anything else → the error, stop. The countdown only shows the time left:
  * once the code has expired, catapult-api refuses the next poll (400) and the flow ends with the
  * expired label, so a poll answered as the code runs out still counts.
  * A refusal (of the device code or of a poll) shows its localized label then catapult-api's message.
  * A verification link that isn't https:// is never rendered as a link and no polling starts. Polling
  * also stops once the flow's element has left the page (the panel's content was replaced) or another
- * admin tab is shown. Listeners are delegated to the panel: its content comes and goes.
+ * admin tab is shown; a patch after another edit leaves a running flow as it is. Listeners are delegated to the panel: its content comes and goes.
  */
 window.CatapultAdminMinecraft = (function () {
     const BASE = "/admin/minecraft-accounts";
@@ -46,18 +46,18 @@ window.CatapultAdminMinecraft = (function () {
         return card.dataset.labelUnavailable;
     }
 
-    /** Posts an account action, holding the button disabled until the tab has reloaded. */
+    /** Posts an account action, holding the button disabled until the list is patched. */
     async function act(panel, card, button, url, body) {
         button.disabled = true;
         try {
             const { status } = await post(url, body);
             if (ok(status)) {
                 window.mdui?.snackbar?.({ message: url.endsWith("/delete") ? card.dataset.labelDeleted : card.dataset.labelUpdated });
-                await CatapultAdminTabs.reload(panel);
+                await CatapultAdminTabs.patch(panel);
                 return;
             }
             CatapultChannel.showError(refusal(card, status));
-            if (status === 404) await CatapultAdminTabs.reload(panel);
+            if (status === 404) await CatapultAdminTabs.patch(panel);
         } finally {
             button.disabled = false;
         }
@@ -148,7 +148,7 @@ window.CatapultAdminMinecraft = (function () {
             end();
             flowEl.replaceChildren();
         };
-        // the panel's content was replaced (a reload, another view) or the page was left
+        // the panel's content was replaced (another view) or the page was left
         const gone = () => !flowEl.isConnected || !panel.contains(flowEl);
 
         button.disabled = true;
@@ -179,10 +179,13 @@ window.CatapultAdminMinecraft = (function () {
             }
             if (answer.status === 200) {
                 end();
-                button.disabled = true; // until the tab has reloaded
+                button.disabled = true; // until the list is patched
                 window.mdui?.snackbar?.({ message: doneLabel });
+                flowEl.replaceChildren(); // done: the code shown is of no more use
+                const enroll = flowEl.closest(".admin-minecraft-enroll");
+                if (enroll) CatapultAdminTabs.reset(enroll);
                 try {
-                    await CatapultAdminTabs.reload(panel);
+                    await CatapultAdminTabs.patch(panel);
                 } finally {
                     button.disabled = false;
                 }

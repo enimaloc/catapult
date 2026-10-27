@@ -1263,7 +1263,9 @@ class AdminTabsFragmentControllerTest {
         assertThat(html).contains("Random 100 %", "Group beta", "Tag beta = on", "Experiment other = enabled", "Manual",
                         "Account enimaloc", "Include", "Exclude", "Force \u00ab enabled \u00bb")
                 .contains("data-rule-delete=\"" + ruleIds[0] + "\"", "data-override-delete=\"" + overrideIds[3] + "\"")
-                .doesNotContain("experiment-rule-warning");
+                // the warning stays rendered, hidden, for admin-tabs.js to show once the last rule is deleted
+                .containsPattern("experiment-rule-warning\" data-admin-value=\"rules-empty\"\\s+hidden")
+                .contains("data-admin-list=\"rules\"", "data-admin-key=\"" + ruleIds[0] + "\"");
         assertThat(html).containsSubsequence("Account enimaloc", "Tag beta", "Tag beta = on", "Group beta");
     }
 

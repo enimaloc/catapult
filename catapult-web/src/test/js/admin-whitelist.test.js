@@ -63,11 +63,12 @@ beforeEach(async () => {
     await load("admin-tabs", "admin-whitelist");
     window.CatapultChannel = { showError: vi.fn() };
     window.CatapultAdminTabs.reload = vi.fn(async () => {});
+    window.CatapultAdminTabs.patch = vi.fn(async () => {});
     page();
 });
 
 describe("admin-whitelist", () => {
-    it("toggles the whitelist and the invitations, then reloads", async () => {
+    it("toggles the whitelist and the invitations, then renders the tab again: whole cards come or go", async () => {
         await click("[data-whitelist-toggle]");
         expect(posted).toHaveBeenLastCalledWith("/admin/whitelist/toggle", {});
         expect(window.mdui.snackbar).toHaveBeenLastCalledWith({ message: "Toggled" });
@@ -76,12 +77,14 @@ describe("admin-whitelist", () => {
         expect(posted).toHaveBeenLastCalledWith("/admin/whitelist/invite/toggle", {});
         expect(window.mdui.snackbar).toHaveBeenLastCalledWith({ message: "Invites toggled" });
         expect(CatapultAdminTabs.reload).toHaveBeenCalledTimes(2);
+        expect(CatapultAdminTabs.patch).not.toHaveBeenCalled();
     });
 
-    it("adds and deletes an entry; saves settings and a quota from its dialog", async () => {
+    it("adds and deletes an entry; saves settings and a quota from its dialog, patching the tab", async () => {
         fill(add(), " 123 ");
         await click(".admin-whitelist-add-save");
         expect(posted).toHaveBeenLastCalledWith("/admin/whitelist/add", { twitchId: "123" });
+        expect(add().value).toBe(""); // emptied for the next one
 
         await click("[data-delete]");
         expect(mdui.confirm).toHaveBeenCalledWith(expect.objectContaining({ headline: "Remove 123?" }));
@@ -103,7 +106,8 @@ describe("admin-whitelist", () => {
         await click(".admin-whitelist-quota-save");
         expect(posted).toHaveBeenLastCalledWith("/admin/whitelist/invite/i%2F1/quota", { maxUses: null, canReinvite: true });
         expect(dialog().open).toBe(false);
-        expect(CatapultAdminTabs.reload).toHaveBeenCalledTimes(4);
+        expect(CatapultAdminTabs.patch).toHaveBeenCalledTimes(4);
+        expect(CatapultAdminTabs.reload).not.toHaveBeenCalled();
     });
 
     it("sends a quota's empty reinvite choice as null", async () => {
@@ -134,7 +138,7 @@ describe("admin-whitelist", () => {
         expect(posted).not.toHaveBeenCalled();
     });
 
-    it("tells a refusal by its status, and reloads when the invite is gone", async () => {
+    it("tells a refusal by its status, and patches when the invite is gone", async () => {
         fill(add(), "123");
         posted.mockResolvedValueOnce(response(400));
         await click(".admin-whitelist-add-save");
@@ -144,12 +148,14 @@ describe("admin-whitelist", () => {
         await click("[data-whitelist-toggle]");
         expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Down");
         expect(CatapultAdminTabs.reload).not.toHaveBeenCalled();
+        expect(CatapultAdminTabs.patch).not.toHaveBeenCalled();
+        expect(add().value).toBe("123"); // refused: kept
 
         posted.mockResolvedValueOnce(response(404));
         await click("[data-quota]");
         await click(".admin-whitelist-quota-save");
         expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Gone");
-        expect(CatapultAdminTabs.reload).toHaveBeenCalledTimes(1);
+        expect(CatapultAdminTabs.patch).toHaveBeenCalledTimes(1);
         expect(dialog().open).toBe(false);
     });
 

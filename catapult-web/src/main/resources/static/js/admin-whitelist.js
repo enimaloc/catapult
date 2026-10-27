@@ -4,7 +4,9 @@
  * saves the global cap and the default max uses (empty meaning unlimited) with "invitees can invite";
  * an invite's Quota dialog sets its max uses (empty meaning the default) and whether it can
  * reinvite (default, yes or no). Everything posts to AdminWhitelistController with the button
- * disabled meanwhile, and a success reloads the tab. A refusal is told by its status, never by
+ * disabled meanwhile, and a success patches the tab (admin-tabs.js: the entry's or invite's row
+ * inserted, updated or removed, the add field emptied); a switch, which shows or hides whole cards,
+ * renders the tab again. A refusal is told by its status, never by
  * catapult-api's message: 400 (refused values), 404 (invite gone), else unavailable. Listeners are
  * delegated to the panel: its content comes and goes.
  */
@@ -43,33 +45,42 @@ window.CatapultAdminWhitelist = (function () {
         return status === 400 ? root.dataset.labelInvalid : root.dataset.labelUnavailable;
     }
 
-    /** Tells the outcome of `status`: done (snackbar, reload) or refused; a vanished invite also reloads. */
-    async function settle(panel, root, status, doneLabel) {
+    /**
+     * Tells the outcome of `status`: done (snackbar, then `update`: the tab patched by default) or
+     * refused; a vanished invite is patched away. Resolves to whether it was done.
+     */
+    async function settle(panel, root, status, doneLabel, update = CatapultAdminTabs.patch) {
         if (ok(status)) {
             window.mdui?.snackbar?.({ message: root.dataset[doneLabel] });
-            await CatapultAdminTabs.reload(panel);
-            return;
+            await update(panel);
+            return true;
         }
         CatapultChannel.showError(refusal(root, status));
-        if (status === 404) await CatapultAdminTabs.reload(panel);
+        if (status === 404) await CatapultAdminTabs.patch(panel);
+        return false;
     }
 
-    /** Posts, then holds the button disabled until the tab has reloaded: a second click must do nothing. */
-    async function act(panel, root, button, url, body, doneLabel) {
+    /** Posts, then holds the button disabled until the tab is updated: a second click must do nothing. */
+    async function act(panel, root, button, url, body, doneLabel, update) {
         const status = await post(button, url, body);
-        button.disabled = true; // post() re-enabled it; still busy until the tab reloads
+        button.disabled = true; // post() re-enabled it; still busy until the tab is updated
         try {
-            await settle(panel, root, status, doneLabel);
+            return await settle(panel, root, status, doneLabel, update);
         } finally {
             button.disabled = false;
         }
     }
 
-    function addEntry(panel, root, button) {
+    /** A switch shows or hides whole cards (invitations, settings): the tab is rendered again. */
+    function toggle(panel, root, button, url, doneLabel) {
+        return act(panel, root, button, url, {}, doneLabel, CatapultAdminTabs.reload);
+    }
+
+    async function addEntry(panel, root, button) {
         const card = button.closest(".admin-whitelist-add");
         const twitchId = valueOf(card, "twitchId");
         if (!/^\d{1,20}$/.test(twitchId)) return mark(fieldOf(card, "twitchId"));
-        return act(panel, root, button, "/admin/whitelist/add", { twitchId }, "labelAdded");
+        if (await act(panel, root, button, "/admin/whitelist/add", { twitchId }, "labelAdded")) CatapultAdminTabs.reset(card);
     }
 
     async function remove(panel, root, button) {
@@ -112,7 +123,7 @@ window.CatapultAdminWhitelist = (function () {
         const canReinvite = reinvite === "" ? null : reinvite === "true";
         const status = await post(button, `/admin/whitelist/invite/${encodeURIComponent(form.dataset.id)}/quota`, { maxUses, canReinvite });
         if (ok(status) || status === 404) dialog.open = false;
-        button.disabled = true; // post() re-enabled it; still busy until the tab reloads
+        button.disabled = true; // post() re-enabled it; still busy until the row is patched
         try {
             await settle(panel, root, status, "labelQuotaSaved");
         } finally {
@@ -133,8 +144,8 @@ window.CatapultAdminWhitelist = (function () {
             if (!target || !panel.contains(target) || target.disabled) return;
             const root = rootOf();
             if (!root) return;
-            if (target.matches("[data-whitelist-toggle]")) act(panel, root, target, "/admin/whitelist/toggle", {}, "labelToggled");
-            else if (target.matches("[data-invites-toggle]")) act(panel, root, target, "/admin/whitelist/invite/toggle", {}, "labelInvitesToggled");
+            if (target.matches("[data-whitelist-toggle]")) toggle(panel, root, target, "/admin/whitelist/toggle", "labelToggled");
+            else if (target.matches("[data-invites-toggle]")) toggle(panel, root, target, "/admin/whitelist/invite/toggle", "labelInvitesToggled");
             else if (target.matches(".admin-whitelist-add-save")) addEntry(panel, root, target);
             else if (target.matches("[data-delete]")) remove(panel, root, target);
             else if (target.matches(".admin-whitelist-settings-save")) saveSettings(panel, root, target);

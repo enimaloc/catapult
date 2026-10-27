@@ -71,7 +71,7 @@ beforeEach(async () => {
     document.documentElement.lang = "en";
     await load("time", "admin-tabs", "admin-minecraft");
     window.CatapultChannel = { showError: vi.fn() };
-    window.CatapultAdminTabs.reload = vi.fn(async () => {});
+    window.CatapultAdminTabs.patch = vi.fn(async () => {});
     page();
 });
 
@@ -80,7 +80,7 @@ afterEach(() => {
 });
 
 describe("admin-minecraft device-code flow", () => {
-    it("shows the user code and an https link, then polls every max(3, interval) s until 200 and reloads", async () => {
+    it("shows the user code and an https link, then polls every max(3, interval) s until 200 and patches", async () => {
         routes["/admin/minecraft-accounts/create"] = [response(202, {}), response(200, { minecraftUsername: "Bot_mc", label: "Bot1" })];
         document.querySelector('[name="label"]').value = " Bot1 ";
 
@@ -99,12 +99,14 @@ describe("admin-minecraft device-code flow", () => {
         await vi.advanceTimersByTimeAsync(1);
         expect(polls()).toHaveLength(1);
         expect(posted).toHaveBeenLastCalledWith("/admin/minecraft-accounts/create", { deviceCode: "dc-1", label: "Bot1" });
-        expect(CatapultAdminTabs.reload).not.toHaveBeenCalled();
+        expect(CatapultAdminTabs.patch).not.toHaveBeenCalled();
 
         await vi.advanceTimersByTimeAsync(3000);
         expect(polls()).toHaveLength(2);
         expect(window.mdui.snackbar).toHaveBeenLastCalledWith({ message: "Created" });
-        expect(CatapultAdminTabs.reload).toHaveBeenCalledWith(panel());
+        expect(CatapultAdminTabs.patch).toHaveBeenCalledWith(panel());
+        expect(addFlow().children).toHaveLength(0); // the code shown is of no more use
+        expect(document.querySelector('[name="label"]').value).toBe("");
 
         await vi.advanceTimersByTimeAsync(30000);
         expect(polls()).toHaveLength(2);
@@ -177,7 +179,7 @@ describe("admin-minecraft device-code flow", () => {
         expect(rowFlow().textContent).toContain("chain failed");
         expect(rowFlow().querySelector("a")).toBeNull();
         expect(document.querySelector(".admin-minecraft-reauth").disabled).toBe(false);
-        expect(CatapultAdminTabs.reload).not.toHaveBeenCalled();
+        expect(CatapultAdminTabs.patch).not.toHaveBeenCalled();
 
         await vi.advanceTimersByTimeAsync(30000);
         expect(polls()).toHaveLength(2);
@@ -239,7 +241,7 @@ describe("admin-minecraft device-code flow", () => {
 
         expect(polls()).toHaveLength(1);
         expect(window.mdui.snackbar).not.toHaveBeenCalled();
-        expect(CatapultAdminTabs.reload).not.toHaveBeenCalled();
+        expect(CatapultAdminTabs.patch).not.toHaveBeenCalled();
     });
 
     it("stops polling when another admin tab is shown", async () => {
@@ -258,7 +260,7 @@ describe("admin-minecraft device-code flow", () => {
 });
 
 describe("admin-minecraft actions", () => {
-    it("toggles, resets the limit and deletes, then reloads", async () => {
+    it("toggles, resets the limit and deletes, then patches", async () => {
         await click(".admin-minecraft-toggle");
         expect(posted).toHaveBeenLastCalledWith(`/admin/minecraft-accounts/${ID}/enabled`, { enabled: true });
         await click(".admin-minecraft-reset");
@@ -267,14 +269,14 @@ describe("admin-minecraft actions", () => {
         expect(mdui.confirm).toHaveBeenCalledWith(expect.objectContaining({ headline: "Delete Off?" }));
         expect(posted).toHaveBeenLastCalledWith(`/admin/minecraft-accounts/${ID}/delete`, {});
         expect(window.mdui.snackbar).toHaveBeenLastCalledWith({ message: "Deleted" });
-        expect(CatapultAdminTabs.reload).toHaveBeenCalledTimes(3);
+        expect(CatapultAdminTabs.patch).toHaveBeenCalledTimes(3);
     });
 
     it("tells a linked account apart from an unreachable api, and posts once on a double click", async () => {
         routes[`/admin/minecraft-accounts/${ID}/delete`] = [response(409, "")];
         await click(".admin-minecraft-delete");
         expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Linked");
-        expect(CatapultAdminTabs.reload).not.toHaveBeenCalled();
+        expect(CatapultAdminTabs.patch).not.toHaveBeenCalled();
 
         routes[`/admin/minecraft-accounts/${ID}/enabled`] = [response(502, "")];
         const toggle = document.querySelector(".admin-minecraft-toggle");

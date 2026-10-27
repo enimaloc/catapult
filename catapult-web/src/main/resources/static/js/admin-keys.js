@@ -2,9 +2,10 @@
  * The admin Keys tab's Steam and DTDD cards: adding a key (the field is cleared once it is accepted),
  * Refresh, and deleting a listed key after a confirmation. Everything posts to AdminKeysController
  * (provider on the card's data-provider; the key and key id in the body) with the button disabled until
- * the tab has reloaded, so a double click posts once. A refusal is told by its status, never by
- * catapult-api's message: 400 (the card's own invalid-format text), 404 (key gone: reloads), else
- * unavailable. Listeners are delegated to the panel: its content comes and goes.
+ * the list is patched (admin-tabs.js: the key's row inserted, updated or removed), so a double click
+ * posts once. A refusal is told by its status, never by catapult-api's message: 400 (the card's own
+ * invalid-format text), 404 (key gone: patched away), else unavailable. Listeners are delegated to the
+ * panel: its content comes and goes.
  */
 window.CatapultAdminKeys = (function () {
     const ok = status => status >= 200 && status < 300;
@@ -26,19 +27,19 @@ window.CatapultAdminKeys = (function () {
         return status === 400 ? card.dataset.labelInvalid : root.dataset.labelUnavailable;
     }
 
-    /** Posts, then holds the button disabled until the tab has reloaded: a second click must do nothing. */
+    /** Posts, then holds the button disabled until the list is patched: a second click must do nothing. */
     async function act(panel, root, card, button, action, body, doneLabel, onDone) {
         const status = await post(button, `/admin/keys/${card.dataset.provider}/${action}`, body);
-        button.disabled = true; // post() re-enabled it; still busy until the tab reloads
+        button.disabled = true; // post() re-enabled it; still busy until the list is patched
         try {
             if (ok(status)) {
                 onDone?.();
                 window.mdui?.snackbar?.({ message: root.dataset[doneLabel] });
-                await CatapultAdminTabs.reload(panel);
+                await CatapultAdminTabs.patch(panel);
                 return;
             }
             CatapultChannel.showError(refusal(root, card, status));
-            if (status === 404) await CatapultAdminTabs.reload(panel);
+            if (status === 404) await CatapultAdminTabs.patch(panel);
         } finally {
             button.disabled = false;
         }

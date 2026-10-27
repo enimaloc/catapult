@@ -90,12 +90,14 @@
 
     <mdui-card class="admin-targeting-card" variant="outlined">
         <h3 th:text="#{admin.experiments.rules.title}">Attribution</h3>
-        <p class="admin-experiments-rule-warning experiment-rule-warning" th:if="${experiment.rules().isEmpty()}">
+        <!--/* the rules and their warning both rendered, one hidden: admin-tabs.js patches them after an edit */-->
+        <p class="admin-experiments-rule-warning experiment-rule-warning" data-admin-value="rules-empty"
+           th:hidden="${!experiment.rules().isEmpty()}">
             <mdui-icon name="warning"></mdui-icon>
             <span th:text="#{admin.experiments.rules.none}">Aucune règle : personne n'est éligible.</span>
         </p>
-        <div class="admin-targeting-rows" th:unless="${experiment.rules().isEmpty()}">
-            <div class="admin-targeting-row" th:each="r : ${experiment.rules()}" th:attr="data-rule=${r.id()}"
+        <div class="admin-targeting-rows" data-admin-list="rules" th:hidden="${experiment.rules().isEmpty()}">
+            <div class="admin-targeting-row" th:each="r : ${experiment.rules()}" th:attr="data-rule=${r.id()},data-admin-key=${r.id()}"
                  th:with="isTag=${r.attributeKey() != null and r.attributeKey().startsWith('flag:')},
                           tag=${isTag ? r.attributeKey().substring(5) : r.attributeKey()}">
                 <span th:switch="${r.type()}">
@@ -159,9 +161,11 @@
 
     <mdui-card id="experiment-overrides" class="admin-targeting-card" variant="outlined">
         <h3 th:text="#{admin.experiments.overrides.title}">Dérogations</h3>
-        <p class="admin-cell-muted" th:if="${experiment.overrides().isEmpty()}" th:text="#{admin.experiments.overrides.empty}">Aucune dérogation.</p>
-        <div class="admin-targeting-rows" th:unless="${experiment.overrides().isEmpty()}">
-            <div class="admin-targeting-row" th:each="o : ${experiment.overrides()}" th:attr="data-override=${o.id()}"
+        <p class="admin-cell-muted" data-admin-value="overrides-empty" th:hidden="${!experiment.overrides().isEmpty()}"
+           th:text="#{admin.experiments.overrides.empty}">Aucune dérogation.</p>
+        <div class="admin-targeting-rows" data-admin-list="overrides" th:hidden="${experiment.overrides().isEmpty()}">
+            <div class="admin-targeting-row" th:each="o : ${experiment.overrides()}"
+                 th:attr="data-override=${o.id()},data-admin-key=${o.id()}"
                  th:with="isTag=${o.attributeKey() != null and o.attributeKey().startsWith('flag:')},
                           tag=${isTag ? o.attributeKey().substring(5) : o.attributeKey()}">
                 <span>

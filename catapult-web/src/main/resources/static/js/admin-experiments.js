@@ -1,9 +1,12 @@
 /**
  * The admin Experiments detail view. Status actions, weights, rules and overrides post to
- * AdminExperimentsController with their button disabled meanwhile; a success reloads the view, a
- * refusal is told by its status (400 invalid, 404 gone and reloads, 409 unavailable and reloads,
- * anything else unavailable). A 404 on an account override means an unknown Twitch login: it is told
- * without reloading, so the form keeps what was typed. End and Reassign, and deleting a rule or an override, confirm first. The rule and override forms
+ * AdminExperimentsController with their button disabled meanwhile. A status action renders the view
+ * again (the status decides which cards and forms there are); weights, a rule or an override patch it
+ * (admin-tabs.js: the rule's or override's row inserted or removed, its form emptied) and reload the
+ * Participants card, which they may move members in. A refusal is told by its status (400 invalid,
+ * 404 gone and 409 unavailable both render the view again, anything else unavailable). A 404 on an
+ * account override means an unknown Twitch login: it is told without updating, so the form keeps
+ * what was typed. End and Reassign, and deleting a rule or an override, confirm first. The rule and override forms
  * hold one block of fields per type/target and show only the chosen one (variantId only for
  * FORCE_VARIANT); weights show their live share of the total, and the weight bar above them (a
  * segment per variant) is dragged or arrowed by the handle between two neighbours, which moves points
@@ -53,35 +56,56 @@ window.CatapultAdminExperiments = (function () {
     }
 
     /**
-     * Tells the outcome of `status`: done (snackbar, reload) or refused. A vanished (404) or
-     * since-changed (409) experiment also reloads; an unknown account keeps the form as typed.
+     * Brings the view up to date after an edit of its weights, rules or overrides: the edited lists
+     * patched, the participants (who the edit may have moved) loaded again as they are filtered.
      */
-    async function settle(panel, root, status, notFound) {
+    function patch(panel, root) {
+        return Promise.all([CatapultAdminTabs.patch(panel), loadParticipants(root)]);
+    }
+
+    /**
+     * Tells the outcome of `status`: done (snackbar, then `update`) or refused. A vanished (404) or
+     * since-changed (409) experiment renders the whole view again: what it shows may all be stale;
+     * an unknown account keeps the form as typed. Resolves to whether it was done.
+     */
+    async function settle(panel, root, status, notFound, update) {
         if (ok(status)) {
             window.mdui?.snackbar?.({ message: root.dataset.labelSaved });
-            await CatapultAdminTabs.reload(panel);
-            return;
+            await update();
+            return true;
         }
         CatapultChannel.showError(refusal(root, status, notFound));
         if ((status === 404 && notFound === "labelUnknown") || status === 409) await CatapultAdminTabs.reload(panel);
+        return false;
     }
 
-    /** Posts and settles; `button` stays busy until the view reloads. */
-    async function send(panel, root, button, url, body, notFound = "labelUnknown") {
+    /**
+     * Posts and settles, updating the view with `update` (by default: patched); `button` stays busy
+     * until the view is updated. Resolves to whether it was done.
+     */
+    async function send(panel, root, button, url, body, notFound = "labelUnknown", update = () => patch(panel, root)) {
         const status = await post(button, url, body);
         if (button) button.disabled = true;
         try {
-            await settle(panel, root, status, notFound);
+            return await settle(panel, root, status, notFound, update);
         } finally {
             if (button) button.disabled = false;
         }
+    }
+
+    /** Empties a rule or override form back to its rendered defaults, its blocks shown to match. */
+    function resetForm(form) {
+        CatapultAdminTabs.reset(form);
+        sync(form);
     }
 
     async function act(panel, root, button, confirmKey) {
         button.disabled = true; // before the confirmation: a second click must not open another
         try {
             if (confirmKey && !await CatapultAdminTabs.confirmed(root, root.dataset[confirmKey])) return;
-            await send(panel, root, button, urlOf(root, button.dataset.experimentAction), {});
+            // the status decides which cards and forms the view has: it is rendered again
+            await send(panel, root, button, urlOf(root, button.dataset.experimentAction), {}, "labelUnknown",
+                () => CatapultAdminTabs.reload(panel));
         } finally {
             button.disabled = false;
         }
@@ -236,7 +260,8 @@ window.CatapultAdminExperiments = (function () {
                 button.disabled = false;
             }
         }
-        return send(panel, root, button, urlOf(root, "weights"), weights);
+        // the fields already show what was saved; the members it moved are the participants'
+        return send(panel, root, button, urlOf(root, "weights"), weights, "labelUnknown", () => loadParticipants(root));
     }
 
     // ---- rules and overrides
@@ -313,17 +338,16 @@ window.CatapultAdminExperiments = (function () {
         return body;
     }
 
-    function submitRule(panel, root, form) {
+    async function submitRule(panel, root, form) {
         const body = ruleBody(form);
-        if (body) send(panel, root, form.querySelector('[type="submit"]'), urlOf(root, "rules"), body);
+        if (body && await send(panel, root, form.querySelector('[type="submit"]'), urlOf(root, "rules"), body)) resetForm(form);
     }
 
-    function submitOverride(panel, root, form) {
+    async function submitOverride(panel, root, form) {
         const body = overrideBody(form);
-        if (body) {
-            const notFound = body.target === "account" ? "labelAccountUnknown" : "labelUnknown";
-            send(panel, root, form.querySelector('[type="submit"]'), urlOf(root, "overrides"), body, notFound);
-        }
+        if (!body) return;
+        const notFound = body.target === "account" ? "labelAccountUnknown" : "labelUnknown";
+        if (await send(panel, root, form.querySelector('[type="submit"]'), urlOf(root, "overrides"), body, notFound)) resetForm(form);
     }
 
     // ---- tag suggestions
