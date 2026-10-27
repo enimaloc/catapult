@@ -30,6 +30,8 @@ public final class SiteCatalog {
             new SpaPage("privacy", "pages/privacy", "privacy", "/spa/privacy", "page.title.privacy", "page.description.privacy"),
             // Served by ChangelogController, which fills its model (catapult-api's versions).
             new SpaPage("changelog", "pages/changelog", "changelog", "/spa/changelog", "page.title.changelog", "page.description.changelog"),
+            // Served by ApiDocsController, which fills its model (the spec's state, catapult-api's health).
+            new SpaPage("docs/api", "pages/api-docs", "api-docs", "/spa/docs/api", "page.title.api-docs", "page.description.api-docs"),
             new SpaPage("channel", "pages/channel", "channel", "/spa/channel", "page.title.channel", null, true),
             // The channel page as an OBS dock (ObsDock): only reached through /channel/{username}, never by its id.
             new SpaPage("channel-dock", "pages/channel-dock", "dock", "/spa/channel-dock", "page.title.channel-dock", null, true),

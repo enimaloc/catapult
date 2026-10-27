@@ -2340,6 +2340,51 @@ mdui-snackbar.broadcast-warning { --mdui-color-inverse-surface: var(--mdui-color
     color: rgb(var(--mdui-color-error));
 }
 
+/*
+ * API documentation (pages/api-docs.html): Swagger UI has a light theme of its own, kept on a light card
+ */
+.api-docs-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+    padding: 4px 12px;
+    border: 1px solid var(--catapult-border);
+    border-radius: 999px;
+    color: var(--catapult-text-secondary);
+    font-size: 0.875rem;
+}
+
+.api-docs-status::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #22c55e;
+}
+
+.api-docs-status[data-state="down"]::before {
+    background: rgb(var(--mdui-color-error));
+}
+
+.api-docs-cached {
+    margin: 24px 0 0;
+    padding: 12px 16px;
+    border: 1px solid var(--catapult-border);
+    border-radius: 12px;
+    background: var(--catapult-surface-elevated);
+    color: var(--catapult-text-secondary);
+}
+
+.api-docs-ui {
+    margin-top: 24px;
+    padding: 8px 16px;
+    border-radius: var(--catapult-radius);
+    background: #fff;
+    color: #3b4151;
+    overflow-x: auto;
+}
+
 /* ── OBS dock (pages/channel-dock.html) ───────────────────────────────────
    A narrow column inside OBS: no app bar or footer (index.html drops them),
    tight spacing, one switch per row. */

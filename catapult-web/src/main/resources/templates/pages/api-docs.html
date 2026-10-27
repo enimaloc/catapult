@@ -1,0 +1,22 @@
+<!--/* The API documentation (ApiDocsController): Swagger UI, which api-docs.js starts on the site's copy of the spec,
+     whether catapult-api answers, and when the copy shown is an older one, from when. */-->
+<mdui-layout-main th:fragment="api-docs">
+    <section class="section privacy-section api-docs-section">
+        <div class="section-header">
+            <span class="eyebrow" th:text="#{api-docs.eyebrow}">api-docs.eyebrow</span>
+            <h1 th:text="#{api-docs.title}">api-docs.title</h1>
+            <p th:text="#{api-docs.description}">api-docs.description</p>
+            <span id="api-docs-status" class="api-docs-status" role="status" th:attr="data-state=${apiUp} ? 'up' : 'down',
+                  data-label-up=#{api-docs.status.up},data-label-down=#{api-docs.status.down}"
+                  th:text="${apiUp} ? #{api-docs.status.up} : #{api-docs.status.down}">api-docs.status</span>
+        </div>
+
+        <p th:if="${apiDocsCachedAt != null}" id="api-docs-cached" class="api-docs-cached" role="note"
+           th:text="#{api-docs.cached(${apiDocsCachedAt})}">api-docs.cached</p>
+        <p th:unless="${apiDocsAvailable}" id="api-docs-unavailable" th:text="#{api-docs.unavailable}">api-docs.unavailable</p>
+
+        <div th:if="${apiDocsAvailable}" id="swagger-ui" class="api-docs-ui"
+             th:attr="data-spec=${apiDocsSpecUrl},data-bundle=|${apiDocsSwaggerUi}/swagger-ui-bundle.js|,
+                      data-css=|${apiDocsSwaggerUi}/swagger-ui.css|,data-label-failed=#{api-docs.ui-failed}"></div>
+    </section>
+</mdui-layout-main>

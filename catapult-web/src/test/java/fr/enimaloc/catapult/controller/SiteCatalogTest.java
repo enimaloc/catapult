@@ -10,7 +10,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SiteCatalogTest {
 
     @ParameterizedTest
-    @ValueSource(strings = {"", "privacy", "changelog", "channel", "admin", "notifications", "login", "join"})
+    @ValueSource(strings = {"", "privacy", "changelog", "docs/api", "channel", "admin", "notifications", "login", "join"})
     void knowsEveryPage(String path) {
         assertThat(SiteCatalog.isPage(path)).isTrue();
     }
@@ -34,7 +34,7 @@ class SiteCatalogTest {
     @Test
     void onlyThePublicPagesAreIndexed() {
         assertThat(SiteCatalog.PAGES).filteredOn(SpaPage::isIndexed).extracting(SpaPage::getId)
-                .containsExactly("", "privacy", "changelog");
+                .containsExactly("", "privacy", "changelog", "docs/api");
     }
 
     @Test
