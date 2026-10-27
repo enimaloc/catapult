@@ -24,11 +24,11 @@
     <script th:if="${seo.indexed and page == '' and seo.canonicalUrl != null}" type="application/ld+json" th:inline="javascript">
         {"@context": "https://schema.org", "@type": "WebSite", "name": /*[[#{app.brand}]]*/ "", "url": /*[[${seo.canonicalUrl}]]*/ ""}
     </script>
-    <link rel="icon" type="image/svg+xml" href="/img/favicon.svg">
+    <link rel="icon" type="image/svg+xml" th:href="@{/img/favicon.svg}">
 
     <link rel="stylesheet" href="/_static/mdui/2.1.4/mdui.css">
     <link rel="stylesheet" href="/assets/ext/fonts/material-icons.css">
-    <link rel="stylesheet" href="/css/catapult.css">
+    <link rel="stylesheet" th:href="@{/css/catapult.css}">
 
     <!--/* The server's trace of this page, which the browser's goes on with (see SentryBrowser). */-->
     <th:block th:if="${sentry != null}">
@@ -157,27 +157,27 @@
 
 <!--/* First, so that it sees every other script's errors and live update streams. */-->
 <th:block th:if="${sentry != null}">
-    <script th:each="script : ${sentry.sdk}" th:src="${script.key}" th:integrity="${script.value}"></script>
-    <script src="/js/monitoring.js"></script>
+    <script th:each="script : ${sentry.sdk}" th:src="@{${script.key}}" th:integrity="${script.value}"></script>
+    <script th:src="@{/js/monitoring.js}"></script>
 </th:block>
-<script src="/js/csrf.js"></script>
-<script src="/js/catapult.js"></script>
-<script src="/js/live.js"></script>
+<script th:src="@{/js/csrf.js}"></script>
+<script th:src="@{/js/catapult.js}"></script>
+<script th:src="@{/js/live.js}"></script>
 <!--/* Before broadcasts.js and notifications.js, which word their times with it. */-->
-<script src="/js/time.js"></script>
-<script src="/js/spa.js"></script>
-<script src="/js/broadcasts.js"></script>
-<script src="/js/degraded.js"></script>
-<script src="/js/help.js"></script>
-<script th:if="${loggedIn}" src="/js/notifications.js"></script>
-<script th:if="${loggedIn}" src="/js/notification-channels.js"></script>
+<script th:src="@{/js/time.js}"></script>
+<script th:src="@{/js/spa.js}"></script>
+<script th:src="@{/js/broadcasts.js}"></script>
+<script th:src="@{/js/degraded.js}"></script>
+<script th:src="@{/js/help.js}"></script>
+<script th:if="${loggedIn}" th:src="@{/js/notifications.js}"></script>
+<script th:if="${loggedIn}" th:src="@{/js/notification-channels.js}"></script>
 <!-- Page-wide, not per-fragment: the OBS connection must survive SPA navigation. -->
-<script src="/js/suggest.js"></script>
-<script src="/js/obs.js"></script>
-<script src="/js/obs-session.js"></script>
-<script src="/js/twitchat-protocol.js"></script>
-<script src="/js/twitchat.js"></script>
-<script src="/js/twitchat-stream.js"></script>
+<script th:src="@{/js/suggest.js}"></script>
+<script th:src="@{/js/obs.js}"></script>
+<script th:src="@{/js/obs-session.js}"></script>
+<script th:src="@{/js/twitchat-protocol.js}"></script>
+<script th:src="@{/js/twitchat.js}"></script>
+<script th:src="@{/js/twitchat-stream.js}"></script>
 
 <!--
     These scripts back interactive fragments (currently only the /channel/{username}
@@ -187,43 +187,43 @@
     Each file instead listens for the "catapult:render" event spa.js dispatches on both
     initial load and every SPA swap, and no-ops via a null-guard when its DOM isn't present.
 -->
-<script src="/js/visibility.js"></script>
-<script src="/js/channel-page.js"></script>
-<script src="/js/channel-events.js"></script>
-<script src="/js/channel-status.js"></script>
-<script src="/js/game-search.js"></script>
-<script src="/js/channel-bindings.js"></script>
-<script src="/js/channel-connections.js"></script>
-<script src="/js/twitchat-events.js"></script>
-<script src="/js/channel-settings.js"></script>
-<script src="/js/channel-dtdd.js"></script>
-<script src="/js/channel-danger-zone.js"></script>
-<script src="/js/channel-custom-bindings.js"></script>
-<script src="/js/channel-dock.js"></script>
-<script src="/js/channel-invite.js"></script>
-<script src="/js/channel-obs-widget.js"></script>
-<script src="/js/channel-command-migration.js"></script>
-<script src="/js/api-docs.js"></script>
-<script src="/js/admin-members.js"></script>
-<script src="/js/admin-tabs.js"></script>
-<script src="/js/admin-member-debug.js"></script>
-<script src="/js/admin-ccl.js"></script>
-<script src="/js/admin-caches.js"></script>
-<script src="/js/admin-data.js"></script>
-<script src="/js/well-known-forms.js"></script>
-<script src="/js/admin-well-known.js"></script>
-<script src="/js/admin-meta-tags.js"></script>
-<script src="/js/admin-social-links.js"></script>
-<script src="/js/admin-notifications.js"></script>
-<script src="/js/admin-dtdd-mapping.js"></script>
-<script src="/js/admin-game-mappings.js"></script>
-<script src="/js/admin-groups.js"></script>
-<script src="/js/admin-experiments.js"></script>
-<script src="/js/admin-whitelist.js"></script>
-<script src="/js/admin-keys.js"></script>
-<script src="/js/admin-tw.js"></script>
-<script src="/js/admin-minecraft.js"></script>
-<script src="/js/admin-broadcast.js"></script>
-<script th:if="${mock}" src="/js/mock-popout.js"></script>
+<script th:src="@{/js/visibility.js}"></script>
+<script th:src="@{/js/channel-page.js}"></script>
+<script th:src="@{/js/channel-events.js}"></script>
+<script th:src="@{/js/channel-status.js}"></script>
+<script th:src="@{/js/game-search.js}"></script>
+<script th:src="@{/js/channel-bindings.js}"></script>
+<script th:src="@{/js/channel-connections.js}"></script>
+<script th:src="@{/js/twitchat-events.js}"></script>
+<script th:src="@{/js/channel-settings.js}"></script>
+<script th:src="@{/js/channel-dtdd.js}"></script>
+<script th:src="@{/js/channel-danger-zone.js}"></script>
+<script th:src="@{/js/channel-custom-bindings.js}"></script>
+<script th:src="@{/js/channel-dock.js}"></script>
+<script th:src="@{/js/channel-invite.js}"></script>
+<script th:src="@{/js/channel-obs-widget.js}"></script>
+<script th:src="@{/js/channel-command-migration.js}"></script>
+<script th:src="@{/js/api-docs.js}"></script>
+<script th:src="@{/js/admin-members.js}"></script>
+<script th:src="@{/js/admin-tabs.js}"></script>
+<script th:src="@{/js/admin-member-debug.js}"></script>
+<script th:src="@{/js/admin-ccl.js}"></script>
+<script th:src="@{/js/admin-caches.js}"></script>
+<script th:src="@{/js/admin-data.js}"></script>
+<script th:src="@{/js/well-known-forms.js}"></script>
+<script th:src="@{/js/admin-well-known.js}"></script>
+<script th:src="@{/js/admin-meta-tags.js}"></script>
+<script th:src="@{/js/admin-social-links.js}"></script>
+<script th:src="@{/js/admin-notifications.js}"></script>
+<script th:src="@{/js/admin-dtdd-mapping.js}"></script>
+<script th:src="@{/js/admin-game-mappings.js}"></script>
+<script th:src="@{/js/admin-groups.js}"></script>
+<script th:src="@{/js/admin-experiments.js}"></script>
+<script th:src="@{/js/admin-whitelist.js}"></script>
+<script th:src="@{/js/admin-keys.js}"></script>
+<script th:src="@{/js/admin-tw.js}"></script>
+<script th:src="@{/js/admin-minecraft.js}"></script>
+<script th:src="@{/js/admin-broadcast.js}"></script>
+<script th:if="${mock}" th:src="@{/js/mock-popout.js}"></script>
 </body>
 </html>

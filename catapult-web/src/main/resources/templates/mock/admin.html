@@ -6,7 +6,7 @@
     <title>[MOCK] Config du membre</title>
     <link rel="stylesheet" href="/_static/mdui/2.1.4/mdui.css">
     <link rel="stylesheet" href="/assets/ext/fonts/material-icons.css">
-    <link rel="stylesheet" href="/css/catapult.css">
+    <link rel="stylesheet" th:href="@{/css/catapult.css}">
     <script src="/_static/mdui/2.1.4/mdui.global.js"></script>
     <script>
         mdui.setTheme("dark");
@@ -262,6 +262,6 @@
         </section>
     </form>
 </main>
-<script src="/js/mock-popout.js" data-role="popout"></script>
+<script th:src="@{/js/mock-popout.js}" data-role="popout"></script>
 </body>
 </html>
