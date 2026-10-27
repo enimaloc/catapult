@@ -130,7 +130,7 @@ public class ApiSecurityConfig {
                 // to the CorsConfigurationSource Spring MVC derives from it.
                 .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(ApiPaths.INTERNAL + "/health", ApiPaths.INTERNAL + "/config/**", ApiPaths.INTERNAL + "/changelog", ApiPaths.INTERNAL + "/status/degraded", ApiPaths.INTERNAL + "/well-known-files", ApiPaths.INTERNAL + "/meta-tags", "/api/twitchat/widget/**", "/api/twitchat/actions/**", "/api/game/**", "/api/user/**", "/api/v3/api-docs/**").permitAll()
+                        .requestMatchers(ApiPaths.INTERNAL + "/health", ApiPaths.INTERNAL + "/config/**", ApiPaths.INTERNAL + "/changelog", ApiPaths.INTERNAL + "/status/degraded", ApiPaths.INTERNAL + "/well-known-files", ApiPaths.INTERNAL + "/meta-tags", ApiPaths.INTERNAL + "/social-links", "/api/twitchat/widget/**", "/api/twitchat/actions/**", "/api/game/**", "/api/user/**", "/api/v3/api-docs/**").permitAll()
                         .requestMatchers(ApiPaths.INTERNAL + "/auth/exchange").permitAll()
                         .requestMatchers("/api/connect/steam/callback").permitAll()
                         .requestMatchers(ApiPaths.ADMIN + "/**").access(Authz.admin())
