@@ -419,7 +419,8 @@ test.describe("DOM mutations", () => {
   test("@perf dom admin-edit", async ({ page }) => {
     const admin = await signIn(ADMIN, "/admin");
     const memberHtml = await (await admin.api.get(`/spa/admin/members?q=${STREAMER}`)).text();
-    const memberId = new RegExp(`data-member-id="([0-9a-f-]{36})" data-member-name="${STREAMER}"`).exec(memberHtml)?.[1];
+    const memberId = openingTags(memberHtml, "admin-member")
+      .find(({ attributes }) => attributes.get("data-member-name") === STREAMER)?.attributes.get("data-member-id");
     expect(memberId, `${STREAMER} in the admin members`).toBeTruthy();
     const steps: MutationCounts[] = [];
     try {
@@ -509,11 +510,29 @@ async function undoAdminEdits(admin: Member, memberId: string) {
   const targeting = await (await admin.api.get(`/spa/admin/members/${memberId}`)).text();
   if (targeting.includes("perf-dom")) await admin.post(`/admin/members/${memberId}/flags/delete`, { key: "perf-dom" });
   const groups = await (await admin.api.get("/spa/admin/groups")).text();
-  const group = /data-id="([0-9a-f-]{36})">\s*<span[^>]*>perf_dom</.exec(groups)?.[1];
+  // a group's row opens with its key's cell
+  const group = openingTags(groups, "admin-groups-row")
+    .find(({ after }) => /^\s*<span[^>]*>perf_dom</.test(after))?.attributes.get("data-id");
   if (group) await admin.post(`/admin/groups/${group}/delete`);
   const meta = await (await admin.api.get("/spa/admin/meta")).text();
-  for (const [row] of meta.matchAll(/<[^>]*admin-meta-tag-row[^>]*>/g)) {
-    const id = /data-id="([^"]+)"/.exec(row)?.[1];
-    if (id && row.includes('data-key="perf-dom"')) await admin.post(`/admin/meta/tags/${id}/delete`);
+  for (const { attributes } of openingTags(meta, "admin-meta-tag-row")) {
+    const id = attributes.get("data-id");
+    if (id && attributes.get("data-key") === "perf-dom") await admin.post(`/admin/meta/tags/${id}/delete`);
   }
+}
+
+type OpeningTag = { attributes: Map<string, string>; after: string };
+
+/**
+ * The opening tags in `html` whose class list has `className`, each with its attributes by name (in
+ * whatever order the template writes them) and the HTML that follows it.
+ */
+function openingTags(html: string, className: string): OpeningTag[] {
+  const tags: OpeningTag[] = [];
+  for (const tag of html.matchAll(/<[a-z][\w-]*\s([^>]*)>/gi)) {
+    const attributes = new Map([...tag[1].matchAll(/([^\s=]+)="([^"]*)"/g)].map(([, name, value]) => [name, value]));
+    if (!(attributes.get("class") ?? "").split(/\s+/).includes(className)) continue;
+    tags.push({ attributes, after: html.slice(tag.index + tag[0].length) });
+  }
+  return tags;
 }
