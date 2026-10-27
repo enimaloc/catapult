@@ -1,6 +1,6 @@
 // catapult-web/src/test/js/time.test.js
 /* time.js: relative times, durations and the ticker keeping every [data-live-time] element current. */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { html, load, render } from "./helpers.js";
 
 const NOW = new Date("2026-10-18T10:00:00Z");
@@ -50,6 +50,45 @@ describe("duration", () => {
         document.documentElement.lang = "fr";
         expect(CatapultTime.duration(2 * DAY + 4 * MINUTE)).toBe("2j");
         expect(CatapultTime.duration(4 * MINUTE + 32 * SECOND)).toBe("4min 32s");
+    });
+});
+
+/** Makes the document hidden or shown and tells the page. */
+function setHidden(hidden) {
+    Object.defineProperty(document, "hidden", { configurable: true, get: () => hidden });
+    document.dispatchEvent(new Event("visibilitychange"));
+}
+
+describe("rewrites and hidden tabs", () => {
+    afterEach(() => setHidden(false));
+
+    it("doesNotWriteAnUnchangedText", () => {
+        html(`<time data-live-time="relative" datetime="${iso(-2 * HOUR)}"></time>
+              <span data-live-time="countdown" data-live-in="1" data-label-future="in {0}" data-label-done="Done"></span>`);
+        render();
+        tick(2 * SECOND);
+        const setter = vi.spyOn(Node.prototype, "textContent", "set");
+        tick(5 * SECOND);
+        expect(setter).not.toHaveBeenCalled();
+    });
+
+    it("pausesWhileTheDocumentIsHidden", () => {
+        html(`<time data-live-time="relative" datetime="${iso(-59 * SECOND)}"></time>`);
+        render();
+        setHidden(true);
+        expect(vi.getTimerCount()).toBe(0);
+        tick(10 * SECOND);
+        expect(document.querySelector("time").textContent).toBe("59 seconds ago");
+    });
+
+    it("refreshesAtOnceWhenShownAgain", () => {
+        html(`<time data-live-time="relative" datetime="${iso(-59 * SECOND)}"></time>`);
+        render();
+        setHidden(true);
+        vi.setSystemTime(new Date(NOW.getTime() + 5 * MINUTE));
+        setHidden(false);
+        expect(document.querySelector("time").textContent).toBe("6 minutes ago");
+        expect(vi.getTimerCount()).toBe(1);
     });
 });
 

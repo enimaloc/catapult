@@ -66,7 +66,7 @@ window.CatapultBroadcasts = (function () {
         el.querySelector("[data-banner-countdown]").setAttribute("datetime", new Date(maintenance.start).toISOString());
         CatapultTime.refresh(el);
         el.hidden = false;
-        if (timer === null) timer = setInterval(tick, TICK_MS);
+        if (timer === null && !document.hidden) timer = setInterval(tick, TICK_MS);
     }
 
     function showSnackbar(text, { action, onAction, ttlSeconds, warning } = {}) {
@@ -136,6 +136,15 @@ window.CatapultBroadcasts = (function () {
         if (!event.target.closest?.("[data-banner-dismiss]") || !maintenance) return;
         remember(maintenance.startsAt);
         hide();
+    });
+    // Paused in a hidden tab; shown again, the window is checked at once.
+    document.addEventListener("visibilitychange", () => {
+        if (document.hidden) {
+            stopTimer();
+        } else if (maintenance && banner() && !banner().hidden) {
+            tick();
+            if (!banner().hidden && timer === null) timer = setInterval(tick, TICK_MS);
+        }
     });
     CatapultLive.on("Broadcast", onBroadcast);
     CatapultLive.onOpen(() => {

@@ -1,6 +1,6 @@
 // catapult-web/src/test/js/broadcasts.test.js
 /* broadcasts.js: the maintenance banner, version / alert snackbars and restart veil shown to every visitor. */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { html, load } from "./helpers.js";
 
 const NOW = new Date("2026-10-18T10:00:00Z");
@@ -113,6 +113,37 @@ describe("maintenance.scheduled", () => {
         expect(banner().hidden).toBe(false);
         banner().querySelector("[data-banner-dismiss]").click();
         expect(banner().hidden).toBe(true);
+    });
+});
+
+describe("hidden tabs", () => {
+    const setHidden = hidden => {
+        Object.defineProperty(document, "hidden", { configurable: true, get: () => hidden });
+        document.dispatchEvent(new Event("visibilitychange"));
+    };
+    afterEach(() => setHidden(false));
+
+    it("pausesWhileTheDocumentIsHidden", () => {
+        send("maintenance.scheduled", { startsAt: iso(HOUR), durationMinutes: 30, message: "m" });
+        setHidden(true);
+        expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it("refreshesAtOnceWhenShownAgain", () => {
+        send("maintenance.scheduled", { startsAt: iso(HOUR), durationMinutes: 30, message: "m" });
+        setHidden(true);
+        vi.setSystemTime(new Date(NOW.getTime() + 2 * HOUR));
+        setHidden(false);
+        expect(banner().hidden).toBe(true);
+        expect(vi.getTimerCount()).toBe(idleTimers);
+    });
+
+    it("restarts the clock when shown again with the window still open", () => {
+        send("maintenance.scheduled", { startsAt: iso(HOUR), durationMinutes: 30, message: "m" });
+        setHidden(true);
+        setHidden(false);
+        expect(banner().hidden).toBe(false);
+        expect(vi.getTimerCount()).toBe(idleTimers + 1);
     });
 });
 

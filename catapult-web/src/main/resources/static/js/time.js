@@ -44,6 +44,11 @@ window.CatapultTime = (function () {
     // A function replacement: a string one would interpret "$&" and the like in the value.
     const fill = (label, value) => (label ?? "").replace("{0}", () => value);
 
+    /** Writes text only when it differs: an unchanged second must not cost a DOM mutation. */
+    function setText(el, text) {
+        if (el.textContent !== text) el.textContent = text;
+    }
+
     function update(el, now) {
         if (el.dataset.liveIn !== undefined && !el.hasAttribute("datetime")) {
             const seconds = Number(el.dataset.liveIn);
@@ -53,19 +58,19 @@ window.CatapultTime = (function () {
         if (Number.isNaN(at)) return;
         switch (el.dataset.liveTime) {
             case "relative":
-                el.textContent = relative(at - now);
+                setText(el, relative(at - now));
                 break;
             case "datetime":
-                el.textContent = new Intl.DateTimeFormat(lang(), { dateStyle: "medium", timeStyle: "short" }).format(new Date(at));
+                setText(el, new Intl.DateTimeFormat(lang(), { dateStyle: "medium", timeStyle: "short" }).format(new Date(at)));
                 break;
             case "countdown":
                 if (at > now) {
-                    el.textContent = fill(el.dataset.labelFuture, duration(at - now));
+                    setText(el, fill(el.dataset.labelFuture, duration(at - now)));
                 } else if (el.dataset.labelPast !== undefined) {
-                    el.textContent = fill(el.dataset.labelPast, duration(now - at));
+                    setText(el, fill(el.dataset.labelPast, duration(now - at)));
                 } else {
-                    el.textContent = el.dataset.labelDone ?? "";
-                    el.setAttribute("data-live-done", "");
+                    setText(el, el.dataset.labelDone ?? "");
+                    if (!el.hasAttribute("data-live-done")) el.setAttribute("data-live-done", "");
                 }
                 break;
         }
@@ -80,7 +85,21 @@ window.CatapultTime = (function () {
     document.addEventListener("catapult:render", () => refresh());
     // An admin tab's content arrives on its own (admin-tabs.js): written at once, not a second later.
     document.addEventListener("catapult:admin-panel", event => refresh(event.detail?.panel ?? document));
-    setInterval(refresh, TICK_MS);
+    // No ticking in a hidden tab; shown again, everything is brought up to date at once.
+    let ticker = null;
+    const startTicker = () => {
+        if (ticker === null) ticker = setInterval(refresh, TICK_MS);
+    };
+    document.addEventListener("visibilitychange", () => {
+        if (document.hidden) {
+            clearInterval(ticker);
+            ticker = null;
+        } else {
+            refresh();
+            startTicker();
+        }
+    });
+    if (!document.hidden) startTicker();
 
     return { relative, duration, refresh };
 })();
