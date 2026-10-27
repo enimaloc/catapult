@@ -1828,10 +1828,10 @@ mdui-select::part(menu) {
  * The tables below are one grid each, every row (header included) a subgrid of it: as separate grids,
  * the rows sized their action column to their own buttons, so no cell sat under its header.
  */
-.admin-table:has(> :is(.admin-dtdd-row, .admin-groups-row, .admin-whitelist-invite-row, .admin-whitelist-row, .admin-keys-row, .admin-minecraft-row, .admin-tw-row, .admin-meta-tag-row, .invite-row, .admin-gm-row, .admin-gm-missing-row)) { display: grid; column-gap: 12px; }
-.admin-table:has(> :is(.admin-dtdd-row, .admin-groups-row, .admin-whitelist-invite-row, .admin-whitelist-row, .admin-keys-row, .admin-minecraft-row, .admin-tw-row, .admin-meta-tag-row, .invite-row, .admin-gm-row, .admin-gm-missing-row)) > * { grid-column: 1 / -1; }
-.admin-table > :is(.admin-dtdd-row, .admin-groups-row, .admin-whitelist-invite-row, .admin-whitelist-row, .admin-keys-row, .admin-minecraft-row, .admin-tw-row, .admin-meta-tag-row, .invite-row, .admin-gm-row, .admin-gm-missing-row) { grid-template-columns: subgrid; }
-.admin-table > :is(.admin-dtdd-row, .admin-groups-row, .admin-whitelist-invite-row, .admin-whitelist-row, .admin-keys-row, .admin-minecraft-row, .admin-tw-row, .admin-meta-tag-row, .invite-row, .admin-gm-row, .admin-gm-missing-row) > .admin-row-actions { justify-content: flex-end; }
+.admin-table:has(> :is(.admin-dtdd-row, .admin-groups-row, .admin-whitelist-invite-row, .admin-whitelist-row, .admin-keys-row, .admin-minecraft-row, .admin-tw-row, .admin-meta-tag-row, .admin-social-link-row, .invite-row, .admin-gm-row, .admin-gm-missing-row)) { display: grid; column-gap: 12px; }
+.admin-table:has(> :is(.admin-dtdd-row, .admin-groups-row, .admin-whitelist-invite-row, .admin-whitelist-row, .admin-keys-row, .admin-minecraft-row, .admin-tw-row, .admin-meta-tag-row, .admin-social-link-row, .invite-row, .admin-gm-row, .admin-gm-missing-row)) > * { grid-column: 1 / -1; }
+.admin-table > :is(.admin-dtdd-row, .admin-groups-row, .admin-whitelist-invite-row, .admin-whitelist-row, .admin-keys-row, .admin-minecraft-row, .admin-tw-row, .admin-meta-tag-row, .admin-social-link-row, .invite-row, .admin-gm-row, .admin-gm-missing-row) { grid-template-columns: subgrid; }
+.admin-table > :is(.admin-dtdd-row, .admin-groups-row, .admin-whitelist-invite-row, .admin-whitelist-row, .admin-keys-row, .admin-minecraft-row, .admin-tw-row, .admin-meta-tag-row, .admin-social-link-row, .invite-row, .admin-gm-row, .admin-gm-missing-row) > .admin-row-actions { justify-content: flex-end; }
 
 .admin-pagination {
     display: flex;
@@ -2224,6 +2224,21 @@ mdui-snackbar.broadcast-warning { --mdui-color-inverse-surface: var(--mdui-color
     .admin-meta-tag-row > :is(.admin-meta-tag-attribute, .admin-meta-tag-updated) { display: none; }
     .admin-meta-tag-row > .admin-meta-tag-content { grid-column: 1 / -1; grid-row: 2; }
     .admin-meta-tags-fields { grid-template-columns: minmax(0, 1fr); }
+}
+/* The Links tab's social links: platform (icon, name, hidden chip), label, address (cut to one line, whole in its title), actions; the form below adds or edits one. */
+.admin-social-link-row, .admin-table:has(> .admin-social-link-row) { grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr) minmax(0, 2fr) auto; }
+.admin-social-link-platform { display: flex; align-items: center; gap: 8px; }
+.admin-social-link-url { color: var(--catapult-text-muted); }
+.admin-social-links { margin-bottom: 48px; }
+.admin-social-links-form { padding: 16px; margin-top: 16px; }
+.admin-social-links-fields { display: grid; grid-template-columns: 11rem minmax(0, 1fr) minmax(0, 2fr) auto auto; gap: 12px; align-items: center; }
+.admin-social-link-option-icon { display: inline-flex; width: 24px; height: 24px; }
+.admin-social-link-option-icon .social-icon, .admin-social-link-platform .social-icon { width: 20px; height: 20px; }
+@media (max-width: 600px) {
+    .admin-social-link-row, .admin-table:has(> .admin-social-link-row) { grid-template-columns: minmax(0, 1fr) auto; }
+    .admin-social-link-row > .admin-cell { grid-column: 1 / -1; }
+    .admin-social-link-row > .admin-row-actions { grid-column: 2; grid-row: 1; }
+    .admin-social-links-fields { grid-template-columns: minmax(0, 1fr); }
 }
 .admin-tw-kw-card h3 { margin: 0 0 12px; }
 .admin-tw-kw-rows { display: flex; flex-direction: column; margin-bottom: 16px; }

@@ -1,0 +1,76 @@
+<!--/*@thymesVar id="links" type="java.util.List<fr.enimaloc.catapult.common.dto.admin.SocialLinkDto>"*/-->
+<!--/*
+  The social links shown in the footer of every page, in the order of this list (admin-social-links.js:
+  the arrows send the whole order, the form below the list adds a link or saves the one picked with its
+  edit button). An address that isn't https is listed as text, never as a link.
+*/-->
+<div th:fragment="content" class="admin-view">
+    <section class="admin-social-links"
+             th:attr="data-confirm-text=#{admin.confirm},data-cancel-text=#{admin.cancel},
+                      data-error=#{admin.error.generic},data-error-400=#{admin.social-links.error.400},
+                      data-error-404=#{admin.social-links.error.404}">
+        <div class="section-header">
+            <div>
+                <h2 th:text="#{admin.social-links.title}">Social links</h2>
+                <span class="eyebrow" th:if="${links != null}" th:text="#{admin.social-links.count(${links.size()})}">0 links</span>
+            </div>
+        </div>
+        <p class="admin-cell-muted" th:text="#{admin.social-links.hint}">Shown in the footer.</p>
+
+        <th:block th:if="${links == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
+        <th:block th:if="${links != null and links.isEmpty()}">
+            <th:block th:replace="~{pages/admin-tab/common :: empty('share', #{admin.social-links.empty})}"></th:block>
+        </th:block>
+
+        <mdui-card class="admin-table" variant="outlined" th:if="${links != null and !links.isEmpty()}">
+            <div class="admin-row admin-social-link-row admin-row-head" aria-hidden="true">
+                <span th:text="#{admin.social-links.column.platform}">Platform</span>
+                <span th:text="#{admin.social-links.column.label}">Label</span>
+                <span th:text="#{admin.social-links.column.url}">Address</span>
+                <span></span>
+            </div>
+            <div class="admin-row admin-social-link-row" th:each="l : ${links}"
+                 th:with="name=${l.label() != null and !#strings.isEmpty(l.label())} ? ${l.label()} : #{'social.platform.' + ${l.platform()}}"
+                 th:attr="data-id=${l.id()},data-platform=${l.platform()},data-label=${l.label()},data-url=${l.url()},data-visible=${l.visible()}">
+                <span class="admin-social-link-platform">
+                    <th:block th:replace="~{fragments/social-icon :: icon(${l.platform()})}"></th:block>
+                    <span th:text="#{'social.platform.' + ${l.platform()}}">GitHub</span>
+                    <mdui-chip th:unless="${l.visible()}" th:text="#{admin.social-links.hidden}">Hidden</mdui-chip>
+                </span>
+                <strong class="admin-cell" th:text="${l.label()}" th:title="${l.label()}">label</strong>
+                <a class="admin-cell admin-social-link-url" th:if="${#strings.startsWith(#strings.toLowerCase(l.url()), 'https://')}"
+                   th:href="${l.url()}" th:text="${l.url()}" th:title="${l.url()}" target="_blank" rel="noopener noreferrer">url</a>
+                <span class="admin-cell admin-social-link-url" th:unless="${#strings.startsWith(#strings.toLowerCase(l.url()), 'https://')}"
+                      th:text="${l.url()}" th:title="${l.url()}">url</span>
+                <span class="admin-row-actions">
+                    <mdui-button-icon icon="arrow_upward" class="admin-social-link-up" th:attr="aria-label=#{admin.social-links.up}"></mdui-button-icon>
+                    <mdui-button-icon icon="arrow_downward" class="admin-social-link-down" th:attr="aria-label=#{admin.social-links.down}"></mdui-button-icon>
+                    <mdui-button-icon icon="edit" class="admin-social-link-edit" th:attr="aria-label=#{admin.social-links.edit}"></mdui-button-icon>
+                    <mdui-button-icon icon="delete" class="admin-social-link-delete"
+                                      th:attr="aria-label=#{admin.social-links.delete},data-confirm=#{admin.social-links.delete.confirm(${name})}"></mdui-button-icon>
+                </span>
+            </div>
+        </mdui-card>
+
+        <mdui-card class="admin-social-links-form" variant="outlined" th:if="${links != null}"
+                   th:attr="data-label-add=#{admin.social-links.add},data-label-save=#{admin.social-links.save}">
+            <div class="admin-social-links-fields">
+                <mdui-select name="platform" value="OTHER" variant="outlined" th:attr="label=#{admin.social-links.column.platform}">
+                    <mdui-menu-item th:each="p : ${T(fr.enimaloc.catapult.common.dto.admin.SocialPlatform).values()}" th:value="${p.name()}">
+                        <span slot="icon" class="admin-social-link-option-icon"><th:block th:replace="~{fragments/social-icon :: icon(${p})}"></th:block></span>
+                        <th:block th:text="#{'social.platform.' + ${p.name()}}">Platform</th:block>
+                    </mdui-menu-item>
+                </mdui-select>
+                <mdui-text-field name="label" variant="outlined" maxlength="64"
+                                 th:attr="label=#{admin.social-links.column.label}"></mdui-text-field>
+                <mdui-text-field name="url" variant="outlined" maxlength="2048" placeholder="https://"
+                                 th:attr="label=#{admin.social-links.column.url}"></mdui-text-field>
+                <mdui-switch name="visible" checked th:text="#{admin.social-links.column.visible}">Visible</mdui-switch>
+                <div class="admin-data-actions">
+                    <mdui-button class="admin-social-link-cancel" variant="text" hidden th:text="#{admin.cancel}">Cancel</mdui-button>
+                    <mdui-button class="admin-social-link-save" variant="tonal" icon="add" th:text="#{admin.social-links.add}">Add</mdui-button>
+                </div>
+            </div>
+        </mdui-card>
+    </section>
+</div>
