@@ -86,6 +86,18 @@ class RealSteamApiClientTest {
         }
 
         @Test
+        void decodesHtmlEntitiesInDisplayNameAndGame() {
+            respond(summary("api-key", "123"), players(
+                    "{\"personaname\": \"Tom &amp; Jerry\", \"personastate\": 1, \"gameid\": \"1\", "
+                            + "\"gameextrainfo\": \"Ratchet &amp; Clank&#8482;\"}"));
+
+            SteamApiClient.PlayerSummary profile = client.getPlayerProfile("123", null).join().orElseThrow();
+
+            assertThat(profile.gameName()).isEqualTo("Ratchet & Clank\u2122");
+            assertThat(profile.displayName()).isEqualTo("Tom & Jerry");
+        }
+
+        @Test
         void mapsEachPersonaStateToItsVocabularyWord() {
             String[] expected = {"offline", "online", "busy", "away", "snooze", "looking to trade", "looking to play", "offline"};
             for (int state = 0; state < expected.length; state++) {

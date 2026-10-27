@@ -175,7 +175,9 @@ class IndexControllerTest {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
-        String spa = html.substring(html.indexOf("spa: ") + 5, html.indexOf("titles: "));
+        // Thymeleaf 3.1.4+ escapes "/" as "\/" in JavaScript inlining: still the same JS string.
+        String spa = html.substring(html.indexOf("spa: ") + 5, html.indexOf("titles: "))
+                .replace("\\/", "/");
         org.assertj.core.api.Assertions.assertThat(spa)
                 .contains("\"id\":\"privacy\"")
                 .contains("\"templateUrl\":\"/spa/channel\"")

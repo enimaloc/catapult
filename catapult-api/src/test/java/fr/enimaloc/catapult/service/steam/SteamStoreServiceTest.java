@@ -409,6 +409,23 @@ class SteamStoreServiceTest {
         assertThat(page.releaseDate().date()).isEqualTo("1 Jan, 2024");
     }
 
+    @Test
+    void fetchData_decodesHtmlEntitiesInPlainTextFields() {
+        givenAppDetails("100", success("100", """
+                {"type": "game", "name": "Ratchet &amp; Clank", "short_description": "Fast &quot;fun&quot;",
+                 "legal_notice": "&copy; Studio", "developers": ["Insomniac &amp; Co"],
+                 "publishers": ["Sony &amp; Co"], "detailed_description": "<b>Bold &amp; brave</b>"}"""));
+
+        SteamStoreService.SteamStorePage page = service.fetchData("100", Locale.ENGLISH, false).orElseThrow();
+        assertThat(page.name()).isEqualTo("Ratchet & Clank");
+        assertThat(page.shortDescription()).isEqualTo("Fast \"fun\"");
+        assertThat(page.legalNotice()).isEqualTo("\u00a9 Studio");
+        assertThat(page.developers()).containsExactly("Insomniac & Co");
+        assertThat(page.publishers()).containsExactly("Sony & Co");
+        // Genuine HTML, rendered as such: left encoded.
+        assertThat(page.detailedDescription()).isEqualTo("<b>Bold &amp; brave</b>");
+    }
+
     // --- fetchIADisclosure --------------------------------------------------------------------
 
     @Test

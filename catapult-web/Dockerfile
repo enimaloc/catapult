@@ -18,7 +18,7 @@ COPY .git ./.git
 # besides leaving a second (-plain) jar for the COPY below. The tests run in CI, not here.
 RUN ./gradlew :catapult-web:bootJar --no-daemon
 
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:25-jre-alpine
 
 WORKDIR /app
 

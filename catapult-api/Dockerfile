@@ -17,7 +17,7 @@ COPY .git ./.git
 # bootJar alone: `build` would also run the tests and leave a second (-plain) jar for the COPY below
 RUN ./gradlew :catapult-api:bootJar --no-daemon
 
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:25-jre-alpine
 
 WORKDIR /app
 

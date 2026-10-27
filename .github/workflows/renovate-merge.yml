@@ -1,0 +1,38 @@
+name: Renovate merge checkbox
+
+# Renovate adds a "Merge now" checkbox to every PR (prBodyNotes in renovate.json). Ticking it squash-merges
+# the PR right away, with its conventional title as the commit message, even during the 7 days automerge waits.
+on:
+  pull_request:
+    types: [edited]
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+jobs:
+  merge:
+    # Only Renovate's PRs, only when the repository owner ticked the box in this very edit
+    if: >-
+      github.event.pull_request.user.login == 'renovate[bot]'
+      && github.event.sender.login == github.repository_owner
+      && github.event.pull_request.state == 'open'
+      && contains(github.event.pull_request.body, '- [x] <!-- merge-now -->')
+      && !contains(github.event.changes.body.from, '- [x] <!-- merge-now -->')
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      PR_TITLE: ${{ github.event.pull_request.title }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - name: Squash-merge the PR
+        run: gh pr merge "$PR_NUMBER" --squash --subject "$PR_TITLE" --body "" --match-head-commit "$HEAD_SHA"
+
+      # A push made with GITHUB_TOKEN starts no workflow, so master's build and tests are started by hand
+      - name: Run master's build and tests
+        run: |
+          gh workflow run build.yml --ref master
+          gh workflow run test.yml --ref master

@@ -10,6 +10,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.util.HtmlUtils;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -311,8 +312,8 @@ public class RealSteamApiClient implements SteamApiClient {
     // -------------------------------------------------------------------------
 
     private static PlayerSummary summaryOf(Map<String, Object> player) {
-        return new PlayerSummary(stringOrNull(player.get("gameid")), stringOrNull(player.get("gameextrainfo")),
-            stringOrNull(player.get("personaname")), onlineStatus(player.get("personastate")));
+        return new PlayerSummary(stringOrNull(player.get("gameid")), unescapedOrNull(player.get("gameextrainfo")),
+            unescapedOrNull(player.get("personaname")), onlineStatus(player.get("personastate")));
     }
 
     /** The player's summary while they are in a game (both its id and name known), empty otherwise. */
@@ -323,6 +324,11 @@ public class RealSteamApiClient implements SteamApiClient {
 
     private static String stringOrNull(Object value) {
         return value != null ? String.valueOf(value) : null;
+    }
+
+    /** Steam returns personaname/gameextrainfo HTML-entity-encoded (e.g. "&amp;"), even in JSON. */
+    private static String unescapedOrNull(Object value) {
+        return value != null ? HtmlUtils.htmlUnescape(String.valueOf(value)) : null;
     }
 
     /** Maps Steam's numeric personastate to the small fixed vocabulary chat commands read. */

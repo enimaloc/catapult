@@ -36,8 +36,12 @@ public class XboxGameGetter implements GameGetter {
     private static final String PRESENCE_URL = "https://userpresence.xboxlive.com/users/xuid({xuid})";
     /** Titlehub (non documentée officiellement) : seule source du Product ID Store attendu par IGDB, le titleId de la présence n'étant pas cet identifiant. */
     private static final String TITLE_DETAIL_URL = "https://titlehub.xboxlive.com/users/xuid({xuid})/titles/titleid({titleId})/decoration/detail";
-    /** Titre représentant le tableau de bord Xbox lui-même, jamais une partie en cours. */
-    private static final String DASHBOARD_TITLE_NAME = "Home";
+    /**
+     * Titres correspondant à l'app/le shell Xbox lui-même (pas une partie en cours) : "Home" sur console,
+     * "Online" pour l'app Xbox sur PC/mobile/companion. Leur titleId varie selon la plateforme (contrairement
+     * à {@link #titleIdBlacklist} qui ne couvre que le dashboard console), donc on filtre aussi par nom.
+     */
+    private static final Set<String> DASHBOARD_TITLE_NAMES = Set.of("Home", "Online");
     /** titleId Xbox Live de Minecraft (build Win32 legacy, sans Product ID Store) ; détecté séparément par {@link MinecraftPresenceGetter} quand actif. */
     private static final String MINECRAFT_XBOX_TITLE_ID = "1791712750";
 
@@ -113,7 +117,7 @@ public class XboxGameGetter implements GameGetter {
             for (Map<String, Object> title : titles) {
                 String titleName = (String) title.get("name");
                 String state = (String) title.get("state");
-                if (titleName == null || DASHBOARD_TITLE_NAME.equals(titleName)) continue;
+                if (titleName == null || DASHBOARD_TITLE_NAMES.contains(titleName)) continue;
                 if (!"Active".equals(state)) continue;
                 String titleId = String.valueOf(title.get("id"));
                 if (titleIdBlacklist.contains(titleId)) continue;

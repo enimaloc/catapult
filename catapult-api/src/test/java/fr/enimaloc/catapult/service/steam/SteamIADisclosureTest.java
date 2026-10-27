@@ -23,14 +23,14 @@ class SteamIADisclosureTest {
     @Test
     void detectsTheHeadingInAnySupportedLanguage() {
         assertThat(SteamIADisclosure.hasDisclosure("<h2>AI Generated Content Disclosure</h2>")).isTrue();
-        assertThat(SteamIADisclosure.hasDisclosure("<h2>Divulgation de contenu généré par IA</h2>")).isTrue();
+        assertThat(SteamIADisclosure.hasDisclosure("<h2>Notification de contenu généré par IA</h2>")).isTrue();
         assertThat(SteamIADisclosure.hasDisclosure("<h2>AI生成コンテンツの開示</h2>")).isTrue();
         assertThat(SteamIADisclosure.hasDisclosure("<h2>Mature Content Description</h2>")).isFalse();
     }
 
     @Test
     void detectsTheHeadingOfOneLanguage() {
-        String french = "<h2>Divulgation de contenu généré par IA</h2>";
+        String french = "<h2>Notification de contenu généré par IA</h2>";
 
         assertThat(SteamIADisclosure.hasDisclosure(french, Locale.FRENCH)).isTrue();
         assertThat(SteamIADisclosure.hasDisclosure(french, Locale.ENGLISH)).isFalse();

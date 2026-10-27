@@ -1,0 +1,66 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":semanticCommits"
+  ],
+  "timezone": "Europe/Paris",
+  "labels": ["dependencies"],
+  "platformAutomerge": false,
+  "automergeStrategy": "squash",
+  "prBodyNotes": [
+    "- [ ] <!-- merge-now --> **Fusionner maintenant** (squash, titre de la PR comme message, sans attendre les 7 jours)"
+  ],
+  "packageRules": [
+    {
+      "description": "Open the PR as soon as a version is out, but keep its renovate/stability-days check pending for a week, so automerge waits: a hijacked or broken release is usually pulled within days",
+      "matchPackageNames": ["*"],
+      "minimumReleaseAge": "7 days",
+      "internalChecksFilter": "none"
+    },
+    {
+      "description": "Gradle dependencies and the Gradle wrapper: one PR for every non-major update",
+      "matchManagers": ["gradle", "gradle-wrapper"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "gradle dependencies"
+    },
+    {
+      "description": "Docker images of the Dockerfiles and the compose file: one PR for every non-major update",
+      "matchManagers": ["dockerfile", "docker-compose"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "docker images"
+    },
+    {
+      "description": "GitHub Actions: one PR for every non-major update",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "github actions"
+    },
+    {
+      "description": "End-to-end test tooling: one PR for every non-major update",
+      "matchManagers": ["npm"],
+      "matchFileNames": ["e2e/**"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "e2e dependencies"
+    },
+    {
+      "description": "Merge minor and patch updates by themselves once every check is green; 0.x versions and majors stay manual",
+      "matchUpdateTypes": ["minor", "patch"],
+      "matchCurrentVersion": "!/^v?0\\./",
+      "automerge": true
+    },
+    {
+      "description": "The Dockerfiles' JDK build stage follows the Gradle toolchain (Java 21): no major for the -jdk tags, the -jre runtime may move on",
+      "matchPackageNames": ["eclipse-temurin"],
+      "matchCurrentValue": "/-jdk/",
+      "matchUpdateTypes": ["major"],
+      "enabled": false
+    },
+    {
+      "description": "No PostgreSQL major upgrade anywhere (compose, Dockerfiles, CI services): prod's data directory needs a manual pg_upgrade, and the tests must run on prod's major",
+      "matchPackageNames": ["postgres"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
+    }
+  ]
+}
