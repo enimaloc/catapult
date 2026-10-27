@@ -80,13 +80,22 @@ class ChannelEventRedisBridgeTest {
     void customBindings_theActiveOneChanged_andTheListUpdated() {
         assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.CUSTOM_BINDING_CHANGED,
                 new ChannelEvents.CustomBindingChanged(owner.toString(), "Streamer", "b-1"))))
-                .containsExactly(new CustomBindingChangedEvent("streamer", "b-1"));
+                .containsExactly(new CustomBindingChangedEvent("streamer", "b-1", 1L));
         assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.CUSTOM_BINDING_CHANGED,
                 new ChannelEvents.CustomBindingChanged(owner.toString(), "Streamer", null))))
-                .containsExactly(new CustomBindingChangedEvent("streamer", null));
+                .containsExactly(new CustomBindingChangedEvent("streamer", null, 1L));
         assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.CUSTOM_BINDINGS_UPDATED,
                 new ChannelEvents.CustomBindingsUpdated(owner.toString(), "Streamer", null, null))))
-                .containsExactly(new CustomBindingsUpdatedEvent("streamer"));
+                .containsExactly(new CustomBindingsUpdatedEvent("streamer", null, null, 1L));
+    }
+
+    @Test
+    void customBindings_withoutTheEnvelopesTime_atNoKnownTime() {
+        String body = JSON.writeValueAsString(Map.of("name", ChannelEvents.CUSTOM_BINDING_CHANGED,
+                "data", new ChannelEvents.CustomBindingChanged(owner.toString(), "Streamer", "b-1")));
+
+        assertThat(ChannelEventRedisBridge.events(channel, body))
+                .containsExactly(new CustomBindingChangedEvent("streamer", "b-1", null));
     }
 
     @Test
@@ -96,7 +105,7 @@ class ChannelEventRedisBridgeTest {
 
         assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.CUSTOM_BINDINGS_UPDATED,
                 new ChannelEvents.CustomBindingsUpdated(owner.toString(), "Streamer", List.of(art), art.id().toString()))))
-                .containsExactly(new CustomBindingsUpdatedEvent("streamer", List.of(art), art.id().toString()));
+                .containsExactly(new CustomBindingsUpdatedEvent("streamer", List.of(art), art.id().toString(), 1L));
     }
 
     @Test

@@ -10,7 +10,8 @@
  *   active binding follows the CustomBindingChangedEvent of the channel stream (setActive, see
  *   channel-events.js), the list its CustomBindingsUpdatedEvent (apply): a binding it no longer lists
  *   loses its row, one it newly lists gets a copy of the page's row template, the others are brought up
- *   to date in place (but for the form of an open row, which the owner may be editing). A save or a
+ *   to date in place (but for the form of an open row, which the owner may be editing). Either event published
+ *   before the last one applied (its ts: events published apart may arrive out of order) is dropped. A save or a
  *   deletion shows its result at once from its answer (the created row added from the same template, the
  *   edited one brought up to date, the deleted one removed): its live event then finds nothing to change.
  * - API token card (Account tab): since when a token exists, generate/regenerate (regeneration confirmed: it
@@ -27,6 +28,19 @@ window.CatapultCustomBindings = (function () {
     const set = (el, property, value) => { if (el && el[property] !== value) el[property] = value; };
     // The list wired last (attachList): its rows' wiring, for the rows apply() adds.
     let wired = null;
+    // When the last live event applied to the list or its active binding was published (its ts, epoch millis).
+    let appliedTs = -Infinity;
+
+    /**
+     * Whether an event published at `ts` is to be applied: not when published before the last one applied.
+     * Without a ts (an older catapult-api, a catch-up's state, the page's own answer) it always is.
+     */
+    function inOrder(ts) {
+        if (typeof ts !== "number") return true;
+        if (ts < appliedTs) return false;
+        appliedTs = ts;
+        return true;
+    }
 
     /** "twitch_unavailable" -> "errorTwitchUnavailable": the data-error-twitch-unavailable of the list. */
     function errorKey(code) {
@@ -59,8 +73,10 @@ window.CatapultCustomBindings = (function () {
     /**
      * Marks the active binding (null: none) and offers to deactivate it, the others to activate. An activation
      * (made here or elsewhere) also takes away a refusal told under the list; the list's own update (apply) leaves it.
+     * `ts`: when the live event telling it was published (see inOrder).
      */
-    function setActive(activeId) {
+    function setActive(activeId, ts) {
+        if (!inOrder(ts)) return;
         markActive(activeId);
         const error = byId("custom-bindings-error");
         if (error) {
@@ -293,11 +309,13 @@ window.CatapultCustomBindings = (function () {
      * Brings the list to `bindings` (all of them, oldest first, as a CustomBindingsUpdatedEvent carries them) and
      * `activeId`. False when it can't be done in place, for the page to be re-rendered: no bindings (an older
      * catapult-api), the list not wired yet, or no row template to add one from. A page without the list (anyone but
-     * the owner, or the experiment closed to the channel) has nothing to update.
+     * the owner, or the experiment closed to the channel) has nothing to update, nor has an event published before the
+     * last one applied (`ts`, see inOrder): what it tells is outdated.
      */
-    function apply(bindings, activeId) {
+    function apply(bindings, activeId, ts) {
         const list = byId("channel-custom-bindings-list");
         if (!list) return true;
+        if (!inOrder(ts)) return true;
         if (!Array.isArray(bindings) || wired?.list !== list) return false;
         const rows = new Map(Array.from(list.querySelectorAll(".custom-binding-item[data-custom-binding-id]"),
             row => [row.dataset.customBindingId, row]));

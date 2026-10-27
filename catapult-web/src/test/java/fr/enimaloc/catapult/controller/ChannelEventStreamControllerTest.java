@@ -99,13 +99,14 @@ class ChannelEventStreamControllerTest {
         CustomBindingDto art = new CustomBindingDto(UUID.randomUUID(), "Art", "509660", "Art", List.of("Violence"),
                 List.of(), true);
 
-        controller.onChannelUpdated(new CustomBindingsUpdatedEvent("enimaloc", List.of(art), null));
+        controller.onChannelUpdated(new CustomBindingsUpdatedEvent("enimaloc", List.of(art), null, 5L));
 
+        // with when catapult-api published it, for the page to drop one arriving after a newer one
         assertThat(owner.getResponse().getContentAsString()).contains("event:CustomBindingsUpdatedEvent")
-                .contains("\"name\":\"Art\"");
+                .contains("\"name\":\"Art\"", "\"ts\":5");
         assertThat(moderator.getResponse().getContentAsString())
                 .contains("event:CustomBindingsUpdatedEvent\ndata:{\"username\":\"enimaloc\",\"bindings\":null,"
-                        + "\"activeId\":null}")
+                        + "\"activeId\":null,\"ts\":null}")
                 .doesNotContain("Art");
     }
 

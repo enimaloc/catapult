@@ -754,6 +754,27 @@ describe("overview list: live updates", () => {
         expect(ids()).toEqual([ART, DEV]);
     });
 
+    it("drops a list or an activation published before the last one applied, not one without a time", () => {
+        overview({ extra: TEMPLATE });
+        expect(window.CatapultCustomBindings.apply([art, dev, games], GAMES, 2000)).toBe(true);
+
+        // an older list arriving late: neither its rows nor its active binding, and no re-render either
+        expect(window.CatapultCustomBindings.apply([art], ART, 1000)).toBe(true);
+        expect(ids()).toEqual([ART, DEV, GAMES]);
+        expect(isActive(GAMES)).toBe(true);
+        CatapultCustomBindings.setActive(DEV, 1500);
+        expect(isActive(GAMES)).toBe(true);
+
+        CatapultCustomBindings.setActive(DEV, 2000); // published at the same time: applied
+        expect(isActive(DEV)).toBe(true);
+        expect(window.CatapultCustomBindings.apply([art, dev], DEV)).toBe(true); // no time: applied
+        expect(ids()).toEqual([ART, DEV]);
+        CatapultCustomBindings.setActive(ART, 1999);
+        expect(isActive(DEV)).toBe(true);
+        CatapultCustomBindings.setActive(null);
+        expect(document.querySelector(".custom-binding-item.is-active")).toBeNull();
+    });
+
     it("has nothing to update on a page without the list", () => {
         html("<p></p>");
 

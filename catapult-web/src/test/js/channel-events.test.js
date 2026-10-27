@@ -179,10 +179,11 @@ describe("events the page catches up on", () => {
         window.CatapultCustomBindings = { setActive: vi.fn() };
         render();
 
-        current().emit("CustomBindingChangedEvent", { username: "enimaloc", activeId: "b1" });
+        current().emit("CustomBindingChangedEvent", { username: "enimaloc", activeId: "b1", ts: 1000 });
         current().emit("CustomBindingChangedEvent", { username: "enimaloc", activeId: null });
 
-        expect(CatapultCustomBindings.setActive.mock.calls).toEqual([["b1"], [null]]);
+        // with when it was published, for the card to drop one arriving after a newer one
+        expect(CatapultCustomBindings.setActive.mock.calls).toEqual([["b1", 1000], [null, undefined]]);
     });
 
     it("hands the custom bindings' list to the overview card, re-rendering the page when it can't take it", async () => {
@@ -190,9 +191,9 @@ describe("events the page catches up on", () => {
         render();
         const bindings = [{ id: "b1", name: "Art" }];
 
-        current().emit("CustomBindingsUpdatedEvent", { username: "enimaloc", bindings, activeId: "b1" });
+        current().emit("CustomBindingsUpdatedEvent", { username: "enimaloc", bindings, activeId: "b1", ts: 1000 });
         await flush();
-        expect(CatapultCustomBindings.apply).toHaveBeenCalledWith(bindings, "b1");
+        expect(CatapultCustomBindings.apply).toHaveBeenCalledWith(bindings, "b1", 1000);
         expect(CatapultSpa.navigate).not.toHaveBeenCalled();
 
         CatapultCustomBindings.apply.mockReturnValue(false);
@@ -531,7 +532,7 @@ describe("catching up on the channel's state", () => {
         expect(row.querySelector(".ccl").checked).toBe(true);
         expect(row.querySelector(".binding-game-name").textContent).toBe("New name");
         expect(document.querySelector("[data-binding-id=b1]")).toBe(row);
-        expect(custom.apply).toHaveBeenCalledWith([{ id: "c1" }], null);
+        expect(custom.apply).toHaveBeenCalledWith([{ id: "c1" }], null, undefined);
         // Only the renamed binding's text
         expect(changes.flatMap(r => [...r.addedNodes, ...r.removedNodes]).every(n => n.nodeType === Node.TEXT_NODE))
             .toBe(true);

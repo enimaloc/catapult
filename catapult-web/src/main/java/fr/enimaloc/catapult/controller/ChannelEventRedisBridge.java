@@ -97,14 +97,17 @@ public class ChannelEventRedisBridge {
             if (name == null || data == null || !data.isObject()) throw new IllegalArgumentException("no name or data");
             String login = data.path("channelLogin").asString(null);
             if (login == null || login.isBlank()) throw new IllegalArgumentException("no channelLogin");
-            return events(name, login.toLowerCase(Locale.ROOT), data);
+            // when catapult-api published it, for a page to drop what arrives after something newer
+            JsonNode ts = envelope.get("ts");
+            Long publishedAt = ts != null && ts.isIntegralNumber() ? ts.asLong() : null;
+            return events(name, login.toLowerCase(Locale.ROOT), data, publishedAt);
         } catch (RuntimeException e) {
             log.warn("Dropped a malformed channel event on {}: {}", channel, e.getMessage());
             return List.of();
         }
     }
 
-    private static List<ChannelUpdatedEvent> events(String name, String login, JsonNode data) {
+    private static List<ChannelUpdatedEvent> events(String name, String login, JsonNode data, Long ts) {
         return switch (name) {
             case ChannelEvents.BOT_TOGGLED -> List.of(new BotStateChangedEvent(login,
                     read(data, ChannelEvents.BotToggled.class).enabled()));
@@ -119,10 +122,10 @@ public class ChannelEventRedisBridge {
             case ChannelEvents.BINDING_DELETED -> List.of(new BindingDeletedEvent(login,
                     read(data, ChannelEvents.BindingDeleted.class).bindingId()));
             case ChannelEvents.CUSTOM_BINDING_CHANGED -> List.of(new CustomBindingChangedEvent(login,
-                    read(data, ChannelEvents.CustomBindingChanged.class).activeId()));
+                    read(data, ChannelEvents.CustomBindingChanged.class).activeId(), ts));
             case ChannelEvents.CUSTOM_BINDINGS_UPDATED -> {
                 var updated = read(data, ChannelEvents.CustomBindingsUpdated.class);
-                yield List.of(new CustomBindingsUpdatedEvent(login, updated.bindings(), updated.activeId()));
+                yield List.of(new CustomBindingsUpdatedEvent(login, updated.bindings(), updated.activeId(), ts));
             }
             case ChannelEvents.SETTINGS_UPDATED -> List.of(new ChannelSettingsUpdatedEvent(login,
                     read(data, ChannelEvents.SettingsUpdated.class).settings()));

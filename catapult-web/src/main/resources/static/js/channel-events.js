@@ -49,9 +49,9 @@
             if (!window.CatapultDtdd?.apply(data)) catchUp();
         },
         // The active custom binding is highlighted in place, their list (create, edit, delete) patched in place.
-        CustomBindingChangedEvent: data => window.CatapultCustomBindings?.setActive(data.activeId ?? null),
+        CustomBindingChangedEvent: data => window.CatapultCustomBindings?.setActive(data.activeId ?? null, data.ts),
         CustomBindingsUpdatedEvent: data => {
-            if (!window.CatapultCustomBindings?.apply(data.bindings, data.activeId)) catchUp();
+            if (!window.CatapultCustomBindings?.apply(data.bindings, data.activeId, data.ts)) catchUp();
         },
         ChannelConnectionChangedEvent: data => {
             if (data.provider === "STEAM") return;
