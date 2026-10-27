@@ -129,4 +129,15 @@ class ApiDocsControllerTest {
             mvc.perform(get("/_static/swagger-ui/5.34.0/" + asset)).andExpect(status().isOk());
         }
     }
+
+    @Test
+    void servesNothingElseOfTheJar() throws Exception {
+        for (String file : List.of("index.html", "swagger-initializer.js", "oauth2-redirect.html", "oauth2-redirect.js",
+                "swagger-ui.js", "index.css")) {
+            for (String root : List.of("/_static/swagger-ui/5.34.0/", "/webjars/swagger-ui/5.34.0/")) {
+                int code = mvc.perform(get(root + file)).andReturn().getResponse().getStatus();
+                assertThat(code).as(root + file).isNotEqualTo(200);
+            }
+        }
+    }
 }
