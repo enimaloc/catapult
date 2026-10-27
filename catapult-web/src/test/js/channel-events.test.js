@@ -600,6 +600,43 @@ describe("catching up on the channel's state", () => {
         expect(CatapultSpa.navigate).not.toHaveBeenCalled();
     });
 
+    it("drops a state answered after that of a later ask, applying the later one alone", async () => {
+        html(PAGE);
+        const answers = [];
+        vi.stubGlobal("fetch", vi.fn(() => new Promise(resolve => answers.push(resolve))));
+        render();
+        reopen();
+        current().emit("open", {});
+        expect(answers).toHaveLength(2);
+
+        answers[1](response(200, [...binding("b1", "Newer", true), { name: "BotStateChangedEvent", data: { state: true } }]));
+        await flush();
+        answers[0](response(200, [...binding("b1", "Older", false), { name: "BotStateChangedEvent", data: { state: false } }]));
+        await flush();
+
+        const row = document.querySelector("[data-binding-id=b1]");
+        expect(row.querySelector(".binding-game-name").textContent).toBe("Newer");
+        expect(row.querySelector(".ccl").checked).toBe(true);
+        expect(document.getElementById("bot").checked).toBe(true);
+        expect(CatapultSpa.navigate).not.toHaveBeenCalled();
+    });
+
+    it("applies each state answered in the order asked", async () => {
+        html(PAGE);
+        const answers = [];
+        vi.stubGlobal("fetch", vi.fn(() => new Promise(resolve => answers.push(resolve))));
+        render();
+        reopen();
+        current().emit("open", {});
+
+        answers[0](response(200, binding("b1", "First", false)));
+        await flush();
+        expect(document.querySelector(".binding-game-name").textContent).toBe("First");
+        answers[1](response(200, binding("b1", "Second", true)));
+        await flush();
+        expect(document.querySelector(".binding-game-name").textContent).toBe("Second");
+    });
+
     it("re-renders the OBS dock, which shows the binding of the game played now", async () => {
         window.CatapultDock = { active: () => true, EVENTS: [], apply: vi.fn() };
         vi.stubGlobal("fetch", vi.fn(async () => response(200, [])));

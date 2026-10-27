@@ -12,7 +12,8 @@
  * so a closed stream is reopened after a backoff (5 s, doubling up to 60 s, back to 5 s once a
  * stream opens), as live.js does. Events sent while the stream was down are lost: every time it
  * opens again (by itself or reopened), the page catches up on the channel's state as events
- * (GET /spa/channel/{username}/state, see ChannelState.java), applied as if the stream had sent them.
+ * (GET /spa/channel/{username}/state, see ChannelState.java), applied as if the stream had sent them;
+ * an answer arriving after that of a later ask is dropped.
  * It is re-rendered instead only when that state can't be applied in place: it lists other bindings
  * than the page does, or a DTDD mapping card the page doesn't have (or the other way round), or it
  * can't be read. The OBS dock, which shows the binding of the game played now, is re-rendered.
@@ -27,6 +28,10 @@
     let retry = null;
     // Whether the channel's stream opened before: an open after that is a reconnection.
     let opened = false;
+    // The /state asks made (each one's number) and the last one whose answer was applied: an answer to an
+    // older ask, arriving after a newer one's, is dropped (it shows the channel as it was before).
+    let stateAsks = 0;
+    let stateApplied = 0;
 
     // The handful of events that need more than Visibility.dispatch's generic handling —
     // BindingDeletedEvent actually removes a row (not a class toggle or property sync, so
@@ -129,6 +134,7 @@
     /** Catches up on the channel's state after its stream was down: in place when it fits the page. */
     async function catchUpState(username) {
         if (window.CatapultDock?.active()) return catchUp();
+        const ask = ++stateAsks;
         let state;
         try {
             const response = await fetch(`/spa/channel/${encodeURIComponent(username)}/state${location.search}`,
@@ -140,6 +146,8 @@
         }
         // The visitor moved to another channel meanwhile: its own page is fresh.
         if (sourceUsername !== username) return;
+        if (ask < stateApplied) return;
+        stateApplied = ask;
         if (!Array.isArray(state) || !fits(state)) return catchUp();
         state.forEach(entry => handle(entry.name, entry.data));
     }
