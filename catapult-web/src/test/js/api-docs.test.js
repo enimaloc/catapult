@@ -46,6 +46,8 @@ describe("API documentation page", () => {
         expect(options.url).toBe("/docs/api/openapi.json");
         expect(options.domNode).toBe(ui());
         expect(options.presets).toEqual(["apis-preset"]);
+        // Its hash history would reach spa.js's popstate, which would render the page again.
+        expect(options.deepLinking).toBe(false);
     });
 
     it("starts it once per page shown, however many renders follow", async () => {

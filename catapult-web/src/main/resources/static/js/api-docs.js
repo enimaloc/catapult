@@ -93,7 +93,8 @@ window.CatapultApiDocs = (function () {
             SwaggerUIBundle({
                 url: root.dataset.spec,
                 domNode: root,
-                deepLinking: true,
+                // Off: its hash history would reach spa.js's popstate, which renders the page again.
+                deepLinking: false,
                 presets: [SwaggerUIBundle.presets.apis],
                 layout: "BaseLayout",
             });
