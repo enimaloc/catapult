@@ -738,6 +738,9 @@ class AdminTabsFragmentControllerTest {
 
         assertThat(html).doesNotContain("<mdui-tab-panel").contains("id=\"admin-members\"", "data-admin-open=\"" + other + "\"")
                 .doesNotContain("data-admin-open=\"" + MEMBER + "\"");
+        // keyed for admin-tabs.js, which patches a member's row after an action
+        assertThat(html).contains("data-admin-list=\"members\"", "data-admin-key=\"" + other + "\"",
+                "data-admin-list=\"migrate-targets\"");
     }
 
     @Test

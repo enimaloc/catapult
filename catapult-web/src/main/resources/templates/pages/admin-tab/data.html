@@ -35,21 +35,22 @@
         <mdui-button id="admin-data-new" variant="tonal" icon="add" th:text="#{admin.data.new}">New</mdui-button>
     </div>
     <th:block th:if="${rows == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
+    <!--/* swapped by a search or a page; a row saved or deleted patches it (admin-tabs.js, data-admin-*) */-->
     <div data-admin-results th:if="${rows != null}">
-        <th:block th:if="${table.rows().isEmpty()}">
+        <div data-admin-value="empty" th:hidden="${!table.rows().isEmpty()}">
             <th:block th:replace="~{pages/admin-tab/common :: empty('inbox', ${#strings.isEmpty(q)} ? #{admin.data.empty} : #{admin.no_match})}"></th:block>
-        </th:block>
-        <mdui-card class="admin-table admin-data-table" variant="outlined" th:unless="${table.rows().isEmpty()}"
+        </div>
+        <mdui-card class="admin-table admin-data-table" variant="outlined" data-admin-list="rows" th:hidden="${table.rows().isEmpty()}"
                    th:style="|--admin-columns: ${table.columns().size()}|">
             <div class="admin-row admin-row-head" aria-hidden="true">
                 <span class="admin-cell" th:each="c : ${table.columns()}" th:text="${c}">column</span>
             </div>
-            <div class="admin-row admin-data-row" th:each="r : ${table.rows()}" th:attr="data-id=${r.id()}"
+            <div class="admin-row admin-data-row" th:each="r : ${table.rows()}" th:attr="data-id=${r.id()},data-admin-key=${r.id()}"
                  role="button" tabindex="0" th:title="#{admin.data.edit}">
                 <span class="admin-cell" th:each="cell : ${r.cells()}" th:text="${cell}" th:title="${cell}">cell</span>
             </div>
         </mdui-card>
-        <th:block th:replace="~{pages/admin-tab/common :: pagination(${rows})}"></th:block>
+        <div data-admin-value="pagination"><th:block th:replace="~{pages/admin-tab/common :: pagination(${rows})}"></th:block></div>
     </div>
     <mdui-dialog id="admin-data-dialog" class="admin-dialog" close-on-overlay-click>
         <div class="admin-dialog-body"></div>

@@ -11,13 +11,17 @@
 <th:block th:fragment="content" th:with="page=${adminMembers}">
     <div class="section-header">
         <h2 th:text="#{admin.tab.members}">Membres</h2>
-        <span class="eyebrow" th:if="${page != null}"
+        <span class="eyebrow" data-admin-value="count" th:if="${page != null}"
               th:text="#{admin.members.count(${page.totalElements()})}">0 membres</span>
         <mdui-text-field class="admin-search" data-admin-search variant="outlined" clearable icon="search"
                          th:attr="label=#{admin.search},value=${q}"></mdui-text-field>
     </div>
 
-    <!--/* Swapped by admin-tabs.js with each search and page: the list, its dialog and its pagination. */-->
+    <!--/*
+      Swapped by admin-tabs.js with each search and page: the list, its dialog and its pagination. A
+      member's action patches it instead (data-admin-*): the list and its empty state are both rendered,
+      one hidden.
+    */-->
     <div data-admin-results>
 
     <mdui-card th:if="${page == null}" class="settings-card admin-placeholder" variant="outlined">
@@ -25,12 +29,14 @@
         <span th:text="#{admin.members.unavailable}">admin.members.unavailable</span>
     </mdui-card>
 
-    <mdui-card th:if="${page != null and page.members().isEmpty()}" class="settings-card admin-placeholder" variant="outlined">
+    <mdui-card th:if="${page != null}" th:hidden="${!page.members().isEmpty()}" data-admin-value="empty"
+               class="settings-card admin-placeholder" variant="outlined">
         <mdui-icon name="group_off"></mdui-icon>
         <span th:text="${#strings.isEmpty(q)} ? #{admin.members.empty} : #{admin.no_match}">admin.members.empty</span>
     </mdui-card>
 
-    <mdui-card id="admin-members" th:if="${page != null and !page.members().isEmpty()}" class="admin-members" variant="outlined"
+    <mdui-card id="admin-members" th:if="${page != null}" th:hidden="${page.members().isEmpty()}" data-admin-list="members"
+               class="admin-members" variant="outlined"
                th:attr="data-confirm-text=#{admin.members.confirm},data-cancel-text=#{admin.members.cancel},
                data-label-impersonate-refused=#{admin.members.impersonate.error},
                data-label-impersonate-unavailable=#{admin.members.impersonate.unavailable}">
@@ -45,7 +51,7 @@
 
         <div class="admin-member" th:each="m : ${page.members()}"
              th:with="name=${m.twitchUsername() ?: '—'}, isSelf=${m.id() == currentUserId}"
-             th:attr="data-member-id=${m.id()},data-member-name=${name}"
+             th:attr="data-member-id=${m.id()},data-admin-key=${m.id()},data-member-name=${name}"
              th:classappend="${m.systemAccount()} ? 'admin-member-system'">
             <div class="admin-member-identity">
                 <mdui-avatar th:src="${m.profileImageUrl()}" th:unless="${m.profileImageUrl() == null}"></mdui-avatar>
@@ -132,7 +138,9 @@
         </div>
     </mdui-card>
 
-    <th:block th:if="${page != null}"><th:block th:replace="~{pages/admin-tab/common :: pagination(${page})}"></th:block></th:block>
+    <div data-admin-value="pagination" th:if="${page != null}">
+        <th:block th:replace="~{pages/admin-tab/common :: pagination(${page})}"></th:block>
+    </div>
 
     <!--/* Opened by the "migrate" action, on the member it was picked from. */-->
     <mdui-dialog id="admin-migrate-dialog" th:if="${page != null}" close-on-overlay-click
@@ -141,8 +149,8 @@
         <div class="admin-migrate-form">
             <mdui-text-field id="admin-migrate-search" variant="outlined" clearable icon="search"
                              th:attr="label=#{admin.search}"></mdui-text-field>
-            <mdui-select id="admin-migrate-target" th:attr="label=#{admin.members.migrate.target}" variant="outlined">
-                <mdui-menu-item th:each="m : ${page.members()}" th:unless="${m.systemAccount()}"
+            <mdui-select id="admin-migrate-target" data-admin-list="migrate-targets" th:attr="label=#{admin.members.migrate.target}" variant="outlined">
+                <mdui-menu-item th:each="m : ${page.members()}" th:unless="${m.systemAccount()}" th:attr="data-admin-key=${m.id()}"
                                 th:value="${m.id()}" th:text="${m.twitchUsername() ?: m.id()}">member</mdui-menu-item>
             </mdui-select>
             <span class="eyebrow" th:text="#{admin.members.migrate.what}">Migrer</span>

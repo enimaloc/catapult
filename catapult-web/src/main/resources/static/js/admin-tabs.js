@@ -4,7 +4,8 @@
  * /spa/admin/{tab}/{sub}, named in the hash as #tab/sub so it can be linked and the back button
  * comes back to the list (spa.js re-renders the page on popstate, and this restores the view).
  * A sub-view's search and pagination only swap its [data-admin-results], keeping the search
- * field focused. Each new content is announced with "catapult:admin-panel" for the tab scripts.
+ * field focused; an edit in them patches them (below). Each new content is announced with
+ * "catapult:admin-panel" for the tab scripts.
  * A panel that comes with the page (data-admin-prerendered: Members) is lazy only for its sub-views:
  * its list is already there, and comes from /spa/admin/{tab} again on the way back from one.
  *
@@ -342,12 +343,6 @@ window.CatapultAdminTabs = (function () {
         return show(panel, true);
     }
 
-    /** Re-fetches the results as they are (same search, same page), after a change to them. */
-    function reloadResults(panel) {
-        const { q, page } = stateOf(panel);
-        return results(panel, q, page);
-    }
-
     /**
      * Resolves to whether the admin confirmed `message` (with `description` under it, if any), in `root`'s
      * data-confirm-text / data-cancel-text.
@@ -420,5 +415,5 @@ window.CatapultAdminTabs = (function () {
 
     document.addEventListener("catapult:render", attach);
 
-    return { route, show, reload, patch, reset, reloadResults, confirmed, refusal, post };
+    return { route, show, reload, patch, reset, confirmed, refusal, post };
 })();

@@ -1,6 +1,7 @@
 /*
  * The admin members tab: the bot switch only posts, every other action posts once confirmed and
- * then re-renders the page; "migrate" goes through its dialog instead.
+ * then patches the list shown (the page itself outside the members tab); "migrate" goes through its
+ * dialog instead. A row a patch inserted is bound once.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flush, html, load, render, response } from "./helpers.js";
@@ -127,19 +128,46 @@ describe("admin-members", () => {
         expect(dialog.open).toBe(false);
     });
 
-    it("reloads the list as shown (same search, same page) rather than the page, inside the members tab", async () => {
+    /** The page inside the members tab panel, its patch stubbed. */
+    function inPanel() {
         page();
         const panel = document.createElement("mdui-tab-panel");
         panel.setAttribute("value", "members");
         panel.append(...document.body.childNodes);
         document.body.append(panel);
-        CatapultAdminTabs.reloadResults = vi.fn(async () => {});
+        CatapultAdminTabs.patch = vi.fn(async () => {});
+        return panel;
+    }
+
+    it("patches the list as shown (same search, same page) rather than the page, inside the members tab", async () => {
+        const panel = inPanel();
+        const target = document.getElementById("admin-migrate-target");
+        target.initialOptions = [];
 
         await click('[data-action="delete"]');
 
         expect(posts()).toEqual([[`/admin/members/${ID}/delete`, {}]]);
-        expect(CatapultAdminTabs.reloadResults).toHaveBeenCalledWith(panel);
+        expect(CatapultAdminTabs.patch).toHaveBeenCalledWith(panel);
         expect(refreshed()).toBe(0);
+        expect(target.initialOptions).toBeUndefined(); // the next open takes the options as patched
+    });
+
+    it("binds a row a patch inserted once, and nothing twice when the list is announced again", async () => {
+        const panel = inPanel();
+        document.querySelector("#admin-members").insertAdjacentHTML("beforeend", `
+            <div class="admin-member" id="new-row" data-member-id="${OTHER}" data-member-name="other">
+                <mdui-menu-item data-action="delete" data-confirm="Delete other?"></mdui-menu-item>
+            </div>`);
+        const row = document.getElementById("new-row");
+        const announce = root => document.dispatchEvent(new CustomEvent("catapult:admin-panel", { detail: { tab: "members", panel, root } }));
+
+        announce(row);
+        announce(row);
+        announce(panel);
+        await click('#new-row [data-action="delete"]');
+        await click(`[data-member-id="${ID}"] [data-action="delete"]`);
+
+        expect(posts()).toEqual([[`/admin/members/${OTHER}/delete`, {}], [`/admin/members/${ID}/delete`, {}]]);
     });
 
     describe("debug mode", () => {

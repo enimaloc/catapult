@@ -1,6 +1,7 @@
 /*
  * The admin caches tab's entries: the detail button opens the entry's record in a dialog, the
- * delete button evicts it once confirmed and reloads the results as they were.
+ * delete button evicts it once confirmed and patches the results as they are shown (the entry's row
+ * removed, the rest and the dialog kept).
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { flush, html, load, render, response } from "./helpers.js";
@@ -85,13 +86,35 @@ describe("admin-caches", () => {
         expect(fetched).not.toHaveBeenCalled();
     });
 
-    it("evicts a confirmed entry, then reloads the results", async () => {
-        page();
+    it("evicts a confirmed entry, then patches its row away from the page shown", async () => {
+        const entries = keys => `
+            <div class="admin-view" data-name="igdb-game-cache" data-confirm-text="OK" data-cancel-text="No" data-error="Failed ({0})">
+                <div data-admin-results>
+                    <div data-admin-value="empty" ${keys.length ? "hidden" : ""}>None</div>
+                    <div data-admin-list="entries">${keys.map(key => `<div class="admin-row" data-key="${key}" data-admin-key="${key}">
+                        <button class="admin-cache-detail"></button>
+                        <button class="admin-cache-delete" data-confirm="Remove ${key}?"></button></div>`).join("")}</div>
+                </div>
+                <div id="admin-cache-dialog"><div class="admin-dialog-body"></div><button class="admin-dialog-close"></button></div>
+            </div>`;
+        let served = entries(["a b", "c"]);
+        fetched.mockImplementation(async () => response(200, served));
+        html(`<mdui-tabs id="admin-tabs"><mdui-tab-panel value="caches" data-admin-lazy></mdui-tab-panel></mdui-tabs>`);
+        document.getElementById("admin-tabs").value = "caches";
+        render();
+        await flush();
+        const kept = document.querySelector('[data-admin-key="c"]');
+        const dialog = document.getElementById("admin-cache-dialog");
+        served = entries(["c"]);
+
         await click(".admin-cache-delete");
 
         expect(mdui.confirm).toHaveBeenCalledWith(expect.objectContaining({ headline: "Remove a b?", confirmText: "OK" }));
         expect(posted.mock.calls).toEqual([["/admin/caches/igdb-game-cache/delete?key=a+b", {}]]);
-        expect(fetched.mock.calls.map(([url]) => url)).toEqual(["/spa/admin/caches/igdb-game-cache?q=&page=0"]);
+        expect(fetched.mock.calls.map(([url]) => url)).toEqual(["/spa/admin/caches/igdb-game-cache", "/spa/admin/caches/igdb-game-cache"]);
+        expect(document.querySelector('[data-admin-key="a b"]')).toBeNull();
+        expect(document.querySelector('[data-admin-key="c"]')).toBe(kept);
+        expect(document.getElementById("admin-cache-dialog")).toBe(dialog);
     });
 
     it("leaves the entry alone when the admin cancels", async () => {
