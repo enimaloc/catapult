@@ -77,6 +77,7 @@ class ApiDocsControllerTest {
         String english = page("/spa/docs/api", Locale.ENGLISH);
 
         assertThat(french).contains("id=\"api-docs-cached\"", "en cache, du " + when, "id=\"swagger-ui\"")
+                .contains("data-fetched-at=\"2026-10-27T09:30:00Z\"", "data-label=\"API injoignable : documentation en cache, du {0}.\"")
                 .contains("data-state=\"down\"");
         assertThat(english).contains("id=\"api-docs-cached\"", "cached, from " + when);
     }

@@ -1,6 +1,8 @@
 /*
  * The API documentation page (/docs/api, ApiDocsController): Swagger UI on the site's copy of catapult-api's spec
  * (#swagger-ui's data-spec), and an indicator of whether catapult-api answers (#api-docs-status, from /api/health).
+ * A cached copy's banner (#api-docs-cached) tells when it was fetched in the visitor's own time zone: the server's
+ * words, in its zone, are rewritten from data-fetched-at (an instant) into data-label's {0}, as DD/MM HH:MM.
  * The page is one of spa.js's: Swagger UI's bundle (data-bundle, data-css: served by the site, no CDN) is only
  * loaded on the first render that shows it, then started on each new #swagger-ui. "Try it out" calls the site
  * itself (the spec's servers are "/"), which relays the documented paths to catapult-api.
@@ -81,7 +83,18 @@ window.CatapultApiDocs = (function () {
         }
     }
 
+    const two = number => String(number).padStart(2, "0");
+
+    function showFetchedAt(el) {
+        const at = new Date(el.dataset.fetchedAt);
+        if (!el.dataset.label || Number.isNaN(at.getTime())) return;
+        const when = `${two(at.getDate())}/${two(at.getMonth() + 1)} ${two(at.getHours())}:${two(at.getMinutes())}`;
+        el.textContent = el.dataset.label.replace("{0}", () => when);
+    }
+
     async function start() {
+        const cached = document.getElementById("api-docs-cached");
+        if (cached) showFetchedAt(cached);
         const status = document.getElementById("api-docs-status");
         if (status) checkHealth(status);
         const root = document.getElementById("swagger-ui");

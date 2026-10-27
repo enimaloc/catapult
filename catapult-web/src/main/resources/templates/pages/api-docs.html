@@ -12,6 +12,7 @@
         </div>
 
         <p th:if="${apiDocsCachedAt != null}" id="api-docs-cached" class="api-docs-cached" role="note"
+           th:attr="data-fetched-at=${apiDocsFetchedAt},data-label=#{api-docs.cached('{0}')}"
            th:text="#{api-docs.cached(${apiDocsCachedAt})}">api-docs.cached</p>
         <p th:unless="${apiDocsAvailable}" id="api-docs-unavailable" th:text="#{api-docs.unavailable}">api-docs.unavailable</p>
 

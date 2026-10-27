@@ -175,6 +175,44 @@ describe("API documentation page", () => {
         });
     });
 
+    describe("cached copy banner", () => {
+        function banner(attributes) {
+            html(`<p id="api-docs-cached" ${attributes}>API unreachable: documentation cached, from 27/10 09:30.</p>`);
+        }
+        const text = () => document.getElementById("api-docs-cached").textContent;
+
+        it("tells when the copy was fetched in the visitor's own time zone", async () => {
+            banner('data-fetched-at="2026-03-04T05:06:00Z" data-label="Cached, from {0}."');
+            await load("api-docs");
+
+            render();
+
+            const at = new Date("2026-03-04T05:06:00Z");
+            const two = n => String(n).padStart(2, "0");
+            expect(text()).toBe(`Cached, from ${two(at.getDate())}/${two(at.getMonth() + 1)} `
+                + `${two(at.getHours())}:${two(at.getMinutes())}.`);
+            expect(text()).toMatch(/^Cached, from \d\d\/\d\d \d\d:\d\d\.$/);
+        });
+
+        it("keeps the server's words without a readable instant", async () => {
+            banner('data-fetched-at="nope" data-label="Cached, from {0}."');
+            await load("api-docs");
+
+            render();
+
+            expect(text()).toBe("API unreachable: documentation cached, from 27/10 09:30.");
+        });
+
+        it("keeps the server's words without a label", async () => {
+            banner('data-fetched-at="2026-03-04T05:06:00Z"');
+            await load("api-docs");
+
+            render();
+
+            expect(text()).toBe("API unreachable: documentation cached, from 27/10 09:30.");
+        });
+    });
+
     describe("indicator", () => {
         it("asks the site's /api/health, never kept", async () => {
             window.SwaggerUIBundle = swaggerStub();

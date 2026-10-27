@@ -22,7 +22,8 @@ import java.util.Optional;
  * The API documentation, on the site: the page ({@code /docs/api}, and spa.js's fragment of it,
  * {@code /spa/docs/api}) runs Swagger UI on the site's copy of catapult-api's spec ({@code /docs/api/openapi.json},
  * see ApiDocsSpec), and says whether catapult-api answers (ApiHealthProbe, followed in the page from
- * {@code /api/health}). A cached copy is shown with the time it was fetched; without any copy the page says so,
+ * {@code /api/health}). A cached copy is shown with the time it was fetched (worded in the visitor's time zone by
+ * api-docs.js, from the instant in {@code data-fetched-at}); without any copy the page says so,
  * still a 200. catapult-api's own Swagger UI addresses, which the site no longer relays, lead here.
  */
 @Controller
@@ -80,10 +81,12 @@ public class ApiDocsController {
 
     private void docs(Model model) {
         Optional<ApiDocsSpec.Cached> cached = spec.current();
+        Optional<ApiDocsSpec.Cached> older = cached.filter(ApiDocsSpec.Cached::fromCache);
         model.addAttribute("apiDocsAvailable", cached.isPresent());
-        model.addAttribute("apiDocsCachedAt", cached.filter(ApiDocsSpec.Cached::fromCache)
-                .map(copy -> FETCHED_AT.withZone(ZoneId.systemDefault()).format(copy.fetchedAt()))
-                .orElse(null));
+        // The server's own zone without script; api-docs.js words it in the visitor's (from the instant).
+        model.addAttribute("apiDocsCachedAt", older
+                .map(copy -> FETCHED_AT.withZone(ZoneId.systemDefault()).format(copy.fetchedAt())).orElse(null));
+        model.addAttribute("apiDocsFetchedAt", older.map(copy -> copy.fetchedAt().toString()).orElse(null));
         model.addAttribute("apiDocsSpecUrl", SPEC_URL);
         model.addAttribute("apiDocsSwaggerUi", SWAGGER_UI);
         model.addAttribute("apiUp", probe.up());
