@@ -6,13 +6,13 @@
     "nodes": 18
   },
   "dock-events": {
-    "nodes": 950
+    "nodes": 948
   },
   "channel-live-events": {
-    "nodes": 70786
+    "nodes": 23606
   },
   "channel-reconnect": {
-    "nodes": 11798
+    "nodes": 0
   },
   "custom-binding-crud": {
     "nodes": 37226
