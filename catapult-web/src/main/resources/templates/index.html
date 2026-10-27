@@ -130,10 +130,13 @@
             <a data-link href="/docs/api" th:text="#{footer.api}">footer.api</a>
             <!--/* Only https links are rendered, whatever catapult-api answered. */-->
             <th:block th:each="socialLink : ${socialLinks}">
-                <a th:if="${#strings.startsWith(socialLink.url, 'https://')}" class="footer-social"
-                   th:href="${socialLink.url}" th:attr="data-platform=${socialLink.platform}"
-                   target="_blank" rel="noopener noreferrer"
-                   th:text="${socialLink.label != null and !#strings.isEmpty(socialLink.label)} ? ${socialLink.label} : #{'social.platform.' + ${socialLink.platform}}">social</a>
+                <a th:if="${#strings.startsWith(#strings.toLowerCase(socialLink.url), 'https://')}" class="footer-social"
+                   th:with="name=${socialLink.label != null and !#strings.isEmpty(socialLink.label)} ? ${socialLink.label} : #{'social.platform.' + ${socialLink.platform}}"
+                   th:href="${socialLink.url}" th:title="${name}" th:attr="data-platform=${socialLink.platform}"
+                   target="_blank" rel="noopener noreferrer">
+                    <th:block th:replace="~{fragments/social-icon :: icon(${socialLink.platform})}"></th:block>
+                    <span class="footer-social-name" th:text="${name}">social</span>
+                </a>
             </th:block>
             <!--/* See BuildVersionAdvice: absent when the build wrote no version. */-->
             <span th:if="${appVersion != null}" class="version" th:text="#{footer.version(${appVersion})}">footer.version</span>

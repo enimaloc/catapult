@@ -72,7 +72,7 @@ class MockSocialLinkStoreTest {
         assertThat(store.order(List.of(a, a))).isEqualTo(400);
         assertThat(store.order(List.of(a, 99L))).isEqualTo(400);
         assertThat(store.order(Arrays.asList(a, null))).isEqualTo(400);
-        assertThat(store.order(List.of(b, a))).isEqualTo(204);
+        assertThat(store.order(List.of(b, a))).isEqualTo(200);
         assertThat(store.list()).extracting(SocialLinkDto::id).containsExactly(b, a);
         assertThat(store.list()).extracting(SocialLinkDto::position).containsExactly(0, 1);
     }

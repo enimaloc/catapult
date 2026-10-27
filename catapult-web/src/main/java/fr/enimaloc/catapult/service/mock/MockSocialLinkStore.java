@@ -63,7 +63,7 @@ class MockSocialLinkStore {
         links.clear();
         links.addAll(ordered);
         renumber();
-        return 204;
+        return 200;
     }
 
     private int indexOf(long id) {

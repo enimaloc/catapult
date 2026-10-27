@@ -1042,14 +1042,14 @@ class RealApiServiceTest {
         expect(HttpMethod.PUT, "/api/internal/admin/social-links/3").andExpect(content().json(json)).andRespond(withStatus(HttpStatus.NOT_FOUND));
         expect(HttpMethod.DELETE, "/api/internal/admin/social-links/3").andRespond(withNoContent());
         expect(HttpMethod.PUT, "/api/internal/admin/social-links/order").andExpect(content().json("{\"ids\":[2,1]}"))
-                .andRespond(withNoContent());
+                .andRespond(withSuccess("[]", MediaType.APPLICATION_JSON));
 
         assertThat(service.adminSocialLinks()).isEmpty();
         assertThat(service.adminSocialLinks()).isNull();
         assertThat(service.adminCreateSocialLink(request)).isEqualTo(201);
         assertThat(service.adminUpdateSocialLink(3, request)).isEqualTo(404);
         assertThat(service.adminDeleteSocialLink(3)).isEqualTo(204);
-        assertThat(service.adminOrderSocialLinks(java.util.List.of(2L, 1L))).isEqualTo(204);
+        assertThat(service.adminOrderSocialLinks(java.util.List.of(2L, 1L))).isEqualTo(200);
     }
 
     @Test

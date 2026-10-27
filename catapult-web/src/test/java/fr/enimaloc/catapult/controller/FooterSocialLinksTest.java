@@ -57,7 +57,7 @@ class FooterSocialLinksTest {
                 new SocialLinkDto(2, SocialPlatform.X, "Our X", "https://x.com/catapult", true, 1));
 
         assertThat(footer).contains("href=\"https://discord.gg/abc\"", "href=\"https://x.com/catapult\"",
-                ">Discord</a>", ">Our X</a>");
+                "title=\"Discord\"", "title=\"Our X\"", ">Discord</span>", ">Our X</span>");
         assertThat(footer.indexOf("discord.gg")).isLessThan(footer.indexOf("x.com"));
         assertThat(footer).doesNotContain("github.com/enimaloc");
     }
@@ -84,5 +84,36 @@ class FooterSocialLinksTest {
 
         assertThat(footer).containsPattern(
                 "<a[^>]*href=\"https://m\\.example/@c\"[^>]*target=\"_blank\"[^>]*rel=\"noopener noreferrer\"");
+    }
+
+    @Test
+    void everyVisibleLinkHasAnIconAndAnAccessibleName() throws Exception {
+        SocialLinkDto[] links = java.util.Arrays.stream(SocialPlatform.values())
+                .map(p -> new SocialLinkDto(p.ordinal() + 1, p, null, "https://p" + p.ordinal() + ".example", true,
+                        p.ordinal()))
+                .toArray(SocialLinkDto[]::new);
+        String footer = footer(links);
+
+        for (SocialPlatform p : SocialPlatform.values()) {
+            int at = footer.indexOf("data-platform=\"" + p + "\"");
+            String anchor = footer.substring(footer.lastIndexOf("<a ", at));
+            anchor = anchor.substring(0, anchor.indexOf("</a>"));
+            assertThat(anchor).contains("aria-hidden=\"true\"").contains("title=\"");
+            assertThat(anchor).containsPattern("footer-social-name\">[^<]+</span>");
+            if (p == SocialPlatform.OTHER) {
+                assertThat(anchor).contains("<mdui-icon").contains("name=\"link\"").doesNotContain("<svg");
+            } else {
+                assertThat(anchor).contains("<svg").contains("<path").doesNotContain("<mdui-icon");
+            }
+        }
+    }
+
+    @Test
+    void anUppercaseSchemeIsRendered_aJavascriptOneStillIsnt() throws Exception {
+        String footer = footer(
+                new SocialLinkDto(1, SocialPlatform.OTHER, "Up", "HTTPS://up.example", true, 0),
+                new SocialLinkDto(2, SocialPlatform.OTHER, "Js", "JavaScript:alert(1)", true, 1));
+
+        assertThat(footer).contains("href=\"HTTPS://up.example\"").doesNotContain("alert(1)");
     }
 }

@@ -568,6 +568,19 @@ mdui-top-app-bar {
     transition: color 120ms ease;
 }
 
+.footer-social {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.social-icon {
+    width: 1.1em;
+    height: 1.1em;
+    fill: currentColor;
+    flex: none;
+}
+
 .footer a:hover {
     color: var(--catapult-text);
 }

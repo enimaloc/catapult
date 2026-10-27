@@ -244,7 +244,7 @@ public interface ApiService {
     int adminUpdateSocialLink(long id, fr.enimaloc.catapult.common.dto.admin.SocialLinkRequest request);
     /** catapult-api's status (204; 404), 502 when unreachable. */
     int adminDeleteSocialLink(long id);
-    /** catapult-api's status (204; 400 ids not the exact set of links), 502 when unreachable. */
+    /** catapult-api's status (200; 400 ids not the exact set of links), 502 when unreachable. */
     int adminOrderSocialLinks(List<Long> ids);
 
     // --- notifications and broadcasts ---
