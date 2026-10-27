@@ -313,7 +313,10 @@ class AdminTabsFragmentControllerTest {
                 "data-label=\"Code\"", "data-url=\"https://github.com/x\"", "data-visible=\"true\"", "data-visible=\"false\"",
                 "admin-social-link-edit", "admin-social-link-up", "admin-social-link-down", "class=\"social-icon\"",
                 "target=\"_blank\"", "rel=\"noopener noreferrer\"", "admin-social-links-form", "data-label-save=\"Save\"",
-                "data-error-400=", "data-confirm=\"Delete the social link Code?\"", "Discord", "Bluesky");
+                "data-error-400=", "data-confirm=\"Delete the social link Code?\"", "Discord", "Bluesky",
+                "data-admin-list=\"links\"", "data-admin-key=\"7\"", "data-admin-key=\"8\"", "data-admin-value=\"links-count\"")
+                // the list and its empty state both rendered, one hidden, for admin-tabs.js to patch
+                .containsPattern("data-admin-value=\"links-empty\"\\s+hidden");
     }
 
     @Test
@@ -336,7 +339,8 @@ class AdminTabsFragmentControllerTest {
     void links_saysWhenThereAreNone() throws Exception {
         when(apiService.adminSocialLinks()).thenReturn(List.of());
 
-        assertThat(asAdmin("/spa/admin/links")).contains("No social link configured.", "admin-social-links-form");
+        assertThat(asAdmin("/spa/admin/links")).contains("No social link configured.", "admin-social-links-form")
+                .containsPattern("data-admin-list=\"links\"\\s+hidden").doesNotContain("data-admin-key=");
     }
 
     @Test
