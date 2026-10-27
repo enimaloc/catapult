@@ -39,7 +39,7 @@
             <span th:text="#{admin.groups.column.member-count}">Members</span>
             <span></span>
         </div>
-        <div class="admin-row admin-groups-row" th:each="g : ${groups}" th:attr="data-id=${g.id()},data-admin-key=${g.id()}">
+        <div class="admin-row admin-groups-row" th:each="g : ${groups}" th:attr="data-admin-key=${g.id()},data-id=${g.id()}">
             <span class="admin-member-id" th:attr="data-label=#{admin.groups.column.key}" th:text="${g.key()}">key</span>
             <span class="admin-cell" th:attr="data-label=#{admin.groups.column.name}" th:text="${g.name()}">name</span>
             <span class="admin-groups-description admin-cell-muted" th:attr="data-label=#{admin.groups.column.description}"
