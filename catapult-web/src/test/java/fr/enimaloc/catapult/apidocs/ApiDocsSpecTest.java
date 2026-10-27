@@ -230,6 +230,27 @@ class ApiDocsSpecTest {
 
     @Test
     @Timeout(10)
+    void anApiThatStallsAfterItsHeadersIsGivenUpOnAfterTheSpecsOwnTimeout() {
+        // The headers come at once, the body never: a request timeout alone would not stop at it.
+        server.enqueue(ok(SPEC).setBodyDelay(30, TimeUnit.SECONDS));
+        long start = System.nanoTime();
+
+        assertThat(spec(Duration.ofMillis(300)).current()).isEmpty();
+
+        assertThat(Duration.ofNanos(System.nanoTime() - start)).isLessThan(Duration.ofSeconds(3));
+    }
+
+    @Test
+    void anInterruptedFetchGivesUp_andKeepsTheInterrupt() {
+        server.enqueue(hung());
+        Thread.currentThread().interrupt();
+
+        assertThat(spec().current()).isEmpty();
+        assertThat(Thread.interrupted()).isTrue();
+    }
+
+    @Test
+    @Timeout(10)
     void withoutACopy_concurrentViewersShareOneFetchOfAHungApi() throws Exception {
         ApiDocsSpec spec = spec(Duration.ofMillis(500));
         for (int i = 0; i < 8; i++) server.enqueue(hung());

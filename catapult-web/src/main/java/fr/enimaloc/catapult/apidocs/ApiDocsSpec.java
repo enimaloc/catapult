@@ -21,6 +21,10 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
@@ -102,14 +106,22 @@ public class ApiDocsSpec {
     /** catapult-api's spec, its servers the site's; null when it answers none or something that is not one. */
     private String fetch() {
         HttpResponse<String> answer;
+        CompletableFuture<HttpResponse<String>> call = null;
         try {
-            HttpRequest request = HttpRequest.newBuilder(specUri).timeout(timeout).GET().build();
-            answer = http.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            HttpRequest request = HttpRequest.newBuilder(specUri).GET().build();
+            call = http.sendAsync(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            // The whole exchange is bounded, the body read included (a request timeout stops at the headers).
+            answer = call.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+        } catch (TimeoutException e) {
+            call.cancel(true);
+            log.warn("catapult-api's spec unavailable: no answer within {} ms", timeout.toMillis());
+            return null;
         } catch (InterruptedException e) {
+            call.cancel(true);
             Thread.currentThread().interrupt();
             return null;
-        } catch (IOException e) {
-            log.warn("catapult-api's spec unavailable: {}", e.toString());
+        } catch (ExecutionException e) {
+            log.warn("catapult-api's spec unavailable: {}", e.getCause().toString());
             return null;
         }
         if (answer.statusCode() != 200) {
