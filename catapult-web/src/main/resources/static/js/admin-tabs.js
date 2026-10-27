@@ -35,6 +35,8 @@ window.CatapultAdminTabs = (function () {
      * the server renders the same is left alone, whatever the scripts did to it since.
      */
     const rendered = new WeakMap();
+    /** The same for each list, of its own element only (its rows are remembered one by one). */
+    const shells = new WeakMap();
 
     function stateOf(panel) {
         let state = states.get(panel);
@@ -42,7 +44,7 @@ window.CatapultAdminTabs = (function () {
             const current = route();
             const sub = current.tab === panel.getAttribute("value") ? current.sub : null;
             const shown = panel.hasAttribute("data-admin-prerendered") && !sub ? fragmentUrl(tabOf(panel), null) : null;
-            state = { view: shown, sub, q: "", page: 0, results: null };
+            state = { view: shown, sub, q: "", page: 0, results: null, loads: 0 };
             states.set(panel, state);
         }
         return state;
@@ -93,12 +95,23 @@ window.CatapultAdminTabs = (function () {
     const VALUE = "[data-admin-value]";
     const KEY = "data-admin-key";
 
+    const shellOf = list => list.cloneNode(false).outerHTML;
+
     /** `html` parsed, not yet in the page, each of its marked parts remembered as rendered. */
     function parse(html) {
         const template = document.createElement("template");
         template.innerHTML = html;
         template.content.querySelectorAll(`[${KEY}],${VALUE}`).forEach(part => rendered.set(part, part.outerHTML));
+        template.content.querySelectorAll(LIST).forEach(list => shells.set(list, shellOf(list)));
         return template.content;
+    }
+
+    /** The element `html` (a part as the server last rendered it) stands for, out of the page; null without one. */
+    function previousOf(html) {
+        if (html === undefined) return null;
+        const template = document.createElement("template");
+        template.innerHTML = html;
+        return template.content.firstElementChild;
     }
 
     /** The marked parts of `root` that are no list's row (a row is its list's to reconcile). */
@@ -108,9 +121,27 @@ window.CatapultAdminTabs = (function () {
 
     const nameOf = part => part.matches(LIST) ? `list:${part.dataset.adminList}` : `value:${part.dataset.adminValue}`;
 
-    function syncAttributes(current, fresh) {
+    /** Whether `element`'s component reflects one of its properties onto the attribute `name` (mdui is Lit). */
+    function reflects(element, name) {
+        const properties = customElements.get(element.localName)?.elementProperties;
+        if (!properties) return false;
+        for (const [property, options] of properties) {
+            const attribute = typeof options?.attribute === "string" ? options.attribute : String(property).toLowerCase();
+            if (options?.reflect && attribute === name) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Sets `fresh`'s attributes on `current`. One `fresh` lacks is removed only when the server's
+     * previous render of it (`previous`) had it: an attribute a component reflected onto itself (an
+     * mdui-chip's default variant) is no server's to remove. Without a previous render, only one
+     * no component reflects is removed.
+     */
+    function syncAttributes(current, fresh, previous) {
         for (const { name } of Array.from(current.attributes)) {
-            if (!fresh.hasAttribute(name)) current.removeAttribute(name);
+            if (fresh.hasAttribute(name)) continue;
+            if (previous ? previous.hasAttribute(name) : !reflects(current, name)) current.removeAttribute(name);
         }
         for (const { name, value } of Array.from(fresh.attributes)) {
             if (current.getAttribute(name) !== value) current.setAttribute(name, value);
@@ -124,9 +155,10 @@ window.CatapultAdminTabs = (function () {
      * Makes `current` look like `fresh` with as few node changes as it takes: attributes and texts are
      * set in place, a node of another kind (or children of another count) is replaced by the fresh one,
      * each element inserted that way listed in `inserted`. A live time's text is time.js's: it is
-     * replaced only when its time changed. Returns the node now in `current`'s place.
+     * replaced only when its time changed. `previous`: the server's previous render of `current`, when
+     * known (see syncAttributes). Returns the node now in `current`'s place.
      */
-    function morph(current, fresh, inserted) {
+    function morph(current, fresh, inserted, previous = null) {
         const replaced = current.nodeName !== fresh.nodeName
             || (current.nodeType === Node.ELEMENT_NODE && current.matches("template") && current.innerHTML !== fresh.innerHTML)
             || (current.nodeType === Node.ELEMENT_NODE && current.matches("[data-live-time]") && !sameAttributes(current, fresh));
@@ -139,7 +171,7 @@ window.CatapultAdminTabs = (function () {
             if (current.nodeValue !== fresh.nodeValue) current.nodeValue = fresh.nodeValue;
             return current;
         }
-        syncAttributes(current, fresh);
+        syncAttributes(current, fresh, previous);
         if (current.matches("[data-live-time]")) return current;
         const now = Array.from(current.childNodes);
         const next = Array.from(fresh.childNodes);
@@ -148,22 +180,34 @@ window.CatapultAdminTabs = (function () {
             inserted.push(...next.filter(node => node.nodeType === Node.ELEMENT_NODE));
             return current;
         }
-        now.forEach((node, i) => morph(node, next[i], inserted));
+        // the previous render's children stand for these only when it had as many
+        const before = previous && previous.childNodes.length === now.length ? Array.from(previous.childNodes) : null;
+        now.forEach((node, i) => {
+            const was = before?.[i];
+            morph(node, next[i], inserted, was && was.nodeName === node.nodeName ? was : null);
+        });
         return current;
     }
 
     /** Patches `current` (a row or a value) into `fresh` unless the server rendered it the same as last time. */
     function patchPart(current, fresh, inserted) {
         const html = rendered.get(fresh);
-        if (rendered.get(current) === html) return current;
-        const now = morph(current, fresh, inserted);
+        const was = rendered.get(current);
+        if (was === html) return current;
+        const now = morph(current, fresh, inserted, previousOf(was));
         rendered.set(now, html);
         return now;
     }
 
     /** Reconciles `current`'s keyed rows with `fresh`'s: removed, inserted at their place, or patched. */
     function patchList(current, fresh, inserted) {
-        syncAttributes(current, fresh);
+        // the list's own element only when the server renders it otherwise (shown or hidden)
+        const shell = shells.get(fresh);
+        const was = shells.get(current);
+        if (was !== shell) {
+            syncAttributes(current, fresh, previousOf(was));
+            shells.set(current, shell);
+        }
         const keyed = node => node.hasAttribute(KEY);
         const rows = new Map(Array.from(current.children).filter(keyed).map(row => [row.getAttribute(KEY), row]));
         const next = Array.from(fresh.children);
@@ -171,12 +215,20 @@ window.CatapultAdminTabs = (function () {
         rows.forEach((row, key) => {
             if (!kept.has(key)) row.remove();
         });
+        // a plain child (a header, a divider) stays as rendered the first time, the n-th one at the n-th place
+        const plain = Array.from(current.children).filter(child => !keyed(child));
+        let plainSeen = 0;
         next.forEach((freshRow, i) => {
-            if (!keyed(freshRow)) return; // a header or a footer: as rendered the first time
-            const shown = rows.get(freshRow.getAttribute(KEY));
-            let row = freshRow;
-            if (shown) row = patchPart(shown, freshRow, inserted);
-            else inserted.push(freshRow);
+            let row;
+            if (!keyed(freshRow)) {
+                row = plain[plainSeen++];
+                if (!row) return;
+            } else {
+                const shown = rows.get(freshRow.getAttribute(KEY));
+                row = freshRow;
+                if (shown) row = patchPart(shown, freshRow, inserted);
+                else inserted.push(freshRow);
+            }
             const at = current.children[i] ?? null;
             if (at !== row) current.insertBefore(row, at);
         });
@@ -203,6 +255,7 @@ window.CatapultAdminTabs = (function () {
         state.sub = sub;
         state.q = "";
         state.page = 0;
+        state.loads++; // a patch on its way is outdated by this view
         const html = await fetchHtml(url);
         if (state.view !== url) return; // another view was asked for meanwhile
         if (html === null) {
@@ -224,9 +277,10 @@ window.CatapultAdminTabs = (function () {
         if (!view) return show(panel, true);
         // a sub-view searched or paged is patched from the results it shows
         const url = from ?? (q || page ? fragmentUrl(tabOf(panel), state.sub, { q, page }) : view);
+        const load = ++state.loads;
         const html = await fetchHtml(url);
-        // another view, search or page was asked for meanwhile
-        if (state.view !== view || state.q !== q || state.page !== page) return;
+        // another view, search, page or patch was asked for meanwhile: this answer may be older than it
+        if (state.loads !== load || state.view !== view || state.q !== q || state.page !== page) return;
         if (html === null) {
             CatapultChannel.showError(panel.dataset.unavailable);
             return;

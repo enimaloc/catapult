@@ -493,6 +493,93 @@ describe("admin-tabs", () => {
             expect(urls().slice(-2)).toEqual(["/spa/admin/caches/igdb-game-cache?q=&page=2", "/spa/admin/caches?status=OTHER"]);
         });
 
+        it("keeps an attribute a component reflected onto itself in a morphed row, removes one the server dropped", async () => {
+            if (!customElements.get("x-reflecting")) {
+                customElements.define("x-reflecting", class extends HTMLElement {
+                    static elementProperties = new Map([["variant", { reflect: true }], ["placement", { reflect: true, attribute: "placement" }]]);
+                    connectedCallback() {
+                        if (!this.hasAttribute("variant")) this.setAttribute("variant", "assist");
+                    }
+                });
+            }
+            const row = (text, extra) => `<div data-admin-list="rows"><div data-admin-key="a"><x-reflecting ${extra}>${text}</x-reflecting></div></div>`;
+            served = row("A", 'data-old="1"');
+            fetched.mockImplementation(async () => response(200, served));
+            page("caches");
+            await flush();
+            const chip = panel().querySelector("x-reflecting");
+            expect(chip.getAttribute("variant")).toBe("assist");
+
+            served = row("A2", "");
+            await CatapultAdminTabs.patch(panel());
+
+            expect(panel().querySelector("x-reflecting")).toBe(chip);
+            expect(chip.textContent).toBe("A2");
+            expect(chip.getAttribute("variant")).toBe("assist");
+            expect(chip.hasAttribute("data-old")).toBe(false);
+        });
+
+        it("without the server's previous render of a row, removes only attributes no component reflects", async () => {
+            await shownWith([["a", "A"]]);
+            const list = panel().querySelector("[data-admin-list]");
+            list.insertAdjacentHTML("beforeend", `<div class="row" data-admin-key="z"><x-reflecting variant="assist" data-stale="1">Z</x-reflecting></div>`);
+            served = view([["a", "A"]]).replace("</div>\n                <form", `<div class="row" data-admin-key="z"><x-reflecting>Z2</x-reflecting></div></div>\n                <form`);
+            customElements.get("x-reflecting") ?? customElements.define("x-reflecting", class extends HTMLElement {
+                static elementProperties = new Map([["variant", { reflect: true }]]);
+            });
+
+            await CatapultAdminTabs.patch(panel());
+
+            const chip = rowOf("z").querySelector("x-reflecting");
+            expect(chip.textContent).toBe("Z2");
+            expect(chip.getAttribute("variant")).toBe("assist");
+            expect(chip.hasAttribute("data-stale")).toBe(false);
+        });
+
+        it("leaves the list's own element alone while the server renders it the same", async () => {
+            await shownWith([["a", "A"]]);
+            const list = panel().querySelector("[data-admin-list]");
+            list.setAttribute("data-busy", "");
+            served = view([["a", "A"], ["b", "B"]]);
+
+            await CatapultAdminTabs.patch(panel());
+
+            expect(list.hasAttribute("data-busy")).toBe(true);
+            expect(keys()).toEqual(["a", "b"]);
+        });
+
+        it("reorders kept rows without patching them, and keeps a plain row between keyed ones in its place", async () => {
+            const sorted = order => `<div data-admin-list="rows">
+                <div class="head">Head</div>
+                ${order.map(key => key === "-" ? `<div class="divider">-</div>` : `<div data-admin-key="${key}">${key}</div>`).join("")}
+            </div>`;
+            served = sorted(["a", "-", "b", "c"]);
+            fetched.mockImplementation(async () => response(200, served));
+            page("caches");
+            await flush();
+            const [a, b, c] = ["a", "b", "c"].map(rowOf);
+            served = sorted(["c", "-", "a", "b"]);
+
+            await CatapultAdminTabs.patch(panel());
+
+            const children = Array.from(panel().querySelector("[data-admin-list]").children);
+            expect(children.map(child => child.dataset.adminKey ?? child.className)).toEqual(["head", "c", "divider", "a", "b"]);
+            expect([rowOf("a"), rowOf("b"), rowOf("c")]).toEqual([a, b, c]);
+        });
+
+        it("drops a patch's answer once a newer patch started after it", async () => {
+            await shownWith([["a", "A"]]);
+            let answerOld;
+            fetched.mockImplementationOnce(() => new Promise(resolve => { answerOld = () => resolve(response(200, view([["old", "Old"]]))); }));
+            const older = CatapultAdminTabs.patch(panel());
+            served = view([["a", "A"], ["new", "New"]]);
+            await CatapultAdminTabs.patch(panel());
+            answerOld();
+            await older;
+
+            expect(keys()).toEqual(["a", "new"]);
+        });
+
         it("renders a view never shown as a whole", async () => {
             page("members");
             await flush();
