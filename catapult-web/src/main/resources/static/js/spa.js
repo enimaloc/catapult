@@ -78,13 +78,14 @@ function keep(url, html) {
 
 /**
  * Fetches the fragment at `url` (or joins the fetch under way), keeping it when it is a page the member may see
- * again: answered, and not redirected (to the login page, say). Resolves to { response, html }.
+ * again: answered, and not redirected (to the login page, say). Resolves to { response, html }. A `prefetch` says
+ * so (Purpose: prefetch), for the server not to count a view the member may never have.
  */
-function fetchPage(url) {
+function fetchPage(url, prefetch = false) {
     let pending = loading.get(url);
     if (!pending) {
         const epoch = forgotten;
-        pending = fetch(url)
+        pending = (prefetch ? fetch(url, { headers: { Purpose: "prefetch" } }) : fetch(url))
             .then(async response => {
                 const html = await response.text();
                 if (response.ok && !response.redirected && epoch === forgotten) keep(url, html);
@@ -204,6 +205,75 @@ function currentPath() {
     return location.pathname.replace(/^\/+|\/+$/g, "");
 }
 
+// Prefetching: the page of a link the member points at (hovered a moment, focused or pressed) is fetched before the
+// click lands, and a static page's link on screen once the browser is idle; never to save data. A channel's is too
+// costly to fetch for every one the navbar lists: only when pointed at.
+const PREFETCH_HOVER_MS = 65;
+const PREFETCH_ON_SCREEN = 6;
+
+/** Fetches the page `href` names ahead, unless it is not one of the SPA's, open, or kept and fresh. */
+function prefetch(href) {
+    if (navigator.connection?.saveData) return;
+    const url = new URL(href, location.href);
+    if (url.origin !== location.origin) return;
+    const path = url.pathname.replace(/^\/+|\/+$/g, "");
+    if (!resolveRoute(path).route || (path === currentPath() && url.search === location.search)) return;
+    const fragment = fragmentUrl(path, url.search);
+    const kept = pages.get(fragment);
+    if ((kept && Date.now() - kept.at < PAGE_FRESH_MS) || loading.has(fragment)) return;
+    fetchPage(fragment, true).catch(() => {});
+}
+
+/** The SPA link `event` happened on, through shadow roots (see the click handler). */
+function linkOf(event) {
+    const el = event.composedPath().find(node => node instanceof Element && node.hasAttribute("data-link"));
+    return el?.getAttribute("href") && !el.hasAttribute("download") ? el : null;
+}
+
+let hovered = null;
+let hoverTimer = 0;
+document.addEventListener("pointerover", event => {
+    const link = linkOf(event);
+    if (link === hovered) return;
+    clearTimeout(hoverTimer);
+    hovered = link;
+    if (link) hoverTimer = setTimeout(() => prefetch(link.getAttribute("href")), PREFETCH_HOVER_MS);
+});
+for (const type of ["pointerdown", "focusin"]) {
+    document.addEventListener(type, event => {
+        const link = linkOf(event);
+        if (link) prefetch(link.getAttribute("href"));
+    });
+}
+
+function whenIdle(callback) {
+    if (window.requestIdleCallback) window.requestIdleCallback(callback);
+    else setTimeout(callback, 200);
+}
+let onScreen = null;
+
+/** Watches the static pages' links on screen, after each render, prefetching the first few seen. */
+function prefetchOnScreen() {
+    onScreen?.disconnect();
+    if (!("IntersectionObserver" in window)) return;
+    let left = PREFETCH_ON_SCREEN;
+    onScreen = new IntersectionObserver(entries => {
+        for (const entry of entries) {
+            if (!entry.isIntersecting || left <= 0) continue;
+            onScreen.unobserve(entry.target);
+            left--;
+            const href = entry.target.getAttribute("href");
+            whenIdle(() => prefetch(href));
+        }
+    });
+    for (const link of document.querySelectorAll("[data-link][href]")) {
+        const path = new URL(link.getAttribute("href"), location.href).pathname.replace(/^\/+|\/+$/g, "");
+        if (resolveRoute(path).route?.dynamic === false) onScreen.observe(link);
+    }
+}
+
+document.addEventListener("catapult:render", prefetchOnScreen);
+
 /**
  * Fills the navbar with the member's channels (absent when logged out). Fetched once the page
  * is on its way rather than rendered with it: the page never waits on catapult-api for them.
@@ -281,13 +351,13 @@ document.addEventListener("click", event => {
         || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
         return;
     }
-    const el = event.composedPath().find(node => node instanceof Element && node.hasAttribute("data-link"));
+    const el = linkOf(event);
     const href = el?.getAttribute("href");
     if (!href) {
         return;
     }
     const target = el.getAttribute("target");
-    if ((target && target !== "_self") || el.hasAttribute("download")) {
+    if (target && target !== "_self") {
         return;
     }
 

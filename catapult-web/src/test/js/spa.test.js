@@ -278,6 +278,86 @@ describe("the pages kept", () => {
     });
 });
 
+describe("prefetching", () => {
+    const prefetched = () => fetchMock.mock.calls.filter(([, options]) => options?.headers?.Purpose === "prefetch")
+        .map(([url]) => url);
+    const press = id => document.getElementById(id)
+        .dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, composed: true }));
+
+    afterEach(() => vi.useRealTimers());
+
+    it("fetches a link's page once pointed at a moment, and shows it from there", async () => {
+        vi.useFakeTimers();
+        document.getElementById("privacy").dispatchEvent(new MouseEvent("pointerover", { bubbles: true, composed: true }));
+        vi.advanceTimersByTime(100);
+        vi.useRealTimers();
+        await flush();
+        expect(prefetched()).toEqual(["/spa/privacy"]);
+
+        await CatapultSpa.navigate("privacy");
+
+        expect(fetchMock.mock.calls.filter(([url]) => url === "/spa/privacy")).toHaveLength(1);
+        expect(document.getElementById("app").innerHTML).toBe("<p>page</p>");
+    });
+
+    it("not when the pointer only passes over it", () => {
+        vi.useFakeTimers();
+        document.getElementById("privacy").dispatchEvent(new MouseEvent("pointerover", { bubbles: true, composed: true }));
+        vi.advanceTimersByTime(20);
+        document.getElementById("app").dispatchEvent(new MouseEvent("pointerover", { bubbles: true, composed: true }));
+        vi.advanceTimersByTime(100);
+
+        expect(prefetched()).toEqual([]);
+    });
+
+    it("at once when pressed or focused", async () => {
+        history.replaceState(null, "", "/channel/x");
+        press("privacy");
+        document.getElementById("home").dispatchEvent(new FocusEvent("focusin", { bubbles: true, composed: true }));
+        await flush();
+
+        expect(prefetched()).toEqual(["/spa/privacy", "/spa/landing"]);
+    });
+
+    it("never the open page, another site's, an unknown one, or to save data", async () => {
+        history.replaceState(null, "", "/privacy");
+        press("privacy");
+        press("external");
+        html(`<a id="nope" data-link href="/nope">x</a><a id="home" data-link href="/">Home</a>`);
+        press("nope");
+        Object.defineProperty(navigator, "connection", { value: { saveData: true }, configurable: true });
+        press("home");
+        delete navigator.connection;
+        await flush();
+
+        expect(prefetched()).toEqual([]);
+    });
+
+    it("prefetches the static pages' links on screen, never a channel's", async () => {
+        const observed = [];
+        let callback;
+        window.IntersectionObserver = class {
+            constructor(cb) { callback = cb; }
+            observe(el) { observed.push(el.id); }
+            unobserve() {}
+            disconnect() {}
+        };
+        window.requestIdleCallback = cb => cb();
+        html(`<a id="home" data-link href="/">Home</a><a id="chan" data-link href="/channel/x">x</a>
+              <a id="privacy" data-link href="/privacy">Privacy</a><main id="app"></main>`);
+        history.replaceState(null, "", "/channel/x");
+
+        document.dispatchEvent(new CustomEvent("catapult:render"));
+        callback(observed.map(id => ({ isIntersecting: true, target: document.getElementById(id) })));
+        await flush();
+
+        expect(observed).toEqual(["home", "privacy"]);
+        expect(prefetched()).toEqual(["/spa/landing", "/spa/privacy"]);
+        delete window.IntersectionObserver;
+        delete window.requestIdleCallback;
+    });
+});
+
 describe("the navbar's channels", () => {
     const NAV = '<a id="c1" data-link class="nav-channel" href="/channel/enimaloc">e</a>'
         + '<a id="c2" data-link class="nav-channel" href="/channel/other">o</a>';

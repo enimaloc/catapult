@@ -7350,7 +7350,7 @@
                     "kind": "DataQuery",
                     "spec": {
                       "instant": true,
-                      "expr": "sum(increase(catapult_web_page_views_total{application=\"catapult-web\"}[24h]))",
+                      "expr": "sum(increase(catapult_web_page_views_total{application=\"catapult-web\", via!=\"prefetch\"}[24h]))",
                       "legendFormat": "Pages vues"
                     },
                     "version": "v0"
@@ -7685,7 +7685,7 @@
             "transformations": []
           }
         },
-        "description": "Chargements complets (full) et navigations SPA (spa).",
+        "description": "Chargements complets (full), navigations SPA (spa) et pages préchargées avant un clic qui peut ne pas venir (prefetch).",
         "id": 405,
         "links": [],
         "title": "Pages vues/min par page",
