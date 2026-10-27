@@ -15,6 +15,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -74,6 +75,22 @@ class SseStreamsTest {
 
         verify(emitter).send(any(SseEmitter.SseEventBuilder.class));
         assertThat(tasks).isEmpty();
+        assertThat(sse.openCount()).isEqualTo(1);
+    }
+
+    /* Registered only once the comment is sent: no heartbeat or other thread's event can come before it. */
+    @Test
+    void aStream_isRegisteredOnlyAfterItsOpeningComment() throws IOException {
+        List<Runnable> tasks = new ArrayList<>();
+        SseStreams sse = new SseStreams(metrics, InstanceBus.local(), tasks::add);
+        SseEmitter emitter = mock(SseEmitter.class);
+        List<Integer> openWhenSent = new ArrayList<>();
+        doAnswer(invocation -> openWhenSent.add(sse.openCount()))
+                .when(emitter).send(any(SseEmitter.SseEventBuilder.class));
+
+        sse.open(emitter, closed::incrementAndGet);
+
+        assertThat(openWhenSent).containsExactly(0);
         assertThat(sse.openCount()).isEqualTo(1);
     }
 
