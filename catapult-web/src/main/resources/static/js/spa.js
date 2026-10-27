@@ -149,9 +149,11 @@ function listenNavChannels() {
     }
     // A reconnection (e.g. the server restarted) may have missed events, and the server
     // its record of this navbar: reloading it catches up on both.
-    CatapultLive.onReopen(() => loadNavChannels());
+    CatapultLive.onReopen(() => loadNavChannels(true));
     CatapultLive.on("NavChannelsChanged", () => loadNavChannels(true));
     CatapultLive.on("NavChannelLive", ({ username, live }) => {
+        // The ring is part of the markup: the DOM no longer matches what was last fetched.
+        navMarkup = null;
         [...navChannels.querySelectorAll(".nav-channel")]
             .find(a => a.getAttribute("href") === `/channel/${username}`)
             ?.classList.toggle("live", live);

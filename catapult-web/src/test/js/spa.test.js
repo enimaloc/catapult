@@ -252,6 +252,7 @@ describe("the navbar's channels", () => {
             const observer = new MutationObserver(records => writes.push(...records));
             observer.observe(nav, { childList: true, subtree: true });
 
+            fetchMock.mockImplementation(async () => response(200, NAV)); // same markup again
             await CatapultSpa.loadNavChannels();
             await flush();
             expect(writes).toHaveLength(0);
@@ -273,6 +274,23 @@ describe("the navbar's channels", () => {
             await flush();
             expect(writes.length).toBeGreaterThan(0);
             observer.disconnect();
+        });
+
+        it("restores a ring patched live when the next poll brings the original markup", async () => {
+            FakeEventSource.last.fire("NavChannelLive", { username: "other", live: true });
+            expect(document.getElementById("c2").classList.contains("live")).toBe(true);
+
+            await CatapultSpa.loadNavChannels();
+            await flush();
+            expect(document.getElementById("c2").classList.contains("live")).toBe(false);
+        });
+
+        it("rewrites them on a reconnection even if the markup is unchanged", async () => {
+            FakeEventSource.last.fire("open", {});
+            FakeEventSource.last.fire("NavChannelLive", { username: "other", live: true });
+            FakeEventSource.last.fire("open", {});
+            await flush();
+            expect(document.getElementById("c2").classList.contains("live")).toBe(false);
         });
 
         it("reloads them on a reconnection, not on the first connection", async () => {
