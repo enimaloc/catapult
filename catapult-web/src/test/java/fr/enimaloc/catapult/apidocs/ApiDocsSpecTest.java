@@ -210,6 +210,15 @@ class ApiDocsSpecTest {
     }
 
     @Test
+    void ignoresADiskCopyThatIsNoOpenApiSpec() throws IOException {
+        Files.createDirectories(cacheFile.getParent());
+        Files.writeString(cacheFile, "{\"fetchedAt\":\"2026-10-27T09:30:00Z\",\"spec\":{\"paths\":{}}}");
+        server.shutdown();
+
+        assertThat(spec().current()).isEmpty();
+    }
+
+    @Test
     void aHungApiIsGivenUpOnAfterTheSpecsOwnTimeout() {
         server.enqueue(hung());
         long start = System.nanoTime();

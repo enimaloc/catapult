@@ -157,7 +157,7 @@ public class ApiDocsSpec {
             JsonNode file = JSON.readTree(Files.readString(cacheFile, StandardCharsets.UTF_8));
             JsonNode spec = file.get("spec");
             JsonNode fetchedAt = file.get("fetchedAt");
-            if (spec == null || !spec.isObject() || fetchedAt == null || !fetchedAt.isString()) {
+            if (spec == null || !spec.isObject() || !spec.has("openapi") || fetchedAt == null || !fetchedAt.isString()) {
                 log.warn("API docs cache {} ignored: no spec in it", cacheFile);
                 return null;
             }
