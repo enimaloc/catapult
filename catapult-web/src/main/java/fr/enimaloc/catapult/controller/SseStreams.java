@@ -30,7 +30,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  *     <li>off the caller's thread (a Redis listener, the scheduler, a request): each stream has its own
  *     queue, written in order on a virtual thread, so a slow client only holds its own; one that lets more
  *     than {@link #MAX_PENDING} events pile up is closed (its page reconnects and catches up);</li>
- *     <li>with a comment on opening (the response, and so its headers, go out at once) and every
+ *     <li>with a comment on opening (the response, and so its headers, go out at once), the one write
+ *     made on the opening request's thread (see {@link #open}), and every
  *     {@link #HEARTBEAT} after, under a proxy's usual read timeout, so that an idle stream is not cut;</li>
  *     <li>closed after their timeout rather than failed (the browser's EventSource reconnects, and
  *     whatever the stream depends on is checked again), and forgotten once closed, whichever way.</li>
@@ -111,7 +112,9 @@ public class SseStreams implements DisposableBean {
         try {
             emitter.send(SseEmitter.event().comment("open"));
         } catch (IOException | IllegalStateException e) {
-            // Gone, or completed meanwhile.
+            // Completed meanwhile: not returned yet, the emitter only keeps the comment (Spring writes it
+            // later, in ResponseBodyEmitter#initialize), so no I/O fails here. A client gone by then is
+            // found by the next heartbeat, within HEARTBEAT.
             outbox.closed();
             emitter.complete();
             return;
