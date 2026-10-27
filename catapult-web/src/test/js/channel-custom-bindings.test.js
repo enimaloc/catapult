@@ -1,6 +1,6 @@
 /*
- * The custom bindings: the overview card's buttons (activate, deactivate, the error told per code), the
- * settings card (create, edit, confirmed delete) and the personal API token card (status, confirmed
+ * The custom bindings: the overview list (activate, deactivate, the error told per code, create through
+ * "New", edit in a row's form, confirmed delete) and the personal API token card (status, confirmed
  * regeneration, the token shown once with its curl example, copy).
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -15,57 +15,79 @@ const ART = "11111111-1111-1111-1111-111111111111";
 const DEV = "22222222-2222-2222-2222-222222222222";
 
 const byId = id => document.getElementById(id);
-const rowBtn = id => document.querySelector(`#channel-custom-bindings-card [data-custom-binding-id="${id}"] .custom-binding-trigger`);
-const stopBtn = id => document.querySelector(`#channel-custom-bindings-card [data-custom-binding-id="${id}"] .custom-binding-stop`);
+const item = id => document.querySelector(`#channel-custom-bindings-list [data-custom-binding-id="${id}"]`);
+const fresh = () => document.querySelector("#channel-custom-bindings-list .custom-binding-new");
+const activateBtn = id => item(id).querySelector(".custom-binding-activate");
+const stopBtn = id => item(id).querySelector(".custom-binding-stop");
 const errorLine = () => byId("custom-bindings-error");
+const isActive = id => item(id).classList.contains("is-active");
+const isHidden = el => el.classList.contains("hidden");
 
-function overview() {
+function form(binding) {
+    const actions = binding
+        ? `<mdui-button class="custom-binding-activate${binding.active ? " hidden" : ""}"></mdui-button>
+           <mdui-button class="custom-binding-stop${binding.active ? "" : " hidden"}"></mdui-button>
+           <mdui-button class="custom-binding-save"></mdui-button>
+           <mdui-button class="custom-binding-delete"></mdui-button>`
+        : `<mdui-button class="custom-binding-save"></mdui-button>`;
+    const on = (list, value) => (list?.includes(value) ? " checked" : "");
+    return `
+        <input class="custom-binding-name" type="text" value="${binding?.name ?? ""}"/>
+        <input type="text" class="custom-binding-game-input" value="${binding?.gameName ?? ""}"/>
+        <input type="hidden" class="custom-binding-game-id" value="${binding?.gameId ?? ""}"/>
+        <mdui-list class="custom-binding-game-results"></mdui-list>
+        <mdui-switch class="custom-binding-ccl-checkbox" value="Violence"${on(binding?.ccls, "Violence")}></mdui-switch>
+        <mdui-switch class="custom-binding-ccl-checkbox" value="Drugs"${on(binding?.ccls, "Drugs")}></mdui-switch>
+        <mdui-switch class="custom-binding-tw-checkbox" value="spoiler"${on(binding?.tws, "spoiler")}></mdui-switch>
+        <mdui-switch class="custom-binding-uninterruptible"${binding?.uninterruptible ? " checked" : ""}></mdui-switch>
+        ${actions}`;
+}
+
+function overview({ empty = false } = {}) {
+    const rows = empty ? "" : `
+        <mdui-collapse-item class="custom-binding-item is-active" data-custom-binding-id="${ART}" value="${ART}">
+            <span class="custom-binding-active-chip"></span>
+            ${form({ name: "Art", gameId: "509660", gameName: "Art", ccls: ["Violence"], tws: ["spoiler"], active: true })}
+        </mdui-collapse-item>
+        <mdui-collapse-item class="custom-binding-item" data-custom-binding-id="${DEV}" value="${DEV}">
+            <span class="custom-binding-active-chip hidden"></span>
+            ${form({ name: "Développement", gameId: "1469308723", gameName: "Software and Game Development",
+                     uninterruptible: true })}
+        </mdui-collapse-item>`;
     html(`
-        <mdui-card id="channel-custom-bindings-card" data-error-twitch-unavailable="Reconnecte ton compte Twitch"
+        <mdui-button id="custom-binding-new-btn"></mdui-button>
+        <mdui-list id="channel-custom-bindings-list"
+                   data-error-twitch-unavailable="Reconnecte ton compte Twitch"
                    data-error-bot-disabled="Catapult est en pause sur cette chaîne"
-                   data-error-twitch-failed="Twitch n'a pas appliqué la catégorie">
-            <div data-custom-binding-id="${ART}" class="custom-binding-row is-active">
-                <mdui-button class="custom-binding-trigger" variant="filled">Art</mdui-button>
-                <mdui-button class="custom-binding-stop">Désactiver</mdui-button>
-            </div>
-            <div data-custom-binding-id="${DEV}" class="custom-binding-row">
-                <mdui-button class="custom-binding-trigger" variant="tonal">Développement</mdui-button>
-                <mdui-button class="custom-binding-stop hidden">Désactiver</mdui-button>
-            </div>
-            <p id="custom-bindings-error" class="hidden"></p>
-        </mdui-card>`);
+                   data-error-twitch-failed="Twitch n'a pas appliqué la catégorie"
+                   data-error-name-taken="Nom déjà pris" data-error-limit-reached="20 bindings maximum"
+                   data-error-invalid="Binding invalide">
+            <mdui-collapse accordion>
+                ${rows}
+                <mdui-collapse-item class="custom-binding-item custom-binding-new hidden" value="new">
+                    ${form(null)}
+                </mdui-collapse-item>
+            </mdui-collapse>
+            <mdui-list-item id="channel-custom-bindings-empty"${empty ? "" : ' class="hidden"'}></mdui-list-item>
+        </mdui-list>
+        <p id="custom-bindings-error" class="hidden"></p>
+        <mdui-dialog id="custom-binding-delete-dialog">
+            <mdui-button class="custom-binding-delete-dismiss"></mdui-button>
+            <mdui-button class="custom-binding-delete-confirm"></mdui-button>
+        </mdui-dialog>`);
+    // mdui-switch exposes its value/checked attributes as properties; jsdom knows no such element.
+    document.querySelectorAll("mdui-switch").forEach(sw => {
+        sw.value = sw.getAttribute("value");
+        sw.checked = sw.hasAttribute("checked");
+    });
     render();
 }
 
-function settings() {
-    html(`
-        <mdui-card id="channel-custom-bindings-settings"
-                   data-error-name-taken="Nom déjà pris" data-error-limit-reached="20 bindings maximum"
-                   data-error-invalid="Binding invalide" data-error-twitch-failed="Twitch n'a pas appliqué la catégorie"
-                   data-error-twitch-unavailable="Reconnecte ton compte Twitch" data-error-bot-disabled="Catapult est en pause">
-            <div data-custom-binding-id="${ART}" data-name="Art" data-game-id="509660" data-game-name="Art"
-                 data-ccls="Violence" data-tws="spoiler" data-uninterruptible="false" class="custom-binding-item">
-                <mdui-button-icon class="custom-binding-edit"></mdui-button-icon>
-                <mdui-button-icon class="custom-binding-delete"></mdui-button-icon>
-            </div>
-            <input id="custom-binding-name" type="text"/>
-            <input type="text" id="custom-binding-game-input"/>
-            <input type="hidden" id="custom-binding-game-id"/>
-            <mdui-list id="custom-binding-game-results"></mdui-list>
-            <mdui-switch class="custom-binding-ccl-checkbox" value="Violence"></mdui-switch>
-            <mdui-switch class="custom-binding-ccl-checkbox" value="Drugs"></mdui-switch>
-            <mdui-switch class="custom-binding-tw-checkbox" value="spoiler"></mdui-switch>
-            <mdui-switch id="custom-binding-uninterruptible"></mdui-switch>
-            <mdui-button id="custom-binding-save-btn">Save</mdui-button>
-            <mdui-button id="custom-binding-cancel-btn" class="hidden">Cancel</mdui-button>
-            <mdui-dialog id="custom-binding-delete-dialog">
-                <mdui-button class="custom-binding-delete-dismiss"></mdui-button>
-                <mdui-button class="custom-binding-delete-confirm"></mdui-button>
-            </mdui-dialog>
-        </mdui-card>`);
-    // mdui-switch exposes its value attribute as a property; jsdom knows no such element.
-    document.querySelectorAll("mdui-switch[value]").forEach(sw => { sw.value = sw.getAttribute("value"); });
-    render();
+/** The GameSearch handle attached to a row's category field. */
+function gameOf(row) {
+    const input = row.querySelector(".custom-binding-game-input");
+    const index = window.GameSearch.attach.mock.calls.findLastIndex(call => call[0] === input);
+    return window.GameSearch.attach.mock.results[index].value;
 }
 
 function tokenCard(example = "Art") {
@@ -116,20 +138,22 @@ beforeEach(async () => {
     await load("channel-custom-bindings");
 });
 
-describe("overview card", () => {
+describe("overview list: activation", () => {
     it("activates a binding by its id and marks it active", async () => {
         overview();
-        rowBtn(DEV).click();
+        activateBtn(DEV).click();
         await flush();
 
         expect(postJson).toHaveBeenCalledWith(`/channel/enimaloc/custom-bindings/${DEV}/activate`, {});
-        expect(document.querySelector(`[data-custom-binding-id="${DEV}"]`).classList.contains("is-active")).toBe(true);
-        expect(document.querySelector(`[data-custom-binding-id="${ART}"]`).classList.contains("is-active")).toBe(false);
-        expect(stopBtn(DEV).classList.contains("hidden")).toBe(false);
-        expect(stopBtn(ART).classList.contains("hidden")).toBe(true);
-        expect(rowBtn(DEV).getAttribute("variant")).toBe("filled");
-        expect(rowBtn(ART).getAttribute("variant")).toBe("tonal");
-        expect(errorLine().classList.contains("hidden")).toBe(true);
+        expect(isActive(DEV)).toBe(true);
+        expect(isActive(ART)).toBe(false);
+        expect(isHidden(item(DEV).querySelector(".custom-binding-active-chip"))).toBe(false);
+        expect(isHidden(item(ART).querySelector(".custom-binding-active-chip"))).toBe(true);
+        expect(isHidden(stopBtn(DEV))).toBe(false);
+        expect(isHidden(activateBtn(DEV))).toBe(true);
+        expect(isHidden(stopBtn(ART))).toBe(true);
+        expect(isHidden(activateBtn(ART))).toBe(false);
+        expect(isHidden(errorLine())).toBe(true);
     });
 
     it("deactivates through the stop button", async () => {
@@ -138,7 +162,8 @@ describe("overview card", () => {
         await flush();
 
         expect(postJson).toHaveBeenCalledWith("/channel/enimaloc/custom-bindings/deactivate", {});
-        expect(document.querySelector(".custom-binding-row.is-active")).toBeNull();
+        expect(document.querySelector(".custom-binding-item.is-active")).toBeNull();
+        expect(isHidden(activateBtn(ART))).toBe(false);
     });
 
     it.each([
@@ -148,23 +173,23 @@ describe("overview card", () => {
     ])("tells the %s refusal in its own text and keeps the previous active binding", async (code, status, text) => {
         overview();
         postJson.mockResolvedValueOnce(response(status, { code }));
-        rowBtn(DEV).click();
+        activateBtn(DEV).click();
         await flush();
 
         expect(errorLine().textContent).toBe(text);
-        expect(errorLine().classList.contains("hidden")).toBe(false);
-        expect(document.querySelector(`[data-custom-binding-id="${ART}"]`).classList.contains("is-active")).toBe(true);
+        expect(isHidden(errorLine())).toBe(false);
+        expect(isActive(ART)).toBe(true);
     });
 
     it("falls back to the generic failure on a bare 403 or an unreachable server", async () => {
         overview();
         postJson.mockResolvedValueOnce(response(403, ""));
-        rowBtn(DEV).click();
+        activateBtn(DEV).click();
         await flush();
         expect(errorLine().textContent).toBe("failed 403");
 
         postJson.mockRejectedValueOnce(new TypeError("offline"));
-        rowBtn(DEV).click();
+        activateBtn(DEV).click();
         await flush();
         expect(errorLine().textContent).toBe("unreachable");
     });
@@ -172,55 +197,65 @@ describe("overview card", () => {
     it("follows the activation made elsewhere (CustomBindingChangedEvent) and clears the error", async () => {
         overview();
         postJson.mockResolvedValueOnce(response(409, { code: "bot_disabled" }));
-        rowBtn(DEV).click();
+        activateBtn(DEV).click();
         await flush();
 
         CatapultCustomBindings.setActive(DEV);
-        expect(document.querySelector(`[data-custom-binding-id="${DEV}"]`).classList.contains("is-active")).toBe(true);
-        expect(errorLine().classList.contains("hidden")).toBe(true);
+        expect(isActive(DEV)).toBe(true);
+        expect(isHidden(errorLine())).toBe(true);
 
         CatapultCustomBindings.setActive(null);
-        expect(document.querySelector(".custom-binding-row.is-active")).toBeNull();
+        expect(document.querySelector(".custom-binding-item.is-active")).toBeNull();
+    });
+
+    it("mirrors a row's open/close as .is-open", () => {
+        overview();
+        item(DEV).dispatchEvent(new Event("open"));
+        expect(item(DEV).classList.contains("is-open")).toBe(true);
+        item(DEV).dispatchEvent(new Event("close"));
+        expect(item(DEV).classList.contains("is-open")).toBe(false);
     });
 });
 
-describe("settings card", () => {
-    const val = id => byId(id).value;
+describe("overview list: create, edit, delete", () => {
+    it("reveals and opens the empty row on New, hiding the empty notice", () => {
+        overview({ empty: true });
+        expect(isHidden(fresh())).toBe(true);
 
-    it("creates a binding from the form", async () => {
-        settings();
-        byId("custom-binding-name").value = "  Musique ";
-        byId("custom-binding-game-id").value = "";
-        window.GameSearch.attach.mock.results[0].value.pick({ id: "26936", name: "Music" });
-        document.querySelectorAll(".custom-binding-ccl-checkbox")[1].checked = true;
-        byId("custom-binding-uninterruptible").checked = true;
+        byId("custom-binding-new-btn").click();
+
+        expect(isHidden(fresh())).toBe(false);
+        expect(fresh().classList.contains("is-open")).toBe(true);
+        expect(document.querySelector("mdui-collapse").value).toBe("new");
+        expect(isHidden(byId("channel-custom-bindings-empty"))).toBe(true);
+    });
+
+    it("creates a binding from the New row", async () => {
+        overview();
+        byId("custom-binding-new-btn").click();
+        fresh().querySelector(".custom-binding-name").value = "  Musique ";
+        gameOf(fresh()).pick({ id: "26936", name: "Music" });
+        fresh().querySelectorAll(".custom-binding-ccl-checkbox")[1].checked = true;
+        fresh().querySelector(".custom-binding-uninterruptible").checked = true;
         postJson.mockResolvedValueOnce(response(201, {}));
 
-        byId("custom-binding-save-btn").click();
+        fresh().querySelector(".custom-binding-save").click();
         await flush();
 
         expect(postJson).toHaveBeenCalledWith("/channel/enimaloc/custom-bindings", {
             name: "Musique", twitchGameId: "26936", twitchGameName: "Music",
             ccls: ["Drugs"], tws: [], uninterruptible: true
         });
+        expect(fresh().querySelector(".custom-binding-game-id").value).toBe("26936");
         expect(refresh).toHaveBeenCalled();
     });
 
-    it("loads a binding into the form to edit it, then posts to its id", async () => {
-        settings();
-        document.querySelector(".custom-binding-edit").click();
-
-        expect(val("custom-binding-name")).toBe("Art");
-        expect(val("custom-binding-game-id")).toBe("509660");
-        expect(val("custom-binding-game-input")).toBe("Art");
-        expect(document.querySelector('.custom-binding-ccl-checkbox[value="Violence"]').checked).toBe(true);
-        expect(document.querySelector('.custom-binding-ccl-checkbox[value="Drugs"]').checked).toBe(false);
-        expect(document.querySelector(".custom-binding-tw-checkbox").checked).toBe(true);
-        expect(byId("custom-binding-cancel-btn").classList.contains("hidden")).toBe(false);
-
-        byId("custom-binding-name").value = "Dessin";
+    it("saves a row's form to its id, with the values it was rendered with", async () => {
+        overview();
+        item(ART).querySelector(".custom-binding-name").value = "Dessin";
         postJson.mockResolvedValueOnce(response(200, { binding: {}, reapplyOutcome: null }));
-        byId("custom-binding-save-btn").click();
+
+        item(ART).querySelector(".custom-binding-save").click();
         await flush();
 
         expect(postJson).toHaveBeenCalledWith(`/channel/enimaloc/custom-bindings/${ART}`, {
@@ -230,11 +265,24 @@ describe("settings card", () => {
         expect(refresh).toHaveBeenCalled();
     });
 
+    it("saves only the row's own switches", async () => {
+        overview();
+        postJson.mockResolvedValueOnce(response(200, { binding: {}, reapplyOutcome: "applied" }));
+
+        item(DEV).querySelector(".custom-binding-save").click();
+        await flush();
+
+        expect(postJson).toHaveBeenCalledWith(`/channel/enimaloc/custom-bindings/${DEV}`, {
+            name: "Développement", twitchGameId: "1469308723", twitchGameName: "Software and Game Development",
+            ccls: [], tws: [], uninterruptible: true
+        });
+        expect(showError).not.toHaveBeenCalled();
+    });
+
     it("tells when the saved active binding could not be re-applied", async () => {
-        settings();
-        document.querySelector(".custom-binding-edit").click();
+        overview();
         postJson.mockResolvedValueOnce(response(200, { binding: {}, reapplyOutcome: "twitch_failed" }));
-        byId("custom-binding-save-btn").click();
+        item(ART).querySelector(".custom-binding-save").click();
         await flush();
 
         expect(showError).toHaveBeenCalledWith("Twitch n'a pas appliqué la catégorie");
@@ -246,11 +294,12 @@ describe("settings card", () => {
         ["limit_reached", "20 bindings maximum"],
         ["invalid", "Binding invalide"],
     ])("tells the %s refusal and does not re-render", async (code, text) => {
-        settings();
-        byId("custom-binding-name").value = "Art";
-        window.GameSearch.attach.mock.results[0].value.pick({ id: "509660", name: "Art" });
+        overview();
+        byId("custom-binding-new-btn").click();
+        fresh().querySelector(".custom-binding-name").value = "Art";
+        gameOf(fresh()).pick({ id: "509660", name: "Art" });
         postJson.mockResolvedValueOnce(response(409, { code }));
-        byId("custom-binding-save-btn").click();
+        fresh().querySelector(".custom-binding-save").click();
         await flush();
 
         expect(showError).toHaveBeenCalledWith(text);
@@ -258,17 +307,21 @@ describe("settings card", () => {
     });
 
     it("does not post a nameless or categoryless binding", async () => {
-        settings();
-        byId("custom-binding-save-btn").click();
+        overview();
+        fresh().querySelector(".custom-binding-save").click();
+        await flush();
+        item(ART).querySelector(".custom-binding-name").value = "  ";
+        item(ART).querySelector(".custom-binding-save").click();
         await flush();
 
         expect(postJson).not.toHaveBeenCalled();
-        expect(showError).toHaveBeenCalledWith("Binding invalide");
+        expect(showError).toHaveBeenNthCalledWith(1, "Binding invalide");
+        expect(showError).toHaveBeenNthCalledWith(2, "Binding invalide");
     });
 
     it("deletes only after the confirmation", async () => {
-        settings();
-        document.querySelector(".custom-binding-delete").click();
+        overview();
+        item(DEV).querySelector(".custom-binding-delete").click();
         expect(byId("custom-binding-delete-dialog").open).toBe(true);
         expect(postJson).not.toHaveBeenCalled();
 
@@ -276,23 +329,30 @@ describe("settings card", () => {
         expect(byId("custom-binding-delete-dialog").open).toBe(false);
         expect(postJson).not.toHaveBeenCalled();
 
-        document.querySelector(".custom-binding-delete").click();
+        item(DEV).querySelector(".custom-binding-delete").click();
         document.querySelector(".custom-binding-delete-confirm").click();
         await flush();
 
-        expect(postJson).toHaveBeenCalledWith(`/channel/enimaloc/custom-bindings/${ART}/delete`, {});
+        expect(postJson).toHaveBeenCalledWith(`/channel/enimaloc/custom-bindings/${DEV}/delete`, {});
         expect(byId("custom-binding-delete-dialog").open).toBe(false);
         expect(refresh).toHaveBeenCalled();
     });
 
-    it("empties the form when the edit is cancelled", () => {
-        settings();
-        document.querySelector(".custom-binding-edit").click();
-        byId("custom-binding-cancel-btn").click();
+    it("tells a refused deletion and does not re-render", async () => {
+        overview();
+        postJson.mockResolvedValueOnce(response(409, { code: "twitch_failed" }));
+        item(ART).querySelector(".custom-binding-delete").click();
+        document.querySelector(".custom-binding-delete-confirm").click();
+        await flush();
 
-        expect(val("custom-binding-name")).toBe("");
-        expect(document.querySelector(".custom-binding-tw-checkbox").checked).toBe(false);
-        expect(byId("custom-binding-cancel-btn").classList.contains("hidden")).toBe(true);
+        expect(showError).toHaveBeenCalledWith("Twitch n'a pas appliqué la catégorie");
+        expect(refresh).not.toHaveBeenCalled();
+    });
+
+    it("does not fetch the token status from the overview", async () => {
+        overview();
+        await flush();
+        expect(fetch).not.toHaveBeenCalledWith("/me/api-token", expect.anything());
     });
 });
 

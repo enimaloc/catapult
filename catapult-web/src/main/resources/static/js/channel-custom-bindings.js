@@ -1,15 +1,15 @@
 /**
- * The owner's custom bindings, on the channel page (the cards are rendered for the owner only, and
- * only while the experiment is open to the channel).
+ * The owner's custom bindings, on the channel page (rendered for the owner only, and only while the
+ * experiment is open to the channel).
  *
- * - Overview card: one button per binding triggers it (activation applies the Twitch category at once,
- *   live or not); the active one is highlighted and offers "Deactivate". A refusal is told in a line
- *   under the buttons, in its own text per catapult-api code (data-error-* on the card). The active
- *   binding follows the CustomBindingChangedEvent of the channel stream (setActive, see channel-events.js).
- * - Settings card: the list with edit/delete (deletion confirmed) and one form for creating or editing.
- *   A save re-renders the page, which lists the result. The category is picked through the same search
- *   as the other settings cards (GameSearch).
- * - API token card: since when a token exists, generate/regenerate (regeneration confirmed: it
+ * - Overview list, under the associations and shaped like them: a row per binding, the active one marked.
+ *   A row opens its edit form (name, category through the same search as the associations' (GameSearch),
+ *   CCLs, TWs, uninterruptible) with activate/deactivate, save and delete (confirmed). "New" reveals an
+ *   empty row whose save creates. Activation applies the Twitch category at once, live or not; its refusal
+ *   is told in a line under the list, in its own text per catapult-api code (data-error-* on the list). The
+ *   active binding follows the CustomBindingChangedEvent of the channel stream (setActive, see
+ *   channel-events.js). A save or a deletion re-renders the page, which lists the result.
+ * - API token card (Account tab): since when a token exists, generate/regenerate (regeneration confirmed: it
  *   invalidates the old token) and revoke. A generated token is shown once, in a read-only field with
  *   a copy button and a curl example on the site's own address (catapult-web relays /api/v2/custom-bindings
  *   to catapult-api); it is kept nowhere but that field.
@@ -20,7 +20,7 @@ window.CatapultCustomBindings = (function () {
     const byId = id => document.getElementById(id);
     const show = (el, visible) => el?.classList.toggle("hidden", !visible);
 
-    /** "twitch_unavailable" -> "errorTwitchUnavailable": the data-error-twitch-unavailable of a card. */
+    /** "twitch_unavailable" -> "errorTwitchUnavailable": the data-error-twitch-unavailable of the list. */
     function errorKey(code) {
         return "error" + String(code).replace(/(^|_)([a-z])/g, (_, __, c) => c.toUpperCase());
     }
@@ -33,9 +33,9 @@ window.CatapultCustomBindings = (function () {
         }
     }
 
-    /** The text of a refusal: the card's own for the code, else the generic failure with the status. */
-    function refusalText(card, code, status) {
-        return (code && card.dataset[errorKey(code)]) || CatapultChannel.actionFailed(status);
+    /** The text of a refusal: the list's own for the code, else the generic failure with the status. */
+    function refusalText(root, code, status) {
+        return (code && root.dataset[errorKey(code)]) || CatapultChannel.actionFailed(status);
     }
 
     /** Posts and answers the response, or null (told) when the request could not be sent. */
@@ -48,17 +48,14 @@ window.CatapultCustomBindings = (function () {
         }
     }
 
-    /** Highlights the active binding (null: none) in the overview card and in the settings list. */
+    /** Marks the active binding (null: none) and offers to deactivate it, the others to activate. */
     function setActive(activeId) {
-        document.querySelectorAll(".custom-binding-row").forEach(row => {
-            const active = !!activeId && row.dataset.customBindingId === activeId;
-            row.classList.toggle("is-active", active);
-            row.querySelector(".custom-binding-trigger")?.setAttribute("variant", active ? "filled" : "tonal");
-            show(row.querySelector(".custom-binding-stop"), active);
-        });
-        document.querySelectorAll(".custom-binding-item").forEach(item => {
-            show(item.querySelector(".custom-binding-active-chip"),
-                !!activeId && item.dataset.customBindingId === activeId);
+        document.querySelectorAll(".custom-binding-item[data-custom-binding-id]").forEach(item => {
+            const active = !!activeId && item.dataset.customBindingId === activeId;
+            item.classList.toggle("is-active", active);
+            show(item.querySelector(".custom-binding-active-chip"), active);
+            show(item.querySelector(".custom-binding-activate"), !active);
+            show(item.querySelector(".custom-binding-stop"), active);
         });
         const error = byId("custom-bindings-error");
         if (error) {
@@ -67,9 +64,12 @@ window.CatapultCustomBindings = (function () {
         }
     }
 
-    function attachOverview(card) {
-        const error = byId("custom-bindings-error");
+    function attachList(list) {
         const base = `${CatapultChannel.baseUrl()}/custom-bindings`;
+        const error = byId("custom-bindings-error");
+        const dialog = byId("custom-binding-delete-dialog");
+        const collapse = list.querySelector("mdui-collapse");
+        let deletingId = null;
 
         function tell(message) {
             error.textContent = message;
@@ -80,59 +80,67 @@ window.CatapultCustomBindings = (function () {
             const response = await post(url, {});
             if (!response) return tell(CatapultChannel.unreachable());
             if (response.ok) return setActive(activeId);
-            tell(refusalText(card, await readCode(response), response.status));
+            tell(refusalText(list, await readCode(response), response.status));
         }
 
-        card.querySelectorAll(".custom-binding-row").forEach(row => {
-            const id = row.dataset.customBindingId;
-            row.querySelector(".custom-binding-trigger")
-                ?.addEventListener("click", () => act(`${base}/${id}/activate`, id));
-            row.querySelector(".custom-binding-stop")
-                ?.addEventListener("click", () => act(`${base}/deactivate`, null));
-        });
-    }
-
-    function attachSettings(card) {
-        const base = `${CatapultChannel.baseUrl()}/custom-bindings`;
-        const name = byId("custom-binding-name");
-        const gameId = byId("custom-binding-game-id");
-        const gameInput = byId("custom-binding-game-input");
-        const uninterruptible = byId("custom-binding-uninterruptible");
-        const cancel = byId("custom-binding-cancel-btn");
-        const dialog = byId("custom-binding-delete-dialog");
-        let editingId = null;
-        let deletingId = null;
-
-        const game = GameSearch.attach(gameInput, byId("custom-binding-game-results"),
-            `${CatapultChannel.baseUrl()}/games/search`, picked => { gameId.value = picked.id; },
-            { initial: { id: gameId.value, name: gameInput.value } });
-
-        const split = value => (value ? value.split(",").filter(Boolean) : []);
-
-        function fill(item) {
-            editingId = item?.dataset.customBindingId ?? null;
-            name.value = item?.dataset.name ?? "";
-            gameId.value = item?.dataset.gameId ?? "";
-            game.select(item ? { id: item.dataset.gameId, name: item.dataset.gameName } : null);
-            const ccls = new Set(split(item?.dataset.ccls));
-            const tws = new Set(split(item?.dataset.tws));
-            card.querySelectorAll(".custom-binding-ccl-checkbox").forEach(sw => { sw.checked = ccls.has(sw.value); });
-            card.querySelectorAll(".custom-binding-tw-checkbox").forEach(sw => { sw.checked = tws.has(sw.value); });
-            uninterruptible.checked = item?.dataset.uninterruptible === "true";
-            show(cancel, !!item);
-        }
-
-        card.querySelectorAll(".custom-binding-item").forEach(item => {
-            item.querySelector(".custom-binding-edit")?.addEventListener("click", () => {
-                fill(item);
-                name.scrollIntoView?.({ block: "center" });
+        async function save(item, id, game) {
+            const selected = game.selected();
+            const trimmed = (item.querySelector(".custom-binding-name").value ?? "").trim();
+            if (!trimmed || !selected?.id) return CatapultChannel.showError(list.dataset.errorInvalid);
+            const response = await post(id ? `${base}/${id}` : base, {
+                name: trimmed,
+                twitchGameId: selected.id,
+                twitchGameName: selected.name,
+                ccls: CatapultChannel.checkedValues(item, ".custom-binding-ccl-checkbox"),
+                tws: CatapultChannel.checkedValues(item, ".custom-binding-tw-checkbox"),
+                uninterruptible: !!item.querySelector(".custom-binding-uninterruptible").checked
             });
+            if (!response) return;
+            if (!response.ok) {
+                return CatapultChannel.showError(refusalText(list, await readCode(response), response.status));
+            }
+            // An edit of the active binding is re-applied on Twitch: its outcome, when it failed, is told.
+            let reapply = null;
+            try {
+                reapply = (await response.json())?.reapplyOutcome ?? null;
+            } catch { /* a creation answers the binding alone */ }
+            if (reapply && reapply !== "applied") CatapultChannel.showError(refusalText(list, reapply, response.status));
+            await CatapultChannel.refresh();
+        }
+
+        // mdui-collapse fires open/close but doesn't reflect them on the item: mirror it as .is-open, which
+        // the CSS shared with the associations list squares the joined header/body corners on.
+        list.querySelectorAll(".custom-binding-item").forEach(item => {
+            item.addEventListener("open", () => item.classList.add("is-open"));
+            item.addEventListener("close", () => item.classList.remove("is-open"));
+
+            const id = item.dataset.customBindingId ?? null;
+            const gameInput = item.querySelector(".custom-binding-game-input");
+            const gameId = item.querySelector(".custom-binding-game-id");
+            const game = GameSearch.attach(gameInput, item.querySelector(".custom-binding-game-results"),
+                `${CatapultChannel.baseUrl()}/games/search`, picked => { gameId.value = picked.id; },
+                { initial: { id: gameId.value, name: gameInput.value } });
+
+            item.querySelector(".custom-binding-activate")
+                ?.addEventListener("click", () => act(`${base}/${id}/activate`, id));
+            item.querySelector(".custom-binding-stop")
+                ?.addEventListener("click", () => act(`${base}/deactivate`, null));
+            item.querySelector(".custom-binding-save")?.addEventListener("click", () => save(item, id, game));
             item.querySelector(".custom-binding-delete")?.addEventListener("click", () => {
-                deletingId = item.dataset.customBindingId;
+                deletingId = id;
                 dialog.open = true;
             });
         });
-        cancel?.addEventListener("click", () => fill(null));
+
+        byId("custom-binding-new-btn")?.addEventListener("click", () => {
+            const fresh = list.querySelector(".custom-binding-new");
+            if (!fresh) return;
+            show(fresh, true);
+            show(byId("channel-custom-bindings-empty"), false);
+            if (collapse) collapse.value = fresh.getAttribute("value");
+            fresh.classList.add("is-open");
+            fresh.querySelector(".custom-binding-name")?.focus?.();
+        });
 
         dialog?.querySelector(".custom-binding-delete-dismiss")?.addEventListener("click", () => { dialog.open = false; });
         dialog?.querySelector(".custom-binding-delete-confirm")?.addEventListener("click", async () => {
@@ -142,32 +150,7 @@ window.CatapultCustomBindings = (function () {
             const response = await post(`${base}/${id}/delete`, {});
             if (!response) return;
             if (response.ok) return CatapultChannel.refresh();
-            CatapultChannel.showError(refusalText(card, await readCode(response), response.status));
-        });
-
-        byId("custom-binding-save-btn")?.addEventListener("click", async () => {
-            const selected = game.selected();
-            const trimmed = (name.value ?? "").trim();
-            if (!trimmed || !selected?.id) return CatapultChannel.showError(card.dataset.errorInvalid);
-            const response = await post(editingId ? `${base}/${editingId}` : base, {
-                name: trimmed,
-                twitchGameId: selected.id,
-                twitchGameName: selected.name,
-                ccls: CatapultChannel.checkedValues(card, ".custom-binding-ccl-checkbox"),
-                tws: CatapultChannel.checkedValues(card, ".custom-binding-tw-checkbox"),
-                uninterruptible: !!uninterruptible.checked
-            });
-            if (!response) return;
-            if (!response.ok) {
-                return CatapultChannel.showError(refusalText(card, await readCode(response), response.status));
-            }
-            // An edit of the active binding is re-applied on Twitch: its outcome, when it failed, is told.
-            let reapply = null;
-            try {
-                reapply = (await response.json())?.reapplyOutcome ?? null;
-            } catch { /* a creation answers the binding alone */ }
-            if (reapply && reapply !== "applied") CatapultChannel.showError(refusalText(card, reapply, response.status));
-            await CatapultChannel.refresh();
+            CatapultChannel.showError(refusalText(list, await readCode(response), response.status));
         });
     }
 
@@ -260,10 +243,8 @@ window.CatapultCustomBindings = (function () {
     }
 
     document.addEventListener("catapult:render", () => {
-        const overview = byId("channel-custom-bindings-card");
-        if (overview) attachOverview(overview);
-        const settings = byId("channel-custom-bindings-settings");
-        if (settings) attachSettings(settings);
+        const list = byId("channel-custom-bindings-list");
+        if (list) attachList(list);
         const token = byId("channel-api-token-card");
         if (token) attachToken(token);
     });
