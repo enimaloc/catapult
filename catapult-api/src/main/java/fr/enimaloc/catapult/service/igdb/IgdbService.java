@@ -35,7 +35,8 @@ import java.util.stream.Collectors;
 public class IgdbService {
 
     private static final String TWITCH_TOKEN_URL = "https://id.twitch.tv/oauth2/token";
-    private static final String KEY_STEAM_PREFIX = "steam:";
+    /** The DB cache key prefix of a game looked up by its Steam app id. */
+    public static final String KEY_STEAM_PREFIX = "steam:";
     private static final String KEY_NAME_PREFIX  = "name:";
     private static final String KEY_EXE_PREFIX   = "exe:";
     private static final String KEY_XBOX_PREFIX  = "xbox:";

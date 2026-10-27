@@ -270,15 +270,23 @@ test.describe("DOM mutations", () => {
     const playing = games.find((g) => g.current);
     const other = games.find((g) => !g.current);
     expect(playing && other, "two bindings, one of them played").toBeTruthy();
+    // The DTDD card of the game played: PerfDataSeeder puts its IGDB id in IGDB's cache (no IGDB under perf).
+    // Without it (a stack seeding no such cache) the events below are a game's the page has no card for, and
+    // re-render it: told in the run's output, not failed, so that an older stack can still be measured.
+    const igdbId = await page.locator("#channel-dtdd-mapping-card").getAttribute("data-igdb-id", { timeout: 1000 })
+      .catch(() => null);
+    console.log(`channel-live-events: DTDD ${igdbId ? `card of IGDB ${igdbId}, patched in place` : "card absent, re-rendered"}`);
     const send = (name: string, data: object = {}) => () => publish(ownerId, STREAMER, name, data);
     const events = [
       send("game.detected", detected(other!)),
       send("game.detected", detected(playing!)),
       send("bot.toggled", { enabled: false }),
       send("bot.toggled", { enabled: true }),
-      // The mapping of a game the page shows no card for (IGDB is off under perf): the page re-renders
-      send("dtdd.mapping.changed", { igdbId: "1", current: null, hasPending: false }),
-      send("dtdd.mapping.changed", { igdbId: "1", current: null, hasPending: false }),
+      // The card's game mapped, then no longer: patched in place (the page as it was after the second)
+      send("dtdd.mapping.changed", {
+        igdbId: igdbId ?? "1", current: { dtddId: 9, name: "Celeste", confidence: 0.8, verified: false }, hasPending: false,
+      }),
+      send("dtdd.mapping.changed", { igdbId: igdbId ?? "1", current: null, hasPending: false }),
       // The streamer has no custom binding (custom-binding-crud leaves none)
       send("custom.bindings.updated", { bindings: [], activeId: null }),
       send("custom.bindings.updated", { bindings: [], activeId: null }),
