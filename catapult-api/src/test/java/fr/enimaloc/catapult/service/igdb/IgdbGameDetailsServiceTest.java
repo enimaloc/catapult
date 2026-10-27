@@ -14,6 +14,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.PlatformTransactionManager;
 import proto.ExternalGame;
 import proto.ExternalGameSource;
 import proto.Game;
@@ -41,6 +42,7 @@ class IgdbGameDetailsServiceTest {
     @Mock IgdbClient igdbClient;
     @Mock IgdbService igdbService;
     @Mock Executor refreshExecutor;
+    @Mock PlatformTransactionManager transactionManager;
 
     private SimpleMeterRegistry meterRegistry;
     private IgdbGameDetailsService service;
@@ -51,8 +53,7 @@ class IgdbGameDetailsServiceTest {
     @BeforeEach
     void setup() {
         meterRegistry = new SimpleMeterRegistry();
-        service = new IgdbGameDetailsService(repository, igdbClient, igdbService, meterRegistry, refreshExecutor, null);
-        ReflectionTestUtils.setField(service, "self", service);
+        service = new IgdbGameDetailsService(repository, igdbClient, igdbService, meterRegistry, refreshExecutor, transactionManager);
         ReflectionTestUtils.setField(service, "cacheTtlHours", 168);
         when(igdbService.getAppToken()).thenReturn(TOKEN);
     }
