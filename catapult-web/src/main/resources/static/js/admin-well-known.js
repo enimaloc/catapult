@@ -4,8 +4,9 @@
  * edited by hand (an existing file's never does), its URL preview follows path and location; a
  * file imported is read in the browser as text into the content (refused when larger than 64 KiB
  * or holding a NUL byte, i.e. not text). Save / Delete post to AdminWellKnownController, then the
- * tab is reloaded; a refusal is told by its status (data-error-400/404/409, else data-error with
- * its {0}, "—" when not sent) and leaves the dialog open. The registry is filtered as typed.
+ * tab is patched (admin-tabs.js: the file's row, the counts, the registry's "configured" chips); a
+ * refusal is told by its status (data-error-400/404/409, else data-error with its {0}, "—" when not
+ * sent) and leaves the dialog open. The registry is filtered as typed, the filter kept by a patch.
  *
  * Response tab: the status (a common one, or "other" typed in statusOther), header rows added / removed
  * (blank names not sent), Redirect = 302 + a Location row. Content tab: Form | Raw. A path with a
@@ -309,7 +310,7 @@ window.CatapultAdminWellKnown = (function () {
         }
         if (!response.ok) {
             CatapultChannel.showError(CatapultAdminTabs.refusal(root, response.status));
-            if (response.status === 404) await CatapultAdminTabs.reload(panel);
+            if (response.status === 404) await patch(panel);
             return;
         }
         dialog.querySelector(".admin-dialog-body").innerHTML = await response.text();
@@ -371,7 +372,7 @@ window.CatapultAdminWellKnown = (function () {
                 return;
             }
             const sent = await CatapultAdminTabs.post(root, target, `/admin/meta/files/${encodeURIComponent(row.dataset.id)}/delete`, {});
-            if (sent === "ok" || sent === 404) await CatapultAdminTabs.reload(panel);
+            if (sent === "ok" || sent === 404) await patch(panel);
             return;
         }
         const form = target.closest(".admin-well-known-form");
@@ -411,16 +412,28 @@ window.CatapultAdminWellKnown = (function () {
             };
             const sent = await CatapultAdminTabs.post(root, target, id ? `/admin/meta/files/${encodeURIComponent(id)}` : "/admin/meta/files", body);
             if (sent === "ok") dialog.open = false;
-            if (sent === "ok" || sent === 404) await CatapultAdminTabs.reload(panel);
+            if (sent === "ok" || sent === 404) await patch(panel);
         }
+    }
+
+    /** Hides the registry's rows `field`'s text doesn't match. */
+    function filter(panel, field) {
+        const q = (field.value ?? "").trim().toLowerCase();
+        panel.querySelectorAll(".admin-iana-row").forEach(row => {
+            row.hidden = q !== "" && !row.dataset.search.includes(q);
+        });
+    }
+
+    /** Patches the tab after an edit; a registry row patched shows again, so the filter is applied again. */
+    async function patch(panel) {
+        await CatapultAdminTabs.patch(panel);
+        const field = panel.querySelector("[data-well-known-filter]");
+        if (field) filter(panel, field);
     }
 
     function onInput(panel, target) {
         if (target.matches("[data-well-known-filter]")) {
-            const q = (target.value ?? "").trim().toLowerCase();
-            panel.querySelectorAll(".admin-iana-row").forEach(row => {
-                row.hidden = q !== "" && !row.dataset.search.includes(q);
-            });
+            filter(panel, target);
             return;
         }
         const form = target.closest(".admin-well-known-form");

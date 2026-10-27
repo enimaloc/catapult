@@ -163,6 +163,16 @@ describe("live elements", () => {
         expect(panel.querySelector("time").textContent).toBe("1 hour ago");
     });
 
+    it("writes only the part an admin edit inserted, that part a live time itself or not", () => {
+        html(`<div id="panel"><time id="old" data-live-time="relative" datetime="${iso(-HOUR)}">kept</time>
+            <time id="new" data-live-time="relative" datetime="${iso(-HOUR)}"></time></div>`);
+        const panel = document.getElementById("panel");
+        const root = document.getElementById("new");
+        document.dispatchEvent(new CustomEvent("catapult:admin-panel", { detail: { tab: "broadcast", panel, root } }));
+        expect(root.textContent).toBe("1 hour ago");
+        expect(document.getElementById("old").textContent).toBe("kept");
+    });
+
     it("refreshes a subtree on demand", () => {
         html(`<div id="root"><time data-live-time="relative" datetime="${iso(-HOUR)}"></time></div>`);
         CatapultTime.refresh(document.getElementById("root"));

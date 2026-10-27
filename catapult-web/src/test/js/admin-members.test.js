@@ -418,7 +418,7 @@ describe("admin-members", () => {
                 <mdui-tab-panel value="members" data-admin-prerendered data-unavailable="Unavailable">${targeting()}</mdui-tab-panel>
             </mdui-tabs>`);
             render();
-            window.CatapultAdminTabs.reload = vi.fn(async () => {});
+            window.CatapultAdminTabs.patch = vi.fn(async () => {});
         }
 
         const field = (form, name) => document.querySelector(`#${form} [name="${name}"]`);
@@ -459,14 +459,15 @@ describe("admin-members", () => {
             expect(fetched).toHaveBeenCalledWith(`/spa/admin/members/${ID}`);
         });
 
-        it("adds and deletes a flag, adds and removes a group, then reloads the sub-view", async () => {
+        it("adds and deletes a flag, adds and removes a group, then patches the sub-view", async () => {
             subView();
 
             fill(field("flag-form", "key"), "  tier ");
             fill(field("flag-form", "value"), "2");
             await click(".admin-targeting-flag-save");
             expect(posts()).toEqual([[`/admin/members/${ID}/flags`, { key: "tier", value: "2" }]]);
-            expect(CatapultAdminTabs.reload).toHaveBeenCalledTimes(1);
+            expect(CatapultAdminTabs.patch).toHaveBeenCalledTimes(1);
+            expect(field("flag-form", "key").value).toBe(""); // emptied for the next one
 
             await click(".admin-targeting-flag-delete");
             expect(mdui.confirm).toHaveBeenCalledWith(expect.objectContaining({ headline: "Delete a/b?" }));
@@ -478,7 +479,7 @@ describe("admin-members", () => {
 
             await click(".admin-targeting-group-remove");
             expect(posts().at(-1)).toEqual([`/admin/members/${ID}/groups/g%2F1/delete`, {}]);
-            expect(CatapultAdminTabs.reload).toHaveBeenCalledTimes(4);
+            expect(CatapultAdminTabs.patch).toHaveBeenCalledTimes(4);
         });
 
         it("sends an empty value as none, and refuses a missing key or group without posting", async () => {
@@ -505,23 +506,51 @@ describe("admin-members", () => {
             expect(posts()).toEqual([]);
         });
 
-        it("tells a refusal by its status, and reloads when the member or group is gone", async () => {
+        it("tells a refusal by its status, and patches when the member or group is gone", async () => {
             subView();
             fill(field("flag-form", "key"), "beta");
 
             posted.mockResolvedValue(response(400));
             await click(".admin-targeting-flag-save");
             expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Refused");
-            expect(CatapultAdminTabs.reload).not.toHaveBeenCalled();
+            expect(CatapultAdminTabs.patch).not.toHaveBeenCalled();
 
             posted.mockResolvedValue(response(404));
             await click(".admin-targeting-flag-save");
             expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Gone");
-            expect(CatapultAdminTabs.reload).toHaveBeenCalledTimes(1);
+            expect(CatapultAdminTabs.patch).toHaveBeenCalledTimes(1);
+            expect(field("flag-form", "key").value).toBe("beta"); // kept: not saved
 
             posted.mockResolvedValue(response(502));
             await click(".admin-targeting-flag-save");
             expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Down");
+        });
+
+        it("inserts a saved flag's row as the server renders it, keeping the rest of the sub-view", async () => {
+            const marked = flags => `
+                <div class="admin-view admin-targeting" data-member-id="${ID}" data-label-flag-saved="Saved">
+                    <p data-admin-value="flags-empty" ${flags.length ? "hidden" : ""}>No flag</p>
+                    <div data-admin-list="flags" ${flags.length ? "" : "hidden"}>
+                        ${flags.map(key => `<div class="admin-targeting-row" data-admin-key="${key}">${key}</div>`).join("")}
+                    </div>
+                    <div class="admin-targeting-form" id="flag-form"><input name="key"><input name="value">
+                        <button class="admin-targeting-flag-save"></button></div>
+                </div>`;
+            let flags = [];
+            fetched.mockImplementation(async url => response(200, url.endsWith("/members") ? "" : marked(flags)));
+            history.replaceState(null, "", `/admin#members/${ID}`);
+            listPage();
+            await flush();
+            const form = document.getElementById("flag-form");
+
+            fill(field("flag-form", "key"), "tier");
+            flags = ["tier"];
+            await click(".admin-targeting-flag-save");
+
+            expect(document.getElementById("flag-form")).toBe(form);
+            expect(field("flag-form", "key").value).toBe("");
+            expect(document.querySelector('[data-admin-key="tier"]').textContent).toBe("tier");
+            expect(document.querySelector('[data-admin-value="flags-empty"]').hidden).toBe(true);
         });
 
         it("disables an action's button while it runs: a double click posts once", async () => {

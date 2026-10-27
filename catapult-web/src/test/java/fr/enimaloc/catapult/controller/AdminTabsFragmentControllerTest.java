@@ -618,6 +618,9 @@ class AdminTabsFragmentControllerTest {
                 "data-rename=\"00000000-0000-0000-0000-000000000042\"", "data-add-member=\"00000000-0000-0000-0000-000000000042\"",
                 "data-delete=\"00000000-0000-0000-0000-000000000042\"", "admin-groups-rename-dialog",
                 "admin-groups-member-dialog", "data-label-conflict=\"");
+        // the list and its empty state both rendered, one hidden, for admin-tabs.js to patch
+        assertThat(html).contains("data-admin-list=\"groups\"", "data-admin-key=\"00000000-0000-0000-0000-000000000042\"")
+                .containsPattern("data-admin-value=\"groups-empty\"\\s+hidden");
 
         when(apiService.adminGroups()).thenReturn(List.of());
         assertThat(asAdmin("/spa/admin/groups")).contains("No group").doesNotContain("data-rename=");

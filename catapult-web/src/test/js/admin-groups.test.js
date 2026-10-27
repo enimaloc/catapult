@@ -64,12 +64,12 @@ beforeEach(async () => {
     window.mdui = { confirm: vi.fn(() => (confirmAnswer ? Promise.resolve() : Promise.reject())), snackbar: vi.fn() };
     await load("admin-tabs", "admin-groups");
     window.CatapultChannel = { showError: vi.fn() };
-    window.CatapultAdminTabs.reload = vi.fn(async () => {});
+    window.CatapultAdminTabs.patch = vi.fn(async () => {});
     page();
 });
 
 describe("admin-groups", () => {
-    it("creates a group from the form and reloads; key and name required", async () => {
+    it("creates a group from the form and patches the list; key and name required", async () => {
         fill(create("key"), "  ");
         fill(create("name"), "Beta");
         await click(".admin-groups-create-save");
@@ -87,7 +87,8 @@ describe("admin-groups", () => {
         await click(".admin-groups-create-save");
 
         expect(posted).toHaveBeenCalledWith("/admin/groups", { key: "beta", name: "Beta", description: "For testers" });
-        expect(CatapultAdminTabs.reload).toHaveBeenCalled();
+        expect(CatapultAdminTabs.patch).toHaveBeenCalled();
+        expect(["key", "name", "description"].map(name => create(name).value)).toEqual(["", "", ""]);
     });
 
     it("sends an empty description as null", async () => {
@@ -98,7 +99,7 @@ describe("admin-groups", () => {
         expect(posted).toHaveBeenCalledWith("/admin/groups", { key: "beta", name: "Beta", description: null });
     });
 
-    it("tells a duplicate key and an unreachable catapult-api, without reloading", async () => {
+    it("tells a duplicate key and an unreachable catapult-api, without patching", async () => {
         fill(create("key"), "beta");
         fill(create("name"), "Beta");
         posted.mockResolvedValueOnce(response(409));
@@ -108,7 +109,7 @@ describe("admin-groups", () => {
         posted.mockResolvedValueOnce(response(502));
         await click(".admin-groups-create-save");
         expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Down");
-        expect(CatapultAdminTabs.reload).not.toHaveBeenCalled();
+        expect(CatapultAdminTabs.patch).not.toHaveBeenCalled();
     });
 
     it("renames through its dialog, prefilled with the group's name and description", async () => {
@@ -124,7 +125,7 @@ describe("admin-groups", () => {
 
         expect(posted).toHaveBeenCalledWith("/admin/groups/g%2F1/rename", { name: "Gamma", description: null });
         expect(dialog.open).toBe(false);
-        expect(CatapultAdminTabs.reload).toHaveBeenCalled();
+        expect(CatapultAdminTabs.patch).toHaveBeenCalled();
     });
 
     it("refuses an empty name when renaming", async () => {
@@ -155,16 +156,16 @@ describe("admin-groups", () => {
 
         expect(CatapultChannel.showError).toHaveBeenCalledWith("No such member");
         expect(memberDialog().open).toBe(true);
-        expect(CatapultAdminTabs.reload).not.toHaveBeenCalled();
+        expect(CatapultAdminTabs.patch).not.toHaveBeenCalled();
     });
 
-    it("tells a group deleted meanwhile (404 on rename) and reloads", async () => {
+    it("tells a group deleted meanwhile (404 on rename) and patches it away", async () => {
         posted.mockResolvedValue(response(404));
         await click("[data-rename]");
         await click(".admin-groups-rename-save");
 
         expect(CatapultChannel.showError).toHaveBeenCalledWith("Gone");
-        expect(CatapultAdminTabs.reload).toHaveBeenCalled();
+        expect(CatapultAdminTabs.patch).toHaveBeenCalled();
     });
 
     it("confirms deletion with the group's name, the button disabled meanwhile", async () => {
@@ -181,7 +182,7 @@ describe("admin-groups", () => {
         expect(posted).toHaveBeenCalledWith("/admin/groups/g%2F1/delete", {});
         release();
         await flush();
-        expect(CatapultAdminTabs.reload).toHaveBeenCalled();
+        expect(CatapultAdminTabs.patch).toHaveBeenCalled();
     });
 
     it("does not delete when the confirmation is declined", async () => {

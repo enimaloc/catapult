@@ -10,8 +10,9 @@ window.CatapultAdminCcl = (function () {
     const selected = select => (Array.isArray(select.value) ? select.value : []);
     const same = (a, b) => a.length === b.length && a.every(value => b.includes(value));
 
-    function selectSaved(panel) {
-        panel.querySelectorAll("[data-ccl-id]").forEach(card => {
+    /** Selects the saved descriptors of each card in `root` (the panel, or a card inserted into it). */
+    function selectSaved(root) {
+        [root, ...root.querySelectorAll("[data-ccl-id]")].filter(card => card.matches("[data-ccl-id]")).forEach(card => {
             card.querySelector(".admin-ccl-select").value = saved(card);
         });
     }
@@ -69,7 +70,7 @@ window.CatapultAdminCcl = (function () {
 
     document.addEventListener("catapult:render", attach);
     document.addEventListener("catapult:admin-panel", event => {
-        if (event.detail.tab === "ccl") selectSaved(event.detail.panel);
+        if (event.detail.tab === "ccl") selectSaved(event.detail.root ?? event.detail.panel);
     });
 
     return { attach };

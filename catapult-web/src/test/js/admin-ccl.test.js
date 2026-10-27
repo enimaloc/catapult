@@ -53,6 +53,18 @@ describe("admin-ccl", () => {
         expect(card("Gambling").querySelector(".admin-ccl-select").value).toEqual([]);
     });
 
+    it("selects the saved descriptors of a card an edit inserted, the others left as picked", () => {
+        const panel = page();
+        card("Gambling").querySelector(".admin-ccl-select").value = ["7"];
+        const inserted = card("Violent Graphic");
+        inserted.dataset.saved = "3";
+
+        document.dispatchEvent(new CustomEvent("catapult:admin-panel", { detail: { tab: "ccl", panel, root: inserted } }));
+
+        expect(inserted.querySelector(".admin-ccl-select").value).toEqual(["3"]);
+        expect(card("Gambling").querySelector(".admin-ccl-select").value).toEqual(["7"]);
+    });
+
     it("enables Save only while the selection differs from the saved one", () => {
         page();
         const save = card("Violent Graphic").querySelector(".admin-ccl-save");

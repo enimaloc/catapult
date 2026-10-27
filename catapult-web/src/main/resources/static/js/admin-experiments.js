@@ -490,8 +490,11 @@ window.CatapultAdminExperiments = (function () {
 
     document.addEventListener("catapult:admin-panel", event => {
         if (event.detail.tab !== "experiments") return;
-        event.detail.panel.querySelectorAll("#experiment-weights").forEach(asPercentages);
-        event.detail.panel.querySelectorAll("#experiment-weights, #experiment-rule-form, #experiment-override-form").forEach(sync);
+        // the panel's whole view, or only the part an edit inserted into it
+        const root = event.detail.root ?? event.detail.panel;
+        const within = selector => [root, ...root.querySelectorAll(selector)].filter(node => node.matches(selector));
+        within("#experiment-weights").forEach(asPercentages);
+        within("#experiment-weights, #experiment-rule-form, #experiment-override-form").forEach(sync);
     });
 
     const handleOf = event => {

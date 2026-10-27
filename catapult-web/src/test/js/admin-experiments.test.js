@@ -102,6 +102,19 @@ beforeEach(async () => {
 });
 
 describe("admin-experiments", () => {
+    it("syncs only the form an edit inserted, the others left as the admin set them", () => {
+        page();
+        const rule = document.getElementById("experiment-rule-form");
+        const override = document.getElementById("experiment-override-form");
+        rule.querySelector('[name="type"]').value = "GROUP";
+        override.querySelector('[name="target"]').value = "TAG";
+
+        document.dispatchEvent(new CustomEvent("catapult:admin-panel", { detail: { tab: "experiments", panel: panel(), root: rule } }));
+
+        expect(rule.querySelector('[data-rule-fields="GROUP"]').hidden).toBe(false);
+        expect(override.querySelector('[data-override-fields="TAG"]').hidden).toBe(true);
+    });
+
     it("posts the lifecycle action to its route and reloads the view", async () => {
         await click('[data-experiment-action="activate"]');
 

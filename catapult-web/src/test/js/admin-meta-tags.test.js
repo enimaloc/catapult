@@ -50,19 +50,20 @@ beforeEach(async () => {
     window.mdui = { confirm: vi.fn(() => (confirmAnswer ? Promise.resolve() : Promise.reject())) };
     await load("admin-tabs", "admin-meta-tags");
     window.CatapultChannel = { showError: vi.fn() }; // after load: channel-page.js isn't loaded, nothing overrides it
-    window.CatapultAdminTabs.reload = vi.fn(async () => {});
+    window.CatapultAdminTabs.patch = vi.fn(async () => {});
     page();
 });
 
 describe("admin-meta-tags", () => {
-    it("adds a tag from the form, trimmed, then reloads the tab", async () => {
+    it("adds a tag from the form, trimmed, then patches the tab", async () => {
         field("key").value = " google-site-verification ";
         field("content").value = " abc123 ";
 
         await click(save());
 
         expect(posted).toHaveBeenCalledWith("/admin/meta/tags", { attribute: "NAME", key: "google-site-verification", content: "abc123" });
-        expect(CatapultAdminTabs.reload).toHaveBeenCalledWith(document.querySelector('mdui-tab-panel[value="meta"]'));
+        expect(CatapultAdminTabs.patch).toHaveBeenCalledWith(document.querySelector('mdui-tab-panel[value="meta"]'));
+        expect([field("key").value, field("content").value]).toEqual(["", ""]);
     });
 
     it("loads a row into the form, saves it in place, and cancels back to adding", async () => {
@@ -76,6 +77,10 @@ describe("admin-meta-tags", () => {
         field("content").value = "https://x/z.png";
         await click(save());
         expect(posted).toHaveBeenCalledWith("/admin/meta/tags/5", { attribute: "PROPERTY", key: "og:image", content: "https://x/z.png" });
+        expect(field("key").value).toBe(""); // saved: the form is back to adding
+        expect(form().dataset.id).toBeUndefined();
+
+        await click(".admin-meta-tag-edit");
 
         await click(cancel());
         expect(field("key").value).toBe("");
@@ -93,7 +98,14 @@ describe("admin-meta-tags", () => {
         confirmAnswer = true;
         await click(".admin-meta-tag-delete");
         expect(posted).toHaveBeenCalledWith("/admin/meta/tags/5/delete", {});
-        expect(CatapultAdminTabs.reload).toHaveBeenCalled();
+        expect(CatapultAdminTabs.patch).toHaveBeenCalled();
+    });
+
+    it("empties the form when the tag deleted is the one being edited", async () => {
+        await click(".admin-meta-tag-edit");
+        await click(".admin-meta-tag-delete");
+        expect(form().dataset.id).toBeUndefined();
+        expect(field("key").value).toBe("");
     });
 
     it("tells a refusal by its status and keeps the tab and the form as they are", async () => {
@@ -107,17 +119,17 @@ describe("admin-meta-tags", () => {
         await click(save());
         expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Failed (—)");
 
-        expect(CatapultAdminTabs.reload).not.toHaveBeenCalled();
+        expect(CatapultAdminTabs.patch).not.toHaveBeenCalled();
         expect(field("key").value).toBe("theme-color");
         expect(save().disabled).toBe(false);
     });
 
-    it("reloads the tab when the tag edited is already gone", async () => {
+    it("patches the tab when the tag edited is already gone", async () => {
         posted.mockResolvedValueOnce(response(404));
         await click(".admin-meta-tag-edit");
         await click(save());
         expect(CatapultChannel.showError).toHaveBeenCalledWith("Gone");
-        expect(CatapultAdminTabs.reload).toHaveBeenCalled();
+        expect(CatapultAdminTabs.patch).toHaveBeenCalled();
     });
 
     it("saves with Enter in a field", async () => {

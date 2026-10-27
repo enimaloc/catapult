@@ -6,7 +6,8 @@
  * target select starts with that page's members and its search field looks the others up.
  *
  * A member's targeting sub-view (#members/{id}, loaded by admin-tabs.js) edits their custom flags and
- * groups: every button posts with itself disabled meanwhile and a success reloads the sub-view. A
+ * groups: every button posts with itself disabled meanwhile and a success patches the sub-view
+ * (admin-tabs.js: the flag's or group's row inserted, updated or removed, the form emptied). A
  * refusal is told by its status (400, 404, else unavailable), never by catapult-api's message. Its
  * listeners are delegated to the panel: the sub-view comes and goes inside it.
  *
@@ -165,16 +166,20 @@ window.CatapultAdminMembers = (function () {
         }
     }
 
-    /** Tells the outcome of `status`: done (snackbar, reload) or refused; a vanished member or group also reloads. */
+    /**
+     * Tells the outcome of `status`: done (snackbar, patch) or refused; a vanished member or group is
+     * patched too (a gone member's sub-view is rendered again as a whole: it says they're gone).
+     */
     async function settle(panel, root, status, doneLabel) {
         if (ok(status)) {
             window.mdui?.snackbar?.({ message: root.dataset[doneLabel] });
-            await CatapultAdminTabs.reload(panel);
-            return;
+            await CatapultAdminTabs.patch(panel);
+            return true;
         }
         CatapultChannel.showError(status === 400 ? root.dataset.labelInvalid
             : status === 404 ? root.dataset.labelUnknown : root.dataset.labelUnavailable);
-        if (status === 404) await CatapultAdminTabs.reload(panel);
+        if (status === 404) await CatapultAdminTabs.patch(panel);
+        return false;
     }
 
     /** Runs `action` with `button` disabled until it is done, the reload included; a second click is ignored. */
@@ -192,8 +197,10 @@ window.CatapultAdminMembers = (function () {
         const key = valueOf(form, "key");
         if (key === "") return mark(fieldOf(form, "key"));
         const value = valueOf(form, "value");
-        await busy(button, async () => settle(panel, root,
-            await post(targetingUrl(root, "flags"), { key, value: value || null }), "labelFlagSaved"));
+        await busy(button, async () => {
+            const status = await post(targetingUrl(root, "flags"), { key, value: value || null });
+            if (await settle(panel, root, status, "labelFlagSaved")) CatapultAdminTabs.reset(form);
+        });
     }
 
     async function deleteFlag(panel, root, button) {
@@ -209,8 +216,11 @@ window.CatapultAdminMembers = (function () {
         const select = fieldOf(form, "groupKey");
         const groupKey = (select.value ?? "").trim();
         if (groupKey === "") return mark(select);
-        await busy(button, async () => settle(panel, root,
-            await post(targetingUrl(root, "groups"), { groupKey }), "labelGroupAdded"));
+        await busy(button, async () => {
+            if (await settle(panel, root, await post(targetingUrl(root, "groups"), { groupKey }), "labelGroupAdded")) {
+                CatapultAdminTabs.reset(form);
+            }
+        });
     }
 
     async function removeGroup(panel, root, button) {
@@ -321,9 +331,9 @@ window.CatapultAdminMembers = (function () {
     }
 
     document.addEventListener("catapult:render", attach);
-    // back from a member's targeting, the list is a new content
+    // back from a member's targeting, the list is a new content (a part an edit inserted is no list)
     document.addEventListener("catapult:admin-panel", event => {
-        if (event.detail.tab === "members") attachList();
+        if (event.detail.tab === "members" && (event.detail.root ?? event.detail.panel) === event.detail.panel) attachList();
     });
 
     return { attach };

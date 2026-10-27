@@ -26,11 +26,12 @@
     </mdui-card>
 
     <th:block th:if="${groups == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
-    <th:block th:if="${groups != null and groups.isEmpty()}">
+    <!--/* both rendered, one hidden: admin-tabs.js patches them as the list changes (data-admin-*) */-->
+    <div data-admin-value="groups-empty" th:if="${groups != null}" th:hidden="${!groups.isEmpty()}">
         <th:block th:replace="~{pages/admin-tab/common :: empty('group', #{admin.groups.empty})}"></th:block>
-    </th:block>
+    </div>
 
-    <mdui-card class="admin-table" variant="outlined" th:if="${groups != null and !groups.isEmpty()}">
+    <mdui-card class="admin-table" variant="outlined" data-admin-list="groups" th:if="${groups != null}" th:hidden="${groups.isEmpty()}">
         <div class="admin-row admin-groups-row admin-row-head" aria-hidden="true">
             <span th:text="#{admin.groups.column.key}">Key</span>
             <span th:text="#{admin.groups.column.name}">Name</span>
@@ -38,7 +39,7 @@
             <span th:text="#{admin.groups.column.member-count}">Members</span>
             <span></span>
         </div>
-        <div class="admin-row admin-groups-row" th:each="g : ${groups}" th:attr="data-id=${g.id()}">
+        <div class="admin-row admin-groups-row" th:each="g : ${groups}" th:attr="data-id=${g.id()},data-admin-key=${g.id()}">
             <span class="admin-member-id" th:attr="data-label=#{admin.groups.column.key}" th:text="${g.key()}">key</span>
             <span class="admin-cell" th:attr="data-label=#{admin.groups.column.name}" th:text="${g.name()}">name</span>
             <span class="admin-groups-description admin-cell-muted" th:attr="data-label=#{admin.groups.column.description}"

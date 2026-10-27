@@ -79,12 +79,14 @@ window.CatapultTime = (function () {
     /** Rewrites every live time under root now. */
     function refresh(root = document) {
         const now = Date.now();
+        if (root.matches?.("[data-live-time]")) update(root, now);
         root.querySelectorAll("[data-live-time]").forEach(el => update(el, now));
     }
 
     document.addEventListener("catapult:render", () => refresh());
-    // An admin tab's content arrives on its own (admin-tabs.js): written at once, not a second later.
-    document.addEventListener("catapult:admin-panel", event => refresh(event.detail?.panel ?? document));
+    // An admin tab's content arrives on its own (admin-tabs.js): written at once, not a second later
+    // (only the new part, when an edit inserted one).
+    document.addEventListener("catapult:admin-panel", event => refresh(event.detail?.root ?? event.detail?.panel ?? document));
     // No ticking in a hidden tab; shown again, everything is brought up to date at once.
     let ticker = null;
     const startTicker = () => {

@@ -5,7 +5,8 @@
   The meta tags added to the head of every page (admin-meta-tags.js: the form below the list adds one,
   or saves the one picked with its edit button), then the files served under /.well-known/ and at the root (content: edited, created and deleted by
   admin-well-known.js through a file's dialog), then IANA's registry, filtered in the browser, each
-  suffix opening a new file's dialog with its path.
+  suffix opening a new file's dialog with its path. Each list and its empty state are both rendered,
+  one hidden, so that admin-tabs.js patches them after an edit (data-admin-*).
 */-->
 <div th:fragment="content" class="admin-view admin-well-known"
      th:attr="data-confirm-text=#{admin.confirm},data-cancel-text=#{admin.cancel},
@@ -19,17 +20,19 @@
         <div class="section-header">
             <div>
                 <h2 th:text="#{admin.meta-tags.title}">Meta tags</h2>
-                <span class="eyebrow" th:if="${metaTags != null}" th:text="#{admin.meta-tags.count(${metaTags.size()})}">0 tags</span>
+                <span class="eyebrow" data-admin-value="meta-tags-count" th:if="${metaTags != null}"
+                      th:text="#{admin.meta-tags.count(${metaTags.size()})}">0 tags</span>
             </div>
         </div>
         <p class="admin-cell-muted" th:text="#{admin.meta-tags.hint}">Added to the head of every page.</p>
 
         <th:block th:if="${metaTags == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
-        <th:block th:if="${metaTags != null and metaTags.isEmpty()}">
+        <div data-admin-value="meta-tags-empty" th:if="${metaTags != null}" th:hidden="${!metaTags.isEmpty()}">
             <th:block th:replace="~{pages/admin-tab/common :: empty('sell', #{admin.meta-tags.empty})}"></th:block>
-        </th:block>
+        </div>
 
-        <mdui-card class="admin-table" variant="outlined" th:if="${metaTags != null and !metaTags.isEmpty()}">
+        <mdui-card class="admin-table" variant="outlined" data-admin-list="meta-tags" th:if="${metaTags != null}"
+                   th:hidden="${metaTags.isEmpty()}">
             <div class="admin-row admin-meta-tag-row admin-row-head" aria-hidden="true">
                 <span th:text="#{admin.meta-tags.column.attribute}">Type</span>
                 <span th:text="#{admin.meta-tags.column.key}">Name</span>
@@ -38,7 +41,8 @@
                 <span></span>
             </div>
             <div class="admin-row admin-meta-tag-row" th:each="t : ${metaTags}"
-                 th:attr="data-id=${t.id()},data-attribute=${t.attribute()},data-key=${t.key()},data-content=${t.content()}">
+                 th:attr="data-id=${t.id()},data-admin-key=${t.id()},data-attribute=${t.attribute()},data-key=${t.key()},
+                          data-content=${t.content()}">
                 <span class="admin-member-id admin-meta-tag-attribute" th:text="${#strings.toLowerCase(t.attribute())}">name</span>
                 <strong class="admin-cell" th:text="${t.key()}">key</strong>
                 <span class="admin-cell admin-meta-tag-content" th:text="${t.content()}" th:title="${t.content()}">content</span>
@@ -74,18 +78,19 @@
     <div class="section-header">
         <div>
             <h2 th:text="#{admin.well-known.title}">Well-known files</h2>
-            <span class="eyebrow" th:if="${files != null}" th:text="#{admin.well-known.count(${files.size()})}">0 files</span>
+            <span class="eyebrow" data-admin-value="files-count" th:if="${files != null}"
+                  th:text="#{admin.well-known.count(${files.size()})}">0 files</span>
         </div>
         <mdui-button id="admin-well-known-new" variant="tonal" icon="add" th:text="#{admin.well-known.new}">New</mdui-button>
     </div>
 
     <th:block th:if="${files == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
-    <th:block th:if="${files != null and files.isEmpty()}">
+    <div data-admin-value="files-empty" th:if="${files != null}" th:hidden="${!files.isEmpty()}">
         <th:block th:replace="~{pages/admin-tab/common :: empty('travel_explore', #{admin.well-known.empty})}"></th:block>
-    </th:block>
+    </div>
 
-    <mdui-card class="admin-table" variant="outlined" th:if="${files != null and !files.isEmpty()}">
-        <div class="admin-row admin-well-known-file" th:each="f : ${files}" th:attr="data-id=${f.id()}"
+    <mdui-card class="admin-table" variant="outlined" data-admin-list="files" th:if="${files != null}" th:hidden="${files.isEmpty()}">
+        <div class="admin-row admin-well-known-file" th:each="f : ${files}" th:attr="data-id=${f.id()},data-admin-key=${f.id()}"
              th:with="url=${(f.location().name() == 'ROOT' ? '/' : '/.well-known/') + f.path()}">
             <a class="admin-well-known-link" th:href="${url}" th:text="${url}" target="_blank" rel="noopener">url</a>
             <mdui-chip class="admin-well-known-status" th:if="${f.status() != 200}" th:text="${f.status()}">302</mdui-chip>
@@ -107,9 +112,9 @@
     <p class="admin-placeholder" th:if="${registry == null}" th:text="#{admin.well-known.registry.unavailable}">unavailable</p>
     <p class="eyebrow" th:if="${registry != null and registry.source() == 'SNAPSHOT'}"
        th:text="#{admin.well-known.registry.snapshot}">offline copy</p>
-    <mdui-card class="admin-table" variant="outlined" th:if="${registry != null}">
+    <mdui-card class="admin-table" variant="outlined" data-admin-list="registry" th:if="${registry != null}">
         <div class="admin-row admin-iana-row" th:each="e : ${registry.entries()}"
-             th:attr="data-search=${#strings.toLowerCase(e.suffix() + ' ' + e.reference())}">
+             th:attr="data-admin-key=${e.suffix()},data-search=${#strings.toLowerCase(e.suffix() + ' ' + e.reference())}">
             <strong th:text="${e.suffix()}">suffix</strong>
             <mdui-chip th:text="${e.status()}">permanent</mdui-chip>
             <a th:if="${#strings.startsWith(e.reference(), 'http')}" th:href="${e.reference()}" th:text="${e.reference()}"

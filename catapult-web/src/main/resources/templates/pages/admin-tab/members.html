@@ -191,9 +191,11 @@
     <th:block th:if="${targeting != null}">
         <mdui-card class="admin-targeting-card" variant="outlined">
             <h3 th:text="#{admin.members.targeting.flags.title}">Flags personnalisés</h3>
-            <p class="admin-cell-muted" th:if="${targeting.flags().isEmpty()}" th:text="#{admin.members.targeting.flags.empty}">Aucun flag.</p>
-            <div class="admin-targeting-rows" th:unless="${targeting.flags().isEmpty()}">
-                <div class="admin-targeting-row" th:each="f : ${targeting.flags()}" th:attr="data-flag=${f.key()}">
+            <!--/* both rendered, one hidden: admin-tabs.js patches them after an edit (data-admin-*) */-->
+            <p class="admin-cell-muted" data-admin-value="flags-empty" th:hidden="${!targeting.flags().isEmpty()}"
+               th:text="#{admin.members.targeting.flags.empty}">Aucun flag.</p>
+            <div class="admin-targeting-rows" data-admin-list="flags" th:hidden="${targeting.flags().isEmpty()}">
+                <div class="admin-targeting-row" th:each="f : ${targeting.flags()}" th:attr="data-flag=${f.key()},data-admin-key=${f.key()}">
                     <span class="admin-member-id" th:text="${f.key()}">key</span>
                     <span class="admin-targeting-value" th:text="${f.value() == null or f.value().isBlank() ? '—' : f.value()}">value</span>
                     <mdui-button-icon icon="delete" class="admin-targeting-flag-delete"
@@ -213,9 +215,10 @@
 
         <mdui-card class="admin-targeting-card" variant="outlined">
             <h3 th:text="#{admin.members.targeting.groups.title}">Groupes</h3>
-            <p class="admin-cell-muted" th:if="${targeting.groupKeys().isEmpty()}" th:text="#{admin.members.targeting.groups.empty}">Aucun groupe.</p>
-            <div class="admin-targeting-rows" th:unless="${targeting.groupKeys().isEmpty()}">
-                <div class="admin-targeting-row" th:each="k : ${targeting.groupKeys()}" th:attr="data-group=${k}">
+            <p class="admin-cell-muted" data-admin-value="groups-empty" th:hidden="${!targeting.groupKeys().isEmpty()}"
+               th:text="#{admin.members.targeting.groups.empty}">Aucun groupe.</p>
+            <div class="admin-targeting-rows" data-admin-list="groups" th:hidden="${targeting.groupKeys().isEmpty()}">
+                <div class="admin-targeting-row" th:each="k : ${targeting.groupKeys()}" th:attr="data-group=${k},data-admin-key=${k}">
                     <span class="admin-member-id" th:text="${k}">key</span>
                     <span></span>
                     <mdui-button-icon icon="delete" class="admin-targeting-group-remove" th:if="${groupIds.containsKey(k)}"
@@ -225,8 +228,8 @@
             </div>
             <h4 th:text="#{admin.members.targeting.groups.add.title}">Ajouter à un groupe</h4>
             <div class="admin-targeting-form">
-                <mdui-select name="groupKey" variant="outlined" th:attr="label=#{admin.members.targeting.groups.add.label}">
-                    <mdui-menu-item th:each="g : ${joinable}" th:value="${g.key()}" th:text="${g.key()}">group</mdui-menu-item>
+                <mdui-select name="groupKey" variant="outlined" data-admin-list="joinable" th:attr="label=#{admin.members.targeting.groups.add.label}">
+                    <mdui-menu-item th:each="g : ${joinable}" th:value="${g.key()}" th:attr="data-admin-key=${g.key()}" th:text="${g.key()}">group</mdui-menu-item>
                 </mdui-select>
                 <mdui-button variant="filled" icon="add" class="admin-targeting-group-save" th:text="#{admin.members.targeting.add}">Ajouter</mdui-button>
             </div>
