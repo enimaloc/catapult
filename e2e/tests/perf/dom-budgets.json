@@ -9,16 +9,16 @@
     "nodes": 948
   },
   "channel-live-events": {
-    "nodes": 23606
+    "nodes": 23694
   },
   "channel-reconnect": {
     "nodes": 0
   },
   "custom-binding-crud": {
-    "nodes": 38170
+    "nodes": 928
   },
   "channel-actions": {
-    "nodes": 23604
+    "nodes": 6
   },
   "admin-edit": {
     "nodes": 5414
