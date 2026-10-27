@@ -1,13 +1,15 @@
 /**
  * The admin Trigger warnings tab: adding a definition (id, label, order) and the three rebuilds, each
  * confirmed with its own text first. Everything posts to AdminTwController with its button disabled
- * meanwhile (and, for an add, until the tab has reloaded), so a double click posts once. A refusal is told
+ * meanwhile (and, for an add, until the list is patched: admin-tabs.js inserts its row and the card is
+ * emptied), so a double click posts once. A refusal is told
  * by its status, never by catapult-api's message: 400 (invalid), 409 (id taken), 503 (trigger warnings
  * disabled), else unavailable. "Manage keywords" is a plain data-admin-open link handled by admin-tabs.js.
  *
  * The keywords sub-view (#tw/{id}) adds and removes (confirmed) Steam keywords of 2 to 50 characters, the
  * keyword travelling in the JSON body, and tests the saved keywords plus the one being typed on a Steam app:
- * the answer is built with textContent only (the notes are data). Refusals are told by status as above.
+ * the answer is built with textContent only (the notes are data). Adding or removing one patches the list
+ * (the field emptied, the test's answer kept). Refusals are told by status as above.
  * Listeners are delegated to the panel: its content comes and goes.
  */
 window.CatapultAdminTw = (function () {
@@ -60,11 +62,12 @@ window.CatapultAdminTw = (function () {
             return;
         }
         const status = await post(button, "/admin/tw", { id, label, sortOrder });
-        button.disabled = true; // post() re-enabled it; still busy until the tab reloads
+        button.disabled = true; // post() re-enabled it; still busy until the list is patched
         try {
             if (ok(status)) {
                 window.mdui?.snackbar?.({ message: root.dataset.labelCreated });
-                await CatapultAdminTabs.reload(panel);
+                CatapultAdminTabs.reset(card);
+                await CatapultAdminTabs.patch(panel);
                 return;
             }
             CatapultChannel.showError(refusal(root, status));
@@ -97,11 +100,12 @@ window.CatapultAdminTw = (function () {
         const keyword = (field.value ?? "").trim();
         if (keyword.length < KEYWORD_MIN || keyword.length > KEYWORD_MAX) return mark(field);
         const status = await post(button, keywordsUrl(root, ""), { keyword });
-        button.disabled = true; // still busy until the view has reloaded
+        button.disabled = true; // still busy until the list is patched
         try {
             if (ok(status)) {
                 window.mdui?.snackbar?.({ message: root.dataset.labelAdded });
-                await CatapultAdminTabs.reload(panel);
+                field.value = "";
+                await CatapultAdminTabs.patch(panel);
                 return;
             }
             CatapultChannel.showError(status === 400 ? root.dataset.labelInvalid : refusal(root, status));
@@ -120,7 +124,7 @@ window.CatapultAdminTw = (function () {
             button.disabled = true;
             if (ok(status)) {
                 window.mdui?.snackbar?.({ message: root.dataset.labelRemoved });
-                await CatapultAdminTabs.reload(panel);
+                await CatapultAdminTabs.patch(panel);
                 return;
             }
             CatapultChannel.showError(status === 400 ? root.dataset.labelInvalid : refusal(root, status));

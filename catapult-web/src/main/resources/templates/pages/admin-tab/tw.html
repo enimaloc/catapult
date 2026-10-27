@@ -35,11 +35,13 @@
     </mdui-card>
 
     <th:block th:if="${definitions == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
-    <th:block th:if="${definitions != null and definitions.isEmpty()}">
+    <!--/* the list and its empty state both rendered, one hidden: admin-tabs.js patches them after an edit */-->
+    <div data-admin-value="empty" th:if="${definitions != null}" th:hidden="${!definitions.isEmpty()}">
         <th:block th:replace="~{pages/admin-tab/common :: empty('policy', #{admin.tw.empty})}"></th:block>
-    </th:block>
+    </div>
 
-    <mdui-card class="admin-table" variant="outlined" th:if="${definitions != null and !definitions.isEmpty()}">
+    <mdui-card class="admin-table" variant="outlined" data-admin-list="definitions" th:if="${definitions != null}"
+               th:hidden="${definitions.isEmpty()}">
         <div class="admin-row admin-tw-row admin-row-head" aria-hidden="true">
             <span th:text="#{admin.tw.column.id}">ID</span>
             <span th:text="#{admin.tw.column.label}">Label</span>
@@ -47,7 +49,7 @@
             <span th:text="#{admin.tw.column.sort-order}">Order</span>
             <span></span>
         </div>
-        <div class="admin-row admin-tw-row" th:each="d : ${definitions}" th:attr="data-id=${d.id()}">
+        <div class="admin-row admin-tw-row" th:each="d : ${definitions}" th:attr="data-id=${d.id()},data-admin-key=${d.id()}">
             <span class="admin-member-id" th:attr="data-label=#{admin.tw.column.id}" th:text="${d.id()}">id</span>
             <span class="admin-cell" th:attr="data-label=#{admin.tw.column.label}" th:text="${d.label()}">label</span>
             <span th:attr="data-label=#{admin.tw.column.enabled}">
@@ -86,9 +88,9 @@
 
     <th:block th:if="${keywords != null}">
         <mdui-card class="admin-tw-kw-card" variant="outlined">
-            <p class="admin-cell-muted" th:if="${keywords.isEmpty()}" th:text="#{admin.tw.kw.empty}">No keyword.</p>
-            <div class="admin-tw-kw-rows" th:unless="${keywords.isEmpty()}">
-                <div class="admin-tw-kw-row" th:each="k : ${keywords}" th:attr="data-keyword=${k}">
+            <p class="admin-cell-muted" data-admin-value="empty" th:hidden="${!keywords.isEmpty()}" th:text="#{admin.tw.kw.empty}">No keyword.</p>
+            <div class="admin-tw-kw-rows" data-admin-list="keywords" th:hidden="${keywords.isEmpty()}">
+                <div class="admin-tw-kw-row" th:each="k : ${keywords}" th:attr="data-keyword=${k},data-admin-key=${k}">
                     <span class="admin-member-id" th:text="${k}">keyword</span>
                     <mdui-button-icon icon="delete" class="admin-tw-keyword-remove"
                                       th:attr="aria-label=#{admin.tw.kw.remove},data-confirm=#{admin.tw.kw.remove-confirm(${k})}"></mdui-button-icon>
