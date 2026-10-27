@@ -16,6 +16,8 @@ import fr.enimaloc.catapult.common.dto.admin.DtddProposalDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.FlagKeyDto;
 import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.SocialLinkDto;
+import fr.enimaloc.catapult.common.dto.admin.SocialLinkRequest;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentAssignmentsDto;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentOverrideRequest;
 import fr.enimaloc.catapult.common.dto.experiment.ExperimentRebalanceDto;
@@ -235,13 +237,13 @@ public interface ApiService {
     // --- social links: shown in the footer of every page, edited from the admin page ---
 
     /** The visible social links in order (read without the session, as every page shows them); null when catapult-api fails. */
-    List<fr.enimaloc.catapult.common.dto.admin.SocialLinkDto> socialLinks();
+    List<SocialLinkDto> socialLinks();
     /** Every social link, hidden ones included; null when catapult-api fails. */
-    List<fr.enimaloc.catapult.common.dto.admin.SocialLinkDto> adminSocialLinks();
+    List<SocialLinkDto> adminSocialLinks();
     /** catapult-api's status (201; 400 invalid link), 502 when unreachable. */
-    int adminCreateSocialLink(fr.enimaloc.catapult.common.dto.admin.SocialLinkRequest request);
+    int adminCreateSocialLink(SocialLinkRequest request);
     /** catapult-api's status (200; 400; 404), 502 when unreachable. */
-    int adminUpdateSocialLink(long id, fr.enimaloc.catapult.common.dto.admin.SocialLinkRequest request);
+    int adminUpdateSocialLink(long id, SocialLinkRequest request);
     /** catapult-api's status (204; 404), 502 when unreachable. */
     int adminDeleteSocialLink(long id);
     /** catapult-api's status (200; 400 ids not the exact set of links), 502 when unreachable. */
