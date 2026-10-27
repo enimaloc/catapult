@@ -149,6 +149,19 @@ describe("API documentation page", () => {
             expect(events).toEqual(["input", "change"]);
         });
 
+        it("stops watching once the page is left for another", async () => {
+            localStorage.setItem("catapult_widget_uuid", "my-own-token");
+            const disconnect = vi.spyOn(MutationObserver.prototype, "disconnect");
+            await withInput("typed by the visitor");
+            render();
+            expect(disconnect).not.toHaveBeenCalled();
+
+            html("<p>elsewhere</p>");
+            render();
+
+            expect(disconnect).toHaveBeenCalledTimes(1);
+        });
+
         it("leaves any other value alone", async () => {
             localStorage.setItem("catapult_widget_uuid", "my-own-token");
 

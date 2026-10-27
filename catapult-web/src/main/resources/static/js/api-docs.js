@@ -18,6 +18,8 @@ window.CatapultApiDocs = (function () {
 
     /** The bundle's loading, shared by every render until it is there; dropped when it fails, to try again. */
     let loading = null;
+    /** The watch on the #swagger-ui shown, disconnected once spa.js has replaced it (the page was left). */
+    let watching = null;
 
     function bundle(root) {
         if (window.SwaggerUIBundle) return Promise.resolve(window.SwaggerUIBundle);
@@ -59,14 +61,22 @@ window.CatapultApiDocs = (function () {
         const uuid = widgetUuid();
         if (!uuid) return;
         const setValue = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-        new MutationObserver(() => {
+        const observer = new MutationObserver(() => {
             root.querySelectorAll("input").forEach(input => {
                 if (input.value !== GENERIC_UUID_EXAMPLE) return;
                 setValue.call(input, uuid);
                 input.dispatchEvent(new Event("input", { bubbles: true }));
                 input.dispatchEvent(new Event("change", { bubbles: true }));
             });
-        }).observe(root, { childList: true, subtree: true });
+        });
+        observer.observe(root, { childList: true, subtree: true });
+        watching = { root, observer };
+    }
+
+    function stopWatchingLeftPage() {
+        if (!watching || watching.root.isConnected) return;
+        watching.observer.disconnect();
+        watching = null;
     }
 
     function showStatus(el, up) {
@@ -93,6 +103,7 @@ window.CatapultApiDocs = (function () {
     }
 
     async function start() {
+        stopWatchingLeftPage();
         const cached = document.getElementById("api-docs-cached");
         if (cached) showFetchedAt(cached);
         const status = document.getElementById("api-docs-status");
