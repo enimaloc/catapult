@@ -10,12 +10,14 @@ import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * The mock's social links: one store for the whole application, not per mock session, since every page
- * shows them, logged in or not. Refuses as catapult-api does: an https URL of at most 2048 characters, a
- * label of at most 64.
+ * shows them, logged in or not. Refuses and stores as catapult-api's SocialLinkService does: an {@code https://}
+ * URL (any case for the scheme, something after it, no blank or control character anywhere) of at most 2048
+ * characters, a label of at most 64, kept as given (a blank one as none).
  */
 class MockSocialLinkStore {
     static final int MAX_URL = 2048;
     static final int MAX_LABEL = 64;
+    private static final String HTTPS = "https://";
 
     private final List<SocialLinkDto> links = new ArrayList<>();
     private final AtomicLong ids = new AtomicLong();
@@ -81,13 +83,16 @@ class MockSocialLinkStore {
     }
 
     private static SocialLinkDto link(long id, SocialLinkRequest r, int position) {
-        String label = r.label() == null || r.label().isBlank() ? null : r.label().strip();
+        String label = r.label() == null || r.label().isBlank() ? null : r.label();
         return new SocialLinkDto(id, r.platform(), label, r.url(), r.visible(), position);
     }
 
     private static boolean valid(SocialLinkRequest r) {
-        return r != null && r.platform() != null && r.url() != null && r.url().startsWith("https://")
-                && r.url().length() <= MAX_URL && r.url().strip().equals(r.url())
-                && (r.label() == null || r.label().strip().length() <= MAX_LABEL);
+        if (r == null || r.platform() == null) return false;
+        String url = r.url();
+        return url != null && url.length() <= MAX_URL && url.length() > HTTPS.length()
+                && url.regionMatches(true, 0, HTTPS, 0, HTTPS.length())
+                && url.chars().noneMatch(c -> Character.isISOControl(c) || Character.isWhitespace(c))
+                && (r.label() == null || r.label().length() <= MAX_LABEL);
     }
 }

@@ -39,6 +39,28 @@ class MockSocialLinkStoreTest {
     }
 
     @Test
+    void createRefusesExactlyAsCatapultApiDoes() {
+        assertThat(store.create(request("https://"))).isEqualTo(400);
+        assertThat(store.create(request("https://x.example/a b"))).isEqualTo(400);
+        assertThat(store.create(request("https://x.example/\ta"))).isEqualTo(400);
+        assertThat(store.create(request("https://x.example/\u0000"))).isEqualTo(400);
+        assertThat(store.create(request("https://x.example\n"))).isEqualTo(400);
+        // Its label is measured as given, not stripped first.
+        assertThat(store.create(new SocialLinkRequest(SocialPlatform.X, " " + "l".repeat(64), "https://x.example", true)))
+                .isEqualTo(400);
+        assertThat(store.list()).hasSize(1);
+
+        assertThat(store.create(request("HTTPS://x.example"))).isEqualTo(201);
+        assertThat(store.create(request("Https://y.example"))).isEqualTo(201);
+        assertThat(store.create(new SocialLinkRequest(SocialPlatform.X, " Me ", "https://z.example", true)))
+                .isEqualTo(201);
+        assertThat(store.list()).extracting(SocialLinkDto::url)
+                .containsExactly("https://github.com/enimaloc/catapult", "HTTPS://x.example", "Https://y.example",
+                        "https://z.example");
+        assertThat(store.list().get(3).label()).isEqualTo(" Me ");
+    }
+
+    @Test
     void createStoresABlankLabelAsNull_atTheEnd() {
         assertThat(store.create(request("https://x.example"))).isEqualTo(201);
         assertThat(store.list().get(1)).satisfies(l -> {
