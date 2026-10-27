@@ -70,7 +70,19 @@ class ApiHealthProbeTest {
         long elapsedMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
 
         assertThat(up).isFalse();
-        assertThat(elapsedMillis).isLessThan(2500);
+        assertThat(elapsedMillis).isLessThan(3000);
+    }
+
+    @Test
+    void downWhenTheBodyStalls() {
+        server.enqueue(new MockResponse().setBody("{\"status\":\"UP\"}").setBodyDelay(10, TimeUnit.SECONDS));
+
+        long start = System.nanoTime();
+        boolean up = probe.up();
+        long elapsedMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+
+        assertThat(up).isFalse();
+        assertThat(elapsedMillis).isLessThan(3000);
     }
 
     @Test

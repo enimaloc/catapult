@@ -12,6 +12,10 @@ import java.net.http.HttpResponse;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Whether catapult-api answers its health, asked anonymously with a short timeout and kept a few seconds:
@@ -27,7 +31,7 @@ public class ApiHealthProbe {
     private final HttpClient http;
     private final URI healthUri;
     private final Clock clock;
-    private final Object lock = new Object();
+    private final ReentrantLock lock = new ReentrantLock();
     private volatile boolean up;
     private volatile Instant until = Instant.MIN;
 
@@ -49,20 +53,30 @@ public class ApiHealthProbe {
     /** Whether catapult-api answered its health with a 200 in the last few seconds (probed now when none is fresh). */
     public boolean up() {
         if (clock.instant().isBefore(until)) return up;
-        synchronized (lock) {
+        lock.lock();
+        try {
             // A caller that waited on the probe in flight takes its answer instead of probing again.
             if (clock.instant().isBefore(until)) return up;
             boolean answer = probe();
             up = answer;
             until = clock.instant().plus(TTL);
             return answer;
+        } finally {
+            lock.unlock();
         }
     }
 
     private boolean probe() {
+        CompletableFuture<HttpResponse<Void>> call = null;
         try {
-            HttpRequest request = HttpRequest.newBuilder(healthUri).timeout(TIMEOUT).GET().build();
-            return http.send(request, HttpResponse.BodyHandlers.discarding()).statusCode() == 200;
+            HttpRequest request = HttpRequest.newBuilder(healthUri).GET().build();
+            call = http.sendAsync(request, HttpResponse.BodyHandlers.discarding());
+            // The whole exchange is bounded, the body read included (a request timeout stops at the headers).
+            return call.get(TIMEOUT.toMillis(), TimeUnit.MILLISECONDS).statusCode() == 200;
+        } catch (TimeoutException e) {
+            call.cancel(true);
+            log.debug("catapult-api health probe timed out");
+            return false;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return false;
