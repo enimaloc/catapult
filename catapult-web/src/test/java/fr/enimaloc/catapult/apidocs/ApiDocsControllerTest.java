@@ -24,6 +24,7 @@ import java.util.Locale;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -52,7 +53,6 @@ class ApiDocsControllerTest {
     @Test
     void servesThePage_fullAndAsAFragment_withSwaggerUi() throws Exception {
         when(spec.current()).thenReturn(Optional.of(new ApiDocsSpec.Cached(SPEC, FETCHED_AT, false)));
-        when(probe.up()).thenReturn(true);
 
         mvc.perform(get("/docs/api")).andExpect(view().name("index"));
         mvc.perform(get("/spa/docs/api")).andExpect(view().name("pages/api-docs :: api-docs"));
@@ -62,10 +62,12 @@ class ApiDocsControllerTest {
         for (String html : List.of(full, fragment)) {
             assertThat(html).contains("id=\"swagger-ui\"", "data-spec=\"/docs/api/openapi.json\"",
                             "/_static/swagger-ui/5.34.0/swagger-ui-bundle.js", "/_static/swagger-ui/5.34.0/swagger-ui.css")
-                    .contains("data-state=\"up\"")
+                    .contains("data-state=\"unknown\"", "Checking the API…", "data-label-up=\"API up\"")
                     .doesNotContain("id=\"api-docs-cached\"", "id=\"api-docs-unavailable\"");
         }
         assertThat(full).contains("<title>API documentation - ", "rel=\"canonical\"", "src=\"/js/api-docs.js\"");
+        // The page asks /api/health itself: rendering it never waits on the probe.
+        verifyNoInteractions(probe);
     }
 
     @Test
@@ -78,7 +80,7 @@ class ApiDocsControllerTest {
 
         assertThat(french).contains("id=\"api-docs-cached\"", "en cache, du " + when, "id=\"swagger-ui\"")
                 .contains("data-fetched-at=\"2026-10-27T09:30:00Z\"", "data-label=\"API injoignable : documentation en cache, du {0}.\"")
-                .contains("data-state=\"down\"");
+                .contains("data-state=\"unknown\"", "Vérification de l&#39;API…");
         assertThat(english).contains("id=\"api-docs-cached\"", "cached, from " + when);
     }
 

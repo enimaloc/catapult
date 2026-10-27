@@ -12,7 +12,7 @@ const CSS = "/_static/swagger-ui/5.34.0/swagger-ui.css";
 
 function page({ withUi = true } = {}) {
     html(`
-        <span id="api-docs-status" data-state="up" data-label-up="API up" data-label-down="API down">API up</span>
+        <span id="api-docs-status" data-state="unknown" data-label-up="API up" data-label-down="API down">Checking</span>
         ${withUi ? `<div id="swagger-ui" data-spec="/docs/api/openapi.json" data-bundle="${BUNDLE}" data-css="${CSS}"
                          data-label-failed="Couldn't load"></div>` : ""}`);
 }
@@ -214,6 +214,22 @@ describe("API documentation page", () => {
     });
 
     describe("indicator", () => {
+        it("stays undecided, as the server rendered it, until /api/health answers", async () => {
+            let answer;
+            fetch.mockReturnValue(new Promise(resolve => { answer = resolve; }));
+            page({ withUi: false });
+            await load("api-docs");
+
+            render();
+            await flush();
+            expect(status().dataset.state).toBe("unknown");
+            expect(status().textContent).toBe("Checking");
+
+            answer(response(200, { status: "UP" }));
+            await flush();
+            expect(status().dataset.state).toBe("up");
+        });
+
         it("asks the site's /api/health, never kept", async () => {
             window.SwaggerUIBundle = swaggerStub();
             page();

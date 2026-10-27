@@ -6,9 +6,10 @@
             <span class="eyebrow" th:text="#{api-docs.eyebrow}">api-docs.eyebrow</span>
             <h1 th:text="#{api-docs.title}">api-docs.title</h1>
             <p th:text="#{api-docs.description}">api-docs.description</p>
-            <span id="api-docs-status" class="api-docs-status" role="status" th:attr="data-state=${apiUp} ? 'up' : 'down',
-                  data-label-up=#{api-docs.status.up},data-label-down=#{api-docs.status.down}"
-                  th:text="${apiUp} ? #{api-docs.status.up} : #{api-docs.status.down}">api-docs.status</span>
+            <!--/* Undecided until api-docs.js has asked /api/health: the page never waits on the probe. */-->
+            <span id="api-docs-status" class="api-docs-status" role="status" data-state="unknown"
+                  th:attr="data-label-up=#{api-docs.status.up},data-label-down=#{api-docs.status.down}"
+                  th:text="#{api-docs.status.unknown}">api-docs.status.unknown</span>
         </div>
 
         <p th:if="${apiDocsCachedAt != null}" id="api-docs-cached" class="api-docs-cached" role="note"

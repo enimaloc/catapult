@@ -1,7 +1,6 @@
 package fr.enimaloc.catapult.apidocs;
 
 import fr.enimaloc.catapult.controller.ModelFiller;
-import fr.enimaloc.catapult.service.ApiHealthProbe;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
@@ -21,8 +20,8 @@ import java.util.Optional;
 /**
  * The API documentation, on the site: the page ({@code /docs/api}, and spa.js's fragment of it,
  * {@code /spa/docs/api}) runs Swagger UI on the site's copy of catapult-api's spec ({@code /docs/api/openapi.json},
- * see ApiDocsSpec), and says whether catapult-api answers (ApiHealthProbe, followed in the page from
- * {@code /api/health}). A cached copy is shown with the time it was fetched (worded in the visitor's time zone by
+ * see ApiDocsSpec), and says whether catapult-api answers: rendered undecided, the page asks {@code /api/health}
+ * (ApiHealthProbe) itself, so it never waits on the probe on top of the spec. A cached copy is shown with the time it was fetched (worded in the visitor's time zone by
  * api-docs.js, from the instant in {@code data-fetched-at}); without any copy the page says so,
  * still a 200. catapult-api's own Swagger UI addresses, which the site no longer relays, lead here.
  */
@@ -35,13 +34,11 @@ public class ApiDocsController {
 
     private final ModelFiller filler;
     private final ApiDocsSpec spec;
-    private final ApiHealthProbe probe;
 
     @Autowired
-    public ApiDocsController(ModelFiller filler, ApiDocsSpec spec, ApiHealthProbe probe) {
+    public ApiDocsController(ModelFiller filler, ApiDocsSpec spec) {
         this.filler = filler;
         this.spec = spec;
-        this.probe = probe;
     }
 
     @GetMapping("/docs/api")
@@ -89,6 +86,5 @@ public class ApiDocsController {
         model.addAttribute("apiDocsFetchedAt", older.map(copy -> copy.fetchedAt().toString()).orElse(null));
         model.addAttribute("apiDocsSpecUrl", SPEC_URL);
         model.addAttribute("apiDocsSwaggerUi", SWAGGER_UI);
-        model.addAttribute("apiUp", probe.up());
     }
 }
