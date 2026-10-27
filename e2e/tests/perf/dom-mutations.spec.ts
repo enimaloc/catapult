@@ -29,9 +29,10 @@ const ADMIN = "perf-admin";
 const ACTION_WINDOW_MS = 18_000;
 const EVENTS_WINDOW_MS = 80_000;
 /**
- * custom-binding-crud: how much later the channel's fragment answers. A save re-renders the page itself
- * and its live event (CustomBindingsUpdatedEvent) re-renders it again; delayed, the two always overlap and
- * spa.js always applies only the later one, instead of one or both depending on which comes first.
+ * custom-binding-crud: how much later the channel's fragment answers. A save shows its result from its own
+ * answer and its live event (CustomBindingsUpdatedEvent) then changes nothing: neither fetches the fragment.
+ * Kept so that a re-render coming back (one the save and its event would both make) stays deterministic:
+ * delayed, the two would always overlap and spa.js apply only the later one.
  */
 const FRAGMENT_DELAY_MS = 1000;
 
@@ -342,7 +343,7 @@ test.describe("DOM mutations", () => {
     const saved = () => list.locator(".custom-binding-item[data-custom-binding-id]");
     await expect(saved()).toHaveCount(0);
 
-    // Each step: its save re-renders the page, then its live event does too (FRAGMENT_DELAY_MS)
+    // Each step: its save shows its result in place, then its live event finds it already shown
     const settle = async (seen: number) => {
       await waitForLiveEvent(page, seen);
       await settled(page);
@@ -374,10 +375,12 @@ test.describe("DOM mutations", () => {
     await settle(seen);
     steps.push(await stopCounting(page, ACTION_WINDOW_MS));
 
-    // Delete: open it, delete, confirm
+    // Delete: open it (the edit left it open), delete, confirm
     await startCounting(page);
     seen = await liveEvents(page);
-    await saved().first().locator("[slot=header]").click();
+    if (!(await saved().first().evaluate((row) => row.classList.contains("is-open")))) {
+      await saved().first().locator("[slot=header]").click();
+    }
     await saved().first().locator(".custom-binding-delete").click();
     await posting(page, `/channel/${STREAMER}/custom-bindings/${id}/delete`,
       () => page.locator("#custom-binding-delete-dialog .custom-binding-delete-confirm").click());
