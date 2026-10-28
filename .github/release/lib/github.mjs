@@ -130,6 +130,17 @@ export function createGitHub({ token, owner, repo, fetch = globalThis.fetch }) {
       );
     },
 
+    /** The latest check run of each check on commit `ref`, as {name, status, conclusion}. */
+    async listCheckRuns(ref) {
+      const runs = [];
+      for (let page = 1; ; page++) {
+        const path = `${repoPath}/commits/${encodeURIComponent(ref)}/check-runs?per_page=100&page=${page}`;
+        const result = await request("GET", path);
+        runs.push(...result.check_runs.map(({ name, status, conclusion }) => ({ name, status, conclusion })));
+        if (result.check_runs.length === 0 || runs.length >= result.total_count) return runs;
+      }
+    },
+
     /** GraphQL `mergeStateStatus` (CLEAN, BLOCKED, UNSTABLE, BEHIND, DIRTY, UNKNOWN…). */
     async getMergeState(pull) {
       const data = await graphql(

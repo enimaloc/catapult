@@ -59,6 +59,18 @@ function nextPatch(tags) {
   return `v${last.major}.${last.minor}.${last.patch + 1}`;
 }
 
+// The checks a release must pass before the App merges it itself: the App may bypass the ruleset,
+// so a CLEAN merge state alone does not prove they ran. A promotion's commitlint job is skipped.
+const REQUIRED_CHECKS = { build: ["success"], test: ["success"], commitlint: ["success", "skipped"] };
+
+/** Whether every required check has run on the commit, each of its runs with an accepted conclusion. */
+export function requiredChecksPassed(runs) {
+  return Object.entries(REQUIRED_CHECKS).every(([name, accepted]) => {
+    const own = runs.filter((r) => r.name === name);
+    return own.length > 0 && own.every((r) => r.status === "completed" && accepted.includes(r.conclusion));
+  });
+}
+
 const short = (sha) => sha.slice(0, 7);
 const AGAIN = "sors-la à nouveau du draft";
 
@@ -178,9 +190,10 @@ async function prepare({ gh, pr, pull, kind, owner, repo, appSlug, promote }) {
     return "auto-merge";
   }
 
-  // Auto-merge cannot be enabled on a PR that is already mergeable: merge it right away.
+  // Auto-merge cannot be enabled on a PR that is already mergeable: merge it right away, once the
+  // required checks are verified green on that very head (otherwise auto-merge waits for them).
   const pinned = { expectedHeadOid: pr.headSha, commitHeadline: title };
-  if ((await gh.getMergeState(pull)) === "CLEAN") {
+  if ((await gh.getMergeState(pull)) === "CLEAN" && requiredChecksPassed(await gh.listCheckRuns(pr.headSha))) {
     await gh.mergePull(pull, pinned);
     console.log(`#${pull.number}: merged ${short(pr.headSha)} for ${version}`);
     return "merged";

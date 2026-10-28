@@ -41,6 +41,11 @@ function fakeGitHub({
   tags = ["v0.0.0", "v1.0.0-BETA.96"],
   ahead = [commit("a", "fix(web): one")], // commits of compare(base, head)
   mergeState = "BLOCKED",
+  checks = [
+    { name: "build", status: "completed", conclusion: "success" },
+    { name: "test", status: "completed", conclusion: "success" },
+    { name: "commitlint", status: "completed", conclusion: "skipped" },
+  ],
   moved = false, // the branch moved before the bump ref update
   later = {}, // fields of the pull on the second getPull
   failOn = null,
@@ -85,6 +90,10 @@ function fakeGitHub({
     async commitFile(file) {
       record("commitFile", file);
       return moved ? null : sha("b");
+    },
+    async listCheckRuns(ref) {
+      record("listCheckRuns", ref);
+      return checks;
     },
     async getMergeState(p) {
       record("getMergeState", p.number);
@@ -163,6 +172,32 @@ test("alreadyBumped_cleanPr_isMergedRightAway", async () => {
     ["mergePull", 7, { expectedHeadOid: sha("a"), commitHeadline: "chore(release): v1.0.0-BETA.97" }],
   ]);
   assert.deepEqual(named(gh, "enableAutoMerge"), []);
+});
+
+test("cleanPr_withAFailedOrPendingRequiredCheck_getsAutoMergeInstead", async () => {
+  const ok = (name, conclusion = "success") => ({ name, status: "completed", conclusion });
+  for (const checks of [
+    [ok("build"), ok("commitlint")], // test missing
+    [ok("build"), ok("test", "failure"), ok("commitlint")],
+    [ok("build"), { name: "test", status: "in_progress", conclusion: null }, ok("commitlint")],
+    [ok("build", "skipped"), ok("test"), ok("commitlint")], // only commitlint may be skipped
+    [ok("build"), ok("test"), ok("test", "failure"), ok("commitlint")], // every run of a name counts
+    [ok("build"), ok("test"), ok("commitlint", "cancelled")],
+  ]) {
+    const gh = fakeGitHub({ gradle: BUMPED, mergeState: "CLEAN", checks });
+    assert.equal(await run(gh), "auto-merge", JSON.stringify(checks));
+    assert.deepEqual(named(gh, "listCheckRuns"), [["listCheckRuns", sha("a")]]);
+    assert.deepEqual(named(gh, "mergePull"), []);
+    assert.deepEqual(named(gh, "enableAutoMerge"), [
+      ["enableAutoMerge", 7, { expectedHeadOid: sha("a"), commitHeadline: "chore(release): v1.0.0-BETA.97" }],
+    ]);
+  }
+});
+
+test("cleanPr_withCommitlintPassed_isMergedRightAway", async () => {
+  const ok = (name) => ({ name, status: "completed", conclusion: "success" });
+  const gh = fakeGitHub({ gradle: BUMPED, mergeState: "CLEAN", checks: [ok("build"), ok("test"), ok("commitlint"), ok("x")] });
+  assert.equal(await run(gh), "merged");
 });
 
 test("ownerReady_enablesAutoMerge_withHeadSha", async () => {

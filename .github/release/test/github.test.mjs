@@ -173,3 +173,17 @@ test("getBranch_missing_isNull_andFound_givesItsSha", async () => {
   assert.equal(await client(fetch).getBranch("v/v2"), null);
   assert.equal(await client(fetch).getBranch("v/v1"), sha("b"));
 });
+
+test("listCheckRuns_givesNameStatusAndConclusion_acrossPages", async () => {
+  const run = (i) => ({ id: i, name: `check-${i}`, status: "completed", conclusion: "success", extra: true });
+  const path = `GET ${REPO}/commits/${sha("a")}/check-runs`;
+  const { fetch, requests } = fakeFetch({
+    [`${path}?per_page=100&page=1`]: { total_count: 101, check_runs: Array.from({ length: 100 }, (_, i) => run(i)) },
+    [`${path}?per_page=100&page=2`]: { total_count: 101, check_runs: [{ ...run(100), status: "in_progress", conclusion: null }] },
+  });
+  const runs = await client(fetch).listCheckRuns(sha("a"));
+  assert.equal(runs.length, 101);
+  assert.deepEqual(runs[0], { name: "check-0", status: "completed", conclusion: "success" });
+  assert.deepEqual(runs[100], { name: "check-100", status: "in_progress", conclusion: null });
+  assert.equal(requests.length, 2);
+});

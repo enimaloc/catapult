@@ -5,7 +5,8 @@ on:
   push:
 
 jobs:
-  test:
+  # Not `test`: ready.mjs requires the check named `test` (Tests workflow) before merging a release.
+  release-scripts:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
