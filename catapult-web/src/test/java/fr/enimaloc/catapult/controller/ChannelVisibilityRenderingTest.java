@@ -85,7 +85,7 @@ class ChannelVisibilityRenderingTest {
                 "enimaloc", true, true, true, null,
                 new PagedBindings(0, 1, 2, List.of(overridden, notOverridden)),
                 List.of(), Set.of(), List.of(), Set.of(),
-                null, null, null, null, null, null, null, "uuid", null);
+                null, null, null, null, null, null, null, null);
         when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(data);
 
         String html = mvc.perform(get("/spa/channel/enimaloc"))
@@ -113,7 +113,7 @@ class ChannelVisibilityRenderingTest {
                 "enimaloc", false, true, true, null,
                 new PagedBindings(0, 1, 1, List.of(binding)),
                 List.of(), Set.of(), List.of(), Set.of(),
-                null, null, null, null, null, null, null, "uuid", null);
+                null, null, null, null, null, null, null, null);
         when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(data);
 
         String html = mvc.perform(get("/spa/channel/enimaloc"))
@@ -150,7 +150,7 @@ class ChannelVisibilityRenderingTest {
                 "enimaloc", false, true, true, null,
                 new PagedBindings(0, 1, 0, List.of()),
                 List.of(), Set.of(), List.of(), Set.of(),
-                null, null, null, null, null, null, null, "uuid", null));
+                null, null, null, null, null, null, null, null));
 
         String moderator = mvc.perform(get("/spa/channel/enimaloc")).andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
@@ -198,7 +198,7 @@ class ChannelVisibilityRenderingTest {
                 "enimaloc", false, true, true, null,
                 new PagedBindings(0, 1, 1, List.of(binding)),
                 List.of(), Set.of(), List.of(), Set.of(),
-                null, null, null, null, null, null, null, "uuid", null));
+                null, null, null, null, null, null, null, null));
 
         String moderator = mvc.perform(get("/spa/channel/enimaloc")).andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
@@ -224,7 +224,7 @@ class ChannelVisibilityRenderingTest {
                 "enimaloc", false, true, true, null,
                 new PagedBindings(0, 1, 1, List.of(binding)),
                 List.of(), Set.of(), List.of(), Set.of(),
-                null, null, null, null, null, null, null, "uuid", null));
+                null, null, null, null, null, null, null, null));
 
         String moderator = mvc.perform(get("/spa/channel/enimaloc")).andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
@@ -263,7 +263,7 @@ class ChannelVisibilityRenderingTest {
                 new ChannelUserDto("id-1", "twitch-1", "enimaloc", "https://example.test/avatar.png"),
                 "enimaloc", true, true, true, null, new PagedBindings(0, 1, 0, List.of()),
                 List.of(), Set.of(), List.of(), Set.of(), null, null, null, null, null,
-                new ObsData(true, "localhost", 4455, true), null, "uuid", null);
+                new ObsData(true, "localhost", 4455, true), null, null);
         when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(withObs);
 
         String owner = mvc.perform(get("/spa/channel/enimaloc")).andExpect(status().isOk())
@@ -367,7 +367,7 @@ class ChannelVisibilityRenderingTest {
                 "enimaloc", true, true, true, null,
                 new PagedBindings(0, 1, 2, List.of(mapped, auto)),
                 List.of(), Set.of(), List.of(), Set.of(),
-                null, null, null, null, null, null, null, "uuid", null);
+                null, null, null, null, null, null, null, null);
         when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(data);
 
         String html = mvc.perform(get("/spa/channel/enimaloc"))
@@ -392,7 +392,7 @@ class ChannelVisibilityRenderingTest {
                 "enimaloc", true, isLive, true, null,
                 new PagedBindings(0, 1, 0, List.of()),
                 List.of(), Set.of(), List.of(), Set.of(),
-                null, null, null, null, minecraft, null, null, "uuid", null);
+                null, null, null, null, minecraft, null, null, null);
     }
 
     /** Extracts the opening tag text for the first element with the given id. */
@@ -437,7 +437,7 @@ class ChannelVisibilityRenderingTest {
                 "enimaloc", true, true, true, currentGame,
                 new PagedBindings(0, 1, 0, List.of()),
                 List.of(), Set.of(), List.of(), Set.of(),
-                null, null, null, null, null, null, null, "uuid", null);
+                null, null, null, null, null, null, null, null);
     }
 
     @Test
@@ -553,7 +553,7 @@ class ChannelVisibilityRenderingTest {
                 new MinecraftData("ACCEPTED", "Steve123", null),
                 new ObsData(true, "localhost", 4455, true),
                 TwitchatData.of("beta"),
-                "uuid", null);
+                null);
         when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(data);
         when(apiService.twitchatEvents("enimaloc")).thenReturn(Map.of("STREAM_STARTED",
                 List.of(new TwitchatEventActionDto("SEND_MESSAGE", "FORM", "{\"message\":\"Live\"}", true))));

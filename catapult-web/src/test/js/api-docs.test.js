@@ -1,9 +1,7 @@
 /*
  * api-docs.js: the API documentation page (/docs/api). Swagger UI is started on the site's copy of the spec, its
- * bundle loaded on the first render that shows the page; catapult-api's generic widget-token example is swapped for
- * the visitor's own; the indicator tells whether catapult-api answers.
+ * bundle loaded on the first render that shows the page; the indicator tells whether catapult-api answers.
  */
-import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { flush, html, load, render, response } from "./helpers.js";
 
@@ -113,79 +111,6 @@ describe("API documentation page", () => {
         page();
         render();
         expect(document.head.querySelectorAll(`script[src="${BUNDLE}"]`)).toHaveLength(2);
-    });
-
-    describe("widget token example", () => {
-        const EXAMPLE = "00000000-0000-0000-0001-000000000190";
-
-        it("is catapult-api's own generic example", () => {
-            // Vitest runs in catapult-web, as Gradle's jsTest does.
-            const snapshot = readFileSync("../catapult-api/src/test/resources/frozen-routes/api-docs.json", "utf8");
-            expect(JSON.parse(snapshot).body).toContain(`"example":"${EXAMPLE}"`);
-        });
-
-        async function withInput(value) {
-            window.SwaggerUIBundle = swaggerStub();
-            page();
-            await load("api-docs");
-            render();
-            await flush();
-            const input = document.createElement("input");
-            input.value = value;
-            const events = [];
-            input.addEventListener("input", () => events.push("input"));
-            input.addEventListener("change", () => events.push("change"));
-            ui().append(input);
-            await flush();
-            return { input, events };
-        }
-
-        it("is replaced by the visitor's own token once Try it out shows it", async () => {
-            localStorage.setItem("catapult_widget_uuid", "my-own-token");
-
-            const { input, events } = await withInput(EXAMPLE);
-
-            expect(input.value).toBe("my-own-token");
-            expect(events).toEqual(["input", "change"]);
-        });
-
-        it("stops watching once the page is left for another", async () => {
-            localStorage.setItem("catapult_widget_uuid", "my-own-token");
-            const disconnect = vi.spyOn(MutationObserver.prototype, "disconnect");
-            await withInput("typed by the visitor");
-            render();
-            expect(disconnect).not.toHaveBeenCalled();
-
-            html("<p>elsewhere</p>");
-            render();
-
-            expect(disconnect).toHaveBeenCalledTimes(1);
-        });
-
-        it("leaves any other value alone", async () => {
-            localStorage.setItem("catapult_widget_uuid", "my-own-token");
-
-            const { input, events } = await withInput("typed by the visitor");
-
-            expect(input.value).toBe("typed by the visitor");
-            expect(events).toEqual([]);
-        });
-
-        it("stays when the visitor has no token", async () => {
-            const { input } = await withInput(EXAMPLE);
-
-            expect(input.value).toBe(EXAMPLE);
-        });
-
-        it("stays when the storage can't be read", async () => {
-            vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
-                throw new Error("denied");
-            });
-
-            const { input } = await withInput(EXAMPLE);
-
-            expect(input.value).toBe(EXAMPLE);
-        });
     });
 
     describe("cached copy banner", () => {

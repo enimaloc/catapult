@@ -8,18 +8,8 @@
  * itself (the spec's servers are "/"), which relays the documented paths to catapult-api.
  */
 window.CatapultApiDocs = (function () {
-    /**
-     * catapult-api's generic example of a widget token (ApiV2.GENERIC_UUID_EXAMPLE), which "Try it out" pre-fills:
-     * replaced by the visitor's own, which the dashboard keeps in localStorage, as catapult-api's own Swagger UI
-     * does (SwaggerUiJwtTransformer). Entirely in the browser: no token of any kind goes to the server for it.
-     */
-    const GENERIC_UUID_EXAMPLE = "00000000-0000-0000-0001-000000000190";
-    const WIDGET_UUID_KEY = "catapult_widget_uuid";
-
     /** The bundle's loading, shared by every render until it is there; dropped when it fails, to try again. */
     let loading = null;
-    /** The watch on the #swagger-ui shown, disconnected once spa.js has replaced it (the page was left). */
-    let watching = null;
 
     function bundle(root) {
         if (window.SwaggerUIBundle) return Promise.resolve(window.SwaggerUIBundle);
@@ -42,41 +32,6 @@ window.CatapultApiDocs = (function () {
             });
         }
         return loading;
-    }
-
-    function widgetUuid() {
-        try {
-            return window.localStorage.getItem(WIDGET_UUID_KEY);
-        } catch {
-            return null;
-        }
-    }
-
-    /**
-     * Swagger UI only creates a parameter's <input> once "Try it out" is clicked, pre-filled with the example: it is
-     * watched for. The input is React-controlled: its value goes through the native setter, then an "input" event,
-     * for React to take the change (assigning el.value would only change what the field shows).
-     */
-    function swapUuidExample(root) {
-        const uuid = widgetUuid();
-        if (!uuid) return;
-        const setValue = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-        const observer = new MutationObserver(() => {
-            root.querySelectorAll("input").forEach(input => {
-                if (input.value !== GENERIC_UUID_EXAMPLE) return;
-                setValue.call(input, uuid);
-                input.dispatchEvent(new Event("input", { bubbles: true }));
-                input.dispatchEvent(new Event("change", { bubbles: true }));
-            });
-        });
-        observer.observe(root, { childList: true, subtree: true });
-        watching = { root, observer };
-    }
-
-    function stopWatchingLeftPage() {
-        if (!watching || watching.root.isConnected) return;
-        watching.observer.disconnect();
-        watching = null;
     }
 
     function showStatus(el, up) {
@@ -103,7 +58,6 @@ window.CatapultApiDocs = (function () {
     }
 
     async function start() {
-        stopWatchingLeftPage();
         const cached = document.getElementById("api-docs-cached");
         if (cached) showFetchedAt(cached);
         const status = document.getElementById("api-docs-status");
@@ -111,7 +65,6 @@ window.CatapultApiDocs = (function () {
         const root = document.getElementById("swagger-ui");
         if (!root || root.dataset.started) return;
         root.dataset.started = "true";
-        swapUuidExample(root);
         try {
             const SwaggerUIBundle = await bundle(root);
             SwaggerUIBundle({

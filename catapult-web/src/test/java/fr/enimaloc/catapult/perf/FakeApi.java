@@ -275,7 +275,6 @@ public final class FakeApi extends Dispatcher {
                 new MinecraftData("ACCEPTED", "BudgetCrafter", "catapult-bot"),
                 new ObsData(true, "localhost", 4455, true),
                 TwitchatData.of("stable"),
-                id("example", 0).toString(),
                 new CustomBindingsStateDto(true, list(i -> new CustomBindingDto(id("custom", i), "Budget binding " + i,
                         "50" + i, "Budget category " + i, List.of("budget-ccl-0"), List.of("budget-tw-0"), i == 0)),
                         id("custom", 0), AT));

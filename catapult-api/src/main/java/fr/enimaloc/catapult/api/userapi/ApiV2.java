@@ -29,11 +29,8 @@ public final class ApiV2 {
     static final String ME_GAME_PATH = "/api/me/game";
     static final String ME_CUSTOM_BINDINGS_PATH = "/api/me/custom-bindings";
 
-    // Baked-in Swagger example for "uuid" path parameters — every uuid endpoint's spec carries
-    // this literal value so SwaggerUiJwtTransformer's client-side script has something fixed to
-    // find and replace with the caller's own widget token (see its class javadoc for why). Public:
-    // also the final fallback in ApiChannelDataController#resolveExampleUuid, for a user with no
-    // encodable binding on record — the same generic demo everyone unpersonalized would see.
+    // The widget token of the dev backdoor (DevBackdoorResolver) that names no real game, and the
+    // example the legacy routes' "uuid" path parameter documents. Public: LegacyRoutesGate reads it too.
     public static final String GENERIC_UUID_EXAMPLE = "00000000-0000-0000-0001-000000000190";
 
     private ApiV2() {}

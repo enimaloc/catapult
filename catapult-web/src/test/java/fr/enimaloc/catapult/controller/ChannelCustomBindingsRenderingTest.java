@@ -73,7 +73,7 @@ class ChannelCustomBindingsRenderingTest {
                 "enimaloc", owner, true, true, null,
                 new PagedBindings(0, 1, 0, List.of()),
                 List.of(), Set.of(), List.of(), Set.of(),
-                null, null, null, null, null, null, null, "uuid", bindings));
+                null, null, null, null, null, null, null, bindings));
         return mvc.perform(get("/spa/channel/enimaloc").locale(Locale.ENGLISH))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
     }
@@ -244,7 +244,7 @@ class ChannelCustomBindingsRenderingTest {
         when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(new ChannelPageData(
                 new ChannelUserDto("id-1", "twitch-1", "enimaloc", "https://example.test/avatar.png"),
                 "enimaloc", true, true, true, null, new PagedBindings(0, 1, 0, List.of()),
-                List.of(), Set.of(), List.of(), Set.of(), null, null, null, null, null, null, null, "uuid", state()));
+                List.of(), Set.of(), List.of(), Set.of(), null, null, null, null, null, null, null, state()));
         String html = mvc.perform(get("/spa/channel/enimaloc").locale(Locale.FRENCH))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
 
