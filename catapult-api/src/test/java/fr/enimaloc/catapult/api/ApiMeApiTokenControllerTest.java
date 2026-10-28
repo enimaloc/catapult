@@ -25,6 +25,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -106,5 +107,33 @@ class ApiMeApiTokenControllerTest {
         mvc.perform(delete(OWN + "/api-token").with(me()).with(csrf())).andExpect(status().isNoContent());
         verify(tokens, never()).regenerate(any(), any());
         verify(tokens).revoke(user, ApiTokenScope.FULL);
+    }
+
+    @Test
+    void readToken_isOfferedOutsideTheCustomBindingsExperiment() throws Exception {
+        when(customBindings.enabled(user)).thenReturn(false);
+        when(tokens.status(user, ApiTokenScope.READ)).thenReturn(new ApiTokenStatusDto(true, Instant.EPOCH));
+        when(tokens.regenerate(user, ApiTokenScope.READ)).thenReturn(new ApiTokenCreatedDto("catr_abc", Instant.EPOCH));
+
+        mvc.perform(get(OWN + "/api-token/read").with(me()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.exists").value(true))
+                .andExpect(jsonPath("$.token").doesNotExist());
+        mvc.perform(post(OWN + "/api-token/read").with(me()).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.token").value("catr_abc"));
+        mvc.perform(post(OWN + "/api-token/read/delete").with(me()).with(csrf()))
+                .andExpect(status().isNoContent());
+        verify(tokens).revoke(user, ApiTokenScope.READ);
+    }
+
+    @Test
+    void fullToken_stillRequiresTheExperiment() throws Exception {
+        when(customBindings.enabled(user)).thenReturn(false);
+
+        mvc.perform(post(OWN + "/api-token").with(me()).with(csrf()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("feature_disabled"));
+        verify(tokens, never()).regenerate(any(), eq(ApiTokenScope.FULL));
     }
 }

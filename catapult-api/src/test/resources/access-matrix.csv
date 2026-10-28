@@ -80,6 +80,9 @@ POST,/api/internal/users/{userId}/invite/regenerate,userId=self,,401,401,PASS,PA
 GET,/api/internal/users/{userId}/api-token,userId=self,,401,401,GATED,GATED,PASS,GATED,401
 POST,/api/internal/users/{userId}/api-token,userId=self,,401,401,GATED,GATED,PASS,GATED,401
 DELETE,/api/internal/users/{userId}/api-token,userId=self,,401,401,PASS,PASS,PASS,PASS,401
+GET,/api/internal/users/{userId}/api-token/read,userId=self,,401,401,PASS,PASS,PASS,PASS,401
+POST,/api/internal/users/{userId}/api-token/read,userId=self,,401,401,PASS,PASS,PASS,PASS,401
+POST,/api/internal/users/{userId}/api-token/read/delete,userId=self,,401,401,PASS,PASS,PASS,PASS,401
 GET,/api/internal/users/{userId}/debug,userId=self,,401,401,PASS,PASS,PASS,PASS,401
 GET,/api/internal/users/{userId}/notification-channels,userId=self,,401,401,PASS,PASS,PASS,PASS,401
 PUT,/api/internal/users/{userId}/notification-channels,userId=self,,401,401,PASS,PASS,PASS,PASS,401
@@ -116,6 +119,9 @@ GET,/api/internal/users/{userId}/bindings/{bindingId}/tws/suggestions,unmapped,,
 PUT,/api/internal/users/{userId}/bindings/{bindingId}/tws,unmapped,,401,401,403,403,PASS,403,401
 GET,/api/internal/users/{userId}/api-token,unmapped,,401,401,403,403,PASS,403,401
 DELETE,/api/internal/users/{userId}/api-token,unmapped,,401,401,403,403,PASS,403,401
+GET,/api/internal/users/{userId}/api-token/read,unmapped,,401,401,403,403,PASS,403,401
+POST,/api/internal/users/{userId}/api-token/read,unmapped,,401,401,403,403,PASS,403,401
+POST,/api/internal/users/{userId}/api-token/read/delete,unmapped,,401,401,403,403,PASS,403,401
 GET,/api/internal/users/{userId}/channels,unmapped,,401,401,403,403,PASS,403,401
 GET,/api/internal/users/{userId}/debug,unmapped,,401,401,403,403,PASS,403,401
 GET,/api/internal/users/{userId}/chat-commands/enabled,unmapped,,401,401,403,403,PASS,403,401
