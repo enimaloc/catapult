@@ -12,6 +12,7 @@ import { kindOf, titleVersion } from "./ready.mjs";
 import { promote as promoteImpl } from "./promote.mjs";
 
 const short = (sha) => sha.slice(0, 7);
+const pattern = (kind) => (kind === "beta" ? "vX.Y.Z-BETA.N" : "vX.Y.Z");
 
 /** Annotated tag on the merge commit; an existing tag must already point there. */
 async function ensureTag(gh, tag, sha, message) {
@@ -109,12 +110,16 @@ export async function publish({ gh, pr, owner, repo, appSlug, promote = promoteI
     return await release(gh, pr, kind, refreshStable);
   } catch (error) {
     const version = titleVersion(pr.title, kind);
-    if (pr.merged && version !== null) {
+    if (pr.merged) {
       try {
         await gh.comment(
           pr.number,
-          `La publication de \`${version}\` a échoué après la fusion.\n\n\`\`\`\n${error.message}\n\`\`\`\n\n` +
-            "Corrige le problème puis relance le workflow « Publish ».",
+          version === null
+            ? `La PR a été fusionnée sans version dans son titre (\`chore(release): ${pattern(kind)}\`) : ` +
+                `aucun tag n'a été créé et rien n'est publié. Pour publier, crée à la main le tag annoté ` +
+                `\`${pattern(kind)}\` sur le commit de merge : son push lance la publication.`
+            : `La publication de \`${version}\` a échoué après la fusion.\n\n\`\`\`\n${error.message}\n\`\`\`\n\n` +
+                "Corrige le problème puis relance le workflow « Publish ».",
         );
       } catch (reportError) {
         console.error(`#${pr.number}: could not report the failure: ${reportError.message}`);

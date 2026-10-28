@@ -225,3 +225,12 @@ test("refreshFailure_afterTheBetaTag_isOnlyLogged", async () => {
   assert.deepEqual(await run(gh, mergedPull(), failing), { tag: "v1.0.0-BETA.97", backports: [] });
   assert.deepEqual(named(gh, "comment"), []);
 });
+
+test("mergedHotfixWithoutVersion_isReportedOnThePr", async () => {
+  const gh = fakeGitHub();
+  await assert.rejects(run(gh, hotfix({ title: "fix: login" })), /title/);
+  assert.deepEqual(named(gh, "createTag"), []);
+  const [[, number, text]] = named(gh, "comment");
+  assert.equal(number, 7);
+  assert.match(text, /`chore\(release\): vX\.Y\.Z`[\s\S]*aucun tag[\s\S]*tag annoté `vX\.Y\.Z`/);
+});
