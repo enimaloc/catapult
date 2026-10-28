@@ -49,7 +49,7 @@ public class GamesController {
     public IgdbDetailResponse igdbDetail(
             @Parameter(description = "IGDB game id.", in = ParameterIn.PATH, example = "1234")
             @PathVariable String igdbId) {
-        return found(gameInfoAssembler.igdb(igdbId), "Unknown IGDB game");
+        return found(gameInfoAssembler.igdb(igdbId, GameInfoAssembler.LinkStyle.CURRENT), "Unknown IGDB game");
     }
 
     @Operation(summary = "Get full Steam store detail for an app", description = "Public lookup "
@@ -76,7 +76,8 @@ public class GamesController {
             @Parameter(description = ACCEPT_LANGUAGE_DESCRIPTION, in = ParameterIn.HEADER,
                     example = "fr-FR,fr;q=0.9")
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
-        return found(gameInfoAssembler.steam(appId, RequestLocale.parse(lang, acceptLanguage)),
+        return found(gameInfoAssembler.steam(appId, RequestLocale.parse(lang, acceptLanguage),
+                        GameInfoAssembler.LinkStyle.CURRENT),
                 "Unknown Steam app");
     }
 

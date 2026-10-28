@@ -13,13 +13,14 @@ import org.junit.jupiter.api.Test;
 class IgdbDetailResponseTest {
 
     private static final String BASE = "https://b";
+    private static final MoreLinks LINKS = new MoreLinks(BASE, GameInfoAssembler.LinkStyle.LEGACY);
 
     private static Map<String, Object> websitesOf(String... keyValues) {
         Map<String, Object> websites = new LinkedHashMap<>();
         for (int i = 0; i < keyValues.length; i += 2) {
             websites.put(keyValues[i], keyValues[i + 1]);
         }
-        return new IgdbDetailResponse(BASE, "s", null, null, null, List.of(), null, null, null, null, null,
+        return new IgdbDetailResponse(LINKS, "s", null, null, null, List.of(), null, null, null, null, null,
                 websites, List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(),
                 null, List.of(), List.of()).websites();
     }
@@ -59,6 +60,6 @@ class IgdbDetailResponseTest {
 
     @Test
     void steamWebsiteWithoutAnAppIdSerializesNoPath() {
-        assertNull(new IgdbDetailResponse.WebsiteLink("u", BASE, null).more());
+        assertNull(new IgdbDetailResponse.WebsiteLink("u", LINKS, null, null).more());
     }
 }

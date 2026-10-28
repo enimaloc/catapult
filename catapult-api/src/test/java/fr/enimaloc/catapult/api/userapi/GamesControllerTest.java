@@ -23,6 +23,7 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 
+import static fr.enimaloc.catapult.api.userapi.GameInfoAssembler.LinkStyle.CURRENT;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -59,7 +60,7 @@ class GamesControllerTest {
 
     @Test
     void games_steam_isPublic() throws Exception {
-        when(games.steam(eq("400"), any(Locale.class))).thenReturn(Optional.of(
+        when(games.steam(eq("400"), any(Locale.class), eq(CURRENT))).thenReturn(Optional.of(
                 new SteamDetailResponse("https://store.steampowered.com/app/400", Set.of(), null, null, null)));
 
         mvc.perform(remote(get("/api/games/steam/400")))
@@ -71,13 +72,13 @@ class GamesControllerTest {
     void games_steam_lang_winsOverAcceptLanguage() throws Exception {
         mvc.perform(remote(get("/api/games/steam/400")).param("lang", "fr").header("Accept-Language", "de"));
 
-        verify(games).steam("400", Locale.FRENCH);
+        verify(games).steam("400", Locale.FRENCH, CURRENT);
     }
 
     @Test
     void games_unknown_is404Problem() throws Exception {
-        when(games.igdb(anyString())).thenReturn(Optional.empty());
-        when(games.steam(anyString(), any())).thenReturn(Optional.empty());
+        when(games.igdb(anyString(), any())).thenReturn(Optional.empty());
+        when(games.steam(anyString(), any(), any())).thenReturn(Optional.empty());
         when(games.xbox(anyString(), any())).thenReturn(Optional.empty());
         when(games.dtdd(anyLong())).thenReturn(Optional.empty());
 
@@ -100,12 +101,12 @@ class GamesControllerTest {
 
     @Test
     void games_version2_isServed() throws Exception {
-        when(games.igdb("1234")).thenReturn(Optional.empty());
+        when(games.igdb("1234", CURRENT)).thenReturn(Optional.empty());
 
         mvc.perform(remote(get("/api/games/igdb/1234")).header(ApiV2.VERSION_HEADER, ApiV2.VERSION))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("not_found"));
-        verify(games).igdb("1234");
+        verify(games).igdb("1234", CURRENT);
     }
 
     @TestConfiguration

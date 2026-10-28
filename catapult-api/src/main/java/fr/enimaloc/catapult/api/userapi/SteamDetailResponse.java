@@ -14,14 +14,14 @@ import java.util.Set;
 
 public record SteamDetailResponse(String storeUrl, Set<String> ccls, GameInfoResponse.IaDisclosure ia,
                                   ParentApp parentApp, Page page) {
-    public record ParentApp(@JsonIgnore String baseUrl, @JsonUnwrapped SteamStoreService.ResolvedParentApp parentApp) {
+    public record ParentApp(@JsonIgnore MoreLinks links, @JsonUnwrapped SteamStoreService.ResolvedParentApp parentApp) {
         @JsonGetter
         public String more() {
-            return baseUrl + ApiV2.PATH + "/steam/" + parentApp.appId();
+            return links.to(MoreLinks.Kind.STEAM, parentApp.appId());
         }
     }
 
-    public record Page(@JsonIgnore String baseUrl, @JsonIgnore Locale locale,
+    public record Page(@JsonIgnore MoreLinks links, @JsonIgnore Locale locale,
                       @JsonUnwrapped @JsonIgnoreProperties({"fullgame", "dlc", "releaseDate"}) SteamStoreService.SteamStorePage page) {
         // Written, never read: no creator, so Jackson 3.1 keeps the alphabetical order the v2 steam
         // answer always had (demo, dlc, fullgame, the page, releaseDate) instead of putting the
@@ -44,37 +44,37 @@ public record SteamDetailResponse(String storeUrl, Set<String> ccls, GameInfoRes
         @JsonGetter("demo")
         public Demo[] demo0() {
             return page().demos() == null ? null : Arrays.stream(page.demos())
-                    .map(d -> new Demo(baseUrl, d)).toArray(Demo[]::new);
+                    .map(d -> new Demo(links, d)).toArray(Demo[]::new);
         }
 
         @JsonGetter("fullgame")
         public FullGame fullGame0() {
-            return page().fullgame() == null ? null : new FullGame(baseUrl, page().fullgame());
+            return page().fullgame() == null ? null : new FullGame(links, page().fullgame());
         }
 
         @JsonGetter("dlc")
         public Dlc[] dlc0() {
             return page.dlc() == null ? null : Arrays.stream(page().dlc())
-                    .mapToObj(d -> new Dlc(baseUrl, d)).toArray(Dlc[]::new);
+                    .mapToObj(d -> new Dlc(links, d)).toArray(Dlc[]::new);
         }
 
-        public record Demo(@JsonIgnore String baseUrl, @JsonUnwrapped SteamStoreService.SteamStorePage.Demo demo) {
+        public record Demo(@JsonIgnore MoreLinks links, @JsonUnwrapped SteamStoreService.SteamStorePage.Demo demo) {
             @JsonGetter
             public String more() {
-                return baseUrl + ApiV2.PATH + "/steam/" + demo.appid();
+                return links.to(MoreLinks.Kind.STEAM, demo.appid());
             }
         }
 
-        public record FullGame(@JsonIgnore String baseUrl, @JsonUnwrapped SteamStoreService.SteamStorePage.FullGame fullGame) {
+        public record FullGame(@JsonIgnore MoreLinks links, @JsonUnwrapped SteamStoreService.SteamStorePage.FullGame fullGame) {
             @JsonGetter
             public String more() {
-                return fullGame.appid() == null ? null : baseUrl + ApiV2.PATH + "/steam/" + fullGame.appid();
+                return fullGame.appid() == null ? null : links.to(MoreLinks.Kind.STEAM, fullGame.appid());
             }
         }
 
         public record Dlc(int appId, String more) {
-            public Dlc(String baseUrl, int appId) {
-                this(appId, baseUrl + ApiV2.PATH + "/steam/" + appId);
+            public Dlc(MoreLinks links, int appId) {
+                this(appId, links.to(MoreLinks.Kind.STEAM, appId));
             }
         }
     }

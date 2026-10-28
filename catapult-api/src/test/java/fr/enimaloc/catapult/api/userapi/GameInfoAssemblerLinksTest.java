@@ -13,9 +13,13 @@ import fr.enimaloc.catapult.service.steam.SteamStoreService;
 import fr.enimaloc.catapult.service.tw.TwLabelService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import com.jayway.jsonpath.JsonPath;
 import org.springframework.context.MessageSource;
+import tools.jackson.databind.json.JsonMapper;
 
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -24,6 +28,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static fr.enimaloc.catapult.api.userapi.GameInfoAssembler.LinkStyle.CURRENT;
+import static fr.enimaloc.catapult.api.userapi.GameInfoAssembler.LinkStyle.LEGACY;
 
 class GameInfoAssemblerLinksTest {
 
@@ -101,5 +107,71 @@ class GameInfoAssemblerLinksTest {
 
         assertThat(assembler.catapult(binding.getId(), other, Locale.ENGLISH)).isEmpty();
         assertThat(assembler.catapult(binding.getId(), user, Locale.ENGLISH)).isPresent();
+    }
+
+    private static final JsonMapper JSON = JsonMapper.builder().build();
+
+    /** Every "more" link of {@code answer} once serialized as its route would. */
+    private static List<String> moreLinks(Object answer) {
+        return JsonPath.read(JSON.writeValueAsString(answer), "$..more");
+    }
+
+    private void igdbGameWithRelatedLinks() {
+        IgdbGameDetails details = new IgdbGameDetails();
+        details.setIgdbId("42");
+        details.setSlug("valheim");
+        details.setDlcIds(List.of("7"));
+        details.setDlcNames(List.of("DLC"));
+        details.setSimilarGameIds(List.of("8"));
+        details.setSimilarGameNames(List.of("Other"));
+        details.setWebsites(Map.of("steam", "892970", "microsoft", "9NBLGGH2JHXJ"));
+        when(igdbGameDetailsService.getDetails("42")).thenReturn(Optional.of(details));
+    }
+
+    private void steamAppWithRelatedApps() {
+        when(steamStoreService.fetchData("892970", Locale.ENGLISH, false)).thenReturn(Optional.of(JSON.readValue("""
+                {"type": "game", "name": "Valheim", "steam_appid": 892970, "required_age": 0, "is_free": false,
+                 "fullgame": {"appid": "10", "name": "Full"},
+                 "demos": [{"appid": 11, "description": ""}], "dlc": [12]}""",
+                SteamStoreService.SteamStorePage.class)));
+        when(steamStoreService.resolveEffectiveApp("892970"))
+                .thenReturn(Optional.of(new SteamStoreService.ResolvedParentApp("13", "Parent")));
+    }
+
+    @Test
+    void currentIgdbDetail_linksItsRelatedGamesAndStoresToApiGames() {
+        igdbGameWithRelatedLinks();
+
+        assertThat(moreLinks(assembler.igdb("42", CURRENT).orElseThrow())).containsExactlyInAnyOrder(
+                BASE + "/api/games/igdb/7", BASE + "/api/games/igdb/8",
+                BASE + "/api/games/steam/892970", BASE + "/api/games/xbox/9NBLGGH2JHXJ");
+    }
+
+    @Test
+    void currentSteamDetail_linksItsRelatedAppsToApiGames() {
+        steamAppWithRelatedApps();
+
+        assertThat(moreLinks(assembler.steam("892970", Locale.ENGLISH, CURRENT).orElseThrow()))
+                .containsExactlyInAnyOrder(BASE + "/api/games/steam/10", BASE + "/api/games/steam/11",
+                        BASE + "/api/games/steam/12", BASE + "/api/games/steam/13");
+    }
+
+    @Test
+    void legacyDetails_keepTheirApiUserLinks() {
+        igdbGameWithRelatedLinks();
+        steamAppWithRelatedApps();
+
+        assertThat(moreLinks(assembler.igdb("42", LEGACY).orElseThrow())).containsExactlyInAnyOrder(
+                BASE + "/api/user/igdb/7", BASE + "/api/user/igdb/8",
+                BASE + "/api/user/steam/892970", BASE + "/api/user/xbox/9NBLGGH2JHXJ");
+        assertThat(moreLinks(assembler.steam("892970", Locale.ENGLISH, LEGACY).orElseThrow()))
+                .containsExactlyInAnyOrder(BASE + "/api/user/steam/10", BASE + "/api/user/steam/11",
+                        BASE + "/api/user/steam/12", BASE + "/api/user/steam/13");
+    }
+
+    @Test
+    void currentAggregatedAnswer_hasNoApiUserLink() {
+        assertThat(moreLinks(assembler.gameInfo(user, Locale.ENGLISH))).isNotEmpty()
+                .noneMatch(link -> link.contains("/api/user"));
     }
 }

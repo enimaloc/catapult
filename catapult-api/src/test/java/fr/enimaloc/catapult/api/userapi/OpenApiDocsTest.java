@@ -146,4 +146,15 @@ class OpenApiDocsTest {
         parameters.forEach(parameter -> names.add(parameter.get("name").asString()));
         assertThat(names).contains(ApiV2.VERSION_HEADER);
     }
+
+    @Test
+    void docs_keepTheMoreLinkSchemasFreeOfTheirLinkBuilder() throws Exception {
+        JsonNode schemas = docs().at("/components/schemas");
+
+        assertThat(schemas.propertyNames()).doesNotContain("MoreLinks", "Kind");
+        for (String name : List.of("IgdbRef", "ParentApp", "Demo", "FullGame", "Dlc")) {
+            assertThat(schemas.get(name).get("properties").propertyNames()).as(name)
+                    .contains("more").doesNotContain("links", "baseUrl", "kind", "id");
+        }
+    }
 }

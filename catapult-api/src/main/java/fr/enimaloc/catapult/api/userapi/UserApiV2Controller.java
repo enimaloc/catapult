@@ -75,7 +75,7 @@ public class UserApiV2Controller {
     // resolution involved.
     @GetMapping("/igdb/{igdbId}")
     public ResponseEntity<IgdbDetailResponse> igdbDetail(@PathVariable String igdbId) {
-        return gameInfoAssembler.igdb(igdbId)
+        return gameInfoAssembler.igdb(igdbId, GameInfoAssembler.LinkStyle.LEGACY)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
@@ -85,7 +85,8 @@ public class UserApiV2Controller {
             @PathVariable String appId,
             @RequestParam(name = "lang", required = false) String lang,
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
-        return gameInfoAssembler.steam(appId, RequestLocale.parse(lang, acceptLanguage))
+        return gameInfoAssembler.steam(appId, RequestLocale.parse(lang, acceptLanguage),
+                        GameInfoAssembler.LinkStyle.LEGACY)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }

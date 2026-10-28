@@ -105,17 +105,17 @@ public class GameInfoAssembler {
                 .orElseGet(() -> new GameInfoResponse(false));
     }
 
-    /** The IGDB game's full detail, empty when IGDB has no game with that id. */
-    public Optional<IgdbDetailResponse> igdb(String igdbId) {
+    /** The IGDB game's full detail, its "more" links in {@code style}; empty when IGDB has no game with that id. */
+    public Optional<IgdbDetailResponse> igdb(String igdbId, LinkStyle style) {
         return igdbGameDetailsService.getDetails(igdbId).map(d -> {
-            String baseUrl = publicBaseUrl.get();
+            MoreLinks links = new MoreLinks(publicBaseUrl.get(), style);
             List<String> videoUrls = d.getVideoIds().stream().map(ExternalLinks::youtubeVideo).toList();
-            return new IgdbDetailResponse(baseUrl, d.getSlug(),
+            return new IgdbDetailResponse(links, d.getSlug(),
                     ExternalLinks.igdbGame(d.getSlug()),
                     d.getSummary(), d.getStoryline(), d.getPlatforms(), d.getRating(), d.getAggregatedRating(),
                     d.getTotalRating(), d.getTotalRatingCount(), d.getFirstReleaseDate(), new HashMap<>(d.getWebsites()),
-                    IgdbDetailResponse.zipRefs(d.getDlcIds(), d.getDlcNames(), baseUrl),
-                    IgdbDetailResponse.zipRefs(d.getSimilarGameIds(), d.getSimilarGameNames(), baseUrl),
+                    IgdbDetailResponse.zipRefs(d.getDlcIds(), d.getDlcNames(), links),
+                    IgdbDetailResponse.zipRefs(d.getSimilarGameIds(), d.getSimilarGameNames(), links),
                     d.getGenres(), d.getGameModes(), d.getThemes(),
                     d.getPlayerPerspectives(), d.getKeywords(), d.getFranchiseNames(),
                     normalizeProtocolRelative(d.getCoverUrl()),
@@ -124,19 +124,22 @@ public class GameInfoAssembler {
         });
     }
 
-    /** The Steam app's store-page detail, empty when Steam has no such app or the store fetch failed. */
-    public Optional<SteamDetailResponse> steam(String appId, Locale steamLocale) {
+    /**
+     * The Steam app's store-page detail, its "more" links in {@code style}; empty when Steam has no such app or the
+     * store fetch failed.
+     */
+    public Optional<SteamDetailResponse> steam(String appId, Locale steamLocale, LinkStyle style) {
         Optional<SteamStoreService.SteamStorePage> page = steamStoreService.fetchData(appId, steamLocale, false);
         if (page.isEmpty()) {
             return Optional.empty();
         }
-        String baseUrl = publicBaseUrl.get();
+        MoreLinks links = new MoreLinks(publicBaseUrl.get(), style);
         Set<String> ccls = steamStoreService.fetchCcls(List.of(appId)).getOrDefault(appId, Set.of());
         SteamStoreService.ResolvedParentApp parentApp = steamStoreService.resolveEffectiveApp(appId).orElse(null);
         GameInfoResponse.IaDisclosure ia = iaDisclosure(appId, steamLocale);
         return Optional.of(new SteamDetailResponse(ExternalLinks.steamApp(appId),
-                ccls, ia, parentApp == null ? null : new SteamDetailResponse.ParentApp(baseUrl, parentApp),
-                new SteamDetailResponse.Page(baseUrl, steamLocale, page.get())));
+                ccls, ia, parentApp == null ? null : new SteamDetailResponse.ParentApp(links, parentApp),
+                new SteamDetailResponse.Page(links, steamLocale, page.get())));
     }
 
     /** The Microsoft Store product, empty when there is none or the catalog fetch failed. */
@@ -206,7 +209,7 @@ public class GameInfoAssembler {
     private Optional<GameInfoResponse.IgdbObject> igdbObject(String igdbId, String base, LinkStyle style) {
         return igdbGameDetailsService.getDetails(igdbId).map(details -> new GameInfoResponse.IgdbObject(igdbId,
                 details.getSlug(), details.getSummary(), normalizeProtocolRelative(details.getCoverUrl()),
-                details.getGenres(), moreUrl(base, style, "/igdb/" + igdbId), details.getFirstReleaseDate()));
+                details.getGenres(), moreUrl(base, style, MoreLinks.Kind.IGDB, igdbId), details.getFirstReleaseDate()));
     }
 
     private GameInfoResponse.SteamObject steamObject(DetectedGame detected, Locale locale, String base,
@@ -219,7 +222,7 @@ public class GameInfoAssembler {
                 .map(page -> new GameInfoResponse.SteamObject(appId, page.name(), page.shortDescription(),
                         page.categories(), page.developers(), page.legalNotice(), page.headerImage(),
                         page.releaseDate(), page.contentDescriptors(), iaDisclosure(appId, locale), locale,
-                        moreUrl(base, style, "/steam/" + appId)))
+                        moreUrl(base, style, MoreLinks.Kind.STEAM, appId)))
                 .orElse(null);
     }
 
@@ -231,7 +234,7 @@ public class GameInfoAssembler {
         String productId = detected.getSourceId();
         return xboxStoreService.fetchProduct(productId, locale)
                 .map(p -> new GameInfoResponse.XboxObject(productId, p.title(), p.description(), p.publisherName(),
-                        p.developerName(), p.coverImage(), p.storeUrl(), moreUrl(base, style, "/xbox/" + productId)))
+                        p.developerName(), p.coverImage(), p.storeUrl(), moreUrl(base, style, MoreLinks.Kind.XBOX, productId)))
                 .orElse(null);
     }
 
@@ -241,7 +244,7 @@ public class GameInfoAssembler {
                                                                      LinkStyle style) {
         return gameBindingRepository.findByUserAndSourceIdAndSourceType(user, detected.getSourceId(), detected.getSourceType())
                 .map(binding -> new GameInfoResponse.CatapultObject(binding.getId(), binding.getCreatedAt(),
-                        binding.getTws(), binding.getCcls(), moreUrl(base, style, "/catapult/" + binding.getId()),
+                        binding.getTws(), binding.getCcls(), moreUrl(base, style, MoreLinks.Kind.BINDING, binding.getId()),
                         localizeTws(binding.getTws(), locale)));
     }
 
@@ -270,7 +273,7 @@ public class GameInfoAssembler {
                 topics.stream().map(t -> t.toLowerCase(Locale.ROOT)).collect(Collectors.toSet()));
         return new GameInfoResponse.DtddObject(mapping.getDtddId(),
                 ExternalLinks.dtddMedia(mapping.getDtddId()), twIds, localizeTws(twIds, locale),
-                moreUrl(base, style, "/dtdd/" + mapping.getDtddId()));
+                moreUrl(base, style, MoreLinks.Kind.DTDD, mapping.getDtddId()));
     }
 
     // IGDB image URLs (cover, screenshots) come back protocol-relative ("//images.igdb.com/...").
@@ -281,14 +284,8 @@ public class GameInfoAssembler {
         return url != null && url.startsWith("//") ? "https:" + url : url;
     }
 
-    /** {@code path} is the legacy one ({@code /igdb/{id}}, ..., {@code /catapult/{id}}); the current style remaps it. */
-    private static String moreUrl(String base, LinkStyle style, String path) {
-        if (style == LinkStyle.LEGACY) {
-            return base + ApiV2.PATH + path;
-        }
-        return path.startsWith("/catapult/")
-                ? base + ApiV2.ME_BINDINGS_PATH + path.substring("/catapult".length())
-                : base + ApiV2.GAMES_PATH + path;
+    private static String moreUrl(String base, LinkStyle style, MoreLinks.Kind kind, Object id) {
+        return new MoreLinks(base, style).to(kind, id);
     }
 
     // ---------------------------------------------------------------- v1 (frozen schema)
