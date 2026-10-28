@@ -66,7 +66,7 @@ public class ExperimentSynchronizer implements ApplicationRunner {
         exp.setKey(spec.key());
         exp.setName(spec.name());
         exp.setDescription(spec.description().isEmpty() ? null : spec.description());
-        exp.setStatus(Experiment.Status.DRAFT);
+        exp.setStatus(spec.initialStatus());
 
         int i = 0;
         createVariantsForExperiment(spec, exp, i);
