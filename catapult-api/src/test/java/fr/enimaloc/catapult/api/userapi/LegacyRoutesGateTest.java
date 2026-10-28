@@ -14,18 +14,35 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
+import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.method.HandlerMethod;
+import org.springframework.web.servlet.HandlerMapping;
+import tools.jackson.databind.json.JsonMapper;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.lang.reflect.Method;
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -189,16 +206,95 @@ class LegacyRoutesGateTest {
     }
 
     @Test
+    void encodedPath_isGatedLikeThePlainOne() throws Exception {
+        experiment(Experiment.Status.ACTIVE);
+        UUID token = widgetToken(false);
+
+        mvc.perform(get(URI.create("/api/user/%67ame/" + token)))
+                .andExpect(status().isGone())
+                .andExpect(jsonPath("$.code").value("route_gone"))
+                .andExpect(header().string("Link", "<" + BASE + "/api/me/game>; rel=\"successor-version\""));
+        mvc.perform(get(URI.create("/api/user/st%65am/400")))
+                .andExpect(header().string("Deprecation", "true"))
+                .andExpect(header().string("Link", "<" + BASE + "/api/games/steam/400>; rel=\"successor-version\""));
+
+        verify(gameInfoAssembler, never()).gameInfo(any(UUID.class), any());
+    }
+
+    @Test
     void successor_mapsEveryLegacyRoute() {
-        UUID id = UUID.randomUUID();
-        assertEquals("/api/me/game", LegacyRoutesGate.successor("/api/game/" + id));
-        assertEquals("/api/me/game", LegacyRoutesGate.successor("/api/user/game/" + id));
-        assertEquals("/api/me/game/summary", LegacyRoutesGate.successor("/api/user/summary/" + id));
-        assertEquals("/api/me/bindings/" + id, LegacyRoutesGate.successor("/api/user/catapult/" + id));
-        assertEquals("/api/games/igdb/1", LegacyRoutesGate.successor("/api/user/igdb/1"));
-        assertEquals("/api/games/steam/400", LegacyRoutesGate.successor("/api/user/steam/400"));
-        assertEquals("/api/games/xbox/9NBLGGH2JHXJ", LegacyRoutesGate.successor("/api/user/xbox/9NBLGGH2JHXJ"));
-        assertEquals("/api/games/dtdd/16758", LegacyRoutesGate.successor("/api/user/dtdd/16758"));
-        assertNull(LegacyRoutesGate.successor("/api/me/game"));
+        String id = UUID.randomUUID().toString();
+        assertEquals("/api/me/game", LegacyRoutesGate.successor("/api/game/{uuid}", Map.of("uuid", id)));
+        assertEquals("/api/me/game", LegacyRoutesGate.successor("/api/user/game/{uuid}", Map.of("uuid", id)));
+        assertEquals("/api/me/game/summary",
+                LegacyRoutesGate.successor("/api/user/summary/{uuid}", Map.of("uuid", id)));
+        assertEquals("/api/me/bindings/" + id,
+                LegacyRoutesGate.successor("/api/user/catapult/{bindingId}", Map.of("bindingId", id)));
+        assertEquals("/api/games/igdb/1", LegacyRoutesGate.successor("/api/user/igdb/{igdbId}", Map.of("igdbId", "1")));
+        assertEquals("/api/games/steam/400",
+                LegacyRoutesGate.successor("/api/user/steam/{appId}", Map.of("appId", "400")));
+        assertEquals("/api/games/xbox/9NBLGGH2JHXJ",
+                LegacyRoutesGate.successor("/api/user/xbox/{productId}", Map.of("productId", "9NBLGGH2JHXJ")));
+        assertEquals("/api/games/dtdd/16758",
+                LegacyRoutesGate.successor("/api/user/dtdd/{dtddId}", Map.of("dtddId", "16758")));
+        assertNull(LegacyRoutesGate.successor("/api/me/game", Map.of()));
+    }
+
+    @Test
+    void successor_encodesTheIdItCarriesOver() {
+        assertEquals("/api/games/xbox/a%2Fb%20c",
+                LegacyRoutesGate.successor("/api/user/xbox/{productId}", Map.of("productId", "a/b c")));
+    }
+
+    /** Every route of the legacy controllers, as Spring combines its class and method mappings, has a successor. */
+    @Test
+    void everyLegacyRequestMapping_hasASuccessor() {
+        List<String> patterns = new ArrayList<>();
+        for (Class<?> controller : List.of(UserApiV1Controller.class, UserApiV2Controller.class)) {
+            RequestMapping root = AnnotatedElementUtils.findMergedAnnotation(controller, RequestMapping.class);
+            String[] prefixes = root == null || root.path().length == 0 ? new String[] {""} : root.path();
+            for (Method method : controller.getDeclaredMethods()) {
+                RequestMapping mapping = AnnotatedElementUtils.findMergedAnnotation(method, RequestMapping.class);
+                if (mapping == null) {
+                    continue;
+                }
+                String[] paths = mapping.path().length == 0 ? new String[] {""} : mapping.path();
+                for (String prefix : prefixes) {
+                    for (String path : paths) {
+                        patterns.add(prefix + path);
+                    }
+                }
+            }
+        }
+
+        assertThat(patterns).hasSize(8).allSatisfy(pattern -> {
+            Map<String, String> variables = new HashMap<>();
+            Matcher variable = Pattern.compile("\\{(\\w+)}").matcher(pattern);
+            while (variable.find()) {
+                variables.put(variable.group(1), "x");
+            }
+            assertThat(LegacyRoutesGate.successor(pattern, variables)).as(pattern).isNotNull();
+        });
+    }
+
+    /** A legacy handler the gate knows no successor of is closed, whatever the experiment says. */
+    @Test
+    void legacyHandlerWithoutSuccessor_failsClosed() throws Exception {
+        experiment(Experiment.Status.ACTIVE);
+        LegacyRoutesGate gate = new LegacyRoutesGate(experimentService, widgetTokenService,
+                new PublicBaseUrl(BASE), JsonMapper.builder().build());
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/user/added/1");
+        request.setAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE, "/api/user/added/{id}");
+        request.setAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE, Map.of("id", "1"));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        // A handler of the legacy controller, matched under a pattern the gate has no successor for
+        HandlerMethod handler = new HandlerMethod(mock(UserApiV2Controller.class),
+                UserApiV2Controller.class.getMethod("igdbDetail", String.class));
+
+        assertThat(gate.preHandle(request, response, handler)).isFalse();
+        assertThat(response.getStatus()).isEqualTo(410);
+        assertThat(response.getContentType()).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
+        assertThat(response.getContentAsString()).contains("\"code\":\"route_gone\"");
+        assertThat(response.getHeader("Link")).isNull();
     }
 }
