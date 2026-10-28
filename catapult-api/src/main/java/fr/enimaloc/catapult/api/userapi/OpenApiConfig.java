@@ -20,7 +20,8 @@ import java.util.List;
  * multiple hostnames/paths, so the request-derived guess doesn't reliably match the public URL.
  *
  * <p>Declares the two ways to present a personal API token, and requires either of them on every
- * {@code /api/me} operation; the {@code /api/games} routes are public and carry no requirement.
+ * {@code /api/me} {@code GET}, the bearer one on its other operations; the {@code /api/games} routes are public and
+ * carry no requirement.
  */
 @Configuration
 public class OpenApiConfig {
@@ -55,7 +56,10 @@ public class OpenApiConfig {
                                         + "request has no Authorization header; the full token is refused here.")));
     }
 
-    /** Either personal-token scheme opens an {@code /api/me} operation. */
+    /**
+     * The bearer scheme opens an {@code /api/me} operation; the {@code ?token=} one opens its {@code GET}s too, the
+     * read-only token opening no write.
+     */
     @Bean
     public OpenApiCustomizer personalTokenRequirement() {
         return openApi -> {
@@ -66,7 +70,9 @@ public class OpenApiConfig {
                 if (path.equals(ME_PREFIX) || path.startsWith(ME_PREFIX + "/")) {
                     for (Operation operation : item.readOperations()) {
                         operation.addSecurityItem(new SecurityRequirement().addList(PERSONAL_TOKEN));
-                        operation.addSecurityItem(new SecurityRequirement().addList(READ_TOKEN));
+                    }
+                    if (item.getGet() != null) {
+                        item.getGet().addSecurityItem(new SecurityRequirement().addList(READ_TOKEN));
                     }
                 }
             });

@@ -121,8 +121,9 @@ class OpenApiDocsTest {
         assertThat(query.get("description").asString()).contains("catr_").contains("GET");
     }
 
+    /** The read-only token opens the reads alone: a write takes the bearer scheme only. */
     @Test
-    void docs_requireEitherSchemeOnMeOperationsOnly() throws Exception {
+    void docs_requireEitherSchemeOnMeReads_andTheBearerOneOnMeWrites() throws Exception {
         JsonNode docs = docs();
 
         docs.get("paths").properties().forEach(path -> path.getValue().properties().forEach(operation -> {
@@ -131,7 +132,13 @@ class OpenApiDocsTest {
                 assertThat(security).as("%s %s", operation.getKey(), path.getKey()).isNotNull();
                 List<String> alternatives = new ArrayList<>();
                 security.forEach(requirement -> alternatives.addAll(requirement.propertyNames()));
-                assertThat(alternatives).containsExactlyInAnyOrder("personalToken", "readToken");
+                if (operation.getKey().equals("get")) {
+                    assertThat(alternatives).as("GET %s", path.getKey())
+                            .containsExactlyInAnyOrder("personalToken", "readToken");
+                } else {
+                    assertThat(alternatives).as("%s %s", operation.getKey(), path.getKey())
+                            .containsExactly("personalToken");
+                }
             } else {
                 assertThat(security).as("%s %s", operation.getKey(), path.getKey()).isNull();
             }
