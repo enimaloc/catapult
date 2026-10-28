@@ -1,6 +1,6 @@
 // Thin GitHub client for the release scripts (REST + the GraphQL mutations REST lacks).
-// Pulls are normalized to {number, nodeId, title, body, state, draft, autoMerge, base, head, headSha, headRepo,
-// labels};
+// Pulls are normalized to {number, nodeId, title, body, state, draft, merged, mergeCommitSha, autoMerge, base,
+// head, headSha, headRepo, labels};
 // commits to {sha, subject, message, author, parents} (author: GitHub login or null; parents: SHAs).
 
 const API = "https://api.github.com";
@@ -41,6 +41,8 @@ export function createGitHub({ token, owner, repo }) {
     body: p.body ?? "",
     state: p.state,
     draft: p.draft,
+    merged: Boolean(p.merged),
+    mergeCommitSha: p.merge_commit_sha ?? null,
     autoMerge: Boolean(p.auto_merge),
     base: p.base.ref,
     head: p.head.ref,
@@ -167,6 +169,37 @@ export function createGitHub({ token, owner, repo }) {
         const result = await request("GET", `${path}?per_page=100&page=${page}`);
         commits.push(...result.commits.map(toCommit));
         if (result.commits.length === 0 || commits.length >= result.total_commits) return commits;
+      }
+    },
+
+    /** The commit SHA a tag points at (annotated tags dereferenced), or null when it does not exist. */
+    async getTag(name) {
+      let ref;
+      try {
+        ref = await request("GET", `${repoPath}/git/ref/tags/${encodeURIComponent(name)}`);
+      } catch (error) {
+        if (error.status === 404) return null;
+        throw error;
+      }
+      let object = ref.object;
+      while (object.type === "tag") object = (await request("GET", `${repoPath}/git/tags/${object.sha}`)).object;
+      return object.sha;
+    },
+
+    /** Creates the annotated tag `tag` on commit `sha`, with `message`. */
+    async createTag({ tag, sha, message }) {
+      const created = await request("POST", `${repoPath}/git/tags`, { tag, message, object: sha, type: "commit" });
+      await request("POST", `${repoPath}/git/refs`, { ref: `refs/tags/${tag}`, sha: created.sha });
+    },
+
+    /** The GitHub Release of `tag` ({id, tag, draft, prerelease}), or null when there is none. */
+    async getRelease(tag) {
+      try {
+        const release = await request("GET", `${repoPath}/releases/tags/${encodeURIComponent(tag)}`);
+        return { id: release.id, tag: release.tag_name, draft: release.draft, prerelease: release.prerelease };
+      } catch (error) {
+        if (error.status === 404) return null;
+        throw error;
       }
     },
 

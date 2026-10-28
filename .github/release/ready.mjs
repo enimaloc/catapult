@@ -24,7 +24,7 @@ export function bumpGradleVersion(text, version) {
 }
 
 /** Promotions dev -> beta and beta -> main, and hotfixes into main, all from this repository. */
-function kindOf(pull, repository) {
+export function kindOf(pull, repository) {
   if (pull.headRepo !== repository) return null;
   if (pull.head === "dev" && pull.base === "beta") return "beta";
   if (pull.head === "beta" && pull.base === "main") return "stable";
@@ -33,7 +33,7 @@ function kindOf(pull, repository) {
 }
 
 /** The version held by the title, when it fits the kind of PR (beta into beta, stable into main). */
-function titleVersion(title, kind) {
+export function titleVersion(title, kind) {
   const match = TITLE.exec(title);
   if (!match) return null;
   let parsed;

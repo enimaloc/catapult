@@ -1,46 +1,93 @@
 name: Release
 
+# Called by publish.yml once a promotion PR is merged (a tag pushed by a workflow triggers nothing),
+# and still run by a tag pushed by hand. Idempotent: skipped when the GitHub Release already exists.
 on:
+  workflow_call:
+    inputs:
+      version:
+        description: Tag to publish (vX.Y.Z or vX.Y.Z-BETA.N)
+        required: true
+        type: string
+      notes:
+        description: Release notes; generated from the commits when empty
+        required: false
+        type: string
+        default: ''
   push:
     tags:
       - '*'
 
 jobs:
-  version-branch:
+  check:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+      prerelease: ${{ steps.check.outputs.prerelease }}
+      image-tag: ${{ steps.check.outputs.image-tag }}
+      channel: ${{ steps.check.outputs.channel }}
+      skip: ${{ steps.check.outputs.skip }}
     steps:
-      - uses: actions/checkout@v7
-
-      - name: Create version branch
+      - id: check
+        name: Resolve the version and look for an existing release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version || github.ref_name }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout -b "v/${GITHUB_REF_NAME}"
-          git push origin "v/${GITHUB_REF_NAME}"
+          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-BETA\.[0-9]+)?$ ]]; then
+            echo "::error::Not a release version: $VERSION (expected vX.Y.Z or vX.Y.Z-BETA.N)"
+            exit 1
+          fi
+          if [[ "$VERSION" == *-BETA.* ]]; then prerelease=true; channel=beta; else prerelease=false; channel=latest; fi
+          if out=$(gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" --json tagName 2>&1); then
+            skip=true
+            echo "::notice::$VERSION already has a GitHub Release: nothing is published again"
+          elif [[ "$out" == *"release not found"* ]]; then
+            skip=false
+          else
+            echo "$out" >&2
+            exit 1
+          fi
+          {
+            echo "version=$VERSION"
+            echo "prerelease=$prerelease"
+            echo "image-tag=${VERSION#v}"
+            echo "channel=$channel"
+            echo "skip=$skip"
+          } >> "$GITHUB_OUTPUT"
 
   github-release:
+    needs: check
+    if: needs.check.outputs.skip != 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ needs.check.outputs.version }}
           fetch-depth: 0
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
-          generate_release_notes: true
-          prerelease: ${{ contains(github.ref_name, '-ALPHA') || contains(github.ref_name, '-BETA') }}
+          tag_name: ${{ needs.check.outputs.version }}
+          body: ${{ inputs.notes }}
+          generate_release_notes: ${{ !inputs.notes }}
+          prerelease: ${{ needs.check.outputs.prerelease == 'true' }}
 
   release-api:
+    needs: check
+    if: needs.check.outputs.skip != 'true'
     runs-on: ubuntu-latest
     permissions:
       packages: write
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.check.outputs.version }}
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v4
@@ -56,15 +103,19 @@ jobs:
           file: catapult-api/Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}/api:${{ github.ref_name }}
-            ghcr.io/${{ github.repository }}/api:latest
+            ghcr.io/${{ github.repository }}/api:${{ needs.check.outputs.image-tag }}
+            ghcr.io/${{ github.repository }}/api:${{ needs.check.outputs.channel }}
 
   release-web:
+    needs: check
+    if: needs.check.outputs.skip != 'true'
     runs-on: ubuntu-latest
     permissions:
       packages: write
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.check.outputs.version }}
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v4
@@ -80,5 +131,5 @@ jobs:
           file: catapult-web/Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}/web:${{ github.ref_name }}
-            ghcr.io/${{ github.repository }}/web:latest
+            ghcr.io/${{ github.repository }}/web:${{ needs.check.outputs.image-tag }}
+            ghcr.io/${{ github.repository }}/web:${{ needs.check.outputs.channel }}
