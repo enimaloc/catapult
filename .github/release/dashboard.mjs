@@ -1,6 +1,11 @@
 // Keeps the pinned issue « Releases en cours »: GitHub cannot pin pull requests, so the bot pins an
 // issue listing the open promotion PRs, the pending backports and the last releases.
-// Called at the end of promote.mjs, ready.mjs and publish.mjs; it never makes a release step fail.
+// Called at the end of promote.mjs, ready.mjs and publish.mjs, and by release.yml once a release is
+// published; it never makes a release step fail.
+// CLI: node .github/release/dashboard.mjs (env: GH_TOKEN, GITHUB_REPOSITORY=owner/repo)
+
+import { pathToFileURL } from "node:url";
+import { createGitHub } from "./lib/github.mjs";
 
 const MARKER = "<!-- release-dashboard -->";
 const TITLE = "🚀 Releases en cours";
@@ -110,4 +115,9 @@ export async function refreshDashboardSafely({ gh, refresh = refreshDashboard })
     console.warn(`::warning::dashboard: could not refresh the releases issue: ${error.message}`);
     return null;
   }
+}
+
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+  const [owner, repo] = (process.env.GITHUB_REPOSITORY ?? "").split("/");
+  console.log(await refreshDashboardSafely({ gh: createGitHub({ token: process.env.GH_TOKEN, owner, repo }) }));
 }
