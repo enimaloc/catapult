@@ -4,7 +4,7 @@
 
 import { parseArgs } from "node:util";
 import { pathToFileURL } from "node:url";
-import { parseVersion, nextBeta, nextStable } from "./lib/version.mjs";
+import { parseVersion, bumpKind, nextBeta, nextStable } from "./lib/version.mjs";
 import { renderEntries } from "./lib/changelog.mjs";
 import { buildBody, parseBody, updateBody } from "./lib/pr-body.mjs";
 import { createGitHub } from "./lib/github.mjs";
@@ -40,15 +40,19 @@ function releaseVersion(target, tags, commits) {
   const lastStable = stables.length ? stables[stables.length - 1] : { tag: "v0.0.0", ...parseVersion("v0.0.0") };
   const betas = versions.filter((v) => v.beta !== null && compareVersions(v, lastStable) > 0);
   if (target === "main") return betas.length ? nextStable(betas[betas.length - 1].tag) : null;
-  try {
-    return nextBeta(lastStable.tag, betas.map((v) => v.tag), commits.map((c) => c.message));
-  } catch {
-    return null; // no releasable commit and no beta to continue
-  }
+  const messages = commits.map((c) => c.message);
+  if (bumpKind(messages, lastStable.tag) === null && betas.length === 0) return null;
+  return nextBeta(lastStable.tag, betas.map((v) => v.tag), messages);
 }
 
-function isBotBump(commit, appSlug) {
-  return Boolean(appSlug) && commit.author === `${appSlug}[bot]` && RELEASE_SUBJECT.test(commit.subject);
+/**
+ * The bot's own commits: the version bump pushed on the source branch, and release merge commits
+ * (a promotion merged by auto-merge is credited to the App). They are never promoted on their own.
+ */
+function isReleaseCommit(commit, appSlug) {
+  if (!RELEASE_SUBJECT.test(commit.subject)) return false;
+  if (commit.parents.length > 1) return true;
+  return Boolean(appSlug) && commit.author === `${appSlug}[bot]`;
 }
 
 function changelogOf(commits) {
@@ -64,10 +68,11 @@ function backToDraftComment(source, version) {
 }
 
 export async function promote({ gh, source, target, owner, repo, appSlug }) {
-  const [pulls, commits] = await Promise.all([
+  const [pulls, compared] = await Promise.all([
     gh.listPulls({ base: target, head: source }),
     gh.compareCommits(target, source),
   ]);
+  const commits = compared.filter((c) => !isReleaseCommit(c, appSlug));
   const pull = pulls[0];
   const withNumber = (action) => (pull ? { action, number: pull.number } : { action });
 
@@ -76,7 +81,6 @@ export async function promote({ gh, source, target, owner, repo, appSlug }) {
     await gh.updatePull(pull.number, { state: "closed" });
     return { action: "closed", number: pull.number };
   }
-  if (isBotBump(commits[commits.length - 1], appSlug)) return withNumber("none");
 
   const version = releaseVersion(target, await gh.listTags(), commits);
   if (version === null) return withNumber("none");

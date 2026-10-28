@@ -5,7 +5,15 @@ import { buildBody, parseBody } from "../lib/pr-body.mjs";
 
 const APP = "catapult-release";
 const sha = (c) => c.repeat(40);
-const commit = (c, subject, login = "enimaloc") => ({ sha: sha(c), subject, message: subject, author: login });
+const commit = (c, subject, login = "enimaloc", parents = [sha("0")]) => ({
+  sha: sha(c),
+  subject,
+  message: subject,
+  author: login,
+  parents,
+});
+const bump = (c, version) => commit(c, `chore(release): ${version}`, `${APP}[bot]`);
+const releaseMerge = (c, version) => commit(c, `chore(release): ${version}`, `${APP}[bot]`, [sha("0"), sha("1")]);
 
 // In-memory GitHub: branches hold the commits not yet on their promotion target.
 function fakeGitHub({ tags = ["v0.0.0", "v1.0.0-BETA.96"], ahead = {}, pulls = [] } = {}) {
@@ -79,7 +87,9 @@ test("nextCommit_recomputesTitle", async () => {
   await run(gh);
   assert.equal(gh.state.pulls[0].title, "chore(release): v0.1.1-BETA.2");
 
-  gh.state.pulls[0].body = gh.state.pulls[0].body.replace("- one (aaaaaaa)", "- one, by hand");
+  const before = gh.state.pulls[0].body;
+  gh.state.pulls[0].body = before.replace("- one (aaaaaaa)", "- one, by hand");
+  assert.notEqual(gh.state.pulls[0].body, before, "the hand edit must hit the generated line");
   gh.calls.length = 0;
   gh.compareCommits = async () => [commit("a", "fix: one"), commit("b", "feat: two")];
   const result = await run(gh);
@@ -148,7 +158,7 @@ test("onePrPerPair", async () => {
 test("betaToMain_usesTheStableOfTheLatestBeta", async () => {
   const gh = fakeGitHub({
     tags: ["v0.0.0", "v1.0.0-BETA.96", "v1.0.0-BETA.97", "v0.9.0-BETA.3"],
-    ahead: { "main...beta": [commit("a", "feat: x"), commit("b", "chore(release): v1.0.0-BETA.97")] },
+    ahead: { "main...beta": [commit("a", "feat: x"), releaseMerge("b", "v1.0.0-BETA.97")] },
   });
   await run(gh, "beta", "main");
   assert.equal(gh.calls[0][1].title, "chore(release): v1.0.0");
@@ -162,9 +172,13 @@ test("betaToMain_withoutBeta_doesNothing", async () => {
 
 test("botBumpCommit_isIgnored", async () => {
   const gh = fakeGitHub({
-    ahead: { "beta...dev": [commit("a", "fix: one"), commit("b", "chore(release): v1.0.0-BETA.97", `${APP}[bot]`)] },
-    pulls: [{ number: 7, base: "beta", head: "dev", draft: false, autoMerge: true, title: "x" }],
+    ahead: { "beta...dev": [commit("a", "fix: one")] },
+    pulls: [{ number: 7, base: "beta", head: "dev", title: "x" }],
   });
+  await run(gh);
+  Object.assign(gh.state.pulls[0], { draft: false, autoMerge: true });
+  gh.calls.length = 0;
+  gh.compareCommits = async () => [commit("a", "fix: one"), bump("b", "v1.0.0-BETA.97")];
   assert.deepEqual(await run(gh), { action: "none", number: 7 });
   assert.deepEqual(gh.calls, []);
 });
@@ -184,4 +198,44 @@ test("disabledBot_keepsTheChangelog_butRecomputesTheTitle", async () => {
   });
   await run(gh);
   assert.deepEqual(gh.calls, [["updatePull", 7, { title: "chore(release): v1.0.0-BETA.97", body }]]);
+});
+
+test("releaseMergeAtTheHeadOfBeta_opensTheStablePr", async () => {
+  const gh = fakeGitHub({
+    tags: ["v0.0.0", "v1.0.0-BETA.97"],
+    ahead: { "main...beta": [commit("a", "feat: x"), bump("b", "v1.0.0-BETA.97"), releaseMerge("c", "v1.0.0-BETA.97")] },
+  });
+  assert.deepEqual(await run(gh, "beta", "main"), { action: "created", number: 100 });
+  assert.equal(gh.calls[0][1].title, "chore(release): v1.0.0");
+});
+
+test("humanCommitBehindTheBump_putsTheReadyPrBackToDraft", async () => {
+  const gh = fakeGitHub({ ahead: { "beta...dev": [commit("a", "fix: one")] } });
+  await run(gh);
+  Object.assign(gh.state.pulls[0], { draft: false, autoMerge: true });
+  gh.calls.length = 0;
+  gh.compareCommits = async () => [commit("a", "fix: one"), commit("y", "fix: late"), bump("b", "v1.0.0-BETA.97")];
+  assert.deepEqual(await run(gh), { action: "updated", number: 100 });
+  assert.deepEqual(gh.calls.map(([name]) => name), ["updatePull", "disableAutoMerge", "convertToDraft", "comment"]);
+  assert.deepEqual(parseBody(gh.state.pulls[0].body).seen, [sha("a"), sha("y")]);
+});
+
+test("botCommits_neverReachTheChangelog", async () => {
+  const gh = fakeGitHub({
+    ahead: {
+      "beta...dev": [bump("b", "v1.0.0-BETA.96"), commit("a", "fix: one"), releaseMerge("c", "v1.0.0-BETA.96")],
+    },
+  });
+  await run(gh);
+  const { changelog, seen } = parseBody(gh.state.pulls[0].body);
+  assert.equal(changelog, "### Fixes\n- one (aaaaaaa)");
+  assert.deepEqual(seen, [sha("a")]);
+});
+
+test("onlyBotCommits_isNothingToPromote", async () => {
+  const gh = fakeGitHub({
+    ahead: { "beta...dev": [bump("b", "v1.0.0-BETA.97")] },
+    pulls: [{ number: 7, base: "beta", head: "dev", title: "x" }],
+  });
+  assert.deepEqual(await run(gh), { action: "closed", number: 7 });
 });

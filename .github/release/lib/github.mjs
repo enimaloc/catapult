@@ -1,6 +1,6 @@
 // Thin GitHub client for the release scripts (REST + the GraphQL mutations REST lacks).
 // Pulls are normalized to {number, nodeId, title, body, draft, autoMerge, base, head};
-// commits to {sha, subject, message, author} where author is the GitHub login or null.
+// commits to {sha, subject, message, author, parents} (author: GitHub login or null; parents: SHAs).
 
 const API = "https://api.github.com";
 
@@ -44,6 +44,7 @@ export function createGitHub({ token, owner, repo }) {
     subject: c.commit.message.split("\n")[0],
     message: c.commit.message,
     author: c.author?.login ?? null,
+    parents: c.parents.map((parent) => parent.sha),
   });
 
   return {
