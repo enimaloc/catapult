@@ -76,3 +76,6 @@ catapult-web/node_modules/
 ### Perf (timing runs) ###
 perf/reports/
 e2e/perf-results/
+
+### Release migration (local state and reports) ###
+.github/release/.migration-*

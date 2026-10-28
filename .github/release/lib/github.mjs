@@ -65,6 +65,9 @@ export function createGitHub({ token, owner, repo, fetch = globalThis.fetch }) {
     parents: c.parents.map((parent) => parent.sha),
   });
 
+  const toRelease = (r) => ({ id: r.id, tag: r.tag_name, prerelease: r.prerelease, url: r.html_url });
+  const refPath = (name) => name.split("/").map(encodeURIComponent).join("/");
+
   return {
     /** Pulls (into `base` when given; open by default), from `head` when given; most recently updated first. */
     async listPulls({ base, head, state = "open" } = {}) {
@@ -250,6 +253,58 @@ export function createGitHub({ token, owner, repo, fetch = globalThis.fetch }) {
         .filter((r) => !r.draft)
         .slice(0, limit)
         .map((r) => ({ tag: r.tag_name, name: r.name || r.tag_name, url: r.html_url, prerelease: r.prerelease }));
+    },
+
+    /** The release of `tag` as {id, tag, prerelease, url}, or null when there is none (drafts are not found). */
+    async getReleaseByTag(tag) {
+      try {
+        return toRelease(await request("GET", `${repoPath}/releases/tags/${encodeURIComponent(tag)}`));
+      } catch (error) {
+        if (error.status === 404) return null;
+        throw error;
+      }
+    },
+
+    async createRelease({ tag, name, body, prerelease, makeLatest }) {
+      const fields = { tag_name: tag, name, body, prerelease, make_latest: String(makeLatest) };
+      return toRelease(await request("POST", `${repoPath}/releases`, fields));
+    },
+
+    async deleteRelease(id) {
+      await request("DELETE", `${repoPath}/releases/${id}`);
+    },
+
+    /** Deletes the tag ref only (the commit and any GitHub Release are left alone). */
+    async deleteTag(name) {
+      await request("DELETE", `${repoPath}/git/refs/tags/${encodeURIComponent(name)}`);
+    },
+
+    /** The commit SHA a branch points at, or null when it does not exist. */
+    async getBranch(name) {
+      try {
+        return (await request("GET", `${repoPath}/git/ref/heads/${refPath(name)}`)).object.sha;
+      } catch (error) {
+        if (error.status === 404) return null;
+        throw error;
+      }
+    },
+
+    async deleteBranch(name) {
+      await request("DELETE", `${repoPath}/git/refs/heads/${refPath(name)}`);
+    },
+
+    /** The repository's workflows as {id, name, path, state} (state: active, disabled_manually…). */
+    async listWorkflows() {
+      const { workflows } = await request("GET", `${repoPath}/actions/workflows?per_page=100`);
+      return workflows.map(({ id, name, path, state }) => ({ id, name, path, state }));
+    },
+
+    async disableWorkflow(id) {
+      await request("PUT", `${repoPath}/actions/workflows/${id}/disable`);
+    },
+
+    async enableWorkflow(id) {
+      await request("PUT", `${repoPath}/actions/workflows/${id}/enable`);
     },
 
     async listTags() {

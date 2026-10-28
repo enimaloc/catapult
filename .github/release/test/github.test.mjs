@@ -107,3 +107,69 @@ test("listReleases_skipsDraftsAndKeepsTheNewest", async () => {
   assert.deepEqual(releases.map((r) => r.tag), ["v2", "v1"]);
   assert.equal(releases[0].name, "v2");
 });
+
+test("listWorkflows_givesIdNameAndState", async () => {
+  const { fetch } = fakeFetch({
+    [`GET ${REPO}/actions/workflows?per_page=100`]: {
+      workflows: [{ id: 7, name: "Build", path: ".github/workflows/build.yml", state: "active" }],
+    },
+  });
+  assert.deepEqual(await client(fetch).listWorkflows(), [
+    { id: 7, name: "Build", path: ".github/workflows/build.yml", state: "active" },
+  ]);
+});
+
+test("disableAndEnableWorkflow_putOnTheWorkflow", async () => {
+  const { fetch, requests } = fakeFetch({
+    [`PUT ${REPO}/actions/workflows/7/disable`]: null,
+    [`PUT ${REPO}/actions/workflows/7/enable`]: null,
+  });
+  await client(fetch).disableWorkflow(7);
+  await client(fetch).enableWorkflow(7);
+  assert.deepEqual(requests, [`PUT ${REPO}/actions/workflows/7/disable`, `PUT ${REPO}/actions/workflows/7/enable`]);
+});
+
+test("getReleaseByTag_missing_isNull_andFound_isNormalized", async () => {
+  const { fetch } = fakeFetch({
+    [`GET ${REPO}/releases/tags/v1`]: { id: 3, tag_name: "v1", prerelease: true, html_url: "https://example/v1" },
+  });
+  assert.equal(await client(fetch).getReleaseByTag("v2"), null);
+  assert.deepEqual(await client(fetch).getReleaseByTag("v1"), {
+    id: 3,
+    tag: "v1",
+    prerelease: true,
+    url: "https://example/v1",
+  });
+});
+
+test("createRelease_sendsTheReleaseFields", async () => {
+  let sent;
+  const fetch = async (url, { method, body }) => {
+    sent = { method, path: new URL(url).pathname, body: JSON.parse(body) };
+    return { ok: true, status: 201, json: async () => ({ id: 9, tag_name: "v1", prerelease: true, html_url: "u" }) };
+  };
+  await client(fetch).createRelease({ tag: "v1", name: "v1", body: "notes", prerelease: true, makeLatest: false });
+  assert.deepEqual(sent, {
+    method: "POST",
+    path: `${REPO}/releases`,
+    body: { tag_name: "v1", name: "v1", body: "notes", prerelease: true, make_latest: "false" },
+  });
+});
+
+test("refDeletions_deleteTheTagRefTheBranchRefAndTheRelease", async () => {
+  const { fetch, requests } = fakeFetch({
+    [`DELETE ${REPO}/git/refs/tags/v0.1.0-BETA`]: null,
+    [`DELETE ${REPO}/git/refs/heads/v/v0.1.0-BETA`]: null,
+    [`DELETE ${REPO}/releases/3`]: null,
+  });
+  await client(fetch).deleteTag("v0.1.0-BETA");
+  await client(fetch).deleteBranch("v/v0.1.0-BETA");
+  await client(fetch).deleteRelease(3);
+  assert.equal(requests.length, 3);
+});
+
+test("getBranch_missing_isNull_andFound_givesItsSha", async () => {
+  const { fetch } = fakeFetch({ [`GET ${REPO}/git/ref/heads/v/v1`]: { object: { type: "commit", sha: sha("b") } } });
+  assert.equal(await client(fetch).getBranch("v/v2"), null);
+  assert.equal(await client(fetch).getBranch("v/v1"), sha("b"));
+});
