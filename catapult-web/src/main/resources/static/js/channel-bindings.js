@@ -40,6 +40,21 @@ document.addEventListener("catapult:render", function () {
         else if (item.classList.contains("is-open") && CatapultLazy.show(waiting, { quiet: true })) bindRow(item);
     });
 
+    /** Shows `boxArtUrl` (the game picked's) in the row's header, an empty frame when it has none to show. */
+    function showBoxArt(row, boxArtUrl) {
+        const current = row.querySelector(".binding-box-art");
+        if (!current) return;
+        const src = GameSearch.boxArt(boxArtUrl);
+        const art = document.createElement(src ? "img" : "span");
+        art.slot = "icon";
+        art.className = "box-art binding-box-art";
+        if (src) {
+            art.src = src;
+            art.alt = "";
+        }
+        current.replaceWith(art);
+    }
+
     /** Binds the controls of a row's body, once built. */
     function bindRow(row) {
         // Generic actions: data-post names the endpoint suffix, data-key the boolean field.
@@ -65,6 +80,7 @@ document.addEventListener("catapult:render", function () {
             const game = GameSearch.attach(gameInput, panel.querySelector(".binding-edit-game-results"),
                 `${CatapultChannel.baseUrl()}/games/search`, picked => {
                     gameIdInput.value = picked.id;
+                    showBoxArt(row, picked.boxArtUrl);
                     saveBinding();
                 }, { initial: { id: gameIdInput.value, name: gameInput.value } });
 

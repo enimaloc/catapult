@@ -22,6 +22,7 @@ import fr.enimaloc.catapult.domain.dtdd.DtddMappingProposal;
 import fr.enimaloc.catapult.domain.minecraft.MinecraftFriendLink;
 import fr.enimaloc.catapult.domain.minecraft.MinecraftServiceAccount;
 import fr.enimaloc.catapult.domain.tw.TwDefinition;
+import fr.enimaloc.catapult.domain.twitch.TwitchCategoryCache;
 import fr.enimaloc.catapult.domain.twitch.TwitchCclDefinition;
 import fr.enimaloc.catapult.domain.twitchat.TwitchatWidgetSettings;
 import fr.enimaloc.catapult.getter.DetectedGame;
@@ -45,6 +46,7 @@ import fr.enimaloc.catapult.service.minecraft.MinecraftFriendService;
 import fr.enimaloc.catapult.service.minecraft.MinecraftGateService;
 import fr.enimaloc.catapult.service.minecraft.MinecraftLinkStateService;
 import fr.enimaloc.catapult.repository.minecraft.MinecraftServiceAccountRepository;
+import fr.enimaloc.catapult.repository.twitch.TwitchCategoryCacheRepository;
 import fr.enimaloc.catapult.service.notification.TwitchatWidgetSettingsService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -95,6 +97,7 @@ class ChannelDashboardAssemblerTest {
     private final RaidRestoreGateService raidRestoreGate = mock(RaidRestoreGateService.class);
     private final fr.enimaloc.catapult.service.binding.CustomBindingService customBindings =
             mock(fr.enimaloc.catapult.service.binding.CustomBindingService.class);
+    private final TwitchCategoryCacheRepository categoryCache = mock(TwitchCategoryCacheRepository.class);
 
     private UserAccount owner;
     private UserAccount moderator;
@@ -106,7 +109,7 @@ class ChannelDashboardAssemblerTest {
         ChannelDashboardAssembler assembler = new ChannelDashboardAssembler(bindings, settingsRepository, streamState,
                 gameState, ccls, tws, encryption, steamClient, diagnostics, igdb, dtddMappings, dtddCache,
                 dtddProposals, oauthTokens, backdoor, minecraftService, twitchat, raidRestoreGate,
-                new fr.enimaloc.catapult.api.CustomBindingViews(customBindings));
+                new fr.enimaloc.catapult.api.CustomBindingViews(customBindings), categoryCache);
         ReflectionTestUtils.setField(assembler, "xboxEnabled", xboxEnabled);
         return assembler;
     }
@@ -254,6 +257,23 @@ class ChannelDashboardAssemblerTest {
                 assertThat(dto.ignored()).isTrue();
                 assertThat(dto.ccls()).containsExactly("Gore");
             });
+        }
+
+        @Test
+        void bindingsCarryTheirCategorysBoxArt_whenTheCacheKnowsIt() {
+            GameBinding valheim = binding(owner, "892970", "Valheim");
+            GameBinding doom = binding(owner, "2280", "Doom");
+            GameBinding unbound = binding(owner, "1", "Unbound");
+            unbound.setTwitchGameId(null);
+            when(bindings.findByUser(eq(owner), any())).thenReturn(new PageImpl<>(List.of(valheim, doom, unbound)));
+            when(categoryCache.findAllById(Set.of("tw-892970", "tw-2280"))).thenReturn(List.of(
+                    new TwitchCategoryCache("tw-892970", "Valheim", "https://static-cdn.jtvnw.net/ttv-boxart/1-52x72.jpg"),
+                    new TwitchCategoryCache("tw-2280", "Doom", "")));
+
+            var content = assembler().page(owner, owner, "streamer", 0, null, null).bindings().content();
+
+            assertThat(content).extracting(BindingDto::boxArtUrl)
+                    .containsExactly("https://static-cdn.jtvnw.net/ttv-boxart/1-52x72.jpg", null, null);
         }
 
         @Test
