@@ -66,7 +66,9 @@ puis repasse la PR en draft puis en ready.
 Pour un correctif urgent d'une version stable :
 
 1. Crée `hotfix/mon-correctif` **depuis `main`**.
-2. Ouvre une PR vers `main` (label `hotfix`) ; la sortie du draft et la fusion publient une release stable patch.
+2. Ouvre une PR vers `main` (label `hotfix`) **en draft**, puis sors-la du draft (« Ready for review ») : le bot
+   met la version à jour et la fusion publie une release stable patch. Une PR ouverte directement en ready ne
+   déclenche pas le bot.
 3. Le bot ouvre ensuite une PR de report `main` → `beta` (label `backport`), puis, une fois celle-ci fusionnée,
    le report `beta` → `dev`. Fusionne-les par commit de merge : tant qu'un report est en attente, les promotions
    depuis et vers sa branche sont refusées.
