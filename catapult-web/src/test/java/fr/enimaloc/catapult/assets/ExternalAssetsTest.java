@@ -39,7 +39,7 @@ class ExternalAssetsTest {
         base = server.url("/").toString();
         clock = new MutableClock(Instant.parse("2026-10-20T10:00:00Z"));
         assets = new ExternalAssets(HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).build(), clock,
-                base + "icon?family=Material+Icons", base + "gstatic/", base + "twitchat/");
+                base + "icon?family=Material+Icons", base + "gstatic/", base + "twitchat/", base + "avatars/");
     }
 
     @AfterEach
@@ -98,6 +98,26 @@ class ExternalAssetsTest {
     }
 
     @Test
+    void avatar_isTwitchsPictureAsASmallWebp() throws Exception {
+        server.enqueue(new MockResponse().setBody(new okio.Buffer().write(AvatarImagesTest.png(300, 300))));
+
+        ExternalAssets.Result avatar = assets.avatar("jtv_user_pictures/abc-profile_image-300x300.png", 64);
+
+        assertThat(avatar.status()).isEqualTo(200);
+        assertThat(new String(avatar.body(), 8, 4, StandardCharsets.US_ASCII)).isEqualTo("WEBP");
+        assertThat(server.takeRequest().getPath()).isEqualTo("/avatars/jtv_user_pictures/abc-profile_image-300x300.png");
+    }
+
+    @Test
+    void avatar_otherThanAPicture_orAtAnotherSize_isRefused() {
+        server.enqueue(new MockResponse().setBody("<html>"));
+        assertThat(assets.avatar("jtv_user_pictures/abc.png", 64).status()).isEqualTo(502);
+        assertThat(assets.avatar("jtv_user_pictures/abc.png", 50).status()).isEqualTo(404);
+        assertThat(assets.avatar("../secret.png", 64).status()).isEqualTo(404);
+        assertThat(server.getRequestCount()).isEqualTo(1);
+    }
+
+    @Test
     void twitchatIcon_mustBeAnSvg() {
         server.enqueue(new MockResponse().setBody("<html>not an icon</html>"));
         assertThat(assets.twitchatIcon(COMMIT, "add").status()).isEqualTo(502);
@@ -140,7 +160,7 @@ class ExternalAssetsTest {
     void aFetchThatBlowsUp_isNotLeftInFlight_andIsAskedAgainNextTime() throws Exception {
         HttpClient http = mock(HttpClient.class);
         when(http.send(any(), any())).thenThrow(new IllegalStateException("closed")).thenThrow(new IOException("reset"));
-        ExternalAssets failing = new ExternalAssets(http, clock, base + "css", base + "gstatic/", base + "twitchat/");
+        ExternalAssets failing = new ExternalAssets(http, clock, base + "css", base + "gstatic/", base + "twitchat/", base + "avatars/");
 
         assertThatThrownBy(failing::materialIconsCss).isInstanceOf(IllegalStateException.class);
         assertThat(failing.materialIconsCss().status()).isEqualTo(502);
@@ -151,7 +171,7 @@ class ExternalAssetsTest {
     void aFetchInterrupted_isA502_andKeepsTheThreadInterrupted() throws Exception {
         HttpClient http = mock(HttpClient.class);
         when(http.send(any(), any())).thenThrow(new InterruptedException("shutting down"));
-        ExternalAssets interrupted = new ExternalAssets(http, clock, base + "css", base + "gstatic/", base + "twitchat/");
+        ExternalAssets interrupted = new ExternalAssets(http, clock, base + "css", base + "gstatic/", base + "twitchat/", base + "avatars/");
 
         try {
             assertThat(interrupted.twitchatIcon(COMMIT, "add").status()).isEqualTo(502);

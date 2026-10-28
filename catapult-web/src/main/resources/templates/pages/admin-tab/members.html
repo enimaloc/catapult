@@ -54,7 +54,7 @@
              th:attr="data-member-id=${m.id()},data-admin-key=${m.id()},data-member-name=${name}"
              th:classappend="${m.systemAccount()} ? 'admin-member-system'">
             <div class="admin-member-identity">
-                <mdui-avatar th:src="${m.profileImageUrl()}" th:unless="${m.profileImageUrl() == null}"></mdui-avatar>
+                <mdui-avatar th:unless="${m.profileImageUrl() == null}"><img th:src="${avatars.url(m.profileImageUrl(), 64)}" alt="" width="40" height="40" loading="lazy" decoding="async"></mdui-avatar>
                 <mdui-avatar icon="person_off" th:if="${m.profileImageUrl() == null}"></mdui-avatar>
                 <div>
                     <strong>

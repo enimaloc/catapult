@@ -18,6 +18,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -26,12 +27,13 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * The third-party files the pages use (Google Fonts' Material Icons, Twitchat's icons on GitHub),
- * fetched by catapult-web itself and served from its own origin ({@link ExternalAssetController}),
- * so a visitor's browser never contacts Google or GitHub.
+ * The third-party files the pages use (Google Fonts' Material Icons, Twitchat's icons on GitHub, Twitch's
+ * avatars), fetched by catapult-web itself and served from its own origin ({@link ExternalAssetController}),
+ * so a visitor's browser never contacts Google, GitHub or Twitch's CDN.
  *
  * <p>Only fixed upstreams are ever asked: the Material Icons style sheet, font files under Google's
- * font host, and SVGs of Twitchat's icon folder at a given commit; the caller checks each path
+ * font host, SVGs of Twitchat's icon folder at a given commit, and Twitch's profile pictures (served
+ * as the size the pages show, in WebP: {@link AvatarImages}); the caller checks each path
  * element against a strict pattern before it gets here. Redirects aren't followed, an answer over
  * its kind's size limit is refused, and the style sheet is rewritten to point at the proxied fonts
  * (one pointing anywhere else is refused). Answers are kept in memory (bounded): an instance fetches
@@ -47,12 +49,18 @@ public class ExternalAssets {
     static final String USER_AGENT =
             "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36";
     static final String FONTS_PATH = "/assets/ext/fonts/gstatic/";
+    static final String TWITCH_CDN = "https://static-cdn.jtvnw.net/";
     static final long MAX_CACHED_BYTES = 32L * 1024 * 1024;
     static final int MAX_ENTRIES = 2000;
     static final Duration MISSING_TTL = Duration.ofMinutes(10);
     private static final Pattern CSS_URL = Pattern.compile("url\\(\\s*(['\"]?)([^'\")]*)\\1\\s*\\)");
     /** A font file's path under Google's font host, as the style sheet names them. */
     static final Pattern FONT_PATH = Pattern.compile("s/[a-z0-9]+/v[0-9]+/[A-Za-z0-9_-]+\\.(woff2|woff|ttf)");
+    /** A profile picture's path on Twitch's CDN, as Helix's profile_image_url names them. */
+    static final Pattern AVATAR_PATH =
+            Pattern.compile("(jtv_user_pictures|user-default-pictures-uv)/[A-Za-z0-9_.-]+\\.(png|jpe?g)");
+    /** The sides the pages show an avatar at (twice their CSS size, for dense screens). */
+    static final Set<Integer> AVATAR_SIZES = Set.of(64, 128);
 
     /** What is served: its status (200, 404 upstream; 502 when it can't be had) and for 200 its body. */
     public record Result(int status, byte[] body) {
@@ -67,6 +75,7 @@ public class ExternalAssets {
     private final URI materialIconsCss;
     private final String fontsBase;
     private final String twitchatBase;
+    private final String avatarsBase;
     private final Map<String, Entry> cache = new ConcurrentHashMap<>();
     private final AtomicLong cachedBytes = new AtomicLong();
     private final Map<String, CompletableFuture<Result>> inflight = new ConcurrentHashMap<>();
@@ -75,19 +84,22 @@ public class ExternalAssets {
     public ExternalAssets(
             @Value("${catapult.external-assets.material-icons-css:https://fonts.googleapis.com/icon?family=Material+Icons}") String materialIconsCss,
             @Value("${catapult.external-assets.fonts-base:https://fonts.gstatic.com/}") String fontsBase,
-            @Value("${catapult.external-assets.twitchat-base:https://raw.githubusercontent.com/Durss/Twitchat/}") String twitchatBase) {
+            @Value("${catapult.external-assets.twitchat-base:https://raw.githubusercontent.com/Durss/Twitchat/}") String twitchatBase,
+            @Value("${catapult.external-assets.avatars-base:" + TWITCH_CDN + "}") String avatarsBase) {
         this(HttpClient.newBuilder()
                 .followRedirects(HttpClient.Redirect.NEVER)
                 .connectTimeout(Duration.ofSeconds(5))
-                .build(), Clock.systemUTC(), materialIconsCss, fontsBase, twitchatBase);
+                .build(), Clock.systemUTC(), materialIconsCss, fontsBase, twitchatBase, avatarsBase);
     }
 
-    ExternalAssets(HttpClient http, Clock clock, String materialIconsCss, String fontsBase, String twitchatBase) {
+    ExternalAssets(HttpClient http, Clock clock, String materialIconsCss, String fontsBase, String twitchatBase,
+                   String avatarsBase) {
         this.http = http;
         this.clock = clock;
         this.materialIconsCss = URI.create(materialIconsCss);
         this.fontsBase = fontsBase;
         this.twitchatBase = twitchatBase;
+        this.avatarsBase = avatarsBase;
     }
 
     /** The Material Icons style sheet, its fonts pointing at {@link #FONTS_PATH}. */
@@ -122,11 +134,20 @@ public class ExternalAssets {
         return get("twitchat:" + commit + "/" + name, uri, Kind.SVG, svg -> looksLikeSvg(svg) ? svg : null);
     }
 
+    /** A Twitch profile picture, a {@code size}-pixel WebP; {@code path} must match {@link #AVATAR_PATH}. */
+    public Result avatar(String path, int size) {
+        if (!AVATAR_PATH.matcher(path).matches() || !AVATAR_SIZES.contains(size)) return Result.MISSING;
+        return get("avatar:" + size + ":" + path, URI.create(avatarsBase + path), Kind.AVATAR,
+                picture -> AvatarImages.webp(picture, size));
+    }
+
     /** Each kind's size limit and how long it is kept (a font or a commit's icon never changes). */
     enum Kind {
         CSS(64 * 1024, Duration.ofDays(1)),
         FONT(2 * 1024 * 1024, Duration.ofDays(7)),
-        SVG(256 * 1024, Duration.ofDays(7));
+        SVG(256 * 1024, Duration.ofDays(7)),
+        // A member changing theirs gets the new one within a day (its file name changes with it anyway).
+        AVATAR(2 * 1024 * 1024, Duration.ofDays(1));
 
         final int maxBytes;
         final Duration ttl;
