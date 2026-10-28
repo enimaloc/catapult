@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.security;
 
 import fr.enimaloc.catapult.api.ApiPaths;
+import fr.enimaloc.catapult.api.userapi.ApiV2;
 import fr.enimaloc.catapult.service.account.UserApiTokenService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.Bean;
@@ -106,7 +107,7 @@ public class ApiSecurityConfig {
         CorsConfiguration config = new CorsConfiguration();
         config.addAllowedOrigin(CorsConfiguration.ALL);
         config.setAllowedMethods(List.of("GET", "PUT", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type", ApiV2.VERSION_HEADER));
         config.setAllowCredentials(false);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         for (String path : PERSONAL_TOKEN_PATHS) {

@@ -11,8 +11,9 @@ public final class ApiV2 {
     // versioning scheme at all — it's a separate, unversioned controller by design.
     static final String VERSION = "2";
 
-    // Request header carrying the version (see ApiVersioningConfig).
-    static final String VERSION_HEADER = "X-API-Version";
+    // Request header carrying the version (see ApiVersioningConfig). Public: the CORS of the public routes
+    // (ApiSecurityConfig) allows it.
+    public static final String VERSION_HEADER = "X-API-Version";
 
     // Query parameter carrying the version when the header is absent (see ApiVersioningConfig).
     static final String VERSION_PARAM = "version";

@@ -31,6 +31,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -97,6 +98,21 @@ class GamesControllerTest {
 
         mvc.perform(remote(get("/api/games/dtdd/16758")).header("Origin", "https://twitchat.fr"))
                 .andExpect(header().string("Access-Control-Allow-Origin", "*"));
+    }
+
+    @Test
+    void games_preflight_allowsTheApiVersionHeader_fromAnyOrigin() throws Exception {
+        for (String path : new String[] {"/api/games/igdb/1", "/api/games/steam/1", "/api/games/xbox/X",
+                "/api/games/dtdd/1"}) {
+            mvc.perform(remote(options(path))
+                            .header("Origin", "https://twitchat.fr")
+                            .header("Access-Control-Request-Method", "GET")
+                            .header("Access-Control-Request-Headers", "x-api-version"))
+                    .andExpect(status().is2xxSuccessful())
+                    .andExpect(header().string("Access-Control-Allow-Origin", "*"))
+                    .andExpect(header().string("Access-Control-Allow-Headers",
+                            org.hamcrest.Matchers.containsStringIgnoringCase("x-api-version")));
+        }
     }
 
     @Test

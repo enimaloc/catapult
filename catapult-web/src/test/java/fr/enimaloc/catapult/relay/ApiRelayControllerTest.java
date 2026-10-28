@@ -38,7 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /** catapult-api's public paths, relayed by catapult-web; a local HTTP server stands in for catapult-api. */
 @WebMvcTest(ApiRelayController.class)
-@Import({WebSecurityConfig.class, CustomBindingsCorsConfig.class})
+@Import({WebSecurityConfig.class, PublicApiCorsConfig.class})
 class ApiRelayControllerTest {
 
     /** What the stand-in catapult-api received last. */
@@ -221,6 +221,32 @@ class ApiRelayControllerTest {
                     .andExpect(header().doesNotExist("Access-Control-Allow-Credentials"));
         }
         assertThat(RECEIVED.get()).isNull();
+    }
+
+    @Test
+    void everyPublicApiPreflight_isAnsweredHere_withTheApiVersionHeader() throws Exception {
+        for (String path : List.of("/api/me/game", "/api/me/game/summary", "/api/me/bindings/b",
+                "/api/me/custom-bindings", "/api/me/custom-bindings/active", "/api/games/igdb/1")) {
+            mvc.perform(options(path)
+                            .header("Origin", ORIGIN)
+                            .header("Access-Control-Request-Method", "GET")
+                            .header("Access-Control-Request-Headers", "authorization, x-api-version"))
+                    .andExpect(status().is2xxSuccessful())
+                    .andExpect(header().string("Access-Control-Allow-Origin", "*"))
+                    .andExpect(header().string("Access-Control-Allow-Headers",
+                            org.hamcrest.Matchers.containsStringIgnoringCase("x-api-version")))
+                    .andExpect(header().doesNotExist("Access-Control-Allow-Credentials"));
+        }
+        assertThat(RECEIVED.get()).isNull();
+    }
+
+    /** The games lookups only read: their preflight allows no write. */
+    @Test
+    void gamesPreflight_allowsReadsOnly() throws Exception {
+        mvc.perform(options("/api/games/steam/400")
+                        .header("Origin", ORIGIN)
+                        .header("Access-Control-Request-Method", "PUT"))
+                .andExpect(status().isForbidden());
     }
 
     /** catapult-api answers with its own CORS headers too: the browser must see Allow-Origin once only. */

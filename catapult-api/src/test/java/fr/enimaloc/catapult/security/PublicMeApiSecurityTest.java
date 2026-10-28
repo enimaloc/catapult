@@ -298,6 +298,21 @@ class PublicMeApiSecurityTest {
         }
 
         @Test
+        void preflight_allowsTheApiVersionHeader_onEveryMeFamily() throws Exception {
+            for (String path : List.of("/api/me/game", "/api/me/game/summary", "/api/me/bindings/b",
+                    CUSTOM_BINDINGS, ACTIVE)) {
+                mvc.perform(options(path)
+                                .header("Origin", ORIGIN)
+                                .header("Access-Control-Request-Method", "GET")
+                                .header("Access-Control-Request-Headers", "authorization, x-api-version"))
+                        .andExpect(status().is2xxSuccessful())
+                        .andExpect(header().string("Access-Control-Allow-Origin", "*"))
+                        .andExpect(header().string("Access-Control-Allow-Headers",
+                                org.hamcrest.Matchers.containsStringIgnoringCase("x-api-version")));
+            }
+        }
+
+        @Test
         void actualRequests_fromAnyOrigin_carryTheCorsHeaders_refusalsIncluded() throws Exception {
             mvc.perform(delete(ACTIVE).header("Origin", ORIGIN)
                             .header("Authorization", "Bearer " + PERSONAL_TOKEN))
