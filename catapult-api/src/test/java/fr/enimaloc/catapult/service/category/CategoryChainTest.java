@@ -398,6 +398,61 @@ class CategoryChainTest {
     }
 
     @Test
+    void streamStarted_gameOpen_appliesItsBindingOverTheDefault() {
+        when(activations.active(user)).thenReturn(Optional.empty());
+        when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(played));
+        when(lookup.findByDetectedGame(user, played)).thenReturn(Optional.of(binding));
+        live(true);
+
+        assertThat(chain.decide(user, new StreamStarted()))
+                .isEqualTo(CategoryDecision.update(CategoryRule.GAME_BINDING, binding));
+        verifyNoInteractions(settingsRepository);
+    }
+
+    @Test
+    void streamStarted_ignoredGameOpen_appliesTheNoGameFallback() {
+        binding.setIgnored(true);
+        settings.setApplyDefaultOnNoGame(true);
+        when(activations.active(user)).thenReturn(Optional.empty());
+        when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(played));
+        when(lookup.findByDetectedGame(user, played)).thenReturn(Optional.of(binding));
+        live(true);
+        withSettings();
+
+        CategoryDecision decision = chain.decide(user, new StreamStarted());
+
+        assertThat(decision.rule()).isEqualTo(CategoryRule.NO_GAME_FALLBACK);
+        assertThat(decision.binding().getTwitchGameId()).isEqualTo("509658");
+    }
+
+    @Test
+    void streamStarted_gameOpenWithoutCategory_fallsBackToTheDefault() {
+        binding.setIgnored(true);
+        settings.setApplyDefaultOnNoGame(false);
+        settings.setApplyDefaultOnStreamStart(true);
+        when(activations.active(user)).thenReturn(Optional.empty());
+        when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(played));
+        when(lookup.findByDetectedGame(user, played)).thenReturn(Optional.of(binding));
+        live(true);
+        withSettings();
+
+        assertThat(chain.decide(user, new StreamStarted()))
+                .isEqualTo(CategoryDecision.reset(CategoryRule.DEFAULT_CATEGORY));
+    }
+
+    @Test
+    void streamStarted_gameOpenWithoutBinding_fallsBackToTheDefault() {
+        settings.setApplyDefaultOnStreamStart(true);
+        when(activations.active(user)).thenReturn(Optional.empty());
+        when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(played));
+        when(lookup.findByDetectedGame(user, played)).thenReturn(Optional.empty());
+        withSettings();
+
+        assertThat(chain.decide(user, new StreamStarted()))
+                .isEqualTo(CategoryDecision.reset(CategoryRule.DEFAULT_CATEGORY));
+    }
+
+    @Test
     void streamStarted_default() {
         when(activations.active(user)).thenReturn(Optional.empty());
         settings.setApplyDefaultOnStreamStart(true);

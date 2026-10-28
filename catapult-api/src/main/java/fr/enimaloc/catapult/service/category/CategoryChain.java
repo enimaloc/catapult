@@ -220,6 +220,13 @@ public class CategoryChain {
             return CategoryDecision.update(CategoryRule.CUSTOM_BINDING,
                     active.get().getCustomBinding().toGameBinding(user));
         }
+        // The game open now wins over the default: it is only detected when it changes, so a game still open from
+        // an earlier stream left nothing pending. Without a category of its own, the default and the pending follow
+        Optional<CategoryDecision> openGame = gameStateService.getLastKnownGame(user)
+                .flatMap(game -> gameBindingLookup.findByDetectedGame(user, game))
+                .map(binding -> gameBinding(user, binding, true))
+                .filter(decision -> decision.action() != CategoryDecision.Action.NONE);
+        if (openGame.isPresent()) return openGame.get();
         boolean applyDefault = userSettingsRepository.findById(user.getId())
                 .map(UserSettings::isApplyDefaultOnStreamStart)
                 .orElse(false);

@@ -22,8 +22,8 @@ public sealed interface CategoryTrigger {
     record NoGameAfterCustomBinding() implements CategoryTrigger {}
 
     /**
-     * {@code stream.online}: the active custom binding re-applied, else the default category when enabled, else the
-     * binding kept pending while offline.
+     * {@code stream.online}: the active custom binding re-applied, else the binding of the game open now, else the
+     * default category when enabled, else the binding kept pending while offline.
      */
     record StreamStarted() implements CategoryTrigger {}
 
