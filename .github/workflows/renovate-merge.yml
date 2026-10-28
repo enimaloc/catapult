@@ -31,8 +31,8 @@ jobs:
       - name: Squash-merge the PR
         run: gh pr merge "$PR_NUMBER" --squash --subject "$PR_TITLE" --body "" --match-head-commit "$HEAD_SHA"
 
-      # A push made with GITHUB_TOKEN starts no workflow, so master's build and tests are started by hand
-      - name: Run master's build and tests
+      # A push made with GITHUB_TOKEN starts no workflow, so dev's build and tests are started by hand
+      - name: Run dev's build and tests
         run: |
-          gh workflow run build.yml --ref master
-          gh workflow run test.yml --ref master
+          gh workflow run build.yml --ref dev
+          gh workflow run test.yml --ref dev

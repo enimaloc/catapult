@@ -2,11 +2,13 @@ name: Tests
 
 on:
   push:
-  # Lets renovate-merge.yml run it on master after a checkbox merge, which GITHUB_TOKEN pushes cannot trigger
+  # Lets renovate-merge.yml run it on dev after a checkbox merge, which GITHUB_TOKEN pushes cannot trigger
   workflow_dispatch:
   pull_request:
     branches:
-      - master
+      - dev
+      - beta
+      - main
 
 jobs:
   test:

@@ -185,3 +185,9 @@ src/main/java/fr/enimaloc/catapult/
 ├── service/       Logique métier
 └── web/           Contrôleurs HTTP et templates
 ```
+
+## Contribuer
+
+Les PR de fonctionnalités et de correctifs s'ouvrent **vers `dev`**, avec des commits au format
+[Conventional Commits](https://www.conventionalcommits.org/fr/v1.0.0/). Le détail du flux (branches, releases,
+hotfix) est dans [CONTRIBUTING.md](CONTRIBUTING.md).
