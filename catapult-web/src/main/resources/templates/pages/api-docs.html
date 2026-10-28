@@ -22,13 +22,17 @@
         <!--/* The member's keys, never a visitor's. sentry-block keeps the widget's token and any token just generated
              out of Sentry Replay. The tokens' rows are api-token-cards.js's (status, generate/regenerate, revoke, the
              token shown once); the widget's copy button is api-docs.js's. Its regeneration stays on the
-             Integrations tab. */-->
+             Integrations tab. Rendered for a spa.js prefetch, it is pending (data-pending, no rows): api-docs.js
+             replaces it with data-src's once the page is shown. */-->
         <mdui-card th:if="${apiDocsMember}" id="api-docs-keys-card" class="settings-card api-docs-keys sentry-block"
-                   variant="outlined">
+                   variant="outlined"
+                   th:attr="data-pending=${apiDocsKeysPending} ? 'true',data-src=${apiDocsKeysPending} ? '/spa/docs/api',
+                            data-label-unavailable=${apiDocsKeysPending} ? #{api-docs.keys.unavailable}">
             <div class="title-row">
                 <h2 th:text="#{api-docs.keys.title}">api-docs.keys.title</h2>
             </div>
             <p th:text="#{api-docs.keys.description}">api-docs.keys.description</p>
+            <th:block th:unless="${apiDocsKeysPending}">
 
             <div th:if="${widgetToken != null or widgetUnavailable}" id="api-docs-widget" class="api-docs-key"
                  th:attr="data-label-copied=#{api-docs.keys.widget.copied}">
@@ -47,6 +51,7 @@
             <th:block th:replace="~{pages/api-docs :: token-row('api-docs-read-token', 'channel.read_token', 'read', null)}"></th:block>
             <th:block th:if="${customBindingsEnabled}">
                 <th:block th:replace="~{pages/api-docs :: token-row('api-docs-full-token', 'channel.api_token', 'full', ${customBindingsExample})}"></th:block>
+            </th:block>
             </th:block>
         </mdui-card>
 

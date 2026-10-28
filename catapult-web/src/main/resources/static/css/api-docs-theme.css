@@ -25,6 +25,11 @@
     color: var(--catapult-text);
     overflow-x: auto;
     color-scheme: dark;
+    /* The site's muted grey is 4.0:1 on the elevated surface: lightened here to 5.4:1 (6.1:1 on the background). */
+    --api-docs-muted: #8a91a0;
+    /* The primary buttons' fill, under white text: 7.1:1, 5.7:1 hovered. */
+    --api-docs-button: var(--catapult-primary-dark);
+    --api-docs-button-hover: #7c3aed;
 }
 
 /* ── Text, font ─────────────────────────────────────────────────────────── */
@@ -38,7 +43,9 @@
         .model, .model-title, .scopes, .errors-wrapper, .loading-container .loading,
         .json-schema-2020-12__title, .json-schema-2020-12__attribute,
         .json-schema-2020-12-keyword__name--primary, .json-schema-2020-12-keyword__value--primary,
-        .json-schema-2020-12-json-viewer__name--primary, .json-schema-2020-12-json-viewer__value--primary) {
+        .json-schema-2020-12-json-viewer__name--primary, .json-schema-2020-12-json-viewer__value--primary,
+        .json-schema-2020-12-json-viewer__name, .json-schema-2020-12-json-viewer__value, .checkbox p,
+        .errors-wrapper hgroup h4) {
     color: var(--catapult-text);
     font-family: inherit;
 }
@@ -51,16 +58,26 @@
 .api-docs-ui .swagger-ui :is(.opblock-summary-description, .parameter__in, .prop-format, .model .property,
         .model .external-docs, table.model tr.description, table.model tr.extension, table.headers .header-example,
         .response-undocumented, .errors-wrapper .errors small, section.models h5, .model-title,
-        .json-schema-2020-12-expand-deep-button) {
+        .json-schema-2020-12-expand-deep-button, .json-schema-2020-12-keyword--description,
+        .json-schema-2020-12-keyword__name--secondary, .json-schema-2020-12-keyword__value,
+        .json-schema-2020-12-keyword__value--secondary, .json-schema-2020-12-json-viewer__name--secondary,
+        .json-schema-2020-12-json-viewer__value--secondary, span.token-string, span.token-not-formatted) {
     color: var(--catapult-text-secondary);
 }
 
-.api-docs-ui .swagger-ui :is(.prop-type, .json-schema-2020-12__attribute--primary) {
+/* Nested deeper than the text rule can reach (and a pseudo-element, which :is() can't take). */
+.api-docs-ui .swagger-ui .scheme-container .schemes > .schemes-server-container > label,
+.api-docs-ui .swagger-ui .loading-container .loading::after {
+    color: var(--catapult-text);
+}
+
+/* `.model .prop-type` gives the rule the text rule's weight, so the attributes it recolors take the accent. */
+.api-docs-ui .swagger-ui :is(.prop-type, .json-schema-2020-12__attribute--primary, .model .prop-type) {
     color: var(--catapult-primary-hover);
 }
 
 .api-docs-ui .swagger-ui .model .property.primitive {
-    color: var(--catapult-text-muted);
+    color: var(--api-docs-muted);
 }
 
 /* ── Links ──────────────────────────────────────────────────────────────── */
@@ -109,8 +126,12 @@
     text-shadow: none;
 }
 
+.api-docs-ui .swagger-ui :is(.opblock.opblock-head, .opblock.opblock-options) .opblock-summary-method {
+    color: #fff; /* their hues are dark: white reads at 5.7:1 (HEAD) and 6.9:1 (OPTIONS) */
+}
+
 .api-docs-ui .swagger-ui .opblock.opblock-deprecated :is(.opblock-summary-path__deprecated, .opblock-summary-description) {
-    color: var(--catapult-text-muted);
+    color: var(--api-docs-muted);
 }
 
 .api-docs-ui .swagger-ui .tab li:first-of-type::after {
@@ -227,11 +248,18 @@
 
 .api-docs-ui .swagger-ui :is(input, select, textarea)[disabled] {
     background-color: var(--catapult-surface-elevated);
-    color: var(--catapult-text-muted);
+    color: var(--api-docs-muted);
 }
 
 .api-docs-ui .swagger-ui :is(input, select, textarea)::placeholder {
-    color: var(--catapult-text-muted);
+    color: var(--api-docs-muted);
+}
+
+/* Try it out's invalid fields: Swagger UI's light-red fill would vanish here; a red border on a red tint instead. */
+.api-docs-ui .swagger-ui :is(input, textarea, select).invalid {
+    border-color: rgb(var(--mdui-color-error));
+    background-color: rgba(249, 62, 62, 0.14);
+    animation: shake .4s 1;
 }
 
 .api-docs-ui .swagger-ui .checkbox input[type=checkbox] + label > .item {
@@ -256,14 +284,14 @@
 }
 
 .api-docs-ui .swagger-ui :is(.btn.execute, .btn.authorize, .auth-btn-wrapper .btn.modal-btn.auth.authorize) {
-    border-color: var(--catapult-primary);
-    background: var(--catapult-primary);
+    border-color: var(--api-docs-button);
+    background: var(--api-docs-button);
     color: #fff;
 }
 
 .api-docs-ui .swagger-ui :is(.btn.execute, .btn.authorize):hover {
-    border-color: var(--catapult-primary-hover);
-    background: var(--catapult-primary-hover);
+    border-color: var(--api-docs-button-hover);
+    background: var(--api-docs-button-hover);
 }
 
 .api-docs-ui .swagger-ui .btn.authorize svg {
@@ -277,7 +305,7 @@
 
 .api-docs-ui .swagger-ui button.invalid {
     border-color: rgb(var(--mdui-color-error));
-    background: transparent;
+    background: rgba(249, 62, 62, 0.14);
 }
 
 /* ── The Authorize modal ────────────────────────────────────────────────── */

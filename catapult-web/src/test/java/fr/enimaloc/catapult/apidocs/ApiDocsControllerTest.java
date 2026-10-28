@@ -2,6 +2,10 @@ package fr.enimaloc.catapult.apidocs;
 
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingDto;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto;
+import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
+import fr.enimaloc.catapult.common.dto.channel.ChannelUserDto;
+import fr.enimaloc.catapult.common.dto.channel.ObsData;
+import fr.enimaloc.catapult.common.dto.channel.PagedBindings;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatSettingsResponse;
 import fr.enimaloc.catapult.config.I18nConfiguration;
 import fr.enimaloc.catapult.config.TwitchatCatalogConfig;
@@ -24,13 +28,17 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
+import java.util.Arrays;
 import java.util.Base64;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -77,14 +85,31 @@ class ApiDocsControllerTest {
     }
 
     static CustomBindingsStateDto customBindings(String... names) {
-        return new CustomBindingsStateDto(true, java.util.Arrays.stream(names)
+        return new CustomBindingsStateDto(true, Arrays.stream(names)
                 .map(name -> new CustomBindingDto(UUID.randomUUID(), name, null, null, List.of(), List.of(), false))
                 .toList(), null, null);
     }
 
+    /**
+     * The member's own channel page as catapult-api answers it: their OBS widget's settings when they have one (always,
+     * for the owner, today), the custom bindings while the experiment is open to them.
+     */
+    static ChannelPageData ownChannel(ObsData obs, CustomBindingsStateDto customBindings) {
+        return new ChannelPageData(new ChannelUserDto("1", "2", LOGIN, "img"), LOGIN, true, false, true,
+                null, new PagedBindings(0, 1, 0, List.of()), List.of(), Set.of(), List.of(), Set.of(),
+                null, null, null, null, null, obs, null, customBindings);
+    }
+
+    static final ObsData OBS = new ObsData(false, null, null, false);
+
+    void docsAvailable() {
+        when(spec.current()).thenReturn(Optional.of(new ApiDocsSpec.Cached(SPEC, FETCHED_AT, false)));
+    }
+
     @Test
     void docsPage_member_showsKeysCard_withWidgetToken() throws Exception {
-        when(spec.current()).thenReturn(Optional.of(new ApiDocsSpec.Cached(SPEC, FETCHED_AT, false)));
+        docsAvailable();
+        when(apiService.channelPage(LOGIN, 0, null, null)).thenReturn(ownChannel(OBS, null));
         when(apiService.twitchatSettings(LOGIN)).thenReturn(new TwitchatSettingsResponse(true, null, null, false, WIDGET));
 
         for (String html : List.of(memberPage("/docs/api", Locale.FRENCH), memberPage("/spa/docs/api", Locale.FRENCH))) {
@@ -93,7 +118,8 @@ class ApiDocsControllerTest {
                     "id=\"api-docs-read-token-generate-btn\"", "Tes clés d&#39;API",
                     // The Account tab's labels, for api-token-cards.js.
                     "data-label-none=\"Aucun jeton de lecture pour le moment.\"", "data-label-since=\"Généré le {0}\"",
-                    ">Générer un jeton de lecture<");
+                    ">Générer un jeton de lecture<")
+                    .doesNotContain("data-pending");
             // Above Swagger UI, and kept out of Sentry Replay with what it holds.
             assertThat(html.indexOf("id=\"api-docs-keys-card\"")).isLessThan(html.indexOf("id=\"swagger-ui\""));
             String card = html.substring(html.lastIndexOf("<mdui-card", html.indexOf("id=\"api-docs-keys-card\"")));
@@ -106,52 +132,75 @@ class ApiDocsControllerTest {
 
     @Test
     void docsPage_member_withoutWidget_hasNoWidgetRow() throws Exception {
-        when(spec.current()).thenReturn(Optional.of(new ApiDocsSpec.Cached(SPEC, FETCHED_AT, false)));
-        when(apiService.twitchatSettings(LOGIN)).thenReturn(new TwitchatSettingsResponse(false, null, null, false, null));
+        docsAvailable();
+        // No OBS on the channel page: nothing to put a widget's token in (catapult-api would still make one up).
+        when(apiService.channelPage(LOGIN, 0, null, null)).thenReturn(ownChannel(null, null));
+        when(apiService.twitchatSettings(LOGIN)).thenReturn(new TwitchatSettingsResponse(false, null, null, false, WIDGET));
 
         String html = memberPage("/docs/api", Locale.FRENCH);
 
         assertThat(html).contains("id=\"api-docs-keys-card\"", "id=\"api-docs-read-token\"")
-                .doesNotContain("id=\"api-docs-widget\"", "id=\"api-docs-widget-unavailable\"");
+                .doesNotContain("id=\"api-docs-widget\"", "id=\"api-docs-widget-unavailable\"", WIDGET);
+        verify(apiService, never()).twitchatSettings(anyString());
     }
 
     @Test
     void docsPage_member_apiFailures_stillRenderTheCard_rowSaysUnavailable() throws Exception {
-        when(spec.current()).thenReturn(Optional.of(new ApiDocsSpec.Cached(SPEC, FETCHED_AT, false)));
+        docsAvailable();
+        when(apiService.channelPage(LOGIN, 0, null, null)).thenReturn(ownChannel(OBS, customBindings()));
         when(apiService.twitchatSettings(anyString())).thenThrow(new IllegalStateException("down"));
-        when(apiService.customBindings(anyString())).thenThrow(new IllegalStateException("down"));
 
-        String html = memberPage("/docs/api", Locale.FRENCH);
+        String widgetDown = memberPage("/docs/api", Locale.FRENCH);
+        assertThat(widgetDown).contains("id=\"api-docs-keys-card\"", "id=\"api-docs-widget-unavailable\"",
+                "id=\"api-docs-read-token\"", "id=\"api-docs-full-token\"").doesNotContain("id=\"api-docs-widget-value\"");
 
-        assertThat(html).contains("id=\"api-docs-keys-card\"", "id=\"api-docs-widget-unavailable\"",
-                "id=\"api-docs-read-token\"").doesNotContain("id=\"api-docs-widget-value\"");
+        when(apiService.channelPage(anyString(), anyInt(), any(), any())).thenThrow(new IllegalStateException("down"));
+        String channelDown = memberPage("/spa/docs/api", Locale.FRENCH);
+        assertThat(channelDown).contains("id=\"api-docs-keys-card\"", "id=\"api-docs-widget-unavailable\"",
+                "id=\"api-docs-read-token\"").doesNotContain("id=\"api-docs-widget-value\"", "id=\"api-docs-full-token\"");
     }
 
     @Test
     void docsPage_anonymous_hasNoKeysCard_butThemedUi() throws Exception {
-        when(spec.current()).thenReturn(Optional.of(new ApiDocsSpec.Cached(SPEC, FETCHED_AT, false)));
+        docsAvailable();
 
         for (String html : List.of(page("/docs/api", Locale.FRENCH), page("/spa/docs/api", Locale.ENGLISH))) {
             assertThat(html).doesNotContain("id=\"api-docs-keys-card\"", "api-docs-read-token", "api-docs-widget")
                     .contains("id=\"swagger-ui\"", "class=\"api-docs-ui\"", "/css/api-docs-theme");
         }
+        verify(apiService, never()).channelPage(anyString(), anyInt(), any(), any());
         verify(apiService, never()).twitchatSettings(anyString());
-        verify(apiService, never()).customBindings(anyString());
     }
 
     @Test
     void docsPage_fullTokenRow_onlyInCustomBindingsExperiment() throws Exception {
-        when(spec.current()).thenReturn(Optional.of(new ApiDocsSpec.Cached(SPEC, FETCHED_AT, false)));
+        docsAvailable();
+        when(apiService.channelPage(LOGIN, 0, null, null)).thenReturn(ownChannel(OBS, null));
 
         String closed = memberPage("/docs/api", Locale.FRENCH);
         assertThat(closed).contains("id=\"api-docs-read-token\"").doesNotContain("id=\"api-docs-full-token\"");
 
-        when(apiService.customBindings(LOGIN)).thenReturn(customBindings("Speedrun"));
+        when(apiService.channelPage(LOGIN, 0, null, null)).thenReturn(ownChannel(OBS, customBindings("Speedrun")));
         for (String html : List.of(memberPage("/docs/api", Locale.FRENCH), memberPage("/spa/docs/api", Locale.FRENCH))) {
             assertThat(html).contains("id=\"api-docs-read-token\"", "id=\"api-docs-full-token\"",
                     "id=\"api-docs-full-token-generate-btn\"", "data-example-name=\"Speedrun\"",
                     "data-label-none=\"Aucun jeton pour le moment.\"", "id=\"api-docs-full-token-confirm-dialog\"");
         }
+    }
+
+    @Test
+    void docsPage_prefetch_asksCatapultApiNothing_andRendersTheCardPending() throws Exception {
+        docsAvailable();
+
+        String html = mvc.perform(get("/spa/docs/api").locale(Locale.FRENCH).header("Purpose", "prefetch")
+                        .sessionAttr(ApiClient.SESSION_JWT_KEY, jwt(LOGIN)))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+
+        assertThat(html).contains("id=\"api-docs-keys-card\"", "data-pending=\"true\"", "data-src=\"/spa/docs/api\"",
+                        "data-label-unavailable=\"Tes clés sont illisibles", "id=\"swagger-ui\"")
+                .doesNotContain("api-docs-read-token", "api-docs-widget", "api-docs-full-token");
+        verify(apiService, never()).channelPage(anyString(), anyInt(), any(), any());
+        verify(apiService, never()).twitchatSettings(anyString());
     }
 
     @Test

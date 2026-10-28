@@ -164,7 +164,8 @@ window.CatapultApiTokenCards = (function () {
         })();
     }
 
-    document.addEventListener("catapult:render", () => {
+    /** Wires every token card the page has (each render; api-docs.js again once its pending keys card is in). */
+    function attachAll() {
         const full = byId("channel-api-token-card");
         if (full) attach(full, { base: FULL, prefix: "api-token", curl: customBindingsCurl });
         const read = byId("channel-read-token-card");
@@ -173,7 +174,9 @@ window.CatapultApiTokenCards = (function () {
         if (docsRead) attach(docsRead, { base: READ, prefix: "api-docs-read-token", curl: summaryCurl });
         const docsFull = byId("api-docs-full-token");
         if (docsFull) attach(docsFull, { base: FULL, prefix: "api-docs-full-token", curl: customBindingsCurl });
-    });
+    }
 
-    return { attach, customBindingsCurl, summaryCurl, FULL, READ };
+    document.addEventListener("catapult:render", attachAll);
+
+    return { attach, attachAll, customBindingsCurl, summaryCurl, FULL, READ };
 })();

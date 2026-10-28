@@ -288,4 +288,13 @@ describe("the API docs page's keys card", () => {
         expect(fetch).toHaveBeenCalledTimes(1);
         expect(fetch).toHaveBeenCalledWith("/me/api-token/read", expect.anything());
     });
+
+    it("wires a card put in after the render, when asked", async () => {
+        html(card("api-docs-read-token", "api-docs-read-token"));
+        window.CatapultApiTokenCards.attachAll();
+        await flush();
+
+        expect(fetch).toHaveBeenCalledWith("/me/api-token/read", expect.anything());
+        expect(byId("api-docs-read-token-status").textContent).toBe("Aucun jeton");
+    });
 });

@@ -7,7 +7,8 @@
  * loaded on the first render that shows it, then started on each new #swagger-ui. "Try it out" calls the site
  * itself (the spec's servers are "/"), which relays the documented paths to catapult-api.
  * A member's keys card (#api-docs-keys-card) has the OBS widget's UUID with a copy button, wired here; its tokens'
- * rows are api-token-cards.js's.
+ * rows are api-token-cards.js's. Prefetched (spa.js), the card came pending, without its rows: the page's fragment
+ * is fetched again (data-src, as a navigation would) and its card put in place, then wired.
  */
 window.CatapultApiDocs = (function () {
     /** The bundle's loading, shared by every render until it is there; dropped when it fails, to try again. */
@@ -75,7 +76,31 @@ window.CatapultApiDocs = (function () {
         });
     }
 
+    /** Puts the member's real keys card in place of the pending one, else says the keys can't be read. */
+    async function fillPendingKeys(card) {
+        if (card.dataset.loading) return;
+        card.dataset.loading = "true";
+        try {
+            const response = await fetch(card.dataset.src);
+            if (!response.ok) throw new Error(String(response.status));
+            const page = new DOMParser().parseFromString(await response.text(), "text/html");
+            const fresh = page.getElementById("api-docs-keys-card");
+            if (!fresh || fresh.dataset.pending) throw new Error("no keys card");
+            if (!card.isConnected) return;
+            card.replaceWith(document.importNode(fresh, true));
+            window.CatapultApiTokenCards?.attachAll();
+            const widget = document.getElementById("api-docs-widget");
+            if (widget) wireWidgetCopy(widget);
+        } catch {
+            const note = document.createElement("p");
+            note.textContent = card.dataset.labelUnavailable ?? "";
+            card.append(note);
+        }
+    }
+
     async function start() {
+        const keys = document.getElementById("api-docs-keys-card");
+        if (keys?.dataset.pending) fillPendingKeys(keys);
         const widget = document.getElementById("api-docs-widget");
         if (widget) wireWidgetCopy(widget);
         const cached = document.getElementById("api-docs-cached");

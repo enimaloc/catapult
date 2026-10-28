@@ -257,4 +257,51 @@ describe("API documentation page", () => {
             expect(field.select).toHaveBeenCalled();
         });
     });
+
+    describe("a prefetched (pending) keys card", () => {
+        const pending = `<mdui-card id="api-docs-keys-card" data-pending="true" data-src="/spa/docs/api"
+                                   data-label-unavailable="Keys unreadable"><p>Your keys</p></mdui-card>`;
+        const fresh = `<mdui-layout-main><mdui-card id="api-docs-keys-card">
+                <div id="api-docs-widget" data-label-copied="UUID copied">
+                    <input id="api-docs-widget-value" value="the-uuid" readonly>
+                    <button id="api-docs-widget-copy-btn"></button>
+                </div>
+                <div id="api-docs-read-token"></div></mdui-card></mdui-layout-main>`;
+
+        it("is replaced by the member's real card, fetched as a navigation, then wired", async () => {
+            const attachAll = vi.fn();
+            window.CatapultApiTokenCards = { attachAll };
+            const writeText = vi.fn(async () => {});
+            vi.stubGlobal("navigator", { clipboard: { writeText } });
+            window.CatapultChannel = { showError: vi.fn() };
+            fetch.mockImplementation(async url => (url === "/spa/docs/api" ? response(200, fresh) : response(200, { status: "UP" })));
+            html(pending);
+            await load("api-docs");
+
+            render();
+            await flush();
+
+            expect(fetch).toHaveBeenCalledWith("/spa/docs/api");
+            const card = document.getElementById("api-docs-keys-card");
+            expect(card.dataset.pending).toBeUndefined();
+            expect(document.getElementById("api-docs-read-token")).not.toBeNull();
+            expect(attachAll).toHaveBeenCalledTimes(1);
+            document.getElementById("api-docs-widget-copy-btn").click();
+            await flush();
+            expect(writeText).toHaveBeenCalledWith("the-uuid");
+        });
+
+        it("says the keys can't be read when that fetch fails", async () => {
+            fetch.mockImplementation(async url => (url === "/spa/docs/api" ? response(502, "") : response(200, { status: "UP" })));
+            html(pending);
+            await load("api-docs");
+
+            render();
+            await flush();
+
+            const card = document.getElementById("api-docs-keys-card");
+            expect(card.dataset.pending).toBe("true");
+            expect(card.textContent).toContain("Keys unreadable");
+        });
+    });
 });
