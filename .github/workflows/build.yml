@@ -1,7 +1,9 @@
 name: Build
 
 on:
+  # Branches only: a version tag push runs release.yml, not the checks again
   push:
+    branches: ['**']
   # Lets renovate-merge.yml run it on dev after a checkbox merge, which GITHUB_TOKEN pushes cannot trigger
   workflow_dispatch:
   pull_request:
