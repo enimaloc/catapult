@@ -5,7 +5,7 @@
 
 const API = "https://api.github.com";
 
-export function createGitHub({ token, owner, repo }) {
+export function createGitHub({ token, owner, repo, fetch = globalThis.fetch }) {
   if (!token) throw new Error("A GitHub token is required");
   const headers = {
     Accept: "application/vnd.github+json",
@@ -41,7 +41,7 @@ export function createGitHub({ token, owner, repo }) {
     body: p.body ?? "",
     state: p.state,
     draft: p.draft,
-    merged: Boolean(p.merged),
+    merged: Boolean(p.merged ?? p.merged_at), // list endpoints only carry merged_at
     mergeCommitSha: p.merge_commit_sha ?? null,
     autoMerge: Boolean(p.auto_merge),
     base: p.base.ref,
@@ -59,9 +59,9 @@ export function createGitHub({ token, owner, repo }) {
   });
 
   return {
-    /** Open pulls into `base`, from `head` when given. */
-    async listPulls({ base, head }) {
-      const query = new URLSearchParams({ state: "open", base, per_page: "100" });
+    /** Pulls into `base` (open by default), from `head` when given; most recently updated first. */
+    async listPulls({ base, head, state = "open" }) {
+      const query = new URLSearchParams({ state, base, per_page: "100", sort: "updated", direction: "desc" });
       if (head) query.set("head", `${owner}:${head}`);
       return (await request("GET", `${repoPath}/pulls?${query}`)).map(toPull);
     },
@@ -190,17 +190,6 @@ export function createGitHub({ token, owner, repo }) {
     async createTag({ tag, sha, message }) {
       const created = await request("POST", `${repoPath}/git/tags`, { tag, message, object: sha, type: "commit" });
       await request("POST", `${repoPath}/git/refs`, { ref: `refs/tags/${tag}`, sha: created.sha });
-    },
-
-    /** The GitHub Release of `tag` ({id, tag, draft, prerelease}), or null when there is none. */
-    async getRelease(tag) {
-      try {
-        const release = await request("GET", `${repoPath}/releases/tags/${encodeURIComponent(tag)}`);
-        return { id: release.id, tag: release.tag_name, draft: release.draft, prerelease: release.prerelease };
-      } catch (error) {
-        if (error.status === 404) return null;
-        throw error;
-      }
     },
 
     async listTags() {

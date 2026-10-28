@@ -8,8 +8,8 @@ const REPO = "catapult";
 const sha = (c) => c.repeat(40);
 const CHANGELOG = "### Fonctionnalités\n\n- abc1234 edited by hand";
 
-// In-memory GitHub: tags map name -> commit SHA, releases a set of tags, pulls the open ones.
-function fakeGitHub({ tags = {}, releases = [], pulls = [], compare = {} } = {}) {
+// In-memory GitHub: tags map name -> commit SHA, pulls the open ones.
+function fakeGitHub({ tags = {}, pulls = [], compare = {} } = {}) {
   const calls = [];
   const record = (name, ...args) => calls.push([name, ...args]);
   return {
@@ -21,10 +21,6 @@ function fakeGitHub({ tags = {}, releases = [], pulls = [], compare = {} } = {})
     async createTag(tag) {
       record("createTag", tag);
       tags[tag.tag] = tag.sha;
-    },
-    async getRelease(tag) {
-      record("getRelease", tag);
-      return releases.includes(tag) ? { tag } : null;
     },
     async listPulls({ base, head }) {
       record("listPulls", base, head);
@@ -62,31 +58,24 @@ const commit = (c, subject) => ({ sha: sha(c), subject, message: subject, author
 test("merge_tagsMergeCommit_withNotesFromBody", async () => {
   const gh = fakeGitHub();
   const result = await run(gh, mergedPull());
-  assert.deepEqual(result, {
-    tag: "v1.0.0-BETA.97",
-    prerelease: true,
-    notes: CHANGELOG,
-    skip: false,
-    backports: [],
-  });
+  assert.deepEqual(result, { tag: "v1.0.0-BETA.97", backports: [] });
   assert.deepEqual(named(gh, "createTag"), [
     ["createTag", { tag: "v1.0.0-BETA.97", sha: sha("m"), message: "chore(release): v1.0.0-BETA.97" }],
   ]);
   assert.deepEqual(named(gh, "createPull"), []);
 });
 
-test("stableMerge_isNotAPrerelease", async () => {
+test("stableMerge_tagsTheStableVersion", async () => {
   const gh = fakeGitHub();
   const result = await run(gh, mergedPull({ base: "main", head: "beta", title: "chore(release): v1.0.0" }));
   assert.equal(result.tag, "v1.0.0");
-  assert.equal(result.prerelease, false);
   assert.deepEqual(named(gh, "createPull"), [], "only a hotfix opens backports");
 });
 
 test("existingTagOnMergeCommit_isKept", async () => {
   const gh = fakeGitHub({ tags: { "v1.0.0-BETA.97": sha("m") } });
   const result = await run(gh, mergedPull());
-  assert.equal(result.skip, false);
+  assert.equal(result.tag, "v1.0.0-BETA.97");
   assert.deepEqual(named(gh, "createTag"), []);
 });
 
@@ -98,17 +87,11 @@ test("existingTagOnAnotherCommit_failsLoudly", async () => {
 });
 
 test("existingRelease_isNotRepublished", async () => {
-  const gh = fakeGitHub({ tags: { "v1.0.0-BETA.97": sha("m") }, releases: ["v1.0.0-BETA.97"] });
-  const result = await run(gh, mergedPull());
-  assert.equal(result.skip, true);
-  assert.equal(result.tag, "v1.0.0-BETA.97");
+  // A re-run after a full publication: the tag is there, so no new tag push re-triggers release.yml.
+  const gh = fakeGitHub({ tags: { "v1.0.0-BETA.97": sha("m") } });
+  await run(gh, mergedPull());
   assert.deepEqual(named(gh, "createTag"), []);
-});
-
-test("emptyChangelog_leavesNotesEmpty", async () => {
-  const gh = fakeGitHub();
-  const result = await run(gh, mergedPull({ body: "" }));
-  assert.equal(result.notes, "");
+  assert.deepEqual(named(gh, "createPull"), []);
 });
 
 test("titleWithoutVersion_fails", async () => {
@@ -138,8 +121,6 @@ test("hotfixMerge_publishesPatchAndOpensBackports", async () => {
     mergedPull({ base: "main", head: "hotfix/login", title: "chore(release): v1.0.1", body: "Corrige le login." }),
   );
   assert.equal(result.tag, "v1.0.1");
-  assert.equal(result.prerelease, false);
-  assert.equal(result.notes, "");
   assert.equal(result.backports.length, 2);
   assert.deepEqual(named(gh, "createTag"), [
     ["createTag", { tag: "v1.0.1", sha: sha("m"), message: "chore(release): v1.0.1" }],

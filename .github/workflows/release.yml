@@ -1,29 +1,25 @@
 name: Release
 
-# Called by publish.yml once a promotion PR is merged (a tag pushed by a workflow triggers nothing),
-# and still run by a tag pushed by hand. Idempotent: skipped when the GitHub Release already exists.
+# Runs on every version tag push: the one publish.yml pushes with the App token once a release PR is
+# merged, or one pushed by hand. Idempotent: skipped when the GitHub Release already exists, which is
+# created last, once both images are pushed.
 on:
-  workflow_call:
-    inputs:
-      version:
-        description: Tag to publish (vX.Y.Z or vX.Y.Z-BETA.N)
-        required: true
-        type: string
-      notes:
-        description: Release notes; generated from the commits when empty
-        required: false
-        type: string
-        default: ''
   push:
     tags:
       - '*'
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
 
 jobs:
   check:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      pull-requests: read
     outputs:
+      notes: ${{ steps.notes.outputs.notes }}
       version: ${{ steps.check.outputs.version }}
       prerelease: ${{ steps.check.outputs.prerelease }}
       image-tag: ${{ steps.check.outputs.image-tag }}
@@ -34,7 +30,7 @@ jobs:
         name: Resolve the version and look for an existing release
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ inputs.version || github.ref_name }}
+          VERSION: ${{ github.ref_name }}
         run: |
           if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-BETA\.[0-9]+)?$ ]]; then
             echo "::error::Not a release version: $VERSION (expected vX.Y.Z or vX.Y.Z-BETA.N)"
@@ -58,8 +54,34 @@ jobs:
             echo "skip=$skip"
           } >> "$GITHUB_OUTPUT"
 
+      - if: steps.check.outputs.skip != 'true'
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - if: steps.check.outputs.skip != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - id: notes
+        if: steps.check.outputs.skip != 'true'
+        name: Take the notes from the merged release pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.check.outputs.version }}
+          SHA: ${{ github.sha }}
+        run: |
+          node .github/release/notes.mjs --tag "$VERSION" --sha "$SHA" --out "$RUNNER_TEMP/notes.md"
+          delimiter="notes_$(openssl rand -hex 16)"
+          {
+            echo "notes<<$delimiter"
+            cat "$RUNNER_TEMP/notes.md"
+            echo
+            echo "$delimiter"
+          } >> "$GITHUB_OUTPUT"
+
+  # Last: the release is the idempotence marker, so it must not exist unless both images were pushed.
   github-release:
-    needs: check
+    needs: [check, release-api, release-web]
     if: needs.check.outputs.skip != 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -74,8 +96,8 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.check.outputs.version }}
-          body: ${{ inputs.notes }}
-          generate_release_notes: ${{ !inputs.notes }}
+          body: ${{ needs.check.outputs.notes }}
+          generate_release_notes: ${{ !needs.check.outputs.notes }}
           prerelease: ${{ needs.check.outputs.prerelease == 'true' }}
 
   release-api:

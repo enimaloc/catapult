@@ -1,13 +1,11 @@
-// A promotion (or hotfix) PR was merged: tag its merge commit, hand the release notes to release.yml,
-// and after a hotfix open the backport PRs main -> beta and beta -> dev.
-// CLI: node .github/release/publish.mjs --number 12 --notes-file notes.md
-// (env: GH_TOKEN, GITHUB_REPOSITORY=owner/repo; GITHUB_OUTPUT receives tag, prerelease and skip)
+// A promotion (or hotfix) PR was merged: tag its merge commit, and after a hotfix open the backport
+// PRs main -> beta and beta -> dev. The tag is pushed with the App token, so its push event runs
+// release.yml, the single publication path (it reads the PR's notes itself).
+// CLI: node .github/release/publish.mjs --number 12
+// (env: GH_TOKEN = the App token, GITHUB_REPOSITORY=owner/repo)
 
-import { appendFileSync, writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { pathToFileURL } from "node:url";
-import { parseVersion } from "./lib/version.mjs";
-import { releaseNotes } from "./lib/pr-body.mjs";
 import { createGitHub } from "./lib/github.mjs";
 import { kindOf, titleVersion } from "./ready.mjs";
 
@@ -61,15 +59,13 @@ async function release(gh, pr, kind) {
   if (tag === null) throw new Error(`#${pr.number}: the title does not carry the version to publish: ${pr.title}`);
 
   await ensureTag(gh, tag, pr.mergeCommitSha, pr.title);
-  const skip = (await gh.getRelease(tag)) !== null;
-  if (skip) console.log(`${tag} already has a GitHub Release: not published again`);
   const backports = kind === "hotfix" ? await openBackports(gh, tag, pr) : [];
-  return { tag, prerelease: parseVersion(tag).beta !== null, notes: releaseNotes(pr.body ?? ""), skip, backports };
+  return { tag, backports };
 }
 
 /**
- * -> {tag, prerelease, notes, skip, backports}: `skip` when the release already exists. Throws on an
- * unmerged or unrelated PR; a failure on a release PR is also reported on it.
+ * -> {tag, backports} (numbers of the backport PRs opened). Throws on an unmerged or unrelated PR; a
+ * failure on a release PR is also reported on it.
  */
 export async function publish({ gh, pr, owner, repo }) {
   const kind = kindOf(pr, `${owner}/${repo}`);
@@ -94,18 +90,10 @@ export async function publish({ gh, pr, owner, repo }) {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
-  const { values } = parseArgs({ options: { number: { type: "string" }, "notes-file": { type: "string" } } });
-  if (!values.number || !values["notes-file"]) throw new Error("Usage: publish.mjs --number <pr> --notes-file <path>");
+  const { values } = parseArgs({ options: { number: { type: "string" } } });
+  if (!values.number) throw new Error("Usage: publish.mjs --number <pr>");
   const [owner, repo] = (process.env.GITHUB_REPOSITORY ?? "").split("/");
   const gh = createGitHub({ token: process.env.GH_TOKEN, owner, repo });
   const pr = await gh.getPull(Number(values.number));
-  const result = await publish({ gh, pr, owner, repo });
-  writeFileSync(values["notes-file"], result.notes);
-  if (process.env.GITHUB_OUTPUT) {
-    appendFileSync(
-      process.env.GITHUB_OUTPUT,
-      `tag=${result.tag}\nprerelease=${result.prerelease}\nskip=${result.skip}\n`,
-    );
-  }
-  console.log(JSON.stringify({ ...result, notes: undefined }));
+  console.log(JSON.stringify(await publish({ gh, pr, owner, repo })));
 }
