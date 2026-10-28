@@ -5,6 +5,7 @@ import { buildBody, parseBody, promotedHead, setPromotedHead } from "../lib/pr-b
 
 const APP = "catapult-release";
 const sha = (c) => c.repeat(40);
+const id = (c) => c.repeat(12);
 const commit = (c, subject, login = "enimaloc", parents = [sha("0")]) => ({
   sha: sha(c),
   subject,
@@ -75,7 +76,7 @@ test("firstCommitAfterPromotion_opensDraft", async () => {
   assert.deepEqual(parseBody(pull.body), {
     changelog: "### Features\n- **web:** dark mode (aaaaaaa)",
     botEnabled: true,
-    seen: [sha("a")],
+    seen: [id("a")],
   });
 });
 
@@ -97,7 +98,7 @@ test("nextCommit_recomputesTitle", async () => {
   const pull = gh.state.pulls[0];
   assert.equal(pull.title, "chore(release): v0.2.0-BETA.1");
   assert.equal(parseBody(pull.body).changelog, "### Features\n- two (bbbbbbb)\n\n### Fixes\n- one, by hand");
-  assert.deepEqual(parseBody(pull.body).seen, [sha("a"), sha("b")]);
+  assert.deepEqual(parseBody(pull.body).seen, [id("a"), id("b")]);
   assert.deepEqual(gh.calls.map(([name]) => name), ["updatePull"], "a draft PR stays a draft, no comment");
 });
 
@@ -218,7 +219,7 @@ test("humanCommitBehindTheBump_putsTheReadyPrBackToDraft", async () => {
   gh.compareCommits = async () => [commit("a", "fix: one"), commit("y", "fix: late"), bump("b", "v1.0.0-BETA.97")];
   assert.deepEqual(await run(gh), { action: "updated", number: 100 });
   assert.deepEqual(gh.calls.map(([name]) => name), ["updatePull", "disableAutoMerge", "convertToDraft", "comment"]);
-  assert.deepEqual(parseBody(gh.state.pulls[0].body).seen, [sha("a"), sha("y")]);
+  assert.deepEqual(parseBody(gh.state.pulls[0].body).seen, [id("a"), id("y")]);
   assert.equal(promotedHead(gh.state.pulls[0].body), sha("b"));
 });
 
@@ -231,7 +232,7 @@ test("botCommits_neverReachTheChangelog", async () => {
   await run(gh);
   const { changelog, seen } = parseBody(gh.state.pulls[0].body);
   assert.equal(changelog, "### Fixes\n- one (aaaaaaa)");
-  assert.deepEqual(seen, [sha("a")]);
+  assert.deepEqual(seen, [id("a")]);
 });
 
 test("onlyBotCommits_isNothingToPromote", async () => {
@@ -246,4 +247,33 @@ test("createdPr_recordsThePromotedHead", async () => {
   const gh = fakeGitHub({ ahead: { "beta...dev": [commit("a", "fix: one"), commit("b", "feat: two")] } });
   await run(gh);
   assert.equal(promotedHead(gh.calls[0][1].body), sha("b"));
+});
+
+test("hugePromotion_opensAPrWithinGitHubsBodyLimit", async () => {
+  const commits = Array.from({ length: 1000 }, (_, i) => ({
+    ...commit("a", `fix(web): change number ${i} of the channel page`),
+    sha: i.toString(16).padStart(12, "0").padEnd(40, "e"),
+  }));
+  const gh = fakeGitHub({ ahead: { "beta...dev": commits } });
+  await run(gh);
+  const { body } = gh.calls[0][1];
+  assert.ok(body.length < 60000, `body is ${body.length} chars`);
+  const { changelog, seen } = parseBody(body);
+  assert.equal(changelog.split("\n").filter((line) => line.startsWith("- ")).length, 200);
+  assert.match(changelog, /… et 800 autres commits$/);
+  assert.equal(seen.length, 1000);
+  assert.equal(promotedHead(body), commits[999].sha);
+
+  gh.calls.length = 0;
+  assert.deepEqual(await run(gh), { action: "none", number: 100 }, "every commit is known, even unlisted ones");
+});
+
+test("legacyFullShasInSeen_areStillKnown", async () => {
+  const body = buildBody({ changelog: "### Fixes\n- one (aaaaaaa)", botEnabled: true, seen: [] })
+    .replace("<!-- changelog:seen  -->", `<!-- changelog:seen ${sha("a")} -->`);
+  const gh = fakeGitHub({
+    ahead: { "beta...dev": [commit("a", "fix: one")] },
+    pulls: [{ number: 7, base: "beta", head: "dev", title: "chore(release): v1.0.0-BETA.97", body }],
+  });
+  assert.deepEqual(await run(gh), { action: "none", number: 7 });
 });

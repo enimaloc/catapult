@@ -5,8 +5,7 @@
 import { parseArgs } from "node:util";
 import { pathToFileURL } from "node:url";
 import { parseVersion, bumpKind, nextBeta, nextStable } from "./lib/version.mjs";
-import { renderEntries } from "./lib/changelog.mjs";
-import { buildBody, parseBody, setPromotedHead, updateBody } from "./lib/pr-body.mjs";
+import { buildBody, parseBody, seenId, setPromotedHead, updateBody } from "./lib/pr-body.mjs";
 import { createGitHub } from "./lib/github.mjs";
 import { refreshDashboardSafely } from "./dashboard.mjs";
 
@@ -56,10 +55,6 @@ export function isReleaseCommit(commit, appSlug) {
   return Boolean(appSlug) && commit.author === `${appSlug}[bot]`;
 }
 
-function changelogOf(commits) {
-  return [...renderEntries(commits)].map(([section, lines]) => [`### ${section}`, ...lines].join("\n")).join("\n\n");
-}
-
 function backToDraftComment(source, version) {
   return (
     `De nouveaux commits sont arrivés sur \`${source}\` : la PR repasse en draft et l'auto-merge est ` +
@@ -96,19 +91,15 @@ export async function promote({ gh, source, target, owner, repo, appSlug }) {
       head: source,
       draft: true,
       labels: ["release"],
-      body: buildBody({
-        changelog: changelogOf(commits),
-        botEnabled: true,
-        seen: commits.map((c) => c.sha),
-        promotedHead: head,
-      }),
+      // Rendered like a refresh of an empty changelog: capped, every commit recorded as seen.
+      body: updateBody(buildBody({ changelog: "", botEnabled: true, seen: [], promotedHead: head }), commits),
     });
     console.log(`${owner}/${repo}: opened #${created.number} ${title}`);
     return { action: "created", number: created.number };
   }
 
   const seen = new Set(parseBody(pull.body ?? "").seen);
-  const fresh = commits.filter((c) => !seen.has(c.sha));
+  const fresh = commits.filter((c) => !seen.has(seenId(c.sha)));
   if (fresh.length === 0 && pull.title === title) return withNumber("none");
 
   await gh.updatePull(pull.number, { title, body: setPromotedHead(updateBody(pull.body ?? "", fresh), head) });

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { buildBody, parseBody, updateBody, releaseNotes, promotedHead, setPromotedHead } from "../lib/pr-body.mjs";
 
 const sha = (c) => c.repeat(40);
+const id = (c) => c.repeat(12); // the short SHA kept in the seen marker
 
 test("buildBody and parseBody round-trip", () => {
   const body = buildBody({ changelog: "### Fixes\n- a (aaaaaaa)", botEnabled: true, seen: [sha("a")] });
@@ -10,7 +11,7 @@ test("buildBody and parseBody round-trip", () => {
   assert.deepEqual(parseBody(body), {
     changelog: "### Fixes\n- a (aaaaaaa)",
     botEnabled: true,
-    seen: [sha("a")],
+    seen: [id("a")],
   });
 });
 
@@ -57,7 +58,7 @@ test("userEditKept_andRemovedEntryNotReadded", () => {
   ]);
   const parsed = parseBody(out);
   assert.equal(parsed.changelog, "### Features\n- ONE rewritten by hand\n- three (3333333)");
-  assert.deepEqual(parsed.seen, [sha("1"), sha("2"), sha("3")]);
+  assert.deepEqual(parsed.seen, [id("1"), id("2"), id("3")]);
 });
 
 test("updateBody re-creates a deleted heading at its ordered position", () => {
@@ -86,7 +87,7 @@ test("updateBody appends into an existing section and keeps outside text", () =>
 test("updateBody adds a seen marker when missing", () => {
   const body = "<!-- changelog:start -->\n<!-- changelog:end -->\n- [x] <!-- changelog-bot --> Le bot met à jour le changelog";
   const out = updateBody(body, [{ sha: sha("a"), subject: "fix: x" }]);
-  assert.deepEqual(parseBody(out).seen, [sha("a")]);
+  assert.deepEqual(parseBody(out).seen, [id("a")]);
   assert.equal(parseBody(out).changelog, "### Fixes\n- x (aaaaaaa)");
 });
 
@@ -110,4 +111,65 @@ test("promotedHead_marker_isWrittenAndReplaced", () => {
   assert.equal(promotedHead(moved), sha("b"));
   assert.equal(moved.match(/promoted-head/g).length, 1);
   assert.equal(promotedHead(buildBody({ changelog: "", botEnabled: true, seen: [] })), null);
+});
+
+// n distinct commits with realistic conventional subjects.
+const many = (n, from = 0) =>
+  Array.from({ length: n }, (_, i) => ({
+    sha: (from + i).toString(16).padStart(12, "0").padEnd(40, "f"),
+    subject: `${["feat", "fix", "perf", "docs"][i % 4]}(web): change number ${from + i} of the channel page`,
+  }));
+const entries = (changelog) => changelog.split("\n").filter((line) => line.startsWith("- "));
+const fresh = () => buildBody({ changelog: "", botEnabled: true, seen: [] });
+
+test("seen_storesShortShas_andStillMatchesFullOnes", () => {
+  const legacy = buildBody({ changelog: "### Fixes\n- a (aaaaaaa)", botEnabled: true, seen: [] }).replace(
+    "<!-- changelog:seen  -->",
+    `<!-- changelog:seen ${sha("a")} -->`,
+  );
+  assert.deepEqual(parseBody(legacy).seen, [id("a")], "a full SHA written before is read as its short form");
+  assert.equal(updateBody(legacy, [{ sha: sha("a"), subject: "fix: a" }]), legacy, "already seen");
+  const out = updateBody(legacy, [{ sha: sha("b"), subject: "fix: b" }]);
+  assert.match(out, new RegExp(`<!-- changelog:seen ${id("a")},${id("b")} -->`));
+});
+
+for (const n of [1000, 2500]) {
+  test(`hugePromotion_${n}Commits_capsTheEntries_andKeepsEverySha`, () => {
+    const out = updateBody(fresh(), many(n));
+    const { changelog, seen } = parseBody(out);
+    assert.equal(entries(changelog).length, 200);
+    assert.match(changelog, new RegExp(`\n\n… et ${n - 200} autres commits$`));
+    assert.equal(seen.length, n);
+    assert.equal(new Set(seen).size, n);
+    assert.ok(out.length < 60000, `body is ${out.length} chars`);
+  });
+}
+
+test("hugePromotion_refresh_countsTheNewCommitsInTheOverflow", () => {
+  const first = updateBody(fresh(), many(1000));
+  const out = updateBody(first, [...many(1000), ...many(10, 1000)]);
+  const { changelog, seen } = parseBody(out);
+  assert.equal(entries(changelog).length, 200);
+  assert.match(changelog, /\n\n… et 810 autres commits$/);
+  assert.equal(changelog.match(/autres commits/g).length, 1);
+  assert.equal(seen.length, 1010);
+});
+
+test("smallRefresh_fillsTheRoomLeftBeforeOverflowing", () => {
+  const first = updateBody(fresh(), many(199));
+  const out = updateBody(first, many(3, 199));
+  const { changelog } = parseBody(out);
+  assert.equal(entries(changelog).length, 200);
+  assert.match(changelog, /\n\n… et 2 autres commits$/);
+  assert.match(parseBody(updateBody(fresh(), many(201))).changelog, /\n\n… et 1 autre commit$/);
+});
+
+test("bodyGuard_keepsTheBodyUnder60000Chars", () => {
+  const long = many(300).map((c) => ({ ...c, subject: `feat: ${"x".repeat(400)} ${c.sha}` }));
+  const out = updateBody(fresh(), long);
+  const { changelog, seen } = parseBody(out);
+  assert.ok(out.length < 60000, `body is ${out.length} chars`);
+  assert.ok(entries(changelog).length < 200, "entries dropped to fit");
+  assert.match(changelog, new RegExp(`… et ${300 - entries(changelog).length} autres commits$`));
+  assert.equal(seen.length, 300);
 });
