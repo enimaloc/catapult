@@ -70,9 +70,10 @@ const MESSAGES = {
   notReady: () => "La PR n'est plus ouverte et prête : rien n'a été fusionné.",
   headMoved: () =>
     `La branche a bougé depuis le passage en ready : la PR repasse en draft. Relis les nouveaux commits puis ${AGAIN}.`,
-  backport: (base, backports) =>
-    `Un report de hotfix vers \`${base}\` est encore ouvert (${backports.map((p) => `#${p.number}`).join(", ")}) : ` +
-    `fusionne d'abord le report. La PR repasse en draft ; ${AGAIN} ensuite.`,
+  backport: (backports) =>
+    `Un report de release est encore ouvert (` +
+    backports.map((p) => `#${p.number} \`${p.head}\` → \`${p.base}\``).join(", ") +
+    `) : fusionne d'abord le report. La PR repasse en draft ; ${AGAIN} ensuite.`,
   noMarker: () =>
     `Le bot n'a pas encore enregistré la tête de branche couverte par cette PR : la PR repasse en draft. ` +
     `Attends sa mise à jour puis ${AGAIN}.`,
@@ -140,8 +141,10 @@ async function prepare({ gh, pr, pull, kind, owner, repo, appSlug, promote }) {
     if (expected !== version) return refuseAndRefresh(gh, pull, MESSAGES.staleVersion(version, expected), refresh);
   }
 
-  const backports = (await gh.listPulls({ base: pull.base })).filter((p) => p.labels?.includes("backport"));
-  if (backports.length) return refuse(gh, pull, MESSAGES.backport(pull.base, backports));
+  // A backport into either branch would otherwise conflict with (or be missing from) this promotion.
+  const intoBranches = await Promise.all([gh.listPulls({ base: pull.base }), gh.listPulls({ base: pull.head })]);
+  const backports = intoBranches.flat().filter((p) => p.labels?.includes("backport"));
+  if (backports.length) return refuse(gh, pull, MESSAGES.backport(backports));
 
   // The owner validated the PR as the bot last refreshed it: nothing human may come after that head.
   // A hotfix PR is written by the owner, without a bot refresh.

@@ -222,6 +222,18 @@ test("prFromAFork_isIgnored", async () => {
   assert.deepEqual(gh.calls, [["getPull", 7]]);
 });
 
+test("pendingBackportIntoTheHeadBranch_refusesAndRedrafts", async () => {
+  // After a stable release, beta -> dev must land before dev is promoted again.
+  const gh = fakeGitHub({ others: [{ number: 11, base: "dev", head: "beta", labels: ["backport"] }] });
+  assert.equal(await run(gh), "refused");
+  assertRefused(gh, /#11/);
+});
+
+test("openNonBackportPrIntoTheHeadBranch_doesNotBlock", async () => {
+  const gh = fakeGitHub({ others: [{ number: 12, base: "dev", head: "feat/x", labels: [] }] });
+  assert.equal(await run(gh), "auto-merge");
+});
+
 test("pendingBackport_refusesAndRedrafts", async () => {
   const gh = fakeGitHub({ others: [{ number: 9, base: "beta", head: "main", labels: ["backport"] }] });
   assert.equal(await run(gh), "refused");

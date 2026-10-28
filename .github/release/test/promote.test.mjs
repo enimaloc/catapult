@@ -4,6 +4,7 @@ import { promote } from "../promote.mjs";
 import { buildBody, parseBody, promotedHead, setPromotedHead } from "../lib/pr-body.mjs";
 
 const APP = "catapult-release";
+const OWNER_LOGIN = "enimaloc";
 const sha = (c) => c.repeat(40);
 const id = (c) => c.repeat(12);
 const commit = (c, subject, login = "enimaloc", parents = [sha("0")]) => ({
@@ -276,4 +277,12 @@ test("legacyFullShasInSeen_areStillKnown", async () => {
     pulls: [{ number: 7, base: "beta", head: "dev", title: "chore(release): v1.0.0-BETA.97", body }],
   });
   assert.deepEqual(await run(gh), { action: "none", number: 7 });
+});
+
+test("backportMerge_isNothingToPromote", async () => {
+  const merge = commit("k", "chore(release): backport v1.0.0 to dev", OWNER_LOGIN, [sha("0"), sha("1")]);
+  const gh = fakeGitHub({ ahead: { "beta...dev": [merge], "main...beta": [{ ...merge, subject: "chore(release): backport v1.0.1 to beta" }] } });
+  assert.deepEqual(await run(gh), { action: "none" });
+  assert.deepEqual(await run(gh, "beta", "main"), { action: "none" });
+  assert.deepEqual(gh.calls, []);
 });

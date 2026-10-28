@@ -112,40 +112,94 @@ test("unmergedOrUnrelatedPull_isRejected", async () => {
   assert.deepEqual(named(gh, "createTag"), []);
 });
 
-test("hotfixMerge_publishesPatchAndOpensBackports", async () => {
+const hotfix = (fields = {}) =>
+  mergedPull({ base: "main", head: "hotfix/login", title: "chore(release): v1.0.1", body: "Corrige le login.", ...fields });
+const opened = (gh) =>
+  named(gh, "createPull").map(([, { base, head, title, draft, labels }]) => ({ base, head, title, draft, labels }));
+const backport = (base, head, tag) => ({
+  base,
+  head,
+  title: `chore(release): backport ${tag} to ${base}`,
+  draft: false,
+  labels: ["backport"],
+});
+
+test("hotfixMerge_publishesPatch_andOpensOnlyTheBackportToBeta", async () => {
   const gh = fakeGitHub({
     compare: {
       "beta...main": [commit("h", "fix: login")],
       "dev...beta": [commit("r", "chore(release): v1.0.1-BETA.1")],
     },
   });
-  const result = await run(
-    gh,
-    mergedPull({ base: "main", head: "hotfix/login", title: "chore(release): v1.0.1", body: "Corrige le login." }),
-  );
+  const result = await run(gh, hotfix());
   assert.equal(result.tag, "v1.0.1");
-  assert.equal(result.backports.length, 2);
+  assert.equal(result.backports.length, 1);
   assert.deepEqual(named(gh, "createTag"), [
     ["createTag", { tag: "v1.0.1", sha: sha("m"), message: "chore(release): v1.0.1" }],
   ]);
-  const created = named(gh, "createPull").map(([, fields]) => fields);
-  assert.deepEqual(
-    created.map(({ base, head, title, draft, labels }) => ({ base, head, title, draft, labels })),
-    [
-      { base: "beta", head: "main", title: "chore(release): backport v1.0.1 to beta", draft: false, labels: ["backport"] },
-      { base: "dev", head: "beta", title: "chore(release): backport v1.0.1 to dev", draft: false, labels: ["backport"] },
-    ],
-  );
-  for (const { body } of created) assert.match(body, /v1\.0\.1.*#7/);
+  assert.deepEqual(opened(gh), [backport("beta", "main", "v1.0.1")], "beta -> dev waits for main -> beta");
+  assert.match(named(gh, "createPull")[0][1].body, /v1\.0\.1.*#7/);
 });
 
 test("hotfixBackports_skipOpenOrEmptyPairs", async () => {
   const gh = fakeGitHub({
     pulls: [{ number: 40, base: "beta", head: "main", labels: ["backport"] }],
-    compare: { "beta...main": [commit("h", "fix: login")] },
+    compare: { "beta...main": [commit("h", "fix: login")], "dev...beta": [commit("r", "fix: r")] },
   });
-  const result = await run(gh, mergedPull({ base: "main", head: "hotfix/login", title: "chore(release): v1.0.1" }));
+  const result = await run(gh, hotfix());
   assert.deepEqual(result.backports, []);
+  assert.deepEqual(named(gh, "createPull"), [], "the open main -> beta is reused; beta -> dev waits for it");
+});
+
+test("hotfixWithNothingToBringToBeta_opensTheBackportToDevRightAway", async () => {
+  const gh = fakeGitHub({ compare: { "dev...beta": [commit("r", "fix: r")] } });
+  const result = await run(gh, hotfix());
+  assert.equal(result.backports.length, 1);
+  assert.deepEqual(opened(gh), [backport("dev", "beta", "v1.0.1")]);
+});
+
+test("stableMerge_opensTheBackportOfBetaToDev", async () => {
+  const gh = fakeGitHub({ compare: { "dev...beta": [commit("r", "chore(release): v1.0.0")] } });
+  const result = await run(gh, mergedPull({ base: "main", head: "beta", title: "chore(release): v1.0.0" }));
+  assert.equal(result.backports.length, 1);
+  assert.deepEqual(opened(gh), [backport("dev", "beta", "v1.0.0")]);
+  assert.match(named(gh, "createPull")[0][1].body, /v1\.0\.0.*#7/);
+});
+
+test("stableMerge_reusesAnOpenBackportToDev", async () => {
+  const gh = fakeGitHub({
+    pulls: [{ number: 41, base: "dev", head: "beta", labels: ["backport"] }],
+    compare: { "dev...beta": [commit("r", "chore(release): v1.0.0")] },
+  });
+  const result = await run(gh, mergedPull({ base: "main", head: "beta", title: "chore(release): v1.0.0" }));
+  assert.deepEqual(result.backports, []);
+  assert.deepEqual(named(gh, "createPull"), []);
+});
+
+test("betaMerge_opensNoBackport", async () => {
+  const gh = fakeGitHub({ compare: { "dev...beta": [commit("r", "fix: r")] } });
+  await run(gh, mergedPull());
+  assert.deepEqual(named(gh, "createPull"), []);
+});
+
+const mergedBackport = (labels = ["backport"]) => ({
+  ...mergedPull({ base: "beta", head: "main", title: "chore(release): backport v1.0.1 to beta" }),
+  labels,
+});
+
+test("mergedBackportToBeta_opensTheBackportToDev", async () => {
+  const gh = fakeGitHub({ compare: { "dev...beta": [commit("r", "fix: login")] } });
+  const result = await run(gh, mergedBackport());
+  assert.equal(result.tag, "v1.0.1");
+  assert.equal(result.backports.length, 1);
+  assert.deepEqual(opened(gh), [backport("dev", "beta", "v1.0.1")]);
+  assert.deepEqual(named(gh, "createTag"), [], "a backport tags nothing");
+  assert.deepEqual(named(gh, "promote"), []);
+});
+
+test("mergedBackportToBeta_withoutBackportLabel_isRejected", async () => {
+  const gh = fakeGitHub({ compare: { "dev...beta": [commit("r", "fix: login")] } });
+  await assert.rejects(run(gh, mergedBackport([])), /promotion/);
   assert.deepEqual(named(gh, "createPull"), []);
 });
 

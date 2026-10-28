@@ -2,7 +2,7 @@ name: Publish
 
 # Tags the merge commit only on an actual merge: a closed but unmerged promotion PR releases nothing.
 # The tag is pushed with the App token, whose pushes do trigger workflows: that tag push runs
-# release.yml, the single publication path.
+# release.yml, the single publication path. A merged hotfix backport main -> beta opens beta -> dev.
 on:
   pull_request:
     types: [closed]
@@ -22,7 +22,9 @@ jobs:
       (
         (github.event.pull_request.base.ref == 'beta' && github.event.pull_request.head.ref == 'dev') ||
         (github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref == 'beta') ||
-        (github.event.pull_request.base.ref == 'main' && startsWith(github.event.pull_request.head.ref, 'hotfix/'))
+        (github.event.pull_request.base.ref == 'main' && startsWith(github.event.pull_request.head.ref, 'hotfix/')) ||
+        (github.event.pull_request.base.ref == 'beta' && github.event.pull_request.head.ref == 'main' &&
+          contains(github.event.pull_request.labels.*.name, 'backport'))
       )
     runs-on: ubuntu-latest
     steps:
@@ -38,7 +40,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Tag the merge commit (and open the hotfix backports)
+      - name: Tag the merge commit (and open the backports to dev)
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           APP_SLUG: ${{ steps.app-token.outputs.app-slug }}

@@ -1,5 +1,5 @@
 // Keeps the pinned issue « Releases en cours »: GitHub cannot pin pull requests, so the bot pins an
-// issue listing the open promotion PRs, the pending hotfix backports and the last releases.
+// issue listing the open promotion PRs, the pending backports and the last releases.
 // Called at the end of promote.mjs, ready.mjs and publish.mjs; it never makes a release step fail.
 
 const MARKER = "<!-- release-dashboard -->";
@@ -28,7 +28,7 @@ export function renderDashboard({ promotions, backports, releases }) {
     }
   }
 
-  lines.push("", "## Reports de hotfix en attente", "");
+  lines.push("", "## Reports en attente", "");
   if (backports.length === 0) {
     lines.push("Aucun report en attente.");
   } else {

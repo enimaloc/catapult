@@ -50,7 +50,8 @@ La version d'une release est calculée à partir de ces messages : un titre pré
 3. À la fusion, le tag `vX.Y.Z-BETA.N` est créé, la pré-release GitHub est publiée et les images Docker sont
    poussées (`:<version>` et `:beta`).
 4. La promotion `beta` → `main` suit le même cycle (`chore(release): vX.Y.Z`) et publie une release stable
-   (images `:<version>` et `:latest`).
+   (images `:<version>` et `:latest`). Le bot ouvre ensuite une PR de report `beta` → `dev` (label `backport`) :
+   fusionne-la par commit de merge, la promotion `dev` → `beta` est refusée tant qu'elle est ouverte.
 
 Si le bot remet une PR en draft, c'est qu'un nouveau commit est arrivé depuis ta validation : relis-la, puis
 sors-la de nouveau du draft.
@@ -66,8 +67,9 @@ Pour un correctif urgent d'une version stable :
 
 1. Crée `hotfix/mon-correctif` **depuis `main`**.
 2. Ouvre une PR vers `main` (label `hotfix`) ; la sortie du draft et la fusion publient une release stable patch.
-3. Le bot ouvre ensuite des PR de report `main` → `beta` puis `beta` → `dev` (label `backport`). Fusionne-les :
-   tant qu'un report est en attente, la promotion correspondante est refusée.
+3. Le bot ouvre ensuite une PR de report `main` → `beta` (label `backport`), puis, une fois celle-ci fusionnée,
+   le report `beta` → `dev`. Fusionne-les par commit de merge : tant qu'un report est en attente, les promotions
+   depuis et vers sa branche sont refusées.
 
 ## Signaler un problème
 

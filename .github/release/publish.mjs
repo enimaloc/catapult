@@ -1,5 +1,5 @@
-// A promotion (or hotfix) PR was merged: tag its merge commit, and after a hotfix open the backport
-// PRs main -> beta and beta -> dev. The tag is pushed with the App token, so its push event runs
+// A promotion (or hotfix) PR was merged: tag its merge commit, and after a stable or a hotfix open
+// the backport PRs that bring it back to dev (main -> beta, then beta -> dev once that one is merged). The tag is pushed with the App token, so its push event runs
 // release.yml, the single publication path (it reads the PR's notes itself).
 // CLI: node .github/release/publish.mjs --number 12
 // (env: GH_TOKEN = the App token, GITHUB_REPOSITORY=owner/repo, APP_SLUG = the release App's slug)
@@ -24,35 +24,53 @@ async function ensureTag(gh, tag, sha, message) {
   }
 }
 
+const BACKPORT_TITLE = /^chore\(release\): backport (v\S+) to beta$/;
+
+/** A merged hotfix backport main -> beta of this repository: beta -> dev comes next. */
+function isBackportToBeta(pr, repository) {
+  return pr.headRepo === repository && pr.head === "main" && pr.base === "beta" && pr.labels?.includes("backport");
+}
+
 function backportBody(tag, pr, from, to) {
   return (
-    `Report du hotfix \`${tag}\` (#${pr.number}) de \`${from}\` vers \`${to}\`.\n\n` +
-    `Fusionne cette PR par commit de merge pour ramener le correctif sur \`${to}\` ; tant qu'elle est ` +
-    `ouverte, la promotion vers \`${to}\` est refusée.\n`
+    `Report de \`${tag}\` (#${pr.number}) de \`${from}\` vers \`${to}\`.\n\n` +
+    `Fusionne cette PR par commit de merge pour ramener la release sur \`${to}\` ; tant qu'elle est ` +
+    `ouverte, la promotion depuis et vers \`${to}\` est refusée.\n`
   );
 }
 
-/** Opens each backport PR whose pair has commits to bring and no open PR yet; returns their numbers. */
-async function openBackports(gh, tag, pr) {
-  const opened = [];
-  for (const [from, to] of [
-    ["main", "beta"],
-    ["beta", "dev"],
-  ]) {
-    const [open, commits] = await Promise.all([gh.listPulls({ base: to, head: from }), gh.compareCommits(to, from)]);
-    if (open.length || commits.length === 0) continue;
-    const created = await gh.createPull({
-      title: `chore(release): backport ${tag} to ${to}`,
-      base: to,
-      head: from,
-      draft: false,
-      labels: ["backport"],
-      body: backportBody(tag, pr, from, to),
-    });
-    console.log(`opened the backport #${created.number} ${from} -> ${to}`);
-    opened.push(created.number);
+/**
+ * Opens the backport PR `from` -> `to` unless one is open (it is reused) or there is nothing to bring.
+ * -> {number} when opened, {pending: true} when one is already open, null when there is nothing to bring.
+ */
+async function openBackport(gh, tag, pr, from, to) {
+  const [open, commits] = await Promise.all([gh.listPulls({ base: to, head: from }), gh.compareCommits(to, from)]);
+  if (open.length) return { pending: true };
+  if (commits.length === 0) return null;
+  const created = await gh.createPull({
+    title: `chore(release): backport ${tag} to ${to}`,
+    base: to,
+    head: from,
+    draft: false,
+    labels: ["backport"],
+    body: backportBody(tag, pr, from, to),
+  });
+  console.log(`opened the backport #${created.number} ${from} -> ${to}`);
+  return { number: created.number };
+}
+
+/**
+ * Brings the release back to dev, whose version line would otherwise conflict with the next
+ * promotion: a stable through beta -> dev; a hotfix through main -> beta first, beta -> dev being
+ * opened once that one is merged (or right away when beta needs nothing). Returns the PRs opened.
+ */
+async function openBackports(gh, tag, pr, kind) {
+  if (kind === "hotfix") {
+    const toBeta = await openBackport(gh, tag, pr, "main", "beta");
+    if (toBeta !== null) return toBeta.number ? [toBeta.number] : [];
   }
-  return opened;
+  const toDev = await openBackport(gh, tag, pr, "beta", "dev");
+  return toDev?.number ? [toDev.number] : [];
 }
 
 async function release(gh, pr, kind, refreshStable) {
@@ -62,7 +80,7 @@ async function release(gh, pr, kind, refreshStable) {
 
   await ensureTag(gh, tag, pr.mergeCommitSha, pr.title);
   if (kind === "beta") await refreshStable();
-  const backports = kind === "hotfix" ? await openBackports(gh, tag, pr) : [];
+  const backports = kind === "beta" ? [] : await openBackports(gh, tag, pr, kind);
   return { tag, backports };
 }
 
@@ -71,6 +89,12 @@ async function release(gh, pr, kind, refreshStable) {
  * failure on a release PR is also reported on it.
  */
 export async function publish({ gh, pr, owner, repo, appSlug, promote = promoteImpl }) {
+  if (isBackportToBeta(pr, `${owner}/${repo}`)) {
+    if (!pr.merged) throw new Error(`#${pr.number} is not merged`);
+    const tag = BACKPORT_TITLE.exec(pr.title)?.[1];
+    if (!tag) throw new Error(`#${pr.number}: the title does not carry the backported version: ${pr.title}`);
+    return { tag, backports: await openBackports(gh, tag, pr, "stable") };
+  }
   const kind = kindOf(pr, `${owner}/${repo}`);
   if (kind === null) throw new Error(`#${pr.number} is not a promotion or hotfix pull request`);
   // The beta -> main PR was titled before this beta's tag existed: retitle it now (best effort).

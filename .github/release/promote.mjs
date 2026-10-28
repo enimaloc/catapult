@@ -10,6 +10,7 @@ import { createGitHub } from "./lib/github.mjs";
 import { refreshDashboardSafely } from "./dashboard.mjs";
 
 const RELEASE_SUBJECT = /^chore\(release\): v/;
+const BACKPORT_SUBJECT = /^chore\(release\): backport v/;
 
 export function versionTags(tags) {
   const versions = [];
@@ -49,10 +50,12 @@ export function releaseVersion(target, tags, commits) {
 }
 
 /**
- * The bot's own commits: the version bump pushed on the source branch, and release merge commits
- * (a promotion merged by auto-merge is credited to the App). They are never promoted on their own.
+ * The bot's own commits: the version bump pushed on the source branch, release merge commits
+ * (a promotion merged by auto-merge is credited to the App) and the merges of backport PRs. They are
+ * never promoted on their own.
  */
 export function isReleaseCommit(commit, appSlug) {
+  if (BACKPORT_SUBJECT.test(commit.subject)) return true;
   if (!RELEASE_SUBJECT.test(commit.subject)) return false;
   if (commit.parents.length > 1) return true;
   return Boolean(appSlug) && commit.author === `${appSlug}[bot]`;
