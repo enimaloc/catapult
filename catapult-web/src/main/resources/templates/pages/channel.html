@@ -3,7 +3,7 @@
     <!--/*@thymesVar id="app" type="fr.enimaloc.catapult.controller.ModelFiller$AppModel"*/-->
     <section class="section channel-section">
         <div class="section-header channel-header">
-            <mdui-avatar class="channel-header-avatar" th:src="${channelPage.channelUser().profileImageUrl()}"></mdui-avatar>
+            <mdui-avatar class="channel-header-avatar"><img th:if="${channelPage.channelUser().profileImageUrl() != null}" th:src="${avatars.url(channelPage.channelUser().profileImageUrl(), 128)}" alt="" width="64" height="64" decoding="async"></mdui-avatar>
             <div>
                 <span class="eyebrow" th:text="#{channel.eyebrow}">channel.eyebrow</span>
                 <h1 th:text="${channelPage.channelUser().twitchUsername()}">username</h1>

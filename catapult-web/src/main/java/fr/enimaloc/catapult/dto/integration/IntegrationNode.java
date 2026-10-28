@@ -78,6 +78,18 @@ public sealed interface IntegrationNode {
             return options.stream().anyMatch(option -> option.protocols() != null);
         }
 
+        /** Beyond this many options, a select with none picked builds them only once opened. */
+        public static final int LAZY_OPTIONS = 20;
+
+        /**
+         * Whether its options wait in a <template data-lazy> until it is opened (lazy.js): many of them (a Twitchat
+         * event's actions to add, 83, three shadow roots each), none picked. A picked one stays, the select showing
+         * its label.
+         */
+        public boolean lazyOptions() {
+            return (value == null || value.isEmpty()) && options.size() > LAZY_OPTIONS;
+        }
+
         /** The picked option's picture, null without one. */
         public String pickedIcon() {
             return options.stream().filter(option -> option.value().equals(value)).map(Option::icon)

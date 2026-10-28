@@ -4,7 +4,7 @@
     <a th:each="channel : ${navChannels}" data-link class="nav-channel"
        th:href="|/channel/${channel.twitchUsername()}|" th:title="${channel.twitchUsername()}"
        th:classappend="${channel.live()} ? 'live'">
-        <mdui-avatar th:src="${channel.profileImageUrl()}"></mdui-avatar>
+        <mdui-avatar><img th:if="${channel.profileImageUrl() != null}" th:src="${avatars.url(channel.profileImageUrl(), 64)}" alt="" width="28" height="28" loading="lazy" decoding="async"></mdui-avatar>
         <span th:text="${channel.twitchUsername()}">username</span>
     </a>
 </th:block>

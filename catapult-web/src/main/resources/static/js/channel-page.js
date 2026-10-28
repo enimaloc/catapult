@@ -8,7 +8,7 @@
  * - username()/baseUrl(): a single place deriving the channel username from the
  *   URL, instead of every file re-deriving `location.pathname.split("/")[2]`.
  *   username() is null outside /channel/{username}.
- * - refresh(): re-renders the current fragment through the SPA router, preserving
+ * - refresh(): re-renders the current fragment, as the server has it now, through the SPA router, preserving
  *   the query string (page/status/source filters) instead of dropping it. No action
  *   of the page uses it: each patches the page itself or through its SSE echo. Only
  *   the mock profile's popout does, for the changes no event carries (mock-popout.js).
@@ -31,7 +31,7 @@ window.CatapultChannel = (function () {
 
     async function refresh() {
         // The query goes as the router's `search`: in the path, it would end up in the route's param.
-        await CatapultSpa.navigate(location.pathname.replace(/^\/+|\/+$/g, ""), false, location.search);
+        await CatapultSpa.navigate(location.pathname.replace(/^\/+|\/+$/g, ""), false, location.search, { fresh: true });
     }
 
     /** Shows `message` in a snackbar, removed from the page once it closes. */
@@ -154,6 +154,8 @@ window.CatapultChannel = (function () {
 // (e.g. after the mock popout's re-render) instead of resetting to the first one. Also makes
 // each tab directly linkable. A hash may go on with a sub-view after a slash (#caches/<name>, see
 // admin-tabs.js); picking another tab drops it.
+// A panel built only once shown (lazy.js: the channel's heavy tabs) is built when its tab is first picked, or
+// with the page when it opens on it, before the fragment scripts bind (they listen after this one).
 document.addEventListener("catapult:render", function () {
     const tabs = document.querySelector("mdui-tabs[data-hash-tabs]");
     if (!tabs) return;
@@ -165,6 +167,8 @@ document.addEventListener("catapult:render", function () {
     if (wanted && tabs.querySelector(`mdui-tab[value="${CSS.escape(wanted)}"]`)) {
         tabs.value = wanted;
     }
+    const panel = () => tabs.querySelector(`mdui-tab-panel[value="${CSS.escape(tabs.value)}"]`);
+    window.CatapultLazy?.showIn(panel(), { quiet: true });
 
     // The tab now shown loses its "new" dot (fragments/new-feature), and catapult-web keeps that
     // per account so it stays gone on every device. Best effort: a failed call brings the dot
@@ -181,6 +185,7 @@ document.addEventListener("catapult:render", function () {
     // field or select inside a panel, which would drop the sub-view from the hash.
     tabs.addEventListener("change", event => {
         if (event.target !== tabs) return;
+        window.CatapultLazy?.showIn(panel());
         const hash = tabs.value === first ? "" : `#${tabs.value}`;
         history.replaceState(history.state, "", location.pathname + location.search + hash);
         markSeen();

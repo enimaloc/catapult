@@ -66,6 +66,23 @@ class ExternalAssetControllerTest {
     }
 
     @Test
+    void servesAnAvatar_asAWebpKeptADay() throws Exception {
+        when(assets.avatar("jtv_user_pictures/abc-profile_image-300x300.png", 64)).thenReturn(ok("RIFF"));
+
+        mvc.perform(get("/assets/ext/avatar/64/jtv_user_pictures/abc-profile_image-300x300.png"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type", "image/webp"))
+                .andExpect(header().string("Cache-Control", "max-age=86400, public"));
+    }
+
+    @Test
+    void anAvatarAtAnotherSize_orElsewhere_isNeverFetched() throws Exception {
+        mvc.perform(get("/assets/ext/avatar/50/jtv_user_pictures/abc.png")).andExpect(status().isNotFound());
+        mvc.perform(get("/assets/ext/avatar/64/other/abc.png")).andExpect(status().isNotFound());
+        verifyNoInteractions(assets);
+    }
+
+    @Test
     void relaysAMissingOrUnavailableFile_uncached() throws Exception {
         when(assets.twitchatIcon(COMMIT, "gone")).thenReturn(ExternalAssets.Result.MISSING);
         when(assets.materialIconsCss()).thenReturn(ExternalAssets.Result.FAILED);

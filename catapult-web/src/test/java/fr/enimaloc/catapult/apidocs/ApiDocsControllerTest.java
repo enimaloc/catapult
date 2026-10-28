@@ -65,7 +65,7 @@ class ApiDocsControllerTest {
                     .contains("data-state=\"unknown\"", "Checking the API…", "data-label-up=\"API up\"")
                     .doesNotContain("id=\"api-docs-cached\"", "id=\"api-docs-unavailable\"");
         }
-        assertThat(full).contains("<title>API documentation - ", "rel=\"canonical\"", "src=\"/js/api-docs.js\"");
+        assertThat(full).contains("<title>API documentation - ", "rel=\"canonical\"", "src=\"/js/api-docs-");
         // The page asks /api/health itself: rendering it never waits on the probe.
         verifyNoInteractions(probe);
     }

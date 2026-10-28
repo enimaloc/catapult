@@ -34,7 +34,13 @@ window.CatapultConnections = (function () {
         toggle("#xbox-disconnect-btn", !connected);
     }
 
-    document.addEventListener("catapult:render", function () {
+    // The Integrations tab is built only once picked (lazy.js): its cards are bound then, as with the page otherwise.
+    document.addEventListener("catapult:render", bind);
+    document.addEventListener("catapult:lazy", event => {
+        if (event.detail.root.contains(document.getElementById("channel-connections"))) bind();
+    });
+
+    function bind() {
         if (!document.getElementById("channel-connections")) return;
         showTwitchatPresence();
 
@@ -102,7 +108,7 @@ window.CatapultConnections = (function () {
             await postJson(`${baseUrl}/settings/twitchat/branch`, { branch: event.currentTarget.value });
             await window.CatapultObsSession?.refresh();
         });
-    });
+    }
 
     return { showXboxConnected };
 })();

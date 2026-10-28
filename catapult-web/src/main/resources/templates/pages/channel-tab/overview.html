@@ -135,7 +135,9 @@
                     <span class="binding-mapped-note" th:if="${b.status() == 'MAPPED'}"
                           th:text="#{binding.mapped}">Catégorie fixée par l'admin</span>
                 </mdui-list-item>
-                <!--/* The owner and moderators alike, but for the TWs (see below). */-->
+                <!--/* The owner and moderators alike, but for the TWs (see below). Built only once the row is opened
+                     (lazy.js, channel-bindings.js): a page lists dozens, each a dozen switches. */-->
+                <template data-lazy>
                 <mdui-list-item>
                     <div class="binding-toggle">
                         <mdui-switch th:id="'binding-ignored-toggle-' + ${b.id()}"
@@ -199,6 +201,7 @@
                         </mdui-button>
                     </div>
                 </mdui-list-item>
+                </template>
             </mdui-collapse-item>
         </mdui-collapse>
         <!-- Always rendered (instead of created on demand) so removeBinding() only ever

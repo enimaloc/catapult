@@ -15,7 +15,7 @@
  */
 window.Visibility = {
     apply(root, state) {
-        root.querySelectorAll("[data-if]").forEach(el => {
+        Visibility._query(root, "[data-if]").forEach(el => {
             const names = el.dataset.if.split(",");
             // `undefined` (not just a missing key) means unknown too: a setter that merges
             // a partial SSE payload via Object.assign creates the key regardless of whether
@@ -33,6 +33,30 @@ window.Visibility = {
     // generic replacement for the ad-hoc `let xState = {}` closures each feature used to
     // hand-roll (e.g. the old setSteamConnectedState's steamState).
     _state: new WeakMap(),
+
+    // The elements under `root` matching `selector`, those of its parts not shown yet included (lazy.js's
+    // <template data-lazy>, outside the document until shown): an event applies to them alike, so that they
+    // show the channel as it is once shown. Each such element is noted with its template (_owner).
+    _query(root, selector, owner = null) {
+        const found = [...root.querySelectorAll(selector)];
+        if (owner) found.forEach(el => Visibility._owner.set(el, owner));
+        root.querySelectorAll("template[data-lazy]").forEach(template => {
+            if (owner) Visibility._owner.set(template, owner);
+            found.push(...Visibility._query(template.content, selector, template));
+        });
+        return found;
+    },
+
+    _owner: new WeakMap(),
+
+    // The binding row `el` is in, through the templates holding it while it is not shown yet.
+    _row(el) {
+        for (let node = el; node; node = Visibility._owner.get(node)) {
+            const row = node.closest("[data-binding-id]");
+            if (row) return row;
+        }
+        return null;
+    },
 
     _truthy(value) {
         return Array.isArray(value) ? value.length > 0 : !!value;
@@ -108,10 +132,12 @@ window.Visibility = {
     // current template needs without ever naming an event itself. Called once per
     // catapult:render, so a brand-new event type referenced by a brand-new spa:* in the
     // template is enough; no line is ever added here either.
+    // What a part not shown yet (lazy.js's <template data-lazy>) names counts too: dispatch() applies those
+    // events to it meanwhile.
     discoverEventNames(root) {
         const names = new Set();
         ["on", "switch", "value", "in"].forEach(attr => {
-            root.querySelectorAll(`[data-${attr}]`).forEach(el => {
+            Visibility._query(root, `[data-${attr}]`).forEach(el => {
                 el.dataset[attr].split(",").forEach(entry => {
                     const sep = entry.indexOf(":");
                     names.add(Visibility._eventNameOf(entry.slice(sep + 1)));
@@ -127,7 +153,7 @@ window.Visibility = {
     // highlight, not for it); an element inside a binding row only reacts when that row's
     // id matches the payload's bindingId, so one row's event never updates another's.
     _included(el, data) {
-        const row = el.closest("[data-binding-id]");
+        const row = Visibility._row(el);
         if (!row) {
             return true;
         }
@@ -139,7 +165,7 @@ window.Visibility = {
     // (switch's fields may carry "=value"), never in how the resulting flag feeds
     // Visibility.apply.
     _mergeFlags(attr, eventName, data, scopedStates) {
-        document.querySelectorAll(`[data-${attr}]`).forEach(el => {
+        Visibility._query(document, `[data-${attr}]`).forEach(el => {
             if (!Visibility._included(el, data)) {
                 return;
             }
@@ -147,7 +173,7 @@ window.Visibility = {
             if (entries.length === 0) {
                 return;
             }
-            const scope = el.closest("[data-binding-id]") || document;
+            const scope = Visibility._row(el) || document;
             let state = scopedStates.get(scope);
             if (!state) {
                 state = Visibility._state.get(scope);
@@ -169,7 +195,7 @@ window.Visibility = {
         Visibility._mergeFlags("switch", eventName, data, scopedStates);
         scopedStates.forEach((state, scope) => Visibility.apply(scope, state));
 
-        document.querySelectorAll("[data-value]").forEach(el => {
+        Visibility._query(document, "[data-value]").forEach(el => {
             if (!Visibility._included(el, data)) {
                 return;
             }
@@ -180,7 +206,7 @@ window.Visibility = {
             });
         });
 
-        document.querySelectorAll("[data-in]").forEach(el => {
+        Visibility._query(document, "[data-in]").forEach(el => {
             if (!Visibility._included(el, data)) {
                 return;
             }

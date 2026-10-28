@@ -52,20 +52,106 @@ function urlOf(path, search = "") {
 // Bumped by every navigation: a slower earlier one never swaps its page over a later one's.
 let generation = 0;
 
-async function navigate(path, push = true, search = "") {
-    const current = ++generation;
+// The pages already fetched, by URL, the latest last: going back to one shows it at once, then checks it against
+// the server (see navigate). Bounded in count and in size, the channel page weighing far more than the others.
+const PAGES_KEPT = 20;
+const PAGES_KEPT_CHARS = 4_000_000;
+// A page fetched this recently (just visited, or prefetched) is shown without asking the server again.
+const PAGE_FRESH_MS = 10_000;
+const pages = new Map();
+// The fetches under way, by URL: a navigation joins the one a prefetch started.
+const loading = new Map();
+// Bumped by forget(): a page fetched before a change is never kept.
+let forgotten = 0;
+
+function keep(url, html) {
+    pages.delete(url);
+    pages.set(url, { html, at: Date.now() });
+    let chars = 0;
+    for (const page of pages.values()) chars += page.html.length;
+    for (const [oldest, page] of pages) {
+        if (pages.size <= PAGES_KEPT && chars <= PAGES_KEPT_CHARS) break;
+        pages.delete(oldest);
+        chars -= page.html.length;
+    }
+}
+
+/**
+ * Fetches the fragment at `url` (or joins the fetch under way), keeping it when it is a page the member may see
+ * again: answered, and not redirected (to the login page, say). Resolves to { response, html }. A `prefetch` says
+ * so (Purpose: prefetch), for the server not to count a view the member may never have.
+ */
+function fetchPage(url, prefetch = false) {
+    let pending = loading.get(url);
+    if (!pending) {
+        const epoch = forgotten;
+        pending = (prefetch ? fetch(url, { headers: { Purpose: "prefetch" } }) : fetch(url))
+            .then(async response => {
+                const html = await response.text();
+                if (response.ok && !response.redirected && epoch === forgotten) keep(url, html);
+                return { response, html };
+            })
+            .finally(() => {
+                if (loading.get(url) === pending) loading.delete(url);
+            });
+        loading.set(url, pending);
+    }
+    return pending;
+}
+
+/** Drops the pages kept: an action changed something any of them may show (csrf.js calls it after each one). */
+function forget() {
+    forgotten++;
+    pages.clear();
+    loading.clear();
+}
+
+/** The fragment URL of the SPA path `path`. */
+function fragmentUrl(path, search = "") {
     const { route, param } = resolveRoute(path);
     const templateUrl = route
         ? (param ? `${route.templateUrl}/${param}` : route.templateUrl)
         : `/spa/${path}`;
+    return templateUrl + search;
+}
+
+/** Whether the member is typing in the page: a newer version of it must not take that away. */
+function typing() {
+    const focused = document.activeElement;
+    return !!focused && app.contains(focused)
+        && focused.matches("input, textarea, select, [contenteditable], mdui-text-field, mdui-select");
+}
+
+/**
+ * Shows the SPA page `path`. One already kept is shown at once and, unless just fetched, replaced by the server's
+ * when that differs (the member left it typing aside). `fresh` asks the server first, never what was kept.
+ */
+async function navigate(path, push = true, search = "", { fresh = false } = {}) {
+    const current = ++generation;
+    const url = fragmentUrl(path, search);
+
+    const kept = fresh ? undefined : pages.get(url);
+    if (kept) {
+        show(path, push, search, kept.html, true);
+        if (Date.now() - kept.at < PAGE_FRESH_MS) return;
+        let page;
+        try {
+            page = await fetchPage(url);
+        } catch {
+            return; // what was kept stays
+        }
+        if (!page.response.ok) pages.delete(url);
+        if (current !== generation || page.html === kept.html || typing()) return;
+        app.innerHTML = page.html;
+        document.dispatchEvent(new CustomEvent("catapult:render"));
+        return;
+    }
 
     progress.hidden = false;
 
-    let response;
-    let html;
+    let page;
     try {
-        response = await fetch(templateUrl + search);
-        html = await response.text();
+        page = await fetchPage(url);
     } catch {
         // Network failure (offline, timeout, ...): fall back to a full
         // navigation so the browser's own error handling takes over.
@@ -76,6 +162,11 @@ async function navigate(path, push = true, search = "") {
     }
     if (current !== generation) return;
 
+    show(path, push, search, page.html, page.response.ok);
+}
+
+/** Swaps the page `path`'s `html` in, as the address bar's, and tells the fragment scripts. */
+function show(path, push, search, html, ok) {
     app.innerHTML = html;
 
     // Before the render: its listeners read the page's channel off location (CatapultChannel.username()).
@@ -91,7 +182,7 @@ async function navigate(path, push = true, search = "") {
     }
     document.dispatchEvent(new CustomEvent("catapult:render"));
 
-    if (!response.ok) {
+    if (!ok) {
         // Server-side error (unknown page or fragment failure): the
         // response body is the error fragment (see ErrorPageController
         // and SpaFragmentController#unknown), render it in place
@@ -100,6 +191,7 @@ async function navigate(path, push = true, search = "") {
     }
 
     // A dynamic page's title names its param (page.title.channel={0} - Catapult).
+    const { route, param } = resolveRoute(path);
     document.title = config.titles[route?.id]?.replace("{0}", param ?? "") ?? document.title;
     updateActiveLink(path);
 
@@ -112,6 +204,75 @@ async function navigate(path, push = true, search = "") {
 function currentPath() {
     return location.pathname.replace(/^\/+|\/+$/g, "");
 }
+
+// Prefetching: the page of a link the member points at (hovered a moment, focused or pressed) is fetched before the
+// click lands, and a static page's link on screen once the browser is idle; never to save data. A channel's is too
+// costly to fetch for every one the navbar lists: only when pointed at.
+const PREFETCH_HOVER_MS = 65;
+const PREFETCH_ON_SCREEN = 6;
+
+/** Fetches the page `href` names ahead, unless it is not one of the SPA's, open, or kept and fresh. */
+function prefetch(href) {
+    if (navigator.connection?.saveData) return;
+    const url = new URL(href, location.href);
+    if (url.origin !== location.origin) return;
+    const path = url.pathname.replace(/^\/+|\/+$/g, "");
+    if (!resolveRoute(path).route || (path === currentPath() && url.search === location.search)) return;
+    const fragment = fragmentUrl(path, url.search);
+    const kept = pages.get(fragment);
+    if ((kept && Date.now() - kept.at < PAGE_FRESH_MS) || loading.has(fragment)) return;
+    fetchPage(fragment, true).catch(() => {});
+}
+
+/** The SPA link `event` happened on, through shadow roots (see the click handler). */
+function linkOf(event) {
+    const el = event.composedPath().find(node => node instanceof Element && node.hasAttribute("data-link"));
+    return el?.getAttribute("href") && !el.hasAttribute("download") ? el : null;
+}
+
+let hovered = null;
+let hoverTimer = 0;
+document.addEventListener("pointerover", event => {
+    const link = linkOf(event);
+    if (link === hovered) return;
+    clearTimeout(hoverTimer);
+    hovered = link;
+    if (link) hoverTimer = setTimeout(() => prefetch(link.getAttribute("href")), PREFETCH_HOVER_MS);
+});
+for (const type of ["pointerdown", "focusin"]) {
+    document.addEventListener(type, event => {
+        const link = linkOf(event);
+        if (link) prefetch(link.getAttribute("href"));
+    });
+}
+
+function whenIdle(callback) {
+    if (window.requestIdleCallback) window.requestIdleCallback(callback);
+    else setTimeout(callback, 200);
+}
+let onScreen = null;
+
+/** Watches the static pages' links on screen, after each render, prefetching the first few seen. */
+function prefetchOnScreen() {
+    onScreen?.disconnect();
+    if (!("IntersectionObserver" in window)) return;
+    let left = PREFETCH_ON_SCREEN;
+    onScreen = new IntersectionObserver(entries => {
+        for (const entry of entries) {
+            if (!entry.isIntersecting || left <= 0) continue;
+            onScreen.unobserve(entry.target);
+            left--;
+            const href = entry.target.getAttribute("href");
+            whenIdle(() => prefetch(href));
+        }
+    });
+    for (const link of document.querySelectorAll("[data-link][href]")) {
+        const path = new URL(link.getAttribute("href"), location.href).pathname.replace(/^\/+|\/+$/g, "");
+        if (resolveRoute(path).route?.dynamic === false) onScreen.observe(link);
+    }
+}
+
+document.addEventListener("catapult:render", prefetchOnScreen);
 
 /**
  * Fills the navbar with the member's channels (absent when logged out). Fetched once the page
@@ -173,7 +334,7 @@ function listenNavChannels() {
 }
 
 // The router's public surface, for the per-fragment scripts (channel-page.js's refresh()).
-window.CatapultSpa = { navigate, resolveRoute, loadNavChannels, urlOf };
+window.CatapultSpa = { navigate, resolveRoute, loadNavChannels, urlOf, forget };
 
 updateActiveLink(currentPath());
 loadNavChannels();
@@ -190,13 +351,13 @@ document.addEventListener("click", event => {
         || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
         return;
     }
-    const el = event.composedPath().find(node => node instanceof Element && node.hasAttribute("data-link"));
+    const el = linkOf(event);
     const href = el?.getAttribute("href");
     if (!href) {
         return;
     }
     const target = el.getAttribute("target");
-    if ((target && target !== "_self") || el.hasAttribute("download")) {
+    if (target && target !== "_self") {
         return;
     }
 

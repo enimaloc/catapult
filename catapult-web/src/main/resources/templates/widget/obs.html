@@ -37,11 +37,11 @@
         document.addEventListener("catapult:twitchat:dispatch", (e) => line(`dispatch ${e.detail?.id ?? "?"}`));
     })();
 </script>
-<script src="/js/suggest.js"></script>
-<script src="/js/obs.js"></script>
-<script src="/js/obs-session.js"></script>
-<script src="/js/twitchat-protocol.js"></script>
-<script src="/js/twitchat.js"></script>
-<script src="/js/twitchat-stream.js"></script>
+<script th:src="@{/js/suggest.js}"></script>
+<script th:src="@{/js/obs.js}"></script>
+<script th:src="@{/js/obs-session.js}"></script>
+<script th:src="@{/js/twitchat-protocol.js}"></script>
+<script th:src="@{/js/twitchat.js}"></script>
+<script th:src="@{/js/twitchat-stream.js}"></script>
 </body>
 </html>

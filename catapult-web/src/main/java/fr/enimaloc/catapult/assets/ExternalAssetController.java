@@ -18,7 +18,9 @@ import java.util.Map;
  *     <li>{@code /assets/ext/fonts/material-icons.css}, Google Fonts' Material Icons style sheet;</li>
  *     <li>{@code /assets/ext/fonts/gstatic/s/{family}/{version}/{file}}, the fonts it names;</li>
  *     <li>{@code /assets/ext/twitchat/{commit}/{name}.svg}, Twitchat's icons (the Twitchat catalog's
- *     option pictures, see scripts/generate-twitchat-protocol.mjs).</li>
+ *     option pictures, see scripts/generate-twitchat-protocol.mjs);</li>
+ *     <li>{@code /assets/ext/avatar/{size}/{dir}/{file}}, a Twitch profile picture as a {@code size}-pixel WebP
+ *     (see {@link Avatars}, which links them).</li>
  * </ul>
  * Each path element is held to a strict pattern before anything is fetched. The type is catapult-web's,
  * never the upstream's, with nosniff; an SVG is also sandboxed, should it be opened on its own.
@@ -51,6 +53,11 @@ public class ExternalAssetController {
     public ResponseEntity<byte[]> twitchatIcon(@PathVariable String commit, @PathVariable String name) {
         return serve(assets.twitchatIcon(commit, name), MediaType.parseMediaType("image/svg+xml"),
                 Duration.ofDays(365), SVG_CSP);
+    }
+
+    @GetMapping("/avatar/{size:64|128}/{dir:jtv_user_pictures|user-default-pictures-uv}/{file:[A-Za-z0-9_.-]+}")
+    public ResponseEntity<byte[]> avatar(@PathVariable int size, @PathVariable String dir, @PathVariable String file) {
+        return serve(assets.avatar(dir + "/" + file, size), MediaType.parseMediaType("image/webp"), Duration.ofDays(1), null);
     }
 
     private static ResponseEntity<byte[]> serve(ExternalAssets.Result result, MediaType type, Duration maxAge, String csp) {

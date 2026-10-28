@@ -171,7 +171,7 @@ describe("events the page catches up on", () => {
         CatapultDtdd.apply.mockReturnValue(false);
         current().emit("DtddMappingChangedEvent", { username: "enimaloc" });
         await flush();
-        expect(CatapultSpa.navigate).toHaveBeenCalledWith("channel/enimaloc", false, "");
+        expect(CatapultSpa.navigate).toHaveBeenCalledWith("channel/enimaloc", false, "", { fresh: true });
         delete window.CatapultDtdd;
     });
 
@@ -199,7 +199,7 @@ describe("events the page catches up on", () => {
         CatapultCustomBindings.apply.mockReturnValue(false);
         current().emit("CustomBindingsUpdatedEvent", { username: "enimaloc" });
         await flush();
-        expect(CatapultSpa.navigate).toHaveBeenCalledWith("channel/enimaloc", false, "");
+        expect(CatapultSpa.navigate).toHaveBeenCalledWith("channel/enimaloc", false, "", { fresh: true });
         delete window.CatapultCustomBindings;
     });
 
@@ -583,7 +583,7 @@ describe("catching up on the channel's state", () => {
         reopen();
         await flush();
 
-        expect(CatapultSpa.navigate).toHaveBeenCalledWith("channel/enimaloc", false, "");
+        expect(CatapultSpa.navigate).toHaveBeenCalledWith("channel/enimaloc", false, "", { fresh: true });
         expect(document.getElementById("bot").checked).not.toBe(true);
     });
 
@@ -701,5 +701,36 @@ describe("in the OBS dock", () => {
         expect(apply).toHaveBeenCalledTimes(1);
         expect(apply).toHaveBeenCalledWith("GameChangedEvent", { bindingId: "b7", sourceName: "X" });
         expect(document.getElementById("live").classList.contains("hidden")).toBe(true);
+    });
+});
+
+describe("parts built only once shown (lazy.js)", () => {
+    beforeEach(async () => {
+        await load("visibility", "lazy", "channel-page", "channel-events");
+        window.CatapultSpa = { navigate: vi.fn(async () => {}) };
+        vi.stubGlobal("fetch", vi.fn(async () => response(200, [])));
+    });
+
+    it("subscribes to the events a part not shown yet names", () => {
+        html(`<section><template data-lazy><span data-on="steam:SteamConnectionStateEvent.connected"></span></template></section>`);
+
+        render();
+
+        expect(current().listeners.SteamConnectionStateEvent).toHaveLength(1);
+    });
+
+    it("catches up on the state when a part shown missed an event applied by hand, not otherwise", async () => {
+        html(`<mdui-tab-panel id="settings"><template data-lazy><p></p></template></mdui-tab-panel>
+              <mdui-tab-panel id="integrations"><template data-lazy><p></p></template></mdui-tab-panel>`);
+        render();
+
+        CatapultLazy.showIn(document.getElementById("settings"));
+        await flush();
+        expect(fetch).not.toHaveBeenCalled();
+
+        current().emit("ChannelSettingsUpdatedEvent", { settings: null });
+        CatapultLazy.showIn(document.getElementById("integrations"));
+        await flush();
+        expect(fetch).toHaveBeenCalledWith("/spa/channel/enimaloc/state", { headers: { Accept: "application/json" } });
     });
 });

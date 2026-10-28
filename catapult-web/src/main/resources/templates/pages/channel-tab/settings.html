@@ -2,6 +2,8 @@
 <!--/*@thymesVar id="channelSettings" type="fr.enimaloc.catapult.common.dto.channel.UserSettingsDto"*/-->
 <!--/* The channel's owner and its moderators alike: catapult-api lets both change these. */-->
 <mdui-tab-panel slot="panel" value="settings" th:with="settings=${channelSettings}" th:fragment="panel" xmlns:spa="urn:fr.enimaloc.catapult:spa">
+<!--/* Built only once the tab is picked (lazy.js): the page carries it, the browser builds nothing of it till then. */-->
+<template data-lazy>
     <div class="section-header">
         <h2 th:text="#{channel.settings.title}">Paramètres</h2>
     </div>
@@ -86,4 +88,5 @@
     </mdui-card>
     </th:block>
 
+</template>
 </mdui-tab-panel>

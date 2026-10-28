@@ -2,6 +2,8 @@
 <!--/*@thymesVar id="integrations" type="java.util.List<fr.enimaloc.catapult.dto.integration.IntegrationDto>"*/-->
 <mdui-tab-panel slot="panel" value="integrations" th:if="${channelPage.isOwner()}" th:fragment="panel"
                 xmlns:spa="urn:fr.enimaloc.catapult:spa">
+<!--/* Built only once the tab is picked (lazy.js): the page carries it, the browser builds nothing of it till then. */-->
+<template data-lazy>
     <div class="section-header">
         <div class="title-row">
             <h2 th:text="#{channel.connections.title}">Connexions</h2>
@@ -20,6 +22,7 @@
             <p th:if="${integration.id() == 'obs' and widgetUrl == null and widgetUnavailable == true}" id="obs-widget-unavailable" th:text="#{channel.connections.obs.widget.link_unavailable}">Lien du widget indisponible.</p>
         </mdui-card>
     </div>
+</template>
 </mdui-tab-panel>
 
 <!--/* A Message as a <span>: its key resolved with its arguments, or its literal. */-->
@@ -53,12 +56,15 @@
                  th:data-unavailable="${n.hasBranchOptions()} ? #{twitchat.option.unavailable}">
         <span th:if="${n.hasIcons()}" slot="icon" class="option-icon"
               th:style="${n.pickedIcon()} ? |--option-icon: url('${n.pickedIcon()}')|"></span>
+        <!--/* Many options, none picked: built only once the select is opened (lazy.js). */-->
+        <template data-lazy th:remove="${n.lazyOptions()} ? none : tag">
         <mdui-menu-item th:each="option : ${n.options()}" th:value="${option.value()}" th:data-icon="${option.icon()}"
                         th:data-protocols="${option.protocols() == null ? null : #strings.listJoin(option.protocols(), ',')}"
                         th:end-text="${option.protocols() == null ? null : #strings.listJoin(option.protocols(), ', ')}">
             <span th:if="${option.icon()}" slot="icon" class="option-icon" th:style="|--option-icon: url('${option.icon()}')|"></span>
             <th:block th:text="${option.text().isKey() ? #messages.msgWithParams(option.text().key(), option.text().argsArray()) : option.text().literal()}"></th:block>
         </mdui-menu-item>
+        </template>
     </mdui-select>
     <mdui-segmented-button th:case="'segmented-button'" th:id="${n.attrs().id()}" th:data-field="${n.attrs().field()}"
                            th:classappend="${n.attrs().className()}" spa:state="${n.attrs().state()}"
@@ -88,9 +94,10 @@
         <mdui-collapse-item th:each="item : ${n.items()}" th:value="${item.value()}"
                             th:id="${item.attrs().id()}" th:classappend="${item.attrs().className()}">
             <mdui-list-item slot="header" th:text="${item.text().isKey() ? #messages.msgWithParams(item.text().key(), item.text().argsArray()) : item.text().literal()}"></mdui-list-item>
-            <div class="collapse-body">
+            <!--/* Built only once the item is opened (lazy.js): a Twitchat event's holds the menu of every action. */-->
+            <template data-lazy><div class="collapse-body">
                 <th:block th:each="child : ${item.children()}"><th:block th:insert="~{pages/channel-tab/integrations :: node(${child})}"></th:block></th:block>
-            </div>
+            </div></template>
         </mdui-collapse-item>
     </mdui-collapse>
     <div th:case="'repeater'" class="repeater" data-repeater th:id="${n.attrs().id()}"

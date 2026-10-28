@@ -18,11 +18,14 @@ COPY .git ./.git
 # besides leaving a second (-plain) jar for the COPY below. The tests run in CI, not here.
 RUN ./gradlew :catapult-web:bootJar --no-daemon
 
-FROM eclipse-temurin:25-jre-alpine
+# Ubuntu rather than Alpine: the avatars' WebP encoder (webp-imageio) bundles libwebp built for glibc, which musl
+# can't load. wget: the compose healthchecks.
+FROM eclipse-temurin:25-jre
 
 WORKDIR /app
 
-RUN addgroup -S catapult && adduser -S catapult -G catapult
+RUN apt-get update && apt-get install -y --no-install-recommends wget && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system catapult && useradd --system --gid catapult --no-create-home catapult
 
 COPY --from=builder /app/catapult-web/build/libs/*.jar app.jar
 
@@ -35,4 +38,5 @@ USER catapult
 # 8081: the site, 8092: the management port (actuator, Prometheus, the compose healthcheck)
 EXPOSE 8081 8092
 
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# webp-imageio loads libwebp (System.load), which the JDK warns of, and will refuse, unless allowed.
+ENTRYPOINT ["java", "--enable-native-access=ALL-UNNAMED", "-jar", "app.jar"]

@@ -170,9 +170,14 @@ window.CatapultObsWidget = (function () {
         attachSourceCheck(card);
     }
 
+    // In the Integrations tab, built only once picked (lazy.js): attached then, as with the page otherwise.
     document.addEventListener("catapult:render", () => {
         const card = document.getElementById("obs-widget");
         if (card) attach(card);
+    });
+    document.addEventListener("catapult:lazy", event => {
+        const card = document.getElementById("obs-widget");
+        if (card && event.detail.root.contains(card)) attach(card);
     });
 
     return { attach };

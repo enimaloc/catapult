@@ -26,6 +26,8 @@ dependencies {
     implementation("org.mvnpm:mdui:2.1.4")
     // The version springdoc gives catapult-api; ApiDocsAssets.SWAGGER_UI_VERSION names it in the page's paths.
     implementation("org.webjars:swagger-ui:5.34.0")
+    // The avatars' WebP encoder (AvatarImages): libwebp, bundled for glibc, hence the Debian-based image.
+    implementation("com.github.usefulness:webp-imageio:0.11.0")
 
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-data-redis")

@@ -84,6 +84,8 @@ window.CatapultTime = (function () {
     }
 
     document.addEventListener("catapult:render", () => refresh());
+    // A part of the page built once shown (lazy.js), its times written as it was rendered.
+    document.addEventListener("catapult:lazy", event => refresh(event.detail?.root ?? document));
     // An admin tab's content arrives on its own (admin-tabs.js): written at once, not a second later
     // (only the new part, when an edit inserted one).
     document.addEventListener("catapult:admin-panel", event => refresh(event.detail?.root ?? event.detail?.panel ?? document));

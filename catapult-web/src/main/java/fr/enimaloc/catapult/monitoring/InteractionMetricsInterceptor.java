@@ -26,7 +26,8 @@ import java.util.UUID;
  * Records each page shown and each dashboard action into {@link InteractionMetrics}, once
  * answered. A request is a page when {@link IndexController} or {@link SpaFragmentController}
  * serves it (the navbar's channels aside: spa.js loads them on its own), an action when one of the
- * mutation controllers does.
+ * mutation controllers does. A page spa.js fetched ahead of a click it may never get ({@code Purpose: prefetch}) is
+ * counted apart, via {@code prefetch}.
  */
 @RequiredArgsConstructor
 public class InteractionMetricsInterceptor implements HandlerInterceptor {
@@ -63,7 +64,8 @@ public class InteractionMetricsInterceptor implements HandlerInterceptor {
                 || controller == SpaFragmentController.class && !method.getMethod().getName().equals("navChannels")) {
             String path = request.getRequestURI();
             boolean spa = path.startsWith("/spa/");
-            metrics.pageView(page(spa ? path.substring("/spa".length()) : path), spa ? "spa" : "full", role, status);
+            String via = "prefetch".equals(request.getHeader("Purpose")) ? "prefetch" : spa ? "spa" : "full";
+            metrics.pageView(page(spa ? path.substring("/spa".length()) : path), via, role, status);
         }
     }
 

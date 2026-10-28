@@ -336,15 +336,34 @@ window.CatapultTwitchatEvents = (function () {
         });
     }
 
-    document.addEventListener("catapult:render", () => {
+    function bind() {
         const root = document.getElementById("channel-connections");
         if (!root) return;
-        root.querySelectorAll(".twitchat-event").forEach(wireEvent);
+        // An event's body (its payloads, and the menu of every action to add, a few hundred elements) is built
+        // only once it is opened (lazy.js): wired then.
+        root.querySelectorAll(".twitchat-event").forEach(event => {
+            if (!event.querySelector(":scope > template[data-lazy]")) {
+                wireEvent(event);
+                return;
+            }
+            event.addEventListener("catapult:lazy", built => {
+                if (built.detail.root !== event) return;
+                wireEvent(event);
+                markAvailability(event);
+                if (window.CatapultTwitchat?.isTwitchatConnected()) event.querySelectorAll("[data-source]").forEach(fillLiveSelect);
+            });
+        });
         // Payloads outside an event block (a lone card) still get their live selects.
         root.querySelectorAll(".twitchat-payload").forEach((card) => {
             if (!card.closest(".twitchat-event")) card.querySelectorAll("[data-source]").forEach(fillLiveSelect);
         });
         markAvailability(root);
+    }
+
+    // The Integrations tab is built only once picked (lazy.js): bound then, as with the page otherwise.
+    document.addEventListener("catapult:render", bind);
+    document.addEventListener("catapult:lazy", event => {
+        if (event.detail.root.contains(document.getElementById("channel-connections"))) bind();
     });
 
     document.addEventListener("catapult:twitchat:presence", () => {
@@ -352,6 +371,14 @@ window.CatapultTwitchatEvents = (function () {
         if (!root) return;
         markAvailability(root);
         if (window.CatapultTwitchat?.isTwitchatConnected()) root.querySelectorAll("[data-source]").forEach(fillLiveSelect);
+    });
+
+    // A select's options built once it is opened (lazy.js): those the protocol hasn't are hidden then.
+    document.addEventListener("catapult:lazy", event => {
+        const select = event.detail.root;
+        if (select.matches("mdui-select[data-unavailable]")) {
+            markOptions(select, window.CatapultTwitchat?.protocol ?? null);
+        }
     });
 
     document.addEventListener("catapult:twitchat:protocol", () => {

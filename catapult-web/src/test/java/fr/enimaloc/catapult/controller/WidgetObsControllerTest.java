@@ -34,6 +34,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import({WebSecurityConfig.class, fr.enimaloc.catapult.config.I18nConfiguration.class})
 class WidgetObsControllerTest {
 
+    /** The page loads {@code /js/<name>.js}, under its versioned name (name-<md5>.js). */
+    private static org.hamcrest.Matcher<String> script(String name) {
+        return org.hamcrest.Matchers.matchesPattern("(?s).*src=\"/js/" + name + "-[0-9a-f]{32}\\.js\".*");
+    }
+
     private static final UUID TOKEN = UUID.fromString("11111111-2222-3333-4444-555555555555");
     private static final UUID OWNER = UUID.fromString("99999999-8888-7777-6666-555555555555");
 
@@ -56,12 +61,12 @@ class WidgetObsControllerTest {
                 .andExpect(content().string(containsString("data-twitchat-events-url=\"/widget/obs/" + TOKEN + "/events\"")))
                 .andExpect(content().string(containsString("<div id=\"log\"></div>")))
                 .andExpect(content().string(containsString("#log{display:block}")))
-                .andExpect(content().string(containsString("src=\"/js/suggest.js\"")))
-                .andExpect(content().string(containsString("src=\"/js/obs.js\"")))
-                .andExpect(content().string(containsString("src=\"/js/obs-session.js\"")))
-                .andExpect(content().string(containsString("src=\"/js/twitchat-protocol.js\"")))
-                .andExpect(content().string(containsString("src=\"/js/twitchat.js\"")))
-                .andExpect(content().string(containsString("src=\"/js/twitchat-stream.js\"")))
+                .andExpect(content().string(script("suggest")))
+                .andExpect(content().string(script("obs")))
+                .andExpect(content().string(script("obs-session")))
+                .andExpect(content().string(script("twitchat-protocol")))
+                .andExpect(content().string(script("twitchat")))
+                .andExpect(content().string(script("twitchat-stream")))
                 // Bare: none of the app's shell.
                 .andExpect(content().string(not(containsString("mdui"))))
                 .andExpect(content().string(not(containsString("spa.js"))))
@@ -88,7 +93,7 @@ class WidgetObsControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("data-obs-config-url=\"/widget/obs/" + TOKEN + "/config\"")))
                 .andExpect(content().string(containsString("data-twitchat-events-url=\"/widget/obs/" + TOKEN + "/events\"")))
-                .andExpect(content().string(containsString("src=\"/js/obs-session.js\"")))
+                .andExpect(content().string(script("obs-session")))
                 .andExpect(content().string(not(containsString("data-disabled"))))
                 .andExpect(content().string(not(containsString("widget disabled"))));
         mvc.perform(get("/widget/obs/" + TOKEN + "/config")).andExpect(status().isNoContent());

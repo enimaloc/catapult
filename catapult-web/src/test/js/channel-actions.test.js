@@ -27,7 +27,7 @@ beforeEach(async () => {
     window.CatapultCsrf = { postJson: posted };
     window.CatapultSpa = { navigate: vi.fn(async () => {}) };
     vi.stubGlobal("fetch", vi.fn(async () => response(200, [])));
-    await load("channel-page", "game-search", "channel-status", "channel-bindings",
+    await load("visibility", "lazy", "channel-page", "game-search", "channel-status", "channel-bindings",
         "channel-connections", "channel-settings", "channel-dtdd");
 });
 
@@ -715,5 +715,89 @@ describe("channel-dtdd", () => {
         document.getElementById("dtdd-validate-btn").click();
 
         expect(posted).not.toHaveBeenCalled();
+    });
+});
+
+describe("parts built only once shown (lazy.js)", () => {
+    const lazyRow = (id, { open = false } = {}) => `
+        <mdui-collapse-item data-binding-id="${id}" class="${open ? "is-open" : ""}">
+          <mdui-list-item slot="header">${id}</mdui-list-item>
+          <template data-lazy>
+            <mdui-list-item>
+              <mdui-switch class="binding-ignored-toggle" data-post="ignored-toggle" data-key="ignored"></mdui-switch>
+              <mdui-select class="inner"></mdui-select>
+            </mdui-list-item>
+          </template>
+        </mdui-collapse-item>`;
+    const row = (id, selector) => document.querySelector(`[data-binding-id=${id}] ${selector}`);
+
+    it("builds and binds a binding's body on its first opening, the open one's with the page", async () => {
+        html(`<ul id="channel-bindings-list"><mdui-collapse>${lazyRow("b1")}${lazyRow("b2", { open: true })}</mdui-collapse></ul>`);
+        render();
+        expect(row("b1", ".binding-ignored-toggle")).toBeNull();
+
+        toggle(row("b2", ".binding-ignored-toggle"), true);
+        const item = document.querySelector("[data-binding-id=b1]");
+        item.dispatchEvent(new Event("open"));
+        item.dispatchEvent(new Event("close"));
+        item.dispatchEvent(new Event("open"));
+        toggle(row("b1", ".binding-ignored-toggle"), true);
+        await flush();
+
+        expect(posts()).toEqual([
+            ["/channel/enimaloc/bindings/b2/ignored-toggle", { ignored: true }],
+            ["/channel/enimaloc/bindings/b1/ignored-toggle", { ignored: true }],
+        ]);
+    });
+
+    it("leaves a binding's body unbuilt when a select inside its header opens", () => {
+        html(`<ul id="channel-bindings-list"><mdui-collapse>${lazyRow("b1")}</mdui-collapse></ul>`);
+        render();
+
+        document.querySelector("[data-binding-id=b1] mdui-list-item[slot=header]")
+            .dispatchEvent(new Event("open", { bubbles: true }));
+
+        expect(row("b1", ".binding-ignored-toggle")).toBeNull();
+    });
+
+    it("binds the Settings and Integrations cards once their tab is built, once", async () => {
+        html(`
+            <section id="settings"><template data-lazy>
+              <div id="channel-ccl-settings-form">
+                <input type="checkbox" id="ccl-enabled-checkbox" checked>
+                <button id="ccl-settings-save-btn"></button>
+              </div>
+              <div id="channel-tw-settings-form"><input type="checkbox" id="tw-enabled-checkbox"></div>
+              <div id="channel-no-game-settings-form">
+                <input id="no-game-game-input" value=""><input type="hidden" id="no-game-game-id" value="">
+                <ul id="no-game-game-results"></ul>
+                <input type="checkbox" id="no-game-apply-start"><input type="checkbox" id="no-game-apply-no-game">
+                <input type="checkbox" id="no-game-apply-end">
+              </div>
+              <div id="channel-incomplete-fallback-settings-form">
+                <input id="incomplete-fallback-game-input" value="">
+                <input type="hidden" id="incomplete-fallback-game-id" value="">
+                <ul id="incomplete-fallback-game-results"></ul>
+              </div>
+            </template></section>
+            <section id="integrations"><template data-lazy>
+              <div id="channel-connections">
+                <select id="twitchat-branch"><option value="auto">auto</option><option value="beta">beta</option></select>
+              </div>
+            </template></section>`);
+        render();
+
+        CatapultLazy.showIn(document.getElementById("settings"));
+        CatapultLazy.showIn(document.getElementById("integrations"));
+        await click("#ccl-settings-save-btn");
+        const branch = document.getElementById("twitchat-branch");
+        branch.value = "beta";
+        branch.dispatchEvent(new Event("change"));
+        await flush();
+
+        expect(posts()).toEqual([
+            ["/channel/enimaloc/settings/ccl", { cclEnabled: true, blockedCcls: [] }],
+            ["/channel/enimaloc/settings/twitchat/branch", { branch: "beta" }],
+        ]);
     });
 });

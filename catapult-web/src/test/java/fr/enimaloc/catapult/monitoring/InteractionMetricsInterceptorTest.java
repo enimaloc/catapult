@@ -108,6 +108,16 @@ class InteractionMetricsInterceptorTest {
     }
 
     @Test
+    void aPrefetchedPage_countsApart() throws Exception {
+        double before = views("landing", "spa", "anonymous", "success");
+
+        mvc.perform(get("/spa/landing").header("Purpose", "prefetch"));
+
+        assertThat(views("landing", "prefetch", "anonymous", "success")).isEqualTo(1);
+        assertThat(views("landing", "spa", "anonymous", "success")).isEqualTo(before);
+    }
+
+    @Test
     void anUnknownPage_countsAsUnknown_notUnderItsPath() throws Exception {
         double before = views("unknown", "spa", "member", "client_error");
 
