@@ -14,10 +14,24 @@
  * field holds a game rather than a search: text typed but never picked is no game, so when the
  * field is left it shows the selection back, and a save never pairs a typed name with another
  * game's id. select() sets the selection from elsewhere (a save made in another tab).
+ *
+ * A result with a Twitch `boxArtUrl` shows its box art, through catapult-web's proxy (the browser
+ * never asks Twitch's CDN); one without (DTDD's, the mock's) shows its name alone.
  */
 window.GameSearch = (function () {
     const MIN_QUERY_LENGTH = 2;
     const DEBOUNCE_MS = 300;
+    const BOX_ART_PREFIX = "https://static-cdn.jtvnw.net/ttv-boxart/";
+
+    /**
+     * The proxied box art of `url`, at the size the proxy serves (whatever size it names: Helix's search a
+     * small one, its games endpoint a `{width}x{height}` template); null for any other URL.
+     */
+    function boxArt(url) {
+        if (typeof url !== "string" || !url.startsWith(BOX_ART_PREFIX)) return null;
+        const file = url.slice(BOX_ART_PREFIX.length).replace(/-(\{width\}x\{height\}|\d+x\d+)(\.\w+)$/, "-96x128$2");
+        return /^[A-Za-z0-9_]+-96x128\.(png|jpe?g)$/.test(file) ? `/assets/ext/boxart/${file}` : null;
+    }
 
     function tellFailure(status) {
         const channel = window.CatapultChannel;
@@ -53,6 +67,16 @@ window.GameSearch = (function () {
             resultsEl.replaceChildren(...(Array.isArray(games) ? games : []).map(game => {
                 const item = document.createElement("mdui-list-item");
                 item.textContent = game.name;
+                const art = boxArt(game.boxArtUrl);
+                if (art) {
+                    const img = document.createElement("img");
+                    img.slot = "icon";
+                    img.className = "box-art";
+                    img.src = art;
+                    img.alt = "";
+                    img.loading = "lazy";
+                    item.append(img);
+                }
                 item.addEventListener("click", () => {
                     resultsEl.replaceChildren();
                     inputEl.value = game.name;
@@ -91,5 +115,5 @@ window.GameSearch = (function () {
         return { selected: () => selected, select };
     }
 
-    return { attach };
+    return { attach, boxArt };
 })();

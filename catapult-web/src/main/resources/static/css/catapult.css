@@ -1706,6 +1706,19 @@ mdui-select::part(menu) {
     list-style: none;
 }
 
+/* A Twitch category's box art, at the proxy's 96x128 halved (game-search.js, the bindings' rows); empty, a frame */
+.box-art {
+    display: block;
+    width: 48px;
+    height: 64px;
+    object-fit: cover;
+    border-radius: 2px;
+}
+
+span.box-art {
+    background: rgb(var(--mdui-color-surface-container-highest));
+}
+
 /* Responsive */
 
 @media (max-width: 650px) {

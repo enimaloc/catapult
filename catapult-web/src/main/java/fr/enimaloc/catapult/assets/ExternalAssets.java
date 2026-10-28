@@ -28,12 +28,13 @@ import java.util.regex.Pattern;
 
 /**
  * The third-party files the pages use (Google Fonts' Material Icons, Twitchat's icons on GitHub, Twitch's
- * avatars), fetched by catapult-web itself and served from its own origin ({@link ExternalAssetController}),
+ * avatars and categories' box arts), fetched by catapult-web itself and served from its own origin ({@link ExternalAssetController}),
  * so a visitor's browser never contacts Google, GitHub or Twitch's CDN.
  *
  * <p>Only fixed upstreams are ever asked: the Material Icons style sheet, font files under Google's
- * font host, SVGs of Twitchat's icon folder at a given commit, and Twitch's profile pictures (served
- * as the size the pages show, in WebP: {@link AvatarImages}); the caller checks each path
+ * font host, SVGs of Twitchat's icon folder at a given commit, Twitch's profile pictures (served
+ * as the size the pages show, in WebP: {@link AvatarImages}) and its categories' box arts (at the one size
+ * the pages ask, as they are once checked to be a JPEG or a PNG); the caller checks each path
  * element against a strict pattern before it gets here. Redirects aren't followed, an answer over
  * its kind's size limit is refused, and the style sheet is rewritten to point at the proxied fonts
  * (one pointing anywhere else is refused). Answers are kept in memory (bounded): an instance fetches
@@ -59,6 +60,8 @@ public class ExternalAssets {
     /** A profile picture's path on Twitch's CDN, as Helix's profile_image_url names them. */
     static final Pattern AVATAR_PATH =
             Pattern.compile("(jtv_user_pictures|user-default-pictures-uv)/[A-Za-z0-9_.-]+\\.(png|jpe?g)");
+    /** A category's box art on Twitch's CDN, at the one size asked of it (twice the 48x64 shown; the CDN scales it). */
+    static final Pattern BOX_ART_PATH = Pattern.compile("ttv-boxart/[A-Za-z0-9_]+-96x128\\.(png|jpe?g)");
     /** The sides the pages show an avatar at (twice their CSS size, for dense screens). */
     static final Set<Integer> AVATAR_SIZES = Set.of(64, 128);
 
@@ -141,13 +144,22 @@ public class ExternalAssets {
                 picture -> AvatarImages.webp(picture, size));
     }
 
+    /** A Twitch category's box art, as it is; {@code path} must match {@link #BOX_ART_PATH}. */
+    public Result boxArt(String path) {
+        if (!BOX_ART_PATH.matcher(path).matches()) return Result.MISSING;
+        return get("boxart:" + path, URI.create(avatarsBase + path), Kind.BOX_ART,
+                picture -> looksLikeJpegOrPng(picture) ? picture : null);
+    }
+
     /** Each kind's size limit and how long it is kept (a font or a commit's icon never changes). */
     enum Kind {
         CSS(64 * 1024, Duration.ofDays(1)),
         FONT(2 * 1024 * 1024, Duration.ofDays(7)),
         SVG(256 * 1024, Duration.ofDays(7)),
         // A member changing theirs gets the new one within a day (its file name changes with it anyway).
-        AVATAR(2 * 1024 * 1024, Duration.ofDays(1));
+        AVATAR(2 * 1024 * 1024, Duration.ofDays(1)),
+        // A 96x128 JPEG is a few KB; a category's art seldom changes.
+        BOX_ART(256 * 1024, Duration.ofDays(7));
 
         final int maxBytes;
         final Duration ttl;
@@ -239,6 +251,11 @@ public class ExternalAssets {
     private static boolean looksLikeSvg(byte[] body) {
         String start = new String(body, 0, Math.min(body.length, 512), StandardCharsets.UTF_8).stripLeading();
         return start.startsWith("<svg") || start.startsWith("<?xml");
+    }
+
+    private static boolean looksLikeJpegOrPng(byte[] body) {
+        if (body.length >= 3 && (body[0] & 0xff) == 0xff && (body[1] & 0xff) == 0xd8 && (body[2] & 0xff) == 0xff) return true;
+        return body.length >= 8 && (body[0] & 0xff) == 0x89 && body[1] == 'P' && body[2] == 'N' && body[3] == 'G';
     }
 
     /** Kept unless the cache is full (in entries or bytes) even once its expired entries are dropped. */

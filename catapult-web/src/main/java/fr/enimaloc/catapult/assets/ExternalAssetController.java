@@ -20,7 +20,8 @@ import java.util.Map;
  *     <li>{@code /assets/ext/twitchat/{commit}/{name}.svg}, Twitchat's icons (the Twitchat catalog's
  *     option pictures, see scripts/generate-twitchat-protocol.mjs);</li>
  *     <li>{@code /assets/ext/avatar/{size}/{dir}/{file}}, a Twitch profile picture as a {@code size}-pixel WebP
- *     (see {@link Avatars}, which links them).</li>
+ *     (see {@link Avatars}, which links them);</li>
+ *     <li>{@code /assets/ext/boxart/{file}}, a Twitch category's box art (game-search.js links them).</li>
  * </ul>
  * Each path element is held to a strict pattern before anything is fetched. The type is catapult-web's,
  * never the upstream's, with nosniff; an SVG is also sandboxed, should it be opened on its own.
@@ -58,6 +59,12 @@ public class ExternalAssetController {
     @GetMapping("/avatar/{size:64|128}/{dir:jtv_user_pictures|user-default-pictures-uv}/{file:[A-Za-z0-9_.-]+}")
     public ResponseEntity<byte[]> avatar(@PathVariable int size, @PathVariable String dir, @PathVariable String file) {
         return serve(assets.avatar(dir + "/" + file, size), MediaType.parseMediaType("image/webp"), Duration.ofDays(1), null);
+    }
+
+    @GetMapping("/boxart/{file:[A-Za-z0-9_]+-96x128}.{ext:png|jpg|jpeg}")
+    public ResponseEntity<byte[]> boxArt(@PathVariable String file, @PathVariable String ext) {
+        return serve(assets.boxArt("ttv-boxart/" + file + "." + ext),
+                MediaType.parseMediaType(ext.equals("png") ? "image/png" : "image/jpeg"), Duration.ofDays(7), null);
     }
 
     private static ResponseEntity<byte[]> serve(ExternalAssets.Result result, MediaType type, Duration maxAge, String csp) {

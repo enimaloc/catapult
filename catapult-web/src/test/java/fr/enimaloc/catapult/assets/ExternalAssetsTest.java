@@ -109,6 +109,26 @@ class ExternalAssetsTest {
     }
 
     @Test
+    void boxArt_isTwitchsPictureAsItIs_thenKept() throws Exception {
+        byte[] jpeg = {(byte) 0xff, (byte) 0xd8, (byte) 0xff, (byte) 0xe0, 0, 0x10};
+        server.enqueue(new MockResponse().setBody(new okio.Buffer().write(jpeg)));
+
+        assertThat(assets.boxArt("ttv-boxart/33214_IGDB-96x128.jpg").body()).isEqualTo(jpeg);
+        assertThat(assets.boxArt("ttv-boxart/33214_IGDB-96x128.jpg").body()).isEqualTo(jpeg);
+        assertThat(server.getRequestCount()).isEqualTo(1);
+        assertThat(server.takeRequest().getPath()).isEqualTo("/avatars/ttv-boxart/33214_IGDB-96x128.jpg");
+    }
+
+    @Test
+    void boxArt_otherThanAPicture_orAtAnotherSize_isRefused() {
+        server.enqueue(new MockResponse().setBody("<html>"));
+        assertThat(assets.boxArt("ttv-boxart/1-96x128.jpg").status()).isEqualTo(502);
+        assertThat(assets.boxArt("ttv-boxart/1-285x380.jpg").status()).isEqualTo(404);
+        assertThat(assets.boxArt("ttv-boxart/../x-96x128.jpg").status()).isEqualTo(404);
+        assertThat(server.getRequestCount()).isEqualTo(1);
+    }
+
+    @Test
     void avatar_otherThanAPicture_orAtAnotherSize_isRefused() {
         server.enqueue(new MockResponse().setBody("<html>"));
         assertThat(assets.avatar("jtv_user_pictures/abc.png", 64).status()).isEqualTo(502);
