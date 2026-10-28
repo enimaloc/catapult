@@ -18,6 +18,7 @@ import fr.enimaloc.catapult.domain.experiment.ExperimentAssignment;
 import fr.enimaloc.catapult.domain.experiment.ExperimentVariant;
 import fr.enimaloc.catapult.domain.igdb.IgdbGameDetails;
 import fr.enimaloc.catapult.domain.twitchat.TwitchatWidgetSettings;
+import fr.enimaloc.catapult.experiment.LegacyApiRoutesExperiment;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
@@ -28,7 +29,6 @@ import fr.enimaloc.catapult.repository.experiment.ExperimentRepository;
 import fr.enimaloc.catapult.repository.igdb.IgdbGameDetailsRepository;
 import fr.enimaloc.catapult.repository.twitchat.TwitchatWidgetSettingsRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
-import fr.enimaloc.catapult.service.account.UserApiTokenService;
 import fr.enimaloc.catapult.service.account.WidgetTokenService;
 import fr.enimaloc.catapult.service.binding.CustomBindingService;
 import fr.enimaloc.catapult.service.binding.GameStateService;
@@ -107,9 +107,6 @@ class FrozenRouteContractTest extends FullContextTestBase {
     WidgetTokenService widgetTokenService;
 
     @Autowired
-    UserApiTokenService userApiTokenService;
-
-    @Autowired
     CustomBindingService customBindingService;
 
     @Autowired
@@ -149,7 +146,6 @@ class FrozenRouteContractTest extends FullContextTestBase {
             HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).build();
 
     UUID widget;
-    String personalToken;
     UUID bindingId;
     UUID firstAction;
     UUID secondAction;
@@ -163,8 +159,9 @@ class FrozenRouteContractTest extends FullContextTestBase {
     private void fixtureRows() {
         UserAccount account = account("frozen-routes", "frozen-routes-twitch");
         widget = widgetTokenService.getOrCreate(account);
-        personalToken = userApiTokenService.regenerate(account).token();
         openCustomBindingsTo(account);
+        // the legacy routes answer as recorded only while they are open to the widget's account
+        assign(account, LegacyApiRoutesExperiment.KEY, LegacyApiRoutesExperiment.LEGACY_VARIANT);
         customBindingService.create(
                 account, new CustomBindingRequest("Art", "509660", "Art", Set.of(), Set.of("Flashing"), false));
 
@@ -253,10 +250,9 @@ class FrozenRouteContractTest extends FullContextTestBase {
         return new Case(name, method, path, Map.of(), volatilePointers);
     }
 
-    /** In this order: the custom binding is activated then deactivated, so later cases see the earlier ones' effect. */
+    /** In this order: later cases see the earlier ones' effect. */
     Stream<Case> answers() {
         String t = widget.toString();
-        Map<String, String> bearer = headers("Authorization", "Bearer " + personalToken);
         return Stream.of(
                 c("v1-game", "GET", "/api/game/" + t),
                 c("v1-game-lang-fr", "GET", "/api/game/" + t + "?lang=fr"),
@@ -290,16 +286,6 @@ class FrozenRouteContractTest extends FullContextTestBase {
                 c("v2-igdb", "GET", "/api/user/igdb/" + IGDB_ID),
                 c("v2-steam", "GET", "/api/user/steam/" + STEAM_APP_ID),
                 c("v2-xbox", "GET", "/api/user/xbox/" + XBOX_PRODUCT_ID),
-                // the generated id of the binding
-                new Case("custom-bindings-list", "GET", "/api/v2/custom-bindings", bearer, "/bindings/0/id"),
-                new Case("custom-bindings-activate", "POST", "/api/v2/custom-bindings/Art/activate", bearer),
-                new Case("custom-bindings-activate-unknown", "POST", "/api/v2/custom-bindings/nope/activate", bearer),
-                new Case("custom-bindings-deactivate", "POST", "/api/v2/custom-bindings/deactivate", bearer),
-                new Case(
-                        "custom-bindings-preflight",
-                        "OPTIONS",
-                        "/api/v2/custom-bindings/Art/activate",
-                        headers("Origin", "https://twitchat.fr", "Access-Control-Request-Method", "POST")),
                 c("twitchat-widget", "GET", "/api/twitchat/widget/" + t),
                 // the generated id of the widget's owner
                 c("twitchat-widget-access", "GET", "/api/twitchat/widget/" + t + "/access", "/ownerId"),
@@ -370,18 +356,23 @@ class FrozenRouteContractTest extends FullContextTestBase {
 
     /** The experiment gate opened to the account, as the access matrix does. */
     private void openCustomBindingsTo(UserAccount account) {
+        assign(account, CustomBindingService.EXPERIMENT_KEY, "enabled");
+    }
+
+    /** Activates the experiment {@code key} and assigns the account to its variant {@code variantKey}. */
+    private void assign(UserAccount account, String key, String variantKey) {
         Experiment experiment = experiments
-                .findByKey(CustomBindingService.EXPERIMENT_KEY)
-                .orElseThrow(() -> new IllegalStateException("custom bindings experiment not seeded"));
+                .findByKey(key)
+                .orElseThrow(() -> new IllegalStateException(key + " experiment not seeded"));
         experiment.setStatus(Experiment.Status.ACTIVE);
         experiments.save(experiment);
-        ExperimentVariant enabled = experiment.getVariants().stream()
-                .filter(v -> "enabled".equals(v.getKey()))
+        ExperimentVariant variant = experiment.getVariants().stream()
+                .filter(v -> variantKey.equals(v.getKey()))
                 .findFirst()
-                .orElseThrow(() -> new IllegalStateException("custom bindings experiment has no enabled variant"));
+                .orElseThrow(() -> new IllegalStateException(key + " experiment has no " + variantKey + " variant"));
         ExperimentAssignment assignment = new ExperimentAssignment();
         assignment.setExperiment(experiment);
-        assignment.setVariant(enabled);
+        assignment.setVariant(variant);
         assignment.setUser(account);
         assignments.save(assignment);
     }

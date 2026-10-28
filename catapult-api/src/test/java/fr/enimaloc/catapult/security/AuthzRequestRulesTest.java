@@ -67,6 +67,21 @@ class AuthzRequestRulesTest {
     }
 
     @Test
+    void readOnlyTokenIsAPersonalTokenButNotAFullOne() {
+        Authentication full = new TestingAuthenticationToken(UUID.randomUUID(), null, List.of(
+                () -> PersonalTokenAuthenticationFilter.AUTHORITY));
+        Authentication read = new TestingAuthenticationToken(UUID.randomUUID(), null, List.of(
+                () -> PersonalTokenAuthenticationFilter.READ_AUTHORITY));
+        assertThat(Authz.isPersonalToken(read)).isTrue();
+        assertThat(Authz.isFullPersonalToken(full)).isTrue();
+        assertThat(Authz.isFullPersonalToken(read)).isFalse();
+        assertThat(Authz.isFullPersonalToken(null)).isFalse();
+        assertThat(Authz.personalToken().authorize(() -> read, ctx("203.0.113.7")).isGranted()).isTrue();
+        assertThat(Authz.fullPersonalToken().authorize(() -> read, ctx("127.0.0.1")).isGranted()).isFalse();
+        assertThat(Authz.fullPersonalToken().authorize(() -> full, ctx("203.0.113.7")).isGranted()).isTrue();
+    }
+
+    @Test
     void managersDecideAsTheRules() {
         assertThat(Authz.admin().authorize(() -> anonymous(), ctx("203.0.113.7")).isGranted()).isFalse();
         assertThat(Authz.admin().authorize(() -> anonymous(), ctx("127.0.0.1")).isGranted()).isTrue();

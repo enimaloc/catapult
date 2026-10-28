@@ -1,9 +1,0 @@
-{
-  "status" : 404,
-  "headers" : {
-    "Cache-Control" : [ "no-cache, no-store, max-age=0, must-revalidate" ],
-    "Content-Type" : [ "application/problem+json" ],
-    "Vary" : [ "Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers" ]
-  },
-  "body" : "{\"detail\":\"Unknown custom binding\",\"instance\":\"/api/v2/custom-bindings/nope/activate\",\"status\":404,\"title\":\"Not Found\",\"code\":\"not_found\"}"
-}

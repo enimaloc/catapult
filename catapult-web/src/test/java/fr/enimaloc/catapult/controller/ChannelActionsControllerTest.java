@@ -300,8 +300,7 @@ class ChannelActionsControllerTest {
 
         mvc.perform(post("/channel/enimaloc/settings/twitchat/regenerate").with(csrf()))
                 .andExpect(status().isOk())
-                .andExpect(content().json("{\"widgetUrl\":\"http://localhost/widget/obs/11111111-2222-3333-4444-555555555555\","
-                        + "\"summaryUrl\":\"http://localhost/api/user/summary/11111111-2222-3333-4444-555555555555\"}",
+                .andExpect(content().json("{\"widgetUrl\":\"http://localhost/widget/obs/11111111-2222-3333-4444-555555555555\"}",
                         org.springframework.test.json.JsonCompareMode.STRICT));
 
         verify(apiService).regenerateTwitchatWidget("enimaloc");

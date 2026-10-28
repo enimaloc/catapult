@@ -53,7 +53,6 @@ public class MockData {
     private static final String[] RANDOM_NAME_PARTS = {
             "nova", "pixel", "comet", "ember", "quartz", "raven", "glitch", "vortex", "cinder", "haze"
     };
-    private static final String EXAMPLE_UUID = "00000000-0000-0000-0000-000000000000";
     private static final ObsData DEFAULT_OBS = new ObsData(false, "127.0.0.1", 4455, true);
     private static final LinkStateResponse MINECRAFT_UNLINKED = new LinkStateResponse("NONE", null, null);
 
@@ -310,7 +309,7 @@ public class MockData {
                 new PagedBindings(0, bindings.isEmpty() ? 0 : 1, bindings.size(), bindings),
                 AVAILABLE_CCLS, userSettingsDto.blockedCcls(), AVAILABLE_TWS, userSettingsDto.blockedTws(),
                 status, source, steamData(), hasXboxProvider ? new XboxData(hasXbox) : null, minecraftData(), obsData,
-                obsData == null ? null : TwitchatData.of(twitchatBranch), EXAMPLE_UUID,
+                obsData == null ? null : TwitchatData.of(twitchatBranch),
                 username.equals(channelDto.twitchUsername()) ? customBindings.state() : null);
     }
 

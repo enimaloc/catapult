@@ -139,6 +139,7 @@ public final class FakeApi extends Dispatcher {
         route("/api/internal/users/{id}/channels", caller -> new ChannelListResponse(twitchId(caller),
                 list(i -> new ChannelDto(id("channel", i), "3" + i, "budget-channel-" + i, avatar(OWNER), i % 2 == 0))));
         route("/api/internal/users/{id}/api-token", caller -> new ApiTokenStatusDto(true, AT));
+        route("/api/internal/users/{id}/api-token/read", caller -> new ApiTokenStatusDto(false, null));
         route("/api/internal/admin/members", caller -> members());
         route("/api/internal/admin/experiments", caller -> list(i -> new ExperimentSummaryDto(
                 id("experiment", i), "budget.experiment-" + i, "Budget experiment " + i, ExperimentStatus.ACTIVE,
@@ -275,7 +276,6 @@ public final class FakeApi extends Dispatcher {
                 new MinecraftData("ACCEPTED", "BudgetCrafter", "catapult-bot"),
                 new ObsData(true, "localhost", 4455, true),
                 TwitchatData.of("stable"),
-                id("example", 0).toString(),
                 new CustomBindingsStateDto(true, list(i -> new CustomBindingDto(id("custom", i), "Budget binding " + i,
                         "50" + i, "Budget category " + i, List.of("budget-ccl-0"), List.of("budget-tw-0"), i == 0)),
                         id("custom", 0), AT));

@@ -73,7 +73,7 @@ class ChannelCustomBindingsRenderingTest {
                 "enimaloc", owner, true, true, null,
                 new PagedBindings(0, 1, 0, List.of()),
                 List.of(), Set.of(), List.of(), Set.of(),
-                null, null, null, null, null, null, null, "uuid", bindings));
+                null, null, null, null, null, null, null, bindings));
         return mvc.perform(get("/spa/channel/enimaloc").locale(Locale.ENGLISH))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
     }
@@ -223,15 +223,33 @@ class ChannelCustomBindingsRenderingTest {
     }
 
     @Test
-    void experimentClosed_hidesEverything() throws Exception {
-        assertThat(render(true, null))
+    void experimentClosed_hidesEverything_butTheReadOnlyTokenCard() throws Exception {
+        String html = render(true, null);
+        assertThat(html)
                 .doesNotContain("channel-custom-bindings-list").doesNotContain("custom-binding-new-btn")
                 .doesNotContain("channel-api-token-card").doesNotContain("custom-binding");
+        assertThat(panel(html, "account")).contains("id=\"channel-read-token-card\"", "id=\"read-token-generate-btn\"",
+                "id=\"read-token-confirm-dialog\"");
+    }
+
+    @Test
+    void theReadOnlyTokenCard_isThereWithTheCustomBindingsToo() throws Exception {
+        String account = panel(render(true, state()), "account");
+        assertThat(account).contains("id=\"channel-read-token-card\"", "id=\"channel-api-token-card\"");
+    }
+
+    /** A token shown once, and the links built on it, are plain text: Sentry Replay must never record them. */
+    @Test
+    void bothTokenCards_areBlockedFromSentryReplay() throws Exception {
+        String account = panel(render(true, state()), "account");
+        assertThat(byId(account, "channel-read-token-card").hasClass("sentry-block")).isTrue();
+        assertThat(byId(account, "channel-api-token-card").hasClass("sentry-block")).isTrue();
     }
 
     @Test
     void aModerator_getsNothing() throws Exception {
-        assertThat(render(false, null)).doesNotContain("channel-custom-bindings-list").doesNotContain("channel-api-token-card");
+        assertThat(render(false, null)).doesNotContain("channel-custom-bindings-list").doesNotContain("channel-api-token-card")
+                .doesNotContain("channel-read-token-card");
     }
 
     @Test
@@ -244,7 +262,7 @@ class ChannelCustomBindingsRenderingTest {
         when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(new ChannelPageData(
                 new ChannelUserDto("id-1", "twitch-1", "enimaloc", "https://example.test/avatar.png"),
                 "enimaloc", true, true, true, null, new PagedBindings(0, 1, 0, List.of()),
-                List.of(), Set.of(), List.of(), Set.of(), null, null, null, null, null, null, null, "uuid", state()));
+                List.of(), Set.of(), List.of(), Set.of(), null, null, null, null, null, null, null, state()));
         String html = mvc.perform(get("/spa/channel/enimaloc").locale(Locale.FRENCH))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
 

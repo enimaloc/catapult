@@ -53,7 +53,7 @@ class ChannelStateTest {
                                         MinecraftData minecraft, CustomBindingsStateDto custom) {
         return new ChannelPageData(new ChannelUserDto("1", "2", "enimaloc", "img"), "enimaloc", true, true, false,
                 game, bindings, List.of(), Set.of(), List.of(), Set.of(), null, null, steam, xbox, minecraft, null,
-                null, "uuid", custom);
+                null, custom);
     }
 
     private static List<ChannelUpdatedEvent> events(List<ChannelState.Entry> entries) {

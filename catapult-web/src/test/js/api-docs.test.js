@@ -1,9 +1,7 @@
 /*
  * api-docs.js: the API documentation page (/docs/api). Swagger UI is started on the site's copy of the spec, its
- * bundle loaded on the first render that shows the page; catapult-api's generic widget-token example is swapped for
- * the visitor's own; the indicator tells whether catapult-api answers.
+ * bundle loaded on the first render that shows the page; the indicator tells whether catapult-api answers.
  */
-import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { flush, html, load, render, response } from "./helpers.js";
 
@@ -115,79 +113,6 @@ describe("API documentation page", () => {
         expect(document.head.querySelectorAll(`script[src="${BUNDLE}"]`)).toHaveLength(2);
     });
 
-    describe("widget token example", () => {
-        const EXAMPLE = "00000000-0000-0000-0001-000000000190";
-
-        it("is catapult-api's own generic example", () => {
-            // Vitest runs in catapult-web, as Gradle's jsTest does.
-            const snapshot = readFileSync("../catapult-api/src/test/resources/frozen-routes/api-docs.json", "utf8");
-            expect(JSON.parse(snapshot).body).toContain(`"example":"${EXAMPLE}"`);
-        });
-
-        async function withInput(value) {
-            window.SwaggerUIBundle = swaggerStub();
-            page();
-            await load("api-docs");
-            render();
-            await flush();
-            const input = document.createElement("input");
-            input.value = value;
-            const events = [];
-            input.addEventListener("input", () => events.push("input"));
-            input.addEventListener("change", () => events.push("change"));
-            ui().append(input);
-            await flush();
-            return { input, events };
-        }
-
-        it("is replaced by the visitor's own token once Try it out shows it", async () => {
-            localStorage.setItem("catapult_widget_uuid", "my-own-token");
-
-            const { input, events } = await withInput(EXAMPLE);
-
-            expect(input.value).toBe("my-own-token");
-            expect(events).toEqual(["input", "change"]);
-        });
-
-        it("stops watching once the page is left for another", async () => {
-            localStorage.setItem("catapult_widget_uuid", "my-own-token");
-            const disconnect = vi.spyOn(MutationObserver.prototype, "disconnect");
-            await withInput("typed by the visitor");
-            render();
-            expect(disconnect).not.toHaveBeenCalled();
-
-            html("<p>elsewhere</p>");
-            render();
-
-            expect(disconnect).toHaveBeenCalledTimes(1);
-        });
-
-        it("leaves any other value alone", async () => {
-            localStorage.setItem("catapult_widget_uuid", "my-own-token");
-
-            const { input, events } = await withInput("typed by the visitor");
-
-            expect(input.value).toBe("typed by the visitor");
-            expect(events).toEqual([]);
-        });
-
-        it("stays when the visitor has no token", async () => {
-            const { input } = await withInput(EXAMPLE);
-
-            expect(input.value).toBe(EXAMPLE);
-        });
-
-        it("stays when the storage can't be read", async () => {
-            vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
-                throw new Error("denied");
-            });
-
-            const { input } = await withInput(EXAMPLE);
-
-            expect(input.value).toBe(EXAMPLE);
-        });
-    });
-
     describe("cached copy banner", () => {
         function banner(attributes) {
             html(`<p id="api-docs-cached" ${attributes}>API unreachable: documentation cached, from 27/10 09:30.</p>`);
@@ -288,6 +213,95 @@ describe("API documentation page", () => {
             await flush();
 
             expect(status().dataset.state).toBe("up");
+        });
+    });
+
+    describe("the keys card's widget UUID", () => {
+        function widget() {
+            html(`
+                <div id="api-docs-widget" data-label-copied="UUID copied">
+                    <input id="api-docs-widget-value" value="5f0c2a8e-9d3b-4c7a-8e21-6b4f1d2c9a70" readonly>
+                    <button id="api-docs-widget-copy-btn"></button>
+                </div>`);
+        }
+
+        it("copies the UUID and says so", async () => {
+            const writeText = vi.fn(async () => {});
+            vi.stubGlobal("navigator", { clipboard: { writeText } });
+            const showError = vi.fn();
+            window.CatapultChannel = { showError };
+            widget();
+            await load("api-docs");
+
+            render();
+            render();
+            document.getElementById("api-docs-widget-copy-btn").click();
+            await flush();
+
+            expect(writeText).toHaveBeenCalledTimes(1);
+            expect(writeText).toHaveBeenCalledWith("5f0c2a8e-9d3b-4c7a-8e21-6b4f1d2c9a70");
+            expect(showError).toHaveBeenCalledWith("UUID copied");
+        });
+
+        it("selects the field when the clipboard refuses", async () => {
+            vi.stubGlobal("navigator", { clipboard: { writeText: vi.fn(async () => { throw new Error("denied"); }) } });
+            widget();
+            const field = document.getElementById("api-docs-widget-value");
+            field.select = vi.fn();
+            await load("api-docs");
+
+            render();
+            document.getElementById("api-docs-widget-copy-btn").click();
+            await flush();
+
+            expect(field.select).toHaveBeenCalled();
+        });
+    });
+
+    describe("a prefetched (pending) keys card", () => {
+        const pending = `<mdui-card id="api-docs-keys-card" data-pending="true" data-src="/spa/docs/api"
+                                   data-label-unavailable="Keys unreadable"><p>Your keys</p></mdui-card>`;
+        const fresh = `<mdui-layout-main><mdui-card id="api-docs-keys-card">
+                <div id="api-docs-widget" data-label-copied="UUID copied">
+                    <input id="api-docs-widget-value" value="the-uuid" readonly>
+                    <button id="api-docs-widget-copy-btn"></button>
+                </div>
+                <div id="api-docs-read-token"></div></mdui-card></mdui-layout-main>`;
+
+        it("is replaced by the member's real card, fetched as a navigation, then wired", async () => {
+            const attachAll = vi.fn();
+            window.CatapultApiTokenCards = { attachAll };
+            const writeText = vi.fn(async () => {});
+            vi.stubGlobal("navigator", { clipboard: { writeText } });
+            window.CatapultChannel = { showError: vi.fn() };
+            fetch.mockImplementation(async url => (url === "/spa/docs/api" ? response(200, fresh) : response(200, { status: "UP" })));
+            html(pending);
+            await load("api-docs");
+
+            render();
+            await flush();
+
+            expect(fetch).toHaveBeenCalledWith("/spa/docs/api");
+            const card = document.getElementById("api-docs-keys-card");
+            expect(card.dataset.pending).toBeUndefined();
+            expect(document.getElementById("api-docs-read-token")).not.toBeNull();
+            expect(attachAll).toHaveBeenCalledTimes(1);
+            document.getElementById("api-docs-widget-copy-btn").click();
+            await flush();
+            expect(writeText).toHaveBeenCalledWith("the-uuid");
+        });
+
+        it("says the keys can't be read when that fetch fails", async () => {
+            fetch.mockImplementation(async url => (url === "/spa/docs/api" ? response(502, "") : response(200, { status: "UP" })));
+            html(pending);
+            await load("api-docs");
+
+            render();
+            await flush();
+
+            const card = document.getElementById("api-docs-keys-card");
+            expect(card.dataset.pending).toBe("true");
+            expect(card.textContent).toContain("Keys unreadable");
         });
     });
 });

@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.experiment;
 
+import fr.enimaloc.catapult.domain.experiment.Experiment;
 import fr.enimaloc.catapult.domain.experiment.ExperimentAssignmentRule;
 import fr.enimaloc.catapult.domain.experiment.ExperimentOverride;
 import org.springframework.stereotype.Component;
@@ -43,6 +44,9 @@ public @interface ExperimentSpec {
     Rule[] rules() default {};
 
     Override[] overrides() default {};
+
+    /** Status the experiment is created with when no record with this key exists yet. */
+    Experiment.Status initialStatus() default Experiment.Status.DRAFT;
 
     @Retention(RetentionPolicy.RUNTIME)
     @Target({})

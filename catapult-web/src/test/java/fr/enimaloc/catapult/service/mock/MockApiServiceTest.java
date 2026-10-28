@@ -904,6 +904,20 @@ class MockApiServiceTest {
     }
 
     @Test
+    void readApiToken_isGeneratedOnce_apartFromTheFullToken_thenRevoked() {
+        assertThat(service.readApiTokenStatus().exists()).isFalse();
+
+        var created = service.regenerateReadApiToken();
+
+        assertThat(created.status()).isEqualTo(200);
+        assertThat(created.body().token()).startsWith("catr_");
+        assertThat(service.readApiTokenStatus().exists()).isTrue();
+        assertThat(service.apiTokenStatus().exists()).isFalse();
+        assertThat(service.revokeReadApiToken()).isEqualTo(204);
+        assertThat(service.readApiTokenStatus().exists()).isFalse();
+    }
+
+    @Test
     void customBindings_startWithArtActiveAndDeveloppement_andShowOnTheOwnersPage() {
         var state = service.customBindings(username);
 

@@ -24,7 +24,6 @@ public record ChannelPageData(
         MinecraftData minecraft,
         ObsData obs,
         TwitchatData twitchat,
-        String exampleUuid,
         /** The owner's custom bindings; null for anyone else, or while the experiment is closed to the channel. */
         CustomBindingsStateDto customBindings
 ) {}

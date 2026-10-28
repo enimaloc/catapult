@@ -31,8 +31,9 @@ class FrozenRoutesTest {
     @ParameterizedTest
     @ValueSource(
             strings = {
-                "/api/v2/custom-bindings",
-                "/api/v2/custom-bindings/x/activate",
+                "/api/me/game",
+                "/api/me/custom-bindings/active",
+                "/api/games/steam/400",
                 "/api/connect/steam/start",
                 "/api/admin/flags",
                 "/api/channels/x/settings",

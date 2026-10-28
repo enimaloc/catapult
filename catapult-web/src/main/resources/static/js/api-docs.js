@@ -6,20 +6,13 @@
  * The page is one of spa.js's: Swagger UI's bundle (data-bundle, data-css: served by the site, no CDN) is only
  * loaded on the first render that shows it, then started on each new #swagger-ui. "Try it out" calls the site
  * itself (the spec's servers are "/"), which relays the documented paths to catapult-api.
+ * A member's keys card (#api-docs-keys-card) has the OBS widget's UUID with a copy button, wired here; its tokens'
+ * rows are api-token-cards.js's. Prefetched (spa.js), the card came pending, without its rows: the page's fragment
+ * is fetched again (data-src, as a navigation would) and its card put in place, then wired.
  */
 window.CatapultApiDocs = (function () {
-    /**
-     * catapult-api's generic example of a widget token (ApiV2.GENERIC_UUID_EXAMPLE), which "Try it out" pre-fills:
-     * replaced by the visitor's own, which the dashboard keeps in localStorage, as catapult-api's own Swagger UI
-     * does (SwaggerUiJwtTransformer). Entirely in the browser: no token of any kind goes to the server for it.
-     */
-    const GENERIC_UUID_EXAMPLE = "00000000-0000-0000-0001-000000000190";
-    const WIDGET_UUID_KEY = "catapult_widget_uuid";
-
     /** The bundle's loading, shared by every render until it is there; dropped when it fails, to try again. */
     let loading = null;
-    /** The watch on the #swagger-ui shown, disconnected once spa.js has replaced it (the page was left). */
-    let watching = null;
 
     function bundle(root) {
         if (window.SwaggerUIBundle) return Promise.resolve(window.SwaggerUIBundle);
@@ -42,41 +35,6 @@ window.CatapultApiDocs = (function () {
             });
         }
         return loading;
-    }
-
-    function widgetUuid() {
-        try {
-            return window.localStorage.getItem(WIDGET_UUID_KEY);
-        } catch {
-            return null;
-        }
-    }
-
-    /**
-     * Swagger UI only creates a parameter's <input> once "Try it out" is clicked, pre-filled with the example: it is
-     * watched for. The input is React-controlled: its value goes through the native setter, then an "input" event,
-     * for React to take the change (assigning el.value would only change what the field shows).
-     */
-    function swapUuidExample(root) {
-        const uuid = widgetUuid();
-        if (!uuid) return;
-        const setValue = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-        const observer = new MutationObserver(() => {
-            root.querySelectorAll("input").forEach(input => {
-                if (input.value !== GENERIC_UUID_EXAMPLE) return;
-                setValue.call(input, uuid);
-                input.dispatchEvent(new Event("input", { bubbles: true }));
-                input.dispatchEvent(new Event("change", { bubbles: true }));
-            });
-        });
-        observer.observe(root, { childList: true, subtree: true });
-        watching = { root, observer };
-    }
-
-    function stopWatchingLeftPage() {
-        if (!watching || watching.root.isConnected) return;
-        watching.observer.disconnect();
-        watching = null;
     }
 
     function showStatus(el, up) {
@@ -102,8 +60,49 @@ window.CatapultApiDocs = (function () {
         el.textContent = el.dataset.label.replace("{0}", () => when);
     }
 
+    /** The widget UUID's copy button: copied and told (data-label-copied), else the field selected to copy by hand. */
+    function wireWidgetCopy(row) {
+        const button = document.getElementById("api-docs-widget-copy-btn");
+        const field = document.getElementById("api-docs-widget-value");
+        if (!button || !field || row.dataset.wired) return;
+        row.dataset.wired = "true";
+        button.addEventListener("click", async () => {
+            try {
+                await navigator.clipboard.writeText(field.value);
+                window.CatapultChannel?.showError(row.dataset.labelCopied);
+            } catch {
+                field.select?.();
+            }
+        });
+    }
+
+    /** Puts the member's real keys card in place of the pending one, else says the keys can't be read. */
+    async function fillPendingKeys(card) {
+        if (card.dataset.loading) return;
+        card.dataset.loading = "true";
+        try {
+            const response = await fetch(card.dataset.src);
+            if (!response.ok) throw new Error(String(response.status));
+            const page = new DOMParser().parseFromString(await response.text(), "text/html");
+            const fresh = page.getElementById("api-docs-keys-card");
+            if (!fresh || fresh.dataset.pending) throw new Error("no keys card");
+            if (!card.isConnected) return;
+            card.replaceWith(document.importNode(fresh, true));
+            window.CatapultApiTokenCards?.attachAll();
+            const widget = document.getElementById("api-docs-widget");
+            if (widget) wireWidgetCopy(widget);
+        } catch {
+            const note = document.createElement("p");
+            note.textContent = card.dataset.labelUnavailable ?? "";
+            card.append(note);
+        }
+    }
+
     async function start() {
-        stopWatchingLeftPage();
+        const keys = document.getElementById("api-docs-keys-card");
+        if (keys?.dataset.pending) fillPendingKeys(keys);
+        const widget = document.getElementById("api-docs-widget");
+        if (widget) wireWidgetCopy(widget);
         const cached = document.getElementById("api-docs-cached");
         if (cached) showFetchedAt(cached);
         const status = document.getElementById("api-docs-status");
@@ -111,7 +110,6 @@ window.CatapultApiDocs = (function () {
         const root = document.getElementById("swagger-ui");
         if (!root || root.dataset.started) return;
         root.dataset.started = "true";
-        swapUuidExample(root);
         try {
             const SwaggerUIBundle = await bundle(root);
             SwaggerUIBundle({

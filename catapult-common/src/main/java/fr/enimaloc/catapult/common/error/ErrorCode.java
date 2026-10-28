@@ -29,6 +29,9 @@ public enum ErrorCode {
 
     FEATURE_DISABLED(403),
 
+    // a legacy public route that was cut: its successor is in the Link header
+    ROUTE_GONE(410),
+
     // custom bindings (the codes custom binding errors always had)
     TWITCH_UNAVAILABLE(409),
     BOT_DISABLED(409),

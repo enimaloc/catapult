@@ -8,17 +8,14 @@ import org.springframework.security.web.util.matcher.RequestMatcher;
 /**
  * The routes whose error answers are frozen: external callers (OBS, Twitchat, pasted URLs, catapult-web's relay)
  * depend on them as they are, so {@link ProblemAdvice} leaves them to Spring's and Boot's default answers.
- * Everything outside {@code /api/} is frozen, including Boot's {@code /error} (the path of an error dispatch).
+ * Everything outside {@code /api/} is frozen, including Boot's {@code /error} (the path of an error dispatch). The
+ * public API ({@code /api/me/**}, {@code /api/games/**}) is not: it answers problems.
  */
 public final class FrozenRoutes {
 
     private static final PathPatternRequestMatcher.Builder PATHS = PathPatternRequestMatcher.withDefaults();
 
     private static final RequestMatcher API = PATHS.matcher("/api/**");
-
-    /** Under {@code /api/v2/**}, but not released yet: it answers problems. */
-    private static final List<RequestMatcher> UNFROZEN =
-            List.of(PATHS.matcher("/api/v2/custom-bindings"), PATHS.matcher("/api/v2/custom-bindings/**"));
 
     private static final List<RequestMatcher> FROZEN = List.of(
             PATHS.matcher("/api/game/**"),
@@ -36,9 +33,6 @@ public final class FrozenRoutes {
     public static boolean isFrozen(HttpServletRequest request) {
         if (!API.matches(request)) {
             return true;
-        }
-        if (UNFROZEN.stream().anyMatch(m -> m.matches(request))) {
-            return false;
         }
         return FROZEN.stream().anyMatch(m -> m.matches(request));
     }

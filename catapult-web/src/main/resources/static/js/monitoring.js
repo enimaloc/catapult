@@ -10,7 +10,9 @@
  * channel page's 3,000 components: +16 MB and 3x the CPU per navigation).
  * Replays show the page's text, which is the member's own dashboard, but never what is typed in a
  * field (a Steam token...), nor what grants access (the OBS widget's link, invitation codes: the
- * templates mark them .sentry-block, recorded as an empty box).
+ * templates mark them .sentry-block, recorded as an empty box). A URL's read-only API token
+ * ("?token=", as in the API docs' examples) never leaves the page: masked as "***" in every
+ * breadcrumb, span and request sent, by the same rule as the server's TokenParameterMask.
  */
 (function () {
     const config = window.Catapult?.sentry;
@@ -18,6 +20,31 @@
     if (!config || !Sentry) {
         return;
     }
+
+    // "token=" as a parameter of its own (not "widget_token="), its value up to the next separator:
+    // TokenParameterMask's pattern.
+    const TOKEN_PARAMETER = /(?<![\w.%-])(token=)[^&#\s"']*/g;
+    const mask = (value) => (typeof value === "string" ? value.replace(TOKEN_PARAMETER, "$1***") : value);
+    /** Every string value of {@code data} (a breadcrumb's or a span's) masked, in place. */
+    const maskValues = (data) => {
+        if (data && typeof data === "object") {
+            for (const key of Object.keys(data)) {
+                data[key] = mask(data[key]);
+            }
+        }
+    };
+    /** An event's request: its URL and query string, the latter a string or [name, value] pairs. */
+    const maskRequest = (request) => {
+        if (!request) {
+            return;
+        }
+        request.url = mask(request.url);
+        if (Array.isArray(request.query_string)) {
+            request.query_string = request.query_string.map(([name, value]) => [name, name === "token" ? "***" : value]);
+        } else if (request.query_string !== undefined) {
+            request.query_string = mask(request.query_string);
+        }
+    };
 
     Sentry.init({
         dsn: config.dsn,
@@ -44,6 +71,22 @@
         tracesSampleRate: config.tracesSampleRate,
         replaysSessionSampleRate: config.replaysSessionSampleRate ?? 0,
         replaysOnErrorSampleRate: 0,
+        beforeBreadcrumb(breadcrumb) {
+            maskValues(breadcrumb.data);
+            return breadcrumb;
+        },
+        beforeSendTransaction(transaction) {
+            maskRequest(transaction.request);
+            for (const span of transaction.spans ?? []) {
+                span.description = mask(span.description);
+                maskValues(span.data);
+            }
+            return transaction;
+        },
+        beforeSend(event) {
+            maskRequest(event.request);
+            return event;
+        },
     });
     if (config.user) {
         Sentry.setUser({ id: config.user });

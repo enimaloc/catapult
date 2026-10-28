@@ -1,7 +1,5 @@
 package fr.enimaloc.catapult.api.channel;
 
-import fr.enimaloc.catapult.api.userapi.ApiV2;
-import fr.enimaloc.catapult.api.userapi.DevBackdoorResolver;
 import fr.enimaloc.catapult.common.dto.channel.BindingDto;
 import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
@@ -87,7 +85,6 @@ class ChannelDashboardAssemblerTest {
     private final DtddGameCacheRepository dtddCache = mock(DtddGameCacheRepository.class);
     private final DtddMappingProposalRepository dtddProposals = mock(DtddMappingProposalRepository.class);
     private final OAuthTokenRepository oauthTokens = mock(OAuthTokenRepository.class);
-    private final DevBackdoorResolver backdoor = mock(DevBackdoorResolver.class);
     private final MinecraftFriendService minecraft = mock(MinecraftFriendService.class);
     private final MinecraftGateService minecraftGate = mock(MinecraftGateService.class);
     private final MinecraftServiceAccountRepository minecraftAccounts = mock(MinecraftServiceAccountRepository.class);
@@ -108,7 +105,7 @@ class ChannelDashboardAssemblerTest {
         SteamProfileDiagnostics diagnostics = new SteamProfileDiagnostics(steamClient, Optional.of(keyRotator), encryption);
         ChannelDashboardAssembler assembler = new ChannelDashboardAssembler(bindings, settingsRepository, streamState,
                 gameState, ccls, tws, encryption, steamClient, diagnostics, igdb, dtddMappings, dtddCache,
-                dtddProposals, oauthTokens, backdoor, minecraftService, twitchat, raidRestoreGate,
+                dtddProposals, oauthTokens, minecraftService, twitchat, raidRestoreGate,
                 new fr.enimaloc.catapult.api.CustomBindingViews(customBindings), categoryCache);
         ReflectionTestUtils.setField(assembler, "xboxEnabled", xboxEnabled);
         return assembler;
@@ -494,58 +491,6 @@ class ChannelDashboardAssemblerTest {
 
             assertThat(steamFor(moderator)).isEqualTo(new SteamData(true, false, false, false, false, false, 30));
             verify(steam, never()).getProfileStatus(any(), any());
-        }
-    }
-
-    @Nested
-    class ExampleUuid {
-        private String exampleUuid() {
-            return assembler().page(owner, owner, "streamer", 0, null, null).exampleUuid();
-        }
-
-        @Test
-        void prefersTheEncodedCurrentGame() {
-            UUID encoded = UUID.randomUUID();
-            when(gameState.getLastKnownGame(owner))
-                    .thenReturn(Optional.of(new DetectedGame("892970", GameBinding.SourceType.STEAM, "Valheim")));
-            when(backdoor.encode(GameBinding.SourceType.STEAM, "892970")).thenReturn(Optional.of(encoded));
-
-            assertThat(exampleUuid()).isEqualTo(encoded.toString());
-        }
-
-        @Test
-        void thenTheLatestEncodableBinding() {
-            UUID encoded = UUID.randomUUID();
-            GameBinding latest = binding(owner, "730", "CS2");
-            when(gameState.getLastKnownGame(owner))
-                    .thenReturn(Optional.of(new DetectedGame("x", GameBinding.SourceType.MINECRAFT, "Minecraft")));
-            when(bindings.findFirstByUserAndSourceTypeInOrderByUpdatedAtDesc(eq(owner), any()))
-                    .thenReturn(Optional.of(latest));
-            when(backdoor.encode(GameBinding.SourceType.STEAM, "730")).thenReturn(Optional.of(encoded));
-
-            assertThat(exampleUuid()).isEqualTo(encoded.toString());
-            verify(backdoor, never()).encode(eq(GameBinding.SourceType.MINECRAFT), any());
-        }
-
-        @Test
-        void thenTheWidgetToken() {
-            UUID token = UUID.randomUUID();
-            owner.setWidgetToken(token);
-
-            assertThat(exampleUuid()).isEqualTo(token.toString());
-        }
-
-        @Test
-        void butNeverTheWidgetTokenToAModerator() {
-            owner.setWidgetToken(UUID.randomUUID());
-
-            assertThat(assembler().page(moderator, owner, "streamer", 0, null, null).exampleUuid())
-                    .isEqualTo(ApiV2.GENERIC_UUID_EXAMPLE);
-        }
-
-        @Test
-        void otherwiseTheGenericExample() {
-            assertThat(exampleUuid()).isEqualTo(ApiV2.GENERIC_UUID_EXAMPLE);
         }
     }
 

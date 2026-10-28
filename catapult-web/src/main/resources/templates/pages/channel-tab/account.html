@@ -11,12 +11,43 @@
 
     <mdui-card th:replace="~{fragments/notification-channels :: card(${notificationChannels})}"></mdui-card>
 
+    <!--/* The read-only personal API token, for chat bots and scripts reading /api/me/** (open to every member, the
+         custom bindings' experiment or not). The status is read by api-token-cards.js (GET /me/api-token/read); the
+         token only ever appears in #read-token-value, once; sentry-block keeps it (and its link) out of Sentry Replay. */-->
+    <mdui-card id="channel-read-token-card" class="settings-card sentry-block" variant="outlined"
+               th:attr="data-label-none=#{channel.read_token.none},data-label-since=#{channel.read_token.since('{0}')},data-label-generate=#{channel.read_token.generate},data-label-regenerate=#{channel.read_token.regenerate},data-label-copied=#{channel.read_token.copied},data-label-unavailable=#{channel.read_token.unavailable}">
+        <div class="title-row">
+            <h3 th:text="#{channel.read_token.title}">Jeton de lecture</h3>
+        </div>
+        <p th:text="#{channel.read_token.description}">Description</p>
+        <p id="read-token-status"></p>
+        <mdui-button id="read-token-generate-btn" th:text="#{channel.read_token.generate}">Générer un jeton de lecture</mdui-button>
+        <mdui-button id="read-token-revoke-btn" class="hidden" variant="text" th:text="#{channel.read_token.revoke}">Révoquer</mdui-button>
+        <div id="read-token-reveal" class="hidden">
+            <p th:text="#{channel.read_token.once}">Copie-le maintenant.</p>
+            <mdui-text-field id="read-token-value" variant="outlined" readonly autocomplete="off"></mdui-text-field>
+            <mdui-button id="read-token-copy-btn" variant="tonal" th:text="#{channel.read_token.copy}">Copier</mdui-button>
+            <p th:text="#{channel.read_token.curl_hint}">Exemple :</p>
+            <pre id="read-token-curl"></pre>
+        </div>
+        <mdui-dialog id="read-token-confirm-dialog" close-on-overlay-click>
+            <p data-for="regenerate" class="hidden"><strong th:text="#{channel.read_token.confirm.regenerate.title}">Régénérer ?</strong>
+                <span th:text="#{channel.read_token.confirm.regenerate.body}">L'ancien jeton cesse de fonctionner.</span></p>
+            <p data-for="revoke" class="hidden"><strong th:text="#{channel.read_token.confirm.revoke.title}">Révoquer ?</strong>
+                <span th:text="#{channel.read_token.confirm.revoke.body}">Le jeton cesse de fonctionner.</span></p>
+            <mdui-button slot="action" variant="text" class="api-token-confirm-dismiss"
+                         th:text="#{channel.read_token.confirm.dismiss}">Annuler</mdui-button>
+            <mdui-button slot="action" variant="filled" class="api-token-confirm-ok"
+                         th:text="#{channel.read_token.confirm.ok}">Confirmer</mdui-button>
+        </mdui-dialog>
+    </mdui-card>
+
     <!--/* The personal API token of the custom bindings (null while the experiment is closed to the channel). The owner's
-         alone, like the whole tab. channel-custom-bindings.js. */-->
+         alone, like the whole tab. api-token-cards.js. */-->
     <th:block th:if="${channelPage.customBindings() != null}"
               th:with="bindings=${channelPage.customBindings().bindings()}">
-    <!--/* The status is read by channel-custom-bindings.js (GET /me/api-token); the token only ever appears in #api-token-value, once. */-->
-    <mdui-card id="channel-api-token-card" class="settings-card" variant="outlined"
+    <!--/* The status is read by api-token-cards.js (GET /me/api-token); the token only ever appears in #api-token-value, once. */-->
+    <mdui-card id="channel-api-token-card" class="settings-card sentry-block" variant="outlined"
                th:attr="data-example-name=${bindings.isEmpty() ? 'Art' : bindings.get(0).name()},data-label-none=#{channel.api_token.none},data-label-since=#{channel.api_token.since('{0}')},data-label-generate=#{channel.api_token.generate},data-label-regenerate=#{channel.api_token.regenerate},data-label-copied=#{channel.api_token.copied},data-label-unavailable=#{channel.api_token.unavailable}">
         <div class="title-row">
             <h3 th:text="#{channel.api_token.title}">Jeton d'API</h3>

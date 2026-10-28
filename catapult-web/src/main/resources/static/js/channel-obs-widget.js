@@ -1,8 +1,8 @@
 /**
  * The OBS card's widget link (the browser source URL, #obs-widget): Copy puts it on the clipboard,
  * Regenerate asks first (a dialog), posts once however often it is clicked, then shows the new link the
- * answer gives in place, in this card and in the Commands tab's links, which carry the same token
- * (#command-migration's data-summary-url); a catapult-api answering none: the page is re-rendered.
+ * answer gives in place (the chat bots' links carry the read-only token instead, not this one); a
+ * catapult-api answering none: the page is re-rendered.
  * Below it, the check of the old page: is there a browser source in OBS pointing at the link (the card's
  * data-widget-url, the new one once regenerated)? It goes through the page's own OBS connection
  * (CatapultObs), waiting a few seconds for it when it isn't up yet, and offers to create the source on
@@ -57,25 +57,9 @@ window.CatapultObsWidget = (function () {
             const field = card.querySelector("#obs-widget-link");
             if (field) field.value = links.widgetUrl;
             card.dataset.widgetUrl = links.widgetUrl;
-            replaceSummaryUrl(links.summaryUrl);
             // A source found points at the old link now. Without OBS, the check waits for its connection anyway.
             if (active?.card === card && window.CatapultObs?.isConnected()) active.check();
         });
-    }
-
-    /** Puts `summaryUrl` in place of the old one in the Commands tab's links (each field and its copy button). */
-    function replaceSummaryUrl(summaryUrl) {
-        const migration = document.getElementById("command-migration");
-        const old = migration?.dataset.summaryUrl;
-        if (!old || !summaryUrl || old === summaryUrl) return;
-        migration.querySelectorAll("mdui-text-field").forEach(field => {
-            const value = field.value ?? field.getAttribute("value") ?? "";
-            if (value.includes(old)) field.value = value.replaceAll(old, summaryUrl);
-        });
-        migration.querySelectorAll("[data-copy]").forEach(button => {
-            if (button.dataset.copy.includes(old)) button.dataset.copy = button.dataset.copy.replaceAll(old, summaryUrl);
-        });
-        migration.dataset.summaryUrl = summaryUrl;
     }
 
     // The current card's source check: one document listener for the page's life, not one per render.

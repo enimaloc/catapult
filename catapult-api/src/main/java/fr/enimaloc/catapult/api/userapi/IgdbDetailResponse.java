@@ -10,7 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-public record IgdbDetailResponse(@JsonIgnore String baseUrl, String slug, String url, String summary,
+public record IgdbDetailResponse(@JsonIgnore MoreLinks links, String slug, String url, String summary,
                                  String storyline, List<String> platforms, Double rating,
                                  Double aggregatedRating, Double totalRating, Integer totalRatingCount,
                                  Instant releaseDate, Map<String, Object> websites, List<IgdbRef> dlcs,
@@ -20,19 +20,19 @@ public record IgdbDetailResponse(@JsonIgnore String baseUrl, String slug, String
                                  List<String> videoUrls) {
     private static final String CATEGORY_NULL_KEY = "category_null";
 
-    // Points at this same API's own /igdb/{id} detail route — dlcs and similarGames are other
+    // Points at this same API's own IGDB detail route — dlcs and similarGames are other
     // IGDB games, already fully describable by that route, not a foreign platform.
-    public record IgdbRef(String igdbId, String name, @JsonIgnore String baseUrl) {
+    public record IgdbRef(String igdbId, String name, @JsonIgnore MoreLinks links) {
         @JsonGetter
         public String more() {
-            return baseUrl + ApiV2.PATH + "/igdb/" + igdbId;
+            return links.to(MoreLinks.Kind.IGDB, igdbId);
         }
     }
 
-    static List<IgdbRef> zipRefs(List<String> ids, List<String> names, String baseUrl) {
+    static List<IgdbRef> zipRefs(List<String> ids, List<String> names, MoreLinks links) {
         List<IgdbRef> refs = new ArrayList<>(ids.size());
         for (int i = 0; i < ids.size() && i < names.size(); i++) {
-            refs.add(new IgdbRef(ids.get(i), names.get(i), baseUrl));
+            refs.add(new IgdbRef(ids.get(i), names.get(i), links));
         }
         return refs;
     }
@@ -63,17 +63,15 @@ public record IgdbDetailResponse(@JsonIgnore String baseUrl, String slug, String
             Map.entry("steampowered.com", "steam"),
             Map.entry("microsoft.com", "microsoft"));
 
-    // Platform keys for which this API also exposes a /more detail route, and the path to
-    // build it from the raw id — only reachable for external_games-sourced entries, since
-    // those carry a clean id; a category_null entry that happens to resolve to the same key
-    // only has a URL, with no id we can safely parse back out of it, so it stays a plain link.
-    private static final Map<String, String> DETAIL_ROUTE_PATH_PREFIX = Map.of(
-            "steam", "/steam/", "microsoft", "/xbox/");
-
-    public record WebsiteLink(String url, @JsonIgnore String baseUrl, @JsonIgnore String path) {
+    // Only the Steam and Microsoft Store websites also have a "more" detail route here, built from
+    // the raw id — only reachable for external_games-sourced entries, since those carry a clean
+    // id; a category_null entry that happens to resolve to the same key only has a URL, with no
+    // id we can safely parse back out of it, so it stays a plain link.
+    public record WebsiteLink(String url, @JsonIgnore MoreLinks links, @JsonIgnore MoreLinks.Kind kind,
+                              @JsonIgnore String id) {
         @JsonGetter
         public String more() {
-            return path == null ? null : baseUrl + ApiV2.PATH + path;
+            return kind == null ? null : links.to(kind, id);
         }
     }
 
@@ -97,11 +95,11 @@ public record IgdbDetailResponse(@JsonIgnore String baseUrl, String slug, String
             String id = (String) value;
             Object resolvedValue = fromCategoryNull ? value : switch (key) {
                 case "steam" -> ExternalLinks.steamAppId(id)
-                        .map(appId -> new WebsiteLink(ExternalLinks.steamApp(appId), baseUrl,
-                                DETAIL_ROUTE_PATH_PREFIX.get("steam") + appId))
-                        .orElseGet(() -> new WebsiteLink(id, baseUrl, null));
-                case "microsoft" -> new WebsiteLink(ExternalLinks.microsoftStoreProduct(id), baseUrl,
-                        DETAIL_ROUTE_PATH_PREFIX.get("microsoft") + id);
+                        .map(appId -> new WebsiteLink(ExternalLinks.steamApp(appId), links,
+                                MoreLinks.Kind.STEAM, appId))
+                        .orElseGet(() -> new WebsiteLink(id, links, null, null));
+                case "microsoft" -> new WebsiteLink(ExternalLinks.microsoftStoreProduct(id), links,
+                        MoreLinks.Kind.XBOX, id);
                 case "twitch" -> value; // TODO: this is a Twitch game id, not a slug — need the slug to build a directory link
                 default -> value;
             };

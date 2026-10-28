@@ -189,7 +189,7 @@ public class ChannelActionsController {
     }
 
     /**
-     * Replaces the OBS widget link: the new links built on its token, for the page to show them in place
+     * Replaces the OBS widget link: the new link built on its token, for the page to show it in place
      * (204 when catapult-api tells no token), else catapult-api's status, 502 when unreachable.
      */
     @PostMapping("/channel/{username}/settings/twitchat/regenerate")
@@ -199,13 +199,13 @@ public class ChannelActionsController {
         if (token == null) {
             return ResponseEntity.status(ApiStatus.answer(result.status()).getStatusCode()).build();
         }
-        // The token is a capability: in the links only, never logged.
-        return ResponseEntity.ok(new WidgetLinks(ModelFiller.absoluteUrl("/widget/obs/" + token),
-                ModelFiller.absoluteUrl("/api/user/summary/" + token)));
+        // The token is a capability: in the link only, never logged. The chat bots' links carry the read-only
+        // personal token instead (ModelFiller#summaryUrl): regenerating the widget leaves them as they are.
+        return ResponseEntity.ok(new WidgetLinks(ModelFiller.absoluteUrl("/widget/obs/" + token)));
     }
 
-    /** The OBS widget's link and the user API summary's, both carrying the widget's token. */
-    public record WidgetLinks(String widgetUrl, String summaryUrl) {}
+    /** The OBS widget's link, carrying the widget's token. */
+    public record WidgetLinks(String widgetUrl) {}
 
     @PostMapping("/channel/{username}/settings/ccl")
     public ResponseEntity<Void> saveCclSettings(@PathVariable String username, @RequestBody CclSettingsRequest body) {

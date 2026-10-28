@@ -1,7 +1,5 @@
 package fr.enimaloc.catapult.api.channel;
 
-import fr.enimaloc.catapult.api.userapi.ApiV2;
-import fr.enimaloc.catapult.api.userapi.DevBackdoorResolver;
 import fr.enimaloc.catapult.common.dto.channel.BindingDto;
 import fr.enimaloc.catapult.common.dto.channel.CclDto;
 import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
@@ -71,9 +69,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ChannelDashboardAssembler {
     static final int BINDINGS_PAGE_SIZE = 20;
-    /** Source types {@link DevBackdoorResolver} can encode into a "try it out" uuid. */
-    private static final Set<GameBinding.SourceType> BACKDOOR_ENCODABLE =
-            Set.of(GameBinding.SourceType.STEAM, GameBinding.SourceType.XBOX);
 
     private final GameBindingRepository gameBindingRepository;
     private final UserSettingsRepository userSettingsRepository;
@@ -89,7 +84,6 @@ public class ChannelDashboardAssembler {
     private final DtddGameCacheRepository dtddGameCacheRepo;
     private final DtddMappingProposalRepository dtddProposalRepo;
     private final OAuthTokenRepository oAuthTokenRepository;
-    private final DevBackdoorResolver devBackdoorResolver;
     // Only present when minecraft.enabled (the service is @ConditionalOnBooleanProperty).
     private final Optional<MinecraftLinkStateService> minecraftLinkStates;
     private final TwitchatWidgetSettingsService twitchatWidgetSettingsService;
@@ -140,7 +134,6 @@ public class ChannelDashboardAssembler {
                 owner ? minecraftData(channel) : null,
                 owner ? obsData(widget) : null,
                 owner ? TwitchatData.of(widget.getTwitchatBranch()) : null,
-                exampleUuid(channel, owner, detected),
                 owner ? customBindingViews.stateIfEnabled(channel) : null);
     }
 
@@ -220,32 +213,6 @@ public class ChannelDashboardAssembler {
     private static ObsData obsData(TwitchatWidgetSettings settings) {
         return new ObsData(settings.isEnabled(), settings.getObsHost(), settings.getObsPort(),
                 settings.getObsPasswordEncrypted() != null);
-    }
-
-    /**
-     * A "try it out"-able uuid for the Swagger docs' {@code uuid} path parameter (see
-     * SwaggerUiJwtTransformer / twitchat-settings.html, which stores it in
-     * {@code localStorage['catapult_widget_uuid']} for a logged-in dashboard user):
-     * <ol>
-     *   <li>the currently detected game, backdoor-encoded, if its source type supports it;
-     *   <li>otherwise the most recently touched encodable binding on record;
-     *   <li>otherwise the account's own widget token, for its owner only (it's a credential);
-     *   <li>and only then the generic example anonymous Swagger visitors see.
-     * </ol>
-     */
-    private String exampleUuid(UserAccount channel, boolean owner, Optional<DetectedGame> detected) {
-        Optional<UUID> encoded = detected
-                .filter(game -> BACKDOOR_ENCODABLE.contains(game.getSourceType()))
-                .flatMap(game -> devBackdoorResolver.encode(game.getSourceType(), game.getSourceId()));
-        if (encoded.isEmpty()) {
-            encoded = gameBindingRepository
-                    .findFirstByUserAndSourceTypeInOrderByUpdatedAtDesc(channel, BACKDOOR_ENCODABLE)
-                    .flatMap(binding -> devBackdoorResolver.encode(binding.getSourceType(), binding.getSourceId()));
-        }
-        return encoded.map(UUID::toString)
-                .orElseGet(() -> owner && channel.getWidgetToken() != null
-                        ? channel.getWidgetToken().toString()
-                        : ApiV2.GENERIC_UUID_EXAMPLE);
     }
 
     // --- settings --------------------------------------------------------------------------------

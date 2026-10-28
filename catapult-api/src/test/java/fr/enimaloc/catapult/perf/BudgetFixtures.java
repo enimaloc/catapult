@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.perf;
 
+import fr.enimaloc.catapult.domain.account.ApiTokenScope;
 import fr.enimaloc.catapult.chat.ChatCommandEvent;
 import fr.enimaloc.catapult.common.dto.admin.MetaTagAttribute;
 import fr.enimaloc.catapult.common.dto.admin.MetaTagRequest;
@@ -30,6 +31,7 @@ import fr.enimaloc.catapult.domain.experiment.Experiment;
 import fr.enimaloc.catapult.domain.experiment.ExperimentAssignment;
 import fr.enimaloc.catapult.domain.experiment.ExperimentAssignmentRule;
 import fr.enimaloc.catapult.domain.experiment.ExperimentVariant;
+import fr.enimaloc.catapult.experiment.LegacyApiRoutesExperiment;
 import fr.enimaloc.catapult.domain.twitchat.TwitchatEventAction;
 import fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType;
 import fr.enimaloc.catapult.domain.twitchat.TwitchatPayloadMode;
@@ -191,6 +193,7 @@ public class BudgetFixtures {
             UserAccount visitor = account(PREFIX + "-visitor");
             UserAccount admin = account(PREFIX + "-admin");
             openCustomBindingsTo(owner);
+            openLegacyRoutesTo(owner);
             deliveries.replaceChannels(owner, EnumSet.allOf(NotificationChannel.class));
             widgetSettings.updateSettings(owner, true, "127.0.0.1", 4455, "budget-obs-password");
             AlphaInvite invite = new AlphaInvite();
@@ -202,7 +205,7 @@ public class BudgetFixtures {
                     IntStream.range(0, LARGE).mapToObj(BudgetFixtures::channelTwitchId).toList();
             // the binding id is only known once the bindings are saved
             Accounts partial = new Accounts(owner, visitor, admin, widgetTokens.getOrCreate(owner),
-                    userApiTokens.regenerate(owner).token(), null, experiment.getId(), channelTwitchIds);
+                    userApiTokens.regenerate(owner, ApiTokenScope.FULL).token(), null, experiment.getId(), channelTwitchIds);
             add(partial, 0, SMALL);
             GameBinding first = gameBindings.findAll().stream()
                     .filter(b -> b.getSourceName().equals(gameName(0)))
@@ -377,13 +380,26 @@ public class BudgetFixtures {
      * makes it ACTIVE and assigns them its {@code enabled} variant.
      */
     private void openCustomBindingsTo(UserAccount account) {
-        Experiment experiment = experiments.findByKey(CustomBindingService.EXPERIMENT_KEY).orElseThrow();
+        assign(account, CustomBindingService.EXPERIMENT_KEY, "enabled");
+    }
+
+    /**
+     * Opens the legacy public routes to the owner ({@value LegacyApiRoutesExperiment#KEY}'s
+     * {@value LegacyApiRoutesExperiment#LEGACY_VARIANT} variant): their rows measure the routes as they answer.
+     */
+    private void openLegacyRoutesTo(UserAccount account) {
+        assign(account, LegacyApiRoutesExperiment.KEY, LegacyApiRoutesExperiment.LEGACY_VARIANT);
+    }
+
+    /** Makes the experiment {@code key} ACTIVE and assigns the account its {@code variantKey} variant. */
+    private void assign(UserAccount account, String key, String variantKey) {
+        Experiment experiment = experiments.findByKey(key).orElseThrow();
         experiment.setStatus(Experiment.Status.ACTIVE);
         experiments.save(experiment);
         ExperimentAssignment assignment = new ExperimentAssignment();
         assignment.setExperiment(experiment);
         assignment.setVariant(experiment.getVariants().stream()
-                .filter(v -> "enabled".equals(v.getKey()))
+                .filter(v -> variantKey.equals(v.getKey()))
                 .findFirst()
                 .orElseThrow());
         assignment.setUser(account);

@@ -37,7 +37,7 @@ class CatapultApplicationTests extends FullContextTestBase {
         assertThat(context.getBean(TwitchService.class)).isInstanceOf(TwitchServiceImpl.class);
         assertThat(context.getBean(TwitchChatService.class)).isInstanceOf(EventSubTwitchChatService.class);
         assertThat(context.getBean(EventSubService.class)).isInstanceOf(TwitchEventSubService.class);
-        assertThat(context.containsBean("customBindingsApiSecurityFilterChain")).isTrue();
+        assertThat(context.containsBean("publicMeApiSecurityFilterChain")).isTrue();
         assertThat(context.containsBean("securityFilterChain")).isTrue();
         assertThat(environment.getProperty("app.chat.provider")).isEqualTo("eventsub");
     }

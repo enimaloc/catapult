@@ -156,7 +156,6 @@ class MockDataTest {
             assertThat(page.xbox().connected()).isFalse();
             assertThat(page.minecraft().status()).isEqualTo("NONE");
             assertThat(page.obs()).isEqualTo(new ObsData(false, "127.0.0.1", 4455, false));
-            assertThat(page.exampleUuid()).isEqualTo("00000000-0000-0000-0000-000000000000");
         }
 
         @Test

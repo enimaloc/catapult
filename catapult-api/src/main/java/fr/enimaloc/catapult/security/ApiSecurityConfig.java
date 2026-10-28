@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.security;
 
 import fr.enimaloc.catapult.api.ApiPaths;
+import fr.enimaloc.catapult.api.userapi.ApiV2;
 import fr.enimaloc.catapult.service.account.UserApiTokenService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.Bean;
@@ -8,6 +9,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
@@ -52,23 +54,30 @@ import java.util.stream.Stream;
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 public class ApiSecurityConfig {
 
-    /** Mount point of the custom bindings API, which only the personal API token opens. */
-    public static final String CUSTOM_BINDINGS_API = "/api/v2/custom-bindings";
+    /** Mount point of the member's own resources, which only a personal API token opens. */
+    public static final String PUBLIC_ME = "/api/me";
+
+    /** The personal-token chain's paths: {@value #PUBLIC_ME} and all below it. */
+    private static final String[] PERSONAL_TOKEN_PATHS = {PUBLIC_ME, PUBLIC_ME + "/**"};
 
     /**
-     * {@value #CUSTOM_BINDINGS_API}/**, in every profile: ordered before the /api/** chains below (which would take
-     * its Bearer for a JWT, and let localhost through), stateless, no CSRF, authenticated by the personal API token
-     * only — a JWT, a widget token or nothing gets a 401, with an {@code unauthorized} problem.
+     * {@value #PUBLIC_ME}/**, in every profile: ordered before the /api/** chains below (which would take its
+     * Bearer for a JWT, and let localhost through), stateless, no CSRF, authenticated by a personal API token only
+     * ({@link PersonalTokenAuthenticationFilter}) — a JWT, a widget token or nothing gets a 401, with an
+     * {@code unauthorized} problem. A {@code GET} takes either token; anything else takes the full one, the
+     * read-only token getting a 403 with a {@code forbidden} problem.
      */
     @Bean
     @Order(Ordered.HIGHEST_PRECEDENCE)
-    public SecurityFilterChain customBindingsApiSecurityFilterChain(
+    public SecurityFilterChain publicMeApiSecurityFilterChain(
             HttpSecurity http, UserApiTokenService userApiTokenService, JsonMapper json) throws Exception {
         http
-                .securityMatcher(CUSTOM_BINDINGS_API, CUSTOM_BINDINGS_API + "/**")
+                .securityMatcher(PERSONAL_TOKEN_PATHS)
                 // Answers the preflight before any authentication, and adds the headers to every answer, 401 included
-                .cors(cors -> cors.configurationSource(customBindingsCors()))
-                .authorizeHttpRequests(auth -> auth.anyRequest().access(Authz.personalToken()))
+                .cors(cors -> cors.configurationSource(publicMeCors()))
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(HttpMethod.GET, PERSONAL_TOKEN_PATHS).access(Authz.personalToken())
+                        .anyRequest().access(Authz.fullPersonalToken()))
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .csrf(AbstractHttpConfigurer::disable)
                 .requestCache(AbstractHttpConfigurer::disable)
@@ -77,7 +86,10 @@ public class ApiSecurityConfig {
                 .logout(AbstractHttpConfigurer::disable)
                 .exceptionHandling(e -> e
                         .authenticationEntryPoint(new ProblemAuthenticationEntryPoint(
-                                new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED), json)))
+                                new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED), json))
+                        .accessDeniedHandler(new ProblemAccessDeniedHandler(
+                                (request, response, denied) -> response.setStatus(HttpStatus.FORBIDDEN.value()),
+                                json)))
                 .addFilterBefore(new PersonalTokenAuthenticationFilter(userApiTokenService),
                         AuthorizationFilter.class)
                 .addFilterAfter(new DebugSubjectFilter(), PersonalTokenAuthenticationFilter.class);
@@ -86,19 +98,21 @@ public class ApiSecurityConfig {
     }
 
     /**
-     * The custom bindings API is open to a page of any origin (Twitchat runs in the browser): the personal token, in
-     * {@code Authorization}, is its only credential — no cookie or session counts here — so the answer allows no
-     * credentials and any origin is safe. Not a bean, so no other chain picks it up.
+     * The personal-token API is open to a page of any origin (Twitchat runs in the browser): the personal token, in
+     * {@code Authorization} or the read-only one in {@code ?token=}, is its only credential — no cookie or session
+     * counts here — so the answer allows no credentials and any origin is safe. Not a bean, so no other chain picks
+     * it up.
      */
-    static CorsConfigurationSource customBindingsCors() {
+    static CorsConfigurationSource publicMeCors() {
         CorsConfiguration config = new CorsConfiguration();
         config.addAllowedOrigin(CorsConfiguration.ALL);
-        config.setAllowedMethods(List.of("GET", "POST", "OPTIONS"));
-        config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+        config.setAllowedMethods(List.of("GET", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type", ApiV2.VERSION_HEADER));
         config.setAllowCredentials(false);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration(CUSTOM_BINDINGS_API, config);
-        source.registerCorsConfiguration(CUSTOM_BINDINGS_API + "/**", config);
+        for (String path : PERSONAL_TOKEN_PATHS) {
+            source.registerCorsConfiguration(path, config);
+        }
         return source;
     }
 
@@ -130,7 +144,7 @@ public class ApiSecurityConfig {
                 // to the CorsConfigurationSource Spring MVC derives from it.
                 .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(ApiPaths.INTERNAL + "/health", ApiPaths.INTERNAL + "/config/**", ApiPaths.INTERNAL + "/changelog", ApiPaths.INTERNAL + "/status/degraded", ApiPaths.INTERNAL + "/well-known-files", ApiPaths.INTERNAL + "/meta-tags", ApiPaths.INTERNAL + "/social-links", "/api/twitchat/widget/**", "/api/twitchat/actions/**", "/api/game/**", "/api/user/**", "/api/v3/api-docs/**").permitAll()
+                        .requestMatchers(ApiPaths.INTERNAL + "/health", ApiPaths.INTERNAL + "/config/**", ApiPaths.INTERNAL + "/changelog", ApiPaths.INTERNAL + "/status/degraded", ApiPaths.INTERNAL + "/well-known-files", ApiPaths.INTERNAL + "/meta-tags", ApiPaths.INTERNAL + "/social-links", "/api/twitchat/widget/**", "/api/twitchat/actions/**", "/api/game/**", "/api/user/**", "/api/games/**", "/api/v3/api-docs/**").permitAll()
                         .requestMatchers(ApiPaths.INTERNAL + "/auth/exchange").permitAll()
                         .requestMatchers("/api/connect/steam/callback").permitAll()
                         .requestMatchers(ApiPaths.ADMIN + "/**").access(Authz.admin())

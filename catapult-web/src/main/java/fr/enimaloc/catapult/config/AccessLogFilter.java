@@ -7,6 +7,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import fr.enimaloc.catapult.monitoring.TokenParameterMask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
@@ -28,7 +29,8 @@ import java.util.regex.Pattern;
  * is left out, since it can carry the one-time login code. Health checks are skipped: docker
  * and the proxy in front hit them every few seconds. Long-lived responses (SSE) are logged when they close.
  * Static assets (css, js, _static, assets) are logged at DEBUG only. An OBS widget link's token is a
- * capability: it is masked wherever it shows (path, Referer, Location).
+ * capability: it is masked wherever it shows (path, Referer, Location); so is the {@code token} parameter
+ * ({@link TokenParameterMask}), a read-only personal API token.
  * <p>
  * Under the dev profile, each line is followed by the whole exchange the way {@code curl -v}
  * shows it.
@@ -97,7 +99,8 @@ public class AccessLogFilter extends OncePerRequestFilter {
                 .append(':').append(request.getRemotePort()).append('\n');
         String query = request.getQueryString();
         out.append("> ").append(request.getMethod()).append(' ').append(maskTokens(request.getRequestURI()))
-                .append(query == null ? "" : "?" + query).append(' ').append(request.getProtocol()).append('\n');
+                .append(query == null ? "" : "?" + TokenParameterMask.mask(query))
+                .append(' ').append(request.getProtocol()).append('\n');
         for (String name : Collections.list(request.getHeaderNames())) {
             for (String value : Collections.list(request.getHeaders(name))) {
                 out.append("> ").append(name).append(": ").append(mask(name, value)).append('\n');
@@ -118,6 +121,6 @@ public class AccessLogFilter extends OncePerRequestFilter {
     }
 
     private static String maskTokens(String value) {
-        return value == null ? null : WIDGET_TOKEN.matcher(value).replaceAll("$1***");
+        return value == null ? null : TokenParameterMask.mask(WIDGET_TOKEN.matcher(value).replaceAll("$1***"));
     }
 }

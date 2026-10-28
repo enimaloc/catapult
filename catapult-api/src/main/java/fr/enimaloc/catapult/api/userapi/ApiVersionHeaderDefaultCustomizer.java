@@ -10,7 +10,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.accept.SemanticApiVersionParser;
 
 /**
- * Gives the {@link ApiV2#VERSION_HEADER} header parameter of every documented operation the
+ * Gives the {@link ApiV2#VERSION_HEADER} header parameter, and the {@link ApiV2#VERSION_PARAM} query
+ * parameter that stands in for it, of every documented operation the
  * default version {@link ApiVersioningConfig} configures, as {@code /v3/api-docs} has always shown
  * it. springdoc 3.2 stopped writing that default; the frozen api-docs answer still carries it.
  * A header that already has a default keeps it.
@@ -35,7 +36,7 @@ public class ApiVersionHeaderDefaultCustomizer implements OpenApiCustomizer {
                     continue;
                 }
                 for (Parameter parameter : operation.getParameters()) {
-                    if (isVersionHeader(parameter) && parameter.getSchema().getDefault() == null) {
+                    if (isVersionParameter(parameter) && parameter.getSchema().getDefault() == null) {
                         setDefault(parameter.getSchema());
                     }
                 }
@@ -43,10 +44,10 @@ public class ApiVersionHeaderDefaultCustomizer implements OpenApiCustomizer {
         }
     }
 
-    private static boolean isVersionHeader(Parameter parameter) {
-        return "header".equals(parameter.getIn())
-                && ApiV2.VERSION_HEADER.equalsIgnoreCase(parameter.getName())
-                && parameter.getSchema() != null;
+    private static boolean isVersionParameter(Parameter parameter) {
+        boolean named = "header".equals(parameter.getIn()) && ApiV2.VERSION_HEADER.equalsIgnoreCase(parameter.getName())
+                || "query".equals(parameter.getIn()) && ApiV2.VERSION_PARAM.equals(parameter.getName());
+        return named && parameter.getSchema() != null;
     }
 
     @SuppressWarnings("unchecked")

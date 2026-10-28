@@ -1626,13 +1626,21 @@ mdui-select::part(menu) {
 }
 
 /*
- * With a single segment (e.g. the Minecraft card's one action button), the
- * group applies BOTH "-first" and "-last" classes to it — its own stylesheet
- * declares "-last" after "-first", so that rule wins the cascade and rounds
- * only the right two corners instead of all four. Full pill, explicitly.
+ * The group tags its "-first"/"-last" segments by DOM index, blind to [hidden] and
+ * .hidden: with an edge segment hidden, the visible one at that edge stays square
+ * (and the first keeps its -1px overlap). Round the visible edges instead. A lone
+ * visible segment gets both rules — and, as with a single segment, where mdui's
+ * "-last" would otherwise win the cascade over "-first", a full pill.
  */
-.connection-card > .card-actions mdui-segmented-button:only-child {
-    border-radius: var(--shape-corner);
+mdui-segmented-button-group > mdui-segmented-button:nth-child(1 of :not([hidden], .hidden)) {
+    margin-left: 0;
+    border-top-left-radius: var(--shape-corner);
+    border-bottom-left-radius: var(--shape-corner);
+}
+
+mdui-segmented-button-group > mdui-segmented-button:nth-last-child(1 of :not([hidden], .hidden)) {
+    border-top-right-radius: var(--shape-corner);
+    border-bottom-right-radius: var(--shape-corner);
 }
 
 /* Settings cards */
@@ -2363,7 +2371,8 @@ mdui-snackbar.broadcast-warning { --mdui-color-inverse-surface: var(--mdui-color
 }
 
 /*
- * API documentation (pages/api-docs.html): Swagger UI has a light theme of its own, kept on a light card
+ * API documentation (pages/api-docs.html): Swagger UI wears the site's theme, in api-docs-theme.css (loaded after
+ * Swagger UI's own stylesheet)
  */
 .api-docs-status {
     display: inline-flex;
@@ -2402,16 +2411,31 @@ mdui-snackbar.broadcast-warning { --mdui-color-inverse-surface: var(--mdui-color
     color: var(--catapult-text-secondary);
 }
 
-.api-docs-ui {
+/* The member's keys, above Swagger UI (Swagger UI's own theme: api-docs-theme.css). */
+.api-docs-keys {
     margin-top: 24px;
-    padding: 8px 16px;
-    border-radius: var(--catapult-radius);
-    background: #fff;
-    color: #3b4151;
-    overflow-x: auto;
-    /* The site's dark color-scheme would give Swagger UI's buttons and fields (the schemas' names among them)
-       the browser's dark backgrounds, under its dark text: the card is light, so are its native controls. */
-    color-scheme: light;
+}
+
+.api-docs-key {
+    padding-top: 16px;
+    margin-top: 16px;
+    border-top: 1px solid var(--catapult-border);
+}
+
+.api-docs-key h3 {
+    margin: 0 0 4px;
+}
+
+.api-docs-key-value {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+}
+
+.api-docs-key-value mdui-text-field {
+    flex: 1 1 320px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 /* ── OBS dock (pages/channel-dock.html) ───────────────────────────────────

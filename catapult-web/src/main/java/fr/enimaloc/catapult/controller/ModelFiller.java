@@ -163,6 +163,15 @@ public class ModelFiller {
         return ServletUriComponentsBuilder.fromCurrentContextPath().path(path).toUriString();
     }
 
+    /**
+     * The member's game summary as the chat bots read it, on this site's origin: authenticated by {@code readToken} in
+     * its query, a read-only personal token just generated or the placeholder standing for it. Null outside a request.
+     */
+    static String summaryUrl(String readToken) {
+        String summary = absoluteUrl("/api/me/game/summary");
+        return summary == null ? null : summary + "?token=" + readToken;
+    }
+
     private Map<String, String> titles(Locale locale) {
         return SiteCatalog.PAGES.stream().collect(Collectors.toMap(
                 SpaPage::getId,
@@ -249,20 +258,21 @@ public class ModelFiller {
         if (channelPage.isOwner()) {
             var twitchatEvents = channelPage.twitchat() == null ? Map.<String, List<TwitchatEventActionDto>>of()
                     : apiService.twitchatEvents(username);
-            // Only when there is something to put the token in: OBS, or commands to move.
-            var commands = apiService.enabledChatCommands();
-            var widget = channelPage.obs() != null || !commands.isEmpty() ? apiService.twitchatSettings(username) : null;
-            // The token is a capability: it goes in the links only, never in a log.
-            String token = widget == null ? null : widget.widgetToken();
+            // Only when there is something to put the widget's token in: OBS.
             if (channelPage.obs() != null) {
+                var widget = apiService.twitchatSettings(username);
+                // The token is a capability: it goes in the link only, never in a log.
+                String token = widget == null ? null : widget.widgetToken();
                 if (token != null) {
                     model.addAttribute("widgetUrl", absoluteUrl("/widget/obs/" + token));
                 } else {
                     model.addAttribute("widgetUnavailable", true);
                 }
             }
-            String summaryUrl = token == null ? null : absoluteUrl("/api/user/summary/" + token);
-            // The card's links carry it: channel-obs-widget.js swaps it for a regenerated one.
+            var commands = apiService.enabledChatCommands();
+            // The read-only token is never known here (shown once, when generated): its placeholder stands in, which
+            // channel-command-migration.js swaps for a token generated on the page.
+            String summaryUrl = summaryUrl(message("channel.read_token.placeholder", null, LocaleContextHolder.getLocale()));
             model.addAttribute("summaryUrl", summaryUrl);
             model.addAttribute("commandMigration", CommandMigration.of(commands, summaryUrl,
                     message("channel.commands.migration.empty", null, LocaleContextHolder.getLocale())));

@@ -147,7 +147,7 @@ class DebugAttributionTest {
                         null, org.springframework.security.core.authority.AuthorityUtils.createAuthorityList(
                                 fr.enimaloc.catapult.security.PersonalTokenAuthenticationFilter.AUTHORITY)));
 
-        filter(new MockHttpServletRequest("POST", "/api/v2/custom-bindings/Art/activate"));
+        filter(new MockHttpServletRequest("PUT", "/api/me/custom-bindings/active"));
 
         assertThat(seen).containsExactly(member);
     }

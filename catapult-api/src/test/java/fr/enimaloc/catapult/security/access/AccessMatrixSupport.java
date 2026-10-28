@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.security.access;
 
+import fr.enimaloc.catapult.domain.account.ApiTokenScope;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -234,7 +235,7 @@ abstract class AccessMatrixSupport {
             mod = account("matrix-mod", "matrix-mod-twitch");
             member = account("matrix-member", "matrix-member-twitch");
             admin = account("matrix-admin", "matrix-admin-twitch");
-            ptoken = userApiTokenService.regenerate(owner).token();
+            ptoken = userApiTokenService.regenerate(owner, ApiTokenScope.FULL).token();
             widgetToken = widgetTokenService.getOrCreate(owner);
             openCustomBindingsTo(owner);
         });

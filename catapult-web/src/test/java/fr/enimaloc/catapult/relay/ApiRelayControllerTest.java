@@ -27,16 +27,18 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /** catapult-api's public paths, relayed by catapult-web; a local HTTP server stands in for catapult-api. */
 @WebMvcTest(ApiRelayController.class)
-@Import({WebSecurityConfig.class, CustomBindingsCorsConfig.class})
+@Import({WebSecurityConfig.class, PublicApiCorsConfig.class})
 class ApiRelayControllerTest {
 
     /** What the stand-in catapult-api received last. */
@@ -155,30 +157,49 @@ class ApiRelayControllerTest {
     }
 
     /**
-     * A Stream Deck or a script reaches the custom bindings API through the site: its token-only POST needs no
+     * A Stream Deck or a script reaches the custom bindings API through the site: its token-only PUT/DELETE needs no
      * CSRF token or session here (catapult-api's own chain authenticates the Bearer), and catapult-api's answer,
      * a refusal included, comes back as is.
      */
     @Test
-    void relaysTheCustomBindingsApi_aTokenOnlyPostWithoutCsrf_andItsStatus() throws Exception {
+    void relaysTheCustomBindingsApi_aTokenOnlyPutWithoutCsrf_andItsStatus() throws Exception {
         answer = exchange -> respond(exchange, 204, "", Map.of());
 
-        mvc.perform(post("/api/v2/custom-bindings/Art/activate").header("Authorization", "Bearer cat_TOKEN"))
+        mvc.perform(put("/api/me/custom-bindings/active").header("Authorization", "Bearer cat_TOKEN")
+                        .contentType("application/json").content("{\"idOrName\":\"Art\"}"))
                 .andExpect(status().isNoContent());
 
         Received received = RECEIVED.get();
-        assertThat(received.method()).isEqualTo("POST");
-        assertThat(received.uri()).isEqualTo("/api/v2/custom-bindings/Art/activate");
+        assertThat(received.method()).isEqualTo("PUT");
+        assertThat(received.uri()).isEqualTo("/api/me/custom-bindings/active");
         assertThat(received.header("Authorization")).isEqualTo("Bearer cat_TOKEN");
 
         answer = exchange -> respond(exchange, 401, "", Map.of());
-        mvc.perform(post("/api/v2/custom-bindings/deactivate")).andExpect(status().isUnauthorized());
-        assertThat(RECEIVED.get().uri()).isEqualTo("/api/v2/custom-bindings/deactivate");
+        mvc.perform(delete("/api/me/custom-bindings/active")).andExpect(status().isUnauthorized());
+        assertThat(RECEIVED.get().method()).isEqualTo("DELETE");
+        assertThat(RECEIVED.get().uri()).isEqualTo("/api/me/custom-bindings/active");
 
         answer = exchange -> respond(exchange, 200, "{\"bindings\":[]}", Map.of("Content-Type", List.of("application/json")));
-        mvc.perform(get("/api/v2/custom-bindings").header("Authorization", "Bearer cat_TOKEN"))
+        mvc.perform(get("/api/me/custom-bindings").header("Authorization", "Bearer cat_TOKEN"))
                 .andExpect(status().isOk()).andExpect(content().string("{\"bindings\":[]}"));
-        assertThat(RECEIVED.get().uri()).isEqualTo("/api/v2/custom-bindings");
+        assertThat(RECEIVED.get().uri()).isEqualTo("/api/me/custom-bindings");
+    }
+
+    /** The public API by resource, the read-only token in the query included: relayed as sent. */
+    @Test
+    void relaysThePublicApiByResource() throws Exception {
+        for (String path : List.of("/api/me/game", "/api/me/game/summary", "/api/me/bindings/x1",
+                "/api/games/igdb/1", "/api/games/steam/2", "/api/games/xbox/9N", "/api/games/dtdd/3")) {
+            mvc.perform(get(path).queryParam("token", "catr_READ")).andExpect(status().isOk());
+            assertThat(RECEIVED.get().uri()).isEqualTo(path + "?token=catr_READ");
+        }
+    }
+
+    @Test
+    void theRetiredCustomBindingsApi_isNoLongerRelayed() throws Exception {
+        mvc.perform(get("/api/v2/custom-bindings").header("Authorization", "Bearer cat_TOKEN"))
+                .andExpect(status().is4xxClientError());
+        assertThat(RECEIVED.get()).isNull();
     }
 
     // --- CORS on the custom bindings API: a page of any origin (Twitchat) calls it with its token alone ---
@@ -187,19 +208,45 @@ class ApiRelayControllerTest {
 
     @Test
     void customBindingsPreflight_isAnsweredHere_withoutAuthentication() throws Exception {
-        for (String path : List.of("/api/v2/custom-bindings", "/api/v2/custom-bindings/Art/activate")) {
+        for (String path : List.of("/api/me/custom-bindings", "/api/me/custom-bindings/active")) {
             mvc.perform(options(path)
                             .header("Origin", ORIGIN)
-                            .header("Access-Control-Request-Method", "POST")
+                            .header("Access-Control-Request-Method", "PUT")
                             .header("Access-Control-Request-Headers", "authorization, content-type"))
                     .andExpect(status().is2xxSuccessful())
                     .andExpect(header().string("Access-Control-Allow-Origin", "*"))
-                    .andExpect(header().string("Access-Control-Allow-Methods", "GET,POST,OPTIONS"))
+                    .andExpect(header().string("Access-Control-Allow-Methods", "GET,PUT,DELETE,OPTIONS"))
                     .andExpect(header().string("Access-Control-Allow-Headers",
                             org.hamcrest.Matchers.containsStringIgnoringCase("authorization")))
                     .andExpect(header().doesNotExist("Access-Control-Allow-Credentials"));
         }
         assertThat(RECEIVED.get()).isNull();
+    }
+
+    @Test
+    void everyPublicApiPreflight_isAnsweredHere_withTheApiVersionHeader() throws Exception {
+        for (String path : List.of("/api/me/game", "/api/me/game/summary", "/api/me/bindings/b",
+                "/api/me/custom-bindings", "/api/me/custom-bindings/active", "/api/games/igdb/1")) {
+            mvc.perform(options(path)
+                            .header("Origin", ORIGIN)
+                            .header("Access-Control-Request-Method", "GET")
+                            .header("Access-Control-Request-Headers", "authorization, x-api-version"))
+                    .andExpect(status().is2xxSuccessful())
+                    .andExpect(header().string("Access-Control-Allow-Origin", "*"))
+                    .andExpect(header().string("Access-Control-Allow-Headers",
+                            org.hamcrest.Matchers.containsStringIgnoringCase("x-api-version")))
+                    .andExpect(header().doesNotExist("Access-Control-Allow-Credentials"));
+        }
+        assertThat(RECEIVED.get()).isNull();
+    }
+
+    /** The games lookups only read: their preflight allows no write. */
+    @Test
+    void gamesPreflight_allowsReadsOnly() throws Exception {
+        mvc.perform(options("/api/games/steam/400")
+                        .header("Origin", ORIGIN)
+                        .header("Access-Control-Request-Method", "PUT"))
+                .andExpect(status().isForbidden());
     }
 
     /** catapult-api answers with its own CORS headers too: the browser must see Allow-Origin once only. */
@@ -208,7 +255,7 @@ class ApiRelayControllerTest {
         answer = exchange -> respond(exchange, 401, "", Map.of(
                 "Access-Control-Allow-Origin", List.of("*"), "Vary", List.of("Origin")));
 
-        MockHttpServletResponse response = mvc.perform(post("/api/v2/custom-bindings/Art/activate")
+        MockHttpServletResponse response = mvc.perform(put("/api/me/custom-bindings/active")
                         .header("Origin", ORIGIN).header("Authorization", "Bearer cat_BAD"))
                 .andExpect(status().isUnauthorized())
                 .andReturn().getResponse();
@@ -222,7 +269,7 @@ class ApiRelayControllerTest {
     void customBindingsWithASessionCookieOnly_getCatapultApis401() throws Exception {
         answer = exchange -> respond(exchange, 401, "", Map.of());
 
-        mvc.perform(post("/api/v2/custom-bindings/Art/activate").header("Origin", ORIGIN)
+        mvc.perform(delete("/api/me/custom-bindings/active").header("Origin", ORIGIN)
                         .cookie(new Cookie("SESSION", "web-session")))
                 .andExpect(status().isUnauthorized())
                 .andExpect(header().string("Access-Control-Allow-Origin", "*"));

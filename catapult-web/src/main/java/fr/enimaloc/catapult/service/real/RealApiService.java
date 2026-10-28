@@ -1388,6 +1388,30 @@ public class RealApiService implements ApiService {
         return client.delete("/api/internal/users/{userId}/api-token", me);
     }
 
+    @Override
+    public ApiTokenStatusDto readApiTokenStatus() {
+        UUID me = me();
+        if (me == null) return null;
+        return client.get("/api/internal/users/{userId}/api-token/read", ApiTokenStatusDto.class, me);
+    }
+
+    @Override
+    public ApiClient.Result<ApiTokenCreatedDto> regenerateReadApiToken() {
+        UUID me = me();
+        if (me == null) return new ApiClient.Result<>(HttpStatus.UNAUTHORIZED.value(), null);
+        // Same as the full token: the answer is never logged, and nothing here keeps it.
+        ApiClient.Result<ApiTokenCreatedDto> result = client.call(HttpMethod.POST, "/api/internal/users/{userId}/api-token/read",
+                null, ApiTokenCreatedDto.class, me);
+        return result.ok() && result.body() != null ? result : new ApiClient.Result<>(result.ok() ? 502 : result.status(), null);
+    }
+
+    @Override
+    public int revokeReadApiToken() {
+        UUID me = me();
+        if (me == null) return HttpStatus.UNAUTHORIZED.value();
+        return client.delete("/api/internal/users/{userId}/api-token/read", me);
+    }
+
     /**
      * {@code call} on the channel named {@code username}, given its account id (the {@code userId} of a channel's
      * routes): {@code refused} with the lookup's status, without calling, when catapult-api does not tell it (401 for

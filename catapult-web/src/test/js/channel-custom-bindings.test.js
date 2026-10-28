@@ -1,7 +1,6 @@
 /*
  * The custom bindings: the overview list (activate, deactivate, the error told per code, create through
- * "New", edit in a row's form, confirmed delete) and the personal API token card (status, confirmed
- * regeneration, the token shown once with its curl example, copy).
+ * "New", edit in a row's form, confirmed delete). The personal API token card is api-token-cards.test.js's.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { flush, html, load, render, response } from "./helpers.js";
@@ -112,27 +111,6 @@ function gameOf(row) {
     const input = row.querySelector(".custom-binding-game-input");
     const index = window.GameSearch.attach.mock.calls.findLastIndex(call => call[0] === input);
     return window.GameSearch.attach.mock.results[index].value;
-}
-
-function tokenCard(example = "Art") {
-    html(`
-        <mdui-card id="channel-api-token-card" data-example-name="${example}"
-                   data-label-none="Aucun jeton" data-label-since="Généré le {0}"
-                   data-label-generate="Générer" data-label-regenerate="Régénérer" data-label-copied="Copié">
-            <span id="api-token-status"></span>
-            <mdui-button id="api-token-generate-btn"></mdui-button>
-            <mdui-button id="api-token-revoke-btn" class="hidden"></mdui-button>
-            <div id="api-token-reveal" class="hidden">
-                <input id="api-token-value" readonly/>
-                <mdui-button id="api-token-copy-btn"></mdui-button>
-                <pre id="api-token-curl"></pre>
-            </div>
-            <mdui-dialog id="api-token-confirm-dialog">
-                <mdui-button class="api-token-confirm-dismiss"></mdui-button>
-                <mdui-button class="api-token-confirm-ok"></mdui-button>
-            </mdui-dialog>
-        </mdui-card>`);
-    render();
 }
 
 beforeEach(async () => {
@@ -596,23 +574,6 @@ describe("overview list: create, edit, delete", () => {
         expect(item(ART)).not.toBeNull();
         expect(refresh).not.toHaveBeenCalled();
     });
-
-    it("fetches the token status once per page, for the token card alone", async () => {
-        overview({ extra: `
-            <mdui-card id="channel-api-token-card" data-example-name="Art" data-label-none="Aucun jeton">
-                <span id="api-token-status"></span>
-                <mdui-button id="api-token-generate-btn"></mdui-button>
-                <mdui-button id="api-token-revoke-btn" class="hidden"></mdui-button>
-                <div id="api-token-reveal" class="hidden"><input id="api-token-value"/><pre id="api-token-curl"></pre></div>
-                <mdui-dialog id="api-token-confirm-dialog"></mdui-dialog>
-            </mdui-card>` });
-        await flush();
-        activateBtn(DEV).click();
-        await flush();
-
-        expect(fetch.mock.calls.filter(([url]) => url === "/me/api-token")).toHaveLength(1);
-        expect(byId("api-token-status").textContent).toBe("Aucun jeton");
-    });
 });
 
 describe("overview list: live updates", () => {
@@ -779,166 +740,5 @@ describe("overview list: live updates", () => {
         html("<p></p>");
 
         expect(apply([art])).toBe(true);
-    });
-});
-
-describe("personal API token card", () => {
-    it("shows no token, and offers to generate", async () => {
-        tokenCard();
-        await flush();
-
-        expect(fetch).toHaveBeenCalledWith("/me/api-token", expect.anything());
-        expect(byId("api-token-status").textContent).toBe("Aucun jeton");
-        expect(byId("api-token-generate-btn").textContent).toBe("Générer");
-        expect(byId("api-token-revoke-btn").classList.contains("hidden")).toBe(true);
-    });
-
-    it("shows since when a token exists, and offers to regenerate and revoke", async () => {
-        fetch.mockResolvedValueOnce(response(200, { exists: true, createdAt: "2026-10-20T10:00:00Z" }));
-        tokenCard();
-        await flush();
-
-        expect(byId("api-token-status").textContent).toMatch(/^Généré le .*2026/);
-        expect(byId("api-token-generate-btn").textContent).toBe("Régénérer");
-        expect(byId("api-token-revoke-btn").classList.contains("hidden")).toBe(false);
-    });
-
-    it("asks for confirmation before regenerating, then shows the token once with the curl example", async () => {
-        fetch.mockResolvedValueOnce(response(200, { exists: true, createdAt: "2026-10-20T10:00:00Z" }));
-        tokenCard("Développement");
-        await flush();
-
-        byId("api-token-generate-btn").click();
-        expect(byId("api-token-confirm-dialog").open).toBe(true);
-        expect(postJson).not.toHaveBeenCalled();
-
-        postJson.mockResolvedValueOnce(response(200, { token: "cat_SECRET", createdAt: "2026-10-24T10:00:00Z" }));
-        document.querySelector(".api-token-confirm-ok").click();
-        await flush();
-
-        expect(postJson).toHaveBeenCalledWith("/me/api-token", {});
-        expect(byId("api-token-confirm-dialog").open).toBe(false);
-        expect(byId("api-token-value").value).toBe("cat_SECRET");
-        expect(byId("api-token-reveal").classList.contains("hidden")).toBe(false);
-        expect(byId("api-token-curl").textContent).toBe(
-            `curl -X POST -H "Authorization: Bearer cat_SECRET" ${window.location.origin}/api/v2/custom-bindings/D%C3%A9veloppement/activate`);
-        expect(refresh).not.toHaveBeenCalled();
-    });
-
-    it("generates the first token without asking", async () => {
-        tokenCard();
-        await flush();
-        postJson.mockResolvedValueOnce(response(200, { token: "cat_FIRST", createdAt: "2026-10-24T10:00:00Z" }));
-
-        byId("api-token-generate-btn").click();
-        await flush();
-
-        expect(byId("api-token-confirm-dialog").open).not.toBe(true);
-        expect(byId("api-token-value").value).toBe("cat_FIRST");
-        expect(byId("api-token-generate-btn").textContent).toBe("Régénérer");
-        expect(byId("api-token-revoke-btn").classList.contains("hidden")).toBe(false);
-    });
-
-    it("copies the token", async () => {
-        tokenCard();
-        await flush();
-        postJson.mockResolvedValueOnce(response(200, { token: "cat_COPY", createdAt: "2026-10-24T10:00:00Z" }));
-        byId("api-token-generate-btn").click();
-        await flush();
-        const writeText = vi.fn(async () => {});
-        Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
-
-        byId("api-token-copy-btn").click();
-        await flush();
-
-        expect(writeText).toHaveBeenCalledWith("cat_COPY");
-    });
-
-    it("revokes after the confirmation and forgets the shown token", async () => {
-        fetch.mockResolvedValueOnce(response(200, { exists: true, createdAt: "2026-10-20T10:00:00Z" }));
-        tokenCard();
-        await flush();
-
-        byId("api-token-revoke-btn").click();
-        expect(byId("api-token-confirm-dialog").open).toBe(true);
-        document.querySelector(".api-token-confirm-ok").click();
-        await flush();
-
-        expect(postJson).toHaveBeenCalledWith("/me/api-token/delete", {});
-        expect(byId("api-token-status").textContent).toBe("Aucun jeton");
-        expect(byId("api-token-value").value).toBe("");
-        expect(byId("api-token-reveal").classList.contains("hidden")).toBe(true);
-    });
-
-    it("tells a refused generation and shows no token", async () => {
-        tokenCard();
-        await flush();
-        postJson.mockResolvedValueOnce(response(403, ""));
-        byId("api-token-generate-btn").click();
-        await flush();
-
-        expect(showError).toHaveBeenCalledWith("failed 403");
-        expect(byId("api-token-reveal").classList.contains("hidden")).toBe(true);
-    });
-});
-
-describe("personal API token status, once per page", () => {
-    const tokenFetches = () => fetch.mock.calls.filter(([url]) => url === "/me/api-token");
-
-    it("token_isFetchedOncePerPageLoad", async () => {
-        fetch.mockResolvedValue(response(200, { exists: true, createdAt: "2026-10-20T10:00:00Z" }));
-        for (let i = 0; i < 3; i++) {
-            tokenCard();
-            await flush();
-            expect(byId("api-token-status").textContent).toMatch(/^Généré le .*2026/);
-        }
-
-        expect(tokenFetches()).toHaveLength(1);
-    });
-
-    it("token_afterRegenerate_rendersWithoutRefetching", async () => {
-        fetch.mockResolvedValue(response(200, { exists: false, createdAt: null }));
-        tokenCard();
-        await flush();
-        postJson.mockResolvedValue(response(200, { token: "cat_NEW", createdAt: "2026-10-26T10:00:00Z" }));
-        byId("api-token-generate-btn").click();
-        await flush();
-
-        tokenCard();
-        await flush();
-
-        expect(byId("api-token-status").textContent).toMatch(/^Généré le .*2026/);
-        expect(byId("api-token-generate-btn").textContent).toBe("Régénérer");
-        expect(tokenFetches()).toHaveLength(1);
-    });
-
-    it("token_afterRevoke_rendersWithoutRefetching", async () => {
-        fetch.mockResolvedValue(response(200, { exists: true, createdAt: "2026-10-20T10:00:00Z" }));
-        tokenCard();
-        await flush();
-        byId("api-token-revoke-btn").click();
-        document.querySelector(".api-token-confirm-ok").click();
-        await flush();
-
-        tokenCard();
-        await flush();
-
-        expect(byId("api-token-status").textContent).toBe("Aucun jeton");
-        expect(tokenFetches()).toHaveLength(1);
-    });
-
-    it("token_afterAFailedFetch_retriesOnTheNextRender", async () => {
-        fetch.mockResolvedValueOnce(response(500));
-        tokenCard();
-        byId("channel-api-token-card").dataset.labelUnavailable = "Indisponible";
-        await flush();
-        expect(byId("api-token-status").textContent).toBe("Indisponible");
-
-        fetch.mockResolvedValueOnce(response(200, { exists: true, createdAt: "2026-10-20T10:00:00Z" }));
-        tokenCard();
-        await flush();
-
-        expect(byId("api-token-status").textContent).toMatch(/^Généré le .*2026/);
-        expect(tokenFetches()).toHaveLength(2);
     });
 });

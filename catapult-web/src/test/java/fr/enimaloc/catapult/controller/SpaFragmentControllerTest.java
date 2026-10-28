@@ -154,7 +154,7 @@ class SpaFragmentControllerTest {
                 new ChannelUserDto("1", "2", "enimaloc", "img"), "enimaloc", true, true, false,
                 new GameDto("b1", "Valheim", "STEAM"), new PagedBindings(2, 3, 1, List.of(new BindingDto("b1", "AUTO",
                         "STEAM", "Valheim", "1", "Valheim", false, true, Set.of(), true, false, Set.of()))),
-                List.of(), Set.of(), List.of(), Set.of(), "AUTO", null, null, null, null, null, null, "uuid", null));
+                List.of(), Set.of(), List.of(), Set.of(), "AUTO", null, null, null, null, null, null, null));
         when(apiService.dtddMappingStatus("enimaloc")).thenReturn(new DtddMappingStatusDto(
                 new DtddMappingCurrentDto(7L, "Valheim", 0.8, true), null, false, "42", false));
 

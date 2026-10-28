@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api;
 
+import fr.enimaloc.catapult.domain.account.ApiTokenScope;
 import fr.enimaloc.catapult.common.dto.account.ApiTokenCreatedDto;
 import fr.enimaloc.catapult.common.dto.account.ApiTokenStatusDto;
 import fr.enimaloc.catapult.domain.account.UserAccount;
@@ -24,6 +25,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -67,7 +69,7 @@ class ApiMeApiTokenControllerTest {
 
     @Test
     void status_neverShowsTheToken() throws Exception {
-        when(tokens.status(user)).thenReturn(new ApiTokenStatusDto(true, Instant.parse("2026-10-24T10:00:00Z")));
+        when(tokens.status(user, ApiTokenScope.FULL)).thenReturn(new ApiTokenStatusDto(true, Instant.parse("2026-10-24T10:00:00Z")));
 
         mvc.perform(get(OWN + "/api-token").with(me()))
                 .andExpect(status().isOk())
@@ -78,7 +80,7 @@ class ApiMeApiTokenControllerTest {
 
     @Test
     void regenerate_showsTheNewTokenOnce() throws Exception {
-        when(tokens.regenerate(user)).thenReturn(new ApiTokenCreatedDto("cat_abc", Instant.EPOCH));
+        when(tokens.regenerate(user, ApiTokenScope.FULL)).thenReturn(new ApiTokenCreatedDto("cat_abc", Instant.EPOCH));
 
         mvc.perform(post(OWN + "/api-token").with(me()).with(csrf()))
                 .andExpect(status().isOk())
@@ -89,7 +91,7 @@ class ApiMeApiTokenControllerTest {
     void delete_revokesIt() throws Exception {
         mvc.perform(delete(OWN + "/api-token").with(me()).with(csrf()))
                 .andExpect(status().isNoContent());
-        verify(tokens).revoke(user);
+        verify(tokens).revoke(user, ApiTokenScope.FULL);
     }
 
     @Test
@@ -103,7 +105,35 @@ class ApiMeApiTokenControllerTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("feature_disabled"));
         mvc.perform(delete(OWN + "/api-token").with(me()).with(csrf())).andExpect(status().isNoContent());
-        verify(tokens, never()).regenerate(any());
-        verify(tokens).revoke(user);
+        verify(tokens, never()).regenerate(any(), any());
+        verify(tokens).revoke(user, ApiTokenScope.FULL);
+    }
+
+    @Test
+    void readToken_isOfferedOutsideTheCustomBindingsExperiment() throws Exception {
+        when(customBindings.enabled(user)).thenReturn(false);
+        when(tokens.status(user, ApiTokenScope.READ)).thenReturn(new ApiTokenStatusDto(true, Instant.EPOCH));
+        when(tokens.regenerate(user, ApiTokenScope.READ)).thenReturn(new ApiTokenCreatedDto("catr_abc", Instant.EPOCH));
+
+        mvc.perform(get(OWN + "/api-token/read").with(me()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.exists").value(true))
+                .andExpect(jsonPath("$.token").doesNotExist());
+        mvc.perform(post(OWN + "/api-token/read").with(me()).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.token").value("catr_abc"));
+        mvc.perform(delete(OWN + "/api-token/read").with(me()).with(csrf()))
+                .andExpect(status().isNoContent());
+        verify(tokens).revoke(user, ApiTokenScope.READ);
+    }
+
+    @Test
+    void fullToken_stillRequiresTheExperiment() throws Exception {
+        when(customBindings.enabled(user)).thenReturn(false);
+
+        mvc.perform(post(OWN + "/api-token").with(me()).with(csrf()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("feature_disabled"));
+        verify(tokens, never()).regenerate(any(), eq(ApiTokenScope.FULL));
     }
 }
