@@ -225,3 +225,9 @@ hotfix) est dans [CONTRIBUTING.md](CONTRIBUTING.md) ; une faille de sécurité s
 
 L'API publique de `catapult-api` est documentée (Swagger) sur le site, à l'adresse `/docs/api`
 (`http://localhost/docs/api` en local).
+
+## Licence
+
+Catapult est distribué sous licence [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0). Tu peux
+l'utiliser, le modifier et l'héberger ; si tu proposes une version modifiée à d'autres utilisateurs, même
+uniquement en tant que service en ligne, tu dois publier son code source sous la même licence.

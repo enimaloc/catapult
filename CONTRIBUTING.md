@@ -23,6 +23,9 @@ Ne pousse jamais directement sur ces trois branches : elles exigent une PR et le
 
 Les PR ouvertes vers `beta` ou `main` sont réservées aux promotions préparées par le bot et aux hotfix.
 
+En ouvrant une PR, tu acceptes que ta contribution soit publiée sous la même licence que le projet,
+l'[AGPL-3.0](LICENSE).
+
 ## Conventional Commits
 
 Les messages de commit suivent [Conventional Commits](https://www.conventionalcommits.org/fr/v1.0.0/) ; le check
