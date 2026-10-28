@@ -1984,7 +1984,7 @@ class RealApiServiceTest {
 
     @Test
     void revokeReadApiToken_postsToItsDeleteRoute() {
-        expect(HttpMethod.POST, OWN + "/api-token/read/delete").andRespond(withNoContent());
+        expect(HttpMethod.DELETE, OWN + "/api-token/read").andRespond(withNoContent());
 
         assertThat(service.revokeReadApiToken()).isEqualTo(204);
     }

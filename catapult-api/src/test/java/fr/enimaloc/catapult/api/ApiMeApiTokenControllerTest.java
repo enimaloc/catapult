@@ -122,7 +122,7 @@ class ApiMeApiTokenControllerTest {
         mvc.perform(post(OWN + "/api-token/read").with(me()).with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.token").value("catr_abc"));
-        mvc.perform(post(OWN + "/api-token/read/delete").with(me()).with(csrf()))
+        mvc.perform(delete(OWN + "/api-token/read").with(me()).with(csrf()))
                 .andExpect(status().isNoContent());
         verify(tokens).revoke(user, ApiTokenScope.READ);
     }

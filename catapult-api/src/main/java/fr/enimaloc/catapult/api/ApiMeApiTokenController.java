@@ -71,7 +71,7 @@ public class ApiMeApiTokenController {
     }
 
     @PreAuthorize("@authz.isSelf(#userId)")
-    @PostMapping("/read/delete")
+    @DeleteMapping("/read")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void revokeRead(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt) {
         userApiTokenService.revoke(userResolver.viewer(jwt), ApiTokenScope.READ);

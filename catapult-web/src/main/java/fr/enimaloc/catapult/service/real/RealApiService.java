@@ -1409,7 +1409,7 @@ public class RealApiService implements ApiService {
     public int revokeReadApiToken() {
         UUID me = me();
         if (me == null) return HttpStatus.UNAUTHORIZED.value();
-        return client.postVoid("/api/internal/users/{userId}/api-token/read/delete", null, me);
+        return client.delete("/api/internal/users/{userId}/api-token/read", me);
     }
 
     /**
