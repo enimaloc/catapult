@@ -5,6 +5,7 @@
     ":semanticCommits"
   ],
   "timezone": "Europe/Paris",
+  "baseBranchPatterns": ["dev"],
   "labels": ["dependencies"],
   "platformAutomerge": false,
   "automergeStrategy": "squash",
