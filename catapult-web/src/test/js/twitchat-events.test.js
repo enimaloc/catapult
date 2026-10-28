@@ -586,3 +586,23 @@ describe("an event built only once opened (lazy.js)", () => {
         expect(document.querySelectorAll(".twitchat-payload")).toHaveLength(1);
     });
 });
+
+describe("a select whose options are built only once opened (lazy.js)", () => {
+    beforeEach(async () => {
+        await load("csrf", "visibility", "lazy", "channel-page", "twitchat-events");
+    });
+
+    it("builds them as it opens, hiding those the Twitchat branch lacks", () => {
+        CatapultTwitchat.protocol = "stable";
+        html(`<mdui-select class="twitchat-add-action" data-unavailable="n/a"><template data-lazy>
+            <mdui-menu-item value="A"></mdui-menu-item>
+            <mdui-menu-item value="B" data-protocols="beta"></mdui-menu-item>
+        </template></mdui-select>`);
+        const select = document.querySelector("mdui-select");
+
+        select.dispatchEvent(new Event("open", { bubbles: true, composed: true }));
+
+        const items = [...select.querySelectorAll("mdui-menu-item")];
+        expect(items.map(item => [item.getAttribute("value"), item.hidden])).toEqual([["A", false], ["B", true]]);
+    });
+});

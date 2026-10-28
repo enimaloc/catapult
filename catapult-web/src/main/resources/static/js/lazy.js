@@ -6,7 +6,7 @@
  *
  * show(template) puts its content in its place and tells the page's scripts (catapult:lazy, dispatched on its
  * parent, detail.root, and bubbling up to the document), unless `quiet`: during a render, whose own listeners then
- * bind what is there. A collapse item's body is shown as the item opens, here for any.
+ * bind what is there. A collapse item's body, or a select's options, are shown as it opens, here for any.
  *
  * The live events their spa:* rules name are applied to them while they wait (Visibility). One a script applies
  * by hand (channel-events.js's customHandlers: the settings, a connection) can't reach them: touch() marks the
@@ -43,9 +43,10 @@ window.CatapultLazy = (function () {
         return show(parent?.querySelector(":scope > template[data-lazy]"), options);
     }
 
-    // Captured on its way down: built before the item's own listeners run, and mdui measures the body right after.
+    // Captured on its way down: built before the element's own listeners run, and mdui measures the body (or places
+    // the menu) right after.
     document.addEventListener("open", event => {
-        if (event.target instanceof Element && event.target.matches("mdui-collapse-item")) showIn(event.target);
+        if (event.target instanceof Element && event.target.matches("mdui-collapse-item, mdui-select")) showIn(event.target);
     }, true);
 
     return { show, showIn, touch, pending };

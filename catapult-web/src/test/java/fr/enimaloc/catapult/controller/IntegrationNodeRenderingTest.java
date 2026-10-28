@@ -53,6 +53,27 @@ class IntegrationNodeRenderingTest {
         assertThat(html).contains("data-source=\"{&quot;stable&quot;:&quot;TRIGGERS_GET_ALL&quot;}\"").contains("data-field=\"id\"");
     }
 
+    private static List<IntegrationNode.Select.Option> options(int count) {
+        return java.util.stream.IntStream.range(0, count)
+                .mapToObj(i -> new IntegrationNode.Select.Option("a" + i, Message.literal("Action " + i))).toList();
+    }
+
+    @Test
+    void select_ofManyOptions_nonePicked_buildsThemOnlyOnceOpened() {
+        String html = render(new IntegrationNode.Select(Attrs.cls("twitchat-add-action"), Message.literal("Add"), "",
+                options(IntegrationNode.Select.LAZY_OPTIONS + 1), null));
+        assertThat(html.indexOf("<template data-lazy>")).isPositive().isLessThan(html.indexOf("<mdui-menu-item"));
+        assertThat(html).contains("value=\"a20\"");
+    }
+
+    @Test
+    void select_ofFewOptions_orOneOfManyPicked_hasThemAtOnce() {
+        assertThat(render(new IntegrationNode.Select(Attrs.NONE, Message.literal("S"), null,
+                options(IntegrationNode.Select.LAZY_OPTIONS), null))).doesNotContain("<template");
+        assertThat(render(new IntegrationNode.Select(Attrs.NONE, Message.literal("S"), "a3",
+                options(IntegrationNode.Select.LAZY_OPTIONS + 1), null))).doesNotContain("<template").contains("value=\"a3\"");
+    }
+
     @Test
     void repeater_rendersRowsAndATemplateRow() {
         IntegrationNode label = new IntegrationNode.TextField(Attrs.field("label"), Message.literal("Label"), "text", "Revert", false);

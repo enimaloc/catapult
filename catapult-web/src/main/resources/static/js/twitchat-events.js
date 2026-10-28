@@ -373,6 +373,14 @@ window.CatapultTwitchatEvents = (function () {
         if (window.CatapultTwitchat?.isTwitchatConnected()) root.querySelectorAll("[data-source]").forEach(fillLiveSelect);
     });
 
+    // A select's options built once it is opened (lazy.js): those the protocol hasn't are hidden then.
+    document.addEventListener("catapult:lazy", event => {
+        const select = event.detail.root;
+        if (select.matches("mdui-select[data-unavailable]")) {
+            markOptions(select, window.CatapultTwitchat?.protocol ?? null);
+        }
+    });
+
     document.addEventListener("catapult:twitchat:protocol", () => {
         const root = document.getElementById("channel-connections");
         if (root) markAvailability(root);

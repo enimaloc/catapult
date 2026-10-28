@@ -56,12 +56,15 @@
                  th:data-unavailable="${n.hasBranchOptions()} ? #{twitchat.option.unavailable}">
         <span th:if="${n.hasIcons()}" slot="icon" class="option-icon"
               th:style="${n.pickedIcon()} ? |--option-icon: url('${n.pickedIcon()}')|"></span>
+        <!--/* Many options, none picked: built only once the select is opened (lazy.js). */-->
+        <template data-lazy th:remove="${n.lazyOptions()} ? none : tag">
         <mdui-menu-item th:each="option : ${n.options()}" th:value="${option.value()}" th:data-icon="${option.icon()}"
                         th:data-protocols="${option.protocols() == null ? null : #strings.listJoin(option.protocols(), ',')}"
                         th:end-text="${option.protocols() == null ? null : #strings.listJoin(option.protocols(), ', ')}">
             <span th:if="${option.icon()}" slot="icon" class="option-icon" th:style="|--option-icon: url('${option.icon()}')|"></span>
             <th:block th:text="${option.text().isKey() ? #messages.msgWithParams(option.text().key(), option.text().argsArray()) : option.text().literal()}"></th:block>
         </mdui-menu-item>
+        </template>
     </mdui-select>
     <mdui-segmented-button th:case="'segmented-button'" th:id="${n.attrs().id()}" th:data-field="${n.attrs().field()}"
                            th:classappend="${n.attrs().className()}" spa:state="${n.attrs().state()}"
