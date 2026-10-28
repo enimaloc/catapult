@@ -719,6 +719,47 @@ describe("channel-dtdd", () => {
 });
 
 describe("parts built only once shown (lazy.js)", () => {
+    const lazyRow = (id, { open = false } = {}) => `
+        <mdui-collapse-item data-binding-id="${id}" class="${open ? "is-open" : ""}">
+          <mdui-list-item slot="header">${id}</mdui-list-item>
+          <template data-lazy>
+            <mdui-list-item>
+              <mdui-switch class="binding-ignored-toggle" data-post="ignored-toggle" data-key="ignored"></mdui-switch>
+              <mdui-select class="inner"></mdui-select>
+            </mdui-list-item>
+          </template>
+        </mdui-collapse-item>`;
+    const row = (id, selector) => document.querySelector(`[data-binding-id=${id}] ${selector}`);
+
+    it("builds and binds a binding's body on its first opening, the open one's with the page", async () => {
+        html(`<ul id="channel-bindings-list"><mdui-collapse>${lazyRow("b1")}${lazyRow("b2", { open: true })}</mdui-collapse></ul>`);
+        render();
+        expect(row("b1", ".binding-ignored-toggle")).toBeNull();
+
+        toggle(row("b2", ".binding-ignored-toggle"), true);
+        const item = document.querySelector("[data-binding-id=b1]");
+        item.dispatchEvent(new Event("open"));
+        item.dispatchEvent(new Event("close"));
+        item.dispatchEvent(new Event("open"));
+        toggle(row("b1", ".binding-ignored-toggle"), true);
+        await flush();
+
+        expect(posts()).toEqual([
+            ["/channel/enimaloc/bindings/b2/ignored-toggle", { ignored: true }],
+            ["/channel/enimaloc/bindings/b1/ignored-toggle", { ignored: true }],
+        ]);
+    });
+
+    it("leaves a binding's body unbuilt when a select inside its header opens", () => {
+        html(`<ul id="channel-bindings-list"><mdui-collapse>${lazyRow("b1")}</mdui-collapse></ul>`);
+        render();
+
+        document.querySelector("[data-binding-id=b1] mdui-list-item[slot=header]")
+            .dispatchEvent(new Event("open", { bubbles: true }));
+
+        expect(row("b1", ".binding-ignored-toggle")).toBeNull();
+    });
+
     it("binds the Settings and Integrations cards once their tab is built, once", async () => {
         html(`
             <section id="settings"><template data-lazy>
