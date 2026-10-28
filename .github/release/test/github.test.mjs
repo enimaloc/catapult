@@ -74,3 +74,36 @@ test("listPulls_closed_normalizesMergedFromMergedAt", async () => {
     [6, false, sha("m")],
   ]);
 });
+
+test("findIssuesByLabel_excludesPullsAndFlagsPinned", async () => {
+  const issue = (number, body, extra = {}) => ({ number, node_id: `I_${number}`, title: "t", body, ...extra });
+  const query = new URLSearchParams({ state: "open", labels: "release", per_page: "100" });
+  const routes = {
+    [`GET ${REPO}/issues?${query}`]: [
+      issue(9, "x <!-- m -->"),
+      issue(4, "<!-- m -->", { pull_request: {} }),
+      issue(3, "<!-- m -->"),
+      issue(2, "other"),
+    ],
+    "POST /graphql": { data: { repository: { pinnedIssues: { nodes: [{ issue: { number: 9 } }] } } } },
+  };
+  const { fetch } = fakeFetch(routes);
+  const found = await client(fetch).findIssuesByLabel("release", "<!-- m -->");
+  assert.deepEqual(found.map((i) => [i.number, i.pinned]), [[3, false], [9, true]]);
+});
+
+test("listReleases_skipsDraftsAndKeepsTheNewest", async () => {
+  const release = (tag, draft = false) => ({
+    tag_name: tag,
+    name: "",
+    html_url: `https://example/${tag}`,
+    prerelease: false,
+    draft,
+  });
+  const { fetch } = fakeFetch({
+    [`GET ${REPO}/releases?per_page=12`]: [release("v3", true), release("v2"), release("v1"), release("v0")],
+  });
+  const releases = await client(fetch).listReleases(2);
+  assert.deepEqual(releases.map((r) => r.tag), ["v2", "v1"]);
+  assert.equal(releases[0].name, "v2");
+});

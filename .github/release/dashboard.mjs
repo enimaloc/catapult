@@ -68,17 +68,37 @@ async function collect(gh) {
   return { promotions, backports, releases: await gh.listReleases(2) };
 }
 
-/** Creates and pins the issue when missing, otherwise rewrites its body only when it changed. */
+const normalize = (text) => text.replace(/\r\n/g, "\n").trim();
+
+/**
+ * Creates the issue when missing, keeps only the lowest-numbered one when concurrent runs made several,
+ * pins it when it is not pinned, and rewrites its body only when it changed.
+ */
 export async function refreshDashboard({ gh }) {
   const body = renderDashboard(await collect(gh));
-  const issue = await gh.findIssueByLabel(LABEL, MARKER);
-  if (!issue) {
-    const created = await gh.createIssue({ title: TITLE, body, labels: [LABEL] });
-    await gh.pinIssue(created);
-    return "created";
+  let issues = await gh.findIssuesByLabel(LABEL, MARKER);
+  let created = null;
+  if (issues.length === 0) {
+    created = await gh.createIssue({ title: TITLE, body, labels: [LABEL] });
+    // Another workflow may have created one at the same time: look again.
+    issues = await gh.findIssuesByLabel(LABEL, MARKER);
+    if (issues.length === 0) issues = [{ ...created, pinned: false }];
   }
-  if (issue.body === body) return "unchanged";
-  await gh.updateIssue(issue.number, { body });
+  const [kept, ...duplicates] = issues;
+  for (const duplicate of duplicates) await gh.closeIssue(duplicate.number);
+
+  // Its own try: a pin failure must not hide the outcome, and the next run pins again.
+  if (!kept.pinned) {
+    try {
+      await gh.pinIssue(kept);
+    } catch (error) {
+      console.warn(`::warning::dashboard: could not pin issue #${kept.number}: ${error.message}`);
+    }
+  }
+
+  if (created?.number === kept.number) return "created";
+  if (normalize(kept.body) === normalize(body)) return "unchanged";
+  await gh.updateIssue(kept.number, { body });
   return "updated";
 }
 
@@ -87,7 +107,7 @@ export async function refreshDashboardSafely({ gh, refresh = refreshDashboard })
   try {
     return await refresh({ gh });
   } catch (error) {
-    console.warn(`dashboard: could not refresh the releases issue: ${error.message}`);
+    console.warn(`::warning::dashboard: could not refresh the releases issue: ${error.message}`);
     return null;
   }
 }

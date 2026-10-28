@@ -13,7 +13,7 @@ const pull = (number, over) => ({
   ...over,
 });
 
-function fakeGitHub({ pulls = [], mergeStates = {}, releases = [], issue = null } = {}) {
+function fakeGitHub({ pulls = [], mergeStates = {}, releases = [], issues = [] } = {}) {
   const calls = [];
   return {
     calls,
@@ -26,13 +26,16 @@ function fakeGitHub({ pulls = [], mergeStates = {}, releases = [], issue = null 
     async listReleases() {
       return releases;
     },
-    async findIssueByLabel(label, marker) {
+    async findIssuesByLabel(label, marker) {
       calls.push(["find", label, marker]);
-      return issue;
+      return issues;
     },
     async createIssue(fields) {
       calls.push(["create", fields]);
       return { number: 7, nodeId: "I_7", ...fields };
+    },
+    async closeIssue(number) {
+      calls.push(["close", number]);
     },
     async updateIssue(number, fields) {
       calls.push(["update", number, fields]);
@@ -99,11 +102,11 @@ test("refresh_updatesOnlyWhenChanged", async () => {
     backports: [],
     releases,
   });
-  const same = fakeGitHub({ ...state, issue: { number: 7, nodeId: "I_7", body } });
+  const same = fakeGitHub({ ...state, issues: [{ number: 7, nodeId: "I_7", body, pinned: true }] });
   assert.equal(await refreshDashboard({ gh: same }), "unchanged");
   assert.ok(!same.calls.some(([name]) => name === "update" || name === "create"));
 
-  const stale = fakeGitHub({ ...state, issue: { number: 7, nodeId: "I_7", body: "<!-- release-dashboard -->\nold" } });
+  const stale = fakeGitHub({ ...state, issues: [{ number: 7, nodeId: "I_7", body: "<!-- release-dashboard -->\nold", pinned: true }] });
   assert.equal(await refreshDashboard({ gh: stale }), "updated");
   assert.deepEqual(stale.calls.at(-1), ["update", 7, { body }]);
 });
@@ -119,4 +122,56 @@ test("dashboardFailure_doesNotFailTheRelease", async (t) => {
   assert.equal(result, null);
   assert.equal(warn.mock.callCount(), 1);
   assert.match(warn.mock.calls[0].arguments[0], /boom/);
+});
+
+const dashboardBody = renderDashboard({ promotions: [], backports: [], releases: [] });
+
+test("refresh_pinsAnExistingUnpinnedDashboard", async () => {
+  const gh = fakeGitHub({ issues: [{ number: 7, nodeId: "I_7", body: dashboardBody, pinned: false }] });
+  assert.equal(await refreshDashboard({ gh }), "unchanged");
+  assert.deepEqual(gh.calls.at(-1), ["pin", "I_7"]);
+});
+
+test("refresh_pinFailure_stillReportsTheOutcome", async (t) => {
+  const warn = t.mock.method(console, "warn", () => {});
+  const gh = fakeGitHub();
+  gh.pinIssue = async () => {
+    throw new Error("no pin");
+  };
+  assert.equal(await refreshDashboard({ gh }), "created");
+  assert.match(warn.mock.calls[0].arguments[0], /^::warning::.*no pin/);
+});
+
+test("refresh_duplicates_keepsLowestClosesOthersAndPinsIt", async () => {
+  const gh = fakeGitHub({
+    issues: [
+      { number: 5, nodeId: "I_5", body: dashboardBody, pinned: false },
+      { number: 9, nodeId: "I_9", body: dashboardBody, pinned: true },
+    ],
+  });
+  assert.equal(await refreshDashboard({ gh }), "unchanged");
+  assert.deepEqual(gh.calls.filter(([n]) => n === "close" || n === "pin"), [["close", 9], ["pin", "I_5"]]);
+});
+
+test("refresh_raceAfterCreate_closesTheLaterIssue", async () => {
+  const gh = fakeGitHub();
+  const finds = [[], [
+    { number: 6, nodeId: "I_6", body: dashboardBody, pinned: false },
+    { number: 7, nodeId: "I_7", body: dashboardBody, pinned: false },
+  ]];
+  gh.findIssuesByLabel = async () => finds.shift();
+  assert.equal(await refreshDashboard({ gh }), "unchanged");
+  assert.deepEqual(gh.calls.filter(([n]) => n === "close" || n === "pin"), [["close", 7], ["pin", "I_6"]]);
+});
+
+test("refresh_ignoresLineEndingsAndTrailingWhitespace", async () => {
+  const body = dashboardBody.replace(/\n/g, "\r\n") + "\r\n";
+  const gh = fakeGitHub({ issues: [{ number: 7, nodeId: "I_7", body, pinned: true }] });
+  assert.equal(await refreshDashboard({ gh }), "unchanged");
+});
+
+test("render_emptyBackportsAndReleases", () => {
+  const text = renderDashboard({ promotions: [], backports: [], releases: [] });
+  assert.match(text, /Aucun report en attente/);
+  assert.match(text, /Aucune release publiée/);
 });

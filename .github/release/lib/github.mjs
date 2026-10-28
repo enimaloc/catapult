@@ -205,11 +205,28 @@ export function createGitHub({ token, owner, repo, fetch = globalThis.fetch }) {
       await request("POST", `${repoPath}/git/refs`, { ref: `refs/tags/${tag}`, sha: created.sha });
     },
 
-    /** The open issue (pull requests excluded) labelled `label` whose body holds `marker`, or null. */
-    async findIssueByLabel(label, marker) {
+    /**
+     * The open issues (pull requests excluded) labelled `label` whose body holds `marker`, lowest number
+     * first, each with `pinned` (whether it is among the repository's pinned issues).
+     */
+    async findIssuesByLabel(label, marker) {
       const query = new URLSearchParams({ state: "open", labels: label, per_page: "100" });
-      const issues = await request("GET", `${repoPath}/issues?${query}`);
-      return issues.map(toIssue).find((i) => !i.isPull && i.body.includes(marker)) ?? null;
+      const issues = (await request("GET", `${repoPath}/issues?${query}`))
+        .map(toIssue)
+        .filter((i) => !i.isPull && i.body.includes(marker))
+        .sort((x, y) => x.number - y.number);
+      if (issues.length === 0) return [];
+      const data = await graphql(
+        "query($owner: String!, $repo: String!) { repository(owner: $owner, name: $repo) " +
+          "{ pinnedIssues(first: 3) { nodes { issue { number } } } } }",
+        { owner, repo },
+      );
+      const pinned = new Set(data.repository.pinnedIssues.nodes.map((n) => n.issue.number));
+      return issues.map((i) => ({ ...i, pinned: pinned.has(i.number) }));
+    },
+
+    async closeIssue(number) {
+      await request("PATCH", `${repoPath}/issues/${number}`, { state: "closed", state_reason: "not_planned" });
     },
 
     async createIssue({ title, body, labels = [] }) {
