@@ -24,7 +24,7 @@ beforeEach(async () => {
     showError = vi.fn();
     writeText = vi.fn(async () => {});
     Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
-    await load("channel-command-migration");
+    await load("api-token-cards", "channel-command-migration");
     window.CatapultChannel = { showError };
 });
 

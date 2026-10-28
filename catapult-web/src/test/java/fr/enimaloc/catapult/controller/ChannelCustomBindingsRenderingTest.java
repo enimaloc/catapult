@@ -238,6 +238,14 @@ class ChannelCustomBindingsRenderingTest {
         assertThat(account).contains("id=\"channel-read-token-card\"", "id=\"channel-api-token-card\"");
     }
 
+    /** A token shown once, and the links built on it, are plain text: Sentry Replay must never record them. */
+    @Test
+    void bothTokenCards_areBlockedFromSentryReplay() throws Exception {
+        String account = panel(render(true, state()), "account");
+        assertThat(byId(account, "channel-read-token-card").hasClass("sentry-block")).isTrue();
+        assertThat(byId(account, "channel-api-token-card").hasClass("sentry-block")).isTrue();
+    }
+
     @Test
     void aModerator_getsNothing() throws Exception {
         assertThat(render(false, null)).doesNotContain("channel-custom-bindings-list").doesNotContain("channel-api-token-card")

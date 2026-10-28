@@ -13,8 +13,8 @@
 
     <!--/* The read-only personal API token, for chat bots and scripts reading /api/me/** (open to every member, the
          custom bindings' experiment or not). The status is read by api-token-cards.js (GET /me/api-token/read); the
-         token only ever appears in #read-token-value, once. */-->
-    <mdui-card id="channel-read-token-card" class="settings-card" variant="outlined"
+         token only ever appears in #read-token-value, once; sentry-block keeps it (and its link) out of Sentry Replay. */-->
+    <mdui-card id="channel-read-token-card" class="settings-card sentry-block" variant="outlined"
                th:attr="data-label-none=#{channel.read_token.none},data-label-since=#{channel.read_token.since('{0}')},data-label-generate=#{channel.read_token.generate},data-label-regenerate=#{channel.read_token.regenerate},data-label-copied=#{channel.read_token.copied},data-label-unavailable=#{channel.read_token.unavailable}">
         <div class="title-row">
             <h3 th:text="#{channel.read_token.title}">Jeton de lecture</h3>
@@ -47,7 +47,7 @@
     <th:block th:if="${channelPage.customBindings() != null}"
               th:with="bindings=${channelPage.customBindings().bindings()}">
     <!--/* The status is read by api-token-cards.js (GET /me/api-token); the token only ever appears in #api-token-value, once. */-->
-    <mdui-card id="channel-api-token-card" class="settings-card" variant="outlined"
+    <mdui-card id="channel-api-token-card" class="settings-card sentry-block" variant="outlined"
                th:attr="data-example-name=${bindings.isEmpty() ? 'Art' : bindings.get(0).name()},data-label-none=#{channel.api_token.none},data-label-since=#{channel.api_token.since('{0}')},data-label-generate=#{channel.api_token.generate},data-label-regenerate=#{channel.api_token.regenerate},data-label-copied=#{channel.api_token.copied},data-label-unavailable=#{channel.api_token.unavailable}">
         <div class="title-row">
             <h3 th:text="#{channel.api_token.title}">Jeton d'API</h3>

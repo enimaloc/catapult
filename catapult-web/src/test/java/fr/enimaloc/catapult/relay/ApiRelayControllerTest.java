@@ -197,7 +197,8 @@ class ApiRelayControllerTest {
 
     @Test
     void theRetiredCustomBindingsApi_isNoLongerRelayed() throws Exception {
-        mvc.perform(get("/api/v2/custom-bindings").header("Authorization", "Bearer cat_TOKEN"));
+        mvc.perform(get("/api/v2/custom-bindings").header("Authorization", "Bearer cat_TOKEN"))
+                .andExpect(status().is4xxClientError());
         assertThat(RECEIVED.get()).isNull();
     }
 

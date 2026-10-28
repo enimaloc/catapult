@@ -41,7 +41,7 @@ window.CatapultCommandMigration = (function () {
 
     document.addEventListener("catapult:api-token", event => {
         const card = document.getElementById("command-migration");
-        if (!card || event.detail?.base !== "/me/api-token/read") return;
+        if (!card || event.detail?.base !== window.CatapultApiTokenCards?.READ) return;
         replaceSummaryUrl(card, event.detail.created?.summaryUrl ?? card.dataset.summaryPlaceholderUrl);
     });
 
