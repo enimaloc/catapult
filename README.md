@@ -219,8 +219,7 @@ Le détail est dans [CONTRIBUTING.md](CONTRIBUTING.md).
 Les PR de fonctionnalités et de correctifs s'ouvrent **vers `dev`**, avec des commits au format
 [Conventional Commits](https://www.conventionalcommits.org/fr/v1.0.0/). Le détail du flux (branches, releases,
 hotfix) est dans [CONTRIBUTING.md](CONTRIBUTING.md) ; une faille de sécurité se signale en privé selon
-[SECURITY.md](SECURITY.md). Les questions et idées peuvent aussi passer par les GitHub Discussions
-(à activer dans les réglages du dépôt).
+[SECURITY.md](SECURITY.md). Les questions passent par le formulaire d'issue « Question ».
 
 ## Documentation de l'API
 

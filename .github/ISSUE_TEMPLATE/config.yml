@@ -1,8 +1,5 @@
 blank_issues_enabled: false
 contact_links:
-  - name: 💬 Discussions
-    url: https://github.com/enimaloc/catapult/discussions
-    about: Échanger, partager des idées ou demander de l'aide sans ouvrir d'issue.
   - name: 🔒 Signaler une faille de sécurité
     url: https://github.com/enimaloc/catapult/security/policy
     about: Ne crée pas d'issue publique ; suis la politique de sécurité (signalement privé).
