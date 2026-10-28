@@ -48,12 +48,15 @@ function fakeGitHub({
   ],
   moved = false, // the branch moved before the bump ref update
   later = {}, // fields of the pull on the second getPull
+  lag = 0, // reads of the pull that still show the old head once the bump is pushed
   failOn = null,
 } = {}) {
   const calls = [];
   const body = buildBody({ changelog: "", botEnabled: true, seen: [], promotedHead: marker });
   const pull = { number: 7, nodeId: "PR_7", title, body, state: "open", draft: false, base, head, headSha, headRepo };
   let reads = 0;
+  let bumped = false;
+  let staleReads = 0;
   const record = (name, ...args) => {
     calls.push([name, ...args]);
     if (failOn === name) throw new Error(`${name} exploded`);
@@ -62,7 +65,9 @@ function fakeGitHub({
     calls,
     async getPull(number) {
       record("getPull", number);
-      return reads++ === 0 ? pull : { ...pull, ...later };
+      const read = reads++ === 0 ? pull : { ...pull, ...later };
+      if (!bumped || staleReads++ < lag) return read;
+      return { ...read, headSha: sha("b") };
     },
     async listPulls({ base: b }) {
       record("listPulls", b);
@@ -89,7 +94,9 @@ function fakeGitHub({
     },
     async commitFile(file) {
       record("commitFile", file);
-      return moved ? null : sha("b");
+      if (moved) return null;
+      bumped = true;
+      return sha("b");
     },
     async listCheckRuns(ref) {
       record("listCheckRuns", ref);
@@ -116,8 +123,19 @@ function fakeGitHub({
 
 // promote.mjs stand-in: records the refresh ready.mjs asks for.
 const fakePromote = (gh) => async (args) => gh.calls.push(["promote", { source: args.source, target: args.target }]);
+// Records the pauses instead of sleeping.
+const fakeWait = (gh) => async (ms) => gh.calls.push(["wait", ms]);
 const run = (gh, { sender = OWNER, headSha = sha("a") } = {}) =>
-  onReady({ gh, pr: { number: 7, headSha }, sender, owner: OWNER, repo: REPO, appSlug: APP, promote: fakePromote(gh) });
+  onReady({
+    gh,
+    pr: { number: 7, headSha },
+    sender,
+    owner: OWNER,
+    repo: REPO,
+    appSlug: APP,
+    promote: fakePromote(gh),
+    wait: fakeWait(gh),
+  });
 const named = (gh, name) => gh.calls.filter((c) => c[0] === name);
 const assertRefused = (gh, pattern) => {
   assert.deepEqual(named(gh, "convertToDraft"), [["convertToDraft", 7]]);
@@ -154,6 +172,23 @@ test("ownerReady_bumpsGradleVersion_thenAutoMergesOnBumpSha", async () => {
   assert.deepEqual(named(gh, "compareCommits"), [["compareCommits", "beta", "dev"]], "marker === head: no compare");
   assert.deepEqual(named(gh, "getTag"), [["getTag", "v1.0.0-BETA.97"]]);
   assert.deepEqual(named(gh, "promote"), []);
+});
+
+test("bumpNotYetOnThePull_waitsForTheBumpHead_thenAutoMerges", async () => {
+  const gh = fakeGitHub({ lag: 2 });
+  assert.equal(await run(gh), "auto-merge");
+  assert.equal(named(gh, "wait").length, 2);
+  assert.deepEqual(named(gh, "enableAutoMerge"), [
+    ["enableAutoMerge", 7, { expectedHeadOid: sha("b"), commitHeadline: "chore(release): v1.0.0-BETA.97" }],
+  ]);
+});
+
+test("bumpNeverOnThePull_redraftsWithoutAutoMerge", async () => {
+  const gh = fakeGitHub({ lag: Infinity });
+  await assert.rejects(run(gh), /still shows aaaaaaa instead of the bump bbbbbbb/);
+  assert.deepEqual(named(gh, "enableAutoMerge"), []);
+  assert.deepEqual(named(gh, "convertToDraft"), [["convertToDraft", 7]]);
+  assert.match(named(gh, "comment")[0][2], /instead of the bump/);
 });
 
 test("alreadyBumped_noCommit_autoMergesOnHeadSha", async () => {
