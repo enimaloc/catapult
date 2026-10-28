@@ -564,3 +564,24 @@ test("parseTagRefs_dereferencesAnnotatedTags", () => {
     { name: "v0.1.0-ALPHA", sha: sha(3), created: "2026-06-02T14:18:56+02:00" },
   ]);
 });
+
+test("changelog_writesNothing_andGivesTheReleaseBodiesCreateWouldGive", async () => {
+  const gh = fakeGitHub();
+  const dateOf = (s) => (s === INIT ? "2026-03-21" : "2026-04-01");
+  const { changelog } = await run("changelog", SMALL, { gh, dateOf });
+
+  assert.deepEqual(gh.writes, []);
+  assert.deepEqual(
+    [...changelog.matchAll(/^## \[(\S+)\]\([^)]+\) - (\S+)$/gm)].map((m) => [m[1], m[2]]),
+    [
+      ["v1.0.0-BETA.3", "2026-04-01"],
+      ["v1.0.0-BETA.2", "2026-04-01"],
+      ["v1.0.0-BETA.1", "2026-04-01"],
+      ["v0.0.0", "2026-03-21"],
+    ],
+  );
+  await run("create", SMALL, { gh, registry: fakeRegistry(oldImages(SMALL)), store: memoryStore(), dryRun: false });
+  for (const [, { body }] of gh.writes.filter((w) => w[0] === "createRelease")) {
+    assert.ok(changelog.includes(body.trim()), body);
+  }
+});

@@ -12,8 +12,10 @@
 //   delete   only after a passing verify of the very same plan, workflows disabled again as for create
 //            and re-enabled once everything is deleted: the old releases, tags and v/<old> branches; old
 //            image tags are kept (GHCR cannot drop a tag without deleting its digest)
+//   changelog  writes CHANGELOG.md at the repository root (local git only, no network) with the very
+//            notes create gives the releases; changelog.mjs regenerates it from the releases afterwards
 // Dry-run by default; --execute performs (and logs) the writes. Every phase skips what already exists.
-// CLI: node .github/release/migrate.mjs --phase plan|create|verify|restore|delete [--execute]
+// CLI: node .github/release/migrate.mjs --phase plan|create|verify|restore|delete|changelog [--execute]
 // (env: GH_TOKEN, GITHUB_REPOSITORY=owner/repo; `docker login ghcr.io` for the image steps; all the
 // legacy tags fetched locally)
 
@@ -23,12 +25,13 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { parseArgs, promisify } from "node:util";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { renderEntries } from "./lib/changelog.mjs";
+import { CHANGELOG_FILE, renderChangelogFile } from "./lib/changelog-file.mjs";
 import { createGitHub } from "./lib/github.mjs";
 
 export const INIT_COMMIT = "cc49904209347d5522b395c276a6148f79deff33";
 export const LEGACY_TAG_COUNT = 96;
 export const IMAGES = ["ghcr.io/enimaloc/catapult/api", "ghcr.io/enimaloc/catapult/web"];
-export const PHASES = ["plan", "create", "verify", "restore", "delete"];
+export const PHASES = ["plan", "create", "verify", "restore", "delete", "changelog"];
 
 const LEGACY_TAG = /^v\d+\.\d+\.\d+-(ALPHA|BETA)$/;
 const BETA_CHANNEL = "beta";
@@ -406,6 +409,18 @@ function deleteReport(plan, deleted, kept, dryRun) {
   ].join("\n");
 }
 
+// --- changelog ---
+
+/** The CHANGELOG.md of the planned versions; deps: {gh ({compareCommits}), dateOf(sha) -> YYYY-MM-DD}. */
+export async function changelogFromPlan(plan, { gh, dateOf }) {
+  const ctx = { gh };
+  const releases = [];
+  for (const entry of plan) {
+    releases.push({ tag: entry.newName, date: dateOf(entry.sha), body: await releaseBody(ctx, entry, plan) });
+  }
+  return renderChangelogFile(releases);
+}
+
 // --- entry points ---
 
 function printPlan(plan, ctx) {
@@ -420,10 +435,10 @@ function printPlan(plan, ctx) {
 
 /**
  * Runs one phase of the migration. deps: {gh, registry, store ({read, write} of the local state),
- * dryRun (default true), log}. -> {counts?, passed?, report? (Markdown)}.
+ * dryRun (default true), log, dateOf (changelog only)}. -> {counts?, passed?, report? (Markdown), changelog?}.
  */
-export async function runPhase(phase, plan, { gh, registry, store, dryRun = true, log = console.log }) {
-  const ctx = { gh, registry, store, dryRun, log };
+export async function runPhase(phase, plan, { gh, registry, store, dryRun = true, log = console.log, dateOf }) {
+  const ctx = { gh, registry, store, dryRun, log, dateOf };
   switch (phase) {
     case "plan":
       return printPlan(plan, ctx);
@@ -435,6 +450,8 @@ export async function runPhase(phase, plan, { gh, registry, store, dryRun = true
       return restore(ctx);
     case "delete":
       return remove(plan, ctx);
+    case "changelog":
+      return { changelog: await changelogFromPlan(plan, { gh, dateOf: ctx.dateOf }) };
     default:
       throw new Error(`Phase inconnue : ${phase} (${PHASES.join(", ")})`);
   }
@@ -461,6 +478,22 @@ function gitIsAncestor(ancestor, sha) {
     throw error;
   }
 }
+
+/** compareCommits from the local history, oldest first, as the GitHub client gives it. */
+const localGit = {
+  async compareCommits(base, head) {
+    const out = execFileSync("git", ["log", "--reverse", "--format=%H%x09%s", `${base}..${head}`], { encoding: "utf8" });
+    return out
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => {
+        const [sha, ...subject] = line.split("\t");
+        return { sha, subject: subject.join("\t") };
+      });
+  },
+};
+
+const commitDate = (sha) => execFileSync("git", ["log", "-1", "--format=%cs", sha], { encoding: "utf8" }).trim();
 
 function fileStore(path) {
   return {
@@ -497,10 +530,13 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   }
 
   const dryRun = !values.execute;
-  const simulated = dryRun && values.phase !== "plan";
+  const simulated = dryRun && !["plan", "changelog"].includes(values.phase);
   console.log(`Phase ${values.phase}${simulated ? " (simulation : rien n'est écrit, --execute pour agir)" : ""}`);
   const deps = { store: fileStore(STATE_FILE), dryRun };
-  if (values.phase !== "plan") {
+  if (values.phase === "changelog") {
+    deps.gh = localGit;
+    deps.dateOf = commitDate;
+  } else if (values.phase !== "plan") {
     const [owner, repo] = (process.env.GITHUB_REPOSITORY ?? "enimaloc/catapult").split("/");
     deps.gh = createGitHub({ token: process.env.GH_TOKEN, owner, repo });
     deps.registry = createRegistry({ exec });
@@ -509,6 +545,11 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   if (result.report) {
     writeFileSync(reportFile(values.phase), result.report);
     console.log(`Rapport : ${reportFile(values.phase)}`);
+  }
+  if (result.changelog) {
+    const path = fileURLToPath(new URL(`../../${CHANGELOG_FILE}`, import.meta.url));
+    writeFileSync(path, result.changelog);
+    console.log(`${CHANGELOG_FILE} : ${path}`);
   }
   if (result.passed === false) process.exitCode = 1;
 }
