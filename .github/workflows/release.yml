@@ -125,6 +125,37 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: node .github/release/dashboard.mjs
 
+  # Best effort, once the release exists: CHANGELOG.md on the default branch (dev) gets its notes.
+  changelog:
+    needs: [check, github-release]
+    if: needs.github-release.result == 'success'
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+      # Full history and tags: each version's date is its tagged commit's.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Regenerate CHANGELOG.md
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          VERSION: ${{ needs.check.outputs.version }}
+          BRANCH: ${{ github.event.repository.default_branch }}
+        run: node .github/release/changelog.mjs --tag "$VERSION" --branch "$BRANCH"
+
   release-api:
     needs: check
     if: needs.check.outputs.skip != 'true'

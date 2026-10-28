@@ -207,7 +207,8 @@ Une release part d'une PR de promotion préparée par un bot :
    (`dev` → `beta`), avec un changelog que le propriétaire peut corriger à la main.
 2. Le propriétaire sort la PR du draft : la version est mise à jour dans `build.gradle.kts` et la fusion se fait
    toute seule dès que les checks sont verts.
-3. À la fusion, le tag est posé, la pré-release GitHub est publiée et les images sont poussées.
+3. À la fusion, le tag est posé, la pré-release GitHub est publiée, les images sont poussées et
+   [`CHANGELOG.md`](CHANGELOG.md), l'historique de toutes les versions, est mis à jour.
 4. La promotion `beta` → `main` (`chore(release): vX.Y.Z`) suit le même cycle et publie la release stable.
 
 Un correctif urgent passe par une branche `hotfix/…` partie de `main`, puis est reporté sur `beta` et `dev`.

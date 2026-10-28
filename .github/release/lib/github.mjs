@@ -266,6 +266,18 @@ export function createGitHub({ token, owner, repo, fetch = globalThis.fetch }) {
         .map((r) => ({ tag: r.tag_name, name: r.name || r.tag_name, url: r.html_url, prerelease: r.prerelease }));
     },
 
+    /** Every published GitHub Release as {tag, body, publishedAt}, newest first. */
+    async listAllReleases() {
+      const releases = [];
+      for (let page = 1; ; page++) {
+        const batch = await request("GET", `${repoPath}/releases?per_page=100&page=${page}`);
+        releases.push(
+          ...batch.filter((r) => !r.draft).map((r) => ({ tag: r.tag_name, body: r.body ?? "", publishedAt: r.published_at })),
+        );
+        if (batch.length < 100) return releases;
+      }
+    },
+
     /** The release of `tag` as {id, tag, prerelease, url}, or null when there is none (drafts are not found). */
     async getReleaseByTag(tag) {
       try {
