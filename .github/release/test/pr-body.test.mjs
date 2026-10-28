@@ -173,3 +173,16 @@ test("bodyGuard_keepsTheBodyUnder60000Chars", () => {
   assert.match(changelog, new RegExp(`… et ${300 - entries(changelog).length} autres commits$`));
   assert.equal(seen.length, 300);
 });
+
+test("updateBody groups the deps scope under Dependencies, whatever its type", () => {
+  const start = buildBody({ changelog: "### Fixes\n- f (fffffff)\n\n### Other\n- o (ooooooo)", botEnabled: true, seen: [] });
+  const out = updateBody(start, [
+    { sha: sha("1"), subject: "fix(deps): update dependency foo to v2" },
+    { sha: sha("2"), subject: "chore(deps): update redis docker tag to v8" },
+  ]);
+  assert.equal(
+    parseBody(out).changelog,
+    "### Fixes\n- f (fffffff)\n\n### Dependencies\n- update dependency foo to v2 (1111111)\n" +
+      "- update redis docker tag to v8 (2222222)\n\n### Other\n- o (ooooooo)",
+  );
+});

@@ -1,6 +1,6 @@
 // Renders conventional commits as changelog entries grouped by section.
 
-export const SECTIONS = ["Features", "Fixes", "Performance", "Refactoring", "Documentation", "Other"];
+export const SECTIONS = ["Features", "Fixes", "Performance", "Refactoring", "Documentation", "Dependencies", "Other"];
 
 const TYPE_SECTION = {
   feat: "Features",
@@ -15,6 +15,8 @@ function entry({ sha, subject }) {
   const m = CONVENTIONAL.exec(subject);
   if (!m) return { section: "Other", line: `- ${subject} (${sha.slice(0, 7)})` };
   const [, type, scope, text] = m;
+  // Renovate's updates (fix(deps), chore(deps)…) would otherwise bury the real fixes
+  if (scope === "deps") return { section: "Dependencies", line: `- ${text} (${sha.slice(0, 7)})` };
   const prefix = scope ? `**${scope}:** ` : "";
   return { section: TYPE_SECTION[type] ?? "Other", line: `- ${prefix}${text} (${sha.slice(0, 7)})` };
 }

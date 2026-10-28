@@ -1660,13 +1660,15 @@ Anciennement `v0.8.1-ALPHA`.
 ### Documentation
 - **e2e:** add chaos engineering checklist for manual pre-release runs (e71ed99)
 
+### Dependencies
+- add spring-data-redis to api and web modules (cac06b9)
+
 ### Other
 - **spike:** add spring-websocket dependency for HTMX-over-WS PoC (224a61a)
 - **spike:** add target controller and thymeleaf fragment for PoC (7223823)
 - **spike:** add websocket handler that forwards to dispatcher servlet (fb23aa2)
 - **spike:** remove PoC code after successful validation (12a83a8)
 - **infra:** add redis 7 service to docker-compose (8c8457c)
-- **deps:** add spring-data-redis to api and web modules (cac06b9)
 - **infra:** configure spring-data-redis connection in both modules (9b5769d)
 - **infra:** verify spring-data-redis wiring with testcontainers (825c476)
 - **infra:** add /ws location with websocket upgrade to nginx-router (3e4db38)
@@ -1905,8 +1907,10 @@ Anciennement `v0.6.1-ALPHA`.
 - **web:** proxy admin and notifications calls server-side via ApiClient (92da58a)
 - **notifications:** admin page styling + cancel handler + surface error body (97f1b1d)
 
+### Dependencies
+- add spring-cloud-context snapshot, commonmark; promote jsoup to runtime (d6fd00a)
+
 ### Other
-- **deps:** add spring-cloud-context snapshot, commonmark; promote jsoup to runtime (d6fd00a)
 - integration tests for config refresh and notification flow (1f53ae3)
 - **release:** bump version to 0.6.0-ALPHA (26dd350)
 
