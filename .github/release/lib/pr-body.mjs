@@ -10,9 +10,10 @@ const REMINDER =
 const TOGGLE = /^- \[( |x|X)\] <!-- changelog-bot -->/m;
 const SEEN = /<!-- changelog:seen([^>]*?)-->/;
 const HEADING = /^### (.+?)\s*$/;
+const PROMOTED_HEAD = /<!-- promoted-head: ([0-9a-f]*) -->/;
 
-export function buildBody({ changelog, botEnabled, seen }) {
-  return [
+export function buildBody({ changelog, botEnabled, seen, promotedHead }) {
+  const body = [
     REMINDER,
     "",
     `- [${botEnabled ? "x" : " "}] ${TOGGLE_TEXT}`,
@@ -24,6 +25,18 @@ export function buildBody({ changelog, botEnabled, seen }) {
     `<!-- changelog:seen ${seen.join(",")} -->`,
     "",
   ].join("\n");
+  return promotedHead ? setPromotedHead(body, promotedHead) : body;
+}
+
+/** The source head SHA the bot last refreshed the PR for (hidden marker), or null. */
+export function promotedHead(body) {
+  return PROMOTED_HEAD.exec(body)?.[1] || null;
+}
+
+/** Writes the promoted-head marker, whatever the changelog toggle says. */
+export function setPromotedHead(body, sha) {
+  const marker = `<!-- promoted-head: ${sha} -->`;
+  return PROMOTED_HEAD.test(body) ? body.replace(PROMOTED_HEAD, () => marker) : `${body.trimEnd()}\n${marker}\n`;
 }
 
 function region(body) {

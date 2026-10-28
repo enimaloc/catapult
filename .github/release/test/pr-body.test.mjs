@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildBody, parseBody, updateBody, releaseNotes } from "../lib/pr-body.mjs";
+import { buildBody, parseBody, updateBody, releaseNotes, promotedHead, setPromotedHead } from "../lib/pr-body.mjs";
 
 const sha = (c) => c.repeat(40);
 
@@ -101,4 +101,13 @@ test("releaseNotes_returnsEditedText", () => {
     "- rewritten\n\nfree text",
   );
   assert.equal(releaseNotes(body), "### Fixes\n- rewritten\n\nfree text");
+});
+
+test("promotedHead_marker_isWrittenAndReplaced", () => {
+  const body = buildBody({ changelog: "", botEnabled: false, seen: [], promotedHead: sha("a") });
+  assert.equal(promotedHead(body), sha("a"));
+  const moved = setPromotedHead(body, sha("b"));
+  assert.equal(promotedHead(moved), sha("b"));
+  assert.equal(moved.match(/promoted-head/g).length, 1);
+  assert.equal(promotedHead(buildBody({ changelog: "", botEnabled: true, seen: [] })), null);
 });

@@ -6,12 +6,12 @@ import { parseArgs } from "node:util";
 import { pathToFileURL } from "node:url";
 import { parseVersion, bumpKind, nextBeta, nextStable } from "./lib/version.mjs";
 import { renderEntries } from "./lib/changelog.mjs";
-import { buildBody, parseBody, updateBody } from "./lib/pr-body.mjs";
+import { buildBody, parseBody, setPromotedHead, updateBody } from "./lib/pr-body.mjs";
 import { createGitHub } from "./lib/github.mjs";
 
 const RELEASE_SUBJECT = /^chore\(release\): v/;
 
-function versionTags(tags) {
+export function versionTags(tags) {
   const versions = [];
   for (const tag of tags) {
     try {
@@ -24,7 +24,7 @@ function versionTags(tags) {
 }
 
 // Orders by X.Y.Z, then a beta before its stable, then by beta number.
-function compareVersions(a, b) {
+export function compareVersions(a, b) {
   return (
     a.major - b.major ||
     a.minor - b.minor ||
@@ -73,6 +73,8 @@ export async function promote({ gh, source, target, owner, repo, appSlug }) {
     gh.compareCommits(target, source),
   ]);
   const commits = compared.filter((c) => !isReleaseCommit(c, appSlug));
+  // The source head this refresh covers: ready.mjs refuses to merge anything human pushed after it.
+  const head = compared.length ? compared[compared.length - 1].sha : null;
   const pull = pulls[0];
   const withNumber = (action) => (pull ? { action, number: pull.number } : { action });
 
@@ -93,7 +95,12 @@ export async function promote({ gh, source, target, owner, repo, appSlug }) {
       head: source,
       draft: true,
       labels: ["release"],
-      body: buildBody({ changelog: changelogOf(commits), botEnabled: true, seen: commits.map((c) => c.sha) }),
+      body: buildBody({
+        changelog: changelogOf(commits),
+        botEnabled: true,
+        seen: commits.map((c) => c.sha),
+        promotedHead: head,
+      }),
     });
     console.log(`${owner}/${repo}: opened #${created.number} ${title}`);
     return { action: "created", number: created.number };
@@ -103,7 +110,7 @@ export async function promote({ gh, source, target, owner, repo, appSlug }) {
   const fresh = commits.filter((c) => !seen.has(c.sha));
   if (fresh.length === 0 && pull.title === title) return withNumber("none");
 
-  await gh.updatePull(pull.number, { title, body: updateBody(pull.body ?? "", fresh) });
+  await gh.updatePull(pull.number, { title, body: setPromotedHead(updateBody(pull.body ?? "", fresh), head) });
   if (!pull.draft) {
     // The owner's approval covered the previous head only (auto-merge is pinned to it).
     if (pull.autoMerge) await gh.disableAutoMerge(pull);

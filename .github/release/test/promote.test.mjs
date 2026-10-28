@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { promote } from "../promote.mjs";
-import { buildBody, parseBody } from "../lib/pr-body.mjs";
+import { buildBody, parseBody, promotedHead, setPromotedHead } from "../lib/pr-body.mjs";
 
 const APP = "catapult-release";
 const sha = (c) => c.repeat(40);
@@ -197,7 +197,8 @@ test("disabledBot_keepsTheChangelog_butRecomputesTheTitle", async () => {
     pulls: [{ number: 7, base: "beta", head: "dev", title: "x", body }],
   });
   await run(gh);
-  assert.deepEqual(gh.calls, [["updatePull", 7, { title: "chore(release): v1.0.0-BETA.97", body }]]);
+  const expected = setPromotedHead(body, sha("a"));
+  assert.deepEqual(gh.calls, [["updatePull", 7, { title: "chore(release): v1.0.0-BETA.97", body: expected }]]);
 });
 
 test("releaseMergeAtTheHeadOfBeta_opensTheStablePr", async () => {
@@ -218,6 +219,7 @@ test("humanCommitBehindTheBump_putsTheReadyPrBackToDraft", async () => {
   assert.deepEqual(await run(gh), { action: "updated", number: 100 });
   assert.deepEqual(gh.calls.map(([name]) => name), ["updatePull", "disableAutoMerge", "convertToDraft", "comment"]);
   assert.deepEqual(parseBody(gh.state.pulls[0].body).seen, [sha("a"), sha("y")]);
+  assert.equal(promotedHead(gh.state.pulls[0].body), sha("b"));
 });
 
 test("botCommits_neverReachTheChangelog", async () => {
@@ -238,4 +240,10 @@ test("onlyBotCommits_isNothingToPromote", async () => {
     pulls: [{ number: 7, base: "beta", head: "dev", title: "x" }],
   });
   assert.deepEqual(await run(gh), { action: "closed", number: 7 });
+});
+
+test("createdPr_recordsThePromotedHead", async () => {
+  const gh = fakeGitHub({ ahead: { "beta...dev": [commit("a", "fix: one"), commit("b", "feat: two")] } });
+  await run(gh);
+  assert.equal(promotedHead(gh.calls[0][1].body), sha("b"));
 });
