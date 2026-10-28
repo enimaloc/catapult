@@ -1,5 +1,6 @@
 // Thin GitHub client for the release scripts (REST + the GraphQL mutations REST lacks).
-// Pulls are normalized to {number, nodeId, title, body, draft, autoMerge, base, head, headSha, labels};
+// Pulls are normalized to {number, nodeId, title, body, state, draft, autoMerge, base, head, headSha, headRepo,
+// labels};
 // commits to {sha, subject, message, author, parents} (author: GitHub login or null; parents: SHAs).
 
 const API = "https://api.github.com";
@@ -18,7 +19,11 @@ export function createGitHub({ token, owner, repo }) {
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
     });
-    if (!response.ok) throw new Error(`${method} ${path}: ${response.status} ${await response.text()}`);
+    if (!response.ok) {
+      const error = new Error(`${method} ${path}: ${response.status} ${await response.text()}`);
+      error.status = response.status;
+      throw error;
+    }
     return response.status === 204 ? null : response.json();
   }
 
@@ -34,11 +39,13 @@ export function createGitHub({ token, owner, repo }) {
     nodeId: p.node_id,
     title: p.title,
     body: p.body ?? "",
+    state: p.state,
     draft: p.draft,
     autoMerge: Boolean(p.auto_merge),
     base: p.base.ref,
     head: p.head.ref,
     headSha: p.head.sha,
+    headRepo: p.head.repo?.full_name ?? null,
     labels: (p.labels ?? []).map((label) => label.name),
   });
   const toCommit = (c) => ({
@@ -95,17 +102,57 @@ export function createGitHub({ token, owner, repo }) {
       );
     },
 
+    /** Merges now with a merge commit, only if the head is still `expectedHeadOid`. */
+    async mergePull(pull, { expectedHeadOid, commitHeadline }) {
+      await graphql(
+        "mutation($id: ID!, $oid: GitObjectID!, $headline: String!) { mergePullRequest(input: " +
+          "{pullRequestId: $id, mergeMethod: MERGE, expectedHeadOid: $oid, commitHeadline: $headline}) " +
+          "{ clientMutationId } }",
+        { id: pull.nodeId, oid: expectedHeadOid, headline: commitHeadline },
+      );
+    },
+
+    /** GraphQL `mergeStateStatus` (CLEAN, BLOCKED, UNSTABLE, BEHIND, DIRTY, UNKNOWN…). */
+    async getMergeState(pull) {
+      const data = await graphql(
+        "query($id: ID!) { node(id: $id) { ... on PullRequest { mergeStateStatus } } }",
+        { id: pull.nodeId },
+      );
+      return data.node.mergeStateStatus;
+    },
+
     /** A text file at `ref`: its decoded content and blob SHA. */
     async getFile(path, ref) {
-      const file = await request("GET", `${repoPath}/contents/${path}?ref=${encodeURIComponent(ref)}`);
+      const encoded = path.split("/").map(encodeURIComponent).join("/");
+      const file = await request("GET", `${repoPath}/contents/${encoded}?ref=${encodeURIComponent(ref)}`);
       return { text: Buffer.from(file.content, "base64").toString("utf8"), sha: file.sha };
     },
 
-    /** Commits `text` to `path` on `branch` (`sha` = the replaced blob); returns the commit SHA. */
-    async updateFile({ path, branch, text, sha, message }) {
-      const content = Buffer.from(text, "utf8").toString("base64");
-      const result = await request("PUT", `${repoPath}/contents/${path}`, { message, content, sha, branch });
-      return result.commit.sha;
+    /**
+     * Commits `text` to `path` as a child of exactly `parent`, then fast-forwards `branch` to it.
+     * Returns the commit SHA, or null when the branch no longer points at `parent` (moved meanwhile).
+     */
+    async commitFile({ branch, parent, path, text, message }) {
+      const { tree } = await request("GET", `${repoPath}/git/commits/${parent}`);
+      const newTree = await request("POST", `${repoPath}/git/trees`, {
+        base_tree: tree.sha,
+        tree: [{ path, mode: "100644", type: "blob", content: text }],
+      });
+      const created = await request("POST", `${repoPath}/git/commits`, {
+        message,
+        tree: newTree.sha,
+        parents: [parent],
+      });
+      try {
+        await request("PATCH", `${repoPath}/git/refs/heads/${branch.split("/").map(encodeURIComponent).join("/")}`, {
+          sha: created.sha,
+          force: false,
+        });
+      } catch (error) {
+        if (error.status === 422) return null; // not a fast-forward: someone pushed after `parent`
+        throw error;
+      }
+      return created.sha;
     },
 
     async comment(number, body) {
