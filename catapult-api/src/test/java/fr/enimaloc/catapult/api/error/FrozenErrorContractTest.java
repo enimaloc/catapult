@@ -5,7 +5,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import fr.enimaloc.catapult.FullContextContainers;
 import fr.enimaloc.catapult.FullContextTestBase;
 import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.experiment.Experiment;
+import fr.enimaloc.catapult.domain.experiment.ExperimentAssignment;
+import fr.enimaloc.catapult.experiment.LegacyApiRoutesExperiment;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.repository.experiment.ExperimentAssignmentRepository;
+import fr.enimaloc.catapult.repository.experiment.ExperimentRepository;
 import fr.enimaloc.catapult.service.account.WidgetTokenService;
 import java.io.IOException;
 import java.net.URI;
@@ -25,6 +30,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Import;
+import org.springframework.transaction.support.TransactionOperations;
 
 /**
  * The error answers of the frozen routes, byte for byte, on a real server: external callers (OBS browser sources,
@@ -51,7 +57,16 @@ class FrozenErrorContractTest extends FullContextTestBase {
     @Autowired
     WidgetTokenService widgetTokenService;
 
-    /** An active account with no detected game, by its widget token. */
+    @Autowired
+    ExperimentRepository experiments;
+
+    @Autowired
+    ExperimentAssignmentRepository assignments;
+
+    @Autowired
+    TransactionOperations transactions;
+
+    /** An active account with no detected game, by its widget token, the legacy routes open to it. */
     UUID token;
 
     @BeforeAll
@@ -60,7 +75,25 @@ class FrozenErrorContractTest extends FullContextTestBase {
         account.setTwitchUsername("frozen-errors");
         account.setTwitchId("frozen-errors-twitch");
         account.setStatus(UserAccount.Status.ACTIVE);
-        token = widgetTokenService.getOrCreate(accounts.save(account));
+        UserAccount saved = accounts.save(account);
+        token = widgetTokenService.getOrCreate(saved);
+        // the legacy routes answer as recorded only while they are open to the widget's account
+        transactions.executeWithoutResult(status -> openLegacyRoutesTo(saved));
+    }
+
+    /** One transaction: the experiment's variants are lazy. */
+    private void openLegacyRoutesTo(UserAccount account) {
+        Experiment experiment = experiments.findByKey(LegacyApiRoutesExperiment.KEY).orElseThrow();
+        experiment.setStatus(Experiment.Status.ACTIVE);
+        experiments.save(experiment);
+        ExperimentAssignment assignment = new ExperimentAssignment();
+        assignment.setExperiment(experiment);
+        assignment.setVariant(experiment.getVariants().stream()
+                .filter(v -> LegacyApiRoutesExperiment.LEGACY_VARIANT.equals(v.getKey()))
+                .findFirst()
+                .orElseThrow());
+        assignment.setUser(account);
+        assignments.save(assignment);
     }
 
     static Stream<Arguments> emptyNotFound() {

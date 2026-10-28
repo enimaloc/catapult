@@ -27,24 +27,33 @@ GET,/api/internal/admin/experiments/{id}/settings,,admin,4,
 GET,/api/internal/admin/experiments/{id}/assignments,?page=0,admin,6,
 # personal API token
 GET,/api/me/custom-bindings,,ptoken,11,
+GET,/api/me/game,,ptoken,5,fixed:the one game the channel plays
+GET,/api/me/game/summary,,ptoken,5,fixed:the one game the channel plays
+GET,/api/me/bindings/{bindingId},,ptoken,2,fixed:one binding
 # public, but GET /api/connect/steam/callback: it only redirects (no SQL) and every row must answer 2xx
 GET,/api/internal/changelog,,anon,0,fixed:read from a file
 GET,/api/internal/config/app,,anon,0,fixed:configuration only
 GET,/api/internal/config/providers,,anon,0,fixed:configuration only
-GET,/api/game/{uuid},,anon,5,fixed:the one game the channel plays
 GET,/api/internal/health,,anon,0,fixed:no data
 GET,/api/internal/meta-tags,,anon,1,
 GET,/api/internal/social-links,,anon,1,
 GET,/api/internal/status/degraded,,anon,0,fixed:no data
 GET,/api/twitchat/widget/{uuid},,anon,2,fixed:one widget
 GET,/api/twitchat/widget/{uuid}/access,,anon,2,fixed:one widget
-GET,/api/user/catapult/{bindingId},,anon,2,fixed:one binding
-GET,/api/user/dtdd/{dtddId},dtddId=1,anon,1,fixed:one DTDD title
-GET,/api/user/game/{uuid},,anon,5,fixed:the one game the channel plays
-GET,/api/user/igdb/{igdbId},igdbId=1,anon,1,fixed:one IGDB game
-GET,/api/user/steam/{appId},appId=990000,anon,0,fixed:one Steam app
-GET,/api/user/summary/{uuid},,anon,5,fixed:the one game the channel plays
-GET,/api/user/xbox/{productId},productId=9NBLGGH4R315,anon,0,fixed:one Microsoft Store product
+GET,/api/games/dtdd/{dtddId},dtddId=1,anon,1,fixed:one DTDD title
+GET,/api/games/igdb/{igdbId},igdbId=1,anon,1,fixed:one IGDB game
+GET,/api/games/steam/{appId},appId=990000,anon,0,fixed:one Steam app
+GET,/api/games/xbox/{productId},productId=9NBLGGH4R315,anon,0,fixed:one Microsoft Store product
 GET,/api/internal/well-known-files,?location=WELL_KNOWN&path=security.txt,anon,1,fixed:one file
 GET,/api/v3/api-docs,,anon,0,fixed:the API description
 GET,/api/v3/api-docs/swagger-config,,anon,0,fixed:the API description
+# legacy public routes, open to the owner (api.legacy-routes experiment): the gate reads the experiment, and
+# for a widget token its assignment, on top of the route itself
+GET,/api/game/{uuid},,anon,5,fixed:the one game the channel plays
+GET,/api/user/catapult/{bindingId},,anon,3,fixed:one binding
+GET,/api/user/dtdd/{dtddId},dtddId=1,anon,2,fixed:one DTDD title
+GET,/api/user/game/{uuid},,anon,5,fixed:the one game the channel plays
+GET,/api/user/igdb/{igdbId},igdbId=1,anon,2,fixed:one IGDB game
+GET,/api/user/steam/{appId},appId=990000,anon,1,fixed:one Steam app
+GET,/api/user/summary/{uuid},,anon,5,fixed:the one game the channel plays
+GET,/api/user/xbox/{productId},productId=9NBLGGH4R315,anon,1,fixed:one Microsoft Store product
