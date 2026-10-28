@@ -146,4 +146,19 @@ class AccessLogFilterTest {
                 .contains("< Location: /widget/obs/***")
                 .doesNotContain(token);
     }
+
+    @Test
+    void masksTheTokenParameter_inTheDevExchange(CapturedOutput output) throws Exception {
+        String token = "catr_" + "r".repeat(43);
+        MockHttpServletRequest request = request("GET", "/api/me/game");
+        request.setQueryString("token=" + token);
+        request.addHeader("Referer", "https://catapult.test/api/me/game?token=" + token);
+
+        devFilter().doFilter(request, new MockHttpServletResponse(), new MockFilterChain());
+
+        assertThat(output)
+                .contains("> GET /api/me/game?token=*** HTTP/1.1")
+                .contains("> Referer: https://catapult.test/api/me/game?token=***")
+                .doesNotContain(token);
+    }
 }

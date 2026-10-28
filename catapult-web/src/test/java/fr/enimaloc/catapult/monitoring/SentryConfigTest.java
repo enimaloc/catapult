@@ -18,6 +18,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.UUID;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
@@ -174,5 +175,32 @@ class SentryConfigTest {
         Properties properties = new Properties();
         properties.setProperty("git.commit", commit);
         return Optional.of(new BuildProperties(properties));
+    }
+
+    @Test
+    void theTokenParameter_isMaskedInWhatSentryIsSent() {
+        String token = "catr_" + "r".repeat(43);
+        io.sentry.SentryEvent event = new io.sentry.SentryEvent();
+        event.setRequest(requestWith(token));
+        io.sentry.protocol.SentryTransaction transaction = new io.sentry.protocol.SentryTransaction(
+                new io.sentry.SentryTracer(new TransactionContext("GET /api/me/game", "http.server"),
+                        io.sentry.NoOpScopes.getInstance()));
+        transaction.setRequest(requestWith(token));
+
+        io.sentry.SentryEvent sentEvent = new SentryConfig().maskTokenParameter().execute(event, new io.sentry.Hint());
+        io.sentry.protocol.SentryTransaction sentTransaction =
+                new SentryConfig().maskTokenParameterInTransactions().execute(transaction, new io.sentry.Hint());
+
+        for (io.sentry.protocol.Request request : List.of(sentEvent.getRequest(), sentTransaction.getRequest())) {
+            assertThat(request.getQueryString()).isEqualTo("a=1&token=***");
+            assertThat(request.getUrl()).isEqualTo("https://catapult.test/api/me/game?token=***");
+        }
+    }
+
+    private static io.sentry.protocol.Request requestWith(String token) {
+        io.sentry.protocol.Request request = new io.sentry.protocol.Request();
+        request.setQueryString("a=1&token=" + token);
+        request.setUrl("https://catapult.test/api/me/game?token=" + token);
+        return request;
     }
 }

@@ -22,7 +22,8 @@ import java.util.UUID;
 
 /**
  * The one definition of the request-level access rules: who is a member, an admin, a loopback caller or a personal
- * API token holder. The filter chains and {@link DebugSubjectFilter} use these, so the rules cannot drift apart.
+ * API token holder (full or read-only). The filter chains and {@link DebugSubjectFilter} use these, so the rules
+ * cannot drift apart.
  * A relayed client ({@code X-Forwarded-For}) is never loopback: with {@code server.forward-headers-strategy=native}
  * the server (Tomcat's {@code RemoteIpValve}) replaces the remote address with the client it resolves from
  * {@code X-Forwarded-For}, so a request relayed by a local proxy carries that client's address, not the proxy's.
@@ -118,8 +119,13 @@ public class Authz {
         return isAdmin(SecurityContextHolder.getContext().getAuthentication(), attributes.getRequest());
     }
 
-    /** Authenticated by the personal API token. */
+    /** Authenticated by a personal API token, the full one or the read-only one. */
     public static boolean isPersonalToken(Authentication auth) {
+        return isFullPersonalToken(auth) || hasAuthority(auth, PersonalTokenAuthenticationFilter.READ_AUTHORITY);
+    }
+
+    /** Authenticated by the full personal API token, the one that may change things. */
+    public static boolean isFullPersonalToken(Authentication auth) {
         return hasAuthority(auth, PersonalTokenAuthenticationFilter.AUTHORITY);
     }
 
@@ -131,8 +137,14 @@ public class Authz {
         return (auth, ctx) -> new AuthorizationDecision(isMember(auth.get()) || isLoopback(ctx.getRequest()));
     }
 
+    /** Any personal API token, the read-only one included. */
     public static AuthorizationManager<RequestAuthorizationContext> personalToken() {
         return (auth, ctx) -> new AuthorizationDecision(isPersonalToken(auth.get()));
+    }
+
+    /** The full personal API token only. */
+    public static AuthorizationManager<RequestAuthorizationContext> fullPersonalToken() {
+        return (auth, ctx) -> new AuthorizationDecision(isFullPersonalToken(auth.get()));
     }
 
     private static boolean hasAuthority(Authentication auth, String authority) {

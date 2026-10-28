@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.monitoring;
 import fr.enimaloc.catapult.service.debug.DebugMembers;
 import io.sentry.Sentry;
 import io.sentry.SentryOptions;
+import io.sentry.protocol.Request;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,8 +17,9 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 
 /**
- * What catapult-web tells Sentry beyond its properties: the release it runs and which requests to
- * trace (the member a report comes from is {@link SentryUserInterceptor}'s).
+ * What catapult-web tells Sentry beyond its properties: the release it runs, which requests to
+ * trace (the member a report comes from is {@link SentryUserInterceptor}'s), and the {@code token}
+ * parameter masked in what it sends.
  */
 @Configuration
 public class SentryConfig {
@@ -95,5 +97,29 @@ public class SentryConfig {
             Boolean parentSampled = context.getTransactionContext().getParentSampled();
             return parentSampled != null ? (parentSampled ? 1.0 : 0.0) : tracedRate;
         };
+    }
+
+    /** An error report never carries the {@code token} parameter in clear ({@link TokenParameterMask}). */
+    @Bean
+    SentryOptions.BeforeSendCallback maskTokenParameter() {
+        return (event, hint) -> {
+            maskTokenParameter(event.getRequest());
+            return event;
+        };
+    }
+
+    /** Nor does a transaction. */
+    @Bean
+    SentryOptions.BeforeSendTransactionCallback maskTokenParameterInTransactions() {
+        return (transaction, hint) -> {
+            maskTokenParameter(transaction.getRequest());
+            return transaction;
+        };
+    }
+
+    private static void maskTokenParameter(Request request) {
+        if (request == null) return;
+        request.setUrl(TokenParameterMask.mask(request.getUrl()));
+        request.setQueryString(TokenParameterMask.mask(request.getQueryString()));
     }
 }

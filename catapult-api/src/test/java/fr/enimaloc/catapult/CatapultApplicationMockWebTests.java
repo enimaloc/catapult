@@ -22,7 +22,7 @@ class CatapultApplicationMockWebTests extends FullContextTestBase {
     @Test
     void loadsTheMockWebServletContext() {
         assertThat(context.getBean(TwitchService.class)).isInstanceOf(MockTwitchService.class);
-        assertThat(context.containsBean("customBindingsApiSecurityFilterChain")).isTrue();
+        assertThat(context.containsBean("publicMeApiSecurityFilterChain")).isTrue();
         assertThat(environment.matchesProfiles("mock-steam")).isTrue();
     }
 

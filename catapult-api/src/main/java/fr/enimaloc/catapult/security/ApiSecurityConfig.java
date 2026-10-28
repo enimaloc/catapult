@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
@@ -52,23 +53,37 @@ import java.util.stream.Stream;
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 public class ApiSecurityConfig {
 
-    /** Mount point of the custom bindings API, which only the personal API token opens. */
-    public static final String CUSTOM_BINDINGS_API = "/api/v2/custom-bindings";
+    /** Mount point of the member's own resources, which only a personal API token opens. */
+    public static final String PUBLIC_ME = "/api/me";
 
     /**
-     * {@value #CUSTOM_BINDINGS_API}/**, in every profile: ordered before the /api/** chains below (which would take
-     * its Bearer for a JWT, and let localhost through), stateless, no CSRF, authenticated by the personal API token
-     * only — a JWT, a widget token or nothing gets a 401, with an {@code unauthorized} problem.
+     * Mount point of the former custom bindings API, opened by a personal API token like {@value #PUBLIC_ME} until it
+     * goes.
+     */
+    public static final String CUSTOM_BINDINGS_API = "/api/v2/custom-bindings";
+
+    /** The personal-token chain's paths: {@value #PUBLIC_ME}, {@value #CUSTOM_BINDINGS_API}, all below included. */
+    private static final String[] PERSONAL_TOKEN_PATHS =
+            {PUBLIC_ME, PUBLIC_ME + "/**", CUSTOM_BINDINGS_API, CUSTOM_BINDINGS_API + "/**"};
+
+    /**
+     * {@value #PUBLIC_ME}/** (and {@value #CUSTOM_BINDINGS_API}/**), in every profile: ordered before the /api/**
+     * chains below (which would take its Bearer for a JWT, and let localhost through), stateless, no CSRF,
+     * authenticated by a personal API token only ({@link PersonalTokenAuthenticationFilter}) — a JWT, a widget token
+     * or nothing gets a 401, with an {@code unauthorized} problem. A {@code GET} takes either token; anything else
+     * takes the full one, the read-only token getting a 403 with a {@code forbidden} problem.
      */
     @Bean
     @Order(Ordered.HIGHEST_PRECEDENCE)
-    public SecurityFilterChain customBindingsApiSecurityFilterChain(
+    public SecurityFilterChain publicMeApiSecurityFilterChain(
             HttpSecurity http, UserApiTokenService userApiTokenService, JsonMapper json) throws Exception {
         http
-                .securityMatcher(CUSTOM_BINDINGS_API, CUSTOM_BINDINGS_API + "/**")
+                .securityMatcher(PERSONAL_TOKEN_PATHS)
                 // Answers the preflight before any authentication, and adds the headers to every answer, 401 included
-                .cors(cors -> cors.configurationSource(customBindingsCors()))
-                .authorizeHttpRequests(auth -> auth.anyRequest().access(Authz.personalToken()))
+                .cors(cors -> cors.configurationSource(publicMeCors()))
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(HttpMethod.GET, PERSONAL_TOKEN_PATHS).access(Authz.personalToken())
+                        .anyRequest().access(Authz.fullPersonalToken()))
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .csrf(AbstractHttpConfigurer::disable)
                 .requestCache(AbstractHttpConfigurer::disable)
@@ -77,7 +92,10 @@ public class ApiSecurityConfig {
                 .logout(AbstractHttpConfigurer::disable)
                 .exceptionHandling(e -> e
                         .authenticationEntryPoint(new ProblemAuthenticationEntryPoint(
-                                new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED), json)))
+                                new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED), json))
+                        .accessDeniedHandler(new ProblemAccessDeniedHandler(
+                                (request, response, denied) -> response.setStatus(HttpStatus.FORBIDDEN.value()),
+                                json)))
                 .addFilterBefore(new PersonalTokenAuthenticationFilter(userApiTokenService),
                         AuthorizationFilter.class)
                 .addFilterAfter(new DebugSubjectFilter(), PersonalTokenAuthenticationFilter.class);
@@ -86,19 +104,21 @@ public class ApiSecurityConfig {
     }
 
     /**
-     * The custom bindings API is open to a page of any origin (Twitchat runs in the browser): the personal token, in
-     * {@code Authorization}, is its only credential — no cookie or session counts here — so the answer allows no
-     * credentials and any origin is safe. Not a bean, so no other chain picks it up.
+     * The personal-token API is open to a page of any origin (Twitchat runs in the browser): the personal token, in
+     * {@code Authorization} or the read-only one in {@code ?token=}, is its only credential — no cookie or session
+     * counts here — so the answer allows no credentials and any origin is safe. Not a bean, so no other chain picks
+     * it up. {@code POST} stays allowed while the {@value #CUSTOM_BINDINGS_API} routes live.
      */
-    static CorsConfigurationSource customBindingsCors() {
+    static CorsConfigurationSource publicMeCors() {
         CorsConfiguration config = new CorsConfiguration();
         config.addAllowedOrigin(CorsConfiguration.ALL);
-        config.setAllowedMethods(List.of("GET", "POST", "OPTIONS"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
         config.setAllowCredentials(false);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration(CUSTOM_BINDINGS_API, config);
-        source.registerCorsConfiguration(CUSTOM_BINDINGS_API + "/**", config);
+        for (String path : PERSONAL_TOKEN_PATHS) {
+            source.registerCorsConfiguration(path, config);
+        }
         return source;
     }
 
