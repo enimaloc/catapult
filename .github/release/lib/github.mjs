@@ -1,5 +1,5 @@
 // Thin GitHub client for the release scripts (REST + the GraphQL mutations REST lacks).
-// Pulls are normalized to {number, nodeId, title, body, draft, autoMerge, base, head};
+// Pulls are normalized to {number, nodeId, title, body, draft, autoMerge, base, head, headSha, labels};
 // commits to {sha, subject, message, author, parents} (author: GitHub login or null; parents: SHAs).
 
 const API = "https://api.github.com";
@@ -38,6 +38,8 @@ export function createGitHub({ token, owner, repo }) {
     autoMerge: Boolean(p.auto_merge),
     base: p.base.ref,
     head: p.head.ref,
+    headSha: p.head.sha,
+    labels: (p.labels ?? []).map((label) => label.name),
   });
   const toCommit = (c) => ({
     sha: c.sha,
@@ -48,9 +50,15 @@ export function createGitHub({ token, owner, repo }) {
   });
 
   return {
+    /** Open pulls into `base`, from `head` when given. */
     async listPulls({ base, head }) {
-      const query = new URLSearchParams({ state: "open", base, head: `${owner}:${head}`, per_page: "100" });
+      const query = new URLSearchParams({ state: "open", base, per_page: "100" });
+      if (head) query.set("head", `${owner}:${head}`);
       return (await request("GET", `${repoPath}/pulls?${query}`)).map(toPull);
+    },
+
+    async getPull(number) {
+      return toPull(await request("GET", `${repoPath}/pulls/${number}`));
     },
 
     async createPull({ labels = [], ...fields }) {
@@ -75,6 +83,29 @@ export function createGitHub({ token, owner, repo }) {
         "mutation($id: ID!) { disablePullRequestAutoMerge(input: {pullRequestId: $id}) { clientMutationId } }",
         { id: pull.nodeId },
       );
+    },
+
+    /** Auto-merge with a merge commit, only while the head is still `expectedHeadOid`. */
+    async enableAutoMerge(pull, { expectedHeadOid, commitHeadline }) {
+      await graphql(
+        "mutation($id: ID!, $oid: GitObjectID!, $headline: String!) { enablePullRequestAutoMerge(input: " +
+          "{pullRequestId: $id, mergeMethod: MERGE, expectedHeadOid: $oid, commitHeadline: $headline}) " +
+          "{ clientMutationId } }",
+        { id: pull.nodeId, oid: expectedHeadOid, headline: commitHeadline },
+      );
+    },
+
+    /** A text file at `ref`: its decoded content and blob SHA. */
+    async getFile(path, ref) {
+      const file = await request("GET", `${repoPath}/contents/${path}?ref=${encodeURIComponent(ref)}`);
+      return { text: Buffer.from(file.content, "base64").toString("utf8"), sha: file.sha };
+    },
+
+    /** Commits `text` to `path` on `branch` (`sha` = the replaced blob); returns the commit SHA. */
+    async updateFile({ path, branch, text, sha, message }) {
+      const content = Buffer.from(text, "utf8").toString("base64");
+      const result = await request("PUT", `${repoPath}/contents/${path}`, { message, content, sha, branch });
+      return result.commit.sha;
     },
 
     async comment(number, body) {

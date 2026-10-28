@@ -49,7 +49,7 @@ function releaseVersion(target, tags, commits) {
  * The bot's own commits: the version bump pushed on the source branch, and release merge commits
  * (a promotion merged by auto-merge is credited to the App). They are never promoted on their own.
  */
-function isReleaseCommit(commit, appSlug) {
+export function isReleaseCommit(commit, appSlug) {
   if (!RELEASE_SUBJECT.test(commit.subject)) return false;
   if (commit.parents.length > 1) return true;
   return Boolean(appSlug) && commit.author === `${appSlug}[bot]`;
