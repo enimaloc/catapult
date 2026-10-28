@@ -1,5 +1,8 @@
 package fr.enimaloc.catapult.apidocs;
 
+import fr.enimaloc.catapult.common.dto.binding.CustomBindingDto;
+import fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatSettingsResponse;
 import fr.enimaloc.catapult.config.I18nConfiguration;
 import fr.enimaloc.catapult.config.TwitchatCatalogConfig;
 import fr.enimaloc.catapult.controller.LocalInstanceBusConfig;
@@ -9,6 +12,7 @@ import fr.enimaloc.catapult.controller.SiteMetaTags;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
 import fr.enimaloc.catapult.service.ApiHealthProbe;
 import fr.enimaloc.catapult.service.ApiService;
+import fr.enimaloc.catapult.service.http.ApiClient;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -16,14 +20,20 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Base64;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -45,9 +55,103 @@ class ApiDocsControllerTest {
     @MockitoBean ApiService apiService;
     @MockitoBean NavEventStreamController navEvents;
 
+    static final String LOGIN = "streamer";
+    static final String WIDGET = "5f0c2a8e-9d3b-4c7a-8e21-6b4f1d2c9a70";
+
     String page(String path, Locale locale) throws Exception {
         return mvc.perform(get(path).locale(locale)).andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
+    }
+
+    /** A session JWT as catapult-api issues it: only its claims are read here. */
+    static String jwt(String login) {
+        Base64.Encoder b64 = Base64.getUrlEncoder().withoutPadding();
+        return b64.encodeToString("{\"alg\":\"none\"}".getBytes(StandardCharsets.UTF_8)) + "."
+                + b64.encodeToString(("{\"sub\":\"" + UUID.randomUUID() + "\",\"username\":\"" + login + "\"}")
+                .getBytes(StandardCharsets.UTF_8)) + ".sig";
+    }
+
+    String memberPage(String path, Locale locale) throws Exception {
+        return mvc.perform(get(path).locale(locale).sessionAttr(ApiClient.SESSION_JWT_KEY, jwt(LOGIN)))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+    }
+
+    static CustomBindingsStateDto customBindings(String... names) {
+        return new CustomBindingsStateDto(true, java.util.Arrays.stream(names)
+                .map(name -> new CustomBindingDto(UUID.randomUUID(), name, null, null, List.of(), List.of(), false))
+                .toList(), null, null);
+    }
+
+    @Test
+    void docsPage_member_showsKeysCard_withWidgetToken() throws Exception {
+        when(spec.current()).thenReturn(Optional.of(new ApiDocsSpec.Cached(SPEC, FETCHED_AT, false)));
+        when(apiService.twitchatSettings(LOGIN)).thenReturn(new TwitchatSettingsResponse(true, null, null, false, WIDGET));
+
+        for (String html : List.of(memberPage("/docs/api", Locale.FRENCH), memberPage("/spa/docs/api", Locale.FRENCH))) {
+            assertThat(html).contains("id=\"api-docs-keys-card\"", "id=\"api-docs-widget-value\"", WIDGET,
+                    "id=\"api-docs-widget-copy-btn\"", "id=\"api-docs-read-token\"", "id=\"api-docs-read-token-status\"",
+                    "id=\"api-docs-read-token-generate-btn\"", "Tes clés d&#39;API",
+                    // The Account tab's labels, for api-token-cards.js.
+                    "data-label-none=\"Aucun jeton de lecture pour le moment.\"", "data-label-since=\"Généré le {0}\"",
+                    ">Générer un jeton de lecture<");
+            // Above Swagger UI, and kept out of Sentry Replay with what it holds.
+            assertThat(html.indexOf("id=\"api-docs-keys-card\"")).isLessThan(html.indexOf("id=\"swagger-ui\""));
+            String card = html.substring(html.lastIndexOf("<mdui-card", html.indexOf("id=\"api-docs-keys-card\"")));
+            assertThat(card.substring(0, card.indexOf('>'))).contains("sentry-block");
+            assertThat(html.indexOf(WIDGET)).isGreaterThan(html.indexOf("id=\"api-docs-keys-card\""));
+            assertThat(html).contains("api-docs-theme");
+        }
+        assertThat(memberPage("/spa/docs/api", Locale.ENGLISH)).contains("Your API keys", "OBS widget");
+    }
+
+    @Test
+    void docsPage_member_withoutWidget_hasNoWidgetRow() throws Exception {
+        when(spec.current()).thenReturn(Optional.of(new ApiDocsSpec.Cached(SPEC, FETCHED_AT, false)));
+        when(apiService.twitchatSettings(LOGIN)).thenReturn(new TwitchatSettingsResponse(false, null, null, false, null));
+
+        String html = memberPage("/docs/api", Locale.FRENCH);
+
+        assertThat(html).contains("id=\"api-docs-keys-card\"", "id=\"api-docs-read-token\"")
+                .doesNotContain("id=\"api-docs-widget\"", "id=\"api-docs-widget-unavailable\"");
+    }
+
+    @Test
+    void docsPage_member_apiFailures_stillRenderTheCard_rowSaysUnavailable() throws Exception {
+        when(spec.current()).thenReturn(Optional.of(new ApiDocsSpec.Cached(SPEC, FETCHED_AT, false)));
+        when(apiService.twitchatSettings(anyString())).thenThrow(new IllegalStateException("down"));
+        when(apiService.customBindings(anyString())).thenThrow(new IllegalStateException("down"));
+
+        String html = memberPage("/docs/api", Locale.FRENCH);
+
+        assertThat(html).contains("id=\"api-docs-keys-card\"", "id=\"api-docs-widget-unavailable\"",
+                "id=\"api-docs-read-token\"").doesNotContain("id=\"api-docs-widget-value\"");
+    }
+
+    @Test
+    void docsPage_anonymous_hasNoKeysCard_butThemedUi() throws Exception {
+        when(spec.current()).thenReturn(Optional.of(new ApiDocsSpec.Cached(SPEC, FETCHED_AT, false)));
+
+        for (String html : List.of(page("/docs/api", Locale.FRENCH), page("/spa/docs/api", Locale.ENGLISH))) {
+            assertThat(html).doesNotContain("id=\"api-docs-keys-card\"", "api-docs-read-token", "api-docs-widget")
+                    .contains("id=\"swagger-ui\"", "class=\"api-docs-ui\"", "/css/api-docs-theme");
+        }
+        verify(apiService, never()).twitchatSettings(anyString());
+        verify(apiService, never()).customBindings(anyString());
+    }
+
+    @Test
+    void docsPage_fullTokenRow_onlyInCustomBindingsExperiment() throws Exception {
+        when(spec.current()).thenReturn(Optional.of(new ApiDocsSpec.Cached(SPEC, FETCHED_AT, false)));
+
+        String closed = memberPage("/docs/api", Locale.FRENCH);
+        assertThat(closed).contains("id=\"api-docs-read-token\"").doesNotContain("id=\"api-docs-full-token\"");
+
+        when(apiService.customBindings(LOGIN)).thenReturn(customBindings("Speedrun"));
+        for (String html : List.of(memberPage("/docs/api", Locale.FRENCH), memberPage("/spa/docs/api", Locale.FRENCH))) {
+            assertThat(html).contains("id=\"api-docs-read-token\"", "id=\"api-docs-full-token\"",
+                    "id=\"api-docs-full-token-generate-btn\"", "data-example-name=\"Speedrun\"",
+                    "data-label-none=\"Aucun jeton pour le moment.\"", "id=\"api-docs-full-token-confirm-dialog\"");
+        }
     }
 
     @Test

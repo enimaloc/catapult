@@ -215,4 +215,46 @@ describe("API documentation page", () => {
             expect(status().dataset.state).toBe("up");
         });
     });
+
+    describe("the keys card's widget UUID", () => {
+        function widget() {
+            html(`
+                <div id="api-docs-widget" data-label-copied="UUID copied">
+                    <input id="api-docs-widget-value" value="5f0c2a8e-9d3b-4c7a-8e21-6b4f1d2c9a70" readonly>
+                    <button id="api-docs-widget-copy-btn"></button>
+                </div>`);
+        }
+
+        it("copies the UUID and says so", async () => {
+            const writeText = vi.fn(async () => {});
+            vi.stubGlobal("navigator", { clipboard: { writeText } });
+            const showError = vi.fn();
+            window.CatapultChannel = { showError };
+            widget();
+            await load("api-docs");
+
+            render();
+            render();
+            document.getElementById("api-docs-widget-copy-btn").click();
+            await flush();
+
+            expect(writeText).toHaveBeenCalledTimes(1);
+            expect(writeText).toHaveBeenCalledWith("5f0c2a8e-9d3b-4c7a-8e21-6b4f1d2c9a70");
+            expect(showError).toHaveBeenCalledWith("UUID copied");
+        });
+
+        it("selects the field when the clipboard refuses", async () => {
+            vi.stubGlobal("navigator", { clipboard: { writeText: vi.fn(async () => { throw new Error("denied"); }) } });
+            widget();
+            const field = document.getElementById("api-docs-widget-value");
+            field.select = vi.fn();
+            await load("api-docs");
+
+            render();
+            document.getElementById("api-docs-widget-copy-btn").click();
+            await flush();
+
+            expect(field.select).toHaveBeenCalled();
+        });
+    });
 });

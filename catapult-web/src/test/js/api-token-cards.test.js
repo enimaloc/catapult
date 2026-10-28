@@ -257,3 +257,35 @@ describe("read-only token card", () => {
         expect(told).toHaveBeenCalledWith({ base: "/me/api-token/read", created: null });
     });
 });
+
+describe("the API docs page's keys card", () => {
+    it("wires both token rows to their own routes, with their own examples", async () => {
+        html(card("api-docs-read-token", "api-docs-read-token")
+            + card("api-docs-full-token", "api-docs-full-token", 'data-example-name="Speedrun"'));
+        render();
+        await flush();
+
+        expect(fetch).toHaveBeenCalledWith("/me/api-token/read", expect.anything());
+        expect(fetch).toHaveBeenCalledWith("/me/api-token", expect.anything());
+        expect(byId("api-docs-read-token-status").textContent).toBe("Aucun jeton");
+        expect(byId("api-docs-full-token-status").textContent).toBe("Aucun jeton");
+
+        postJson.mockResolvedValueOnce(response(200, { token: "cat_FULL", createdAt: "2026-10-28T10:00:00Z" }));
+        byId("api-docs-full-token-generate-btn").click();
+        await flush();
+
+        expect(postJson).toHaveBeenCalledWith("/me/api-token", {});
+        expect(byId("api-docs-full-token-value").value).toBe("cat_FULL");
+        expect(byId("api-docs-full-token-curl").textContent).toContain('"idOrName":"Speedrun"');
+        expect(byId("api-docs-read-token-value").value).toBe("");
+    });
+
+    it("has only the read-only row outside the custom bindings' experiment", async () => {
+        html(card("api-docs-read-token", "api-docs-read-token"));
+        render();
+        await flush();
+
+        expect(fetch).toHaveBeenCalledTimes(1);
+        expect(fetch).toHaveBeenCalledWith("/me/api-token/read", expect.anything());
+    });
+});

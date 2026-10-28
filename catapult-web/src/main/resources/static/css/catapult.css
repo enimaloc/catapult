@@ -2371,7 +2371,8 @@ mdui-snackbar.broadcast-warning { --mdui-color-inverse-surface: var(--mdui-color
 }
 
 /*
- * API documentation (pages/api-docs.html): Swagger UI has a light theme of its own, kept on a light card
+ * API documentation (pages/api-docs.html): Swagger UI wears the site's theme, in api-docs-theme.css (loaded after
+ * Swagger UI's own stylesheet)
  */
 .api-docs-status {
     display: inline-flex;
@@ -2410,16 +2411,31 @@ mdui-snackbar.broadcast-warning { --mdui-color-inverse-surface: var(--mdui-color
     color: var(--catapult-text-secondary);
 }
 
-.api-docs-ui {
+/* The member's keys, above Swagger UI (Swagger UI's own theme: api-docs-theme.css). */
+.api-docs-keys {
     margin-top: 24px;
-    padding: 8px 16px;
-    border-radius: var(--catapult-radius);
-    background: #fff;
-    color: #3b4151;
-    overflow-x: auto;
-    /* The site's dark color-scheme would give Swagger UI's buttons and fields (the schemas' names among them)
-       the browser's dark backgrounds, under its dark text: the card is light, so are its native controls. */
-    color-scheme: light;
+}
+
+.api-docs-key {
+    padding-top: 16px;
+    margin-top: 16px;
+    border-top: 1px solid var(--catapult-border);
+}
+
+.api-docs-key h3 {
+    margin: 0 0 4px;
+}
+
+.api-docs-key-value {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+}
+
+.api-docs-key-value mdui-text-field {
+    flex: 1 1 320px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 /* ── OBS dock (pages/channel-dock.html) ───────────────────────────────────

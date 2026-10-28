@@ -7,7 +7,9 @@
  *
  * - #channel-api-token-card (Account tab, while custom bindings are open to the channel): the full token,
  *   /me/api-token, a curl example activating a custom binding;
- * - #channel-read-token-card (Account tab): the read-only token, /me/api-token/read, the chat bots' summary link.
+ * - #channel-read-token-card (Account tab): the read-only token, /me/api-token/read, the chat bots' summary link;
+ * - #api-docs-read-token and #api-docs-full-token (the API docs page's keys card, /docs/api): the same two tokens,
+ *   the full one only while custom bindings are open to the member.
  *
  * Each token generated or revoked is told to the page as a `catapult:api-token` event ({base, created}, created null
  * once revoked): the Commands tab's links put a new read-only token in (channel-command-migration.js).
@@ -167,6 +169,10 @@ window.CatapultApiTokenCards = (function () {
         if (full) attach(full, { base: FULL, prefix: "api-token", curl: customBindingsCurl });
         const read = byId("channel-read-token-card");
         if (read) attach(read, { base: READ, prefix: "read-token", curl: summaryCurl });
+        const docsRead = byId("api-docs-read-token");
+        if (docsRead) attach(docsRead, { base: READ, prefix: "api-docs-read-token", curl: summaryCurl });
+        const docsFull = byId("api-docs-full-token");
+        if (docsFull) attach(docsFull, { base: FULL, prefix: "api-docs-full-token", curl: customBindingsCurl });
     });
 
     return { attach, customBindingsCurl, summaryCurl, FULL, READ };

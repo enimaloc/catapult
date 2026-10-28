@@ -1,6 +1,11 @@
 package fr.enimaloc.catapult.apidocs;
 
+import fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatSettingsResponse;
 import fr.enimaloc.catapult.controller.ModelFiller;
+import fr.enimaloc.catapult.service.ApiService;
+import fr.enimaloc.catapult.service.http.ApiClient;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
@@ -17,6 +22,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 /**
  * The API documentation, on the site: the page ({@code /docs/api}, and spa.js's fragment of it,
@@ -25,7 +31,13 @@ import java.util.Optional;
  * (ApiHealthProbe) itself, so it never waits on the probe on top of the spec. A cached copy is shown with the time it was fetched (worded in the visitor's time zone by
  * api-docs.js, from the instant in {@code data-fetched-at}); without any copy the page says so,
  * still a 200. catapult-api's own Swagger UI addresses, which the site no longer relays, lead here.
+ * <p>
+ * A logged-in member also gets their keys above Swagger UI ({@code #api-docs-keys-card}): their OBS widget's token
+ * (a capability: rendered in the card only, never logged) and their personal API tokens' cards, the full one only
+ * while the custom bindings' experiment is open to them. A failing catapult-api leaves the row it feeds unavailable,
+ * never the page.
  */
+@Slf4j
 @Controller
 public class ApiDocsController {
     static final String PAGE = "docs/api";
@@ -33,13 +45,18 @@ public class ApiDocsController {
     static final String SWAGGER_UI = "/_static/swagger-ui/" + ApiDocsAssets.SWAGGER_UI_VERSION;
     private static final DateTimeFormatter FETCHED_AT = DateTimeFormatter.ofPattern("dd/MM HH:mm");
 
+    /** The full token's example binding when the member has none of their own (as on the Account tab). */
+    static final String EXAMPLE_BINDING = "Art";
+
     private final ModelFiller filler;
     private final ApiDocsSpec spec;
+    private final ApiService apiService;
 
     @Autowired
-    public ApiDocsController(ModelFiller filler, ApiDocsSpec spec) {
+    public ApiDocsController(ModelFiller filler, ApiDocsSpec spec, ApiService apiService) {
         this.filler = filler;
         this.spec = spec;
+        this.apiService = apiService;
     }
 
     @GetMapping("/docs/api")
@@ -87,5 +104,34 @@ public class ApiDocsController {
         model.addAttribute("apiDocsFetchedAt", older.map(copy -> copy.fetchedAt().toString()).orElse(null));
         model.addAttribute("apiDocsSpecUrl", SPEC_URL);
         model.addAttribute("apiDocsSwaggerUi", SWAGGER_UI);
+        keys(model);
+    }
+
+    /** The keys card's model: none for a visitor; for a member, each row from its own call, unavailable on failure. */
+    private void keys(Model model) {
+        boolean member = ApiClient.hasSession();
+        model.addAttribute("apiDocsMember", member);
+        if (!member) return;
+        String login = ApiClient.currentLogin();
+        TwitchatSettingsResponse twitchat = login == null ? null : orNull("Twitchat settings",
+                () -> apiService.twitchatSettings(login));
+        // The token is a capability: it goes in the card only, never in a log.
+        model.addAttribute("widgetToken", twitchat == null ? null : twitchat.widgetToken());
+        model.addAttribute("widgetUnavailable", twitchat == null);
+        CustomBindingsStateDto custom = login == null ? null : orNull("custom bindings",
+                () -> apiService.customBindings(login));
+        model.addAttribute("customBindingsEnabled", custom != null);
+        model.addAttribute("customBindingsExample", custom == null || custom.bindings() == null
+                || custom.bindings().isEmpty() ? EXAMPLE_BINDING : custom.bindings().getFirst().name());
+    }
+
+    /** {@code call}'s answer, or null when it fails: the docs page renders without it. */
+    private static <T> T orNull(String what, Supplier<T> call) {
+        try {
+            return call.get();
+        } catch (RuntimeException e) {
+            log.warn("API docs keys card: {} unavailable ({})", what, e.getClass().getSimpleName());
+            return null;
+        }
     }
 }

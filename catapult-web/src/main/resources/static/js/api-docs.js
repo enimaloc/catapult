@@ -6,6 +6,8 @@
  * The page is one of spa.js's: Swagger UI's bundle (data-bundle, data-css: served by the site, no CDN) is only
  * loaded on the first render that shows it, then started on each new #swagger-ui. "Try it out" calls the site
  * itself (the spec's servers are "/"), which relays the documented paths to catapult-api.
+ * A member's keys card (#api-docs-keys-card) has the OBS widget's UUID with a copy button, wired here; its tokens'
+ * rows are api-token-cards.js's.
  */
 window.CatapultApiDocs = (function () {
     /** The bundle's loading, shared by every render until it is there; dropped when it fails, to try again. */
@@ -57,7 +59,25 @@ window.CatapultApiDocs = (function () {
         el.textContent = el.dataset.label.replace("{0}", () => when);
     }
 
+    /** The widget UUID's copy button: copied and told (data-label-copied), else the field selected to copy by hand. */
+    function wireWidgetCopy(row) {
+        const button = document.getElementById("api-docs-widget-copy-btn");
+        const field = document.getElementById("api-docs-widget-value");
+        if (!button || !field || row.dataset.wired) return;
+        row.dataset.wired = "true";
+        button.addEventListener("click", async () => {
+            try {
+                await navigator.clipboard.writeText(field.value);
+                window.CatapultChannel?.showError(row.dataset.labelCopied);
+            } catch {
+                field.select?.();
+            }
+        });
+    }
+
     async function start() {
+        const widget = document.getElementById("api-docs-widget");
+        if (widget) wireWidgetCopy(widget);
         const cached = document.getElementById("api-docs-cached");
         if (cached) showFetchedAt(cached);
         const status = document.getElementById("api-docs-status");

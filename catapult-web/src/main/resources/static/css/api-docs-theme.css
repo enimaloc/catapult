@@ -1,0 +1,320 @@
+/*
+ * Swagger UI in the site's theme (pages/api-docs.html links it; tokens from catapult.css's :root).
+ *
+ * Swagger UI's own stylesheet (swagger-ui.css, appended to <head> by api-docs.js) is light: dark text (#3b4151) on
+ * white. Everything here is scoped under .api-docs-ui (#swagger-ui), one class more specific than Swagger UI's rules,
+ * and this file comes after it in the document (it sits in the page's body), so it wins ties too.
+ *
+ * Kept from Swagger UI on purpose: each method's hue (GET blue, POST green, PUT orange, DELETE red, PATCH teal…),
+ * whose translucent tints and borders read on the dark surface; only the badge's text is darkened to stay readable.
+ *
+ * Specificity: the text rule below carries a two-class argument in its :is() (so it beats Swagger UI's nested
+ * rules); the rules after it that recolor some of the same elements carry one too, and win by coming later.
+ *
+ * Native controls: the site's dark color-scheme applies here too, so the browser draws dark buttons and fields;
+ * every control is given the site's light text explicitly (the schemas' name buttons once were dark-on-dark, see
+ * "keep Swagger UI's native controls light"), never left to Swagger UI's dark default.
+ */
+
+.api-docs-ui {
+    margin-top: 24px;
+    padding: 8px 16px;
+    border: 1px solid var(--catapult-border);
+    border-radius: var(--catapult-radius);
+    background: var(--catapult-surface);
+    color: var(--catapult-text);
+    overflow-x: auto;
+    color-scheme: dark;
+}
+
+/* ── Text, font ─────────────────────────────────────────────────────────── */
+
+.api-docs-ui .swagger-ui,
+.api-docs-ui .swagger-ui :is(h1, h2, h3, h4, h5, h6, p, li, label, td, th, table, section,
+        .info .title, .info .base-url, .opblock-tag, .opblock-tag small, .opblock-summary-path,
+        .opblock-summary-operation-id, .opblock-summary-path__deprecated, .opblock-summary-description,
+        .opblock-description-wrapper, .opblock-external-docs-wrapper, .opblock-title_normal, .opblock-section-header,
+        .parameter__name, .parameter__type, .response-col_status, .response-col_links, .responses-inner,
+        .model, .model-title, .scopes, .errors-wrapper, .loading-container .loading,
+        .json-schema-2020-12__title, .json-schema-2020-12__attribute,
+        .json-schema-2020-12-keyword__name--primary, .json-schema-2020-12-keyword__value--primary,
+        .json-schema-2020-12-json-viewer__name--primary, .json-schema-2020-12-json-viewer__value--primary) {
+    color: var(--catapult-text);
+    font-family: inherit;
+}
+
+.api-docs-ui .swagger-ui :is(.opblock-summary-path, .opblock-summary-operation-id, .parameter__type, .model,
+        .info .base-url, .json-schema-2020-12__title, .json-schema-2020-12__attribute, code, pre, textarea) {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.api-docs-ui .swagger-ui :is(.opblock-summary-description, .parameter__in, .prop-format, .model .property,
+        .model .external-docs, table.model tr.description, table.model tr.extension, table.headers .header-example,
+        .response-undocumented, .errors-wrapper .errors small, section.models h5, .model-title,
+        .json-schema-2020-12-expand-deep-button) {
+    color: var(--catapult-text-secondary);
+}
+
+.api-docs-ui .swagger-ui :is(.prop-type, .json-schema-2020-12__attribute--primary) {
+    color: var(--catapult-primary-hover);
+}
+
+.api-docs-ui .swagger-ui .model .property.primitive {
+    color: var(--catapult-text-muted);
+}
+
+/* ── Links ──────────────────────────────────────────────────────────────── */
+
+.api-docs-ui .swagger-ui a:not(.nostyle),
+.api-docs-ui .swagger-ui .info a {
+    color: var(--catapult-primary-hover);
+}
+
+.api-docs-ui .swagger-ui a:not(.nostyle):hover,
+.api-docs-ui .swagger-ui .info a:hover {
+    color: var(--catapult-text);
+}
+
+/* ── Surfaces, borders ──────────────────────────────────────────────────── */
+
+.api-docs-ui .swagger-ui .scheme-container {
+    background: var(--catapult-surface-elevated);
+    border: 1px solid var(--catapult-border);
+    border-radius: 12px;
+    box-shadow: none;
+}
+
+.api-docs-ui .swagger-ui .opblock-tag {
+    border-bottom-color: var(--catapult-border);
+}
+
+.api-docs-ui .swagger-ui :is(.opblock-tag:hover, section.models h4:hover) {
+    background: var(--catapult-surface-elevated);
+}
+
+/* The method's tint and border stay Swagger UI's (set per method); only the shape and shadow are the site's. */
+.api-docs-ui .swagger-ui .opblock {
+    border-radius: 12px;
+    box-shadow: none;
+}
+
+.api-docs-ui .swagger-ui .opblock .opblock-section-header {
+    background: var(--catapult-surface-elevated);
+    box-shadow: none;
+}
+
+.api-docs-ui .swagger-ui .opblock .opblock-summary-method {
+    border-radius: 8px;
+    color: var(--catapult-background);
+    text-shadow: none;
+}
+
+.api-docs-ui .swagger-ui .opblock.opblock-deprecated :is(.opblock-summary-path__deprecated, .opblock-summary-description) {
+    color: var(--catapult-text-muted);
+}
+
+.api-docs-ui .swagger-ui .tab li:first-of-type::after {
+    background: var(--catapult-border);
+}
+
+.api-docs-ui .swagger-ui table thead tr :is(td, th) {
+    border-bottom-color: var(--catapult-border);
+}
+
+.api-docs-ui .swagger-ui .responses-table .response,
+.api-docs-ui .swagger-ui .parameters-col_description,
+.api-docs-ui .swagger-ui .opblock-body {
+    border-color: var(--catapult-border);
+}
+
+/* ── Models, schemas ────────────────────────────────────────────────────── */
+
+.api-docs-ui .swagger-ui section.models {
+    border-color: var(--catapult-border);
+    border-radius: 12px;
+}
+
+.api-docs-ui .swagger-ui section.models.is-open h4 {
+    border-bottom-color: var(--catapult-border);
+}
+
+.api-docs-ui .swagger-ui section.models h4 {
+    color: var(--catapult-text);
+}
+
+.api-docs-ui .swagger-ui section.models .model-container {
+    background: var(--catapult-surface-elevated);
+}
+
+.api-docs-ui .swagger-ui section.models .model-container:hover {
+    background: var(--catapult-background);
+}
+
+.api-docs-ui .swagger-ui .model-box {
+    background: var(--catapult-surface-elevated);
+}
+
+.api-docs-ui .swagger-ui section.models .model-box {
+    background: none;
+}
+
+.api-docs-ui .swagger-ui .json-schema-2020-12-body {
+    border-left-color: var(--catapult-border);
+}
+
+/* The schemas' names and their expand toggles are native buttons: no browser background under the site's text. */
+.api-docs-ui .swagger-ui :is(.json-schema-2020-12-accordion, .json-schema-2020-12-expand-deep-button,
+        .model-box-control, .models-control, .opblock-summary-control, .expand-methods, .expand-operation,
+        .opblock-control-arrow, .authorization__btn, .tab li button.tablinks) {
+    background: transparent;
+    color: inherit;
+}
+
+/* Swagger UI's arrows and icons are black SVGs: drawn in the text's color instead. */
+.api-docs-ui .swagger-ui :is(.arrow, .opblock-control-arrow svg, .expand-methods svg, .expand-operation svg,
+        .authorization__btn svg, .model-box-control svg, .models-control svg, .json-schema-2020-12-accordion svg) {
+    fill: currentColor;
+}
+
+.api-docs-ui .swagger-ui .model-toggle::after {
+    filter: invert(1);
+}
+
+/* ── Code, responses ────────────────────────────────────────────────────── */
+
+.api-docs-ui .swagger-ui :is(.opblock-body pre.microlight, .highlight-code > .microlight, textarea.curl) {
+    background: var(--catapult-background) !important;
+    border: 1px solid var(--catapult-border);
+    border-radius: 8px;
+    color: var(--catapult-text);
+}
+
+.api-docs-ui .swagger-ui :is(.markdown, .renderedMarkdown) code {
+    background: var(--catapult-surface-elevated);
+    color: var(--catapult-primary-hover);
+}
+
+.api-docs-ui .swagger-ui :is(.markdown, .renderedMarkdown) pre {
+    color: var(--catapult-text);
+}
+
+.api-docs-ui .swagger-ui :is(.copy-to-clipboard, .download-contents) {
+    background: var(--catapult-surface-elevated);
+    border: 1px solid var(--catapult-border);
+    color: var(--catapult-text);
+}
+
+/* ── Fields, selects ────────────────────────────────────────────────────── */
+
+.api-docs-ui .swagger-ui :is(input[type=text], input[type=password], input[type=search], input[type=email],
+        input[type=file], textarea, select) {
+    background-color: var(--catapult-background);
+    border: 1px solid var(--catapult-border);
+    border-radius: 8px;
+    box-shadow: none;
+    color: var(--catapult-text);
+}
+
+.api-docs-ui .swagger-ui :is(input, textarea, select):focus {
+    border-color: var(--catapult-primary);
+    outline: none;
+}
+
+/* The select's chevron is a black SVG background: inverted, its position and size kept. */
+.api-docs-ui .swagger-ui select {
+    background-image: url("data:image/svg+xml;charset=utf-8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 20 20\"><path fill=\"%23aeb4c0\" d=\"M13.418 7.859a.695.695 0 0 1 .978 0 .68.68 0 0 1 0 .969l-3.908 3.83a.697.697 0 0 1-.979 0l-3.908-3.83a.68.68 0 0 1 0-.969.695.695 0 0 1 .978 0L10 11z\"/></svg>");
+}
+
+.api-docs-ui .swagger-ui :is(input, select, textarea)[disabled] {
+    background-color: var(--catapult-surface-elevated);
+    color: var(--catapult-text-muted);
+}
+
+.api-docs-ui .swagger-ui :is(input, select, textarea)::placeholder {
+    color: var(--catapult-text-muted);
+}
+
+.api-docs-ui .swagger-ui .checkbox input[type=checkbox] + label > .item {
+    background-color: var(--catapult-surface-elevated);
+    box-shadow: 0 0 0 2px var(--catapult-border);
+}
+
+/* ── Buttons ────────────────────────────────────────────────────────────── */
+
+.api-docs-ui .swagger-ui .btn {
+    border: 1px solid var(--catapult-border);
+    border-radius: 999px;
+    background: transparent;
+    box-shadow: none;
+    color: var(--catapult-text);
+    font-family: inherit;
+}
+
+.api-docs-ui .swagger-ui .btn:hover {
+    border-color: var(--catapult-border-hover);
+    box-shadow: none;
+}
+
+.api-docs-ui .swagger-ui :is(.btn.execute, .btn.authorize, .auth-btn-wrapper .btn.modal-btn.auth.authorize) {
+    border-color: var(--catapult-primary);
+    background: var(--catapult-primary);
+    color: #fff;
+}
+
+.api-docs-ui .swagger-ui :is(.btn.execute, .btn.authorize):hover {
+    border-color: var(--catapult-primary-hover);
+    background: var(--catapult-primary-hover);
+}
+
+.api-docs-ui .swagger-ui .btn.authorize svg {
+    fill: currentColor;
+}
+
+.api-docs-ui .swagger-ui .btn.cancel {
+    border-color: rgb(var(--mdui-color-error));
+    color: rgb(var(--mdui-color-error));
+}
+
+.api-docs-ui .swagger-ui button.invalid {
+    border-color: rgb(var(--mdui-color-error));
+    background: transparent;
+}
+
+/* ── The Authorize modal ────────────────────────────────────────────────── */
+
+.api-docs-ui .swagger-ui .dialog-ux .backdrop-ux {
+    background: rgba(11, 13, 18, 0.8);
+}
+
+.api-docs-ui .swagger-ui .dialog-ux .modal-ux {
+    border: 1px solid var(--catapult-border);
+    border-radius: var(--catapult-radius);
+    background: var(--catapult-surface-elevated);
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+    color: var(--catapult-text);
+}
+
+.api-docs-ui .swagger-ui .dialog-ux .modal-ux-header {
+    border-bottom-color: var(--catapult-border);
+}
+
+.api-docs-ui .swagger-ui .dialog-ux :is(.modal-ux-header h3, .modal-ux-content h4, .modal-ux-content p) {
+    color: var(--catapult-text);
+}
+
+.api-docs-ui .swagger-ui .dialog-ux .modal-ux-header .close-modal svg {
+    fill: currentColor;
+}
+
+.api-docs-ui .swagger-ui .dialog-ux .modal-ux-header .close-modal {
+    color: var(--catapult-text-secondary);
+}
+
+.api-docs-ui .swagger-ui .auth-container {
+    border-bottom-color: var(--catapult-border);
+}
+
+.api-docs-ui .swagger-ui .auth-container .errors {
+    background-color: rgb(var(--mdui-color-error-container));
+    color: rgb(var(--mdui-color-on-error-container));
+}
