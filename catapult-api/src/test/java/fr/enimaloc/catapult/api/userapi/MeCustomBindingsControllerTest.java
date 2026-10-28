@@ -166,6 +166,19 @@ class MeCustomBindingsControllerTest {
     }
 
     @Test
+    void putActive_withoutOrBlankIdOrName_is400Problem() throws Exception {
+        for (String body : new String[] {"{}", "{\"idOrName\": null}", "{\"idOrName\": \"  \"}"}) {
+            mvc.perform(withToken(put(ACTIVE).contentType(MediaType.APPLICATION_JSON).content(body)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                    .andExpect(jsonPath("$.code").value("bad_request"));
+        }
+
+        verify(service, never()).resolve(any(), any());
+        verify(service, never()).activate(any(), any());
+    }
+
+    @Test
     void putActive_withoutBody_is400() throws Exception {
         mvc.perform(withToken(put(ACTIVE).contentType(MediaType.APPLICATION_JSON)))
                 .andExpect(status().isBadRequest());

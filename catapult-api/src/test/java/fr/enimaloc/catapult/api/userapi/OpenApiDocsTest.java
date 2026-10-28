@@ -164,4 +164,13 @@ class OpenApiDocsTest {
                     .contains("more").doesNotContain("links", "baseUrl", "kind", "id");
         }
     }
+
+    @Test
+    void docs_requireTheActivatedBindingsIdOrName() throws Exception {
+        JsonNode required = docs().at("/components/schemas/ActivateRequest/required");
+
+        List<String> names = new ArrayList<>();
+        required.forEach(name -> names.add(name.asString()));
+        assertThat(names).containsExactly("idOrName");
+    }
 }
