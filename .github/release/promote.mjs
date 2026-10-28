@@ -33,8 +33,11 @@ export function compareVersions(a, b) {
   );
 }
 
-/** Stable for a promotion to `main`, beta otherwise; null when there is nothing to release. */
-function releaseVersion(target, tags, commits) {
+/**
+ * Stable for a promotion to `main`, beta otherwise; null when there is nothing to release. `commits`
+ * are the promoted ones (release commits left out). ready.mjs checks the PR title against it.
+ */
+export function releaseVersion(target, tags, commits) {
   const versions = versionTags(tags).sort(compareVersions);
   const stables = versions.filter((v) => v.beta === null);
   const lastStable = stables.length ? stables[stables.length - 1] : { tag: "v0.0.0", ...parseVersion("v0.0.0") };

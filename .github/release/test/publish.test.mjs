@@ -51,7 +51,10 @@ function mergedPull({
   return { number: 7, title, body, state: "closed", merged, base, head, headRepo, mergeCommitSha: sha("m") };
 }
 
-const run = (gh, pr) => publish({ gh, pr, owner: OWNER, repo: REPO });
+// promote.mjs stand-in: records the refreshes publish.mjs asks for, in the call order.
+const fakePromote = (gh) => async ({ source, target, appSlug }) => gh.calls.push(["promote", { source, target, appSlug }]);
+const run = (gh, pr, promote = fakePromote(gh)) =>
+  publish({ gh, pr, owner: OWNER, repo: REPO, appSlug: "catapult-release", promote });
 const named = (gh, name) => gh.calls.filter((c) => c[0] === name);
 const commit = (c, subject) => ({ sha: sha(c), subject, message: subject, author: OWNER, parents: [sha("0")] });
 
@@ -144,4 +147,27 @@ test("hotfixBackports_skipOpenOrEmptyPairs", async () => {
   const result = await run(gh, mergedPull({ base: "main", head: "hotfix/login", title: "chore(release): v1.0.1" }));
   assert.deepEqual(result.backports, []);
   assert.deepEqual(named(gh, "createPull"), []);
+});
+
+test("betaTag_refreshesTheStablePromotionWithTheNewTag", async () => {
+  const gh = fakeGitHub();
+  await run(gh, mergedPull());
+  const names = gh.calls.map(([name]) => name);
+  assert.deepEqual(named(gh, "promote"), [["promote", { source: "beta", target: "main", appSlug: "catapult-release" }]]);
+  assert.ok(names.indexOf("createTag") < names.indexOf("promote"), "refreshed once the tag exists");
+});
+
+test("stableTag_doesNotRefreshTheStablePromotion", async () => {
+  const gh = fakeGitHub();
+  await run(gh, mergedPull({ base: "main", head: "beta", title: "chore(release): v1.0.0" }));
+  assert.deepEqual(named(gh, "promote"), []);
+});
+
+test("refreshFailure_afterTheBetaTag_isOnlyLogged", async () => {
+  const gh = fakeGitHub();
+  const failing = async () => {
+    throw new Error("promote exploded");
+  };
+  assert.deepEqual(await run(gh, mergedPull(), failing), { tag: "v1.0.0-BETA.97", backports: [] });
+  assert.deepEqual(named(gh, "comment"), []);
 });

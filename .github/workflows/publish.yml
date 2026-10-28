@@ -41,5 +41,6 @@ jobs:
       - name: Tag the merge commit (and open the hotfix backports)
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
           NUMBER: ${{ github.event.pull_request.number }}
         run: node .github/release/publish.mjs --number "$NUMBER"

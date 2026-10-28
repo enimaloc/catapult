@@ -9,7 +9,13 @@ import { parseVersion } from "./lib/version.mjs";
 import { promotedHead } from "./lib/pr-body.mjs";
 import { createGitHub } from "./lib/github.mjs";
 import { refreshDashboardSafely } from "./dashboard.mjs";
-import { compareVersions, isReleaseCommit, versionTags } from "./promote.mjs";
+import {
+  compareVersions,
+  isReleaseCommit,
+  promote as promoteImpl,
+  releaseVersion,
+  versionTags,
+} from "./promote.mjs";
 
 const GRADLE_FILE = "build.gradle.kts";
 const VERSION_LINE = /^(\s*version\s*=\s*)"[^"]*"/m;
@@ -74,6 +80,16 @@ const MESSAGES = {
     "Des commits sont arrivés après la dernière mise à jour du bot : la PR repasse en draft. " +
     `Attends la mise à jour du changelog, relis-le puis ${AGAIN}.\n\n` +
     commits.map((c) => `- ${short(c.sha)} ${c.subject}`).join("\n"),
+  tagExists: (version, promotion) =>
+    `Le tag \`${version}\` existe déjà : cette version est déjà publiée et la PR repasse en draft. ` +
+    (promotion
+      ? `Le bot corrige le titre à sa prochaine mise à jour (lancée maintenant) ; relis-le puis ${AGAIN}.`
+      : `Corrige le titre (ou retire la version pour que le bot prenne le patch suivant) puis ${AGAIN}.`),
+  staleVersion: (version, expected) =>
+    `Le titre annonce \`${version}\` alors que les tags actuels donnent ` +
+    (expected ? `\`${expected}\`` : "rien à publier") +
+    ` : la PR repasse en draft. Le bot corrige le titre à sa prochaine mise à jour (lancée maintenant) ; ` +
+    `relis-le puis ${AGAIN}.`,
   error: (error) =>
     `La préparation de la release a échoué : la PR repasse en draft.\n\n\`\`\`\n${error.message}\n\`\`\`\n\n` +
     `Corrige le problème puis ${AGAIN}.`,
@@ -86,7 +102,18 @@ async function refuse(gh, pull, message) {
   return "refused";
 }
 
-async function prepare({ gh, pr, pull, kind, appSlug }) {
+/** Re-drafts the promotion, then has the bot retitle it from the current tags (best effort). */
+async function refuseAndRefresh(gh, pull, message, refresh) {
+  const result = await refuse(gh, pull, message);
+  try {
+    await refresh();
+  } catch (error) {
+    console.warn(`::warning::#${pull.number}: could not refresh the promotion: ${error.message}`);
+  }
+  return result;
+}
+
+async function prepare({ gh, pr, pull, kind, owner, repo, appSlug, promote }) {
   if (pull.state !== "open" || pull.draft) return refuse(gh, pull, MESSAGES.notReady());
   if (pull.headSha !== pr.headSha) return refuse(gh, pull, MESSAGES.headMoved());
 
@@ -98,6 +125,20 @@ async function prepare({ gh, pr, pull, kind, appSlug }) {
     await gh.updatePull(pull.number, { title });
   }
   if (version === null) return refuse(gh, pull, MESSAGES.title(kind));
+
+  // The title was computed from the tags of the bot's last refresh: a release may have been tagged since.
+  const promotion = kind !== "hotfix";
+  const refresh = () => promote({ gh, source: pull.head, target: pull.base, owner, repo, appSlug });
+  if ((await gh.getTag(version)) !== null) {
+    const message = MESSAGES.tagExists(version, promotion);
+    return promotion ? refuseAndRefresh(gh, pull, message, refresh) : refuse(gh, pull, message);
+  }
+  if (promotion) {
+    const [tags, compared] = await Promise.all([gh.listTags(), gh.compareCommits(pull.base, pull.head)]);
+    const promoted = compared.filter((c) => !isReleaseCommit(c, appSlug));
+    const expected = releaseVersion(pull.base, tags, promoted);
+    if (expected !== version) return refuseAndRefresh(gh, pull, MESSAGES.staleVersion(version, expected), refresh);
+  }
 
   const backports = (await gh.listPulls({ base: pull.base })).filter((p) => p.labels?.includes("backport"));
   if (backports.length) return refuse(gh, pull, MESSAGES.backport(pull.base, backports));
@@ -147,14 +188,14 @@ async function prepare({ gh, pr, pull, kind, appSlug }) {
 }
 
 /** -> "auto-merge" | "merged" | "ignored" | "refused"; any failure re-drafts the PR, then rethrows. */
-export async function onReady({ gh, pr, sender, owner, repo, appSlug }) {
+export async function onReady({ gh, pr, sender, owner, repo, appSlug, promote = promoteImpl }) {
   if (sender !== owner) return "ignored";
   const pull = await gh.getPull(pr.number);
   const kind = kindOf(pull, `${owner}/${repo}`);
   if (kind === null) return "ignored";
 
   try {
-    return await prepare({ gh, pr, pull, kind, appSlug });
+    return await prepare({ gh, pr, pull, kind, owner, repo, appSlug, promote });
   } catch (error) {
     // Best effort: each report step on its own, so a failed re-draft still leaves the comment.
     for (const step of [() => gh.convertToDraft(pull), () => gh.comment(pull.number, MESSAGES.error(error))]) {

@@ -2,13 +2,14 @@
 // PRs main -> beta and beta -> dev. The tag is pushed with the App token, so its push event runs
 // release.yml, the single publication path (it reads the PR's notes itself).
 // CLI: node .github/release/publish.mjs --number 12
-// (env: GH_TOKEN = the App token, GITHUB_REPOSITORY=owner/repo)
+// (env: GH_TOKEN = the App token, GITHUB_REPOSITORY=owner/repo, APP_SLUG = the release App's slug)
 
 import { parseArgs } from "node:util";
 import { pathToFileURL } from "node:url";
 import { createGitHub } from "./lib/github.mjs";
 import { refreshDashboardSafely } from "./dashboard.mjs";
 import { kindOf, titleVersion } from "./ready.mjs";
+import { promote as promoteImpl } from "./promote.mjs";
 
 const short = (sha) => sha.slice(0, 7);
 
@@ -54,12 +55,13 @@ async function openBackports(gh, tag, pr) {
   return opened;
 }
 
-async function release(gh, pr, kind) {
+async function release(gh, pr, kind, refreshStable) {
   if (!pr.merged || !pr.mergeCommitSha) throw new Error(`#${pr.number} is not merged`);
   const tag = titleVersion(pr.title, kind);
   if (tag === null) throw new Error(`#${pr.number}: the title does not carry the version to publish: ${pr.title}`);
 
   await ensureTag(gh, tag, pr.mergeCommitSha, pr.title);
+  if (kind === "beta") await refreshStable();
   const backports = kind === "hotfix" ? await openBackports(gh, tag, pr) : [];
   return { tag, backports };
 }
@@ -68,11 +70,19 @@ async function release(gh, pr, kind) {
  * -> {tag, backports} (numbers of the backport PRs opened). Throws on an unmerged or unrelated PR; a
  * failure on a release PR is also reported on it.
  */
-export async function publish({ gh, pr, owner, repo }) {
+export async function publish({ gh, pr, owner, repo, appSlug, promote = promoteImpl }) {
   const kind = kindOf(pr, `${owner}/${repo}`);
   if (kind === null) throw new Error(`#${pr.number} is not a promotion or hotfix pull request`);
+  // The beta -> main PR was titled before this beta's tag existed: retitle it now (best effort).
+  const refreshStable = async () => {
+    try {
+      await promote({ gh, source: "beta", target: "main", owner, repo, appSlug });
+    } catch (error) {
+      console.warn(`::warning::could not refresh the beta -> main promotion: ${error.message}`);
+    }
+  };
   try {
-    return await release(gh, pr, kind);
+    return await release(gh, pr, kind, refreshStable);
   } catch (error) {
     const version = titleVersion(pr.title, kind);
     if (pr.merged && version !== null) {
@@ -96,6 +106,6 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   const [owner, repo] = (process.env.GITHUB_REPOSITORY ?? "").split("/");
   const gh = createGitHub({ token: process.env.GH_TOKEN, owner, repo });
   const pr = await gh.getPull(Number(values.number));
-  console.log(JSON.stringify(await publish({ gh, pr, owner, repo })));
+  console.log(JSON.stringify(await publish({ gh, pr, owner, repo, appSlug: process.env.APP_SLUG })));
   await refreshDashboardSafely({ gh });
 }

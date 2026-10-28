@@ -38,7 +38,8 @@ function fakeGitHub({
   after = [], // commits of compare(marker, head)
   gradle = GRADLE,
   others = [],
-  tags = ["v0.0.0", "v1.0.0-BETA.96", "v1.0.0", "v1.0.1-BETA.1"],
+  tags = ["v0.0.0", "v1.0.0-BETA.96"],
+  ahead = [commit("a", "fix(web): one")], // commits of compare(base, head)
   mergeState = "BLOCKED",
   moved = false, // the branch moved before the bump ref update
   later = {}, // fields of the pull on the second getPull
@@ -71,7 +72,11 @@ function fakeGitHub({
     },
     async compareCommits(b, h) {
       record("compareCommits", b, h);
-      return after;
+      return b === base && h === head ? ahead : after;
+    },
+    async getTag(name) {
+      record("getTag", name);
+      return tags.includes(name) ? sha("9") : null;
     },
     async getFile(path, ref) {
       record("getFile", path, ref);
@@ -100,8 +105,10 @@ function fakeGitHub({
   };
 }
 
+// promote.mjs stand-in: records the refresh ready.mjs asks for.
+const fakePromote = (gh) => async (args) => gh.calls.push(["promote", { source: args.source, target: args.target }]);
 const run = (gh, { sender = OWNER, headSha = sha("a") } = {}) =>
-  onReady({ gh, pr: { number: 7, headSha }, sender, owner: OWNER, repo: REPO, appSlug: APP });
+  onReady({ gh, pr: { number: 7, headSha }, sender, owner: OWNER, repo: REPO, appSlug: APP, promote: fakePromote(gh) });
 const named = (gh, name) => gh.calls.filter((c) => c[0] === name);
 const assertRefused = (gh, pattern) => {
   assert.deepEqual(named(gh, "convertToDraft"), [["convertToDraft", 7]]);
@@ -135,7 +142,9 @@ test("ownerReady_bumpsGradleVersion_thenAutoMergesOnBumpSha", async () => {
     ["enableAutoMerge", 7, { expectedHeadOid: sha("b"), commitHeadline: "chore(release): v1.0.0-BETA.97" }],
   ]);
   assert.deepEqual(named(gh, "convertToDraft"), []);
-  assert.deepEqual(named(gh, "compareCommits"), [], "marker === head needs no compare");
+  assert.deepEqual(named(gh, "compareCommits"), [["compareCommits", "beta", "dev"]], "marker === head: no compare");
+  assert.deepEqual(named(gh, "getTag"), [["getTag", "v1.0.0-BETA.97"]]);
+  assert.deepEqual(named(gh, "promote"), []);
 });
 
 test("alreadyBumped_noCommit_autoMergesOnHeadSha", async () => {
@@ -160,7 +169,7 @@ test("ownerReady_enablesAutoMerge_withHeadSha", async () => {
   // Only the App's previous bump came after the promoted head (PR re-drafted, then made ready again).
   const gh = fakeGitHub({ headSha: sha("c"), marker: sha("a"), after: [bump("c", "v1.0.0-BETA.97")], gradle: BUMPED });
   assert.equal(await run(gh, { headSha: sha("c") }), "auto-merge");
-  assert.deepEqual(named(gh, "compareCommits"), [["compareCommits", sha("a"), sha("c")]]);
+  assert.deepEqual(named(gh, "compareCommits").at(-1), ["compareCommits", sha("a"), sha("c")]);
   assert.equal(named(gh, "enableAutoMerge")[0][2].expectedHeadOid, sha("c"));
 });
 
@@ -173,7 +182,8 @@ test("stablePromotion_bumpsToTheStableVersion", async () => {
 });
 
 test("hotfixWithoutVersionTitle_getsTheNextPatch", async () => {
-  const gh = fakeGitHub({ base: "main", head: "hotfix/login", title: "fix: login", marker: null });
+  const tags = ["v0.0.0", "v1.0.0"];
+  const gh = fakeGitHub({ base: "main", head: "hotfix/login", title: "fix: login", marker: null, tags });
   assert.equal(await run(gh), "auto-merge");
   assert.deepEqual(named(gh, "updatePull"), [["updatePull", 7, { title: "chore(release): v1.0.1" }]]);
   const [[, file]] = named(gh, "commitFile");
@@ -185,7 +195,8 @@ test("hotfixWithoutVersionTitle_getsTheNextPatch", async () => {
 });
 
 test("hotfixWithVersionTitle_keepsIt", async () => {
-  const gh = fakeGitHub({ base: "main", head: "hotfix/login", title: "chore(release): v1.0.5", marker: null });
+  const tags = ["v0.0.0", "v1.0.0"];
+  const gh = fakeGitHub({ base: "main", head: "hotfix/login", title: "chore(release): v1.0.5", marker: null, tags });
   assert.equal(await run(gh), "auto-merge");
   assert.deepEqual(named(gh, "updatePull"), []);
   assert.equal(named(gh, "commitFile")[0][1].message, "chore(release): v1.0.5");
@@ -278,4 +289,58 @@ test("apiFailure_redraftsWithTheError_thenRethrows", async () => {
   await assert.rejects(run(gh), /enableAutoMerge exploded/);
   assert.deepEqual(named(gh, "convertToDraft"), [["convertToDraft", 7]]);
   assert.match(named(gh, "comment")[0][2], /a échoué[\s\S]*enableAutoMerge exploded/);
+});
+
+test("titleTagAlreadyExists_refuses_andRefreshesThePromotion", async () => {
+  const gh = fakeGitHub({ tags: ["v0.0.0", "v1.0.0-BETA.96", "v1.0.0-BETA.97"] });
+  assert.equal(await run(gh), "refused");
+  assertRefused(gh, /`v1\.0\.0-BETA\.97` existe déjà[\s\S]*prochaine mise à jour/);
+  assert.deepEqual(named(gh, "promote"), [["promote", { source: "dev", target: "beta" }]]);
+  assert.ok(gh.calls.findIndex(([n]) => n === "comment") < gh.calls.findIndex(([n]) => n === "promote"));
+});
+
+test("hotfixTitleTagAlreadyExists_refuses_withoutRefresh", async () => {
+  const gh = fakeGitHub({
+    base: "main",
+    head: "hotfix/login",
+    title: "chore(release): v1.0.0",
+    marker: null,
+    tags: ["v0.0.0", "v1.0.0"],
+  });
+  assert.equal(await run(gh), "refused");
+  assertRefused(gh, /`v1\.0\.0` existe déjà[\s\S]*Corrige le titre/);
+  assert.deepEqual(named(gh, "promote"), []);
+});
+
+test("staleBetaTitle_refuses_andRefreshesThePromotion", async () => {
+  // v1.0.0 was released since the bot titled the PR: the next beta is v1.0.1-BETA.1.
+  const gh = fakeGitHub({ tags: ["v0.0.0", "v1.0.0-BETA.96", "v1.0.0"] });
+  assert.equal(await run(gh), "refused");
+  assertRefused(gh, /`v1\.0\.0-BETA\.97`[\s\S]*`v1\.0\.1-BETA\.1`[\s\S]*prochaine mise à jour/);
+  assert.deepEqual(named(gh, "promote"), [["promote", { source: "dev", target: "beta" }]]);
+});
+
+test("staleStableTitle_refuses_andRefreshesThePromotion", async () => {
+  // A newer beta was tagged after the bot titled the stable PR.
+  const gh = fakeGitHub({
+    base: "main",
+    head: "beta",
+    title: "chore(release): v1.0.0",
+    tags: ["v0.0.0", "v1.0.0-BETA.96", "v1.1.0-BETA.1"],
+  });
+  assert.equal(await run(gh), "refused");
+  assertRefused(gh, /`v1\.1\.0`/);
+  assert.deepEqual(named(gh, "promote"), [["promote", { source: "beta", target: "main" }]]);
+});
+
+test("refreshFailure_afterARefusal_isOnlyLogged", async () => {
+  const gh = fakeGitHub({ tags: ["v0.0.0", "v1.0.0-BETA.96", "v1.0.0-BETA.97"] });
+  const failing = async () => {
+    throw new Error("promote exploded");
+  };
+  const result = await onReady({
+    gh, pr: { number: 7, headSha: sha("a") }, sender: OWNER, owner: OWNER, repo: REPO, appSlug: APP, promote: failing,
+  });
+  assert.equal(result, "refused");
+  assert.equal(named(gh, "comment").length, 1);
 });
