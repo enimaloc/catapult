@@ -6,6 +6,7 @@ on:
   workflow_dispatch:
   pull_request:
     branches:
+      - master # until it is renamed dev
       - dev
       - beta
       - main

@@ -4,7 +4,6 @@
     "config:recommended",
     ":semanticCommits"
   ],
-  "baseBranches": ["dev"],
   "timezone": "Europe/Paris",
   "labels": ["dependencies"],
   "platformAutomerge": false,
