@@ -31,8 +31,9 @@ public final class ApiV2 {
     static final String ME_CUSTOM_BINDINGS_PATH = "/api/me/custom-bindings";
 
     // The widget token of the dev backdoor (DevBackdoorResolver) that names no real game, and the
-    // example the legacy routes' "uuid" path parameter documents. Public: LegacyRoutesGate reads it too.
-    public static final String GENERIC_UUID_EXAMPLE = "00000000-0000-0000-0001-000000000190";
+    // example the legacy routes' "uuid" path parameter documents. LegacyRoutesGate does not read it:
+    // it recognizes any backdoor uuid by DevBackdoorResolver.isBackdoor.
+    static final String GENERIC_UUID_EXAMPLE = "00000000-0000-0000-0001-000000000190";
 
     private ApiV2() {}
 }
