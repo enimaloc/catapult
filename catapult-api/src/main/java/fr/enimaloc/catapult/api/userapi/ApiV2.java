@@ -20,6 +20,11 @@ public final class ApiV2 {
     // Stable, version-neutral mount point for the v2 controller and all its "more" links.
     static final String PATH = "/api/user";
 
+    // Mount points of the current routes ("games" by platform id, the caller's own bindings); the
+    // "more" links of GameInfoAssembler point at them in the CURRENT link style.
+    static final String GAMES_PATH = "/api/games";
+    static final String ME_BINDINGS_PATH = "/api/me/bindings";
+
     // Baked-in Swagger example for "uuid" path parameters — every uuid endpoint's spec carries
     // this literal value so SwaggerUiJwtTransformer's client-side script has something fixed to
     // find and replace with the caller's own widget token (see its class javadoc for why). Public:
