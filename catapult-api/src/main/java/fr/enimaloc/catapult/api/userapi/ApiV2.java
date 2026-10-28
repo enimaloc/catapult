@@ -14,6 +14,9 @@ public final class ApiV2 {
     // Request header carrying the version (see ApiVersioningConfig).
     static final String VERSION_HEADER = "X-API-Version";
 
+    // Query parameter carrying the version when the header is absent (see ApiVersioningConfig).
+    static final String VERSION_PARAM = "version";
+
     // Stable, version-neutral mount point for the v2 controller and all its "more" links.
     static final String PATH = "/api/user";
 

@@ -24,6 +24,15 @@ class ApiVersionHeaderDefaultCustomizerTest {
     }
 
     @Test
+    void versionQueryParamWithoutDefault_getsTheConfiguredDefaultVersion() {
+        Parameter query = new Parameter().in("query").name(ApiV2.VERSION_PARAM).schema(new StringSchema());
+
+        customizer.customise(api(query));
+
+        assertThat(query.getSchema().getDefault()).isEqualTo("2.0.0");
+    }
+
+    @Test
     void versionHeaderWithAnotherDefault_isLeftAlone() {
         StringSchema schema = new StringSchema();
         schema.setDefault("1");
