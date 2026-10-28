@@ -1,11 +1,11 @@
 package fr.enimaloc.catapult.chat.command.registry.catapult;
 
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunction;
-import fr.enimaloc.catapult.domain.MinecraftFriendLink;
-import fr.enimaloc.catapult.domain.OAuthToken;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.MinecraftFriendLinkRepository;
-import fr.enimaloc.catapult.repository.OAuthTokenRepository;
+import fr.enimaloc.catapult.domain.account.OAuthToken;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.minecraft.MinecraftFriendLink;
+import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
+import fr.enimaloc.catapult.repository.minecraft.MinecraftFriendLinkRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

@@ -1,11 +1,20 @@
 package fr.enimaloc.catapult.chat.command.registry.catapult;
 
-import fr.enimaloc.catapult.domain.GameBinding;
-import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.service.binding.GameBindingLookup;
+import fr.enimaloc.catapult.service.binding.RaidRestoreGateService;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.getter.DetectedGame;
-import fr.enimaloc.catapult.service.GameStateService;
-import fr.enimaloc.catapult.service.IgdbService;
-import fr.enimaloc.catapult.service.TwitchService;
+import fr.enimaloc.catapult.service.binding.CustomBindingActivations;
+import fr.enimaloc.catapult.service.binding.GameStateService;
+import fr.enimaloc.catapult.service.igdb.IgdbService;
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
+import fr.enimaloc.catapult.service.binding.RaidRestoreHold;
+import fr.enimaloc.catapult.service.binding.StreamStateService;
+import fr.enimaloc.catapult.service.category.CategoryApplier;
+import fr.enimaloc.catapult.service.category.CategoryChain;
+import fr.enimaloc.catapult.service.twitch.TwitchService;
 import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
@@ -21,10 +30,18 @@ import static org.mockito.Mockito.when;
 
 class CatapultSetGameFunctionTest {
 
+    /** The real chain and applier over {@code twitchService}: the other collaborators decide nothing for a manual choice. */
+    private static CategoryChain chainOver(TwitchService twitchService) {
+        return new CategoryChain(mock(CustomBindingActivations.class), mock(StreamStateService.class),
+            mock(UserSettingsRepository.class), new RaidRestoreHold(), mock(GameStateService.class),
+            mock(UserAccountRepository.class), new CategoryApplier(twitchService, mock(StreamStateService.class)), mock(RaidRestoreGateService.class), mock(GameBindingLookup.class));
+    }
+
     @Test
     void nameAndParameters() {
         CatapultSetGameFunction fn = new CatapultSetGameFunction(
-            mock(TwitchService.class), mock(GameStateService.class), mock(IgdbService.class));
+            mock(TwitchService.class), mock(CategoryChain.class), mock(GameStateService.class), mock(IgdbService.class),
+            mock(CustomBindingActivations.class));
         assertThat(fn.namespace()).isEqualTo("catapult");
         assertThat(fn.name()).isEqualTo("setGame");
         assertThat(fn.parameterNames()).containsExactly("name", "igdbId");
@@ -39,13 +56,13 @@ class CatapultSetGameFunctionTest {
         IgdbService igdbService = mock(IgdbService.class);
         UserAccount user = new UserAccount();
         when(twitchService.findCategoryIdByName(user, "Cyberpunk 2077")).thenReturn(Optional.of("1877"));
-        CatapultSetGameFunction fn = new CatapultSetGameFunction(twitchService, gameStateService, igdbService);
+        CatapultSetGameFunction fn = new CatapultSetGameFunction(twitchService, chainOver(twitchService), gameStateService, igdbService, mock(CustomBindingActivations.class));
 
         Object result = fn.invoke(user, new Object[]{"Cyberpunk 2077"});
 
         assertThat(result).isEqualTo("");
         var captor = org.mockito.ArgumentCaptor.forClass(GameBinding.class);
-        verify(twitchService).updateChannel(eq(user), captor.capture());
+        verify(twitchService).updateChannelReporting(eq(user), captor.capture());
         GameBinding binding = captor.getValue();
         assertThat(binding.getUser()).isEqualTo(user);
         assertThat(binding.getSourceType()).isEqualTo(GameBinding.SourceType.MANUAL);
@@ -67,12 +84,12 @@ class CatapultSetGameFunctionTest {
         IgdbService igdbService = mock(IgdbService.class);
         UserAccount user = new UserAccount();
         when(igdbService.findTwitchGameId("1877")).thenReturn(Optional.of("1877"));
-        CatapultSetGameFunction fn = new CatapultSetGameFunction(twitchService, gameStateService, igdbService);
+        CatapultSetGameFunction fn = new CatapultSetGameFunction(twitchService, chainOver(twitchService), gameStateService, igdbService, mock(CustomBindingActivations.class));
 
         fn.invoke(user, new Object[]{"Cyberpunk 2077", "1877"});
 
         var bindingCaptor = org.mockito.ArgumentCaptor.forClass(GameBinding.class);
-        verify(twitchService).updateChannel(eq(user), bindingCaptor.capture());
+        verify(twitchService).updateChannelReporting(eq(user), bindingCaptor.capture());
         GameBinding binding = bindingCaptor.getValue();
         assertThat(binding.getSourceId()).isEqualTo("1877");
         assertThat(binding.getTwitchGameId()).isEqualTo("1877");
@@ -95,12 +112,12 @@ class CatapultSetGameFunctionTest {
         UserAccount user = new UserAccount();
         when(igdbService.findTwitchGameId("1877")).thenReturn(Optional.empty());
         when(twitchService.findCategoryIdByName(user, "Cyberpunk 2077")).thenReturn(Optional.of("1877"));
-        CatapultSetGameFunction fn = new CatapultSetGameFunction(twitchService, gameStateService, igdbService);
+        CatapultSetGameFunction fn = new CatapultSetGameFunction(twitchService, chainOver(twitchService), gameStateService, igdbService, mock(CustomBindingActivations.class));
 
         fn.invoke(user, new Object[]{"Cyberpunk 2077", "1877"});
 
         var captor = org.mockito.ArgumentCaptor.forClass(GameBinding.class);
-        verify(twitchService).updateChannel(eq(user), captor.capture());
+        verify(twitchService).updateChannelReporting(eq(user), captor.capture());
         assertThat(captor.getValue().getTwitchGameId()).isEqualTo("1877");
     }
 
@@ -111,15 +128,31 @@ class CatapultSetGameFunctionTest {
         IgdbService igdbService = mock(IgdbService.class);
         UserAccount user = new UserAccount();
         when(twitchService.findCategoryIdByName(user, "Cyberpunk 2077")).thenReturn(Optional.empty());
-        CatapultSetGameFunction fn = new CatapultSetGameFunction(twitchService, gameStateService, igdbService);
+        CatapultSetGameFunction fn = new CatapultSetGameFunction(twitchService, chainOver(twitchService), gameStateService, igdbService, mock(CustomBindingActivations.class));
 
         fn.invoke(user, new Object[]{"Cyberpunk 2077", ""});
 
         verifyNoInteractions(gameStateService);
         verifyNoInteractions(igdbService);
         var captor = org.mockito.ArgumentCaptor.forClass(GameBinding.class);
-        verify(twitchService).updateChannel(eq(user), captor.capture());
+        verify(twitchService).updateChannelReporting(eq(user), captor.capture());
         assertThat(captor.getValue().getSourceId()).isNull();
         assertThat(captor.getValue().getTwitchGameId()).isNull();
+    }
+
+    @Test
+    void invokeEndsTheActiveCustomBinding_afterTheCategoryIsSent() throws Exception {
+        TwitchService twitchService = mock(TwitchService.class);
+        CustomBindingActivations activations = mock(CustomBindingActivations.class);
+        UserAccount user = new UserAccount();
+        when(twitchService.findCategoryIdByName(user, "Cyberpunk 2077")).thenReturn(Optional.of("1877"));
+        CatapultSetGameFunction fn = new CatapultSetGameFunction(twitchService, chainOver(twitchService), mock(GameStateService.class),
+            mock(IgdbService.class), activations);
+
+        fn.invoke(user, new Object[]{"Cyberpunk 2077"});
+
+        var order = org.mockito.Mockito.inOrder(twitchService, activations);
+        order.verify(twitchService).updateChannelReporting(eq(user), any());
+        order.verify(activations).clear(user);
     }
 }

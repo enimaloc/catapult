@@ -1,14 +1,18 @@
 package fr.enimaloc.catapult.service.notification;
 
-import fr.enimaloc.catapult.domain.TwitchatWidgetSettings;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.TwitchatWidgetSettingsRepository;
+import fr.enimaloc.catapult.common.dto.channel.TwitchatData;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.twitchat.TwitchatWidgetSettings;
+import fr.enimaloc.catapult.repository.twitchat.TwitchatWidgetSettingsRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
-import fr.enimaloc.catapult.service.WidgetTokenService;
-import fr.enimaloc.catapult.service.notification.dto.TwitchatWidgetConfig;
+import fr.enimaloc.catapult.service.account.WidgetTokenService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Optional;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -24,16 +28,22 @@ public class TwitchatWidgetSettingsService {
     private final TokenEncryptionService tokenEncryptionService;
     private final ChannelEventPublisher channelEventPublisher;
     private final WidgetTokenService widgetTokenService;
+    private final TwitchatEventActionService eventActionService;
 
     @Transactional
     public TwitchatWidgetSettings getOrCreate(UserAccount user) {
         widgetTokenService.getOrCreate(user);
         return repository.findById(user.getId()).orElseGet(() -> {
-            TwitchatWidgetSettings settings = new TwitchatWidgetSettings();
-            settings.setUser(user);
-            settings.setEnabled(false);
-            return repository.save(settings);
+            repository.insertIfAbsent(user.getId());
+            return repository.findById(user.getId())
+                    .orElseThrow(() -> new IllegalStateException("No Twitchat settings row for " + user.getId()));
         });
+    }
+
+    /** Whether the user's relay is on; read only, unlike getOrCreate() (no row, no token created). */
+    @Transactional(readOnly = true)
+    public boolean isEnabled(UserAccount user) {
+        return repository.findById(user.getId()).map(TwitchatWidgetSettings::isEnabled).orElse(false);
     }
 
     @Transactional
@@ -48,7 +58,43 @@ public class TwitchatWidgetSettingsService {
         }
         TwitchatWidgetSettings saved = repository.save(settings);
         publishWidgetConfig(saved);
+        if (saved.isEnabled()) {
+            eventActionService.ensureInitialized(user);
+        }
         return saved;
+    }
+
+    /**
+     * Sets the Twitchat API the user's pages speak, pushed live like the OBS settings.
+     *
+     * @throws IllegalArgumentException when not one of {@link TwitchatData}'s
+     */
+    @Transactional
+    public TwitchatWidgetSettings updateBranch(UserAccount user, String branch) {
+        if (!TwitchatData.isValid(branch)) {
+            throw new IllegalArgumentException("Unknown Twitchat branch " + branch);
+        }
+        TwitchatWidgetSettings settings = getOrCreate(user);
+        settings.setTwitchatBranch(branch);
+        TwitchatWidgetSettings saved = repository.save(settings);
+        publishWidgetConfig(saved);
+        return saved;
+    }
+
+    /**
+     * The OBS connection of the user's enabled relay, password decrypted: what the logged-in
+     * user's own browser connects to OBS with. Empty when disabled or never configured.
+     */
+    @Transactional(readOnly = true)
+    public Optional<TwitchatWidgetConfig> enabledConfig(UUID userId) {
+        return repository.findById(userId).filter(TwitchatWidgetSettings::isEnabled).map(this::config);
+    }
+
+    private TwitchatWidgetConfig config(TwitchatWidgetSettings settings) {
+        String password = settings.getObsPasswordEncrypted() == null
+                ? null : tokenEncryptionService.decrypt(settings.getObsPasswordEncrypted());
+        return new TwitchatWidgetConfig(settings.getObsHost(), settings.getObsPort(), password,
+                settings.getTwitchatBranch());
     }
 
     // Pushed live so a widget page already open in a browser tab or OBS browser source picks
@@ -56,10 +102,7 @@ public class TwitchatWidgetSettingsService {
     // from regenerateToken(): the whole point of regenerating is to cut off any existing
     // session using the old token, so it must NOT be kept alive with fresh values.
     private void publishWidgetConfig(TwitchatWidgetSettings settings) {
-        String password = settings.getObsPasswordEncrypted() == null
-                ? null : tokenEncryptionService.decrypt(settings.getObsPasswordEncrypted());
-        channelEventPublisher.twitchatWidgetSettingsUpdated(settings.getUser().getId(),
-                new TwitchatWidgetConfig(settings.getObsHost(), settings.getObsPort(), password));
+        channelEventPublisher.twitchatWidgetSettingsUpdated(settings.getUser().getId(), config(settings));
     }
 
     @Transactional

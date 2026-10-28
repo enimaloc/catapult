@@ -1,149 +1,89 @@
-/*
- * admin-keys.js — live updates for the Steam / DTDD API-key admin pages.
- *
- * Subscribes to the auth-gated `events.admin` channel and patches the key
- * table in place when another admin (or this one) adds / deletes / refreshes
- * a key. Replaces the former full-page POST → redirect reload.
- *
- * Event contract (payloads carry only masked status, never raw keys):
- *   <provider>.key.added     { key: {id, masked, owner, blocked, blockedForSeconds} }
- *   <provider>.key.deleted   { keyId }
- *   <provider>.keys.refreshed{ keys: [ ...KeyStatus ] }
- * where <provider> is "steam" or "dtdd".
- *
- * Loaded globally for admins (not per active_page): the events.admin
- * subscription lives in ws-client and survives hx-boost body swaps, and each
- * event re-resolves its card from the current DOM — so live updates keep
- * working on pages reached through boosted navigation.
+/**
+ * The admin Keys tab's Steam and DTDD cards: adding a key (the field is cleared once it is accepted),
+ * Refresh, and deleting a listed key after a confirmation. Everything posts to AdminKeysController
+ * (provider on the card's data-provider; the key and key id in the body) with the button disabled until
+ * the list is patched (admin-tabs.js: the key's row inserted, updated or removed), so a double click
+ * posts once. A refusal is told by its status, never by catapult-api's message: 400 (the card's own
+ * invalid-format text), 404 (key gone: patched away), else unavailable. Listeners are delegated to the
+ * panel: its content comes and goes.
  */
-(function () {
-  "use strict";
+window.CatapultAdminKeys = (function () {
+    const ok = status => status >= 200 && status < 300;
 
-  function cssEscape(s) {
-    if (window.CSS && CSS.escape) return CSS.escape(s);
-    return String(s).replace(/[^a-zA-Z0-9_-]/g, function (c) {
-      return "\\" + c.charCodeAt(0).toString(16) + " ";
-    });
-  }
-
-  function el(tag, className, text) {
-    var n = document.createElement(tag);
-    if (className) n.className = className;
-    if (text != null) n.textContent = String(text);
-    return n;
-  }
-
-  function renderRow(card, key) {
-    var tr = document.createElement("tr");
-    tr.setAttribute("data-key-id", key.id);
-
-    var tdKey = el("td");
-    tdKey.appendChild(el("span", "badge", key.masked || ""));
-    tr.appendChild(tdKey);
-
-    var tdOwner = el("td");
-    if (key.owner) tdOwner.appendChild(el("span", "badge badge-default", key.owner));
-    else tdOwner.appendChild(el("span", "text-muted", card.dataset.i18nOwnerAdmin || "Admin"));
-    tr.appendChild(tdOwner);
-
-    var tdStatus = el("td");
-    if (key.blocked) {
-      var blockedLabel = (card.dataset.i18nBlocked || "Blocked") + " " + (key.blockedForSeconds || 0) + "s";
-      tdStatus.appendChild(el("span", "badge badge-warning", blockedLabel));
-    } else {
-      tdStatus.appendChild(el("span", "badge badge-connected", card.dataset.i18nAvailable || "Available"));
+    /** The status of a POST (0 when it couldn't be sent), `button` disabled meanwhile. */
+    async function post(button, url, body) {
+        button.disabled = true;
+        try {
+            return (await CatapultCsrf.postJson(url, body)).status;
+        } catch {
+            return 0;
+        } finally {
+            button.disabled = false;
+        }
     }
-    tr.appendChild(tdStatus);
 
-    tr.appendChild(renderDeleteCell(card, key.id));
-    // Bind the whole row: ws-actions.bind() scans descendants of its argument,
-    // so it must receive an ancestor of the form, not the form itself.
-    if (window.catapultWsActions) window.catapultWsActions.bind(tr);
-    return tr;
-  }
+    function refusal(root, card, status) {
+        if (status === 404) return root.dataset.labelUnknown;
+        return status === 400 ? card.dataset.labelInvalid : root.dataset.labelUnavailable;
+    }
 
-  function renderDeleteCell(card, keyId) {
-    var td = el("td");
-    var form = document.createElement("form");
-    // ws-actions.js binds any element carrying data-ws-path — mirror the
-    // server-side ws:post dialect output so the delete goes over WebSocket.
-    form.setAttribute("data-ws-method", "POST");
-    form.setAttribute("data-ws-path", card.dataset.deleteUrl);
-    form.setAttribute("data-ws-swap", "none");
+    /** Posts, then holds the button disabled until the list is patched: a second click must do nothing. */
+    async function act(panel, root, card, button, action, body, doneLabel, onDone) {
+        const status = await post(button, `/admin/keys/${card.dataset.provider}/${action}`, body);
+        button.disabled = true; // post() re-enabled it; still busy until the list is patched
+        try {
+            if (ok(status)) {
+                onDone?.();
+                window.mdui?.snackbar?.({ message: root.dataset[doneLabel] });
+                await CatapultAdminTabs.patch(panel);
+                return;
+            }
+            CatapultChannel.showError(refusal(root, card, status));
+            if (status === 404) await CatapultAdminTabs.patch(panel);
+        } finally {
+            button.disabled = false;
+        }
+    }
 
-    var hidden = document.createElement("input");
-    hidden.type = "hidden";
-    hidden.name = "keyId";
-    hidden.value = keyId;
-    form.appendChild(hidden);
+    function addKey(panel, root, card, button) {
+        const field = card.querySelector('[name="apiKey"]');
+        const apiKey = (field.value ?? "").trim();
+        if (apiKey === "") {
+            field.setAttribute("invalid", "");
+            field.reportValidity?.();
+            return;
+        }
+        return act(panel, root, card, button, "add", { apiKey }, "labelAdded", () => { field.value = ""; });
+    }
 
-    var btn = el("button", "btn btn-sm", card.dataset.i18nDelete || "Delete");
-    btn.type = "submit";
-    form.appendChild(btn);
+    async function remove(panel, root, card, button) {
+        button.disabled = true; // before the confirmation: a second click must not open another
+        try {
+            if (!await CatapultAdminTabs.confirmed(root, button.dataset.confirm)) return;
+            await act(panel, root, card, button, "delete", { keyId: button.dataset.keyId }, "labelDeleted");
+        } finally {
+            button.disabled = false;
+        }
+    }
 
-    td.appendChild(form);
-    return td;
-  }
+    function attach() {
+        const panel = document.querySelector('mdui-tab-panel[value="keys"]');
+        if (!panel) return;
 
-  function bodyOf(card) { return card.querySelector("[data-keys-body]"); }
+        panel.addEventListener("click", event => {
+            const target = event.target.closest?.(".admin-keys-add-save, .admin-keys-refresh, .admin-keys-delete");
+            if (!target || !panel.contains(target) || target.disabled) return;
+            const root = panel.querySelector(".admin-keys");
+            const card = target.closest(".admin-keys-card");
+            if (!root || !card) return;
+            if (target.matches(".admin-keys-add-save")) addKey(panel, root, card, target);
+            else if (target.matches(".admin-keys-refresh")) act(panel, root, card, target, "refresh", {}, "labelRefreshed");
+            else remove(panel, root, card, target);
+        });
+        panel.addEventListener("input", event => event.target.removeAttribute?.("invalid"));
+    }
 
-  function syncEmptyState(card) {
-    var body = bodyOf(card);
-    var empty = card.querySelector("[data-keys-empty]");
-    var table = card.querySelector("[data-keys-table]");
-    var has = body && body.children.length > 0;
-    if (empty) empty.style.display = has ? "none" : "";
-    if (table) table.style.display = has ? "" : "none";
-  }
+    document.addEventListener("catapult:render", attach);
 
-  function onKeyAdded(card, key) {
-    if (!key || !key.id) return;
-    var body = bodyOf(card);
-    if (!body || body.querySelector('tr[data-key-id="' + cssEscape(key.id) + '"]')) return; // idempotent
-    body.appendChild(renderRow(card, key));
-    syncEmptyState(card);
-    var input = card.parentElement && card.parentElement.querySelector("[data-keys-add-input]");
-    if (input) input.value = "";
-  }
-
-  function onKeyDeleted(card, keyId) {
-    var body = bodyOf(card);
-    if (!body || !keyId) return;
-    var row = body.querySelector('tr[data-key-id="' + cssEscape(keyId) + '"]');
-    if (row) row.remove();
-    syncEmptyState(card);
-  }
-
-  function onKeysRefreshed(card, keys) {
-    var body = bodyOf(card);
-    if (!body) return;
-    while (body.firstChild) body.removeChild(body.firstChild);
-    (keys || []).forEach(function (k) { body.appendChild(renderRow(card, k)); });
-    syncEmptyState(card);
-  }
-
-  function onEvent(msg) {
-    if (!msg || !msg.name) return;
-    var dot = msg.name.indexOf(".");
-    var provider = dot > 0 ? msg.name.slice(0, dot) : "";
-    // Resolve fresh each event: after an hx-boost swap the card is a new node.
-    var card = document.querySelector('[data-keys-card][data-provider="' + provider + '"]');
-    if (!card) return;
-    var data = msg.data || {};
-    if (msg.name === provider + ".key.added") onKeyAdded(card, data.key);
-    else if (msg.name === provider + ".key.deleted") onKeyDeleted(card, data.keyId);
-    else if (msg.name === provider + ".keys.refreshed") onKeysRefreshed(card, data.keys);
-  }
-
-  var subscribed = false;
-  function subscribe() {
-    if (subscribed || !window.catapultWs) return;
-    subscribed = true;
-    window.catapultWs.subscribe("events.admin", onEvent);
-  }
-
-  // events.admin is ADMIN-gated (ChannelResolver), so wait for auth before
-  // subscribing — subscribing earlier would get sub.denied.
-  document.addEventListener("ws:auth.ok", subscribe, { once: true });
-  subscribe(); // immediate if already connected + authenticated
-}());
+    return { attach };
+})();

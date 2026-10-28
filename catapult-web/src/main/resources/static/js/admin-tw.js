@@ -1,97 +1,204 @@
-/*
- * admin-tw.js — live updates for the Trigger Warnings admin page.
+/**
+ * The admin Trigger warnings tab: adding a definition (id, label, order) and the three rebuilds, each
+ * confirmed with its own text first. Everything posts to AdminTwController with its button disabled
+ * meanwhile (and, for an add, until the list is patched: admin-tabs.js inserts its row and the card is
+ * emptied), so a double click posts once. A refusal is told
+ * by its status, never by catapult-api's message: 400 (invalid), 409 (id taken), 503 (trigger warnings
+ * disabled), else unavailable. "Manage keywords" is a plain data-admin-open link handled by admin-tabs.js.
  *
- * Subscribes to the ADMIN-gated `events.admin` channel and appends a row when
- * a TW definition is created, instead of the former POST → redirect reload.
- *
- *   tw.definition.added { definition: {id, label, enabled, sortOrder} }
- *
- * The `tw.rebuild` action goes over WS with no swap and produces no visible
- * table change (it recomputes binding mappings, not the definition list).
+ * The keywords sub-view (#tw/{id}) adds and removes (confirmed) Steam keywords of 2 to 50 characters, the
+ * keyword travelling in the JSON body, and tests the saved keywords plus the one being typed on a Steam app:
+ * the answer is built with textContent only (the notes are data). Adding or removing one patches the list
+ * (the field emptied, the test's answer kept). Refusals are told by status as above.
+ * Listeners are delegated to the panel: its content comes and goes.
  */
-(function () {
-  "use strict";
+window.CatapultAdminTw = (function () {
+    const ID = /^[a-z0-9_]{1,40}$/;
+    const ok = status => status >= 200 && status < 300;
+    const fieldOf = (scope, name) => scope.querySelector(`[name="${name}"]`);
+    const valueOf = (scope, name) => (fieldOf(scope, name).value ?? "").trim();
 
-  // Loaded globally for admins; re-resolved per event so it survives hx-boost swaps.
-  var card = null;
+    function mark(field) {
+        field.setAttribute("invalid", "");
+        field.reportValidity?.();
+    }
 
-  function cssEscape(s) {
-    if (window.CSS && CSS.escape) return CSS.escape(s);
-    return String(s).replace(/[^a-zA-Z0-9_-]/g, function (c) {
-      return "\\" + c.charCodeAt(0).toString(16) + " ";
-    });
-  }
+    /** The response of a POST (null when it couldn't be sent), `button` disabled meanwhile. */
+    async function send(button, url, body) {
+        button.disabled = true;
+        try {
+            return await CatapultCsrf.postJson(url, body);
+        } catch {
+            return null;
+        } finally {
+            button.disabled = false;
+        }
+    }
 
-  function el(tag, className, text) {
-    var n = document.createElement(tag);
-    if (className) n.className = className;
-    if (text != null) n.textContent = String(text);
-    return n;
-  }
+    /** The status of a POST (0 when it couldn't be sent). */
+    async function post(button, url, body) {
+        return (await send(button, url, body))?.status ?? 0;
+    }
 
-  function body() { return card.querySelector("[data-tw-body]"); }
+    function refusal(root, status) {
+        if (status === 404 && root.dataset.labelUnknown) return root.dataset.labelUnknown;
+        if (status === 409) return root.dataset.labelConflict;
+        if (status === 503) return root.dataset.labelDisabled;
+        return status === 400 ? root.dataset.labelInvalid : root.dataset.labelUnavailable;
+    }
 
-  function syncEmptyState() {
-    var b = body();
-    var empty = card.querySelector("[data-tw-empty]");
-    var table = card.querySelector("[data-tw-table]");
-    var has = b && b.children.length > 0;
-    if (empty) empty.style.display = has ? "none" : "";
-    if (table) table.style.display = has ? "" : "none";
-  }
+    async function addDefinition(panel, root, button) {
+        const card = button.closest(".admin-tw-create");
+        const id = valueOf(card, "id");
+        const label = valueOf(card, "label");
+        const sortOrder = Number(valueOf(card, "sortOrder") || "0");
+        const invalid = [
+            ["id", !ID.test(id)],
+            ["label", label === "" || label.length > 80],
+            ["sortOrder", !Number.isInteger(sortOrder)],
+        ].filter(([, bad]) => bad);
+        if (invalid.length > 0) {
+            invalid.forEach(([name]) => mark(fieldOf(card, name)));
+            return;
+        }
+        const status = await post(button, "/admin/tw", { id, label, sortOrder });
+        button.disabled = true; // post() re-enabled it; still busy until the list is patched
+        try {
+            if (ok(status)) {
+                window.mdui?.snackbar?.({ message: root.dataset.labelCreated });
+                CatapultAdminTabs.reset(card);
+                await CatapultAdminTabs.patch(panel);
+                return;
+            }
+            CatapultChannel.showError(refusal(root, status));
+        } finally {
+            button.disabled = false;
+        }
+    }
 
-  function renderRow(d) {
-    var tr = document.createElement("tr");
-    tr.setAttribute("data-tw-id", d.id);
+    async function rebuild(root, button) {
+        button.disabled = true; // before the confirmation: a second click must not open another
+        try {
+            if (!await CatapultAdminTabs.confirmed(root, button.dataset.confirm)) return;
+            const status = await post(button, `/admin/tw/rebuild/${button.dataset.rebuild}`, {});
+            if (ok(status)) window.mdui?.snackbar?.({ message: root.dataset.labelRebuildStarted });
+            else CatapultChannel.showError(refusal(root, status));
+        } finally {
+            button.disabled = false;
+        }
+    }
 
-    var tdId = el("td");
-    tdId.appendChild(el("span", "badge", d.id));
-    tr.appendChild(tdId);
+    // --- the keywords sub-view ---------------------------------------------------------------
 
-    tr.appendChild(el("td", null, d.label || ""));
+    const KEYWORD_MIN = 2;
+    const KEYWORD_MAX = 50;
+    const APP_ID = /^[0-9]{1,12}$/;
+    const keywordsUrl = (root, action) => `/admin/tw/${encodeURIComponent(root.dataset.twId)}/keywords${action}`;
 
-    var tdStatus = el("td");
-    if (d.enabled) tdStatus.appendChild(el("span", "badge badge-connected", card.dataset.i18nEnabled || "Enabled"));
-    else tdStatus.appendChild(el("span", "badge badge-warning", card.dataset.i18nDisabled || "Disabled"));
-    tr.appendChild(tdStatus);
+    async function addKeyword(panel, root, button) {
+        const field = fieldOf(root, "keyword");
+        const keyword = (field.value ?? "").trim();
+        if (keyword.length < KEYWORD_MIN || keyword.length > KEYWORD_MAX) return mark(field);
+        const status = await post(button, keywordsUrl(root, ""), { keyword });
+        button.disabled = true; // still busy until the list is patched
+        try {
+            if (ok(status)) {
+                window.mdui?.snackbar?.({ message: root.dataset.labelAdded });
+                field.value = "";
+                await CatapultAdminTabs.patch(panel);
+                return;
+            }
+            CatapultChannel.showError(status === 400 ? root.dataset.labelInvalid : refusal(root, status));
+        } finally {
+            button.disabled = false;
+        }
+    }
 
-    tr.appendChild(el("td", null, d.sortOrder != null ? d.sortOrder : 0));
+    async function removeKeyword(panel, root, button) {
+        button.disabled = true; // before the confirmation: a second click must not open another
+        try {
+            if (!await CatapultAdminTabs.confirmed(root, button.dataset.confirm)) return;
+            // free text: it travels in the body, a path can't carry a "/" or a "%"
+            const keyword = button.closest("[data-keyword]").dataset.keyword;
+            const status = await post(button, keywordsUrl(root, "/remove"), { keyword });
+            button.disabled = true;
+            if (ok(status)) {
+                window.mdui?.snackbar?.({ message: root.dataset.labelRemoved });
+                await CatapultAdminTabs.patch(panel);
+                return;
+            }
+            CatapultChannel.showError(status === 400 ? root.dataset.labelInvalid : refusal(root, status));
+        } finally {
+            button.disabled = false;
+        }
+    }
 
-    var tdActions = el("td");
-    var link = document.createElement("a");
-    link.className = "btn btn-secondary";
-    link.href = "/admin/tw/" + encodeURIComponent(d.id) + "/keywords";
-    link.textContent = card.dataset.i18nManageKeywords || "Manage keywords";
-    tdActions.appendChild(link);
-    tr.appendChild(tdActions);
+    /** A paragraph made of a label and a value, both as text. */
+    function line(label, value, className) {
+        const p = document.createElement("p");
+        if (className) p.className = className;
+        p.textContent = value === undefined ? label : `${label} ${value}`;
+        return p;
+    }
 
-    return tr;
-  }
+    function showTest(root, view) {
+        const none = root.dataset.labelNone;
+        const out = root.querySelector(".admin-tw-test-result");
+        const list = items => (items?.length ? items.join(", ") : none);
+        const lines = [
+            line(root.dataset.labelMatchedKeywords, list(view.matchedKeywords)),
+            line(root.dataset.labelMatchedIds, list(view.matchedContentDescriptorIds)),
+        ];
+        if (view.draftKeywordMatch === true) lines.push(line(root.dataset.labelDraftMatch));
+        else if (view.draftKeywordMatch === false) lines.push(line(root.dataset.labelDraftNoMatch));
+        lines.push(line(root.dataset.labelNotes, view.notes ? view.notes : none, "admin-tw-test-notes"));
+        out.replaceChildren(...lines);
+    }
 
-  function onDefinitionAdded(d) {
-    if (!d || !d.id) return;
-    var b = body();
-    if (!b || b.querySelector('tr[data-tw-id="' + cssEscape(d.id) + '"]')) return; // idempotent
-    b.appendChild(renderRow(d));
-    syncEmptyState();
-    var form = document.querySelector("[data-tw-add-form]");
-    if (form) form.reset();
-  }
+    async function runTest(root, button) {
+        const appField = fieldOf(root, "appId");
+        const appId = (appField.value ?? "").trim();
+        if (!APP_ID.test(appId)) return mark(appField);
+        const out = root.querySelector(".admin-tw-test-result");
+        const draftKeyword = (fieldOf(root, "keyword")?.value ?? "").trim();
+        const answer = await send(button, keywordsUrl(root, "/test"), { appId, draftKeyword });
+        let view = null;
+        if (answer && ok(answer.status)) {
+            try {
+                view = await answer.json();
+            } catch {
+                view = null;
+            }
+        }
+        if (!root.isConnected) return; // the view was left meanwhile
+        if (view) showTest(root, view);
+        else out.textContent = root.dataset.labelTestError;
+    }
 
-  function onEvent(msg) {
-    if (!msg || msg.name !== "tw.definition.added") return;
-    card = document.querySelector("[data-tw-card]");
-    if (!card) return;
-    onDefinitionAdded((msg.data || {}).definition);
-  }
+    function attach() {
+        const panel = document.querySelector('mdui-tab-panel[value="tw"]');
+        if (!panel) return;
 
-  var subscribed = false;
-  function subscribe() {
-    if (subscribed || !window.catapultWs) return;
-    subscribed = true;
-    window.catapultWs.subscribe("events.admin", onEvent);
-  }
+        panel.addEventListener("click", event => {
+            const target = event.target.closest?.(".admin-tw-add-save, .admin-tw-rebuild,"
+                + " .admin-tw-keyword-add, .admin-tw-keyword-remove, .admin-tw-test-run");
+            if (!target || !panel.contains(target) || target.disabled) return;
+            const keywordsRoot = target.closest(".admin-tw-kw");
+            if (keywordsRoot) {
+                if (target.matches(".admin-tw-keyword-add")) addKeyword(panel, keywordsRoot, target);
+                else if (target.matches(".admin-tw-keyword-remove")) removeKeyword(panel, keywordsRoot, target);
+                else runTest(keywordsRoot, target);
+                return;
+            }
+            const root = panel.querySelector(".admin-tw");
+            if (!root) return;
+            if (target.matches(".admin-tw-add-save")) addDefinition(panel, root, target);
+            else rebuild(root, target);
+        });
+        panel.addEventListener("input", event => event.target.removeAttribute?.("invalid"));
+    }
 
-  document.addEventListener("ws:auth.ok", subscribe, { once: true });
-  subscribe();
-}());
+    document.addEventListener("catapult:render", attach);
+
+    return { attach };
+})();

@@ -1,0 +1,215 @@
+/**
+ * Settings tab. Each card's fields already show what it saves, so a save only posts: no
+ * re-render, which would lose the scroll position and any card being edited.
+ *
+ * A save made elsewhere (another tab, a moderator) comes back as ChannelSettingsUpdatedEvent,
+ * and so does the state a reconnected stream catches up on: channel-events.js hands its settings
+ * to CatapultSettings.apply(), which sets the cards' fields to them, but for those the visitor
+ * changed and hasn't saved yet (their edit is kept until their card is saved, or the server's
+ * value comes back to what they set).
+ */
+window.CatapultSettings = (function () {
+    // The current render's game pickers, by card prefix.
+    let games = {};
+    // The fields the visitor changed since their card was last saved (the game pickers by their text field).
+    let dirty = new WeakSet();
+
+    const RAID_DEFAULT_MINUTES = 15;
+    const RAID_MIN_MINUTES = 1;
+    const RAID_MAX_MINUTES = 120;
+
+    const byId = id => document.getElementById(id);
+
+    /** Sets switch `sw` to `checked`, unless the visitor changed it (until it holds that value again). */
+    function check(sw, checked) {
+        if (!sw) return;
+        if (sw.checked === checked) {
+            dirty.delete(sw);
+        } else if (!dirty.has(sw)) {
+            sw.checked = checked;
+        }
+    }
+
+    function setChecked(id, checked) {
+        check(byId(id), !!checked);
+    }
+
+    /** Checks the switches of class `switchClass` under the card `formId` whose value is in `values`. */
+    function setGrid(formId, switchClass, values) {
+        const wanted = new Set(values ?? []);
+        byId(formId)?.querySelectorAll(`.${switchClass}`).forEach(sw => check(sw, wanted.has(sw.value)));
+    }
+
+    function setGame(prefix, id, name) {
+        const game = id ? { id, name } : null;
+        const input = byId(`${prefix}-game-input`);
+        const idInput = byId(`${prefix}-game-id`);
+        if (input && dirty.has(input)) {
+            // Kept until it shows that game again: picked, or typed back to it.
+            const shown = games[prefix] ? games[prefix].selected()?.id : idInput?.value || undefined;
+            if (shown !== game?.id || input.value !== (game?.name ?? "")) return;
+            dirty.delete(input);
+        }
+        if (idInput && idInput.value !== (game?.id ?? "")) idInput.value = game?.id ?? "";
+        if (games[prefix]) {
+            const selected = games[prefix].selected();
+            if (selected?.id !== game?.id || (game && selected.name !== game.name)) games[prefix].select(game);
+        } else if (input && input.value !== (game?.name ?? "")) {
+            input.value = game?.name ?? "";
+        }
+    }
+
+    /** The raid card set to the server's `minutes`, unless the visitor changed its switch or delay. */
+    function applyRaid(minutes) {
+        const sw = byId("raid-restore-enabled");
+        const field = byId("raid-restore-minutes");
+        const same = sw?.checked === (minutes != null) && (minutes == null || field?.value === String(minutes));
+        if (same) {
+            dirty.delete(sw);
+            dirty.delete(field);
+        } else if (!dirty.has(sw) && !dirty.has(field)) {
+            setRaid(minutes);
+        }
+    }
+
+    /** What the visitor changes in a settings card: kept from the server's settings until saved. */
+    document.addEventListener("input", markDirty, true);
+    document.addEventListener("change", markDirty, true);
+
+    function markDirty(event) {
+        const target = event.target;
+        if (target?.closest?.('[id^="channel-"][id$="-settings-form"]')) dirty.add(target);
+    }
+
+    /** The card `formId` was saved: its fields take the server's settings again. */
+    function saved(formId) {
+        byId(formId)?.querySelectorAll("*").forEach(el => dirty.delete(el));
+    }
+
+    /**
+     * The raid card: its switch turns "put the last game back" on (a delay of `minutes`, the field
+     * filled with the suggested 15 when empty) or off (null, the field greyed out but kept).
+     */
+    function setRaid(minutes) {
+        const sw = byId("raid-restore-enabled");
+        const field = byId("raid-restore-minutes");
+        if (!sw || !field) return;
+        sw.checked = minutes != null;
+        if (minutes != null) field.value = String(minutes);
+        else if (!field.value) field.value = String(RAID_DEFAULT_MINUTES);
+        field.disabled = !sw.checked;
+    }
+
+    /** The raid delay to save: null when off, else the field's minutes kept within 1..120 (15 when unreadable). */
+    function raidMinutes() {
+        if (!byId("raid-restore-enabled")?.checked) return null;
+        const typed = byId("raid-restore-minutes")?.value ?? "";
+        const minutes = Math.round(Number(typed));
+        if (typed === "" || !Number.isFinite(minutes)) return RAID_DEFAULT_MINUTES;
+        // A typed 0 is kept at 1 rather than sent as "off": the switch is the off control.
+        return Math.min(RAID_MAX_MINUTES, Math.max(RAID_MIN_MINUTES, minutes));
+    }
+
+    /** Sets every settings card to `settings` (ChannelEvents.Settings: one entry per card). */
+    function apply(settings) {
+        if (!settings || !byId("channel-ccl-settings-form")) return;
+        const { ccl, tw, noGame, incompleteFallback, raid } = settings;
+        if (ccl) {
+            setChecked("ccl-enabled-checkbox", ccl.enabled);
+            setGrid("channel-ccl-settings-form", "ccl-block-checkbox", ccl.blockedCcls);
+        }
+        if (tw) {
+            setChecked("tw-enabled-checkbox", tw.enabled);
+            setGrid("channel-tw-settings-form", "tw-block-checkbox", tw.blockedTws);
+        }
+        if (noGame) {
+            setGame("no-game", noGame.twitchGameId, noGame.twitchGameName);
+            setGrid("channel-no-game-settings-form", "no-game-ccl-checkbox", noGame.ccls);
+            setChecked("no-game-apply-start", noGame.applyOnStreamStart);
+            setChecked("no-game-apply-no-game", noGame.applyOnNoGame);
+            setChecked("no-game-apply-end", noGame.applyOnStreamEnd);
+        }
+        if (incompleteFallback) {
+            setGame("incomplete-fallback", incompleteFallback.twitchGameId, incompleteFallback.twitchGameName);
+            setGrid("channel-incomplete-fallback-settings-form", "incomplete-fallback-ccl-checkbox",
+                incompleteFallback.ccls);
+        }
+        if (raid) applyRaid(raid.restoreGameMinutes ?? null);
+    }
+
+    function track(prefix, game) {
+        games[prefix] = game;
+    }
+
+    function reset() {
+        games = {};
+        dirty = new WeakSet();
+    }
+
+    return { apply, track, reset, saved, setRaid, raidMinutes, RAID_DEFAULT_MINUTES };
+})();
+
+// The Settings tab is built only once picked (lazy.js): its cards are bound then, as with the page otherwise.
+document.addEventListener("catapult:render", bindSettings);
+document.addEventListener("catapult:lazy", event => {
+    if (event.detail.root.contains(document.getElementById("channel-ccl-settings-form"))) bindSettings();
+});
+
+function bindSettings() {
+    CatapultSettings.reset();
+    if (!document.getElementById("channel-ccl-settings-form")) return;
+
+    const { on, checkedValues, postJson } = CatapultChannel;
+    const baseUrl = CatapultChannel.baseUrl();
+    const byId = id => document.getElementById(id);
+
+    // A save that went through: its card's fields follow the server's settings again.
+    const save = async (formId, url, body) => {
+        const response = await postJson(url, body);
+        if (response.ok) CatapultSettings.saved(formId);
+        return response;
+    };
+
+    on("ccl-settings-save-btn", "click", () => save("channel-ccl-settings-form", `${baseUrl}/settings/ccl`, {
+        cclEnabled: byId("ccl-enabled-checkbox").checked,
+        blockedCcls: checkedValues(byId("channel-ccl-settings-form"), ".ccl-block-checkbox")
+    }));
+
+    // Only offered while the channel is in the raid.restore-game experiment: absent otherwise.
+    on("raid-restore-enabled", "change", event => CatapultSettings.setRaid(
+        event.target.checked ? (byId("raid-restore-minutes")?.value || CatapultSettings.RAID_DEFAULT_MINUTES) : null));
+    on("raid-settings-save-btn", "click", () => save("channel-raid-settings-form", `${baseUrl}/settings/raid`, {
+        restoreGameMinutes: CatapultSettings.raidMinutes()
+    }));
+
+    on("tw-settings-save-btn", "click", () => save("channel-tw-settings-form", `${baseUrl}/settings/tws`, {
+        enabled: byId("tw-enabled-checkbox").checked,
+        blockedTws: checkedValues(byId("channel-tw-settings-form"), ".tw-block-checkbox")
+    }));
+
+    // The "no game" and "incomplete game" cards share the same game picker + ccl
+    // switches shape; only their id prefix, endpoint and extra fields differ. Only a picked
+    // game is saved (with its own id), never the text being typed; an emptied field saves neither.
+    function attachDefaultGameCard(prefix, endpoint, extraFields = () => ({})) {
+        const gameInput = byId(`${prefix}-game-input`);
+        const gameIdInput = byId(`${prefix}-game-id`);
+        const game = GameSearch.attach(gameInput, byId(`${prefix}-game-results`), `${baseUrl}/games/search`,
+            picked => { gameIdInput.value = picked.id; },
+            { initial: { id: gameIdInput.value, name: gameInput.value } });
+        CatapultSettings.track(prefix, game);
+
+        on(`${prefix}-settings-save-btn`, "click", () => save(`channel-${prefix}-settings-form`, `${baseUrl}/settings/${endpoint}`, {
+            twitchGameId: game.selected()?.id ?? null,
+            twitchGameName: game.selected()?.name ?? null,
+            ccls: checkedValues(byId(`channel-${prefix}-settings-form`), `.${prefix}-ccl-checkbox`),
+            ...extraFields()
+        }));
+    }
+
+    attachDefaultGameCard("no-game", "no-game", () => ({
+        applyOnStreamStart: byId("no-game-apply-start").checked,
+        applyOnNoGame: byId("no-game-apply-no-game").checked,
+        applyOnStreamEnd: byId("no-game-apply-end").checked
+    }));
+    attachDefaultGameCard("incomplete-fallback", "incomplete-fallback");
+}

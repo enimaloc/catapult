@@ -1,8 +1,8 @@
 package fr.enimaloc.catapult.chat;
 
-import fr.enimaloc.catapult.domain.ChatCommandDefinition;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.chatcommand.ChatCommandDefinition;
+import fr.enimaloc.catapult.repository.chatcommand.ChatCommandDefinitionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

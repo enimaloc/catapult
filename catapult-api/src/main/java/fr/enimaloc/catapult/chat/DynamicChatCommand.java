@@ -7,12 +7,13 @@ import fr.enimaloc.catapult.chat.command.js.JsCompiler;
 import fr.enimaloc.catapult.chat.command.js.SandboxExecutionException;
 import fr.enimaloc.catapult.chat.command.js.SandboxExecutor;
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
-import fr.enimaloc.catapult.domain.ChatCommandDefinition;
-import fr.enimaloc.catapult.domain.ChatCommandSetting;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.ChatCommandDefinitionRepository;
-import fr.enimaloc.catapult.repository.ChatCommandSettingRepository;
-import fr.enimaloc.catapult.service.GameContextService;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.chatcommand.ChatCommandDefinition;
+import fr.enimaloc.catapult.domain.chatcommand.ChatCommandFallback;
+import fr.enimaloc.catapult.domain.chatcommand.ChatCommandSetting;
+import fr.enimaloc.catapult.repository.chatcommand.ChatCommandDefinitionRepository;
+import fr.enimaloc.catapult.repository.chatcommand.ChatCommandSettingRepository;
+import fr.enimaloc.catapult.service.binding.GameContextService;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import lombok.extern.slf4j.Slf4j;
@@ -96,7 +97,7 @@ public class DynamicChatCommand implements ChatCommand {
 
         GameContext ctx = gameContextService.get(user).orElse(GameContext.empty());
         Map<String, String> fallbacks = definition.getFallbacks().stream()
-            .collect(Collectors.toMap(fb -> fb.getPlaceholder(), fb -> fb.getFallbackText()));
+            .collect(Collectors.toMap(ChatCommandFallback::getPlaceholder, ChatCommandFallback::getFallbackText));
         Map<String, String> settings = (user == null ? List.<ChatCommandSetting>of() : settingRepository.findByUser(user)).stream()
             .collect(Collectors.toMap(ChatCommandSetting::getKey, ChatCommandSetting::getValue));
 

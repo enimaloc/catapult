@@ -1,0 +1,338 @@
+package fr.enimaloc.catapult.api.channel;
+
+import fr.enimaloc.catapult.common.dto.channel.BindingDto;
+import fr.enimaloc.catapult.common.dto.channel.CclDto;
+import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
+import fr.enimaloc.catapult.common.dto.channel.ChannelUserDto;
+import fr.enimaloc.catapult.common.dto.channel.DtddMappingCurrentDto;
+import fr.enimaloc.catapult.common.dto.channel.DtddMappingProposalDto;
+import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
+import fr.enimaloc.catapult.common.dto.channel.GameDto;
+import fr.enimaloc.catapult.common.dto.channel.MinecraftData;
+import fr.enimaloc.catapult.common.dto.channel.ObsData;
+import fr.enimaloc.catapult.common.dto.channel.TwitchatData;
+import fr.enimaloc.catapult.common.dto.channel.PagedBindings;
+import fr.enimaloc.catapult.common.dto.channel.StatusData;
+import fr.enimaloc.catapult.common.dto.channel.SteamData;
+import fr.enimaloc.catapult.common.dto.channel.TwDto;
+import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
+import fr.enimaloc.catapult.common.dto.channel.XboxData;
+import fr.enimaloc.catapult.domain.account.OAuthToken;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserSettings;
+import fr.enimaloc.catapult.domain.binding.GameBinding;
+import fr.enimaloc.catapult.domain.dtdd.DtddGameCache;
+import fr.enimaloc.catapult.domain.dtdd.DtddGameMapping;
+import fr.enimaloc.catapult.domain.dtdd.DtddMappingProposal;
+import fr.enimaloc.catapult.domain.twitch.TwitchCategoryCache;
+import fr.enimaloc.catapult.domain.twitchat.TwitchatWidgetSettings;
+import fr.enimaloc.catapult.getter.DetectedGame;
+import fr.enimaloc.catapult.getter.steam.SteamApiClient;
+import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
+import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
+import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
+import fr.enimaloc.catapult.repository.dtdd.DtddGameCacheRepository;
+import fr.enimaloc.catapult.repository.dtdd.DtddGameMappingRepository;
+import fr.enimaloc.catapult.repository.dtdd.DtddMappingProposalRepository;
+import fr.enimaloc.catapult.repository.tw.TwDefinitionRepository;
+import fr.enimaloc.catapult.repository.twitch.TwitchCategoryCacheRepository;
+import fr.enimaloc.catapult.security.TokenEncryptionService;
+import fr.enimaloc.catapult.service.binding.GameStateService;
+import fr.enimaloc.catapult.service.binding.RaidRestoreGateService;
+import fr.enimaloc.catapult.service.binding.StreamStateService;
+import fr.enimaloc.catapult.service.connections.SteamProfileDiagnostics;
+import fr.enimaloc.catapult.service.connections.SteamProfileDto;
+import fr.enimaloc.catapult.service.igdb.AdminCclService;
+import fr.enimaloc.catapult.api.CustomBindingViews;
+import fr.enimaloc.catapult.service.igdb.IgdbService;
+import fr.enimaloc.catapult.service.minecraft.MinecraftLinkStateService;
+import fr.enimaloc.catapult.service.notification.TwitchatWidgetSettingsService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Component;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+/**
+ * Builds what the channel dashboard shows (status, bindings page, settings, DTDD mapping) for
+ * a viewer already allowed on the channel — {@link ApiChannelDataController} only checks access.
+ */
+@Component
+@RequiredArgsConstructor
+public class ChannelDashboardAssembler {
+    static final int BINDINGS_PAGE_SIZE = 20;
+
+    private final GameBindingRepository gameBindingRepository;
+    private final UserSettingsRepository userSettingsRepository;
+    private final StreamStateService streamStateService;
+    private final GameStateService gameStateService;
+    private final AdminCclService adminCclService;
+    private final TwDefinitionRepository twDefinitionRepository;
+    private final TokenEncryptionService tokenEncryptionService;
+    private final Optional<SteamApiClient> steamApiClient;
+    private final SteamProfileDiagnostics steamDiagnostics;
+    private final IgdbService igdbService;
+    private final DtddGameMappingRepository dtddMappingRepo;
+    private final DtddGameCacheRepository dtddGameCacheRepo;
+    private final DtddMappingProposalRepository dtddProposalRepo;
+    private final OAuthTokenRepository oAuthTokenRepository;
+    // Only present when minecraft.enabled (the service is @ConditionalOnBooleanProperty).
+    private final Optional<MinecraftLinkStateService> minecraftLinkStates;
+    private final TwitchatWidgetSettingsService twitchatWidgetSettingsService;
+    private final RaidRestoreGateService raidRestoreGate;
+    private final CustomBindingViews customBindingViews;
+    private final TwitchCategoryCacheRepository twitchCategoryCache;
+
+    @Value("${xbox.enabled:false}")
+    private boolean xboxEnabled;
+
+    // --- status ----------------------------------------------------------------------------------
+
+    public StatusData status(UserAccount viewer, UserAccount channel, String username) {
+        return new StatusData(username, isOwner(viewer, channel), channel.isBotEnabled(),
+                streamStateService.isLive(channel), currentGame(channel).orElse(null));
+    }
+
+    // --- dashboard page --------------------------------------------------------------------------
+
+    /**
+     * The whole dashboard. Connection details (Steam diagnostics, Minecraft link, OBS) and the custom bindings are only
+     * filled in for the channel's owner; a provider that isn't available at all is null.
+     */
+    public ChannelPageData page(UserAccount viewer, UserAccount channel, String username,
+                                int page, String status, String source) {
+        boolean owner = isOwner(viewer, channel);
+        Optional<DetectedGame> detected = gameStateService.getLastKnownGame(channel);
+        Optional<UserSettings> settings = userSettingsRepository.findById(channel.getId());
+        // One read (or creation, on a first view) for both the OBS and the Twitchat parts
+        TwitchatWidgetSettings widget = owner ? twitchatWidgetSettingsService.getOrCreate(channel) : null;
+
+        return new ChannelPageData(
+                channelUser(channel),
+                username,
+                owner,
+                streamStateService.isLive(channel),
+                channel.isBotEnabled(),
+                detected.map(game -> toGameDto(channel, game)).orElse(null),
+                bindings(channel, page, status, source),
+                availableCcls(),
+                settings.map(UserSettings::getBlockedCcls).orElse(Set.of()),
+                availableTws(),
+                settings.map(UserSettings::getBlockedTws).orElse(Set.of()),
+                status,
+                source,
+                steamData(channel, owner),
+                xboxEnabled ? new XboxData(hasXboxToken(channel)) : null,
+                owner ? minecraftData(channel) : null,
+                owner ? obsData(widget) : null,
+                owner ? TwitchatData.of(widget.getTwitchatBranch()) : null,
+                owner ? customBindingViews.stateIfEnabled(channel) : null);
+    }
+
+    private static ChannelUserDto channelUser(UserAccount channel) {
+        return new ChannelUserDto(channel.getId().toString(), channel.getTwitchId(), channel.getTwitchUsername(),
+                channel.getProfileImageUrl());
+    }
+
+    /** One page of bindings, filtered by status (which wins; AUTO includes MAPPED) or source type. */
+    private PagedBindings bindings(UserAccount channel, int page, String status, String source) {
+        PageRequest request = PageRequest.of(page, BINDINGS_PAGE_SIZE);
+        Page<GameBinding> bindings;
+        if (status != null && !status.isBlank()) {
+            GameBinding.Status wanted = GameBinding.Status.valueOf(status.toUpperCase());
+            Set<GameBinding.Status> statuses = wanted == GameBinding.Status.AUTO
+                    ? Set.of(GameBinding.Status.AUTO, GameBinding.Status.MAPPED)
+                    : Set.of(wanted);
+            bindings = gameBindingRepository.findByUserAndStatusIn(channel, statuses, request);
+        } else if (source != null && !source.isBlank()) {
+            bindings = gameBindingRepository.findByUserAndSourceType(
+                    channel, GameBinding.SourceType.valueOf(source.toUpperCase()), request);
+        } else {
+            bindings = gameBindingRepository.findByUser(channel, request);
+        }
+        Map<String, String> boxArts = boxArts(bindings.getContent());
+        List<BindingDto> content = bindings.getContent().stream()
+                .map(binding -> toBindingDto(binding, boxArts.get(binding.getTwitchGameId())))
+                .toList();
+        return new PagedBindings(bindings.getNumber(), bindings.getTotalPages(), bindings.getTotalElements(), content);
+    }
+
+    /** The page's categories' box arts, by Twitch category id, as the category cache knows them (one query). */
+    private Map<String, String> boxArts(List<GameBinding> bindings) {
+        Set<String> ids = bindings.stream().map(GameBinding::getTwitchGameId).filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (ids.isEmpty()) return Map.of();
+        return twitchCategoryCache.findAllById(ids).stream()
+                .filter(category -> category.getBoxArtUrl() != null && !category.getBoxArtUrl().isBlank())
+                .collect(Collectors.toMap(TwitchCategoryCache::getId, TwitchCategoryCache::getBoxArtUrl));
+    }
+
+    private static BindingDto toBindingDto(GameBinding binding, String boxArtUrl) {
+        return new BindingDto(binding.getId().toString(), binding.getStatus().name(), binding.getSourceType().name(),
+                binding.getSourceName(), binding.getTwitchGameId(), binding.getTwitchGameName(), binding.isIgnored(),
+                binding.isCclEnabled(), binding.getCcls(), binding.isTwEnabled(), binding.isTwOverride(),
+                binding.getTws(), boxArtUrl);
+    }
+
+    /** Steam state, null without Steam; only the owner's profile is probed live. */
+    private SteamData steamData(UserAccount channel, boolean owner) {
+        if (!steamDiagnostics.available()) {
+            return null;
+        }
+        SteamProfileDto steam = steamDiagnostics.snapshot(channel, owner);
+        return new SteamData(steam.hasSteam(), steam.hasPersonalToken(), steam.tokenShared(), steam.profilePrivate(),
+                steam.rateLimited(), steam.offlineMode(), steam.ttlMinutes());
+    }
+
+    private boolean hasXboxToken(UserAccount channel) {
+        return oAuthTokenRepository.findByUserAndProvider(channel, OAuthToken.Provider.XBOX).isPresent();
+    }
+
+    /**
+     * The Minecraft link as the connect endpoint states it (FULL included), null without
+     * Minecraft or when it's {@link MinecraftLinkStateService#UNAVAILABLE unavailable} to the
+     * channel: the card then has nothing to offer.
+     */
+    private MinecraftData minecraftData(UserAccount channel) {
+        return minecraftLinkStates
+                .map(service -> service.state(channel))
+                .filter(state -> !MinecraftLinkStateService.UNAVAILABLE.equals(state.status()))
+                .map(state -> new MinecraftData(state.status(), state.minecraftName(), state.serviceAccountUsername()))
+                .orElse(null);
+    }
+
+    /** The Twitchat relay's OBS settings, without the password itself. */
+    private static ObsData obsData(TwitchatWidgetSettings settings) {
+        return new ObsData(settings.isEnabled(), settings.getObsHost(), settings.getObsPort(),
+                settings.getObsPasswordEncrypted() != null);
+    }
+
+    // --- settings --------------------------------------------------------------------------------
+
+    /** The channel's settings, defaults when it never saved any. */
+    public UserSettingsDto settings(UserAccount channel) {
+        UserSettings settings = userSettingsRepository.findById(channel.getId()).orElseGet(() -> {
+            UserSettings defaults = new UserSettings();
+            defaults.setUserId(channel.getId());
+            return defaults;
+        });
+        return new UserSettingsDto(
+                settings.isCclFeatureEnabled(),
+                settings.getBlockedCcls(),
+                settings.getNoGameTwitchGameId(),
+                settings.getNoGameTwitchGameName(),
+                settings.getNoGameCcls(),
+                settings.isApplyDefaultOnStreamStart(),
+                settings.isApplyDefaultOnNoGame(),
+                settings.isApplyDefaultOnStreamEnd(),
+                settings.getIncompleteFallbackTwitchGameId(),
+                settings.getIncompleteFallbackTwitchGameName(),
+                settings.getIncompleteFallbackCcls(),
+                availableCcls(),
+                settings.isTwFeatureEnabled(),
+                settings.getBlockedTws(),
+                availableTws(),
+                settings.getRaidRestoreGameMinutes(),
+                // Asked of the channel's owner, whose raids it acts on (and who it may enrol)
+                raidRestoreGate.isAvailableFor(channel));
+    }
+
+    // --- DTDD mapping ----------------------------------------------------------------------------
+
+    /**
+     * The DTDD mapping of the game the channel is playing, as {@code viewer} sees it: the
+     * current mapping, their own pending proposal, and whether they may validate it directly
+     * (an admin, on an unverified mapping nobody else has a proposal pending on).
+     */
+    public DtddMappingStatusDto dtddMapping(UserAccount viewer, UserAccount channel, boolean viewerIsAdmin) {
+        Optional<String> igdbId = gameStateService.getLastKnownGame(channel)
+                .flatMap(this::igdbGame)
+                .map(IgdbService.IgdbGame::id);
+        if (igdbId.isEmpty()) {
+            return new DtddMappingStatusDto(null, null, false, null);
+        }
+        String id = igdbId.get();
+
+        Optional<DtddGameMapping> mapping = dtddMappingRepo.findById(id);
+        Optional<DtddMappingProposal> myProposal = dtddProposalRepo
+                .findFirstByProposerAndIgdbIdAndStatus(viewer, id, DtddMappingProposal.Status.PENDING);
+        long pendingProposals = dtddProposalRepo.countByIgdbIdAndStatus(id, DtddMappingProposal.Status.PENDING);
+        boolean canValidate = viewerIsAdmin
+                && mapping.isPresent() && !mapping.get().isVerified() && pendingProposals == 0;
+
+        DtddMappingCurrentDto current = mapping.map(m -> new DtddMappingCurrentDto(
+                m.getDtddId(), dtddName(m.getDtddId()), m.getConfidence(), m.isVerified())).orElse(null);
+        DtddMappingProposalDto pending = myProposal.map(p ->
+                new DtddMappingProposalDto(p.getId(), p.getProposedDtddId(), p.getReason())).orElse(null);
+
+        return new DtddMappingStatusDto(current, pending, canValidate, id, viewerIsAdmin);
+    }
+
+    /** IGDB entry of a detected game: by app id for Steam games, by name otherwise. */
+    private Optional<IgdbService.IgdbGame> igdbGame(DetectedGame game) {
+        return game.getSourceType() == GameBinding.SourceType.STEAM
+                ? igdbService.findBySteamAppId(game.getSourceId())
+                : igdbService.findByName(game.getSourceName());
+    }
+
+    private String dtddName(Long dtddId) {
+        return dtddId == null ? null : dtddGameCacheRepo.findById(dtddId).map(DtddGameCache::getName).orElse(null);
+    }
+
+    // --- Steam profile cache ---------------------------------------------------------------------
+
+    /** Forgets the channel's cached Steam profile, so the next read asks Steam again. */
+    public void refreshSteamProfileCache(UserAccount channel) {
+        if (channel.getSteamId() == null) {
+            return;
+        }
+        String personalToken = channel.getSteamPersonalToken() != null
+                ? tokenEncryptionService.decrypt(channel.getSteamPersonalToken()) : null;
+        steamApiClient.ifPresent(client -> client.invalidateProfileCache(channel.getSteamId(), personalToken));
+    }
+
+    // --- shared ----------------------------------------------------------------------------------
+
+    private static boolean isOwner(UserAccount viewer, UserAccount channel) {
+        return viewer.getId().equals(channel.getId());
+    }
+
+    private Optional<GameDto> currentGame(UserAccount channel) {
+        return gameStateService.getLastKnownGame(channel).map(game -> toGameDto(channel, game));
+    }
+
+    /** The channel's binding for the game it plays now, absent when no game is detected or none is bound to it. */
+    public Optional<BindingDto> currentBinding(UserAccount channel) {
+        return gameStateService.getLastKnownGame(channel)
+                .flatMap(game -> gameBindingRepository
+                        .findByUserAndSourceIdAndSourceType(channel, game.getSourceId(), game.getSourceType()))
+                .map(binding -> toBindingDto(binding, boxArts(List.of(binding)).get(binding.getTwitchGameId())));
+    }
+
+    /** The detected game, with the id of the channel's binding for it when there is one. */
+    private GameDto toGameDto(UserAccount channel, DetectedGame game) {
+        String bindingId = gameBindingRepository
+                .findByUserAndSourceIdAndSourceType(channel, game.getSourceId(), game.getSourceType())
+                .map(binding -> binding.getId().toString())
+                .orElse(null);
+        return new GameDto(bindingId, game.getSourceName(), game.getSourceType().name());
+    }
+
+    private List<CclDto> availableCcls() {
+        return adminCclService.getAllCcls().stream().map(c -> new CclDto(c.getId(), c.getName())).toList();
+    }
+
+    private List<TwDto> availableTws() {
+        return twDefinitionRepository.findAllByEnabledTrueOrderBySortOrderAscIdAsc().stream()
+                .map(t -> new TwDto(t.getId(), t.getLabel()))
+                .toList();
+    }
+}

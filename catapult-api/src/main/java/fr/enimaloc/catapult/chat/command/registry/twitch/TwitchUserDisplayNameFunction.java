@@ -1,8 +1,9 @@
 package fr.enimaloc.catapult.chat.command.registry.twitch;
 
 import fr.enimaloc.catapult.chat.command.registry.ServiceFunction;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.service.TwitchChatService;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.service.twitch.TwitchChatService;
+import fr.enimaloc.catapult.service.twitch.TwitchUserProfile;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -32,6 +33,6 @@ public class TwitchUserDisplayNameFunction implements ServiceFunction {
     @Override
     public Object invoke(UserAccount user, Object[] args) {
         String login = String.valueOf(args[0]);
-        return twitchChatService.getUserProfile(user, login).map(p -> p.displayName()).orElse("");
+        return twitchChatService.getUserProfile(user, login).map(TwitchUserProfile::displayName).orElse("");
     }
 }

@@ -1,9 +1,9 @@
 package fr.enimaloc.catapult.experiment.provider;
 
 import fr.enimaloc.catapult.config.ExperimentProviderProperties;
-import fr.enimaloc.catapult.domain.Experiment;
-import fr.enimaloc.catapult.domain.ExperimentVariant;
-import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.experiment.Experiment;
+import fr.enimaloc.catapult.domain.experiment.ExperimentVariant;
 import growthbook.sdk.java.GrowthBook;
 import growthbook.sdk.java.model.GBContext;
 import lombok.extern.slf4j.Slf4j;

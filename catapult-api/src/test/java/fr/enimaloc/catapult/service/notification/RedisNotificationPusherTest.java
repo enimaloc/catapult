@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.service.notification;
 
-import fr.enimaloc.catapult.domain.Notification;
+import fr.enimaloc.catapult.common.dto.notification.NotificationDto;
+import fr.enimaloc.catapult.common.dto.notification.Severity;
 import fr.enimaloc.catapult.event.NotificationAllReadEvent;
 import fr.enimaloc.catapult.event.NotificationCreatedEvent;
 import fr.enimaloc.catapult.event.NotificationDeletedEvent;
@@ -28,7 +29,7 @@ class RedisNotificationPusherTest {
         UUID u1 = UUID.randomUUID();
         UUID u2 = UUID.randomUUID();
         NotificationDto dto = new NotificationDto(UUID.randomUUID(), "T", "<p>B</p>",
-                Notification.Severity.INFO, null, null, null, Instant.now(), false);
+                Severity.INFO, null, null, null, Instant.now(), false);
         NotificationCreatedEvent ev = new NotificationCreatedEvent(this, List.of(u1, u2), dto);
 
         pusher.onCommitted(ev);
@@ -72,5 +73,20 @@ class RedisNotificationPusherTest {
 
         verify(publisher).publishUser(userId, "notification.deleted",
                 Map.of("notificationId", notifId.toString(), "unreadCount", 2L));
+    }
+
+    @Test
+    void onDeliveryPending_publishesTheIds_inChunksOf500() {
+        RedisNotificationPusher pusher = new RedisNotificationPusher(publisher);
+        List<UUID> ids = java.util.stream.Stream.generate(UUID::randomUUID).limit(1001).toList();
+
+        pusher.onDeliveryPending(new fr.enimaloc.catapult.event.NotificationDeliveryPendingEvent(ids));
+
+        verify(publisher).publishNotificationDelivery("notification.delivery.pending",
+                new fr.enimaloc.catapult.common.event.ChannelEvents.NotificationDeliveryPending(ids.subList(0, 500)));
+        verify(publisher).publishNotificationDelivery("notification.delivery.pending",
+                new fr.enimaloc.catapult.common.event.ChannelEvents.NotificationDeliveryPending(ids.subList(500, 1000)));
+        verify(publisher).publishNotificationDelivery("notification.delivery.pending",
+                new fr.enimaloc.catapult.common.event.ChannelEvents.NotificationDeliveryPending(ids.subList(1000, 1001)));
     }
 }

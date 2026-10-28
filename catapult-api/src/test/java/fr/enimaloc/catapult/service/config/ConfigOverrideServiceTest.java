@@ -1,12 +1,12 @@
 package fr.enimaloc.catapult.service.config;
 
 import fr.enimaloc.catapult.config.DatabaseOverridePropertySource;
-import fr.enimaloc.catapult.domain.ConfigAudit;
-import fr.enimaloc.catapult.domain.ConfigOverride;
-import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.config.ConfigAudit;
+import fr.enimaloc.catapult.domain.config.ConfigOverride;
 import fr.enimaloc.catapult.event.ConfigOverrideAppliedEvent;
-import fr.enimaloc.catapult.repository.ConfigAuditRepository;
-import fr.enimaloc.catapult.repository.ConfigOverrideRepository;
+import fr.enimaloc.catapult.repository.config.ConfigAuditRepository;
+import fr.enimaloc.catapult.repository.config.ConfigOverrideRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,7 +23,6 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -212,5 +211,37 @@ class ConfigOverrideServiceTest {
         ArgumentCaptor<ConfigAudit> auCap = ArgumentCaptor.forClass(ConfigAudit.class);
         verify(auditRepo).save(auCap.capture());
         assertThat(auCap.getValue().getModule()).isEqualTo("web");
+    }
+
+    @Test
+    void moduleOverrides_withholdsASecretsValue() {
+        ConfigOverride plain = new ConfigOverride();
+        plain.setModule("web");
+        plain.setKey("web.feature.foo");
+        plain.setValue("true");
+        plain.setSecret(false);
+        ConfigOverride secret = new ConfigOverride();
+        secret.setModule("web");
+        secret.setKey("web.some.secret");
+        secret.setValue("hunter2");
+        secret.setSecret(true);
+        when(overrideRepo.findByIdModule("web")).thenReturn(List.of(plain, secret));
+
+        assertThat(service.moduleOverrides("web"))
+                .extracting(o -> o.key(), o -> o.value(), o -> o.secret())
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple("web.feature.foo", "true", false),
+                        org.assertj.core.groups.Tuple.tuple("web.some.secret", null, true));
+    }
+
+    @Test
+    void audit_readsTheHistoryOfTheKeyAndOfTheModulesKey() {
+        ConfigAudit api = new ConfigAudit();
+        ConfigAudit web = new ConfigAudit();
+        when(auditRepo.findByKeyOrderByChangedAtDesc("app.foo")).thenReturn(List.of(api));
+        when(auditRepo.findByModuleAndKeyOrderByChangedAtDesc("web", "web.feature.foo")).thenReturn(List.of(web));
+
+        assertThat(service.audit("app.foo")).containsExactly(api);
+        assertThat(service.audit("web", "web.feature.foo")).containsExactly(web);
     }
 }

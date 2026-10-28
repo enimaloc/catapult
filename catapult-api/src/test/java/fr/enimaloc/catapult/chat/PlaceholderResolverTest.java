@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.chat;
 
-import fr.enimaloc.catapult.domain.GameBinding;
+import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
@@ -268,8 +268,7 @@ class PlaceholderResolverTest {
         // CommandDslParser#bareTagWithoutHashIsAVarRefNotAContextGet — a later bare {game} tag
         // reads that variable, not a "game" context path (which doesn't exist; only "game#name"
         // etc. do). Reproduced from a save that failed with "Unknown placeholders: game" for
-        // {var game = arg(0, "")}{if igdb#getGame(game).id != ""}{catapult#setGame(game,
-        // igdb#getGame(game).id)}Jeu mis à jour: {game}{else}{game} non trouvé{/if}.
+        // the template below (a !setgame-style command whose replies are in French).
         Set<String> unknown = resolver.findUnknownPaths(
             "{var game = arg(0, \"\")}"
             + "{if igdb#getGame(game).id != \"\"}"

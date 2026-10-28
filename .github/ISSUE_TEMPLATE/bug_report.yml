@@ -1,6 +1,6 @@
 name: 🐛 Bug report
 description: Signaler un comportement inattendu
-labels: ["bug"]
+labels: ["bug", "needs-triage"]
 body:
   - type: textarea
     id: description
@@ -22,16 +22,18 @@ body:
       required: true
 
   - type: dropdown
-    id: module
+    id: area
     attributes:
-      label: Module concerné
+      label: Domaine
+      description: "Le domaine correspond au label `area: …` que le mainteneur posera."
       options:
-        - catapult-api
-        - catapult-web
-        - catapult-maintenance
-        - nginx-router
-        - Chat commands
-        - Admin / CCL
+        - "area: api"
+        - "area: web"
+        - "area: obs"
+        - "area: twitch"
+        - "area: twitchat"
+        - "area: chat-commands"
+        - "area: ci"
         - Autre / inconnu
     validations:
       required: true
@@ -40,7 +42,8 @@ body:
     id: version
     attributes:
       label: Version de Catapult
-      placeholder: ex. 0.2.3-BETA
+      description: Visible dans le pied de page du site ou dans le tag de l'image Docker.
+      placeholder: ex. v1.0.0-BETA.97
     validations:
       required: false
 

@@ -1,7 +1,8 @@
 package fr.enimaloc.catapult.experiment;
 
-import fr.enimaloc.catapult.domain.ExperimentAssignmentRule;
-import fr.enimaloc.catapult.domain.ExperimentOverride;
+import fr.enimaloc.catapult.domain.experiment.Experiment;
+import fr.enimaloc.catapult.domain.experiment.ExperimentAssignmentRule;
+import fr.enimaloc.catapult.domain.experiment.ExperimentOverride;
 import org.springframework.stereotype.Component;
 
 import java.lang.annotation.*;
@@ -14,10 +15,10 @@ import java.lang.annotation.*;
  * <pre>{@code
  * @ExperimentSpec(
  *     key  = "new-sidebar",
- *     name = "Nouveau design sidebar",
+ *     name = "New sidebar design",
  *     variants = {
- *         @ExperimentSpec.Variant(key = "control",      name = "Actuelle",     weight = 50, control = true),
- *         @ExperimentSpec.Variant(key = "variant-left", name = "Bot à gauche", weight = 50)
+ *         @ExperimentSpec.Variant(key = "control",      name = "Current",      weight = 50, control = true),
+ *         @ExperimentSpec.Variant(key = "variant-left", name = "Bot on the left", weight = 50)
  *     },
  *     rules = @ExperimentSpec.Rule(type = RuleType.MANUAL)
  * )
@@ -43,6 +44,9 @@ public @interface ExperimentSpec {
     Rule[] rules() default {};
 
     Override[] overrides() default {};
+
+    /** Status the experiment is created with when no record with this key exists yet. */
+    Experiment.Status initialStatus() default Experiment.Status.DRAFT;
 
     @Retention(RetentionPolicy.RUNTIME)
     @Target({})

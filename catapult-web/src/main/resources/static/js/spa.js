@@ -1,0 +1,384 @@
+const app = document.querySelector("#app");
+const progress = document.querySelector("#nav-progress");
+const navChannels = document.querySelector("#nav-channels");
+// Twitch tells no one when a member becomes or stops being a moderator: the navbar catches up
+// now and then, and when its tab comes back after a while.
+const NAV_REFRESH_MS = 5 * 60_000;
+const NAV_STALE_MS = 60_000;
+let navLoadedAt = 0;
+let navMarkup = null;
+// Bumped by each live patch: a response that began before one holds a stale ring.
+let navPatches = 0;
+
+const config = window.Catapult;
+
+const routes = Object.fromEntries(
+    config.spa.map(route => [
+        route.id,
+        route
+    ])
+);
+
+function updateActiveLink(path) {
+    document.querySelectorAll("a[data-link]").forEach(a => {
+        const href = new URL(a.href).pathname.replace(/^\/+|\/+$/g, "");
+        a.classList.toggle("active", href === path);
+    });
+}
+
+// Static pages match `path` against a route id exactly. A `dynamic` route (e.g.
+// "channel") additionally matches "<id>/<param>" — the param is appended as its
+// own path segment to templateUrl, mirroring the server's own
+// /spa/<id>/{param} mapping.
+function resolveRoute(path) {
+    if (routes[path]) {
+        return { route: routes[path], param: null };
+    }
+    const segments = path.split("/");
+    if (segments.length === 2) {
+        const base = routes[segments[0]];
+        if (base && base.dynamic && segments[1]) {
+            return { route: base, param: segments[1] };
+        }
+    }
+    return { route: undefined, param: null };
+}
+
+/** The address bar's URL of the SPA path `path` (no leading slash, "" for the landing page). */
+function urlOf(path, search = "") {
+    return (path === "" ? "/" : `/${path}`) + search;
+}
+
+// Bumped by every navigation: a slower earlier one never swaps its page over a later one's.
+let generation = 0;
+
+// The pages already fetched, by URL, the latest last: going back to one shows it at once, then checks it against
+// the server (see navigate). Bounded in count and in size, the channel page weighing far more than the others.
+const PAGES_KEPT = 20;
+const PAGES_KEPT_CHARS = 4_000_000;
+// A page fetched this recently (just visited, or prefetched) is shown without asking the server again.
+const PAGE_FRESH_MS = 10_000;
+const pages = new Map();
+// The fetches under way, by URL: a navigation joins the one a prefetch started.
+const loading = new Map();
+// Bumped by forget(): a page fetched before a change is never kept.
+let forgotten = 0;
+
+function keep(url, html) {
+    pages.delete(url);
+    pages.set(url, { html, at: Date.now() });
+    let chars = 0;
+    for (const page of pages.values()) chars += page.html.length;
+    for (const [oldest, page] of pages) {
+        if (pages.size <= PAGES_KEPT && chars <= PAGES_KEPT_CHARS) break;
+        pages.delete(oldest);
+        chars -= page.html.length;
+    }
+}
+
+/**
+ * Fetches the fragment at `url` (or joins the fetch under way), keeping it when it is a page the member may see
+ * again: answered, and not redirected (to the login page, say). Resolves to { response, html }. A `prefetch` says
+ * so (Purpose: prefetch), for the server not to count a view the member may never have.
+ */
+function fetchPage(url, prefetch = false) {
+    let pending = loading.get(url);
+    if (!pending) {
+        const epoch = forgotten;
+        pending = (prefetch ? fetch(url, { headers: { Purpose: "prefetch" } }) : fetch(url))
+            .then(async response => {
+                const html = await response.text();
+                if (response.ok && !response.redirected && epoch === forgotten) keep(url, html);
+                return { response, html };
+            })
+            .finally(() => {
+                if (loading.get(url) === pending) loading.delete(url);
+            });
+        loading.set(url, pending);
+    }
+    return pending;
+}
+
+/** Drops the pages kept: an action changed something any of them may show (csrf.js calls it after each one). */
+function forget() {
+    forgotten++;
+    pages.clear();
+    loading.clear();
+}
+
+/** The fragment URL of the SPA path `path`. */
+function fragmentUrl(path, search = "") {
+    const { route, param } = resolveRoute(path);
+    const templateUrl = route
+        ? (param ? `${route.templateUrl}/${param}` : route.templateUrl)
+        : `/spa/${path}`;
+    return templateUrl + search;
+}
+
+/** Whether the member is typing in the page: a newer version of it must not take that away. */
+function typing() {
+    const focused = document.activeElement;
+    return !!focused && app.contains(focused)
+        && focused.matches("input, textarea, select, [contenteditable], mdui-text-field, mdui-select");
+}
+
+/**
+ * Shows the SPA page `path`. One already kept is shown at once and, unless just fetched, replaced by the server's
+ * when that differs (the member left it typing aside). `fresh` asks the server first, never what was kept.
+ */
+async function navigate(path, push = true, search = "", { fresh = false } = {}) {
+    const current = ++generation;
+    const url = fragmentUrl(path, search);
+
+    const kept = fresh ? undefined : pages.get(url);
+    if (kept) {
+        show(path, push, search, kept.html, true);
+        if (Date.now() - kept.at < PAGE_FRESH_MS) return;
+        let page;
+        try {
+            page = await fetchPage(url);
+        } catch {
+            return; // what was kept stays
+        }
+        if (!page.response.ok) pages.delete(url);
+        if (current !== generation || page.html === kept.html || typing()) return;
+        app.innerHTML = page.html;
+        document.dispatchEvent(new CustomEvent("catapult:render"));
+        return;
+    }
+
+    progress.hidden = false;
+
+    let page;
+    try {
+        page = await fetchPage(url);
+    } catch {
+        // Network failure (offline, timeout, ...): fall back to a full
+        // navigation so the browser's own error handling takes over.
+        if (current === generation) window.location.href = urlOf(path, search);
+        return;
+    } finally {
+        if (current === generation) progress.hidden = true;
+    }
+    if (current !== generation) return;
+
+    show(path, push, search, page.html, page.response.ok);
+}
+
+/** Swaps the page `path`'s `html` in, as the address bar's, and tells the fragment scripts. */
+function show(path, push, search, html, ok) {
+    app.innerHTML = html;
+
+    // Before the render: its listeners read the page's channel off location (CatapultChannel.username()).
+    if (push) {
+        history.pushState(
+            {
+                spa: true,
+                path
+            },
+            "",
+            urlOf(path, search)
+        );
+    }
+    document.dispatchEvent(new CustomEvent("catapult:render"));
+
+    if (!ok) {
+        // Server-side error (unknown page or fragment failure): the
+        // response body is the error fragment (see ErrorPageController
+        // and SpaFragmentController#unknown), render it in place
+        // instead of reloading the whole page.
+        return;
+    }
+
+    // A dynamic page's title names its param (page.title.channel={0} - Catapult).
+    const { route, param } = resolveRoute(path);
+    document.title = config.titles[route?.id]?.replace("{0}", param ?? "") ?? document.title;
+    updateActiveLink(path);
+
+    window.scrollTo({
+        top: 0,
+        behavior: "instant"
+    });
+}
+
+function currentPath() {
+    return location.pathname.replace(/^\/+|\/+$/g, "");
+}
+
+// Prefetching: the page of a link the member points at (hovered a moment, focused or pressed) is fetched before the
+// click lands, and a static page's link on screen once the browser is idle; never to save data. A channel's is too
+// costly to fetch for every one the navbar lists: only when pointed at.
+const PREFETCH_HOVER_MS = 65;
+const PREFETCH_ON_SCREEN = 6;
+
+/** Fetches the page `href` names ahead, unless it is not one of the SPA's, open, or kept and fresh. */
+function prefetch(href) {
+    if (navigator.connection?.saveData) return;
+    const url = new URL(href, location.href);
+    if (url.origin !== location.origin) return;
+    const path = url.pathname.replace(/^\/+|\/+$/g, "");
+    if (!resolveRoute(path).route || (path === currentPath() && url.search === location.search)) return;
+    const fragment = fragmentUrl(path, url.search);
+    const kept = pages.get(fragment);
+    if ((kept && Date.now() - kept.at < PAGE_FRESH_MS) || loading.has(fragment)) return;
+    fetchPage(fragment, true).catch(() => {});
+}
+
+/** The SPA link `event` happened on, through shadow roots (see the click handler). */
+function linkOf(event) {
+    const el = event.composedPath().find(node => node instanceof Element && node.hasAttribute("data-link"));
+    return el?.getAttribute("href") && !el.hasAttribute("download") ? el : null;
+}
+
+let hovered = null;
+let hoverTimer = 0;
+document.addEventListener("pointerover", event => {
+    const link = linkOf(event);
+    if (link === hovered) return;
+    clearTimeout(hoverTimer);
+    hovered = link;
+    if (link) hoverTimer = setTimeout(() => prefetch(link.getAttribute("href")), PREFETCH_HOVER_MS);
+});
+for (const type of ["pointerdown", "focusin"]) {
+    document.addEventListener(type, event => {
+        const link = linkOf(event);
+        if (link) prefetch(link.getAttribute("href"));
+    });
+}
+
+function whenIdle(callback) {
+    if (window.requestIdleCallback) window.requestIdleCallback(callback);
+    else setTimeout(callback, 200);
+}
+let onScreen = null;
+
+/** Watches the static pages' links on screen, after each render, prefetching the first few seen. */
+function prefetchOnScreen() {
+    onScreen?.disconnect();
+    if (!("IntersectionObserver" in window)) return;
+    let left = PREFETCH_ON_SCREEN;
+    onScreen = new IntersectionObserver(entries => {
+        for (const entry of entries) {
+            if (!entry.isIntersecting || left <= 0) continue;
+            onScreen.unobserve(entry.target);
+            left--;
+            const href = entry.target.getAttribute("href");
+            whenIdle(() => prefetch(href));
+        }
+    });
+    for (const link of document.querySelectorAll("[data-link][href]")) {
+        const path = new URL(link.getAttribute("href"), location.href).pathname.replace(/^\/+|\/+$/g, "");
+        if (resolveRoute(path).route?.dynamic === false) onScreen.observe(link);
+    }
+}
+
+document.addEventListener("catapult:render", prefetchOnScreen);
+
+/**
+ * Fills the navbar with the member's channels (absent when logged out). Fetched once the page
+ * is on its way rather than rendered with it: the page never waits on catapult-api for them.
+ * The list is only rewritten when it differs from what was last fetched, unless {@code force}d
+ * (the server said it changed).
+ */
+async function loadNavChannels(force = false) {
+    if (!navChannels) {
+        return;
+    }
+    const patchesAtStart = navPatches;
+    try {
+        const response = await fetch("/spa/nav-channels");
+        if (!response.ok) {
+            return;
+        }
+        const markup = await response.text();
+        const stale = navPatches !== patchesAtStart;
+        if (force || (!stale && markup !== navMarkup)) {
+            navChannels.innerHTML = markup;
+            // A stale response is never the reference: the next poll rewrites.
+            navMarkup = stale ? null : markup;
+        }
+        navLoadedAt = Date.now();
+    } catch {
+        return; // the navbar just stays without them
+    }
+    // The full path, not config.page: a dynamic page's id ("channel") lacks its param.
+    updateActiveLink(currentPath());
+}
+
+/**
+ * Keeps the navbar current from /events/nav (NavEventStreamController): a channel going live or
+ * offline flips its ring, a change of the list reloads it.
+ */
+function listenNavChannels() {
+    if (!navChannels) {
+        return;
+    }
+    // A reconnection (e.g. the server restarted) may have missed events, and the server
+    // its record of this navbar: reloading it catches up on both.
+    CatapultLive.onReopen(() => loadNavChannels(true));
+    CatapultLive.on("NavChannelsChanged", () => loadNavChannels(true));
+    CatapultLive.on("NavChannelLive", ({ username, live }) => {
+        // The ring is part of the markup: the DOM no longer matches what was last fetched.
+        navMarkup = null;
+        navPatches++;
+        [...navChannels.querySelectorAll(".nav-channel")]
+            .find(a => a.getAttribute("href") === `/channel/${username}`)
+            ?.classList.toggle("live", live);
+    });
+    setInterval(() => {
+        if (!document.hidden) loadNavChannels();
+    }, NAV_REFRESH_MS);
+    document.addEventListener("visibilitychange", () => {
+        if (!document.hidden && Date.now() - navLoadedAt > NAV_STALE_MS) loadNavChannels();
+    });
+}
+
+// The router's public surface, for the per-fragment scripts (channel-page.js's refresh()).
+window.CatapultSpa = { navigate, resolveRoute, loadNavChannels, urlOf, forget };
+
+updateActiveLink(currentPath());
+loadNavChannels();
+listenNavChannels();
+
+document.addEventListener("click", event => {
+    // composedPath() (rather than event.target) is required here: for a
+    // click inside a web component's shadow DOM (e.g. <mdui-button href>),
+    // event.target is retargeted to the component itself, which isn't an
+    // <a> and wouldn't match a plain `a[data-link]` selector.
+    // What the browser does itself is left to it: a new tab or window (modifier, middle click,
+    // target), a download, or a click a handler already took care of.
+    if (event.defaultPrevented || event.button !== 0
+        || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+        return;
+    }
+    const el = linkOf(event);
+    const href = el?.getAttribute("href");
+    if (!href) {
+        return;
+    }
+    const target = el.getAttribute("target");
+    if (target && target !== "_self") {
+        return;
+    }
+
+    const url = new URL(href, window.location.href);
+    if (url.origin !== window.location.origin) {
+        return;
+    }
+
+    event.preventDefault();
+    navigate(url.pathname.replace(/^\/+|\/+$/g, ""), true, url.search);
+});
+
+window.addEventListener("popstate", () => {
+    navigate(currentPath(), false, window.location.search);
+});
+
+// spa.js is loaded without defer/async, before the per-fragment scripts that follow it
+// in index.html (channel-status.js and friends) — those haven't registered their
+// "catapult:render" listeners yet when this line runs, so the dispatch must wait until
+// the whole document (all script tags included) has finished parsing, not just until
+// spa.js itself has executed. DOMContentLoaded fires after every script tag has run.
+document.addEventListener("DOMContentLoaded", () => {
+    document.dispatchEvent(new CustomEvent("catapult:render"));
+});

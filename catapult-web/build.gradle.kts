@@ -2,7 +2,7 @@ import java.time.Instant
 
 plugins {
     java
-    id("org.springframework.boot") version "4.0.4"
+    id("org.springframework.boot") version "4.1.2"
     id("io.spring.dependency-management") version "1.1.7"
 }
 
@@ -20,30 +20,27 @@ configurations {
     }
 }
 
-val chartjsVersion = "4.4.9"
-val htmxVersion = "2.0.4"
-val blocklyVersion = "10.4.1" // latest version published on the webjars.npm mirror at time of writing
-
 dependencies {
+    implementation(project(":catapult-common"))
+
+    implementation("org.mvnpm:mdui:2.1.4")
+    // The version springdoc gives catapult-api; ApiDocsAssets.SWAGGER_UI_VERSION names it in the page's paths.
+    implementation("org.webjars:swagger-ui:5.34.0")
+    // The avatars' WebP encoder (AvatarImages): libwebp, bundled for glibc, hence the Debian-based image.
+    implementation("com.github.usefulness:webp-imageio:0.11.0")
+
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
+    implementation("org.springframework.boot:spring-boot-starter-restclient")
     implementation("org.springframework.boot:spring-boot-starter-security")
+    implementation("org.springframework.boot:spring-boot-starter-session-data-redis")
     implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
-    implementation("org.springframework.boot:spring-boot-starter-websocket")
     implementation("org.springframework.boot:spring-boot-starter-validation")
-    // Used by HtmxWsDispatcher: MockHttpServletRequest/Response forwarded to DispatcherServlet.
-    implementation("org.springframework:spring-test")
-    implementation("com.github.ben-manes.caffeine:caffeine")
-    implementation("com.bucket4j:bucket4j-core:8.10.1")
-    implementation("org.thymeleaf.extras:thymeleaf-extras-springsecurity6")
-    implementation("org.webjars.npm:chart.js:$chartjsVersion")
-    implementation("org.webjars.npm:htmx.org:$htmxVersion")
-    // Served from the classpath (not a CDN) to match this project's self-hosted static asset
-    // convention; used by the chat command editor's Blocks tab (Task 17).
-    implementation("org.webjars.npm:blockly:$blocklyVersion")
-    implementation("org.webjars:webjars-locator-lite")
     implementation("io.micrometer:micrometer-registry-prometheus")
+    implementation(platform("io.sentry:sentry-bom:8.60.0"))
+    implementation("io.sentry:sentry-spring-boot-4-starter")
+    implementation("io.sentry:sentry-logback")
 
     compileOnly("org.projectlombok:lombok")
     developmentOnly("org.springframework.boot:spring-boot-devtools")
@@ -56,11 +53,16 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
     testImplementation("org.testcontainers:testcontainers-junit-jupiter")
+    testImplementation("com.squareup.okhttp3:mockwebserver:5.4.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
 tasks.withType<Test> {
     useJUnitPlatform()
+    // VitestTest runs the browser scripts' suite: a JS-only change must not leave the task up to date.
+    inputs.dir("src/main/resources/static/js").withPropertyName("browserScripts")
+    inputs.dir("src/test/js").withPropertyName("browserScriptTests")
+    inputs.files("vitest.config.js", "package-lock.json").withPropertyName("vitestSetup")
 }
 
 springBoot {
@@ -109,4 +111,34 @@ springBoot {
             )
         }
     }
+}
+
+/*
+ * Browser-script unit tests (Vitest + jsdom, see vitest.config.js), part of `check`.
+ */
+val npmInstall = tasks.register<Exec>("npmInstall") {
+    description = "Installs the JS test toolchain from package-lock.json."
+    inputs.file("package-lock.json")
+    outputs.dir("node_modules")
+    commandLine("npm", "ci", "--no-fund", "--no-audit")
+}
+
+// VitestTest runs the suite from node_modules: a fresh checkout (CI) must install it first.
+tasks.named<Test>("test") {
+    dependsOn(npmInstall)
+}
+
+val jsTest = tasks.register<Exec>("jsTest") {
+    description = "Runs the browser-script unit tests with coverage."
+    group = "verification"
+    dependsOn(npmInstall)
+    inputs.files("vitest.config.js", "package-lock.json")
+    inputs.dir("src/main/resources/static/js")
+    inputs.dir("src/test/js")
+    outputs.dir(layout.buildDirectory.dir("reports/js-coverage"))
+    commandLine("npx", "vitest", "run", "--coverage")
+}
+
+tasks.named("check") {
+    dependsOn(jsTest)
 }

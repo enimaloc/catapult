@@ -1,8 +1,8 @@
 package fr.enimaloc.catapult.security;
 
-import fr.enimaloc.catapult.domain.OAuthToken;
+import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.event.TwitchLoginEvent;
-import fr.enimaloc.catapult.repository.OAuthTokenRepository;
+import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -69,15 +69,17 @@ public class TwitchLoginSuccessHandler implements AuthenticationSuccessHandler {
                 saveRefreshToken(request, authentication, catUser, "twitch", OAuthToken.Provider.TWITCH);
 
                 // If catapult-web is configured, redirect there with a one-time code instead of the JWT.
-                // catapult-web exchanges the code server-to-server via POST /api/auth/exchange (30s TTL, single-use).
+                // catapult-web exchanges the code server-to-server via POST /api/internal/auth/exchange (30s TTL, single-use).
+                // catapult-web's state comes back with it: its callback only completes a login its session started.
                 if (webUrl != null && !webUrl.isBlank()) {
                     String jwt = jwtService.generate(catUser);
                     String code = codeStore.issue(jwt);
-                    String callbackUrl = UriComponentsBuilder.fromUriString(webUrl)
+                    UriComponentsBuilder callback = UriComponentsBuilder.fromUriString(webUrl)
                             .path("/auth/callback")
-                            .queryParam("code", code)
-                            .build().toUriString();
-                    response.sendRedirect(callbackUrl);
+                            .queryParam("code", code);
+                    InviteCodeRelayFilter.pendingWebState(request).ifPresent(state -> callback.queryParam("state", state));
+                    InviteCodeRelayFilter.clearPendingWebState(request, response);
+                    response.sendRedirect(callback.encode().build().toUriString());
                     return;
                 }
             } else if ("xbox".equals(registrationId)) {
@@ -85,11 +87,13 @@ public class TwitchLoginSuccessHandler implements AuthenticationSuccessHandler {
                 // Only the refresh token needs saving — no login event, no JWT re-issuance.
                 saveRefreshToken(request, authentication, catUser, "xbox", OAuthToken.Provider.XBOX);
 
-                // Send the user back to their channel settings on catapult-web, not the
-                // /dashboard default meant for the primary Twitch login on catapult-api itself.
+                // Send the user back to their channel's integrations tab on catapult-web, where
+                // they started, not the /dashboard default meant for the primary Twitch login on
+                // catapult-api itself.
                 if (webUrl != null && !webUrl.isBlank()) {
                     String channelUrl = UriComponentsBuilder.fromUriString(webUrl)
-                            .path("/channels/{username}")
+                            .path("/channel/{username}")
+                            .fragment("integrations")
                             .buildAndExpand(catUser.getUserAccount().getTwitchUsername())
                             .toUriString();
                     response.sendRedirect(channelUrl);

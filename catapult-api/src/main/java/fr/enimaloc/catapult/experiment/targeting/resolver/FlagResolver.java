@@ -1,9 +1,9 @@
 package fr.enimaloc.catapult.experiment.targeting.resolver;
 
-import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.experiment.targeting.AttributeResolver;
 import fr.enimaloc.catapult.experiment.targeting.AttributeValue;
-import fr.enimaloc.catapult.repository.UserFlagRepository;
+import fr.enimaloc.catapult.repository.account.UserFlagRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -24,7 +24,7 @@ public class FlagResolver implements AttributeResolver {
     public AttributeValue resolve(UserAccount user, String key) {
         String flagKey = key.substring(PREFIX.length());
         return flagRepository.findByUserAndFlagKey(user, flagKey)
-            .map(f -> AttributeValue.text(f.getFlagValue()))
+            .map(f -> f.getFlagValue() == null ? AttributeValue.present() : AttributeValue.text(f.getFlagValue()))
             .orElse(AttributeValue.missing());
     }
 }

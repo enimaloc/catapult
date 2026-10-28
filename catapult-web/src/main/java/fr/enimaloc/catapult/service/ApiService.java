@@ -1,0 +1,507 @@
+package fr.enimaloc.catapult.service;
+
+import fr.enimaloc.catapult.common.dto.InvitePageData;
+import fr.enimaloc.catapult.common.dto.UserInfoResponse;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import fr.enimaloc.catapult.service.http.ApiClient;
+import fr.enimaloc.catapult.service.http.ApiError;
+import fr.enimaloc.catapult.common.dto.*;
+import fr.enimaloc.catapult.common.dto.admin.AdminMemberDto;
+import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
+import fr.enimaloc.catapult.common.dto.admin.AdminCclPage;
+import fr.enimaloc.catapult.common.dto.admin.AdminNotificationCreateBody;
+import fr.enimaloc.catapult.common.dto.admin.DtddProposalDto;
+import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.FlagKeyDto;
+import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.SocialLinkDto;
+import fr.enimaloc.catapult.common.dto.admin.SocialLinkRequest;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentAssignmentsDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentOverrideRequest;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentRebalanceDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentRuleRequest;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentSettingsDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider;
+import fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto;
+import fr.enimaloc.catapult.common.dto.admin.TwDefinitionDto;
+import fr.enimaloc.catapult.common.dto.admin.TwKeywordTestDto;
+import fr.enimaloc.catapult.common.dto.admin.TwRebuild;
+import fr.enimaloc.catapult.common.dto.admin.AccountDto;
+import fr.enimaloc.catapult.common.dto.admin.MinecraftDeviceCodeDto;
+import fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto;
+import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
+import fr.enimaloc.catapult.common.dto.admin.AdminPage;
+import fr.enimaloc.catapult.common.dto.admin.DetectedGameDto;
+import fr.enimaloc.catapult.common.dto.admin.GameMappingDto;
+import fr.enimaloc.catapult.common.dto.admin.GameMappingRequest;
+import fr.enimaloc.catapult.common.dto.admin.GameMappingResult;
+import fr.enimaloc.catapult.common.dto.admin.TwitchCategoryDto;
+import fr.enimaloc.catapult.common.dto.notification.AdminNotificationDto;
+import fr.enimaloc.catapult.common.dto.notification.BroadcastRequestDto;
+import fr.enimaloc.catapult.common.dto.notification.NotificationChannel;
+import fr.enimaloc.catapult.common.dto.notification.NotificationChannelsDto;
+import fr.enimaloc.catapult.common.dto.notification.NotificationDto;
+import fr.enimaloc.catapult.common.dto.notification.NotificationSnapshotDto;
+import fr.enimaloc.catapult.common.dto.admin.CacheEntryDetailDto;
+import fr.enimaloc.catapult.common.dto.admin.CacheEntryDto;
+import fr.enimaloc.catapult.common.dto.admin.CacheSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.RepoSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.IanaRegistryDto;
+import fr.enimaloc.catapult.common.dto.admin.WellKnownFileDetailDto;
+import fr.enimaloc.catapult.common.dto.admin.WellKnownFileDto;
+import fr.enimaloc.catapult.common.dto.admin.WellKnownFileRequest;
+import fr.enimaloc.catapult.common.dto.admin.WellKnownLocation;
+import fr.enimaloc.catapult.common.dto.channel.BindingDto;
+import fr.enimaloc.catapult.common.dto.channel.ChannelListResponse;
+import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
+import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
+import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
+import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
+import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatValidationError;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatSettingsResponse;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig;
+import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetAccessResponse;
+
+public interface ApiService {
+    TokenResponse exchangeCode(String code);
+    ChannelListResponse channelList();
+    ChannelPageData channelPage(String username, int page, String status, String source);
+    int toggleBot(String username);
+    int recheckGame(String username);
+    int cclToggle(String username, String bindingId, boolean enabled);
+    int ignoredToggle(String username, String bindingId, boolean ignored);
+    int deleteBinding(String username, String bindingId);
+    Object searchGames(String username, String q);
+    int updateBinding(String username, String bindingId, String twitchGameId, String twitchGameName, java.util.Set<String> ccls);
+    int saveTws(String bindingId, java.util.Set<String> tws);
+    int resetTws(String bindingId);
+    int toggleTwEnabled(String bindingId, boolean enabled);
+    int saveSteamToken(String username, String token, boolean shared);
+    int steamTokenSharing(String username, boolean shared);
+    int deleteSteamToken(String username);
+    int refreshSteamProfileCache(String username);
+    LinkStateResponse minecraftStatus(String username);
+    int minecraftEnroll(String username, String name);
+    int minecraftSync(String username);
+    int minecraftDisconnect(String username);
+    /** Unlinks the channel's Xbox account; catapult-api's status (204; 403 not the owner), 502 when unreachable. */
+    int xboxDisconnect(String username);
+    /** The logged-in user's OBS connection; null when logged out or OBS isn't enabled. */
+    TwitchatWidgetConfig obsConnection();
+    /**
+     * The OBS connection of the widget {@code token} (anonymous), on Twitchat branch "auto";
+     * null when the token is unknown, the widget is off, or catapult-api is unreachable.
+     */
+    TwitchatWidgetConfig widgetObsConfig(UUID token);
+    /**
+     * The owner of the widget {@code token} and whether it is on (anonymous): catapult-api's status
+     * (404 unknown), 502 when unreachable; the body only on a 200.
+     */
+    ApiClient.Result<TwitchatWidgetAccessResponse> widgetAccess(UUID token);
+    /** The channel's Twitchat widget settings (the owner's); null when refused or unreachable. */
+    TwitchatSettingsResponse twitchatSettings(String username);
+    /**
+     * Replaces the OBS widget link's token: catapult-api's status (403 refused, 404...), 502 when
+     * unreachable; the body carries the new settings on success, null otherwise.
+     */
+    ApiClient.Result<TwitchatSettingsResponse> regenerateTwitchatWidget(String username);
+    int saveObsSettings(String username, boolean enabled, String host, Integer port, String password);
+    /** "auto" or one of TwitchatData.SUPPORTED_BRANCHES. */
+    int saveTwitchatBranch(String username, String branch);
+    int saveCclSettings(String username, boolean enabled, java.util.Set<String> blockedCcls);
+    int saveTwSettings(String username, boolean enabled, java.util.Set<String> blockedTws);
+    UserSettingsDto channelSettings(String username);
+    /** The binding of the game the channel plays now (the OBS dock's); null when there is none or on failure. */
+    BindingDto currentBinding(String username);
+    /** The logged-in streamer's enabled chat commands, to move to another chat bot; empty on failure. */
+    java.util.List<fr.enimaloc.catapult.common.dto.chatcommand.EnabledChatCommandDto> enabledChatCommands();
+    int saveNoGameSettings(String username, String twitchGameId, String twitchGameName, java.util.Set<String> ccls,
+                             boolean applyOnStreamStart, boolean applyOnNoGame, boolean applyOnStreamEnd);
+    int saveIncompleteFallbackSettings(String username, String twitchGameId, String twitchGameName, java.util.Set<String> ccls);
+    /** How recent (1..120 minutes) a game an outgoing raid puts back, null or 0 for off; catapult-api's status, 502 when unreachable. */
+    int saveRaidSettings(String username, Integer restoreGameMinutes);
+    DtddMappingStatusDto dtddMappingStatus(String username);
+    SearchResponse dtddSearch(String q);
+    int dtddValidate(String igdbId);
+    int dtddPropose(String igdbId, Long dtddId, String reason);
+    /** The logged-in user's account id (the subject of their JWT); null when logged out. */
+    java.util.UUID currentUserId();
+    /** Whether the logged-in user is a Catapult admin; false when logged out. */
+    boolean isAdmin();
+    /** Every event's Twitchat payloads, by event name. */
+    java.util.Map<String, java.util.List<TwitchatEventActionDto>> twitchatEvents(String username);
+    /** Replaces an event's payloads; the validation errors, empty when saved. */
+    java.util.List<TwitchatValidationError> saveTwitchatEvent(String username, String eventType, java.util.List<TwitchatEventActionDto> payloads);
+    /** Sends payloads as edited, saved or not; the validation errors, empty when sent. */
+    java.util.List<TwitchatValidationError> testTwitchatEvent(String username, String eventType, java.util.List<TwitchatEventActionDto> payloads);
+    /** Runs the Catapult action behind a Twitchat button's token; false when used or expired. */
+    boolean executeTwitchatAction(String token);
+
+    // --- admin: members (catapult-api refuses them to anyone but an admin) ---
+    /** One page (50) of the members matching {@code q} (blank: all), and whether each one is live. */
+    AdminMembersPage adminMembers(String q, int page);
+    /** Up to 20 members matching {@code q}, for a picker; none for a blank one, null when unavailable. */
+    List<AdminMemberDto> adminSearchMembers(String q);
+    int adminToggleMemberBot(java.util.UUID memberId);
+    int adminUnlinkMemberSteam(java.util.UUID memberId);
+    /** Leaves the account inactive, without Twitch identity nor bot. */
+    int adminUnlinkMemberTwitch(java.util.UUID memberId);
+    /** Makes the member the account posting chat command replies, in place of the previous one. */
+    int adminPromoteMemberToSystem(java.util.UUID memberId);
+    int adminDeleteMember(java.util.UUID memberId);
+    // --- admin: a member's debug mode ---
+    /** The member's debug mode; null when it was never on or catapult-api fails. */
+    fr.enimaloc.catapult.common.dto.admin.MemberDebugStateDto memberDebug(java.util.UUID memberId);
+    /** Turns the member's debug mode on; {@code revealSecrets} false masks the secrets in what is recorded. */
+    int enableMemberDebug(java.util.UUID memberId, boolean revealSecrets, double replayRate);
+    int disableMemberDebug(java.util.UUID memberId);
+    /** Deletes everything recorded for the member. */
+    int clearMemberDebug(java.util.UUID memberId);
+    /** One page of the member's recorded exchanges, newest first; null when catapult-api fails. */
+    AdminPage<fr.enimaloc.catapult.common.dto.admin.DebugExchangeSummaryDto> memberDebugExchanges(java.util.UUID memberId, DebugExchangeFilter filter, int page);
+    fr.enimaloc.catapult.common.dto.admin.DebugExchangeDto memberDebugExchange(java.util.UUID memberId, java.util.UUID exchangeId);
+    /** The services the member's exchanges were with, for the filter. */
+    List<String> memberDebugServices(java.util.UUID memberId);
+    /** Whether the logged-in member is in debug mode, and their replay rate; null when catapult-api could not tell. */
+    fr.enimaloc.catapult.common.dto.MyDebugDto myDebug();
+    /** Copies the chosen parts of a member's data onto another member. */
+    int adminMigrateMember(java.util.UUID memberId, java.util.UUID targetId,
+                            boolean settings, boolean getters, boolean bindings);
+
+    // --- admin: CCL, caches and data tabs (catapult-api refuses them to anyone but an admin) ---
+
+    /** Twitch's CCLs and the IGDB descriptors they map to; null when catapult-api fails. */
+    AdminCclPage adminCcl();
+    /** Reloads the CCLs from Twitch: catapult-api's status (204), 502 when unreachable. */
+    int adminRefreshCcl();
+    /** Maps a CCL to IGDB descriptors: catapult-api's status (204; the mock's 404 for an unknown CCL), 502 when unreachable. */
+    int adminSaveCclMappings(String cclId, java.util.Set<Long> igdbDescriptorIds);
+
+    /** catapult-api's in-memory caches; null when it fails. */
+    List<CacheSummaryDto> adminCaches();
+    /** One page of a cache's entries matching {@code q} (all when blank); null when it fails or the cache is unknown. */
+    AdminPage<CacheEntryDto> adminCacheEntries(String name, String q, int page);
+    /** A cache entry and the record behind it; null when catapult-api fails. */
+    CacheEntryDetailDto adminCacheEntry(String name, String key);
+    /** Evicts a cache entry: catapult-api's status (204; 400 read-only cache; 404), 502 when unreachable. */
+    int adminDeleteCacheEntry(String name, String key);
+
+    /** The repositories the data tab can browse; null when catapult-api fails. */
+    List<RepoSummaryDto> adminDataRepos();
+    /** One page of a repository's rows matching {@code q}; null when it fails or the repository is unknown. */
+    AdminPage<Map<String, Object>> adminDataRows(String repo, String q, int page);
+    /** One row, its collection relations included; null when it fails or there is no such row. */
+    Map<String, Object> adminDataRow(String repo, String id);
+    /** catapult-api's status (201; 400 invalid value), 502 when unreachable. */
+    int adminCreateDataRow(String repo, Map<String, String> fields);
+    /** catapult-api's status (200; 400 invalid value; 404), 502 when unreachable. */
+    int adminUpdateDataRow(String repo, String id, Map<String, String> fields);
+    /** catapult-api's status (204; 404; 409 still referenced), 502 when unreachable. */
+    int adminDeleteDataRow(String repo, String id);
+
+    // --- well-known files: served to anyone, edited from the admin page ---
+
+    /** The file configured at {@code path}: catapult-api's answer (200 / 404), 502 when unreachable. */
+    WellKnownContent wellKnown(WellKnownLocation location, String path);
+    /** SchemaStore's schema for {@code path}; null when none or catapult-api fails. */
+    String adminWellKnownSchema(String path);
+    /** The configured well-known files; null when catapult-api fails. */
+    List<WellKnownFileDto> adminWellKnownFiles();
+    /** One configured file with its content; null when it fails or there is none. */
+    WellKnownFileDetailDto adminWellKnownFile(long id);
+    /** IANA's registry (live or catapult-api's bundled copy); null when catapult-api fails. */
+    IanaRegistryDto adminIanaRegistry();
+    /** catapult-api's status (201; 400 invalid; 409 path taken), 502 when unreachable. */
+    int adminCreateWellKnownFile(WellKnownFileRequest request);
+    /** catapult-api's status (200; 400; 404; 409), 502 when unreachable. */
+    int adminUpdateWellKnownFile(long id, WellKnownFileRequest request);
+    /** catapult-api's status (204; 404), 502 when unreachable. */
+    int adminDeleteWellKnownFile(long id);
+
+    // --- meta tags: added to every page, edited from the admin page ---
+
+    /** The configured meta tags (read without the session, as every page shows them); null when catapult-api fails. */
+    List<fr.enimaloc.catapult.common.dto.admin.MetaTagDto> metaTags();
+    /** catapult-api's status (201; 400 invalid or reserved key; 409 key taken), 502 when unreachable. */
+    int adminCreateMetaTag(fr.enimaloc.catapult.common.dto.admin.MetaTagRequest request);
+    /** catapult-api's status (200; 400; 404; 409), 502 when unreachable. */
+    int adminUpdateMetaTag(long id, fr.enimaloc.catapult.common.dto.admin.MetaTagRequest request);
+    /** catapult-api's status (204; 404), 502 when unreachable. */
+    int adminDeleteMetaTag(long id);
+
+    // --- social links: shown in the footer of every page, edited from the admin page ---
+
+    /** The visible social links in order (read without the session, as every page shows them); null when catapult-api fails. */
+    List<SocialLinkDto> socialLinks();
+    /** Every social link, hidden ones included; null when catapult-api fails. */
+    List<SocialLinkDto> adminSocialLinks();
+    /** catapult-api's status (201; 400 invalid link), 502 when unreachable. */
+    int adminCreateSocialLink(SocialLinkRequest request);
+    /** catapult-api's status (200; 400; 404), 502 when unreachable. */
+    int adminUpdateSocialLink(long id, SocialLinkRequest request);
+    /** catapult-api's status (204; 404), 502 when unreachable. */
+    int adminDeleteSocialLink(long id);
+    /** catapult-api's status (200; 400 ids not the exact set of links), 502 when unreachable. */
+    int adminOrderSocialLinks(List<Long> ids);
+
+    // --- notifications and broadcasts ---
+
+    /** The bell's content: the newest notifications and the unread count; null when catapult-api fails. */
+    NotificationSnapshotDto notificationSnapshot();
+    /** One page (20, newest first) of the logged-in user's notifications; null when catapult-api fails. */
+    AdminPage<NotificationDto> notifications(int page);
+    /** catapult-api's status (204; 404), 502 when unreachable. */
+    int markNotificationRead(UUID id);
+    /** catapult-api's status (204), 502 when unreachable. */
+    int markAllNotificationsRead();
+    /** The channels the logged-in member also receives notifications through, besides the site; null when catapult-api fails. */
+    NotificationChannelsDto notificationChannels();
+    /** Replaces those channels; catapult-api's status (204), 502 when unreachable. */
+    int saveNotificationChannels(java.util.Set<NotificationChannel> channels);
+    /** The new features (NewFeatures keys) the logged-in user has opened; null when catapult-api fails. */
+    List<String> seenFeatures();
+    /** catapult-api's status (204; 400 malformed key), 502 when unreachable. */
+    int markFeatureSeen(String key);
+    /** One page (20, newest first) of every notification sent; null when catapult-api fails. */
+    AdminPage<AdminNotificationDto> adminNotifications(int page);
+    /** catapult-api's status (201; 400 invalid), 502 when unreachable. */
+    default int adminCreateNotification(AdminNotificationCreateBody body) {
+        return adminSendNotification(body).status();
+    }
+    /**
+     * {@link #adminCreateNotification} with, for an audience reached by one send ({@code EXPERIMENT} and
+     * {@code CHAT_COMMANDS}), how many members were told; the count is null otherwise.
+     */
+    ApiClient.Result<Integer> adminSendNotification(AdminNotificationCreateBody body);
+    /**
+     * How many members an experiment's participants audience reaches (all of its variants when
+     * {@code variantId} is null); null when unknown or catapult-api fails.
+     */
+    Long adminNotificationAudienceCount(UUID experimentId, UUID variantId);
+    /** catapult-api's status (204; 404), 502 when unreachable. */
+    int adminDeleteNotification(UUID id);
+    /**
+     * The sanitized HTML catapult-api renders for a Markdown body, with its status (200; 400 empty
+     * body; 404 an older catapult-api without the route), 502 when unreachable or answered without HTML.
+     */
+    ApiClient.Result<String> adminPreviewNotification(String body);
+    /**
+     * A token logged in as the member {@code username}, which catapult-api mints for an admin, with its
+     * status (200; 404 unknown; 403 not active, the admin themself or a system account); 502 when
+     * unreachable or answered without a token.
+     */
+    ApiClient.Result<String> adminImpersonate(String username);
+    /** The DTDD mapping proposals with {@code status} (PENDING, APPROVED, REJECTED), oldest first; null when catapult-api fails. */
+    List<DtddProposalDto> adminDtddProposals(String status);
+    /** catapult-api's status (204; 404 unknown; 409 already resolved), 502 when unreachable. */
+    int adminApproveDtddProposal(UUID id);
+    /** As {@link #adminApproveDtddProposal}; the reason is sent only when not blank. */
+    int adminRejectDtddProposal(UUID id, String reason);
+    /** One page of the admin game mappings, last changed first; null when catapult-api fails. */
+    AdminPage<GameMappingDto> adminGameMappings(int page);
+    /** One page of the detected games still missing a mapping, most streamers first; null when catapult-api fails. */
+    AdminPage<DetectedGameDto> adminMissingGameMappings(int page);
+    /** The games detected on {@code sourceType} matching {@code q} (20 at most); null when catapult-api fails. */
+    List<DetectedGameDto> adminDetectedGames(String sourceType, String q);
+    /** The Twitch categories matching {@code q}, with the box art as catapult-api returns it; null when catapult-api fails. */
+    List<TwitchCategoryDto> adminSearchCategories(String q);
+    /** catapult-api's status (201; 400 MANUAL platform, missing ID or category; 409 already mapped) and result, 502 when unreachable. */
+    ApiClient.Result<GameMappingResult> adminCreateGameMapping(GameMappingRequest request);
+    /** catapult-api's status (200; 400 as for a creation; 404 unknown) and result, 502 when unreachable. */
+    ApiClient.Result<GameMappingResult> adminUpdateGameMapping(UUID id, GameMappingRequest request);
+    /** catapult-api's status (200; 404 unknown) and result (no mapping), 502 when unreachable. */
+    ApiClient.Result<GameMappingResult> adminDeleteGameMapping(UUID id, boolean applyLive);
+
+    /** The member groups, with their member counts; null when catapult-api fails. */
+    List<GroupSummaryDto> adminGroups();
+    /** catapult-api's status (201; 400 blank key; 409 key already used), 502 when unreachable. */
+    int adminCreateGroup(String key, String name, String description);
+    /** catapult-api's status (204; 404 unknown group), 502 when unreachable. */
+    int adminRenameGroup(UUID id, String name, String description);
+    /** catapult-api's status (204; 404 unknown group), 502 when unreachable. */
+    int adminDeleteGroup(UUID id);
+    /** catapult-api's status (204; 404 unknown group or Twitch username), 502 when unreachable. */
+    int adminAddGroupMember(UUID id, String twitchUsername);
+
+    /** The experiments with their variants and rule counts; null when catapult-api fails. */
+    List<ExperimentSummaryDto> adminExperiments();
+    /** One experiment's variants, rules and overrides; null when unknown or catapult-api fails. */
+    ExperimentSettingsDto adminExperiment(UUID id);
+    /** The targeting tag keys members carry, with their values; null when catapult-api fails. */
+    List<FlagKeyDto> adminFlagKeys();
+    /** {@code action} is activate, pause, end or reassign; catapult-api's status (204; 404 unknown; 409 refused by the status), 502 when unreachable. */
+    int adminExperimentAction(UUID id, String action);
+    /** Sets the variants' weights by variant id; catapult-api's status (204; 404 unknown), 502 when unreachable. */
+    int adminExperimentWeights(UUID id, Map<UUID, Integer> weights);
+
+    /** What saving these weights would move; null when catapult-api fails. */
+    ExperimentRebalanceDto adminExperimentWeightsPreview(UUID id, Map<UUID, Integer> weights);
+    /** catapult-api's status (204; 404 unknown experiment), 502 when unreachable. */
+    int adminAddExperimentRule(UUID id, ExperimentRuleRequest rule);
+    /** catapult-api's status (204; 404 unknown experiment or rule), 502 when unreachable. */
+    int adminDeleteExperimentRule(UUID id, UUID ruleId);
+    /** catapult-api's status (204; 404 unknown experiment, Twitch username or variant of another experiment), 502 when unreachable. */
+    int adminAddExperimentOverride(UUID id, ExperimentOverrideRequest override);
+    /** catapult-api's status (204; 404 unknown experiment or override), 502 when unreachable. */
+    int adminDeleteExperimentOverride(UUID id, UUID overrideId);
+    /** One page (20) of the experiment's participants, filtered by variant (null = all) and login substring (null/blank = all), with every variant's count; null when unknown or catapult-api fails. */
+    ExperimentAssignmentsDto adminExperimentAssignments(UUID id, UUID variantId, String q, int page);
+    /** catapult-api's status (204; 400, 404, 409), 502 when unreachable. */
+    int adminMoveExperimentAssignment(UUID id, UUID userId, UUID variantId);
+
+    /** The whitelist, its entries, invitation settings and invites; null when catapult-api fails. */
+    WhitelistPageDto adminWhitelist();
+    /** Flips the whitelist; catapult-api's status (204), 502 when unreachable. */
+    int adminToggleWhitelist();
+    /** Adds a Twitch id (already listed changes nothing); catapult-api's status (204), 502 when unreachable. */
+    int adminAddWhitelist(String twitchId);
+    /** Removes a Twitch id (also an absent one); catapult-api's status (204), 502 when unreachable. */
+    int adminDeleteWhitelist(String twitchId);
+    /** Flips the invitations; catapult-api's status (204), 502 when unreachable. */
+    int adminToggleInvites();
+    /** Saves the invitation settings, a null cap meaning unlimited; catapult-api's status (204), 502 when unreachable. */
+    int adminSaveInviteSettings(Integer globalMaxMembers, Integer defaultMaxUses, boolean defaultCanReinvite);
+    /** Sets an invite's quota, null meaning the default; catapult-api's status (204), 502 when unreachable. */
+    int adminSaveInviteQuota(UUID inviteId, Integer maxUses, Boolean canReinvite);
+
+    /** One member, for the targeting view's header; null when unknown or catapult-api fails. */
+    AdminMemberSummaryDto adminMember(UUID id);
+    /** The member's custom flags and group keys; null when unknown or catapult-api fails. */
+    MemberTargetingDto adminMemberTargeting(UUID id);
+    /** Sets (or replaces) a custom flag; catapult-api's status (204; 400 blank key, 404 unknown member), 502 when unreachable. */
+    int adminSetMemberFlag(UUID id, String key, String value);
+    /** Deletes a custom flag; catapult-api's status (204, also for an absent flag; 404 unknown member), 502 when unreachable. */
+    int adminDeleteMemberFlag(UUID id, String key);
+    /** Adds the member to the group of that key; catapult-api's status (204; 404 unknown member or group), 502 when unreachable. */
+    int adminAddMemberToGroup(UUID id, String groupKey);
+    /** Removes the member from the group; catapult-api's status (204; 404 unknown group), 502 when unreachable. */
+    int adminRemoveMemberFromGroup(UUID id, UUID groupId);
+    /** catapult-api's status (202; 400 invalid; 429 rate-limited), 502 when unreachable. */
+    int adminBroadcast(BroadcastRequestDto body);
+
+    // --- account deletion ---
+
+    /** The logged-in account as catapult-api validates it (status, deletion request time); null when it fails. */
+    UserInfoResponse accountInfo();
+    /**
+     * Whether catapult-api still accepts the session's JWT: its status (2xx yes; 401/403 no), 502 when
+     * unreachable, which tells nothing about the JWT.
+     */
+    int validateSession();
+    /** Days between a deletion request and the account's removal; 7 when catapult-api gives none. */
+    int accountDeletionDelayDays();
+    /**
+     * Asks for the channel's deletion: catapult-api's status (204; 400 when {@code confirmUsername} is not
+     * the channel's, deleting nothing; 403 not the caller's channel), 502 when unreachable.
+     */
+    int deleteAccount(String username, String confirmUsername);
+    /** Cancels a pending deletion: catapult-api's status (204), 502 when unreachable. */
+    int cancelAccountDeletion(String username);
+
+    // --- member invitations ---
+
+    /** The member's invite code, link and redemptions (canInvite false without the right); null when catapult-api fails. */
+    InvitePageData invitePage();
+    /**
+     * Replaces the member's invite code: catapult-api's status, with the page holding the new code (no body
+     * from a catapult-api that answers 204), 502 when unreachable.
+     */
+    ApiClient.Result<InvitePageData> regenerateInvite();
+
+    /** A provider's shared API keys, masked; null when catapult-api fails. */
+    ApiKeysPageDto adminApiKeys(ApiKeyProvider provider);
+    /** Adds a key (an already listed one changes nothing); catapult-api's status (204; 400 invalid format), 502 when unreachable. */
+    int adminAddApiKey(ApiKeyProvider provider, String apiKey);
+    /** Removes the key of that id; catapult-api's status (204; 404 unknown), 502 when unreachable. */
+    int adminDeleteApiKey(ApiKeyProvider provider, String keyId);
+    /** Reloads the provider's keys into its rotator; catapult-api's status (204), 502 when unreachable. */
+    int adminRefreshApiKeys(ApiKeyProvider provider);
+
+    /** The Minecraft service accounts; null when catapult-api fails (Minecraft disabled included). */
+    List<AccountDto> adminMinecraftAccounts();
+    /** PATCHes an account ({@code enabled}, {@code friendLimitReached}); catapult-api's status (200; 404 unknown), 502 when unreachable. */
+    int adminPatchMinecraftAccount(UUID id, Map<String, Object> patch);
+    /** Deletes an account; catapult-api's status (204; 409 while users are linked to it; 404 unknown), 502 when unreachable. */
+    int adminDeleteMinecraftAccount(UUID id);
+    /**
+     * Starts a Microsoft device-code flow: status 200 with the code, else catapult-api's status and its
+     * problem when it gave one (Microsoft's AADSTS answer is the {@code upstream} of a refusal), 502 when unreachable.
+     */
+    MinecraftDeviceCodeStart adminMinecraftDeviceCode();
+
+    /** A device-code start: the code when {@code status} is 200, else null and catapult-api's problem (may be null). */
+    record MinecraftDeviceCodeStart(int status, MinecraftDeviceCodeDto code, ApiError error) {}
+    /**
+     * Polls the device code to enrol a new account ({@code label} null: catapult-api's default):
+     * 202 while it isn't confirmed yet, 200 with the account once it is, else the error; 502 when unreachable.
+     */
+    ApiClient.Result<Map<String, Object>> adminCreateMinecraftAccount(String deviceCode, String label);
+    /** Polls the device code to re-authenticate the account, answered like {@link #adminCreateMinecraftAccount}. */
+    ApiClient.Result<Map<String, Object>> adminReauthMinecraftAccount(UUID id, String deviceCode);
+
+    /** The trigger warning definitions, by sort order; null when catapult-api fails. */
+    List<TwDefinitionDto> adminTws();
+    /** One definition; null when unknown or when catapult-api fails. */
+    TwDefinitionDto adminTw(String id);
+    /** Creates a definition; catapult-api's status (201), 502 when unreachable. */
+    int adminCreateTw(String id, String label, int sortOrder);
+    /** Starts a background rebuild of the mappings; catapult-api's status (202; 503 when trigger warnings are off), 502 when unreachable. */
+    int adminRebuildTws(TwRebuild mode);
+    /** A definition's Steam keywords, sorted; null when unknown or when catapult-api fails. */
+    List<String> adminTwKeywords(String id);
+    /** Adds a keyword (already there changes nothing); catapult-api's status (204), 502 when unreachable. */
+    int adminAddTwKeyword(String id, String keyword);
+    /** Removes a keyword (also an absent one); catapult-api's status (204), 502 when unreachable. */
+    int adminRemoveTwKeyword(String id, String keyword);
+    /** Tries the definition's saved Steam signals, and the draft keyword, on a Steam app; null on failure. */
+    TwKeywordTestDto adminTestTwKeyword(String id, String appId, String draftKeyword);
+
+    /** A card's help in {@code locale}'s language (catapult-api's own message bundles, HTML); null when catapult-api fails. */
+    fr.enimaloc.catapult.common.dto.HelpContent help(String cardId, java.util.Locale locale);
+
+    /**
+     * Where the member's Steam-linking popup goes: Steam's OpenID login as catapult-api prepared it (the mock
+     * links at once and answers its closing page); null when logged out or catapult-api fails.
+     */
+    String steamConnectUrl();
+    /** Unlinks the member's Steam account; catapult-api's status (204), 502 when unreachable. */
+    int steamDisconnect();
+    /** catapult-api's public changelog, newest version first; null when it can't give it. */
+    List<fr.enimaloc.catapult.dto.changelog.ChangelogSection> changelog();
+    /** Whether catapult-api runs degraded, with the properties it changes; null when it can't say. */
+    DegradedStatusDto degradedStatus();
+    /** Whether catapult-api answers and reports itself up (its health, asked without the session's bearer). */
+    boolean apiAvailable();
+
+    /** The owner's custom bindings; null when catapult-api fails or refuses (experiment closed to the channel). */
+    fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto customBindings(String username);
+    /** Creates one; catapult-api's status (201, or 400/403/409) with the created binding on success. */
+    CustomBindingSave<fr.enimaloc.catapult.common.dto.binding.CustomBindingDto> createCustomBinding(
+            String username, fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest request);
+    /** Saves an edit; catapult-api's status with how re-applying the active binding went on success. */
+    CustomBindingSave<fr.enimaloc.catapult.common.dto.binding.CustomBindingSaveResult> updateCustomBinding(
+            String username, UUID id, fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest request);
+    /** catapult-api's status (204), 502 when unreachable. */
+    int deleteCustomBinding(String username, UUID id);
+    /** Makes the binding the active one, applying its category on Twitch. */
+    ActivationOutcome activateCustomBinding(String username, UUID id);
+    /** catapult-api's status (204), 502 when unreachable. */
+    int deactivateCustomBinding(String username);
+    /** Whether the logged-in member has a personal API token; null when catapult-api fails or refuses. */
+    fr.enimaloc.catapult.common.dto.account.ApiTokenStatusDto apiTokenStatus();
+    /** Replaces the personal API token; the body carries the new one, shown once, never logged or kept. */
+    ApiClient.Result<fr.enimaloc.catapult.common.dto.account.ApiTokenCreatedDto> regenerateApiToken();
+    /** catapult-api's status (204), 502 when unreachable. */
+    int revokeApiToken();
+    /** Whether the logged-in member has a read-only personal API token; null when catapult-api fails or refuses. */
+    fr.enimaloc.catapult.common.dto.account.ApiTokenStatusDto readApiTokenStatus();
+    /** Replaces the read-only personal API token; the body carries the new one, shown once, never logged or kept. */
+    ApiClient.Result<fr.enimaloc.catapult.common.dto.account.ApiTokenCreatedDto> regenerateReadApiToken();
+    /** catapult-api's status (204), 502 when unreachable. */
+    int revokeReadApiToken();
+}

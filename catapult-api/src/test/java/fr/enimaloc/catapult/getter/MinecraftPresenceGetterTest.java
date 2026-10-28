@@ -1,19 +1,21 @@
 // test/…/getter/MinecraftPresenceGetterTest.java
 package fr.enimaloc.catapult.getter;
 
-import fr.enimaloc.catapult.domain.MinecraftFriendLink;
-import fr.enimaloc.catapult.domain.MinecraftServiceAccount;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.MinecraftFriendLinkRepository;
-import fr.enimaloc.catapult.repository.MinecraftServiceAccountRepository;
-import fr.enimaloc.catapult.service.MinecraftGateService;
-import fr.enimaloc.catapult.service.MinecraftService;
-import fr.enimaloc.catapult.service.MinecraftTokenService;
+import fr.enimaloc.catapult.service.debug.DebugRecording;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.minecraft.MinecraftFriendLink;
+import fr.enimaloc.catapult.domain.minecraft.MinecraftServiceAccount;
+import fr.enimaloc.catapult.repository.minecraft.MinecraftFriendLinkRepository;
+import fr.enimaloc.catapult.repository.minecraft.MinecraftServiceAccountRepository;
+import fr.enimaloc.catapult.service.minecraft.MinecraftGateService;
+import fr.enimaloc.catapult.service.minecraft.MinecraftService;
+import fr.enimaloc.catapult.service.minecraft.MinecraftTokenService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -24,7 +26,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -37,6 +38,7 @@ class MinecraftPresenceGetterTest {
     @Mock private MinecraftFriendLinkRepository linkRepository;
     @Mock private MinecraftGateService gateService;
 
+    @Spy private DebugRecording debug = DebugRecording.OFF;
     @InjectMocks private MinecraftPresenceGetter getter;
 
     private UserAccount user;
@@ -143,7 +145,7 @@ class MinecraftPresenceGetterTest {
 
     @Test
     void profileIdFormatMismatch_stillDetected() {
-        // lien stocké avec tirets, presence sans tirets : normalisation des deux côtés
+        // link stored with dashes, presence without dashes: both sides are normalised
         link.setMinecraftProfileId("069a79f4-44e9-4726-a5be-fca90e38aaf5");
         when(minecraftService.updatePresence(eq("mc-token"), any(MinecraftService.PresenceStatus.class)))
                 .thenReturn(presenceOf("069a79f444e94726a5befca90e38aaf5", MinecraftService.PresenceStatus.PLAYING_SERVER));
@@ -155,7 +157,7 @@ class MinecraftPresenceGetterTest {
 
     @Test
     void stalePresence_isNotDetected() {
-        // jeu fermé sans publier OFFLINE : l'API renvoie l'ancien statut, lastUpdated ne bouge plus
+        // game closed without publishing OFFLINE: the API returns the old status, lastUpdated no longer moves
         when(minecraftService.updatePresence(eq("mc-token"), any(MinecraftService.PresenceStatus.class)))
                 .thenReturn(presenceAgedOf("profile-1", MinecraftService.PresenceStatus.PLAYING_SERVER,
                         Instant.now().minusSeconds(600)));

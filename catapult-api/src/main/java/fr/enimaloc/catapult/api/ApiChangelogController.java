@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.api;
 
-import fr.enimaloc.catapult.service.ChangelogService;
+import fr.enimaloc.catapult.service.feedback.ChangelogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/changelog")
+@RequestMapping(ApiPaths.INTERNAL + "/changelog")
 @RequiredArgsConstructor
 public class ApiChangelogController {
 

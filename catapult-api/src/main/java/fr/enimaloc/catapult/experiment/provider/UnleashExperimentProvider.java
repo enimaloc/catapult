@@ -1,9 +1,9 @@
 package fr.enimaloc.catapult.experiment.provider;
 
 import fr.enimaloc.catapult.config.ExperimentProviderProperties;
-import fr.enimaloc.catapult.domain.Experiment;
-import fr.enimaloc.catapult.domain.ExperimentVariant;
-import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.experiment.Experiment;
+import fr.enimaloc.catapult.domain.experiment.ExperimentVariant;
 import io.getunleash.DefaultUnleash;
 import io.getunleash.Unleash;
 import io.getunleash.UnleashContext;

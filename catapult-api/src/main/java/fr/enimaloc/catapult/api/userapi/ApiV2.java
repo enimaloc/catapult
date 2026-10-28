@@ -11,15 +11,29 @@ public final class ApiV2 {
     // versioning scheme at all — it's a separate, unversioned controller by design.
     static final String VERSION = "2";
 
+    // Request header carrying the version (see ApiVersioningConfig). Public: the CORS of the public routes
+    // (ApiSecurityConfig) allows it.
+    public static final String VERSION_HEADER = "X-API-Version";
+
+    // Query parameter carrying the version when the header is absent (see ApiVersioningConfig).
+    static final String VERSION_PARAM = "version";
+
     // Stable, version-neutral mount point for the v2 controller and all its "more" links.
     static final String PATH = "/api/user";
 
-    // Baked-in Swagger example for "uuid" path parameters — every uuid endpoint's spec carries
-    // this literal value so SwaggerUiJwtTransformer's client-side script has something fixed to
-    // find and replace with the caller's own widget token (see its class javadoc for why). Public:
-    // also the final fallback in ApiChannelDataController#resolveExampleUuid, for a user with no
-    // encodable binding on record — the same generic demo everyone unpersonalized would see.
-    public static final String GENERIC_UUID_EXAMPLE = "00000000-0000-0000-0001-000000000190";
+    // Mount points of the current routes ("games" by platform id, the caller's own bindings); the
+    // "more" links of GameInfoAssembler point at them in the CURRENT link style.
+    static final String GAMES_PATH = "/api/games";
+    static final String ME_BINDINGS_PATH = "/api/me/bindings";
+
+    // The other mount points under /api/me: the caller's own game, their custom bindings.
+    static final String ME_GAME_PATH = "/api/me/game";
+    static final String ME_CUSTOM_BINDINGS_PATH = "/api/me/custom-bindings";
+
+    // The widget token of the dev backdoor (DevBackdoorResolver) that names no real game, and the
+    // example the legacy routes' "uuid" path parameter documents. LegacyRoutesGate does not read it:
+    // it recognizes any backdoor uuid by DevBackdoorResolver.isBackdoor.
+    static final String GENERIC_UUID_EXAMPLE = "00000000-0000-0000-0001-000000000190";
 
     private ApiV2() {}
 }

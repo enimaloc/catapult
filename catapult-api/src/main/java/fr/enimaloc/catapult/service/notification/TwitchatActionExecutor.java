@@ -1,11 +1,14 @@
 package fr.enimaloc.catapult.service.notification;
 
-import fr.enimaloc.catapult.domain.TwitchatActionToken;
-import fr.enimaloc.catapult.domain.UserAccount;
-import fr.enimaloc.catapult.repository.UserAccountRepository;
-import fr.enimaloc.catapult.service.BindingService;
-import fr.enimaloc.catapult.service.BotToggleService;
-import fr.enimaloc.catapult.service.TwitchService;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.twitchat.TwitchatActionToken;
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.service.account.BotToggleService;
+import fr.enimaloc.catapult.service.binding.BindingService;
+import fr.enimaloc.catapult.service.binding.CustomBindingActivations;
+import fr.enimaloc.catapult.service.category.CategoryChain;
+import fr.enimaloc.catapult.service.category.CategoryTrigger.RevertCategory;
+import fr.enimaloc.catapult.service.debug.DebugContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,9 +24,10 @@ public class TwitchatActionExecutor {
 
     private final TwitchatActionTokenService actionTokenService;
     private final UserAccountRepository userAccountRepository;
-    private final TwitchService twitchService;
+    private final CategoryChain categoryChain;
     private final BindingService bindingService;
     private final BotToggleService botToggleService;
+    private final CustomBindingActivations customBindingActivations;
 
     @Transactional
     public Result execute(UUID actionToken) {
@@ -40,8 +44,13 @@ public class TwitchatActionExecutor {
         Map<String, String> payload = actionTokenService.readPayload(token.getPayloadJson());
 
         switch (token.getActionType()) {
-            case REVERT_CATEGORY, REVERT_TO_APP_CATEGORY ->
-                    twitchService.setCategory(user, payload.get("gameId"), payload.get("gameName"));
+            case REVERT_CATEGORY, REVERT_TO_APP_CATEGORY -> {
+                // The widget route has no subject: the change is recorded in the channel's debug log
+                DebugContext.runAs(user.getId(), () -> categoryChain.apply(user,
+                        new RevertCategory(payload.get("gameId"), payload.get("gameName"))).orThrow());
+                // A category chosen by hand ends the active custom binding, whatever its kind
+                customBindingActivations.clear(user);
+            }
             case BIND_GAME_CATEGORY -> {
                 UUID bindingId = parseUuid(payload.get("bindingId"));
                 // The token is already burned at this point — a malformed payload must yield a

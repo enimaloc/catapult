@@ -2,10 +2,9 @@ import java.time.Instant
 
 plugins {
     java
-    jacoco
-    id("org.springframework.boot") version "4.0.4"
-    id("io.spring.dependency-management") version "1.1.7"
-    id("org.sonarqube") version "7.3.0.8198"
+    id("org.springframework.boot")
+    id("io.spring.dependency-management")
+    id("org.sonarqube") version "7.5.0.8588"
 }
 
 description = "catapult-api"
@@ -23,15 +22,17 @@ configurations {
 }
 
 val igdbApiVersion = "1.3.2"
-val unleashVersion = "9.2.4"
-val growthbookVersion = "0.10.10"
+val unleashVersion = "9.3.2"
+val growthbookVersion = "0.11.3"
 val icuVersion = "76.1"
-val jsoupVersion = "1.17.2"
-val jjwtVersion = "0.12.6"
-val commonmarkVersion = "0.22.0"
-val springCloudContextVersion = "5.0.2"
+val jsoupVersion = "1.23.2"
+val jjwtVersion = "0.13.0"
+val commonmarkVersion = "0.31.0"
+val springCloudContextVersion = "5.0.4"
 
 dependencies {
+    implementation(project(":catapult-common"))
+
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
@@ -55,17 +56,21 @@ dependencies {
     implementation("com.github.growthbook:growthbook-sdk-java:$growthbookVersion")
     implementation("com.ibm.icu:icu4j:$icuVersion")
     implementation("io.micrometer:micrometer-registry-prometheus")
+    // Sentry, only for the members in debug mode (see DebugSentryConfig)
+    implementation(platform("io.sentry:sentry-bom:8.60.0"))
+    implementation("io.sentry:sentry-spring-boot-4-starter")
+    implementation("io.sentry:sentry-logback")
     implementation("org.jsoup:jsoup:$jsoupVersion")
     implementation("org.commonmark:commonmark:$commonmarkVersion")
     implementation("org.springframework.cloud:spring-cloud-context:$springCloudContextVersion")
 
     // GraalJS sandbox for executing compiled chat-command JS
-    implementation("org.graalvm.polyglot:polyglot:24.1.1")
-    implementation("org.graalvm.polyglot:js:24.1.1")
+    implementation("org.graalvm.polyglot:polyglot:24.2.2")
+    implementation("org.graalvm.polyglot:js:24.2.2")
 
     // JWT generation/validation
     implementation("io.jsonwebtoken:jjwt-api:$jjwtVersion")
-    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.0")
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.2.0")
     runtimeOnly("io.jsonwebtoken:jjwt-impl:$jjwtVersion")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:$jjwtVersion")
 
@@ -84,7 +89,9 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
     testImplementation("org.testcontainers:testcontainers-junit-jupiter")
-    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+    testImplementation("org.testcontainers:testcontainers-postgresql")
+    testImplementation("com.squareup.okhttp3:mockwebserver:5.4.0")
+    testImplementation("net.ttddyy:datasource-proxy:1.11.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
@@ -107,15 +114,30 @@ tasks.processResources {
 
 tasks.withType<Test> {
     useJUnitPlatform()
-    finalizedBy(tasks.jacocoTestReport)
 }
 
-tasks.jacocoTestReport {
-    dependsOn(tasks.withType<Test>())
-    reports {
-        xml.required = true
-        html.required = true
+tasks.test {
+    // EnglishConventionsTest has its own task: it reads the sibling modules' sources
+    filter.excludeTestsMatching("*EnglishConventionsTest")
+}
+
+// EnglishConventionsTest reads the sibling modules' sources: only this task reruns when they change
+val englishConventions = tasks.register<Test>("englishConventions") {
+    description = "Checks that the code, comments, logs and test names of every module are written in English."
+    group = "verification"
+    val testSourceSet = sourceSets.test.get()
+    testClassesDirs = testSourceSet.output.classesDirs
+    classpath = testSourceSet.runtimeClasspath
+    filter.includeTestsMatching("*EnglishConventionsTest")
+    listOf("catapult-common", "catapult-web").forEach { module ->
+        inputs.dir(rootProject.file("$module/src"))
+            .withPropertyName("${module}Sources")
+            .withPathSensitivity(PathSensitivity.RELATIVE)
     }
+}
+
+tasks.check {
+    dependsOn(englishConventions)
 }
 
 springBoot {

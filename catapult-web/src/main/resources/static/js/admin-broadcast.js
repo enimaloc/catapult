@@ -1,79 +1,140 @@
-/*
- * /admin/broadcast page driver.
- *
- *  - toggles the per-name fieldset visibility when the `name` dropdown changes
- *  - on submit, collects only the fields belonging to the selected name,
- *    sends the payload via admin.broadcast.send WS action, and surfaces status
+/**
+ * The admin Broadcast tab. The select shows the form of the broadcast type picked (the others stay
+ * hidden); Send checks the fields as catapult-api does, posts the type's JSON to
+ * AdminBroadcastController and tells the outcome by its status (202 sent, 400 data-label-invalid,
+ * 429 data-label-rate, else data-label-unavailable); once sent, the tab reloads. "Cancel it" on the announced maintenance
+ * selects the cancel form with that maintenance's start filled in. Listeners are delegated to the
+ * panel: its content comes and goes.
  */
-(function () {
-  "use strict";
+window.CatapultAdminBroadcast = (function () {
+    const fieldOf = (form, name) => form.querySelector(`[name="${name}"]`);
+    const textOf = (form, name) => (fieldOf(form, name).value ?? "").trim();
 
-  document.addEventListener("DOMContentLoaded", function () {
-    var form = document.getElementById("broadcast-form");
-    var nameSelect = document.getElementById("broadcast-name");
-    var channelSelect = document.getElementById("broadcast-channel");
-    var statusEl = document.getElementById("broadcast-status");
-    if (!form || !nameSelect) return;
-
-    var fieldsets = form.querySelectorAll("fieldset[data-name]");
-
-    function showFieldsFor(name) {
-      fieldsets.forEach(function (fs) {
-        var match = fs.getAttribute("data-name") === name;
-        fs.hidden = !match;
-        // Disable inputs in hidden fieldsets so they don't get serialized.
-        var inputs = fs.querySelectorAll("input, textarea, select");
-        inputs.forEach(function (el) { el.disabled = !match; });
-      });
+    function mark(field) {
+        field.setAttribute("invalid", "");
+        field.reportValidity?.();
     }
 
-    nameSelect.addEventListener("change", function () {
-      showFieldsFor(nameSelect.value);
-    });
-
-    form.addEventListener("submit", function (e) {
-      e.preventDefault();
-      var name = nameSelect.value;
-      if (!name) return;
-
-      var channel = channelSelect ? channelSelect.value : "events.global";
-      var data = {};
-      var active = form.querySelector('fieldset[data-name="' + name + '"]');
-      if (active) {
-        var inputs = active.querySelectorAll("input, textarea, select");
-        inputs.forEach(function (el) {
-          if (!el.name) return;
-          if (el.type === "checkbox") {
-            data[el.name] = el.checked;
-          } else if (el.type === "number") {
-            var v = el.value === "" ? null : Number(el.value);
-            if (v !== null && !Number.isNaN(v)) data[el.name] = v;
-          } else if (el.type === "datetime-local" && el.value) {
-            // Local datetime → ISO 8601 with the browser's offset; the API
-            // parses Instant from any ISO string so this is acceptable.
-            data[el.name] = new Date(el.value).toISOString();
-          } else if (el.value !== "") {
-            data[el.name] = el.value;
-          }
-        });
-      }
-
-      setStatus("Envoi…", false);
-      catapultWs.request("admin.broadcast.send", { channel: channel, name: name, data: data })
-        .then(function (resp) {
-          setStatus("Diffusion '" + name + "' acceptée.", false);
-        }, function (err) {
-          var code = err && err.error && err.error.code ? err.error.code : (err && err.code ? err.code : "?");
-          var msg = err && err.error && err.error.message ? err.error.message : (err && err.message ? err.message : "Erreur inconnue");
-          setStatus("Erreur " + code + " : " + msg, true);
-        });
-    });
-
-    function setStatus(msg, isError) {
-      if (!statusEl) return;
-      statusEl.hidden = false;
-      statusEl.textContent = msg;
-      statusEl.style.color = isError ? "var(--danger, #c33)" : "var(--muted)";
+    /** `datetime-local`'s value (the browser's zone) as an ISO instant, or null when empty / invalid. */
+    function isoOf(local) {
+        if (local === "") return null;
+        const date = new Date(local);
+        return Number.isNaN(date.getTime()) ? null : date.toISOString();
     }
-  });
+
+    /** An ISO instant as a `datetime-local` value in the browser's zone, seconds included. */
+    function localOf(iso) {
+        const date = new Date(iso);
+        if (Number.isNaN(date.getTime())) return "";
+        const pad = n => String(n).padStart(2, "0");
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+            + `T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+    }
+
+    function select(root, name) {
+        root.querySelectorAll("form[data-broadcast]").forEach(form => { form.hidden = form.dataset.broadcast !== name; });
+        const type = root.querySelector('[name="type"]');
+        if (type && type.value !== name) type.value = name;
+    }
+
+    /** The JSON body of the form, or null when a required field is refused (the field is marked). */
+    function bodyOf(form) {
+        const name = form.dataset.broadcast;
+        const refuse = (...fields) => { fields.forEach(mark); return null; };
+        const required = (...names) => names.filter(n => textOf(form, n) === "").map(n => fieldOf(form, n));
+        const number = (field, min) => {
+            const raw = textOf(form, field);
+            const value = Number(raw);
+            return raw !== "" && Number.isInteger(value) && value >= min ? value : null;
+        };
+        if (name === "maintenance.scheduled") {
+            const startsAt = isoOf(textOf(form, "startsAt"));
+            const durationMinutes = number("durationMinutes", 1);
+            const missing = required("message");
+            if (startsAt === null) missing.push(fieldOf(form, "startsAt"));
+            if (durationMinutes === null) missing.push(fieldOf(form, "durationMinutes"));
+            if (missing.length) return refuse(...missing);
+            return { name, startsAt, durationMinutes, message: textOf(form, "message") };
+        }
+        if (name === "maintenance.cancelled") {
+            const field = fieldOf(form, "originalStartsAt");
+            // the instant the announcement came with, unless the field was edited since
+            const exact = form.dataset.originalIso && form.dataset.originalLocal === field.value ? form.dataset.originalIso : null;
+            const originalStartsAt = exact ?? isoOf(textOf(form, "originalStartsAt"));
+            const missing = required("reason");
+            if (originalStartsAt === null) missing.push(field);
+            if (missing.length) return refuse(...missing);
+            return { name, originalStartsAt, reason: textOf(form, "reason") };
+        }
+        if (name === "version.deployed") {
+            const missing = required("version");
+            if (missing.length) return refuse(...missing);
+            return { name, version: textOf(form, "version"), promptReload: fieldOf(form, "promptReload").checked === true };
+        }
+        const ttlSeconds = number("ttlSeconds", 0);
+        const missing = required("title", "body");
+        if (ttlSeconds === null) missing.push(fieldOf(form, "ttlSeconds"));
+        if (missing.length) return refuse(...missing);
+        return { name, title: textOf(form, "title"), body: fieldOf(form, "body").value, ttlSeconds };
+    }
+
+    const labelOf = status => ({ 400: "labelInvalid", 429: "labelRate" })[status] ?? "labelUnavailable";
+
+    async function send(panel, root, form, button) {
+        const body = bodyOf(form);
+        if (body === null) return;
+        button.disabled = true; // synchronously: a second click finds it disabled
+        let status = 0;
+        try {
+            status = (await CatapultCsrf.postJson("/admin/broadcast", body)).status;
+        } catch {
+            // not sent: told below
+        } finally {
+            button.disabled = false;
+        }
+        if (status === 202) {
+            window.mdui?.snackbar?.({ message: root.dataset.labelSent });
+            // Reloaded rather than reset: a reset leaves the required fields marked, and the
+            // "Announced maintenance" card would not show what was just sent.
+            await CatapultAdminTabs.reload(panel);
+        } else {
+            CatapultChannel.showError(root.dataset[labelOf(status)]);
+        }
+    }
+
+    function cancelCurrent(root, card) {
+        const form = root.querySelector('form[data-broadcast="maintenance.cancelled"]');
+        const iso = card.dataset.currentStartsAt;
+        const field = fieldOf(form, "originalStartsAt");
+        field.value = localOf(iso);
+        form.dataset.originalIso = iso;
+        form.dataset.originalLocal = field.value;
+        select(root, "maintenance.cancelled");
+    }
+
+    function attach() {
+        const panel = document.querySelector('mdui-tab-panel[value="broadcast"]');
+        if (!panel) return;
+        const rootOf = () => panel.querySelector(".admin-broadcast");
+
+        panel.addEventListener("click", event => {
+            const target = event.target.closest(".admin-broadcast-send, #admin-broadcast-cancel-current");
+            const root = rootOf();
+            if (!target || target.disabled || !root) return;
+            if (target.matches("#admin-broadcast-cancel-current")) {
+                cancelCurrent(root, target.closest("[data-current-starts-at]"));
+            } else {
+                send(panel, root, target.closest("form[data-broadcast]"), target);
+            }
+        });
+        panel.addEventListener("input", event => event.target.removeAttribute?.("invalid"));
+        panel.addEventListener("change", event => {
+            const root = rootOf();
+            if (root && event.target.matches?.('[name="type"]')) select(root, event.target.value);
+        });
+    }
+
+    document.addEventListener("catapult:render", attach);
+
+    return { attach };
 })();

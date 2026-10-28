@@ -34,6 +34,9 @@ public class ConfigCatalogService {
             }
         }
 
+        DatabaseOverridePropertySource overrides =
+                (DatabaseOverridePropertySource) environment.getPropertySources().get(DatabaseOverridePropertySource.NAME);
+
         List<ConfigEntry> out = new ArrayList<>(keys.size());
         for (String key : keys) {
             String normalized = key.replace('-', '.');
@@ -42,8 +45,9 @@ public class ConfigCatalogService {
             boolean restartRequired = restartPrefixes.stream().anyMatch(key::startsWith);
             String source = sourceOf(key);
             boolean overridden = DatabaseOverridePropertySource.NAME.equals(source);
+            boolean ignoredByProfile = overrides != null && overrides.ignores(key);
             String value = secret ? null : environment.getProperty(key);
-            out.add(new ConfigEntry(key, value, secret, restartRequired, overridden, taboo, source));
+            out.add(new ConfigEntry(key, value, secret, restartRequired, overridden, taboo, ignoredByProfile, source));
         }
         return out;
     }

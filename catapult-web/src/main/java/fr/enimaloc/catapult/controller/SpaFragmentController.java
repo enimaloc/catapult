@@ -1,0 +1,194 @@
+package fr.enimaloc.catapult.controller;
+
+import fr.enimaloc.catapult.common.dto.HelpContent;
+import fr.enimaloc.catapult.common.dto.channel.ChannelDto;
+import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
+import fr.enimaloc.catapult.service.ApiService;
+import fr.enimaloc.catapult.service.http.ApiClient;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+
+import java.io.IOException;
+import java.util.List;
+import java.util.Locale;
+import java.util.regex.Pattern;
+
+/**
+ * The fragments spa.js swaps into #app on client-side navigation — one per
+ * {@link SiteCatalog#PAGES} entry's {@code templateUrl}, plus a 404 fragment for anything else.
+ */
+@Controller
+@RequestMapping("/spa")
+@RequiredArgsConstructor
+public class SpaFragmentController {
+    private static final Pattern HELP_CARD_ID = Pattern.compile("[a-z-]{1,40}");
+
+    private final ModelFiller filler;
+    private final ApiService apiService;
+    private final NavEventStreamController navEvents;
+
+    @GetMapping("/landing")
+    String landing(Model model) {
+        filler.defaultAttr(model, "");
+        return "pages/landing :: landing";
+    }
+
+    @GetMapping("/privacy")
+    String privacy(Model model, Locale locale) throws IOException {
+        filler.privacy(model, locale);
+        return "pages/privacy :: privacy";
+    }
+
+    /** The navbar's channels, which spa.js loads once the page is shown; their live updates follow them. */
+    @GetMapping("/nav-channels")
+    String navChannels(Model model, HttpServletRequest request) {
+        List<ChannelDto> channels = filler.navChannels(model);
+        HttpSession session = SessionStreams.loggedIn(request);
+        if (session != null) {
+            navEvents.remember(session, channels);
+        }
+        return "fragments/nav-channels :: channels";
+    }
+
+    @GetMapping("/channel/{username}")
+    String channel(Model model, @PathVariable String username,
+                   @RequestParam(defaultValue = "0") int page,
+                   @RequestParam(required = false) String status,
+                   @RequestParam(required = false) String source,
+                   @RequestParam(required = false) String view,
+                   @RequestHeader(value = HttpHeaders.USER_AGENT, required = false) String userAgent,
+                   HttpServletResponse response) {
+        // The dock re-renders itself through here too (CatapultChannel.refresh): it must stay a dock.
+        if (ObsDock.wanted(userAgent, view)) {
+            return dock(model, username, response);
+        }
+        int refused = filler.channel(model, username, page, status, source);
+        if (refused != 0) {
+            response.setStatus(refused);
+            filler.error(model, refused);
+            return "pages/error :: error";
+        }
+        filler.defaultAttr(model, "channel");
+        return "pages/channel :: channel";
+    }
+
+    /**
+     * The channel page's state as its live events (see {@link ChannelState}), which channel-events.js applies when
+     * its stream opens again instead of re-rendering the page; the page's own query, for the bindings it lists.
+     * 401 for a visitor, 404 when catapult-api answers nothing, as the page.
+     */
+    @GetMapping(value = "/channel/{username}/state", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    ResponseEntity<List<ChannelState.Entry>> channelState(@PathVariable String username,
+                                                          @RequestParam(defaultValue = "0") int page,
+                                                          @RequestParam(required = false) String status,
+                                                          @RequestParam(required = false) String source) {
+        ChannelPageData channelPage = apiService.channelPage(username, page, status, source);
+        if (channelPage == null) {
+            return ResponseEntity.status(ApiClient.hasSession() ? HttpStatus.NOT_FOUND : HttpStatus.UNAUTHORIZED).build();
+        }
+        return ResponseEntity.ok(ChannelState.of(channelPage, apiService.channelSettings(username),
+                apiService.dtddMappingStatus(username)));
+    }
+
+    @GetMapping("/channel/{username}/dock")
+    String dock(Model model, @PathVariable String username, HttpServletResponse response) {
+        int refused = filler.channelDock(model, username);
+        if (refused != 0) {
+            response.setStatus(refused);
+            filler.error(model, refused);
+            return "pages/error :: error";
+        }
+        filler.defaultAttr(model, "channel-dock");
+        return "pages/channel-dock :: dock";
+    }
+
+    @GetMapping("/admin")
+    String admin(Model model, HttpServletResponse response) {
+        int refused = AdminAccess.refusal(filler);
+        if (refused != 0) {
+            response.setStatus(refused);
+            filler.error(model, refused);
+            return "pages/error :: error";
+        }
+        filler.admin(model);
+        filler.defaultAttr(model, "admin");
+        return "pages/admin :: admin";
+    }
+
+    /** The notifications page; only "logged in" matters, every member sees their own. */
+    @GetMapping("/notifications")
+    String notifications(Model model, @RequestParam(defaultValue = "0") int page, HttpServletResponse response) {
+        if (!ApiClient.hasSession()) {
+            response.setStatus(HttpStatus.UNAUTHORIZED.value());
+            filler.error(model, HttpStatus.UNAUTHORIZED.value());
+            return "pages/error :: error";
+        }
+        filler.notifications(model, Math.max(page, 0));
+        filler.defaultAttr(model, "notifications");
+        model.addAttribute("page", Math.max(page, 0));
+        return "pages/notifications :: notifications";
+    }
+
+    @GetMapping("/login")
+    String login(Model model, @RequestParam(required = false) String error) {
+        String channel = ModelFiller.loggedInChannelPath();
+        if (channel != null) {
+            return "redirect:/spa" + channel;
+        }
+        filler.login(model, error);
+        filler.defaultAttr(model, "login");
+        return "pages/login :: login";
+    }
+
+    @GetMapping("/join")
+    String join(Model model, @RequestParam(required = false) String invite,
+                @RequestParam(required = false) String error) {
+        String channel = ModelFiller.loggedInChannelPath();
+        if (channel != null) {
+            return "redirect:/spa" + channel;
+        }
+        filler.join(model, invite, error);
+        filler.defaultAttr(model, "join");
+        return "pages/join :: join";
+    }
+
+    /**
+     * A card's help, in the visitor's language, for the side sheet help.js fills. catapult-api's answer
+     * is its own message bundles, so its HTML is rendered as is ({@code th:utext}); the card id (checked
+     * here, it reaches a catapult-api path) is the only thing the visitor chooses.
+     */
+    @GetMapping("/help/{cardId}")
+    String help(Model model, @PathVariable String cardId, Locale locale, HttpServletResponse response) {
+        if (!HELP_CARD_ID.matcher(cardId).matches()) {
+            response.setStatus(HttpStatus.NOT_FOUND.value());
+            filler.error(model, HttpStatus.NOT_FOUND.value());
+            return "pages/error :: error";
+        }
+        HelpContent help = apiService.help(cardId, locale);
+        model.addAttribute("helpTitle", help != null ? help.title() : cardId);
+        model.addAttribute("helpBody", help != null ? help.body() : "");
+        return "fragments/help :: content";
+    }
+
+    @GetMapping("/{page}")
+    String unknown(Model model, HttpServletResponse response) {
+        response.setStatus(HttpStatus.NOT_FOUND.value());
+        filler.error(model, HttpStatus.NOT_FOUND.value());
+        return "pages/error :: error";
+    }
+}

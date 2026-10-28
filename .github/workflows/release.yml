@@ -1,130 +1,213 @@
 name: Release
 
+# Runs on every version tag push: the one publish.yml pushes with the App token once a release PR is
+# merged, or one pushed by hand. Idempotent: skipped when the GitHub Release already exists, which is
+# created last, once both images are pushed.
 on:
   push:
     tags:
       - '*'
 
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
 jobs:
-  version-branch:
+  check:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
+      pull-requests: read
+    outputs:
+      notes: ${{ steps.notes.outputs.notes }}
+      version: ${{ steps.check.outputs.version }}
+      prerelease: ${{ steps.check.outputs.prerelease }}
+      image-tag: ${{ steps.check.outputs.image-tag }}
+      channel: ${{ steps.check.outputs.channel }}
+      skip: ${{ steps.check.outputs.skip }}
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Create version branch
+      - id: check
+        name: Resolve the version and look for an existing release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ github.ref_name }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout -b "v/${GITHUB_REF_NAME}"
-          git push origin "v/${GITHUB_REF_NAME}"
+          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-BETA\.[0-9]+)?$ ]]; then
+            echo "::error::Not a release version: $VERSION (expected vX.Y.Z or vX.Y.Z-BETA.N)"
+            exit 1
+          fi
+          if [[ "$VERSION" == *-BETA.* ]]; then prerelease=true; channel=beta; else prerelease=false; channel=latest; fi
+          if out=$(gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" --json tagName 2>&1); then
+            skip=true
+            echo "::notice::$VERSION already has a GitHub Release: nothing is published again"
+          elif [[ "$out" == *"release not found"* ]]; then
+            skip=false
+          else
+            echo "$out" >&2
+            exit 1
+          fi
+          {
+            echo "version=$VERSION"
+            echo "prerelease=$prerelease"
+            echo "image-tag=${VERSION#v}"
+            echo "channel=$channel"
+            echo "skip=$skip"
+          } >> "$GITHUB_OUTPUT"
 
+      - if: steps.check.outputs.skip != 'true'
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - if: steps.check.outputs.skip != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - id: notes
+        if: steps.check.outputs.skip != 'true'
+        name: Take the notes from the merged release pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.check.outputs.version }}
+          SHA: ${{ github.sha }}
+        run: |
+          node .github/release/notes.mjs --tag "$VERSION" --sha "$SHA" --out "$RUNNER_TEMP/notes.md"
+          delimiter="notes_$(openssl rand -hex 16)"
+          {
+            echo "notes<<$delimiter"
+            cat "$RUNNER_TEMP/notes.md"
+            echo
+            echo "$delimiter"
+          } >> "$GITHUB_OUTPUT"
+
+  # Last: the release is the idempotence marker, so it must not exist unless both images were pushed.
   github-release:
+    needs: [check, release-api, release-web]
+    if: needs.check.outputs.skip != 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
-          fetch-depth: 0
+          ref: ${{ needs.check.outputs.version }}
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
-          generate_release_notes: true
-          prerelease: ${{ contains(github.ref_name, '-ALPHA') || contains(github.ref_name, '-BETA') }}
+          tag_name: ${{ needs.check.outputs.version }}
+          body: ${{ needs.check.outputs.notes }}
+          generate_release_notes: ${{ !needs.check.outputs.notes }}
+          prerelease: ${{ needs.check.outputs.prerelease == 'true' }}
+
+  # Best effort, once the release exists: the pinned issue's « Dernières releases » lists it right away.
+  dashboard:
+    needs: [github-release]
+    if: needs.github-release.result == 'success'
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Refresh the releases dashboard
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: node .github/release/dashboard.mjs
+
+  # Best effort, once the release exists: CHANGELOG.md on the default branch (dev) gets its notes.
+  changelog:
+    needs: [check, github-release]
+    if: needs.github-release.result == 'success'
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+      # Full history and tags: each version's date is its tagged commit's.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Regenerate CHANGELOG.md
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          VERSION: ${{ needs.check.outputs.version }}
+          BRANCH: ${{ github.event.repository.default_branch }}
+        run: node .github/release/changelog.mjs --tag "$VERSION" --branch "$BRANCH"
 
   release-api:
+    needs: check
+    if: needs.check.outputs.skip != 'true'
     runs-on: ubuntu-latest
     permissions:
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.check.outputs.version }}
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: catapult-api/Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}/api:${{ github.ref_name }}
-            ghcr.io/${{ github.repository }}/api:latest
+            ghcr.io/${{ github.repository }}/api:${{ needs.check.outputs.image-tag }}
+            ghcr.io/${{ github.repository }}/api:${{ needs.check.outputs.channel }}
 
   release-web:
+    needs: check
+    if: needs.check.outputs.skip != 'true'
     runs-on: ubuntu-latest
     permissions:
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.check.outputs.version }}
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: catapult-web/Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}/web:${{ github.ref_name }}
-            ghcr.io/${{ github.repository }}/web:latest
-
-  release-maintenance:
-    runs-on: ubuntu-latest
-    permissions:
-      packages: write
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push
-        uses: docker/build-push-action@v5
-        with:
-          context: catapult-maintenance
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository }}/maintenance:${{ github.ref_name }}
-            ghcr.io/${{ github.repository }}/maintenance:latest
-
-  release-nginx-router:
-    runs-on: ubuntu-latest
-    permissions:
-      packages: write
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push
-        uses: docker/build-push-action@v5
-        with:
-          context: nginx-router
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository }}/nginx-router:${{ github.ref_name }}
-            ghcr.io/${{ github.repository }}/nginx-router:latest
+            ghcr.io/${{ github.repository }}/web:${{ needs.check.outputs.image-tag }}
+            ghcr.io/${{ github.repository }}/web:${{ needs.check.outputs.channel }}

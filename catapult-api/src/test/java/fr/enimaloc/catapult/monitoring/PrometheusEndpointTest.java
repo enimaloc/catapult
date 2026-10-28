@@ -1,7 +1,7 @@
 package fr.enimaloc.catapult.monitoring;
 
 import fr.enimaloc.catapult.security.TwitchLoginSuccessHandler;
-import fr.enimaloc.catapult.service.AdminCclService;
+import fr.enimaloc.catapult.service.igdb.AdminCclService;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
 import org.junit.jupiter.api.Test;

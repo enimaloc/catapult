@@ -1,0 +1,2609 @@
+:root {
+    color-scheme: dark;
+
+    /* Catapult colors */
+    --catapult-background: #0b0d12;
+
+    --catapult-surface: #11141b;
+    --catapult-surface-elevated: #181c25;
+
+    --catapult-border: #292e3a;
+    --catapult-border-hover: #3b4252;
+
+    --catapult-text: #f4f6fb;
+    --catapult-text-secondary: #aeb4c0;
+    --catapult-text-muted: #747b89;
+
+    --catapult-primary: #8b5cf6;
+    --catapult-primary-hover: #a78bfa;
+    --catapult-primary-dark: #6d28d9;
+
+    --catapult-max-width: 1180px;
+    --catapult-radius: 20px;
+
+    --catapult-gradient: linear-gradient(135deg, #a78bfa 0%, #818cf8 50%, #60a5fa 100%);
+
+    /* An experiment's variants (the admin weight bar): the control in the muted grey, the others in the gradient's hues. */
+    --catapult-variant-control: var(--catapult-text-muted);
+    --catapult-variant-1: var(--catapult-primary);
+    --catapult-variant-2: #818cf8;
+    --catapult-variant-3: #60a5fa;
+    --catapult-variant-4: var(--catapult-primary-hover);
+}
+
+
+/*
+ * Base
+ */
+
+* {
+    box-sizing: border-box;
+}
+
+html {
+    scroll-behavior: smooth;
+    background: var(--catapult-background);
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--catapult-background);
+    color: var(--catapult-text);
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+
+/*
+ * mdui
+ */
+
+mdui-layout {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--catapult-background);
+}
+
+mdui-layout-main {
+    flex: 1 0 auto;
+    background: var(--catapult-background);
+}
+
+mdui-top-app-bar {
+    --mdui-color-surface: rgba(11, 13, 18, 0.78);
+}
+
+
+/*
+ * Navigation
+ */
+
+.app-bar {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(18px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    font-weight: 700;
+}
+
+.brand-icon {
+    font-size: 1.2em;
+}
+
+/* Brand and end share the free space evenly, so the channels sit in the bar's center. */
+.app-bar > .brand-link,
+.app-bar > .app-bar-end {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.app-bar-end {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.nav-channels {
+    display: flex;
+    gap: 6px;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.nav-channel {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 12px 4px 4px;
+    border-radius: 999px;
+    color: var(--catapult-text-secondary);
+    text-decoration: none;
+    transition: background-color 150ms ease, color 150ms ease;
+}
+
+.nav-channel:hover {
+    background: var(--catapult-surface);
+    color: var(--catapult-text);
+}
+
+.nav-channel.active {
+    background: rgba(139, 92, 246, 0.13);
+    color: var(--catapult-primary-hover);
+}
+
+/* An avatar's picture given as its own <img> (for loading="lazy", which mdui-avatar's src lacks): mdui only sizes
+   the one it renders itself. */
+mdui-avatar > img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.nav-channel mdui-avatar {
+    width: 28px;
+    height: 28px;
+    flex: none;
+}
+
+/* The bell: as Material 3 places it, the badge starts at the icon's middle (the 24px icon is
+   centred in the 40px button) and grows rightwards, so "99+" never covers the bell. Clicks go
+   through it to the button. */
+.notifications-trigger {
+    position: relative;
+    display: inline-flex;
+}
+
+.notifications-trigger mdui-badge {
+    position: absolute;
+    top: 4px;
+    left: 20px;
+    pointer-events: none;
+}
+
+.notifications-dropdown {
+    width: min(360px, calc(100vw - 32px));
+    max-height: 70vh;
+    overflow: auto;
+    background: rgb(var(--mdui-color-surface-container));
+    border-radius: var(--mdui-shape-corner-medium);
+}
+
+.notification-item {
+    --notification-color: rgb(var(--mdui-color-primary));
+    display: flex;
+    gap: 12px;
+    padding: 12px 16px;
+    border-left: 3px solid transparent;
+    cursor: pointer;
+}
+
+.notification-item[data-severity="WARNING"] { --notification-color: rgb(var(--mdui-color-tertiary)); }
+.notification-item[data-severity="ERROR"] { --notification-color: rgb(var(--mdui-color-error)); }
+
+.notification-item .notification-icon { color: var(--notification-color); flex: none; }
+
+.notification-item[data-read="false"] {
+    border-left-color: var(--notification-color);
+}
+
+.notification-item[data-read="false"] .notification-title { font-weight: 700; }
+
+.notification-content { min-width: 0; }
+.notification-body { overflow-wrap: anywhere; }
+.notification-date { display: block; color: var(--catapult-text-secondary); font-size: 0.8em; }
+.notification-empty { padding: 16px; text-align: center; color: var(--catapult-text-secondary); }
+
+.notification-actions {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 8px;
+}
+
+/* A phone: anchored to the bell, the panel would run off the left edge; pinned under the bar instead. */
+@media (max-width: 600px) {
+    #notifications-bell::part(panel) {
+        position: fixed !important;
+        left: 16px !important;
+        right: 16px !important;
+        top: 64px !important;
+        transform: none !important;
+    }
+
+    .notifications-dropdown { width: auto; }
+}
+
+/* The /notifications page: the same items as the menu, in a card-like list. */
+#notifications-page {
+    background: rgb(var(--mdui-color-surface-container));
+    border-radius: var(--mdui-shape-corner-medium);
+    overflow: hidden;
+}
+
+#notifications-page .notification-item + .notification-item {
+    border-top: 1px solid rgb(var(--mdui-color-outline-variant));
+}
+
+.nav-admin {
+    margin-right: 8px;
+    padding-left: 8px;
+}
+
+/* The log-out button sits in the bar like the bell: the form adds no box of its own. */
+.nav-logout {
+    display: contents;
+}
+
+/* Live: a red ring around the avatar. */
+.nav-channel.live mdui-avatar {
+    outline: 2px solid #ef4444;
+    outline-offset: 1px;
+}
+
+@media (max-width: 650px) {
+    /* The rocket alone: the channels need the room. */
+    .app-bar .brand > span:not(.brand-icon) {
+        display: none;
+    }
+
+    .nav-channel {
+        padding: 4px;
+    }
+
+    .nav-channel span {
+        display: none;
+    }
+}
+
+
+/*
+ * Hero
+ */
+
+.hero {
+    position: relative;
+    min-height: 680px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 100px 24px;
+    overflow: hidden;
+}
+
+.hero-glow {
+    position: absolute;
+    width: 800px;
+    height: 600px;
+    top: -300px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: radial-gradient(ellipse, rgba(124, 58, 237, 0.24) 0%, rgba(99, 102, 241, 0.10) 35%, transparent 70%);
+    pointer-events: none;
+}
+
+.hero-content {
+    position: relative;
+    z-index: 1;
+    width: min(820px, 100%);
+    text-align: center;
+}
+
+.hero-chip {
+    margin-bottom: 28px;
+}
+
+.hero h1 {
+    margin: 0;
+    font-size: clamp(3rem, 7vw, 5.5rem);
+    line-height: 0.98;
+    letter-spacing: -0.065em;
+    font-weight: 800;
+}
+
+.hero h1 span {
+    display: block;
+    margin-top: 8px;
+    background: var(--catapult-gradient);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.hero-description {
+    max-width: 650px;
+    margin: 32px auto 0;
+    color: var(--catapult-text-secondary);
+    font-size: 1.18rem;
+    line-height: 1.7;
+}
+
+.hero-error {
+    margin: 24px auto 0;
+    max-width: 650px;
+    color: rgb(var(--mdui-color-error));
+}
+
+.hero-actions {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    margin-top: 40px;
+    flex-wrap: wrap;
+}
+
+
+/*
+ * Sections
+ */
+
+.section,
+.platform-section,
+.cta-section,
+.footer {
+    width: min(var(--catapult-max-width), calc(100% - 48px));
+    margin: 0 auto;
+}
+
+.section {
+    padding: 100px 0;
+}
+
+.section-header {
+    margin-bottom: 48px;
+}
+
+.eyebrow {
+    display: block;
+    color: var(--catapult-primary-hover);
+    font-size: 0.72rem;
+    font-weight: 750;
+    letter-spacing: 0.16em;
+}
+
+.section-header h2 {
+    margin: 10px 0 12px;
+    color: var(--catapult-text);
+    font-size: clamp(2rem, 4vw, 3rem);
+    line-height: 1.1;
+    letter-spacing: -0.045em;
+}
+
+.section-header p {
+    max-width: 650px;
+    margin: 0;
+    color: var(--catapult-text-secondary);
+    font-size: 1rem;
+    line-height: 1.65;
+}
+
+
+/*
+ * Cards
+ *
+ * Every content card shares one surface; each card's own rule only adds its
+ * layout. The landing's showcase cards also lift on hover.
+ */
+
+:is(.feature-card, .platform-card, .privacy-card,
+    .status-card, .connection-card, .settings-card) {
+    border-radius: var(--catapult-radius);
+    background: var(--catapult-surface);
+    border: 1px solid var(--catapult-border);
+    color: var(--catapult-text);
+}
+
+:is(.feature-card, .platform-card) {
+    transition: transform 150ms ease, background-color 150ms ease, border-color 150ms ease;
+}
+
+:is(.feature-card, .platform-card):hover {
+    transform: translateY(-4px);
+    background: var(--catapult-surface-elevated);
+    border-color: var(--catapult-border-hover);
+}
+
+
+/*
+ * Feature cards
+ */
+
+.features-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+}
+
+.feature-card {
+    min-height: 230px;
+    padding: 28px;
+}
+
+.feature-icon {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 22px;
+    border-radius: 14px;
+    background: rgba(139, 92, 246, 0.13);
+    color: var(--catapult-primary-hover);
+}
+
+.feature-icon mdui-icon {
+    font-size: 24px;
+}
+
+.feature-card h3 {
+    margin: 0 0 10px;
+    color: var(--catapult-text);
+    font-size: 1.12rem;
+    line-height: 1.3;
+}
+
+.feature-card p {
+    margin: 0;
+    color: var(--catapult-text-secondary);
+    line-height: 1.65;
+}
+
+
+/*
+ * Platforms
+ */
+
+.platform-section {
+    padding: 80px 0;
+}
+
+.platforms {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+}
+
+.platform-card {
+    min-height: 120px;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 24px;
+}
+
+.platform-icon {
+    width: 52px;
+    height: 52px;
+    flex: 0 0 52px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 15px;
+    font-size: 1.8rem;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.platform-icon mdui-icon {
+    font-size: 28px;
+}
+
+.platform-content h3 {
+    margin: 0 0 5px;
+    color: var(--catapult-text);
+    font-size: 1.05rem;
+}
+
+.platform-content p {
+    margin: 0;
+    color: var(--catapult-text-secondary);
+    font-size: 0.9rem;
+}
+
+
+/*
+ * CTA
+ */
+
+.cta-section {
+    padding: 80px 0 120px;
+}
+
+.cta-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 32px;
+    padding: 42px;
+    border-radius: 24px;
+    background: radial-gradient(circle at 100% 0%, rgba(139, 92, 246, 0.16), transparent 45%), var(--catapult-surface);
+    border: 1px solid var(--catapult-border);
+}
+
+.cta-content h2 {
+    margin: 8px 0 10px;
+    color: var(--catapult-text);
+    font-size: 2rem;
+    letter-spacing: -0.035em;
+}
+
+.cta-content p {
+    margin: 0;
+    color: var(--catapult-text-secondary);
+    line-height: 1.6;
+}
+
+
+/*
+ * Footer
+ */
+.footer {
+    padding: 28px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    color: var(--catapult-text-muted);
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.footer-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--catapult-text-secondary);
+    font-weight: 650;
+}
+
+.footer-links {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.footer a {
+    color: var(--catapult-text-muted);
+    text-decoration: none;
+    transition: color 120ms ease;
+}
+
+.footer-social {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.social-icon {
+    width: 1.1em;
+    height: 1.1em;
+    fill: currentColor;
+    flex: none;
+}
+
+.footer a:hover {
+    color: var(--catapult-text);
+}
+
+a[data-link].active {
+    color: var(--catapult-text);
+    font-weight: 650;
+}
+
+.version {
+    padding: 5px 9px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    font-size: 0.75rem;
+}
+
+
+/*
+ * Responsive
+ */
+@media (max-width: 900px) {
+
+    .features-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .platforms {
+        grid-template-columns: 1fr;
+    }
+
+}
+
+@media (max-width: 650px) {
+
+    .hero {
+        min-height: 600px;
+        padding: 80px 20px;
+    }
+
+    .hero h1 {
+        font-size: 3.1rem;
+    }
+
+    .hero-description {
+        font-size: 1rem;
+    }
+
+    .hero-actions {
+        flex-direction: column;
+    }
+
+    .hero-actions mdui-button {
+        width: 100%;
+    }
+
+    .section,
+    .platform-section,
+    .cta-section,
+    .footer {
+        width: calc(100% - 32px);
+    }
+
+    .section {
+        padding: 70px 0;
+    }
+
+    .features-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .cta-card {
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 30px;
+    }
+
+    .cta-card mdui-button {
+        width: 100%;
+    }
+
+    .footer {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+}
+
+/*
+ * Privacy
+ */
+.privacy-page {
+    width: 100%;
+}
+
+.privacy-section {
+    padding-top: 80px;
+    padding-bottom: 100px;
+}
+
+.privacy-section .section-header {
+    max-width: 760px;
+}
+
+.privacy-section .section-header h1 {
+    margin: 10px 0 16px;
+    color: var(--catapult-text);
+    font-size: clamp(2.5rem, 5vw, 4rem);
+    line-height: 1.05;
+    letter-spacing: -0.05em;
+}
+
+/*
+ * Privacy card
+ */
+.privacy-card {
+    display: block;
+    width: 100%;
+    max-width: none;
+    margin-top: 48px;
+    padding: 36px;
+    overflow: hidden;
+    transition: background-color 150ms ease, border-color 150ms ease;
+}
+
+.privacy-card:hover {
+    background: var(--catapult-surface-elevated);
+    border-color: var(--catapult-border-hover);
+}
+
+/*
+ * Privacy content
+ */
+.privacy-content {
+    width: 100%;
+}
+
+.privacy-content section {
+    width: 100%;
+    padding: 0;
+}
+
+.privacy-content section + section {
+    margin-top: 28px;
+    padding-top: 28px;
+    border-top: 1px solid var(--catapult-border);
+}
+
+/*
+ * Headings
+ */
+.privacy-content h2 {
+    margin: 0 0 12px;
+    color: var(--catapult-text);
+    font-size: 1.25rem;
+    line-height: 1.35;
+    letter-spacing: -0.02em;
+}
+
+/*
+ * Text
+ */
+.privacy-content p {
+    margin: 0;
+    color: var(--catapult-text-secondary);
+    font-size: 1rem;
+    line-height: 1.7;
+}
+
+/*
+ * Lists
+ */
+.privacy-content ul {
+    margin: 0;
+    padding-left: 24px;
+    color: var(--catapult-text-secondary);
+}
+
+.privacy-content li {
+    color: var(--catapult-text-secondary);
+    line-height: 1.7;
+}
+
+.privacy-content li + li {
+    margin-top: 6px;
+}
+
+/*
+ * Links
+ */
+.privacy-content a {
+    color: var(--catapult-primary-hover);
+    text-decoration: none;
+    transition: color 120ms ease;
+}
+
+.privacy-content a:hover {
+    color: var(--catapult-text);
+}
+
+/*
+ * Last update
+ */
+.privacy-last-update {
+    margin: 24px 0 0;
+    padding-top: 20px;
+    border-top: 1px solid var(--catapult-border);
+    color: var(--catapult-text-muted);
+    font-size: 0.85rem;
+    line-height: 1.5;
+}
+
+/*
+ * Mdui
+ *
+ * Le séparateur mdui reprend la bordure Catapult plutôt que la couleur
+ * de contour du thème, pour s'aligner sur les autres séparateurs.
+ */
+.privacy-card mdui-divider {
+    --mdui-color-divider: var(--catapult-border);
+}
+
+/*
+ * Responsive
+ */
+@media (max-width: 650px) {
+
+    .privacy-section {
+        padding-top: 60px;
+        padding-bottom: 70px;
+    }
+
+    .privacy-card {
+        margin-top: 32px;
+        padding: 24px;
+    }
+
+    .privacy-content h2 {
+        font-size: 1.15rem;
+    }
+
+    .privacy-content p,
+    .privacy-content li {
+        font-size: 0.95rem;
+    }
+
+}
+
+
+/*
+ * Error
+ */
+
+.error-page {
+    min-height: 620px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+.error-content {
+    width: min(700px, 100%);
+    margin: 0 auto;
+}
+
+/*
+ * Error code
+ */
+.error-code {
+    display: block;
+    margin-bottom: 18px;
+    background: var(--catapult-gradient);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    font-size: clamp(6rem, 18vw, 11rem);
+    font-weight: 800;
+    line-height: 0.85;
+    letter-spacing: -0.08em;
+}
+
+/*
+ * Title
+ */
+.error-content h1 {
+    margin: 12px 0 16px;
+    color: var(--catapult-text);
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    line-height: 1.05;
+    letter-spacing: -0.05em;
+}
+
+/*
+ * Description
+ */
+.error-description {
+    max-width: 600px;
+    margin: 0 auto;
+    color: var(--catapult-text-secondary);
+    font-size: 1.1rem;
+    line-height: 1.7;
+}
+
+/*
+ * Actions
+ */
+.error-actions {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    margin-top: 36px;
+    flex-wrap: wrap;
+}
+
+/*
+ * Responsive
+ */
+@media (max-width: 650px) {
+
+    .error-page {
+        min-height: 560px;
+    }
+
+    .error-code {
+        font-size: 7rem;
+    }
+
+    .error-description {
+        font-size: 1rem;
+    }
+
+    .error-actions {
+        flex-direction: column;
+    }
+
+    .error-actions mdui-button {
+        width: 100%;
+    }
+
+}
+
+
+/*
+ * Channel dashboard
+ */
+
+.channel-section {
+    padding-top: 80px;
+}
+
+.channel-section .section-header {
+    margin-bottom: 28px;
+}
+
+.channel-section h2 {
+    margin: 0 0 14px;
+    color: var(--catapult-text);
+    font-size: 1.5rem;
+    letter-spacing: -0.02em;
+}
+
+/* Header: same eyebrow + display title as the privacy/channels pages, with the avatar. */
+
+.channel-section .channel-header {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 36px;
+}
+
+.channel-header-avatar {
+    width: 64px;
+    height: 64px;
+    flex: 0 0 64px;
+    border: 1px solid var(--catapult-border);
+}
+
+.channel-header h1 {
+    margin: 6px 0 0;
+    color: var(--catapult-text);
+    font-size: clamp(2.2rem, 5vw, 3.4rem);
+    line-height: 1.05;
+    letter-spacing: -0.05em;
+}
+
+/* Tabs */
+
+/* The tab strip paints its own rgb(--mdui-color-surface) background, a shade off the page's. */
+.channel-tabs::part(container) {
+    background-color: transparent;
+}
+
+.channel-tabs mdui-tab-panel {
+    padding-top: 36px;
+}
+
+/* Each tab panel stacks its own section headers: space them like the old single page. */
+.channel-tabs mdui-tab-panel > * + .section-header {
+    margin-top: 56px;
+}
+
+.admin-placeholder {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--catapult-text-secondary);
+}
+
+/* Admin members: one grid row per account, a header row above them on wide screens. */
+.admin-members {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 24px;
+    padding: 8px 0;
+}
+
+.admin-member {
+    display: grid;
+    grid-template-columns: minmax(0, 2.4fr) minmax(0, 1.4fr) 64px minmax(0, 1fr) minmax(0, 1fr) 40px;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 24px;
+}
+
+.admin-member + .admin-member {
+    border-top: 1px solid var(--catapult-border);
+}
+
+.admin-member-head {
+    color: var(--catapult-text-muted);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.admin-member-identity {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+}
+
+.admin-member-identity > div {
+    min-width: 0;
+}
+
+.admin-member-identity strong {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.admin-member-badges {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.admin-member-id,
+.admin-member-steam,
+.admin-member-created {
+    color: var(--catapult-text-secondary);
+    font-size: 0.85rem;
+    overflow-wrap: anywhere;
+}
+
+.admin-member-live {
+    --mdui-color-secondary-container: 239, 68, 68;
+}
+
+.admin-member-delete {
+    color: #ef4444;
+}
+
+.admin-migrate-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.admin-migrate-form label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.admin-debug-warning {
+    margin: 0;
+    color: #ef4444;
+}
+
+.admin-debug-state {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 24px;
+    margin-bottom: 16px;
+}
+
+.admin-debug-filters {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.admin-debug-exchange {
+    cursor: pointer;
+}
+
+.admin-debug-exchange:hover, .admin-debug-exchange:focus-visible {
+    background: rgb(var(--mdui-color-surface-container-high));
+}
+
+/* .admin-row's own columns come later in this file: the second class outranks them. Every column has its own
+   width, the badges' too (room for both): each row is its own grid, they line up only if none is sized by content. */
+.admin-row.admin-debug-row {
+    grid-template-columns: 11rem 3.5rem 6rem 4rem minmax(0, 1fr) 3.5rem 5rem 12rem;
+}
+
+.admin-debug-badges {
+    display: flex;
+    gap: 4px;
+}
+
+.admin-debug-detail pre {
+    margin: 0 0 16px;
+    padding: 12px;
+    overflow: auto;
+    max-height: 40vh;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-size: 0.8rem;
+    background: rgb(var(--mdui-color-surface-container-high));
+    border-radius: 8px;
+}
+
+.admin-debug-trace {
+    cursor: copy;
+}
+
+@media (max-width: 650px) {
+    .admin-row.admin-debug-row {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .admin-debug-row.admin-row-head {
+        display: none;
+    }
+
+    .admin-member-head {
+        display: none;
+    }
+
+    /* Identity and menu on the first line, the rest wrapped below. */
+    .admin-member {
+        grid-template-columns: auto auto minmax(0, 1fr) 40px;
+        grid-template-areas:
+            "identity identity identity menu"
+            "bot status created created"
+            "steam steam steam steam";
+        padding: 12px 16px;
+    }
+
+    .admin-member > :nth-child(1) { grid-area: identity; }
+    .admin-member > :nth-child(2) { grid-area: steam; }
+    .admin-member > :nth-child(3) { grid-area: bot; }
+    .admin-member > :nth-child(4) { grid-area: status; }
+    .admin-member > :nth-child(5) { grid-area: created; }
+    .admin-member > :nth-child(6) { grid-area: menu; }
+}
+
+/* Dashboard cards (surface shared via Cards above) */
+
+.status-card,
+.settings-card {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 24px;
+    padding: 24px 28px;
+}
+
+.status-card {
+    gap: 16px;
+}
+
+.settings-card {
+    gap: 14px;
+}
+
+#custom-bindings-error {
+    margin: 0;
+    color: rgb(var(--mdui-color-error));
+}
+
+#api-token-curl {
+    margin: 0;
+    padding: 12px;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    border-radius: 8px;
+    background: rgb(var(--mdui-color-surface-container-highest));
+}
+
+/*
+ * One row per connection: name on the left, status chip on the right, then any
+ * details (diagnostics, token form, Minecraft status) and the actions below,
+ * across the full width.
+ */
+.connection-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px 16px;
+    padding: 20px 24px;
+}
+
+/* Inline "switch + text" rows, wherever they appear on the dashboard. */
+:is(.settings-card, .connection-card, .binding-edit-panel, .binding-ccl-panel, .binding-tw-panel) label,
+.binding-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--catapult-text-secondary);
+    font-size: 0.9rem;
+}
+
+/* Every content block inside a card is separated from the previous one by a rule. */
+:is(.bot-toggle-row, .settings-switch-group, .connection-card > div, #dtdd-search-dialog,
+    .binding-edit-panel, .binding-ccl-panel, .binding-tw-panel) {
+    border-top: 1px solid var(--catapult-border);
+}
+
+/* Status card */
+
+.status-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+
+.status-row span {
+    color: var(--catapult-text-secondary);
+}
+
+.status-row mdui-button-icon {
+    margin-left: auto;
+}
+
+.bot-toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-top: 12px;
+}
+
+.bot-toggle-row label {
+    color: var(--catapult-text-secondary);
+    font-size: 0.92rem;
+}
+
+/* Bindings filters */
+
+.bindings-filters {
+    flex-wrap: wrap;
+}
+
+/*
+ * mdui-segmented-button-group resets every child's `selected` state on connect
+ * even without `selects` set, and a segment with `href` is excluded from the
+ * group's own value-tracking entirely — so the "current filter" look is ours to
+ * draw, via a plain class reaching into the shadow-rendered button part.
+ */
+.bindings-filters mdui-segmented-button.filter-active::part(button) {
+    background-color: rgba(139, 92, 246, 0.16);
+    color: var(--catapult-text);
+    font-weight: 650;
+}
+
+/* Bindings list */
+
+:is(#channel-bindings-list, #channel-custom-bindings-list) {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 24px;
+    padding: 0;
+    list-style: none;
+}
+
+:is(#channel-bindings-list, #channel-custom-bindings-list) mdui-list-item {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 16px 20px;
+    border-radius: 14px;
+    background: var(--catapult-surface);
+    border: 1px solid var(--catapult-border);
+    transition: border-color 150ms ease;
+}
+
+:is(#channel-bindings-list, #channel-custom-bindings-list) mdui-list-item:hover {
+    border-color: var(--catapult-border-hover);
+}
+
+/* An open row's header and body read as one card: square their joined corners.
+ * .is-open is set by the server (current game) and by channel-bindings.js. */
+:is(#channel-bindings-list, #channel-custom-bindings-list) mdui-collapse-item.is-open > mdui-list-item[slot="header"] {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+:is(#channel-bindings-list, #channel-custom-bindings-list) mdui-collapse-item.is-open > mdui-list-item:not([slot="header"]) {
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+}
+
+/*
+ * mdui-list-item renders its light-DOM children inside an internal
+ * ::part(container) div that, by default, only shrinks to fit its content
+ * (it isn't a flex-grow item of anything we control). Our own `display: flex`
+ * on the host above doesn't reach through the shadow boundary, so without
+ * this the container — and everything slotted into it, including the
+ * edit/tw grids below — stays only as wide as its content instead of filling
+ * the card.
+ */
+:is(#channel-bindings-list, #channel-custom-bindings-list) mdui-list-item::part(container) {
+    width: 100%;
+}
+
+:is(#channel-bindings-list, #channel-custom-bindings-list) mdui-list-item > span:first-child {
+    color: var(--catapult-text);
+    font-weight: 600;
+    margin-right: auto;
+}
+
+:is(#channel-bindings-list, #channel-custom-bindings-list) mdui-list-item > span:not(:first-child) {
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--catapult-text-muted);
+    font-size: 0.72rem;
+    font-weight: 650;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.binding-edit-panel,
+.binding-ccl-panel,
+.binding-tw-panel {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 16px;
+    margin-top: 12px;
+    padding-top: 16px;
+}
+
+.binding-edit-panel .binding-edit-game-input,
+.binding-edit-panel .binding-edit-game-results,
+.binding-ccl-panel > label:first-child,
+.binding-tw-panel > label:first-child,
+.binding-tw-panel .binding-tw-reset-btn {
+    grid-column: 1 / -1;
+}
+
+/* Custom bindings: the associations' list and panels, plus a name field, panel titles and the actions row
+ * spanning the whole width; the active binding's pill is tinted. */
+.binding-edit-panel .custom-binding-name,
+.custom-binding-panel-title,
+.custom-binding-actions {
+    grid-column: 1 / -1;
+}
+
+.custom-binding-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+/* A custom binding's form starts right under its header: no rule there, unlike an association's. */
+#channel-custom-bindings-list .binding-edit-panel {
+    margin-top: 0;
+    border-top: none;
+}
+
+#channel-custom-bindings-list mdui-list-item > span.custom-binding-active-chip {
+    background-color: rgba(139, 92, 246, 0.16);
+    color: var(--catapult-text);
+}
+
+#custom-binding-new-btn {
+    margin-top: 14px;
+}
+
+/* Bindings pagination */
+
+.bindings-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    margin-bottom: 56px;
+    color: var(--catapult-text-secondary);
+    font-size: 0.9rem;
+}
+
+.bindings-pagination a {
+    color: var(--catapult-primary-hover);
+    text-decoration: none;
+}
+
+.bindings-pagination a:hover {
+    color: var(--catapult-text);
+}
+
+/* Connections */
+
+#channel-connections,
+.channel-commands {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 56px;
+}
+
+.connection-card > span:first-child {
+    font-weight: 650;
+}
+
+/* Both Steam chips (connected / not connected) share the slot; one is always hidden. */
+.connection-card > mdui-chip {
+    grid-row: 1;
+    grid-column: 2;
+}
+
+.connection-card > :not(span:first-child, mdui-chip) {
+    grid-column: 1 / -1;
+}
+
+.connection-card p {
+    margin: 0;
+    color: var(--catapult-text-muted);
+    font-size: 0.85rem;
+    line-height: 1.5;
+}
+
+.connection-card > div {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-top: 12px;
+}
+
+/* Inputs don't need the full row on a wide screen. */
+.connection-card > div :is(input, label) {
+    max-width: 480px;
+}
+
+/* OBS: address, port and password side by side, the port narrower. */
+.connection-card .obs-fields {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(90px, 1fr) minmax(0, 2fr);
+    gap: 10px;
+    max-width: 720px;
+}
+
+/* Twitchat: the branch picker only needs its longest option's width. */
+.connection-card .twitchat-fields mdui-select {
+    max-width: 320px;
+}
+
+/* mdui opens a select's menu at its full height in a fixed panel: a long one (Twitchat's
+ * actions, its icons) ran past the window, its end out of reach. Cap it and let it scroll. */
+mdui-select::part(menu) {
+    max-height: min(50vh, 360px);
+    overflow-y: auto;
+}
+
+/* An option's picture (Twitchat's icons), beside it and beside the select once picked. Used as
+ * a mask painted in the text color, like Twitchat's own forceFill: its SVGs are white. */
+.option-icon {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    background-color: currentColor;
+    -webkit-mask: var(--option-icon) center / contain no-repeat;
+    mask: var(--option-icon) center / contain no-repeat;
+}
+
+/* Twitchat events: an event's body stacks its payload cards, then the add/test/save row. */
+.connection-card .twitchat-events-title {
+    padding-top: 12px;
+    color: var(--catapult-text);
+    font-weight: 650;
+}
+
+#twitchat-events .collapse-body,
+.connection-card .twitchat-payloads,
+.connection-card :is(.twitchat-payload-form, .twitchat-payload-raw) {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+#twitchat-events .collapse-body {
+    padding: 4px 16px 16px;
+}
+
+.connection-card .twitchat-payload {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px 16px 16px;
+    border: 1px solid var(--catapult-border);
+    border-radius: 12px;
+    background: var(--catapult-surface-elevated);
+}
+
+/* Title on the left, enable switch and actions on the right; wraps on a narrow card. */
+.connection-card .twitchat-payload-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+}
+
+.connection-card .twitchat-payload-title {
+    flex: 1 1 200px;
+    font-weight: 600;
+}
+
+.connection-card .twitchat-payload-header label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-right: 8px;
+}
+
+.connection-card :is(.twitchat-payload-errors, .twitchat-event-errors) {
+    color: rgb(var(--mdui-color-error));
+}
+
+.connection-card :is(.twitchat-payload-errors, .twitchat-event-errors):empty {
+    display: none;
+}
+
+.connection-card .repeater,
+.connection-card .repeater-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.connection-card .repeater-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+/* A row's fields wrap rather than shrink past readable (a chat button has six). */
+.connection-card .repeater-row > :not(.repeater-remove) {
+    flex: 1 1 180px;
+    min-width: 0;
+}
+
+.connection-card .repeater-add {
+    align-self: flex-start;
+}
+
+/* Add-payload picker takes the room left by the test/save buttons. */
+.connection-card .twitchat-event-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.connection-card .twitchat-add-action {
+    flex: 1 1 240px;
+}
+
+/* .connection-card > div caps inputs at 480px; the grid sizes them here instead. */
+.connection-card .obs-fields input {
+    max-width: none;
+}
+
+/* Actions sit right-aligned under the details. A segmented group lays out its own
+ * segments; a plain div (OBS) holds separate buttons. Either way, no separator:
+ * outranks the `.connection-card > div` rules above. */
+.connection-card > .card-actions {
+    justify-self: end;
+    max-width: 100%;
+}
+
+.connection-card > div.card-actions {
+    flex-direction: row;
+    gap: 8px;
+    padding-top: 0;
+    border-top: none;
+}
+
+/*
+ * The group never wraps to a second row (fixed height, flex-wrap: nowrap
+ * internally) and its segments refuse to shrink by default — on a narrow card,
+ * two or three French labels side by side would overflow past the card's edge.
+ * Let segments shrink and ellipsize instead.
+ */
+.connection-card > .card-actions mdui-segmented-button {
+    flex-shrink: 1;
+    min-width: 0;
+}
+
+.connection-card > .card-actions mdui-segmented-button::part(button) {
+    min-width: 0;
+}
+
+.connection-card > .card-actions mdui-segmented-button::part(label) {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+    max-width: 100%;
+}
+
+/*
+ * The group tags its "-first"/"-last" segments by DOM index, blind to [hidden] and
+ * .hidden: with an edge segment hidden, the visible one at that edge stays square
+ * (and the first keeps its -1px overlap). Round the visible edges instead. A lone
+ * visible segment gets both rules — and, as with a single segment, where mdui's
+ * "-last" would otherwise win the cascade over "-first", a full pill.
+ */
+mdui-segmented-button-group > mdui-segmented-button:nth-child(1 of :not([hidden], .hidden)) {
+    margin-left: 0;
+    border-top-left-radius: var(--shape-corner);
+    border-bottom-left-radius: var(--shape-corner);
+}
+
+mdui-segmented-button-group > mdui-segmented-button:nth-last-child(1 of :not([hidden], .hidden)) {
+    border-top-right-radius: var(--shape-corner);
+    border-bottom-right-radius: var(--shape-corner);
+}
+
+/* Settings cards */
+
+.settings-card h3 {
+    margin: 0;
+    color: var(--catapult-text);
+    font-size: 1.05rem;
+}
+
+.settings-card mdui-button {
+    align-self: flex-start;
+}
+
+.settings-card mdui-chip {
+    margin-right: 6px;
+}
+
+.settings-card .settings-master-toggle {
+    color: var(--catapult-text);
+    font-weight: 600;
+}
+
+.settings-switch-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 10px 16px;
+}
+
+.settings-switch-group {
+    padding-top: 14px;
+}
+
+#dtdd-search-dialog {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 8px;
+    padding-top: 16px;
+}
+
+/* Form controls */
+
+.channel-section :is(input[type="text"], input[type="password"], input[type="number"]) {
+    width: 100%;
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--catapult-border);
+    background: var(--catapult-background);
+    color: var(--catapult-text);
+    font: inherit;
+    font-size: 0.92rem;
+    transition: border-color 120ms ease;
+}
+
+.channel-section :is(input[type="text"], input[type="password"], input[type="number"]):focus {
+    outline: none;
+    border-color: var(--catapult-primary-hover);
+}
+
+.channel-section input::placeholder {
+    color: var(--catapult-text-muted);
+}
+
+/* Search results under a game picker */
+.binding-edit-game-results,
+#no-game-game-results,
+#incomplete-fallback-game-results,
+#dtdd-search-results {
+    padding: 0;
+    list-style: none;
+}
+
+/* A Twitch category's box art, at the proxy's 96x128 halved (game-search.js, the bindings' rows); empty, a frame */
+.box-art {
+    display: block;
+    width: 48px;
+    height: 64px;
+    object-fit: cover;
+    border-radius: 2px;
+}
+
+span.box-art {
+    background: rgb(var(--mdui-color-surface-container-highest));
+}
+
+/* Responsive */
+
+@media (max-width: 650px) {
+
+    .channel-section {
+        padding-top: 50px;
+    }
+
+    .channel-header-avatar {
+        width: 52px;
+        height: 52px;
+        flex-basis: 52px;
+    }
+
+    .channel-tabs mdui-tab-panel {
+        padding-top: 24px;
+    }
+
+    .status-card,
+    .connection-card,
+    .settings-card {
+        padding: 20px;
+    }
+
+    :is(#channel-bindings-list, #channel-custom-bindings-list) mdui-list-item {
+        padding: 14px 16px;
+    }
+
+    .connection-card > .card-actions {
+        justify-self: stretch;
+    }
+
+    .connection-card .obs-fields {
+        grid-template-columns: 1fr;
+    }
+
+    .bindings-pagination {
+        gap: 10px;
+        font-size: 0.85rem;
+    }
+
+}
+
+
+/*
+ * Utilities
+ */
+
+/*
+ * .hidden is toggled by spa:if (visibility.js), [hidden] by plain JS. !important so
+ * both win over any component's own `display` rule whatever its specificity — mdui
+ * components and flex/grid containers here would otherwise override the UA's
+ * [hidden] style or a same-specificity class.
+ */
+[hidden],
+.hidden {
+    display: none !important;
+}
+
+/* Admin lazy tabs: shared list, sub-view and pagination layout (admin-tabs.js). */
+.admin-loading {
+    display: flex;
+    justify-content: center;
+    padding: 48px 0;
+}
+
+.admin-subheader {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.admin-subheader h2 {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.admin-search {
+    flex: 0 1 320px;
+}
+
+/* mdui-card is inline-block: an admin tab's cards would shrink to their content. */
+.admin-view mdui-card {
+    display: block;
+}
+
+.admin-table {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 16px;
+    padding: 8px 0;
+    overflow: hidden;
+}
+
+.admin-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 24px;
+}
+
+.admin-row + .admin-row {
+    border-top: 1px solid var(--catapult-border);
+}
+
+.admin-row-head {
+    color: var(--catapult-text-muted);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.admin-cell {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.admin-row-actions {
+    display: flex;
+    gap: 4px;
+}
+
+/*
+ * The tables below are one grid each, every row (header included) a subgrid of it: as separate grids,
+ * the rows sized their action column to their own buttons, so no cell sat under its header.
+ */
+.admin-table:has(> :is(.admin-dtdd-row, .admin-groups-row, .admin-whitelist-invite-row, .admin-whitelist-row, .admin-keys-row, .admin-minecraft-row, .admin-tw-row, .admin-meta-tag-row, .admin-social-link-row, .invite-row, .admin-gm-row, .admin-gm-missing-row)) { display: grid; column-gap: 12px; }
+.admin-table:has(> :is(.admin-dtdd-row, .admin-groups-row, .admin-whitelist-invite-row, .admin-whitelist-row, .admin-keys-row, .admin-minecraft-row, .admin-tw-row, .admin-meta-tag-row, .admin-social-link-row, .invite-row, .admin-gm-row, .admin-gm-missing-row)) > * { grid-column: 1 / -1; }
+.admin-table > :is(.admin-dtdd-row, .admin-groups-row, .admin-whitelist-invite-row, .admin-whitelist-row, .admin-keys-row, .admin-minecraft-row, .admin-tw-row, .admin-meta-tag-row, .admin-social-link-row, .invite-row, .admin-gm-row, .admin-gm-missing-row) { grid-template-columns: subgrid; }
+.admin-table > :is(.admin-dtdd-row, .admin-groups-row, .admin-whitelist-invite-row, .admin-whitelist-row, .admin-keys-row, .admin-minecraft-row, .admin-tw-row, .admin-meta-tag-row, .admin-social-link-row, .invite-row, .admin-gm-row, .admin-gm-missing-row) > .admin-row-actions { justify-content: flex-end; }
+
+.admin-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.admin-list mdui-list-item {
+    --shape-corner: 12px;
+}
+
+@media (max-width: 650px) {
+    .admin-row {
+        grid-template-columns: minmax(0, 1fr) auto;
+        padding: 10px 16px;
+    }
+
+    .admin-row-head {
+        display: none;
+    }
+
+    .admin-search {
+        flex-basis: 100%;
+    }
+}
+
+.admin-ccl-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.admin-ccl {
+    gap: 12px;
+    margin-bottom: 0;
+}
+
+.admin-ccl-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.admin-ccl-description {
+    margin: 0;
+    color: var(--catapult-text-secondary);
+}
+
+.admin-ccl-save {
+    align-self: flex-end;
+}
+
+.admin-cell-muted {
+    color: var(--catapult-text-secondary);
+}
+
+.admin-dialog {
+    --mdui-comp-dialog-max-width: min(720px, 100vw - 32px);
+}
+
+.admin-detail h3 {
+    margin: 0 0 12px;
+    overflow-wrap: anywhere;
+}
+
+.admin-fields {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: 6px 16px;
+    margin: 0;
+}
+
+.admin-fields dt {
+    color: var(--catapult-text-muted);
+}
+
+.admin-fields dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+.admin-detail-table {
+    overflow-x: auto;
+}
+
+.admin-detail-table table {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+.admin-detail-table th,
+.admin-detail-table td {
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--catapult-border);
+    text-align: left;
+}
+
+.admin-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 12px;
+}
+
+.admin-data-table {
+    overflow-x: auto;
+}
+
+.admin-data-table .admin-row {
+    grid-template-columns: repeat(var(--admin-columns), minmax(120px, 1fr));
+    min-width: min-content;
+}
+
+.admin-data-row {
+    cursor: pointer;
+}
+
+.admin-data-row:hover,
+.admin-data-row:focus-visible {
+    background: var(--catapult-hover, rgba(127, 127, 127, 0.08));
+}
+
+.admin-data-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.admin-data-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.admin-data-delete {
+    margin-right: auto;
+    color: #ef4444;
+}
+
+.admin-well-known-file { grid-template-columns: minmax(0, 2fr) auto minmax(0, 1fr) auto auto auto auto; align-items: center; }
+.admin-well-known-link { overflow-wrap: anywhere; }
+.admin-iana-row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.admin-iana-row[hidden] { display: none; }
+.admin-well-known-form { display: flex; flex-direction: column; gap: 12px; min-width: min(640px, 100%); }
+.admin-well-known-import-button { margin-right: auto; }
+.admin-well-known-content { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.admin-well-known-url { overflow-wrap: anywhere; color: rgb(var(--mdui-color-on-surface-variant)); }
+.admin-well-known-status-row { display: flex; gap: 12px; flex-wrap: wrap; }
+.admin-well-known-header { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto; gap: 8px; align-items: center; }
+.admin-well-known-response[active], .admin-well-known-content-panel[active] { display: flex; flex-direction: column; gap: 12px; padding-top: 12px; }
+.admin-well-known-fields { display: flex; flex-direction: column; gap: 12px; }
+.admin-well-known-fields fieldset { border: 1px solid rgb(var(--mdui-color-outline-variant)); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.admin-well-known-mode-reason { color: rgb(var(--mdui-color-error)); }
+@media (max-width: 600px) {
+    .admin-well-known-file { grid-template-columns: 1fr auto auto; }
+    .admin-well-known-file > .admin-member-id, .admin-well-known-file > .admin-well-known-status { display: none; }
+    .admin-well-known-header { grid-template-columns: minmax(0, 1fr) auto; }
+    .admin-well-known-header [data-header=value] { grid-column: 1 / -1; grid-row: 2; }
+}
+
+/* The admin Notifications tab. */
+.admin-notification-row { grid-template-columns: auto minmax(0, 2fr) minmax(0, 1fr) auto auto auto; }
+.admin-notification-severity { color: var(--catapult-text-secondary); }
+.admin-notification-severity[data-severity="WARNING"] { color: rgb(var(--mdui-color-tertiary)); }
+.admin-notification-severity[data-severity="ERROR"] { color: rgb(var(--mdui-color-error)); }
+.admin-notification-text { min-width: 0; overflow-wrap: anywhere; }
+.admin-notification-excerpt { font-size: 0.85em; }
+.admin-notifications-form { display: flex; flex-direction: column; gap: 12px; min-width: min(640px, 100%); }
+.admin-notifications-form .notification-preview { padding: 12px; border: 1px solid rgb(var(--mdui-color-outline-variant)); border-radius: 12px; overflow-wrap: anywhere; }
+.admin-notifications-form [hidden] { display: none; }
+.admin-notifications-member { display: flex; flex-direction: column; gap: 4px; }
+@media (max-width: 600px) {
+    .admin-notification-row { grid-template-columns: auto minmax(0, 1fr) auto; }
+    .admin-notification-row > .admin-notification-audience, .admin-notification-row > .admin-member-id { grid-column: 2 / -1; }
+}
+
+/* The admin Broadcast tab. */
+.admin-broadcast-current { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; padding: 16px; margin-bottom: 16px; }
+.admin-broadcast-forms { display: flex; flex-direction: column; gap: 12px; max-width: 640px; }
+.admin-broadcast-forms form { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
+.admin-broadcast-forms form > mdui-text-field { width: 100%; }
+.admin-broadcast-forms form[hidden] { display: none; }
+.admin-broadcast-switch { display: flex; align-items: center; gap: 8px; }
+
+/* Broadcasts shown to every visitor (broadcasts.js). */
+/*
+ * The banner sits under the app bar, which mdui-layout positions absolutely over the page's top
+ * padding: an mdui-layout-item would be placed there too, but nothing here is padded for it (the
+ * pages' mdui-layout-main is not a direct child of mdui-layout). In the flow instead, pushed below
+ * the bar by its height and pulling the page back up by as much, so the page moves down by the
+ * banner's own height only; above the page, which follows it.
+ */
+.broadcast-banner { position: relative; z-index: 1; margin-top: 64px; margin-bottom: -64px; display: flex; align-items: center; gap: 12px; padding: 8px 16px; background: rgb(var(--mdui-color-surface-container-high)); color: rgb(var(--mdui-color-on-surface)); }
+.broadcast-banner[hidden], .broadcast-veil[hidden] { display: none; }
+/* As the broadcast banner, above it; a warning: the admin acts as someone else. Wraps at phone width. */
+.impersonation-banner { position: relative; z-index: 1; margin-top: 64px; margin-bottom: -64px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 16px; background: rgb(var(--mdui-color-tertiary-container)); color: rgb(var(--mdui-color-on-tertiary-container)); }
+.impersonation-banner-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.broadcast-banner-text { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; column-gap: 12px; row-gap: 2px; overflow-wrap: anywhere; }
+/* catapult-api's degraded mode (degraded.js): as the broadcast banner, folded by default; the summary is the toggle. */
+.degraded-banner { position: relative; z-index: 1; margin-top: 64px; margin-bottom: -64px; display: flex; align-items: flex-start; gap: 12px; padding: 4px 8px 4px 16px; background: rgb(var(--mdui-color-secondary-container)); color: rgb(var(--mdui-color-on-secondary-container)); }
+.degraded-banner[hidden], .degraded-banner [hidden] { display: none; }
+.degraded-banner-details { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.degraded-banner-details > summary { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-height: 40px; cursor: pointer; list-style: none; }
+.degraded-banner-details > summary::-webkit-details-marker { display: none; }
+.degraded-banner-toggle { display: inline-flex; align-items: center; gap: 2px; font-size: 0.875rem; }
+.degraded-banner-chevron { transition: transform 0.2s; }
+.degraded-banner-details[open] .degraded-banner-chevron { transform: rotate(180deg); }
+.degraded-banner-link { display: inline-flex; align-items: center; min-height: 40px; color: inherit; font-weight: 500; white-space: nowrap; }
+.degraded-banner-effects { margin: 0 0 8px; padding-left: 20px; }
+/* The dock has no app bar to sit under, nor room for it; channel-dock.js also sets the class client-side. */
+.obs-dock-mode .degraded-banner { display: none !important; }
+mdui-snackbar.broadcast-warning { --mdui-color-inverse-surface: var(--mdui-color-error-container); --mdui-color-inverse-on-surface: var(--mdui-color-on-error-container); }
+/* Informs, does not block. Above the content, below the dialogs. */
+.broadcast-veil { position: fixed; inset: 0; z-index: 1500; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; background: rgb(var(--mdui-color-surface) / 0.7); pointer-events: none; }
+
+/* Settings tab's danger zone: the card and its delete button read as destructive. */
+.danger-zone-card {
+    border-color: rgb(var(--mdui-color-error));
+}
+
+.danger-zone-card h3 {
+    color: rgb(var(--mdui-color-error));
+}
+
+.danger-zone-card p {
+    margin: 0;
+}
+
+#danger-zone-delete-btn,
+.danger-zone-confirm {
+    --mdui-color-primary: var(--mdui-color-error);
+    --mdui-color-on-primary: var(--mdui-color-on-error);
+}
+
+/* The admin DTDD mapping tab. */
+.admin-dtdd-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.admin-dtdd-row, .admin-table:has(> .admin-dtdd-row) { grid-template-columns: 9.5rem 5rem 6rem minmax(0, 1fr) minmax(0, 2fr) auto; }
+.admin-dtdd-reason { min-width: 0; overflow-wrap: anywhere; }
+.admin-dtdd-form { display: flex; flex-direction: column; gap: 12px; min-width: min(480px, 100%); }
+@media (max-width: 650px) {
+    .admin-dtdd-row, .admin-table:has(> .admin-dtdd-row) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .admin-dtdd-row > [data-label]::before { content: attr(data-label) " : "; color: var(--catapult-text-muted); }
+    .admin-dtdd-row > .admin-dtdd-reason, .admin-dtdd-row > .admin-row-actions { grid-column: 1 / -1; }
+    .admin-dtdd-row > .admin-cell { white-space: normal; }
+}
+
+/* The admin game mappings tab. */
+.admin-gm-hint { margin: 0 0 16px; }
+.admin-gm-missing-header { margin-top: 24px; }
+.admin-gm-row, .admin-table:has(> .admin-gm-row) { grid-template-columns: 7.5rem minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr) 5.5rem 9rem auto; }
+.admin-gm-missing-row, .admin-table:has(> .admin-gm-missing-row) { grid-template-columns: 7.5rem minmax(0, 1fr) minmax(0, 2fr) 6rem auto; }
+.admin-gm-labels { min-width: 0; overflow-wrap: anywhere; }
+.admin-gm-row > .admin-member-id { display: flex; flex-direction: column; }
+.admin-gm-form { display: flex; flex-direction: column; gap: 12px; min-width: min(560px, 100%); }
+.admin-gm-form [hidden] { display: none; }
+.admin-gm-search { display: flex; flex-direction: column; gap: 4px; }
+.admin-gm-suggestions, .admin-gm-category-results { max-height: 220px; overflow-y: auto; padding: 0; }
+.admin-gm-override { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 8px 12px 12px; border: 1px solid var(--catapult-border); border-radius: 12px; }
+.admin-gm-override legend { padding: 0 4px; color: var(--catapult-text-muted); }
+.admin-gm-switch { display: flex; align-items: center; gap: 12px; }
+.admin-gm-choices { display: flex; flex-wrap: wrap; gap: 0 16px; }
+.admin-gm-error { margin: 0; color: rgb(var(--mdui-color-error)); }
+.admin-gm-result { margin: 0; color: var(--catapult-text-secondary); }
+@media (max-width: 650px) {
+    .admin-gm-row, .admin-table:has(> .admin-gm-row),
+    .admin-gm-missing-row, .admin-table:has(> .admin-gm-missing-row) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .admin-gm-row > [data-label]::before, .admin-gm-missing-row > [data-label]::before { content: attr(data-label) " : "; color: var(--catapult-text-muted); }
+    .admin-gm-row > .admin-row-actions, .admin-gm-missing-row > .admin-row-actions { grid-column: 1 / -1; }
+    .admin-gm-row > .admin-cell, .admin-gm-missing-row > .admin-cell { white-space: normal; }
+}
+
+/* The admin Groups tab. */
+.admin-groups-create { padding: 16px; margin-bottom: 16px; }
+.admin-groups-create-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; gap: 12px; align-items: start; }
+.admin-groups-row, .admin-table:has(> .admin-groups-row) { grid-template-columns: 10rem minmax(0, 1fr) minmax(0, 2fr) 5rem auto; }
+.admin-groups-description { min-width: 0; overflow-wrap: anywhere; }
+.admin-groups-form { display: flex; flex-direction: column; gap: 12px; min-width: min(480px, 100%); }
+@media (max-width: 650px) {
+    .admin-groups-create-fields { grid-template-columns: minmax(0, 1fr); }
+    .admin-groups-row, .admin-table:has(> .admin-groups-row) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .admin-groups-row > [data-label]::before { content: attr(data-label) " : "; color: var(--catapult-text-muted); }
+    .admin-groups-row > .admin-groups-description, .admin-groups-row > .admin-row-actions { grid-column: 1 / -1; }
+    .admin-groups-row > .admin-cell { white-space: normal; }
+}
+
+/* A member's targeting (#members/{id}) in the admin Members tab. */
+.admin-targeting-card { padding: 16px; margin-bottom: 16px; }
+.admin-targeting-card h3, .admin-targeting-card h4 { margin: 0 0 12px; }
+.admin-targeting-card h4 { margin-top: 20px; }
+.admin-targeting-rows { display: flex; flex-direction: column; }
+.admin-targeting-row { display: grid; grid-template-columns: minmax(8rem, 14rem) minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 4px 0; }
+.admin-targeting-row + .admin-targeting-row { border-top: 1px solid var(--catapult-border, rgba(127, 127, 127, 0.2)); }
+.admin-targeting-row > .admin-member-id, .admin-targeting-value { min-width: 0; overflow-wrap: anywhere; }
+.admin-targeting-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)) auto; gap: 12px; align-items: start; }
+.admin-targeting-form > mdui-select:only-of-type { grid-column: 1 / 3; }
+@media (max-width: 650px) {
+    .admin-targeting-row { grid-template-columns: minmax(0, 1fr) auto; }
+    .admin-targeting-row > .admin-targeting-value, .admin-targeting-row > span:empty { display: none; }
+    .admin-targeting-form { grid-template-columns: minmax(0, 1fr); }
+    .admin-targeting-form > mdui-select:only-of-type { grid-column: auto; }
+}
+
+/* The admin Whitelist tab. */
+.admin-whitelist-card { padding: 16px; margin-bottom: 16px; }
+.admin-whitelist-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.admin-whitelist-head p, .admin-whitelist-head h3 { margin: 0; }
+.admin-whitelist-add { display: flex; gap: 12px; align-items: start; }
+.admin-whitelist-add mdui-text-field { flex: 1; max-width: 20rem; }
+.admin-whitelist-settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: center; margin: 16px 0 8px; }
+.admin-whitelist-settings mdui-checkbox, .admin-whitelist-settings mdui-button { justify-self: start; }
+.admin-whitelist-cap { color: rgb(var(--mdui-color-error)); margin: 8px 0; }
+.admin-whitelist-zero { color: rgb(var(--mdui-color-error)); font-weight: 600; }
+.admin-whitelist-invite-row, .admin-table:has(> .admin-whitelist-invite-row) { grid-template-columns: minmax(0, 1fr) repeat(5, auto); }
+.admin-whitelist-row, .admin-table:has(> .admin-whitelist-row) { grid-template-columns: 12rem minmax(0, 1fr) auto; }
+.admin-whitelist-form { display: flex; flex-direction: column; gap: 12px; min-width: min(480px, 100%); }
+@media (max-width: 650px) {
+    .admin-whitelist-add { flex-direction: column; align-items: stretch; }
+    .admin-whitelist-add mdui-text-field { max-width: none; }
+    .admin-whitelist-settings { grid-template-columns: minmax(0, 1fr); }
+    .admin-whitelist-invite-row, .admin-whitelist-row, .admin-table:has(> .admin-whitelist-invite-row), .admin-table:has(> .admin-whitelist-row) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .admin-whitelist-invite-row > [data-label]::before, .admin-whitelist-row > [data-label]::before { content: attr(data-label) " : "; color: var(--catapult-text-muted); }
+    .admin-whitelist-invite-row > .admin-row-actions { grid-column: 1 / -1; }
+    .admin-whitelist-invite-row > .admin-cell, .admin-whitelist-row > .admin-cell { white-space: normal; }
+}
+
+/* The channel's Invitations tab: the code reads large, the link and its buttons stack on a phone. */
+.invite-code { font-size: 2rem; letter-spacing: 0.15em; overflow-wrap: anywhere; }
+.invite-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.invite-row, .admin-table:has(> .invite-row) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+
+/* The admin Keys tab. */
+.admin-keys-card { padding: 16px; margin-bottom: 16px; }
+.admin-keys-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.admin-keys-head h3 { margin: 0; }
+.admin-keys-add { display: flex; gap: 12px; align-items: start; margin: 16px 0; }
+.admin-keys-add mdui-text-field { flex: 1; max-width: 24rem; }
+.admin-keys-row, .admin-table:has(> .admin-keys-row) { grid-template-columns: minmax(0, 1fr) 10rem 10rem auto; }
+.admin-keys-blocked:not([data-live-done]) { color: rgb(var(--mdui-color-error)); }
+@media (max-width: 600px) {
+    .admin-keys-add { flex-direction: column; align-items: stretch; }
+    .admin-keys-add mdui-text-field { max-width: none; }
+    .admin-keys-row, .admin-table:has(> .admin-keys-row) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .admin-keys-row > [data-label]::before { content: attr(data-label) " : "; color: var(--catapult-text-muted); }
+    .admin-keys-row > .admin-row-actions { grid-column: 1 / -1; }
+    .admin-keys-row > .admin-cell { white-space: normal; }
+}
+.admin-minecraft-row, .admin-table:has(> .admin-minecraft-row) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 6rem 4rem 12rem auto; }
+.admin-minecraft-states { display: flex; flex-wrap: wrap; gap: 4px; }
+.admin-minecraft-full { color: rgb(var(--mdui-color-error)); }
+.admin-minecraft-row > .admin-minecraft-flow { grid-column: 1 / -1; }
+.admin-minecraft-flow:empty { display: none; }
+.admin-minecraft-flow { overflow-wrap: anywhere; }
+.admin-minecraft-code { margin: 4px 0; }
+.admin-minecraft-user-code { font-family: monospace; font-size: 1.15em; letter-spacing: .05em; }
+.admin-minecraft-error { color: rgb(var(--mdui-color-error)); }
+@media (max-width: 600px) {
+    .admin-minecraft-row, .admin-table:has(> .admin-minecraft-row) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .admin-minecraft-row > [data-label]::before { content: attr(data-label) " : "; color: var(--catapult-text-muted); }
+    .admin-minecraft-row > .admin-row-actions { grid-column: 1 / -1; flex-wrap: wrap; }
+    .admin-minecraft-row > .admin-cell { white-space: normal; }
+}
+
+/* The admin Trigger warnings tab. */
+.admin-tw-head { flex-wrap: wrap; gap: 12px; }
+.admin-tw-rebuilds { display: flex; flex-wrap: wrap; gap: 8px; }
+.admin-tw-danger { --mdui-color-primary: var(--mdui-color-error); --mdui-color-on-primary: var(--mdui-color-on-error); }
+.admin-tw-create { padding: 16px; margin-bottom: 16px; }
+.admin-tw-create-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) 8rem auto; gap: 12px; align-items: start; }
+.admin-tw-row, .admin-table:has(> .admin-tw-row) { grid-template-columns: 12rem minmax(0, 1fr) 8rem 5rem auto; }
+@media (max-width: 600px) {
+    .admin-tw-create-fields { grid-template-columns: minmax(0, 1fr); }
+    .admin-tw-row, .admin-table:has(> .admin-tw-row) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .admin-tw-row > [data-label]::before { content: attr(data-label) " : "; color: var(--catapult-text-muted); }
+    .admin-tw-row > .admin-row-actions { grid-column: 1 / -1; }
+    .admin-tw-row > .admin-cell { white-space: normal; }
+}
+.admin-tw-kw-card { padding: 16px; margin-bottom: 16px; }
+/* The Meta tab's tags: type, name, content (cut to one line, whole in its title), last change, actions; the form below adds or edits one. */
+.admin-meta-tag-row, .admin-table:has(> .admin-meta-tag-row) { grid-template-columns: 6rem minmax(0, 1fr) minmax(0, 2fr) auto auto; }
+.admin-meta-tag-content { color: var(--catapult-text-muted); }
+.admin-meta-tags { margin-bottom: 48px; }
+.admin-meta-tags-form { padding: 16px; margin-top: 16px; }
+.admin-meta-tags-fields { display: grid; grid-template-columns: 9rem minmax(0, 1fr) minmax(0, 2fr) auto; gap: 12px; align-items: center; }
+@media (max-width: 600px) {
+    .admin-meta-tag-row, .admin-table:has(> .admin-meta-tag-row) { grid-template-columns: minmax(0, 1fr) auto; }
+    .admin-meta-tag-row > :is(.admin-meta-tag-attribute, .admin-meta-tag-updated) { display: none; }
+    .admin-meta-tag-row > .admin-meta-tag-content { grid-column: 1 / -1; grid-row: 2; }
+    .admin-meta-tags-fields { grid-template-columns: minmax(0, 1fr); }
+}
+/* The Links tab's social links: platform (icon, name, hidden chip), label, address (cut to one line, whole in its title), actions; the form below adds or edits one. */
+.admin-social-link-row, .admin-table:has(> .admin-social-link-row) { grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr) minmax(0, 2fr) auto; }
+.admin-social-link-platform { display: flex; align-items: center; gap: 8px; }
+.admin-social-link-url { color: var(--catapult-text-muted); }
+.admin-social-links { margin-bottom: 48px; }
+.admin-social-links-form { padding: 16px; margin-top: 16px; }
+.admin-social-links-fields { display: grid; grid-template-columns: 11rem minmax(0, 1fr) minmax(0, 2fr) auto auto; gap: 12px; align-items: center; }
+.admin-social-link-option-icon { display: inline-flex; width: 24px; height: 24px; }
+.admin-social-link-option-icon .social-icon, .admin-social-link-platform .social-icon { width: 20px; height: 20px; }
+@media (max-width: 600px) {
+    .admin-social-link-row, .admin-table:has(> .admin-social-link-row) { grid-template-columns: minmax(0, 1fr) auto; }
+    .admin-social-link-row > .admin-cell { grid-column: 1 / -1; }
+    .admin-social-link-row > .admin-row-actions { grid-column: 2; grid-row: 1; }
+    .admin-social-links-fields { grid-template-columns: minmax(0, 1fr); }
+}
+.admin-tw-kw-card h3 { margin: 0 0 12px; }
+.admin-tw-kw-rows { display: flex; flex-direction: column; margin-bottom: 16px; }
+.admin-tw-kw-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 4px 0; }
+.admin-tw-kw-row + .admin-tw-kw-row { border-top: 1px solid var(--catapult-border, rgba(127, 127, 127, 0.2)); }
+.admin-tw-kw-row > .admin-member-id { min-width: 0; overflow-wrap: anywhere; }
+.admin-tw-kw-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: start; }
+.admin-tw-test-result { margin-top: 12px; overflow-wrap: anywhere; }
+.admin-tw-test-result p { margin: 4px 0; }
+.admin-tw-test-result .admin-tw-test-notes { white-space: pre-wrap; color: var(--catapult-text-muted); }
+@media (max-width: 600px) {
+    .admin-tw-kw-form { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Contextual help: the "?" beside a card's title, and the side sheet it opens. */
+.title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.title-row > h2,
+.title-row > h3 {
+    min-width: 0;
+}
+
+/* A section title's space below goes under the whole row: on the title, it would center the "?" lower.
+   Not a card's title row: the card's gap already spaces it. */
+.channel-section .section-header > .title-row {
+    margin-bottom: 14px;
+}
+
+.channel-section .section-header > .title-row > h2 {
+    margin-bottom: 0;
+}
+
+.help-button {
+    flex: none;
+    color: var(--catapult-text-secondary);
+}
+
+/* Fixed to the viewport (!important: mdui-layout places its items with inline styles): as an absolutely
+   placed drawer it spans the whole scrolling page, and its content would sit at the top, out of sight.
+   Modal, the host is the full-screen overlay and the sheet is its panel part: the width goes there,
+   kept under mdui's 80% so that a phone still has a strip of overlay to tap it closed. */
+.help-panel {
+    position: fixed !important;
+    top: 0 !important;
+    bottom: 0 !important;
+}
+
+.help-panel::part(panel) {
+    width: min(420px, 100vw);
+}
+
+.help-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 12px 0 24px;
+    font-weight: 600;
+}
+
+.help-content {
+    padding: 8px 24px 24px;
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+}
+
+/*
+ * Changelog: laid out as the privacy page, one card per version
+ */
+.changelog-card {
+    margin-top: 24px;
+    padding: 28px;
+}
+
+.changelog-version {
+    margin: 0 0 8px;
+    color: var(--catapult-text);
+    font-size: 1.25rem;
+}
+
+.changelog-kind {
+    margin: 16px 0 6px;
+    font-size: 1rem;
+}
+
+.changelog-entries {
+    margin: 0;
+    padding-left: 1.25rem;
+}
+
+.changelog-scope {
+    color: var(--catapult-text-muted);
+}
+
+.changelog-breaking {
+    color: rgb(var(--mdui-color-error));
+}
+
+/*
+ * API documentation (pages/api-docs.html): Swagger UI wears the site's theme, in api-docs-theme.css (loaded after
+ * Swagger UI's own stylesheet)
+ */
+.api-docs-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+    padding: 4px 12px;
+    border: 1px solid var(--catapult-border);
+    border-radius: 999px;
+    color: var(--catapult-text-secondary);
+    font-size: 0.875rem;
+}
+
+.api-docs-status::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #22c55e;
+}
+
+.api-docs-status[data-state="down"]::before {
+    background: rgb(var(--mdui-color-error));
+}
+
+.api-docs-status[data-state="unknown"]::before {
+    background: var(--catapult-text-muted);
+}
+
+.api-docs-cached {
+    margin: 24px 0 0;
+    padding: 12px 16px;
+    border: 1px solid var(--catapult-border);
+    border-radius: 12px;
+    background: var(--catapult-surface-elevated);
+    color: var(--catapult-text-secondary);
+}
+
+/* The member's keys, above Swagger UI (Swagger UI's own theme: api-docs-theme.css). */
+.api-docs-keys {
+    margin-top: 24px;
+}
+
+.api-docs-key {
+    padding-top: 16px;
+    margin-top: 16px;
+    border-top: 1px solid var(--catapult-border);
+}
+
+.api-docs-key h3 {
+    margin: 0 0 4px;
+}
+
+.api-docs-key-value {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+}
+
+.api-docs-key-value mdui-text-field {
+    flex: 1 1 320px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* ── OBS dock (pages/channel-dock.html) ───────────────────────────────────
+   A narrow column inside OBS: no app bar or footer (index.html drops them),
+   tight spacing, one switch per row. */
+body.obs-dock-mode #app {
+    padding: 8px;
+}
+
+/* An icon whose font couldn't be had shows its name instead: kept within the icon's own box. */
+mdui-icon {
+    overflow: hidden;
+}
+
+/* A dock reached by client-side navigation: its shell still has them (channel-dock.js). */
+body.obs-dock-mode .app-bar,
+body.obs-dock-mode .footer {
+    display: none;
+}
+
+.obs-dock {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 0.875rem;
+}
+
+.obs-dock-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 36px;
+}
+
+.obs-dock-game-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 600;
+}
+
+.obs-dock-muted {
+    flex: 1;
+    margin: 0;
+    color: var(--catapult-text-muted);
+}
+
+.obs-dock-binding {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.obs-dock-card {
+    padding: 8px 12px;
+}
+
+.obs-dock-card h3 {
+    margin: 0 0 4px;
+    font-size: 0.95rem;
+}
+
+.obs-dock-global {
+    border-bottom: 1px solid var(--catapult-border);
+    padding-bottom: 4px;
+}
+
+.obs-dock-items {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding-left: 12px;
+}
+
+.obs-dock-items label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.obs-dock-login {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+/* The chat commands moving to another chat bot (pages/channel-tab/integrations.html): a connection
+   card, whose blocks it reuses; only a command's own rows need a layout. */
+.command-migration-tool mdui-select {
+    max-width: 320px;
+}
+
+.command-migration-steps {
+    margin: 0;
+    padding-left: 20px;
+    color: var(--catapult-text-secondary);
+    font-size: 0.9rem;
+    line-height: 1.6;
+}
+
+.command-migration-row {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.command-migration-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.command-migration-name {
+    font-weight: 650;
+}
+
+.admin-experiments-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 2fr) auto; gap: 12px; align-items: center; padding: 8px 0; cursor: pointer; }
+.admin-experiments-row + .admin-experiments-row { border-top: 1px solid var(--catapult-border, rgba(127, 127, 127, 0.2)); }
+.admin-experiments-chips { display: flex; gap: 8px; justify-content: flex-end; }
+.admin-experiments-actions, .admin-experiments-form { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; }
+.admin-experiments-form [hidden] { display: none; }
+.admin-experiments-weight { display: flex; gap: 8px; align-items: center; }
+/* A confirmation's description with one line per item (the rebalance preview) */
+mdui-dialog::part(description) { white-space: pre-line; }
+.experiment-weight-bar { position: relative; display: flex; width: 100%; height: 40px; border-radius: 12px; overflow: hidden; background: var(--catapult-surface-elevated); border: 1px solid var(--catapult-border); }
+.experiment-weight-bar.is-mini { height: 10px; border-radius: 5px; min-width: 120px; }
+.experiment-weight-segment { flex: 0 1 0; min-width: 0; display: flex; align-items: center; justify-content: center; background: var(--variant-color); color: #fff; font-size: 0.8125rem; white-space: nowrap; overflow: hidden; transition: flex-grow 0.12s ease; }
+.experiment-weight-bar.is-dragging .experiment-weight-segment { transition: none; }
+.experiment-weight-label { overflow: hidden; text-overflow: ellipsis; padding: 0 6px; }
+.experiment-weight-handle { position: relative; flex: 0 0 0; z-index: 1; cursor: ew-resize; touch-action: none; outline: none; }
+.experiment-weight-handle::before { content: ""; position: absolute; top: 4px; bottom: 4px; left: -3px; width: 6px; border-radius: 3px; background: var(--catapult-text); box-shadow: 0 0 0 2px var(--catapult-background); }
+.experiment-weight-handle::after { content: ""; position: absolute; top: 0; bottom: 0; left: -12px; width: 24px; }
+.experiment-weight-handle:focus-visible::before { background: var(--catapult-primary-hover); box-shadow: 0 0 0 3px var(--catapult-primary-dark); }
+.admin-experiments-weight [data-weight-share] { white-space: nowrap; }
+.experiment-weight-swatch { flex: none; width: 12px; height: 12px; border-radius: 50%; background: var(--variant-color); }
+#experiment-weights > .experiment-weight-bar { flex-basis: 100%; }
+.admin-experiments-rule-warning { display: flex; gap: 8px; align-items: center; }
+.admin-participants-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.admin-participants-chips .experiment-weight-swatch { margin-inline-start: 4px; }
+.admin-participants > .admin-search { display: block; margin-bottom: 12px; }
+.admin-participants-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 3fr); gap: 12px; align-items: center; padding: 8px 0; }
+.admin-participants-row + .admin-participants-row { border-top: 1px solid var(--catapult-border, rgba(127, 127, 127, 0.2)); }
+.admin-participants-variant { display: flex; gap: 8px; align-items: center; }
+.admin-participants-actions { display: flex; flex-wrap: nowrap; gap: 8px; align-items: center; justify-content: flex-end; }
+.admin-participants-actions mdui-select { min-width: 180px; }
+@media (max-width: 650px) {
+    .admin-experiments-row { grid-template-columns: minmax(0, 1fr); }
+    .admin-experiments-chips { justify-content: flex-start; }
+    .admin-participants-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .admin-participants-actions { flex-wrap: wrap; justify-content: flex-start; grid-column: 1 / -1; }
+}
+
+/* The /notifications page's "also receive by" card: one muted line under each switch. */
+.notification-channel {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.notification-channel-hint {
+    margin: 0;
+    color: var(--catapult-text-muted);
+    font-size: 0.85rem;
+}
+
+.notification-channel .notification-channel-hint {
+    margin-inline-start: 52px;
+}

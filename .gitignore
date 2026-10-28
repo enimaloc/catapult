@@ -63,9 +63,19 @@ catapult_obs_local.py
 ### Local artifacts ###
 .run/
 /*.sql
+/data/
 catapult-api/src/test/java/Tmp.java
 docs/
 scripts/*
 docker-compose.override.yml
 e2e/package-lock.json
 test-results/
+/catapult-web-old/
+catapult-web/node_modules/
+
+### Perf (timing runs) ###
+perf/reports/
+e2e/perf-results/
+
+### Release migration (local state and reports) ###
+.github/release/.migration-*

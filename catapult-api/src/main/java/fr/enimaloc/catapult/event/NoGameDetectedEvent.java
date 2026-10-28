@@ -1,12 +1,12 @@
 package fr.enimaloc.catapult.event;
 
-import fr.enimaloc.catapult.domain.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserAccount;
 import lombok.Getter;
 import org.springframework.context.ApplicationEvent;
 
 /**
- * Publié lorsque tous les getters actifs retournent vide et que l'utilisateur
- * était précédemment en train de jouer.
+ * Published when all active getters return empty and the user
+ * was previously playing.
  */
 @Getter
 public class NoGameDetectedEvent extends ApplicationEvent {
