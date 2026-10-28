@@ -339,7 +339,20 @@ window.CatapultTwitchatEvents = (function () {
     function bind() {
         const root = document.getElementById("channel-connections");
         if (!root) return;
-        root.querySelectorAll(".twitchat-event").forEach(wireEvent);
+        // An event's body (its payloads, and the menu of every action to add, a few hundred elements) is built
+        // only once it is opened (lazy.js): wired then.
+        root.querySelectorAll(".twitchat-event").forEach(event => {
+            if (!event.querySelector(":scope > template[data-lazy]")) {
+                wireEvent(event);
+                return;
+            }
+            event.addEventListener("catapult:lazy", built => {
+                if (built.detail.root !== event) return;
+                wireEvent(event);
+                markAvailability(event);
+                if (window.CatapultTwitchat?.isTwitchatConnected()) event.querySelectorAll("[data-source]").forEach(fillLiveSelect);
+            });
+        });
         // Payloads outside an event block (a lone card) still get their live selects.
         root.querySelectorAll(".twitchat-payload").forEach((card) => {
             if (!card.closest(".twitchat-event")) card.querySelectorAll("[data-source]").forEach(fillLiveSelect);

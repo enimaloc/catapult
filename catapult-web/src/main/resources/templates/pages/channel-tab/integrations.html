@@ -91,9 +91,10 @@
         <mdui-collapse-item th:each="item : ${n.items()}" th:value="${item.value()}"
                             th:id="${item.attrs().id()}" th:classappend="${item.attrs().className()}">
             <mdui-list-item slot="header" th:text="${item.text().isKey() ? #messages.msgWithParams(item.text().key(), item.text().argsArray()) : item.text().literal()}"></mdui-list-item>
-            <div class="collapse-body">
+            <!--/* Built only once the item is opened (lazy.js): a Twitchat event's holds the menu of every action. */-->
+            <template data-lazy><div class="collapse-body">
                 <th:block th:each="child : ${item.children()}"><th:block th:insert="~{pages/channel-tab/integrations :: node(${child})}"></th:block></th:block>
-            </div>
+            </div></template>
         </mdui-collapse-item>
     </mdui-collapse>
     <div th:case="'repeater'" class="repeater" data-repeater th:id="${n.attrs().id()}"

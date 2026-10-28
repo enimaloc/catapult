@@ -720,8 +720,8 @@ describe("parts built only once shown (lazy.js)", () => {
     });
 
     it("catches up on the state when a part shown missed an event applied by hand, not otherwise", async () => {
-        html(`<section id="settings"><template data-lazy><p></p></template></section>
-              <section id="integrations"><template data-lazy><p></p></template></section>`);
+        html(`<mdui-tab-panel id="settings"><template data-lazy><p></p></template></mdui-tab-panel>
+              <mdui-tab-panel id="integrations"><template data-lazy><p></p></template></mdui-tab-panel>`);
         render();
 
         CatapultLazy.showIn(document.getElementById("settings"));

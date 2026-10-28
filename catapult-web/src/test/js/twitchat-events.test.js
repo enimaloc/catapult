@@ -560,3 +560,29 @@ describe("lists of texts", () => {
         expect(data).toEqual({ title: "Best?", choices: ["A", "B"] });
     });
 });
+
+describe("an event built only once opened (lazy.js)", () => {
+    beforeEach(async () => {
+        await load("csrf", "visibility", "lazy", "channel-page", "twitchat-events");
+    });
+
+    it("is wired when its body is built, not before, and only once", async () => {
+        html(`<div id="channel-connections"><mdui-collapse-item class="twitchat-event"><template data-lazy>
+            <input type="hidden" class="twitchat-event-type" value="STREAM_STARTED">
+            <div class="twitchat-payloads"></div>
+            <select class="twitchat-add-action"><option value="SEND_MESSAGE">s</option></select>
+        </template></mdui-collapse-item></div>`);
+        render();
+        expect(document.querySelector(".twitchat-add-action")).toBeNull();
+
+        const event = document.querySelector(".twitchat-event");
+        event.dispatchEvent(new Event("open", { bubbles: true }));
+        event.dispatchEvent(new Event("open", { bubbles: true }));
+        fetchMock.mockResolvedValueOnce(response(200, CARD("SEND_MESSAGE")));
+        document.querySelector(".twitchat-add-action").dispatchEvent(new Event("change", { bubbles: true }));
+        await flush();
+
+        expect(fetchMock).toHaveBeenCalledOnce();
+        expect(document.querySelectorAll(".twitchat-payload")).toHaveLength(1);
+    });
+});

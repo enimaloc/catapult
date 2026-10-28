@@ -23,13 +23,14 @@ document.addEventListener("catapult:render", function () {
     // squaring the joined header/body corners works either way. (mdui's open/close
     // events bubble: a select's inside the row is not the row's.)
     // A row's body is built only once it is opened (lazy.js): with the page for the row
-    // open with it (the current game's), else on its first opening (mdui then measures
-    // it, right after the event), and bound then; one the page holds already at once.
+    // open with it (the current game's), else by lazy.js on its first opening, and bound
+    // then; one the page holds already at once.
     list.querySelectorAll("mdui-collapse-item").forEach(item => {
         item.addEventListener("open", event => {
-            if (event.target !== item) return;
-            item.classList.add("is-open");
-            if (CatapultLazy.showIn(item)) bindRow(item);
+            if (event.target === item) item.classList.add("is-open");
+        });
+        item.addEventListener("catapult:lazy", event => {
+            if (event.detail.root === item) bindRow(item);
         });
         item.addEventListener("close", event => {
             if (event.target === item) item.classList.remove("is-open");

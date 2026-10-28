@@ -40,9 +40,9 @@ describe("show", () => {
 });
 
 describe("touch", () => {
-    it("marks stale the parts waiting, a binding's body aside", () => {
-        html(`<section id="panel"><template data-lazy><p>x</p></template></section>
-              <div data-binding-id="b1" id="row"><template data-lazy><p>y</p></template></div>`);
+    it("marks stale the tabs waiting, never a collapse item's body", () => {
+        html(`<mdui-tab-panel id="panel"><template data-lazy><p>x</p></template></mdui-tab-panel>
+              <mdui-collapse-item data-binding-id="b1" id="row"><template data-lazy><p>y</p></template></mdui-collapse-item>`);
         const details = [];
         document.addEventListener("catapult:lazy", e => details.push(e.detail.stale));
 
@@ -59,5 +59,22 @@ describe("touch", () => {
 
         expect(() => CatapultLazy.touch()).not.toThrow();
         expect(CatapultLazy.pending()).toEqual([]);
+    });
+});
+
+describe("a collapse item", () => {
+    it("builds its body as it opens, before its own listeners, and tells it", () => {
+        html(`<mdui-collapse-item id="item"><template data-lazy><p id="body">x</p></template></mdui-collapse-item>`);
+        const item = document.getElementById("item");
+        let seen = null;
+        item.addEventListener("open", () => { seen = document.getElementById("body"); });
+        const told = vi.fn();
+        item.addEventListener("catapult:lazy", told);
+
+        item.dispatchEvent(new Event("open", { bubbles: true }));
+        item.dispatchEvent(new Event("open", { bubbles: true }));
+
+        expect(seen).not.toBeNull();
+        expect(told).toHaveBeenCalledOnce();
     });
 });
