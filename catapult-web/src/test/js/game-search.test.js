@@ -64,6 +64,36 @@ describe("GameSearch.attach", () => {
             .toEqual([["MDUI-LIST-ITEM", "Doom"], ["MDUI-LIST-ITEM", "Doom II"]]);
     });
 
+    it("shows a Twitch box art through the proxy, at the size it serves", async () => {
+        fetchMock.mockResolvedValueOnce(response(200, [
+            { id: "1", name: "Doom", boxArtUrl: "https://static-cdn.jtvnw.net/ttv-boxart/1-52x72.jpg" },
+            { id: "2", name: "Doom II", boxArtUrl: "https://static-cdn.jtvnw.net/ttv-boxart/2_IGDB-{width}x{height}.jpg" },
+        ]));
+        GameSearch.attach(input, results, "/search", vi.fn());
+
+        type("doom");
+        await vi.runAllTimersAsync();
+
+        expect([...results.children].map(item => item.querySelector("img[slot=icon]").getAttribute("src")))
+            .toEqual(["/assets/ext/boxart/1-96x128.jpg", "/assets/ext/boxart/2_IGDB-96x128.jpg"]);
+        expect(results.children[0].textContent).toBe("Doom");
+    });
+
+    it("shows no box art for a result without one, or one from elsewhere", async () => {
+        fetchMock.mockResolvedValueOnce(response(200, [
+            { id: "1", name: "Doom" },
+            { id: "2", name: "Doom II", boxArtUrl: "" },
+            { id: "3", name: "Doom 3", boxArtUrl: "https://tracker.example/ttv-boxart/3-52x72.jpg" },
+            { id: "4", name: "Doom 64", boxArtUrl: "https://static-cdn.jtvnw.net/ttv-boxart/../x-52x72.jpg" },
+        ]));
+        GameSearch.attach(input, results, "/search", vi.fn());
+
+        type("doom");
+        await vi.runAllTimersAsync();
+
+        expect([...results.children].map(item => item.querySelector("img"))).toEqual([null, null, null, null]);
+    });
+
     it("on pick: clears the list, fills the input and hands the game over", async () => {
         const onSelect = vi.fn();
         GameSearch.attach(input, results, "/search", onSelect);

@@ -83,6 +83,23 @@ class ExternalAssetControllerTest {
     }
 
     @Test
+    void servesABoxArt_asItsTypeKeptAWeek() throws Exception {
+        when(assets.boxArt("ttv-boxart/33214-96x128.jpg")).thenReturn(ok("JFIF"));
+
+        mvc.perform(get("/assets/ext/boxart/33214-96x128.jpg"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type", "image/jpeg"))
+                .andExpect(header().string("Cache-Control", "max-age=604800, public"));
+    }
+
+    @Test
+    void aBoxArtAtAnotherSize_isNeverFetched() throws Exception {
+        mvc.perform(get("/assets/ext/boxart/33214-285x380.jpg")).andExpect(status().isNotFound());
+        mvc.perform(get("/assets/ext/boxart/33214-96x128.gif")).andExpect(status().isNotFound());
+        verifyNoInteractions(assets);
+    }
+
+    @Test
     void relaysAMissingOrUnavailableFile_uncached() throws Exception {
         when(assets.twitchatIcon(COMMIT, "gone")).thenReturn(ExternalAssets.Result.MISSING);
         when(assets.materialIconsCss()).thenReturn(ExternalAssets.Result.FAILED);

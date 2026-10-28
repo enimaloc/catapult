@@ -121,6 +121,12 @@
                                 th:value="${b.id()}"
                                 th:class="${ch.currentGame()?.bindingId() == b.id() ? 'is-open' : ''}">
                 <mdui-list-item slot="header">
+                    <!--/* Its Twitch category's box art, through the proxy (BoxArts); an empty frame when not known,
+                         so that the names stay aligned. channel-bindings.js swaps it when another game is picked. */-->
+                    <img slot="icon" class="box-art binding-box-art" alt="" loading="lazy"
+                         th:if="${boxArts.url(b.boxArtUrl()) != null}" th:src="${boxArts.url(b.boxArtUrl())}"/>
+                    <span slot="icon" class="box-art binding-box-art"
+                          th:unless="${boxArts.url(b.boxArtUrl()) != null}"></span>
                     <!-- spa:value only mirrors the twitchGameName branch: BindingUpdatedEvent
                          never carries sourceName (ApiChannelActionsController's update action
                          only ever touches twitchGameName/ccls), so there's nothing to keep a

@@ -77,6 +77,7 @@ describe("channel-bindings", () => {
               <mdui-collapse>
                 <mdui-collapse-item data-binding-id="b1">
                   <mdui-list-item>
+                    <span slot="icon" class="box-art binding-box-art"></span>
                     <mdui-switch class="binding-ignored-toggle" data-post="ignored-toggle" data-key="ignored"></mdui-switch>
                     <mdui-button-icon class="binding-delete-btn" data-post="delete"></mdui-button-icon>
                     <div class="binding-edit-panel">
@@ -139,6 +140,27 @@ describe("channel-bindings", () => {
 
         expect(posts()).toEqual([["/channel/enimaloc/bindings/b1",
             { twitchGameId: "10", twitchGameName: "Old", ccls: ["Drugs", "Gore"] }]]);
+    });
+
+    it("shows the picked game's box art in the row, an empty frame for one without", async () => {
+        vi.useFakeTimers();
+        const pick = async game => {
+            fetch.mockResolvedValueOnce(response(200, [game]));
+            const input = row(".binding-edit-game-input");
+            input.value = "doom";
+            input.dispatchEvent(new Event("input"));
+            await vi.runAllTimersAsync();
+            row(".binding-edit-game-results").firstElementChild.click();
+            await vi.runAllTimersAsync();
+        };
+
+        await pick({ id: "42", name: "Doom", boxArtUrl: "https://static-cdn.jtvnw.net/ttv-boxart/42-52x72.jpg" });
+        expect(row(".binding-box-art").tagName).toBe("IMG");
+        expect(row(".binding-box-art").getAttribute("src")).toBe("/assets/ext/boxart/42-96x128.jpg");
+
+        await pick({ id: "43", name: "Doom II" });
+        expect(row(".binding-box-art").tagName).toBe("SPAN");
+        expect(row(".binding-box-art").slot).toBe("icon");
     });
 
     it("saves the picked game together with the current ccls", async () => {

@@ -26,6 +26,7 @@ import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.dtdd.DtddGameCache;
 import fr.enimaloc.catapult.domain.dtdd.DtddGameMapping;
 import fr.enimaloc.catapult.domain.dtdd.DtddMappingProposal;
+import fr.enimaloc.catapult.domain.twitch.TwitchCategoryCache;
 import fr.enimaloc.catapult.domain.twitchat.TwitchatWidgetSettings;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.getter.steam.SteamApiClient;
@@ -36,6 +37,7 @@ import fr.enimaloc.catapult.repository.dtdd.DtddGameCacheRepository;
 import fr.enimaloc.catapult.repository.dtdd.DtddGameMappingRepository;
 import fr.enimaloc.catapult.repository.dtdd.DtddMappingProposalRepository;
 import fr.enimaloc.catapult.repository.tw.TwDefinitionRepository;
+import fr.enimaloc.catapult.repository.twitch.TwitchCategoryCacheRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.binding.GameStateService;
 import fr.enimaloc.catapult.service.binding.RaidRestoreGateService;
@@ -54,9 +56,12 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Builds what the channel dashboard shows (status, bindings page, settings, DTDD mapping) for
@@ -90,6 +95,7 @@ public class ChannelDashboardAssembler {
     private final TwitchatWidgetSettingsService twitchatWidgetSettingsService;
     private final RaidRestoreGateService raidRestoreGate;
     private final CustomBindingViews customBindingViews;
+    private final TwitchCategoryCacheRepository twitchCategoryCache;
 
     @Value("${xbox.enabled:false}")
     private boolean xboxEnabled;
@@ -159,15 +165,28 @@ public class ChannelDashboardAssembler {
         } else {
             bindings = gameBindingRepository.findByUser(channel, request);
         }
-        List<BindingDto> content = bindings.getContent().stream().map(ChannelDashboardAssembler::toBindingDto).toList();
+        Map<String, String> boxArts = boxArts(bindings.getContent());
+        List<BindingDto> content = bindings.getContent().stream()
+                .map(binding -> toBindingDto(binding, boxArts.get(binding.getTwitchGameId())))
+                .toList();
         return new PagedBindings(bindings.getNumber(), bindings.getTotalPages(), bindings.getTotalElements(), content);
     }
 
-    private static BindingDto toBindingDto(GameBinding binding) {
+    /** The page's categories' box arts, by Twitch category id, as the category cache knows them (one query). */
+    private Map<String, String> boxArts(List<GameBinding> bindings) {
+        Set<String> ids = bindings.stream().map(GameBinding::getTwitchGameId).filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (ids.isEmpty()) return Map.of();
+        return twitchCategoryCache.findAllById(ids).stream()
+                .filter(category -> category.getBoxArtUrl() != null && !category.getBoxArtUrl().isBlank())
+                .collect(Collectors.toMap(TwitchCategoryCache::getId, TwitchCategoryCache::getBoxArtUrl));
+    }
+
+    private static BindingDto toBindingDto(GameBinding binding, String boxArtUrl) {
         return new BindingDto(binding.getId().toString(), binding.getStatus().name(), binding.getSourceType().name(),
                 binding.getSourceName(), binding.getTwitchGameId(), binding.getTwitchGameName(), binding.isIgnored(),
                 binding.isCclEnabled(), binding.getCcls(), binding.isTwEnabled(), binding.isTwOverride(),
-                binding.getTws());
+                binding.getTws(), boxArtUrl);
     }
 
     /** Steam state, null without Steam; only the owner's profile is probed live. */
@@ -328,7 +347,7 @@ public class ChannelDashboardAssembler {
         return gameStateService.getLastKnownGame(channel)
                 .flatMap(game -> gameBindingRepository
                         .findByUserAndSourceIdAndSourceType(channel, game.getSourceId(), game.getSourceType()))
-                .map(ChannelDashboardAssembler::toBindingDto);
+                .map(binding -> toBindingDto(binding, boxArts(List.of(binding)).get(binding.getTwitchGameId())));
     }
 
     /** The detected game, with the id of the channel's binding for it when there is one. */
