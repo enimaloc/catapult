@@ -50,6 +50,13 @@ export function createGitHub({ token, owner, repo, fetch = globalThis.fetch }) {
     headRepo: p.head.repo?.full_name ?? null,
     labels: (p.labels ?? []).map((label) => label.name),
   });
+  const toIssue = (i) => ({
+    number: i.number,
+    nodeId: i.node_id,
+    title: i.title,
+    body: i.body ?? "",
+    isPull: Boolean(i.pull_request),
+  });
   const toCommit = (c) => ({
     sha: c.sha,
     subject: c.commit.message.split("\n")[0],
@@ -59,9 +66,15 @@ export function createGitHub({ token, owner, repo, fetch = globalThis.fetch }) {
   });
 
   return {
-    /** Pulls into `base` (open by default), from `head` when given; most recently updated first. */
-    async listPulls({ base, head, state = "open" }) {
-      const query = new URLSearchParams({ state, base, per_page: "100", sort: "updated", direction: "desc" });
+    /** Pulls (into `base` when given; open by default), from `head` when given; most recently updated first. */
+    async listPulls({ base, head, state = "open" } = {}) {
+      const query = new URLSearchParams({
+        state,
+        ...(base && { base }),
+        per_page: "100",
+        sort: "updated",
+        direction: "desc",
+      });
       if (head) query.set("head", `${owner}:${head}`);
       return (await request("GET", `${repoPath}/pulls?${query}`)).map(toPull);
     },
@@ -190,6 +203,36 @@ export function createGitHub({ token, owner, repo, fetch = globalThis.fetch }) {
     async createTag({ tag, sha, message }) {
       const created = await request("POST", `${repoPath}/git/tags`, { tag, message, object: sha, type: "commit" });
       await request("POST", `${repoPath}/git/refs`, { ref: `refs/tags/${tag}`, sha: created.sha });
+    },
+
+    /** The open issue (pull requests excluded) labelled `label` whose body holds `marker`, or null. */
+    async findIssueByLabel(label, marker) {
+      const query = new URLSearchParams({ state: "open", labels: label, per_page: "100" });
+      const issues = await request("GET", `${repoPath}/issues?${query}`);
+      return issues.map(toIssue).find((i) => !i.isPull && i.body.includes(marker)) ?? null;
+    },
+
+    async createIssue({ title, body, labels = [] }) {
+      return toIssue(await request("POST", `${repoPath}/issues`, { title, body, labels }));
+    },
+
+    async updateIssue(number, fields) {
+      await request("PATCH", `${repoPath}/issues/${number}`, fields);
+    },
+
+    async pinIssue(issue) {
+      await graphql("mutation($id: ID!) { pinIssue(input: {issueId: $id}) { clientMutationId } }", {
+        id: issue.nodeId,
+      });
+    },
+
+    /** The `limit` most recent published GitHub Releases, newest first. */
+    async listReleases(limit = 2) {
+      const releases = await request("GET", `${repoPath}/releases?per_page=${Math.min(limit + 10, 100)}`);
+      return releases
+        .filter((r) => !r.draft)
+        .slice(0, limit)
+        .map((r) => ({ tag: r.tag_name, name: r.name || r.tag_name, url: r.html_url, prerelease: r.prerelease }));
     },
 
     async listTags() {

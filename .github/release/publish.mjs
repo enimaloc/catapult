@@ -7,6 +7,7 @@
 import { parseArgs } from "node:util";
 import { pathToFileURL } from "node:url";
 import { createGitHub } from "./lib/github.mjs";
+import { refreshDashboardSafely } from "./dashboard.mjs";
 import { kindOf, titleVersion } from "./ready.mjs";
 
 const short = (sha) => sha.slice(0, 7);
@@ -96,4 +97,5 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   const gh = createGitHub({ token: process.env.GH_TOKEN, owner, repo });
   const pr = await gh.getPull(Number(values.number));
   console.log(JSON.stringify(await publish({ gh, pr, owner, repo })));
+  await refreshDashboardSafely({ gh });
 }

@@ -8,6 +8,7 @@ import { pathToFileURL } from "node:url";
 import { parseVersion } from "./lib/version.mjs";
 import { promotedHead } from "./lib/pr-body.mjs";
 import { createGitHub } from "./lib/github.mjs";
+import { refreshDashboardSafely } from "./dashboard.mjs";
 import { compareVersions, isReleaseCommit, versionTags } from "./promote.mjs";
 
 const GRADLE_FILE = "build.gradle.kts";
@@ -185,4 +186,5 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
     appSlug: process.env.APP_SLUG,
   });
   console.log(result);
+  await refreshDashboardSafely({ gh });
 }

@@ -8,6 +8,7 @@ import { parseVersion, bumpKind, nextBeta, nextStable } from "./lib/version.mjs"
 import { renderEntries } from "./lib/changelog.mjs";
 import { buildBody, parseBody, setPromotedHead, updateBody } from "./lib/pr-body.mjs";
 import { createGitHub } from "./lib/github.mjs";
+import { refreshDashboardSafely } from "./dashboard.mjs";
 
 const RELEASE_SUBJECT = /^chore\(release\): v/;
 
@@ -128,4 +129,5 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   const gh = createGitHub({ token: process.env.GH_TOKEN, owner, repo });
   const result = await promote({ ...values, gh, owner, repo, appSlug: process.env.APP_SLUG });
   console.log(JSON.stringify(result));
+  await refreshDashboardSafely({ gh });
 }
