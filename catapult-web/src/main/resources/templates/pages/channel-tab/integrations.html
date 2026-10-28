@@ -2,6 +2,8 @@
 <!--/*@thymesVar id="integrations" type="java.util.List<fr.enimaloc.catapult.dto.integration.IntegrationDto>"*/-->
 <mdui-tab-panel slot="panel" value="integrations" th:if="${channelPage.isOwner()}" th:fragment="panel"
                 xmlns:spa="urn:fr.enimaloc.catapult:spa">
+<!--/* Built only once the tab is picked (lazy.js): the page carries it, the browser builds nothing of it till then. */-->
+<template data-lazy>
     <div class="section-header">
         <div class="title-row">
             <h2 th:text="#{channel.connections.title}">Connexions</h2>
@@ -20,6 +22,7 @@
             <p th:if="${integration.id() == 'obs' and widgetUrl == null and widgetUnavailable == true}" id="obs-widget-unavailable" th:text="#{channel.connections.obs.widget.link_unavailable}">Lien du widget indisponible.</p>
         </mdui-card>
     </div>
+</template>
 </mdui-tab-panel>
 
 <!--/* A Message as a <span>: its key resolved with its arguments, or its literal. */-->

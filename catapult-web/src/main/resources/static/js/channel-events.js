@@ -18,6 +18,8 @@
  * It is re-rendered instead only when that state can't be applied in place: it lists other bindings
  * than the page does, or a DTDD mapping card the page doesn't have (or the other way round), or it
  * can't be read. The OBS dock, which shows the binding of the game played now, is re-rendered.
+ * A part of the page built only once shown (lazy.js) catches up the same way when one of the events a customHandler
+ * applies came before that.
  */
 (function () {
     const FIRST_DELAY = 5000;
@@ -104,6 +106,8 @@
         if (handler) {
             handler(data);
         }
+        // Applied by hand: a part of the page not built yet (lazy.js) misses it, and catches up once shown.
+        if (handler) window.CatapultLazy?.touch();
     }
 
     // Subscribes to every event name the current DOM's spa:on/spa:switch/spa:value/
@@ -192,6 +196,11 @@
         }
         registerDiscoveredEvents();
     }
+
+    // A part shown after an event it missed: the page catches up on the channel's state, in place.
+    document.addEventListener("catapult:lazy", event => {
+        if (event.detail?.stale && sourceUsername) catchUpState(sourceUsername);
+    });
 
     document.addEventListener("catapult:render", () => {
         const username = CatapultChannel.username();

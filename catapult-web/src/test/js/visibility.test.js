@@ -245,3 +245,40 @@ describe("dispatch", () => {
         expect($("#tw").checked).toBe(false);
     });
 });
+
+describe("parts not shown yet (lazy.js)", () => {
+    beforeEach(async () => {
+        await load("visibility", "lazy");
+    });
+
+    it("applies an event to them, a binding's rules to its own events only", () => {
+        html(`
+            <div data-binding-id="b1" id="row1"><template data-lazy>
+                <span class="name" data-value="textContent:BindingUpdatedEvent.twitchGameName"></span>
+                <mdui-switch class="ccl" data-value="checked:CclStateEvent.enabled"></mdui-switch>
+            </template></div>
+            <div data-binding-id="b2" id="row2"><template data-lazy>
+                <span class="name" data-value="textContent:BindingUpdatedEvent.twitchGameName">Old</span>
+            </template></div>
+            <section id="panel"><template data-lazy>
+                <p id="steam" class="hidden" data-on="connected:SteamConnectionStateEvent.connected" data-if="connected"></p>
+            </template></section>`);
+
+        Visibility.dispatch("BindingUpdatedEvent", { bindingId: "b1", twitchGameName: "Valheim" });
+        Visibility.dispatch("CclStateEvent", { bindingId: "b1", enabled: true });
+        Visibility.dispatch("SteamConnectionStateEvent", { connected: true });
+        ["row1", "row2", "panel"].forEach(id => CatapultLazy.showIn(document.getElementById(id), { quiet: true }));
+
+        expect($("#row1 .name").textContent).toBe("Valheim");
+        expect($("#row1 .ccl").checked).toBe(true);
+        expect($("#row2 .name").textContent).toBe("Old");
+        expect(hidden($("#steam"))).toBe(false);
+    });
+
+    it("finds the events they name", () => {
+        html(`<span data-on="a:FirstEvent.x"></span>
+              <section><template data-lazy><span data-value="textContent:SecondEvent.y"></span></template></section>`);
+
+        expect([...Visibility.discoverEventNames(document)].sort()).toEqual(["FirstEvent", "SecondEvent"]);
+    });
+});

@@ -703,3 +703,34 @@ describe("in the OBS dock", () => {
         expect(document.getElementById("live").classList.contains("hidden")).toBe(true);
     });
 });
+
+describe("parts built only once shown (lazy.js)", () => {
+    beforeEach(async () => {
+        await load("visibility", "lazy", "channel-page", "channel-events");
+        window.CatapultSpa = { navigate: vi.fn(async () => {}) };
+        vi.stubGlobal("fetch", vi.fn(async () => response(200, [])));
+    });
+
+    it("subscribes to the events a part not shown yet names", () => {
+        html(`<section><template data-lazy><span data-on="steam:SteamConnectionStateEvent.connected"></span></template></section>`);
+
+        render();
+
+        expect(current().listeners.SteamConnectionStateEvent).toHaveLength(1);
+    });
+
+    it("catches up on the state when a part shown missed an event applied by hand, not otherwise", async () => {
+        html(`<section id="settings"><template data-lazy><p></p></template></section>
+              <section id="integrations"><template data-lazy><p></p></template></section>`);
+        render();
+
+        CatapultLazy.showIn(document.getElementById("settings"));
+        await flush();
+        expect(fetch).not.toHaveBeenCalled();
+
+        current().emit("ChannelSettingsUpdatedEvent", { settings: null });
+        CatapultLazy.showIn(document.getElementById("integrations"));
+        await flush();
+        expect(fetch).toHaveBeenCalledWith("/spa/channel/enimaloc/state", { headers: { Accept: "application/json" } });
+    });
+});

@@ -149,7 +149,13 @@ window.CatapultSettings = (function () {
     return { apply, track, reset, saved, setRaid, raidMinutes, RAID_DEFAULT_MINUTES };
 })();
 
-document.addEventListener("catapult:render", function () {
+// The Settings tab is built only once picked (lazy.js): its cards are bound then, as with the page otherwise.
+document.addEventListener("catapult:render", bindSettings);
+document.addEventListener("catapult:lazy", event => {
+    if (event.detail.root.contains(document.getElementById("channel-ccl-settings-form"))) bindSettings();
+});
+
+function bindSettings() {
     CatapultSettings.reset();
     if (!document.getElementById("channel-ccl-settings-form")) return;
 
@@ -206,4 +212,4 @@ document.addEventListener("catapult:render", function () {
         applyOnStreamEnd: byId("no-game-apply-end").checked
     }));
     attachDefaultGameCard("incomplete-fallback", "incomplete-fallback");
-});
+}

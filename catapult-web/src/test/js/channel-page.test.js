@@ -8,7 +8,7 @@ beforeEach(async () => {
     postJson = vi.fn(async () => response(204));
     window.CatapultCsrf = { postJson };
     window.CatapultSpa = { navigate: vi.fn(async () => {}) };
-    await load("channel-page");
+    await load("visibility", "lazy", "channel-page");
 });
 
 describe("username / baseUrl", () => {
@@ -308,5 +308,48 @@ describe("tab <-> location.hash", () => {
 
     it("does nothing on pages without tabs", () => {
         expect(() => render()).not.toThrow();
+    });
+
+    describe("a panel built only once shown", () => {
+        function lazyTabs() {
+            html(`<mdui-tabs id="channel-tabs" data-hash-tabs>
+                <mdui-tab value="overview"></mdui-tab><mdui-tab value="settings"></mdui-tab>
+                <mdui-tab-panel value="overview"><p id="overview-content"></p></mdui-tab-panel>
+                <mdui-tab-panel value="settings"><template data-lazy><p id="settings-content"></p></template></mdui-tab-panel>
+            </mdui-tabs>`);
+            const el = document.getElementById("channel-tabs");
+            el.value = "overview";
+            return el;
+        }
+
+        it("is built when its tab is first picked, and the page told", () => {
+            const el = lazyTabs();
+            const shown = vi.fn();
+            document.addEventListener("catapult:lazy", shown, { once: true });
+            render();
+            expect(document.getElementById("settings-content")).toBeNull();
+
+            el.value = "settings";
+            el.dispatchEvent(new Event("change"));
+
+            expect(document.getElementById("settings-content")).not.toBeNull();
+            expect(shown.mock.calls[0][0].detail.root.getAttribute("value")).toBe("settings");
+        });
+
+        it("is built with the page when its hash opens it, before the scripts bind, without telling", () => {
+            lazyTabs();
+            history.replaceState(null, "", "/channel/enimaloc#settings");
+            const shown = vi.fn();
+            document.addEventListener("catapult:lazy", shown);
+            let seen = null;
+            document.addEventListener("catapult:render", () => { seen = document.getElementById("settings-content"); },
+                { once: true });
+
+            render();
+
+            expect(seen).not.toBeNull();
+            expect(shown).not.toHaveBeenCalled();
+            document.removeEventListener("catapult:lazy", shown);
+        });
     });
 });

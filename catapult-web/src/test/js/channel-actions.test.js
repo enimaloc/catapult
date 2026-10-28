@@ -27,7 +27,7 @@ beforeEach(async () => {
     window.CatapultCsrf = { postJson: posted };
     window.CatapultSpa = { navigate: vi.fn(async () => {}) };
     vi.stubGlobal("fetch", vi.fn(async () => response(200, [])));
-    await load("channel-page", "game-search", "channel-status", "channel-bindings",
+    await load("visibility", "lazy", "channel-page", "game-search", "channel-status", "channel-bindings",
         "channel-connections", "channel-settings", "channel-dtdd");
 });
 
@@ -715,5 +715,48 @@ describe("channel-dtdd", () => {
         document.getElementById("dtdd-validate-btn").click();
 
         expect(posted).not.toHaveBeenCalled();
+    });
+});
+
+describe("parts built only once shown (lazy.js)", () => {
+    it("binds the Settings and Integrations cards once their tab is built, once", async () => {
+        html(`
+            <section id="settings"><template data-lazy>
+              <div id="channel-ccl-settings-form">
+                <input type="checkbox" id="ccl-enabled-checkbox" checked>
+                <button id="ccl-settings-save-btn"></button>
+              </div>
+              <div id="channel-tw-settings-form"><input type="checkbox" id="tw-enabled-checkbox"></div>
+              <div id="channel-no-game-settings-form">
+                <input id="no-game-game-input" value=""><input type="hidden" id="no-game-game-id" value="">
+                <ul id="no-game-game-results"></ul>
+                <input type="checkbox" id="no-game-apply-start"><input type="checkbox" id="no-game-apply-no-game">
+                <input type="checkbox" id="no-game-apply-end">
+              </div>
+              <div id="channel-incomplete-fallback-settings-form">
+                <input id="incomplete-fallback-game-input" value="">
+                <input type="hidden" id="incomplete-fallback-game-id" value="">
+                <ul id="incomplete-fallback-game-results"></ul>
+              </div>
+            </template></section>
+            <section id="integrations"><template data-lazy>
+              <div id="channel-connections">
+                <select id="twitchat-branch"><option value="auto">auto</option><option value="beta">beta</option></select>
+              </div>
+            </template></section>`);
+        render();
+
+        CatapultLazy.showIn(document.getElementById("settings"));
+        CatapultLazy.showIn(document.getElementById("integrations"));
+        await click("#ccl-settings-save-btn");
+        const branch = document.getElementById("twitchat-branch");
+        branch.value = "beta";
+        branch.dispatchEvent(new Event("change"));
+        await flush();
+
+        expect(posts()).toEqual([
+            ["/channel/enimaloc/settings/ccl", { cclEnabled: true, blockedCcls: [] }],
+            ["/channel/enimaloc/settings/twitchat/branch", { branch: "beta" }],
+        ]);
     });
 });

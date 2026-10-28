@@ -336,7 +336,7 @@ window.CatapultTwitchatEvents = (function () {
         });
     }
 
-    document.addEventListener("catapult:render", () => {
+    function bind() {
         const root = document.getElementById("channel-connections");
         if (!root) return;
         root.querySelectorAll(".twitchat-event").forEach(wireEvent);
@@ -345,6 +345,12 @@ window.CatapultTwitchatEvents = (function () {
             if (!card.closest(".twitchat-event")) card.querySelectorAll("[data-source]").forEach(fillLiveSelect);
         });
         markAvailability(root);
+    }
+
+    // The Integrations tab is built only once picked (lazy.js): bound then, as with the page otherwise.
+    document.addEventListener("catapult:render", bind);
+    document.addEventListener("catapult:lazy", event => {
+        if (event.detail.root.contains(document.getElementById("channel-connections"))) bind();
     });
 
     document.addEventListener("catapult:twitchat:presence", () => {
