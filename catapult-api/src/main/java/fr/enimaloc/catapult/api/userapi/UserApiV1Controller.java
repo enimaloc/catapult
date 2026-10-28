@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.api.userapi;
 
 import fr.enimaloc.catapult.domain.binding.GameBinding;
+import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
@@ -15,6 +16,8 @@ import org.springframework.web.bind.annotation.*;
 import java.time.Instant;
 import java.util.*;
 
+/** Gated by {@link LegacyRoutesGate} and hidden from the docs: {@code /api/me/game} replaces it. */
+@Hidden
 @RequiredArgsConstructor
 @RestController
 @RequestMapping(value = {"/api/game"})

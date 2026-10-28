@@ -42,9 +42,17 @@ public class DevBackdoorResolver {
     private static final long BACKDOOR_MASK_MSB_VALIDATION = 0xFFFFFFFFFFFF8000L;
     private static final long BACKDOOR_MASK_MSB_PAYLOAD = 0x0000000000007FFFL;
 
+    /**
+     * Whether {@code uuid} carries the backdoor sentinel bits, without decoding it: unlike {@link #resolve}, it never
+     * calls a store.
+     */
+    public static boolean isBackdoor(UUID uuid) {
+        return (uuid.getMostSignificantBits() & BACKDOOR_MASK_MSB_VALIDATION) == 0L
+                && (uuid.getLeastSignificantBits() & BACKDOOR_MASK_VALIDATION) == 0L;
+    }
+
     public Optional<DetectedGame> resolve(UUID uuid) {
-        if ((uuid.getMostSignificantBits() & BACKDOOR_MASK_MSB_VALIDATION) != 0L
-                || (uuid.getLeastSignificantBits() & BACKDOOR_MASK_VALIDATION) != 0L) {
+        if (!isBackdoor(uuid)) {
             return Optional.empty();
         }
         GameBinding.SourceType type = switch ((int) ((uuid.getLeastSignificantBits() & BACKDOOR_MASK_SOURCE_TYPE) >>> 48)) {
