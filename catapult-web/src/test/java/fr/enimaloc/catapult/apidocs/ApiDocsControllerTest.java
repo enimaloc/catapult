@@ -166,10 +166,20 @@ class ApiDocsControllerTest {
 
         for (String html : List.of(page("/docs/api", Locale.FRENCH), page("/spa/docs/api", Locale.ENGLISH))) {
             assertThat(html).doesNotContain("id=\"api-docs-keys-card\"", "api-docs-read-token", "api-docs-widget")
-                    .contains("id=\"swagger-ui\"", "class=\"api-docs-ui\"", "/css/api-docs-theme");
+                    .contains("id=\"swagger-ui\"", "class=\"api-docs-ui sentry-mask\"", "/css/api-docs-theme");
         }
         verify(apiService, never()).channelPage(anyString(), anyInt(), any(), any());
         verify(apiService, never()).twitchatSettings(anyString());
+    }
+
+    /** Swagger UI writes the token tried out into its curl and Request URL text: Replay records none of its text. */
+    @Test
+    void docsPage_swaggerUi_isMaskedInReplays() throws Exception {
+        docsAvailable();
+
+        String html = page("/docs/api", Locale.ENGLISH);
+        String ui = html.substring(html.indexOf("id=\"swagger-ui\""));
+        assertThat(ui.substring(0, ui.indexOf('>'))).contains("sentry-mask");
     }
 
     @Test

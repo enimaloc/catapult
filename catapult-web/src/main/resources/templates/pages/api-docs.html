@@ -55,7 +55,9 @@
             </th:block>
         </mdui-card>
 
-        <div th:if="${apiDocsAvailable}" id="swagger-ui" class="api-docs-ui"
+        <!--/* sentry-mask: Swagger UI writes the token tried out into its curl and Request URL text, which Replay
+             records masked. */-->
+        <div th:if="${apiDocsAvailable}" id="swagger-ui" class="api-docs-ui sentry-mask"
              th:attr="data-spec=${apiDocsSpecUrl},data-bundle=|${apiDocsSwaggerUi}/swagger-ui-bundle.js|,
                       data-css=|${apiDocsSwaggerUi}/swagger-ui.css|,data-label-failed=#{api-docs.ui-failed}"></div>
     </section>

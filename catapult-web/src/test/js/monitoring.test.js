@@ -132,6 +132,85 @@ describe("with a DSN", () => {
     });
 });
 
+describe("the read-only token in a URL", () => {
+    const TOKEN = "catr_" + "s".repeat(43);
+    /** The hook monitoring.js gives Sentry.init under {@code name}. */
+    const hook = async (name) => {
+        await load("monitoring");
+        return Sentry.init.mock.calls[0][0][name];
+    };
+
+    it("is masked in a breadcrumb's URL, and only the token parameter", async () => {
+        const beforeBreadcrumb = await hook("beforeBreadcrumb");
+
+        const crumb = beforeBreadcrumb({ category: "fetch",
+            data: { url: `/api/me/game?lang=fr&token=${TOKEN}&widget_token=w`, method: "GET" } });
+
+        expect(crumb.data).toEqual({ url: "/api/me/game?lang=fr&token=***&widget_token=w", method: "GET" });
+    });
+
+    it("is masked in a navigation breadcrumb's from and to", async () => {
+        const beforeBreadcrumb = await hook("beforeBreadcrumb");
+
+        const crumb = beforeBreadcrumb({ category: "navigation",
+            data: { from: `/docs?token=${TOKEN}`, to: `/docs?token=${TOKEN}#x` } });
+
+        expect(crumb.data).toEqual({ from: "/docs?token=***", to: "/docs?token=***#x" });
+    });
+
+    it("leaves a breadcrumb without data as it is", async () => {
+        const beforeBreadcrumb = await hook("beforeBreadcrumb");
+
+        expect(beforeBreadcrumb({ category: "ui.click", message: "button" }))
+            .toEqual({ category: "ui.click", message: "button" });
+    });
+
+    it("is masked in a transaction's spans and request", async () => {
+        const beforeSendTransaction = await hook("beforeSendTransaction");
+
+        const transaction = beforeSendTransaction({
+            request: { url: `https://catapult.test/api/me/game?token=${TOKEN}` },
+            spans: [
+                { op: "http.client", description: `GET /api/me/game?token=${TOKEN}`,
+                    data: { url: `/api/me/game?token=${TOKEN}`, "http.query": `?token=${TOKEN}`,
+                        "http.method": "GET" } },
+                { op: "ui.long-task", description: "Main UI thread blocked" },
+            ],
+        });
+
+        expect(transaction.request.url).toBe("https://catapult.test/api/me/game?token=***");
+        expect(transaction.spans[0]).toEqual({ op: "http.client", description: "GET /api/me/game?token=***",
+            data: { url: "/api/me/game?token=***", "http.query": "?token=***", "http.method": "GET" } });
+        expect(transaction.spans[1].description).toBe("Main UI thread blocked");
+    });
+
+    it("is masked in an error's request, URL and query string", async () => {
+        const beforeSend = await hook("beforeSend");
+
+        const event = beforeSend({ request: { url: `https://catapult.test/api-docs?token=${TOKEN}`,
+            query_string: `token=${TOKEN}&a=1` } });
+
+        expect(event.request).toEqual({ url: "https://catapult.test/api-docs?token=***",
+            query_string: "token=***&a=1" });
+    });
+
+    it("is masked in an error's query string given as pairs", async () => {
+        const beforeSend = await hook("beforeSend");
+
+        const event = beforeSend({ request: { query_string: [["token", TOKEN], ["a", "1"]] } });
+
+        expect(event.request.query_string).toEqual([["token", "***"], ["a", "1"]]);
+    });
+
+    it("lets an event without a request through", async () => {
+        const beforeSend = await hook("beforeSend");
+        const beforeSendTransaction = await hook("beforeSendTransaction");
+
+        expect(beforeSend({ message: "x" })).toEqual({ message: "x" });
+        expect(beforeSendTransaction({ transaction: "/" })).toEqual({ transaction: "/" });
+    });
+});
+
 describe("without one", () => {
     it("does nothing when the page has no Sentry config", async () => {
         window.Catapult = { sentry: null };
