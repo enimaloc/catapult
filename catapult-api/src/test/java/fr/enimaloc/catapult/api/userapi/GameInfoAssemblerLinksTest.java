@@ -15,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import com.jayway.jsonpath.JsonPath;
 import org.springframework.context.MessageSource;
+import org.springframework.web.context.request.RequestContextHolder;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.util.List;
@@ -50,6 +51,9 @@ class GameInfoAssemblerLinksTest {
 
     @BeforeEach
     void setUp() {
+        // PublicBaseUrl follows the current request when there is one: a request a previous test left bound to
+        // this thread would change the links' origin
+        RequestContextHolder.resetRequestAttributes();
         assembler = new GameInfoAssembler(widgetTokenService, gameStateService, gameBindingRepository, igdbService,
                 igdbGameDetailsService, steamStoreService, null, twLabelService, null, devBackdoorResolver,
                 mock(MessageSource.class), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
