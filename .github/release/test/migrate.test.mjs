@@ -24,15 +24,20 @@ v0.3.7-BETA`.split(/\s+/);
 const dated = (names) =>
   names.map((name, i) => ({ name, sha: sha(i + 1), created: new Date(Date.UTC(2026, 5, 1) + i * 3600e3).toISOString() }));
 
+// Linear history: every commit descends from every earlier one.
+const linear = { isAncestor: () => true };
+
 // Three old tags; the last two share nothing with the new names.
-const SMALL = planMigration(dated(["v0.0.1-ALPHA", "v0.1.0-BETA", "v0.1.1-BETA"]), INIT);
+const SMALL = planMigration(dated(["v0.0.1-ALPHA", "v0.1.0-BETA", "v0.1.1-BETA"]), INIT, linear);
 
 // In-memory GitHub: tags/branches map name -> commit SHA, releases map tag -> release.
-function fakeGitHub({ tags = {}, releases = {}, branches = {}, workflows = [], failDisable = [] } = {}) {
+function fakeGitHub({ tags = {}, releases = {}, branches = {}, workflows = [], failDisable = [], compare } = {}) {
   const writes = [];
+  const compared = [];
   let nextId = 100;
   return {
     writes,
+    compared,
     tags,
     releases,
     workflows,
@@ -48,6 +53,8 @@ function fakeGitHub({ tags = {}, releases = {}, branches = {}, workflows = [], f
       delete tags[name];
     },
     async compareCommits(base, head) {
+      compared.push([base, head]);
+      if (compare) return compare(base, head);
       return [{ sha: head, subject: `feat: work up to ${head.slice(-2)}`, message: "", author: null, parents: [base] }];
     },
     async getReleaseByTag(tag) {
@@ -122,12 +129,24 @@ const run = (phase, plan, deps) => runPhase(phase, plan, { log: quiet, ...deps }
 test("plan_ordersByCreation_andEndsAtBeta96", () => {
   const tags = dated(REAL_TAGS);
   const shuffled = [...tags].reverse().concat({ name: "v1.0.0-BETA.3", sha: sha(999), created: "2026-10-28T00:00:00Z" });
-  const plan = planMigration(shuffled, INIT);
+  const plan = planMigration(shuffled, INIT, linear);
 
   assert.equal(plan.length, 97);
-  assert.deepEqual(plan[0], { name: null, newName: "v0.0.0", sha: INIT });
-  assert.deepEqual(plan[1], { name: "v0.0.1-ALPHA", newName: "v1.0.0-BETA.1", sha: tags[0].sha });
-  assert.deepEqual(plan[96], { name: "v0.3.7-BETA", newName: "v1.0.0-BETA.96", sha: tags[95].sha });
+  assert.deepEqual(plan[0], { name: null, newName: "v0.0.0", sha: INIT, base: null, nonLinear: false });
+  assert.deepEqual(plan[1], {
+    name: "v0.0.1-ALPHA",
+    newName: "v1.0.0-BETA.1",
+    sha: tags[0].sha,
+    base: "v0.0.0",
+    nonLinear: false,
+  });
+  assert.deepEqual(plan[96], {
+    name: "v0.3.7-BETA",
+    newName: "v1.0.0-BETA.96",
+    sha: tags[95].sha,
+    base: "v1.0.0-BETA.95",
+    nonLinear: false,
+  });
   assert.deepEqual(
     plan.slice(1).map((e) => e.name),
     REAL_TAGS,
@@ -144,6 +163,7 @@ test("plan_sameCreationSecond_keepsTheVersionOrder", () => {
       { name: "v0.1.7-BETA", sha: sha(7), created: at },
     ],
     INIT,
+    linear,
   );
   assert.deepEqual(
     plan.map((e) => e.name),
@@ -151,8 +171,76 @@ test("plan_sameCreationSecond_keepsTheVersionOrder", () => {
   );
 });
 
+test("plan_changelogBase_isTheLatestEarlierAncestor_elseTheInitialCommit", () => {
+  // 1 <- 2 <- 4 on one line, 3 on a side line from 1, 5 unrelated to all of them.
+  const ancestors = { [sha(2)]: [sha(1)], [sha(3)]: [sha(1)], [sha(4)]: [sha(1), sha(2)], [sha(5)]: [] };
+  const isAncestor = (a, b) => a === INIT || (ancestors[b] ?? []).includes(a);
+  const plan = planMigration(dated(["v0.1.0-BETA", "v0.2.0-BETA", "v0.3.0-BETA", "v0.4.0-BETA", "v0.5.0-BETA"]), INIT, {
+    isAncestor,
+  });
+
+  assert.deepEqual(
+    plan.map((e) => [e.newName, e.base, e.nonLinear]),
+    [
+      ["v0.0.0", null, false],
+      ["v1.0.0-BETA.1", "v0.0.0", false],
+      ["v1.0.0-BETA.2", "v1.0.0-BETA.1", false],
+      ["v1.0.0-BETA.3", "v1.0.0-BETA.1", false],
+      ["v1.0.0-BETA.4", "v1.0.0-BETA.2", false],
+      ["v1.0.0-BETA.5", "v0.0.0", true],
+    ],
+  );
+  assert.notEqual(planHash(plan), planHash(planMigration(dated(plan.slice(1).map((e) => e.name)), INIT, linear)));
+});
+
+test("create_releaseBody_comparesWithTheBase_andFlagsNonLinearHistory", async () => {
+  const plan = [
+    { name: null, newName: "v0.0.0", sha: INIT, base: null, nonLinear: false },
+    { name: "v0.1.0-BETA", newName: "v1.0.0-BETA.1", sha: sha(1), base: "v0.0.0", nonLinear: false },
+    { name: "v0.2.0-BETA", newName: "v1.0.0-BETA.2", sha: sha(2), base: "v0.0.0", nonLinear: true },
+  ];
+  const gh = fakeGitHub();
+
+  await run("create", plan, { gh, registry: fakeRegistry(oldImages(plan)), store: memoryStore(), dryRun: false });
+
+  assert.deepEqual(gh.compared, [
+    [INIT, sha(1)],
+    [INIT, sha(2)],
+  ]);
+  const bodies = gh.writes.filter((w) => w[0] === "createRelease").map((w) => w[1].body);
+  assert.doesNotMatch(bodies[1], /Historique non linéaire/);
+  assert.match(bodies[2], /Historique non linéaire : comparé au commit initial\./);
+});
+
+test("create_releaseBody_capsTheChangelogAt200Entries", async () => {
+  const many = Array.from({ length: 205 }, (_, i) => ({ sha: sha(i + 1), subject: `fix: n${i}`, message: "", author: null, parents: [] }));
+  const gh = fakeGitHub({ compare: () => many });
+
+  await run("create", SMALL.slice(0, 2), { gh, registry: fakeRegistry(oldImages(SMALL)), store: memoryStore(), dryRun: false });
+
+  const body = gh.writes.find((w) => w[0] === "createRelease" && w[1].tag === "v1.0.0-BETA.1")[1].body;
+  assert.equal((body.match(/^- /gm) ?? []).length, 200);
+  assert.match(body, /… et 5 autres commits/);
+});
+
+test("create_disableRecordedNowhere_namesTheWorkflowToReenableByHand", async () => {
+  const gh = fakeGitHub({ workflows: [{ id: 7, name: "Build", state: "active" }] });
+  const store = {
+    read: () => ({}),
+    write: () => {
+      throw new Error("EACCES");
+    },
+  };
+
+  await assert.rejects(
+    run("create", SMALL, { gh, registry: fakeRegistry(oldImages(SMALL)), store, dryRun: false }),
+    /Build \(7\).*à la main.*gh workflow enable 7/s,
+  );
+  assert.ok(!gh.writes.some((w) => w[0] === "createTag"));
+});
+
 test("create_dryRun_listsEverything_withoutWriting", async () => {
-  const plan = planMigration(dated(REAL_TAGS), INIT);
+  const plan = planMigration(dated(REAL_TAGS), INIT, linear);
   const gh = fakeGitHub({ workflows: [{ id: 1, name: "Build", state: "active" }] });
   const registry = fakeRegistry(oldImages(plan));
   const store = memoryStore();
@@ -357,6 +445,59 @@ test("delete_refusesWithoutSuccessfulVerify", async () => {
   assert.deepEqual(gh.writes, []);
 });
 
+async function verified() {
+  const setup = await created();
+  await run("verify", SMALL, { ...setup, dryRun: false });
+  setup.gh.writes.length = 0;
+  return setup;
+}
+
+test("delete_disablesTheWorkflowsFirst_andRestoresThemAfterSuccess", async () => {
+  const { gh, registry, store } = await verified();
+
+  await run("delete", SMALL, { gh, registry, store, dryRun: false });
+
+  assert.deepEqual(gh.writes[0], ["disableWorkflow", 1]);
+  assert.deepEqual(gh.writes.at(-1), ["enableWorkflow", 1]);
+  assert.deepEqual(store.read().disabledWorkflows, []);
+});
+
+test("delete_refusesToDelete_whenAWorkflowCouldNotBeDisabled", async () => {
+  const { gh, registry, store } = await verified();
+  gh.workflows.push({ id: 2, name: "Release", state: "active" });
+  const failing = { ...gh, disableWorkflow: async (id) => (id === 2 ? Promise.reject(new Error("403")) : gh.disableWorkflow(id)) };
+
+  await assert.rejects(run("delete", SMALL, { gh: failing, registry, store, dryRun: false }), /Suppression refusée.*Release/s);
+  assert.deepEqual(gh.writes, [["disableWorkflow", 1]]);
+  assert.deepEqual(store.read().disabledWorkflows, [1]);
+});
+
+test("delete_midwayFailure_leavesTheWorkflowsDisabled", async () => {
+  const { gh, registry, store } = await verified();
+  const failing = { ...gh, deleteTag: async () => Promise.reject(new Error("500")) };
+
+  await assert.rejects(run("delete", SMALL, { gh: failing, registry, store, dryRun: false }), /500/);
+  assert.ok(!gh.writes.some((w) => w[0] === "enableWorkflow"));
+  assert.deepEqual(store.read().disabledWorkflows, [1]);
+});
+
+test("delete_newTagMoved_stopsBeforeDeletingIt", async () => {
+  const { gh, registry, store } = await verified();
+  gh.tags["v1.0.0-BETA.2"] = sha(555);
+
+  await assert.rejects(run("delete", SMALL, { gh, registry, store, dryRun: false }), /Suppression interrompue.*BETA\.2/);
+  assert.ok(gh.tags["v0.1.0-BETA"]);
+  assert.ok(gh.releases["v0.1.0-BETA"]);
+});
+
+test("delete_newReleaseMissing_keepsTheOldRelease", async () => {
+  const { gh, registry, store } = await verified();
+  delete gh.releases["v1.0.0-BETA.2"];
+
+  await assert.rejects(run("delete", SMALL, { gh, registry, store, dryRun: false }), /Suppression interrompue.*release/);
+  assert.ok(gh.releases["v0.1.0-BETA"]);
+});
+
 test("delete_afterVerify_removesOldTagsReleasesAndBranches", async () => {
   const { gh, registry, store } = await created();
   await run("verify", SMALL, { gh, registry, store, dryRun: false });
@@ -364,7 +505,7 @@ test("delete_afterVerify_removesOldTagsReleasesAndBranches", async () => {
 
   await run("delete", SMALL, { gh, registry, store, dryRun: false });
 
-  assert.deepEqual(gh.writes, [
+  assert.deepEqual(gh.writes.filter((w) => !w[0].endsWith("Workflow")), [
     ["deleteTag", "v0.0.1-ALPHA"],
     ["deleteRelease", 50],
     ["deleteTag", "v0.1.0-BETA"],

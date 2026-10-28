@@ -1,22 +1,24 @@
 // One-off retroactive renumbering of the past releases: v0.0.0 on the initial commit, then the 96 legacy
 // tags (v0.0.1-ALPHA … v0.3.7-BETA, in tag creation order) as v1.0.0-BETA.1 … v1.0.0-BETA.96, each with
 // its GitHub Release and its GHCR image tags. Phases, each run only once the previous one is checked:
-//   plan     prints the plan (local git only, no network)
+//   plan     prints the plan (local git only, no network); each tag's changelog base is the latest earlier
+//            tag whose commit is an ancestor of it (git merge-base --is-ancestor), else the initial commit
 //   create   disables every active workflow (pushing a tag runs the workflows of the tagged commit, whose
 //            old release.yml rebuilds the images and moves :latest), then creates the annotated tags, the
 //            releases and the image tags (:beta -> the last one; :latest is never touched)
 //   verify   checks every new object and writes a report; when everything is right, records it and
 //            re-enables the workflows
 //   restore  re-enables exactly the workflows this script disabled (after an interrupted run)
-//   delete   only after a passing verify of the very same plan: the old releases, tags and v/<old>
-//            branches; old image tags are kept (GHCR cannot drop a tag without deleting its digest)
+//   delete   only after a passing verify of the very same plan, workflows disabled again as for create
+//            and re-enabled once everything is deleted: the old releases, tags and v/<old> branches; old
+//            image tags are kept (GHCR cannot drop a tag without deleting its digest)
 // Dry-run by default; --execute performs (and logs) the writes. Every phase skips what already exists.
 // CLI: node .github/release/migrate.mjs --phase plan|create|verify|restore|delete [--execute]
 // (env: GH_TOKEN, GITHUB_REPOSITORY=owner/repo; `docker login ghcr.io` for the image steps; all the
 // legacy tags fetched locally)
 
 import { createHash } from "node:crypto";
-import { execFile } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { parseArgs, promisify } from "node:util";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -30,6 +32,7 @@ export const PHASES = ["plan", "create", "verify", "restore", "delete"];
 
 const LEGACY_TAG = /^v\d+\.\d+\.\d+-(ALPHA|BETA)$/;
 const BETA_CHANNEL = "beta";
+const CHANGELOG_LIMIT = 200;
 const STATE_FILE = fileURLToPath(new URL(".migration-state.json", import.meta.url));
 const reportFile = (phase) => fileURLToPath(new URL(`.migration-${phase}.md`, import.meta.url));
 
@@ -46,17 +49,30 @@ function byVersion(a, b) {
 }
 
 /**
- * tags: {name, sha (commit), created (ISO date)}[] -> {name (old tag, null for v0.0.0), newName, sha}[]:
- * v0.0.0 on `initSha`, then the legacy tags by creation date as v1.0.0-BETA.1… (other tags ignored).
+ * tags: {name, sha (commit), created (ISO date)}[] -> {name (old tag, null for v0.0.0), newName, sha, base,
+ * nonLinear}[]: v0.0.0 on `initSha`, then the legacy tags by creation date as v1.0.0-BETA.1… (other tags
+ * ignored). `base` (the newName the changelog starts from) is the latest earlier entry whose commit is an
+ * ancestor, per `isAncestor(ancestorSha, sha)`; when none is, v0.0.0 with `nonLinear` set.
  */
-export function planMigration(tags, initSha) {
+export function planMigration(tags, initSha, { isAncestor }) {
   const legacy = tags
     .filter((t) => LEGACY_TAG.test(t.name))
     .sort((a, b) => Date.parse(a.created) - Date.parse(b.created) || byVersion(a.name, b.name));
-  return [
-    { name: null, newName: "v0.0.0", sha: initSha },
-    ...legacy.map((t, i) => ({ name: t.name, newName: `v1.0.0-BETA.${i + 1}`, sha: t.sha })),
-  ];
+  const plan = [{ name: null, newName: "v0.0.0", sha: initSha, base: null, nonLinear: false }];
+  for (const [i, t] of legacy.entries()) {
+    const base = plan
+      .slice(1)
+      .reverse()
+      .find((earlier) => isAncestor(earlier.sha, t.sha));
+    plan.push({
+      name: t.name,
+      newName: `v1.0.0-BETA.${i + 1}`,
+      sha: t.sha,
+      base: base?.newName ?? "v0.0.0",
+      nonLinear: base === undefined && i > 0,
+    });
+  }
+  return plan;
 }
 
 /** Identifies a plan: delete only trusts a verify recorded for the same hash. */
@@ -105,16 +121,24 @@ function updateState(ctx, change) {
 
 // --- create ---
 
-async function disableWorkflows(ctx) {
+/** Disables every active workflow, recording each one; throws (`refused` first) if any could not be. */
+async function disableWorkflows(ctx, refused) {
   const failures = [];
   for (const workflow of await ctx.gh.listWorkflows()) {
     if (workflow.state !== "active") continue;
     try {
       await write(ctx, `désactivation du workflow ${workflow.name} (${workflow.id})`, async () => {
         await ctx.gh.disableWorkflow(workflow.id);
-        updateState(ctx, (state) => {
-          state.disabledWorkflows = [...new Set([...(state.disabledWorkflows ?? []), workflow.id])];
-        });
+        try {
+          updateState(ctx, (state) => {
+            state.disabledWorkflows = [...new Set([...(state.disabledWorkflows ?? []), workflow.id])];
+          });
+        } catch (error) {
+          throw new Error(
+            `désactivé mais non enregistré dans ${STATE_FILE} (${error.message}) : réactive-le à la main ` +
+              `après la migration (gh workflow enable ${workflow.id})`,
+          );
+        }
       });
     } catch (error) {
       failures.push(`${workflow.name} (${workflow.id}) : ${error.message}`);
@@ -122,8 +146,8 @@ async function disableWorkflows(ctx) {
   }
   if (failures.length) {
     throw new Error(
-      `Création refusée, des workflows n'ont pas pu être désactivés : ${failures.join(" ; ")}. ` +
-        "Relance la phase create, ou réactive ceux déjà désactivés avec --phase restore.",
+      `${refused}, des workflows n'ont pas pu être désactivés : ${failures.join(" ; ")}. ` +
+        "Relance la phase, ou réactive ceux déjà désactivés avec --phase restore.",
     );
   }
 }
@@ -138,10 +162,15 @@ function changelogOf(commits) {
   return [...renderEntries(commits)].map(([section, lines]) => [`### ${section}`, ...lines].join("\n")).join("\n\n");
 }
 
-async function releaseBody(ctx, entry, previous) {
+async function releaseBody(ctx, entry, plan) {
   if (!entry.name) return "Commit initial du projet, point de départ de la numérotation des versions.\n";
-  const changelog = changelogOf(await ctx.gh.compareCommits(previous.sha, entry.sha)) || "_Aucun changement._";
-  return `${changelog}\n\nAnciennement \`${entry.name}\`.\n`;
+  const base = plan.find((e) => e.newName === entry.base);
+  const commits = await ctx.gh.compareCommits(base.sha, entry.sha);
+  const parts = [changelogOf(commits.slice(0, CHANGELOG_LIMIT)) || "_Aucun changement._"];
+  if (commits.length > CHANGELOG_LIMIT) parts.push(`… et ${commits.length - CHANGELOG_LIMIT} autres commits.`);
+  if (entry.nonLinear) parts.push("Historique non linéaire : comparé au commit initial.");
+  parts.push(`Anciennement \`${entry.name}\`.`);
+  return `${parts.join("\n\n")}\n`;
 }
 
 /** -> whether the tag is (or would be) created; an existing tag must already be on the planned commit. */
@@ -157,9 +186,9 @@ async function ensureTag(ctx, entry) {
   return true;
 }
 
-async function ensureRelease(ctx, entry, previous) {
+async function ensureRelease(ctx, entry, plan) {
   if ((await ctx.gh.getReleaseByTag(entry.newName)) !== null) return false;
-  const body = await releaseBody(ctx, entry, previous);
+  const body = await releaseBody(ctx, entry, plan);
   const prerelease = entry.name !== null;
   await write(ctx, `release ${entry.newName}${prerelease ? " (pré-release)" : ""}`, () =>
     ctx.gh.createRelease({ tag: entry.newName, name: entry.newName, body, prerelease, makeLatest: !prerelease }),
@@ -184,15 +213,15 @@ async function ensureImage(ctx, source, target) {
 }
 
 async function create(plan, ctx) {
-  await disableWorkflows(ctx);
+  await disableWorkflows(ctx, "Création refusée");
   const counts = { tags: 0, releases: 0, images: 0, noImage: 0 };
   const countImage = (result) => {
     if (result === "tagged") counts.images++;
     if (result === "noImage") counts.noImage++;
   };
-  for (const [i, entry] of plan.entries()) {
+  for (const entry of plan) {
     if (await ensureTag(ctx, entry)) counts.tags++;
-    if (await ensureRelease(ctx, entry, plan[i - 1])) counts.releases++;
+    if (await ensureRelease(ctx, entry, plan)) counts.releases++;
     if (!entry.name) continue;
     for (const image of IMAGES) {
       countImage(await ensureImage(ctx, `${image}:${entry.name}`, `${image}:${imageTag(entry.newName)}`));
@@ -319,6 +348,7 @@ async function remove(plan, ctx) {
         "(lance --phase verify --execute).",
     );
   }
+  await disableWorkflows(ctx, "Suppression refusée");
   const deleted = [];
   const kept = [];
   for (const entry of plan.filter((e) => e.name)) {
@@ -328,6 +358,9 @@ async function remove(plan, ctx) {
     }
     const release = await ctx.gh.getReleaseByTag(entry.name);
     if (release !== null) {
+      if ((await ctx.gh.getReleaseByTag(entry.newName)) === null) {
+        throw new Error(`Suppression interrompue : la release ${entry.newName} n'existe plus`);
+      }
       await write(ctx, `suppression de la release ${entry.name}`, () => ctx.gh.deleteRelease(release.id));
       deleted.push(`release \`${entry.name}\``);
     }
@@ -347,6 +380,7 @@ async function remove(plan, ctx) {
   }
   const done = ctx.dryRun ? "à supprimer" : "supprimés";
   ctx.log(`${deleted.length} objets ${done}, ${kept.length} tags d'image conservés.`);
+  await restore(ctx);
   return { report: deleteReport(plan, deleted, kept, ctx.dryRun) };
 }
 
@@ -375,8 +409,10 @@ function deleteReport(plan, deleted, kept, dryRun) {
 // --- entry points ---
 
 function printPlan(plan, ctx) {
-  for (const entry of plan) {
-    ctx.log(`${entry.newName} <- ${entry.name ?? "(commit initial)"} ${short(entry.sha)}`);
+  for (const [i, entry] of plan.entries()) {
+    const since = i > 1 && entry.base !== plan[i - 1].newName ? `, changelog depuis ${entry.base}` : "";
+    const flag = entry.nonLinear ? " (historique non linéaire)" : "";
+    ctx.log(`${entry.newName} <- ${entry.name ?? "(commit initial)"} ${short(entry.sha)}${since}${flag}`);
   }
   ctx.log(`${plan.length} versions (${plan.length - 1} anciens tags).`);
   return {};
@@ -415,6 +451,17 @@ export function parseTagRefs(output) {
     });
 }
 
+/** `git merge-base --is-ancestor`: exit 0 = ancestor, 1 = not, anything else is an error. */
+function gitIsAncestor(ancestor, sha) {
+  try {
+    execFileSync("git", ["merge-base", "--is-ancestor", ancestor, sha], { stdio: "ignore" });
+    return true;
+  } catch (error) {
+    if (error.status === 1) return false;
+    throw error;
+  }
+}
+
 function fileStore(path) {
   return {
     read: () => (existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : {}),
@@ -442,7 +489,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
     "--sort=creatordate",
     "--format=%(refname:short)%09%(objectname)%09%(*objectname)%09%(creatordate:iso-strict)",
   ]);
-  const plan = planMigration(parseTagRefs(stdout), INIT_COMMIT);
+  const plan = planMigration(parseTagRefs(stdout), INIT_COMMIT, { isAncestor: gitIsAncestor });
   if (plan.length !== LEGACY_TAG_COUNT + 1) {
     throw new Error(
       `${plan.length - 1} anciens tags trouvés localement, ${LEGACY_TAG_COUNT} attendus (git fetch --tags ?)`,
