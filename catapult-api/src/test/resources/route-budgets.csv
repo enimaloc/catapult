@@ -1,6 +1,6 @@
 method,pattern,vars,caller,sql,notes
 # owner
-GET,/api/internal/users/{userId}/dashboard,,owner,25,
+GET,/api/internal/users/{userId}/dashboard,,owner,26,
 GET,/api/internal/users/{userId}/seen-features,,owner,2,
 GET,/api/internal/users/{userId}/settings,,owner,5,fixed:one settings row; the CCL and TW catalogs are global
 GET,/api/internal/users/{userId}/dtdd-mapping,,owner,5,fixed:the mapping of the one game the channel plays
@@ -13,11 +13,11 @@ GET,/api/internal/users/{userId}/notifications/snapshot,,owner,3,
 GET,/api/internal/users/{userId}/invite,,owner,4,
 GET,/api/internal/users/{userId}/channels,,owner,2,
 GET,/api/internal/users/{userId}/api-token,,owner,6,fixed:one token
-GET,/api/internal/users/{userId}/bindings/current,,owner,4,fixed:the binding of the one game the channel plays
+GET,/api/internal/users/{userId}/bindings/current,,owner,5,fixed:the binding of the one game the channel plays
 GET,/api/internal/auth/validate,,owner,1,fixed:the caller's own account
 GET,/api/internal/config/app,,owner,0,fixed:configuration only
 # visitor
-GET,/api/internal/users/{userId}/dashboard,,visitor,12,
+GET,/api/internal/users/{userId}/dashboard,,visitor,13,
 # admin
 GET,/api/internal/admin/members,?page=0&q=,admin,2,
 GET,/api/internal/admin/members/search,?q=budget,admin,2,
