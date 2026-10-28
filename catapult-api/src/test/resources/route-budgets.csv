@@ -25,7 +25,7 @@ GET,/api/internal/admin/experiments,,admin,3,
 GET,/api/internal/admin/experiments/{id}/settings,,admin,4,
 GET,/api/internal/admin/experiments/{id}/assignments,?page=0,admin,6,
 # personal API token
-GET,/api/v2/custom-bindings,,ptoken,11,
+GET,/api/me/custom-bindings,,ptoken,11,
 # public, but GET /api/connect/steam/callback: it only redirects (no SQL) and every row must answer 2xx
 GET,/api/internal/changelog,,anon,0,fixed:read from a file
 GET,/api/internal/config/app,,anon,0,fixed:configuration only

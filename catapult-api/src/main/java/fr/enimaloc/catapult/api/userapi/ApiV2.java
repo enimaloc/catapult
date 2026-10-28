@@ -25,6 +25,10 @@ public final class ApiV2 {
     static final String GAMES_PATH = "/api/games";
     static final String ME_BINDINGS_PATH = "/api/me/bindings";
 
+    // The other mount points under /api/me: the caller's own game, their custom bindings.
+    static final String ME_GAME_PATH = "/api/me/game";
+    static final String ME_CUSTOM_BINDINGS_PATH = "/api/me/custom-bindings";
+
     // Baked-in Swagger example for "uuid" path parameters — every uuid endpoint's spec carries
     // this literal value so SwaggerUiJwtTransformer's client-side script has something fixed to
     // find and replace with the caller's own widget token (see its class javadoc for why). Public:

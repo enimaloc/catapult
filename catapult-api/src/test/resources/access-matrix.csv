@@ -24,10 +24,17 @@ GET,/api/user/xbox/{productId},,,PASS,PASS,PASS,PASS,PASS,PASS,401
 GET,/api/internal/well-known-files,,,PASS,PASS,PASS,PASS,PASS,PASS,401
 GET,/api/v3/api-docs,,,PASS,PASS,PASS,PASS,PASS,PASS,401
 GET,/api/v3/api-docs/swagger-config,,,PASS,PASS,PASS,PASS,PASS,PASS,401
-# custom bindings
-GET,/api/v2/custom-bindings,,,401,401,401,401,401,401,PASS
-POST,/api/v2/custom-bindings/deactivate,,,401,401,401,401,401,401,PASS
-POST,/api/v2/custom-bindings/{idOrName}/activate,,,401,401,401,401,401,401,PASS
+GET,/api/games/dtdd/{dtddId},dtddId=1,,PASS,PASS,PASS,PASS,PASS,PASS,401
+GET,/api/games/igdb/{igdbId},,,PASS,PASS,PASS,PASS,PASS,PASS,401
+GET,/api/games/steam/{appId},,,PASS,PASS,PASS,PASS,PASS,PASS,401
+GET,/api/games/xbox/{productId},,,PASS,PASS,PASS,PASS,PASS,PASS,401
+# personal API token
+GET,/api/me/bindings/{bindingId},,,401,401,401,401,401,401,PASS
+GET,/api/me/custom-bindings,,,401,401,401,401,401,401,PASS
+PUT,/api/me/custom-bindings/active,,"{""idOrName"":""matrix""}",401,401,401,401,401,401,PASS
+DELETE,/api/me/custom-bindings/active,,,401,401,401,401,401,401,PASS
+GET,/api/me/game,,,401,401,401,401,401,401,PASS
+GET,/api/me/game/summary,,,401,401,401,401,401,401,PASS
 # member
 GET,/api/internal/auth/me,,,401,401,PASS,PASS,PASS,PASS,401
 GET,/api/internal/auth/validate,,,401,401,PASS,PASS,PASS,PASS,401

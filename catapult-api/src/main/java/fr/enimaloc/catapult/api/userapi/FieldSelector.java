@@ -1,8 +1,11 @@
 package fr.enimaloc.catapult.api.userapi;
 
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.nio.charset.StandardCharsets;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
@@ -15,7 +18,23 @@ import java.util.stream.StreamSupport;
  */
 final class FieldSelector {
 
+    /** The Swagger description of the {@code f} parameter. */
+    static final String FIELD_DESCRIPTION = "One field of the answer, as plain text instead of "
+            + "JSON: a dotted path (name, igdb.url, releaseDate.releaseDate). For chat bots that can't "
+            + "read JSON; a list is joined with \", \", a missing field is empty.";
+
     private FieldSelector() {}
+
+    /**
+     * {@code answer} as is, or its field {@code field} alone as plain text (seen through {@code view}, when there
+     * is one): for the chat bots that can't read JSON. An answer without a body (a 404) stays as it is.
+     */
+    static ResponseEntity<?> answer(JsonMapper mapper, ResponseEntity<?> answer, Class<?> view, String field) {
+        if (field == null || field.isBlank() || answer.getBody() == null) return answer;
+        return ResponseEntity.status(answer.getStatusCode())
+                .contentType(new MediaType(MediaType.TEXT_PLAIN, StandardCharsets.UTF_8))
+                .body(select(mapper, answer.getBody(), view, field.strip()));
+    }
 
     static String select(JsonMapper mapper, Object answer, Class<?> view, String path) {
         String json = view == null ? mapper.writeValueAsString(answer)

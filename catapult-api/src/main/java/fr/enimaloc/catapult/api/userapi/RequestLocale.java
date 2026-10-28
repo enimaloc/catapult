@@ -6,6 +6,20 @@ import java.util.Locale;
 /** Locale resolution shared by the user API versions. */
 final class RequestLocale {
 
+    /** The Swagger description of the {@code lang} parameter. */
+    static final String LANG_DESCRIPTION = "BCP 47 language tag used to localize/re-fetch "
+            + "platform data (Steam store text and date format, trigger warning labels, Xbox "
+            + "store text). Falls back to the Accept-Language request header, then English. For "
+            + "the list of locales Steam actually supports, see the \"lang\" parameter on GET "
+            + "/steam/{appId}.";
+
+    /** The Swagger description of the {@code Accept-Language} header. */
+    static final String ACCEPT_LANGUAGE_DESCRIPTION = "Fallback for \"lang\" when that "
+            + "query param is omitted — used by clients that can set headers (this route is also "
+            + "meant to be pasted as a plain URL into an OBS browser source, which sends no "
+            + "custom headers, hence \"lang\" taking priority). The highest-quality (\"q=\") tag "
+            + "is used; unparseable values are ignored.";
+
     private RequestLocale() {
     }
 

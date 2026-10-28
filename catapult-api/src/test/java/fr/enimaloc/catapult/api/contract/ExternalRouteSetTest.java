@@ -17,7 +17,8 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
 
 /**
  * The handler routes outside callers use (OBS widgets, Twitchat, the API token clients, Steam's return) are exactly
- * the frozen ones: a route added under these prefixes is a new external contract, one dropped breaks a caller.
+ * the frozen ones and the public API's: a route added under these prefixes is a new external contract, one dropped
+ * breaks a caller.
  */
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.MOCK,
@@ -29,9 +30,6 @@ class ExternalRouteSetTest {
 
     private static final Set<String> FROZEN = Set.of(
             "GET /api/connect/steam/callback",
-            "GET /api/v2/custom-bindings",
-            "POST /api/v2/custom-bindings/{idOrName}/activate",
-            "POST /api/v2/custom-bindings/deactivate",
             "GET /api/game/{uuid}",
             "GET /api/user/game/{uuid}",
             "GET /api/user/summary/{uuid}",
@@ -45,8 +43,22 @@ class ExternalRouteSetTest {
             "POST /api/twitchat/widget/{uuid}/notifications/flush",
             "POST /api/twitchat/actions/{token}");
 
+    /** The public API, versioned: by the personal API token under /api/me, open under /api/games. */
+    private static final Set<String> PUBLIC = Set.of(
+            "GET /api/me/game",
+            "GET /api/me/game/summary",
+            "GET /api/me/bindings/{bindingId}",
+            "GET /api/me/custom-bindings",
+            "PUT /api/me/custom-bindings/active",
+            "DELETE /api/me/custom-bindings/active",
+            "GET /api/games/igdb/{igdbId}",
+            "GET /api/games/steam/{appId}",
+            "GET /api/games/xbox/{productId}",
+            "GET /api/games/dtdd/{dtddId}");
+
     private static final String[] PREFIXES = {
-        "/api/game/", "/api/user/", "/api/v1/", "/api/v2/", "/api/twitchat/widget/", "/api/twitchat/actions/"
+        "/api/game/", "/api/user/", "/api/v1/", "/api/v2/", "/api/twitchat/widget/", "/api/twitchat/actions/",
+        "/api/me/", "/api/games/"
     };
 
     @Autowired
@@ -71,7 +83,9 @@ class ExternalRouteSetTest {
             }
         }
 
-        assertThat(external).containsExactlyInAnyOrderElementsOf(FROZEN);
+        Set<String> expected = new TreeSet<>(FROZEN);
+        expected.addAll(PUBLIC);
+        assertThat(external).containsExactlyInAnyOrderElementsOf(expected);
     }
 
     private static boolean isExternal(String pattern) {

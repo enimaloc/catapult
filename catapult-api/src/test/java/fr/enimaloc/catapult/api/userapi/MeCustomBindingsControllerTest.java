@@ -45,20 +45,22 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(
-        controllers = CustomBindingsApiV2Controller.class,
+        controllers = MeCustomBindingsController.class,
         excludeAutoConfiguration = ThymeleafAutoConfiguration.class,
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
-@Import({ApiSecurityConfig.class, CustomBindingsApiV2ControllerTest.Keys.class, CustomBindingViews.class,
+@Import({ApiSecurityConfig.class, MeCustomBindingsControllerTest.Keys.class, CustomBindingViews.class,
         ApiUserResolver.class})
 @ActiveProfiles("test")
-class CustomBindingsApiV2ControllerTest {
+class MeCustomBindingsControllerTest {
 
+    private static final String ACTIVE = "/api/me/custom-bindings/active";
     private static final String TOKEN = "cat_" + "t".repeat(43);
 
     @Autowired MockMvc mvc;
@@ -90,6 +92,11 @@ class CustomBindingsApiV2ControllerTest {
         art.setUninterruptible(true);
     }
 
+    private static MockHttpServletRequestBuilder activate(String idOrName) {
+        return put(ACTIVE).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"idOrName\": \"" + idOrName + "\"}");
+    }
+
     private static MockHttpServletRequestBuilder withToken(MockHttpServletRequestBuilder request) {
         return request.header("Authorization", "Bearer " + TOKEN);
     }
@@ -100,7 +107,7 @@ class CustomBindingsApiV2ControllerTest {
         when(service.list(user)).thenReturn(List.of(art));
         when(service.active(user)).thenReturn(Optional.of(new CustomBindingActivation(user.getId(), art, at)));
 
-        mvc.perform(withToken(get("/api/v2/custom-bindings")))
+        mvc.perform(withToken(get("/api/me/custom-bindings")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.enabled").value(true))
                 .andExpect(jsonPath("$.activeId").value(art.getId().toString()))
@@ -120,40 +127,48 @@ class CustomBindingsApiV2ControllerTest {
         when(service.list(user)).thenReturn(List.of());
         when(service.active(user)).thenReturn(Optional.empty());
 
-        mvc.perform(withToken(get("/api/v2/custom-bindings")))
+        mvc.perform(withToken(get("/api/me/custom-bindings")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.bindings").isEmpty())
                 .andExpect(jsonPath("$.activeId").doesNotExist());
     }
 
     @Test
-    void personalToken_activatesByNameIgnoringCase() throws Exception {
+    void putActive_appliesByName_204() throws Exception {
         when(service.resolve(user, "art")).thenReturn(Optional.of(art));
         when(service.activate(user, art)).thenReturn(ActivationResult.APPLIED);
 
-        mvc.perform(withToken(post("/api/v2/custom-bindings/art/activate")))
+        mvc.perform(withToken(activate("art")))
                 .andExpect(status().isNoContent());
 
         verify(service).activate(user, art);
     }
 
     @Test
-    void activatesById() throws Exception {
+    void putActive_appliesById_204() throws Exception {
         when(service.resolve(user, art.getId().toString())).thenReturn(Optional.of(art));
         when(service.activate(user, art)).thenReturn(ActivationResult.APPLIED);
 
-        mvc.perform(withToken(post("/api/v2/custom-bindings/" + art.getId() + "/activate")))
+        mvc.perform(withToken(activate(art.getId().toString())))
                 .andExpect(status().isNoContent());
     }
 
     @Test
-    void unknownBinding_is404() throws Exception {
+    void putActive_unknown_404Problem() throws Exception {
         when(service.resolve(any(), anyString())).thenReturn(Optional.empty());
 
-        mvc.perform(withToken(post("/api/v2/custom-bindings/nope/activate")))
+        mvc.perform(withToken(activate("nope")))
                 .andExpect(status().isNotFound())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.code").value("not_found"));
+
+        verify(service, never()).activate(any(), any());
+    }
+
+    @Test
+    void putActive_withoutBody_is400() throws Exception {
+        mvc.perform(withToken(put(ACTIVE).contentType(MediaType.APPLICATION_JSON)))
+                .andExpect(status().isBadRequest());
 
         verify(service, never()).activate(any(), any());
     }
@@ -163,7 +178,7 @@ class CustomBindingsApiV2ControllerTest {
         when(service.resolve(user, "art")).thenReturn(Optional.of(art));
         when(service.activate(user, art)).thenReturn(ActivationResult.TWITCH_UNAVAILABLE);
 
-        mvc.perform(withToken(post("/api/v2/custom-bindings/art/activate")))
+        mvc.perform(withToken(activate("art")))
                 .andExpect(status().isConflict())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.code").value("twitch_unavailable"))
@@ -175,7 +190,7 @@ class CustomBindingsApiV2ControllerTest {
         when(service.resolve(user, "art")).thenReturn(Optional.of(art));
         when(service.activate(user, art)).thenReturn(ActivationResult.BOT_DISABLED);
 
-        mvc.perform(withToken(post("/api/v2/custom-bindings/art/activate")))
+        mvc.perform(withToken(activate("art")))
                 .andExpect(status().isConflict())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.code").value("bot_disabled"))
@@ -187,7 +202,7 @@ class CustomBindingsApiV2ControllerTest {
         when(service.resolve(user, "art")).thenReturn(Optional.of(art));
         when(service.activate(user, art)).thenReturn(ActivationResult.FAILED);
 
-        mvc.perform(withToken(post("/api/v2/custom-bindings/art/activate")))
+        mvc.perform(withToken(activate("art")))
                 .andExpect(status().isBadGateway())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.code").value("twitch_failed"))
@@ -195,8 +210,8 @@ class CustomBindingsApiV2ControllerTest {
     }
 
     @Test
-    void deactivate_is204() throws Exception {
-        mvc.perform(withToken(post("/api/v2/custom-bindings/deactivate")))
+    void deleteActive_204() throws Exception {
+        mvc.perform(withToken(delete(ACTIVE)))
                 .andExpect(status().isNoContent());
 
         verify(service).deactivate(user);
@@ -209,11 +224,11 @@ class CustomBindingsApiV2ControllerTest {
         when(service.resolve(any(), anyString())).thenThrow(closed);
         doThrow(closed).when(service).deactivate(any());
 
-        mvc.perform(withToken(get("/api/v2/custom-bindings")))
+        mvc.perform(withToken(get("/api/me/custom-bindings")))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("feature_disabled"));
-        mvc.perform(withToken(post("/api/v2/custom-bindings/art/activate"))).andExpect(status().isForbidden());
-        mvc.perform(withToken(post("/api/v2/custom-bindings/deactivate"))).andExpect(status().isForbidden());
+        mvc.perform(withToken(activate("art"))).andExpect(status().isForbidden());
+        mvc.perform(withToken(delete(ACTIVE))).andExpect(status().isForbidden());
         verify(service, never()).activate(any(), any());
     }
 
@@ -221,7 +236,7 @@ class CustomBindingsApiV2ControllerTest {
     void aTokenWhoseAccountIsGone_is401() throws Exception {
         when(accounts.findById(user.getId())).thenReturn(Optional.empty());
 
-        mvc.perform(withToken(post("/api/v2/custom-bindings/deactivate"))).andExpect(status().isUnauthorized());
+        mvc.perform(withToken(delete(ACTIVE))).andExpect(status().isUnauthorized());
         verify(service, never()).deactivate(any());
     }
 

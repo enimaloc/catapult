@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * How the custom bindings read on the wire, shared by the token API ({@code /api/v2/custom-bindings}), the owner's
+ * How the custom bindings read on the wire, shared by the token API ({@code /api/me/custom-bindings}), the owner's
  * endpoints and the channel dashboard: the DTOs, and what an activation's outcome answers (204 once applied; 409
  * for a broken Twitch link or a paused bot, 502 when Twitch failed, each an {@link ApiProblem}).
  */

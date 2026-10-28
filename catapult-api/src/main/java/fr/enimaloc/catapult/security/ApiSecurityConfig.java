@@ -56,22 +56,15 @@ public class ApiSecurityConfig {
     /** Mount point of the member's own resources, which only a personal API token opens. */
     public static final String PUBLIC_ME = "/api/me";
 
-    /**
-     * Mount point of the former custom bindings API, opened by a personal API token like {@value #PUBLIC_ME} until it
-     * goes.
-     */
-    public static final String CUSTOM_BINDINGS_API = "/api/v2/custom-bindings";
-
-    /** The personal-token chain's paths: {@value #PUBLIC_ME}, {@value #CUSTOM_BINDINGS_API}, all below included. */
-    private static final String[] PERSONAL_TOKEN_PATHS =
-            {PUBLIC_ME, PUBLIC_ME + "/**", CUSTOM_BINDINGS_API, CUSTOM_BINDINGS_API + "/**"};
+    /** The personal-token chain's paths: {@value #PUBLIC_ME} and all below it. */
+    private static final String[] PERSONAL_TOKEN_PATHS = {PUBLIC_ME, PUBLIC_ME + "/**"};
 
     /**
-     * {@value #PUBLIC_ME}/** (and {@value #CUSTOM_BINDINGS_API}/**), in every profile: ordered before the /api/**
-     * chains below (which would take its Bearer for a JWT, and let localhost through), stateless, no CSRF,
-     * authenticated by a personal API token only ({@link PersonalTokenAuthenticationFilter}) — a JWT, a widget token
-     * or nothing gets a 401, with an {@code unauthorized} problem. A {@code GET} takes either token; anything else
-     * takes the full one, the read-only token getting a 403 with a {@code forbidden} problem.
+     * {@value #PUBLIC_ME}/**, in every profile: ordered before the /api/** chains below (which would take its
+     * Bearer for a JWT, and let localhost through), stateless, no CSRF, authenticated by a personal API token only
+     * ({@link PersonalTokenAuthenticationFilter}) — a JWT, a widget token or nothing gets a 401, with an
+     * {@code unauthorized} problem. A {@code GET} takes either token; anything else takes the full one, the
+     * read-only token getting a 403 with a {@code forbidden} problem.
      */
     @Bean
     @Order(Ordered.HIGHEST_PRECEDENCE)
@@ -107,12 +100,12 @@ public class ApiSecurityConfig {
      * The personal-token API is open to a page of any origin (Twitchat runs in the browser): the personal token, in
      * {@code Authorization} or the read-only one in {@code ?token=}, is its only credential — no cookie or session
      * counts here — so the answer allows no credentials and any origin is safe. Not a bean, so no other chain picks
-     * it up. {@code POST} stays allowed while the {@value #CUSTOM_BINDINGS_API} routes live.
+     * it up.
      */
     static CorsConfigurationSource publicMeCors() {
         CorsConfiguration config = new CorsConfiguration();
         config.addAllowedOrigin(CorsConfiguration.ALL);
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedMethods(List.of("GET", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
         config.setAllowCredentials(false);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
@@ -150,7 +143,7 @@ public class ApiSecurityConfig {
                 // to the CorsConfigurationSource Spring MVC derives from it.
                 .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(ApiPaths.INTERNAL + "/health", ApiPaths.INTERNAL + "/config/**", ApiPaths.INTERNAL + "/changelog", ApiPaths.INTERNAL + "/status/degraded", ApiPaths.INTERNAL + "/well-known-files", ApiPaths.INTERNAL + "/meta-tags", ApiPaths.INTERNAL + "/social-links", "/api/twitchat/widget/**", "/api/twitchat/actions/**", "/api/game/**", "/api/user/**", "/api/v3/api-docs/**").permitAll()
+                        .requestMatchers(ApiPaths.INTERNAL + "/health", ApiPaths.INTERNAL + "/config/**", ApiPaths.INTERNAL + "/changelog", ApiPaths.INTERNAL + "/status/degraded", ApiPaths.INTERNAL + "/well-known-files", ApiPaths.INTERNAL + "/meta-tags", ApiPaths.INTERNAL + "/social-links", "/api/twitchat/widget/**", "/api/twitchat/actions/**", "/api/game/**", "/api/user/**", "/api/games/**", "/api/v3/api-docs/**").permitAll()
                         .requestMatchers(ApiPaths.INTERNAL + "/auth/exchange").permitAll()
                         .requestMatchers("/api/connect/steam/callback").permitAll()
                         .requestMatchers(ApiPaths.ADMIN + "/**").access(Authz.admin())

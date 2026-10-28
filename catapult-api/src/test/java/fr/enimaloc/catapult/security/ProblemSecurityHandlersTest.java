@@ -133,8 +133,8 @@ class ProblemSecurityHandlersTest {
     }
 
     @Test
-    void customBindingsWithoutTokenIs401Problem() throws Exception {
-        mvc.perform(remote(get("/api/v2/custom-bindings")).header("Origin", "https://example.org"))
+    void publicMeWithoutTokenIs401Problem() throws Exception {
+        mvc.perform(remote(get("/api/me/custom-bindings")).header("Origin", "https://example.org"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(header().string("Access-Control-Allow-Origin", "*"))
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))

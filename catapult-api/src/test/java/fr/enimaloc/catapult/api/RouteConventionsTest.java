@@ -25,7 +25,7 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
 
 /**
  * The conventions of the internal routes (see {@link ApiPaths}): every catapult route is under
- * {@value ApiPaths#INTERNAL} or one of the frozen external ones; an internal
+ * {@value ApiPaths#INTERNAL}, one of the frozen external ones or one of the public API's; an internal
  * route says what it does with its verb, not a path segment; and a route under {@value ApiPaths#USER} takes its owner
  * as a {@code UUID userId}.
  */
@@ -50,9 +50,6 @@ class RouteConventionsTest {
     /** The external routes, frozen byte for byte (as {@code ExternalRouteSetTest} pins them). */
     private static final Set<String> FROZEN = Set.of(
             "GET /api/connect/steam/callback",
-            "GET /api/v2/custom-bindings",
-            "POST /api/v2/custom-bindings/{idOrName}/activate",
-            "POST /api/v2/custom-bindings/deactivate",
             "GET /api/game/{uuid}",
             "GET /api/user/game/{uuid}",
             "GET /api/user/summary/{uuid}",
@@ -65,6 +62,19 @@ class RouteConventionsTest {
             "GET /api/twitchat/widget/{uuid}",
             "POST /api/twitchat/widget/{uuid}/notifications/flush",
             "POST /api/twitchat/actions/{token}");
+
+    /** The public API, versioned: by the personal API token under /api/me, open under /api/games. */
+    private static final Set<String> PUBLIC = Set.of(
+            "GET /api/me/game",
+            "GET /api/me/game/summary",
+            "GET /api/me/bindings/{bindingId}",
+            "GET /api/me/custom-bindings",
+            "PUT /api/me/custom-bindings/active",
+            "DELETE /api/me/custom-bindings/active",
+            "GET /api/games/igdb/{igdbId}",
+            "GET /api/games/steam/{appId}",
+            "GET /api/games/xbox/{productId}",
+            "GET /api/games/dtdd/{dtddId}");
 
     /** Path segments that name a CRUD operation the verb should carry. */
     private static final Set<String> CRUD_SEGMENTS = Set.of(
@@ -90,12 +100,13 @@ class RouteConventionsTest {
         List<String> stray = new ArrayList<>();
         for (Route route : routes()) {
             if (!route.pattern().startsWith(ApiPaths.INTERNAL + "/")
-                    && !FROZEN.contains(route.key())) {
+                    && !FROZEN.contains(route.key())
+                    && !PUBLIC.contains(route.key())) {
                 stray.add(route.key() + " (" + route.handler().getShortLogMessage() + ")");
             }
         }
         stray.sort(null);
-        assertThat(stray).as("routes neither under " + ApiPaths.INTERNAL + "/ nor frozen").isEmpty();
+        assertThat(stray).as("routes neither under " + ApiPaths.INTERNAL + "/ nor frozen nor public").isEmpty();
     }
 
     @Test

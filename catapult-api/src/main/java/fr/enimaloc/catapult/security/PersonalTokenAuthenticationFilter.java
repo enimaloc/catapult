@@ -19,10 +19,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Authenticates a request to the personal-token API ({@code /api/me/**}, and {@code /api/v2/custom-bindings/**} until
- * it goes) by a member's personal API token, and by nothing else: a JWT, a widget token or no token leaves it
- * unauthenticated (401). The principal is the member's account id ({@link UUID}); the authority tells the token's
- * scope apart: {@value #AUTHORITY} for the full token, {@value #READ_AUTHORITY} for the read-only one.
+ * Authenticates a request to the personal-token API ({@code /api/me/**}) by a member's personal API token, and by
+ * nothing else: a JWT, a widget token or no token leaves it unauthenticated (401). The principal is the member's
+ * account id ({@link UUID}); the authority tells the token's scope apart: {@value #AUTHORITY} for the full token,
+ * {@value #READ_AUTHORITY} for the read-only one.
  * <p>
  * The token comes from {@code Authorization: Bearer <token>}. Only when the request has no {@code Authorization}
  * header at all is the {@code token} parameter read instead, and there the read-only token alone counts: a full token

@@ -1,8 +1,0 @@
-{
-  "status" : 204,
-  "headers" : {
-    "Cache-Control" : [ "no-cache, no-store, max-age=0, must-revalidate" ],
-    "Vary" : [ "Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers" ]
-  },
-  "body" : ""
-}
