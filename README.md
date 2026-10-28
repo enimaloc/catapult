@@ -1,7 +1,8 @@
 # Catapult
 
-[![Tests](https://github.com/enimaloc/catapult/actions/workflows/test.yml/badge.svg)](https://github.com/enimaloc/catapult/actions/workflows/test.yml)
 [![Build](https://github.com/enimaloc/catapult/actions/workflows/build.yml/badge.svg)](https://github.com/enimaloc/catapult/actions/workflows/build.yml)
+[![Tests](https://github.com/enimaloc/catapult/actions/workflows/test.yml/badge.svg)](https://github.com/enimaloc/catapult/actions/workflows/test.yml)
+[![Dernière release](https://img.shields.io/github/v/release/enimaloc/catapult?include_prereleases&sort=semver)](https://github.com/enimaloc/catapult/releases)
 
 Outil d'automatisation pour streamers Twitch : détecte le jeu en cours et met à jour automatiquement la catégorie Twitch ainsi que les labels de classification de contenu (CCL) selon les données IGDB.
 
@@ -186,8 +187,40 @@ src/main/java/fr/enimaloc/catapult/
 └── web/           Contrôleurs HTTP et templates
 ```
 
+## Branches et releases
+
+Trois branches longues, du plus récent au plus stable :
+
+```
+dev  ──►  beta  ──►  main
+```
+
+| Branche | Contenu | Version publiée | Images Docker |
+|---|---|---|---|
+| `dev` | Intégration : les PR de fonctionnalités et de correctifs arrivent ici (branche par défaut) | aucune | aucune |
+| `beta` | Pré-releases | `v1.0.0-BETA.N` | `:<version>` et `:beta` |
+| `main` | Releases stables | `vX.Y.Z` | `:<version>` et `:latest` |
+
+Une release part d'une PR de promotion préparée par un bot :
+
+1. À chaque commit sur `dev`, le bot ouvre ou met à jour, **en draft**, la PR `chore(release): vX.Y.Z-BETA.N`
+   (`dev` → `beta`), avec un changelog que le propriétaire peut corriger à la main.
+2. Le propriétaire sort la PR du draft : la version est mise à jour dans `build.gradle.kts` et la fusion se fait
+   toute seule dès que les checks sont verts.
+3. À la fusion, le tag est posé, la pré-release GitHub est publiée et les images sont poussées.
+4. La promotion `beta` → `main` (`chore(release): vX.Y.Z`) suit le même cycle et publie la release stable.
+
+Un correctif urgent passe par une branche `hotfix/…` partie de `main`, puis est reporté sur `beta` et `dev`.
+Le détail est dans [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Contribuer
 
 Les PR de fonctionnalités et de correctifs s'ouvrent **vers `dev`**, avec des commits au format
 [Conventional Commits](https://www.conventionalcommits.org/fr/v1.0.0/). Le détail du flux (branches, releases,
-hotfix) est dans [CONTRIBUTING.md](CONTRIBUTING.md).
+hotfix) est dans [CONTRIBUTING.md](CONTRIBUTING.md) ; une faille de sécurité se signale en privé selon
+[SECURITY.md](SECURITY.md).
+
+## Documentation de l'API
+
+L'API publique de `catapult-api` est documentée (Swagger) sur le site, à l'adresse `/docs/api`
+(`http://localhost/docs/api` en local).
