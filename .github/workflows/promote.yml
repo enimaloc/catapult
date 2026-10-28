@@ -3,6 +3,8 @@ name: Promote
 on:
   push:
     branches: [dev, beta]
+  # Lets renovate-merge.yml run it on dev after a checkbox merge, which GITHUB_TOKEN pushes cannot trigger
+  workflow_dispatch:
 
 concurrency:
   group: promote-${{ github.ref_name }}
@@ -13,6 +15,7 @@ permissions:
 
 jobs:
   promote:
+    if: github.ref_name == 'dev' || github.ref_name == 'beta'
     runs-on: ubuntu-latest
     steps:
       - id: app-token
