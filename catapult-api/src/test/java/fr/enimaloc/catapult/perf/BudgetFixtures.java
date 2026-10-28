@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.perf;
 
+import fr.enimaloc.catapult.domain.account.ApiTokenScope;
 import fr.enimaloc.catapult.chat.ChatCommandEvent;
 import fr.enimaloc.catapult.common.dto.admin.MetaTagAttribute;
 import fr.enimaloc.catapult.common.dto.admin.MetaTagRequest;
@@ -202,7 +203,7 @@ public class BudgetFixtures {
                     IntStream.range(0, LARGE).mapToObj(BudgetFixtures::channelTwitchId).toList();
             // the binding id is only known once the bindings are saved
             Accounts partial = new Accounts(owner, visitor, admin, widgetTokens.getOrCreate(owner),
-                    userApiTokens.regenerate(owner).token(), null, experiment.getId(), channelTwitchIds);
+                    userApiTokens.regenerate(owner, ApiTokenScope.FULL).token(), null, experiment.getId(), channelTwitchIds);
             add(partial, 0, SMALL);
             GameBinding first = gameBindings.findAll().stream()
                     .filter(b -> b.getSourceName().equals(gameName(0)))

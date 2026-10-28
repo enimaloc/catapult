@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api;
 
+import fr.enimaloc.catapult.domain.account.ApiTokenScope;
 import fr.enimaloc.catapult.common.dto.account.ApiTokenCreatedDto;
 import fr.enimaloc.catapult.common.dto.account.ApiTokenStatusDto;
 import fr.enimaloc.catapult.domain.account.UserAccount;
@@ -67,7 +68,7 @@ class ApiMeApiTokenControllerTest {
 
     @Test
     void status_neverShowsTheToken() throws Exception {
-        when(tokens.status(user)).thenReturn(new ApiTokenStatusDto(true, Instant.parse("2026-10-24T10:00:00Z")));
+        when(tokens.status(user, ApiTokenScope.FULL)).thenReturn(new ApiTokenStatusDto(true, Instant.parse("2026-10-24T10:00:00Z")));
 
         mvc.perform(get(OWN + "/api-token").with(me()))
                 .andExpect(status().isOk())
@@ -78,7 +79,7 @@ class ApiMeApiTokenControllerTest {
 
     @Test
     void regenerate_showsTheNewTokenOnce() throws Exception {
-        when(tokens.regenerate(user)).thenReturn(new ApiTokenCreatedDto("cat_abc", Instant.EPOCH));
+        when(tokens.regenerate(user, ApiTokenScope.FULL)).thenReturn(new ApiTokenCreatedDto("cat_abc", Instant.EPOCH));
 
         mvc.perform(post(OWN + "/api-token").with(me()).with(csrf()))
                 .andExpect(status().isOk())
@@ -89,7 +90,7 @@ class ApiMeApiTokenControllerTest {
     void delete_revokesIt() throws Exception {
         mvc.perform(delete(OWN + "/api-token").with(me()).with(csrf()))
                 .andExpect(status().isNoContent());
-        verify(tokens).revoke(user);
+        verify(tokens).revoke(user, ApiTokenScope.FULL);
     }
 
     @Test
@@ -103,7 +104,7 @@ class ApiMeApiTokenControllerTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("feature_disabled"));
         mvc.perform(delete(OWN + "/api-token").with(me()).with(csrf())).andExpect(status().isNoContent());
-        verify(tokens, never()).regenerate(any());
-        verify(tokens).revoke(user);
+        verify(tokens, never()).regenerate(any(), any());
+        verify(tokens).revoke(user, ApiTokenScope.FULL);
     }
 }

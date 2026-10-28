@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.contract;
 
+import fr.enimaloc.catapult.domain.account.ApiTokenScope;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
@@ -163,7 +164,7 @@ class FrozenRouteContractTest extends FullContextTestBase {
     private void fixtureRows() {
         UserAccount account = account("frozen-routes", "frozen-routes-twitch");
         widget = widgetTokenService.getOrCreate(account);
-        personalToken = userApiTokenService.regenerate(account).token();
+        personalToken = userApiTokenService.regenerate(account, ApiTokenScope.FULL).token();
         openCustomBindingsTo(account);
         customBindingService.create(
                 account, new CustomBindingRequest("Art", "509660", "Art", Set.of(), Set.of("Flashing"), false));

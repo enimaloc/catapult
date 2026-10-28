@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.security;
 
+import fr.enimaloc.catapult.domain.account.ApiTokenScope;
 import fr.enimaloc.catapult.api.ApiMeApiTokenController;
 import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.api.CustomBindingViews;
@@ -8,6 +9,7 @@ import fr.enimaloc.catapult.common.dto.account.ApiTokenStatusDto;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.account.ChannelAccessService;
+import fr.enimaloc.catapult.service.account.ApiTokenOwner;
 import fr.enimaloc.catapult.service.account.UserApiTokenService;
 import fr.enimaloc.catapult.service.binding.CustomBindingService;
 import org.junit.jupiter.api.BeforeEach;
@@ -80,10 +82,10 @@ class CustomBindingApiSecurityTest {
             user.setTwitchUsername("enimaloc");
             user.setWidgetToken(UUID.randomUUID());
             when(accounts.findById(user.getId())).thenReturn(Optional.of(user));
-            when(tokens.authenticate(PERSONAL_TOKEN)).thenReturn(Optional.of(user));
+            when(tokens.authenticate(PERSONAL_TOKEN)).thenReturn(Optional.of(new ApiTokenOwner(user, ApiTokenScope.FULL)));
             when(customBindings.list(any())).thenReturn(List.of());
             when(customBindings.enabled(any())).thenReturn(true);
-            when(tokens.status(any())).thenReturn(new ApiTokenStatusDto(true, Instant.EPOCH));
+            when(tokens.status(any(), any())).thenReturn(new ApiTokenStatusDto(true, Instant.EPOCH));
         }
 
         /** A 401 whose body is a problem with the code {@code unauthorized} (CORS headers aside). */

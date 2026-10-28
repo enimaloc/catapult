@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.api.error.ApiProblem;
 import fr.enimaloc.catapult.common.dto.account.ApiTokenCreatedDto;
 import fr.enimaloc.catapult.common.dto.account.ApiTokenStatusDto;
 import fr.enimaloc.catapult.common.error.ErrorCode;
+import fr.enimaloc.catapult.domain.account.ApiTokenScope;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.service.account.UserApiTokenService;
 import fr.enimaloc.catapult.service.binding.CustomBindingService;
@@ -38,21 +39,21 @@ public class ApiMeApiTokenController {
     @PreAuthorize("@authz.isSelf(#userId)")
     @GetMapping
     public ApiTokenStatusDto status(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt) {
-        return userApiTokenService.status(enabledMember(jwt));
+        return userApiTokenService.status(enabledMember(jwt), ApiTokenScope.FULL);
     }
 
     /** A new token, replacing the current one at once: the only time it is shown. */
     @PreAuthorize("@authz.isSelf(#userId)")
     @PostMapping
     public ApiTokenCreatedDto regenerate(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt) {
-        return userApiTokenService.regenerate(enabledMember(jwt));
+        return userApiTokenService.regenerate(enabledMember(jwt), ApiTokenScope.FULL);
     }
 
     @PreAuthorize("@authz.isSelf(#userId)")
     @DeleteMapping
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void revoke(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt) {
-        userApiTokenService.revoke(userResolver.viewer(jwt));
+        userApiTokenService.revoke(userResolver.viewer(jwt), ApiTokenScope.FULL);
     }
 
     private UserAccount enabledMember(Jwt jwt) {

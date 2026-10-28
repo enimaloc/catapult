@@ -1,6 +1,5 @@
 package fr.enimaloc.catapult.security;
 
-import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.service.account.UserApiTokenService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -41,7 +40,7 @@ public class PersonalTokenAuthenticationFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         bearer(request)
                 .flatMap(tokens::authenticate)
-                .map(UserAccount::getId)
+                .map(owner -> owner.user().getId())
                 .ifPresent(userId -> {
                     SecurityContext context = SecurityContextHolder.createEmptyContext();
                     context.setAuthentication(UsernamePasswordAuthenticationToken.authenticated(

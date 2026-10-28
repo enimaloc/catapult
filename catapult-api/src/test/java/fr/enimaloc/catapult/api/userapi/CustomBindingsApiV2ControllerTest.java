@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.userapi;
 
+import fr.enimaloc.catapult.domain.account.ApiTokenScope;
 import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.api.CustomBindingViews;
 import fr.enimaloc.catapult.api.error.ApiProblem;
@@ -9,6 +10,7 @@ import fr.enimaloc.catapult.domain.binding.CustomBinding;
 import fr.enimaloc.catapult.domain.binding.CustomBindingActivation;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.security.ApiSecurityConfig;
+import fr.enimaloc.catapult.service.account.ApiTokenOwner;
 import fr.enimaloc.catapult.service.account.UserApiTokenService;
 import fr.enimaloc.catapult.service.binding.CustomBindingService;
 import fr.enimaloc.catapult.service.binding.CustomBindingService.ActivationResult;
@@ -73,7 +75,7 @@ class CustomBindingsApiV2ControllerTest {
         user.setId(UUID.randomUUID());
         user.setTwitchUsername("enimaloc");
         when(accounts.findById(user.getId())).thenReturn(Optional.of(user));
-        when(tokens.authenticate(TOKEN)).thenReturn(Optional.of(user));
+        when(tokens.authenticate(TOKEN)).thenReturn(Optional.of(new ApiTokenOwner(user, ApiTokenScope.FULL)));
         when(service.enabled(any())).thenReturn(true);
         doCallRealMethod().when(service).activateByIdOrName(any(UserAccount.class), anyString());
         art = new CustomBinding();
