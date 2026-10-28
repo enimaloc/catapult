@@ -15,14 +15,14 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Profile("!mock")
 class CustomBindingsCorsConfig implements WebMvcConfigurer {
 
-    /** Also matches {@code /api/v2/custom-bindings} itself. */
-    static final String PATH = "/api/v2/custom-bindings/**";
+    /** Also matches {@code /api/me/custom-bindings} itself. */
+    static final String PATH = "/api/me/custom-bindings/**";
 
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping(PATH)
                 .allowedOrigins("*")
-                .allowedMethods("GET", "POST", "OPTIONS")
+                .allowedMethods("GET", "PUT", "DELETE", "OPTIONS")
                 .allowedHeaders("Authorization", "Content-Type")
                 .allowCredentials(false);
     }

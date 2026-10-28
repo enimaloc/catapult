@@ -18,7 +18,7 @@ import java.util.Locale;
 import java.util.UUID;
 
 /**
- * One mock member's custom bindings and personal API token, answering like catapult-api: a name is trimmed, 1-40
+ * One mock member's custom bindings and personal API tokens (full and read-only), answering like catapult-api: a name is trimmed, 1-40
  * characters and unique whatever its case (400 invalid, 409 taken), a Twitch category is required (400), 20 at most
  * (409), a single binding active at a time. Starts with two bindings, the first one active.
  */
@@ -31,6 +31,7 @@ class MockCustomBindings {
     private UUID activeId;
     private Instant activatedAt;
     private Instant tokenCreatedAt;
+    private Instant readTokenCreatedAt;
 
     MockCustomBindings() {
         CustomBindingDto art = new CustomBindingDto(UUID.randomUUID(), "Art", "509660", "Art",
@@ -102,6 +103,22 @@ class MockCustomBindings {
 
     synchronized void revokeToken() {
         tokenCreatedAt = null;
+    }
+
+    synchronized ApiTokenStatusDto readTokenStatus() {
+        return new ApiTokenStatusDto(readTokenCreatedAt != null, readTokenCreatedAt);
+    }
+
+    /** A new read-only token replacing the current one: the only time it is known. */
+    synchronized ApiTokenCreatedDto regenerateReadToken() {
+        byte[] bytes = new byte[32];
+        RANDOM.nextBytes(bytes);
+        readTokenCreatedAt = Instant.now();
+        return new ApiTokenCreatedDto("catr_" + Base64.getUrlEncoder().withoutPadding().encodeToString(bytes), readTokenCreatedAt);
+    }
+
+    synchronized void revokeReadToken() {
+        readTokenCreatedAt = null;
     }
 
     private int indexOf(UUID id) {

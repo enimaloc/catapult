@@ -18,12 +18,12 @@
      field with its copy button; channel-command-migration.js switches the tool and copies. */-->
 <!--/*@thymesVar id="m" type="fr.enimaloc.catapult.controller.CommandMigration"*/-->
 <mdui-card th:fragment="command-migration(m)" id="command-migration" class="connection-card command-migration sentry-block" variant="outlined"
-           th:attr="data-summary-url=${summaryUrl},data-label-copied=#{channel.commands.migration.copied},data-label-copy-failed=#{channel.commands.migration.copy_failed}">
+           th:attr="data-summary-url=${summaryUrl},data-summary-placeholder-url=${summaryUrl},data-label-copied=#{channel.commands.migration.copied},data-label-copy-failed=#{channel.commands.migration.copy_failed}">
     <span th:text="#{channel.commands.migration.title}">Tes commandes de chat</span>
     <mdui-chip th:text="#{channel.commands.migration.retiring}">Bientôt retirées</mdui-chip>
     <p th:text="#{channel.commands.migration.intro}">Les commandes de chat de catapult vont être retirées.</p>
     <p th:text="#{channel.commands.migration.overlap}">Deux réponses peuvent apparaître.</p>
-    <p th:text="#{channel.commands.migration.token}">Ces liens contiennent le jeton de ton widget.</p>
+    <p th:text="#{channel.commands.migration.token}">Ces liens lisent ton jeu avec ton jeton de lecture.</p>
     <div class="command-migration-tool">
         <mdui-select id="command-migration-tool" variant="outlined" th:value="${m.tools()[0].id()}"
                      th:attr="label=#{channel.commands.migration.tool}">

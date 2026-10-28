@@ -498,4 +498,10 @@ public interface ApiService {
     ApiClient.Result<fr.enimaloc.catapult.common.dto.account.ApiTokenCreatedDto> regenerateApiToken();
     /** catapult-api's status (204), 502 when unreachable. */
     int revokeApiToken();
+    /** Whether the logged-in member has a read-only personal API token; null when catapult-api fails or refuses. */
+    fr.enimaloc.catapult.common.dto.account.ApiTokenStatusDto readApiTokenStatus();
+    /** Replaces the read-only personal API token; the body carries the new one, shown once, never logged or kept. */
+    ApiClient.Result<fr.enimaloc.catapult.common.dto.account.ApiTokenCreatedDto> regenerateReadApiToken();
+    /** catapult-api's status (204), 502 when unreachable. */
+    int revokeReadApiToken();
 }

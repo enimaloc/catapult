@@ -14,10 +14,7 @@
  *   before the last one applied (its ts: events published apart may arrive out of order) is dropped. A save or a
  *   deletion shows its result at once from its answer (the created row added from the same template, the
  *   edited one brought up to date, the deleted one removed): its live event then finds nothing to change.
- * - API token card (Account tab): since when a token exists, generate/regenerate (regeneration confirmed: it
- *   invalidates the old token) and revoke. A generated token is shown once, in a read-only field with
- *   a copy button and a curl example on the site's own address (catapult-web relays /api/v2/custom-bindings
- *   to catapult-api); it is kept nowhere but that field.
+ * - The personal API token card (Account tab) is api-token-cards.js's.
  *
  * Every text goes in through textContent or a property, never as markup.
  */
@@ -352,118 +349,9 @@ window.CatapultCustomBindings = (function () {
         return true;
     }
 
-    // The promise of the last /me/api-token answer, kept for the page: /me is the logged-in member, not the
-    // channel, so SPA navigations reuse it. Null until fetched, and again after a failure so a later render retries.
-    let tokenStatus = null;
-
-    function fetchTokenStatus() {
-        if (!tokenStatus) {
-            const request = (async () => {
-                const response = await fetch("/me/api-token", { headers: { Accept: "application/json" } });
-                if (!response.ok) throw new Error(String(response.status));
-                return response.json();
-            })();
-            tokenStatus = request;
-            request.catch(() => { if (tokenStatus === request) tokenStatus = null; });
-        }
-        return tokenStatus;
-    }
-
-    function attachToken(card) {
-        const status = byId("api-token-status");
-        const generate = byId("api-token-generate-btn");
-        const revoke = byId("api-token-revoke-btn");
-        const reveal = byId("api-token-reveal");
-        const value = byId("api-token-value");
-        const curl = byId("api-token-curl");
-        const dialog = byId("api-token-confirm-dialog");
-        let exists = false;
-        let pending = null;
-
-        function render(token) {
-            exists = !!token?.exists;
-            status.textContent = exists
-                ? card.dataset.labelSince.replace("{0}", new Date(token.createdAt)
-                    .toLocaleString(document.documentElement.lang || undefined))
-                : card.dataset.labelNone;
-            generate.textContent = exists ? card.dataset.labelRegenerate : card.dataset.labelGenerate;
-            show(revoke, exists);
-        }
-
-        function forget() {
-            value.value = "";
-            curl.textContent = "";
-            show(reveal, false);
-        }
-
-        function showToken(token) {
-            value.value = token;
-            curl.textContent = `curl -X POST -H "Authorization: Bearer ${token}" `
-                + `${window.location.origin}/api/v2/custom-bindings/${encodeURIComponent(card.dataset.exampleName)}/activate`;
-            show(reveal, true);
-        }
-
-        async function regenerate() {
-            const response = await post("/me/api-token", {});
-            if (!response) return;
-            if (!response.ok) return CatapultChannel.showError(CatapultChannel.actionFailed(response.status));
-            const created = await response.json();
-            showToken(created.token);
-            const generated = { exists: true, createdAt: created.createdAt };
-            tokenStatus = Promise.resolve(generated);
-            render(generated);
-        }
-
-        async function revokeToken() {
-            const response = await post("/me/api-token/delete", {});
-            if (!response) return;
-            if (!response.ok) return CatapultChannel.showError(CatapultChannel.actionFailed(response.status));
-            forget();
-            const revoked = { exists: false };
-            tokenStatus = Promise.resolve(revoked);
-            render(revoked);
-        }
-
-        function confirm(action) {
-            pending = action;
-            dialog.querySelectorAll("[data-for]").forEach(el => show(el, el.dataset.for === action));
-            dialog.open = true;
-        }
-
-        generate.addEventListener("click", () => (exists ? confirm("regenerate") : regenerate()));
-        revoke.addEventListener("click", () => confirm("revoke"));
-        dialog.querySelector(".api-token-confirm-dismiss")?.addEventListener("click", () => { dialog.open = false; });
-        dialog.querySelector(".api-token-confirm-ok")?.addEventListener("click", async () => {
-            const action = pending;
-            pending = null;
-            dialog.open = false;
-            await (action === "revoke" ? revokeToken() : regenerate());
-        });
-
-        byId("api-token-copy-btn")?.addEventListener("click", async () => {
-            try {
-                await navigator.clipboard.writeText(value.value);
-                CatapultChannel.showError(card.dataset.labelCopied);
-            } catch {
-                value.select?.();
-            }
-        });
-
-        // The token itself is never part of the page: only whether one exists.
-        (async () => {
-            try {
-                render(await fetchTokenStatus());
-            } catch {
-                status.textContent = card.dataset.labelUnavailable ?? "";
-            }
-        })();
-    }
-
     document.addEventListener("catapult:render", () => {
         const list = byId("channel-custom-bindings-list");
         if (list) attachList(list);
-        const token = byId("channel-api-token-card");
-        if (token) attachToken(token);
     });
 
     return { setActive, apply };

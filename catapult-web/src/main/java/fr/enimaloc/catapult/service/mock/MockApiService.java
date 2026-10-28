@@ -1723,4 +1723,25 @@ public class MockApiService implements ApiService {
         current.customBindings().revokeToken();
         return NO_CONTENT;
     }
+
+    @Override
+    public ApiTokenStatusDto readApiTokenStatus() {
+        MockData current = currentData();
+        return current == null ? null : current.customBindings().readTokenStatus();
+    }
+
+    @Override
+    public ApiClient.Result<ApiTokenCreatedDto> regenerateReadApiToken() {
+        MockData current = currentData();
+        return current == null ? new ApiClient.Result<>(401, null)
+                : new ApiClient.Result<>(200, current.customBindings().regenerateReadToken());
+    }
+
+    @Override
+    public int revokeReadApiToken() {
+        MockData current = currentData();
+        if (current == null) return 401;
+        current.customBindings().revokeReadToken();
+        return NO_CONTENT;
+    }
 }

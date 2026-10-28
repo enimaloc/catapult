@@ -10,9 +10,10 @@ import java.util.Map;
 /**
  * The Commands tab's card moving a streamer's catapult chat commands to another chat bot: for
  * each tool, what to set up for each command. Every command made from a preset becomes a read of
- * the user API's summary ({@code /api/user/summary/{token}}, relayed on this site's origin): the
- * field standing for what the preset said, read from the JSON by the tools that can, or asked for
- * alone with {@code ?f=} by those that can't (StreamElements, Wizebot).
+ * the member's game summary ({@code /api/me/game/summary?token=…}, relayed on this site's origin,
+ * authenticated by the read-only personal token in its query): the field standing for what the
+ * preset said, read from the JSON by the tools that can, or asked for alone with {@code f=} by
+ * those that can't (StreamElements, Wizebot).
  *
  * <p>A command the API has nothing for ({@code !setgame}, the streamer's own) has no row: it is
  * listed apart.
@@ -59,8 +60,8 @@ public record CommandMigration(List<Tool> tools, List<String> unmatched) {
             "FOLLOWERS", 100, "SUBS", 250, "VIP", 400, "MODERATOR", 500, "BROADCASTER", 1500);
 
     /**
-     * The card for {@code commands}, read from the summary at {@code summaryUrl} (absolute); null
-     * when there is nothing to move.
+     * The card for {@code commands}, read from the summary at {@code summaryUrl} (absolute, its
+     * token or the token's placeholder included); null when there is nothing to move.
      *
      * @param empty what Nightbot posts when the field is empty (nothing played, no store...)
      */
@@ -110,7 +111,7 @@ public record CommandMigration(List<Tool> tools, List<String> unmatched) {
     private record Command(String name, String role, String field, String url) {
         /** The field alone, as plain text, for the tools that can't read JSON. */
         String fieldUrl() {
-            return url + "?f=" + field;
+            return url + (url.contains("?") ? "&" : "?") + "f=" + field;
         }
 
         /** Twitchat's placeholder for the field: its path, uppercased, dots dropped. */

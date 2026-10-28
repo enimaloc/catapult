@@ -7,6 +7,7 @@ GET,/spa/channel/budget-owner/state,owner,3,
 GET,/channel/budget-owner/dock,owner,3,
 GET,/spa/nav-channels,owner,1,
 GET,/me/api-token,owner,1,fixed:one token status
+GET,/me/api-token/read,owner,1,fixed:one token status
 # visitor
 GET,/channel/budget-owner,visitor,4,
 GET,/spa/channel/budget-owner/state,visitor,3,

@@ -64,19 +64,16 @@ afterEach(() => vi.useRealTimers());
 describe("channel-obs-widget link", () => {
     const NEW_TOKEN = "99999999-8888-7777-6666-555555555555";
     const NEW_URL = `https://catapult.test/widget/obs/${NEW_TOKEN}`;
-    const OLD_SUMMARY = "https://catapult.test/api/user/summary/11111111-2222-3333-4444-555555555555";
-    const NEW_SUMMARY = `https://catapult.test/api/user/summary/${NEW_TOKEN}`;
+    // The chat bots' links carry the read-only token, not the widget's: a regenerated widget leaves them alone.
+    const SUMMARY = "https://catapult.test/api/me/game/summary?token=<READ_TOKEN>";
     const MIGRATION = `
-        <mdui-card id="command-migration" data-summary-url="${OLD_SUMMARY}">
-            <mdui-text-field readonly value="${OLD_SUMMARY}?f=name">
-                <mdui-button-icon class="command-migration-copy" data-copy="${OLD_SUMMARY}?f=name"></mdui-button-icon>
-            </mdui-text-field>
-            <mdui-text-field readonly value="$.name">
-                <mdui-button-icon class="command-migration-copy" data-copy="$.name"></mdui-button-icon>
+        <mdui-card id="command-migration" data-summary-url="${SUMMARY}">
+            <mdui-text-field readonly value="${SUMMARY}&f=name">
+                <mdui-button-icon class="command-migration-copy" data-copy="${SUMMARY}&f=name"></mdui-button-icon>
             </mdui-text-field>
         </mdui-card>`;
 
-    it("shows the regenerated link in place, the Commands tab's links and the source check following it", async () => {
+    it("shows the regenerated link in place, the source check following it, the Commands tab's links left alone", async () => {
         page();
         document.body.insertAdjacentHTML("beforeend", MIGRATION);
         await vi.advanceTimersByTimeAsync(0);
@@ -88,7 +85,7 @@ describe("channel-obs-widget link", () => {
 
         document.getElementById("obs-widget-regenerate-btn").click();
         confirm().click();
-        release(response(200, { widgetUrl: NEW_URL, summaryUrl: NEW_SUMMARY }));
+        release(response(200, { widgetUrl: NEW_URL }));
         await vi.advanceTimersByTimeAsync(0);
 
         expect(refresh).not.toHaveBeenCalled();
@@ -97,12 +94,10 @@ describe("channel-obs-widget link", () => {
         expect(confirm().disabled).toBe(false);
         expect(document.getElementById("obs-widget-link").value).toBe(NEW_URL);
         expect(document.getElementById("obs-widget").dataset.widgetUrl).toBe(NEW_URL);
-        const [link, path] = document.querySelectorAll("#command-migration mdui-text-field");
-        expect(link.value).toBe(`${NEW_SUMMARY}?f=name`);
-        expect(link.querySelector("[data-copy]").dataset.copy).toBe(`${NEW_SUMMARY}?f=name`);
-        expect(path.value).toBeUndefined();
-        expect(path.querySelector("[data-copy]").dataset.copy).toBe("$.name");
-        expect(document.getElementById("command-migration").dataset.summaryUrl).toBe(NEW_SUMMARY);
+        const link = document.querySelector("#command-migration mdui-text-field");
+        expect(link.getAttribute("value")).toBe(`${SUMMARY}&f=name`);
+        expect(link.querySelector("[data-copy]").dataset.copy).toBe(`${SUMMARY}&f=name`);
+        expect(document.getElementById("command-migration").dataset.summaryUrl).toBe(SUMMARY);
         expect(status().textContent).toBe("found");
 
         document.getElementById("obs-widget-copy-btn").click();
@@ -115,7 +110,7 @@ describe("channel-obs-widget link", () => {
         await vi.advanceTimersByTimeAsync(0);
         document.getElementById("obs-widget-regenerate-btn").click();
         confirm().click();
-        release(response(200, { widgetUrl: NEW_URL, summaryUrl: NEW_SUMMARY }));
+        release(response(200, { widgetUrl: NEW_URL }));
         await vi.advanceTimersByTimeAsync(0);
 
         createBtn().click();
@@ -133,7 +128,7 @@ describe("channel-obs-widget link", () => {
 
         document.getElementById("obs-widget-regenerate-btn").click();
         confirm().click();
-        release(response(200, { widgetUrl: NEW_URL, summaryUrl: NEW_SUMMARY }));
+        release(response(200, { widgetUrl: NEW_URL }));
         await vi.advanceTimersByTimeAsync(0);
 
         expect(status().textContent).toBe("unreachable");

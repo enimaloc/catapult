@@ -7,8 +7,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 /**
- * The paths catapult-web relays to catapult-api are the external routes, which are frozen: a path added or dropped here
- * changes what outside callers reach. No later change of the API's routes may touch this list. Swagger UI is no longer
+ * The paths catapult-web relays to catapult-api are the external routes: a path added or dropped here changes what
+ * outside callers reach. The public API by resource ({@code /api/me/**}, {@code /api/games/**}) replaced
+ * {@code /api/v2/custom-bindings}; the legacy {@code /api/game/**} and {@code /api/user/**} stay relayed (catapult-api
+ * gates them itself). Swagger UI is no longer
  * relayed: catapult-web serves its own at /docs/api, where catapult-api's addresses redirect (ApiDocsController).
  */
 class ApiRelayPathsTest {
@@ -19,15 +21,20 @@ class ApiRelayPathsTest {
         "/api/connect/steam/callback",
         "/api/game/**",
         "/api/user/**",
+        "/api/me/game",
+        "/api/me/game/**",
+        "/api/me/bindings/**",
+        "/api/me/custom-bindings",
+        "/api/me/custom-bindings/**",
+        "/api/games/**",
         "/api/v3/api-docs",
         "/api/v3/api-docs/**",
-        "/api/v2/custom-bindings",
-        "/api/v2/custom-bindings/**",
     };
 
     @Test
-    void relaysExactlyTheFrozenPaths() {
+    void relay_forwardsNewPublicRoutes_andNotV2CustomBindings() {
         assertThat(ApiRelayController.PATHS).containsExactly(FROZEN);
+        assertThat(ApiRelayController.PATHS).noneMatch(path -> path.startsWith("/api/v2/"));
     }
 
     @Test

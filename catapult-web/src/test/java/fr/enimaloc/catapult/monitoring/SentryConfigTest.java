@@ -194,6 +194,8 @@ class SentryConfigTest {
         for (io.sentry.protocol.Request request : List.of(sentEvent.getRequest(), sentTransaction.getRequest())) {
             assertThat(request.getQueryString()).isEqualTo("a=1&token=***");
             assertThat(request.getUrl()).isEqualTo("https://catapult.test/api/me/game?token=***");
+            assertThat(request.getHeaders()).containsEntry("Referer", "https://catapult.test/docs/api?token=***")
+                    .containsEntry("Accept", "application/json");
         }
     }
 
@@ -201,6 +203,8 @@ class SentryConfigTest {
         io.sentry.protocol.Request request = new io.sentry.protocol.Request();
         request.setQueryString("a=1&token=" + token);
         request.setUrl("https://catapult.test/api/me/game?token=" + token);
+        request.setHeaders(new java.util.HashMap<>(java.util.Map.of(
+                "Referer", "https://catapult.test/docs/api?token=" + token, "Accept", "application/json")));
         return request;
     }
 }

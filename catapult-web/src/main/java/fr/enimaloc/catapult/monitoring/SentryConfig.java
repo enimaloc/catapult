@@ -13,6 +13,7 @@ import org.springframework.boot.info.BuildProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
@@ -121,5 +122,8 @@ public class SentryConfig {
         if (request == null) return;
         request.setUrl(TokenParameterMask.mask(request.getUrl()));
         request.setQueryString(TokenParameterMask.mask(request.getQueryString()));
+        // The Referer quotes the page's URL, which may carry the token too (and any header may quote one)
+        Map<String, String> headers = request.getHeaders();
+        if (headers != null) headers.replaceAll((name, value) -> TokenParameterMask.mask(value));
     }
 }

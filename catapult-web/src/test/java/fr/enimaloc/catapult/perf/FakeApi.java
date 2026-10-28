@@ -139,6 +139,7 @@ public final class FakeApi extends Dispatcher {
         route("/api/internal/users/{id}/channels", caller -> new ChannelListResponse(twitchId(caller),
                 list(i -> new ChannelDto(id("channel", i), "3" + i, "budget-channel-" + i, avatar(OWNER), i % 2 == 0))));
         route("/api/internal/users/{id}/api-token", caller -> new ApiTokenStatusDto(true, AT));
+        route("/api/internal/users/{id}/api-token/read", caller -> new ApiTokenStatusDto(false, null));
         route("/api/internal/admin/members", caller -> members());
         route("/api/internal/admin/experiments", caller -> list(i -> new ExperimentSummaryDto(
                 id("experiment", i), "budget.experiment-" + i, "Budget experiment " + i, ExperimentStatus.ACTIVE,

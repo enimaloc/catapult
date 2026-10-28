@@ -296,10 +296,17 @@ class ChannelVisibilityRenderingTest {
         String owner = mvc.perform(get("/spa/channel/enimaloc")).andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
-        // channel-obs-widget.js swaps it in the fields for a regenerated one
+        // The read-only token's placeholder: channel-command-migration.js swaps it for a token generated on the page
         assertThat(owner).contains("id=\"command-migration\"",
-                "data-summary-url=\"http://localhost/api/user/summary/11111111-2222-3333-4444-555555555555\"",
-                "value=\"http://localhost/api/user/summary/11111111-2222-3333-4444-555555555555");
+                "data-summary-url=\"http://localhost/api/me/game/summary?token=&lt;READ_TOKEN&gt;\"",
+                "data-summary-placeholder-url=\"http://localhost/api/me/game/summary?token=&lt;READ_TOKEN&gt;\"",
+                "value=\"http://localhost/api/me/game/summary?token=&lt;READ_TOKEN&gt;")
+                // The widget's token is in no bot link any more
+                .doesNotContain("11111111-2222-3333-4444-555555555555");
+
+        String french = mvc.perform(get("/spa/channel/enimaloc").locale(java.util.Locale.FRENCH)).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(french).contains("value=\"http://localhost/api/me/game/summary?token=&lt;JETON_LECTURE&gt;");
     }
 
     @Test

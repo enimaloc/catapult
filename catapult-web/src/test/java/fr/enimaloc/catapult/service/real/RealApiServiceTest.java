@@ -116,6 +116,9 @@ class RealApiServiceTest {
         assertThat(service.obsConnection()).isNull();
         assertThat(service.minecraftDisconnect("someone-else")).isEqualTo(401);
         assertThat(service.regenerateApiToken().status()).isEqualTo(401);
+        assertThat(service.readApiTokenStatus()).isNull();
+        assertThat(service.regenerateReadApiToken().status()).isEqualTo(401);
+        assertThat(service.revokeReadApiToken()).isEqualTo(401);
         assertThat(service.enabledChatCommands()).isEmpty();
         // The TW overrides are the member's own too.
         assertThat(service.saveTws("b1", Set.of("spiders"))).isEqualTo(401);
@@ -1950,5 +1953,39 @@ class RealApiServiceTest {
         expect(HttpMethod.DELETE, OWN + "/api-token").andRespond(withNoContent());
 
         assertThat(service.revokeApiToken()).isEqualTo(204);
+    }
+
+    @Test
+    void readApiTokenStatus_isReadFromTheReadRoute() {
+        respond(HttpMethod.GET, OWN + "/api-token/read", "{\"exists\":true,\"createdAt\":\"2026-01-01T00:00:00Z\"}");
+
+        assertThat(service.readApiTokenStatus().exists()).isTrue();
+    }
+
+    @Test
+    void regenerateReadApiToken_givesTheNewTokenToTheCaller() {
+        respond(HttpMethod.POST, OWN + "/api-token/read", "{\"token\":\"catr_abc\",\"createdAt\":\"2026-01-01T00:00:00Z\"}");
+
+        var created = service.regenerateReadApiToken();
+
+        assertThat(created.status()).isEqualTo(200);
+        assertThat(created.body().token()).isEqualTo("catr_abc");
+    }
+
+    @Test
+    void regenerateReadApiToken_aRefusalHasNoBody() {
+        expect(HttpMethod.POST, OWN + "/api-token/read").andRespond(withStatus(HttpStatus.FORBIDDEN));
+
+        var refused = service.regenerateReadApiToken();
+
+        assertThat(refused.status()).isEqualTo(403);
+        assertThat(refused.body()).isNull();
+    }
+
+    @Test
+    void revokeReadApiToken_postsToItsDeleteRoute() {
+        expect(HttpMethod.POST, OWN + "/api-token/read/delete").andRespond(withNoContent());
+
+        assertThat(service.revokeReadApiToken()).isEqualTo(204);
     }
 }

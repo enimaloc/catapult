@@ -1,4 +1,7 @@
-/* The chat command migration card: the menu shows the tool picked; each line's button copies that line. */
+/*
+ * The chat command migration card: the menu shows the tool picked; each line's button copies that line; a read-only
+ * token generated on the page takes the placeholder's place in the links, the placeholder coming back once revoked.
+ */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { flush, html, load, render } from "./helpers.js";
 
@@ -57,5 +60,57 @@ describe("channel-command-migration", () => {
         await flush();
 
         expect(showError).toHaveBeenCalledWith("nocopy");
+    });
+
+    describe("the read-only token", () => {
+        const PLACEHOLDER = "https://catapult.test/api/me/game/summary?token=<READ_TOKEN>";
+        const REAL = "https://catapult.test/api/me/game/summary?token=catr_READ";
+        const tell = (base, created) =>
+            document.dispatchEvent(new CustomEvent("catapult:api-token", { detail: { base, created } }));
+
+        function links() {
+            html(`
+                <mdui-card id="command-migration" data-summary-url="${PLACEHOLDER}" data-summary-placeholder-url="${PLACEHOLDER}">
+                    <mdui-text-field readonly value="${PLACEHOLDER}&f=name">
+                        <mdui-button-icon class="command-migration-copy" data-copy="${PLACEHOLDER}&f=name"></mdui-button-icon>
+                    </mdui-text-field>
+                    <mdui-text-field readonly value="$.name">
+                        <mdui-button-icon class="command-migration-copy" data-copy="$.name"></mdui-button-icon>
+                    </mdui-text-field>
+                </mdui-card>`);
+            render();
+            return document.querySelectorAll("#command-migration mdui-text-field");
+        }
+
+        it("takes the placeholder's place once generated, in each field and its copy button", () => {
+            const [link, path] = links();
+
+            tell("/me/api-token/read", { token: "catr_READ", summaryUrl: REAL });
+
+            expect(link.value).toBe(`${REAL}&f=name`);
+            expect(link.querySelector("[data-copy]").dataset.copy).toBe(`${REAL}&f=name`);
+            expect(path.value).toBeUndefined();
+            expect(path.querySelector("[data-copy]").dataset.copy).toBe("$.name");
+            expect(document.getElementById("command-migration").dataset.summaryUrl).toBe(REAL);
+        });
+
+        it("gives the placeholder back once revoked", () => {
+            const [link] = links();
+            tell("/me/api-token/read", { token: "catr_READ", summaryUrl: REAL });
+
+            tell("/me/api-token/read", null);
+
+            expect(link.value).toBe(`${PLACEHOLDER}&f=name`);
+            expect(document.getElementById("command-migration").dataset.summaryUrl).toBe(PLACEHOLDER);
+        });
+
+        it("ignores the full token", () => {
+            const [link] = links();
+
+            tell("/me/api-token", { token: "cat_FULL", summaryUrl: "https://catapult.test/elsewhere" });
+
+            expect(link.getAttribute("value")).toBe(`${PLACEHOLDER}&f=name`);
+            expect(document.getElementById("command-migration").dataset.summaryUrl).toBe(PLACEHOLDER);
+        });
     });
 });

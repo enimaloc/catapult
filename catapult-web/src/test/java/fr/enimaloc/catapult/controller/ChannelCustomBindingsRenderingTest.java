@@ -223,15 +223,25 @@ class ChannelCustomBindingsRenderingTest {
     }
 
     @Test
-    void experimentClosed_hidesEverything() throws Exception {
-        assertThat(render(true, null))
+    void experimentClosed_hidesEverything_butTheReadOnlyTokenCard() throws Exception {
+        String html = render(true, null);
+        assertThat(html)
                 .doesNotContain("channel-custom-bindings-list").doesNotContain("custom-binding-new-btn")
                 .doesNotContain("channel-api-token-card").doesNotContain("custom-binding");
+        assertThat(panel(html, "account")).contains("id=\"channel-read-token-card\"", "id=\"read-token-generate-btn\"",
+                "id=\"read-token-confirm-dialog\"");
+    }
+
+    @Test
+    void theReadOnlyTokenCard_isThereWithTheCustomBindingsToo() throws Exception {
+        String account = panel(render(true, state()), "account");
+        assertThat(account).contains("id=\"channel-read-token-card\"", "id=\"channel-api-token-card\"");
     }
 
     @Test
     void aModerator_getsNothing() throws Exception {
-        assertThat(render(false, null)).doesNotContain("channel-custom-bindings-list").doesNotContain("channel-api-token-card");
+        assertThat(render(false, null)).doesNotContain("channel-custom-bindings-list").doesNotContain("channel-api-token-card")
+                .doesNotContain("channel-read-token-card");
     }
 
     @Test
