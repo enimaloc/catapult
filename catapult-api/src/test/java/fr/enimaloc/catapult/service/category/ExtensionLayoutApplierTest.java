@@ -175,4 +175,30 @@ class ExtensionLayoutApplierTest {
 
         verify(activityLogService).addEntry(eq(user.getId()), eq("WARN"), any());
     }
+
+    @Test
+    void twitch_error_without_message_is_logged_with_its_type() {
+        when(twitchService.getUserExtensions(user)).thenReturn(List.of());
+        doThrow(new IllegalStateException()).when(twitchService).setActiveExtensions(eq(user), any());
+
+        applier.applyOnSwitch(user, "k", List.of(setting(Type.PANEL, 1, null)));
+
+        verify(activityLogService).addEntry(user.getId(), "WARN",
+                "Twitch extensions not applied: java.lang.IllegalStateException");
+    }
+
+    @Test
+    void unreadable_installed_list_logs_one_entry_and_still_applies_the_none_slots() {
+        when(twitchService.getUserExtensions(user)).thenReturn(List.of());
+
+        applier.applyOnSwitch(user, "k", List.of(setting(Type.PANEL, 1, "p1"), setting(Type.PANEL, 2, "p2"),
+                setting(Type.OVERLAY, 1, null)));
+
+        verify(activityLogService, times(1)).addEntry(eq(user.getId()), eq("WARN"),
+                org.mockito.ArgumentMatchers.contains("could not be read"));
+        verify(activityLogService, times(1)).addEntry(eq(user.getId()), eq("WARN"), any());
+        TwitchExtensionPlacement placement = sent();
+        assertThat(placement.overlay().first()).isEqualTo(Slot.empty());
+        assertThat(placement.panel()).isNull();
+    }
 }

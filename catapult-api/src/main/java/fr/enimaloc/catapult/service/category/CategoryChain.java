@@ -98,7 +98,7 @@ public class CategoryChain {
         }
         boolean switches = trigger instanceof GameDetected || trigger instanceof GameClosed
                 || trigger instanceof NoGameAfterCustomBinding || trigger instanceof StreamStarted
-                || trigger instanceof CustomBindingTriggered;
+                || trigger instanceof CustomBindingTriggered || trigger instanceof NoGameSettingsSaved;
         if (!switches || outcome.status() != ChannelUpdateOutcome.APPLIED) return;
         switch (decision.action()) {
             case UPDATE_CHANNEL -> extensionLayouts.applyOnSwitch(user, ExtensionLayoutApplier.keyOf(decision.binding()),

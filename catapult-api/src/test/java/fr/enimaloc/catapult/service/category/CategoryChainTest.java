@@ -1033,6 +1033,20 @@ class CategoryChainTest {
     }
 
     @Test
+    void no_game_settings_saved_applies_the_no_game_layout() {
+        settings.getNoGameExtensionSlots().add(panel);
+        when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.empty());
+        when(activations.active(user)).thenReturn(Optional.empty());
+        live(true);
+        withSettings();
+        applierAnswers(CategoryOutcome.applied(CategoryRule.DEFAULT_CATEGORY));
+
+        chain.apply(user, new NoGameSettingsSaved(true));
+
+        verify(layouts).applyOnSwitch(user, ExtensionLayoutApplier.NO_GAME_KEY, Set.of(panel));
+    }
+
+    @Test
     void failed_category_leaves_extensions_alone() {
         binding.getExtensionSlots().add(panel);
         live(true);

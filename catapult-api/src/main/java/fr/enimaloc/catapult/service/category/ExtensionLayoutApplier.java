@@ -71,7 +71,13 @@ public class ExtensionLayoutApplier {
             TwitchExtensionPlacement active = needsActive ? twitchService.getActiveExtensions(user) : null;
             List<ExtensionSlotSetting> skipped = new ArrayList<>();
             TwitchExtensionPlacement placement = toPlacement(layout, installed, active, skipped);
-            for (ExtensionSlotSetting setting : skipped) {
+            // An empty list while extensions are wanted means the read failed, not that each one is missing.
+            boolean unreadable = installed.isEmpty() && !skipped.isEmpty();
+            if (unreadable) {
+                activityLogService.addEntry(user.getId(), "WARN", "Twitch extensions not applied: the installed"
+                        + " extensions could not be read, the extension slots were left as they are");
+            }
+            for (ExtensionSlotSetting setting : unreadable ? List.<ExtensionSlotSetting>of() : skipped) {
                 activityLogService.addEntry(user.getId(), "WARN", "Twitch extension " + setting.getExtensionName()
                         + " not applied to " + setting.getType() + " " + setting.getSlot()
                         + ": not installed or not activable");
@@ -80,7 +86,7 @@ public class ExtensionLayoutApplier {
             twitchService.setActiveExtensions(user, placement);
         } catch (RuntimeException e) {
             log.warn("Applying the extension layout for user {} failed: {}", user.getId(), e.toString());
-            activityLogService.addEntry(user.getId(), "WARN", "Twitch extensions not applied: " + e.getMessage());
+            activityLogService.addEntry(user.getId(), "WARN", "Twitch extensions not applied: " + e.toString());
         }
     }
 
