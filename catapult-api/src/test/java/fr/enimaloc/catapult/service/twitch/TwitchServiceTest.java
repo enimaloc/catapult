@@ -25,6 +25,7 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.HttpClientErrorException;
@@ -477,12 +478,12 @@ class TwitchServiceTest {
         ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
         doReturn(headersSpec).when(getSpec).uri(uriCaptor.capture());
 
-        TwitchServiceImpl.ModeratedChannelsResponse mockResponse =
-            new TwitchServiceImpl.ModeratedChannelsResponse(List.of(
+        TwitchServiceImpl.WrappedListResponse<TwitchServiceImpl.ModeratedChannel> mockResponse =
+            new TwitchServiceImpl.WrappedListResponse<>(List.of(
                 new TwitchServiceImpl.ModeratedChannel("ch1"),
                 new TwitchServiceImpl.ModeratedChannel("ch2")
             ));
-        doReturn(mockResponse).when(getResponseSpec).body(TwitchServiceImpl.ModeratedChannelsResponse.class);
+        doReturn(mockResponse).when(getResponseSpec).body(any(ParameterizedTypeReference.class));
 
         List<String> result = twitchService.getModeratedChannelIds(user);
 
@@ -496,7 +497,7 @@ class TwitchServiceTest {
     void getModeratedChannelIds_returns_empty_list_when_api_throws() {
         doReturn(headersSpec).when(getSpec).uri(anyString());
         doThrow(new RuntimeException("network error")).when(getResponseSpec)
-            .body(TwitchServiceImpl.ModeratedChannelsResponse.class);
+            .body(any(ParameterizedTypeReference.class));
 
         List<String> result = twitchService.getModeratedChannelIds(user);
 
@@ -904,6 +905,60 @@ class TwitchServiceTest {
             (List<Map<String, Object>>) bodyCaptor.getValue().get("content_classification_labels");
         return cclPayload.stream().filter(e -> ccl.equals(e.get("id")))
             .map(e -> (Boolean) e.get("is_enabled")).findFirst().orElseThrow();
+    }
+
+    @Test
+    void setActiveExtensions_answers_the_placement_twitch_returns() {
+        TwitchExtensionPlacement after = TwitchExtensionPlacement.empty();
+        stubExtensionsPut();
+        doReturn(new TwitchServiceImpl.WrappedResponse<>(after))
+            .when(responseSpec).body(any(ParameterizedTypeReference.class));
+
+        TwitchExtensionPlacement result = twitchService.setActiveExtensions(user, TwitchExtensionPlacement.update()
+            .panel(1, TwitchExtensionPlacement.Slot.of("ext", "1.0")).build());
+
+        assertThat(result).isEqualTo(after);
+        assertThat(timer("set_active_extensions", "success")).isNotNull();
+    }
+
+    @Test
+    void setActiveExtensions_throws_the_http_error() {
+        stubExtensionsPut();
+        doThrow(new HttpClientErrorException(HttpStatus.UNAUTHORIZED))
+            .when(responseSpec).body(any(ParameterizedTypeReference.class));
+
+        assertThrows(HttpClientErrorException.class,
+            () -> twitchService.setActiveExtensions(user, TwitchExtensionPlacement.empty()));
+        assertThat(timer("set_active_extensions", "error")).isNotNull();
+    }
+
+    @Test
+    void setActiveExtensions_throws_without_a_token() {
+        when(oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH))
+            .thenReturn(Optional.empty());
+
+        assertThrows(IllegalStateException.class,
+            () -> twitchService.setActiveExtensions(user, TwitchExtensionPlacement.empty()));
+        verify(restClient, never()).put();
+    }
+
+    @Test
+    void setActiveExtensions_throws_when_the_bot_is_disabled() {
+        UserAccount disabled = new UserAccount();
+        disabled.setBotEnabled(false);
+        when(userAccountRepository.findById(any())).thenReturn(Optional.of(disabled));
+
+        assertThrows(IllegalStateException.class,
+            () -> twitchService.setActiveExtensions(user, TwitchExtensionPlacement.empty()));
+        verify(restClient, never()).put();
+        assertThat(timer("set_active_extensions", "error")).isNull();
+    }
+
+    /** The PUT goes through the same body specs as the PATCH; its body is the wrapped placement, not a map. */
+    private void stubExtensionsPut() {
+        doReturn(patchSpec).when(restClient).put();
+        doReturn(bodySpec).when(bodySpec).contentType(any());
+        doReturn(bodySpec).when(bodySpec).body(any(Object.class));
     }
 
     private Timer timer(String operation, String outcome) {

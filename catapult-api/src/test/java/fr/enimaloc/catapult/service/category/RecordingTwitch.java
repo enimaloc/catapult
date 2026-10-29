@@ -5,6 +5,8 @@ import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.service.debug.DebugContext;
 import fr.enimaloc.catapult.service.twitch.ChannelUpdateOutcome;
 import fr.enimaloc.catapult.service.twitch.TwitchCategory;
+import fr.enimaloc.catapult.service.twitch.TwitchExtension;
+import fr.enimaloc.catapult.service.twitch.TwitchExtensionPlacement;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
 
 import java.util.ArrayList;
@@ -111,6 +113,21 @@ public class RecordingTwitch implements TwitchService {
     @Override
     public List<String> getModeratedChannelIds(UserAccount viewer) {
         return List.of();
+    }
+
+    @Override
+    public List<TwitchExtension> getUserExtensions(UserAccount user) {
+        return List.of();
+    }
+
+    @Override
+    public TwitchExtensionPlacement getActiveExtensions(UserAccount user) {
+        return TwitchExtensionPlacement.empty();
+    }
+
+    @Override
+    public TwitchExtensionPlacement setActiveExtensions(UserAccount user, TwitchExtensionPlacement placement) {
+        return TwitchExtensionPlacement.empty();
     }
 
     private void update(GameBinding binding) {

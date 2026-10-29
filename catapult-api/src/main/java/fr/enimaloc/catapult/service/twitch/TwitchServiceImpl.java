@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -22,6 +23,7 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
 import java.util.*;
+import java.util.function.Function;
 
 @Slf4j
 @Service
@@ -356,29 +358,89 @@ public class TwitchServiceImpl implements TwitchService {
 
     @Override
     public List<String> getModeratedChannelIds(UserAccount viewer) {
-        return apiObservations.observe("twitch", "get_moderated_channels", () ->
-            oAuthTokenRepository.findByUserAndProvider(viewer, OAuthToken.Provider.TWITCH)
+        return callAsUser(viewer, "get_moderated_channels", List.of(), accessToken -> {
+            WrappedListResponse<ModeratedChannel> response = restClient.get()
+                .uri(TWITCH_API_URL + "/moderation/channels?user_id=" + viewer.getTwitchId())
+                .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
+                .header(CLIENT_ID, twitchClientId)
+                .retrieve()
+                .body(new ParameterizedTypeReference<>() {});
+            return response != null && response.data() != null
+                ? response.data().stream().map(ModeratedChannel::broadcasterId).toList()
+                : null;
+        });
+    }
+
+    @Override
+    public List<TwitchExtension> getUserExtensions(UserAccount user) {
+        return callAsUser(user, "get_user_extensions", List.of(), accessToken -> {
+            WrappedListResponse<TwitchExtension> response = restClient.get()
+                .uri(TWITCH_API_URL + "/users/extensions/list")
+                .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
+                .header(CLIENT_ID, twitchClientId)
+                .retrieve()
+                .body(new ParameterizedTypeReference<>() {});
+            return response != null ? response.data() : null;
+        });
+    }
+
+    @Override
+    public TwitchExtensionPlacement getActiveExtensions(UserAccount user) {
+        return callAsUser(user, "get_active_extensions", TwitchExtensionPlacement.empty(), accessToken -> {
+            WrappedResponse<TwitchExtensionPlacement> response = restClient.get()
+                .uri(TWITCH_API_URL + "/users/extensions")
+                .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
+                .header(CLIENT_ID, twitchClientId)
+                .retrieve()
+                .body(new ParameterizedTypeReference<>() {});
+            return response != null ? response.data() : null;
+        });
+    }
+
+    @Override
+    public TwitchExtensionPlacement setActiveExtensions(UserAccount user, TwitchExtensionPlacement placement) {
+        if (!canActOnTwitch(user)) {
+            throw new IllegalStateException(
+                "Twitch extensions not set for user " + user.getId() + ": bot disabled or account not active");
+        }
+        return apiObservations.observe("twitch", "set_active_extensions", () -> {
+            OAuthToken token = oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
+                .orElseThrow(() -> new IllegalStateException("No Twitch token found for user " + user.getId()));
+            String accessToken = twitchTokenService.resolveAccessToken(token, user);
+            WrappedResponse<TwitchExtensionPlacement> response = restClient.put()
+                .uri(TWITCH_API_URL + "/users/extensions")
+                .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
+                .header(CLIENT_ID, twitchClientId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(new WrappedResponse<>(placement))
+                .retrieve()
+                .body(new ParameterizedTypeReference<>() {});
+            log.info("Twitch extensions set for user {}", user.getId());
+            return response != null && response.data() != null ? response.data() : TwitchExtensionPlacement.empty();
+        });
+    }
+
+    /**
+     * Runs {@code call} with the user's Twitch access token, observed as {@code operation}: {@code fallback} without
+     * a token, when the call fails (logged, not thrown) or when it answers nothing ({@code null}).
+     */
+    private <T> T callAsUser(UserAccount user, String operation, T fallback, Function<String, T> call) {
+        return apiObservations.observe("twitch", operation, () ->
+            oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
                 .map(token -> {
                     try {
-                        String accessToken = twitchTokenService.resolveAccessToken(token, viewer);
-                        ModeratedChannelsResponse response = restClient.get()
-                            .uri(TWITCH_API_URL + "/moderation/channels?user_id=" + viewer.getTwitchId())
-                                .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
-                                .header(CLIENT_ID, twitchClientId)
-                            .retrieve()
-                            .body(ModeratedChannelsResponse.class);
-                        return response != null && response.data() != null
-                            ? response.data().stream().map(ModeratedChannel::broadcasterId).toList()
-                            : List.<String>of();
+                        T result = call.apply(twitchTokenService.resolveAccessToken(token, user));
+                        return result != null ? result : fallback;
                     } catch (Exception e) {
-                        log.warn("Failed to get moderated channels for user {}: {}", viewer.getId(), e.getMessage());
-                        return List.<String>of();
+                        log.warn("Twitch {} failed for user {}: {}", operation, user.getId(), e.getMessage());
+                        return fallback;
                     }
                 })
-                .orElse(List.of())
+                .orElse(fallback)
         );
     }
 
-    record ModeratedChannelsResponse(List<ModeratedChannel> data) {}
+    record WrappedResponse<T>(T data) {}
+    record WrappedListResponse<T>(List<T> data) {}
     record ModeratedChannel(@JsonProperty("broadcaster_id") String broadcasterId) {}
 }
