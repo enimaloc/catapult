@@ -166,6 +166,7 @@ PUT,/api/internal/users/{userId}/settings/twitchat/branch,,,401,401,403,403,PASS
 POST,/api/internal/users/{userId}/settings/twitchat/regenerate,,,401,401,403,403,PASS,403,401
 PUT,/api/internal/users/{userId}/settings/tws,,"{""enabled"":false}",401,401,403,PASS,PASS,403,401
 GET,/api/internal/users/{userId}/status,,,401,401,403,PASS,PASS,403,401
+GET,/api/internal/users/{userId}/twitch/extensions,,,401,401,403,PASS,PASS,403,401
 POST,/api/internal/users/{userId}/steam-profile/refresh,,,401,401,403,403,PASS,403,401
 GET,/api/internal/users/{userId}/twitchat-events,,,401,401,403,403,PASS,403,401
 PUT,/api/internal/users/{userId}/twitchat-events/{eventType}/actions,eventType=matrix,[],401,401,403,403,PASS,403,401
