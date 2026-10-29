@@ -28,6 +28,9 @@ class CatapultApplicationMockTests extends FullContextTestBase {
     @DynamicPropertySource
     static void stateFile(DynamicPropertyRegistry registry) {
         registry.add("catapult.simulation.state-file", () -> stateDir.resolve("simulation.json").toString());
+        // application-dev.properties is local only (git-ignored): without it sentry.environment falls back to
+        // production, which MockGuard refuses
+        registry.add("sentry.environment", () -> "development");
     }
 
     @Test
