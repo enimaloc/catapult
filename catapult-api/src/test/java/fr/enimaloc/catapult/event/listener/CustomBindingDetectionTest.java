@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.event.listener;
 
+import fr.enimaloc.catapult.simulation.SimulationGates;
 import fr.enimaloc.catapult.service.category.ExtensionLayoutApplier;
 import fr.enimaloc.catapult.service.binding.RaidRestoreGateService;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -345,7 +346,8 @@ class CustomBindingDetectionTest {
     private SchedulerService freshlyStartedScheduler(GameGetterChain chain) {
         GameStateService freshState = new GameStateService(channelEventPublisher);
         return new SchedulerService(mock(UserAccountRepository.class), chain, freshState, this::dispatch,
-                new SimpleMeterRegistry(), Optional.empty(), Optional.empty(), bindingService);
+                new SimpleMeterRegistry(), Optional.empty(), Optional.empty(), bindingService,
+                SimulationGates.none());
     }
 
     private void dispatch(Object event) {

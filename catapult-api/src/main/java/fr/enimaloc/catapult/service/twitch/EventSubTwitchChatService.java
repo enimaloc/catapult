@@ -12,10 +12,13 @@ import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.debug.DebugContext;
 import fr.enimaloc.catapult.service.debug.DebugRecording;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
+import fr.enimaloc.catapult.simulation.SimulatedCalls;
+import fr.enimaloc.catapult.simulation.SimulationGate;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationEventPublisher;
@@ -64,6 +67,7 @@ public class EventSubTwitchChatService implements TwitchChatService {
     private final EventSubConnections connections;
 
     private final DebugRecording debug;
+    private final ObjectProvider<SimulationGate> simulationGate;
 
     public EventSubTwitchChatService(OAuthTokenRepository oAuthTokenRepository,
                                      UserAccountRepository userAccountRepository,
@@ -76,7 +80,8 @@ public class EventSubTwitchChatService implements TwitchChatService {
                                      MeterRegistry meterRegistry,
                                      ExternalApiObservations apiObservations,
                                      TwitchChatRateLimiter chatRateLimiter,
-                                     DebugRecording debug) {
+                                     DebugRecording debug,
+                                     ObjectProvider<SimulationGate> simulationGate) {
         this.oAuthTokenRepository = oAuthTokenRepository;
         this.userAccountRepository = userAccountRepository;
         this.twitchTokenService = twitchTokenService;
@@ -89,6 +94,7 @@ public class EventSubTwitchChatService implements TwitchChatService {
         this.apiObservations = apiObservations;
         this.chatRateLimiter = chatRateLimiter;
         this.debug = debug;
+        this.simulationGate = simulationGate;
         this.connections = new EventSubConnections(
             "[EventSub Chat]", "twitch-chat-watchdog", oAuthTokenRepository, this::handleMessage);
     }
@@ -118,6 +124,11 @@ public class EventSubTwitchChatService implements TwitchChatService {
 
     @Override
     public void connect(UserAccount user) {
+        if (SimulationGate.blocks(simulationGate, user.getId(), SimulatedCalls.TWITCH_CHAT_CONNECT)) {
+            log.debug("[EventSub Chat] connect skipped for user {} — the simulated chat connection is not REAL",
+                    user.getId());
+            return;
+        }
         connections.allowReconnect(user);
         connections.close(user, "reconnecting");
         oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)

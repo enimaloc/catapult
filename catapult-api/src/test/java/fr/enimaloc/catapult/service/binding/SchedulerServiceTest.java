@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.service.binding;
 
+import fr.enimaloc.catapult.simulation.SimulationGate;
+import fr.enimaloc.catapult.simulation.SimulationGates;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.getter.GameGetterChain;
 import fr.enimaloc.catapult.getter.steam.SteamGameGetter;
@@ -22,6 +24,7 @@ import java.util.concurrent.CompletableFuture;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -43,7 +46,7 @@ class SchedulerServiceTest {
         registry = new SimpleMeterRegistry();
         schedulerService = new SchedulerService(
             userAccountRepository, gameGetterChain, gameStateService, eventPublisher, registry,
-            Optional.empty(), Optional.empty(), bindingService);
+            Optional.empty(), Optional.empty(), bindingService, SimulationGates.none());
     }
 
     @Test
@@ -94,7 +97,7 @@ class SchedulerServiceTest {
 
         SchedulerService service = new SchedulerService(
             userAccountRepository, gameGetterChain, gameStateService, eventPublisher, registry,
-            Optional.of(steamGetter), Optional.empty(), bindingService);
+            Optional.of(steamGetter), Optional.empty(), bindingService, SimulationGates.none());
 
         service.poll();
 
@@ -126,7 +129,7 @@ class SchedulerServiceTest {
 
         SchedulerService service = new SchedulerService(
             userAccountRepository, gameGetterChain, gameStateService, eventPublisher, registry,
-            Optional.of(steamGetter), Optional.empty(), bindingService);
+            Optional.of(steamGetter), Optional.empty(), bindingService, SimulationGates.none());
         when(gameGetterChain.resolve(user)).thenReturn(Optional.empty());
         when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.empty());
 
@@ -148,5 +151,44 @@ class SchedulerServiceTest {
         schedulerService.retryIncompleteBindings();
 
         verify(bindingService).refreshIncompleteBindings();
+    }
+
+    @Test
+    void scheduler_skips_mock_accounts_without_simulation() {
+        UserAccount real = new UserAccount(); real.setId(UUID.randomUUID()); real.setTwitchId("12345");
+        UserAccount fictitious = new UserAccount(); fictitious.setId(UUID.randomUUID()); fictitious.setTwitchId("mock-1");
+        SteamGameGetter steamGetter = mock(SteamGameGetter.class);
+        when(steamGetter.prefetchBatch(any())).thenReturn(CompletableFuture.completedFuture(null));
+        real.setSteamId("steam-1");
+        fictitious.setSteamId("steam-2");
+        when(userAccountRepository.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE))
+            .thenReturn(List.of(real, fictitious));
+        when(gameGetterChain.resolve(any())).thenReturn(Optional.empty());
+        when(gameStateService.getLastKnownGame(any())).thenReturn(Optional.empty());
+        SchedulerService service = new SchedulerService(
+            userAccountRepository, gameGetterChain, gameStateService, eventPublisher, registry,
+            Optional.of(steamGetter), Optional.empty(), bindingService, SimulationGates.none());
+
+        service.poll();
+
+        verify(gameGetterChain).resolve(real);
+        verify(gameGetterChain, never()).resolve(fictitious);
+        verify(steamGetter).prefetchBatch(List.of(real));
+    }
+
+    @Test
+    void scheduler_polls_mock_accounts_under_simulation() {
+        UserAccount fictitious = new UserAccount(); fictitious.setId(UUID.randomUUID()); fictitious.setTwitchId("mock-1");
+        when(userAccountRepository.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE))
+            .thenReturn(List.of(fictitious));
+        when(gameGetterChain.resolve(any())).thenReturn(Optional.empty());
+        when(gameStateService.getLastKnownGame(any())).thenReturn(Optional.empty());
+        SchedulerService service = new SchedulerService(
+            userAccountRepository, gameGetterChain, gameStateService, eventPublisher, registry,
+            Optional.empty(), Optional.empty(), bindingService, SimulationGates.of(mock(SimulationGate.class)));
+
+        service.poll();
+
+        verify(gameGetterChain).resolve(fictitious);
     }
 }

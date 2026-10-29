@@ -6,8 +6,11 @@ import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.igdb.IgdbWebsiteKeys;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
 import fr.enimaloc.catapult.service.steam.SteamStoreService;
+import fr.enimaloc.catapult.simulation.SimulatedCalls;
+import fr.enimaloc.catapult.simulation.SimulationGate;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import proto.Franchise;
@@ -39,6 +42,7 @@ public class DefaultChatCommandServiceGateway implements ChatCommandServiceGatew
     private final RestClient restClient;
     private final ExternalApiObservations apiObservations;
     private final SteamStoreService steamStoreService;
+    private final ObjectProvider<SimulationGate> simulationGate;
 
     @Override
     public Optional<IgdbGame> igdbGame(String query) {
@@ -206,6 +210,7 @@ public class DefaultChatCommandServiceGateway implements ChatCommandServiceGatew
 
     @Override
     public Optional<String> steamPrice(String appId) {
+        if (storeSimulated()) return Optional.empty();
         return apiObservations.observe("steam_store", "chat_command_get_price", () -> {
             try {
                 Map<?, ?> body = restClient.get()
@@ -230,6 +235,7 @@ public class DefaultChatCommandServiceGateway implements ChatCommandServiceGatew
 
     @Override
     public Optional<Object> steamGame(String appId, @Nullable String locale) {
+        if (storeSimulated()) return Optional.empty();
         return apiObservations.observe("steam_store", "chat_command_get_game", () -> {
             try {
                 String effectiveAppId = steamStoreService.resolveEffectiveApp(appId)
@@ -254,5 +260,10 @@ public class DefaultChatCommandServiceGateway implements ChatCommandServiceGatew
                 return Optional.empty();
             }
         });
+    }
+
+    /** Whether the simulation keeps the raw Steam store calls from going out: what a failure answers, then. */
+    private boolean storeSimulated() {
+        return SimulationGate.blocks(simulationGate, null, SimulatedCalls.STEAM_STORE_APP_DETAILS);
     }
 }

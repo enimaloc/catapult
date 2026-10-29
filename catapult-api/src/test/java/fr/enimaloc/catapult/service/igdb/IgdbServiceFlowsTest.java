@@ -12,6 +12,7 @@ import fr.enimaloc.catapult.repository.igdb.IgdbGameCclRepository;
 import fr.enimaloc.catapult.repository.igdb.IgdbGameExternalIdRepository;
 import fr.enimaloc.catapult.repository.twitch.TwitchCclDefinitionRepository;
 import fr.enimaloc.catapult.service.steam.SteamStoreService;
+import fr.enimaloc.catapult.simulation.SimulationGates;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -62,7 +63,7 @@ class IgdbServiceFlowsTest {
     private final SteamStoreService steamStore = mock(SteamStoreService.class);
     private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
     private final IgdbService service = new IgdbService(igdb, cache, externalIds, ccls, cclDefinitions, steamStore,
-            mock(RestClient.class), meters);
+            mock(RestClient.class), meters, SimulationGates.none());
 
     @BeforeEach
     void setUp() {
@@ -213,6 +214,54 @@ class IgdbServiceFlowsTest {
 
             assertThat(service.findByXboxAppId("A")).isEmpty();
             verify(igdb).findExternalGameByUid("A", XBOX, "token");
+        }
+    }
+
+    /** The reverse lookup: a game's store id, for the control panel's game picker. */
+    @Nested
+    class StoreIdOfAGame {
+
+        private ExternalGame onSource(String uid, long sourceId) {
+            return ExternalGame.newBuilder().setUid(uid)
+                    .setExternalGameSource(ExternalGameSource.newBuilder().setId(sourceId)).build();
+        }
+
+        @Test
+        void the_external_id_table_answers_first() {
+            when(externalIds.findByIgdbIdAndSourceId("7", STEAM))
+                    .thenReturn(Optional.of(new IgdbGameExternalId("7", STEAM, "892970")));
+
+            assertThat(service.findExternalUid("7", GameBinding.SourceType.STEAM)).contains("892970");
+            verifyNoInteractions(igdb);
+        }
+
+        @Test
+        void otherwise_the_games_external_games_on_igdb_of_that_source() {
+            when(igdb.fetchGameById(eq("7"), anyString(), eq("token"))).thenReturn(List.of(Game.newBuilder().setId(7)
+                    .addExternalGames(onSource("TW1", TWITCH))
+                    .addExternalGames(onSource("9NBLGGH4X8M8", XBOX))
+                    .addExternalGames(onSource("892970", STEAM))
+                    .build()));
+
+            assertThat(service.findExternalUid("7", GameBinding.SourceType.XBOX)).contains("9NBLGGH4X8M8");
+            assertThat(service.findExternalUid("7", GameBinding.SourceType.STEAM)).contains("892970");
+        }
+
+        @Test
+        void nothing_for_a_source_igdb_does_not_list_or_another_type() {
+            when(igdb.fetchGameById(eq("7"), anyString(), eq("token")))
+                    .thenReturn(List.of(Game.newBuilder().setId(7).addExternalGames(onSource("892970", STEAM)).build()));
+
+            assertThat(service.findExternalUid("7", GameBinding.SourceType.XBOX)).isEmpty();
+            assertThat(service.findExternalUid("7", GameBinding.SourceType.MINECRAFT)).isEmpty();
+        }
+
+        @Test
+        void nothing_without_igdb() {
+            blankClientId();
+
+            assertThat(service.findExternalUid("7", GameBinding.SourceType.STEAM)).isEmpty();
+            verifyNoInteractions(igdb);
         }
     }
 

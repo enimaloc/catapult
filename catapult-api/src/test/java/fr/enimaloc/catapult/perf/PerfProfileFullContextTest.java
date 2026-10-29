@@ -7,8 +7,6 @@ import fr.enimaloc.catapult.FullContextTestBase;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.getter.dtdd.DtddApiClient;
-import fr.enimaloc.catapult.getter.dtdd.MockDtddApiClient;
-import fr.enimaloc.catapult.getter.steam.MockSteamApiClient;
 import fr.enimaloc.catapult.getter.steam.SteamApiClient;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
@@ -18,39 +16,54 @@ import fr.enimaloc.catapult.security.JwtService;
 import fr.enimaloc.catapult.service.account.WidgetTokenService;
 import fr.enimaloc.catapult.service.igdb.IgdbClient;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
-import fr.enimaloc.catapult.service.igdb.MockIgdbClient;
 import fr.enimaloc.catapult.service.notification.NotificationDeliveryService;
-import fr.enimaloc.catapult.service.steam.MockSteamStoreService;
 import fr.enimaloc.catapult.service.steam.SteamStoreService;
-import fr.enimaloc.catapult.service.twitch.EventSubService;
-import fr.enimaloc.catapult.service.twitch.MockTwitchCategoryService;
-import fr.enimaloc.catapult.service.twitch.MockTwitchChatService;
-import fr.enimaloc.catapult.service.twitch.MockTwitchEventSubService;
-import fr.enimaloc.catapult.service.twitch.MockTwitchService;
+import fr.enimaloc.catapult.service.twitch.EventSubTwitchChatService;
 import fr.enimaloc.catapult.service.twitch.TwitchCategoryService;
+import fr.enimaloc.catapult.service.twitch.TwitchEventSubService;
 import fr.enimaloc.catapult.service.twitch.TwitchChatService;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
-import fr.enimaloc.catapult.service.xbox.MockXboxStoreService;
-import fr.enimaloc.catapult.service.xbox.XboxStoreService;
+import fr.enimaloc.catapult.service.twitch.TwitchTokenService;
+import fr.enimaloc.catapult.simulation.CallKey;
+import fr.enimaloc.catapult.simulation.CallSetting;
+import fr.enimaloc.catapult.simulation.SimulatedCalls;
+import fr.enimaloc.catapult.simulation.SimulationJournal;
+import fr.enimaloc.catapult.simulation.SimulationRegistry;
+import fr.enimaloc.catapult.simulation.external.SimulatedDtddApiClient;
+import fr.enimaloc.catapult.simulation.external.SimulatedIgdbClient;
+import fr.enimaloc.catapult.simulation.external.SimulatedSteamApiClient;
+import fr.enimaloc.catapult.simulation.external.SimulatedSteamStoreService;
+import fr.enimaloc.catapult.simulation.twitch.SimulatedTwitchCategoryService;
+import fr.enimaloc.catapult.simulation.twitch.SimulatedTwitchChatService;
+import fr.enimaloc.catapult.simulation.twitch.SimulatedTwitchService;
+import fr.enimaloc.catapult.simulation.twitch.SimulatedTwitchTokenService;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.util.ReflectionTestUtils;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
  * The {@code perf} profile on Postgres: its seeded accounts, its test login (whose JWT opens the API like a real
- * one), its simulated game change, and fakes in place of every outbound client. The calls go out as a remote client
+ * one), its simulated game change, and the simulation layer in front of every outbound client, every call simulated.
+ * The calls go out as a remote client
  * ({@code X-Forwarded-For}) so that the loopback's own access does not open the routes the token must open.
  */
 @Import(FullContextContainers.class)
@@ -60,6 +73,14 @@ import tools.jackson.databind.json.JsonMapper;
 class PerfProfileFullContextTest extends FullContextTestBase {
 
     private static final String REMOTE_CLIENT = "203.0.113.7";
+
+    @TempDir
+    static Path stateDir;
+
+    @DynamicPropertySource
+    static void stateFile(DynamicPropertyRegistry registry) {
+        registry.add("catapult.simulation.state-file", () -> stateDir.resolve("simulation.json").toString());
+    }
 
     @LocalServerPort
     int port;
@@ -90,6 +111,12 @@ class PerfProfileFullContextTest extends FullContextTestBase {
 
     @Autowired
     JwtService jwtService;
+
+    @Autowired
+    SimulationRegistry simulation;
+
+    @Autowired
+    SimulationJournal journal;
 
     @Test
     void sentryEnvironmentIsPerf() {
@@ -190,7 +217,14 @@ class PerfProfileFullContextTest extends FullContextTestBase {
         HttpResponse<String> response = send("POST", "/api/internal/perf/users/perf-streamer-002/game?name=Hades", null);
 
         assertThat(response.statusCode()).isEqualTo(204);
-        assertThat(context.getBean(MockTwitchService.class).lastCategoryName(streamer.getId())).contains("Hades");
+        // The simulated Helix PATCH keeps the category it set, and journals it
+        Awaitility.await().atMost(Duration.ofSeconds(10)).untilAsserted(() ->
+                assertThat(simulation.data(streamer.getId()).currentCategoryName()).isEqualTo("Hades"));
+        assertThat(journal.recent(streamer.getId()))
+                .anySatisfy(entry -> {
+                    assertThat(entry.key()).isEqualTo(SimulatedCalls.TWITCH_HELIX_UPDATE_CHANNEL.id());
+                    assertThat(entry.mode()).isEqualTo("OK");
+                });
     }
 
     @Test
@@ -206,18 +240,45 @@ class PerfProfileFullContextTest extends FullContextTestBase {
     }
 
     @Test
-    void noOutboundClientIsReal() {
-        assertThat(context.getBean(TwitchService.class)).isInstanceOf(MockTwitchService.class);
-        assertThat(context.getBean(TwitchCategoryService.class)).isInstanceOf(MockTwitchCategoryService.class);
-        assertThat(context.getBean(TwitchChatService.class)).isInstanceOf(MockTwitchChatService.class);
-        assertThat(context.getBean(EventSubService.class)).isInstanceOf(MockTwitchEventSubService.class);
-        assertThat(context.getBean(IgdbClient.class)).isInstanceOf(MockIgdbClient.class);
-        assertThat(context.getBean(SteamApiClient.class)).isInstanceOf(MockSteamApiClient.class);
-        assertThat(context.getBean(SteamStoreService.class)).isInstanceOf(MockSteamStoreService.class);
-        assertThat(context.getBean(XboxStoreService.class)).isInstanceOf(MockXboxStoreService.class);
-        assertThat(context.getBean(DtddApiClient.class)).isInstanceOf(MockDtddApiClient.class);
+    void everyOutboundClientIsSimulated() {
+        assertThat(context.getBean(TwitchService.class)).isInstanceOf(SimulatedTwitchService.class);
+        assertThat(context.getBean(TwitchCategoryService.class)).isInstanceOf(SimulatedTwitchCategoryService.class);
+        assertThat(context.getBean(TwitchChatService.class)).isInstanceOf(SimulatedTwitchChatService.class);
+        assertThat(context.getBean(TwitchTokenService.class)).isInstanceOf(SimulatedTwitchTokenService.class);
+        assertThat(context.getBean(IgdbClient.class)).isInstanceOf(SimulatedIgdbClient.class);
+        assertThat(context.getBean(SteamApiClient.class)).isInstanceOf(SimulatedSteamApiClient.class);
+        assertThat(context.getBean(SteamStoreService.class)).isInstanceOf(SimulatedSteamStoreService.class);
+        assertThat(context.getBean(DtddApiClient.class)).isInstanceOf(SimulatedDtddApiClient.class);
         assertThat(environment.getProperty("xbox.enabled")).isEqualTo("false");
         assertThat(environment.getProperty("minecraft.enabled")).isEqualTo("false");
+    }
+
+    /** The seeded streamers are live with their bot on, yet no chat nor EventSub socket is open: both are simulated. */
+    @Test
+    void noRealSocketIsOpen() {
+        assertThat(context.getBean(EventSubTwitchChatService.class).connectionCount()).isZero();
+        Object eventSubConnections = ReflectionTestUtils.getField(context.getBean(TwitchEventSubService.class),
+                "connections");
+        assertThat((Integer) ReflectionTestUtils.invokeMethod(eventSubConnections, "size")).isZero();
+    }
+
+    /** Nothing real goes out: every global call is simulated, and so is every call of the perf accounts. */
+    @Test
+    void noCallIsReal() {
+        List<UserAccount> perfAccounts = accounts.findAll().stream()
+                .filter(a -> a.getTwitchUsername().startsWith("perf-"))
+                .toList();
+        assertThat(perfAccounts).isNotEmpty();
+        for (CallKey key : SimulatedCalls.all()) {
+            if (key.scope() == CallKey.Scope.GLOBAL) {
+                assertThat(simulation.setting(null, key).mode()).as(key.id()).isEqualTo(CallSetting.Mode.OK);
+            } else {
+                for (UserAccount account : perfAccounts) {
+                    assertThat(simulation.setting(account.getId(), key).mode())
+                            .as(key.id() + " of " + account.getTwitchUsername()).isEqualTo(CallSetting.Mode.OK);
+                }
+            }
+        }
     }
 
     private String login(String username) throws Exception {

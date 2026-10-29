@@ -10,6 +10,7 @@ import fr.enimaloc.catapult.repository.minecraft.MinecraftServiceAccountReposito
 import fr.enimaloc.catapult.service.minecraft.MinecraftGateService;
 import fr.enimaloc.catapult.service.minecraft.MinecraftService;
 import fr.enimaloc.catapult.service.minecraft.MinecraftTokenService;
+import fr.enimaloc.catapult.simulation.SimulationGate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,6 +20,7 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.beans.factory.ObjectProvider;
 
 import java.time.Instant;
 import java.util.List;
@@ -38,6 +40,7 @@ class MinecraftPresenceGetterTest {
     @Mock private MinecraftFriendLinkRepository linkRepository;
     @Mock private MinecraftGateService gateService;
 
+    @Mock private ObjectProvider<SimulationGate> simulationGate;
     @Spy private DebugRecording debug = DebugRecording.OFF;
     @InjectMocks private MinecraftPresenceGetter getter;
 

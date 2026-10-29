@@ -17,7 +17,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
-@ActiveProfiles("mock-web")
+@ActiveProfiles("h2-test")
 @TestPropertySource(properties = {
         "spring.datasource.url=jdbc:h2:mem:catapult_config_refresh_it;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;NON_KEYWORDS=KEY,VALUE",
         "app.admin.config.exposed-prefixes=app.,twitch.",

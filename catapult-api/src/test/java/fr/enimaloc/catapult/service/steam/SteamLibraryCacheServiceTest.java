@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.getter.steam.SteamApiClient;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
+import fr.enimaloc.catapult.simulation.SimulationGates;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -27,7 +28,8 @@ class SteamLibraryCacheServiceTest {
     private final IgdbService igdb = mock(IgdbService.class);
     private final UserAccountRepository accounts = mock(UserAccountRepository.class);
     private final TokenEncryptionService encryption = mock(TokenEncryptionService.class);
-    private final SteamLibraryCacheService service = new SteamLibraryCacheService(steam, igdb, accounts, encryption);
+    private final SteamLibraryCacheService service = new SteamLibraryCacheService(steam, igdb, accounts, encryption,
+            SimulationGates.none());
 
     private static UserAccount steamUser(String steamId, String personalToken) {
         UserAccount user = new UserAccount();

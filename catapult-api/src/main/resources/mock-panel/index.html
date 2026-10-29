@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mock control panel</title>
+  <link rel="stylesheet" href="/mock/panel.css">
+  <script src="/mock/panel.js" defer></script>
+</head>
+<body>
+<header class="top">
+  <h1>Mock control panel</h1>
+  <span class="muted">catapult-api, mock profile, loopback only</span>
+  <span id="toast" class="toast" role="status" aria-live="polite" hidden></span>
+</header>
+
+<div class="layout">
+  <aside class="side">
+    <h2>Accounts</h2>
+    <ul id="accounts" class="accounts"></ul>
+    <details id="create" class="create">
+      <summary class="btn">+ Fictitious account</summary>
+      <form id="create-form">
+        <label>Username <input name="username" required autocomplete="off"></label>
+        <label class="check"><input type="checkbox" name="admin"> Admin</label>
+        <label class="check"><input type="checkbox" name="botEnabled" checked> Bot on</label>
+        <fieldset>
+          <legend>Moderates</legend>
+          <div id="create-moderates" class="checks"></div>
+        </fieldset>
+        <button type="submit" class="btn primary">Create</button>
+      </form>
+    </details>
+    <p class="muted">To sign in to the dashboard as one of them, use "Sign in with Twitch": the mock profile offers
+      these accounts or the real Twitch login.</p>
+  </aside>
+
+  <main class="main">
+    <p id="empty" class="card muted">Select an account.</p>
+
+    <div id="account" hidden>
+      <section class="card">
+        <h2>State <span id="state-title" class="muted"></span></h2>
+        <div class="row">
+          <label class="switch"><input type="checkbox" id="live"><span></span></label> Live
+          <span class="muted">(injects stream.online / stream.offline; Catapult sees it as <b id="catapult-live">?</b>)</span>
+        </div>
+        <div class="row">
+          <label class="switch"><input type="checkbox" id="bot"><span></span></label> Bot on
+        </div>
+        <div class="row">
+          Detected game: <b id="detected">none</b> · Twitch category: <b id="category">?</b>
+        </div>
+        <div class="row">
+          Platform:
+          <span class="seg" id="platform">
+            <button type="button" data-provider="STEAM" class="on">Steam</button><button type="button"
+              data-provider="XBOX">Xbox</button><button type="button"
+              data-provider="MINECRAFT">Minecraft</button><button type="button"
+              data-provider="BATTLENET">Battle.net</button>
+          </span>
+        </div>
+        <form class="row" id="search-form">
+          <input id="search" placeholder="Search a game (Twitch category search)" autocomplete="off">
+          <button type="submit" class="btn">Search</button>
+        </form>
+        <ul id="results" class="results"></ul>
+        <form class="row" id="play-form">
+          <input id="game-id" placeholder="Game id on the platform (Steam app id…)" autocomplete="off">
+          <input id="game-name" placeholder="Game name" autocomplete="off">
+          <button type="submit" class="btn primary">Play</button>
+          <button type="button" class="btn" id="stop">Stop playing</button>
+        </form>
+        <p class="muted"><span id="game-note">Pick a search result: Catapult resolves its id on the platform.</span>
+          "Play" sets the simulated presence, then runs a real detection cycle.</p>
+        <form class="row" id="category-form">
+          <input id="category-id" placeholder="Category id" autocomplete="off">
+          <input id="category-name" placeholder="Category name" autocomplete="off">
+          <button type="submit" class="btn">Manual category change on Twitch…</button>
+        </form>
+        <form class="row" id="raid-form">
+          <input id="raid-login" placeholder="Login of the raided channel" autocomplete="off">
+          <button type="submit" class="btn">Raid out…</button>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>External APIs <span class="muted">for this account, one call at a time</span></h2>
+        <div id="account-settings"></div>
+        <p class="muted">"Real" is greyed out when the account lacks the token or link it needs (always, for a
+          fictitious account).</p>
+      </section>
+
+      <section class="card">
+        <h2>Simulated data</h2>
+        <form id="data-form">
+          <label class="check"><input type="checkbox" id="steam-public"> Steam profile public</label>
+          <fieldset>
+            <legend>Moderated channels</legend>
+            <div id="data-moderates" class="checks"></div>
+          </fieldset>
+          <label>Content classification labels (comma separated)
+            <input id="ccls" autocomplete="off"></label>
+          <label>Installed extensions (JSON, Twitch's format)
+            <textarea id="installed" rows="6" spellcheck="false"></textarea></label>
+          <label>Active extensions (JSON, Twitch's format)
+            <textarea id="active" rows="6" spellcheck="false"></textarea></label>
+          <button type="submit" class="btn primary">Save simulated data</button>
+        </form>
+      </section>
+    </div>
+
+    <section class="card">
+      <h2>Global <span class="muted">calls without an account, one mode for everyone</span></h2>
+      <div id="global-settings"></div>
+    </section>
+
+    <section class="card">
+      <h2>Journal
+        <label class="check inline"><input type="checkbox" id="journal-mine"> This account only</label>
+        <span id="journal-status" class="muted"></span>
+      </h2>
+      <div id="journal" class="journal"></div>
+    </section>
+  </main>
+</div>
+</body>
+</html>

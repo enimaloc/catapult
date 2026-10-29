@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.twitch;
 
+import fr.enimaloc.catapult.simulation.SimulationGates;
 import fr.enimaloc.catapult.service.debug.DebugRecording;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
@@ -34,7 +35,8 @@ class TwitchAccountValidationServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new TwitchAccountValidationService(userAccountRepository, twitchTokenService, restClient, DebugRecording.OFF);
+        service = new TwitchAccountValidationService(userAccountRepository, twitchTokenService, restClient, DebugRecording.OFF,
+                SimulationGates.none());
         ReflectionTestUtils.setField(service, "twitchClientId", "client-id");
     }
 
@@ -45,6 +47,19 @@ class TwitchAccountValidationServiceTest {
         u.setTwitchUsername("user_" + twitchId);
         u.setStatus(UserAccount.Status.ACTIVE);
         return u;
+    }
+
+    @Test
+    void validate_skipsMockAccountsWithoutSimulation() {
+        UserAccount fictitious = userWith("mock-a1b2c3d4");
+        when(userAccountRepository.findByStatusAndTwitchIdNotNull(UserAccount.Status.ACTIVE))
+            .thenReturn(List.of(fictitious));
+
+        service.validateAccounts();
+
+        assertThat(fictitious.getStatus()).isEqualTo(UserAccount.Status.ACTIVE);
+        verify(twitchTokenService, never()).getAppAccessToken();
+        verify(restClient, never()).get();
     }
 
     @Test

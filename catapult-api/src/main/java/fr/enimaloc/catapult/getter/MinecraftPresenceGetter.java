@@ -11,8 +11,11 @@ import fr.enimaloc.catapult.service.debug.DebugRecording;
 import fr.enimaloc.catapult.service.minecraft.MinecraftGateService;
 import fr.enimaloc.catapult.service.minecraft.MinecraftService;
 import fr.enimaloc.catapult.service.minecraft.MinecraftTokenService;
+import fr.enimaloc.catapult.simulation.SimulatedCalls;
+import fr.enimaloc.catapult.simulation.SimulationGate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.stereotype.Component;
@@ -53,6 +56,7 @@ public class MinecraftPresenceGetter implements GameGetter {
     private volatile Map<String, MinecraftService.PresenceStatus> cycleCache = Map.of();
 
     private final DebugRecording debug;
+    private final ObjectProvider<SimulationGate> simulationGate;
 
     @Override
     public String name() {
@@ -64,6 +68,9 @@ public class MinecraftPresenceGetter implements GameGetter {
             Map<String, MinecraftService.PresenceStatus> cache = new HashMap<>();
             for (MinecraftServiceAccount account : accountRepository.findByEnabledTrueOrderByFillOrderAsc()) {
                 if (!linkRepository.existsByServiceAccountAndStatus(account, MinecraftFriendLink.Status.ACCEPTED)) {
+                    continue;
+                }
+                if (simulated(account)) {
                     continue;
                 }
                 tokenService.getToken(account).ifPresent(token -> {
@@ -106,6 +113,17 @@ public class MinecraftPresenceGetter implements GameGetter {
             log.warn("Could not list the members of {} for the debug recording: {}", account.getLabel(), e.toString());
             return List.of();
         }
+    }
+
+    /**
+     * Whether the simulation keeps the account's presence call (and its token refresh) from going out: none of its
+     * members has {@code minecraft.presence} REAL.
+     */
+    private boolean simulated(MinecraftServiceAccount account) {
+        return SimulationGate.blocksAll(simulationGate, () -> linkRepository.findByServiceAccount(account).stream()
+                .filter(link -> link.getUser() != null)
+                .map(link -> link.getUser().getId())
+                .toList(), SimulatedCalls.MINECRAFT_PRESENCE);
     }
 
     public void clearCycleCache() {

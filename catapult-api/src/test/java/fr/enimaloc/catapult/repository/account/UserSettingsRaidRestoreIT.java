@@ -17,7 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /** The raid "put the last game back" delay, through the Flyway-migrated schema (same context as NotificationFlowIT). */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
-@ActiveProfiles("mock-web")
+@ActiveProfiles("h2-test")
 @TestPropertySource(properties = "spring.datasource.url=jdbc:h2:mem:catapult_notification_flow_it;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;NON_KEYWORDS=KEY,VALUE")
 class UserSettingsRaidRestoreIT {
 

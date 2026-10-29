@@ -14,9 +14,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
-@ActiveProfiles("mock-web")
+@ActiveProfiles("h2-test")
 // Use a dedicated H2 in-memory DB name ("catapult_prometheus") to avoid shared-state conflicts
-// with other @SpringBootTest + @ActiveProfiles("mock-web") contexts (e.g. CatapultApplicationTests).
+// with other @SpringBootTest + @ActiveProfiles("h2-test") contexts.
 // Without this isolation, both contexts share the same H2 instance, which causes
 // ExperimentSynchronizer stale-entity failures when the second context reuses JPA entities
 // already managed by the first context's transaction.

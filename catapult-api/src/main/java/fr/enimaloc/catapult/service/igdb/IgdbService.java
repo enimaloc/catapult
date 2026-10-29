@@ -12,10 +12,13 @@ import fr.enimaloc.catapult.repository.igdb.IgdbGameCclRepository;
 import fr.enimaloc.catapult.repository.igdb.IgdbGameExternalIdRepository;
 import fr.enimaloc.catapult.repository.twitch.TwitchCclDefinitionRepository;
 import fr.enimaloc.catapult.service.steam.SteamStoreService;
+import fr.enimaloc.catapult.simulation.SimulatedCalls;
+import fr.enimaloc.catapult.simulation.SimulationGate;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Service;
@@ -50,6 +53,7 @@ public class IgdbService {
     private final SteamStoreService steamStoreService;
     private final RestClient restClient;
     private final MeterRegistry meterRegistry;
+    private final ObjectProvider<SimulationGate> simulationGate;
 
     @Value("${app.igdb.client-id:}")
     private String clientId;
@@ -74,6 +78,8 @@ public class IgdbService {
         "age_ratings.rating_content_descriptions.description," +
         "age_ratings.rating_category.rating," +
         "age_ratings.rating_category.organization.name";
+
+    private static final String EXTERNAL_GAME_FIELDS = "external_games.uid,external_games.external_game_source";
 
     // L1 cache: igdbId → name
     private final Map<String, String> igdbGameCache = new ConcurrentHashMap<>();
@@ -364,6 +370,33 @@ public class IgdbService {
         log.info("CCL prewarm complete: {} / {} fetched", resolved, toLoad.size());
     }
 
+    /**
+     * The game's id on a store, the reverse of {@link #findByExternalAppId}: its Steam app id ({@code STEAM}) or its
+     * Microsoft Store product id ({@code XBOX}), from the external-id table, else from the game's external games on
+     * IGDB. Empty for another source type, without IGDB, or when IGDB lists none.
+     */
+    public Optional<String> findExternalUid(String igdbGameId, GameBinding.SourceType sourceType) {
+        long sourceId = switch (sourceType) {
+            case STEAM -> steamSourceId;
+            case XBOX -> xboxSourceId;
+            default -> -1;
+        };
+        if (clientId.isBlank() || sourceId < 0) return Optional.empty();
+
+        Optional<String> known = externalIdRepository.findByIgdbIdAndSourceId(igdbGameId, sourceId)
+            .map(IgdbGameExternalId::getUid);
+        if (known.isPresent()) return known;
+
+        String token = getOrRefreshAppToken();
+        if (token.isBlank()) return Optional.empty();
+        return igdbClient.fetchGameById(igdbGameId, EXTERNAL_GAME_FIELDS, token).stream()
+            .flatMap(game -> game.getExternalGamesList().stream())
+            .filter(external -> external.getExternalGameSource().getId() == sourceId)
+            .map(proto.ExternalGame::getUid)
+            .filter(uid -> !uid.isBlank())
+            .findFirst();
+    }
+
     public Optional<String> findTwitchGameId(String igdbGameId) {
         if (twitchSourceId < 0) return Optional.empty();
         return externalIdRepository.findByIgdbIdAndSourceId(igdbGameId, twitchSourceId)
@@ -586,6 +619,8 @@ public class IgdbService {
         }
         // without a secret no token can be had: only the DB cache answers (the perf profile's)
         if (clientSecret.isBlank()) return "";
+        // simulated app token: no token either, and nothing leaves
+        if (SimulationGate.blocks(simulationGate, null, SimulatedCalls.TWITCH_APP_APP_TOKEN)) return "";
         try {
             Map<String, Object> response = restClient.post()
                 .uri(TWITCH_TOKEN_URL + "?client_id={clientId}&client_secret={clientSecret}&grant_type=client_credentials",

@@ -11,7 +11,6 @@ import fr.enimaloc.catapult.domain.chatcommand.ChatCommandDefinition;
 import fr.enimaloc.catapult.domain.experiment.Experiment;
 import fr.enimaloc.catapult.domain.experiment.ExperimentVariant;
 import fr.enimaloc.catapult.domain.igdb.IgdbGameCacheEntry;
-import fr.enimaloc.catapult.getter.steam.MockSteamApiClient;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
 import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
@@ -24,6 +23,11 @@ import fr.enimaloc.catapult.service.binding.StreamStateService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.notification.NotificationDeliveryService;
 import fr.enimaloc.catapult.service.notification.NotificationService;
+import fr.enimaloc.catapult.simulation.CallKey;
+import fr.enimaloc.catapult.simulation.CallSetting;
+import fr.enimaloc.catapult.simulation.SimulatedCalls;
+import fr.enimaloc.catapult.simulation.SimulatedData.SimulatedPresence;
+import fr.enimaloc.catapult.simulation.SimulationRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
@@ -38,6 +42,7 @@ import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -47,8 +52,9 @@ import java.util.Set;
  * a game binding for each {@link #GAMES game}, both notification channels, {@value #NOTIFICATIONS} notifications
  * and a widget token. An account that already exists is left as it is, so a restart seeds nothing twice.
  *
- * <p>On every start (that state is in memory), each streamer is live and playing the first game on the fake Steam,
- * as the presence detection would see them.
+ * <p>On every start, each streamer is live and playing the first game on the simulated Steam, as the presence
+ * detection would see them. Every global external call is set to simulated too: the stores, which would otherwise
+ * default to real, are never reached from a perf run.
  */
 @Slf4j
 @Component
@@ -96,7 +102,7 @@ public class PerfDataSeeder implements ApplicationRunner {
     private final NotificationDeliveryService deliveries;
     private final WidgetTokenService widgetTokens;
     private final StreamStateService streamStates;
-    private final MockSteamApiClient steam;
+    private final SimulationRegistry simulation;
     private final IgdbGameCacheRepository igdbCache;
 
     public PerfDataSeeder(
@@ -112,7 +118,7 @@ public class PerfDataSeeder implements ApplicationRunner {
             NotificationDeliveryService deliveries,
             WidgetTokenService widgetTokens,
             StreamStateService streamStates,
-            MockSteamApiClient steam,
+            SimulationRegistry simulation,
             IgdbGameCacheRepository igdbCache) {
         this.accountCount = accountCount;
         this.transactions = transactions;
@@ -126,7 +132,7 @@ public class PerfDataSeeder implements ApplicationRunner {
         this.deliveries = deliveries;
         this.widgetTokens = widgetTokens;
         this.streamStates = streamStates;
-        this.steam = steam;
+        this.simulation = simulation;
         this.igdbCache = igdbCache;
     }
 
@@ -143,6 +149,7 @@ public class PerfDataSeeder implements ApplicationRunner {
     @Override
     @SuppressWarnings("NullableProblems")
     public void run(ApplicationArguments args) {
+        simulateGlobalCalls();
         transactions.executeWithoutResult(status -> igdbCache());
         UserAccount admin = transactions.execute(status -> admin());
         int created = 0;
@@ -212,10 +219,20 @@ public class PerfDataSeeder implements ApplicationRunner {
         commands.save(command);
     }
 
-    /** Live, and playing the first game on the fake Steam: picked up by the next detection cycle. */
+    /** Every global call simulated as succeeding; the streamers' own calls already are, by default. */
+    private void simulateGlobalCalls() {
+        for (CallKey key : SimulatedCalls.all()) {
+            if (key.scope() == CallKey.Scope.GLOBAL) {
+                simulation.set(null, key, CallSetting.ok());
+            }
+        }
+    }
+
+    /** Live, and playing the first game on the simulated Steam: picked up by the next detection cycle. */
     private void startPlaying(UserAccount streamer) {
         PerfGame first = GAMES.getFirst();
-        steam.setGameForUser(streamer.getSteamId(), first.steamAppId(), first.name());
+        simulation.update(streamer.getId(), data -> data.withLive(true).withPresence(
+                Map.of(GetterConfig.Provider.STEAM, new SimulatedPresence(first.steamAppId(), first.name()))));
         streamStates.setLive(streamer, true);
     }
 

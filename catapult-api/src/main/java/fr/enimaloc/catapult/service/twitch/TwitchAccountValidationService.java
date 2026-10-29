@@ -4,8 +4,11 @@ import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.debug.BatchDebugFilter;
 import fr.enimaloc.catapult.service.debug.DebugRecording;
+import fr.enimaloc.catapult.simulation.SimulatedCalls;
+import fr.enimaloc.catapult.simulation.SimulationGate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -32,6 +35,7 @@ public class TwitchAccountValidationService {
     private final RestClient restClient;
 
     private final DebugRecording debug;
+    private final ObjectProvider<SimulationGate> simulationGate;
 
     @Value("${twitch.client-id:}")
     private String twitchClientId;
@@ -39,8 +43,16 @@ public class TwitchAccountValidationService {
     @Scheduled(cron = "0 0 3 * * *")
     @Transactional
     public void validateAccounts() {
+        if (SimulationGate.blocks(simulationGate, null, SimulatedCalls.TWITCH_APP_APP_TOKEN)) {
+            log.debug("Twitch account validation skipped — the simulated app token is not REAL");
+            return;
+        }
+        // Fictitious accounts (the mock profile's) do not exist on Twitch, with the simulation or without it: they
+        // would all be marked INACTIVE
         List<UserAccount> accounts = userAccountRepository
-            .findByStatusAndTwitchIdNotNull(UserAccount.Status.ACTIVE);
+            .findByStatusAndTwitchIdNotNull(UserAccount.Status.ACTIVE).stream()
+            .filter(account -> !SimulationGate.isFictitious(account))
+            .toList();
         if (accounts.isEmpty()) return;
 
         log.info("Validating {} Twitch accounts", accounts.size());

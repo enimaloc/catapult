@@ -33,7 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
-@ActiveProfiles("mock-web")
+@ActiveProfiles("h2-test")
 @TestPropertySource(properties = {
         "spring.datasource.url=jdbc:h2:mem:catapult_admin_data_it;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;NON_KEYWORDS=KEY,VALUE"
 })
