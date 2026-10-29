@@ -9,11 +9,13 @@ import fr.enimaloc.catapult.common.dto.channel.TwSettingsRequest;
 import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.account.UserSettings;
+import fr.enimaloc.catapult.domain.binding.ExtensionSlotSetting;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
 import fr.enimaloc.catapult.service.binding.RaidRestoreGameService;
 import fr.enimaloc.catapult.service.binding.RaidRestoreGateService;
 import fr.enimaloc.catapult.service.category.CategoryChain;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.NoGameSettingsSaved;
+import fr.enimaloc.catapult.service.category.ExtensionLayoutApplier;
 import fr.enimaloc.catapult.service.debug.DebugContext;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +38,7 @@ public class ChannelSettingsService {
     private final CategoryChain categoryChain;
     private final RaidRestoreGateService raidRestoreGate;
     private final ChannelEventPublisher channelEventPublisher;
+    private final ExtensionLayoutApplier extensionLayoutApplier;
 
     public void saveCcl(UserAccount channel, CclSettingsRequest body) {
         UserSettings settings = settings(channel, s -> {
@@ -76,6 +79,26 @@ public class ChannelSettingsService {
             s.setIncompleteFallbackTwitchGameName(body.twitchGameName());
             replace(s.getIncompleteFallbackCcls(), body.ccls());
         });
+        channelEventPublisher.settingsUpdated(channel.getId(), settings);
+    }
+
+    /** Replaces the no-game fallback's extension layout and pushes it when that fallback is in place. */
+    public void saveNoGameExtensions(UserAccount channel, Set<ExtensionSlotSetting> slots) {
+        UserSettings settings = settings(channel, s -> {
+            s.getNoGameExtensionSlots().clear();
+            s.getNoGameExtensionSlots().addAll(slots);
+        });
+        extensionLayoutApplier.applyIfCurrent(channel, ExtensionLayoutApplier.NO_GAME_KEY, slots);
+        channelEventPublisher.settingsUpdated(channel.getId(), settings);
+    }
+
+    /** Replaces the incomplete fallback's extension layout and pushes it when that fallback is in place. */
+    public void saveIncompleteFallbackExtensions(UserAccount channel, Set<ExtensionSlotSetting> slots) {
+        UserSettings settings = settings(channel, s -> {
+            s.getIncompleteFallbackExtensionSlots().clear();
+            s.getIncompleteFallbackExtensionSlots().addAll(slots);
+        });
+        extensionLayoutApplier.applyIfCurrent(channel, ExtensionLayoutApplier.INCOMPLETE_KEY, slots);
         channelEventPublisher.settingsUpdated(channel.getId(), settings);
     }
 

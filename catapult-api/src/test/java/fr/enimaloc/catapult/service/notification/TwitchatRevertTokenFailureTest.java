@@ -17,6 +17,7 @@ import fr.enimaloc.catapult.service.binding.RaidRestoreHold;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
 import fr.enimaloc.catapult.service.category.CategoryApplier;
 import fr.enimaloc.catapult.service.category.CategoryChain;
+import fr.enimaloc.catapult.service.category.ExtensionLayoutApplier;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
 import fr.enimaloc.catapult.service.twitch.EventSubService;
 import fr.enimaloc.catapult.service.twitch.TwitchCategoryService;
@@ -117,6 +118,7 @@ class TwitchatRevertTokenFailureTest {
     @MockitoBean StreamStateService streamStateService;
     @MockitoBean GameStateService gameStateService;
     @MockitoBean RaidRestoreGateService raidRestoreGateService;
+    @MockitoBean ExtensionLayoutApplier extensionLayoutApplier;
     @MockitoBean GameBindingLookup gameBindingLookup;
 
     @AfterEach

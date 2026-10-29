@@ -268,6 +268,8 @@ window.CatapultCustomBindings = (function () {
         // Once in the page, its switches and fields are upgraded: their properties are theirs.
         fillForm(row, binding, null);
         wired.attachItem(row);
+        // The template's extension layout has no binding to save to: this one has now.
+        window.CatapultExtensions?.enable(row, `${CatapultChannel.baseUrl()}/custom-bindings/${binding.id}/extensions`);
         return row;
     }
 

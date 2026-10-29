@@ -9,6 +9,7 @@ import fr.enimaloc.catapult.common.event.ChannelEvents;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.account.UserSettings;
 import fr.enimaloc.catapult.domain.binding.CustomBinding;
+import fr.enimaloc.catapult.domain.binding.ExtensionSlotSetting;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
@@ -163,7 +164,7 @@ public class ChannelEventPublisher {
         return new BindingDto(binding.getId().toString(), binding.getStatus().name(), binding.getSourceType().name(),
                 binding.getSourceName(), binding.getTwitchGameId(), binding.getTwitchGameName(), binding.isIgnored(),
                 binding.isCclEnabled(), Set.copyOf(binding.getCcls()), binding.isTwEnabled(), binding.isTwOverride(),
-                Set.copyOf(binding.getTws()));
+                Set.copyOf(binding.getTws()), null, ExtensionSlotSetting.toDtos(binding.getExtensionSlots()));
     }
 
     /** A custom binding as the API answers it, CCLs and TWs sorted. */

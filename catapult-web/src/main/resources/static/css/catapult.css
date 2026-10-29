@@ -1225,7 +1225,7 @@ a[data-link].active {
 
 /* Every content block inside a card is separated from the previous one by a rule. */
 :is(.bot-toggle-row, .settings-switch-group, .connection-card > div, #dtdd-search-dialog,
-    .binding-edit-panel, .binding-ccl-panel, .binding-tw-panel) {
+    .binding-edit-panel, .binding-ccl-panel, .binding-tw-panel, .binding-extensions-panel) {
     border-top: 1px solid var(--catapult-border);
 }
 
@@ -1391,6 +1391,168 @@ a[data-link].active {
 
 #custom-binding-new-btn {
     margin-top: 14px;
+}
+
+/* A configuration's Twitch extensions, drawn as the channel (fragments/extensions.html): the player, its overlay slot
+ * in the middle and its two component slots on its right edge, the three panel slots under it. A slot is dashed while
+ * kept, red once emptied, tinted with its extension's name; struck through when that one is no longer installed. */
+.binding-extensions-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 12px;
+    padding-top: 16px;
+}
+
+.extension-board {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    box-sizing: border-box;
+    width: min(100%, 340px);
+    padding: 12px;
+    border: 2px solid var(--catapult-border-hover);
+    border-radius: 18px;
+}
+
+.extension-player {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 150px;
+    border: 2px solid var(--catapult-border-hover);
+    border-radius: 14px;
+}
+
+.extension-components {
+    position: absolute;
+    top: 50%;
+    right: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    transform: translateY(-50%);
+}
+
+.extension-panels {
+    display: flex;
+    gap: 8px;
+}
+
+.extension-slot-panel-dropdown {
+    flex: 1;
+    min-width: 0;
+}
+
+.extension-slot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    padding: 4px;
+    border: 2px solid var(--catapult-border-hover);
+    border-radius: 12px;
+    background: transparent;
+    color: var(--catapult-text-secondary);
+    font: inherit;
+    font-size: 0.7rem;
+    line-height: 1.2;
+    text-align: center;
+    overflow-wrap: anywhere;
+    cursor: pointer;
+}
+
+.extension-slot-label {
+    color: var(--catapult-text-muted);
+    font-size: 0.62rem;
+    font-weight: 650;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.extension-slot-value {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}
+
+/* Narrower on a phone, clear of the component slots. */
+.extension-slot-overlay {
+    width: min(124px, 38%);
+    height: 72px;
+    border-radius: 50%;
+}
+
+.extension-slot-component {
+    width: 78px;
+    height: 40px;
+    padding: 2px;
+    border-radius: 6px;
+    font-size: 0.62rem;
+}
+
+.extension-slot-component .extension-slot-label {
+    font-size: 0.55rem;
+    letter-spacing: 0;
+    white-space: nowrap;
+}
+
+.extension-slot-component .extension-slot-value {
+    -webkit-line-clamp: 1;
+}
+
+.extension-slot-panel {
+    width: 100%;
+    height: 80px;
+}
+
+.extension-slot.is-keep {
+    border-style: dashed;
+    color: var(--catapult-text-muted);
+}
+
+.extension-slot.is-none {
+    border-color: rgb(var(--mdui-color-error));
+    color: rgb(var(--mdui-color-error));
+}
+
+.extension-slot.is-extension {
+    border-color: var(--catapult-primary);
+    background: rgba(139, 92, 246, 0.16);
+    color: var(--catapult-text);
+    font-weight: 600;
+}
+
+.extension-slot.is-missing .extension-slot-value {
+    text-decoration: line-through;
+    opacity: 0.7;
+}
+
+.extension-slot:not(:disabled):hover {
+    border-color: var(--catapult-primary-hover);
+}
+
+.extension-slot:focus-visible {
+    outline: 2px solid var(--catapult-primary-hover);
+    outline-offset: 2px;
+}
+
+.extension-slot:disabled {
+    cursor: default;
+    opacity: 0.45;
+}
+
+.binding-extensions-panel.is-saving .extension-slot {
+    cursor: progress;
+}
+
+.extension-layout-note {
+    margin: 0;
+    color: var(--catapult-text-muted);
+    font-size: 0.85rem;
 }
 
 /* Bindings pagination */

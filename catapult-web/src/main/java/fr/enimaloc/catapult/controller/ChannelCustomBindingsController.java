@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.common.dto.binding.CustomBindingDto;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingSaveResult;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto;
+import fr.enimaloc.catapult.common.dto.channel.ExtensionSlotDto;
 import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.service.ActivationOutcome;
 import fr.enimaloc.catapult.service.ApiService;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -50,6 +52,12 @@ public class ChannelCustomBindingsController {
     public ResponseEntity<?> update(@PathVariable String username, @PathVariable UUID id,
                                                           @RequestBody CustomBindingRequest body) {
         return relay(apiService.updateCustomBinding(username, id, body));
+    }
+
+    @PostMapping("/channel/{username}/custom-bindings/{id}/extensions")
+    public ResponseEntity<Void> saveExtensions(@PathVariable String username, @PathVariable UUID id,
+                                               @RequestBody List<ExtensionSlotDto> body) {
+        return ApiStatus.answer(apiService.saveCustomBindingExtensions(username, id, body));
     }
 
     @PostMapping("/channel/{username}/custom-bindings/{id}/delete")

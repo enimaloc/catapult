@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -117,6 +118,51 @@ class ChannelActionsControllerTest {
 
         verify(apiService).updateBinding("enimaloc", "abc-123", "509658", "Celeste",
                 java.util.Set.of("violent-graphic"));
+    }
+
+    private static final java.util.List<fr.enimaloc.catapult.common.dto.channel.ExtensionSlotDto> SLOTS = java.util.List.of(
+            new fr.enimaloc.catapult.common.dto.channel.ExtensionSlotDto(
+                    fr.enimaloc.catapult.common.dto.channel.TwitchExtensionsDto.Type.PANEL, 1, "ext-1", "Guide"));
+    private static final String SLOTS_JSON = "[{\"type\":\"PANEL\",\"slot\":1,\"extensionId\":\"ext-1\",\"extensionName\":\"Guide\"}]";
+
+    @Test
+    void saveBindingExtensions_callsApiServiceWithParsedBody() throws Exception {
+        mvc.perform(post("/channel/enimaloc/bindings/abc-123/extensions").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content(SLOTS_JSON))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).saveBindingExtensions("enimaloc", "abc-123", SLOTS);
+    }
+
+    @Test
+    void saveNoGameExtensions_callsApiServiceWithParsedBody() throws Exception {
+        mvc.perform(post("/channel/enimaloc/settings/no-game/extensions").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content(SLOTS_JSON))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).saveNoGameExtensions("enimaloc", SLOTS);
+    }
+
+    @Test
+    void saveIncompleteFallbackExtensions_callsApiServiceWithParsedBody() throws Exception {
+        mvc.perform(post("/channel/enimaloc/settings/incomplete-fallback/extensions").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content(SLOTS_JSON))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).saveIncompleteFallbackExtensions("enimaloc", SLOTS);
+    }
+
+    @Test
+    void twitchExtensions_returnsTheInstalledAndActiveExtensions() throws Exception {
+        org.mockito.Mockito.when(apiService.twitchExtensions("enimaloc")).thenReturn(
+                new fr.enimaloc.catapult.common.dto.channel.TwitchExtensionsDto(java.util.List.of(
+                        new fr.enimaloc.catapult.common.dto.channel.TwitchExtensionsDto.Installed("e1", "Guide", "1",
+                                java.util.List.of(fr.enimaloc.catapult.common.dto.channel.TwitchExtensionsDto.Type.PANEL), true)),
+                        java.util.List.of()));
+
+        mvc.perform(get("/channel/enimaloc/twitch/extensions"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.installed[0].id").value("e1"));
     }
 
     @Test

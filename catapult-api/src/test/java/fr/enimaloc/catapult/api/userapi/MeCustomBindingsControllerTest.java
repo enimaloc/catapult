@@ -8,6 +8,8 @@ import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.CustomBinding;
 import fr.enimaloc.catapult.domain.binding.CustomBindingActivation;
+import fr.enimaloc.catapult.domain.binding.ExtensionSlotSetting;
+import fr.enimaloc.catapult.common.dto.channel.TwitchExtensionsDto;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.security.ApiSecurityConfig;
 import fr.enimaloc.catapult.service.account.ApiTokenOwner;
@@ -120,6 +122,18 @@ class MeCustomBindingsControllerTest {
                 .andExpect(jsonPath("$.bindings[0].tws[0]").value("art"))
                 .andExpect(jsonPath("$.bindings[0].tws[1]").value("chill"))
                 .andExpect(jsonPath("$.bindings[0].uninterruptible").value(true));
+    }
+
+    @Test
+    void list_neverGivesTheExtensionLayouts() throws Exception {
+        art.getExtensionSlots().add(new ExtensionSlotSetting(TwitchExtensionsDto.Type.PANEL, 1, "p1", "Panel"));
+        when(service.list(user)).thenReturn(List.of(art));
+        when(service.active(user)).thenReturn(Optional.empty());
+
+        mvc.perform(withToken(get("/api/me/custom-bindings")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.bindings[0].id").value(art.getId().toString()))
+                .andExpect(jsonPath("$.extensions").doesNotExist());
     }
 
     @Test

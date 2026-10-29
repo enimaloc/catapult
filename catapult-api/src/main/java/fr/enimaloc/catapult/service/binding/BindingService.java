@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.service.binding;
 
 import fr.enimaloc.catapult.service.debug.DebugContext;
 import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.binding.ExtensionSlotSetting;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.binding.GameMapping;
 import fr.enimaloc.catapult.domain.igdb.IgdbGameDetails;
@@ -10,14 +11,17 @@ import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
 import fr.enimaloc.catapult.repository.binding.GameMappingRepository;
 import fr.enimaloc.catapult.service.category.CategoryChain;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.BindingEdited;
+import fr.enimaloc.catapult.service.category.ExtensionLayoutApplier;
 import fr.enimaloc.catapult.service.igdb.IgdbGameDetailsService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.tw.TwResolverService;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Objects;
@@ -39,6 +43,7 @@ public class BindingService {
     private final GameMappingRepository gameMappingRepository;
     private final GameBindingLookup gameBindingLookup;
     private final CategoryChain categoryChain;
+    private final ExtensionLayoutApplier extensionLayoutApplier;
 
     /**
      * Applies {@code change} to the user's binding (if it exists), saves it, and applies it when it is the game
@@ -304,6 +309,20 @@ public class BindingService {
     @Transactional
     public void toggleCclEnabled(UserAccount user, UUID bindingId, boolean enabled) {
         editBinding(user, bindingId, binding -> binding.setCclEnabled(enabled));
+    }
+
+    /**
+     * Replaces the binding's whole extension layout and, when it is the configuration in place, pushes it to Twitch.
+     * @throws ResponseStatusException 404 when the binding isn't the user's
+     */
+    @Transactional
+    public void updateExtensionSlots(UserAccount user, UUID bindingId, Set<ExtensionSlotSetting> slots) {
+        GameBinding binding = gameBindingRepository.findByIdAndUser(bindingId, user)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown binding"));
+        binding.getExtensionSlots().clear();
+        binding.getExtensionSlots().addAll(slots);
+        gameBindingRepository.save(binding);
+        extensionLayoutApplier.applyIfCurrent(user, ExtensionLayoutApplier.keyOf(binding), slots);
     }
 
     @Transactional

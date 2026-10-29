@@ -85,6 +85,21 @@ public class MockTwitchService implements TwitchService {
         return ids;
     }
 
+    @Override
+    public List<TwitchExtension> getUserExtensions(UserAccount user) {
+        return List.of();
+    }
+
+    @Override
+    public TwitchExtensionPlacement getActiveExtensions(UserAccount user) {
+        return TwitchExtensionPlacement.empty();
+    }
+
+    @Override
+    public TwitchExtensionPlacement setActiveExtensions(UserAccount user, TwitchExtensionPlacement placement) {
+        return TwitchExtensionPlacement.empty();
+    }
+
     // For mock-user-N: randomly picks a non-empty subset of the channels it could moderate
     // (mock-admin + mock-user-0 … mock-user-(N-1)). Seeded on N for reproducibility.
     private List<String> computeModeratedChannels(String twitchId) {

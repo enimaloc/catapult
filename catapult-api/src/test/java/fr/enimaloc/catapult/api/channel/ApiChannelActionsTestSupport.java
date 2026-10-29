@@ -24,6 +24,7 @@ import fr.enimaloc.catapult.service.binding.SchedulerService;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
 import fr.enimaloc.catapult.service.category.CategoryApplier;
 import fr.enimaloc.catapult.service.category.CategoryChain;
+import fr.enimaloc.catapult.service.category.ExtensionLayoutApplier;
 import fr.enimaloc.catapult.service.connections.SteamProfileDiagnostics;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import fr.enimaloc.catapult.service.notification.TwitchatEventDispatcher;
@@ -78,6 +79,7 @@ abstract class ApiChannelActionsTestSupport {
     @MockitoBean TwitchatEventDispatcher twitchatEventDispatcher;
     @MockitoBean SteamProfileDiagnostics steamProfileDiagnostics;
     @MockitoBean RaidRestoreGateService raidRestoreGate;
+    @MockitoBean ExtensionLayoutApplier extensionLayoutApplier;
     @MockitoBean fr.enimaloc.catapult.service.binding.GameBindingLookup gameBindingLookup;
     @MockitoBean fr.enimaloc.catapult.service.binding.CustomBindingActivations customBindingActivations;
 

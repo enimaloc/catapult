@@ -27,6 +27,7 @@ import fr.enimaloc.catapult.service.binding.SchedulerService;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
 import fr.enimaloc.catapult.service.category.CategoryApplier;
 import fr.enimaloc.catapult.service.category.CategoryChain;
+import fr.enimaloc.catapult.service.category.ExtensionLayoutApplier;
 import fr.enimaloc.catapult.service.connections.SteamProfileDiagnostics;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import fr.enimaloc.catapult.service.notification.NotificationService;
@@ -96,6 +97,7 @@ class AccountResolutionPerRequestTest {
     @MockitoBean TwitchatEventDispatcher twitchatEventDispatcher;
     @MockitoBean SteamProfileDiagnostics steamProfileDiagnostics;
     @MockitoBean RaidRestoreGateService raidRestoreGate;
+    @MockitoBean ExtensionLayoutApplier extensionLayoutApplier;
     @MockitoBean GameBindingLookup gameBindingLookup;
     @MockitoBean CustomBindingActivations customBindingActivations;
     @MockitoBean NotificationService notificationService;

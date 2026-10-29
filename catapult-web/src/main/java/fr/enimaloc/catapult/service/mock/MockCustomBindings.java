@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.service.mock;
 import fr.enimaloc.catapult.common.dto.account.ApiTokenCreatedDto;
 import fr.enimaloc.catapult.common.dto.account.ApiTokenStatusDto;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingDto;
+import fr.enimaloc.catapult.common.dto.channel.ExtensionSlotDto;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingSaveResult;
 import fr.enimaloc.catapult.common.error.ErrorCode;
@@ -13,7 +14,9 @@ import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -28,6 +31,7 @@ class MockCustomBindings {
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private final List<CustomBindingDto> bindings = new ArrayList<>();
+    private final Map<UUID, List<ExtensionSlotDto>> extensions = new HashMap<>();
     private UUID activeId;
     private Instant activatedAt;
     private Instant tokenCreatedAt;
@@ -44,7 +48,8 @@ class MockCustomBindings {
     }
 
     synchronized CustomBindingsStateDto state() {
-        return new CustomBindingsStateDto(true, List.copyOf(bindings), activeId, activatedAt);
+        return new CustomBindingsStateDto(true, List.copyOf(bindings), activeId, activatedAt,
+                Map.copyOf(extensions));
     }
 
     synchronized CustomBindingSave<CustomBindingDto> create(CustomBindingRequest request) {
@@ -73,6 +78,7 @@ class MockCustomBindings {
         if (index < 0) return 404;
         if (id.equals(activeId)) deactivate();
         bindings.remove(index);
+        extensions.remove(id);
         return 204;
     }
 
@@ -119,6 +125,14 @@ class MockCustomBindings {
 
     synchronized void revokeReadToken() {
         readTokenCreatedAt = null;
+    }
+
+    /** 204 once kept, 404 for an unknown binding; an empty layout keeps nothing. */
+    synchronized int saveExtensions(UUID id, List<ExtensionSlotDto> slots) {
+        if (indexOf(id) < 0) return 404;
+        if (slots.isEmpty()) extensions.remove(id);
+        else extensions.put(id, List.copyOf(slots));
+        return 204;
     }
 
     private int indexOf(UUID id) {

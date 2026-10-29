@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.binding;
 
+import fr.enimaloc.catapult.service.category.ExtensionLayoutApplier;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.account.UserSettings;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
@@ -54,7 +55,7 @@ class RaidRestoreGameServiceTest {
     void setUp() {
         CategoryApplier applier = new CategoryApplier(twitchService, streamStateService);
         CategoryChain chain = new CategoryChain(customBindingActivations, streamStateService, userSettingsRepository,
-                hold, gameStateService, userAccountRepository, applier, gate, bindingLookup);
+                hold, gameStateService, userAccountRepository, applier, gate, bindingLookup, mock(ExtensionLayoutApplier.class));
         service = new RaidRestoreGameService(chain, applier, hold);
         user = new UserAccount();
         user.setId(UUID.randomUUID());

@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.debug;
 
+import fr.enimaloc.catapult.service.category.ExtensionLayoutApplier;
 import fr.enimaloc.catapult.service.category.CategoryChain;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
 import fr.enimaloc.catapult.service.category.CategoryApplier;
@@ -310,7 +311,7 @@ class DebugAttributionTest {
         });
         BindingService service = new BindingService(bindings, mock(IgdbService.class),
                 mock(IgdbGameDetailsService.class), mock(TwitchService.class), mock(TwResolverService.class),
-                mappings, new GameBindingLookup(bindings), mock(CategoryChain.class));
+                mappings, new GameBindingLookup(bindings), mock(CategoryChain.class), mock(ExtensionLayoutApplier.class));
 
         service.refreshIncompleteBindings();
 
@@ -406,7 +407,7 @@ class DebugAttributionTest {
         CategoryApplier applier = new CategoryApplier(twitch, streams);
         CategoryChain chain = new CategoryChain(mock(CustomBindingActivations.class), streams, settings, hold,
                 mock(GameStateService.class), mock(UserAccountRepository.class), applier,
-                mock(RaidRestoreGateService.class), mock(GameBindingLookup.class));
+                mock(RaidRestoreGateService.class), mock(GameBindingLookup.class), mock(ExtensionLayoutApplier.class));
         RaidRestoreGameService service = new RaidRestoreGameService(chain, applier, hold);
 
         service.onRaidedOut(new ChannelRaidedOutEvent(this, user, "509658"));

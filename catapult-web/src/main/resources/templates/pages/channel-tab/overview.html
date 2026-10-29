@@ -184,6 +184,10 @@
                         </label>
                     </div>
 
+                    <th:block th:replace="~{fragments/extensions :: extensionLayout('binding',
+                            @{/channel/{u}/bindings/{id}/extensions(u=${ch.channelUsername()},id=${b.id()})},
+                            ${b.extensions()})}"></th:block>
+
                     <!--/* Owner only: catapult-api applies a binding's TWs to the caller's own channel. */-->
                     <div class="binding-tw-panel" th:if="${ch.isOwner()}">
                         <label>
@@ -305,7 +309,7 @@
 </mdui-tab-panel>
 
 <!--/* A custom binding's edit form (b null: an empty one), in the same panels as an association's: the name and
-     Twitch category, its CCLs, its TWs, uninterruptible, then the actions; activating and deleting only for a saved
+     Twitch category, its CCLs, its Twitch extensions, its TWs, uninterruptible, then the actions; activating and deleting only for a saved
      binding (saved), the "New" row's form creating one. */-->
 <th:block th:fragment="customBindingForm(b, active, saved)">
     <div class="binding-edit-panel">
@@ -328,6 +332,11 @@
             <span th:text="${ccl.name()}">ccl name</span>
         </label>
     </div>
+
+    <!--/* Saved apart, at each pick: a binding not saved yet (the "New" row's, the row template's) has none to save to. */-->
+    <th:block th:replace="~{fragments/extensions :: extensionLayout('custom-binding',
+            ${b == null} ? null : @{/channel/{u}/custom-bindings/{id}/extensions(u=${channelPage.channelUsername()},id=${b.id()})},
+            ${b == null ? null : channelPage.customBindings().extensions().get(b.id())})}"></th:block>
 
     <div class="binding-tw-panel">
         <span class="eyebrow custom-binding-panel-title" th:text="#{channel.custom_bindings.settings.tw}">TW</span>

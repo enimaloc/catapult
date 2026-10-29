@@ -250,6 +250,34 @@ class MockApiServiceTest {
     }
 
     @Test
+    void twitchExtensions_areThreeFixedInstalledOnes_withNothingActive() {
+        var extensions = service.twitchExtensions(username);
+
+        assertThat(extensions.installed()).extracting("id").containsExactly("mock-panel", "mock-map", "mock-old");
+        assertThat(extensions.installed()).extracting("canActivate").containsExactly(true, true, false);
+        assertThat(extensions.active()).isEmpty();
+    }
+
+    @Test
+    void extensionLayouts_areKeptPerConfiguration() {
+        org.junit.jupiter.api.Assumptions.assumeTrue(bindingId != null);
+        var slots = List.of(new fr.enimaloc.catapult.common.dto.channel.ExtensionSlotDto(
+                fr.enimaloc.catapult.common.dto.channel.TwitchExtensionsDto.Type.PANEL, 1, "mock-panel", "Build Guide"));
+
+        assertThat(service.saveBindingExtensions(username, bindingId, slots)).isEqualTo(204);
+        assertThat(service.saveNoGameExtensions(username, slots)).isEqualTo(204);
+        assertThat(service.saveIncompleteFallbackExtensions(username, slots)).isEqualTo(204);
+        UUID custom = service.customBindings(username).bindings().getFirst().id();
+        assertThat(service.saveCustomBindingExtensions(username, custom, slots)).isEqualTo(204);
+
+        assertThat(data.bindingById(bindingId).extensions()).isEqualTo(slots);
+        assertThat(service.channelSettings(username).noGameExtensions()).isEqualTo(slots);
+        assertThat(service.channelSettings(username).incompleteFallbackExtensions()).isEqualTo(slots);
+        assertThat(service.customBindings(username).extensions()).containsEntry(custom, slots);
+        assertThat(service.saveCustomBindingExtensions(username, UUID.randomUUID(), slots)).isEqualTo(404);
+    }
+
+    @Test
     void searchGames_matchesCategoryNamesIgnoringCase() {
         assertThat(service.searchGames(username, "VAL")).isEqualTo(List.of(Map.of("id", "508455", "name", "Valheim")));
         assertThat((List<?>) service.searchGames(username, "")).hasSize(MockPresets.CATEGORIES.size());

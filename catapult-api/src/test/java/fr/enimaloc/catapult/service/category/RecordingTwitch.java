@@ -5,6 +5,8 @@ import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.service.debug.DebugContext;
 import fr.enimaloc.catapult.service.twitch.ChannelUpdateOutcome;
 import fr.enimaloc.catapult.service.twitch.TwitchCategory;
+import fr.enimaloc.catapult.service.twitch.TwitchExtension;
+import fr.enimaloc.catapult.service.twitch.TwitchExtensionPlacement;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
 
 import java.util.ArrayList;
@@ -40,6 +42,8 @@ public class RecordingTwitch implements TwitchService {
     private ChannelUpdateOutcome answer = ChannelUpdateOutcome.APPLIED;
     private RuntimeException next;
     private int thrown;
+    private RuntimeException extensionError;
+    private int extensionFailures;
     private Consumer<Write> onWrite = w -> { };
 
     RecordingTwitch(List<String> journal) {
@@ -58,6 +62,16 @@ public class RecordingTwitch implements TwitchService {
     /** The next write throws {@code e} instead of being recorded (it still goes through {@link #onWrite}). */
     public void throwNext(RuntimeException e) {
         this.next = e;
+    }
+
+    /** {@link #setActiveExtensions} throws {@code e} from now on. */
+    public void failExtensions(RuntimeException e) {
+        this.extensionError = e;
+    }
+
+    /** How many {@link #setActiveExtensions} calls have thrown (see {@link #failExtensions}). */
+    public int extensionFailures() {
+        return extensionFailures;
     }
 
     /** How many writes have thrown so far (see {@link #throwNext}). */
@@ -111,6 +125,25 @@ public class RecordingTwitch implements TwitchService {
     @Override
     public List<String> getModeratedChannelIds(UserAccount viewer) {
         return List.of();
+    }
+
+    @Override
+    public List<TwitchExtension> getUserExtensions(UserAccount user) {
+        return List.of();
+    }
+
+    @Override
+    public TwitchExtensionPlacement getActiveExtensions(UserAccount user) {
+        return TwitchExtensionPlacement.empty();
+    }
+
+    @Override
+    public TwitchExtensionPlacement setActiveExtensions(UserAccount user, TwitchExtensionPlacement placement) {
+        if (extensionError != null) {
+            extensionFailures++;
+            throw extensionError;
+        }
+        return TwitchExtensionPlacement.empty();
     }
 
     private void update(GameBinding binding) {

@@ -7,6 +7,7 @@ import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.CustomBinding;
 import fr.enimaloc.catapult.domain.binding.CustomBindingActivation;
+import fr.enimaloc.catapult.domain.binding.ExtensionSlotSetting;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.event.listener.GameEventListener;
 import fr.enimaloc.catapult.getter.DetectedGame;
@@ -18,6 +19,7 @@ import fr.enimaloc.catapult.service.category.CategoryOutcome;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.CustomBindingTriggered;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.NoGameAfterCustomBinding;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.StreamEnded;
+import fr.enimaloc.catapult.service.category.ExtensionLayoutApplier;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import lombok.RequiredArgsConstructor;
@@ -88,6 +90,7 @@ public class CustomBindingService {
     private final GameEventListener gameEventListener;
     private final ChannelEventPublisher channelEventPublisher;
     private final CategoryChain categoryChain;
+    private final ExtensionLayoutApplier extensionLayoutApplier;
 
     /** Created DRAFT, so closed to everyone until the admin opens it. */
     @EventListener(ApplicationReadyEvent.class)
@@ -142,6 +145,20 @@ public class CustomBindingService {
                 .filter(activation -> activation.getCustomBinding().getId().equals(saved.getId()))
                 .isPresent();
         return new UpdateResult(saved, active ? applyToTwitch(user, saved) : null);
+    }
+
+    /**
+     * Replaces the binding's whole extension layout and, when it is the one in place, pushes it to Twitch.
+     * @throws ResponseStatusException 404 when the binding isn't the user's
+     */
+    public void updateExtensionSlots(UserAccount user, UUID id, Set<ExtensionSlotSetting> slots) {
+        requireEnabled(user);
+        CustomBinding binding = existing(user, id);
+        binding.getExtensionSlots().clear();
+        binding.getExtensionSlots().addAll(slots);
+        CustomBinding saved = save(binding);
+        publishList(user);
+        extensionLayoutApplier.applyIfCurrent(user, ExtensionLayoutApplier.keyOf(saved.toGameBinding(user)), slots);
     }
 
     /** Deleting the active one deactivates it first, with the same effect as a deactivation. */
