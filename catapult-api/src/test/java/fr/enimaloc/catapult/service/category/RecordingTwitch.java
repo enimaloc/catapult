@@ -42,6 +42,8 @@ public class RecordingTwitch implements TwitchService {
     private ChannelUpdateOutcome answer = ChannelUpdateOutcome.APPLIED;
     private RuntimeException next;
     private int thrown;
+    private RuntimeException extensionError;
+    private int extensionFailures;
     private Consumer<Write> onWrite = w -> { };
 
     RecordingTwitch(List<String> journal) {
@@ -60,6 +62,16 @@ public class RecordingTwitch implements TwitchService {
     /** The next write throws {@code e} instead of being recorded (it still goes through {@link #onWrite}). */
     public void throwNext(RuntimeException e) {
         this.next = e;
+    }
+
+    /** {@link #setActiveExtensions} throws {@code e} from now on. */
+    public void failExtensions(RuntimeException e) {
+        this.extensionError = e;
+    }
+
+    /** How many {@link #setActiveExtensions} calls have thrown (see {@link #failExtensions}). */
+    public int extensionFailures() {
+        return extensionFailures;
     }
 
     /** How many writes have thrown so far (see {@link #throwNext}). */
@@ -127,6 +139,10 @@ public class RecordingTwitch implements TwitchService {
 
     @Override
     public TwitchExtensionPlacement setActiveExtensions(UserAccount user, TwitchExtensionPlacement placement) {
+        if (extensionError != null) {
+            extensionFailures++;
+            throw extensionError;
+        }
         return TwitchExtensionPlacement.empty();
     }
 

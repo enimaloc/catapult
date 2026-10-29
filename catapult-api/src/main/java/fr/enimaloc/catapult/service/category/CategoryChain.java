@@ -16,6 +16,7 @@ import fr.enimaloc.catapult.service.binding.RaidRestoreGateService;
 import fr.enimaloc.catapult.service.binding.RaidRestoreHold;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
 import fr.enimaloc.catapult.service.category.CategoryOutcome.Reason;
+import fr.enimaloc.catapult.service.twitch.ChannelUpdateOutcome;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.BindingEdited;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.CustomBindingTriggered;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.GameClosed;
@@ -72,10 +73,41 @@ public class CategoryChain {
     private final CategoryApplier applier;
     private final RaidRestoreGateService raidRestoreGate;
     private final GameBindingLookup gameBindingLookup;
+    private final ExtensionLayoutApplier extensionLayouts;
 
-    /** {@link #decide}, then applied right away. */
+    /**
+     * {@link #decide}, then applied right away. When the category is applied, the channel's Twitch extensions follow
+     * the configuration it comes from; the extensions never change the returned outcome.
+     */
     public CategoryOutcome apply(UserAccount user, CategoryTrigger trigger) {
-        return applier.apply(user, decide(user, trigger));
+        CategoryDecision decision = decide(user, trigger);
+        CategoryOutcome outcome = applier.apply(user, decision);
+        switchExtensions(user, trigger, decision, outcome);
+        return outcome;
+    }
+
+    /**
+     * The configuration in force changes only on the triggers that switch the category: an applied category puts its
+     * extension layout, the end of the stream forgets it. Edits, manual changes and raids leave the extensions alone.
+     */
+    private void switchExtensions(UserAccount user, CategoryTrigger trigger, CategoryDecision decision,
+                                  CategoryOutcome outcome) {
+        if (trigger instanceof StreamEnded) {
+            extensionLayouts.forget(user);
+            return;
+        }
+        boolean switches = trigger instanceof GameDetected || trigger instanceof GameClosed
+                || trigger instanceof NoGameAfterCustomBinding || trigger instanceof StreamStarted
+                || trigger instanceof CustomBindingTriggered;
+        if (!switches || outcome.status() != ChannelUpdateOutcome.APPLIED) return;
+        switch (decision.action()) {
+            case UPDATE_CHANNEL -> extensionLayouts.applyOnSwitch(user, ExtensionLayoutApplier.keyOf(decision.binding()),
+                    decision.binding().getExtensionSlots());
+            case RESET_TO_DEFAULT -> userSettingsRepository.findById(user.getId()).ifPresent(settings ->
+                    extensionLayouts.applyOnSwitch(user, ExtensionLayoutApplier.NO_GAME_KEY,
+                            settings.getNoGameExtensionSlots()));
+            default -> { }
+        }
     }
 
     public CategoryDecision decide(UserAccount user, CategoryTrigger trigger) {
@@ -308,6 +340,7 @@ public class CategoryChain {
         // without the blocklist (a transient binding)
         fallbackBinding.getCcls().addAll(settings.getNoGameCcls());
         fallbackBinding.setCclEnabled(!settings.getNoGameCcls().isEmpty());
+        fallbackBinding.getExtensionSlots().addAll(settings.getNoGameExtensionSlots());
         fallbackBinding.setStatus(GameBinding.Status.MANUAL);
         // Checked again right before the PATCH: a raid may have taken the hold since the check above
         if (raidRestoreHold.isHolding(user)) {
@@ -337,6 +370,7 @@ public class CategoryChain {
         // channel's CCLs are left as they are
         fallback.getCcls().addAll(settings.getIncompleteFallbackCcls());
         fallback.setCclEnabled(!settings.getIncompleteFallbackCcls().isEmpty());
+        fallback.getExtensionSlots().addAll(settings.getIncompleteFallbackExtensionSlots());
         fallback.setStatus(GameBinding.Status.MANUAL);
 
         if (streamStateService.isLive(user)) {

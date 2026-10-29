@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.binding;
 
+import fr.enimaloc.catapult.service.category.ExtensionLayoutApplier;
 import fr.enimaloc.catapult.api.error.ApiProblem;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
@@ -79,7 +80,7 @@ class CustomBindingServiceTest {
         // The real chain and applier: the Twitch stubs below are what the category decision ends up calling
         CategoryChain chain = new CategoryChain(activations, streamStateService, userSettingsRepository,
                 new RaidRestoreHold(), gameStateService, userAccountRepository,
-                new CategoryApplier(twitchService, streamStateService), mock(RaidRestoreGateService.class), mock(GameBindingLookup.class));
+                new CategoryApplier(twitchService, streamStateService), mock(RaidRestoreGateService.class), mock(GameBindingLookup.class), mock(ExtensionLayoutApplier.class));
         service = new CustomBindingService(bindings, activations, experimentService, gameStateService,
                 streamStateService, userAccountRepository, oAuthTokenRepository, gameEventListener,
                 channelEventPublisher, chain);

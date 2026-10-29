@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.event.listener;
 
+import fr.enimaloc.catapult.service.category.ExtensionLayoutApplier;
 import fr.enimaloc.catapult.service.binding.GameBindingLookup;
 import fr.enimaloc.catapult.service.binding.RaidRestoreGateService;
 import static org.mockito.Mockito.mock;
@@ -53,7 +54,7 @@ class GameEventListenerLiveCheckTest {
     @BeforeEach
     void setUp() {
         CategoryChain chain = new CategoryChain(customBindingActivations, streamStateService, userSettingsRepository,
-                raidRestoreHold, mock(GameStateService.class), mock(UserAccountRepository.class), new CategoryApplier(twitchService, streamStateService), mock(RaidRestoreGateService.class), mock(GameBindingLookup.class));
+                raidRestoreHold, mock(GameStateService.class), mock(UserAccountRepository.class), new CategoryApplier(twitchService, streamStateService), mock(RaidRestoreGateService.class), mock(GameBindingLookup.class), mock(ExtensionLayoutApplier.class));
         listener = new GameEventListener(bindingService, streamStateService, channelEventPublisher,
                 raidRestoreHold, customBindingActivations, chain);
         user = new UserAccount();

@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.notification;
 
+import fr.enimaloc.catapult.service.category.ExtensionLayoutApplier;
 import fr.enimaloc.catapult.service.binding.GameBindingLookup;
 import fr.enimaloc.catapult.service.binding.RaidRestoreGateService;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatActionType;
@@ -52,7 +53,7 @@ class TwitchatActionExecutorTest {
         lenient().when(userAccountRepository.findById(user.getId())).thenReturn(Optional.of(user));
         CategoryChain chain = new CategoryChain(customBindingActivations, mock(StreamStateService.class),
                 mock(UserSettingsRepository.class), new RaidRestoreHold(), mock(GameStateService.class),
-                userAccountRepository, new CategoryApplier(twitchService, mock(StreamStateService.class)), mock(RaidRestoreGateService.class), mock(GameBindingLookup.class));
+                userAccountRepository, new CategoryApplier(twitchService, mock(StreamStateService.class)), mock(RaidRestoreGateService.class), mock(GameBindingLookup.class), mock(ExtensionLayoutApplier.class));
         executor = new TwitchatActionExecutor(actionTokenService, userAccountRepository, chain, bindingService,
                 botToggleService, customBindingActivations);
     }

@@ -224,7 +224,7 @@ public class ChannelFixture {
         streamStateService = new StreamStateService(publisher, dispatcher);
         categoryChain = new CategoryChain(activations, streamStateService, settingsRepository,
                 raidRestoreHold, gameStateService, accountRepository,
-                new CategoryApplier(twitch, streamStateService), new RaidRestoreGateService(experimentService), lookup);
+                new CategoryApplier(twitch, streamStateService), new RaidRestoreGateService(experimentService), lookup, mock(ExtensionLayoutApplier.class));
         bindingService = new BindingService(bindingRepository, igdbService, mock(IgdbGameDetailsService.class),
                 twitch, mock(TwResolverService.class), mappingRepository, lookup, categoryChain);
         raidRestoreGameService = new RaidRestoreGameService(categoryChain, new CategoryApplier(twitch, streamStateService),

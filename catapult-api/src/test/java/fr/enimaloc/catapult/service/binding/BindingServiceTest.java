@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.binding;
 
+import fr.enimaloc.catapult.service.category.ExtensionLayoutApplier;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
@@ -59,7 +60,7 @@ class BindingServiceTest {
         bindingService = new BindingService(gameBindingRepository, igdbService, igdbGameDetailsService, twitchService, twResolverService, gameMappingRepository, new GameBindingLookup(gameBindingRepository),
                 new CategoryChain(mock(CustomBindingActivations.class), streamState,
                         mock(UserSettingsRepository.class), new RaidRestoreHold(), gameStateService,
-                        mock(UserAccountRepository.class), new CategoryApplier(twitchService, streamState), mock(RaidRestoreGateService.class), mock(GameBindingLookup.class)));
+                        mock(UserAccountRepository.class), new CategoryApplier(twitchService, streamState), mock(RaidRestoreGateService.class), mock(GameBindingLookup.class), mock(ExtensionLayoutApplier.class)));
 
         user = new UserAccount();
         bindingId = UUID.randomUUID();
