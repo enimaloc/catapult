@@ -19,9 +19,17 @@ public record TwitchExtensionPlacement(
         OverlayPlacement overlay,
         PanelPlacement panel
 ) {
-    /** Every slot inactive: what a read answers when the channel's extensions cannot be read. */
+    /** Every slot inactive. */
     public static TwitchExtensionPlacement empty() {
         return new TwitchExtensionPlacement(ComponentPlacement.empty(), OverlayPlacement.empty(), PanelPlacement.empty());
+    }
+
+    /**
+     * No placement at all: what a read answers when the channel's extensions cannot be read. Twitch always answers
+     * the three placements, so this cannot be mistaken for a channel without extensions.
+     */
+    public static TwitchExtensionPlacement unreadable() {
+        return new TwitchExtensionPlacement(null, null, null);
     }
 
     /** A partial update: the slots it is not given stay untouched on Twitch. */

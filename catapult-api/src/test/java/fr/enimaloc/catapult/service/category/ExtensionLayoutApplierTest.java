@@ -154,15 +154,151 @@ class ExtensionLayoutApplierTest {
     }
 
     @Test
-    void forget_lets_the_same_key_apply_again() {
+    void restore_lets_the_same_key_apply_again() {
         when(twitchService.getUserExtensions(user)).thenReturn(List.of());
         List<ExtensionSlotSetting> layout = List.of(setting(Type.PANEL, 1, null));
 
         applier.applyOnSwitch(user, "k", layout);
-        applier.forget(user);
+        applier.restore(user);
         applier.applyOnSwitch(user, "k", layout);
 
         verify(twitchService, times(2)).setActiveExtensions(eq(user), any());
+    }
+
+    private List<TwitchExtensionPlacement> allSent(int count) {
+        ArgumentCaptor<TwitchExtensionPlacement> captor = ArgumentCaptor.forClass(TwitchExtensionPlacement.class);
+        verify(twitchService, times(count)).setActiveExtensions(eq(user), captor.capture());
+        return captor.getAllValues();
+    }
+
+    @Test
+    void restore_puts_back_what_the_layout_replaced_at_its_installed_version() {
+        when(twitchService.getUserExtensions(user)).thenReturn(List.of(installed("game", "1", true),
+                installed("mine", "2.1", true)));
+        when(twitchService.getActiveExtensions(user)).thenReturn(TwitchExtensionPlacement.update()
+                .panel(1, new Slot(true, "mine", "Mine", "2.0", null, null))
+                .overlay(1, Slot.empty()).component(1, Slot.empty()).build());
+
+        applier.applyOnSwitch(user, "binding:1", List.of(setting(Type.PANEL, 1, "game")));
+        applier.restore(user);
+
+        List<TwitchExtensionPlacement> sent = allSent(2);
+        assertThat(sent.get(0).panel().first()).isEqualTo(Slot.of("game", "1"));
+        assertThat(sent.get(1).panel().first()).isEqualTo(Slot.of("mine", "2.1"));
+        assertThat(sent.get(1).overlay()).isNull();
+        assertThat(sent.get(1).component()).isNull();
+    }
+
+    @Test
+    void restore_empties_a_slot_that_was_empty_and_puts_a_component_back_where_it_was() {
+        when(twitchService.getUserExtensions(user)).thenReturn(List.of(installed("game", "1", true),
+                installed("comp", "4", true)));
+        when(twitchService.getActiveExtensions(user)).thenReturn(TwitchExtensionPlacement.update()
+                .panel(2, Slot.empty()).component(1, new Slot(true, "comp", "Comp", "4", 30, 40)).build());
+
+        applier.applyOnSwitch(user, "binding:1",
+                List.of(setting(Type.PANEL, 2, "game"), setting(Type.COMPONENT, 1, null)));
+        applier.restore(user);
+
+        TwitchExtensionPlacement back = allSent(2).get(1);
+        assertThat(back.panel().second()).isEqualTo(Slot.empty());
+        assertThat(back.component().first()).isEqualTo(Slot.at("comp", "4", 30, 40));
+    }
+
+    @Test
+    void the_next_configuration_gets_back_the_slots_it_keeps_but_not_the_ones_it_sets() {
+        when(twitchService.getUserExtensions(user)).thenReturn(List.of(installed("a", "1", true),
+                installed("b", "1", true), installed("mine", "1", true)));
+        when(twitchService.getActiveExtensions(user)).thenReturn(TwitchExtensionPlacement.update()
+                .panel(1, Slot.of("mine", "1")).panel(2, Slot.of("mine", "1")).build());
+
+        applier.applyOnSwitch(user, "binding:A", List.of(setting(Type.PANEL, 1, "a"), setting(Type.PANEL, 2, "a")));
+        applier.applyOnSwitch(user, "binding:B", List.of(setting(Type.PANEL, 2, "b")));
+        applier.restore(user);
+
+        List<TwitchExtensionPlacement> sent = allSent(3);
+        assertThat(sent.get(1).panel().first()).isEqualTo(Slot.of("mine", "1"));
+        assertThat(sent.get(1).panel().second()).isEqualTo(Slot.of("b", "1"));
+        // Slot 2 still holds what was there before game A, not game A's extension
+        assertThat(sent.get(2).panel().first()).isNull();
+        assertThat(sent.get(2).panel().second()).isEqualTo(Slot.of("mine", "1"));
+    }
+
+    @Test
+    void the_next_configuration_puts_its_extensions_on_top_of_the_restored_ones() {
+        when(twitchService.getUserExtensions(user)).thenReturn(List.of(installed("game", "1", true),
+                installed("nogame", "1", true), installed("mine", "1", true)));
+        when(twitchService.getActiveExtensions(user)).thenReturn(TwitchExtensionPlacement.update()
+                .panel(1, Slot.of("mine", "1")).panel(2, Slot.empty())
+                .component(1, Slot.at("mine", "1", 5, 6)).build());
+        applier.applyOnSwitch(user, "binding:1", List.of(setting(Type.PANEL, 1, "game"),
+                setting(Type.PANEL, 2, "game"), setting(Type.COMPONENT, 1, "game")));
+        // What Twitch holds once the game's layout is in place
+        when(twitchService.getActiveExtensions(user)).thenReturn(TwitchExtensionPlacement.update()
+                .panel(1, Slot.of("game", "1")).panel(2, Slot.of("game", "1"))
+                .component(1, Slot.at("game", "1", 90, 90)).build());
+
+        applier.applyOnSwitch(user, ExtensionLayoutApplier.NO_GAME_KEY,
+                List.of(setting(Type.PANEL, 2, "nogame"), setting(Type.COMPONENT, 1, "nogame")));
+
+        TwitchExtensionPlacement next = allSent(2).get(1);
+        assertThat(next.panel().first()).isEqualTo(Slot.of("mine", "1"));
+        assertThat(next.panel().second()).isEqualTo(Slot.of("nogame", "1"));
+        // At the position the component had before the game moved it
+        assertThat(next.component().first()).isEqualTo(Slot.at("nogame", "1", 5, 6));
+    }
+
+    @Test
+    void restore_without_any_change_calls_twitch_not_at_all() {
+        applier.restore(user);
+
+        verifyNoInteractions(twitchService);
+    }
+
+    @Test
+    void an_unreadable_channel_is_logged_and_nothing_is_put_back() {
+        when(twitchService.getUserExtensions(user)).thenReturn(List.of(installed("game", "1", true)));
+        when(twitchService.getActiveExtensions(user)).thenReturn(TwitchExtensionPlacement.unreadable());
+
+        applier.applyOnSwitch(user, "binding:1", List.of(setting(Type.PANEL, 1, "game")));
+        applier.restore(user);
+
+        verify(twitchService, times(1)).setActiveExtensions(eq(user), any());
+        verify(activityLogService).addEntry(eq(user.getId()), eq("WARN"),
+                org.mockito.ArgumentMatchers.contains("will not be put back"));
+    }
+
+    @Test
+    void an_extension_uninstalled_since_is_given_up_and_logged() {
+        when(twitchService.getUserExtensions(user)).thenReturn(List.of(installed("game", "1", true),
+                installed("mine", "1", true)));
+        when(twitchService.getActiveExtensions(user)).thenReturn(TwitchExtensionPlacement.update()
+                .panel(1, Slot.of("mine", "1")).build());
+        applier.applyOnSwitch(user, "binding:1", List.of(setting(Type.PANEL, 1, "game")));
+        when(twitchService.getUserExtensions(user)).thenReturn(List.of(installed("game", "1", true)));
+
+        applier.restore(user);
+        applier.restore(user);
+
+        verify(twitchService, times(1)).setActiveExtensions(eq(user), any());
+        verify(activityLogService).addEntry(eq(user.getId()), eq("WARN"),
+                org.mockito.ArgumentMatchers.contains("not put back"));
+    }
+
+    @Test
+    void a_failed_restore_is_tried_again_next_time() {
+        when(twitchService.getUserExtensions(user)).thenReturn(List.of(installed("game", "1", true),
+                installed("mine", "1", true)));
+        when(twitchService.getActiveExtensions(user)).thenReturn(TwitchExtensionPlacement.update()
+                .panel(1, Slot.of("mine", "1")).build());
+        applier.applyOnSwitch(user, "binding:1", List.of(setting(Type.PANEL, 1, "game")));
+        doThrow(new IllegalStateException("down")).doReturn(null)
+                .when(twitchService).setActiveExtensions(eq(user), any());
+
+        applier.restore(user);
+        applier.restore(user);
+
+        assertThat(allSent(3).get(2).panel().first()).isEqualTo(Slot.of("mine", "1"));
     }
 
     @Test

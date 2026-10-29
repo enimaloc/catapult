@@ -386,7 +386,7 @@ public class TwitchServiceImpl implements TwitchService {
 
     @Override
     public TwitchExtensionPlacement getActiveExtensions(UserAccount user) {
-        return callAsUser(user, "get_active_extensions", TwitchExtensionPlacement.empty(), accessToken -> {
+        return callAsUser(user, "get_active_extensions", TwitchExtensionPlacement.unreadable(), accessToken -> {
             WrappedResponse<TwitchExtensionPlacement> response = restClient.get()
                 .uri(TWITCH_API_URL + "/users/extensions")
                 .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)

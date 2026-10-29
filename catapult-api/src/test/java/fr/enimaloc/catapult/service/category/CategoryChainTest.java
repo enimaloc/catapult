@@ -1089,13 +1089,60 @@ class CategoryChainTest {
     }
 
     @Test
-    void stream_end_forgets_the_last_layout() {
+    void stream_end_puts_the_extensions_back() {
         withSettings();
         applierAnswers(CategoryOutcome.skipped(CategoryRule.DEFAULT_CATEGORY, Reason.DEFAULT_OFF));
 
         chain.apply(user, new StreamEnded());
 
-        verify(layouts).forget(user);
+        verify(layouts).restore(user);
+    }
+
+    @Test
+    void leaving_the_game_without_a_no_game_category_still_puts_the_no_game_layout() {
+        settings.setApplyDefaultOnNoGame(false);
+        settings.getNoGameExtensionSlots().add(panel);
+        withSettings();
+        when(activations.active(user)).thenReturn(Optional.empty());
+        live(true);
+        applierAnswers(CategoryOutcome.skipped(CategoryRule.NO_GAME_FALLBACK, Reason.NO_GAME_FALLBACK_OFF));
+
+        chain.apply(user, new GameClosed());
+
+        verify(layouts).applyOnSwitch(user, ExtensionLayoutApplier.NO_GAME_KEY, Set.of(panel));
+    }
+
+    @Test
+    void leaving_the_game_offline_after_a_custom_binding_puts_the_no_game_layout() {
+        settings.getNoGameExtensionSlots().add(panel);
+        withSettings();
+        live(false);
+        applierAnswers(CategoryOutcome.skipped(CategoryRule.NO_GAME_FALLBACK, Reason.OFFLINE));
+
+        chain.apply(user, new NoGameAfterCustomBinding());
+
+        verify(layouts).applyOnSwitch(user, ExtensionLayoutApplier.NO_GAME_KEY, Set.of(panel));
+    }
+
+    @Test
+    void leaving_the_game_without_settings_puts_the_extensions_back() {
+        when(activations.active(user)).thenReturn(Optional.empty());
+        live(true);
+        applierAnswers(CategoryOutcome.skipped(CategoryRule.NO_GAME_FALLBACK, Reason.NO_SETTINGS));
+
+        chain.apply(user, new GameClosed());
+
+        verify(layouts).restore(user);
+    }
+
+    @Test
+    void leaving_the_game_under_a_custom_binding_keeps_the_extensions() {
+        when(activations.active(user)).thenReturn(Optional.of(mock(CustomBindingActivation.class)));
+        applierAnswers(CategoryOutcome.skipped(CategoryRule.CUSTOM_BINDING, Reason.CUSTOM_BINDING_ACTIVE));
+
+        chain.apply(user, new GameClosed());
+
+        verifyNoInteractions(layouts);
     }
 
     @Test

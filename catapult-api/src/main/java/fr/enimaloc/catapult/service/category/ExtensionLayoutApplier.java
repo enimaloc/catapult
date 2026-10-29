@@ -15,15 +15,26 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Pushes a configuration's extension layout to Twitch. The last configuration applied is remembered per user, so
- * the same one is not pushed twice in a row; the memory is lost on restart, which at worst re-applies a layout.
+ * the same one is not pushed twice in a row.
+ * <p>
+ * A configuration's extensions only last while it is in force: before a slot is changed for the first time, what it
+ * held is kept, and it is put back as soon as the configuration in force no longer sets that slot (another game that
+ * keeps it, leaving the game, the end of the stream). Everything is kept in memory: a restart forgets the
+ * configuration in place, which at worst re-applies a layout, and what the slots held, which are then left as the
+ * last configuration put them.
+ * <p>
  * A Twitch error is logged in the activity log, never thrown: the extensions must not break a category change.
  */
 @Slf4j
@@ -38,6 +49,15 @@ public class ExtensionLayoutApplier {
     private final ActivityLogService activityLogService;
 
     private final Map<UUID, String> lastKeys = new ConcurrentHashMap<>();
+    /** Per user, what each slot changed by a configuration held before; an inactive slot is {@link Slot#empty()}. */
+    private final Map<UUID, Map<SlotRef, Slot>> originals = new ConcurrentHashMap<>();
+
+    /** One Twitch slot, numbered from 1. */
+    record SlotRef(TwitchExtensionsDto.Type type, int number) {
+        static SlotRef of(ExtensionSlotSetting setting) {
+            return new SlotRef(setting.getType(), setting.getSlot());
+        }
+    }
 
     /** Identifies the configuration: persisted bindings by id, transient ones by their source name. */
     public static String keyOf(GameBinding binding) {
@@ -57,20 +77,33 @@ public class ExtensionLayoutApplier {
         apply(user, layout);
     }
 
-    /** Forgets the configuration in place (end of stream). */
-    public void forget(UserAccount user) {
+    /** No configuration in force any more (game left, end of stream): every changed slot gets back what it held. */
+    public void restore(UserAccount user) {
         lastKeys.remove(user.getId());
+        apply(user, List.of());
     }
 
     private void apply(UserAccount user, Collection<ExtensionSlotSetting> layout) {
-        if (layout == null || layout.isEmpty()) return;
+        Map<SlotRef, Slot> held = originals.computeIfAbsent(user.getId(), id -> new ConcurrentHashMap<>());
+        Set<SlotRef> set = new HashSet<>();
+        layout.forEach(setting -> set.add(SlotRef.of(setting)));
+        Map<SlotRef, Slot> toRestore = new HashMap<>(held);
+        toRestore.keySet().removeAll(set);
+        if (layout.isEmpty() && toRestore.isEmpty()) return;
         try {
             List<TwitchExtension> installed = twitchService.getUserExtensions(user);
-            boolean needsActive = layout.stream()
-                    .anyMatch(s -> s.getType() == TwitchExtensionsDto.Type.COMPONENT && s.getExtensionId() != null);
-            TwitchExtensionPlacement active = needsActive ? twitchService.getActiveExtensions(user) : null;
+            TwitchExtensionPlacement active = layout.isEmpty() ? null : twitchService.getActiveExtensions(user);
+            if (readable(active)) {
+                set.forEach(ref -> held.computeIfAbsent(ref, r -> current(active, r)));
+            } else if (active != null) {
+                activityLogService.addEntry(user.getId(), "WARN", "Twitch extensions in place could not be read:"
+                        + " the extensions changed now will not be put back when this configuration ends");
+            }
+            TwitchExtensionPlacement.Update update = TwitchExtensionPlacement.update();
+            Set<SlotRef> restored = restore(user, toRestore, installed, update);
             List<ExtensionSlotSetting> skipped = new ArrayList<>();
-            TwitchExtensionPlacement placement = toPlacement(layout, installed, active, skipped);
+            // The layout goes on top of the slots as they are once put back: a component takes its original position
+            fill(update, layout, installed, readable(active) ? restoredComponents(active, held) : null, skipped);
             // An empty list while extensions are wanted means the read failed, not that each one is missing.
             boolean unreadable = installed.isEmpty() && !skipped.isEmpty();
             if (unreadable) {
@@ -82,12 +115,82 @@ public class ExtensionLayoutApplier {
                         + " not applied to " + setting.getType() + " " + setting.getSlot()
                         + ": not installed or not activable");
             }
-            if (placement.component() == null && placement.overlay() == null && placement.panel() == null) return;
-            twitchService.setActiveExtensions(user, placement);
+            TwitchExtensionPlacement placement = update.build();
+            if (placement.component() != null || placement.overlay() != null || placement.panel() != null) {
+                twitchService.setActiveExtensions(user, placement);
+            }
+            restored.forEach(held::remove);
         } catch (RuntimeException e) {
             log.warn("Applying the extension layout for user {} failed: {}", user.getId(), e.toString());
             activityLogService.addEntry(user.getId(), "WARN", "Twitch extensions not applied: " + e.toString());
         }
+    }
+
+    /**
+     * Adds to {@code update} what each slot of {@code toRestore} held; returns the slots done with. An extension
+     * uninstalled since is given up and logged; while the installed list cannot be read, the slot is tried later.
+     */
+    private Set<SlotRef> restore(UserAccount user, Map<SlotRef, Slot> toRestore, List<TwitchExtension> installed,
+                                 TwitchExtensionPlacement.Update update) {
+        Set<SlotRef> done = new HashSet<>();
+        toRestore.forEach((ref, slot) -> {
+            Slot back = slot;
+            if (slot.active()) {
+                TwitchExtension extension = installed.stream()
+                        .filter(e -> e.id().equals(slot.id()) && e.canActivate())
+                        .findFirst().orElse(null);
+                if (extension == null) {
+                    if (installed.isEmpty()) return;
+                    activityLogService.addEntry(user.getId(), "WARN", "Twitch extension " + slot.id()
+                            + " not put back in " + ref.type() + " " + ref.number()
+                            + ": no longer installed or not activable");
+                    done.add(ref);
+                    return;
+                }
+                // The version installed now: the one read before may have been updated since
+                back = slot.x() != null
+                        ? Slot.at(extension.id(), extension.version(), slot.x(), slot.y())
+                        : Slot.of(extension.id(), extension.version());
+            }
+            put(update, ref.type(), ref.number(), back);
+            done.add(ref);
+        });
+        return done;
+    }
+
+    /** The slot as {@code active} reads it, cleaned to what a PUT takes back. */
+    private static Slot current(TwitchExtensionPlacement active, SlotRef ref) {
+        Placement placement = switch (ref.type()) {
+            case COMPONENT -> active.component();
+            case OVERLAY -> active.overlay();
+            case PANEL -> active.panel();
+            case MOBILE -> null;
+        };
+        Slot slot = placement == null || ref.number() > placement.slots().size()
+                ? null : placement.slots().get(ref.number() - 1);
+        if (slot == null || !slot.active() || slot.id() == null) return Slot.empty();
+        return ref.type() == TwitchExtensionsDto.Type.COMPONENT
+                ? Slot.at(slot.id(), slot.version(), slot.x() != null ? slot.x() : 0, slot.y() != null ? slot.y() : 0)
+                : Slot.of(slot.id(), slot.version());
+    }
+
+    /** {@code active} with each component slot changed by a configuration back to what it held before. */
+    private static TwitchExtensionPlacement restoredComponents(TwitchExtensionPlacement active,
+                                                                Map<SlotRef, Slot> held) {
+        List<Slot> slots = active.component() == null
+                ? Arrays.asList(null, null) : new ArrayList<>(active.component().slots());
+        for (int number = 1; number <= slots.size(); number++) {
+            Slot original = held.get(new SlotRef(TwitchExtensionsDto.Type.COMPONENT, number));
+            if (original != null) slots.set(number - 1, original);
+        }
+        return new TwitchExtensionPlacement(new TwitchExtensionPlacement.ComponentPlacement(slots.get(0), slots.get(1)),
+                active.overlay(), active.panel());
+    }
+
+    /** False for {@link TwitchExtensionPlacement#unreadable()}, what a failed read answers. */
+    private static boolean readable(TwitchExtensionPlacement active) {
+        return active != null
+                && (active.component() != null || active.overlay() != null || active.panel() != null);
     }
 
     /**
@@ -101,6 +204,13 @@ public class ExtensionLayoutApplier {
                                                        TwitchExtensionPlacement active,
                                                        List<ExtensionSlotSetting> skipped) {
         TwitchExtensionPlacement.Update update = TwitchExtensionPlacement.update();
+        fill(update, layout, installed, active, skipped);
+        return update.build();
+    }
+
+    private static void fill(TwitchExtensionPlacement.Update update, Collection<ExtensionSlotSetting> layout,
+                             List<TwitchExtension> installed, TwitchExtensionPlacement active,
+                             List<ExtensionSlotSetting> skipped) {
         for (ExtensionSlotSetting setting : layout) {
             Slot slot;
             if (setting.getExtensionId() == null) {
@@ -117,14 +227,18 @@ public class ExtensionLayoutApplier {
                         ? componentSlot(extension, setting.getSlot(), active)
                         : Slot.of(extension.id(), extension.version());
             }
-            switch (setting.getType()) {
-                case COMPONENT -> update.component(setting.getSlot(), slot);
-                case OVERLAY -> update.overlay(setting.getSlot(), slot);
-                case PANEL -> update.panel(setting.getSlot(), slot);
-                case MOBILE -> throw new IllegalArgumentException("Mobile extension slots cannot be configured");
-            }
+            put(update, setting.getType(), setting.getSlot(), slot);
         }
-        return update.build();
+    }
+
+    private static void put(TwitchExtensionPlacement.Update update, TwitchExtensionsDto.Type type, int number,
+                            Slot slot) {
+        switch (type) {
+            case COMPONENT -> update.component(number, slot);
+            case OVERLAY -> update.overlay(number, slot);
+            case PANEL -> update.panel(number, slot);
+            case MOBILE -> throw new IllegalArgumentException("Mobile extension slots cannot be configured");
+        }
     }
 
     private static Slot componentSlot(TwitchExtension extension, int number, TwitchExtensionPlacement active) {

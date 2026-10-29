@@ -88,26 +88,41 @@ public class CategoryChain {
 
     /**
      * The configuration in force changes only on the triggers that switch the category: an applied category puts its
-     * extension layout, the end of the stream forgets it. Edits, manual changes and raids leave the extensions alone.
+     * extension layout. Leaving the game puts back the extensions the game's configuration replaced, then puts the
+     * "no game" layout, whether its category is applied or not; a custom binding or a raid that keeps the game keeps
+     * them. The end of the stream puts every replaced extension back. Edits, manual changes and raids leave the
+     * extensions alone.
      */
     private void switchExtensions(UserAccount user, CategoryTrigger trigger, CategoryDecision decision,
                                   CategoryOutcome outcome) {
         if (trigger instanceof StreamEnded) {
-            extensionLayouts.forget(user);
+            extensionLayouts.restore(user);
             return;
         }
-        boolean switches = trigger instanceof GameDetected || trigger instanceof GameClosed
-                || trigger instanceof NoGameAfterCustomBinding || trigger instanceof StreamStarted
+        boolean leavesGame = trigger instanceof GameClosed || trigger instanceof NoGameAfterCustomBinding;
+        if (leavesGame) {
+            if (keepsTheGame(decision.reason()) || keepsTheGame(outcome.reason())) return;
+            userSettingsRepository.findById(user.getId()).ifPresentOrElse(
+                    settings -> extensionLayouts.applyOnSwitch(user, ExtensionLayoutApplier.NO_GAME_KEY,
+                            settings.getNoGameExtensionSlots()),
+                    () -> extensionLayouts.restore(user));
+            return;
+        }
+        boolean switches = trigger instanceof GameDetected || trigger instanceof StreamStarted
                 || trigger instanceof CustomBindingTriggered || trigger instanceof NoGameSettingsSaved;
         if (!switches || outcome.status() != ChannelUpdateOutcome.APPLIED) return;
         switch (decision.action()) {
-            case UPDATE_CHANNEL -> extensionLayouts.applyOnSwitch(user, ExtensionLayoutApplier.keyOf(decision.binding()),
-                    decision.binding().getExtensionSlots());
+            case UPDATE_CHANNEL -> extensionLayouts.applyOnSwitch(user,
+                    ExtensionLayoutApplier.keyOf(decision.binding()), decision.binding().getExtensionSlots());
             case RESET_TO_DEFAULT -> userSettingsRepository.findById(user.getId()).ifPresent(settings ->
                     extensionLayouts.applyOnSwitch(user, ExtensionLayoutApplier.NO_GAME_KEY,
                             settings.getNoGameExtensionSlots()));
             default -> { }
         }
+    }
+
+    private static boolean keepsTheGame(Reason reason) {
+        return reason == Reason.CUSTOM_BINDING_ACTIVE || reason == Reason.RAID_HOLD;
     }
 
     public CategoryDecision decide(UserAccount user, CategoryTrigger trigger) {
