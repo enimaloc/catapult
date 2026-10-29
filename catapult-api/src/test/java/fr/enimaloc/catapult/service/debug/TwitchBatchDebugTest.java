@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.debug;
 
+import fr.enimaloc.catapult.simulation.SimulationGates;
 import fr.enimaloc.catapult.config.HttpTraceLoggingInterceptor;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.debug.DebugExchange.Direction;
@@ -66,7 +67,7 @@ class TwitchBatchDebugTest {
                 .requestInterceptor(new HttpTraceLoggingInterceptor(registry, recorder));
         helix = MockRestServiceServer.bindTo(builder).build();
         service = new TwitchAccountValidationService(accounts, tokens, builder.build(),
-                new DebugRecording(registry, recorder));
+                new DebugRecording(registry, recorder), SimulationGates.none());
         ReflectionTestUtils.setField(service, "twitchClientId", "client-id");
         when(accounts.findByStatusAndTwitchIdNotNull(UserAccount.Status.ACTIVE)).thenReturn(List.of(a, b, c));
         when(tokens.getAppAccessToken()).thenReturn("app-token");

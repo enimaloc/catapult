@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.service.twitch;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.event.AccountCreatedEvent;
@@ -17,17 +18,23 @@ import fr.enimaloc.catapult.service.debug.DebugContext;
 import fr.enimaloc.catapult.service.debug.DebugRecording;
 import fr.enimaloc.catapult.service.notification.CatapultCategoryChangeStateService;
 import fr.enimaloc.catapult.service.notification.TwitchatEventDispatcher;
+import fr.enimaloc.catapult.simulation.CallKey;
+import fr.enimaloc.catapult.simulation.SimulatedCalls;
+import fr.enimaloc.catapult.simulation.SimulatedData;
+import fr.enimaloc.catapult.simulation.SimulationGate;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -38,7 +45,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Service
-@ConditionalOnProperty(name = "app.mock.twitch-eventsub", havingValue = "false", matchIfMissing = true)
 public class TwitchEventSubService implements EventSubService {
 
     private static final String EVENTSUB_API = "https://api.twitch.tv/helix/eventsub/subscriptions";
@@ -63,6 +69,7 @@ public class TwitchEventSubService implements EventSubService {
     private final EventSubConnections connections;
 
     private final DebugRecording debug;
+    private final ObjectProvider<SimulationGate> simulationGate;
 
     public TwitchEventSubService(OAuthTokenRepository oAuthTokenRepository,
                                  UserAccountRepository userAccountRepository,
@@ -73,7 +80,8 @@ public class TwitchEventSubService implements EventSubService {
                                  ObjectMapper objectMapper,
                                  TwitchatEventDispatcher twitchatEventDispatcher,
                                  CatapultCategoryChangeStateService categoryChangeStateService,
-                                 DebugRecording debug) {
+                                 DebugRecording debug,
+                                 ObjectProvider<SimulationGate> simulationGate) {
         this.oAuthTokenRepository = oAuthTokenRepository;
         this.userAccountRepository = userAccountRepository;
         this.twitchTokenService = twitchTokenService;
@@ -84,6 +92,7 @@ public class TwitchEventSubService implements EventSubService {
         this.twitchatEventDispatcher = twitchatEventDispatcher;
         this.categoryChangeStateService = categoryChangeStateService;
         this.debug = debug;
+        this.simulationGate = simulationGate;
         this.connections = new EventSubConnections(
             "[EventSub]", "twitch-eventsub-watchdog", oAuthTokenRepository, this::handleMessage);
     }
@@ -106,8 +115,23 @@ public class TwitchEventSubService implements EventSubService {
         connect(event.getUser());
     }
 
+    /**
+     * Under the simulation, the real connection only opens while one of the user's EventSub events is {@code REAL};
+     * otherwise the channel's initial state comes from the simulated data and only injected events arrive. Without
+     * it, a fictitious account of the mock profile is skipped.
+     */
     public void connect(UserAccount user) {
+        if (SimulationGate.ignoresFictitious(simulationGate, user)) {
+            log.debug("User {} is a fictitious account and the simulation is off — skipping EventSub connect",
+                user.getId());
+            return;
+        }
         disconnect(user);
+        if (simulatedEvents(user).size() == SUBSCRIPTIONS.size()) {
+            log.debug("Every EventSub event of user {} is simulated — no real connection", user.getId());
+            seedSimulatedState(user, true, true);
+            return;
+        }
         connections.allowReconnect(user);
         oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
             .ifPresentOrElse(
@@ -125,16 +149,64 @@ public class TwitchEventSubService implements EventSubService {
         streamStateService.clear(user);
     }
 
+    /**
+     * Hands a notification the simulation made up to the same handling as a real one, past the filter that drops
+     * the real events of a simulated type. A {@code channel.update} needs the channel's previous state to tell a
+     * change: when there is none yet, it is seeded from the simulated data first.
+     *
+     * @param subscriptionType the EventSub type ({@code stream.online}, {@code channel.update}…)
+     * @param event            the notification's {@code payload.event}
+     * @throws IllegalStateException outside the simulation
+     */
+    public void injectNotification(UserAccount user, String subscriptionType, JsonNode event) {
+        SimulationGate gate = simulationGate.getIfAvailable();
+        if (gate == null) {
+            throw new IllegalStateException("EventSub notifications are only injected under the simulation");
+        }
+        if ("channel.update".equals(subscriptionType)) {
+            seedChannelStateIfAbsent(user);
+        }
+        ObjectNode root = objectMapper.createObjectNode();
+        root.putObject("metadata")
+            .put("message_id", UUID.randomUUID().toString())
+            .put("message_type", "notification")
+            .put("message_timestamp", Instant.now().toString())
+            .put("subscription_type", subscriptionType);
+        ObjectNode payload = root.putObject("payload");
+        payload.putObject("subscription").put("type", subscriptionType);
+        payload.set("event", event);
+        handle(user, null, root.toString(), false, true);
+    }
+
+    /**
+     * Under the simulation, gives the channel a previous state from the simulated data when it has none yet, so the
+     * next injected {@code channel.update} is told apart from it. Called before a change the simulated data will
+     * already hold by the time its notification is injected. Does nothing outside the simulation.
+     */
+    public void seedChannelStateIfAbsent(UserAccount user) {
+        SimulationGate gate = simulationGate.getIfAvailable();
+        if (gate != null) {
+            channelStates.computeIfAbsent(user.getId(), id -> channelState(gate.data(id)));
+        }
+    }
+
     // Package-private for testing
     void handleMessage(UserAccount user, OAuthToken token, String message, boolean reconnectSession) {
+        handle(user, token, message, reconnectSession, false);
+    }
+
+    /** {@code token} is only read by the session messages: an injected notification has none. */
+    private void handle(UserAccount user, @Nullable OAuthToken token, String message, boolean reconnectSession,
+                        boolean injected) {
         DebugContext.runAs(user.getId(), () -> {
             debug.inbound(user.getId(), "twitch", "WS", EventSubConnections.WS_URI, message,
                 () -> DebugRecording.eventSubOperation(message));
-            dispatch(user, token, message, reconnectSession);
+            dispatch(user, token, message, reconnectSession, injected);
         });
     }
 
-    private void dispatch(UserAccount user, OAuthToken token, String message, boolean reconnectSession) {
+    private void dispatch(UserAccount user, @Nullable OAuthToken token, String message, boolean reconnectSession,
+                          boolean injected) {
         try {
             JsonNode root = objectMapper.readTree(message);
             String messageType = root.path("metadata").path("message_type").asText();
@@ -159,6 +231,10 @@ public class TwitchEventSubService implements EventSubService {
                 }
                 case "notification" -> {
                     String subscriptionType = root.path("metadata").path("subscription_type").asText();
+                    if (!injected && simulated(user, subscriptionType)) {
+                        log.debug("EventSub {} for user {} dropped — simulated", subscriptionType, user.getId());
+                        return;
+                    }
                     switch (subscriptionType) {
                         case "stream.online" -> {
                             streamStateService.setLive(user, true);
@@ -181,20 +257,70 @@ public class TwitchEventSubService implements EventSubService {
         }
     }
 
-    /** One EventSub subscription on the user's channel: {@code conditionKey} names the condition holding their id. */
-    private record Subscription(String type, String version, String conditionKey) {}
+    /**
+     * One EventSub subscription on the user's channel: {@code conditionKey} names the condition holding their id,
+     * {@code simulationKey} the call key setting its mode under the simulation.
+     */
+    private record Subscription(String type, String version, String conditionKey, CallKey simulationKey) {}
 
     private static final List<Subscription> SUBSCRIPTIONS = List.of(
-        new Subscription("stream.online", "1", "broadcaster_user_id"),
-        new Subscription("stream.offline", "1", "broadcaster_user_id"),
-        new Subscription("channel.update", "2", "broadcaster_user_id"),
+        new Subscription("stream.online", "1", "broadcaster_user_id", SimulatedCalls.TWITCH_EVENTSUB_STREAM_ONLINE),
+        new Subscription("stream.offline", "1", "broadcaster_user_id", SimulatedCalls.TWITCH_EVENTSUB_STREAM_OFFLINE),
+        new Subscription("channel.update", "2", "broadcaster_user_id", SimulatedCalls.TWITCH_EVENTSUB_CHANNEL_UPDATE),
         // The streamer's outgoing raids only (no scope needed)
-        new Subscription("channel.raid", "1", "from_broadcaster_user_id")
+        new Subscription("channel.raid", "1", "from_broadcaster_user_id", SimulatedCalls.TWITCH_EVENTSUB_CHANNEL_RAID)
     );
 
+    /** Whether the simulation is on and keeps the real events of {@code subscriptionType} out for the user. */
+    private boolean simulated(UserAccount user, String subscriptionType) {
+        return SUBSCRIPTIONS.stream()
+            .filter(sub -> sub.type().equals(subscriptionType))
+            .anyMatch(sub -> SimulationGate.blocks(simulationGate, user.getId(), sub.simulationKey()));
+    }
+
+    /** The types the simulation keeps out for the user: none without it. */
+    private Set<String> simulatedEvents(UserAccount user) {
+        Set<String> types = new HashSet<>();
+        for (Subscription sub : SUBSCRIPTIONS) {
+            if (SimulationGate.blocks(simulationGate, user.getId(), sub.simulationKey())) {
+                types.add(sub.type());
+            }
+        }
+        return types;
+    }
+
+    /**
+     * The initial state of what the simulation keeps out, taken from the simulated data rather than Helix: the
+     * category (when {@code channel} is) and the stream's liveness (when {@code stream} is). A simulated live
+     * channel is set live as the Helix stream lookup would, without a {@link StreamOnlineEvent}.
+     */
+    private void seedSimulatedState(UserAccount user, boolean channel, boolean stream) {
+        SimulationGate gate = simulationGate.getIfAvailable();
+        if (gate == null) return;
+        SimulatedData data = gate.data(user.getId());
+        if (channel) {
+            seedChannelState(user, data);
+        }
+        if (stream && data.live()) {
+            streamStateService.setLive(user, true);
+        }
+    }
+
+    private void seedChannelState(UserAccount user, SimulatedData data) {
+        channelStates.put(user.getId(), channelState(data));
+    }
+
+    private static ChannelState channelState(SimulatedData data) {
+        return new ChannelState(data.currentCategoryId(), data.currentCategoryName(), new HashSet<>(data.ccls()));
+    }
+
     private void subscribe(UserAccount user, OAuthToken token, String sessionId) {
+        Set<String> simulated = simulatedEvents(user);
         String accessToken = twitchTokenService.resolveAccessToken(token, user);
         for (Subscription sub : SUBSCRIPTIONS) {
+            if (simulated.contains(sub.type())) {
+                continue;
+            }
             String eventType = sub.type();
             try {
                 postSubscription(accessToken, sub, user.getTwitchId(), sessionId);
@@ -217,8 +343,15 @@ public class TwitchEventSubService implements EventSubService {
                 log.warn("Failed to subscribe to {} for user {}: {}", eventType, user.getId(), e.getMessage());
             }
         }
-        initChannelState(user, accessToken);
-        initStreamState(user, accessToken);
+        boolean channelSimulated = simulated.contains("channel.update");
+        boolean streamSimulated = simulated.contains("stream.online") && simulated.contains("stream.offline");
+        if (!channelSimulated) {
+            initChannelState(user, accessToken);
+        }
+        if (!streamSimulated) {
+            initStreamState(user, accessToken);
+        }
+        seedSimulatedState(user, channelSimulated, streamSimulated);
     }
 
     private void handleChannelUpdate(UserAccount user, JsonNode event) {

@@ -25,7 +25,7 @@ public class SteamProfileDiagnostics {
             new SteamApiClient.SteamProfileStatus(false, false);
 
     private final Optional<SteamApiClient> steamApiClient;
-    // Absent under the mock profile or with steam.enabled off.
+    // Absent with steam.enabled off.
     private final Optional<SteamApiKeyRotator> keyRotator;
     private final TokenEncryptionService tokenEncryptionService;
 

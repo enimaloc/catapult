@@ -7,6 +7,7 @@ import fr.enimaloc.catapult.domain.minecraft.MinecraftFriendLink;
 import fr.enimaloc.catapult.domain.minecraft.MinecraftServiceAccount;
 import fr.enimaloc.catapult.repository.minecraft.MinecraftFriendLinkRepository;
 import fr.enimaloc.catapult.repository.minecraft.MinecraftServiceAccountRepository;
+import fr.enimaloc.catapult.simulation.SimulationGate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,6 +17,7 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.HttpClientErrorException;
@@ -41,6 +43,7 @@ class MinecraftFriendServiceTest {
     @Mock private fr.enimaloc.catapult.repository.binding.GetterConfigRepository getterConfigRepository;
     @Mock private fr.enimaloc.catapult.service.notification.ChannelEventPublisher channelEventPublisher;
 
+    @Mock private ObjectProvider<SimulationGate> simulationGate;
     @Spy private DebugRecording debug = DebugRecording.OFF;
     @InjectMocks private MinecraftFriendService service;
 

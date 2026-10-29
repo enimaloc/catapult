@@ -12,15 +12,19 @@ import fr.enimaloc.catapult.repository.minecraft.MinecraftServiceAccountReposito
 import fr.enimaloc.catapult.service.debug.BatchDebugFilter;
 import fr.enimaloc.catapult.service.debug.DebugRecording;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
+import fr.enimaloc.catapult.simulation.SimulatedCalls;
+import fr.enimaloc.catapult.simulation.SimulationGate;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.HttpClientErrorException;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
@@ -35,6 +39,10 @@ import java.util.stream.Collectors;
  * Lifecycle of the friend links between users and service accounts.
  * Accounts are filled in sequence: the (unknown) friend limit is discovered at the
  * first failed add, and the account is then marked full (reversible by an admin).
+ * <p>
+ * Under the simulation, enrolment and unenrolment only reach Minecraft while the member's {@code minecraft.friends}
+ * is {@code REAL}; otherwise the link is written as if the player had accepted at once, with a made-up profile id,
+ * and removed without asking the service account.
  */
 @Slf4j
 @Service
@@ -55,9 +63,13 @@ public class MinecraftFriendService {
     static final String MANAGE_FRIENDS_OPERATION = "minecraft.manage_friends";
 
     private final DebugRecording debug;
+    private final ObjectProvider<SimulationGate> simulationGate;
 
     @Transactional
     public MinecraftFriendLink enroll(UserAccount user, String playerName) {
+        if (SimulationGate.blocks(simulationGate, user.getId(), SimulatedCalls.MINECRAFT_FRIENDS)) {
+            return enrollSimulated(user, playerName);
+        }
         MinecraftService.ProfileLookup profile = minecraftService.lookupProfile(playerName)
                 .orElseThrow(() -> new MinecraftEnrollmentException(
                         MinecraftEnrollmentException.Reason.UNKNOWN_PLAYER, "Unknown Minecraft player: " + playerName));
@@ -133,12 +145,44 @@ public class MinecraftFriendService {
 
     @Transactional
     public void unenroll(UserAccount user) {
-        linkRepository.findByUser(user).ifPresent(this::removeLink);
+        if (SimulationGate.blocks(simulationGate, user.getId(), SimulatedCalls.MINECRAFT_FRIENDS)) {
+            linkRepository.findByUser(user).ifPresent(linkRepository::delete);
+        } else {
+            linkRepository.findByUser(user).ifPresent(this::removeLink);
+        }
         getterConfigRepository.findByUserAndProvider(user, GetterConfig.Provider.MINECRAFT)
                 .ifPresent(config -> {
                     config.setEnabled(false);
                     getterConfigRepository.save(config);
                 });
+    }
+
+    /**
+     * A simulated enrolment: no profile lookup, no token, no friend request. The link is ACCEPTED at once with a
+     * profile id made from the name, on the first enabled service account, so the simulated presence works through
+     * the real chain.
+     */
+    private MinecraftFriendLink enrollSimulated(UserAccount user, String playerName) {
+        MinecraftServiceAccount account = accountRepository.findByEnabledTrueOrderByFillOrderAsc().stream()
+                .findFirst()
+                .orElseThrow(() -> new MinecraftEnrollmentException(
+                        MinecraftEnrollmentException.Reason.NO_ACCOUNT_AVAILABLE,
+                        "No enabled service account to link the simulated player to"));
+        MinecraftFriendLink link = linkRepository.findByUser(user).orElseGet(MinecraftFriendLink::new);
+        link.setUser(user);
+        link.setServiceAccount(account);
+        link.setMinecraftProfileId(simulatedProfileId(playerName));
+        link.setMinecraftName(playerName);
+        link.setStatus(MinecraftFriendLink.Status.ACCEPTED);
+        link.setRequestedAt(Instant.now());
+        link.setAcceptedAt(Instant.now());
+        enableMinecraftGetter(user);
+        return linkRepository.save(link);
+    }
+
+    /** The same made-up profile id for the same name, dashed as Mojang's. */
+    static String simulatedProfileId(String playerName) {
+        return UUID.nameUUIDFromBytes(("mock-mc:" + playerName).getBytes(StandardCharsets.UTF_8)).toString();
     }
 
     /**
@@ -176,6 +220,12 @@ public class MinecraftFriendService {
         for (MinecraftServiceAccount account : accountRepository.findByEnabledTrueOrderByFillOrderAsc()) {
             List<MinecraftFriendLink> links = linkRepository.findByServiceAccount(account);
             if (links.isEmpty()) continue;
+            if (SimulationGate.blocksAll(simulationGate, () -> links.stream()
+                    .filter(link -> link.getUser() != null)
+                    .map(link -> link.getUser().getId())
+                    .toList(), SimulatedCalls.MINECRAFT_PRESENCE)) {
+                continue; // simulated: no member of this account has its Minecraft presence REAL
+            }
 
             Optional<String> token = tokenService.getToken(account);
             if (token.isEmpty()) continue; // failing account: leave its links alone

@@ -1,10 +1,10 @@
 package fr.enimaloc.catapult.perf;
 
 import fr.enimaloc.catapult.domain.account.UserAccount;
-import fr.enimaloc.catapult.getter.steam.MockSteamApiClient;
+import fr.enimaloc.catapult.domain.binding.GetterConfig;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.security.JwtService;
-import fr.enimaloc.catapult.service.binding.SchedulerService;
+import fr.enimaloc.catapult.simulation.SimulationActions;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.context.annotation.Profile;
@@ -34,20 +34,17 @@ public class PerfService {
 
     private final UserAccountRepository accounts;
     private final JwtService jwtService;
-    private final MockSteamApiClient steam;
-    private final SchedulerService scheduler;
+    private final SimulationActions simulation;
     private final String ownerId;
 
     public PerfService(
             UserAccountRepository accounts,
             JwtService jwtService,
-            MockSteamApiClient steam,
-            SchedulerService scheduler,
+            SimulationActions simulation,
             @Value("${app.owner-id:}") String ownerId) {
         this.accounts = accounts;
         this.jwtService = jwtService;
-        this.steam = steam;
-        this.scheduler = scheduler;
+        this.simulation = simulation;
         this.ownerId = ownerId;
     }
 
@@ -79,8 +76,8 @@ public class PerfService {
     }
 
     /**
-     * {@code username} starts playing {@code name}: the fake Steam reports it, then a detection cycle runs for them,
-     * the one the scheduled poll runs (getters, game state, {@code GameDetectedEvent}, category chain). A game of
+     * {@code username} starts playing {@code name}: the simulated Steam reports it, then a detection cycle runs for
+     * them, the one the scheduled poll runs (getters, game state, {@code GameDetectedEvent}, category chain). A game of
      * {@link PerfDataSeeder#GAMES} lands on its binding; any other name on a new binding, as an unknown game would.
      * 404 for an unknown account or one without Steam.
      */
@@ -92,8 +89,7 @@ public class PerfService {
         String appId = PerfDataSeeder.game(name)
                 .map(PerfDataSeeder.PerfGame::steamAppId)
                 .orElseGet(() -> "perf-" + name.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "-"));
-        steam.setGameForUser(account.getSteamId(), appId, name);
-        scheduler.triggerManualCheck(account);
+        simulation.play(account, GetterConfig.Provider.STEAM, appId, name);
     }
 
     private UserAccount account(String username) {

@@ -3,7 +3,6 @@ package fr.enimaloc.catapult.config;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Profile;
 import org.springframework.security.oauth2.client.endpoint.OAuth2AccessTokenResponseClient;
 import org.springframework.security.oauth2.client.endpoint.OAuth2RefreshTokenGrantRequest;
 import org.springframework.security.oauth2.client.endpoint.RestClientRefreshTokenTokenResponseClient;
@@ -17,7 +16,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Configuration
-@Profile("!mock-web")
 public class OAuth2ClientConfig {
 
     @Value("${twitch.client-id:}")

@@ -55,6 +55,7 @@ import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import fr.enimaloc.catapult.service.twitch.TwitchChatService;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
 import fr.enimaloc.catapult.common.dto.notification.NotificationChannel;
+import fr.enimaloc.catapult.simulation.SimulationGates;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -262,7 +263,8 @@ class DebugAttributionTest {
         GameStateService state = mock(GameStateService.class);
         when(state.getLastKnownGame(any())).thenReturn(Optional.empty());
         return new SchedulerService(accounts, chain, state, mock(ApplicationEventPublisher.class),
-                new SimpleMeterRegistry(), Optional.empty(), Optional.empty(), mock(BindingService.class));
+                new SimpleMeterRegistry(), Optional.empty(), Optional.empty(), mock(BindingService.class),
+                SimulationGates.none());
     }
 
     @Test
@@ -363,7 +365,8 @@ class DebugAttributionTest {
             note();
             return CompletableFuture.completedFuture(List.of());
         });
-        return new SteamLibraryCacheService(steam, mock(IgdbService.class), accounts, mock(TokenEncryptionService.class));
+        return new SteamLibraryCacheService(steam, mock(IgdbService.class), accounts, mock(TokenEncryptionService.class),
+                SimulationGates.none());
     }
 
     @Test

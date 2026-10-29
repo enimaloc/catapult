@@ -7,6 +7,7 @@ import fr.enimaloc.catapult.repository.igdb.IgdbGameCclRepository;
 import fr.enimaloc.catapult.repository.igdb.IgdbGameExternalIdRepository;
 import fr.enimaloc.catapult.repository.twitch.TwitchCclDefinitionRepository;
 import fr.enimaloc.catapult.service.steam.SteamStoreService;
+import fr.enimaloc.catapult.simulation.SimulationGate;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,6 +19,7 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestClient;
 
@@ -42,6 +44,7 @@ class IgdbServiceDescriptorHelpersTest {
     @Mock TwitchCclDefinitionRepository twitchCclRepo;
     @Mock SteamStoreService steamStoreService;
     @Mock RestClient restClient;
+    @Mock ObjectProvider<SimulationGate> simulationGate;
     @Mock MeterRegistry meterRegistry;
 
     @Spy @InjectMocks IgdbService igdbService;

@@ -12,6 +12,7 @@ import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
 import fr.enimaloc.catapult.service.notification.CatapultCategoryChangeStateService;
 import fr.enimaloc.catapult.service.notification.TwitchatEventDispatcher;
+import fr.enimaloc.catapult.simulation.SimulationGates;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -80,7 +81,7 @@ class TwitchEventSubServiceFlowsTest {
         RestClient.Builder builder = RestClient.builder();
         helix = MockRestServiceServer.bindTo(builder).build();
         service = new TwitchEventSubService(tokens, users, tokenService, streamState, publisher, builder.build(),
-                new ObjectMapper(), twitchat, selfChanges, DebugRecording.OFF);
+                new ObjectMapper(), twitchat, selfChanges, DebugRecording.OFF, SimulationGates.none());
         ReflectionTestUtils.setField(service, "twitchClientId", "client-id");
         ReflectionTestUtils.setField(ReflectionTestUtils.getField(service, "connections"), "httpClient", httpClient);
 
@@ -136,6 +137,22 @@ class TwitchEventSubServiceFlowsTest {
             service.init();
 
             verify(wsBuilder).buildAsync(any(), any());
+        }
+
+        @Test
+        void eventsub_skips_mock_accounts_without_simulation() {
+            UserAccount fictitious = new UserAccount();
+            fictitious.setId(UUID.randomUUID());
+            fictitious.setTwitchId("mock-1");
+            when(tokens.findByUserAndProvider(fictitious, OAuthToken.Provider.TWITCH)).thenReturn(Optional.of(token));
+            when(users.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE)).thenReturn(List.of(user, fictitious));
+
+            service.init();
+            service.onAccountCreated(new AccountCreatedEvent(this, fictitious));
+
+            verify(wsBuilder, times(1)).buildAsync(any(), any());
+            verify(tokens, never()).findByUserAndProvider(fictitious, OAuthToken.Provider.TWITCH);
+            verify(streamState, never()).clear(fictitious);
         }
 
         @Test

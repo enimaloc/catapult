@@ -6,7 +6,6 @@ import fr.enimaloc.catapult.service.link.ExternalLinks;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
@@ -18,7 +17,6 @@ import java.util.Optional;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = "app.mock.xbox-store", havingValue = "false", matchIfMissing = true)
 public class XboxStoreServiceImpl implements XboxStoreService {
 
     // Unofficial/undocumented Microsoft Store catalog API (community-reverse-engineered, same

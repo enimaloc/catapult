@@ -12,6 +12,9 @@ import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
 import fr.enimaloc.catapult.service.notification.CatapultCategoryChangeStateService;
 import fr.enimaloc.catapult.service.notification.TwitchatEventDispatcher;
+import fr.enimaloc.catapult.simulation.SimulatedCalls;
+import fr.enimaloc.catapult.simulation.SimulatedData;
+import fr.enimaloc.catapult.simulation.SimulationGate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,6 +25,7 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.ResponseEntity;
@@ -60,6 +64,9 @@ class TwitchEventSubServiceTest {
     @Mock private RestClient.ResponseSpec getResponseSpec;
 
     @Spy private DebugRecording debug = DebugRecording.OFF;
+    /** Absent by default (answers {@code null}): no simulation. */
+    @Mock private ObjectProvider<SimulationGate> simulationGate;
+    @Mock private SimulationGate gate;
     @InjectMocks private TwitchEventSubService service;
 
     private final ObjectMapper mapper = new ObjectMapper();
@@ -425,5 +432,146 @@ class TwitchEventSubServiceTest {
 
         assertThat(seen).containsExactly(user.getId());
         assertThat(fr.enimaloc.catapult.service.debug.DebugContext.subject()).isEmpty();
+    }
+
+    // --- Under the simulation ---
+
+    private static final String ONLINE = """
+        {
+          "metadata": { "message_type": "notification", "subscription_type": "stream.online" },
+          "payload": { "event": {} }
+        }
+        """;
+
+    private static final String OUTGOING_RAID = """
+        {
+          "metadata": { "message_type": "notification", "subscription_type": "channel.raid" },
+          "payload": { "event": { "from_broadcaster_user_id": "broadcaster-123", "to_broadcaster_user_id": "999" } }
+        }
+        """;
+
+    private static final String WELCOME = """
+        {
+          "metadata": { "message_type": "session_welcome" },
+          "payload": { "session": { "id": "session-abc" } }
+        }
+        """;
+
+    /** Turns the simulation on, every EventSub key of the user simulated except {@code real}. */
+    private void simulate(fr.enimaloc.catapult.simulation.CallKey... real) {
+        when(simulationGate.getIfAvailable()).thenReturn(gate);
+        when(gate.real(eq(user.getId()), any())).thenReturn(false);
+        for (var key : real) {
+            when(gate.real(user.getId(), key)).thenReturn(true);
+        }
+        when(gate.data(user.getId())).thenReturn(SimulatedData.defaults());
+    }
+
+    @Test
+    void real_online_is_dropped_when_simulated() {
+        simulate();
+
+        service.handleMessage(user, token, ONLINE, false);
+
+        verify(streamStateService, never()).setLive(any(), anyBoolean());
+        verify(eventPublisher, never()).publishEvent(any(StreamOnlineEvent.class));
+    }
+
+    @Test
+    void injected_online_passes() {
+        simulate();
+
+        service.injectNotification(user, "stream.online", mapper.createObjectNode());
+
+        verify(streamStateService).setLive(user, true);
+        verify(eventPublisher).publishEvent(any(StreamOnlineEvent.class));
+    }
+
+    @Test
+    void real_raid_passes_when_real() {
+        simulate(SimulatedCalls.TWITCH_EVENTSUB_CHANNEL_RAID);
+
+        service.handleMessage(user, token, OUTGOING_RAID, false);
+
+        verify(eventPublisher).publishEvent(any(ChannelRaidedOutEvent.class));
+    }
+
+    @Test
+    void outside_simulation_eventsub_is_unchanged() {
+        service.handleMessage(user, token, ONLINE, false);
+        service.handleMessage(user, token, OUTGOING_RAID, false);
+
+        verify(streamStateService).setLive(user, true);
+        verify(eventPublisher).publishEvent(any(StreamOnlineEvent.class));
+        verify(eventPublisher).publishEvent(any(ChannelRaidedOutEvent.class));
+        verify(gate, never()).real(any(), any());
+    }
+
+    @Test
+    void outside_simulation_nothing_is_injected() {
+        org.assertj.core.api.Assertions.assertThatIllegalStateException()
+            .isThrownBy(() -> service.injectNotification(user, "stream.online", mapper.createObjectNode()));
+        verify(streamStateService, never()).setLive(any(), anyBoolean());
+    }
+
+    @Test
+    void injected_manual_category_change_seeds_the_initial_state_from_the_simulated_data() {
+        simulate();
+        when(categoryChangeStateService.consumeIfMatches(user, "222")).thenReturn(Optional.empty());
+
+        var event = mapper.createObjectNode().put("category_id", "222").put("category_name", "New Game");
+        event.putArray("content_classification_labels");
+        service.injectNotification(user, "channel.update", event);
+
+        verify(twitchatEventDispatcher).onCategoryChangedManually(user, "222", "New Game", "Just Chatting");
+    }
+
+    @Test
+    void startup_opens_no_connection_when_every_eventsub_event_is_simulated() {
+        simulate();
+        when(gate.data(user.getId())).thenReturn(SimulatedData.defaults().withLive(true));
+        when(userAccountRepository.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE)).thenReturn(List.of(user));
+
+        service.init();
+
+        verify(oAuthTokenRepository, never()).findByUserAndProvider(any(), any());
+        verify(restClient, never()).get();
+        // Seeded from the simulated data, as the Helix stream lookup would: no StreamOnlineEvent
+        verify(streamStateService).setLive(user, true);
+        verify(eventPublisher, never()).publishEvent(any(StreamOnlineEvent.class));
+    }
+
+    @Test
+    void startup_leaves_a_simulated_offline_channel_untouched() {
+        simulate();
+        when(userAccountRepository.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE)).thenReturn(List.of(user));
+
+        service.init();
+
+        verify(streamStateService, never()).setLive(any(), anyBoolean());
+    }
+
+    @Test
+    void startup_connects_when_one_eventsub_event_is_real() {
+        simulate(SimulatedCalls.TWITCH_EVENTSUB_CHANNEL_RAID);
+        // No token: the lookup proves the connection was attempted, without opening a socket
+        when(oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)).thenReturn(Optional.empty());
+
+        service.connect(user);
+
+        verify(oAuthTokenRepository).findByUserAndProvider(user, OAuthToken.Provider.TWITCH);
+    }
+
+    @Test
+    void a_simulated_welcome_subscribes_only_to_the_real_events_and_skips_the_simulated_helix_reads() {
+        simulate(SimulatedCalls.TWITCH_EVENTSUB_CHANNEL_RAID);
+
+        service.handleMessage(user, token, WELCOME, false);
+
+        ArgumentCaptor<Object> bodies = ArgumentCaptor.forClass(Object.class);
+        verify(postBodySpec).body(bodies.capture());
+        assertThat(((Map<String, Object>) bodies.getValue()).get("type")).isEqualTo("channel.raid");
+        // channel.update and stream.* are simulated: their initial state comes from the simulated data
+        verify(restClient, never()).get();
     }
 }

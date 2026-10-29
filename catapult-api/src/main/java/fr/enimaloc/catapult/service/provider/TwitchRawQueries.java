@@ -5,7 +5,11 @@ import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.twitch.TwitchTokenService;
+import fr.enimaloc.catapult.simulation.SimulatedCalls;
+import fr.enimaloc.catapult.simulation.SimulationGate;
+import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -15,6 +19,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.UUID;
 
 /** The admin probe of the Twitch API: one raw call, answered as the provider sent it. */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class TwitchRawQueries {
@@ -29,6 +34,7 @@ public class TwitchRawQueries {
     private final UserAccountRepository userAccountRepository;
     private final RestClient restClient;
     private final RawProviderResponseSupport rawSupport;
+    private final ObjectProvider<SimulationGate> simulationGate;
 
     public RawProviderResponseSupport.RawProviderResponse games(String name) {
         return rawSupport.fetch(() -> fetchGames(name));
@@ -47,6 +53,10 @@ public class TwitchRawQueries {
     }
 
     private String fetchGames(String name) {
+        if (SimulationGate.blocks(simulationGate, null, SimulatedCalls.TWITCH_APP_APP_TOKEN)) {
+            log.debug("Twitch games probe skipped — the simulated app token is not REAL");
+            return "{\"data\":[]}";
+        }
         String token = twitchTokenService.getAppAccessToken();
         return restClient.get()
                 .uri(TWITCH_API_URL + "/games?name=" + name)

@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api;
 
+import fr.enimaloc.catapult.getter.GameGetter;
 import fr.enimaloc.catapult.getter.steam.SteamApiKeyRotator;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -19,6 +20,22 @@ class ApiConfigControllerTest {
         ReflectionTestUtils.setField(controller, "steamEnabled", true);
         ReflectionTestUtils.setField(controller, "steamApiKey", configuredKey);
         return controller;
+    }
+
+    @Test
+    void appConfig_listsEachGetterNameOnce_inOrder() {
+        // under the simulation a getter and its simulated subclass are both GameGetter beans
+        ApiConfigController controller = new ApiConfigController(
+                List.of(getter("Steam"), getter("Xbox"), getter("Minecraft"), getter("Xbox"), getter("Minecraft")),
+                Optional.empty());
+
+        assertThat(controller.appConfig().gettersName()).containsExactly("Steam", "Xbox", "Minecraft");
+    }
+
+    private static GameGetter getter(String name) {
+        GameGetter getter = mock(GameGetter.class);
+        when(getter.name()).thenReturn(name);
+        return getter;
     }
 
     @Test

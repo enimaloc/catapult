@@ -5,7 +5,6 @@ import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
-import org.springframework.context.annotation.Profile;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -18,7 +17,6 @@ import java.util.concurrent.TimeUnit;
 // the Retry-After deadline. conservativePause drains all keys simultaneously.
 @Slf4j
 @Component
-@Profile("!mock")
 @ConditionalOnBooleanProperty("steam.enabled")
 public class SteamRateLimiter {
 

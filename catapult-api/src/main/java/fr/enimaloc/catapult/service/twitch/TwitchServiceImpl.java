@@ -14,7 +14,6 @@ import fr.enimaloc.catapult.service.notification.CatapultCategoryChangeStateServ
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -28,7 +27,6 @@ import java.util.function.Function;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = "app.mock.twitch", havingValue = "false", matchIfMissing = true)
 public class TwitchServiceImpl implements TwitchService {
 
     private static final String TWITCH_API_URL = "https://api.twitch.tv/helix";

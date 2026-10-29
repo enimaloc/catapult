@@ -228,7 +228,12 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
         return new CatapultOAuth2User(oAuth2User, account, isOwner);
     }
 
-    private UserAccount createNewAccount(String twitchId, String twitchUsername) {
+    /**
+     * A new member's account, set up as every new member's is: the system account's settings migrated to it, or the
+     * default settings and getters (Steam enabled) when there is no system account. Publishes nothing: the caller
+     * publishes the {@link AccountCreatedEvent} once the account is complete.
+     */
+    public UserAccount createNewAccount(String twitchId, String twitchUsername) {
         UserAccount account = new UserAccount();
         account.setTwitchId(twitchId);
         account.setTwitchUsername(twitchUsername);

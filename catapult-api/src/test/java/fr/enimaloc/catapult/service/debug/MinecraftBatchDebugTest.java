@@ -17,6 +17,7 @@ import fr.enimaloc.catapult.service.minecraft.MinecraftGateService;
 import fr.enimaloc.catapult.service.minecraft.MinecraftService;
 import fr.enimaloc.catapult.service.minecraft.MinecraftTokenService;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
+import fr.enimaloc.catapult.simulation.SimulationGates;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -104,7 +105,7 @@ class MinecraftBatchDebugTest {
 
     private MinecraftPresenceGetter presenceGetter() {
         MinecraftPresenceGetter getter = new MinecraftPresenceGetter(minecraft, tokens, serviceAccounts, links,
-                mock(MinecraftGateService.class), new DebugRecording(registry, recorder));
+                mock(MinecraftGateService.class), new DebugRecording(registry, recorder), SimulationGates.none());
         return getter;
     }
 
@@ -148,7 +149,7 @@ class MinecraftBatchDebugTest {
     private MinecraftFriendService friendService() {
         MinecraftFriendService friends = new MinecraftFriendService(minecraft, tokens, serviceAccounts, links,
                 mock(MinecraftAccountLimitMarker.class), mock(GetterConfigRepository.class), new ObjectMapper(),
-                mock(ChannelEventPublisher.class), new DebugRecording(registry, recorder));
+                mock(ChannelEventPublisher.class), new DebugRecording(registry, recorder), SimulationGates.none());
         return friends;
     }
 

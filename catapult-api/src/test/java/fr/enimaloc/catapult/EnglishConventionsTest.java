@@ -69,16 +69,10 @@ class EnglishConventionsTest {
                     API + "chat/command/ChatCommandLegacyPresetMigration.java LITERAL",
                     "default chat command templates viewers read, and the old ones matched in stored rows"),
             Map.entry(
-                    API + "experiment/DarkModeExperiment.java LITERAL",
-                    "experiment name, description and variants, seeded once into the DB"),
-            Map.entry(
                     API + "experiment/InviteButtonPlacementExperiment.java LITERAL",
                     "experiment name, description and variants, seeded once into the DB"),
             Map.entry(
                     API + "experiment/MinecraftIntegrationExperiment.java LITERAL",
-                    "experiment name, description and variants, seeded once into the DB"),
-            Map.entry(
-                    API + "experiment/NotificationBannerExperiment.java LITERAL",
                     "experiment name, description and variants, seeded once into the DB"),
             Map.entry(
                     API + "experiment/RaidRestoreGameExperiment.java LITERAL",

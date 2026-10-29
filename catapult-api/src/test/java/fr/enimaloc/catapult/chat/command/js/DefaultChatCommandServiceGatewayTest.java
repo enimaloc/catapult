@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.service.igdb.IgdbClient;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
 import fr.enimaloc.catapult.service.steam.SteamStoreService;
+import fr.enimaloc.catapult.simulation.SimulationGates;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.observation.ObservationRegistry;
 import org.junit.jupiter.api.BeforeEach;
@@ -52,7 +53,8 @@ class DefaultChatCommandServiceGatewayTest {
     @BeforeEach
     void setUp() {
         gateway = new DefaultChatCommandServiceGateway(igdbClient, igdbService, restClient,
-            new ExternalApiObservations(ObservationRegistry.NOOP, new SimpleMeterRegistry()), steamStoreService);
+            new ExternalApiObservations(ObservationRegistry.NOOP, new SimpleMeterRegistry()), steamStoreService,
+            SimulationGates.none());
         doReturn(getSpec).when(restClient).get();
         doReturn(headersSpec).when(getSpec).uri(anyString(), any(Object[].class));
         doReturn(responseSpec).when(headersSpec).retrieve();

@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.service.twitch;
 
+import fr.enimaloc.catapult.simulation.SimulationGate;
+import org.springframework.beans.factory.ObjectProvider;
 import fr.enimaloc.catapult.domain.igdb.IgdbGameExternalId;
 import fr.enimaloc.catapult.domain.twitch.TwitchCategoryCache;
 import fr.enimaloc.catapult.repository.igdb.IgdbGameExternalIdRepository;
@@ -37,6 +39,7 @@ class TwitchCategoryServiceTest {
     @Mock private IgdbGameExternalIdRepository   externalIdRepo;
     @Mock private IgdbService                    igdbService;
     @Mock private RestClient restClient;
+    @Mock private ObjectProvider<SimulationGate> simulationGate;
 
     @Spy
     private ExternalApiObservations apiObservations =

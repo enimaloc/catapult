@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.api.provider;
 
+import fr.enimaloc.catapult.simulation.SimulationGate;
+import org.springframework.beans.factory.ObjectProvider;
 import fr.enimaloc.catapult.service.provider.RawProviderResponseSupport;
 import fr.enimaloc.catapult.service.provider.TwitchRawQueries;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
@@ -37,6 +39,7 @@ class ApiAdminProviderTwitchControllerTest {
     @Mock private OAuthTokenRepository oAuthTokenRepository;
     @Mock private UserAccountRepository userAccountRepository;
     @Mock private RestClient restClient;
+    @Mock private ObjectProvider<SimulationGate> simulationGate;
     @Mock private RestClient.RequestHeadersUriSpec getSpec;
     @Mock private RestClient.RequestHeadersSpec headersSpec;
     @Mock private RestClient.ResponseSpec responseSpec;

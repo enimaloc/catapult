@@ -22,6 +22,7 @@ import fr.enimaloc.catapult.service.twitch.TwitchChatRateLimiter;
 import fr.enimaloc.catapult.service.twitch.TwitchEventSubService;
 import fr.enimaloc.catapult.service.twitch.TwitchHelixChannelClient;
 import fr.enimaloc.catapult.service.twitch.TwitchTokenService;
+import fr.enimaloc.catapult.simulation.SimulationGates;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.observation.ObservationRegistry;
 import org.junit.jupiter.api.AfterEach;
@@ -107,7 +108,8 @@ class InboundDebugTest {
         eventSub = new TwitchEventSubService(mock(OAuthTokenRepository.class), mock(UserAccountRepository.class),
                 mock(TwitchTokenService.class), streamState, mock(ApplicationEventPublisher.class),
                 RestClient.create(), new ObjectMapper(), mock(TwitchatEventDispatcher.class),
-                mock(CatapultCategoryChangeStateService.class), new DebugRecording(registry, recorder));
+                mock(CatapultCategoryChangeStateService.class), new DebugRecording(registry, recorder),
+                SimulationGates.none());
         return eventSub;
     }
 
@@ -118,7 +120,7 @@ class InboundDebugTest {
                 mock(TwitchHelixChannelClient.class), RestClient.create(), new ObjectMapper(),
                 mock(SystemTwitchAccountService.class), meters,
                 new ExternalApiObservations(ObservationRegistry.NOOP, meters), mock(TwitchChatRateLimiter.class),
-                new DebugRecording(registry, recorder));
+                new DebugRecording(registry, recorder), SimulationGates.none());
         return chat;
     }
 
