@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.category;
 
+import fr.enimaloc.catapult.service.ActivityLogService;
 import fr.enimaloc.catapult.service.binding.GameBindingLookup;
 import fr.enimaloc.catapult.service.binding.RaidRestoreGateService;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
@@ -31,7 +32,7 @@ import fr.enimaloc.catapult.service.category.CategoryTrigger.RevertCategory;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.NoGameAfterCustomBinding;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.StreamEnded;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.StreamStarted;
-import fr.enimaloc.catapult.service.ActivityLogService;
+import fr.enimaloc.catapult.service.twitch.ChannelUpdateOutcome;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -40,6 +41,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -1041,12 +1044,34 @@ class CategoryChainTest {
     }
 
     @Test
-    void edits_and_manual_changes_leave_extensions_alone() {
-        applierAnswers(CategoryOutcome.applied(CategoryRule.MANUAL_CHOICE));
+    void binding_edited_mapping_changed_manual_and_raid_leave_extensions_alone() {
+        binding.getExtensionSlots().add(panel);
+        playing(true);
+        live(true);
+        raidSetUp();
+        applierAnswers(CategoryOutcome.applied(CategoryRule.GAME_BINDING));
 
-        chain.apply(user, new ManualCategory(binding));
+        for (CategoryTrigger trigger : List.<CategoryTrigger>of(new BindingEdited(binding),
+                new MappingChanged(binding), new ManualCategory(binding), new RaidedOut("1"))) {
+            assertThat(chain.decide(user, trigger).action()).as(trigger.toString()).isEqualTo(Action.UPDATE_CHANNEL);
+            assertThat(chain.apply(user, trigger).status()).as(trigger.toString())
+                    .isEqualTo(ChannelUpdateOutcome.APPLIED);
+        }
 
         verifyNoInteractions(layouts);
+    }
+
+    @Test
+    void stream_start_replays_the_pending_bindings_layout() {
+        binding.getExtensionSlots().add(panel);
+        settings.setApplyDefaultOnStreamStart(false);
+        withSettings();
+        when(streamStateService.getPending(user)).thenReturn(Optional.of(binding));
+        applierAnswers(CategoryOutcome.applied(CategoryRule.PENDING));
+
+        chain.apply(user, new StreamStarted());
+
+        verify(layouts).applyOnSwitch(user, "binding:" + binding.getId(), binding.getExtensionSlots());
     }
 
     @Test
@@ -1061,7 +1086,7 @@ class CategoryChainTest {
 
     @Test
     void layout_error_keeps_the_outcome_applied() {
-        RecordingTwitch twitch = new RecordingTwitch(new java.util.ArrayList<>());
+        RecordingTwitch twitch = new RecordingTwitch(new ArrayList<>());
         twitch.failExtensions(new IllegalStateException("twitch down"));
         CategoryChain real = new CategoryChain(activations, streamStateService, settingsRepository, hold,
                 gameStateService, accountRepository, applier, gate, lookup,
