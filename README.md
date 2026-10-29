@@ -133,7 +133,7 @@ sans membre identifiable (préchauffage du cache des catégories, CCL de l'admin
 | `BATTLENET_CLIENT_ID` | Non | Client ID Battle.net |
 | `BATTLENET_CLIENT_SECRET` | Non | Client Secret Battle.net |
 | `IGDB_CLIENT_ID` | Non | Client ID IGDB (utilise `TWITCH_CLIENT_ID` si absent) |
-| `DTDD_ENABLED` | Non | Active l'intégration DoesTheDogDie (clés gérées dans l'admin `/admin/dtdd-keys`) |
+| `DTDD_ENABLED` | Non | Intégration DoesTheDogDie, active par défaut : `false` pour la couper (clés gérées dans l'admin `/admin/dtdd-keys`) |
 | `API_SENTRY_DSN` | Non | DSN Sentry de `catapult-api`, qui n'envoie que les membres en mode débug (vide : coupé) |
 | `SENTRY_ENVIRONMENT` | Non | Environnement Sentry de `catapult-api` (`production` par défaut) |
 
