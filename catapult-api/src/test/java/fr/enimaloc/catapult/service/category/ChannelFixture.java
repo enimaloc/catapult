@@ -1,6 +1,5 @@
 package fr.enimaloc.catapult.service.category;
 
-import fr.enimaloc.catapult.service.category.ExtensionLayoutApplier;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.MappingChanged;
 import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.api.channel.ApiChannelActionsController;

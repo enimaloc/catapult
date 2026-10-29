@@ -22,6 +22,7 @@ public class DashboardOnlySchemaCustomizer implements OpenApiCustomizer {
         if (state != null && state.getProperties() != null) {
             state.getProperties().remove("extensions");
         }
+        // Safe by name: springdoc only scans api.userapi, and no route there uses ExtensionSlotDto otherwise
         openApi.getComponents().getSchemas().remove("ExtensionSlotDto");
     }
 }

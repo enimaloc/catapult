@@ -31,7 +31,6 @@ public record BindingDto(
                 twEnabled, twOverride, tws, boxArtUrl, List.of());
     }
 
-
     /** A binding whose category's box art isn't known (live events, the mock). */
     public BindingDto(String id, String status, String sourceType, String sourceName, String twitchGameId,
                       String twitchGameName, boolean ignored, boolean cclEnabled, Set<String> ccls,

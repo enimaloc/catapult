@@ -1,8 +1,8 @@
 package fr.enimaloc.catapult.api.channel;
 
 import fr.enimaloc.catapult.api.ApiUserResolver;
-import fr.enimaloc.catapult.domain.binding.ExtensionSlotSetting;
 import fr.enimaloc.catapult.common.dto.channel.TwitchExtensionsDto;
+import fr.enimaloc.catapult.domain.binding.ExtensionSlotSetting;
 import fr.enimaloc.catapult.service.account.ChannelSettingsService;
 import fr.enimaloc.catapult.service.binding.ChannelDashboardActions;
 import fr.enimaloc.catapult.service.binding.CustomBindingService;
