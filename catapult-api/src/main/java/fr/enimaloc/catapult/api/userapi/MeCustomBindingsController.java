@@ -46,7 +46,7 @@ public class MeCustomBindingsController {
     @GetMapping
     @Operation(summary = "The custom bindings and the active one")
     public CustomBindingsStateDto list(@AuthenticationPrincipal UUID userId) {
-        return views.state(userResolver.tokenOwner(userId));
+        return views.publicState(userResolver.tokenOwner(userId));
     }
 
     @PutMapping("/active")

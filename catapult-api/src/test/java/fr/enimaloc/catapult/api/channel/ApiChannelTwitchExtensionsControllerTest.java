@@ -1,6 +1,11 @@
 package fr.enimaloc.catapult.api.channel;
 
 import fr.enimaloc.catapult.api.ApiUserResolver;
+import fr.enimaloc.catapult.domain.binding.ExtensionSlotSetting;
+import fr.enimaloc.catapult.common.dto.channel.TwitchExtensionsDto;
+import fr.enimaloc.catapult.service.account.ChannelSettingsService;
+import fr.enimaloc.catapult.service.binding.ChannelDashboardActions;
+import fr.enimaloc.catapult.service.binding.CustomBindingService;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.security.Authz;
@@ -28,13 +33,16 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -50,6 +58,9 @@ class ApiChannelTwitchExtensionsControllerTest {
     @MockitoBean UserAccountRepository userAccountRepository;
     @MockitoBean ChannelAccessService channelAccessService;
     @MockitoBean TwitchService twitchService;
+    @MockitoBean ChannelDashboardActions dashboardActions;
+    @MockitoBean CustomBindingService customBindingService;
+    @MockitoBean ChannelSettingsService settingsService;
 
     private UserAccount owner;
     private UserAccount moderator;
@@ -123,5 +134,94 @@ class ApiChannelTwitchExtensionsControllerTest {
 
         mvc.perform(get(extensions()).with(as(moderator))).andExpect(status().isForbidden());
         verifyNoInteractions(twitchService);
+    }
+
+    private static final String PANEL_ONE =
+            "[{\"type\":\"PANEL\",\"slot\":1,\"extensionId\":\"p1\",\"extensionName\":\"Panel\"}]";
+    private static final Set<ExtensionSlotSetting> PANEL_ONE_SETTINGS = Set.of(
+            new ExtensionSlotSetting(TwitchExtensionsDto.Type.PANEL, 1, "p1", "Panel"));
+
+    private String base() {
+        return "/api/internal/users/" + owner.getId();
+    }
+
+    @Test
+    void put_binding_extensions_saves_the_layout() throws Exception {
+        UUID bindingId = UUID.randomUUID();
+
+        mvc.perform(put(base() + "/bindings/" + bindingId + "/extensions").with(as(owner))
+                        .contentType("application/json").content(PANEL_ONE))
+                .andExpect(status().isNoContent());
+
+        verify(dashboardActions).updateExtensionSlots(owner, bindingId, PANEL_ONE_SETTINGS);
+    }
+
+    @Test
+    void put_custom_binding_extensions_saves_the_layout() throws Exception {
+        UUID id = UUID.randomUUID();
+
+        mvc.perform(put(base() + "/custom-bindings/" + id + "/extensions").with(as(owner))
+                        .contentType("application/json").content(PANEL_ONE))
+                .andExpect(status().isNoContent());
+
+        verify(customBindingService).updateExtensionSlots(owner, id, PANEL_ONE_SETTINGS);
+    }
+
+    @Test
+    void put_no_game_extensions_saves_the_layout() throws Exception {
+        mvc.perform(put(base() + "/settings/no-game/extensions").with(as(owner))
+                        .contentType("application/json").content(PANEL_ONE))
+                .andExpect(status().isNoContent());
+
+        verify(settingsService).saveNoGameExtensions(owner, PANEL_ONE_SETTINGS);
+    }
+
+    @Test
+    void put_incomplete_fallback_extensions_saves_the_layout() throws Exception {
+        mvc.perform(put(base() + "/settings/incomplete-fallback/extensions").with(as(owner))
+                        .contentType("application/json").content(PANEL_ONE))
+                .andExpect(status().isNoContent());
+
+        verify(settingsService).saveIncompleteFallbackExtensions(owner, PANEL_ONE_SETTINGS);
+    }
+
+    @Test
+    void put_rejects_an_out_of_range_slot() throws Exception {
+        String body = "[{\"type\":\"PANEL\",\"slot\":4,\"extensionId\":\"p1\",\"extensionName\":\"Panel\"}]";
+
+        mvc.perform(put(base() + "/bindings/" + UUID.randomUUID() + "/extensions").with(as(owner))
+                        .contentType("application/json").content(body))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(dashboardActions);
+    }
+
+    @Test
+    void put_rejects_a_null_element() throws Exception {
+        mvc.perform(put(base() + "/settings/no-game/extensions").with(as(owner))
+                        .contentType("application/json").content("[null]"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(settingsService);
+    }
+
+    @Test
+    void moderator_may_edit() throws Exception {
+        mvc.perform(put(base() + "/settings/no-game/extensions").with(as(moderator))
+                        .contentType("application/json").content("[]"))
+                .andExpect(status().isNoContent());
+
+        verify(settingsService).saveNoGameExtensions(owner, Set.of());
+    }
+
+    @Test
+    void stranger_is_refused() throws Exception {
+        when(channelAccessService.canAccess(any(UserAccount.class), any(UserAccount.class))).thenReturn(false);
+
+        mvc.perform(put(base() + "/settings/no-game/extensions").with(as(moderator))
+                        .contentType("application/json").content("[]"))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(settingsService);
     }
 }

@@ -195,7 +195,7 @@ class CustomBindingDetectionTest {
         when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(game));
         CustomBindingService service = new CustomBindingService(mock(CustomBindingRepository.class), activations,
                 experimentService, gameStateService, streamStateService, mock(UserAccountRepository.class),
-                mock(OAuthTokenRepository.class), listener, channelEventPublisher, chain);
+                mock(OAuthTokenRepository.class), listener, channelEventPublisher, chain, mock(ExtensionLayoutApplier.class));
 
         service.deactivate(user);
 
@@ -223,7 +223,7 @@ class CustomBindingDetectionTest {
         when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(game));
         CustomBindingService service = new CustomBindingService(mock(CustomBindingRepository.class), activations,
                 experimentService, gameStateService, streamStateService, mock(UserAccountRepository.class),
-                mock(OAuthTokenRepository.class), listener, channelEventPublisher, chain);
+                mock(OAuthTokenRepository.class), listener, channelEventPublisher, chain, mock(ExtensionLayoutApplier.class));
 
         service.deactivate(user);
 
@@ -286,7 +286,7 @@ class CustomBindingDetectionTest {
                 mock(RaidRestoreHold.class), gameStateService, mock(UserAccountRepository.class), new CategoryApplier(twitchService, streamStateService), mock(RaidRestoreGateService.class), mock(GameBindingLookup.class), mock(ExtensionLayoutApplier.class));
         BindingService realBindings = new BindingService(gameBindings, mock(IgdbService.class),
                 mock(IgdbGameDetailsService.class), twitchService, mock(TwResolverService.class),
-                mock(GameMappingRepository.class), new GameBindingLookup(gameBindings), realChain);
+                mock(GameMappingRepository.class), new GameBindingLookup(gameBindings), realChain, mock(ExtensionLayoutApplier.class));
 
         realBindings.setTwitchGame(user, gameBinding.getId(), "1234", "Other");
 

@@ -5,7 +5,9 @@ import fr.enimaloc.catapult.api.error.ApiProblem;
 import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingSaveResult;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto;
+import fr.enimaloc.catapult.common.dto.channel.ExtensionSlotDto;
 import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.binding.ExtensionSlotSetting;
 import fr.enimaloc.catapult.domain.binding.CustomBinding;
 import fr.enimaloc.catapult.domain.binding.CustomBindingActivation;
 import fr.enimaloc.catapult.service.binding.CustomBindingService;
@@ -15,8 +17,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * How the custom bindings read on the wire, shared by the token API ({@code /api/me/custom-bindings}), the owner's
@@ -31,11 +36,22 @@ public class CustomBindingViews {
 
     /** {@code user}'s bindings and the active one; 403 while the experiment is closed to them. */
     public CustomBindingsStateDto state(UserAccount user) {
-        List<CustomBindingDto> bindings = service.list(user).stream().map(CustomBindingViews::toDto).toList();
+        List<CustomBinding> listed = service.list(user);
+        List<CustomBindingDto> bindings = listed.stream().map(CustomBindingViews::toDto).toList();
         Optional<CustomBindingActivation> active = service.active(user);
+        Map<UUID, List<ExtensionSlotDto>> extensions = new LinkedHashMap<>();
+        for (CustomBinding binding : listed) {
+            extensions.put(binding.getId(), ExtensionSlotSetting.toDtos(binding.getExtensionSlots()));
+        }
         return new CustomBindingsStateDto(true, bindings,
                 active.map(activation -> activation.getCustomBinding().getId()).orElse(null),
-                active.map(CustomBindingActivation::getActivatedAt).orElse(null));
+                active.map(CustomBindingActivation::getActivatedAt).orElse(null), extensions);
+    }
+
+    /** {@link #state} as the token API answers it: without the dashboard-only extension layouts. */
+    public CustomBindingsStateDto publicState(UserAccount user) {
+        CustomBindingsStateDto state = state(user);
+        return new CustomBindingsStateDto(state.enabled(), state.bindings(), state.activeId(), state.activatedAt());
     }
 
     /** {@link #state}, or null while the experiment is closed to {@code user}. */

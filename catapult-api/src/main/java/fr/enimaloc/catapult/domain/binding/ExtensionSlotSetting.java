@@ -12,7 +12,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /** The extension a configuration puts in one Twitch slot; a null {@code extensionId} empties the slot. */
@@ -44,11 +46,21 @@ public class ExtensionSlotSetting {
         return new ExtensionSlotDto(type, slot, extensionId, extensionName);
     }
 
+    /** A layout as the API answers it, in slot order. */
+    public static List<ExtensionSlotDto> toDtos(Collection<ExtensionSlotSetting> slots) {
+        return slots.stream().map(ExtensionSlotSetting::toDto)
+                .sorted(Comparator.comparing(ExtensionSlotDto::type).thenComparingInt(ExtensionSlotDto::slot))
+                .toList();
+    }
+
     /** @throws IllegalArgumentException on a mobile slot, a slot out of Twitch's bounds or a duplicated slot */
     public static Set<ExtensionSlotSetting> validated(Collection<ExtensionSlotDto> dtos) {
         Set<ExtensionSlotSetting> result = new HashSet<>();
         Set<String> seen = new HashSet<>();
         for (ExtensionSlotDto dto : dtos) {
+            if (dto == null) {
+                throw new IllegalArgumentException("Extension slot is required");
+            }
             if (dto.type() == null) {
                 throw new IllegalArgumentException("Extension slot type is required");
             }

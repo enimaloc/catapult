@@ -22,5 +22,23 @@ public record UserSettingsDto(
         // On an outgoing raid, how recent (minutes) a game is put back as the category; null: off
         Integer raidRestoreGameMinutes,
         // Whether the channel is offered that setting at all (experiment raid.restore-game)
-        boolean raidRestoreGameAvailable
-) {}
+        boolean raidRestoreGameAvailable,
+        // The Twitch extension layouts of the two fallbacks (empty: they change nothing)
+        List<ExtensionSlotDto> noGameExtensions,
+        List<ExtensionSlotDto> incompleteFallbackExtensions
+) {
+    /** Settings without extension layouts. */
+    public UserSettingsDto(boolean cclFeatureEnabled, Set<String> blockedCcls, String noGameTwitchGameId,
+                           String noGameTwitchGameName, Set<String> noGameCcls, boolean applyDefaultOnStreamStart,
+                           boolean applyDefaultOnNoGame, boolean applyDefaultOnStreamEnd,
+                           String incompleteFallbackTwitchGameId, String incompleteFallbackTwitchGameName,
+                           Set<String> incompleteFallbackCcls, List<CclDto> availableCcls, boolean twFeatureEnabled,
+                           Set<String> blockedTws, List<TwDto> availableTws, Integer raidRestoreGameMinutes,
+                           boolean raidRestoreGameAvailable) {
+        this(cclFeatureEnabled, blockedCcls, noGameTwitchGameId, noGameTwitchGameName, noGameCcls,
+                applyDefaultOnStreamStart, applyDefaultOnNoGame, applyDefaultOnStreamEnd,
+                incompleteFallbackTwitchGameId, incompleteFallbackTwitchGameName, incompleteFallbackCcls,
+                availableCcls, twFeatureEnabled, blockedTws, availableTws, raidRestoreGameMinutes,
+                raidRestoreGameAvailable, List.of(), List.of());
+    }
+}

@@ -311,7 +311,7 @@ class DebugAttributionTest {
         });
         BindingService service = new BindingService(bindings, mock(IgdbService.class),
                 mock(IgdbGameDetailsService.class), mock(TwitchService.class), mock(TwResolverService.class),
-                mappings, new GameBindingLookup(bindings), mock(CategoryChain.class));
+                mappings, new GameBindingLookup(bindings), mock(CategoryChain.class), mock(ExtensionLayoutApplier.class));
 
         service.refreshIncompleteBindings();
 

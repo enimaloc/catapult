@@ -88,7 +88,7 @@ class AdminGameMappingServiceTest {
         chain = spy(new CategoryChain(activations, streamStateService, userSettingsRepository,
                 raidRestoreHold, gameStateService, mock(UserAccountRepository.class), new CategoryApplier(twitchService, streamStateService), mock(RaidRestoreGateService.class), mock(GameBindingLookup.class), mock(ExtensionLayoutApplier.class)));
         bindingService = spy(new BindingService(bindingRepo, igdbService, igdbGameDetailsService, twitchService,
-                twResolverService, mappingRepo, new GameBindingLookup(bindingRepo), chain));
+                twResolverService, mappingRepo, new GameBindingLookup(bindingRepo), chain, mock(ExtensionLayoutApplier.class)));
         service = new AdminGameMappingService(mappingRepo, bindingRepo, userRepo, bindingService, gameStateService,
                 streamStateService, channelEventPublisher, chain, transactionManager);
 

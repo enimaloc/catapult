@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.service.binding;
 
 import fr.enimaloc.catapult.common.dto.channel.UpdateBindingRequest;
 import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.binding.ExtensionSlotSetting;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -43,6 +44,11 @@ public class ChannelDashboardActions {
     public void update(UserAccount channel, UUID bindingId, UpdateBindingRequest body) {
         Set<String> ccls = body.ccls() != null ? body.ccls() : Set.of();
         bindingService.updateBinding(channel, bindingId, body.twitchGameId(), body.twitchGameName(), ccls, false);
+        publishBinding(channel, bindingId);
+    }
+
+    public void updateExtensionSlots(UserAccount channel, UUID bindingId, Set<ExtensionSlotSetting> slots) {
+        bindingService.updateExtensionSlots(channel, bindingId, slots);
         publishBinding(channel, bindingId);
     }
 
