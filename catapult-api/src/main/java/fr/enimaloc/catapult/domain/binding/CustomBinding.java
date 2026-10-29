@@ -53,6 +53,11 @@ public class CustomBinding {
 
     @ElementCollection(fetch = FetchType.EAGER)
     @BatchSize(size = 100)
+    @CollectionTable(name = "custom_binding_extension_slot", joinColumns = @JoinColumn(name = "custom_binding_id"))
+    private Set<ExtensionSlotSetting> extensionSlots = new HashSet<>();
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @BatchSize(size = 100)
     @CollectionTable(name = "custom_binding_tw", joinColumns = @JoinColumn(name = "custom_binding_id"))
     @Column(name = "tw")
     private Set<String> tws = new HashSet<>();
@@ -79,6 +84,7 @@ public class CustomBinding {
         applied.setTwitchGameId(twitchGameId);
         applied.setTwitchGameName(twitchGameName);
         applied.getCcls().addAll(ccls);
+        applied.getExtensionSlots().addAll(extensionSlots);
         applied.getTws().addAll(tws);
         return applied;
     }
