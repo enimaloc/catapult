@@ -5,7 +5,9 @@ import fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto;
 import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.channel.ChannelUserDto;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
+import fr.enimaloc.catapult.common.dto.channel.ExtensionSlotDto;
 import fr.enimaloc.catapult.common.dto.channel.PagedBindings;
+import fr.enimaloc.catapult.common.dto.channel.TwitchExtensionsDto;
 import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
 import fr.enimaloc.catapult.config.TwitchatCatalogConfig;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
@@ -19,6 +21,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -255,6 +258,81 @@ class ChannelCustomBindingsRenderingTest {
     @Test
     void aModeratorIsShownNothing_evenWhenGivenTheBindings() throws Exception {
         assertThat(render(false, state())).doesNotContain("channel-custom-bindings-list");
+    }
+
+    /** Art's layout: Build Guide in the second panel, the overlay emptied; the other slots are kept. */
+    private static CustomBindingsStateDto stateWithExtensions() {
+        CustomBindingsStateDto plain = state();
+        return new CustomBindingsStateDto(plain.enabled(), plain.bindings(), plain.activeId(), plain.activatedAt(),
+                Map.of(ART, List.of(
+                        new ExtensionSlotDto(TwitchExtensionsDto.Type.PANEL, 2, "mock-panel", "Build Guide"),
+                        new ExtensionSlotDto(TwitchExtensionsDto.Type.OVERLAY, 1, null, null))));
+    }
+
+    /** The extension layout of {@code html} (a row): from its root on. */
+    private static String layout(String html) {
+        int start = html.indexOf("binding-extensions-panel");
+        assertThat(start).as("extension layout").isNotNegative();
+        return html.substring(start);
+    }
+
+    private static List<Tag> slots(String html) {
+        List<Tag> found = new ArrayList<>();
+        Matcher m = START_TAG.matcher(html);
+        while (m.find()) {
+            if (!m.group(2).contains("data-slot=")) continue;
+            Map<String, String> attributes = new HashMap<>();
+            Matcher a = ATTRIBUTE.matcher(m.group(2));
+            while (a.find()) attributes.put(a.group(1), a.group(2) == null ? "" : a.group(2));
+            found.add(new Tag(m.group(1), attributes, m.group(3).trim()));
+        }
+        return found;
+    }
+
+    @Test
+    void custom_binding_form_renders_six_extension_slots() throws Exception {
+        String art = row(panel(render(true, stateWithExtensions()), "overview"), ART);
+
+        List<Tag> slots = slots(art);
+        assertThat(slots).hasSize(6);
+        assertThat(slots).extracting(t -> t.attr("data-type") + " " + t.attr("data-slot")).containsExactly(
+                "OVERLAY 1", "COMPONENT 1", "COMPONENT 2", "PANEL 1", "PANEL 2", "PANEL 3");
+        // Saved to the binding's own route; a slot it doesn't set keeps what Twitch has.
+        assertThat(byClass(art, "binding-extensions-panel").attr("data-save-url"))
+                .isEqualTo("/channel/enimaloc/custom-bindings/" + ART + "/extensions");
+        assertThat(slots.get(1).classes()).contains("extension-slot", "is-keep");
+        assertThat(slots.get(0).classes()).contains("is-none");
+        assertThat(art).contains("Twitch extensions", "Keep", "None", "Panel 3", "Component 2", "Overlay");
+    }
+
+    @Test
+    void saved_extension_shows_its_name() throws Exception {
+        String art = row(panel(render(true, stateWithExtensions()), "overview"), ART);
+
+        Tag panel = slots(art).get(4);
+        assertThat(panel.classes()).contains("is-extension").doesNotContain("is-keep");
+        assertThat(panel.attr("data-extension-id")).isEqualTo("mock-panel");
+        assertThat(panel.attr("data-extension-name")).isEqualTo("Build Guide");
+        assertThat(layout(art)).contains(">Build Guide<");
+        // The other binding has no layout: every slot kept.
+        assertThat(slots(row(panel(render(true, stateWithExtensions()), "overview"), DEV)))
+                .allSatisfy(t -> assertThat(t.classes()).contains("is-keep"));
+    }
+
+    @Test
+    void new_custom_binding_disables_the_layout() throws Exception {
+        String overview = panel(render(true, stateWithExtensions()), "overview");
+        int start = overview.lastIndexOf("<mdui-collapse-item", overview.indexOf("custom-binding-new hidden"));
+        String fresh = overview.substring(start, overview.indexOf("</mdui-collapse-item>", start));
+
+        Tag root = byClass(fresh, "binding-extensions-panel");
+        assertThat(root.classes()).contains("is-disabled");
+        assertThat(root.attr("data-save-url")).isNull();
+        assertThat(slots(fresh)).hasSize(6).allSatisfy(t -> assertThat(t.attr("disabled")).isNotNull());
+        assertThat(fresh).contains("Save the binding to choose its extensions");
+        // A saved binding's layout is not.
+        assertThat(byClass(row(overview, ART), "binding-extensions-panel").classes()).doesNotContain("is-disabled");
+        assertThat(row(overview, ART)).doesNotContain("Save the binding to choose its extensions");
     }
 
     @Test

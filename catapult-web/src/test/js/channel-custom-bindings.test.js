@@ -384,6 +384,21 @@ describe("overview list: create, edit, delete", () => {
         expect(document.querySelectorAll(`[data-custom-binding-id="${GAMES}"]`)).toHaveLength(1);
     });
 
+    it("opens the created binding's extension layout to its route", async () => {
+        window.CatapultExtensions = { enable: vi.fn() };
+        overview({ extra: TEMPLATE });
+        byId("custom-binding-new-btn").click();
+        fresh().querySelector(".custom-binding-name").value = "Jeux";
+        gameOf(fresh()).pick({ id: "66082", name: "Games + Demos" });
+        postJson.mockResolvedValueOnce(response(201, games));
+
+        fresh().querySelector(".custom-binding-save").click();
+        await flush();
+
+        expect(window.CatapultExtensions.enable)
+            .toHaveBeenCalledWith(item(GAMES), `/channel/enimaloc/custom-bindings/${GAMES}/extensions`);
+    });
+
     it("adds no second row when the live event listed the created binding first", async () => {
         overview({ extra: TEMPLATE });
         byId("custom-binding-new-btn").click();
