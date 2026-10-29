@@ -38,7 +38,7 @@ public class Oauth2LoginFailureHandler implements AuthenticationFailureHandler {
             "not_whitelisted", "invalid_invite", "alpha_full",
             "system_account_login_forbidden", "unauthorized");
 
-    @Value("${app.web-url:http://localhost:8081}")
+    @Value("${app.web-url:http://localhost:8080}")
     private String webUrl;
 
     @Override

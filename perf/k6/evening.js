@@ -1,8 +1,8 @@
 // A busy evening on catapult (perf/run.sh's load run): STREAMERS streamers working on their channel page
 // and VIEWERS viewers whose stream overlay polls the streamer's game, for DURATION.
 //
-// Run by perf/run.sh in grafana/k6 on the stack's perf-internal network: the site is http://web:8081 and
-// catapult-api's perf routes http://api:8080 (never published). Env: STREAMERS, VIEWERS, DURATION, WEB, API.
+// Run by perf/run.sh in grafana/k6 on the stack's perf-internal network: the site is http://web:8080 and
+// catapult-api's perf routes http://api:8081 (never published). Env: STREAMERS, VIEWERS, DURATION, WEB, API.
 //
 // streamers  each signs in once (/perf/login, session cookie), opens the live streams its channel page keeps
 //            open (live.js's /events/nav and channel-events.js's /events/channel/{u}: catapult has no
@@ -25,8 +25,8 @@ import { check } from "k6";
 import { Counter } from "k6/metrics";
 import { setTimeout } from "k6/timers";
 
-const WEB = __ENV.WEB || "http://web:8081";
-const API = __ENV.API || "http://api:8080";
+const WEB = __ENV.WEB || "http://web:8080";
+const API = __ENV.API || "http://api:8081";
 const STREAMERS = Number(__ENV.STREAMERS || 100);
 const VIEWERS = Number(__ENV.VIEWERS || 1000);
 const DURATION = __ENV.DURATION || "30m";

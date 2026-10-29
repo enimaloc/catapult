@@ -35,8 +35,8 @@ RUN mkdir -p /app/data && chown catapult:catapult /app/data
 
 USER catapult
 
-# 8081: the site, 8092: the management port (actuator, Prometheus, the compose healthcheck)
-EXPOSE 8081 8092
+# 8080: the site, 8092: the management port (actuator, Prometheus, the compose healthcheck)
+EXPOSE 8080 8092
 
 # webp-imageio loads libwebp (System.load), which the JDK warns of, and will refuse, unless allowed.
 ENTRYPOINT ["java", "--enable-native-access=ALL-UNNAMED", "-jar", "app.jar"]

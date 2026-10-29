@@ -25,7 +25,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ApiSteamConnectController {
 
-    @Value("${app.web-url:http://localhost:8081}")
+    @Value("${app.web-url:http://localhost:8080}")
     private String webBaseUrl;
 
     private final SteamOpenIdLinkService steamLinks;
