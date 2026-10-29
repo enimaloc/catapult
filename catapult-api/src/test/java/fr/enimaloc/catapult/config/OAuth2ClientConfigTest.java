@@ -35,7 +35,8 @@ class OAuth2ClientConfigTest {
         assertThat(twitch.getClientAuthenticationMethod()).isEqualTo(ClientAuthenticationMethod.CLIENT_SECRET_POST);
         assertThat(twitch.getAuthorizationGrantType()).isEqualTo(AuthorizationGrantType.AUTHORIZATION_CODE);
         assertThat(twitch.getRedirectUri()).isEqualTo("https://api.test/login/oauth2/code/{registrationId}");
-        assertThat(twitch.getScopes()).contains("user:write:chat", "moderator:manage:shoutouts");
+        assertThat(twitch.getScopes()).contains("user:write:chat", "user:edit:broadcast")
+                .doesNotContain("moderator:manage:shoutouts");
         assertThat(twitch.getProviderDetails().getUserInfoEndpoint().getUri()).isEqualTo("https://api.twitch.tv/helix/users");
         assertThat(repository.findByRegistrationId("xbox")).isNull();
         assertThat(repository.findByRegistrationId("battlenet")).isNull();
