@@ -116,7 +116,7 @@ window.CatapultExtensions = (function () {
         item.dataset.choice = choice.kind;
         if (choice.kind === "extension") {
             item.dataset.extensionId = choice.id;
-            item.dataset.extensionName = choice.name;
+            item.dataset.extensionName = choice.name ?? "";
         }
         item.textContent = text;
         if (icon) item.icon = icon;

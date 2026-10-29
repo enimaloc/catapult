@@ -277,6 +277,19 @@ describe("a pick", () => {
         expect(postJson.mock.calls[0][1]).toContainEqual({ type: "PANEL", slot: 1, extensionId: "nameless", extensionName: null });
         expect(open("binding", "PANEL", 1)[2].endText).toBeUndefined();
     });
+
+    it("of an extension whose name is missing sends no name and never stores the word undefined", async () => {
+        stubInstalled([{ id: "unnamed", version: "", types: ["PANEL"], canActivate: true }]);
+        render();
+        await flush();
+        const items = open("binding", "PANEL", 1);
+        const item = items.find(i => i.dataset.extensionId === "unnamed");
+        expect(item.dataset.extensionName).toBe("");
+        choose(items, "unnamed");
+        await flush();
+
+        expect(postJson.mock.calls[0][1]).toContainEqual({ type: "PANEL", slot: 1, extensionId: "unnamed", extensionName: null });
+    });
 });
 
 describe("a menu opened before the extensions are known", () => {
