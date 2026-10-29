@@ -202,13 +202,14 @@ class GameEventListenerLiveCheckTest {
     }
 
     @Test
-    void onNoGameDetected_whenNotLive_skipsRepository() {
+    void onNoGameDetected_whenNotLive_skipsTheCategory() {
         when(streamStateService.isLive(user)).thenReturn(false);
 
         listener.onNoGameDetected(new NoGameDetectedEvent(this, user));
 
-        verify(userSettingsRepository, never()).findById(any());
+        // The settings are still read for the "no game" extension layout, which follows the game being left
         verify(twitchService, never()).updateChannelReporting(any(), any());
+        verify(twitchService, never()).resetToDefault(any());
     }
 
     @Test
