@@ -78,6 +78,8 @@ import fr.enimaloc.catapult.common.dto.channel.CclToggleRequest;
 import fr.enimaloc.catapult.common.dto.channel.ChannelListResponse;
 import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
+import fr.enimaloc.catapult.common.dto.channel.ExtensionSlotDto;
+import fr.enimaloc.catapult.common.dto.channel.TwitchExtensionsDto;
 import fr.enimaloc.catapult.common.dto.channel.DtddProposalRequest;
 import fr.enimaloc.catapult.common.dto.channel.IgnoredToggleRequest;
 import fr.enimaloc.catapult.common.dto.channel.IncompleteFallbackRequest;
@@ -414,6 +416,38 @@ public class RealApiService implements ApiService {
     public int saveIncompleteFallbackSettings(String username, String twitchGameId, String twitchGameName, Set<String> ccls) {
         return onChannel(username, id -> client.putVoid("/api/internal/users/{userId}/settings/incomplete-fallback",
                 new IncompleteFallbackRequest(twitchGameId, twitchGameName, ccls), id), status -> status);
+    }
+
+    @Override
+    public TwitchExtensionsDto twitchExtensions(String username) {
+        TwitchExtensionsDto extensions = readChannel(username,
+                id -> client.getResult("/api/internal/users/{userId}/twitch/extensions", TwitchExtensionsDto.class, id));
+        return extensions == null ? new TwitchExtensionsDto(List.of(), List.of()) : extensions;
+    }
+
+    @Override
+    public int saveBindingExtensions(String username, String bindingId, List<ExtensionSlotDto> slots) {
+        return onChannel(username, id -> client.putVoid("/api/internal/users/{userId}/bindings/{bindingId}/extensions",
+                slots, id, bindingId), status -> status);
+    }
+
+    @Override
+    public int saveCustomBindingExtensions(String username, UUID customBindingId, List<ExtensionSlotDto> slots) {
+        return onChannel(username, id -> client.putVoid(
+                "/api/internal/users/{userId}/custom-bindings/{customBindingId}/extensions", slots, id, customBindingId),
+                status -> status);
+    }
+
+    @Override
+    public int saveNoGameExtensions(String username, List<ExtensionSlotDto> slots) {
+        return onChannel(username, id -> client.putVoid("/api/internal/users/{userId}/settings/no-game/extensions",
+                slots, id), status -> status);
+    }
+
+    @Override
+    public int saveIncompleteFallbackExtensions(String username, List<ExtensionSlotDto> slots) {
+        return onChannel(username, id -> client.putVoid(
+                "/api/internal/users/{userId}/settings/incomplete-fallback/extensions", slots, id), status -> status);
     }
 
     @Override

@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.common.dto.channel.ChannelDto;
 import fr.enimaloc.catapult.common.dto.channel.ChannelListResponse;
 import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.channel.ChannelUserDto;
+import fr.enimaloc.catapult.common.dto.channel.ExtensionSlotDto;
 import fr.enimaloc.catapult.common.dto.channel.GameDto;
 import fr.enimaloc.catapult.common.dto.channel.MinecraftData;
 import fr.enimaloc.catapult.common.dto.channel.ObsData;
@@ -372,6 +373,10 @@ public class MockData {
         updateBinding(bindingId, b -> BindingCopy.of(b).twEnabled(enabled).build());
     }
 
+    public void setBindingExtensions(String bindingId, List<ExtensionSlotDto> slots) {
+        updateBinding(bindingId, b -> BindingCopy.of(b).extensions(List.copyOf(slots)).build());
+    }
+
     /** Applies {@code mapper} to the binding matching {@code bindingId}, leaving the others untouched. */
     private void updateBinding(String bindingId, UnaryOperator<BindingDto> mapper) {
         binding = binding.stream().map(b -> b.id().equals(bindingId) ? mapper.apply(b) : b).toList();
@@ -392,6 +397,14 @@ public class MockData {
         userSettingsDto = SettingsCopy.of(userSettingsDto)
                 .noGame(twitchGameId, twitchGameName, Set.copyOf(ccls), applyOnStreamStart, applyOnNoGame, applyOnStreamEnd)
                 .build();
+    }
+
+    public void saveNoGameExtensions(List<ExtensionSlotDto> slots) {
+        userSettingsDto = SettingsCopy.of(userSettingsDto).noGameExtensions(List.copyOf(slots)).build();
+    }
+
+    public void saveIncompleteFallbackExtensions(List<ExtensionSlotDto> slots) {
+        userSettingsDto = SettingsCopy.of(userSettingsDto).fallbackExtensions(List.copyOf(slots)).build();
     }
 
     public void saveRaidSettings(Integer restoreGameMinutes) {
@@ -642,6 +655,7 @@ public class MockData {
         private boolean twEnabled;
         private boolean twOverride;
         private Set<String> tws;
+        private List<ExtensionSlotDto> extensions;
 
         private BindingCopy(BindingDto from) {
             this.from = from;
@@ -653,6 +667,7 @@ public class MockData {
             this.twEnabled = from.twEnabled();
             this.twOverride = from.twOverride();
             this.tws = from.tws();
+            this.extensions = from.extensions();
         }
 
         static BindingCopy of(BindingDto from) {
@@ -691,9 +706,14 @@ public class MockData {
             return this;
         }
 
+        BindingCopy extensions(List<ExtensionSlotDto> extensions) {
+            this.extensions = extensions;
+            return this;
+        }
+
         BindingDto build() {
             return new BindingDto(from.id(), from.status(), from.sourceType(), from.sourceName(), twitchGameId,
-                    twitchGameName, ignored, cclEnabled, ccls, twEnabled, twOverride, tws);
+                    twitchGameName, ignored, cclEnabled, ccls, twEnabled, twOverride, tws, from.boxArtUrl(), extensions);
         }
     }
 
@@ -714,6 +734,8 @@ public class MockData {
         private boolean twEnabled;
         private Set<String> blockedTws;
         private Integer raidMinutes;
+        private List<ExtensionSlotDto> noGameExtensions;
+        private List<ExtensionSlotDto> fallbackExtensions;
 
         private SettingsCopy(UserSettingsDto from) {
             this.from = from;
@@ -731,6 +753,8 @@ public class MockData {
             this.twEnabled = from.twFeatureEnabled();
             this.blockedTws = from.blockedTws();
             this.raidMinutes = from.raidRestoreGameMinutes();
+            this.noGameExtensions = from.noGameExtensions();
+            this.fallbackExtensions = from.incompleteFallbackExtensions();
         }
 
         static SettingsCopy of(UserSettingsDto from) {
@@ -772,11 +796,21 @@ public class MockData {
             return this;
         }
 
+        SettingsCopy noGameExtensions(List<ExtensionSlotDto> slots) {
+            this.noGameExtensions = slots;
+            return this;
+        }
+
+        SettingsCopy fallbackExtensions(List<ExtensionSlotDto> slots) {
+            this.fallbackExtensions = slots;
+            return this;
+        }
+
         UserSettingsDto build() {
             return new UserSettingsDto(cclEnabled, blockedCcls, noGameId, noGameName, noGameCcls,
                     applyOnStreamStart, applyOnNoGame, applyOnStreamEnd, fallbackId, fallbackName, fallbackCcls,
                     from.availableCcls(), twEnabled, blockedTws, from.availableTws(),
-                    raidMinutes, from.raidRestoreGameAvailable());
+                    raidMinutes, from.raidRestoreGameAvailable(), noGameExtensions, fallbackExtensions);
         }
     }
 }

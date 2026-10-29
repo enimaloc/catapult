@@ -125,6 +125,16 @@ public interface ApiService {
     int saveIncompleteFallbackSettings(String username, String twitchGameId, String twitchGameName, java.util.Set<String> ccls);
     /** How recent (1..120 minutes) a game an outgoing raid puts back, null or 0 for off; catapult-api's status, 502 when unreachable. */
     int saveRaidSettings(String username, Integer restoreGameMinutes);
+    /** The channel's installed and active Twitch extensions, for the layout menus; empty on failure. */
+    fr.enimaloc.catapult.common.dto.channel.TwitchExtensionsDto twitchExtensions(String username);
+    /** Saves a game binding's extension layout (empty: keep); catapult-api's status (204, or 400/403/404). */
+    int saveBindingExtensions(String username, String bindingId, java.util.List<fr.enimaloc.catapult.common.dto.channel.ExtensionSlotDto> slots);
+    /** Saves a custom binding's extension layout; catapult-api's status (204, or 400/403/404). */
+    int saveCustomBindingExtensions(String username, UUID id, java.util.List<fr.enimaloc.catapult.common.dto.channel.ExtensionSlotDto> slots);
+    /** Saves the no-game fallback's extension layout; catapult-api's status. */
+    int saveNoGameExtensions(String username, java.util.List<fr.enimaloc.catapult.common.dto.channel.ExtensionSlotDto> slots);
+    /** Saves the incomplete-game fallback's extension layout; catapult-api's status. */
+    int saveIncompleteFallbackExtensions(String username, java.util.List<fr.enimaloc.catapult.common.dto.channel.ExtensionSlotDto> slots);
     DtddMappingStatusDto dtddMappingStatus(String username);
     SearchResponse dtddSearch(String q);
     int dtddValidate(String igdbId);

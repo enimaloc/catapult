@@ -718,6 +718,54 @@ class RealApiServiceTest {
         service.saveNoGameSettings("enimaloc", "1", "Just Chatting", Set.of(), true, false, true);
     }
 
+    private static final List<fr.enimaloc.catapult.common.dto.channel.ExtensionSlotDto> SLOTS = List.of(
+            new fr.enimaloc.catapult.common.dto.channel.ExtensionSlotDto(
+                    fr.enimaloc.catapult.common.dto.channel.TwitchExtensionsDto.Type.PANEL, 1, "ext-1", "Guide"));
+    private static final String SLOTS_JSON = "[{\"type\":\"PANEL\",\"slot\":1,\"extensionId\":\"ext-1\",\"extensionName\":\"Guide\"}]";
+
+    @Test
+    void twitchExtensions() {
+        respond(HttpMethod.GET, channel("enimaloc") + "/twitch/extensions", """
+                {"installed":[{"id":"e1","name":"Guide","version":"1","types":["PANEL"],"canActivate":true}],"active":[]}""");
+
+        assertThat(service.twitchExtensions("enimaloc").installed()).extracting("id").containsExactly("e1");
+    }
+
+    @Test
+    void twitchExtensions_emptyWhenCatapultApiFails() {
+        expect(HttpMethod.GET, channel("enimaloc") + "/twitch/extensions").andRespond(withStatus(HttpStatus.BAD_GATEWAY));
+
+        var result = service.twitchExtensions("enimaloc");
+
+        assertThat(result.installed()).isEmpty();
+        assertThat(result.active()).isEmpty();
+    }
+
+    @Test
+    void saveBindingExtensions() {
+        expectPut(channel("enimaloc") + "/bindings/b1/extensions", SLOTS_JSON);
+        service.saveBindingExtensions("enimaloc", "b1", SLOTS);
+    }
+
+    @Test
+    void saveCustomBindingExtensions() {
+        UUID id = UUID.randomUUID();
+        expectPut(channel("enimaloc") + "/custom-bindings/" + id + "/extensions", SLOTS_JSON);
+        service.saveCustomBindingExtensions("enimaloc", id, SLOTS);
+    }
+
+    @Test
+    void saveNoGameExtensions() {
+        expectPut(channel("enimaloc") + "/settings/no-game/extensions", SLOTS_JSON);
+        service.saveNoGameExtensions("enimaloc", SLOTS);
+    }
+
+    @Test
+    void saveIncompleteFallbackExtensions() {
+        expectPut(channel("enimaloc") + "/settings/incomplete-fallback/extensions", SLOTS_JSON);
+        service.saveIncompleteFallbackExtensions("enimaloc", SLOTS);
+    }
+
     @Test
     void saveRaidSettings() {
         expectPut(channel("enimaloc") + "/settings/raid", "{\"restoreGameMinutes\":15}");

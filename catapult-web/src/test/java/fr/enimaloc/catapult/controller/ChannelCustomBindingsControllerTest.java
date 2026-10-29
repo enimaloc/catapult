@@ -85,6 +85,19 @@ class ChannelCustomBindingsControllerTest {
     }
 
     @Test
+    void saveExtensions_delegatesWithTheReceivedLayout() throws Exception {
+        when(apiService.saveCustomBindingExtensions(any(), any(), any())).thenReturn(204);
+        mvc.perform(post("/channel/enimaloc/custom-bindings/" + ID + "/extensions").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("[{\"type\":\"PANEL\",\"slot\":1,\"extensionId\":\"ext-1\",\"extensionName\":\"Guide\"}]"))
+                .andExpect(status().isNoContent());
+
+        org.mockito.Mockito.verify(apiService).saveCustomBindingExtensions("enimaloc", ID, java.util.List.of(
+                new fr.enimaloc.catapult.common.dto.channel.ExtensionSlotDto(
+                        fr.enimaloc.catapult.common.dto.channel.TwitchExtensionsDto.Type.PANEL, 1, "ext-1", "Guide")));
+    }
+
+    @Test
     void update_relaysHowReapplyingWent() throws Exception {
         when(apiService.updateCustomBinding("enimaloc", ID, REQUEST))
                 .thenReturn(new CustomBindingSave<>(200, new CustomBindingSaveResult(DTO, "bot_disabled"), null));
