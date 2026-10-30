@@ -630,6 +630,18 @@ describe("overview list: live updates", () => {
         expect(refresh).not.toHaveBeenCalled();
     });
 
+    it("doesn't toggle the row when activating or deactivating from its header", async () => {
+        overview();
+        const toggled = vi.fn();
+        document.addEventListener("click", toggled);
+
+        activateBtn(ART).click();
+        await flush();
+
+        document.removeEventListener("click", toggled);
+        expect(toggled).not.toHaveBeenCalled();
+    });
+
     it("removes the row of a binding no longer listed, the empty notice back once none is", () => {
         overview({ extra: TEMPLATE });
 

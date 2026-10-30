@@ -271,9 +271,10 @@
                               th:text="#{channel.custom_bindings.active}">Actif</span>
                         <span class="custom-binding-uninterruptible-chip" th:classappend="${b.uninterruptible()} ? '' : 'hidden'"
                               th:text="#{channel.custom_bindings.uninterruptible}">Ininterruptible</span>
+                        <th:block th:replace="~{pages/channel-tab/overview :: customBindingRunButtons(${active})}"></th:block>
                     </mdui-list-item>
                     <mdui-list-item nonclickable>
-                        <th:block th:replace="~{pages/channel-tab/overview :: customBindingForm(${b}, ${active}, true)}"></th:block>
+                        <th:block th:replace="~{pages/channel-tab/overview :: customBindingForm(${b}, true)}"></th:block>
                     </mdui-list-item>
                 </mdui-collapse-item>
                 <mdui-collapse-item class="custom-binding-item custom-binding-new hidden" value="new">
@@ -281,7 +282,7 @@
                         <span th:text="#{channel.custom_bindings.new_title}">Nouveau binding</span>
                     </mdui-list-item>
                     <mdui-list-item nonclickable>
-                        <th:block th:replace="~{pages/channel-tab/overview :: customBindingForm(null, false, false)}"></th:block>
+                        <th:block th:replace="~{pages/channel-tab/overview :: customBindingForm(null, false)}"></th:block>
                     </mdui-list-item>
                 </mdui-collapse-item>
             </mdui-collapse>
@@ -299,9 +300,10 @@
                     <span class="custom-binding-active-chip hidden" th:text="#{channel.custom_bindings.active}">Actif</span>
                     <span class="custom-binding-uninterruptible-chip hidden"
                           th:text="#{channel.custom_bindings.uninterruptible}">Ininterruptible</span>
+                    <th:block th:replace="~{pages/channel-tab/overview :: customBindingRunButtons(false)}"></th:block>
                 </mdui-list-item>
                 <mdui-list-item nonclickable>
-                    <th:block th:replace="~{pages/channel-tab/overview :: customBindingForm(null, false, true)}"></th:block>
+                    <th:block th:replace="~{pages/channel-tab/overview :: customBindingForm(null, true)}"></th:block>
                 </mdui-list-item>
             </mdui-collapse-item>
         </template>
@@ -318,9 +320,9 @@
 </mdui-tab-panel>
 
 <!--/* A custom binding's edit form (b null: an empty one), in the same panels as an association's: the name and
-     Twitch category, its CCLs, its Twitch extensions, its TWs, uninterruptible, then the actions; activating and deleting only for a saved
+     Twitch category, its CCLs, its Twitch extensions, its TWs, uninterruptible, then the actions; deleting only for a saved
      binding (saved), the "New" row's form creating one. */-->
-<th:block th:fragment="customBindingForm(b, active, saved)">
+<th:block th:fragment="customBindingForm(b, saved)">
     <div class="binding-edit-panel">
         <mdui-text-field class="custom-binding-name" variant="outlined" maxlength="40" autocomplete="off"
                          th:value="${b?.name()}"
@@ -361,15 +363,17 @@
     </div>
 
     <div class="custom-binding-actions">
-        <th:block th:if="${saved}">
-            <mdui-button class="custom-binding-activate" variant="filled" th:classappend="${active} ? 'hidden'"
-                         th:text="#{channel.custom_bindings.activate}">Activer</mdui-button>
-            <mdui-button class="custom-binding-stop" variant="tonal" th:classappend="${active} ? '' : 'hidden'"
-                         th:text="#{channel.custom_bindings.stop}">Désactiver</mdui-button>
-        </th:block>
         <mdui-button class="custom-binding-save" variant="outlined"
                      th:text="#{channel.custom_bindings.settings.save}">Enregistrer</mdui-button>
         <mdui-button th:if="${saved}" class="custom-binding-delete" variant="text" icon="delete"
                      th:text="#{channel.custom_bindings.settings.delete}">Supprimer</mdui-button>
     </div>
+</th:block>
+
+<!--/* A saved custom binding's activate/deactivate, on its row: a click on them doesn't open it (channel-custom-bindings.js). */-->
+<th:block th:fragment="customBindingRunButtons(active)">
+    <mdui-button slot="end-icon" class="custom-binding-activate" variant="filled" th:classappend="${active} ? 'hidden'"
+                 th:text="#{channel.custom_bindings.activate}">Activer</mdui-button>
+    <mdui-button slot="end-icon" class="custom-binding-stop" variant="tonal" th:classappend="${active} ? '' : 'hidden'"
+                 th:text="#{channel.custom_bindings.stop}">Désactiver</mdui-button>
 </th:block>
