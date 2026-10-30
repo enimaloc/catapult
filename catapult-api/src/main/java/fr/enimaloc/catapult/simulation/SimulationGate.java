@@ -57,8 +57,10 @@ public class SimulationGate {
     }
 
     /**
-     * Whether {@code account} is a fictitious one, made from the mock control panel: its Twitch id starts with
-     * {@value SimulationRegistry#FICTITIOUS_PREFIX}, which no real (numeric) Twitch id does.
+     * Whether {@code account} is a fictitious one, made from the mock control panel: its Twitch id is
+     * {@value SimulationRegistry#FICTITIOUS_PREFIX} and digits, which no real (numeric) Twitch id is, or one made
+     * before the prefix was shortened ({@value #LEGACY_FICTITIOUS_PREFIX} and a suffix). Any other id starting with
+     * an {@code m} is not: test and perf fixtures give real accounts such ids.
      */
     public static boolean isFictitious(UserAccount account) {
         return isFictitiousTwitchId(account.getTwitchId());
@@ -66,8 +68,19 @@ public class SimulationGate {
 
     /** Whether {@code twitchId} is a fictitious account's, see {@link #isFictitious(UserAccount)}. */
     public static boolean isFictitiousTwitchId(@Nullable String twitchId) {
-        return twitchId != null && twitchId.startsWith(SimulationRegistry.FICTITIOUS_PREFIX);
+        if (twitchId == null) {
+            return false;
+        }
+        if (twitchId.startsWith(LEGACY_FICTITIOUS_PREFIX)) {
+            return true;
+        }
+        String digits = twitchId.startsWith(SimulationRegistry.FICTITIOUS_PREFIX)
+                ? twitchId.substring(SimulationRegistry.FICTITIOUS_PREFIX.length())
+                : "";
+        return !digits.isEmpty() && digits.chars().allMatch(Character::isDigit);
     }
+
+    private static final String LEGACY_FICTITIOUS_PREFIX = "mock-";
 
     /**
      * Whether the simulation is off and {@code account} is a fictitious one: the scheduled jobs and connections leave

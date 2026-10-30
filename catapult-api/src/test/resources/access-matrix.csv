@@ -358,6 +358,10 @@ GET,/api/nonexistent,unmapped,,401,PASS,PASS,PASS,PASS,PASS,401
 GET,/api/internal/mock/accounts,unmapped,,401,PASS,PASS,PASS,PASS,PASS,401
 POST,/api/internal/mock/accounts,unmapped,,401,PASS,PASS,PASS,PASS,PASS,401
 DELETE,/api/internal/mock/accounts/{id},unmapped,,401,PASS,PASS,PASS,PASS,PASS,401
+GET,/api/internal/mock/twitch/users,unmapped,,401,PASS,PASS,PASS,PASS,PASS,401
+PUT,/api/internal/mock/accounts/{id}/identity,unmapped,,401,PASS,PASS,PASS,PASS,PASS,401
+POST,/api/internal/mock/accounts/{id}/convert,unmapped,,401,PASS,PASS,PASS,PASS,PASS,401
+POST,/api/internal/mock/accounts/{id}/revert,unmapped,,401,PASS,PASS,PASS,PASS,PASS,401
 GET,/api/internal/mock/accounts/{id}/state,unmapped,,401,PASS,PASS,PASS,PASS,PASS,401
 POST,/api/internal/mock/accounts/{id}/live,unmapped,,401,PASS,PASS,PASS,PASS,PASS,401
 POST,/api/internal/mock/accounts/{id}/bot,unmapped,,401,PASS,PASS,PASS,PASS,PASS,401

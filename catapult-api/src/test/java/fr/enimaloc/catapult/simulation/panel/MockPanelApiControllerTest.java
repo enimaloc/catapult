@@ -21,6 +21,8 @@ import fr.enimaloc.catapult.simulation.SimulationJournal;
 import fr.enimaloc.catapult.simulation.SimulationProperties;
 import fr.enimaloc.catapult.simulation.SimulationRegistry;
 import fr.enimaloc.catapult.simulation.account.FictitiousAccountService;
+import fr.enimaloc.catapult.simulation.account.FictitiousIdentity;
+import fr.enimaloc.catapult.simulation.account.TwitchUserLookup;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -71,6 +73,7 @@ class MockPanelApiControllerTest {
     StreamStateService streamState = mock(StreamStateService.class);
     TwitchEventSubService eventSub = mock(TwitchEventSubService.class);
     GameSourceResolver games = mock(GameSourceResolver.class);
+    TwitchUserLookup twitchUsers = mock(TwitchUserLookup.class);
     MockEnvironment env = new MockEnvironment();
     SimulationJournal journal = new SimulationJournal();
     SimulationRegistry registry;
@@ -100,7 +103,8 @@ class MockPanelApiControllerTest {
         StaticListableBeanFactory beans = new StaticListableBeanFactory();
         beans.addBean("twitchEventSubService", eventSub);
         mvc = standaloneSetup(new MockPanelApiController(accounts, registry, journal, actions,
-                gameState, streamState, beans.getBeanProvider(TwitchEventSubService.class), games, "12345"))
+                gameState, streamState, beans.getBeanProvider(TwitchEventSubService.class), games, twitchUsers,
+                "12345"))
                 .build();
     }
 
@@ -347,7 +351,7 @@ class MockPanelApiControllerTest {
 
     @Test
     void fictitious_accounts_are_created_and_deleted() throws Exception {
-        when(accounts.create("bob", false, List.of(real.getId()), true)).thenReturn(account("mock-0000beef", "bob"));
+        when(accounts.create(FictitiousIdentity.named("bob"), false, List.of(real.getId()), true)).thenReturn(account("mock-0000beef", "bob"));
 
         mvc.perform(write(post(API + "/accounts"),
                         "{\"username\":\"bob\",\"admin\":false,\"moderates\":[\"" + real.getId()
@@ -359,7 +363,7 @@ class MockPanelApiControllerTest {
                 .andExpect(status().isNoContent());
         verify(accounts).delete(alice.getId());
 
-        when(accounts.create(eq("alice"), any(Boolean.class), any(), any(Boolean.class)))
+        when(accounts.create(eq(FictitiousIdentity.named("alice")), any(Boolean.class), any(), any(Boolean.class)))
                 .thenThrow(new IllegalArgumentException("The username alice is taken"));
         mvc.perform(write(post(API + "/accounts"), "{\"username\":\"alice\"}"))
                 .andExpect(status().isBadRequest());
@@ -444,5 +448,79 @@ class MockPanelApiControllerTest {
 
         verify(actions, never()).stopPlaying(any());
         verify(accounts, never()).delete(any());
+    }
+
+    @Test
+    void create_passes_the_typed_identity() throws Exception {
+        UserAccount bob = account("m777", "bob");
+        bob.setProfileImageUrl("https://cdn/b.png");
+        bob.setSteamId("76561198000000003");
+        when(accounts.create(new FictitiousIdentity("bob", "777", "https://cdn/b.png", "76561198000000003"), false,
+                List.of(), true)).thenReturn(bob);
+
+        mvc.perform(write(post(API + "/accounts"), "{\"username\":\"bob\",\"admin\":false,\"twitchId\":\"777\","
+                        + "\"profileImageUrl\":\"https://cdn/b.png\",\"steamId\":\"76561198000000003\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.twitchId").value("m777"))
+                .andExpect(jsonPath("$.profileImageUrl").value("https://cdn/b.png"))
+                .andExpect(jsonPath("$.steamId").value("76561198000000003"))
+                .andExpect(jsonPath("$.converted").value(false));
+    }
+
+    @Test
+    void lookup_returns_the_twitch_user_or_a_404() throws Exception {
+        when(twitchUsers.byLogin("alice")).thenReturn(Optional.of(
+                new TwitchUserLookup.TwitchUser("123", "alice", "https://cdn/a.png")));
+        when(twitchUsers.byLogin("nobody")).thenReturn(Optional.empty());
+
+        mvc.perform(get(API + "/twitch/users").param("login", "alice"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("123"))
+                .andExpect(jsonPath("$.profileImageUrl").value("https://cdn/a.png"));
+        mvc.perform(get(API + "/twitch/users").param("login", "nobody"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void convert_revert_and_identity_answer_the_account_view() throws Exception {
+        when(accounts.convert(real.getId())).thenAnswer(call -> {
+            real.setTwitchId("m12345");
+            return real;
+        });
+        when(accounts.isConverted(real.getId())).thenReturn(true);
+        mvc.perform(write(post(API + "/accounts/{id}/convert", real.getId()), ""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.twitchId").value("m12345"))
+                .andExpect(jsonPath("$.fictitious").value(true))
+                .andExpect(jsonPath("$.converted").value(true));
+
+        when(accounts.revert(real.getId())).thenAnswer(call -> {
+            real.setTwitchId("12345");
+            return real;
+        });
+        when(accounts.isConverted(real.getId())).thenReturn(false);
+        mvc.perform(write(post(API + "/accounts/{id}/revert", real.getId()), ""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fictitious").value(false));
+
+        when(accounts.updateIdentity(alice.getId(), new FictitiousIdentity("alicia", null, "", null)))
+                .thenAnswer(call -> {
+                    alice.setTwitchUsername("alicia");
+                    return alice;
+                });
+        mvc.perform(write(put(API + "/accounts/{id}/identity", alice.getId()),
+                        "{\"username\":\"alicia\",\"profileImageUrl\":\"\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.username").value("alicia"));
+    }
+
+    @Test
+    void the_new_writes_need_the_panel_header() throws Exception {
+        mvc.perform(post(API + "/accounts/{id}/convert", real.getId())).andExpect(status().isForbidden());
+        mvc.perform(post(API + "/accounts/{id}/revert", real.getId())).andExpect(status().isForbidden());
+        mvc.perform(put(API + "/accounts/{id}/identity", alice.getId()).contentType(MediaType.APPLICATION_JSON)
+                .content("{}")).andExpect(status().isForbidden());
+        verify(accounts, never()).convert(any());
+        verify(accounts, never()).revert(any());
     }
 }

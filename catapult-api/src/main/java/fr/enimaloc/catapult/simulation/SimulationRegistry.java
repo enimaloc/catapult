@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
 
 /**
  * The mode of every external call, per account or globally, the data the simulated platforms answer with, and
- * which fictitious accounts are admins.
+ * which fictitious accounts are admins and which were converted from real ones.
  * Kept in a JSON file ({@code catapult.simulation.state-file}), loaded at startup and rewritten on every change.
  * <p>
  * Defaults: a fictitious account (Twitch id starting with {@value #FICTITIOUS_PREFIX}) has every call {@code OK}.
@@ -59,7 +59,11 @@ import java.util.stream.Collectors;
 @ConditionalOnBooleanProperty("catapult.simulation.enabled")
 public class SimulationRegistry {
 
-    static final String FICTITIOUS_PREFIX = "mock-";
+    /**
+     * What a fictitious account's Twitch id starts with, digits following: a real one is numeric. See
+     * {@link SimulationGate#isFictitiousTwitchId} for the exact rule.
+     */
+    public static final String FICTITIOUS_PREFIX = "m";
 
     /** The global APIs that resolve a game: real by default when their keys exist. */
     private static final Set<String> RESOLUTION_APIS = Set.of("igdb", "dtdd", "steam.store", "xbox.store");
@@ -71,12 +75,13 @@ public class SimulationRegistry {
 
     /** What the state file holds. */
     record State(Map<String, CallSetting> global, Map<String, Map<String, CallSetting>> accounts,
-                 Map<String, SimulatedData> data, Set<String> admins) {
+                 Map<String, SimulatedData> data, Set<String> admins, Set<String> converted) {
         State {
             global = global == null ? Map.of() : global;
             accounts = accounts == null ? Map.of() : accounts;
             data = data == null ? Map.of() : data;
             admins = admins == null ? Set.of() : admins;
+            converted = converted == null ? Set.of() : converted;
         }
     }
 
@@ -92,6 +97,7 @@ public class SimulationRegistry {
     private final Map<UUID, Map<String, CallSetting>> perAccount = new ConcurrentHashMap<>();
     private final Map<UUID, SimulatedData> data = new ConcurrentHashMap<>();
     private final Set<UUID> admins = ConcurrentHashMap.newKeySet();
+    private final Set<UUID> converted = ConcurrentHashMap.newKeySet();
 
     public SimulationRegistry(SimulationProperties properties, UserAccountRepository accounts,
                               OAuthTokenRepository tokens, MinecraftFriendLinkRepository minecraftLinks,
@@ -240,6 +246,23 @@ public class SimulationRegistry {
         save();
     }
 
+    /**
+     * Whether the account is a real one converted to fictitious: its Twitch id is its real one behind the prefix,
+     * so it can be reverted. Not dropped by {@link #forget}, which only drops what the simulation made up.
+     */
+    public boolean converted(UUID accountId) {
+        return converted.contains(accountId);
+    }
+
+    public synchronized void setConverted(UUID accountId, boolean isConverted) {
+        if (isConverted) {
+            converted.add(accountId);
+        } else {
+            converted.remove(accountId);
+        }
+        save();
+    }
+
     /** Drops everything kept for a deleted account: its settings, its simulated data and its admin role. */
     public synchronized void forget(UUID accountId) {
         perAccount.remove(accountId);
@@ -255,7 +278,7 @@ public class SimulationRegistry {
     }
 
     private boolean isFictitious(UserAccount account) {
-        return account.getTwitchId() != null && account.getTwitchId().startsWith(FICTITIOUS_PREFIX);
+        return SimulationGate.isFictitiousTwitchId(account.getTwitchId());
     }
 
     private boolean globalKeysPresent(CallKey key) {
@@ -290,11 +313,13 @@ public class SimulationRegistry {
                     perAccount.put(UUID.fromString(id), new ConcurrentHashMap<>(settings)));
             state.data().forEach((id, d) -> data.put(UUID.fromString(id), d));
             state.admins().forEach(id -> admins.add(UUID.fromString(id)));
+            state.converted().forEach(id -> converted.add(UUID.fromString(id)));
         } catch (RuntimeException e) {
             global.clear();
             perAccount.clear();
             data.clear();
             admins.clear();
+            converted.clear();
             moveAside(e);
         }
     }
@@ -318,7 +343,8 @@ public class SimulationRegistry {
         Map<String, SimulatedData> accountData = new HashMap<>();
         data.forEach((id, d) -> accountData.put(id.toString(), d));
         Set<String> adminIds = admins.stream().map(UUID::toString).collect(Collectors.toSet());
-        State state = new State(Map.copyOf(global), accountSettings, accountData, adminIds);
+        Set<String> convertedIds = converted.stream().map(UUID::toString).collect(Collectors.toSet());
+        State state = new State(Map.copyOf(global), accountSettings, accountData, adminIds, convertedIds);
         try {
             Path parent = stateFile.toAbsolutePath().getParent();
             if (parent != null) {

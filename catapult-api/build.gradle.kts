@@ -104,7 +104,11 @@ val generateChangelog = tasks.register("generateChangelog") {
                 .directory(rootProject.projectDir)
                 .start().inputStream.bufferedReader().readLines()
         }.getOrDefault(emptyList())
-        outputFile.writeText(lines.joinToString("\n"))
+        // Rewritten only when it changes: a touched resource makes devtools restart the running app
+        val content = lines.joinToString("\n")
+        if (!outputFile.exists() || outputFile.readText() != content) {
+            outputFile.writeText(content)
+        }
     }
 }
 
@@ -142,6 +146,9 @@ tasks.check {
 
 springBoot {
     buildInfo {
+        // No build time: it would make every build rewrite build-info.properties, and devtools restart the app
+        excludes.set(setOf("time"))
+
         val gitBranch = runCatching {
             ProcessBuilder("git", "rev-parse", "--abbrev-ref", "HEAD")
                 .directory(rootProject.projectDir)
