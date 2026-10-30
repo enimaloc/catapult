@@ -251,4 +251,24 @@ class SimulationRegistryTest {
 
         assertThat(registry.setting(null, SimulatedCalls.TWITCH_APP_BOT_REFRESH)).isEqualTo(CallSetting.real());
     }
+
+    @Test
+    void converted_survives_a_reload_from_the_file() {
+        registry().setConverted(realId, true);
+
+        assertThat(registry().converted(realId)).isTrue();
+        assertThat(registry().converted(fictitiousId)).isFalse();
+    }
+
+    @Test
+    void a_state_file_without_converted_accounts_still_loads() throws Exception {
+        Path file = dir.resolve("simulation.json");
+        Files.writeString(file, "{\"global\":{},\"accounts\":{},\"data\":{},\"admins\":[\"" + fictitiousId + "\"]}");
+
+        SimulationRegistry registry = registry();
+
+        assertThat(registry.admin(fictitiousId)).isTrue();
+        assertThat(registry.converted(fictitiousId)).isFalse();
+        assertThat(dir.resolve("simulation.json.corrupt")).doesNotExist();
+    }
 }
