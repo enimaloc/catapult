@@ -197,9 +197,9 @@ dev  ──►  beta  ──►  main
 
 | Branche | Contenu | Version publiée | Images Docker |
 |---|---|---|---|
-| `dev` | Intégration : les PR de fonctionnalités et de correctifs arrivent ici (branche par défaut) | aucune | aucune |
+| `dev` | Intégration : les PR de fonctionnalités et de correctifs arrivent ici | aucune | aucune |
 | `beta` | Pré-releases | `v1.0.0-BETA.N` | `:<version>` et `:beta` |
-| `main` | Releases stables | `vX.Y.Z` | `:<version>` et `:latest` |
+| `main` | Releases stables (branche par défaut du dépôt) | `vX.Y.Z` | `:<version>` et `:latest` |
 
 Une release part d'une PR de promotion préparée par un bot :
 

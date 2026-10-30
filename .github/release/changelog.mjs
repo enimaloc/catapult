@@ -1,5 +1,5 @@
-// Regenerates CHANGELOG.md from every published GitHub Release and commits it on the default branch
-// (dev), the only branch it is written on: it reaches beta and main through the promotions, so the
+// Regenerates CHANGELOG.md from every published GitHub Release and commits it on dev,
+// the only branch it is written on: it reaches beta and main through the promotions, so the
 // backports never conflict on it. The commit is a release commit (App author, `chore(release): v…`
 // subject), never promoted on its own. Run by release.yml once a release is published.
 // CLI: node .github/release/changelog.mjs --tag v1.0.0 --branch dev
