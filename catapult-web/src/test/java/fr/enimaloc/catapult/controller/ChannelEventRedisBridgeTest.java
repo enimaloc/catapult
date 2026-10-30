@@ -151,7 +151,7 @@ class ChannelEventRedisBridgeTest {
 
         assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.BINDING_UPSERTED,
                 new ChannelEvents.BindingUpserted(owner.toString(), "streamer", binding))))
-                .contains(new TwResetEvent("streamer", "b1"), new TwEnabledStateEvent("streamer", "b1", false));
+                .contains(new TwResetEvent("streamer", "b1", Set.of("auto")), new TwEnabledStateEvent("streamer", "b1", false));
     }
 
     @Test

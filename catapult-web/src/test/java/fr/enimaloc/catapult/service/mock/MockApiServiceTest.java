@@ -408,7 +408,7 @@ class MockApiServiceTest {
         assertThat(binding().twOverride()).isFalse();
         assertThat(events).containsExactly(new TwUpdatedEvent(username, bindingId, Set.of("spiders")),
                 new TwEnabledStateEvent(username, bindingId, false),
-                new TwResetEvent(username, bindingId));
+                new TwResetEvent(username, bindingId, Set.of()));
     }
 
     @Test

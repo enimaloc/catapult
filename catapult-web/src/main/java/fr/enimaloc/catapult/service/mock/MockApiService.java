@@ -375,7 +375,7 @@ public class MockApiService implements ApiService {
         log.trace("resetTws({})", bindingId);
         MockData data = currentData();
         data.resetBindingTws(bindingId);
-        eventPublisher.publishEvent(new TwResetEvent(data.getChannelDto().twitchUsername(), bindingId));
+        eventPublisher.publishEvent(new TwResetEvent(data.getChannelDto().twitchUsername(), bindingId, Set.of()));
         return NO_CONTENT;
     }
 

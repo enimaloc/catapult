@@ -26,7 +26,7 @@ window.CatapultDock = (function () {
         BindingUpdatedEvent: ["bindingId", "twitchGameId", "twitchGameName", "ccls"],
         BindingDeletedEvent: ["bindingId"],
         TwUpdatedEvent: ["bindingId", "tws"],
-        TwResetEvent: ["bindingId"],
+        TwResetEvent: ["bindingId", "tws"],
         TwEnabledStateEvent: ["bindingId", "enabled"],
         ChannelSettingsUpdatedEvent: ["settings"],
     };

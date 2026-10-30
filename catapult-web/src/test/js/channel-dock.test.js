@@ -230,7 +230,8 @@ describe("live events", () => {
         }],
         ["TwUpdatedEvent", { bindingId: "b1", tws: ["tw-a"] },
             () => expect(checked(".obs-dock-binding-tw")).toEqual([true, false])],
-        ["TwResetEvent", { bindingId: "b1" }, () => expect(checked(".obs-dock-binding-tw")).toEqual([false, false])],
+        ["TwResetEvent", { bindingId: "b1", tws: ["tw-a"] },
+            () => expect(checked(".obs-dock-binding-tw")).toEqual([true, false])],
         ["TwEnabledStateEvent", { bindingId: "b1", enabled: true },
             () => expect(byId("obs-dock-binding-tw-enabled").checked).toBe(true)],
         ["ChannelSettingsUpdatedEvent", { settings: BLOCKED_CCLS_ONLY_D }, () => {
@@ -318,6 +319,7 @@ describe("live events", () => {
         ["ChannelSettingsUpdatedEvent", { settings: { ccl: { enabled: true, blockedCcls: [] } } }],
         ["ChannelSettingsUpdatedEvent", { settings: { ccl: { enabled: true }, tw: { enabled: true, blockedTws: [] } } }],
         ["ChannelSettingsUpdatedEvent", { settings: { ccl: { enabled: true, blockedCcls: [] }, tw: { enabled: true } } }],
+        ["TwResetEvent", { bindingId: "b1" }],
         ["TwResetEvent", null],
     ])("re-renders for a %s lacking a field it patches with", async (eventName, data) => {
         dock();
