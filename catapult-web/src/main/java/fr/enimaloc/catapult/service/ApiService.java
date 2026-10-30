@@ -80,6 +80,7 @@ public interface ApiService {
     int updateBinding(String username, String bindingId, String twitchGameId, String twitchGameName, java.util.Set<String> ccls);
     int saveTws(String bindingId, java.util.Set<String> tws);
     int resetTws(String bindingId);
+    int resetBinding(String bindingId);
     int toggleTwEnabled(String bindingId, boolean enabled);
     int saveSteamToken(String username, String token, boolean shared);
     int steamTokenSharing(String username, boolean shared);

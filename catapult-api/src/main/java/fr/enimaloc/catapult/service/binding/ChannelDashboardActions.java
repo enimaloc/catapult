@@ -62,6 +62,11 @@ public class ChannelDashboardActions {
         publishBinding(owner, bindingId);
     }
 
+    public void resetToDefaults(UserAccount owner, UUID bindingId) {
+        bindingService.resetToDefaults(owner, bindingId);
+        publishBinding(owner, bindingId);
+    }
+
     public void toggleTwEnabled(UserAccount owner, UUID bindingId, boolean enabled) {
         bindingService.toggleTwEnabled(owner, bindingId, enabled);
         publishBinding(owner, bindingId);

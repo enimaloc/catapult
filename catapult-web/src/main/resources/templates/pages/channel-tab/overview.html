@@ -154,6 +154,9 @@
                         <label th:for="'binding-ignored-toggle-' + ${b.id()}"
                                th:text="#{channel.bindings.ignored}">Ignoré</label>
                     </div>
+                    <!--/* Owner only: it resets the TWs too (see below). */-->
+                    <mdui-button th:if="${ch.isOwner()}" class="binding-reset-btn" variant="text" icon="restart_alt"
+                                 th:text="#{channel.bindings.reset}">Remettre par défaut</mdui-button>
                     <mdui-button-icon icon="delete" data-post="delete"
                                       class="binding-delete-btn"></mdui-button-icon>
 
@@ -220,6 +223,15 @@
             Aucune association.
         </mdui-list-item>
     </mdui-list>
+
+    <mdui-dialog th:if="${ch.isOwner()}" id="binding-reset-dialog" close-on-overlay-click
+                 th:attr="headline=#{channel.bindings.reset.title}">
+        <p th:text="#{channel.bindings.reset.prompt}">Sa catégorie, ses CCL et ses TW reviennent à la détection automatique.</p>
+        <mdui-button slot="action" variant="text" class="binding-reset-dismiss"
+                     th:text="#{channel.bindings.reset.dismiss}">Annuler</mdui-button>
+        <mdui-button slot="action" variant="filled" class="binding-reset-confirm"
+                     th:text="#{channel.bindings.reset.confirm}">Remettre par défaut</mdui-button>
+    </mdui-dialog>
 
     <div class="bindings-pagination" th:if="${ch.bindings().totalPages() > 1}">
         <a data-link th:unless="${ch.bindings().first()}"

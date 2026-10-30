@@ -380,6 +380,15 @@ public class MockApiService implements ApiService {
     }
 
     @Override
+    public int resetBinding(String bindingId) {
+        log.trace("resetBinding({})", bindingId);
+        MockData data = currentData();
+        data.resetBinding(bindingId);
+        eventPublisher.publishEvent(new TwResetEvent(data.getChannelDto().twitchUsername(), bindingId, Set.of()));
+        return NO_CONTENT;
+    }
+
+    @Override
     public int toggleTwEnabled(String bindingId, boolean enabled) {
         log.trace("toggleTwEnabled({}, {})", bindingId, enabled);
         MockData data = currentData();

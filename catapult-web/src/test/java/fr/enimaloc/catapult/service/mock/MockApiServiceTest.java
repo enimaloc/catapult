@@ -412,6 +412,18 @@ class MockApiServiceTest {
     }
 
     @Test
+    void resetBinding_turnsItsTogglesBackOn() {
+        service.toggleTwEnabled(bindingId, false);
+        service.saveTws(bindingId, Set.of("spiders"));
+
+        service.resetBinding(bindingId);
+
+        assertThat(binding().twEnabled()).isTrue();
+        assertThat(binding().twOverride()).isFalse();
+        assertThat(binding().tws()).isEmpty();
+    }
+
+    @Test
     void steamToken() {
         service.saveSteamToken(username, "KEY", true);
         service.steamTokenSharing(username, false);

@@ -369,6 +369,11 @@ public class MockData {
         updateBinding(bindingId, b -> BindingCopy.of(b).tws(false, Set.of()).build());
     }
 
+    public void resetBinding(String bindingId) {
+        updateBinding(bindingId, b -> BindingCopy.of(b).ignored(false).cclEnabled(true).twEnabled(true)
+                .tws(false, Set.of()).extensions(List.of()).build());
+    }
+
     public void setBindingTwEnabled(String bindingId, boolean enabled) {
         updateBinding(bindingId, b -> BindingCopy.of(b).twEnabled(enabled).build());
     }
