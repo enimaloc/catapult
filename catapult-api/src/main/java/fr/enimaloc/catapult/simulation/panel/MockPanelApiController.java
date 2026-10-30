@@ -19,6 +19,7 @@ import fr.enimaloc.catapult.simulation.SimulationGate;
 import fr.enimaloc.catapult.simulation.SimulationJournal;
 import fr.enimaloc.catapult.simulation.SimulationRegistry;
 import fr.enimaloc.catapult.simulation.account.FictitiousAccountService;
+import fr.enimaloc.catapult.simulation.account.FictitiousIdentity;
 import fr.enimaloc.catapult.simulation.panel.MockPanelDtos.AccountView;
 import fr.enimaloc.catapult.simulation.panel.MockPanelDtos.ApiCalls;
 import fr.enimaloc.catapult.simulation.panel.MockPanelDtos.BotRequest;
@@ -155,7 +156,7 @@ public class MockPanelApiController {
 
     @PostMapping("/accounts")
     public AccountView create(@RequestBody CreateAccount body) {
-        UserAccount created = accounts.create(body.username(), body.admin(),
+        UserAccount created = accounts.create(FictitiousIdentity.named(body.username()), body.admin(),
                 body.moderates() == null ? List.of() : body.moderates(),
                 body.botEnabled() == null || body.botEnabled());
         Map<String, String> usernames = usernamesByTwitchId(accounts.list());

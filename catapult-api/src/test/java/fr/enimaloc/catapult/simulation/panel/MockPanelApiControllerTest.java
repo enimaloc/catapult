@@ -21,6 +21,7 @@ import fr.enimaloc.catapult.simulation.SimulationJournal;
 import fr.enimaloc.catapult.simulation.SimulationProperties;
 import fr.enimaloc.catapult.simulation.SimulationRegistry;
 import fr.enimaloc.catapult.simulation.account.FictitiousAccountService;
+import fr.enimaloc.catapult.simulation.account.FictitiousIdentity;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -347,7 +348,7 @@ class MockPanelApiControllerTest {
 
     @Test
     void fictitious_accounts_are_created_and_deleted() throws Exception {
-        when(accounts.create("bob", false, List.of(real.getId()), true)).thenReturn(account("mock-0000beef", "bob"));
+        when(accounts.create(FictitiousIdentity.named("bob"), false, List.of(real.getId()), true)).thenReturn(account("mock-0000beef", "bob"));
 
         mvc.perform(write(post(API + "/accounts"),
                         "{\"username\":\"bob\",\"admin\":false,\"moderates\":[\"" + real.getId()
@@ -359,7 +360,7 @@ class MockPanelApiControllerTest {
                 .andExpect(status().isNoContent());
         verify(accounts).delete(alice.getId());
 
-        when(accounts.create(eq("alice"), any(Boolean.class), any(), any(Boolean.class)))
+        when(accounts.create(eq(FictitiousIdentity.named("alice")), any(Boolean.class), any(), any(Boolean.class)))
                 .thenThrow(new IllegalArgumentException("The username alice is taken"));
         mvc.perform(write(post(API + "/accounts"), "{\"username\":\"alice\"}"))
                 .andExpect(status().isBadRequest());

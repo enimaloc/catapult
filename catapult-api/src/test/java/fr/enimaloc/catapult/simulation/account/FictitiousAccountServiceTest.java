@@ -77,8 +77,12 @@ class FictitiousAccountServiceTest {
                 .toList());
         when(accounts.findAll()).thenAnswer(call -> new ArrayList<>(stored.values()));
         when(accounts.findBySystemAccountTrue()).thenReturn(Optional.empty());
-        when(accounts.findBySteamId(any())).thenReturn(Optional.empty());
-        when(accounts.findByTwitchUsername(any())).thenReturn(Optional.empty());
+        when(accounts.findBySteamId(any())).thenAnswer(call -> stored.values().stream()
+                .filter(account -> call.getArgument(0).equals(account.getSteamId())).findFirst());
+        when(accounts.findByTwitchUsername(any())).thenAnswer(call -> stored.values().stream()
+                .filter(account -> call.getArgument(0).equals(account.getTwitchUsername())).findFirst());
+        when(accounts.findByTwitchId(any())).thenAnswer(call -> stored.values().stream()
+                .filter(account -> call.getArgument(0).equals(account.getTwitchId())).findFirst());
         when(getters.save(any())).thenAnswer(call -> {
             GetterConfig config = call.getArgument(0);
             savedGetters.add(config);
@@ -112,7 +116,7 @@ class FictitiousAccountServiceTest {
     void creates_a_fictitious_member_with_settings() {
         UserAccount channel = realAccount("12345");
 
-        UserAccount account = service.create("alice", true, List.of(channel.getId()), false);
+        UserAccount account = service.create(FictitiousIdentity.named("alice"), true, List.of(channel.getId()), false);
 
         assertThat(account.getTwitchId()).startsWith("m").hasSize(9);
         assertThat(account.getTwitchUsername()).isEqualTo("alice");
@@ -135,17 +139,17 @@ class FictitiousAccountServiceTest {
 
     @Test
     void a_member_is_not_admin_and_unknown_moderated_channels_are_refused() {
-        UserAccount account = service.create("bob", false, List.of(), true);
+        UserAccount account = service.create(FictitiousIdentity.named("bob"), false, List.of(), true);
 
         assertThat(registry.admin(account.getId())).isFalse();
         assertThat(account.isBotEnabled()).isTrue();
-        assertThatThrownBy(() -> service.create("carol", false, List.of(UUID.randomUUID()), true))
+        assertThatThrownBy(() -> service.create(FictitiousIdentity.named("carol"), false, List.of(UUID.randomUUID()), true))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void delete_removes_the_account() {
-        UserAccount account = service.create("alice", true, List.of(), true);
+        UserAccount account = service.create(FictitiousIdentity.named("alice"), true, List.of(), true);
 
         service.delete(account.getId());
 
@@ -171,5 +175,72 @@ class FictitiousAccountServiceTest {
         assertThat(service.account(real.getId())).contains(real);
         assertThat(service.account(system.getId())).isEmpty();
         assertThat(service.account(UUID.randomUUID())).isEmpty();
+    }
+
+    @Test
+    void a_typed_twitch_id_gets_the_fictitious_prefix_once() {
+        assertThat(service.create(new FictitiousIdentity("alice", " 123 ", null, null), false, List.of(), true)
+                .getTwitchId()).isEqualTo("m123");
+        assertThat(service.create(new FictitiousIdentity("bob", "m456", null, null), false, List.of(), true)
+                .getTwitchId()).isEqualTo("m456");
+    }
+
+    @Test
+    void a_taken_twitch_id_is_refused() {
+        service.create(new FictitiousIdentity("alice", "123", null, null), false, List.of(), true);
+
+        assertThatThrownBy(() -> service.create(new FictitiousIdentity("bob", "m123", null, null), false, List.of(),
+                true)).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("m123");
+    }
+
+    @Test
+    void a_typed_steam_id_is_kept_and_a_taken_one_refused() {
+        UserAccount alice = service.create(new FictitiousIdentity("alice", null, null, "76561198000000001"), false,
+                List.of(), true);
+
+        assertThat(alice.getSteamId()).isEqualTo("76561198000000001");
+        assertThatThrownBy(() -> service.create(new FictitiousIdentity("bob", null, null, "76561198000000001"),
+                false, List.of(), true)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void a_blank_steam_id_gets_a_fictitious_one_and_the_avatar_is_kept() {
+        UserAccount alice = service.create(new FictitiousIdentity("alice", null, " https://cdn/a.png ", " "), false,
+                List.of(), true);
+
+        assertThat(alice.getSteamId()).startsWith(FictitiousAccountService.STEAM_ID_PREFIX);
+        assertThat(alice.getProfileImageUrl()).isEqualTo("https://cdn/a.png");
+    }
+
+    @Test
+    void update_identity_changes_the_given_fields_only() {
+        UserAccount alice = service.create(new FictitiousIdentity("alice", null, "https://cdn/a.png", null), false,
+                List.of(), true);
+        String steamId = alice.getSteamId();
+
+        service.updateIdentity(alice.getId(), new FictitiousIdentity("alicia", null, "", null));
+
+        assertThat(alice.getTwitchUsername()).isEqualTo("alicia");
+        assertThat(alice.getProfileImageUrl()).isNull();
+        assertThat(alice.getSteamId()).isEqualTo(steamId);
+        service.updateIdentity(alice.getId(), new FictitiousIdentity(null, null, null, "76561198000000002"));
+        assertThat(alice.getSteamId()).isEqualTo("76561198000000002");
+        assertThat(alice.getTwitchUsername()).isEqualTo("alicia");
+    }
+
+    @Test
+    void update_identity_refuses_a_real_account_a_twitch_id_and_a_taken_username() {
+        UserAccount real = realAccount("12345");
+        UserAccount alice = service.create(FictitiousIdentity.named("alice"), false, List.of(), true);
+        service.create(FictitiousIdentity.named("bob"), false, List.of(), true);
+
+        assertThatThrownBy(() -> service.updateIdentity(real.getId(), FictitiousIdentity.named("x")))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.updateIdentity(alice.getId(), new FictitiousIdentity(null, "m9", null, null)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.updateIdentity(alice.getId(), FictitiousIdentity.named("bob")))
+                .isInstanceOf(IllegalArgumentException.class);
+        // Its own username is not taken
+        service.updateIdentity(alice.getId(), FictitiousIdentity.named("alice"));
     }
 }

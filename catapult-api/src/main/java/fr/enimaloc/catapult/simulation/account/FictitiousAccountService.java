@@ -10,6 +10,7 @@ import fr.enimaloc.catapult.service.account.AccountService;
 import fr.enimaloc.catapult.simulation.SimulationGate;
 import fr.enimaloc.catapult.simulation.SimulationRegistry;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.DependsOn;
@@ -67,34 +68,38 @@ public class FictitiousAccountService {
     }
 
     /**
-     * A new fictitious member, active, set up as a new member is, with a fictitious Steam id and its Steam getter
-     * enabled. Publishes the {@link AccountCreatedEvent} a new member's account does.
+     * A new fictitious member, active, set up as a new member is, with its Steam getter enabled. Publishes the
+     * {@link AccountCreatedEvent} a new member's account does.
      *
-     * @param username   its Twitch login, unique
+     * @param identity   its username (unique), and optionally its Twitch id (a made-up one when blank), avatar and
+     *                   Steam id (a fictitious one when blank)
      * @param admin      whether its fictitious login is given {@code ROLE_ADMIN}
      * @param moderates  the accounts whose channels it moderates
      * @param botEnabled whether its bot is on
-     * @throws IllegalArgumentException for a blank or taken username, or an unknown moderated account
+     * @throws IllegalArgumentException for a blank or taken username, Twitch id or Steam id, or an unknown moderated
+     *                                  account
      */
     @Transactional
-    public UserAccount create(String username, boolean admin, List<UUID> moderates, boolean botEnabled) {
-        if (username == null || username.isBlank()) {
-            throw new IllegalArgumentException("A fictitious account needs a username");
+    public UserAccount create(FictitiousIdentity identity, boolean admin, List<UUID> moderates, boolean botEnabled) {
+        String login = freeUsername(identity.username(), null);
+        String twitchId = isBlank(identity.twitchId())
+                ? SimulationRegistry.FICTITIOUS_PREFIX + shortSuffix()
+                : fictitiousTwitchId(identity.twitchId());
+        if (accounts.findByTwitchId(twitchId).isPresent()) {
+            throw new IllegalArgumentException("The Twitch id " + twitchId + " is taken");
         }
-        String login = username.trim();
-        if (accounts.findByTwitchUsername(login).isPresent()) {
-            throw new IllegalArgumentException("The username " + login + " is taken");
-        }
+        String steamId = isBlank(identity.steamId()) ? freeSteamId() : freeSteamId(identity.steamId(), null);
         List<UUID> moderatedIds = moderates == null ? List.of() : List.copyOf(new LinkedHashSet<>(moderates));
         List<UserAccount> moderated = accounts.findAllById(moderatedIds);
         if (moderated.size() != moderatedIds.size()) {
             throw new IllegalArgumentException("Unknown moderated account in " + moderatedIds);
         }
 
-        UserAccount account = members.createNewAccount(SimulationRegistry.FICTITIOUS_PREFIX + shortSuffix(), login);
+        UserAccount account = members.createNewAccount(twitchId, login);
         account.setStatus(UserAccount.Status.ACTIVE);
         account.setBotEnabled(botEnabled);
-        account.setSteamId(freeSteamId());
+        account.setSteamId(steamId);
+        account.setProfileImageUrl(blankToNull(identity.profileImageUrl()));
         account = accounts.save(account);
         enableSteamGetter(account);
 
@@ -105,6 +110,32 @@ public class FictitiousAccountService {
         eventPublisher.publishEvent(new AccountCreatedEvent(this, account));
         log.info("Fictitious account {} ({}) created, admin={}, bot={}", account.getId(), login, admin, botEnabled);
         return account;
+    }
+
+    /**
+     * Changes what a fictitious account is known by: a {@code null} field is left as it is, a blank avatar is
+     * cleared. Its Twitch id stays: the simulation's state and a converted account's way back are keyed on it.
+     *
+     * @throws IllegalArgumentException for an unknown or real account, a Twitch id, a blank username or Steam id, or
+     *                                  one another account has
+     */
+    @Transactional
+    public UserAccount updateIdentity(UUID accountId, FictitiousIdentity identity) {
+        UserAccount account = fictitious(accountId)
+                .orElseThrow(() -> new IllegalArgumentException("No fictitious account " + accountId));
+        if (identity.twitchId() != null) {
+            throw new IllegalArgumentException("A fictitious account's Twitch id cannot be changed");
+        }
+        if (identity.username() != null) {
+            account.setTwitchUsername(freeUsername(identity.username(), accountId));
+        }
+        if (identity.profileImageUrl() != null) {
+            account.setProfileImageUrl(blankToNull(identity.profileImageUrl()));
+        }
+        if (identity.steamId() != null) {
+            account.setSteamId(freeSteamId(identity.steamId(), accountId));
+        }
+        return accounts.save(account);
     }
 
     /**
@@ -148,6 +179,47 @@ public class FictitiousAccountService {
     /** Whether the fictitious account is an admin. */
     public boolean isAdmin(UUID accountId) {
         return registry.admin(accountId);
+    }
+
+    /** {@code raw} trimmed, behind the fictitious prefix unless it already is. */
+    static String fictitiousTwitchId(String raw) {
+        if (isBlank(raw)) {
+            throw new IllegalArgumentException("A blank Twitch id");
+        }
+        String id = raw.trim();
+        return SimulationGate.isFictitiousTwitchId(id) ? id : SimulationRegistry.FICTITIOUS_PREFIX + id;
+    }
+
+    /** {@code username} trimmed, when no account but {@code self} has it. */
+    private String freeUsername(@Nullable String username, @Nullable UUID self) {
+        if (isBlank(username)) {
+            throw new IllegalArgumentException("A fictitious account needs a username");
+        }
+        String login = username.trim();
+        if (accounts.findByTwitchUsername(login).filter(other -> !other.getId().equals(self)).isPresent()) {
+            throw new IllegalArgumentException("The username " + login + " is taken");
+        }
+        return login;
+    }
+
+    /** {@code steamId} trimmed, when no account but {@code self} has it. */
+    private String freeSteamId(@Nullable String steamId, @Nullable UUID self) {
+        if (isBlank(steamId)) {
+            throw new IllegalArgumentException("A blank Steam id");
+        }
+        String id = steamId.trim();
+        if (accounts.findBySteamId(id).filter(other -> !other.getId().equals(self)).isPresent()) {
+            throw new IllegalArgumentException("The Steam id " + id + " is taken");
+        }
+        return id;
+    }
+
+    private static boolean isBlank(@Nullable String value) {
+        return value == null || value.isBlank();
+    }
+
+    private static @Nullable String blankToNull(@Nullable String value) {
+        return isBlank(value) ? null : value.trim();
     }
 
     private static String shortSuffix() {
