@@ -103,6 +103,13 @@ export function createGitHub({ token, owner, repo, fetch = globalThis.fetch }) {
       );
     },
 
+    async markReady(pull) {
+      await graphql(
+        "mutation($id: ID!) { markPullRequestReadyForReview(input: {pullRequestId: $id}) { clientMutationId } }",
+        { id: pull.nodeId },
+      );
+    },
+
     async disableAutoMerge(pull) {
       await graphql(
         "mutation($id: ID!) { disablePullRequestAutoMerge(input: {pullRequestId: $id}) { clientMutationId } }",
@@ -186,6 +193,23 @@ export function createGitHub({ token, owner, repo, fetch = globalThis.fetch }) {
 
     async comment(number, body) {
       await request("POST", `${repoPath}/issues/${number}/comments`, { body });
+    },
+
+    /** The comments of an issue or pull request, oldest first, as {author, body, createdAt, updatedAt}. */
+    async listComments(number) {
+      const comments = [];
+      for (let page = 1; ; page++) {
+        const result = await request("GET", `${repoPath}/issues/${number}/comments?per_page=100&page=${page}`);
+        comments.push(
+          ...result.map((c) => ({
+            author: c.user?.login ?? null,
+            body: c.body ?? "",
+            createdAt: c.created_at,
+            updatedAt: c.updated_at,
+          })),
+        );
+        if (result.length < 100) return comments;
+      }
     },
 
     /** Commits on `head` not on `base`, oldest first. */

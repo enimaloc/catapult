@@ -5,7 +5,8 @@
 import { parseArgs } from "node:util";
 import { pathToFileURL } from "node:url";
 import { parseVersion, bumpKind, nextBeta, nextStable } from "./lib/version.mjs";
-import { buildBody, parseBody, seenId, setPromotedHead, updateBody } from "./lib/pr-body.mjs";
+import { buildBody, parseBody, scheduledText, seenId, setPromotedHead, setScheduledText, updateBody } from "./lib/pr-body.mjs";
+import { activeSchedule, NO_SCHEDULE } from "./lib/schedule.mjs";
 import { createGitHub } from "./lib/github.mjs";
 import { refreshDashboardSafely } from "./dashboard.mjs";
 
@@ -70,6 +71,15 @@ function backToDraftComment(source, version) {
   );
 }
 
+function scheduleCancelledComment(source, commits) {
+  return (
+    `De nouveaux commits sont arrivés sur \`${source}\` : la sortie programmée est annulée. ` +
+    `Relis-les puis indique une nouvelle date pour la reprogrammer.\n\n` +
+    commits.map((c) => `- ${c.sha.slice(0, 7)} ${c.subject}`).join("\n") +
+    `\n\n${NO_SCHEDULE}`
+  );
+}
+
 export async function promote({ gh, source, target, owner, repo, appSlug }) {
   const [pulls, compared] = await Promise.all([
     gh.listPulls({ base: target, head: source }),
@@ -109,7 +119,12 @@ export async function promote({ gh, source, target, owner, repo, appSlug }) {
   const fresh = commits.filter((c) => !seen.has(seenId(c.sha)));
   if (fresh.length === 0 && pull.title === title) return withNumber("none");
 
-  await gh.updatePull(pull.number, { title, body: setPromotedHead(updateBody(pull.body ?? "", fresh), head) });
+  // The owner's schedule covered the previous head only.
+  const cancelled = fresh.length > 0 && activeSchedule(await gh.listComments(pull.number), appSlug) !== null;
+  const refreshed = setPromotedHead(updateBody(pull.body ?? "", fresh), head);
+  const scheduled = cancelled ? "" : scheduledText(pull.body ?? "");
+  await gh.updatePull(pull.number, { title, body: setScheduledText(refreshed, scheduled) });
+  if (cancelled) await gh.comment(pull.number, scheduleCancelledComment(source, fresh));
   if (!pull.draft) {
     // The owner's approval covered the previous head only (auto-merge is pinned to it).
     if (pull.autoMerge) await gh.disableAutoMerge(pull);

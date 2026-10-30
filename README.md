@@ -211,6 +211,9 @@ Une release part d'une PR de promotion préparée par un bot :
    [`CHANGELOG.md`](CHANGELOG.md), l'historique de toutes les versions, est mis à jour.
 4. La promotion `beta` → `main` (`chore(release): vX.Y.Z`) suit le même cycle et publie la release stable.
 
+Le propriétaire peut aussi programmer une sortie, en remplissant la ligne `Sortie programmée :` de la PR
+(`AAAA-MM-JJ HH:MM`, heure de Paris). Le détail est dans [CONTRIBUTING.md](CONTRIBUTING.md).
+
 Un correctif urgent passe par une branche `hotfix/…` partie de `main`, puis est reporté sur `beta` et `dev`.
 Le détail est dans [CONTRIBUTING.md](CONTRIBUTING.md).
 

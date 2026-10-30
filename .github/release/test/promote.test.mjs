@@ -34,6 +34,9 @@ function fakeGitHub({ tags = ["v0.0.0", "v1.0.0-BETA.96"], ahead = {}, pulls = [
     async compareCommits(base, head) {
       return ahead[`${base}...${head}`] ?? [];
     },
+    async listComments() {
+      return [];
+    },
     async listPulls({ base, head }) {
       return state.pulls.filter((p) => p.state === "open" && p.base === base && p.head === head);
     },

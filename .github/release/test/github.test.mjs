@@ -187,3 +187,16 @@ test("listCheckRuns_givesNameStatusAndConclusion_acrossPages", async () => {
   assert.deepEqual(runs[100], { name: "check-100", status: "in_progress", conclusion: null });
   assert.equal(requests.length, 2);
 });
+
+test("listComments_followsPages_andKeepsAuthorAndDates", async () => {
+  const comment = { user: { login: "a" }, body: "b", created_at: "c", updated_at: "u" };
+  const { fetch, requests } = fakeFetch({
+    [`GET ${REPO}/issues/7/comments?per_page=100&page=1`]: Array(100).fill(comment),
+    [`GET ${REPO}/issues/7/comments?per_page=100&page=2`]: [{ ...comment, user: null }],
+  });
+  const comments = await client(fetch).listComments(7);
+  assert.equal(comments.length, 101);
+  assert.deepEqual(comments[0], { author: "a", body: "b", createdAt: "c", updatedAt: "u" });
+  assert.equal(comments[100].author, null);
+  assert.equal(requests.length, 2);
+});
