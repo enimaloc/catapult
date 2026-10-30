@@ -4,6 +4,79 @@ Toutes les versions publiées de Catapult, la plus récente en premier.
 
 Ce fichier est régénéré par le bot à chaque release à partir des notes des [GitHub Releases](https://github.com/enimaloc/catapult/releases) : pour corriger une entrée, modifie les notes de la release (ou le changelog de la PR de release avant sa publication), pas ce fichier.
 
+## [v1.0.0-BETA.98](https://github.com/enimaloc/catapult/releases/tag/v1.0.0-BETA.98) - 2026-10-30
+
+### Features
+- **twitch:** read and set the channel's extensions through Helix (7fece90)
+- **twitch:** expose a channel's installed and active extensions (9afc196)
+- **twitch:** store an extension layout on every binding configuration (3940cda)
+- **twitch:** apply a configuration's extension layout on Twitch (addb2ab)
+- **twitch:** switch extensions with the channel's configuration (9f4e66c)
+- **twitch:** let the dashboard edit each configuration's extension layout (328c80e)
+- **twitch:** relay extension layouts through catapult-web (9e7faa3)
+- **twitch:** pick each configuration's extensions on a channel diagram (22f105d)
+- **twitch:** merge the channel extensions per configuration into dev (41c79c2)
+- **api:** replace the mock profile with a local simulation control panel (5d11abf)
+- **api:** merge the local simulation control panel into dev (90a30cf)
+- **dtdd:** enable DoesTheDogDie by default (a70c30b)
+- **release:** name the version bump commit bump version to vX (79a66bd)
+- **release:** merge the version bump commit naming into dev (296b650)
+- **simulation:** remember which accounts were converted to fictitious (32a32f5)
+- **simulation:** let fictitious accounts take a custom twitch id, avatar and steam id (6a88d6b)
+- **simulation:** look up a twitch user by login for the mock panel (dee86c5)
+- **simulation:** convert a real account to fictitious and back (3e57aad)
+- **simulation:** expose twitch prefill, identity edit and convert in the mock panel api (4cde7b1)
+- **simulation:** prefill, edit and convert accounts from the mock panel (da4b28c)
+- **simulation:** merge the mock panel account prefill and conversion into dev (1675711)
+- **release:** schedule a promotion from a date in its pull request (a5a3a56)
+- **release:** merge the scheduled releases into dev (1930620)
+- **binding:** reset a binding to its default from its row (7c09681)
+- **web:** start and stop a custom binding from its row (6bc7c5d)
+
+### Fixes
+- **release:** wait for the pull request to show the bump before pinning auto-merge to it (07b22ce)
+- **release:** merge the auto-merge head race fix into dev (9681c01)
+- **twitch:** request only the scopes the Helix calls use (f66a7b2)
+- **twitch:** log extension layout failures precisely and switch layout on no-game settings save (5f824d4)
+- **twitch:** keep a nameless extension's menu item from storing the word undefined (2352229)
+- **twitch:** put back the extensions a configuration replaced once it ends (724af80)
+- **api:** apply the game open when the stream starts (1267d6f)
+- **api:** merge the stream-start game open fix into dev (296bc75)
+- **simulation:** refuse converting onto a taken fictitious id and save it before disconnecting (df196c8)
+- **simulation:** only take m and digits for a fictitious twitch id (29aec41)
+- **web:** keep overflowing admin tabs and app bar buttons reachable (56cbab2)
+- **web:** merge overflowing tabs and nav fix into dev (89a4e65)
+- **release:** run the release workflows from dev now that main is the default branch (408715b)
+- **release:** merge the release workflows running from dev into dev (de1b244)
+- **web:** keep a binding's resolved TWs ticked after an edit (ac32286)
+- **web:** open an extension slot's menu under the slot (4fe575f)
+- **web:** drop the click effect on the binding cards (f21907b)
+- **web:** merge the binding controls fixes and the reset to default into dev (8faae94)
+- **api:** purge each expired account in its own transaction (7c6e280)
+- **api:** delete an account's chat command settings with it (6330757)
+- **api:** merge the permanent account deletion fixes into dev (40bb9d0)
+
+### Refactoring
+- serve the site on 8080 and catapult-api on 8081 (1288115)
+- **api:** group application.properties by concern and comment each section (e64f446)
+- drop the profile keys that repeat the defaults (96efbdc)
+- **simulation:** mark fictitious twitch ids with a single m prefix (34f31f4)
+
+### Documentation
+- **release:** explain how to schedule a release (b4a4a88)
+
+### Other
+- **twitch:** expect the incremental scopes out of the login registration (c5da160)
+- **twitch:** pin that edits, mappings, manual changes and raids keep the extensions (7b46bec)
+- **twitch:** pin that the token API never returns extension layouts (0846e51)
+- **api:** budget the extension layouts' collection reads on the binding routes (1ee592e)
+- **api:** let a game left offline read the settings for the no-game extensions (cc8f429)
+- **api:** set the dev sentry environment in the mock context test (1ebeea8)
+- merge the properties reorganization and port swap into dev (257343e)
+- stop an unchanged build from rewriting the resources devtools watches (7eb4187)
+- **simulation:** list the new mock panel routes in the access matrix (0f628cc)
+- **api:** add the binding reset route to the access matrix (8f1dd96)
+
 ## [v1.0.0-BETA.97](https://github.com/enimaloc/catapult/releases/tag/v1.0.0-BETA.97) - 2026-10-28
 
 ### Features
