@@ -87,7 +87,7 @@ function docker(args: string[]): string {
 /** The account id of `username`, from catapult-api's perf routes (inside the stack's network). */
 function accountId(username: string): string {
   const accounts: { username: string; userId: string }[] = JSON.parse(
-    docker(["exec", "-T", "api", "wget", "-q", "-O-", "http://localhost:8080/api/internal/perf/accounts"]),
+    docker(["exec", "-T", "api", "wget", "-q", "-O-", "http://localhost:8081/api/internal/perf/accounts"]),
   );
   const id = accounts.find((a) => a.username === username)?.userId;
   if (!id) throw new Error(`no perf account ${username}`);

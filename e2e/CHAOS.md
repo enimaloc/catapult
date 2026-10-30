@@ -122,7 +122,7 @@ avec le JWT d'un admin dans `$ADMIN_JWT`.
 ```bash
 for i in $(seq 1 100); do
   curl -s -o /dev/null -w "%{http_code}\n" \
-    -X POST http://catapult-api-internal:8080/api/internal/admin/broadcasts \
+    -X POST http://catapult-api-internal:8081/api/internal/admin/broadcasts \
     -H 'Content-Type: application/json' \
     -H "Authorization: Bearer $ADMIN_JWT" \
     -d '{"channel":"events.global","name":"alert.info",
@@ -139,7 +139,7 @@ done | sort | uniq -c
 client, pas `innerHTML`.
 
 ```bash
-curl -X POST http://catapult-api-internal:8080/api/internal/admin/broadcasts \
+curl -X POST http://catapult-api-internal:8081/api/internal/admin/broadcasts \
   -H 'Content-Type: application/json' \
   -H "Authorization: Bearer $ADMIN_JWT" \
   -d '{"channel":"events.global","name":"alert.info",

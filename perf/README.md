@@ -88,8 +88,8 @@ two runs.
 
 ## The load run
 
-`perf/k6/evening.js`, a busy evening, in k6 on `perf-internal` (the site as `http://web:8081`, the perf
-routes of catapult-api as `http://api:8080`), for `DURATION`:
+`perf/k6/evening.js`, a busy evening, in k6 on `perf-internal` (the site as `http://web:8080`, the perf
+routes of catapult-api as `http://api:8081`), for `DURATION`:
 
 - `STREAMERS` streamers: each signs in once (`/perf/login`), keeps open the two live streams its channel page
   opens (`/events/nav` and `/events/channel/{login}`, SSE: catapult has no WebSocket), loads one of its
