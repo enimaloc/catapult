@@ -176,6 +176,14 @@ class ChannelActionsControllerTest {
     }
 
     @Test
+    void resetBinding_callsApiService() throws Exception {
+        mvc.perform(post("/channel/bindings/abc-123/reset").with(csrf()))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).resetBinding("abc-123");
+    }
+
+    @Test
     void resetTws_callsApiService() throws Exception {
         mvc.perform(post("/channel/bindings/abc-123/tws/reset").with(csrf()))
                 .andExpect(status().isNoContent());

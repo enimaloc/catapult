@@ -600,6 +600,12 @@ class RealApiServiceTest {
     }
 
     @Test
+    void resetBinding() {
+        expectPost(OWN + "/bindings/b1/reset");
+        service.resetBinding("b1");
+    }
+
+    @Test
     void resetTws() {
         expectDelete(OWN + "/bindings/b1/tws");
         service.resetTws("b1");

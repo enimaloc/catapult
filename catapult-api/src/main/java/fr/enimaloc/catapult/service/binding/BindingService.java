@@ -332,19 +332,39 @@ public class BindingService {
 
     @Transactional
     public void resetTws(UserAccount user, UUID bindingId) {
-        gameBindingRepository.findByIdAndUser(bindingId, user).ifPresent(binding -> {
-            binding.setTwOverride(false);
-            // Resetting the TWs hands a MANUAL binding back to the automatic resolution: its game's admin mapping
-            // when there is one, else IGDB (which sets the status itself).
-            if (binding.getStatus() == GameBinding.Status.MANUAL) binding.setStatus(GameBinding.Status.AUTO);
-            CategoryKey before = CategoryKey.of(binding);
-            GameBinding resolved = updateWithIgdbResolution(user, detectedOf(binding), binding);
-            // A new category is pushed like an edit (the played binding only)
-            if (!before.equals(CategoryKey.of(resolved))) {
-                DebugContext.runAs(user.getId(),
-                        () -> categoryChain.apply(user, new BindingEdited(resolved)).orThrow());
-            }
-        });
+        gameBindingRepository.findByIdAndUser(bindingId, user).ifPresent(binding -> resolveAnew(user, binding));
+    }
+
+    /**
+     * Puts the binding back as first detected: resolved anew (category, CCLs, TWs), its toggles on, not ignored, its
+     * extension layout emptied (pushed to Twitch when it is the configuration in place).
+     * @throws ResponseStatusException 404 when the binding isn't the user's
+     */
+    @Transactional
+    public void resetToDefaults(UserAccount user, UUID bindingId) {
+        GameBinding binding = gameBindingRepository.findByIdAndUser(bindingId, user)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown binding"));
+        binding.setIgnored(false);
+        binding.setCclEnabled(true);
+        binding.setTwEnabled(true);
+        binding.getExtensionSlots().clear();
+        GameBinding resolved = resolveAnew(user, binding);
+        extensionLayoutApplier.applyIfCurrent(user, ExtensionLayoutApplier.keyOf(resolved), Set.of());
+    }
+
+    private GameBinding resolveAnew(UserAccount user, GameBinding binding) {
+        binding.setTwOverride(false);
+        // Resetting the TWs hands a MANUAL binding back to the automatic resolution: its game's admin mapping
+        // when there is one, else IGDB (which sets the status itself).
+        if (binding.getStatus() == GameBinding.Status.MANUAL) binding.setStatus(GameBinding.Status.AUTO);
+        CategoryKey before = CategoryKey.of(binding);
+        GameBinding resolved = updateWithIgdbResolution(user, detectedOf(binding), binding);
+        // A new category is pushed like an edit (the played binding only)
+        if (!before.equals(CategoryKey.of(resolved))) {
+            DebugContext.runAs(user.getId(),
+                    () -> categoryChain.apply(user, new BindingEdited(resolved)).orThrow());
+        }
+        return resolved;
     }
 
     /**

@@ -205,6 +205,15 @@ class ChannelCustomBindingsRenderingTest {
     }
 
     @Test
+    void activatingIsOnTheRow_notInItsForm() throws Exception {
+        String overview = panel(render(true, state()), "overview");
+        int form = overview.indexOf("custom-binding-name\"");
+
+        assertThat(overview.indexOf("custom-binding-activate")).isBetween(0, form);
+        assertThat(overview.indexOf("custom-binding-stop")).isBetween(0, form);
+    }
+
+    @Test
     void noBindingsYet_showsTheEmptyNoticeAndTheNewRowOnly() throws Exception {
         String overview = panel(render(true, new CustomBindingsStateDto(true, List.of(), null, null)), "overview");
 

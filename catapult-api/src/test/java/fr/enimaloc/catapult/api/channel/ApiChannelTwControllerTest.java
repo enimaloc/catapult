@@ -29,6 +29,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -89,6 +90,20 @@ class ApiChannelTwControllerTest {
                 .andExpect(status().isNoContent());
 
         verify(bindingService).resetTws(any(UserAccount.class), eq(bindingId));
+    }
+
+    @Test
+    void resetToDefaults_callsService() throws Exception {
+        MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).apply(springSecurity()).build();
+        UserAccount user = seededUser();
+
+        UUID bindingId = UUID.randomUUID();
+        mvc.perform(post("/api/internal/users/{userId}/bindings/{bindingId}/reset", user.getId(), bindingId)
+                        .with(jwt().jwt(j -> j.subject(user.getId().toString()).claim("twitchId", user.getTwitchId())))
+                        .with(csrf()))
+                .andExpect(status().isNoContent());
+
+        verify(bindingService).resetToDefaults(any(UserAccount.class), eq(bindingId));
     }
 
     @Test

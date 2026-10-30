@@ -4,6 +4,21 @@ document.addEventListener("catapult:render", function () {
 
     const { postJson, postSwitch, checkedValues } = CatapultChannel;
     const rowOf = el => el.closest("[data-binding-id]");
+    const resetDialog = document.getElementById("binding-reset-dialog");
+    let resetting = null;
+
+    resetDialog?.querySelector(".binding-reset-dismiss").addEventListener("click", () => { resetDialog.open = false; });
+    resetDialog?.querySelector(".binding-reset-confirm").addEventListener("click", async () => {
+        const row = resetting;
+        resetDialog.open = false;
+        if (!row) return;
+        const response = await postJson(twUrl(row, "reset"), {});
+        // Its status, box art and extensions aren't in its live events: the page is drawn anew, where it was.
+        if (!response.ok) return;
+        const top = window.scrollY;
+        await CatapultChannel.refresh();
+        window.scrollTo({ top, behavior: "instant" });
+    });
 
     // ccl-toggle/ignored-toggle/delete/edit hit ApiChannelActionsController, which IS
     // username-scoped.
@@ -65,6 +80,11 @@ document.addEventListener("catapult:render", function () {
 
         row.querySelectorAll("mdui-button-icon[data-post]").forEach(el => {
             el.addEventListener("click", () => postJson(bindingUrl(rowOf(el), el.dataset.post), {}));
+        });
+
+        row.querySelector(".binding-reset-btn")?.addEventListener("click", () => {
+            resetting = row;
+            resetDialog.open = true;
         });
 
         // updateBinding replaces twitchGameId/twitchGameName/ccls wholesale, so every save —

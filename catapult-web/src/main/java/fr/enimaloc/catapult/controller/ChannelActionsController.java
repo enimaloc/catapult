@@ -105,6 +105,11 @@ public class ChannelActionsController {
         return ApiStatus.answer(apiService.resetTws(bindingId));
     }
 
+    @PostMapping("/channel/bindings/{bindingId}/reset")
+    public ResponseEntity<Void> resetBinding(@PathVariable String bindingId) {
+        return ApiStatus.answer(apiService.resetBinding(bindingId));
+    }
+
     @PostMapping("/channel/bindings/{bindingId}/tw-enabled")
     public ResponseEntity<Void> toggleTwEnabled(@PathVariable String bindingId, @RequestBody TwEnabledBody body) {
         return ApiStatus.answer(apiService.toggleTwEnabled(bindingId, body.enabled()));

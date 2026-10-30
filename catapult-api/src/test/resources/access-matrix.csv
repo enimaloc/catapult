@@ -42,6 +42,7 @@ GET,/api/internal/users,?twitchUsername=matrix-owner,,401,PASS,PASS,PASS,PASS,PA
 PUT,/api/internal/users/{userId}/bindings/{bindingId}/tw-enabled,userId=self,"{""enabled"":false}",401,401,PASS,PASS,PASS,PASS,401
 PUT,/api/internal/users/{userId}/bindings/{bindingId}/tws,userId=self,,401,401,PASS,PASS,PASS,PASS,401
 DELETE,/api/internal/users/{userId}/bindings/{bindingId}/tws,userId=self,,401,401,PASS,PASS,PASS,PASS,401
+POST,/api/internal/users/{userId}/bindings/{bindingId}/reset,userId=self,,401,401,PASS,PASS,PASS,PASS,401
 GET,/api/internal/users/{userId}/bindings/{bindingId}/tws/suggestions,userId=self,,401,401,PASS,PASS,PASS,PASS,401
 GET,/api/internal/dtdd-mappings/{igdbId},igdbId=1,,401,PASS,PASS,PASS,PASS,PASS,401
 POST,/api/internal/dtdd-mappings/{igdbId}/proposals,igdbId=1,,401,401,PASS,PASS,PASS,PASS,401

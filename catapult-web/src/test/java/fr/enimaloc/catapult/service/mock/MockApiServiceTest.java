@@ -408,7 +408,19 @@ class MockApiServiceTest {
         assertThat(binding().twOverride()).isFalse();
         assertThat(events).containsExactly(new TwUpdatedEvent(username, bindingId, Set.of("spiders")),
                 new TwEnabledStateEvent(username, bindingId, false),
-                new TwResetEvent(username, bindingId));
+                new TwResetEvent(username, bindingId, Set.of()));
+    }
+
+    @Test
+    void resetBinding_turnsItsTogglesBackOn() {
+        service.toggleTwEnabled(bindingId, false);
+        service.saveTws(bindingId, Set.of("spiders"));
+
+        service.resetBinding(bindingId);
+
+        assertThat(binding().twEnabled()).isTrue();
+        assertThat(binding().twOverride()).isFalse();
+        assertThat(binding().tws()).isEmpty();
     }
 
     @Test

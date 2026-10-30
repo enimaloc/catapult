@@ -254,6 +254,13 @@ public class RealApiService implements ApiService {
     }
 
     @Override
+    public int resetBinding(String bindingId) {
+        UUID me = me();
+        if (me == null) return HttpStatus.UNAUTHORIZED.value();
+        return client.postVoid("/api/internal/users/{userId}/bindings/{bindingId}/reset", null, me, bindingId);
+    }
+
+    @Override
     public int toggleTwEnabled(String bindingId, boolean enabled) {
         UUID me = me();
         if (me == null) return HttpStatus.UNAUTHORIZED.value();
