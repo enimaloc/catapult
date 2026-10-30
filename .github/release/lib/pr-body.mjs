@@ -6,7 +6,10 @@ const START = "<!-- changelog:start -->";
 const END = "<!-- changelog:end -->";
 const TOGGLE_TEXT = "<!-- changelog-bot --> Le bot met à jour le changelog";
 const REMINDER =
-  "Sors cette PR du draft pour publier la release ; elle fusionnera quand les checks seront verts.";
+  "Sors cette PR du draft pour publier la release ; elle fusionnera quand les checks seront verts. " +
+  "Pour la programmer, indique ci-dessous une date `AAAA-MM-JJ HH:MM`, en heure de Paris.";
+const SCHEDULE_LABEL = "Sortie programmée :";
+const SCHEDULE = /^Sortie programmée[ \t]*:[ \t]*(.*?)[ \t]*$/m;
 const TOGGLE = /^- \[( |x|X)\] <!-- changelog-bot -->/m;
 const SEEN = /<!-- changelog:seen([^>]*?)-->/;
 const HEADING = /^### (.+?)\s*$/;
@@ -29,6 +32,8 @@ export function buildBody({ changelog, botEnabled, seen, promotedHead }) {
     "",
     `- [${botEnabled ? "x" : " "}] ${TOGGLE_TEXT}`,
     "",
+    SCHEDULE_LABEL,
+    "",
     START,
     changelog,
     END,
@@ -48,6 +53,19 @@ export function promotedHead(body) {
 export function setPromotedHead(body, sha) {
   const marker = `<!-- promoted-head: ${sha} -->`;
   return PROMOTED_HEAD.test(body) ? body.replace(PROMOTED_HEAD, () => marker) : `${body.trimEnd()}\n${marker}\n`;
+}
+
+/** The text of the schedule line, "" when it is empty or missing. */
+export function scheduledText(body) {
+  return SCHEDULE.exec(body)?.[1] ?? "";
+}
+
+/** Writes the schedule line, adding it before the changelog when the body has none. */
+export function setScheduledText(body, text) {
+  const line = `${SCHEDULE_LABEL} ${text}`.trimEnd();
+  if (SCHEDULE.test(body)) return body.replace(SCHEDULE, () => line);
+  const at = body.indexOf(START);
+  return at < 0 ? `${body.trimEnd()}\n\n${line}\n` : `${body.slice(0, at)}${line}\n\n${body.slice(at)}`;
 }
 
 function region(body) {

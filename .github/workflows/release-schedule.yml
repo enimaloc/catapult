@@ -1,0 +1,102 @@
+name: Release schedule
+
+# Scheduled releases. `schedule` only runs from the default branch: this file is also on main, where it
+# must stay identical so that the promotions merge cleanly. The scripts always come from dev.
+on:
+  schedule:
+    - cron: '7,22,37,52 * * * *'
+  pull_request:
+    types: [edited, ready_for_review, converted_to_draft]
+
+permissions:
+  contents: read
+
+jobs:
+  schedule-confirm:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.sender.login == github.repository_owner &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      (
+        (github.event.pull_request.base.ref == 'beta' && github.event.pull_request.head.ref == 'dev') ||
+        (github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref == 'beta')
+      )
+    runs-on: ubuntu-latest
+    steps:
+      - id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+      - uses: actions/checkout@v7
+        with:
+          ref: dev
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Answer the owner's change
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+        run: node .github/release/schedule.mjs --confirm
+
+  # Outside the promote-* concurrency groups: GitHub drops a pending run when a newer one queues, so a
+  # run every 15 minutes could drop a pending promotion. Only a release that is due enters them.
+  schedule-due:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    outputs:
+      sources: ${{ steps.due.outputs.sources }}
+    steps:
+      - id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+      - uses: actions/checkout@v7
+        with:
+          ref: dev
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - id: due
+        name: List the releases whose date has come
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+        run: node .github/release/schedule.mjs --due
+
+  schedule-run:
+    needs: schedule-due
+    if: needs.schedule-due.outputs.sources != '[]' && needs.schedule-due.outputs.sources != ''
+    strategy:
+      fail-fast: false
+      matrix:
+        source: ${{ fromJSON(needs.schedule-due.outputs.sources) }}
+    # Shared with promote.yml and release-ready.yml: never overlaps them on the same source branch.
+    concurrency:
+      group: promote-${{ matrix.source }}
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    steps:
+      - id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+      - uses: actions/checkout@v7
+        with:
+          ref: dev
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Start the release
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+          SOURCE: ${{ matrix.source }}
+          TARGET: ${{ matrix.source == 'dev' && 'beta' || 'main' }}
+        run: node .github/release/schedule.mjs --run --source "$SOURCE" --target "$TARGET"
