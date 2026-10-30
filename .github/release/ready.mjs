@@ -197,7 +197,8 @@ async function prepare({ gh, pr, pull, kind, owner, repo, appSlug, promote, wait
       parent: pr.headSha,
       path: GRADLE_FILE,
       text: bumped,
-      message: title,
+      // Not the PR title: the release merge commit already carries it.
+      message: `chore(release): bump version to ${version}`,
     });
     if (bump === null) return refuse(gh, current, MESSAGES.headMoved());
     await waitForHead(gh, pull.number, bump, wait);

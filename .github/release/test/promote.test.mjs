@@ -14,7 +14,9 @@ const commit = (c, subject, login = "enimaloc", parents = [sha("0")]) => ({
   author: login,
   parents,
 });
-const bump = (c, version) => commit(c, `chore(release): ${version}`, `${APP}[bot]`);
+const bump = (c, version) => commit(c, `chore(release): bump version to ${version}`, `${APP}[bot]`);
+// The bumps pushed before they were named so, still left out of the promotions.
+const legacyBump = (c, version) => commit(c, `chore(release): ${version}`, `${APP}[bot]`);
 const releaseMerge = (c, version) => commit(c, `chore(release): ${version}`, `${APP}[bot]`, [sha("0"), sha("1")]);
 
 // In-memory GitHub: branches hold the commits not yet on their promotion target.
@@ -180,7 +182,7 @@ test("botBumpCommit_isIgnored", async () => {
   await run(gh);
   Object.assign(gh.state.pulls[0], { draft: false, autoMerge: true });
   gh.calls.length = 0;
-  gh.compareCommits = async () => [commit("a", "fix: one"), bump("b", "v1.0.0-BETA.97")];
+  gh.compareCommits = async () => [commit("a", "fix: one"), bump("b", "v1.0.0-BETA.97"), legacyBump("d", "v1.0.0-BETA.97")];
   assert.deepEqual(await run(gh), { action: "none", number: 7 });
   assert.deepEqual(gh.calls, []);
 });

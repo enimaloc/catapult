@@ -8,7 +8,7 @@ const REPO = "catapult";
 const APP = "catapult-release";
 const sha = (c) => c.repeat(40);
 const commit = (c, subject, login = OWNER) => ({ sha: sha(c), subject, message: subject, author: login, parents: [sha("0")] });
-const bump = (c, version) => commit(c, `chore(release): ${version}`, `${APP}[bot]`);
+const bump = (c, version) => commit(c, `chore(release): bump version to ${version}`, `${APP}[bot]`);
 
 const GRADLE = [
   "plugins {",
@@ -162,7 +162,7 @@ test("ownerReady_bumpsGradleVersion_thenAutoMergesOnBumpSha", async () => {
   assert.deepEqual(named(gh, "commitFile"), [
     [
       "commitFile",
-      { branch: "dev", parent: sha("a"), path: "build.gradle.kts", text: BUMPED, message: "chore(release): v1.0.0-BETA.97" },
+      { branch: "dev", parent: sha("a"), path: "build.gradle.kts", text: BUMPED, message: "chore(release): bump version to v1.0.0-BETA.97" },
     ],
   ]);
   assert.deepEqual(named(gh, "enableAutoMerge"), [
@@ -258,7 +258,7 @@ test("hotfixWithoutVersionTitle_getsTheNextPatch", async () => {
   assert.deepEqual(named(gh, "updatePull"), [["updatePull", 7, { title: "chore(release): v1.0.1" }]]);
   const [[, file]] = named(gh, "commitFile");
   assert.equal(file.branch, "hotfix/login");
-  assert.equal(file.message, "chore(release): v1.0.1");
+  assert.equal(file.message, "chore(release): bump version to v1.0.1");
   assert.match(file.text, /version = "1\.0\.1"\n/);
   assert.equal(named(gh, "enableAutoMerge")[0][2].commitHeadline, "chore(release): v1.0.1");
   assert.deepEqual(named(gh, "compareCommits"), []);
@@ -269,7 +269,7 @@ test("hotfixWithVersionTitle_keepsIt", async () => {
   const gh = fakeGitHub({ base: "main", head: "hotfix/login", title: "chore(release): v1.0.5", marker: null, tags });
   assert.equal(await run(gh), "auto-merge");
   assert.deepEqual(named(gh, "updatePull"), []);
-  assert.equal(named(gh, "commitFile")[0][1].message, "chore(release): v1.0.5");
+  assert.equal(named(gh, "commitFile")[0][1].message, "chore(release): bump version to v1.0.5");
 });
 
 test("otherSender_isIgnored", async () => {

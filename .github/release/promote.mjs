@@ -9,7 +9,8 @@ import { buildBody, parseBody, seenId, setPromotedHead, updateBody } from "./lib
 import { createGitHub } from "./lib/github.mjs";
 import { refreshDashboardSafely } from "./dashboard.mjs";
 
-const RELEASE_SUBJECT = /^chore\(release\): v/;
+// The bump (`bump version to v…`, plain `v…` before it was named so), the release merges and the changelog.
+const RELEASE_SUBJECT = /^chore\(release\): (bump version to )?v/;
 const BACKPORT_SUBJECT = /^chore\(release\): backport v/;
 
 export function versionTags(tags) {
