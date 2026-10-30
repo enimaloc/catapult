@@ -14,5 +14,9 @@ class SimulationGateTest {
         assertThat(SimulationGate.isFictitiousTwitchId("mock-ab12cd34")).isTrue();
         assertThat(SimulationGate.isFictitiousTwitchId("123456")).isFalse();
         assertThat(SimulationGate.isFictitiousTwitchId(null)).isFalse();
+        // Any other id starting with an m is not one: test and perf fixtures use such ids for real accounts
+        assertThat(SimulationGate.isFictitiousTwitchId("matrix-mod")).isFalse();
+        assertThat(SimulationGate.isFictitiousTwitchId("m")).isFalse();
+        assertThat(SimulationGate.isFictitiousTwitchId("m12a")).isFalse();
     }
 }

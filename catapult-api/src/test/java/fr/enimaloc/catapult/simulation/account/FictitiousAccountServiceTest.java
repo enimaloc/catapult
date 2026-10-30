@@ -136,7 +136,7 @@ class FictitiousAccountServiceTest {
 
         UserAccount account = service.create(FictitiousIdentity.named("alice"), true, List.of(channel.getId()), false);
 
-        assertThat(account.getTwitchId()).startsWith("m").hasSize(9);
+        assertThat(account.getTwitchId()).matches("m\\d{8}");
         assertThat(account.getTwitchUsername()).isEqualTo("alice");
         assertThat(account.getStatus()).isEqualTo(UserAccount.Status.ACTIVE);
         assertThat(account.isBotEnabled()).isFalse();
@@ -383,5 +383,15 @@ class FictitiousAccountServiceTest {
         service.revert(real.getId());
         assertThat(real.getTwitchUsername()).isEqualTo("real-12345");
         assertThat(real.getSteamId()).isEqualTo("76561198000000042");
+    }
+
+    @Test
+    void a_typed_twitch_id_must_be_numeric() {
+        assertThatThrownBy(() -> service.create(new FictitiousIdentity("alice", "abc", null, null), false, List.of(),
+                true)).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("numeric");
+        assertThatThrownBy(() -> service.create(new FictitiousIdentity("bob", "m", null, null), false, List.of(),
+                true)).isInstanceOf(IllegalArgumentException.class);
+        assertThat(service.create(new FictitiousIdentity("carol", " m123 ", null, null), false, List.of(), true)
+                .getTwitchId()).isEqualTo("m123");
     }
 }

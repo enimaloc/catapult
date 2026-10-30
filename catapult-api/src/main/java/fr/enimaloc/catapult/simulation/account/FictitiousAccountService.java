@@ -54,7 +54,7 @@ public class FictitiousAccountService {
     static final String STEAM_ID_PREFIX = "7656119790";
     private static final int STEAM_ID_SUFFIX_DIGITS = 7;
     private static final int STEAM_ID_ATTEMPTS = 20;
-    private static final int TWITCH_ID_SUFFIX_LENGTH = 8;
+    private static final int TWITCH_ID_SUFFIX_DIGITS = 8;
 
     private final UserAccountRepository accounts;
     private final CatapultOAuth2UserService members;
@@ -286,13 +286,19 @@ public class FictitiousAccountService {
         return registry.admin(accountId);
     }
 
-    /** {@code raw} trimmed, behind the fictitious prefix unless it already is. */
+    /** {@code raw} trimmed, a numeric Twitch id behind the fictitious prefix unless it already is. */
     static String fictitiousTwitchId(String raw) {
         if (isBlank(raw)) {
             throw new IllegalArgumentException("A blank Twitch id");
         }
         String id = raw.trim();
-        return SimulationGate.isFictitiousTwitchId(id) ? id : SimulationRegistry.FICTITIOUS_PREFIX + id;
+        String prefixed = id.startsWith(SimulationRegistry.FICTITIOUS_PREFIX)
+                ? id
+                : SimulationRegistry.FICTITIOUS_PREFIX + id;
+        if (!SimulationGate.isFictitiousTwitchId(prefixed) || prefixed.startsWith("mock-")) {
+            throw new IllegalArgumentException("A Twitch id is numeric, not " + id);
+        }
+        return prefixed;
     }
 
     /** {@code username} trimmed, when no account but {@code self} has it. */
@@ -328,7 +334,8 @@ public class FictitiousAccountService {
     }
 
     private static String shortSuffix() {
-        return UUID.randomUUID().toString().replace("-", "").substring(0, TWITCH_ID_SUFFIX_LENGTH);
+        int suffix = ThreadLocalRandom.current().nextInt((int) Math.pow(10, TWITCH_ID_SUFFIX_DIGITS));
+        return String.format("%0" + TWITCH_ID_SUFFIX_DIGITS + "d", suffix);
     }
 
     /** A fictitious Steam id no account has yet ({@code steam_id} is unique). */

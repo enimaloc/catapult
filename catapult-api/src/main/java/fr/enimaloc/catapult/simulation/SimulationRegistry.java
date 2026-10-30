@@ -60,8 +60,8 @@ import java.util.stream.Collectors;
 public class SimulationRegistry {
 
     /**
-     * What a fictitious account's Twitch id starts with: a real one is numeric. The {@code mock-} ids made before
-     * the prefix was shortened start with it too.
+     * What a fictitious account's Twitch id starts with, digits following: a real one is numeric. See
+     * {@link SimulationGate#isFictitiousTwitchId} for the exact rule.
      */
     public static final String FICTITIOUS_PREFIX = "m";
 
@@ -278,7 +278,7 @@ public class SimulationRegistry {
     }
 
     private boolean isFictitious(UserAccount account) {
-        return account.getTwitchId() != null && account.getTwitchId().startsWith(FICTITIOUS_PREFIX);
+        return SimulationGate.isFictitiousTwitchId(account.getTwitchId());
     }
 
     private boolean globalKeysPresent(CallKey key) {
