@@ -1305,6 +1305,11 @@ a[data-link].active {
     transition: border-color 150ms ease;
 }
 
+/* nonclickable: no ripple on the cards; a row's header still opens it. */
+:is(#channel-bindings-list, #channel-custom-bindings-list) mdui-list-item[slot="header"]::part(container) {
+    cursor: pointer;
+}
+
 :is(#channel-bindings-list, #channel-custom-bindings-list) mdui-list-item:hover {
     border-color: var(--catapult-border-hover);
 }

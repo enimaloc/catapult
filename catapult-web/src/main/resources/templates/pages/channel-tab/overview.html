@@ -120,7 +120,7 @@
                                 th:attr="data-binding-id=${b.id()}"
                                 th:value="${b.id()}"
                                 th:class="${ch.currentGame()?.bindingId() == b.id() ? 'is-open' : ''}">
-                <mdui-list-item slot="header">
+                <mdui-list-item slot="header" nonclickable>
                     <!--/* Its Twitch category's box art, through the proxy (BoxArts); an empty frame when not known,
                          so that the names stay aligned. channel-bindings.js swaps it when another game is picked. */-->
                     <img slot="icon" class="box-art binding-box-art" alt="" loading="lazy"
@@ -144,7 +144,7 @@
                 <!--/* The owner and moderators alike, but for the TWs (see below). Built only once the row is opened
                      (lazy.js, channel-bindings.js): a page lists dozens, each a dozen switches. */-->
                 <template data-lazy>
-                <mdui-list-item>
+                <mdui-list-item nonclickable>
                     <div class="binding-toggle">
                         <mdui-switch th:id="'binding-ignored-toggle-' + ${b.id()}"
                                      class="binding-ignored-toggle"
@@ -214,7 +214,7 @@
         <!-- Always rendered (instead of created on demand) so removeBinding() only ever
              reveals an already-translated element — no translated label needs stashing
              in a data-* attribute for JS to read, unlike the old data-empty-text. -->
-        <mdui-list-item id="channel-bindings-empty"
+        <mdui-list-item id="channel-bindings-empty" nonclickable
                         th:class="${!ch.bindings().content().isEmpty()} ? 'hidden' : ''"
                         th:text="#{channel.bindings.empty}">
             Aucune association.
@@ -252,7 +252,7 @@
                                     th:with="active=${b.id() == cb.activeId()}"
                                     th:classappend="${active} ? 'is-active'"
                                     th:attr="data-custom-binding-id=${b.id()}" th:value="${b.id()}">
-                    <mdui-list-item slot="header">
+                    <mdui-list-item slot="header" nonclickable>
                         <span class="custom-binding-name-label" th:text="${b.name()}">Binding</span>
                         <span class="custom-binding-game-label" th:text="${b.twitchGameName() ?: '—'}">Game</span>
                         <span class="custom-binding-active-chip" th:classappend="${active} ? '' : 'hidden'"
@@ -260,20 +260,20 @@
                         <span class="custom-binding-uninterruptible-chip" th:classappend="${b.uninterruptible()} ? '' : 'hidden'"
                               th:text="#{channel.custom_bindings.uninterruptible}">Ininterruptible</span>
                     </mdui-list-item>
-                    <mdui-list-item>
+                    <mdui-list-item nonclickable>
                         <th:block th:replace="~{pages/channel-tab/overview :: customBindingForm(${b}, ${active}, true)}"></th:block>
                     </mdui-list-item>
                 </mdui-collapse-item>
                 <mdui-collapse-item class="custom-binding-item custom-binding-new hidden" value="new">
-                    <mdui-list-item slot="header">
+                    <mdui-list-item slot="header" nonclickable>
                         <span th:text="#{channel.custom_bindings.new_title}">Nouveau binding</span>
                     </mdui-list-item>
-                    <mdui-list-item>
+                    <mdui-list-item nonclickable>
                         <th:block th:replace="~{pages/channel-tab/overview :: customBindingForm(null, false, false)}"></th:block>
                     </mdui-list-item>
                 </mdui-collapse-item>
             </mdui-collapse>
-            <mdui-list-item id="channel-custom-bindings-empty" th:classappend="${cb.bindings().isEmpty()} ? '' : 'hidden'"
+            <mdui-list-item id="channel-custom-bindings-empty" nonclickable th:classappend="${cb.bindings().isEmpty()} ? '' : 'hidden'"
                             th:text="#{channel.custom_bindings.empty}">Aucun binding personnalisé.</mdui-list-item>
         </mdui-list>
         <p id="custom-bindings-error" class="hidden" role="alert"></p>
@@ -281,14 +281,14 @@
              and the page doesn't (CustomBindingsUpdatedEvent). */-->
         <template id="custom-binding-item-template">
             <mdui-collapse-item class="custom-binding-item">
-                <mdui-list-item slot="header">
+                <mdui-list-item slot="header" nonclickable>
                     <span class="custom-binding-name-label"></span>
                     <span class="custom-binding-game-label">—</span>
                     <span class="custom-binding-active-chip hidden" th:text="#{channel.custom_bindings.active}">Actif</span>
                     <span class="custom-binding-uninterruptible-chip hidden"
                           th:text="#{channel.custom_bindings.uninterruptible}">Ininterruptible</span>
                 </mdui-list-item>
-                <mdui-list-item>
+                <mdui-list-item nonclickable>
                     <th:block th:replace="~{pages/channel-tab/overview :: customBindingForm(null, false, true)}"></th:block>
                 </mdui-list-item>
             </mdui-collapse-item>
