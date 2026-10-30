@@ -16,4 +16,7 @@ public interface ChatCommandSettingRepository extends JpaRepository<ChatCommandS
     /** A derived delete removes each row it finds, which needs a transaction: its own, or the caller's. */
     @Transactional
     void deleteByUserAndKey(UserAccount user, String key);
+
+    @Transactional
+    void deleteByUser(UserAccount user);
 }

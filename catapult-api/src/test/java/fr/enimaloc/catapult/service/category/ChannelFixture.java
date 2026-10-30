@@ -224,16 +224,17 @@ public class ChannelFixture {
         streamStateService = new StreamStateService(publisher, dispatcher);
         categoryChain = new CategoryChain(activations, streamStateService, settingsRepository,
                 raidRestoreHold, gameStateService, accountRepository,
-                new CategoryApplier(twitch, streamStateService), new RaidRestoreGateService(experimentService), lookup);
+                new CategoryApplier(twitch, streamStateService), new RaidRestoreGateService(experimentService), lookup, mock(ExtensionLayoutApplier.class));
         bindingService = new BindingService(bindingRepository, igdbService, mock(IgdbGameDetailsService.class),
-                twitch, mock(TwResolverService.class), mappingRepository, lookup, categoryChain);
+                twitch, mock(TwResolverService.class), mappingRepository, lookup, categoryChain,
+                mock(ExtensionLayoutApplier.class));
         raidRestoreGameService = new RaidRestoreGameService(categoryChain, new CategoryApplier(twitch, streamStateService),
                 raidRestoreHold);
         listener = new GameEventListener(bindingService, streamStateService, publisher,
                 raidRestoreHold, activations, categoryChain);
         customBindingService = new CustomBindingService(customBindingRepository, activations,
                 experimentService, gameStateService, streamStateService, accountRepository,
-                tokenRepository, listener, publisher, categoryChain);
+                tokenRepository, listener, publisher, categoryChain, mock(ExtensionLayoutApplier.class));
         setGameFunction = new CatapultSetGameFunction(twitch, categoryChain, gameStateService, igdbService,
                 activations);
         twitchatActionExecutor = new TwitchatActionExecutor(actionTokenService, accountRepository, categoryChain,
@@ -244,7 +245,8 @@ public class ChannelFixture {
                         publisher),
                 mock(BotToggleService.class),
                 new ChannelSettingsService(settingsRepository, categoryChain,
-                        new RaidRestoreGateService(experimentService), publisher),
+                        new RaidRestoreGateService(experimentService), publisher,
+                        mock(ExtensionLayoutApplier.class)),
                 new SteamPersonalTokenService(
                         new SteamPersonalTokenStore(accountRepository, mock(SteamApiKeyRepository.class)),
                         mock(TokenEncryptionService.class), publisher, mock(SteamProfileDiagnostics.class),

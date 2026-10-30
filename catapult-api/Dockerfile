@@ -30,6 +30,8 @@ RUN chown catapult:catapult app.jar
 
 USER catapult
 
-EXPOSE 8080
+# 8081: catapult-api, reached by catapult-web only; 8091: the management port (actuator, Prometheus, the compose
+# healthcheck)
+EXPOSE 8081 8091
 
 ENTRYPOINT ["java", "-jar", "app.jar"]

@@ -2,11 +2,13 @@ package fr.enimaloc.catapult.service.binding;
 
 import fr.enimaloc.catapult.api.error.ApiProblem;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest;
+import fr.enimaloc.catapult.common.dto.channel.TwitchExtensionsDto;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.account.UserSettings;
 import fr.enimaloc.catapult.domain.binding.CustomBinding;
 import fr.enimaloc.catapult.domain.binding.CustomBindingActivation;
+import fr.enimaloc.catapult.domain.binding.ExtensionSlotSetting;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.event.listener.GameEventListener;
 import fr.enimaloc.catapult.getter.DetectedGame;
@@ -19,6 +21,7 @@ import fr.enimaloc.catapult.service.category.CategoryApplier;
 import fr.enimaloc.catapult.service.category.CategoryChain;
 import fr.enimaloc.catapult.service.category.CategoryOutcome;
 import fr.enimaloc.catapult.service.category.CategoryRule;
+import fr.enimaloc.catapult.service.category.ExtensionLayoutApplier;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import fr.enimaloc.catapult.service.twitch.ChannelUpdateOutcome;
@@ -69,6 +72,7 @@ class CustomBindingServiceTest {
     @Mock private OAuthTokenRepository oAuthTokenRepository;
     @Mock private GameEventListener gameEventListener;
     @Mock private ChannelEventPublisher channelEventPublisher;
+    @Mock private ExtensionLayoutApplier layouts;
 
     private CustomBindingService service;
 
@@ -79,10 +83,10 @@ class CustomBindingServiceTest {
         // The real chain and applier: the Twitch stubs below are what the category decision ends up calling
         CategoryChain chain = new CategoryChain(activations, streamStateService, userSettingsRepository,
                 new RaidRestoreHold(), gameStateService, userAccountRepository,
-                new CategoryApplier(twitchService, streamStateService), mock(RaidRestoreGateService.class), mock(GameBindingLookup.class));
+                new CategoryApplier(twitchService, streamStateService), mock(RaidRestoreGateService.class), mock(GameBindingLookup.class), mock(ExtensionLayoutApplier.class));
         service = new CustomBindingService(bindings, activations, experimentService, gameStateService,
                 streamStateService, userAccountRepository, oAuthTokenRepository, gameEventListener,
-                channelEventPublisher, chain);
+                channelEventPublisher, chain, layouts);
         user = new UserAccount();
         user.setId(UUID.randomUUID());
         user.setBotEnabled(true);
@@ -612,5 +616,28 @@ class CustomBindingServiceTest {
         service.ensureExperiment();
 
         verify(experimentService).ensureExists("custom.bindings", "enabled");
+    }
+
+    @Test
+    void updateExtensionSlots_replacesTheLayout_andReappliesItWhenCurrent() {
+        CustomBinding b = binding("Art");
+        b.getExtensionSlots().add(new ExtensionSlotSetting(TwitchExtensionsDto.Type.OVERLAY, 1, "old", "Old"));
+        when(bindings.findByIdAndUser(b.getId(), user)).thenReturn(Optional.of(b));
+        Set<ExtensionSlotSetting> layout =
+                Set.of(new ExtensionSlotSetting(TwitchExtensionsDto.Type.PANEL, 1, "p1", "Panel"));
+
+        service.updateExtensionSlots(user, b.getId(), layout);
+
+        assertThat(b.getExtensionSlots()).isEqualTo(layout);
+        verify(bindings).save(b);
+        verify(layouts).applyIfCurrent(user, ExtensionLayoutApplier.keyOf(b.toGameBinding(user)), layout);
+    }
+
+    @Test
+    void updateExtensionSlots_answers404_forAnotherChannelsBinding() {
+        when(bindings.findByIdAndUser(any(), any())).thenReturn(Optional.empty());
+
+        assertStatus(() -> service.updateExtensionSlots(user, UUID.randomUUID(), Set.of()), HttpStatus.NOT_FOUND);
+        verifyNoInteractions(layouts);
     }
 }

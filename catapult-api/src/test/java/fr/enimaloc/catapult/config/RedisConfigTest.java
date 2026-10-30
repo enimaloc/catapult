@@ -18,7 +18,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
-@ActiveProfiles("mock-web")
+@ActiveProfiles("h2-test")
 @TestPropertySource(properties = "spring.datasource.url=jdbc:h2:mem:catapult_redis_config_test;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;NON_KEYWORDS=KEY,VALUE")
 @Testcontainers
 class RedisConfigTest {

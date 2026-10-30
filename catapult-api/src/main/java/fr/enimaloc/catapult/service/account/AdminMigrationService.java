@@ -46,9 +46,11 @@ public class AdminMigrationService {
         tgt.setNoGameTwitchGameId(src.getNoGameTwitchGameId());
         tgt.setNoGameTwitchGameName(src.getNoGameTwitchGameName());
         tgt.setNoGameCcls(new HashSet<>(src.getNoGameCcls()));
+        tgt.setNoGameExtensionSlots(new HashSet<>(src.getNoGameExtensionSlots()));
         tgt.setIncompleteFallbackTwitchGameId(src.getIncompleteFallbackTwitchGameId());
         tgt.setIncompleteFallbackTwitchGameName(src.getIncompleteFallbackTwitchGameName());
         tgt.setIncompleteFallbackCcls(new HashSet<>(src.getIncompleteFallbackCcls()));
+        tgt.setIncompleteFallbackExtensionSlots(new HashSet<>(src.getIncompleteFallbackExtensionSlots()));
         tgt.setApplyDefaultOnStreamStart(src.isApplyDefaultOnStreamStart());
         tgt.setApplyDefaultOnNoGame(src.isApplyDefaultOnNoGame());
         tgt.setApplyDefaultOnStreamEnd(src.isApplyDefaultOnStreamEnd());
@@ -94,6 +96,7 @@ public class AdminMigrationService {
                         tgt.setIgnored(src.isIgnored());
                         tgt.setCclEnabled(src.isCclEnabled());
                         tgt.setCcls(new HashSet<>(src.getCcls()));
+                        tgt.setExtensionSlots(new HashSet<>(src.getExtensionSlots()));
                         gameBindingRepository.save(tgt);
                     },
                     () -> {
@@ -108,6 +111,7 @@ public class AdminMigrationService {
                         tgt.setIgnored(src.isIgnored());
                         tgt.setCclEnabled(src.isCclEnabled());
                         tgt.setCcls(new HashSet<>(src.getCcls()));
+                        tgt.setExtensionSlots(new HashSet<>(src.getExtensionSlots()));
                         gameBindingRepository.save(tgt);
                     }
                 );

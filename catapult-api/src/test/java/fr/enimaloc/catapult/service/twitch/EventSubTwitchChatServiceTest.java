@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.service.twitch;
 
+import fr.enimaloc.catapult.simulation.SimulationGate;
+import org.springframework.beans.factory.ObjectProvider;
 import fr.enimaloc.catapult.service.debug.DebugRecording;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
@@ -44,6 +46,7 @@ class EventSubTwitchChatServiceTest {
     @Mock private TwitchTokenService twitchTokenService;
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private RestClient restClient;
+    @Mock private ObjectProvider<SimulationGate> simulationGate;
     @Mock private TwitchHelixChannelClient helix;
     @Mock private SystemTwitchAccountService systemTwitchAccountService;
     @Mock private ExternalApiObservations apiObservations;

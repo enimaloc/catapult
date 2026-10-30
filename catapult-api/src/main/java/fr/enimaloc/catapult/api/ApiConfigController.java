@@ -44,8 +44,10 @@ public class ApiConfigController {
 
     @GetMapping("/app")
     public AppConfigResponse appConfig() {
+        // distinct: under the simulation a getter and its simulated subclass are both beans
         List<String> getterNames = availableGetters.stream()
                 .map(GameGetter::name)
+                .distinct()
                 .toList();
         return new AppConfigResponse(appName, deletionDelayDays, getterNames);
     }

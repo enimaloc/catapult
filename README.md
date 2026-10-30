@@ -133,7 +133,7 @@ sans membre identifiable (préchauffage du cache des catégories, CCL de l'admin
 | `BATTLENET_CLIENT_ID` | Non | Client ID Battle.net |
 | `BATTLENET_CLIENT_SECRET` | Non | Client Secret Battle.net |
 | `IGDB_CLIENT_ID` | Non | Client ID IGDB (utilise `TWITCH_CLIENT_ID` si absent) |
-| `DTDD_ENABLED` | Non | Active l'intégration DoesTheDogDie (clés gérées dans l'admin `/admin/dtdd-keys`) |
+| `DTDD_ENABLED` | Non | Intégration DoesTheDogDie, active par défaut : `false` pour la couper (clés gérées dans l'admin `/admin/dtdd-keys`) |
 | `API_SENTRY_DSN` | Non | DSN Sentry de `catapult-api`, qui n'envoie que les membres en mode débug (vide : coupé) |
 | `SENTRY_ENVIRONMENT` | Non | Environnement Sentry de `catapult-api` (`production` par défaut) |
 
@@ -197,9 +197,9 @@ dev  ──►  beta  ──►  main
 
 | Branche | Contenu | Version publiée | Images Docker |
 |---|---|---|---|
-| `dev` | Intégration : les PR de fonctionnalités et de correctifs arrivent ici (branche par défaut) | aucune | aucune |
+| `dev` | Intégration : les PR de fonctionnalités et de correctifs arrivent ici | aucune | aucune |
 | `beta` | Pré-releases | `v1.0.0-BETA.N` | `:<version>` et `:beta` |
-| `main` | Releases stables | `vX.Y.Z` | `:<version>` et `:latest` |
+| `main` | Releases stables (branche par défaut du dépôt) | `vX.Y.Z` | `:<version>` et `:latest` |
 
 Une release part d'une PR de promotion préparée par un bot :
 
@@ -210,6 +210,9 @@ Une release part d'une PR de promotion préparée par un bot :
 3. À la fusion, le tag est posé, la pré-release GitHub est publiée, les images sont poussées et
    [`CHANGELOG.md`](CHANGELOG.md), l'historique de toutes les versions, est mis à jour.
 4. La promotion `beta` → `main` (`chore(release): vX.Y.Z`) suit le même cycle et publie la release stable.
+
+Le propriétaire peut aussi programmer une sortie, en remplissant la ligne `Sortie programmée :` de la PR
+(`AAAA-MM-JJ HH:MM`, heure de Paris). Le détail est dans [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Un correctif urgent passe par une branche `hotfix/…` partie de `main`, puis est reporté sur `beta` et `dev`.
 Le détail est dans [CONTRIBUTING.md](CONTRIBUTING.md).

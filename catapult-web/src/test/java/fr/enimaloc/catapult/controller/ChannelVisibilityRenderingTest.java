@@ -6,11 +6,13 @@ import fr.enimaloc.catapult.common.dto.channel.BindingDto;
 import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.channel.ChannelUserDto;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
+import fr.enimaloc.catapult.common.dto.channel.ExtensionSlotDto;
 import fr.enimaloc.catapult.common.dto.channel.GameDto;
 import fr.enimaloc.catapult.common.dto.channel.MinecraftData;
 import fr.enimaloc.catapult.common.dto.channel.ObsData;
 import fr.enimaloc.catapult.common.dto.channel.PagedBindings;
 import fr.enimaloc.catapult.common.dto.channel.SteamData;
+import fr.enimaloc.catapult.common.dto.channel.TwitchExtensionsDto;
 import fr.enimaloc.catapult.common.dto.channel.TwitchatData;
 import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
 import fr.enimaloc.catapult.common.dto.channel.XboxData;
@@ -360,6 +362,43 @@ class ChannelVisibilityRenderingTest {
 
         assertThat(openingTagForId(html, "raid-restore-enabled")).doesNotContain("checked");
         assertThat(openingTagForId(html, "raid-restore-minutes")).contains("value=\"15\"", "disabled");
+    }
+
+    /**
+     * A binding row and both fallback cards carry the channel diagram of their extension layout, saved to their own
+     * route: six slots each, a slot the layout sets showing its extension by name.
+     */
+    @Test
+    void bindingRowAndFallbacks_carryTheirExtensionLayout() throws Exception {
+        BindingDto binding = new BindingDto("binding-1", "AUTO", "STEAM", "Game A", "123", "Game A",
+                false, true, Set.of(), true, false, Set.of(), null,
+                List.of(new ExtensionSlotDto(TwitchExtensionsDto.Type.OVERLAY, 1, "mock-overlay", "Live Map")));
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(new ChannelPageData(
+                new ChannelUserDto("id-1", "twitch-1", "enimaloc", "https://example.test/avatar.png"),
+                "enimaloc", false, true, true, null,
+                new PagedBindings(0, 1, 1, List.of(binding)),
+                List.of(), Set.of(), List.of(), Set.of(),
+                null, null, null, null, null, null, null, null));
+        when(apiService.channelSettings(any())).thenReturn(new UserSettingsDto(
+                false, Set.of(), null, null, Set.of(), false, false, false,
+                null, null, Set.of(), List.of(), false, Set.of(), List.of(), null, false,
+                List.of(new ExtensionSlotDto(TwitchExtensionsDto.Type.PANEL, 1, "mock-panel", "Build Guide")),
+                List.of(new ExtensionSlotDto(TwitchExtensionsDto.Type.COMPONENT, 2, null, null))));
+
+        String html = mvc.perform(get("/spa/channel/enimaloc")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(countOccurrences(html, "data-slot=\"")).isEqualTo(18);
+        assertThat(html).contains("data-save-url=\"/channel/enimaloc/bindings/binding-1/extensions\"",
+                "data-save-url=\"/channel/enimaloc/settings/no-game/extensions\"",
+                "data-save-url=\"/channel/enimaloc/settings/incomplete-fallback/extensions\"",
+                ">Live Map<", ">Build Guide<");
+        // The row's layout comes after its CCLs, each card's inside it.
+        assertThat(html.indexOf("data-extensions=\"binding\"")).isGreaterThan(html.indexOf("binding-ccl-panel"));
+        int noGame = html.indexOf("id=\"channel-no-game-settings-form\"");
+        int fallback = html.indexOf("id=\"channel-incomplete-fallback-settings-form\"");
+        assertThat(html.indexOf("data-extensions=\"no-game\"")).isBetween(noGame, fallback);
+        assertThat(html.indexOf("data-extensions=\"incomplete-fallback\"")).isGreaterThan(fallback);
     }
 
     /** A MAPPED binding reads as automatic, with the mention that an admin mapping set its category. */

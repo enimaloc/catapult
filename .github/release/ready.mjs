@@ -72,6 +72,10 @@ export function requiredChecksPassed(runs) {
 }
 
 const short = (sha) => sha.slice(0, 7);
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+// GitHub moves a pull request's head a few seconds after the branch push.
+const HEAD_READS = 10;
+const HEAD_PAUSE_MS = 3000;
 const AGAIN = "sors-la à nouveau du draft";
 
 const MESSAGES = {
@@ -126,7 +130,18 @@ async function refuseAndRefresh(gh, pull, message, refresh) {
   return result;
 }
 
-async function prepare({ gh, pr, pull, kind, owner, repo, appSlug, promote }) {
+/** Waits until the pull request shows `sha` as its head: auto-merge pinned to it is refused before. */
+async function waitForHead(gh, number, sha, wait) {
+  let seen;
+  for (let read = 1; read <= HEAD_READS; read++) {
+    seen = (await gh.getPull(number)).headSha;
+    if (seen === sha) return;
+    if (read < HEAD_READS) await wait(HEAD_PAUSE_MS);
+  }
+  throw new Error(`#${number} still shows ${short(seen)} instead of the bump ${short(sha)}`);
+}
+
+async function prepare({ gh, pr, pull, kind, owner, repo, appSlug, promote, wait }) {
   if (pull.state !== "open" || pull.draft) return refuse(gh, pull, MESSAGES.notReady());
   if (pull.headSha !== pr.headSha) return refuse(gh, pull, MESSAGES.headMoved());
 
@@ -182,9 +197,11 @@ async function prepare({ gh, pr, pull, kind, owner, repo, appSlug, promote }) {
       parent: pr.headSha,
       path: GRADLE_FILE,
       text: bumped,
-      message: title,
+      // Not the PR title: the release merge commit already carries it.
+      message: `chore(release): bump version to ${version}`,
     });
     if (bump === null) return refuse(gh, current, MESSAGES.headMoved());
+    await waitForHead(gh, pull.number, bump, wait);
     await gh.enableAutoMerge(pull, { expectedHeadOid: bump, commitHeadline: title });
     console.log(`#${pull.number}: auto-merge on the bump ${short(bump)} for ${version}`);
     return "auto-merge";
@@ -204,14 +221,14 @@ async function prepare({ gh, pr, pull, kind, owner, repo, appSlug, promote }) {
 }
 
 /** -> "auto-merge" | "merged" | "ignored" | "refused"; any failure re-drafts the PR, then rethrows. */
-export async function onReady({ gh, pr, sender, owner, repo, appSlug, promote = promoteImpl }) {
+export async function onReady({ gh, pr, sender, owner, repo, appSlug, promote = promoteImpl, wait = sleep }) {
   if (sender !== owner) return "ignored";
   const pull = await gh.getPull(pr.number);
   const kind = kindOf(pull, `${owner}/${repo}`);
   if (kind === null) return "ignored";
 
   try {
-    return await prepare({ gh, pr, pull, kind, owner, repo, appSlug, promote });
+    return await prepare({ gh, pr, pull, kind, owner, repo, appSlug, promote, wait });
   } catch (error) {
     // Best effort: each report step on its own, so a failed re-draft still leaves the comment.
     for (const step of [() => gh.convertToDraft(pull), () => gh.comment(pull.number, MESSAGES.error(error))]) {

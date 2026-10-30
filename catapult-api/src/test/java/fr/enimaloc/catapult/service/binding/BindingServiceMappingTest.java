@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.binding;
 
+import fr.enimaloc.catapult.service.category.ExtensionLayoutApplier;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
@@ -24,7 +25,11 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+import org.springframework.web.server.ResponseStatusException;
+import fr.enimaloc.catapult.domain.binding.ExtensionSlotSetting;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -46,7 +51,7 @@ class BindingServiceMappingTest {
             new BindingService(bindings, igdb, igdbDetails, twitch, twResolver, mappings,
                     new GameBindingLookup(bindings), new CategoryChain(mock(CustomBindingActivations.class),
                     mock(StreamStateService.class), mock(UserSettingsRepository.class), new RaidRestoreHold(),
-                    gameState, mock(UserAccountRepository.class), new CategoryApplier(twitch, mock(StreamStateService.class)), mock(RaidRestoreGateService.class), mock(GameBindingLookup.class)));
+                    gameState, mock(UserAccountRepository.class), new CategoryApplier(twitch, mock(StreamStateService.class)), mock(RaidRestoreGateService.class), mock(GameBindingLookup.class), mock(ExtensionLayoutApplier.class)), mock(ExtensionLayoutApplier.class));
 
     private final DetectedGame cs2 = new DetectedGame("730", GameBinding.SourceType.STEAM, "Counter-Strike 2");
     private UserAccount user;
@@ -246,6 +251,35 @@ class BindingServiceMappingTest {
         assertThat(binding.getTwitchGameId()).isEqualTo("igdb-twitch");
         assertThat(binding.getTwitchGameName()).isEqualTo("Counter-Strike 2");
         assertThat(binding.getTws()).containsExactly("tw-igdb");
+    }
+
+    @Test
+    void resetToDefaults_putsTheBindingBackAsFirstDetected() {
+        when(mappings.findBySourceTypeAndSourceId(GameBinding.SourceType.STEAM, "730")).thenReturn(Optional.empty());
+        GameBinding binding = binding(GameBinding.Status.MANUAL);
+        binding.setTwOverride(true);
+        binding.setIgnored(true);
+        binding.setCclEnabled(false);
+        binding.setTwEnabled(false);
+        binding.getExtensionSlots().add(new ExtensionSlotSetting());
+
+        service.resetToDefaults(user, binding.getId());
+
+        assertThat(binding.getStatus()).isEqualTo(GameBinding.Status.AUTO);
+        assertThat(binding.getTwitchGameId()).isEqualTo("igdb-twitch");
+        assertThat(binding.getCcls()).containsExactly("ViolentGraphic");
+        assertThat(binding.getTws()).containsExactly("tw-igdb");
+        assertThat(binding.isTwOverride()).isFalse();
+        assertThat(binding.isIgnored()).isFalse();
+        assertThat(binding.isCclEnabled()).isTrue();
+        assertThat(binding.isTwEnabled()).isTrue();
+        assertThat(binding.getExtensionSlots()).isEmpty();
+    }
+
+    @Test
+    void resetToDefaults_ofAnotherOnesBinding_isNotFound() {
+        assertThatThrownBy(() -> service.resetToDefaults(user, UUID.randomUUID()))
+                .isInstanceOf(ResponseStatusException.class);
     }
 
     @Test

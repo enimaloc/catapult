@@ -7,16 +7,16 @@ une release est publiée.
 
 | Branche | Rôle |
 |---|---|
-| `dev` | Intégration (branche par défaut). Toutes les PR de fonctionnalités et de correctifs arrivent ici. |
+| `dev` | Intégration. Toutes les PR de fonctionnalités et de correctifs arrivent ici. |
 | `beta` | Pré-releases `vX.Y.Z-BETA.N`. Alimentée uniquement par la promotion `dev` → `beta`. |
-| `main` | Releases stables `vX.Y.Z`. Alimentée par la promotion `beta` → `main` et par les hotfix. |
+| `main` | Releases stables `vX.Y.Z` (branche par défaut du dépôt). Alimentée par la promotion `beta` → `main` et par les hotfix. |
 
 Ne pousse jamais directement sur ces trois branches : elles exigent une PR et les checks `build`, `test` et
 `commitlint`.
 
 ## Proposer un changement
 
-1. Crée une branche depuis `dev` : `feat/ma-fonctionnalite`, `fix/mon-correctif`, `docs/…`, `chore/…`.
+1. Crée une branche depuis `dev` : `feat/ma-fonctionnalite`, `fix/mon-correctif`, `docs/…`, `chore/…`. Ouvre ta PR vers `dev`, pas vers `main` que GitHub propose par défaut.
 2. Fais des commits ciblés (un commit par fonctionnalité, correctif ou refactor).
 3. Ouvre une PR **vers `dev`**. Le modèle de PR rappelle la checklist.
 4. Les checks doivent être verts ; la PR est ensuite fusionnée dans `dev`.
@@ -25,6 +25,22 @@ Les PR ouvertes vers `beta` ou `main` sont réservées aux promotions préparée
 
 En ouvrant une PR, tu acceptes que ta contribution soit publiée sous la même licence que le projet,
 l'[AGPL-3.0](LICENSE).
+
+## Programmer une sortie
+
+Dans une PR de promotion en draft (`dev` → `beta` ou `beta` → `main`), le propriétaire remplit la ligne
+`Sortie programmée : AAAA-MM-JJ HH:MM`, en heure de Paris. Le bot confirme par un commentaire : tant qu'il n'a
+pas répondu, rien n'est programmé.
+
+- **À l'heure dite :** la PR sort du draft et suit le circuit habituel. La vérification a lieu toutes les
+  15 minutes, et GitHub peut la retarder. Au-delà d'une heure de retard, la sortie part quand même et un
+  commentaire indique l'heure prévue et l'heure réelle.
+- **Annulation automatique :** un nouveau commit, une date illisible ou passée, ou un passage manuel de la PR
+  dans ou hors du draft annulent la sortie, avec un commentaire. Il faut ensuite saisir une nouvelle date.
+- **Annulation manuelle :** vider la ligne.
+
+`.github/workflows/release-schedule.yml` doit rester identique sur `dev` et sur `main` : GitHub ne lance les
+tâches planifiées que depuis la branche par défaut.
 
 ## Conventional Commits
 

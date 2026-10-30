@@ -4,8 +4,8 @@
  *
  * - Overview list, under the associations and shaped like them: a row per binding, the active one marked.
  *   A row opens its edit form (name, category through the same search as the associations' (GameSearch),
- *   CCLs, TWs, uninterruptible) with activate/deactivate, save and delete (confirmed). "New" reveals an
- *   empty row whose save creates. Activation applies the Twitch category at once, live or not; its refusal
+ *   CCLs, TWs, uninterruptible) with save and delete (confirmed); activate/deactivate stay on the row itself,
+ *   without opening it. "New" reveals an empty row whose save creates. Activation applies the Twitch category at once, live or not; its refusal
  *   is told in a line under the list, in its own text per catapult-api code (data-error-* on the list). The
  *   active binding follows the CustomBindingChangedEvent of the channel stream (setActive, see
  *   channel-events.js), the list its CustomBindingsUpdatedEvent (apply): a binding it no longer lists
@@ -185,7 +185,11 @@ window.CatapultCustomBindings = (function () {
             });
 
             const on = (selector, handler) => item.querySelector(selector)
-                ?.addEventListener("click", event => busy(event.currentTarget, handler));
+                ?.addEventListener("click", event => {
+                    // On the row's header, activate/deactivate don't toggle it.
+                    event.stopPropagation();
+                    busy(event.currentTarget, handler);
+                });
             on(".custom-binding-activate", focused => act(item, `${base}/${id}/activate`, id, focused));
             on(".custom-binding-stop", focused => act(item, `${base}/deactivate`, null, focused));
             on(".custom-binding-save", focused => save(item, id, game, focused));
@@ -268,6 +272,8 @@ window.CatapultCustomBindings = (function () {
         // Once in the page, its switches and fields are upgraded: their properties are theirs.
         fillForm(row, binding, null);
         wired.attachItem(row);
+        // The template's extension layout has no binding to save to: this one has now.
+        window.CatapultExtensions?.enable(row, `${CatapultChannel.baseUrl()}/custom-bindings/${binding.id}/extensions`);
         return row;
     }
 

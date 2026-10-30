@@ -15,7 +15,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
-@ActiveProfiles("mock-web")
+@ActiveProfiles("h2-test")
 @TestPropertySource(properties = {
         "spring.datasource.url=jdbc:h2:mem:catapult_idcodec_it;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;NON_KEYWORDS=KEY,VALUE"
 })

@@ -7,9 +7,11 @@ import fr.enimaloc.catapult.getter.steam.SteamApiClient;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
+import fr.enimaloc.catapult.simulation.SimulatedCalls;
+import fr.enimaloc.catapult.simulation.SimulationGate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.context.event.EventListener;
@@ -23,18 +25,24 @@ import java.util.concurrent.CompletableFuture;
 @Service
 @DependsOn("flyway")
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = "app.mock.steam", havingValue = "false", matchIfMissing = true)
 public class SteamLibraryCacheService {
 
     private final SteamApiClient steamApiClient;
     private final IgdbService igdbService;
     private final UserAccountRepository userAccountRepository;
     private final TokenEncryptionService tokenEncryptionService;
+    private final ObjectProvider<SimulationGate> simulationGate;
 
     @Async
     @EventListener(ApplicationReadyEvent.class)
     public void preloadAllUserLibraries() {
-        List<UserAccount> users = userAccountRepository.findBySteamIdNotNull();
+        if (simulated()) {
+            return;
+        }
+        // A fictitious account's Steam id is made up: without the simulation, nothing asks Steam about it
+        List<UserAccount> users = userAccountRepository.findBySteamIdNotNull().stream()
+            .filter(user -> !SimulationGate.ignoresFictitious(simulationGate, user))
+            .toList();
         if (users.isEmpty()) {
             log.info("No users with Steam linked — skipping library preload");
             igdbService.prewarmCclCache();
@@ -53,9 +61,24 @@ public class SteamLibraryCacheService {
     @Async
     @EventListener
     public void onSteamLinked(SteamLinkedEvent event) {
+        if (simulated()) {
+            return;
+        }
         UserAccount user = event.getUser();
+        if (SimulationGate.ignoresFictitious(simulationGate, user)) {
+            return;
+        }
         DebugContext.runAs(user.getId(), () -> cacheLibraryAsync(user).join());
         igdbService.prewarmCclCache();
+    }
+
+    /** Whether the simulation keeps the library preload (owned games, then IGDB) from running. */
+    private boolean simulated() {
+        if (SimulationGate.blocks(simulationGate, null, SimulatedCalls.STEAM_STORE_LIBRARY)) {
+            log.debug("Steam library preload skipped — steam.store.library is simulated");
+            return true;
+        }
+        return false;
     }
 
     private CompletableFuture<Void> cacheLibraryAsync(UserAccount user) {

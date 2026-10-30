@@ -5,7 +5,6 @@ import fr.enimaloc.catapult.repository.steam.SteamApiKeyRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
-import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import java.util.Comparator;
@@ -17,7 +16,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
 @Component
-@Profile("!mock")
 @ConditionalOnBooleanProperty("steam.enabled")
 public class SteamApiKeyRotator {
 

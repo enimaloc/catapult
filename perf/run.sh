@@ -242,7 +242,7 @@ sample_stats() {
     while :; do
         docker stats --no-stream --format '{{.Name}},{{.CPUPerc}},{{.MemUsage}}' "${ids[@]}" \
             | sed "s/^/$(date +%s),/" >>"$1" || true
-        jvm_memory api 8090 >>"$2" || true
+        jvm_memory api 8091 >>"$2" || true
         jvm_memory web 8092 >>"$2" || true
         sleep 5
     done
@@ -281,7 +281,7 @@ run_load() {
         -v "${PERF_DIR}/k6:/scripts:ro" -v "${REPORT_DIR}:/out" \
         "${K6_IMAGE}" run --quiet --summary-export /out/k6-summary.json \
         -e STREAMERS="${STREAMERS}" -e VIEWERS="${VIEWERS}" -e DURATION="${DURATION}" \
-        -e WEB=http://web:8081 -e API=http://api:8080 /scripts/evening.js || status=$?
+        -e WEB=http://web:8080 -e API=http://api:8081 /scripts/evening.js || status=$?
     stop_stats
     [[ -f "${REPORT_DIR}/k6-summary.json" ]] && echo "Wrote ${REPORT_DIR}/k6-summary.json"
     load_status=${status}

@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.twitch;
 
+import fr.enimaloc.catapult.simulation.SimulationGates;
 import fr.enimaloc.catapult.service.debug.DebugRecording;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.enimaloc.catapult.chat.ChatCommandEvent;
@@ -80,7 +81,7 @@ class EventSubTwitchChatServiceFlowsTest {
         service = new EventSubTwitchChatService(tokens, users, tokenService, publisher,
                 mock(TwitchHelixChannelClient.class), builder.build(), new ObjectMapper(), bot, meters,
                 new ExternalApiObservations(ObservationRegistry.NOOP, meters), rateLimiter,
-                DebugRecording.OFF);
+                DebugRecording.OFF, SimulationGates.none());
         ReflectionTestUtils.setField(service, "twitchClientId", "client-id");
         ReflectionTestUtils.setField(ReflectionTestUtils.getField(service, "connections"), "httpClient", httpClient);
 

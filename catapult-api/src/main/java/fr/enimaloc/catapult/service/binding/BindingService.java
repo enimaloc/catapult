@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.service.binding;
 
 import fr.enimaloc.catapult.service.debug.DebugContext;
 import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.binding.ExtensionSlotSetting;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.binding.GameMapping;
 import fr.enimaloc.catapult.domain.igdb.IgdbGameDetails;
@@ -10,14 +11,17 @@ import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
 import fr.enimaloc.catapult.repository.binding.GameMappingRepository;
 import fr.enimaloc.catapult.service.category.CategoryChain;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.BindingEdited;
+import fr.enimaloc.catapult.service.category.ExtensionLayoutApplier;
 import fr.enimaloc.catapult.service.igdb.IgdbGameDetailsService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.tw.TwResolverService;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Objects;
@@ -39,6 +43,7 @@ public class BindingService {
     private final GameMappingRepository gameMappingRepository;
     private final GameBindingLookup gameBindingLookup;
     private final CategoryChain categoryChain;
+    private final ExtensionLayoutApplier extensionLayoutApplier;
 
     /**
      * Applies {@code change} to the user's binding (if it exists), saves it, and applies it when it is the game
@@ -306,6 +311,20 @@ public class BindingService {
         editBinding(user, bindingId, binding -> binding.setCclEnabled(enabled));
     }
 
+    /**
+     * Replaces the binding's whole extension layout and, when it is the configuration in place, pushes it to Twitch.
+     * @throws ResponseStatusException 404 when the binding isn't the user's
+     */
+    @Transactional
+    public void updateExtensionSlots(UserAccount user, UUID bindingId, Set<ExtensionSlotSetting> slots) {
+        GameBinding binding = gameBindingRepository.findByIdAndUser(bindingId, user)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown binding"));
+        binding.getExtensionSlots().clear();
+        binding.getExtensionSlots().addAll(slots);
+        gameBindingRepository.save(binding);
+        extensionLayoutApplier.applyIfCurrent(user, ExtensionLayoutApplier.keyOf(binding), slots);
+    }
+
     @Transactional
     public void toggleTwEnabled(UserAccount user, UUID bindingId, boolean enabled) {
         editBinding(user, bindingId, binding -> binding.setTwEnabled(enabled));
@@ -313,19 +332,39 @@ public class BindingService {
 
     @Transactional
     public void resetTws(UserAccount user, UUID bindingId) {
-        gameBindingRepository.findByIdAndUser(bindingId, user).ifPresent(binding -> {
-            binding.setTwOverride(false);
-            // Resetting the TWs hands a MANUAL binding back to the automatic resolution: its game's admin mapping
-            // when there is one, else IGDB (which sets the status itself).
-            if (binding.getStatus() == GameBinding.Status.MANUAL) binding.setStatus(GameBinding.Status.AUTO);
-            CategoryKey before = CategoryKey.of(binding);
-            GameBinding resolved = updateWithIgdbResolution(user, detectedOf(binding), binding);
-            // A new category is pushed like an edit (the played binding only)
-            if (!before.equals(CategoryKey.of(resolved))) {
-                DebugContext.runAs(user.getId(),
-                        () -> categoryChain.apply(user, new BindingEdited(resolved)).orThrow());
-            }
-        });
+        gameBindingRepository.findByIdAndUser(bindingId, user).ifPresent(binding -> resolveAnew(user, binding));
+    }
+
+    /**
+     * Puts the binding back as first detected: resolved anew (category, CCLs, TWs), its toggles on, not ignored, its
+     * extension layout emptied (pushed to Twitch when it is the configuration in place).
+     * @throws ResponseStatusException 404 when the binding isn't the user's
+     */
+    @Transactional
+    public void resetToDefaults(UserAccount user, UUID bindingId) {
+        GameBinding binding = gameBindingRepository.findByIdAndUser(bindingId, user)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown binding"));
+        binding.setIgnored(false);
+        binding.setCclEnabled(true);
+        binding.setTwEnabled(true);
+        binding.getExtensionSlots().clear();
+        GameBinding resolved = resolveAnew(user, binding);
+        extensionLayoutApplier.applyIfCurrent(user, ExtensionLayoutApplier.keyOf(resolved), Set.of());
+    }
+
+    private GameBinding resolveAnew(UserAccount user, GameBinding binding) {
+        binding.setTwOverride(false);
+        // Resetting the TWs hands a MANUAL binding back to the automatic resolution: its game's admin mapping
+        // when there is one, else IGDB (which sets the status itself).
+        if (binding.getStatus() == GameBinding.Status.MANUAL) binding.setStatus(GameBinding.Status.AUTO);
+        CategoryKey before = CategoryKey.of(binding);
+        GameBinding resolved = updateWithIgdbResolution(user, detectedOf(binding), binding);
+        // A new category is pushed like an edit (the played binding only)
+        if (!before.equals(CategoryKey.of(resolved))) {
+            DebugContext.runAs(user.getId(),
+                    () -> categoryChain.apply(user, new BindingEdited(resolved)).orThrow());
+        }
+        return resolved;
     }
 
     /**

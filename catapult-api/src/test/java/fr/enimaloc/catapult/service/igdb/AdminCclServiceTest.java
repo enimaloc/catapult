@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.domain.igdb.IgdbRatingDescriptor;
 import fr.enimaloc.catapult.domain.twitch.TwitchCclDefinition;
 import fr.enimaloc.catapult.repository.igdb.IgdbRatingDescriptorRepository;
 import fr.enimaloc.catapult.repository.twitch.TwitchCclDefinitionRepository;
+import fr.enimaloc.catapult.simulation.SimulationGates;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -66,7 +67,7 @@ class AdminCclServiceTest {
     void setUp() {
         RestClient.Builder builder = RestClient.builder();
         server = MockRestServiceServer.bindTo(builder).build();
-        service = new AdminCclService(builder.build(), ccls, descriptors, transactions);
+        service = new AdminCclService(builder.build(), ccls, descriptors, transactions, SimulationGates.none());
         ReflectionTestUtils.setField(service, "twitchClientId", "twitch-id");
         ReflectionTestUtils.setField(service, "twitchClientSecret", "secret");
         ReflectionTestUtils.setField(service, "igdbClientId", "");

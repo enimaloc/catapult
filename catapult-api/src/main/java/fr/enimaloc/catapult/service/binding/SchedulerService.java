@@ -9,10 +9,12 @@ import fr.enimaloc.catapult.getter.GameGetterChain;
 import fr.enimaloc.catapult.getter.MinecraftPresenceGetter;
 import fr.enimaloc.catapult.getter.steam.SteamGameGetter;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.simulation.SimulationGate;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.DependsOn;
@@ -42,6 +44,7 @@ public class SchedulerService {
     private final Optional<SteamGameGetter> steamGameGetter;
     private final Optional<MinecraftPresenceGetter> minecraftPresenceGetter;
     private final BindingService bindingService;
+    private final ObjectProvider<SimulationGate> simulationGate;
 
     /**
      * Guards the prefetch→process→clear cycle so a manual {@link #triggerManualCheck}
@@ -58,8 +61,11 @@ public class SchedulerService {
         Timer.Sample sample = Timer.start(meterRegistry);
         cycleLock.lock();
         try {
+            // Without the simulation, the fictitious accounts of the mock profile are left alone: no platform knows them
             List<UserAccount> activeUsers = userAccountRepository
-                .findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE);
+                .findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE).stream()
+                .filter(user -> !SimulationGate.ignoresFictitious(simulationGate, user))
+                .toList();
 
             prefetch(activeUsers);
 

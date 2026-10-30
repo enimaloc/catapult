@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.category;
 
+import fr.enimaloc.catapult.service.ActivityLogService;
 import fr.enimaloc.catapult.service.binding.GameBindingLookup;
 import fr.enimaloc.catapult.service.binding.RaidRestoreGateService;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
@@ -8,6 +9,8 @@ import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.account.UserSettings;
 import fr.enimaloc.catapult.domain.binding.CustomBinding;
 import fr.enimaloc.catapult.domain.binding.CustomBindingActivation;
+import fr.enimaloc.catapult.common.dto.channel.TwitchExtensionsDto;
+import fr.enimaloc.catapult.domain.binding.ExtensionSlotSetting;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
 import fr.enimaloc.catapult.service.binding.CustomBindingActivations;
@@ -29,6 +32,7 @@ import fr.enimaloc.catapult.service.category.CategoryTrigger.RevertCategory;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.NoGameAfterCustomBinding;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.StreamEnded;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.StreamStarted;
+import fr.enimaloc.catapult.service.twitch.ChannelUpdateOutcome;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -37,6 +41,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -62,6 +68,7 @@ class CategoryChainTest {
     @Mock private CategoryApplier applier;
     @Mock private RaidRestoreGateService gate;
     @Mock private GameBindingLookup lookup;
+    @Mock private ExtensionLayoutApplier layouts;
 
     private final RaidRestoreHold hold = new RaidRestoreHold();
     private CategoryChain chain;
@@ -72,7 +79,7 @@ class CategoryChainTest {
     @BeforeEach
     void setUp() {
         chain = new CategoryChain(activations, streamStateService, settingsRepository, hold, gameStateService,
-                accountRepository, applier, gate, lookup);
+                accountRepository, applier, gate, lookup, layouts);
         user = new UserAccount();
         user.setId(UUID.randomUUID());
 
@@ -395,6 +402,61 @@ class CategoryChainTest {
         assertThat(decision.binding().getTwitchGameId()).isEqualTo("509660");
         assertThat(decision.binding().getUser()).isSameAs(user);
         verifyNoInteractions(settingsRepository, streamStateService);
+    }
+
+    @Test
+    void streamStarted_gameOpen_appliesItsBindingOverTheDefault() {
+        when(activations.active(user)).thenReturn(Optional.empty());
+        when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(played));
+        when(lookup.findByDetectedGame(user, played)).thenReturn(Optional.of(binding));
+        live(true);
+
+        assertThat(chain.decide(user, new StreamStarted()))
+                .isEqualTo(CategoryDecision.update(CategoryRule.GAME_BINDING, binding));
+        verifyNoInteractions(settingsRepository);
+    }
+
+    @Test
+    void streamStarted_ignoredGameOpen_appliesTheNoGameFallback() {
+        binding.setIgnored(true);
+        settings.setApplyDefaultOnNoGame(true);
+        when(activations.active(user)).thenReturn(Optional.empty());
+        when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(played));
+        when(lookup.findByDetectedGame(user, played)).thenReturn(Optional.of(binding));
+        live(true);
+        withSettings();
+
+        CategoryDecision decision = chain.decide(user, new StreamStarted());
+
+        assertThat(decision.rule()).isEqualTo(CategoryRule.NO_GAME_FALLBACK);
+        assertThat(decision.binding().getTwitchGameId()).isEqualTo("509658");
+    }
+
+    @Test
+    void streamStarted_gameOpenWithoutCategory_fallsBackToTheDefault() {
+        binding.setIgnored(true);
+        settings.setApplyDefaultOnNoGame(false);
+        settings.setApplyDefaultOnStreamStart(true);
+        when(activations.active(user)).thenReturn(Optional.empty());
+        when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(played));
+        when(lookup.findByDetectedGame(user, played)).thenReturn(Optional.of(binding));
+        live(true);
+        withSettings();
+
+        assertThat(chain.decide(user, new StreamStarted()))
+                .isEqualTo(CategoryDecision.reset(CategoryRule.DEFAULT_CATEGORY));
+    }
+
+    @Test
+    void streamStarted_gameOpenWithoutBinding_fallsBackToTheDefault() {
+        settings.setApplyDefaultOnStreamStart(true);
+        when(activations.active(user)).thenReturn(Optional.empty());
+        when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(played));
+        when(lookup.findByDetectedGame(user, played)).thenReturn(Optional.empty());
+        withSettings();
+
+        assertThat(chain.decide(user, new StreamStarted()))
+                .isEqualTo(CategoryDecision.reset(CategoryRule.DEFAULT_CATEGORY));
     }
 
     @Test
@@ -952,5 +1014,205 @@ class CategoryChainTest {
         chain.decide(user, new RaidedOut("29595"));
 
         assertThat(hold.isHolding(user)).isFalse();
+    }
+
+    // ---- extension layout ----
+
+    private final ExtensionSlotSetting panel =
+            new ExtensionSlotSetting(TwitchExtensionsDto.Type.PANEL, 1, "ext-1", "Ext One");
+
+    private void applierAnswers(CategoryOutcome outcome) {
+        when(applier.apply(any(), any())).thenReturn(outcome);
+    }
+
+    @Test
+    void game_detected_applies_the_bindings_layout() {
+        binding.getExtensionSlots().add(panel);
+        live(true);
+        applierAnswers(CategoryOutcome.applied(CategoryRule.GAME_BINDING));
+
+        chain.apply(user, new GameDetected(binding));
+
+        verify(layouts).applyOnSwitch(user, "binding:" + binding.getId(), binding.getExtensionSlots());
+    }
+
+    @Test
+    void no_game_fallback_carries_the_no_game_layout() {
+        settings.setApplyDefaultOnNoGame(true);
+        settings.getNoGameExtensionSlots().add(panel);
+        live(true);
+        withSettings();
+        applierAnswers(CategoryOutcome.applied(CategoryRule.NO_GAME_FALLBACK));
+
+        chain.apply(user, new GameClosed());
+
+        verify(layouts).applyOnSwitch(user, "no-game-fallback", Set.of(panel));
+    }
+
+    @Test
+    void incomplete_fallback_carries_its_layout() {
+        binding.setStatus(GameBinding.Status.INCOMPLETE);
+        settings.getIncompleteFallbackExtensionSlots().add(panel);
+        live(true);
+        withSettings();
+        applierAnswers(CategoryOutcome.applied(CategoryRule.INCOMPLETE_FALLBACK));
+
+        chain.apply(user, new GameDetected(binding));
+
+        verify(layouts).applyOnSwitch(user, "incomplete-fallback", Set.of(panel));
+    }
+
+    @Test
+    void custom_binding_carries_its_layout() {
+        CustomBinding art = art();
+        art.getExtensionSlots().add(panel);
+        when(accountRepository.findById(user.getId()))
+                .thenReturn(Optional.of(account(true, UserAccount.Status.ACTIVE)));
+        applierAnswers(CategoryOutcome.applied(CategoryRule.CUSTOM_BINDING));
+
+        chain.apply(user, new CustomBindingTriggered(art));
+
+        verify(layouts).applyOnSwitch(user, "custom:Art", Set.of(panel));
+    }
+
+    @Test
+    void stream_start_reset_applies_the_no_game_layout() {
+        settings.setApplyDefaultOnStreamStart(true);
+        settings.getNoGameExtensionSlots().add(panel);
+        withSettings();
+        applierAnswers(CategoryOutcome.applied(CategoryRule.DEFAULT_CATEGORY));
+
+        chain.apply(user, new StreamStarted());
+
+        verify(layouts).applyOnSwitch(user, ExtensionLayoutApplier.NO_GAME_KEY, Set.of(panel));
+    }
+
+    @Test
+    void no_game_settings_saved_applies_the_no_game_layout() {
+        settings.getNoGameExtensionSlots().add(panel);
+        when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.empty());
+        when(activations.active(user)).thenReturn(Optional.empty());
+        live(true);
+        withSettings();
+        applierAnswers(CategoryOutcome.applied(CategoryRule.DEFAULT_CATEGORY));
+
+        chain.apply(user, new NoGameSettingsSaved(true));
+
+        verify(layouts).applyOnSwitch(user, ExtensionLayoutApplier.NO_GAME_KEY, Set.of(panel));
+    }
+
+    @Test
+    void failed_category_leaves_extensions_alone() {
+        binding.getExtensionSlots().add(panel);
+        live(true);
+        applierAnswers(CategoryOutcome.failed(CategoryRule.GAME_BINDING, Reason.TWITCH_FAILED));
+
+        chain.apply(user, new GameDetected(binding));
+
+        verifyNoInteractions(layouts);
+    }
+
+    @Test
+    void binding_edited_mapping_changed_manual_and_raid_leave_extensions_alone() {
+        binding.getExtensionSlots().add(panel);
+        playing(true);
+        live(true);
+        raidSetUp();
+        applierAnswers(CategoryOutcome.applied(CategoryRule.GAME_BINDING));
+
+        for (CategoryTrigger trigger : List.<CategoryTrigger>of(new BindingEdited(binding),
+                new MappingChanged(binding), new ManualCategory(binding), new RaidedOut("1"))) {
+            assertThat(chain.decide(user, trigger).action()).as(trigger.toString()).isEqualTo(Action.UPDATE_CHANNEL);
+            assertThat(chain.apply(user, trigger).status()).as(trigger.toString())
+                    .isEqualTo(ChannelUpdateOutcome.APPLIED);
+        }
+
+        verifyNoInteractions(layouts);
+    }
+
+    @Test
+    void stream_start_replays_the_pending_bindings_layout() {
+        binding.getExtensionSlots().add(panel);
+        settings.setApplyDefaultOnStreamStart(false);
+        withSettings();
+        when(streamStateService.getPending(user)).thenReturn(Optional.of(binding));
+        applierAnswers(CategoryOutcome.applied(CategoryRule.PENDING));
+
+        chain.apply(user, new StreamStarted());
+
+        verify(layouts).applyOnSwitch(user, "binding:" + binding.getId(), binding.getExtensionSlots());
+    }
+
+    @Test
+    void stream_end_puts_the_extensions_back() {
+        withSettings();
+        applierAnswers(CategoryOutcome.skipped(CategoryRule.DEFAULT_CATEGORY, Reason.DEFAULT_OFF));
+
+        chain.apply(user, new StreamEnded());
+
+        verify(layouts).restore(user);
+    }
+
+    @Test
+    void leaving_the_game_without_a_no_game_category_still_puts_the_no_game_layout() {
+        settings.setApplyDefaultOnNoGame(false);
+        settings.getNoGameExtensionSlots().add(panel);
+        withSettings();
+        when(activations.active(user)).thenReturn(Optional.empty());
+        live(true);
+        applierAnswers(CategoryOutcome.skipped(CategoryRule.NO_GAME_FALLBACK, Reason.NO_GAME_FALLBACK_OFF));
+
+        chain.apply(user, new GameClosed());
+
+        verify(layouts).applyOnSwitch(user, ExtensionLayoutApplier.NO_GAME_KEY, Set.of(panel));
+    }
+
+    @Test
+    void leaving_the_game_offline_after_a_custom_binding_puts_the_no_game_layout() {
+        settings.getNoGameExtensionSlots().add(panel);
+        withSettings();
+        live(false);
+        applierAnswers(CategoryOutcome.skipped(CategoryRule.NO_GAME_FALLBACK, Reason.OFFLINE));
+
+        chain.apply(user, new NoGameAfterCustomBinding());
+
+        verify(layouts).applyOnSwitch(user, ExtensionLayoutApplier.NO_GAME_KEY, Set.of(panel));
+    }
+
+    @Test
+    void leaving_the_game_without_settings_puts_the_extensions_back() {
+        when(activations.active(user)).thenReturn(Optional.empty());
+        live(true);
+        applierAnswers(CategoryOutcome.skipped(CategoryRule.NO_GAME_FALLBACK, Reason.NO_SETTINGS));
+
+        chain.apply(user, new GameClosed());
+
+        verify(layouts).restore(user);
+    }
+
+    @Test
+    void leaving_the_game_under_a_custom_binding_keeps_the_extensions() {
+        when(activations.active(user)).thenReturn(Optional.of(mock(CustomBindingActivation.class)));
+        applierAnswers(CategoryOutcome.skipped(CategoryRule.CUSTOM_BINDING, Reason.CUSTOM_BINDING_ACTIVE));
+
+        chain.apply(user, new GameClosed());
+
+        verifyNoInteractions(layouts);
+    }
+
+    @Test
+    void layout_error_keeps_the_outcome_applied() {
+        RecordingTwitch twitch = new RecordingTwitch(new ArrayList<>());
+        twitch.failExtensions(new IllegalStateException("twitch down"));
+        CategoryChain real = new CategoryChain(activations, streamStateService, settingsRepository, hold,
+                gameStateService, accountRepository, applier, gate, lookup,
+                new ExtensionLayoutApplier(twitch, mock(ActivityLogService.class)));
+        binding.getExtensionSlots().add(new ExtensionSlotSetting(TwitchExtensionsDto.Type.PANEL, 1, null, null));
+        live(true);
+        CategoryOutcome applied = CategoryOutcome.applied(CategoryRule.GAME_BINDING);
+        applierAnswers(applied);
+
+        assertThat(real.apply(user, new GameDetected(binding))).isSameAs(applied);
+        assertThat(twitch.extensionFailures()).isEqualTo(1);
     }
 }

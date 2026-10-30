@@ -156,8 +156,8 @@ public class ChannelEventRedisBridge {
         events.add(new CclStateEvent(login, id, binding.cclEnabled()));
         events.add(new BindingIgnoredStateEvent(login, id, binding.ignored()));
         events.add(new TwEnabledStateEvent(login, id, binding.twEnabled()));
-        // Without an override, the binding follows the channel's defaults: what a reset leaves it with.
-        events.add(binding.twOverride() ? new TwUpdatedEvent(login, id, tws) : new TwResetEvent(login, id));
+        // Without an override, its TWs are the ones it resolved to: what a reset leaves it with.
+        events.add(binding.twOverride() ? new TwUpdatedEvent(login, id, tws) : new TwResetEvent(login, id, tws));
         return events;
     }
 

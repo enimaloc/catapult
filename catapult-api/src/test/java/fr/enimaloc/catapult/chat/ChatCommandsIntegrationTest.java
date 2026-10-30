@@ -25,12 +25,13 @@ import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.security.TwitchLoginSuccessHandler;
 import fr.enimaloc.catapult.service.binding.GameStateService;
 import fr.enimaloc.catapult.service.igdb.AdminCclService;
-import fr.enimaloc.catapult.service.twitch.MockTwitchChatService;
+import fr.enimaloc.catapult.testsupport.RecordingTwitchChatService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -47,15 +48,14 @@ import static org.assertj.core.api.Assertions.assertThat;
  * test then shows that nothing is said in chat. Notifications still reach the chat.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
-@ActiveProfiles("mock-web")
-@TestPropertySource(properties = {
-    "spring.datasource.url=jdbc:h2:mem:catapult_chat_commands_it;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;NON_KEYWORDS=KEY,VALUE",
-    "app.chat.provider=mock"
-})
+@ActiveProfiles("h2-test")
+@Import(RecordingTwitchChatService.class)
+@TestPropertySource(properties =
+    "spring.datasource.url=jdbc:h2:mem:catapult_chat_commands_it;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;NON_KEYWORDS=KEY,VALUE")
 class ChatCommandsIntegrationTest {
 
-    /** {@code app.owner-id} of the mock-web profile. */
-    private static final String OWNER_TWITCH_ID = "mock-admin";
+    /** {@code app.owner-id} of the h2-test profile. */
+    private static final String OWNER_TWITCH_ID = "h2-test-owner";
 
     @MockitoBean AdminCclService adminCclService;
     @MockitoBean TwitchLoginSuccessHandler twitchLoginSuccessHandler;
@@ -67,7 +67,7 @@ class ChatCommandsIntegrationTest {
     @Autowired ExperimentService experimentService;
     @Autowired ChatCommandDefinitionRepository definitions;
     @Autowired ApplicationEventPublisher publisher;
-    @Autowired MockTwitchChatService mockChat;
+    @Autowired RecordingTwitchChatService chat;
     @Autowired ChatCommandPresetCatalog presets;
     @Autowired GameStateService gameStateService;
     @Autowired TransactionTemplate transactionTemplate;
@@ -78,7 +78,7 @@ class ChatCommandsIntegrationTest {
 
     @BeforeEach
     void setup() {
-        mockChat.clearMessages();
+        chat.clearMessages();
         user = persistUser();
         forceEnabledVariant(user);
     }
@@ -136,12 +136,12 @@ class ChatCommandsIntegrationTest {
         publisher.publishEvent(new StreamOnlineEvent(this, user));
 
         Awaitility.await().atMost(Duration.ofSeconds(5)).untilAsserted(() ->
-            assertThat(mockChat.lastMessageFor(user.getId())).startsWith("[Catapult] Hello"));
+            assertThat(chat.lastMessageFor(user.getId())).startsWith("[Catapult] Hello"));
     }
 
     private void assertNoReply() {
         org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> Thread.sleep(500));
-        assertThat(mockChat.lastMessageFor(user.getId())).isNull();
+        assertThat(chat.lastMessageFor(user.getId())).isNull();
     }
 
     private void publish(String command, String senderTwitchId) {

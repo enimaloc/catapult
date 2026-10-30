@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.chat.command.registry.catapult.CatapultSetGameFuncti
 import fr.enimaloc.catapult.event.listener.GameEventListener;
 import fr.enimaloc.catapult.service.account.BotToggleService;
 import fr.enimaloc.catapult.service.category.CategoryApplier;
+import fr.enimaloc.catapult.service.category.ExtensionLayoutApplier;
 import fr.enimaloc.catapult.service.category.CategoryChain;
 import fr.enimaloc.catapult.service.notification.TwitchatActionExecutor;
 import fr.enimaloc.catapult.service.notification.TwitchatActionTokenService;
@@ -49,6 +50,7 @@ class CustomBindingWiringTest {
             .withBean(RaidRestoreHold.class)
             .withBean(CategoryChain.class)
             .withBean(CategoryApplier.class)
+            .withBean(ExtensionLayoutApplier.class, () -> mock(ExtensionLayoutApplier.class))
             .withBean(RaidRestoreGateService.class, () -> mock(RaidRestoreGateService.class))
             .withBean(GameMappingRepository.class, () -> mock(GameMappingRepository.class))
             .withBean(CustomBindingRepository.class, () -> mock(CustomBindingRepository.class))

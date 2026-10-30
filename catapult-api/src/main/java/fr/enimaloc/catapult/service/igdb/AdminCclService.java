@@ -4,7 +4,10 @@ import fr.enimaloc.catapult.domain.igdb.IgdbRatingDescriptor;
 import fr.enimaloc.catapult.domain.twitch.TwitchCclDefinition;
 import fr.enimaloc.catapult.repository.igdb.IgdbRatingDescriptorRepository;
 import fr.enimaloc.catapult.repository.twitch.TwitchCclDefinitionRepository;
+import fr.enimaloc.catapult.simulation.SimulatedCalls;
+import fr.enimaloc.catapult.simulation.SimulationGate;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -38,6 +41,7 @@ public class AdminCclService {
     private final TwitchCclDefinitionRepository twitchCclRepo;
     private final IgdbRatingDescriptorRepository igdbDescriptorRepo;
     private final TransactionOperations transactions;
+    private final ObjectProvider<SimulationGate> simulationGate;
 
     @Value("${twitch.client-id:}")
     private String twitchClientId;
@@ -61,11 +65,13 @@ public class AdminCclService {
     );
 
     @Autowired
-    public AdminCclService(RestClient restClient, TwitchCclDefinitionRepository twitchCclRepo, IgdbRatingDescriptorRepository igdbDescriptorRepo, TransactionOperations transactions) {
+    public AdminCclService(RestClient restClient, TwitchCclDefinitionRepository twitchCclRepo, IgdbRatingDescriptorRepository igdbDescriptorRepo, TransactionOperations transactions,
+                           ObjectProvider<SimulationGate> simulationGate) {
         this.restClient = restClient;
         this.twitchCclRepo = twitchCclRepo;
         this.igdbDescriptorRepo = igdbDescriptorRepo;
         this.transactions = transactions;
+        this.simulationGate = simulationGate;
     }
 
     /**
@@ -75,10 +81,17 @@ public class AdminCclService {
     @EventListener(ApplicationReadyEvent.class)
     public void init() {
         try {
+            // simulated app token: neither Twitch nor IGDB is asked (both use that token)
+            if (SimulationGate.blocks(simulationGate, null, SimulatedCalls.TWITCH_APP_APP_TOKEN)) {
+                log.debug("CCL sync skipped — the simulated app token is not REAL");
+                return;
+            }
             String appToken = fetchAppToken();
             if (appToken != null) {
                 transactions.executeWithoutResult(status -> syncTwitchCcls(appToken));
-                transactions.executeWithoutResult(status -> syncIgdbDescriptors(appToken));
+                if (!SimulationGate.blocks(simulationGate, null, SimulatedCalls.IGDB_GAME)) {
+                    transactions.executeWithoutResult(status -> syncIgdbDescriptors(appToken));
+                }
                 transactions.executeWithoutResult(status -> applyDefaultMappings());
             }
         } catch (Exception e) {

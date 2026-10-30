@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.service.binding;
 
+import fr.enimaloc.catapult.common.dto.channel.TwitchExtensionsDto;
+import fr.enimaloc.catapult.domain.binding.ExtensionSlotSetting;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
@@ -11,6 +13,7 @@ import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
 import fr.enimaloc.catapult.repository.binding.GameMappingRepository;
+import fr.enimaloc.catapult.service.category.ExtensionLayoutApplier;
 import fr.enimaloc.catapult.service.igdb.IgdbGameDetailsService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.tw.TwResolverService;
@@ -18,6 +21,8 @@ import fr.enimaloc.catapult.service.twitch.TwitchService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Optional;
@@ -26,6 +31,7 @@ import java.util.UUID;
 import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -45,10 +51,11 @@ class BindingServiceEditsTest {
     private final GameStateService gameState = mock(GameStateService.class);
     private final GameMappingRepository mappings = mock(GameMappingRepository.class);
     private final StreamStateService streamState = mock(StreamStateService.class);
+    private final ExtensionLayoutApplier layouts = mock(ExtensionLayoutApplier.class);
     private final BindingService service = new BindingService(bindings, igdb, igdbDetails, twitch, twResolver, mappings,
             new GameBindingLookup(bindings), new CategoryChain(mock(CustomBindingActivations.class),
                     streamState, mock(UserSettingsRepository.class), new RaidRestoreHold(),
-                    gameState, mock(UserAccountRepository.class), new CategoryApplier(twitch, streamState), mock(RaidRestoreGateService.class), mock(GameBindingLookup.class)));
+                    gameState, mock(UserAccountRepository.class), new CategoryApplier(twitch, streamState), mock(RaidRestoreGateService.class), mock(GameBindingLookup.class), mock(ExtensionLayoutApplier.class)), layouts);
 
     private UserAccount user;
     private GameBinding binding;
@@ -326,5 +333,26 @@ class BindingServiceEditsTest {
 
         when(bindings.findAllByStatusAndIgnoredFalse(GameBinding.Status.INCOMPLETE)).thenReturn(List.of());
         service.refreshIncompleteBindings();
+    }
+
+    @Test
+    void updateExtensionSlots_replacesTheLayout_andReappliesItWhenCurrent() {
+        binding.getExtensionSlots().add(new ExtensionSlotSetting(TwitchExtensionsDto.Type.OVERLAY, 1, "old", "Old"));
+        Set<ExtensionSlotSetting> layout =
+                Set.of(new ExtensionSlotSetting(TwitchExtensionsDto.Type.PANEL, 1, "p1", "Panel"));
+
+        service.updateExtensionSlots(user, binding.getId(), layout);
+
+        assertThat(binding.getExtensionSlots()).isEqualTo(layout);
+        verify(bindings).save(binding);
+        verify(layouts).applyIfCurrent(user, ExtensionLayoutApplier.keyOf(binding), layout);
+    }
+
+    @Test
+    void updateExtensionSlots_answers404_forABindingOfAnotherChannel() {
+        assertThatThrownBy(() -> service.updateExtensionSlots(user, UUID.randomUUID(), Set.of()))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
+        verifyNoInteractions(layouts);
     }
 }

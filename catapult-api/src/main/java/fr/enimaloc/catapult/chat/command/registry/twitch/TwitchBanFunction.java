@@ -35,6 +35,11 @@ public class TwitchBanFunction implements ServiceFunction {
     }
 
     @Override
+    public List<String> requiredScopes() {
+        return List.of("moderator:manage:banned_users");
+    }
+
+    @Override
     public boolean isAction() {
         return true;
     }

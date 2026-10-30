@@ -57,6 +57,10 @@
                     ${settings.applyDefaultOnStreamEnd()}, 'channel.settings.no_game.apply_end', null)}"></label>
         </div>
         <mdui-button id="no-game-settings-save-btn" th:text="#{channel.settings.save}">Enregistrer</mdui-button>
+        <!--/* Saved apart, at each pick, not by the card's button. */-->
+        <th:block th:replace="~{fragments/extensions :: extensionLayout('no-game',
+                @{/channel/{u}/settings/no-game/extensions(u=${channelPage.channelUsername()})},
+                ${settings.noGameExtensions()})}"></th:block>
     </mdui-card>
 
     <mdui-card id="channel-incomplete-fallback-settings-form" class="settings-card" variant="outlined">
@@ -69,6 +73,9 @@
         <div th:replace="~{fragments/controls :: switchGrid(${settings.availableCcls()},
                 'incomplete-fallback-ccl-checkbox', ${settings.incompleteFallbackCcls()}, 'name')}"></div>
         <mdui-button id="incomplete-fallback-settings-save-btn" th:text="#{channel.settings.save}">Enregistrer</mdui-button>
+        <th:block th:replace="~{fragments/extensions :: extensionLayout('incomplete-fallback',
+                @{/channel/{u}/settings/incomplete-fallback/extensions(u=${channelPage.channelUsername()})},
+                ${settings.incompleteFallbackExtensions()})}"></th:block>
     </mdui-card>
 
     <!--/* Only while the channel is in the raid.restore-game experiment (catapult-api says so). Off: the delay

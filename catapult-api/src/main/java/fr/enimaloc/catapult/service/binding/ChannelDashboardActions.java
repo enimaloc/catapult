@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.service.binding;
 
 import fr.enimaloc.catapult.common.dto.channel.UpdateBindingRequest;
 import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.binding.ExtensionSlotSetting;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -46,6 +47,11 @@ public class ChannelDashboardActions {
         publishBinding(channel, bindingId);
     }
 
+    public void updateExtensionSlots(UserAccount channel, UUID bindingId, Set<ExtensionSlotSetting> slots) {
+        bindingService.updateExtensionSlots(channel, bindingId, slots);
+        publishBinding(channel, bindingId);
+    }
+
     public void setTws(UserAccount owner, UUID bindingId, Set<String> tws) {
         bindingService.setTwsForBinding(owner, bindingId, tws == null ? Set.of() : tws);
         publishBinding(owner, bindingId);
@@ -53,6 +59,11 @@ public class ChannelDashboardActions {
 
     public void resetTws(UserAccount owner, UUID bindingId) {
         bindingService.resetTws(owner, bindingId);
+        publishBinding(owner, bindingId);
+    }
+
+    public void resetToDefaults(UserAccount owner, UUID bindingId) {
+        bindingService.resetToDefaults(owner, bindingId);
         publishBinding(owner, bindingId);
     }
 

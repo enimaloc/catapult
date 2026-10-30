@@ -6,10 +6,12 @@ import fr.enimaloc.catapult.repository.igdb.IgdbGameExternalIdRepository;
 import fr.enimaloc.catapult.repository.twitch.TwitchCategoryCacheRepository;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
+import fr.enimaloc.catapult.simulation.SimulatedCalls;
+import fr.enimaloc.catapult.simulation.SimulationGate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.context.event.EventListener;
@@ -26,7 +28,6 @@ import java.util.stream.Collectors;
 @Service
 @DependsOn("flyway")
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = "app.mock.twitch-category", havingValue = "false", matchIfMissing = true)
 public class TwitchCategoryServiceImpl implements TwitchCategoryService {
 
     private static final String TWITCH_TOKEN_URL = "https://id.twitch.tv/oauth2/token";
@@ -42,6 +43,7 @@ public class TwitchCategoryServiceImpl implements TwitchCategoryService {
     private final IgdbService                   igdbService;
     private final RestClient restClient;
     private final ExternalApiObservations apiObservations;
+    private final ObjectProvider<SimulationGate> simulationGate;
 
     @Value("${twitch.client-id:}")
     private String twitchClientId;
@@ -61,6 +63,10 @@ public class TwitchCategoryServiceImpl implements TwitchCategoryService {
     @Async
     @EventListener(ApplicationReadyEvent.class)
     public void prewarmCategoryCache() {
+        if (SimulationGate.blocks(simulationGate, null, SimulatedCalls.TWITCH_APP_CATEGORY_SEARCH)) {
+            log.debug("Twitch category prewarm skipped — the simulated category search is not REAL");
+            return;
+        }
         switch (prewarmMode) {
             case TOP   -> { fillIgdbKnownCategories(); prewarmByTopGames(); }
             case SWEEP -> { fillIgdbKnownCategories(); prewarmBySweep(); }

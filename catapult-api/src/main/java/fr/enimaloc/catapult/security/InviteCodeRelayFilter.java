@@ -96,14 +96,14 @@ public class InviteCodeRelayFilter extends OncePerRequestFilter {
      * catapult-web's state relayed to {@code request}'s OAuth callback — from the session, else from the
      * cookie (the failure handler's retry drops the session).
      */
-    static Optional<String> pendingWebState(HttpServletRequest request) {
+    public static Optional<String> pendingWebState(HttpServletRequest request) {
         HttpSession session = request.getSession(false);
         String fromSession = session != null ? (String) session.getAttribute(WEB_STATE_SESSION_KEY) : null;
         return Optional.ofNullable(fromSession != null ? fromSession : readCookie(request, WEB_STATE_COOKIE_NAME));
     }
 
     /** Forgets catapult-web's relayed state once sent back or the login given up: session attribute and cookie. */
-    static void clearPendingWebState(HttpServletRequest request, HttpServletResponse response) {
+    public static void clearPendingWebState(HttpServletRequest request, HttpServletResponse response) {
         HttpSession session = request.getSession(false);
         if (session != null) {
             session.removeAttribute(WEB_STATE_SESSION_KEY);

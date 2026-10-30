@@ -67,6 +67,9 @@ tasks.withType<Test> {
 
 springBoot {
     buildInfo {
+        // No build time: it would make every build rewrite build-info.properties, and devtools restart the app
+        excludes.set(setOf("time"))
+
         val gitBranch = runCatching {
             ProcessBuilder("git", "rev-parse", "--abbrev-ref", "HEAD")
                 .directory(rootProject.projectDir)

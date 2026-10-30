@@ -384,6 +384,21 @@ describe("overview list: create, edit, delete", () => {
         expect(document.querySelectorAll(`[data-custom-binding-id="${GAMES}"]`)).toHaveLength(1);
     });
 
+    it("opens the created binding's extension layout to its route", async () => {
+        window.CatapultExtensions = { enable: vi.fn() };
+        overview({ extra: TEMPLATE });
+        byId("custom-binding-new-btn").click();
+        fresh().querySelector(".custom-binding-name").value = "Jeux";
+        gameOf(fresh()).pick({ id: "66082", name: "Games + Demos" });
+        postJson.mockResolvedValueOnce(response(201, games));
+
+        fresh().querySelector(".custom-binding-save").click();
+        await flush();
+
+        expect(window.CatapultExtensions.enable)
+            .toHaveBeenCalledWith(item(GAMES), `/channel/enimaloc/custom-bindings/${GAMES}/extensions`);
+    });
+
     it("adds no second row when the live event listed the created binding first", async () => {
         overview({ extra: TEMPLATE });
         byId("custom-binding-new-btn").click();
@@ -613,6 +628,18 @@ describe("overview list: live updates", () => {
         await flush();
         expect(postJson).toHaveBeenCalledWith("/channel/enimaloc/custom-bindings/deactivate", {});
         expect(refresh).not.toHaveBeenCalled();
+    });
+
+    it("doesn't toggle the row when activating or deactivating from its header", async () => {
+        overview();
+        const toggled = vi.fn();
+        document.addEventListener("click", toggled);
+
+        activateBtn(ART).click();
+        await flush();
+
+        document.removeEventListener("click", toggled);
+        expect(toggled).not.toHaveBeenCalled();
     });
 
     it("removes the row of a binding no longer listed, the empty notice back once none is", () => {

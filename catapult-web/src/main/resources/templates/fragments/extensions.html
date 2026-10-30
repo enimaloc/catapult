@@ -1,0 +1,62 @@
+<!--/*
+  A configuration's Twitch extension layout, drawn as the channel (channel-extensions.js): the player, its overlay
+  slot in the middle and its two component slots stacked on its right edge, then the three panel slots under it.
+  `prefix` names the configuration (data-extensions: binding, custom-binding, no-game, incomplete-fallback),
+  `saveUrl` the route a pick posts the whole layout to (null: not saved yet, the layout is disabled), `slots` its
+  ExtensionSlotDto (null or empty: every slot kept). A slot it doesn't list keeps what Twitch has; one it lists
+  without an extension empties it.
+*/-->
+<th:block th:fragment="extensionLayout(prefix, saveUrl, slots)">
+<div class="binding-extensions-panel" th:classappend="${saveUrl == null} ? 'is-disabled'"
+     th:attr="data-extensions=${prefix},data-save-url=${saveUrl},data-label-keep=#{channel.extensions.keep},data-label-none=#{channel.extensions.none},data-label-keep-current=#{channel.extensions.menu.keep},data-label-no-extension=#{channel.extensions.menu.none},data-label-unavailable=#{channel.extensions.menu.unavailable},data-label-loading=#{channel.extensions.menu.loading},data-label-missing=#{channel.extensions.missing}">
+    <span class="eyebrow extension-layout-title" th:text="#{channel.extensions.title}">Extensions Twitch</span>
+    <div class="extension-board">
+        <div class="extension-player">
+            <th:block th:replace="~{fragments/extensions :: extensionSlot(
+                    ${slots == null ? null : slots.^[type().name() == 'OVERLAY' and slot() == 1]}, 'OVERLAY', 1,
+                    #{channel.extensions.slot.overlay}, 'extension-slot-overlay', ${saveUrl == null})}"></th:block>
+            <div class="extension-components">
+                <th:block th:replace="~{fragments/extensions :: extensionSlot(
+                        ${slots == null ? null : slots.^[type().name() == 'COMPONENT' and slot() == 1]}, 'COMPONENT', 1,
+                        #{channel.extensions.slot.component(1)}, 'extension-slot-component', ${saveUrl == null})}"></th:block>
+                <th:block th:replace="~{fragments/extensions :: extensionSlot(
+                        ${slots == null ? null : slots.^[type().name() == 'COMPONENT' and slot() == 2]}, 'COMPONENT', 2,
+                        #{channel.extensions.slot.component(2)}, 'extension-slot-component', ${saveUrl == null})}"></th:block>
+            </div>
+        </div>
+        <div class="extension-panels">
+            <th:block th:replace="~{fragments/extensions :: extensionSlot(
+                    ${slots == null ? null : slots.^[type().name() == 'PANEL' and slot() == 1]}, 'PANEL', 1,
+                    #{channel.extensions.slot.panel(1)}, 'extension-slot-panel', ${saveUrl == null})}"></th:block>
+            <th:block th:replace="~{fragments/extensions :: extensionSlot(
+                    ${slots == null ? null : slots.^[type().name() == 'PANEL' and slot() == 2]}, 'PANEL', 2,
+                    #{channel.extensions.slot.panel(2)}, 'extension-slot-panel', ${saveUrl == null})}"></th:block>
+            <th:block th:replace="~{fragments/extensions :: extensionSlot(
+                    ${slots == null ? null : slots.^[type().name() == 'PANEL' and slot() == 3]}, 'PANEL', 3,
+                    #{channel.extensions.slot.panel(3)}, 'extension-slot-panel', ${saveUrl == null})}"></th:block>
+        </div>
+    </div>
+    <p class="extension-layout-note" th:if="${saveUrl == null}" th:text="#{channel.extensions.unsaved}">
+        Enregistre le binding pour choisir ses extensions</p>
+    <!--/* Shown by channel-extensions.js when Twitch lists no installed extension. */-->
+    <p class="extension-layout-note extension-layout-empty hidden" th:text="#{channel.extensions.empty}">
+        Aucune extension trouvée</p>
+</div>
+</th:block>
+
+<!--/*
+  One slot of the layout: `entry` its ExtensionSlotDto (null: kept), `type`/`n` the slot, `label` its name on the
+  diagram, `shape` its size class. Its menu is filled by channel-extensions.js as it opens.
+*/-->
+<mdui-dropdown th:fragment="extensionSlot(entry, type, n, label, shape, disabled)" class="extension-slot-dropdown"
+               placement="bottom-start" th:classappend="${shape} + '-dropdown'" th:disabled="${disabled}">
+    <button slot="trigger" type="button" class="extension-slot"
+            th:classappend="${shape} + ' ' + ${entry == null ? 'is-keep' : (entry.extensionId() == null ? 'is-none' : 'is-extension')}"
+            th:attr="data-type=${type},data-slot=${n},data-extension-id=${entry?.extensionId()},data-extension-name=${entry?.extensionName()}"
+            th:disabled="${disabled}">
+        <span class="extension-slot-label" th:text="${label}">Panneau 1</span>
+        <span class="extension-slot-value"
+              th:text="${entry == null} ? #{channel.extensions.keep} : (${entry.extensionId() == null} ? #{channel.extensions.none} : ${entry.extensionName() ?: entry.extensionId()})">Garder</span>
+    </button>
+    <mdui-menu dense></mdui-menu>
+</mdui-dropdown>

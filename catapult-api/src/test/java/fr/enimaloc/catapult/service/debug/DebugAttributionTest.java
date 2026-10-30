@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.debug;
 
+import fr.enimaloc.catapult.service.category.ExtensionLayoutApplier;
 import fr.enimaloc.catapult.service.category.CategoryChain;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
 import fr.enimaloc.catapult.service.category.CategoryApplier;
@@ -54,6 +55,7 @@ import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import fr.enimaloc.catapult.service.twitch.TwitchChatService;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
 import fr.enimaloc.catapult.common.dto.notification.NotificationChannel;
+import fr.enimaloc.catapult.simulation.SimulationGates;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -261,7 +263,8 @@ class DebugAttributionTest {
         GameStateService state = mock(GameStateService.class);
         when(state.getLastKnownGame(any())).thenReturn(Optional.empty());
         return new SchedulerService(accounts, chain, state, mock(ApplicationEventPublisher.class),
-                new SimpleMeterRegistry(), Optional.empty(), Optional.empty(), mock(BindingService.class));
+                new SimpleMeterRegistry(), Optional.empty(), Optional.empty(), mock(BindingService.class),
+                SimulationGates.none());
     }
 
     @Test
@@ -310,7 +313,7 @@ class DebugAttributionTest {
         });
         BindingService service = new BindingService(bindings, mock(IgdbService.class),
                 mock(IgdbGameDetailsService.class), mock(TwitchService.class), mock(TwResolverService.class),
-                mappings, new GameBindingLookup(bindings), mock(CategoryChain.class));
+                mappings, new GameBindingLookup(bindings), mock(CategoryChain.class), mock(ExtensionLayoutApplier.class));
 
         service.refreshIncompleteBindings();
 
@@ -362,7 +365,8 @@ class DebugAttributionTest {
             note();
             return CompletableFuture.completedFuture(List.of());
         });
-        return new SteamLibraryCacheService(steam, mock(IgdbService.class), accounts, mock(TokenEncryptionService.class));
+        return new SteamLibraryCacheService(steam, mock(IgdbService.class), accounts, mock(TokenEncryptionService.class),
+                SimulationGates.none());
     }
 
     @Test
@@ -406,7 +410,7 @@ class DebugAttributionTest {
         CategoryApplier applier = new CategoryApplier(twitch, streams);
         CategoryChain chain = new CategoryChain(mock(CustomBindingActivations.class), streams, settings, hold,
                 mock(GameStateService.class), mock(UserAccountRepository.class), applier,
-                mock(RaidRestoreGateService.class), mock(GameBindingLookup.class));
+                mock(RaidRestoreGateService.class), mock(GameBindingLookup.class), mock(ExtensionLayoutApplier.class));
         RaidRestoreGameService service = new RaidRestoreGameService(chain, applier, hold);
 
         service.onRaidedOut(new ChannelRaidedOutEvent(this, user, "509658"));

@@ -115,7 +115,7 @@ jobs:
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.repository.default_branch }}
+          ref: dev
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
@@ -125,7 +125,7 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: node .github/release/dashboard.mjs
 
-  # Best effort, once the release exists: CHANGELOG.md on the default branch (dev) gets its notes.
+  # Best effort, once the release exists: CHANGELOG.md on dev gets its notes.
   changelog:
     needs: [check, github-release]
     if: needs.github-release.result == 'success'
@@ -142,7 +142,7 @@ jobs:
       # Full history and tags: each version's date is its tagged commit's.
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.repository.default_branch }}
+          ref: dev
           fetch-depth: 0
           fetch-tags: true
           persist-credentials: false
@@ -153,7 +153,7 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           VERSION: ${{ needs.check.outputs.version }}
-          BRANCH: ${{ github.event.repository.default_branch }}
+          BRANCH: dev
         run: node .github/release/changelog.mjs --tag "$VERSION" --branch "$BRANCH"
 
   release-api:

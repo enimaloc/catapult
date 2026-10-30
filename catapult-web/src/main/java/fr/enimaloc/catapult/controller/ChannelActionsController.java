@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.controller;
 import fr.enimaloc.catapult.common.dto.channel.CclSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.CclToggleRequest;
 import fr.enimaloc.catapult.common.dto.channel.DeleteAccountRequest;
+import fr.enimaloc.catapult.common.dto.channel.ExtensionSlotDto;
 import fr.enimaloc.catapult.common.dto.channel.IgnoredToggleRequest;
 import fr.enimaloc.catapult.common.dto.channel.IncompleteFallbackRequest;
 import fr.enimaloc.catapult.common.dto.channel.NoGameSettingsRequest;
@@ -14,6 +15,7 @@ import fr.enimaloc.catapult.common.dto.channel.SaveBody;
 import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
 import fr.enimaloc.catapult.common.dto.channel.SteamTokenRequest;
 import fr.enimaloc.catapult.common.dto.channel.SteamTokenSharingRequest;
+import fr.enimaloc.catapult.common.dto.channel.TwitchExtensionsDto;
 import fr.enimaloc.catapult.common.dto.channel.TwEnabledBody;
 import fr.enimaloc.catapult.common.dto.channel.TwSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.UpdateBindingRequest;
@@ -31,6 +33,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 /**
  * Browser-facing mutation endpoints for the channel dashboard page. These exist because
@@ -99,6 +103,11 @@ public class ChannelActionsController {
     @PostMapping("/channel/bindings/{bindingId}/tws/reset")
     public ResponseEntity<Void> resetTws(@PathVariable String bindingId) {
         return ApiStatus.answer(apiService.resetTws(bindingId));
+    }
+
+    @PostMapping("/channel/bindings/{bindingId}/reset")
+    public ResponseEntity<Void> resetBinding(@PathVariable String bindingId) {
+        return ApiStatus.answer(apiService.resetBinding(bindingId));
     }
 
     @PostMapping("/channel/bindings/{bindingId}/tw-enabled")
@@ -221,6 +230,28 @@ public class ChannelActionsController {
     public ResponseEntity<Void> saveNoGameSettings(@PathVariable String username, @RequestBody NoGameSettingsRequest body) {
         return ApiStatus.answer(apiService.saveNoGameSettings(username, body.twitchGameId(), body.twitchGameName(), body.ccls(),
                 body.applyOnStreamStart(), body.applyOnNoGame(), body.applyOnStreamEnd()));
+    }
+
+    @GetMapping("/channel/{username}/twitch/extensions")
+    public TwitchExtensionsDto twitchExtensions(@PathVariable String username) {
+        return apiService.twitchExtensions(username);
+    }
+
+    @PostMapping("/channel/{username}/bindings/{bindingId}/extensions")
+    public ResponseEntity<Void> saveBindingExtensions(@PathVariable String username, @PathVariable String bindingId,
+                                                      @RequestBody List<ExtensionSlotDto> body) {
+        return ApiStatus.answer(apiService.saveBindingExtensions(username, bindingId, body));
+    }
+
+    @PostMapping("/channel/{username}/settings/no-game/extensions")
+    public ResponseEntity<Void> saveNoGameExtensions(@PathVariable String username, @RequestBody List<ExtensionSlotDto> body) {
+        return ApiStatus.answer(apiService.saveNoGameExtensions(username, body));
+    }
+
+    @PostMapping("/channel/{username}/settings/incomplete-fallback/extensions")
+    public ResponseEntity<Void> saveIncompleteFallbackExtensions(@PathVariable String username,
+                                                                 @RequestBody List<ExtensionSlotDto> body) {
+        return ApiStatus.answer(apiService.saveIncompleteFallbackExtensions(username, body));
     }
 
     @PostMapping("/channel/{username}/settings/raid")

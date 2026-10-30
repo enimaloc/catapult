@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
+import fr.enimaloc.catapult.repository.chatcommand.ChatCommandSettingRepository;
 import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
 import fr.enimaloc.catapult.repository.binding.GetterConfigRepository;
 import fr.enimaloc.catapult.repository.experiment.ExperimentAssignmentRepository;
@@ -44,6 +45,7 @@ class AccountServiceTest {
     @Mock private ExperimentEventRepository experimentEventRepository;
     @Mock private ExperimentFeedbackRepository experimentFeedbackRepository;
     @Mock private FeedbackSubmissionRepository feedbackSubmissionRepository;
+    @Mock private ChatCommandSettingRepository chatCommandSettingRepository;
     @Mock private GameBindingRepository gameBindingRepository;
     @Mock private GetterConfigRepository getterConfigRepository;
     @Mock private UserSettingsRepository userSettingsRepository;

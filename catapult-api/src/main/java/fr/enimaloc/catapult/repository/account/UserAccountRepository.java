@@ -28,6 +28,8 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
 
     List<UserAccount> findBySteamIdNotNull();
 
+    Optional<UserAccount> findBySteamId(String steamId);
+
     List<UserAccount> findByStatusAndDeletionRequestedAtBefore(UserAccount.Status status, Instant cutoff);
 
     List<UserAccount> findByStatusAndTwitchIdNotNull(UserAccount.Status status);

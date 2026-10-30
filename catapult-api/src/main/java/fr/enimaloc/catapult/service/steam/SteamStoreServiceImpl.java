@@ -6,7 +6,6 @@ import fr.enimaloc.catapult.repository.steam.SteamAppParentRepository;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
@@ -17,7 +16,6 @@ import java.util.*;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = "app.mock.steam", havingValue = "false", matchIfMissing = true)
 public class SteamStoreServiceImpl implements SteamStoreService {
 
     private static final String APP_DETAILS_URL = "https://store.steampowered.com/api/appdetails";

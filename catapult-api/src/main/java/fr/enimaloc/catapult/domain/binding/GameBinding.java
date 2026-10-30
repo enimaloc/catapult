@@ -74,6 +74,15 @@ public class GameBinding {
     @Column(name = "ccl")
     private Set<String> ccls = new HashSet<>();
 
+    // the extension layout of this binding, read with the CCLs
+    @ElementCollection(fetch = FetchType.EAGER)
+    @BatchSize(size = 100)
+    @CollectionTable(
+        name = "binding_extension_slot",
+        joinColumns = @JoinColumn(name = "binding_id")
+    )
+    private Set<ExtensionSlotSetting> extensionSlots = new HashSet<>();
+
     @Column(name = "tw_enabled", nullable = false)
     private boolean twEnabled = true;
 

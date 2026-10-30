@@ -20,6 +20,7 @@ import fr.enimaloc.catapult.common.dto.channel.XboxData;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.account.UserSettings;
+import fr.enimaloc.catapult.domain.binding.ExtensionSlotSetting;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.dtdd.DtddGameCache;
 import fr.enimaloc.catapult.domain.dtdd.DtddGameMapping;
@@ -179,7 +180,7 @@ public class ChannelDashboardAssembler {
         return new BindingDto(binding.getId().toString(), binding.getStatus().name(), binding.getSourceType().name(),
                 binding.getSourceName(), binding.getTwitchGameId(), binding.getTwitchGameName(), binding.isIgnored(),
                 binding.isCclEnabled(), binding.getCcls(), binding.isTwEnabled(), binding.isTwOverride(),
-                binding.getTws(), boxArtUrl);
+                binding.getTws(), boxArtUrl, ExtensionSlotSetting.toDtos(binding.getExtensionSlots()));
     }
 
     /** Steam state, null without Steam; only the owner's profile is probed live. */
@@ -242,7 +243,9 @@ public class ChannelDashboardAssembler {
                 availableTws(),
                 settings.getRaidRestoreGameMinutes(),
                 // Asked of the channel's owner, whose raids it acts on (and who it may enrol)
-                raidRestoreGate.isAvailableFor(channel));
+                raidRestoreGate.isAvailableFor(channel),
+                ExtensionSlotSetting.toDtos(settings.getNoGameExtensionSlots()),
+                ExtensionSlotSetting.toDtos(settings.getIncompleteFallbackExtensionSlots()));
     }
 
     // --- DTDD mapping ----------------------------------------------------------------------------

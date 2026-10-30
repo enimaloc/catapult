@@ -3,7 +3,6 @@ package fr.enimaloc.catapult.config;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Profile;
 import org.springframework.security.oauth2.client.endpoint.OAuth2AccessTokenResponseClient;
 import org.springframework.security.oauth2.client.endpoint.OAuth2RefreshTokenGrantRequest;
 import org.springframework.security.oauth2.client.endpoint.RestClientRefreshTokenTokenResponseClient;
@@ -17,7 +16,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Configuration
-@Profile("!mock-web")
 public class OAuth2ClientConfig {
 
     @Value("${twitch.client-id:}")
@@ -47,10 +45,14 @@ public class OAuth2ClientConfig {
 
         registrations.add(authorizationCode("twitch", twitchClientId, twitchClientSecret)
             .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_POST)
-            .scope("user:read:email", "channel:manage:broadcast",
-                   "user:read:chat", "user:write:chat",
-                   "channel:moderate", "channel:read:redemptions", "user:read:moderated_channels",
-                   "moderator:read:followers", "moderator:manage:shoutouts")
+            // One per Helix call or EventSub subscription made with the streamer's token (the system bot
+            // logs in through this same registration): changing it asks every streamer to log in again.
+            .scope("user:read:email",                 // GET /users email, at login
+                   "channel:manage:broadcast",        // PATCH /channels: category, CCLs
+                   "user:edit:broadcast",             // GET/PUT /users/extensions, GET /users/extensions/list
+                   "user:read:chat", "user:write:chat", // EventSub channel.chat.message, POST /chat/messages
+                   "channel:read:redemptions",        // EventSub channel.channel_points_custom_reward_redemption.add
+                   "user:read:moderated_channels")    // GET /moderation/channels
             .authorizationUri("https://id.twitch.tv/oauth2/authorize")
             .tokenUri("https://id.twitch.tv/oauth2/token")
             .userInfoUri("https://api.twitch.tv/helix/users")

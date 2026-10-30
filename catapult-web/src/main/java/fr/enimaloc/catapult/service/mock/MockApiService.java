@@ -56,6 +56,8 @@ import fr.enimaloc.catapult.common.dto.admin.WellKnownLocation;
 import fr.enimaloc.catapult.service.WellKnownContent;
 import fr.enimaloc.catapult.common.dto.channel.BindingDto;
 import fr.enimaloc.catapult.common.dto.channel.ChannelListResponse;
+import fr.enimaloc.catapult.common.dto.channel.ExtensionSlotDto;
+import fr.enimaloc.catapult.common.dto.channel.TwitchExtensionsDto;
 import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
 import fr.enimaloc.catapult.common.dto.channel.GameDto;
@@ -373,7 +375,16 @@ public class MockApiService implements ApiService {
         log.trace("resetTws({})", bindingId);
         MockData data = currentData();
         data.resetBindingTws(bindingId);
-        eventPublisher.publishEvent(new TwResetEvent(data.getChannelDto().twitchUsername(), bindingId));
+        eventPublisher.publishEvent(new TwResetEvent(data.getChannelDto().twitchUsername(), bindingId, Set.of()));
+        return NO_CONTENT;
+    }
+
+    @Override
+    public int resetBinding(String bindingId) {
+        log.trace("resetBinding({})", bindingId);
+        MockData data = currentData();
+        data.resetBinding(bindingId);
+        eventPublisher.publishEvent(new TwResetEvent(data.getChannelDto().twitchUsername(), bindingId, Set.of()));
         return NO_CONTENT;
     }
 
@@ -600,6 +611,50 @@ public class MockApiService implements ApiService {
     public int saveIncompleteFallbackSettings(String username, String twitchGameId, String twitchGameName, Set<String> ccls) {
         log.trace("saveIncompleteFallbackSettings({}, {}, {}, {})", username, twitchGameId, twitchGameName, ccls);
         currentData().saveIncompleteFallbackSettings(twitchGameId, twitchGameName, ccls);
+        publishSettings(username);
+        return NO_CONTENT;
+    }
+
+    @Override
+    public TwitchExtensionsDto twitchExtensions(String username) {
+        log.trace("twitchExtensions({})", username);
+        return new TwitchExtensionsDto(List.of(
+                new TwitchExtensionsDto.Installed("mock-panel", "Build Guide", "1.2",
+                        List.of(TwitchExtensionsDto.Type.PANEL), true),
+                new TwitchExtensionsDto.Installed("mock-map", "Live Map", "3.0",
+                        List.of(TwitchExtensionsDto.Type.OVERLAY, TwitchExtensionsDto.Type.COMPONENT), true),
+                new TwitchExtensionsDto.Installed("mock-old", "Old Poll", "0.9",
+                        List.of(TwitchExtensionsDto.Type.PANEL), false)), List.of());
+    }
+
+    @Override
+    public int saveBindingExtensions(String username, String bindingId, List<ExtensionSlotDto> slots) {
+        log.trace("saveBindingExtensions({}, {}, {})", username, bindingId, slots);
+        if (currentData().bindingById(bindingId) == null) return 404;
+        currentData().setBindingExtensions(bindingId, slots);
+        return NO_CONTENT;
+    }
+
+    @Override
+    public int saveCustomBindingExtensions(String username, UUID id, List<ExtensionSlotDto> slots) {
+        log.trace("saveCustomBindingExtensions({}, {}, {})", username, id, slots);
+        int status = currentData().customBindings().saveExtensions(id, slots);
+        if (status == NO_CONTENT) eventPublisher.publishEvent(new CustomBindingsUpdatedEvent(username));
+        return status;
+    }
+
+    @Override
+    public int saveNoGameExtensions(String username, List<ExtensionSlotDto> slots) {
+        log.trace("saveNoGameExtensions({}, {})", username, slots);
+        currentData().saveNoGameExtensions(slots);
+        publishSettings(username);
+        return NO_CONTENT;
+    }
+
+    @Override
+    public int saveIncompleteFallbackExtensions(String username, List<ExtensionSlotDto> slots) {
+        log.trace("saveIncompleteFallbackExtensions({}, {})", username, slots);
+        currentData().saveIncompleteFallbackExtensions(slots);
         publishSettings(username);
         return NO_CONTENT;
     }

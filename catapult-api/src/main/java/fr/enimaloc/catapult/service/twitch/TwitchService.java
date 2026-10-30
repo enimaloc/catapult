@@ -23,4 +23,15 @@ public interface TwitchService {
     /** Sends the no-game default category, telling what happened. */
     ChannelUpdateOutcome resetToDefault(UserAccount user);
     List<String> getModeratedChannelIds(UserAccount viewer);
+    /** The extensions the user installed on their channel, empty without a token or when Twitch fails. */
+    List<TwitchExtension> getUserExtensions(UserAccount user);
+    /** The extensions active on the user's channel, {@link TwitchExtensionPlacement#empty()} when it cannot be read. */
+    TwitchExtensionPlacement getActiveExtensions(UserAccount user);
+    /**
+     * Sends {@code placement}, only its non-null slots changing (see {@link TwitchExtensionPlacement#update()}), and
+     * answers the channel's placement as Twitch has it afterwards. Nothing is swallowed, as with {@link #setCategory}:
+     * a disabled bot, an inactive account or a missing token throw {@link IllegalStateException}, an HTTP error is
+     * thrown as is.
+     */
+    TwitchExtensionPlacement setActiveExtensions(UserAccount user, TwitchExtensionPlacement placement);
 }

@@ -54,7 +54,7 @@ public class TwitchatEventDispatcher {
     private final GameStateService gameStateService;
     private final GameBindingLookup gameBindingLookup;
 
-    @Value("${app.web-url:http://localhost:8081}")
+    @Value("${app.web-url:http://localhost:8080}")
     private String publicWebUrl;
 
     public TwitchatEventDispatcher(TwitchatWidgetSettingsService widgetSettingsService,

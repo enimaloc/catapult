@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.domain.account;
 
+import fr.enimaloc.catapult.domain.binding.ExtensionSlotSetting;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -51,6 +52,13 @@ public class UserSettings {
     @Column(name = "ccl_id")
     private Set<String> noGameCcls = new HashSet<>();
 
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(
+        name = "user_settings_no_game_extension_slot",
+        joinColumns = @JoinColumn(name = "user_id")
+    )
+    private Set<ExtensionSlotSetting> noGameExtensionSlots = new HashSet<>();
+
     @Column(name = "incomplete_fallback_twitch_game_id")
     private String incompleteFallbackTwitchGameId;
 
@@ -64,6 +72,13 @@ public class UserSettings {
     )
     @Column(name = "ccl_id")
     private Set<String> incompleteFallbackCcls = new HashSet<>();
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(
+        name = "user_settings_incomplete_fallback_extension_slot",
+        joinColumns = @JoinColumn(name = "user_id")
+    )
+    private Set<ExtensionSlotSetting> incompleteFallbackExtensionSlots = new HashSet<>();
 
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(
