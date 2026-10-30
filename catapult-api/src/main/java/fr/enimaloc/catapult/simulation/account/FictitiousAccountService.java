@@ -1,22 +1,29 @@
 package fr.enimaloc.catapult.simulation.account;
 
+import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GetterConfig;
 import fr.enimaloc.catapult.event.AccountCreatedEvent;
+import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.binding.GetterConfigRepository;
 import fr.enimaloc.catapult.security.CatapultOAuth2UserService;
 import fr.enimaloc.catapult.service.account.AccountService;
+import fr.enimaloc.catapult.service.twitch.TwitchChatService;
+import fr.enimaloc.catapult.service.twitch.TwitchEventSubService;
 import fr.enimaloc.catapult.simulation.SimulationGate;
 import fr.enimaloc.catapult.simulation.SimulationRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.Comparator;
 import java.util.LinkedHashSet;
@@ -55,16 +62,24 @@ public class FictitiousAccountService {
     private final AccountService accountService;
     private final SimulationRegistry registry;
     private final ApplicationEventPublisher eventPublisher;
+    private final OAuthTokenRepository tokens;
+    private final ObjectProvider<TwitchChatService> chat;
+    private final ObjectProvider<TwitchEventSubService> eventSub;
 
     public FictitiousAccountService(UserAccountRepository accounts, CatapultOAuth2UserService members,
                                     GetterConfigRepository getterConfigs, AccountService accountService,
-                                    SimulationRegistry registry, ApplicationEventPublisher eventPublisher) {
+                                    SimulationRegistry registry, ApplicationEventPublisher eventPublisher,
+                                    OAuthTokenRepository tokens, ObjectProvider<TwitchChatService> chat,
+                                    ObjectProvider<TwitchEventSubService> eventSub) {
         this.accounts = accounts;
         this.members = members;
         this.getterConfigs = getterConfigs;
         this.accountService = accountService;
         this.registry = registry;
         this.eventPublisher = eventPublisher;
+        this.tokens = tokens;
+        this.chat = chat;
+        this.eventSub = eventSub;
     }
 
     /**
@@ -141,15 +156,97 @@ public class FictitiousAccountService {
     /**
      * Deletes a fictitious account and its data as an account deletion does, then what the simulation kept about it.
      *
-     * @throws IllegalArgumentException for an unknown or real account
+     * @throws IllegalArgumentException for an unknown, real or converted account
      */
     @Transactional
     public void delete(UUID accountId) {
         UserAccount account = fictitious(accountId)
                 .orElseThrow(() -> new IllegalArgumentException("No fictitious account " + accountId));
+        if (registry.converted(accountId)) {
+            throw new IllegalArgumentException("Revert the converted account " + accountId + " instead: it is a "
+                    + "member's real account");
+        }
         accountService.deleteAccountImmediately(account);
         registry.forget(accountId);
         log.info("Fictitious account {} deleted", accountId);
+    }
+
+    /**
+     * Makes a real account a fictitious one, its configuration kept: its Twitch id goes behind the fictitious prefix
+     * and its Twitch token is dropped (not revoked: the member's grant on Twitch stays). Its live connections are cut
+     * and, with its bot on, reopened once committed, the simulation's now.
+     *
+     * @throws IllegalArgumentException for an unknown, system or already fictitious account
+     */
+    @Transactional
+    public UserAccount convert(UUID accountId) {
+        UserAccount account = accounts.findById(accountId)
+                .filter(found -> !found.isSystemAccount() && !SimulationGate.isFictitious(found)
+                        && found.getTwitchId() != null)
+                .orElseThrow(() -> new IllegalArgumentException("No real account " + accountId + " to convert"));
+        disconnect(account);
+        tokens.findByUserAndProvider(account, OAuthToken.Provider.TWITCH).ifPresent(tokens::delete);
+        account.setTwitchId(SimulationRegistry.FICTITIOUS_PREFIX + account.getTwitchId());
+        account = accounts.save(account);
+        registry.setConverted(accountId, true);
+        if (account.isBotEnabled()) {
+            UserAccount converted = account;
+            afterCommit(() -> {
+                chat.getObject().connect(converted);
+                eventSub.getObject().connect(converted);
+            });
+        }
+        log.info("Account {} converted to fictitious ({})", accountId, account.getTwitchId());
+        return account;
+    }
+
+    /**
+     * Makes a converted account real again: its Twitch id loses the prefix and what the simulation kept about it is
+     * dropped. It has no Twitch token until its member logs in again, so nothing is reconnected.
+     *
+     * @throws IllegalArgumentException for an account that was not converted
+     * @throws IllegalStateException    when a real account has its Twitch id meanwhile (its member logged in again)
+     */
+    @Transactional
+    public UserAccount revert(UUID accountId) {
+        UserAccount account = fictitious(accountId).filter(found -> registry.converted(accountId))
+                .orElseThrow(() -> new IllegalArgumentException("No converted account " + accountId));
+        String realId = account.getTwitchId().substring(SimulationRegistry.FICTITIOUS_PREFIX.length());
+        if (accounts.findByTwitchId(realId).isPresent()) {
+            throw new IllegalStateException("A real account has the Twitch id " + realId + " again: delete it first");
+        }
+        disconnect(account);
+        account.setTwitchId(realId);
+        account = accounts.save(account);
+        registry.forget(accountId);
+        registry.setAdmin(accountId, false);
+        registry.setConverted(accountId, false);
+        log.info("Converted account {} reverted to {}", accountId, realId);
+        return account;
+    }
+
+    /** Whether the account is a real one converted to fictitious, which can be reverted. */
+    public boolean isConverted(UUID accountId) {
+        return registry.converted(accountId);
+    }
+
+    private void disconnect(UserAccount account) {
+        chat.getObject().disconnect(account);
+        eventSub.getObject().disconnect(account);
+    }
+
+    /** Once the transaction commits, so a connection reads the account as saved; at once without one. */
+    private static void afterCommit(Runnable action) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            action.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                action.run();
+            }
+        });
     }
 
     /** Every account but the system one, real and fictitious, by username. */

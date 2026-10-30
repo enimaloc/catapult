@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.simulation.account;
 
+import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.account.UserSettings;
 import fr.enimaloc.catapult.domain.binding.GetterConfig;
@@ -16,12 +17,17 @@ import fr.enimaloc.catapult.service.access.InviteService;
 import fr.enimaloc.catapult.service.access.WhitelistService;
 import fr.enimaloc.catapult.service.account.AccountService;
 import fr.enimaloc.catapult.service.account.AdminMigrationService;
+import fr.enimaloc.catapult.service.twitch.TwitchChatService;
+import fr.enimaloc.catapult.service.twitch.TwitchEventSubService;
 import fr.enimaloc.catapult.simulation.SimulationProperties;
 import fr.enimaloc.catapult.simulation.SimulationRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.mock.env.MockEnvironment;
 import org.springframework.web.client.RestClient;
@@ -38,6 +44,8 @@ import java.util.stream.StreamSupport;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -54,6 +62,9 @@ class FictitiousAccountServiceTest {
     private final GetterConfigRepository getters = mock(GetterConfigRepository.class);
     private final AccountService accountService = mock(AccountService.class);
     private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
+    private final OAuthTokenRepository tokens = mock(OAuthTokenRepository.class);
+    private final TwitchChatService chat = mock(TwitchChatService.class);
+    private final TwitchEventSubService eventSub = mock(TwitchEventSubService.class);
     private final Map<UUID, UserAccount> stored = new HashMap<>();
     private final List<GetterConfig> savedGetters = new ArrayList<>();
     private SimulationRegistry registry;
@@ -92,7 +103,6 @@ class FictitiousAccountServiceTest {
                 .filter(config -> config.getProvider() == call.getArgument(1))
                 .findFirst());
 
-        OAuthTokenRepository tokens = mock(OAuthTokenRepository.class);
         CatapultOAuth2UserService members = new CatapultOAuth2UserService(accounts, tokens, settings, getters,
                 mock(TokenEncryptionService.class), events, mock(RestClient.class), mock(WhitelistService.class),
                 mock(AdminMigrationService.class), mock(InviteService.class));
@@ -100,7 +110,14 @@ class FictitiousAccountServiceTest {
         properties.setStateFile(dir.resolve("simulation.json").toString());
         registry = new SimulationRegistry(properties, accounts, tokens, mock(MinecraftFriendLinkRepository.class),
                 mock(MinecraftServiceAccountRepository.class), new MockEnvironment());
-        service = new FictitiousAccountService(accounts, members, getters, accountService, registry, events);
+        service = new FictitiousAccountService(accounts, members, getters, accountService, registry, events, tokens,
+                provider(TwitchChatService.class, chat), provider(TwitchEventSubService.class, eventSub));
+    }
+
+    private static <T> ObjectProvider<T> provider(Class<T> type, T bean) {
+        StaticListableBeanFactory factory = new StaticListableBeanFactory();
+        factory.addBean(type.getSimpleName(), bean);
+        return factory.getBeanProvider(type);
     }
 
     private UserAccount realAccount(String twitchId) {
@@ -242,5 +259,102 @@ class FictitiousAccountServiceTest {
                 .isInstanceOf(IllegalArgumentException.class);
         // Its own username is not taken
         service.updateIdentity(alice.getId(), FictitiousIdentity.named("alice"));
+    }
+
+    @Test
+    void convert_prefixes_the_twitch_id_and_drops_only_the_twitch_token() {
+        UserAccount real = realAccount("12345");
+        OAuthToken twitch = new OAuthToken();
+        when(tokens.findByUserAndProvider(real, OAuthToken.Provider.TWITCH)).thenReturn(Optional.of(twitch));
+
+        service.convert(real.getId());
+
+        assertThat(real.getTwitchId()).isEqualTo("m12345");
+        assertThat(service.isConverted(real.getId())).isTrue();
+        assertThat(service.fictitious(real.getId())).contains(real);
+        verify(tokens).delete(twitch);
+        verify(tokens, never()).findByUserAndProvider(any(), org.mockito.ArgumentMatchers.eq(OAuthToken.Provider.XBOX));
+    }
+
+    @Test
+    void convert_reconnects_through_the_simulation_when_the_bot_is_on() {
+        UserAccount real = realAccount("12345");
+        real.setBotEnabled(true);
+        List<String> idsAtConnect = new ArrayList<>();
+        doAnswer(call -> idsAtConnect.add(call.<UserAccount>getArgument(0).getTwitchId())).when(chat).connect(any());
+        doAnswer(call -> idsAtConnect.add(call.<UserAccount>getArgument(0).getTwitchId())).when(eventSub).connect(any());
+
+        service.convert(real.getId());
+
+        InOrder order = inOrder(chat, eventSub);
+        order.verify(chat).disconnect(real);
+        order.verify(eventSub).disconnect(real);
+        order.verify(chat).connect(real);
+        order.verify(eventSub).connect(real);
+        assertThat(idsAtConnect).containsExactly("m12345", "m12345");
+    }
+
+    @Test
+    void convert_with_the_bot_off_stays_disconnected() {
+        UserAccount real = realAccount("12345");
+        real.setBotEnabled(false);
+
+        service.convert(real.getId());
+
+        verify(chat).disconnect(real);
+        verify(chat, never()).connect(any());
+        verify(eventSub, never()).connect(any());
+    }
+
+    @Test
+    void convert_refuses_a_fictitious_or_the_system_account() {
+        UserAccount fictitious = service.create(FictitiousIdentity.named("alice"), false, List.of(), true);
+        UserAccount system = realAccount("1");
+        system.setSystemAccount(true);
+
+        assertThatThrownBy(() -> service.convert(fictitious.getId())).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.convert(system.getId())).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void revert_restores_the_real_id_and_forgets_the_simulation() {
+        UserAccount real = realAccount("12345");
+        service.convert(real.getId());
+        registry.setAdmin(real.getId(), true);
+
+        service.revert(real.getId());
+
+        assertThat(real.getTwitchId()).isEqualTo("12345");
+        assertThat(service.isConverted(real.getId())).isFalse();
+        assertThat(registry.admin(real.getId())).isFalse();
+        verify(chat, org.mockito.Mockito.times(2)).disconnect(real);
+    }
+
+    @Test
+    void revert_is_refused_when_a_real_account_has_the_id_again() {
+        UserAccount real = realAccount("12345");
+        service.convert(real.getId());
+        realAccount("12345");
+
+        assertThatThrownBy(() -> service.revert(real.getId())).isInstanceOf(IllegalStateException.class);
+        assertThat(real.getTwitchId()).isEqualTo("m12345");
+        assertThat(service.isConverted(real.getId())).isTrue();
+    }
+
+    @Test
+    void revert_refuses_an_account_that_was_not_converted() {
+        UserAccount alice = service.create(new FictitiousIdentity("alice", "999", null, null), false, List.of(), true);
+
+        assertThatThrownBy(() -> service.revert(alice.getId())).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void delete_refuses_a_converted_account() {
+        UserAccount real = realAccount("12345");
+        service.convert(real.getId());
+
+        assertThatThrownBy(() -> service.delete(real.getId())).isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Revert");
+        verify(accountService, never()).deleteAccountImmediately(any());
     }
 }
