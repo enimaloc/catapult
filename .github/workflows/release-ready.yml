@@ -2,7 +2,7 @@ name: Release ready
 
 # `pull_request` rather than `pull_request_target`: `main` holds no workflow until the first stable
 # release, so a target-based trigger would never fire for beta -> main. The job only runs for the
-# owner on this repository's release branches, and it runs the default branch's scripts.
+# owner on this repository's release branches, and it runs dev's scripts.
 on:
   pull_request:
     types: [ready_for_review]
@@ -34,7 +34,7 @@ jobs:
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.repository.default_branch }}
+          ref: dev
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:

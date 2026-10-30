@@ -7,16 +7,16 @@ une release est publiée.
 
 | Branche | Rôle |
 |---|---|
-| `dev` | Intégration (branche par défaut). Toutes les PR de fonctionnalités et de correctifs arrivent ici. |
+| `dev` | Intégration. Toutes les PR de fonctionnalités et de correctifs arrivent ici. |
 | `beta` | Pré-releases `vX.Y.Z-BETA.N`. Alimentée uniquement par la promotion `dev` → `beta`. |
-| `main` | Releases stables `vX.Y.Z`. Alimentée par la promotion `beta` → `main` et par les hotfix. |
+| `main` | Releases stables `vX.Y.Z` (branche par défaut du dépôt). Alimentée par la promotion `beta` → `main` et par les hotfix. |
 
 Ne pousse jamais directement sur ces trois branches : elles exigent une PR et les checks `build`, `test` et
 `commitlint`.
 
 ## Proposer un changement
 
-1. Crée une branche depuis `dev` : `feat/ma-fonctionnalite`, `fix/mon-correctif`, `docs/…`, `chore/…`.
+1. Crée une branche depuis `dev` : `feat/ma-fonctionnalite`, `fix/mon-correctif`, `docs/…`, `chore/…`. Ouvre ta PR vers `dev`, pas vers `main` que GitHub propose par défaut.
 2. Fais des commits ciblés (un commit par fonctionnalité, correctif ou refactor).
 3. Ouvre une PR **vers `dev`**. Le modèle de PR rappelle la checklist.
 4. Les checks doivent être verts ; la PR est ensuite fusionnée dans `dev`.
