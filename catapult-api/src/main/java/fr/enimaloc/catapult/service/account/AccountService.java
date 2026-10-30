@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.domain.binding.GetterConfig;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
+import fr.enimaloc.catapult.repository.chatcommand.ChatCommandSettingRepository;
 import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
 import fr.enimaloc.catapult.repository.binding.GetterConfigRepository;
 import fr.enimaloc.catapult.repository.experiment.ExperimentAssignmentRepository;
@@ -41,6 +42,7 @@ public class AccountService {
     private final ExperimentEventRepository experimentEventRepository;
     private final ExperimentFeedbackRepository experimentFeedbackRepository;
     private final FeedbackSubmissionRepository feedbackSubmissionRepository;
+    private final ChatCommandSettingRepository chatCommandSettingRepository;
     private final GameBindingRepository gameBindingRepository;
     private final GetterConfigRepository getterConfigRepository;
     private final UserSettingsRepository userSettingsRepository;
@@ -87,6 +89,7 @@ public class AccountService {
         experimentEventRepository.deleteByUser(account);
         experimentFeedbackRepository.deleteByUser(account);
         feedbackSubmissionRepository.deleteByUser(account);
+        chatCommandSettingRepository.deleteByUser(account);
         gameBindingRepository.deleteByUser(account);
         getterConfigRepository.deleteByUser(account);
         userSettingsRepository.deleteByUser(account);
