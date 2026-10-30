@@ -72,6 +72,7 @@ class FictitiousAccountServiceTest {
 
     @BeforeEach
     void setUp() {
+        when(accounts.saveAndFlush(any())).thenAnswer(call -> accounts.save(call.getArgument(0)));
         when(accounts.save(any())).thenAnswer(call -> {
             UserAccount account = call.getArgument(0);
             if (account.getId() == null) {
@@ -356,5 +357,31 @@ class FictitiousAccountServiceTest {
         assertThatThrownBy(() -> service.delete(real.getId())).isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Revert");
         verify(accountService, never()).deleteAccountImmediately(any());
+    }
+
+    @Test
+    void convert_is_refused_when_its_fictitious_twitch_id_is_taken() {
+        UserAccount real = realAccount("12826");
+        service.create(new FictitiousIdentity("twitch-copy", "12826", null, null), false, List.of(), true);
+
+        assertThatThrownBy(() -> service.convert(real.getId())).isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("m12826");
+        assertThat(real.getTwitchId()).isEqualTo("12826");
+        assertThat(service.isConverted(real.getId())).isFalse();
+        verify(chat, never()).disconnect(any());
+    }
+
+    @Test
+    void convert_keeps_the_exact_login_and_steam_id() {
+        UserAccount real = realAccount("12345");
+        real.setSteamId("76561198000000042");
+
+        service.convert(real.getId());
+
+        assertThat(real.getTwitchUsername()).isEqualTo("real-12345");
+        assertThat(real.getSteamId()).isEqualTo("76561198000000042");
+        service.revert(real.getId());
+        assertThat(real.getTwitchUsername()).isEqualTo("real-12345");
+        assertThat(real.getSteamId()).isEqualTo("76561198000000042");
     }
 }

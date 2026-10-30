@@ -173,10 +173,13 @@ public class FictitiousAccountService {
 
     /**
      * Makes a real account a fictitious one, its configuration kept: its Twitch id goes behind the fictitious prefix
-     * and its Twitch token is dropped (not revoked: the member's grant on Twitch stays). Its live connections are cut
-     * and, with its bot on, reopened once committed, the simulation's now.
+     * and its Twitch token is dropped (not revoked: the member's grant on Twitch stays). Its login and Steam id stay
+     * exactly as they are: a dev-only copy, so the member signing in again meanwhile gets a second account with the
+     * same login. Its live connections are cut and, with its bot on, reopened once committed, the simulation's
+     * now.
      *
-     * @throws IllegalArgumentException for an unknown, system or already fictitious account
+     * @throws IllegalArgumentException for an unknown, system or already fictitious account, or one whose fictitious
+     *                                  Twitch id another account has
      */
     @Transactional
     public UserAccount convert(UUID accountId) {
@@ -184,10 +187,15 @@ public class FictitiousAccountService {
                 .filter(found -> !found.isSystemAccount() && !SimulationGate.isFictitious(found)
                         && found.getTwitchId() != null)
                 .orElseThrow(() -> new IllegalArgumentException("No real account " + accountId + " to convert"));
-        disconnect(account);
+        String fictitiousId = SimulationRegistry.FICTITIOUS_PREFIX + account.getTwitchId();
+        if (accounts.findByTwitchId(fictitiousId).isPresent()) {
+            throw new IllegalArgumentException("The Twitch id " + fictitiousId + " is taken by a fictitious account");
+        }
+        account.setTwitchId(fictitiousId);
+        // Flushed first: once the database took it, the connections and the state file follow
+        account = accounts.saveAndFlush(account);
         tokens.findByUserAndProvider(account, OAuthToken.Provider.TWITCH).ifPresent(tokens::delete);
-        account.setTwitchId(SimulationRegistry.FICTITIOUS_PREFIX + account.getTwitchId());
-        account = accounts.save(account);
+        disconnect(account);
         registry.setConverted(accountId, true);
         if (account.isBotEnabled()) {
             UserAccount converted = account;
@@ -196,16 +204,17 @@ public class FictitiousAccountService {
                 eventSub.getObject().connect(converted);
             });
         }
-        log.info("Account {} converted to fictitious ({})", accountId, account.getTwitchId());
+        log.info("Account {} converted to fictitious ({})", accountId, fictitiousId);
         return account;
     }
 
     /**
      * Makes a converted account real again: its Twitch id loses the prefix and what the simulation kept about it is
-     * dropped. It has no Twitch token until its member logs in again, so nothing is reconnected.
+     * dropped. It has no Twitch token until its member logs in again, so nothing
+     * is reconnected.
      *
      * @throws IllegalArgumentException for an account that was not converted
-     * @throws IllegalStateException    when a real account has its Twitch id meanwhile (its member logged in again)
+     * @throws IllegalStateException    when a real account has its Twitch id meanwhile (its member signed in again)
      */
     @Transactional
     public UserAccount revert(UUID accountId) {
@@ -215,11 +224,10 @@ public class FictitiousAccountService {
         if (accounts.findByTwitchId(realId).isPresent()) {
             throw new IllegalStateException("A real account has the Twitch id " + realId + " again: delete it first");
         }
-        disconnect(account);
         account.setTwitchId(realId);
-        account = accounts.save(account);
+        account = accounts.saveAndFlush(account);
+        disconnect(account);
         registry.forget(accountId);
-        registry.setAdmin(accountId, false);
         registry.setConverted(accountId, false);
         log.info("Converted account {} reverted to {}", accountId, realId);
         return account;

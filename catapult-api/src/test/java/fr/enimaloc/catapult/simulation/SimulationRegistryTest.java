@@ -258,6 +258,8 @@ class SimulationRegistryTest {
 
         assertThat(registry().converted(realId)).isTrue();
         assertThat(registry().converted(fictitiousId)).isFalse();
+        registry().setConverted(realId, false);
+        assertThat(registry().converted(realId)).isFalse();
     }
 
     @Test
