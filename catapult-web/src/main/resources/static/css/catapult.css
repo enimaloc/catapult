@@ -98,11 +98,12 @@ mdui-top-app-bar {
     font-size: 1.2em;
 }
 
-/* Brand and end share the free space evenly, so the channels sit in the bar's center. */
+/* Brand and end share the free space evenly, so the channels sit in the bar's center. Never below their own
+   width, though: with many channels, it is the channels that shrink (and scroll), not the buttons. */
 .app-bar > .brand-link,
 .app-bar > .app-bar-end {
-    flex: 1 1 0;
-    min-width: 0;
+    flex: 1 0 0;
+    min-width: max-content;
 }
 
 .app-bar-end {
@@ -111,12 +112,15 @@ mdui-top-app-bar {
     justify-content: flex-end;
 }
 
+/* mdui-top-app-bar keeps its children from shrinking (flex-shrink: 0): the channels must, or they push the end off. */
 .nav-channels {
     display: flex;
+    flex-shrink: 1;
     gap: 6px;
     min-width: 0;
     overflow-x: auto;
-    scrollbar-width: none;
+    /* a mouse has no other way to reach the channels past the bar's width */
+    scrollbar-width: thin;
 }
 
 .nav-channel {
@@ -978,9 +982,11 @@ a[data-link].active {
 
 /* Tabs */
 
-/* The tab strip paints its own rgb(--mdui-color-surface) background, a shade off the page's. */
+/* The tab strip paints its own rgb(--mdui-color-surface) background, a shade off the page's. mdui centres the
+   tabs (placement="top"): once they overflow, those cut off on the left could not be scrolled to, hence "safe". */
 .channel-tabs::part(container) {
     background-color: transparent;
+    justify-content: safe center;
 }
 
 .channel-tabs mdui-tab-panel {
