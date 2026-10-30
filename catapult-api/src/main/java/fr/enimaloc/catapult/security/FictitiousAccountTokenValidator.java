@@ -11,8 +11,9 @@ import org.springframework.security.oauth2.jwt.Jwt;
 
 /**
  * Outside the {@code mock} profile, refuses the JWT of a fictitious account (its {@code twitchId} claim starts with
- * {@code mock-}): only the profile's fictitious login issues one, so a token left over from a {@code mock} run, a
- * fictitious admin's included, dies at its first request once the server runs without the profile.
+ * {@code m}, which no real numeric Twitch id does): only the profile's fictitious login issues one, so a token left
+ * over from a {@code mock} run, a fictitious admin's included, dies at its first request once the server runs
+ * without the profile.
  */
 public class FictitiousAccountTokenValidator implements OAuth2TokenValidator<Jwt> {
 

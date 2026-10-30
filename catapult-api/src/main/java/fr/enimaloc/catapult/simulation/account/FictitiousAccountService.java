@@ -26,7 +26,7 @@ import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * The {@code mock} profile's fictitious accounts: real {@link UserAccount}s of the dev database, without any token,
- * whose Twitch id ({@code mock-} and a short suffix) no real Twitch id can be. They are made and removed through the
+ * whose Twitch id ({@code m} and a short suffix) no real Twitch id can be. They are made and removed through the
  * paths a member's account takes ({@link CatapultOAuth2UserService#createNewAccount},
  * {@link AccountService#deleteAccountImmediately}); what only the simulation knows about them (their admin role, the
  * channels they moderate) is kept in the {@link SimulationRegistry}.
@@ -46,7 +46,6 @@ public class FictitiousAccountService {
     static final String STEAM_ID_PREFIX = "7656119790";
     private static final int STEAM_ID_SUFFIX_DIGITS = 7;
     private static final int STEAM_ID_ATTEMPTS = 20;
-    private static final String TWITCH_ID_PREFIX = "mock-";
     private static final int TWITCH_ID_SUFFIX_LENGTH = 8;
 
     private final UserAccountRepository accounts;
@@ -92,7 +91,7 @@ public class FictitiousAccountService {
             throw new IllegalArgumentException("Unknown moderated account in " + moderatedIds);
         }
 
-        UserAccount account = members.createNewAccount(TWITCH_ID_PREFIX + shortSuffix(), login);
+        UserAccount account = members.createNewAccount(SimulationRegistry.FICTITIOUS_PREFIX + shortSuffix(), login);
         account.setStatus(UserAccount.Status.ACTIVE);
         account.setBotEnabled(botEnabled);
         account.setSteamId(freeSteamId());

@@ -114,7 +114,7 @@ class FictitiousAccountServiceTest {
 
         UserAccount account = service.create("alice", true, List.of(channel.getId()), false);
 
-        assertThat(account.getTwitchId()).startsWith("mock-");
+        assertThat(account.getTwitchId()).startsWith("m").hasSize(9);
         assertThat(account.getTwitchUsername()).isEqualTo("alice");
         assertThat(account.getStatus()).isEqualTo(UserAccount.Status.ACTIVE);
         assertThat(account.isBotEnabled()).isFalse();

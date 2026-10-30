@@ -59,7 +59,11 @@ import java.util.stream.Collectors;
 @ConditionalOnBooleanProperty("catapult.simulation.enabled")
 public class SimulationRegistry {
 
-    static final String FICTITIOUS_PREFIX = "mock-";
+    /**
+     * What a fictitious account's Twitch id starts with: a real one is numeric. The {@code mock-} ids made before
+     * the prefix was shortened start with it too.
+     */
+    public static final String FICTITIOUS_PREFIX = "m";
 
     /** The global APIs that resolve a game: real by default when their keys exist. */
     private static final Set<String> RESOLUTION_APIS = Set.of("igdb", "dtdd", "steam.store", "xbox.store");
