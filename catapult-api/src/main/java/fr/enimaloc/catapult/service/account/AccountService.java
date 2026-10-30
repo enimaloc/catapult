@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.domain.binding.GetterConfig;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
+import fr.enimaloc.catapult.repository.chatcommand.ChatCommandSettingRepository;
 import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
 import fr.enimaloc.catapult.repository.binding.GetterConfigRepository;
 import fr.enimaloc.catapult.repository.experiment.ExperimentAssignmentRepository;
@@ -22,15 +23,11 @@ import fr.enimaloc.catapult.service.twitch.TwitchChatService;
 import fr.enimaloc.catapult.service.xbox.XboxUserTokenService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.List;
 import java.util.Optional;
 
 @Slf4j
@@ -45,6 +42,7 @@ public class AccountService {
     private final ExperimentEventRepository experimentEventRepository;
     private final ExperimentFeedbackRepository experimentFeedbackRepository;
     private final FeedbackSubmissionRepository feedbackSubmissionRepository;
+    private final ChatCommandSettingRepository chatCommandSettingRepository;
     private final GameBindingRepository gameBindingRepository;
     private final GetterConfigRepository getterConfigRepository;
     private final UserSettingsRepository userSettingsRepository;
@@ -56,9 +54,6 @@ public class AccountService {
     private final BotToggleService botToggleService;
     private final TwitchChatService twitchChatService;
     private final EventSubService twitchEventSubService;
-
-    @Value("${app.account.deletion-delay-days:7}")
-    private int deletionDelayDays;
 
     // =========================================================
     // Two-step deletion
@@ -85,22 +80,6 @@ public class AccountService {
         deleteAccountPermanently(account);
     }
 
-    @Scheduled(cron = "0 0 2 * * *")
-    @Transactional
-    public void purgeExpiredAccounts() {
-        Instant cutoff = Instant.now().minus(deletionDelayDays, ChronoUnit.DAYS);
-        List<UserAccount> toDelete = userAccountRepository
-            .findByStatusAndDeletionRequestedAtBefore(UserAccount.Status.PENDING_DELETION, cutoff);
-
-        for (UserAccount account : toDelete) {
-            try {
-                deleteAccountPermanently(account);
-            } catch (Exception e) {
-                log.error("Failed to permanently delete account {}", account.getId(), e);
-            }
-        }
-    }
-
     private void deleteAccountPermanently(UserAccount account) {
         twitchChatService.disconnect(account);
         twitchEventSubService.disconnect(account);
@@ -110,6 +89,7 @@ public class AccountService {
         experimentEventRepository.deleteByUser(account);
         experimentFeedbackRepository.deleteByUser(account);
         feedbackSubmissionRepository.deleteByUser(account);
+        chatCommandSettingRepository.deleteByUser(account);
         gameBindingRepository.deleteByUser(account);
         getterConfigRepository.deleteByUser(account);
         userSettingsRepository.deleteByUser(account);
