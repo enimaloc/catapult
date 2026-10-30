@@ -26,6 +26,22 @@ Les PR ouvertes vers `beta` ou `main` sont réservées aux promotions préparée
 En ouvrant une PR, tu acceptes que ta contribution soit publiée sous la même licence que le projet,
 l'[AGPL-3.0](LICENSE).
 
+## Programmer une sortie
+
+Dans une PR de promotion en draft (`dev` → `beta` ou `beta` → `main`), le propriétaire remplit la ligne
+`Sortie programmée : AAAA-MM-JJ HH:MM`, en heure de Paris. Le bot confirme par un commentaire : tant qu'il n'a
+pas répondu, rien n'est programmé.
+
+- **À l'heure dite :** la PR sort du draft et suit le circuit habituel. La vérification a lieu toutes les
+  15 minutes, et GitHub peut la retarder. Au-delà d'une heure de retard, la sortie part quand même et un
+  commentaire indique l'heure prévue et l'heure réelle.
+- **Annulation automatique :** un nouveau commit, une date illisible ou passée, ou un passage manuel de la PR
+  dans ou hors du draft annulent la sortie, avec un commentaire. Il faut ensuite saisir une nouvelle date.
+- **Annulation manuelle :** vider la ligne.
+
+`.github/workflows/release-schedule.yml` doit rester identique sur `dev` et sur `main` : GitHub ne lance les
+tâches planifiées que depuis la branche par défaut.
+
 ## Conventional Commits
 
 Les messages de commit suivent [Conventional Commits](https://www.conventionalcommits.org/fr/v1.0.0/) ; le check
