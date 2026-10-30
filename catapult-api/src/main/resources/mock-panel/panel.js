@@ -105,12 +105,22 @@ function renderAccounts() {
       class: account.id === state.selected ? 'sel' : '',
       onclick: () => select(account.id),
     },
+    account.profileImageUrl ? el('img', {class: 'avatar', src: account.profileImageUrl, alt: ''}) : null,
     el('span', {class: 'name', title: account.twitchId}, account.username || account.twitchId),
     account.fictitious ? el('span', {class: 'tag'}, 'fictitious') : el('span', {class: 'tag real'}, 'real'),
+    account.converted ? el('span', {class: 'tag'}, 'converted') : null,
     account.admin ? el('span', {class: 'tag'}, 'admin') : null,
     account.botEnabled ? null : el('span', {class: 'tag'}, 'bot off'),
     account.moderates.length ? el('span', {class: 'tag'}, 'mod of ' + account.moderates.join(', ')) : null,
-    account.fictitious ? el('button', {
+    account.fictitious ? null : el('button', {
+      class: 'act', type: 'button', title: 'Make this real account a fictitious one, its configuration kept',
+      onclick: (event) => { event.stopPropagation(); convert(account); },
+    }, 'convert'),
+    account.converted ? el('button', {
+      class: 'act', type: 'button', title: 'Make this converted account real again',
+      onclick: (event) => { event.stopPropagation(); revert(account); },
+    }, 'revert') : null,
+    account.fictitious && !account.converted ? el('button', {
       class: 'del', type: 'button', title: 'Delete this fictitious account',
       onclick: (event) => { event.stopPropagation(); remove(account); },
     }, '×') : null)));
@@ -141,11 +151,58 @@ async function remove(account) {
   await act('Account deleted', () => call('DELETE', '/accounts/' + account.id), loadAccounts);
 }
 
+async function convert(account) {
+  if (!confirm('Convert ' + (account.username || account.twitchId) + ' to a fictitious account? Its Twitch token is '
+    + 'dropped: once reverted, its member has to sign in again.')) return;
+  await act('Account converted', () => call('POST', '/accounts/' + account.id + '/convert'), loadAccounts);
+}
+
+async function revert(account) {
+  if (!confirm('Make ' + (account.username || account.twitchId) + ' a real account again?')) return;
+  await act('Account reverted', () => call('POST', '/accounts/' + account.id + '/revert'), loadAccounts);
+}
+
+/** Shows {@code url} in {@code img}, hidden while empty. */
+function showAvatar(img, url) {
+  img.hidden = !url;
+  if (url) img.src = url;
+  else img.removeAttribute('src');
+}
+
+/** An optional field as the API reads it: null when left empty. */
+function optional(input) {
+  const value = input.value.trim();
+  return value ? value : null;
+}
+
+$('prefill-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const login = $('prefill-login').value.trim();
+  if (!login) return;
+  const form = $('create-form');
+  try {
+    const user = await call('GET', '/twitch/users?login=' + encodeURIComponent(login));
+    form.username.value = user.login;
+    form.twitchId.value = 'm' + user.id;
+    form.profileImageUrl.value = user.profileImageUrl || '';
+    showAvatar($('create-avatar'), user.profileImageUrl);
+    toast('Prefilled from ' + user.login);
+  } catch (e) {
+    toast('Prefill failed: ' + e.message, true);
+  }
+});
+
+$('create-form').profileImageUrl.addEventListener('input', (event) =>
+  showAvatar($('create-avatar'), event.target.value.trim()));
+
 $('create-form').addEventListener('submit', async (event) => {
   event.preventDefault();
   const form = event.target;
   const body = {
     username: form.username.value.trim(),
+    twitchId: optional(form.twitchId),
+    profileImageUrl: optional(form.profileImageUrl),
+    steamId: optional(form.steamId),
     admin: form.admin.checked,
     botEnabled: form.botEnabled.checked,
     moderates: checkedValues($('create-moderates')),
@@ -154,6 +211,8 @@ $('create-form').addEventListener('submit', async (event) => {
   await act('Account created', async () => { created = await call('POST', '/accounts', body); }, loadAccounts);
   if (created) {
     form.reset();
+    $('prefill-login').value = '';
+    showAvatar($('create-avatar'), null);
     $('create').open = false;
     await select(created.id);
   }
@@ -184,11 +243,36 @@ async function refreshAccount() {
   }
   if (state.selected !== id) return;
   showAccount(true);
+  renderIdentity(account);
   renderState(account, current);
   renderSettings($('account-settings'), settings, (key, body) =>
     call('PUT', '/accounts/' + id + '/settings/' + key, body));
   renderData(account, current.data);
 }
+
+function renderIdentity(account) {
+  $('identity-card').hidden = !account || !account.fictitious;
+  if (!account || !account.fictitious) return;
+  $('identity-username').value = account.username || '';
+  $('identity-avatar-url').value = account.profileImageUrl || '';
+  $('identity-steam').value = account.steamId || '';
+  $('identity-twitch').textContent = 'Twitch id ' + account.twitchId + (account.converted ? ' (converted)' : '');
+  showAvatar($('identity-avatar'), account.profileImageUrl);
+}
+
+$('identity-avatar-url').addEventListener('input', (event) =>
+  showAvatar($('identity-avatar'), event.target.value.trim()));
+
+$('identity-form').addEventListener('submit', (event) => {
+  event.preventDefault();
+  const steamId = $('identity-steam').value.trim();
+  act('Identity saved', () => call('PUT', '/accounts/' + state.selected + '/identity', {
+    username: $('identity-username').value.trim(),
+    profileImageUrl: $('identity-avatar-url').value.trim(),
+    // An empty Steam id is left as it is: the API refuses a blank one
+    steamId: steamId ? steamId : null,
+  }), loadAccounts);
+});
 
 function renderState(account, current) {
   $('state-title').textContent = account ? '— ' + (account.username || account.twitchId) : '';

@@ -55,8 +55,9 @@ public class MockPanelController {
             return ResponseEntity.ok()
                     .contentType(new MediaType(type, StandardCharsets.UTF_8))
                     .cacheControl(CacheControl.noStore())
-                    // The page's own script and style only: nothing inline, nothing from elsewhere
-                    .header("Content-Security-Policy", "default-src 'self'")
+                    // The page's own script and style only: nothing inline, nothing from elsewhere. Avatars are
+                    // the exception: Twitch's CDN or any URL typed in the panel
+                    .header("Content-Security-Policy", "default-src 'self'; img-src 'self' https:")
                     .body(in.readAllBytes());
         } catch (IOException e) {
             throw new UncheckedIOException("The mock panel's " + name + " is missing from the classpath", e);

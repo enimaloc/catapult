@@ -27,6 +27,8 @@ class MockPanelControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith("text/html"))
                 .andExpect(header().string("Cache-Control", "no-store"))
+                // Avatars come from Twitch's CDN or any URL typed in; scripts and styles stay the page's own
+                .andExpect(header().string("Content-Security-Policy", "default-src 'self'; img-src 'self' https:"))
                 .andReturn().getResponse().getContentAsString();
 
         assertThat(page).contains("Mock control panel").contains("/mock/panel.js").contains("/mock/panel.css");
