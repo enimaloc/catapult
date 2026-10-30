@@ -22,15 +22,11 @@ import fr.enimaloc.catapult.service.twitch.TwitchChatService;
 import fr.enimaloc.catapult.service.xbox.XboxUserTokenService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.List;
 import java.util.Optional;
 
 @Slf4j
@@ -57,9 +53,6 @@ public class AccountService {
     private final TwitchChatService twitchChatService;
     private final EventSubService twitchEventSubService;
 
-    @Value("${app.account.deletion-delay-days:7}")
-    private int deletionDelayDays;
-
     // =========================================================
     // Two-step deletion
     // =========================================================
@@ -83,22 +76,6 @@ public class AccountService {
     @Transactional
     public void deleteAccountImmediately(UserAccount account) {
         deleteAccountPermanently(account);
-    }
-
-    @Scheduled(cron = "0 0 2 * * *")
-    @Transactional
-    public void purgeExpiredAccounts() {
-        Instant cutoff = Instant.now().minus(deletionDelayDays, ChronoUnit.DAYS);
-        List<UserAccount> toDelete = userAccountRepository
-            .findByStatusAndDeletionRequestedAtBefore(UserAccount.Status.PENDING_DELETION, cutoff);
-
-        for (UserAccount account : toDelete) {
-            try {
-                deleteAccountPermanently(account);
-            } catch (Exception e) {
-                log.error("Failed to permanently delete account {}", account.getId(), e);
-            }
-        }
     }
 
     private void deleteAccountPermanently(UserAccount account) {
