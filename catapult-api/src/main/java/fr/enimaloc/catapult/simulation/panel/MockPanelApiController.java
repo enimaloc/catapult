@@ -20,6 +20,7 @@ import fr.enimaloc.catapult.simulation.SimulationJournal;
 import fr.enimaloc.catapult.simulation.SimulationRegistry;
 import fr.enimaloc.catapult.simulation.account.FictitiousAccountService;
 import fr.enimaloc.catapult.simulation.account.FictitiousIdentity;
+import fr.enimaloc.catapult.simulation.account.TwitchUserLookup;
 import fr.enimaloc.catapult.simulation.panel.MockPanelDtos.AccountView;
 import fr.enimaloc.catapult.simulation.panel.MockPanelDtos.ApiCalls;
 import fr.enimaloc.catapult.simulation.panel.MockPanelDtos.BotRequest;
@@ -27,6 +28,7 @@ import fr.enimaloc.catapult.simulation.panel.MockPanelDtos.CallView;
 import fr.enimaloc.catapult.simulation.panel.MockPanelDtos.CreateAccount;
 import fr.enimaloc.catapult.simulation.panel.MockPanelDtos.DataUpdate;
 import fr.enimaloc.catapult.simulation.panel.MockPanelDtos.DetectedGameView;
+import fr.enimaloc.catapult.simulation.panel.MockPanelDtos.IdentityUpdate;
 import fr.enimaloc.catapult.simulation.panel.MockPanelDtos.LiveRequest;
 import fr.enimaloc.catapult.simulation.panel.MockPanelDtos.ManualCategoryRequest;
 import fr.enimaloc.catapult.simulation.panel.MockPanelDtos.PlayRequest;
@@ -104,6 +106,7 @@ public class MockPanelApiController {
     private final StreamStateService streamState;
     private final ObjectProvider<TwitchEventSubService> eventSub;
     private final GameSourceResolver games;
+    private final TwitchUserLookup twitchUsers;
     /** {@code app.owner-id}: the real account whose login gets {@code ROLE_ADMIN}. */
     private final String ownerId;
 
@@ -111,7 +114,7 @@ public class MockPanelApiController {
                                   SimulationJournal journal, SimulationActions actions,
                                   GameStateService gameState, StreamStateService streamState,
                                   ObjectProvider<TwitchEventSubService> eventSub, GameSourceResolver games,
-                                  @Value("${app.owner-id:}") String ownerId) {
+                                  TwitchUserLookup twitchUsers, @Value("${app.owner-id:}") String ownerId) {
         this.accounts = accounts;
         this.registry = registry;
         this.journal = journal;
@@ -120,6 +123,7 @@ public class MockPanelApiController {
         this.streamState = streamState;
         this.eventSub = eventSub;
         this.games = games;
+        this.twitchUsers = twitchUsers;
         this.ownerId = ownerId;
     }
 
@@ -156,14 +160,46 @@ public class MockPanelApiController {
 
     @PostMapping("/accounts")
     public AccountView create(@RequestBody CreateAccount body) {
-        UserAccount created = accounts.create(FictitiousIdentity.named(body.username()), body.admin(),
+        FictitiousIdentity identity = new FictitiousIdentity(body.username(), body.twitchId(),
+                body.profileImageUrl(), body.steamId());
+        UserAccount created = accounts.create(identity, body.admin(),
                 body.moderates() == null ? List.of() : body.moderates(),
                 body.botEnabled() == null || body.botEnabled());
         Map<String, String> usernames = usernamesByTwitchId(accounts.list());
         return view(created, usernames);
     }
 
+    /** What the panel prefills a new fictitious account with; 404 for a login Twitch does not know. */
+    @GetMapping("/twitch/users")
+    public TwitchUserLookup.TwitchUser twitchUser(@RequestParam String login) {
+        return twitchUsers.byLogin(login)
+                .orElseThrow(() -> new ApiProblem(ErrorCode.NOT_FOUND, "No Twitch user " + login));
+    }
+
     /** Fictitious accounts only: a real one is refused (400). */
+    @PutMapping("/accounts/{id}/identity")
+    public AccountView identity(@PathVariable UUID id, @RequestBody IdentityUpdate body) {
+        account(id);
+        UserAccount updated = accounts.updateIdentity(id,
+                new FictitiousIdentity(body.username(), null, body.profileImageUrl(), body.steamId()));
+        return view(updated, usernamesByTwitchId(accounts.list()));
+    }
+
+    /** Real accounts only: a fictitious one is refused (400). */
+    @PostMapping("/accounts/{id}/convert")
+    public AccountView convert(@PathVariable UUID id) {
+        account(id);
+        return view(accounts.convert(id), usernamesByTwitchId(accounts.list()));
+    }
+
+    /** Converted accounts only (400 otherwise). */
+    @PostMapping("/accounts/{id}/revert")
+    public AccountView revert(@PathVariable UUID id) {
+        account(id);
+        return view(accounts.revert(id), usernamesByTwitchId(accounts.list()));
+    }
+
+    /** Fictitious accounts only: a real or converted one is refused (400). */
     @DeleteMapping("/accounts/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable UUID id) {
@@ -397,7 +433,8 @@ public class MockPanelApiController {
         boolean fictitious = SimulationGate.isFictitious(account);
         return new AccountView(account.getId(), account.getTwitchUsername(), account.getTwitchId(), fictitious,
                 fictitious ? accounts.isAdmin(account.getId()) : isOwner(account), account.isBotEnabled(),
-                String.valueOf(account.getStatus()), moderates);
+                String.valueOf(account.getStatus()), moderates, account.getProfileImageUrl(), account.getSteamId(),
+                fictitious && accounts.isConverted(account.getId()));
     }
 
     private void reconnectEventSub(UserAccount account) {

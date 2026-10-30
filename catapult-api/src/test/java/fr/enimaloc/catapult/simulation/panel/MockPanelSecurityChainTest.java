@@ -21,6 +21,7 @@ import fr.enimaloc.catapult.simulation.SimulationRegistry;
 import fr.enimaloc.catapult.simulation.account.FictitiousAccountService;
 import fr.enimaloc.catapult.simulation.account.MockGuard;
 import fr.enimaloc.catapult.simulation.account.MockLoginNonces;
+import fr.enimaloc.catapult.simulation.account.TwitchUserLookup;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -102,6 +103,7 @@ class MockPanelSecurityChainTest {
     @MockitoBean StreamStateService streamState;
     @MockitoBean TwitchEventSubService eventSub;
     @MockitoBean GameSourceResolver games;
+    @MockitoBean TwitchUserLookup twitchUsers;
     @MockitoBean UserApiTokenService userApiTokenService;
     @MockitoBean CatapultOAuth2UserService oAuth2UserService;
     @MockitoBean TwitchLoginSuccessHandler loginSuccessHandler;

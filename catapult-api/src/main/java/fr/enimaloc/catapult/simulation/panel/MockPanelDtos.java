@@ -21,13 +21,23 @@ public final class MockPanelDtos {
      * One account of the list.
      *
      * @param moderates the usernames of the channels the simulated Twitch says it moderates
+     * @param converted a real account made fictitious, which can be reverted
      */
     public record AccountView(UUID id, @Nullable String username, String twitchId, boolean fictitious,
-                              boolean admin, boolean botEnabled, String status, List<String> moderates) {}
+                              boolean admin, boolean botEnabled, String status, List<String> moderates,
+                              @Nullable String profileImageUrl, @Nullable String steamId, boolean converted) {}
 
-    /** A new fictitious account; {@code moderates} are account ids. */
+    /**
+     * A new fictitious account; {@code moderates} are account ids. A blank {@code twitchId} or {@code steamId} is
+     * made up.
+     */
     public record CreateAccount(@Nullable String username, boolean admin, @Nullable List<UUID> moderates,
-                                @Nullable Boolean botEnabled) {}
+                                @Nullable Boolean botEnabled, @Nullable String twitchId,
+                                @Nullable String profileImageUrl, @Nullable String steamId) {}
+
+    /** What a fictitious account is known by, to change: a {@code null} field is left as it is. */
+    public record IdentityUpdate(@Nullable String username, @Nullable String profileImageUrl,
+                                 @Nullable String steamId) {}
 
     /**
      * The channel as Catapult sees it ({@code live}, {@code detectedGame}, {@code botEnabled}) and as the
