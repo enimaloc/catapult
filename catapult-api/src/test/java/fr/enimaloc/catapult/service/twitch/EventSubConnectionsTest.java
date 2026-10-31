@@ -215,17 +215,80 @@ class EventSubConnectionsTest {
     }
 
     @Test
-    void welcome_recordsTheKeepalive_andResetsTheBackoff() {
-        @SuppressWarnings("unchecked")
-        Map<UUID, Long> backoff = (Map<UUID, Long>) ReflectionTestUtils.getField(connections, "retryDelaySeconds");
+    void welcome_recordsTheKeepalive_andKeepsTheBackoff() {
+        Map<UUID, Long> backoff = backoff();
         backoff.put(user.getId(), 32L);
 
         connections.onWelcome(user, 30);
 
-        assertThat(backoff).doesNotContainKey(user.getId());
+        assertThat(backoff).containsEntry(user.getId(), 32L);
         @SuppressWarnings("unchecked")
         Map<UUID, Long> keepalives = (Map<UUID, Long>) ReflectionTestUtils.getField(connections, "keepaliveTimeoutSeconds");
         assertThat(keepalives).containsEntry(user.getId(), 30L);
+    }
+
+    @Test
+    void subscribed_resetsTheBackoff() {
+        Map<UUID, Long> backoff = backoff();
+        backoff.put(user.getId(), 32L);
+
+        connections.onSubscribed(user);
+
+        assertThat(backoff).doesNotContainKey(user.getId());
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<UUID, Long> backoff() {
+        return (Map<UUID, Long>) ReflectionTestUtils.getField(connections, "retryDelaySeconds");
+    }
+
+    @Test
+    void reopen_closesTheSocket_thenOpensANewSession() {
+        handshakesSucceed();
+        connections.open(user, token);
+        WebSocket first = socketOf(listeners.getFirst());
+
+        connections.reopen(user, token);
+
+        verify(first).sendClose(eq(WebSocket.NORMAL_CLOSURE), anyString());
+        assertThat(backoff()).containsEntry(user.getId(), 2L);
+        verify(builder, timeout(3000).times(2)).buildAsync(eq(CANONICAL), any());
+        assertThat(socketOf(listeners.getLast())).isNotSameAs(first);
+        assertThat(registered()).containsEntry(user.getId(), socketOf(listeners.getLast()));
+    }
+
+    @Test
+    void reopen_afterADisconnect_doesNotReconnect() {
+        handshakesSucceed();
+        connections.open(user, token);
+        connections.forbidReconnect(user);
+
+        connections.reopen(user, token);
+
+        verify(builder, after(1500).times(1)).buildAsync(any(), any());
+        assertThat(registered()).doesNotContainKey(user.getId());
+    }
+
+    @Test
+    void aSocketWithoutAWelcome_isWatchedFromTheStart() {
+        handshakesSucceed();
+
+        connections.open(user, token);
+
+        assertThat(((Map<?, ?>) ReflectionTestUtils.getField(connections, "watchdogs")).containsKey(user.getId())).isTrue();
+    }
+
+    @Test
+    void aReconnectThatFails_isTriedAgain() {
+        handshakesSucceed();
+        connections.open(user, token);
+        when(tokens.findByUserAndProvider(user, OAuthToken.Provider.TWITCH))
+                .thenThrow(new IllegalStateException("database down"))
+                .thenReturn(Optional.of(token));
+
+        connections.reopen(user, token);
+
+        verify(builder, timeout(5000).times(2)).buildAsync(eq(CANONICAL), any());
     }
 
     @Test
