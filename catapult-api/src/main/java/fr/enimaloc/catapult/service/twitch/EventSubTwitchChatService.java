@@ -168,6 +168,7 @@ public class EventSubTwitchChatService implements TwitchChatService {
                         // re-subscribing would only yield 409 Conflict noise.
                         log.info("[EventSub Chat] session_welcome for user {} ({}) — reconnected, subscriptions carried over (sessionId={}, keepalive={}s)",
                                 user.getId(), user.getTwitchUsername(), sessionId, timeout);
+                        connections.onSubscribed(user);
                     } else {
                         log.info("[EventSub Chat] session_welcome for user {} ({}) — subscribing (sessionId={}, keepalive={}s)",
                                 user.getId(), user.getTwitchUsername(), sessionId, timeout);
@@ -237,11 +238,18 @@ public class EventSubTwitchChatService implements TwitchChatService {
 
     private void subscribe(UserAccount user, OAuthToken token, String sessionId) {
         String accessToken = twitchTokenService.resolveAccessToken(token, user);
-        subscribeEvent(user, token, accessToken, sessionId, "channel.chat.message",
-            Map.of("broadcaster_user_id", user.getTwitchId(), "user_id", user.getTwitchId()));
-        subscribeEvent(user, token, accessToken, sessionId,
-            "channel.channel_points_custom_reward_redemption.add",
-            Map.of("broadcaster_user_id", user.getTwitchId()));
+        try {
+            subscribeEvent(user, token, accessToken, sessionId, "channel.chat.message",
+                Map.of("broadcaster_user_id", user.getTwitchId(), "user_id", user.getTwitchId()));
+            subscribeEvent(user, token, accessToken, sessionId,
+                "channel.channel_points_custom_reward_redemption.add",
+                Map.of("broadcaster_user_id", user.getTwitchId()));
+            connections.onSubscribed(user);
+        } catch (HttpClientErrorException.TooManyRequests e) {
+            log.warn("[EventSub Chat] Twitch refused a subscription for user {}, opening a new session: {}",
+                user.getId(), e.getMessage());
+            connections.reopen(user, token);
+        }
     }
 
     private void subscribeEvent(UserAccount user, OAuthToken token, String accessToken, String sessionId,
@@ -250,6 +258,8 @@ public class EventSubTwitchChatService implements TwitchChatService {
             postSubscription(accessToken, sessionId, type, condition);
             log.info("[EventSub Chat] Subscribed {} for user {} ({})",
                     type, user.getId(), user.getTwitchUsername());
+        } catch (HttpClientErrorException.TooManyRequests e) {
+            throw e;
         } catch (HttpClientErrorException.Unauthorized e) {
             // Token revoked or expired despite expires_at: force a refresh and retry once
             String refreshed = twitchTokenService.refreshAccessToken(token, user);

@@ -220,6 +220,7 @@ public class TwitchEventSubService implements EventSubService {
                         // Reconnect via reconnect_url: Twitch carries subscriptions over,
                         // re-subscribing would only yield 409 Conflict noise.
                         log.info("EventSub session_welcome for user {} — reconnected, subscriptions carried over", user.getId());
+                        connections.onSubscribed(user);
                     } else {
                         subscribe(user, token, sessionId);
                     }
@@ -325,6 +326,10 @@ public class TwitchEventSubService implements EventSubService {
             try {
                 postSubscription(accessToken, sub, user.getTwitchId(), sessionId);
                 log.debug("Subscribed to {} for user {}", eventType, user.getId());
+            } catch (HttpClientErrorException.TooManyRequests e) {
+                log.warn("Twitch refused {} for user {}, opening a new session: {}", eventType, user.getId(), e.getMessage());
+                connections.reopen(user, token);
+                return;
             } catch (HttpClientErrorException.Unauthorized e) {
                 log.debug("Token expired for user {}, refreshing", user.getId());
                 String refreshed = twitchTokenService.refreshAccessToken(token, user);
@@ -343,6 +348,7 @@ public class TwitchEventSubService implements EventSubService {
                 log.warn("Failed to subscribe to {} for user {}: {}", eventType, user.getId(), e.getMessage());
             }
         }
+        connections.onSubscribed(user);
         boolean channelSimulated = simulated.contains("channel.update");
         boolean streamSimulated = simulated.contains("stream.online") && simulated.contains("stream.offline");
         if (!channelSimulated) {

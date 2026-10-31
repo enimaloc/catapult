@@ -1,5 +1,9 @@
 package fr.enimaloc.catapult.service.twitch;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.anyString;
+import java.net.http.WebSocket;
 import fr.enimaloc.catapult.simulation.SimulationGate;
 import org.springframework.beans.factory.ObjectProvider;
 import fr.enimaloc.catapult.service.debug.DebugRecording;
@@ -200,6 +204,28 @@ class EventSubTwitchChatServiceTest {
         assertThat(service.getFollowedAtById(user, "42")).contains(at);
         assertThat(service.getStreamInfo(user)).contains(live);
         assertThat(service.getUserProfile(user, "fan")).contains(profile);
+    }
+
+    @Test
+    void handleMessage_sessionWelcome_on429_closesTheSessionAtOnce_andKeepsTheBackoff() {
+        EventSubConnections connections = (EventSubConnections) ReflectionTestUtils.getField(service, "connections");
+        // No new session for this test: reopening is EventSubConnectionsTest's.
+        connections.forbidReconnect(user);
+        WebSocket socket = mock(WebSocket.class);
+        Map<UUID, WebSocket> sockets = (Map<UUID, WebSocket>) connectionState("connections");
+        sockets.put(user.getId(), socket);
+        Map<UUID, Long> retryDelays = (Map<UUID, Long>) connectionState("retryDelaySeconds");
+        retryDelays.put(user.getId(), 32L);
+        when(postResponseSpec.toBodilessEntity())
+            .thenThrow(HttpClientErrorException.create(HttpStatus.TOO_MANY_REQUESTS, "Too Many Requests",
+                new HttpHeaders(), new byte[0], StandardCharsets.UTF_8));
+
+        service.handleMessage(user, token, WELCOME_MESSAGE, false);
+
+        verify(restClient, times(1)).post();
+        verify(socket).sendClose(eq(WebSocket.NORMAL_CLOSURE), anyString());
+        assertThat(sockets).doesNotContainKey(user.getId());
+        assertThat(retryDelays).containsEntry(user.getId(), 32L);
     }
 
     private Object connectionState(String field) {
