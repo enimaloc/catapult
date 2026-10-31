@@ -161,11 +161,26 @@ jobs:
     if: needs.check.outputs.skip != 'true'
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       packages: write
+      pull-requests: read
     steps:
       - uses: actions/checkout@v7
         with:
           ref: ${{ needs.check.outputs.version }}
+          # Full history and tags: the changelog built into the image lists every version.
+          fetch-depth: 0
+          fetch-tags: true
+
+      # The changelog's entries are the merged pull requests' titles; without them it uses the merge commits' subjects.
+      - name: List the merged pull requests
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >-
+          gh pr list --state merged --limit 5000 --json title,mergeCommit
+          --jq '.[] | select(.mergeCommit) | [.mergeCommit.oid, .title] | @tsv'
+          > catapult-api/src/main/pr-titles.tsv
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v4

@@ -59,6 +59,7 @@ catapult_obs_local.py
 
 ### Generated ###
 **/src/main/resources/changelog.log
+catapult-api/src/main/pr-titles.tsv
 
 ### Local artifacts ###
 .run/
