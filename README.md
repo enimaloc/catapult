@@ -125,6 +125,7 @@ sans membre identifiable (préchauffage du cache des catégories, CCL de l'admin
 | `DB_USERNAME` | Oui | Utilisateur PostgreSQL |
 | `DB_PASSWORD` | Oui | Mot de passe PostgreSQL |
 | `TOKEN_ENCRYPTION_KEY` | Oui | Clé AES-256 pour les tokens OAuth (`openssl rand -base64 32`) |
+| `TOKEN_ENCRYPTION_PREVIOUS_KEY` | Non | Clé remplacée, le temps de rechiffrer les tokens au démarrage de catapult-api (`__EMPTY__` si aucune clé n'était définie). À retirer une fois le log `the previous key can be removed` affiché |
 | `TWITCH_CLIENT_ID` | Oui | Client ID de votre application Twitch |
 | `TWITCH_CLIENT_SECRET` | Oui | Client Secret Twitch |
 | `STEAM_API_KEY` | Non | Clé API Steam (détection de jeu via Steam) |
