@@ -45,7 +45,8 @@ public class SseStreams implements DisposableBean {
     /** Below the usual 60 s read timeout of proxies (nginx's default). */
     static final Duration HEARTBEAT = Duration.ofSeconds(30);
     /** How long a stream stays open; the browser then opens another, its rights checked again. */
-    public static final Duration TIMEOUT = Duration.ofMinutes(30);
+    /** Under the 30 min a session lasts unused: reconnecting renews it, so that a page left open never races its expiry. */
+    public static final Duration TIMEOUT = Duration.ofMinutes(25);
     static final int MAX_PENDING = 64;
     static final String CLOSE_SESSION_TOPIC = "session.streams.close";
     private static final String HEARTBEAT_COMMENT = "heartbeat";
