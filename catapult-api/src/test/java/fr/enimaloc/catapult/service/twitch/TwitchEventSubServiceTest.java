@@ -1,5 +1,13 @@
 package fr.enimaloc.catapult.service.twitch;
 
+import java.nio.charset.StandardCharsets;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import static org.mockito.Mockito.mock;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.anyString;
+import java.net.http.WebSocket;
 import fr.enimaloc.catapult.service.debug.DebugRecording;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
@@ -409,6 +417,34 @@ class TwitchEventSubServiceTest {
 
         // A successful session must reset the backoff so the next disconnect reconnects promptly.
         assertThat(retryDelays).doesNotContainKey(user.getId());
+    }
+
+    @Test
+    void handleMessage_sessionWelcome_on429_closesTheSessionAtOnce_andKeepsTheBackoff() {
+        EventSubConnections connections = (EventSubConnections) ReflectionTestUtils.getField(service, "connections");
+        // No new session for this test: reopening is EventSubConnectionsTest's.
+        connections.forbidReconnect(user);
+        WebSocket socket = mock(WebSocket.class);
+        Map<UUID, WebSocket> sockets = (Map<UUID, WebSocket>) connectionState("connections");
+        sockets.put(user.getId(), socket);
+        Map<UUID, Long> retryDelays = (Map<UUID, Long>) connectionState("retryDelaySeconds");
+        retryDelays.put(user.getId(), 32L);
+        when(postBodySpec.body(any(Object.class))).thenReturn(postBodySpec);
+        when(postResponseSpec.toBodilessEntity())
+            .thenThrow(HttpClientErrorException.create(HttpStatus.TOO_MANY_REQUESTS, "Too Many Requests",
+                new HttpHeaders(), new byte[0], StandardCharsets.UTF_8));
+
+        service.handleMessage(user, token, """
+            {
+              "metadata": { "message_type": "session_welcome" },
+              "payload": { "session": { "id": "session-abc" } }
+            }
+            """, false);
+
+        verify(restClient, times(1)).post();
+        verify(socket).sendClose(eq(WebSocket.NORMAL_CLOSURE), anyString());
+        assertThat(sockets).doesNotContainKey(user.getId());
+        assertThat(retryDelays).containsEntry(user.getId(), 32L);
     }
 
     private Object connectionState(String field) {

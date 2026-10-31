@@ -82,12 +82,32 @@ final class EventSubConnections {
         openConnection(user, freshToken(user, token), reconnectUrl, true);
     }
 
-    /** Records a {@code session_welcome}: its keepalive deadline, and a healthy connection. */
+    /** Records a {@code session_welcome}: its keepalive deadline. */
     void onWelcome(UserAccount user, long keepaliveSeconds) {
         keepaliveTimeoutSeconds.put(user.getId(), keepaliveSeconds);
-        // A live session proves the connection is healthy — reset the backoff so a
-        // later, unrelated disconnect doesn't inherit delays from a past failure streak.
+    }
+
+    /**
+     * The session holds its subscriptions: reset the backoff so a later, unrelated disconnect doesn't
+     * inherit delays from a past failure streak. Not on the welcome alone, which also opens the
+     * sessions Twitch then refuses subscriptions to ({@link #reopen}).
+     */
+    void onSubscribed(UserAccount user) {
         retryDelaySeconds.remove(user.getId());
+    }
+
+    /**
+     * Twitch refused the session's subscriptions (429: too many transports, its former sockets still
+     * counting): closes this socket, which frees its transport and would otherwise stay open without
+     * them, and opens a new session once the backoff has passed.
+     */
+    void reopen(UserAccount user, OAuthToken token) {
+        cancelWatchdog(user.getId());
+        WebSocket ws = connections.remove(user.getId());
+        if (ws != null) ws.sendClose(WebSocket.NORMAL_CLOSURE, "subscriptions refused");
+        if (!intentionallyDisconnected.contains(user.getId())) {
+            scheduleReconnect(user, token);
+        }
     }
 
     /** Stops dropped sockets of this user from being reopened, until {@link #allowReconnect}. */
@@ -141,8 +161,14 @@ final class EventSubConnections {
         CompletableFuture.delayedExecutor(delaySeconds, TimeUnit.SECONDS).execute(() -> {
             if (connections.containsKey(user.getId())) return;
             if (intentionallyDisconnected.contains(user.getId())) return;
-            // Always a brand-new session on the canonical URL: reconnect URLs are single-use
-            openConnection(user, freshToken(user, token), WS_URL, false);
+            try {
+                // Always a brand-new session on the canonical URL: reconnect URLs are single-use
+                openConnection(user, freshToken(user, token), WS_URL, false);
+            } catch (RuntimeException e) {
+                // Nothing else would ever try again: the socket is gone, and this task was its only retry
+                log.warn("{} Failed to reconnect user {}: {}", logPrefix, user.getId(), e.getMessage());
+                scheduleReconnect(user, token);
+            }
         });
     }
 
@@ -151,6 +177,8 @@ final class EventSubConnections {
     }
 
     private void armWatchdog(UserAccount user, Listener listener) {
+        // Dropped meanwhile (reopen): a watchdog would only displace the next socket's
+        if (connections.get(user.getId()) != listener.webSocket) return;
         long timeout = keepaliveTimeoutSeconds.getOrDefault(user.getId(), DEFAULT_KEEPALIVE_SECONDS);
         long deadlineSeconds = Math.max(1L, Math.round(timeout * KEEPALIVE_GRACE));
         ScheduledFuture<?> next = watchdogExecutor.schedule(
@@ -223,6 +251,9 @@ final class EventSubConnections {
             if (previous != null && previous != webSocket) {
                 previous.sendClose(WebSocket.NORMAL_CLOSURE, "replaced by newer session");
             }
+            // Armed from the start: a socket that never gets a welcome holds the user's slot, and
+            // would block every reconnect, for good.
+            armWatchdog(user, this);
             webSocket.request(1);
         }
 
