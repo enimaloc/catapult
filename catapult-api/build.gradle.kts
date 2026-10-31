@@ -97,12 +97,33 @@ dependencies {
 
 val generateChangelog = tasks.register("generateChangelog") {
     val outputFile = file("src/main/resources/changelog.log")
+    // Merge commit -> pull request title, written by the release workflow; absent locally, where the subjects are used
+    val prTitlesFile = file("src/main/pr-titles.tsv")
     outputs.file(outputFile)
+    outputs.upToDateWhen { false }
     doLast {
+        fun git(vararg args: String) = ProcessBuilder("git", *args)
+            .directory(rootProject.projectDir)
+            .start().inputStream.bufferedReader().readLines()
+        val prTitles = if (prTitlesFile.exists()) {
+            prTitlesFile.readLines().map { it.split("\t", limit = 2) }.filter { it.size == 2 }.associate { it[0] to it[1] }
+        } else emptyMap()
+        // What a range brings: its merged pull requests, or its commits for a version made without any
+        fun entries(range: String): List<String> {
+            fun log(kind: String) = git("log", kind, "--format=%H|%h|%s", range).mapNotNull { line ->
+                val (full, short, subject) = line.split("|", limit = 3)
+                val title = (prTitles[full] ?: subject).replace("|", "/")
+                if (title.startsWith("chore(release)")) null else "$short|$title|"
+            }
+            return log("--merges").ifEmpty { log("--no-merges") }
+        }
         val lines = runCatching {
-            ProcessBuilder("git", "log", "--format=%h|%s|%D", "--no-merges", "-n", "100")
-                .directory(rootProject.projectDir)
-                .start().inputStream.bufferedReader().readLines()
+            val tags = git("-c", "versionsort.suffix=-BETA", "tag", "--list", "v*", "--sort=-v:refname")
+            val unreleased = tags.firstOrNull()?.let { entries("$it..HEAD") } ?: entries("HEAD")
+            unreleased + tags.flatMapIndexed { i, tag ->
+                val previous = tags.getOrNull(i + 1)
+                listOf("||tag: $tag") + entries(if (previous != null) "$previous..$tag" else tag)
+            }
         }.getOrDefault(emptyList())
         // Rewritten only when it changes: a touched resource makes devtools restart the running app
         val content = lines.joinToString("\n")

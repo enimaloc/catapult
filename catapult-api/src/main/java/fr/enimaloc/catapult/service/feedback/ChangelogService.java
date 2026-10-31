@@ -21,6 +21,12 @@ public class ChangelogService {
         Pattern.CASE_INSENSITIVE
     );
 
+    /** A merge commit's subject, used when its pull request's title isn't known. */
+    private static final Pattern MERGE = Pattern.compile("^merge (.+) into \\S+$", Pattern.CASE_INSENSITIVE);
+
+    /** The older merge commits' form, {@code merge(#12): subject}, which has no conventional type. */
+    private static final Pattern NUMBERED_MERGE = Pattern.compile("^merge\\(#\\d+\\):\\s*(.+)$", Pattern.CASE_INSENSITIVE);
+
     public record ChangelogEntry(String hash, String type, String scope, String subject, boolean breaking) {}
 
     /** {@code version} is null for the commits after the last tag. */
@@ -32,25 +38,9 @@ public class ChangelogService {
     @PostConstruct
     public void load() {
         try {
-            List<String> lines;
-            try {
-                lines = runGitLog();
-            } catch (Exception e) {
-                log.debug("git not available, loading changelog from classpath: {}", e.getMessage());
-                lines = readFromClasspath();
-            }
-            sections = parse(lines);
+            sections = parse(readFromClasspath());
         } catch (Exception e) {
             log.warn("Could not load changelog: {}", e.getMessage());
-        }
-    }
-
-    private List<String> runGitLog() throws Exception {
-        Process process = new ProcessBuilder(
-            "git", "log", "--format=%h|%s|%D", "--no-merges", "-n", "100"
-        ).start();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-            return reader.lines().toList();
         }
     }
 
@@ -85,12 +75,24 @@ public class ChangelogService {
                 currentVersion = tag;
             }
 
+            Matcher numbered = NUMBERED_MERGE.matcher(subject);
+            if (numbered.matches()) {
+                currentEntries.add(new ChangelogEntry(hash, "chore", null, numbered.group(1), false));
+                continue;
+            }
+
             Matcher m = CONVENTIONAL.matcher(subject);
             if (m.matches()) {
                 String type = m.group(1).toLowerCase();
                 String scope = m.group(2) != null ? m.group(2).replaceAll("[()]", "") : null;
                 boolean breaking = m.group(3) != null;
                 String msg = m.group(4);
+                Matcher merge = MERGE.matcher(msg);
+                if (merge.matches()) {
+                    msg = merge.group(1);
+                    // Only a branch name: a sync between branches, nothing a version brings
+                    if (!msg.contains(" ")) continue;
+                }
                 currentEntries.add(new ChangelogEntry(hash, type, scope, msg, breaking));
             }
         }
