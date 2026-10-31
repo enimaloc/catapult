@@ -1,0 +1,90 @@
+package fr.enimaloc.catapult.security;
+
+import fr.enimaloc.catapult.relay.ApiRelayController;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
+import fr.enimaloc.catapult.controller.SseStreams;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.FormLoginConfigurer;
+import org.springframework.security.config.annotation.web.configurers.HttpBasicConfigurer;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfFilter;
+import org.springframework.security.web.csrf.CsrfToken;
+import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+
+@Configuration
+@EnableWebSecurity
+public class WebSecurityConfig {
+    /**
+     * The session is shared by every catapult-web instance (Spring Session, in Redis); logging out closes
+     * its streams on all of them, before it is invalidated (they would otherwise go on until they time out).
+     */
+    @Bean
+    SecurityFilterChain securityFilterChain(HttpSecurity http, ObjectProvider<SseStreams> sse) throws Exception {
+        return http
+                .authorizeHttpRequests(auth ->
+                        auth.anyRequest().permitAll()
+                )
+                .cors(Customizer.withDefaults())
+                .csrf(csrf -> csrf
+                        .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+                        // The default XorCsrfTokenRequestAttributeHandler masks the token
+                        // differently on every response (BREACH protection), which breaks a
+                        // cookie meant to be read once by csrf.js and replayed verbatim as a
+                        // header on later requests. The plain handler keeps the cookie value
+                        // stable and comparable, matching Spring's documented "SPA" CSRF setup.
+                        .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
+                        // The Sentry SDK posts its reports there without the token; relayed, they change nothing here.
+                        .ignoringRequestMatchers("/monitoring/tunnel")
+                        // catapult-api's own paths (ApiRelayController): its rules apply to them, not these.
+                        .ignoringRequestMatchers(ApiRelayController.PATHS))
+                .addFilterAfter(new CsrfCookieFilter(), CsrfFilter.class)
+                // POST with the CSRF token only: a cross-site link or image can't log a member out.
+                .logout(logout -> logout
+                        .logoutUrl("/logout")
+                        .logoutSuccessUrl("/")
+                        .addLogoutHandler((request, response, authentication) -> {
+                            HttpSession session = request.getSession(false);
+                            SseStreams streams = sse.getIfAvailable();
+                            if (session != null && streams != null) streams.closeSession(session.getId());
+                        })
+                        .invalidateHttpSession(true)
+                        .deleteCookies("JSESSIONID"))
+                .formLogin(FormLoginConfigurer::disable)
+                .httpBasic(HttpBasicConfigurer::disable)
+                .build();
+    }
+
+    /**
+     * Since Spring Security 6, the CSRF token is resolved lazily: with a cookie-based
+     * repository, the cookie is only written to the response once something calls
+     * {@link CsrfToken#getToken()} during request processing. Nothing else in
+     * catapult-web does this (no {@code ${_csrf}} reference in any template), so without
+     * this filter the XSRF-TOKEN cookie never materializes on a user's first page load,
+     * and csrf.js reads an empty token for the first POST of every session. This filter
+     * forces that resolution (and thus the cookie write) on every request.
+     */
+    private static class CsrfCookieFilter extends OncePerRequestFilter {
+        @Override
+        protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
+                                         FilterChain filterChain) throws ServletException, IOException {
+            CsrfToken csrfToken = (CsrfToken) request.getAttribute(CsrfToken.class.getName());
+            if (csrfToken != null) {
+                csrfToken.getToken();
+            }
+            filterChain.doFilter(request, response);
+        }
+    }
+}

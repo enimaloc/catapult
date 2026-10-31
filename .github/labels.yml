@@ -1,0 +1,110 @@
+# Labels du dépôt, appliqués par .github/release/labels.mjs (crée et met à jour, ne supprime jamais).
+# Format : liste plate `- name / color / description`, lue par un petit analyseur maison.
+
+- name: "bug"
+  color: d73a4a
+  description: "Quelque chose ne fonctionne pas"
+
+- name: "enhancement"
+  color: a2eeef
+  description: "Amélioration d'une fonctionnalité existante"
+
+- name: "documentation"
+  color: 0075ca
+  description: "Amélioration ou ajout de documentation"
+
+- name: "question"
+  color: d876e3
+  description: "Demande d'information"
+
+- name: "duplicate"
+  color: cfd3d7
+  description: "Cette issue ou PR existe déjà"
+
+- name: "invalid"
+  color: e4e669
+  description: "Ça ne semble pas correct"
+
+- name: "wontfix"
+  color: ffffff
+  description: "Ne sera pas traité"
+
+- name: "help wanted"
+  color: 008672
+  description: "Un coup de main est le bienvenu"
+
+- name: "good first issue"
+  color: 7057ff
+  description: "Idéal pour une première contribution"
+
+- name: "accessibility"
+  color: c5def5
+  description: "Accessibilité"
+
+- name: "dependencies"
+  color: 0366d6
+  description: "Mise à jour de dépendances"
+
+- name: "feature"
+  color: 1d76db
+  description: "Nouvelle fonctionnalité"
+
+- name: "security"
+  color: b60205
+  description: "Sécurité"
+
+- name: "performance"
+  color: fbca04
+  description: "Performance"
+
+- name: "area: api"
+  color: 5319e7
+  description: "catapult-api"
+
+- name: "area: web"
+  color: 5319e7
+  description: "catapult-web"
+
+- name: "area: obs"
+  color: 5319e7
+  description: "Widget et intégration OBS"
+
+- name: "area: twitch"
+  color: 5319e7
+  description: "Intégration Twitch"
+
+- name: "area: twitchat"
+  color: 5319e7
+  description: "Intégration Twitchat"
+
+- name: "area: chat-commands"
+  color: 5319e7
+  description: "Commandes de chat"
+
+- name: "area: ci"
+  color: 5319e7
+  description: "CI, workflows et releases"
+
+- name: "needs-triage"
+  color: ededed
+  description: "À trier"
+
+- name: "confirmed"
+  color: 0e8a16
+  description: "Confirmé"
+
+- name: "blocked"
+  color: 000000
+  description: "Bloqué par autre chose"
+
+- name: "release"
+  color: 8b5cf6
+  description: "PR de promotion (bot)"
+
+- name: "hotfix"
+  color: d93f0b
+  description: "Correctif urgent sur main"
+
+- name: "backport"
+  color: c5def5
+  description: "Report d'un correctif"

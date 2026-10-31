@@ -1,0 +1,49 @@
+name: Release ready
+
+# `pull_request` rather than `pull_request_target`: `main` holds no workflow until the first stable
+# release, so a target-based trigger would never fire for beta -> main. The job only runs for the
+# owner on this repository's release branches, and it runs dev's scripts.
+on:
+  pull_request:
+    types: [ready_for_review]
+
+# Shared with promote.yml: a ready run and a promote run on the same source branch never overlap.
+concurrency:
+  group: promote-${{ github.event.pull_request.head.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  auto-merge:
+    if: >-
+      github.event.sender.login == github.repository_owner &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      (
+        (github.event.pull_request.base.ref == 'beta' && github.event.pull_request.head.ref == 'dev') ||
+        (github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref == 'beta') ||
+        (github.event.pull_request.base.ref == 'main' && startsWith(github.event.pull_request.head.ref, 'hotfix/'))
+      )
+    runs-on: ubuntu-latest
+    steps:
+      - id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+      - uses: actions/checkout@v7
+        with:
+          ref: dev
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Bump the version and merge once checks pass
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+          NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          SENDER: ${{ github.event.sender.login }}
+        run: node .github/release/ready.mjs --number "$NUMBER" --head-sha "$HEAD_SHA" --sender "$SENDER"

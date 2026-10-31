@@ -1,0 +1,4 @@
+[
+  { "name": "home", "metric": "ttfb", "samples": [5, 6, 7], "p50": 6, "p95": 7, "budget": 800 },
+  { "name": "channel", "metric": "lcp", "samples": [3000], "p50": 3000, "p95": 3000, "budget": 2500, "note": "slow" }
+]

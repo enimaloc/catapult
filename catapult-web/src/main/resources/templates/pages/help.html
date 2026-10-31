@@ -1,0 +1,16 @@
+<!--/*@thymesVar id="helpTitle" type="java.lang.String"*/-->
+<!--/*@thymesVar id="helpBody" type="java.lang.String"*/-->
+<!--/* A card's help as a page (HelpPageController), laid out as the privacy page. The body is
+     catapult-api's own message text (HTML), never anything a visitor wrote, hence th:utext. */-->
+<mdui-layout-main th:fragment="help">
+    <section class="section privacy-section help-page">
+        <div class="section-header">
+            <span class="eyebrow" th:text="#{help.page.eyebrow}">help.page.eyebrow</span>
+            <h1 th:text="${helpTitle}">Help</h1>
+        </div>
+
+        <mdui-card class="privacy-card" variant="outlined">
+            <div class="privacy-content help-body" th:utext="${helpBody}"></div>
+        </mdui-card>
+    </section>
+</mdui-layout-main>

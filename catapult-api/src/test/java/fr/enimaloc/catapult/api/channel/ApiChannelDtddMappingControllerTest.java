@@ -1,0 +1,168 @@
+package fr.enimaloc.catapult.api.channel;
+
+import fr.enimaloc.catapult.common.dto.channel.DtddProposalRequest;
+import fr.enimaloc.catapult.common.dto.channel.SearchResultDto;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.dtdd.DtddGameCache;
+import fr.enimaloc.catapult.domain.dtdd.DtddGameMapping;
+import fr.enimaloc.catapult.domain.dtdd.DtddMappingProposal;
+import fr.enimaloc.catapult.domain.dtdd.DtddMappingProposal.Status;
+import fr.enimaloc.catapult.getter.dtdd.DtddApiClient;
+import fr.enimaloc.catapult.getter.dtdd.DtddApiClient.DtddSearchResult;
+import fr.enimaloc.catapult.repository.dtdd.DtddGameCacheRepository;
+import fr.enimaloc.catapult.repository.dtdd.DtddGameMappingRepository;
+import fr.enimaloc.catapult.repository.dtdd.DtddMappingProposalRepository;
+import fr.enimaloc.catapult.repository.dtdd.DtddSearchCacheRepository;
+import fr.enimaloc.catapult.service.dtdd.DtddGameSearchService;
+import fr.enimaloc.catapult.service.dtdd.DtddMappingProposalService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class ApiChannelDtddMappingControllerTest {
+
+    @Mock DtddGameMappingRepository mappingRepo;
+    @Mock DtddGameCacheRepository gameRepo;
+    @Mock DtddSearchCacheRepository searchRepo;
+    @Mock DtddMappingProposalRepository proposalRepo;
+    @Mock DtddApiClient apiClient;
+    @Mock fr.enimaloc.catapult.repository.dtdd.DtddTopicsCacheRepository topicsRepo;
+    @Mock fr.enimaloc.catapult.service.notification.AdminEventPublisher events;
+    @Mock fr.enimaloc.catapult.service.dtdd.DtddMappingEvents mappingEvents;
+    @Mock fr.enimaloc.catapult.api.ApiUserResolver userResolver;
+    @Mock org.springframework.security.oauth2.jwt.Jwt jwt;
+
+    ApiChannelDtddMappingController controller;
+    UserAccount user;
+
+    @BeforeEach
+    void setUp() {
+        controller = new ApiChannelDtddMappingController(
+            new DtddMappingProposalService(mappingRepo, gameRepo, proposalRepo, topicsRepo, mappingEvents, events),
+            new DtddGameSearchService(gameRepo, searchRepo, apiClient), userResolver);
+        user = new UserAccount();
+        user.setId(UUID.randomUUID());
+        lenient().when(userResolver.viewer(jwt)).thenReturn(user);
+    }
+
+    private static org.springframework.security.core.Authentication auth(String authority) {
+        return new org.springframework.security.authentication.TestingAuthenticationToken("u", "p", authority);
+    }
+
+    private static org.springframework.mock.web.MockHttpServletRequest remote(String addr) {
+        var request = new org.springframework.mock.web.MockHttpServletRequest();
+        request.setRemoteAddr(addr);
+        return request;
+    }
+
+    @Test
+    void status_memberCannotValidate() {
+        when(mappingRepo.findById("100")).thenReturn(Optional.of(
+            new DtddGameMapping("100", 4521L, 0.71, false, Instant.now())));
+        when(proposalRepo.countByIgdbIdAndStatus("100", Status.PENDING)).thenReturn(0L);
+        when(proposalRepo.findFirstByProposerAndIgdbIdAndStatus(user, "100", Status.PENDING))
+            .thenReturn(Optional.empty());
+        when(gameRepo.findById(4521L)).thenReturn(Optional.empty());
+
+        var status = controller.status("100", jwt, auth("ROLE_USER"), remote("203.0.113.7"));
+
+        assertThat(status.canValidateDirectly()).isFalse();
+    }
+
+    @Test
+    void status_canValidateDirectly_whenUnverifiedAndNoOtherProposals() {
+        when(mappingRepo.findById("100")).thenReturn(Optional.of(
+            new DtddGameMapping("100", 4521L, 0.71, false, Instant.now())));
+        when(proposalRepo.countByIgdbIdAndStatus("100", Status.PENDING)).thenReturn(0L);
+        when(proposalRepo.findFirstByProposerAndIgdbIdAndStatus(user, "100", Status.PENDING))
+            .thenReturn(Optional.empty());
+        when(gameRepo.findById(4521L)).thenReturn(Optional.empty());
+
+        var status = controller.status("100", jwt, auth("ROLE_ADMIN"), remote("203.0.113.7"));
+        assertThat(status.canValidateDirectly()).isTrue();
+    }
+
+    @Test
+    void status_cannotValidate_whenVerified() {
+        when(mappingRepo.findById("100")).thenReturn(Optional.of(
+            new DtddGameMapping("100", 4521L, 0.92, true, Instant.now())));
+        when(gameRepo.findById(4521L)).thenReturn(Optional.empty());
+        var status = controller.status("100", jwt, auth("ROLE_ADMIN"), remote("203.0.113.7"));
+        assertThat(status.canValidateDirectly()).isFalse();
+    }
+
+    @Test
+    void validate_marksMappingVerified_whenAllowed() {
+        DtddGameMapping mapping = new DtddGameMapping("100", 4521L, 0.71, false, Instant.now());
+        when(mappingRepo.findById("100")).thenReturn(Optional.of(mapping));
+        when(proposalRepo.countByIgdbIdAndStatus("100", Status.PENDING)).thenReturn(0L);
+
+        controller.validate("100");
+
+        assertThat(mapping.isVerified()).isTrue();
+        assertThat(mapping.getConfidence()).isEqualTo(1.0);
+        verify(mappingRepo).save(mapping);
+        verify(mappingEvents).mappingChanged("100");
+    }
+
+    @Test
+    void validate_rejects_whenAlreadyVerified() {
+        when(mappingRepo.findById("100")).thenReturn(Optional.of(
+            new DtddGameMapping("100", 4521L, 0.92, true, Instant.now())));
+        assertThatThrownBy(() -> controller.validate("100"))
+            .isInstanceOf(ResponseStatusException.class);
+        verifyNoInteractions(mappingEvents);
+    }
+
+    @Test
+    void propose_createsPendingProposal() {
+        controller.propose("100", new DtddProposalRequest(1287L, "wrong game"), jwt);
+        var saved = org.mockito.ArgumentCaptor.forClass(DtddMappingProposal.class);
+        verify(proposalRepo).save(saved.capture());
+        assertThat(saved.getValue().getProposer()).isSameAs(user); // the caller, from the JWT
+        verify(mappingEvents).mappingChanged("100");
+    }
+
+    @Test
+    void search_combinesLocalAndRemote() {
+        when(gameRepo.searchByNameLike(eq("stardew"), any(PageRequest.class))).thenReturn(List.of(
+            new DtddGameCache(4521L, "Stardew Valley", "s-v", "Video Game", null, Instant.now())));
+        when(searchRepo.findById("stardew")).thenReturn(Optional.empty());
+        when(apiClient.search("stardew")).thenReturn(Optional.of(List.of(
+            new DtddSearchResult(4521L, "Stardew Valley", "s-v", "Video Game", null),
+            new DtddSearchResult(7777L, "Stardew Mod", "mod", "Video Game", null)
+        )));
+
+        var results = controller.search("stardew");
+
+        assertThat(results.results()).extracting(SearchResultDto::dtddId).containsExactlyInAnyOrder(4521L, 7777L);
+    }
+
+    @Test
+    void search_cachedQuery_neverCallsDtdd() {
+        when(gameRepo.searchByNameLike(eq("stardew"), any(PageRequest.class))).thenReturn(List.of(
+            new DtddGameCache(4521L, "Stardew Valley", "s-v", "Video Game", null, Instant.now())));
+        when(searchRepo.findById("stardew")).thenReturn(Optional.of(
+            new fr.enimaloc.catapult.domain.dtdd.DtddSearchCache("stardew", List.of(4521L), Instant.now())));
+
+        var results = controller.search("Stardew");
+
+        assertThat(results.results()).extracting(SearchResultDto::dtddId).containsExactly(4521L);
+        verifyNoInteractions(apiClient);
+        verify(gameRepo, never()).save(any());
+        verify(searchRepo, never()).save(any());
+    }
+}

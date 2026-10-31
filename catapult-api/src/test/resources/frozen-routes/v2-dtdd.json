@@ -1,0 +1,8 @@
+{
+  "status" : 200,
+  "headers" : {
+    "Cache-Control" : [ "no-cache, no-store, max-age=0, must-revalidate" ],
+    "Content-Type" : [ "application/json" ]
+  },
+  "body" : "{\"url\":\"https://www.doesthedogdie.com/media/16758\",\"yesTopics\":[\"a dog dies\"],\"noTopics\":[\"a cat dies\"],\"mostlyTopics\":[\"jump scares\"],\"overview\":null,\"genres\":null,\"releaseYear\":0,\"itemTypeName\":null,\"tmdbId\":0,\"imdbId\":null,\"posterImage\":null,\"backgroundImage\":null,\"topicItemStats\":null}"
+}

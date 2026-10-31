@@ -1,0 +1,111 @@
+package fr.enimaloc.catapult.chat;
+
+import fr.enimaloc.catapult.chat.command.js.JsCompiler;
+import fr.enimaloc.catapult.chat.command.js.SandboxExecutor;
+import fr.enimaloc.catapult.chat.command.registry.ServiceFunctionRegistry;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.chatcommand.ChatCommandDefinition;
+import fr.enimaloc.catapult.event.ChatCommandDefinitionChangedEvent;
+import fr.enimaloc.catapult.repository.chatcommand.ChatCommandDefinitionRepository;
+import fr.enimaloc.catapult.repository.chatcommand.ChatCommandSettingRepository;
+import fr.enimaloc.catapult.service.binding.GameContextService;
+import io.micrometer.core.instrument.MeterRegistry;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.event.EventListener;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
+
+@Service
+public class DynamicCommandResolver {
+
+    private final ChatCommandDefinitionRepository repository;
+    private final PlaceholderResolver placeholderResolver;
+    private final GameContextService gameContextService;
+    private final JsCompiler jsCompiler;
+    private final SandboxExecutor sandboxExecutor;
+    private final ServiceFunctionRegistry serviceFunctionRegistry;
+    private final ChatCommandSettingRepository settingRepository;
+    private final MeterRegistry meterRegistry;
+    private final Map<String, ChatCommand> staticByPresetKey;
+
+    private final Map<UUID, Map<String, Optional<ChatCommand>>> userCache = new ConcurrentHashMap<>();
+
+    @Autowired
+    public DynamicCommandResolver(ChatCommandDefinitionRepository repository,
+                                  PlaceholderResolver placeholderResolver,
+                                  GameContextService gameContextService,
+                                  JsCompiler jsCompiler,
+                                  SandboxExecutor sandboxExecutor,
+                                  ServiceFunctionRegistry serviceFunctionRegistry,
+                                  ChatCommandSettingRepository settingRepository,
+                                  MeterRegistry meterRegistry,
+                                  List<ChatCommand> staticCommands) {
+        this.repository = repository;
+        this.placeholderResolver = placeholderResolver;
+        this.gameContextService = gameContextService;
+        this.jsCompiler = jsCompiler;
+        this.sandboxExecutor = sandboxExecutor;
+        this.serviceFunctionRegistry = serviceFunctionRegistry;
+        this.settingRepository = settingRepository;
+        this.meterRegistry = meterRegistry;
+        this.staticByPresetKey = staticCommands.stream()
+            .collect(Collectors.toMap(
+                c -> ChatCommandPresetCatalog.BUILTIN_PRESET_KEY_PREFIX
+                     + c.getName().replaceFirst("^!", ""),
+                c -> c,
+                (a, b) -> a));
+    }
+
+    public Optional<ChatCommand> resolve(UserAccount user, String name) {
+        return userCache
+            .computeIfAbsent(user.getId(), k -> new ConcurrentHashMap<>())
+            .computeIfAbsent(name, k -> loadFromRepo(user, name));
+    }
+
+    private Optional<ChatCommand> loadFromRepo(UserAccount user, String name) {
+        return repository.findByUserAndName(user, name)
+            .filter(ChatCommandDefinition::isEnabled)
+            .map(def -> {
+                // If the row is a renamed built-in, route it to the matching static
+                // Java bean (otherwise the action would be lost).
+                if (ChatCommandPresetCatalog.isBuiltin(def)) {
+                    ChatCommand bean = staticByPresetKey.get(def.getPresetKey());
+                    if (bean != null) return bean;
+                }
+                return new DynamicChatCommand(
+                    def, jsCompiler, sandboxExecutor, serviceFunctionRegistry,
+                    gameContextService, placeholderResolver, resolveLocale(user), settingRepository,
+                    repository, meterRegistry);
+            });
+    }
+
+    private Locale resolveLocale(UserAccount user) {
+        // No per-user locale is currently exposed on UserAccount/UserSettings.
+        // Default to Locale.FRANCE as specified in the chat-commands plan.
+        return Locale.FRANCE;
+    }
+
+    @EventListener
+    public void onDefinitionChanged(ChatCommandDefinitionChangedEvent event) {
+        userCache.remove(event.getUserId());
+    }
+
+    /** Resolved command names cached per user — for the admin cache viewer. */
+    public Map<UUID, Set<String>> cacheSnapshot() {
+        return userCache.entrySet().stream()
+            .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().keySet()));
+    }
+
+    /** Same effect as {@link #onDefinitionChanged}, triggered manually from the admin cache viewer. */
+    public boolean evictUser(UUID userId) {
+        return userCache.remove(userId) != null;
+    }
+}

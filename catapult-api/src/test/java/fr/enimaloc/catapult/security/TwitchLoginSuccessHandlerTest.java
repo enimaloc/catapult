@@ -1,0 +1,266 @@
+package fr.enimaloc.catapult.security;
+
+import fr.enimaloc.catapult.domain.account.OAuthToken;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.mock.web.MockHttpSession;
+import jakarta.servlet.http.Cookie;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository;
+import org.springframework.security.oauth2.core.OAuth2AccessToken;
+import org.springframework.security.oauth2.core.OAuth2RefreshToken;
+import org.springframework.test.util.ReflectionTestUtils;
+
+import java.time.Instant;
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
+class TwitchLoginSuccessHandlerTest {
+
+    @Mock OAuth2AuthorizedClientRepository authorizedClientRepository;
+    @Mock OAuthTokenRepository oAuthTokenRepository;
+    @Mock TokenEncryptionService tokenEncryptionService;
+    @Mock ApplicationEventPublisher eventPublisher;
+    @Mock JwtService jwtService;
+    @Mock AuthCodeStore codeStore;
+
+    @InjectMocks TwitchLoginSuccessHandler handler;
+
+    private MockHttpServletRequest request;
+    private MockHttpServletResponse response;
+    private UserAccount userAccount;
+    private CatapultOAuth2User catapultUser;
+
+    @BeforeEach
+    void setup() {
+        handler.init();
+        request = new MockHttpServletRequest();
+        response = new MockHttpServletResponse();
+
+        userAccount = new UserAccount();
+        userAccount.setId(UUID.randomUUID());
+        userAccount.setTwitchId("twitch-123");
+
+        catapultUser = mock(CatapultOAuth2User.class);
+        when(catapultUser.getUserAccount()).thenReturn(userAccount);
+    }
+
+    @Test
+    void nonOAuth2Token_skipsTokenSave() throws Exception {
+        Authentication nonOAuth2 = mock(Authentication.class);
+
+        handler.onAuthenticationSuccess(request, response, nonOAuth2);
+
+        verify(oAuthTokenRepository, never()).save(any());
+    }
+
+    @Test
+    void twitchToken_noClient_skipsTokenSave() throws Exception {
+        var token = mock(OAuth2AuthenticationToken.class);
+        when(token.getAuthorizedClientRegistrationId()).thenReturn("twitch");
+        when(token.getPrincipal()).thenReturn(catapultUser);
+        when(authorizedClientRepository.loadAuthorizedClient("twitch", token, request)).thenReturn(null);
+
+        handler.onAuthenticationSuccess(request, response, token);
+
+        verify(oAuthTokenRepository, never()).save(any());
+    }
+
+    @Test
+    void twitchToken_noRefreshToken_skipsTokenSave() throws Exception {
+        var token = mock(OAuth2AuthenticationToken.class);
+        when(token.getAuthorizedClientRegistrationId()).thenReturn("twitch");
+        when(token.getPrincipal()).thenReturn(catapultUser);
+
+        var client = mock(OAuth2AuthorizedClient.class);
+        when(client.getRefreshToken()).thenReturn(null);
+        when(authorizedClientRepository.loadAuthorizedClient("twitch", token, request)).thenReturn(client);
+
+        handler.onAuthenticationSuccess(request, response, token);
+
+        verify(oAuthTokenRepository, never()).save(any());
+    }
+
+    @Test
+    void twitchToken_withRefreshToken_savesToken() throws Exception {
+        var authToken = mock(OAuth2AuthenticationToken.class);
+        when(authToken.getAuthorizedClientRegistrationId()).thenReturn("twitch");
+        when(authToken.getPrincipal()).thenReturn(catapultUser);
+
+        var refreshToken = mock(OAuth2RefreshToken.class);
+        when(refreshToken.getTokenValue()).thenReturn("raw-refresh-token");
+
+        var accessToken = mock(OAuth2AccessToken.class);
+        when(accessToken.getExpiresAt()).thenReturn(Instant.now().plusSeconds(3600));
+
+        var client = mock(OAuth2AuthorizedClient.class);
+        when(client.getRefreshToken()).thenReturn(refreshToken);
+        when(client.getAccessToken()).thenReturn(accessToken);
+        when(authorizedClientRepository.loadAuthorizedClient("twitch", authToken, request)).thenReturn(client);
+
+        OAuthToken oauthToken = new OAuthToken();
+        when(oAuthTokenRepository.findByUserAndProvider(userAccount, OAuthToken.Provider.TWITCH))
+            .thenReturn(Optional.of(oauthToken));
+        when(tokenEncryptionService.encrypt("raw-refresh-token")).thenReturn("encrypted-token");
+
+        handler.onAuthenticationSuccess(request, response, authToken);
+
+        verify(tokenEncryptionService).encrypt("raw-refresh-token");
+        verify(oAuthTokenRepository).save(oauthToken);
+    }
+
+    @Test
+    void twitchToken_withRefreshToken_noDbRecord_doesNotSave() throws Exception {
+        var authToken = mock(OAuth2AuthenticationToken.class);
+        when(authToken.getAuthorizedClientRegistrationId()).thenReturn("twitch");
+        when(authToken.getPrincipal()).thenReturn(catapultUser);
+
+        var refreshToken = mock(OAuth2RefreshToken.class);
+        when(refreshToken.getTokenValue()).thenReturn("raw-refresh-token");
+
+        var accessToken = mock(OAuth2AccessToken.class);
+        when(accessToken.getExpiresAt()).thenReturn(null);
+
+        var client = mock(OAuth2AuthorizedClient.class);
+        when(client.getRefreshToken()).thenReturn(refreshToken);
+        when(client.getAccessToken()).thenReturn(accessToken);
+        when(authorizedClientRepository.loadAuthorizedClient("twitch", authToken, request)).thenReturn(client);
+
+        when(oAuthTokenRepository.findByUserAndProvider(userAccount, OAuthToken.Provider.TWITCH))
+            .thenReturn(Optional.empty());
+
+        handler.onAuthenticationSuccess(request, response, authToken);
+
+        verify(oAuthTokenRepository, never()).save(any());
+    }
+
+    @Test
+    void nonTwitchOAuth2Token_skipsTokenSave() throws Exception {
+        var token = mock(OAuth2AuthenticationToken.class);
+        when(token.getAuthorizedClientRegistrationId()).thenReturn("discord");
+        when(token.getPrincipal()).thenReturn(catapultUser);
+
+        handler.onAuthenticationSuccess(request, response, token);
+
+        verify(oAuthTokenRepository, never()).save(any());
+    }
+
+    @Test
+    void xboxToken_withRefreshToken_savesToken() throws Exception {
+        var authToken = mock(OAuth2AuthenticationToken.class);
+        when(authToken.getAuthorizedClientRegistrationId()).thenReturn("xbox");
+        when(authToken.getPrincipal()).thenReturn(catapultUser);
+
+        var refreshToken = mock(OAuth2RefreshToken.class);
+        when(refreshToken.getTokenValue()).thenReturn("raw-xbox-refresh");
+
+        var accessToken = mock(OAuth2AccessToken.class);
+        when(accessToken.getExpiresAt()).thenReturn(Instant.now().plusSeconds(3600));
+
+        var client = mock(OAuth2AuthorizedClient.class);
+        when(client.getRefreshToken()).thenReturn(refreshToken);
+        when(client.getAccessToken()).thenReturn(accessToken);
+        when(authorizedClientRepository.loadAuthorizedClient("xbox", authToken, request)).thenReturn(client);
+
+        OAuthToken oauthToken = new OAuthToken();
+        when(oAuthTokenRepository.findByUserAndProvider(userAccount, OAuthToken.Provider.XBOX))
+            .thenReturn(Optional.of(oauthToken));
+        when(tokenEncryptionService.encrypt("raw-xbox-refresh")).thenReturn("encrypted-token");
+
+        handler.onAuthenticationSuccess(request, response, authToken);
+
+        verify(tokenEncryptionService).encrypt("raw-xbox-refresh");
+        verify(oAuthTokenRepository).save(oauthToken);
+    }
+
+    @Test
+    void xboxToken_noWebUrlConfigured_fallsBackToDefaultTarget() throws Exception {
+        var authToken = mock(OAuth2AuthenticationToken.class);
+        when(authToken.getAuthorizedClientRegistrationId()).thenReturn("xbox");
+        when(authToken.getPrincipal()).thenReturn(catapultUser);
+        when(authorizedClientRepository.loadAuthorizedClient("xbox", authToken, request)).thenReturn(null);
+
+        handler.onAuthenticationSuccess(request, response, authToken);
+
+        assertThat(response.getRedirectedUrl()).isEqualTo("/dashboard");
+    }
+
+    @Test
+    void xboxToken_withWebUrlConfigured_redirectsToChannelSettings() throws Exception {
+        ReflectionTestUtils.setField(handler, "webUrl", "https://web.example.com");
+        userAccount.setTwitchUsername("jeb_");
+
+        var authToken = mock(OAuth2AuthenticationToken.class);
+        when(authToken.getAuthorizedClientRegistrationId()).thenReturn("xbox");
+        when(authToken.getPrincipal()).thenReturn(catapultUser);
+        when(authorizedClientRepository.loadAuthorizedClient("xbox", authToken, request)).thenReturn(null);
+
+        handler.onAuthenticationSuccess(request, response, authToken);
+
+        assertThat(response.getRedirectedUrl()).isEqualTo("https://web.example.com/channel/jeb_#integrations");
+    }
+
+    @Test
+    void twitchToken_withWebUrl_sendsCatapultWebsStateBackAndForgetsIt() throws Exception {
+        ReflectionTestUtils.setField(handler, "webUrl", "https://web.example.com");
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute(InviteCodeRelayFilter.WEB_STATE_SESSION_KEY, "st-123_x");
+        request.setSession(session);
+        var authToken = twitchLogin();
+
+        handler.onAuthenticationSuccess(request, response, authToken);
+
+        assertThat(response.getRedirectedUrl()).isEqualTo("https://web.example.com/auth/callback?code=one-time&state=st-123_x");
+        assertThat(session.getAttribute(InviteCodeRelayFilter.WEB_STATE_SESSION_KEY)).isNull();
+        assertThat(response.getCookie(InviteCodeRelayFilter.WEB_STATE_COOKIE_NAME).getMaxAge()).isZero();
+    }
+
+    @Test
+    void twitchToken_withWebUrl_takesTheStateFromTheCookieAfterARetry() throws Exception {
+        ReflectionTestUtils.setField(handler, "webUrl", "https://web.example.com");
+        request.setCookies(new Cookie(InviteCodeRelayFilter.WEB_STATE_COOKIE_NAME, "from-cookie"));
+        var authToken = twitchLogin();
+
+        handler.onAuthenticationSuccess(request, response, authToken);
+
+        assertThat(response.getRedirectedUrl()).isEqualTo("https://web.example.com/auth/callback?code=one-time&state=from-cookie");
+    }
+
+    @Test
+    void twitchToken_withWebUrl_withoutState_sendsTheCodeAlone() throws Exception {
+        ReflectionTestUtils.setField(handler, "webUrl", "https://web.example.com");
+        var authToken = twitchLogin();
+
+        handler.onAuthenticationSuccess(request, response, authToken);
+
+        assertThat(response.getRedirectedUrl()).isEqualTo("https://web.example.com/auth/callback?code=one-time");
+    }
+
+    private OAuth2AuthenticationToken twitchLogin() {
+        var authToken = mock(OAuth2AuthenticationToken.class);
+        when(authToken.getAuthorizedClientRegistrationId()).thenReturn("twitch");
+        when(authToken.getPrincipal()).thenReturn(catapultUser);
+        when(authorizedClientRepository.loadAuthorizedClient("twitch", authToken, request)).thenReturn(null);
+        when(jwtService.generate(catapultUser)).thenReturn("jwt");
+        when(codeStore.issue("jwt")).thenReturn("one-time");
+        return authToken;
+    }
+}

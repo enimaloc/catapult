@@ -35,3 +35,47 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### Env ###
+.env
+.env.*
+!.env.example
+
+### Local dev config ###
+**/src/main/resources/application-dev.properties
+
+### Tools ###
+.playwright-mcp/
+
+### E2E (Playwright) ###
+e2e/node_modules/
+e2e/test-results/
+e2e/playwright-report/
+e2e/blob-report/
+e2e/.playwright/
+
+### Local scripts ###
+catapult_obs_local.py
+
+### Generated ###
+**/src/main/resources/changelog.log
+
+### Local artifacts ###
+.run/
+/*.sql
+/data/
+catapult-api/src/test/java/Tmp.java
+docs/
+scripts/*
+docker-compose.override.yml
+e2e/package-lock.json
+test-results/
+/catapult-web-old/
+catapult-web/node_modules/
+
+### Perf (timing runs) ###
+perf/reports/
+e2e/perf-results/
+
+### Release migration (local state and reports) ###
+.github/release/.migration-*

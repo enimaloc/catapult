@@ -1,22 +1,92 @@
 name: Tests
 
 on:
+  # Branches only: a version tag push runs release.yml, not the checks again
+  push:
+    branches: ['**']
+  # Lets renovate-merge.yml run it on dev after a checkbox merge, which GITHUB_TOKEN pushes cannot trigger
+  workflow_dispatch:
   pull_request:
     branches:
-      - master
+      - master # until it is renamed dev
+      - dev
+      - beta
+      - main
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: catapult_test
+          POSTGRES_USER: catapult
+          POSTGRES_PASSWORD: catapult
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v6
         with:
-          java-version: '17'
+          java-version: '25'
           distribution: 'temurin'
           cache: 'gradle'
 
-      - name: Run tests
-        run: ./gradlew test
+      # catapult-web's `check` also runs the browser-script suite (jsTest: npm ci + Vitest)
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: catapult-web/package-lock.json
+
+      # `check` = unit tests + JaCoCo report + the per-module coverage floor (root build.gradle.kts)
+      # for catapult-common, catapult-api and catapult-web, plus jsTest; --continue reports every
+      # failing module rather than stopping at the first
+      - name: Run tests and coverage checks
+        run: ./gradlew check --continue
+        env:
+          DB_URL: jdbc:postgresql://localhost:5432/catapult_test
+          DB_USERNAME: catapult
+          DB_PASSWORD: catapult
+          TOKEN_ENCRYPTION_KEY: test-encryption-key-32-bytes-long!
+          TWITCH_CLIENT_ID: test
+          TWITCH_CLIENT_SECRET: test
+          DISCORD_CLIENT_ID: test
+          DISCORD_CLIENT_SECRET: test
+          STEAM_CLIENT_ID: test
+          STEAM_CLIENT_SECRET: test
+          IGDB_CLIENT_ID: test
+          JWT_SECRET: ${{ secrets.TEST_JWT_SECRET }}
+
+      - name: Coverage summary
+        if: always()
+        run: |
+          for module in catapult-common catapult-api catapult-web; do
+            report="$module/build/reports/jacoco/test/jacocoTestReport.xml"
+            [ -f "$report" ] || { echo "$module: no coverage report" >> "$GITHUB_STEP_SUMMARY"; continue; }
+            grep -o '<counter type="LINE"[^>]*>' "$report" | tail -1 | \
+            awk -v m="$module" '{for(i=1;i<=NF;i++){if($i~/^missed=/){split($i,a,"\"");mi=a[2]} if($i~/^covered=/){split($i,a,"\"");c=a[2]}}}
+                 END{printf "%s line coverage: %.1f%%\n", m, c/(mi+c)*100}' >> "$GITHUB_STEP_SUMMARY"
+          done
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results
+          path: |
+            */build/reports/jacoco/
+            */build/test-results/test/
+            catapult-web/build/reports/js-coverage/
+          retention-days: 7

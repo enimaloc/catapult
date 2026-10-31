@@ -1,0 +1,269 @@
+package fr.enimaloc.catapult.chat.command.js;
+
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.service.igdb.IgdbClient;
+import fr.enimaloc.catapult.service.igdb.IgdbService;
+import fr.enimaloc.catapult.service.igdb.IgdbWebsiteKeys;
+import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
+import fr.enimaloc.catapult.service.steam.SteamStoreService;
+import fr.enimaloc.catapult.simulation.SimulatedCalls;
+import fr.enimaloc.catapult.simulation.SimulationGate;
+import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.Nullable;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClient;
+import proto.Franchise;
+import proto.Game;
+import proto.GameMode;
+import proto.Genre;
+import proto.InvolvedCompany;
+import proto.Keyword;
+import proto.Platform;
+import proto.PlayerPerspective;
+import proto.Screenshot;
+import proto.Theme;
+
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.Function;
+
+@Component
+@RequiredArgsConstructor
+public class DefaultChatCommandServiceGateway implements ChatCommandServiceGateway {
+
+    private final IgdbClient igdbClient;
+    private final IgdbService igdbService;
+    private final RestClient restClient;
+    private final ExternalApiObservations apiObservations;
+    private final SteamStoreService steamStoreService;
+    private final ObjectProvider<SimulationGate> simulationGate;
+
+    @Override
+    public Optional<IgdbGame> igdbGame(String query) {
+        try {
+            String token = igdbService.getAppToken();
+            if (token == null || token.isBlank()) {
+                return Optional.empty();
+            }
+            List<Game> results = igdbClient.searchByName(query, token);
+            if (results.isEmpty()) {
+                return Optional.empty();
+            }
+            // The search endpoint only returns id/name — fetch the enriched fields (summary,
+            // release date, ratings, platforms) the same way the game-details cache does.
+            Game game = igdbClient.fetchGameDetails(String.valueOf(results.getFirst().getId()), token)
+                .orElse(results.getFirst());
+            return Optional.of(toIgdbGame(game));
+        } catch (Exception e) {
+            return Optional.empty();
+        }
+    }
+
+    private static IgdbGame toIgdbGame(Game game) {
+        String releaseDate = game.hasFirstReleaseDate() && game.getFirstReleaseDate().getSeconds() > 0
+            ? DateTimeFormatter.ISO_LOCAL_DATE.format(
+                Instant.ofEpochSecond(game.getFirstReleaseDate().getSeconds()).atZone(ZoneOffset.UTC))
+            : "";
+        String platforms = String.join(", ", mapValues(game.getPlatformsList(), Platform::getName));
+        String igdbUrl = game.getSlug().isBlank()
+            ? "" : "https://www.igdb.com/games/" + game.getSlug();
+        return new IgdbGame(
+            String.valueOf(game.getId()),
+            game.getName(),
+            game.getSummary(),
+            releaseDate,
+            game.getRating() > 0 ? String.valueOf(Math.round(game.getRating())) : "",
+            game.getAggregatedRating() > 0 ? String.valueOf(Math.round(game.getAggregatedRating())) : "",
+            platforms,
+            igdbUrl
+        );
+    }
+
+    @Override
+    public Optional<Map<String, String>> igdbExternalPlatforms(String igdbId) {
+        return fetchDetails(igdbId).map(IgdbWebsiteKeys::links);
+    }
+
+    @Override
+    public Optional<List<String>> igdbGenres(String igdbId) {
+        return fetchDetails(igdbId).map(game -> mapValues(game.getGenresList(), Genre::getName));
+    }
+
+    @Override
+    public Optional<Map<String, Object>> igdbCover(String igdbId) {
+        return fetchDetails(igdbId).map(game -> {
+            if (!game.hasCover()) {
+                return Map.of();
+            }
+            proto.Cover cover = game.getCover();
+            return Map.of("url", cover.getUrl(), "width", cover.getWidth(), "height", cover.getHeight());
+        });
+    }
+
+    @Override
+    public Optional<List<String>> igdbScreenshots(String igdbId) {
+        return fetchDetails(igdbId).map(game -> mapValues(game.getScreenshotsList(), Screenshot::getUrl));
+    }
+
+    @Override
+    public Optional<List<Map<String, Object>>> igdbVideos(String igdbId) {
+        return fetchDetails(igdbId).map(game -> mapValues(game.getVideosList(), v -> Map.of(
+            "name", v.getName(),
+            "url", "https://www.youtube.com/watch?v=" + v.getVideoId()
+        )));
+    }
+
+    @Override
+    public Optional<List<String>> igdbGameModes(String igdbId) {
+        return fetchDetails(igdbId).map(game -> mapValues(game.getGameModesList(), GameMode::getName));
+    }
+
+    @Override
+    public Optional<List<String>> igdbThemes(String igdbId) {
+        return fetchDetails(igdbId).map(game -> mapValues(game.getThemesList(), Theme::getName));
+    }
+
+    @Override
+    public Optional<List<String>> igdbPlayerPerspectives(String igdbId) {
+        return fetchDetails(igdbId).map(game -> mapValues(game.getPlayerPerspectivesList(), PlayerPerspective::getName));
+    }
+
+    @Override
+    public Optional<List<Map<String, Object>>> igdbInvolvedCompanies(String igdbId) {
+        return fetchDetails(igdbId).map(game -> mapValues(game.getInvolvedCompaniesList(),
+            DefaultChatCommandServiceGateway::describeInvolvedCompany));
+    }
+
+    @Override
+    public Optional<List<Map<String, Object>>> igdbAgeRatings(String igdbId) {
+        return fetchDetails(igdbId).map(game -> mapValues(game.getAgeRatingsList(), ar -> Map.of(
+            "organization", ar.getRatingCategory().getOrganization().getName(),
+            "rating", ar.getRatingCategory().getRating()
+        )));
+    }
+
+    @Override
+    public Optional<List<String>> igdbFranchises(String igdbId) {
+        return fetchDetails(igdbId).map(game -> mapValues(game.getFranchisesList(), Franchise::getName));
+    }
+
+    @Override
+    public Optional<List<String>> igdbKeywords(String igdbId) {
+        return fetchDetails(igdbId).map(game -> mapValues(game.getKeywordsList(), Keyword::getName));
+    }
+
+    @Override
+    public Optional<List<String>> igdbSimilarGames(String igdbId) {
+        return fetchDetails(igdbId).map(game -> mapValues(game.getSimilarGamesList(), Game::getName));
+    }
+
+    @Override
+    public Optional<List<String>> igdbDlcs(String igdbId) {
+        return fetchDetails(igdbId).map(game -> mapValues(game.getDlcsList(), Game::getName));
+    }
+
+    private static Map<String, Object> describeInvolvedCompany(InvolvedCompany involvedCompany) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("name", involvedCompany.getCompany().getName());
+        map.put("developer", involvedCompany.getDeveloper());
+        map.put("publisher", involvedCompany.getPublisher());
+        map.put("supporting", involvedCompany.getSupporting());
+        map.put("porting", involvedCompany.getPorting());
+        return map;
+    }
+
+    private static <T, R> List<R> mapValues(List<T> items, Function<T, R> mapper) {
+        return items.stream().map(mapper).toList();
+    }
+
+    private Optional<Game> fetchDetails(String igdbId) {
+        try {
+            String token = igdbService.getAppToken();
+            if (token == null || token.isBlank()) {
+                return Optional.empty();
+            }
+            return igdbClient.fetchGameDetails(igdbId, token);
+        } catch (Exception e) {
+            return Optional.empty();
+        }
+    }
+
+
+    @Override
+    public Optional<String> twitchOwnDisplayName(UserAccount user) {
+        // Phase 1 scope: only the broadcaster's own profile is exposed,
+        // not arbitrary Twitch user lookups (no Twitch user-info client exists yet).
+        // NOTE: brief's reference used UserAccount#getDisplayName(), which does not
+        // exist on this entity — the closest equivalent is the Twitch username.
+        try {
+            return Optional.ofNullable(user).map(UserAccount::getTwitchUsername);
+        } catch (Exception e) {
+            return Optional.empty();
+        }
+    }
+
+    @Override
+    public Optional<String> steamPrice(String appId) {
+        if (storeSimulated()) return Optional.empty();
+        return apiObservations.observe("steam_store", "chat_command_get_price", () -> {
+            try {
+                Map<?, ?> body = restClient.get()
+                    .uri("https://store.steampowered.com/api/appdetails?appids={appId}&filters=price_overview", appId)
+                    .retrieve()
+                    .body(Map.class);
+                if (body == null) return Optional.empty();
+                // Steam appdetails unwrapping (body.get(appId) -> success -> data -> field) mirrors
+                // fr.enimaloc.catapult.service.steam.SteamStoreServiceImpl; not extracted to a shared helper here.
+                Map<?, ?> appEntry = (Map<?, ?>) body.get(appId);
+                if (appEntry == null || !Boolean.TRUE.equals(appEntry.get("success"))) return Optional.empty();
+                Map<?, ?> data = (Map<?, ?>) appEntry.get("data");
+                if (data == null) return Optional.empty();
+                Map<?, ?> priceOverview = (Map<?, ?>) data.get("price_overview");
+                if (priceOverview == null) return Optional.empty();
+                return Optional.ofNullable((String) priceOverview.get("final_formatted"));
+            } catch (Exception e) {
+                return Optional.empty();
+            }
+        });
+    }
+
+    @Override
+    public Optional<Object> steamGame(String appId, @Nullable String locale) {
+        if (storeSimulated()) return Optional.empty();
+        return apiObservations.observe("steam_store", "chat_command_get_game", () -> {
+            try {
+                String effectiveAppId = steamStoreService.resolveEffectiveApp(appId)
+                        .map(SteamStoreService.ResolvedParentApp::appId)
+                        .orElse(appId);
+                // Steam's appdetails language parameter is "l" (e.g. l=french), not "locale" —
+                // defaulting to "english" both documents the fallback and keeps a single URI
+                // template (no branching on whether locale was supplied).
+                String lang = (locale != null && !locale.isBlank()) ? locale : "english";
+                Map<?, ?> body = restClient.get()
+                        .uri("https://store.steampowered.com/api/appdetails?appids={appId}&l={lang}", effectiveAppId, lang)
+                        .retrieve()
+                        .body(Map.class);
+                if (body == null) return Optional.empty();
+                // Steam appdetails unwrapping (body.get(appId) -> success -> data -> field) mirrors
+                // fr.enimaloc.catapult.service.steam.SteamStoreServiceImpl; not extracted to a shared helper here.
+                Map<?, ?> appEntry = (Map<?, ?>) body.get(effectiveAppId);
+                if (appEntry == null || !Boolean.TRUE.equals(appEntry.get("success"))) return Optional.empty();
+                Map<?, ?> data = (Map<?, ?>) appEntry.get("data");
+                return Optional.ofNullable(data);
+            } catch (Exception e) {
+                return Optional.empty();
+            }
+        });
+    }
+
+    /** Whether the simulation keeps the raw Steam store calls from going out: what a failure answers, then. */
+    private boolean storeSimulated() {
+        return SimulationGate.blocks(simulationGate, null, SimulatedCalls.STEAM_STORE_APP_DETAILS);
+    }
+}

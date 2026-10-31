@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.language}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!--/* See ModelFiller#seo: a member's page and an error stay out of search engines. */-->
+    <title th:text="${seo.title}">Catapult</title>
+    <th:block th:if="${seo.indexed}">
+        <meta name="description" th:content="${seo.description}">
+        <link th:if="${seo.canonicalUrl}" rel="canonical" th:href="${seo.canonicalUrl}">
+        <meta property="og:type" content="website">
+        <meta property="og:site_name" th:content="#{app.brand}">
+        <meta property="og:title" th:content="${seo.title}">
+        <meta property="og:description" th:content="${seo.description}">
+        <meta th:if="${seo.canonicalUrl}" property="og:url" th:content="${seo.canonicalUrl}">
+        <meta name="twitter:card" content="summary">
+    </th:block>
+    <meta th:unless="${seo.indexed}" name="robots" content="noindex">
+    <meta name="darkreader-lock">
+    <!--/* The admin's own (Meta tab, see SiteMetaTags), on every page: site verifications, theme-color…
+         The tags above can't be configured there (MetaTagRules.RESERVED, see IndexTemplateMetaTagsTest). */-->
+    <meta th:each="tag : ${metaTags}" th:attr="__${tag.attribute().html()}__=${tag.key()}" th:content="${tag.content()}">
+    <script th:if="${seo.indexed and page == '' and seo.canonicalUrl != null}" type="application/ld+json" th:inline="javascript">
+        {"@context": "https://schema.org", "@type": "WebSite", "name": /*[[#{app.brand}]]*/ "", "url": /*[[${seo.canonicalUrl}]]*/ ""}
+    </script>
+    <link rel="icon" type="image/svg+xml" th:href="@{/img/favicon.svg}">
+
+    <link rel="stylesheet" href="/_static/mdui/2.1.4/mdui.css">
+    <link rel="stylesheet" href="/assets/ext/fonts/material-icons.css">
+    <link rel="stylesheet" th:href="@{/css/catapult.css}">
+
+    <!--/* The server's trace of this page, which the browser's goes on with (see SentryBrowser). */-->
+    <th:block th:if="${sentry != null}">
+        <meta th:if="${sentry.trace}" name="sentry-trace" th:content="${sentry.trace}">
+        <meta th:if="${sentry.baggage}" name="baggage" th:content="${sentry.baggage}">
+    </th:block>
+
+    <script src="/_static/mdui/2.1.4/mdui.global.js"></script>
+    <script th:inline="javascript">
+        window.Catapult = {
+            page: /*[[${page}]]*/,
+            spa: /*[[${app.spa}]]*/,
+            titles: /*[[${titles}]]*/,
+            sentry: /*[[${sentry?.script()}]]*/ null
+        };
+    </script>
+</head>
+
+<!--/* The words of a failed action's snackbar, for every page's scripts (CatapultChannel.postJson). */-->
+<!--/* An OBS dock (ObsDock) is the channel page alone: no app bar, no footer, a compact layout. */-->
+<body th:classappend="${dock} ? 'obs-dock-mode'" th:attr="data-label-action-failed=#{action.error.failed('{0}')},data-label-action-unreachable=#{action.error.unreachable}">
+<mdui-layout>
+    <!-- Navigation -->
+    <mdui-top-app-bar class="app-bar" th:unless="${dock}">
+        <a data-link href="/" class="brand-link">
+            <mdui-top-app-bar-title>
+            <span class="brand">
+                <span class="brand-icon">🚀</span>
+                <span th:text="#{app.brand}">app.brand</span>
+            </span>
+            </mdui-top-app-bar-title>
+        </a>
+
+        <!-- The channels the member can act on: spa.js fills it from /spa/nav-channels once the page is shown. -->
+        <nav th:if="${loggedIn}" id="nav-channels" class="nav-channels" th:aria-label="#{nav.channels}"></nav>
+
+        <!--/* mdui-top-app-bar only has a default slot: this is a plain flex item, sized like the brand. */-->
+        <div class="app-bar-end">
+            <!--/* Members: notifications.js fills the dropdown and shows the bell once it has the count. */-->
+            <mdui-dropdown th:if="${loggedIn}" id="notifications-bell" placement="bottom-end" hidden>
+                <!--/* The badge sits beside the button, not in it: the button clips its content. */-->
+                <span slot="trigger" class="notifications-trigger">
+                    <mdui-button-icon th:attr="aria-label=#{notifications.bell}">
+                        <mdui-icon name="notifications"></mdui-icon>
+                    </mdui-button-icon>
+                    <mdui-badge id="notifications-badge" hidden></mdui-badge>
+                </span>
+                <div class="notifications-dropdown" id="notifications-dropdown"></div>
+            </mdui-dropdown>
+            <!--/* Admins only (ROLE_ADMIN): opens the admin page, marked active there by spa.js like a channel. */-->
+            <a th:if="${admin}" id="nav-admin" data-link class="nav-channel nav-admin" href="/admin" th:title="#{nav.admin}">
+                <mdui-icon name="admin_panel_settings"></mdui-icon>
+                <span th:text="#{nav.admin}">nav.admin</span>
+            </a>
+            <!-- Mock profile only: reopens the member's config popout (mock-popout.js). -->
+            <mdui-button th:if="${mock}" id="mock-popout-btn" variant="text" icon="tune">Mock</mdui-button>
+            <!--/* Members: a plain POST (Thymeleaf adds the CSRF field), which ends the session and reloads the home page. */-->
+            <form th:if="${loggedIn}" id="nav-logout" class="nav-logout" th:action="@{/logout}" method="post">
+                <mdui-button-icon type="submit" icon="logout" th:title="#{nav.logout}" th:attr="aria-label=#{nav.logout}"></mdui-button-icon>
+            </form>
+            <mdui-button th:unless="${loggedIn}" variant="text" href="/auth/login"
+                         th:text="#{nav.login}">nav.login</mdui-button>
+        </div>
+
+    </mdui-top-app-bar>
+
+    <!--/* An admin impersonating a member (ImpersonationController): whom they act as, and the way back,
+         a plain POST (Thymeleaf adds the CSRF field) like the log-out. */-->
+    <div th:if="${impersonatedLogin != null}" id="impersonation-banner" class="impersonation-banner" role="status">
+        <mdui-icon name="supervisor_account"></mdui-icon>
+        <span class="impersonation-banner-text"><span th:text="#{nav.impersonate_as}">nav.impersonate_as</span>
+            <strong th:text="${impersonatedLogin}">login</strong></span>
+        <form th:action="@{/admin/impersonate/exit}" method="post">
+            <mdui-button type="submit" variant="tonal" icon="undo" th:text="#{nav.back_to_admin}">nav.back_to_admin</mdui-button>
+        </form>
+    </div>
+
+    <div th:replace="~{fragments/broadcasts :: banner}"></div>
+    <div th:replace="~{fragments/degraded :: banner}"></div>
+
+    <mdui-linear-progress id="nav-progress" hidden></mdui-linear-progress>
+
+    <div id="app">
+        <th:block th:if="${error}"><div th:replace="~{pages/error::error}"></div></th:block>
+        <th:block th:unless="${error}" th:each="spaPage : ${app.spa}" th:if="${page == spaPage.id}">
+            <div th:replace="~{${spaPage.template} :: ${spaPage.fragment}}"></div>
+        </th:block>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer" th:unless="${dock}">
+        <div class="footer-brand">
+            <span class="brand-icon">🚀</span><span th:text="#{app.brand}">app.brand</span>
+        </div>
+
+        <div class="footer-links">
+            <a data-link href="/privacy" th:text="#{footer.privacy}">footer.privacy</a>
+            <a data-link href="/changelog" th:text="#{footer.changelog}">footer.changelog</a>
+            <a data-link href="/docs/api" th:text="#{footer.api}">footer.api</a>
+            <!--/* Only https links are rendered, whatever catapult-api answered. */-->
+            <th:block th:each="socialLink : ${socialLinks}">
+                <a th:if="${#strings.startsWith(#strings.toLowerCase(socialLink.url), 'https://')}" class="footer-social"
+                   th:with="name=${socialLink.label != null and !#strings.isEmpty(socialLink.label)} ? ${socialLink.label} : #{'social.platform.' + ${socialLink.platform}}"
+                   th:href="${socialLink.url}" th:title="${name}" th:attr="data-platform=${socialLink.platform}"
+                   target="_blank" rel="noopener noreferrer">
+                    <th:block th:replace="~{fragments/social-icon :: icon(${socialLink.platform})}"></th:block>
+                    <span class="footer-social-name" th:text="${name}">social</span>
+                </a>
+            </th:block>
+            <!--/* See BuildVersionAdvice: absent when the build wrote no version. */-->
+            <span th:if="${appVersion != null}" class="version" th:text="#{footer.version(${appVersion})}">footer.version</span>
+        </div>
+    </footer>
+    <div th:replace="~{fragments/broadcasts :: veil}"></div>
+
+    <!--/* The one help sheet of the page: help.js fills #help-content when a card's "?" is clicked. */-->
+    <mdui-navigation-drawer id="help-panel" class="help-panel" placement="right" modal close-on-esc close-on-overlay-click>
+        <div class="help-panel-header">
+            <span class="help-panel-title" th:text="#{help.panel.title}">help.panel.title</span>
+            <mdui-button-icon id="help-panel-close" icon="close" data-help-close th:title="#{help.panel.close}"
+                              th:attr="aria-label=#{help.panel.close}"></mdui-button-icon>
+        </div>
+        <div id="help-content" class="help-content"></div>
+    </mdui-navigation-drawer>
+</mdui-layout>
+
+<!--/* First, so that it sees every other script's errors and live update streams. */-->
+<th:block th:if="${sentry != null}">
+    <script th:each="script : ${sentry.sdk}" th:src="@{${script.key}}" th:integrity="${script.value}"></script>
+    <script th:src="@{/js/monitoring.js}"></script>
+</th:block>
+<script th:src="@{/js/csrf.js}"></script>
+<script th:src="@{/js/catapult.js}"></script>
+<script th:src="@{/js/live.js}"></script>
+<!--/* Before broadcasts.js and notifications.js, which word their times with it. */-->
+<script th:src="@{/js/time.js}"></script>
+<script th:src="@{/js/spa.js}"></script>
+<script th:src="@{/js/broadcasts.js}"></script>
+<script th:src="@{/js/degraded.js}"></script>
+<script th:src="@{/js/help.js}"></script>
+<script th:if="${loggedIn}" th:src="@{/js/notifications.js}"></script>
+<script th:if="${loggedIn}" th:src="@{/js/notification-channels.js}"></script>
+<!-- Page-wide, not per-fragment: the OBS connection must survive SPA navigation. -->
+<script th:src="@{/js/suggest.js}"></script>
+<script th:src="@{/js/obs.js}"></script>
+<script th:src="@{/js/obs-session.js}"></script>
+<script th:src="@{/js/twitchat-protocol.js}"></script>
+<script th:src="@{/js/twitchat.js}"></script>
+<script th:src="@{/js/twitchat-stream.js}"></script>
+
+<!--
+    These scripts back interactive fragments (currently only the /channel/{username}
+    dashboard). They are loaded here, once per full page load, rather than inlined in
+    their fragment templates: a script tag inserted via innerHTML (which is exactly what
+    spa.js's navigate() does to swap #app's content) never executes per the HTML/DOM spec.
+    Each file instead listens for the "catapult:render" event spa.js dispatches on both
+    initial load and every SPA swap, and no-ops via a null-guard when its DOM isn't present.
+-->
+<script th:src="@{/js/visibility.js}"></script>
+<script th:src="@{/js/lazy.js}"></script>
+<script th:src="@{/js/channel-page.js}"></script>
+<script th:src="@{/js/channel-events.js}"></script>
+<script th:src="@{/js/channel-status.js}"></script>
+<script th:src="@{/js/game-search.js}"></script>
+<script th:src="@{/js/channel-bindings.js}"></script>
+<script th:src="@{/js/channel-connections.js}"></script>
+<script th:src="@{/js/twitchat-events.js}"></script>
+<script th:src="@{/js/channel-settings.js}"></script>
+<script th:src="@{/js/channel-dtdd.js}"></script>
+<script th:src="@{/js/channel-danger-zone.js}"></script>
+<script th:src="@{/js/channel-custom-bindings.js}"></script>
+<script th:src="@{/js/channel-extensions.js}"></script>
+<script th:src="@{/js/api-token-cards.js}"></script>
+<script th:src="@{/js/channel-dock.js}"></script>
+<script th:src="@{/js/channel-invite.js}"></script>
+<script th:src="@{/js/channel-obs-widget.js}"></script>
+<script th:src="@{/js/channel-command-migration.js}"></script>
+<script th:src="@{/js/api-docs.js}"></script>
+<script th:src="@{/js/admin-members.js}"></script>
+<script th:src="@{/js/admin-tabs.js}"></script>
+<script th:src="@{/js/admin-member-debug.js}"></script>
+<script th:src="@{/js/admin-ccl.js}"></script>
+<script th:src="@{/js/admin-caches.js}"></script>
+<script th:src="@{/js/admin-data.js}"></script>
+<script th:src="@{/js/well-known-forms.js}"></script>
+<script th:src="@{/js/admin-well-known.js}"></script>
+<script th:src="@{/js/admin-meta-tags.js}"></script>
+<script th:src="@{/js/admin-social-links.js}"></script>
+<script th:src="@{/js/admin-notifications.js}"></script>
+<script th:src="@{/js/admin-dtdd-mapping.js}"></script>
+<script th:src="@{/js/admin-game-mappings.js}"></script>
+<script th:src="@{/js/admin-groups.js}"></script>
+<script th:src="@{/js/admin-experiments.js}"></script>
+<script th:src="@{/js/admin-whitelist.js}"></script>
+<script th:src="@{/js/admin-keys.js}"></script>
+<script th:src="@{/js/admin-tw.js}"></script>
+<script th:src="@{/js/admin-minecraft.js}"></script>
+<script th:src="@{/js/admin-broadcast.js}"></script>
+<script th:if="${mock}" th:src="@{/js/mock-popout.js}"></script>
+</body>
+</html>

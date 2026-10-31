@@ -1,0 +1,92 @@
+<!--/* The API documentation (ApiDocsController): Swagger UI, which api-docs.js starts on the site's copy of the spec,
+     whether catapult-api answers, and when the copy shown is an older one, from when. A member also gets their keys
+     above it (#api-docs-keys-card); Swagger UI wears the site's theme (api-docs-theme.css, after its own stylesheet). */-->
+<mdui-layout-main th:fragment="api-docs">
+    <link rel="stylesheet" th:href="@{/css/api-docs-theme.css}">
+    <section class="section privacy-section api-docs-section">
+        <div class="section-header">
+            <span class="eyebrow" th:text="#{api-docs.eyebrow}">api-docs.eyebrow</span>
+            <h1 th:text="#{api-docs.title}">api-docs.title</h1>
+            <p th:text="#{api-docs.description}">api-docs.description</p>
+            <!--/* Undecided until api-docs.js has asked /api/health: the page never waits on the probe. */-->
+            <span id="api-docs-status" class="api-docs-status" role="status" data-state="unknown"
+                  th:attr="data-label-up=#{api-docs.status.up},data-label-down=#{api-docs.status.down}"
+                  th:text="#{api-docs.status.unknown}">api-docs.status.unknown</span>
+        </div>
+
+        <p th:if="${apiDocsCachedAt != null}" id="api-docs-cached" class="api-docs-cached" role="note"
+           th:attr="data-fetched-at=${apiDocsFetchedAt},data-label=#{api-docs.cached('{0}')}"
+           th:text="#{api-docs.cached(${apiDocsCachedAt})}">api-docs.cached</p>
+        <p th:unless="${apiDocsAvailable}" id="api-docs-unavailable" th:text="#{api-docs.unavailable}">api-docs.unavailable</p>
+
+        <!--/* The member's keys, never a visitor's. sentry-block keeps the widget's token and any token just generated
+             out of Sentry Replay. The tokens' rows are api-token-cards.js's (status, generate/regenerate, revoke, the
+             token shown once); the widget's copy button is api-docs.js's. Its regeneration stays on the
+             Integrations tab. Rendered for a spa.js prefetch, it is pending (data-pending, no rows): api-docs.js
+             replaces it with data-src's once the page is shown. */-->
+        <mdui-card th:if="${apiDocsMember}" id="api-docs-keys-card" class="settings-card api-docs-keys sentry-block"
+                   variant="outlined"
+                   th:attr="data-pending=${apiDocsKeysPending} ? 'true',data-src=${apiDocsKeysPending} ? '/spa/docs/api',
+                            data-label-unavailable=${apiDocsKeysPending} ? #{api-docs.keys.unavailable}">
+            <div class="title-row">
+                <h2 th:text="#{api-docs.keys.title}">api-docs.keys.title</h2>
+            </div>
+            <p th:text="#{api-docs.keys.description}">api-docs.keys.description</p>
+            <th:block th:unless="${apiDocsKeysPending}">
+
+            <div th:if="${widgetToken != null or widgetUnavailable}" id="api-docs-widget" class="api-docs-key"
+                 th:attr="data-label-copied=#{api-docs.keys.widget.copied}">
+                <h3 th:text="#{api-docs.keys.widget.title}">api-docs.keys.widget.title</h3>
+                <p th:text="#{api-docs.keys.widget.description}">api-docs.keys.widget.description</p>
+                <div th:if="${widgetToken != null}" class="api-docs-key-value">
+                    <mdui-text-field id="api-docs-widget-value" variant="outlined" readonly autocomplete="off"
+                                     th:attr="label=#{api-docs.keys.widget.label},value=${widgetToken}"></mdui-text-field>
+                    <mdui-button id="api-docs-widget-copy-btn" variant="tonal"
+                                 th:text="#{api-docs.keys.widget.copy}">api-docs.keys.widget.copy</mdui-button>
+                </div>
+                <p th:if="${widgetToken == null}" id="api-docs-widget-unavailable"
+                   th:text="#{api-docs.keys.widget.unavailable}">api-docs.keys.widget.unavailable</p>
+            </div>
+
+            <th:block th:replace="~{pages/api-docs :: token-row('api-docs-read-token', 'channel.read_token', 'read', null)}"></th:block>
+            <th:block th:if="${customBindingsEnabled}">
+                <th:block th:replace="~{pages/api-docs :: token-row('api-docs-full-token', 'channel.api_token', 'full', ${customBindingsExample})}"></th:block>
+            </th:block>
+            </th:block>
+        </mdui-card>
+
+        <!--/* sentry-mask: Swagger UI writes the token tried out into its curl and Request URL text, which Replay
+             records masked. */-->
+        <div th:if="${apiDocsAvailable}" id="swagger-ui" class="api-docs-ui sentry-mask"
+             th:attr="data-spec=${apiDocsSpecUrl},data-bundle=|${apiDocsSwaggerUi}/swagger-ui-bundle.js|,
+                      data-css=|${apiDocsSwaggerUi}/swagger-ui.css|,data-label-failed=#{api-docs.ui-failed}"></div>
+    </section>
+</mdui-layout-main>
+
+<!--/* One personal API token's row of the keys card, the Account tab's card in small (the same labels, <labels>.*):
+     its elements are <prefix>-status, -generate-btn… as api-token-cards.js wires them. */-->
+<div th:fragment="token-row(prefix, labels, kind, exampleName)" th:id="${prefix}" class="api-docs-key"
+     th:attr="data-example-name=${exampleName},data-label-none=#{${labels + '.none'}},data-label-since=#{${labels + '.since'}('{0}')},data-label-generate=#{${labels + '.generate'}},data-label-regenerate=#{${labels + '.regenerate'}},data-label-copied=#{${labels + '.copied'}},data-label-unavailable=#{${labels + '.unavailable'}}">
+    <h3 th:text="#{${labels + '.title'}}">Jeton</h3>
+    <p th:text="#{${'api-docs.keys.' + kind + '.description'}}">Description</p>
+    <p th:id="|${prefix}-status|"></p>
+    <mdui-button th:id="|${prefix}-generate-btn|" th:text="#{${labels + '.generate'}}">Générer</mdui-button>
+    <mdui-button th:id="|${prefix}-revoke-btn|" class="hidden" variant="text" th:text="#{${labels + '.revoke'}}">Révoquer</mdui-button>
+    <div th:id="|${prefix}-reveal|" class="hidden">
+        <p th:text="#{${labels + '.once'}}">Copie-le maintenant.</p>
+        <mdui-text-field th:id="|${prefix}-value|" variant="outlined" readonly autocomplete="off"></mdui-text-field>
+        <mdui-button th:id="|${prefix}-copy-btn|" variant="tonal" th:text="#{${labels + '.copy'}}">Copier</mdui-button>
+        <p th:text="#{${labels + '.curl_hint'}}">Exemple :</p>
+        <pre th:id="|${prefix}-curl|"></pre>
+    </div>
+    <mdui-dialog th:id="|${prefix}-confirm-dialog|" close-on-overlay-click>
+        <p data-for="regenerate" class="hidden"><strong th:text="#{${labels + '.confirm.regenerate.title'}}">Régénérer ?</strong>
+            <span th:text="#{${labels + '.confirm.regenerate.body'}}">L'ancien jeton cesse de fonctionner.</span></p>
+        <p data-for="revoke" class="hidden"><strong th:text="#{${labels + '.confirm.revoke.title'}}">Révoquer ?</strong>
+            <span th:text="#{${labels + '.confirm.revoke.body'}}">Le jeton cesse de fonctionner.</span></p>
+        <mdui-button slot="action" variant="text" class="api-token-confirm-dismiss"
+                     th:text="#{${labels + '.confirm.dismiss'}}">Annuler</mdui-button>
+        <mdui-button slot="action" variant="filled" class="api-token-confirm-ok"
+                     th:text="#{${labels + '.confirm.ok'}}">Confirmer</mdui-button>
+    </mdui-dialog>
+</div>

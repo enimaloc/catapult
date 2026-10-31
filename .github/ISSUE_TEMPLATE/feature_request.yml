@@ -1,0 +1,50 @@
+name: ✨ Feature request
+description: Proposer une nouvelle fonctionnalité ou une amélioration
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problème / besoin
+      description: Quel problème cette fonctionnalité résout-elle ?
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Solution proposée
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Domaine
+      options:
+        - "area: api"
+        - "area: web"
+        - "area: obs"
+        - "area: twitch"
+        - "area: twitchat"
+        - "area: chat-commands"
+        - "area: ci"
+        - Autre / inconnu
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives envisagées
+    validations:
+      required: false
+
+  - type: input
+    id: version
+    attributes:
+      label: Version de Catapult concernée
+      description: Facultatif.
+      placeholder: ex. v1.0.0-BETA.97
+    validations:
+      required: false

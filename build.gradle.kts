@@ -1,46 +1,64 @@
 plugins {
-    java
-    id("org.springframework.boot") version "4.0.4"
-    id("io.spring.dependency-management") version "1.1.7"
+    id("org.sonarqube") version "7.5.0.8588" apply false
 }
 
-group = "fr.esportline"
-version = "0.0.1-SNAPSHOT"
-description = "catapult"
+allprojects {
+    group = "fr.enimaloc"
+    version = "1.0.0-BETA.99"
+}
 
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(17)
+subprojects {
+    repositories {
+        mavenCentral()
+        maven { url = uri("https://jitpack.io") }
     }
 }
 
-configurations {
-    compileOnly {
-        extendsFrom(configurations.annotationProcessor.get())
+/*
+ * Test coverage: JaCoCo on every module except the legacy catapult-web-old. `check` fails when a
+ * module's line coverage drops below its floor, so new code can't silently lower it.
+ */
+val coverageFloors = mapOf(
+    "catapult-common" to 0.95,
+    "catapult-api" to 0.87,
+    "catapult-web" to 0.95,
+)
+
+configure(subprojects.filter { it.name in coverageFloors }) {
+    apply(plugin = "jacoco")
+
+    pluginManager.withPlugin("java") {
+        val floor = coverageFloors.getValue(project.name)
+
+        tasks.withType<Test>().configureEach {
+            // Gradle's default test heap (512 MB) overflows once the suite has cached its Spring contexts
+            maxHeapSize = "1g"
+            finalizedBy("jacocoTestReport")
+        }
+
+        tasks.named<JacocoReport>("jacocoTestReport") {
+            dependsOn(tasks.withType<Test>())
+            reports {
+                xml.required = true
+                html.required = true
+            }
+        }
+
+        tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
+            dependsOn("jacocoTestReport")
+            violationRules {
+                rule {
+                    limit {
+                        counter = "LINE"
+                        minimum = floor.toBigDecimal()
+                    }
+                }
+            }
+        }
+
+        tasks.named("check") {
+            dependsOn("jacocoTestCoverageVerification")
+        }
     }
 }
 
-repositories {
-    mavenCentral()
-}
-
-dependencies {
-    implementation("org.springframework.boot:spring-boot-starter-security")
-    implementation("org.springframework.boot:spring-boot-starter-security-oauth2-client")
-    implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
-    implementation("org.springframework.boot:spring-boot-starter-webmvc")
-    implementation("org.thymeleaf.extras:thymeleaf-extras-springsecurity6")
-    compileOnly("org.projectlombok:lombok")
-    developmentOnly("org.springframework.boot:spring-boot-devtools")
-    annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
-    annotationProcessor("org.projectlombok:lombok")
-    testImplementation("org.springframework.boot:spring-boot-starter-security-oauth2-client-test")
-    testImplementation("org.springframework.boot:spring-boot-starter-security-test")
-    testImplementation("org.springframework.boot:spring-boot-starter-thymeleaf-test")
-    testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-}
-
-tasks.withType<Test> {
-    useJUnitPlatform()
-}

@@ -1,0 +1,146 @@
+<!--/*@thymesVar id="channelPage" type="fr.enimaloc.catapult.common.dto.channel.ChannelPageData"*/-->
+<!--/*@thymesVar id="integrations" type="java.util.List<fr.enimaloc.catapult.dto.integration.IntegrationDto>"*/-->
+<mdui-tab-panel slot="panel" value="integrations" th:if="${channelPage.isOwner()}" th:fragment="panel"
+                xmlns:spa="urn:fr.enimaloc.catapult:spa">
+<!--/* Built only once the tab is picked (lazy.js): the page carries it, the browser builds nothing of it till then. */-->
+<template data-lazy>
+    <div class="section-header">
+        <div class="title-row">
+            <h2 th:text="#{channel.connections.title}">Connexions</h2>
+            <mdui-button-icon th:replace="~{fragments/controls :: helpButton('connections')}"></mdui-button-icon>
+        </div>
+    </div>
+
+    <!--/* Cards are built by IntegrationCards: every state is pre-rendered and toggled with the
+         `hidden` class, by visibility.js (spa:state) or channel-connections.js. */-->
+    <div id="channel-connections">
+        <mdui-card th:each="integration : ${integrations}" class="connection-card" variant="outlined"
+                   th:attr="data-conn=${integration.id()}">
+            <span th:replace="~{pages/channel-tab/integrations :: message(${integration.name()})}">Twitch</span>
+            <th:block th:each="node : ${integration.nodes()}"><th:block th:insert="~{pages/channel-tab/integrations :: node(${node})}"></th:block></th:block>
+            <th:block th:if="${integration.id() == 'obs' and widgetUrl != null}" th:insert="~{pages/channel-tab/integrations :: obs-widget}"></th:block>
+            <p th:if="${integration.id() == 'obs' and widgetUrl == null and widgetUnavailable == true}" id="obs-widget-unavailable" th:text="#{channel.connections.obs.widget.link_unavailable}">Lien du widget indisponible.</p>
+        </mdui-card>
+    </div>
+</template>
+</mdui-tab-panel>
+
+<!--/* A Message as a <span>: its key resolved with its arguments, or its literal. */-->
+<span th:fragment="message(m)"
+      th:text="${m.isKey()} ? ${#messages.msgWithParams(m.key(), m.argsArray())} : ${m.literal()}"></span>
+
+<!--/* One IntegrationNode, recursing into Container children. */-->
+<th:block th:fragment="node(n)" th:switch="${n.type()}"
+          th:with="text=${n.text() == null ? null : (n.text().isKey() ? #messages.msgWithParams(n.text().key(), n.text().argsArray()) : n.text().literal())}"
+          xmlns:spa="urn:fr.enimaloc.catapult:spa">
+    <span th:case="'span'" th:id="${n.attrs().id()}" th:data-field="${n.attrs().field()}" th:classappend="${n.attrs().className()}"
+          spa:state="${n.attrs().state()}" th:text="${text}"></span>
+    <p th:case="'paragraph'" th:id="${n.attrs().id()}" th:data-field="${n.attrs().field()}" th:classappend="${n.attrs().className()}"
+       spa:state="${n.attrs().state()}" th:text="${text}"></p>
+    <mdui-chip th:case="'chip'" th:id="${n.attrs().id()}" th:data-field="${n.attrs().field()}" th:classappend="${n.attrs().className()}"
+               spa:state="${n.attrs().state()}" th:text="${text}"></mdui-chip>
+    <input th:case="'input'" th:type="${n.inputType()}" th:id="${n.attrs().id()}" th:data-field="${n.attrs().field()}"
+           th:classappend="${n.attrs().className()}" spa:state="${n.attrs().state()}"
+           th:placeholder="${text}"
+           th:aria-label="${n.ariaLabel().isKey() ? #messages.msgWithParams(n.ariaLabel().key(), n.ariaLabel().argsArray()) : n.ariaLabel().literal()}"
+           th:value="${n.value()}" th:min="${n.min()}" th:max="${n.max()}"/>
+    <label th:case="'switch'">
+        <mdui-switch th:id="${n.attrs().id()}" th:data-field="${n.attrs().field()}" th:classappend="${n.attrs().className()}"
+                     spa:state="${n.attrs().state()}" th:checked="${n.checked()}"></mdui-switch>
+        <span th:text="${text}"></span>
+    </label>
+    <mdui-select th:case="'select'" variant="outlined" th:id="${n.attrs().id()}" th:data-field="${n.attrs().field()}"
+                 th:classappend="${(n.attrs().className() ?: '') + (n.hasIcons() ? ' icon-select' : '')}" spa:state="${n.attrs().state()}"
+                 th:value="${n.value()}" th:label="${text}" th:data-source="${n.source()}"
+                 th:data-show-if="${n.attrs().showIf()}"
+                 th:data-unavailable="${n.hasBranchOptions()} ? #{twitchat.option.unavailable}">
+        <span th:if="${n.hasIcons()}" slot="icon" class="option-icon"
+              th:style="${n.pickedIcon()} ? |--option-icon: url('${n.pickedIcon()}')|"></span>
+        <!--/* Many options, none picked: built only once the select is opened (lazy.js). */-->
+        <template data-lazy th:remove="${n.lazyOptions()} ? none : tag">
+        <mdui-menu-item th:each="option : ${n.options()}" th:value="${option.value()}" th:data-icon="${option.icon()}"
+                        th:data-protocols="${option.protocols() == null ? null : #strings.listJoin(option.protocols(), ',')}"
+                        th:end-text="${option.protocols() == null ? null : #strings.listJoin(option.protocols(), ', ')}">
+            <span th:if="${option.icon()}" slot="icon" class="option-icon" th:style="|--option-icon: url('${option.icon()}')|"></span>
+            <th:block th:text="${option.text().isKey() ? #messages.msgWithParams(option.text().key(), option.text().argsArray()) : option.text().literal()}"></th:block>
+        </mdui-menu-item>
+        </template>
+    </mdui-select>
+    <mdui-segmented-button th:case="'segmented-button'" th:id="${n.attrs().id()}" th:data-field="${n.attrs().field()}"
+                           th:classappend="${n.attrs().className()}" spa:state="${n.attrs().state()}"
+                           th:text="${text}"></mdui-segmented-button>
+    <mdui-button th:case="'button'" th:id="${n.attrs().id()}" th:data-field="${n.attrs().field()}" th:classappend="${n.attrs().className()}"
+                 spa:state="${n.attrs().state()}" th:text="${text}"></mdui-button>
+    <div th:case="'div'" th:id="${n.attrs().id()}" th:data-field="${n.attrs().field()}" th:classappend="${n.attrs().className()}"
+         spa:state="${n.attrs().state()}">
+        <th:block th:each="child : ${n.children()}"><th:block th:insert="~{pages/channel-tab/integrations :: node(${child})}"></th:block></th:block>
+    </div>
+    <mdui-segmented-button-group th:case="'segmented-group'" th:id="${n.attrs().id()}" th:data-field="${n.attrs().field()}"
+                                 th:classappend="${n.attrs().className()}" spa:state="${n.attrs().state()}">
+        <th:block th:each="child : ${n.children()}"><th:block th:insert="~{pages/channel-tab/integrations :: node(${child})}"></th:block></th:block>
+    </mdui-segmented-button-group>
+    <mdui-text-field th:case="'text-field'" variant="outlined" th:id="${n.attrs().id()}"
+                     th:classappend="${n.attrs().className()}" spa:state="${n.attrs().state()}"
+                     th:data-field="${n.attrs().field()}" th:data-show-if="${n.attrs().showIf()}"
+                     th:type="${n.inputType()}" th:label="${text}"
+                     th:value="${n.value()}" th:rows="${n.multiline()} ? 3 : null"
+                     th:attr="autosize=${n.multiline()} ? 'autosize' : null"></mdui-text-field>
+    <input th:case="'hidden'" type="hidden" th:id="${n.attrs().id()}" th:classappend="${n.attrs().className()}"
+           th:data-field="${n.attrs().field()}" th:value="${n.value()}"/>
+    <mdui-button th:case="'text-button'" variant="text" th:id="${n.attrs().id()}"
+                 th:classappend="${n.attrs().className()}" spa:state="${n.attrs().state()}"
+                 th:text="${text}"></mdui-button>
+    <mdui-collapse th:case="'collapse'" th:id="${n.attrs().id()}" th:classappend="${n.attrs().className()}">
+        <mdui-collapse-item th:each="item : ${n.items()}" th:value="${item.value()}"
+                            th:id="${item.attrs().id()}" th:classappend="${item.attrs().className()}">
+            <mdui-list-item slot="header" th:text="${item.text().isKey() ? #messages.msgWithParams(item.text().key(), item.text().argsArray()) : item.text().literal()}"></mdui-list-item>
+            <!--/* Built only once the item is opened (lazy.js): a Twitchat event's holds the menu of every action. */-->
+            <template data-lazy><div class="collapse-body">
+                <th:block th:each="child : ${item.children()}"><th:block th:insert="~{pages/channel-tab/integrations :: node(${child})}"></th:block></th:block>
+            </div></template>
+        </mdui-collapse-item>
+    </mdui-collapse>
+    <div th:case="'repeater'" class="repeater" data-repeater th:id="${n.attrs().id()}"
+         th:classappend="${n.attrs().className()}" th:data-field="${n.attrs().field()}">
+        <span class="repeater-label" th:text="${text}"></span>
+        <div class="repeater-rows">
+            <div class="repeater-row" th:each="row : ${n.rows()}">
+                <th:block th:each="child : ${row}"><th:block th:insert="~{pages/channel-tab/integrations :: node(${child})}"></th:block></th:block>
+                <mdui-button-icon class="repeater-remove" icon="delete" th:aria-label="#{twitchat.repeater.remove}"></mdui-button-icon>
+            </div>
+        </div>
+        <template>
+            <div class="repeater-row">
+                <th:block th:each="child : ${n.template()}"><th:block th:insert="~{pages/channel-tab/integrations :: node(${child})}"></th:block></th:block>
+                <mdui-button-icon class="repeater-remove" icon="delete" th:aria-label="#{twitchat.repeater.remove}"></mdui-button-icon>
+            </div>
+        </template>
+        <mdui-button class="repeater-add" variant="text" icon="add" th:text="#{twitchat.repeater.add}"></mdui-button>
+    </div>
+</th:block>
+
+<!--/* The OBS card's widget link: the browser source URL (read-only + Copy), its regeneration (confirmed in a
+     dialog) and the source check channel-obs-widget.js runs through the page's own OBS connection. */-->
+<div th:fragment="obs-widget" id="obs-widget" class="obs-widget sentry-block" th:attr="data-widget-url=${widgetUrl},data-label-copied=#{channel.connections.obs.widget.copied},data-label-copy-failed=#{channel.connections.obs.widget.copy_failed},data-label-refused=#{channel.connections.obs.widget.refused},data-label-unavailable=#{channel.connections.obs.widget.unavailable},data-label-create-failed=#{channel.connections.obs.widget.create_failed}">
+    <p th:text="#{channel.connections.obs.widget.hint}">Lien à mettre dans une source web OBS :</p>
+    <mdui-text-field id="obs-widget-link" readonly variant="outlined" th:attr="label=#{channel.connections.obs.widget.label},value=${widgetUrl}"></mdui-text-field>
+    <div class="card-actions">
+        <mdui-button id="obs-widget-copy-btn" variant="tonal" th:text="#{channel.connections.obs.widget.copy}">Copier le lien</mdui-button>
+        <mdui-button id="obs-widget-regenerate-btn" variant="text" th:text="#{channel.connections.obs.widget.regenerate}">Régénérer le lien</mdui-button>
+    </div>
+    <mdui-dialog id="obs-widget-regenerate-dialog" close-on-overlay-click th:attr="headline=#{channel.connections.obs.widget.regenerate}">
+        <p th:text="#{channel.connections.obs.widget.regenerate.confirm}">Régénérer le lien invalidera le précédent.</p>
+        <mdui-button slot="action" variant="text" class="obs-widget-regenerate-dismiss" th:text="#{channel.connections.obs.widget.regenerate.dismiss}">Annuler</mdui-button>
+        <mdui-button slot="action" variant="filled" class="obs-widget-regenerate-confirm" th:text="#{channel.connections.obs.widget.regenerate}">Régénérer le lien</mdui-button>
+    </mdui-dialog>
+    <p id="obs-widget-source-status" class="obs-widget-source-status hidden"
+       th:attr="data-label-checking=#{channel.connections.obs.widget.source.checking},data-label-found=#{channel.connections.obs.widget.source.found},data-label-unreachable=#{channel.connections.obs.widget.source.unreachable}"></p>
+    <div id="obs-widget-source-missing" class="obs-widget-source-missing hidden">
+        <p th:text="#{channel.connections.obs.widget.source.missing}">Aucune source de relais détectée dans OBS.</p>
+        <mdui-button id="obs-widget-source-create-btn" variant="filled" th:text="#{channel.connections.obs.widget.source.create}">Créer la source dans OBS</mdui-button>
+    </div>
+    <p class="obs-widget-reminder" th:text="#{channel.connections.obs.widget.reminder}">N'oublie pas de configurer aussi Twitchat.</p>
+</div>
+
+<!--/* Renders ${node} alone: IntegrationNodeRenderingTest's entry point. */-->
+<th:block th:fragment="node-alone" th:insert="~{pages/channel-tab/integrations :: node(${node})}"></th:block>

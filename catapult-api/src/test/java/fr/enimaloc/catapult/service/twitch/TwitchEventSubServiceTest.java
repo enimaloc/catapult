@@ -1,0 +1,613 @@
+package fr.enimaloc.catapult.service.twitch;
+
+import java.nio.charset.StandardCharsets;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import static org.mockito.Mockito.mock;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.anyString;
+import java.net.http.WebSocket;
+import fr.enimaloc.catapult.service.debug.DebugRecording;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import fr.enimaloc.catapult.domain.account.OAuthToken;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.event.ChannelRaidedOutEvent;
+import fr.enimaloc.catapult.event.StreamOfflineEvent;
+import fr.enimaloc.catapult.event.StreamOnlineEvent;
+import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.service.binding.StreamStateService;
+import fr.enimaloc.catapult.service.notification.CatapultCategoryChangeStateService;
+import fr.enimaloc.catapult.service.notification.TwitchatEventDispatcher;
+import fr.enimaloc.catapult.simulation.SimulatedCalls;
+import fr.enimaloc.catapult.simulation.SimulatedData;
+import fr.enimaloc.catapult.simulation.SimulationGate;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.Spy;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.context.ApplicationEvent;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.http.ResponseEntity;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.client.RestClient;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
+import static org.mockito.Mockito.*;
+
+@SuppressWarnings({"unchecked", "rawtypes"})
+@ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
+class TwitchEventSubServiceTest {
+
+    @Mock private OAuthTokenRepository oAuthTokenRepository;
+    @Mock private UserAccountRepository userAccountRepository;
+    @Mock private TwitchTokenService twitchTokenService;
+    @Mock private StreamStateService streamStateService;
+    @Mock private ApplicationEventPublisher eventPublisher;
+    @Mock private RestClient restClient;
+    @Mock private TwitchatEventDispatcher twitchatEventDispatcher;
+    @Mock private CatapultCategoryChangeStateService categoryChangeStateService;
+
+    @Mock private RestClient.RequestBodyUriSpec postUriSpec;
+    @Mock private RestClient.RequestBodySpec postBodySpec;
+    @Mock private RestClient.ResponseSpec postResponseSpec;
+
+    @Mock private RestClient.RequestHeadersUriSpec getUriSpec;
+    @Mock private RestClient.RequestHeadersSpec getHeaderSpec;
+    @Mock private RestClient.ResponseSpec getResponseSpec;
+
+    @Spy private DebugRecording debug = DebugRecording.OFF;
+    /** Absent by default (answers {@code null}): no simulation. */
+    @Mock private ObjectProvider<SimulationGate> simulationGate;
+    @Mock private SimulationGate gate;
+    @InjectMocks private TwitchEventSubService service;
+
+    private final ObjectMapper mapper = new ObjectMapper();
+    private UserAccount user;
+    private OAuthToken token;
+
+    @BeforeEach
+    void setUp() {
+        user = new UserAccount();
+        user.setId(UUID.randomUUID());
+        user.setTwitchId("broadcaster-123");
+
+        token = new OAuthToken();
+        token.setAccessToken("encrypted");
+
+        when(twitchTokenService.resolveAccessToken(eq(token), eq(user))).thenReturn("decrypted-token");
+        when(oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH))
+            .thenReturn(Optional.of(token));
+
+        when(restClient.post()).thenReturn(postUriSpec);
+        when(postUriSpec.uri(anyString())).thenReturn(postBodySpec);
+        when(postBodySpec.header(anyString(), anyString())).thenReturn(postBodySpec);
+        when(postBodySpec.body(any())).thenReturn(postBodySpec);
+        when(postBodySpec.retrieve()).thenReturn(postResponseSpec);
+        when(postResponseSpec.toBodilessEntity()).thenReturn(ResponseEntity.ok().build());
+
+        when(userAccountRepository.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE))
+            .thenReturn(List.of());
+
+        ReflectionTestUtils.setField(service, "twitchClientId", "test-client-id");
+        ReflectionTestUtils.setField(service, "objectMapper", new ObjectMapper());
+    }
+
+    @Test
+    void handleMessage_streamOnline_setsLiveTrueAndPublishesEvent() {
+        String message = """
+            {
+              "metadata": { "message_type": "notification", "subscription_type": "stream.online" },
+              "payload": { "event": {} }
+            }
+            """;
+
+        service.handleMessage(user, token, message, false);
+
+        verify(streamStateService).setLive(user, true);
+        ArgumentCaptor<StreamOnlineEvent> captor = ArgumentCaptor.forClass(StreamOnlineEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        assertThat(captor.getValue().getUser()).isEqualTo(user);
+    }
+
+    @Test
+    void handleMessage_streamOffline_setsLiveFalseAndPublishesEvent() {
+        String message = """
+            {
+              "metadata": { "message_type": "notification", "subscription_type": "stream.offline" },
+              "payload": { "event": {} }
+            }
+            """;
+
+        service.handleMessage(user, token, message, false);
+
+        verify(streamStateService).setLive(user, false);
+        ArgumentCaptor<StreamOfflineEvent> captor = ArgumentCaptor.forClass(StreamOfflineEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        assertThat(captor.getValue().getUser()).isEqualTo(user);
+    }
+
+    @Test
+    void handleChannelUpdate_matchesSelfSetState_notifiesCatapultChange() {
+        when(categoryChangeStateService.consumeIfMatches(user, "222"))
+            .thenReturn(Optional.of(new CatapultCategoryChangeStateService.SelfChange("111")));
+
+        String firstMessage = """
+            {
+              "metadata": { "message_type": "notification", "subscription_type": "channel.update" },
+              "payload": { "event": { "category_id": "111", "category_name": "Old Game", "content_classification_labels": [] } }
+            }
+            """;
+        String secondMessage = """
+            {
+              "metadata": { "message_type": "notification", "subscription_type": "channel.update" },
+              "payload": { "event": { "category_id": "222", "category_name": "New Game", "content_classification_labels": [] } }
+            }
+            """;
+
+        service.handleMessage(user, token, firstMessage, false);
+        service.handleMessage(user, token, secondMessage, false);
+
+        verify(twitchatEventDispatcher).onCategoryChangedByCatapult(user, "222", "New Game", "111", "Old Game");
+        verify(twitchatEventDispatcher, never()).onCategoryChangedManually(any(), any(), any(), any());
+    }
+
+    @Test
+    void handleChannelUpdate_noSelfSetMatch_notifiesManualChange() {
+        when(categoryChangeStateService.consumeIfMatches(user, "222")).thenReturn(Optional.empty());
+
+        String firstMessage = """
+            {
+              "metadata": { "message_type": "notification", "subscription_type": "channel.update" },
+              "payload": { "event": { "category_id": "111", "category_name": "Old Game", "content_classification_labels": [] } }
+            }
+            """;
+        String secondMessage = """
+            {
+              "metadata": { "message_type": "notification", "subscription_type": "channel.update" },
+              "payload": { "event": { "category_id": "222", "category_name": "New Game", "content_classification_labels": [] } }
+            }
+            """;
+
+        service.handleMessage(user, token, firstMessage, false);
+        service.handleMessage(user, token, secondMessage, false);
+
+        verify(twitchatEventDispatcher).onCategoryChangedManually(user, "222", "New Game", "Old Game");
+        verify(twitchatEventDispatcher, never()).onCategoryChangedByCatapult(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void handleMessage_sessionWelcome_subscribesToStreamOnlineAndOffline() {
+        String message = """
+            {
+              "metadata": { "message_type": "session_welcome" },
+              "payload": { "session": { "id": "session-abc" } }
+            }
+            """;
+
+        service.handleMessage(user, token, message, false);
+
+        // One POST each for stream.online, stream.offline, channel.update, channel.raid
+        verify(restClient, times(4)).post();
+    }
+
+    @Test
+    void handleMessage_sessionWelcome_subscribesToTheStreamersOutgoingRaids() {
+        String message = """
+            {
+              "metadata": { "message_type": "session_welcome" },
+              "payload": { "session": { "id": "session-abc" } }
+            }
+            """;
+
+        service.handleMessage(user, token, message, false);
+
+        ArgumentCaptor<Object> bodies = ArgumentCaptor.forClass(Object.class);
+        verify(postBodySpec, atLeastOnce()).body(bodies.capture());
+        assertThat(bodies.getAllValues())
+            .map(body -> (Map<String, Object>) body)
+            .filteredOn(body -> "channel.raid".equals(body.get("type")))
+            .singleElement()
+            .satisfies(body -> {
+                assertThat(body.get("version")).isEqualTo("1");
+                assertThat(body.get("condition")).isEqualTo(Map.of("from_broadcaster_user_id", "broadcaster-123"));
+            });
+    }
+
+    @Test
+    void handleMessage_outgoingRaid_publishesItWithTheCurrentCategory() {
+        service.handleMessage(user, token, """
+            {
+              "metadata": { "message_type": "notification", "subscription_type": "channel.update" },
+              "payload": { "event": { "category_id": "509658", "category_name": "Just Chatting", "content_classification_labels": [] } }
+            }
+            """, false);
+
+        service.handleMessage(user, token, """
+            {
+              "metadata": { "message_type": "notification", "subscription_type": "channel.raid" },
+              "payload": { "event": { "from_broadcaster_user_id": "broadcaster-123", "to_broadcaster_user_id": "999", "viewers": 12 } }
+            }
+            """, false);
+
+        ArgumentCaptor<ApplicationEvent> events = ArgumentCaptor.forClass(ApplicationEvent.class);
+        verify(eventPublisher, atLeastOnce()).publishEvent(events.capture());
+        assertThat(events.getAllValues()).filteredOn(ChannelRaidedOutEvent.class::isInstance)
+            .singleElement()
+            .satisfies(e -> {
+                ChannelRaidedOutEvent raid = (ChannelRaidedOutEvent) e;
+                assertThat(raid.getUser()).isEqualTo(user);
+                assertThat(raid.getCurrentCategoryId()).isEqualTo("509658");
+            });
+    }
+
+    @Test
+    void handleMessage_incomingRaid_isIgnored() {
+        service.handleMessage(user, token, """
+            {
+              "metadata": { "message_type": "notification", "subscription_type": "channel.raid" },
+              "payload": { "event": { "from_broadcaster_user_id": "999", "to_broadcaster_user_id": "broadcaster-123" } }
+            }
+            """, false);
+
+        verify(eventPublisher, never()).publishEvent(any(ChannelRaidedOutEvent.class));
+    }
+
+    @Test
+    void handleMessage_sessionWelcome_whenStreamIsLive_setsLiveTrue() {
+        when(restClient.get()).thenReturn(getUriSpec);
+        when(getUriSpec.uri(anyString())).thenReturn(getHeaderSpec);
+        when(getHeaderSpec.header(anyString(), anyString())).thenReturn(getHeaderSpec);
+        when(getHeaderSpec.retrieve()).thenReturn(getResponseSpec);
+        // first call is initChannelState (empty object, returns early), second is initStreamState
+        when(getResponseSpec.body(String.class))
+            .thenReturn("{}")
+            .thenReturn("{\"data\":[{\"id\":\"42\",\"user_id\":\"broadcaster-123\"}]}");
+
+        String message = """
+            {
+              "metadata": { "message_type": "session_welcome" },
+              "payload": { "session": { "id": "session-abc" } }
+            }
+            """;
+
+        service.handleMessage(user, token, message, false);
+
+        verify(streamStateService).setLive(user, true);
+    }
+
+    @Test
+    void handleMessage_sessionWelcome_whenStreamIsOffline_setsLiveFalse() {
+        when(restClient.get()).thenReturn(getUriSpec);
+        when(getUriSpec.uri(anyString())).thenReturn(getHeaderSpec);
+        when(getHeaderSpec.header(anyString(), anyString())).thenReturn(getHeaderSpec);
+        when(getHeaderSpec.retrieve()).thenReturn(getResponseSpec);
+        when(getResponseSpec.body(String.class))
+            .thenReturn("{}")
+            .thenReturn("{\"data\":[]}");
+
+        String message = """
+            {
+              "metadata": { "message_type": "session_welcome" },
+              "payload": { "session": { "id": "session-abc" } }
+            }
+            """;
+
+        service.handleMessage(user, token, message, false);
+
+        verify(streamStateService).setLive(user, false);
+    }
+
+    @Test
+    void handleMessage_sessionWelcome_whenStreamsApiFails_doesNotThrow() {
+        when(restClient.get()).thenReturn(getUriSpec);
+        when(getUriSpec.uri(anyString())).thenReturn(getHeaderSpec);
+        when(getHeaderSpec.header(anyString(), anyString())).thenReturn(getHeaderSpec);
+        when(getHeaderSpec.retrieve()).thenReturn(getResponseSpec);
+        when(getResponseSpec.body(String.class))
+            .thenReturn("{}")
+            .thenThrow(new RuntimeException("network error"));
+
+        String message = """
+            {
+              "metadata": { "message_type": "session_welcome" },
+              "payload": { "session": { "id": "session-abc" } }
+            }
+            """;
+
+        assertThatNoException().isThrownBy(() -> service.handleMessage(user, token, message, false));
+        verify(streamStateService, never()).setLive(any(), anyBoolean());
+    }
+
+    @Test
+    void handleMessage_invalidJson_doesNotThrow() {
+        assertThatNoException().isThrownBy(
+            () -> service.handleMessage(user, token, "not-json", false)
+        );
+    }
+
+    @Test
+    void handleMessage_unknownMessageType_doesNotThrow() {
+        String message = """
+            { "metadata": { "message_type": "session_keepalive" }, "payload": {} }
+            """;
+
+        assertThatNoException().isThrownBy(
+            () -> service.handleMessage(user, token, message, false)
+        );
+    }
+
+    @Test
+    void handleMessage_sessionWelcome_storesKeepaliveTimeoutFromPayload() {
+        String message = """
+            {
+              "metadata": { "message_type": "session_welcome" },
+              "payload": { "session": { "id": "session-abc", "keepalive_timeout_seconds": 30 } }
+            }
+            """;
+
+        service.handleMessage(user, token, message, false);
+
+        Map<UUID, Long> timeouts = (Map<UUID, Long>) connectionState("keepaliveTimeoutSeconds");
+        assertThat(timeouts).containsEntry(user.getId(), 30L);
+    }
+
+    @Test
+    void handleMessage_sessionWelcome_fallsBackToDefaultWhenTimeoutAbsent() {
+        String message = """
+            {
+              "metadata": { "message_type": "session_welcome" },
+              "payload": { "session": { "id": "session-abc" } }
+            }
+            """;
+
+        service.handleMessage(user, token, message, false);
+
+        Map<UUID, Long> timeouts = (Map<UUID, Long>) connectionState("keepaliveTimeoutSeconds");
+        assertThat(timeouts).containsEntry(user.getId(), 10L);
+    }
+
+    @Test
+    void handleMessage_sessionWelcome_onReconnectedSession_doesNotResubscribe() {
+        String message = """
+            {
+              "metadata": { "message_type": "session_welcome" },
+              "payload": { "session": { "id": "session-abc", "keepalive_timeout_seconds": 30 } }
+            }
+            """;
+
+        service.handleMessage(user, token, message, true);
+
+        // Subscriptions carry over when reconnecting via reconnect_url — no POST expected
+        verify(restClient, never()).post();
+        // But the keepalive timeout of the new session must still be recorded
+        Map<UUID, Long> timeouts = (Map<UUID, Long>) connectionState("keepaliveTimeoutSeconds");
+        assertThat(timeouts).containsEntry(user.getId(), 30L);
+    }
+
+    @Test
+    void handleMessage_sessionWelcome_resetsRetryBackoffAfterPriorFailures() {
+        // Simulate a prior string of failures that inflated the backoff far past the base delay.
+        Map<UUID, Long> retryDelays = (Map<UUID, Long>) connectionState("retryDelaySeconds");
+        retryDelays.put(user.getId(), 32L);
+
+        String message = """
+            {
+              "metadata": { "message_type": "session_welcome" },
+              "payload": { "session": { "id": "session-abc" } }
+            }
+            """;
+
+        service.handleMessage(user, token, message, false);
+
+        // A successful session must reset the backoff so the next disconnect reconnects promptly.
+        assertThat(retryDelays).doesNotContainKey(user.getId());
+    }
+
+    @Test
+    void handleMessage_sessionWelcome_on429_closesTheSessionAtOnce_andKeepsTheBackoff() {
+        EventSubConnections connections = (EventSubConnections) ReflectionTestUtils.getField(service, "connections");
+        // No new session for this test: reopening is EventSubConnectionsTest's.
+        connections.forbidReconnect(user);
+        WebSocket socket = mock(WebSocket.class);
+        Map<UUID, WebSocket> sockets = (Map<UUID, WebSocket>) connectionState("connections");
+        sockets.put(user.getId(), socket);
+        Map<UUID, Long> retryDelays = (Map<UUID, Long>) connectionState("retryDelaySeconds");
+        retryDelays.put(user.getId(), 32L);
+        when(postBodySpec.body(any(Object.class))).thenReturn(postBodySpec);
+        when(postResponseSpec.toBodilessEntity())
+            .thenThrow(HttpClientErrorException.create(HttpStatus.TOO_MANY_REQUESTS, "Too Many Requests",
+                new HttpHeaders(), new byte[0], StandardCharsets.UTF_8));
+
+        service.handleMessage(user, token, """
+            {
+              "metadata": { "message_type": "session_welcome" },
+              "payload": { "session": { "id": "session-abc" } }
+            }
+            """, false);
+
+        verify(restClient, times(1)).post();
+        verify(socket).sendClose(eq(WebSocket.NORMAL_CLOSURE), anyString());
+        assertThat(sockets).doesNotContainKey(user.getId());
+        assertThat(retryDelays).containsEntry(user.getId(), 32L);
+    }
+
+    private Object connectionState(String field) {
+        return ReflectionTestUtils.getField(ReflectionTestUtils.getField(service, "connections"), field);
+    }
+
+    @Test
+    void handleMessage_runsAsTheMemberTheSocketIsFor() {
+        List<UUID> seen = new java.util.ArrayList<>();
+        doAnswer(inv -> {
+            seen.add(fr.enimaloc.catapult.service.debug.DebugContext.subject().orElse(null));
+            return null;
+        }).when(eventPublisher).publishEvent(any(ApplicationEvent.class));
+
+        service.handleMessage(user, token, """
+            {
+              "metadata": { "message_type": "notification", "subscription_type": "stream.online" },
+              "payload": { "event": {} }
+            }
+            """, false);
+
+        assertThat(seen).containsExactly(user.getId());
+        assertThat(fr.enimaloc.catapult.service.debug.DebugContext.subject()).isEmpty();
+    }
+
+    // --- Under the simulation ---
+
+    private static final String ONLINE = """
+        {
+          "metadata": { "message_type": "notification", "subscription_type": "stream.online" },
+          "payload": { "event": {} }
+        }
+        """;
+
+    private static final String OUTGOING_RAID = """
+        {
+          "metadata": { "message_type": "notification", "subscription_type": "channel.raid" },
+          "payload": { "event": { "from_broadcaster_user_id": "broadcaster-123", "to_broadcaster_user_id": "999" } }
+        }
+        """;
+
+    private static final String WELCOME = """
+        {
+          "metadata": { "message_type": "session_welcome" },
+          "payload": { "session": { "id": "session-abc" } }
+        }
+        """;
+
+    /** Turns the simulation on, every EventSub key of the user simulated except {@code real}. */
+    private void simulate(fr.enimaloc.catapult.simulation.CallKey... real) {
+        when(simulationGate.getIfAvailable()).thenReturn(gate);
+        when(gate.real(eq(user.getId()), any())).thenReturn(false);
+        for (var key : real) {
+            when(gate.real(user.getId(), key)).thenReturn(true);
+        }
+        when(gate.data(user.getId())).thenReturn(SimulatedData.defaults());
+    }
+
+    @Test
+    void real_online_is_dropped_when_simulated() {
+        simulate();
+
+        service.handleMessage(user, token, ONLINE, false);
+
+        verify(streamStateService, never()).setLive(any(), anyBoolean());
+        verify(eventPublisher, never()).publishEvent(any(StreamOnlineEvent.class));
+    }
+
+    @Test
+    void injected_online_passes() {
+        simulate();
+
+        service.injectNotification(user, "stream.online", mapper.createObjectNode());
+
+        verify(streamStateService).setLive(user, true);
+        verify(eventPublisher).publishEvent(any(StreamOnlineEvent.class));
+    }
+
+    @Test
+    void real_raid_passes_when_real() {
+        simulate(SimulatedCalls.TWITCH_EVENTSUB_CHANNEL_RAID);
+
+        service.handleMessage(user, token, OUTGOING_RAID, false);
+
+        verify(eventPublisher).publishEvent(any(ChannelRaidedOutEvent.class));
+    }
+
+    @Test
+    void outside_simulation_eventsub_is_unchanged() {
+        service.handleMessage(user, token, ONLINE, false);
+        service.handleMessage(user, token, OUTGOING_RAID, false);
+
+        verify(streamStateService).setLive(user, true);
+        verify(eventPublisher).publishEvent(any(StreamOnlineEvent.class));
+        verify(eventPublisher).publishEvent(any(ChannelRaidedOutEvent.class));
+        verify(gate, never()).real(any(), any());
+    }
+
+    @Test
+    void outside_simulation_nothing_is_injected() {
+        org.assertj.core.api.Assertions.assertThatIllegalStateException()
+            .isThrownBy(() -> service.injectNotification(user, "stream.online", mapper.createObjectNode()));
+        verify(streamStateService, never()).setLive(any(), anyBoolean());
+    }
+
+    @Test
+    void injected_manual_category_change_seeds_the_initial_state_from_the_simulated_data() {
+        simulate();
+        when(categoryChangeStateService.consumeIfMatches(user, "222")).thenReturn(Optional.empty());
+
+        var event = mapper.createObjectNode().put("category_id", "222").put("category_name", "New Game");
+        event.putArray("content_classification_labels");
+        service.injectNotification(user, "channel.update", event);
+
+        verify(twitchatEventDispatcher).onCategoryChangedManually(user, "222", "New Game", "Just Chatting");
+    }
+
+    @Test
+    void startup_opens_no_connection_when_every_eventsub_event_is_simulated() {
+        simulate();
+        when(gate.data(user.getId())).thenReturn(SimulatedData.defaults().withLive(true));
+        when(userAccountRepository.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE)).thenReturn(List.of(user));
+
+        service.init();
+
+        verify(oAuthTokenRepository, never()).findByUserAndProvider(any(), any());
+        verify(restClient, never()).get();
+        // Seeded from the simulated data, as the Helix stream lookup would: no StreamOnlineEvent
+        verify(streamStateService).setLive(user, true);
+        verify(eventPublisher, never()).publishEvent(any(StreamOnlineEvent.class));
+    }
+
+    @Test
+    void startup_leaves_a_simulated_offline_channel_untouched() {
+        simulate();
+        when(userAccountRepository.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE)).thenReturn(List.of(user));
+
+        service.init();
+
+        verify(streamStateService, never()).setLive(any(), anyBoolean());
+    }
+
+    @Test
+    void startup_connects_when_one_eventsub_event_is_real() {
+        simulate(SimulatedCalls.TWITCH_EVENTSUB_CHANNEL_RAID);
+        // No token: the lookup proves the connection was attempted, without opening a socket
+        when(oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)).thenReturn(Optional.empty());
+
+        service.connect(user);
+
+        verify(oAuthTokenRepository).findByUserAndProvider(user, OAuthToken.Provider.TWITCH);
+    }
+
+    @Test
+    void a_simulated_welcome_subscribes_only_to_the_real_events_and_skips_the_simulated_helix_reads() {
+        simulate(SimulatedCalls.TWITCH_EVENTSUB_CHANNEL_RAID);
+
+        service.handleMessage(user, token, WELCOME, false);
+
+        ArgumentCaptor<Object> bodies = ArgumentCaptor.forClass(Object.class);
+        verify(postBodySpec).body(bodies.capture());
+        assertThat(((Map<String, Object>) bodies.getValue()).get("type")).isEqualTo("channel.raid");
+        // channel.update and stream.* are simulated: their initial state comes from the simulated data
+        verify(restClient, never()).get();
+    }
+}

@@ -1,0 +1,8 @@
+{
+  "status" : 200,
+  "headers" : {
+    "Cache-Control" : [ "no-cache, no-store, max-age=0, must-revalidate" ],
+    "Content-Type" : [ "application/json" ]
+  },
+  "body" : "{\"slug\":\"frozen-game\",\"url\":\"https://www.igdb.com/games/frozen-game\",\"summary\":\"A game kept for the contract tests\",\"storyline\":null,\"platforms\":[\"PC (Microsoft Windows)\"],\"rating\":80.5,\"aggregatedRating\":null,\"totalRating\":null,\"totalRatingCount\":null,\"releaseDate\":\"2020-01-01T00:00:00Z\",\"websites\":{},\"dlcs\":[],\"similarGames\":[],\"genres\":[\"Adventure\"],\"gameModes\":[],\"themes\":[],\"playerPerspectives\":[],\"keywords\":[],\"franchiseNames\":[],\"coverUrl\":null,\"screenshotUrls\":[],\"videoUrls\":[]}"
+}
