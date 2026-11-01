@@ -58,8 +58,8 @@ e2e/.playwright/
 catapult_obs_local.py
 
 ### Generated ###
-**/src/main/resources/changelog.log
-catapult-api/src/main/pr-titles.tsv
+**/src/main/resources/changelog.md
+catapult-api/src/main/changelog.md
 
 ### Local artifacts ###
 .run/

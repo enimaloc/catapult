@@ -5,12 +5,12 @@ import java.util.Map;
 import java.util.function.Predicate;
 
 /**
- * One version of catapult-api's changelog ({@code GET /api/internal/changelog}, built from its git history):
- * its conventional commits, newest first. {@code version} is {@code null} for the commits after the last tag.
+ * One version of catapult-api's changelog ({@code GET /api/internal/changelog}, built from the release notes):
+ * its entries as the notes list them. {@code version} is {@code null} when catapult-api doesn't name it.
  */
 public record ChangelogSection(String version, List<Entry> entries) {
 
-    /** A conventional commit: its type (feat, fix…), optional scope, subject and whether it breaks something. */
+    /** A line of the notes: its type (feat, fix…), optional hash and scope, subject and whether it breaks something. */
     public record Entry(String hash, String type, String scope, String subject, boolean breaking) {}
 
     /** Entries of one kind, as the page lists them: {@code feat}, {@code fix}, then every {@code other} type. */

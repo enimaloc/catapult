@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.feedback;
 
+import fr.enimaloc.catapult.service.feedback.ChangelogService.ChangelogEntry;
 import fr.enimaloc.catapult.service.feedback.ChangelogService.ChangelogSection;
 import org.junit.jupiter.api.Test;
 
@@ -10,62 +11,71 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ChangelogServiceTest {
 
     @Test
-    void commitsAfterTheLastTag_haveNoVersion() {
+    void eachVersionHeading_startsItsSection() {
         List<ChangelogSection> sections = ChangelogService.parse(List.of(
-                "a|feat: x|HEAD -> master", "b|fix: y|tag: v1.2.0", "c|feat: z|"));
+                "# Changelog", "", "Every published version.", "",
+                "## [v1.2.0](https://github.com/o/r/releases/tag/v1.2.0) - 2026-10-30", "",
+                "### Features", "- x (abc1234)", "",
+                "## v1.1.0", "", "### Fixes", "- y (def5678)"));
 
-        assertThat(sections).extracting(ChangelogSection::version).containsExactly(null, "v1.2.0");
-        assertThat(sections.get(0).entries()).extracting(ChangelogService.ChangelogEntry::hash).containsExactly("a");
-        assertThat(sections.get(1).entries()).extracting(ChangelogService.ChangelogEntry::hash).containsExactly("b", "c");
+        assertThat(sections).extracting(ChangelogSection::version).containsExactly("v1.2.0", "v1.1.0");
+        assertThat(sections.get(0).entries()).extracting(ChangelogEntry::subject).containsExactly("x");
     }
 
     @Test
-    void aTagOnTheNewestCommit_leavesNoUnversionedSection() {
-        List<ChangelogSection> sections = ChangelogService.parse(List.of("b|fix: y|tag: v1.2.0"));
-
-        assertThat(sections).extracting(ChangelogSection::version).containsExactly("v1.2.0");
-    }
-
-    @Test
-    void noTag_givesOneUnversionedSection() {
-        List<ChangelogSection> sections = ChangelogService.parse(List.of("a|feat: x|"));
-
-        assertThat(sections).extracting(ChangelogSection::version).containsExactly((String) null);
-    }
-
-    @Test
-    void aVersionMarker_startsItsSectionWithoutBeingAnEntry() {
+    void aVersionWithoutEntries_staysListed() {
         List<ChangelogSection> sections = ChangelogService.parse(List.of(
-                "||tag: v1.2.0", "a|feat: x|", "||tag: v1.1.0", "||tag: v1.0.0", "b|fix: y|"));
+                "## v1.2.0", "", "_Aucune note._", "", "## v1.1.0", "- y", "## v1.0.0"));
 
-        assertThat(sections).extracting(ChangelogSection::version).containsExactly("v1.2.0", "v1.0.0");
-        assertThat(sections.get(0).entries()).extracting(ChangelogService.ChangelogEntry::hash).containsExactly("a");
+        assertThat(sections).extracting(ChangelogSection::version).containsExactly("v1.2.0", "v1.1.0", "v1.0.0");
+        assertThat(sections.get(0).entries()).isEmpty();
+        assertThat(sections.get(2).entries()).isEmpty();
     }
 
     @Test
-    void aMergeSubject_isReducedToWhatItMerges() {
-        List<ChangelogSection> sections = ChangelogService.parse(List.of(
-                "a|fix(api): merge the permanent account deletion fixes into dev|"));
+    void aGeneratedEntry_givesItsScopeSubjectAndHash() {
+        ChangelogEntry entry = entries("### Fixes", "- **api:** apply the game open (1267d6f)").getFirst();
 
-        assertThat(sections.getFirst().entries()).singleElement().satisfies(entry -> {
-            assertThat(entry.subject()).isEqualTo("the permanent account deletion fixes");
-            assertThat(entry.scope()).isEqualTo("api");
-        });
+        assertThat(entry).isEqualTo(new ChangelogEntry("1267d6f", "fix", "api", "apply the game open", false));
     }
 
     @Test
-    void anOlderNumberedMerge_isKeptAsAnOtherChange() {
-        List<ChangelogSection> sections = ChangelogService.parse(List.of("a|merge(#2): fix CI tests suite|"));
+    void aHandEditedEntry_isKeptAsWritten() {
+        ChangelogEntry entry = entries("### Corrections", "- La connexion tient enfin (vraiment)").getFirst();
 
-        assertThat(sections.getFirst().entries()).singleElement().satisfies(entry -> {
-            assertThat(entry.type()).isEqualTo("chore");
-            assertThat(entry.scope()).isNull();
-            assertThat(entry.subject()).isEqualTo("fix CI tests suite");
-        });
+        assertThat(entry).isEqualTo(new ChangelogEntry(null, "fix", null, "La connexion tient enfin (vraiment)", false));
     }
 
     @Test
-    void aMergeOfOneBranchIntoAnother_isLeftOut() {
-        assertThat(ChangelogService.parse(List.of("a|chore: merge master into feat/web-ui|"))).isEmpty();
+    void aHandWrittenParagraph_isKept() {
+        assertThat(entries("### Features", "Une version majeure.", "* une liste", "- [ ] pas une case"))
+                .extracting(ChangelogEntry::subject)
+                .containsExactly("Une version majeure.", "une liste", "[ ] pas une case");
+    }
+
+    @Test
+    void eachHeading_givesItsEntriesType() {
+        assertThat(entries("### Features", "- a", "### FEATURES", "- b", "### Fixes", "- c",
+                "### Refactoring", "- d", "### What's Changed", "- e", "- f"))
+                .extracting(ChangelogEntry::type)
+                .containsExactly("feat", "feat", "fix", "chore", "chore", "chore");
+    }
+
+    @Test
+    void anEntryBeforeAnyHeading_isAnOtherChange() {
+        assertThat(entries("- a")).extracting(ChangelogEntry::type).containsExactly("chore");
+    }
+
+    @Test
+    void theFullChangelogLinkAndComments_areLeftOut() {
+        assertThat(entries("- a", "**Full Changelog**: https://github.com/o/r/compare/a...b", "<!-- hidden -->"))
+                .extracting(ChangelogEntry::subject)
+                .containsExactly("a");
+    }
+
+    private static List<ChangelogEntry> entries(String... lines) {
+        List<String> file = new java.util.ArrayList<>(List.of("## v1.0.0"));
+        file.addAll(List.of(lines));
+        return ChangelogService.parse(file).getFirst().entries();
     }
 }

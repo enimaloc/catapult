@@ -13,6 +13,7 @@ RUN ./gradlew :catapult-api:dependencies --no-daemon -q
 
 COPY catapult-common/src ./catapult-common/src
 COPY catapult-api/src ./catapult-api/src
+COPY CHANGELOG.md ./
 COPY .git ./.git
 # bootJar alone: `build` would also run the tests and leave a second (-plain) jar for the COPY below
 RUN ./gradlew :catapult-api:bootJar --no-daemon

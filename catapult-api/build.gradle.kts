@@ -96,37 +96,16 @@ dependencies {
 }
 
 val generateChangelog = tasks.register("generateChangelog") {
-    val outputFile = file("src/main/resources/changelog.log")
-    // Merge commit -> pull request title, written by the release workflow; absent locally, where the subjects are used
-    val prTitlesFile = file("src/main/pr-titles.tsv")
+    // Written by the release workflow with the version being released; CHANGELOG.md otherwise
+    val released = file("src/main/changelog.md")
+    val published = rootProject.file("CHANGELOG.md")
+    val outputFile = file("src/main/resources/changelog.md")
     outputs.file(outputFile)
     outputs.upToDateWhen { false }
     doLast {
-        fun git(vararg args: String) = ProcessBuilder("git", *args)
-            .directory(rootProject.projectDir)
-            .start().inputStream.bufferedReader().readLines()
-        val prTitles = if (prTitlesFile.exists()) {
-            prTitlesFile.readLines().map { it.split("\t", limit = 2) }.filter { it.size == 2 }.associate { it[0] to it[1] }
-        } else emptyMap()
-        // What a range brings: its merged pull requests, or its commits for a version made without any
-        fun entries(range: String): List<String> {
-            fun log(kind: String) = git("log", kind, "--format=%H|%h|%s", range).mapNotNull { line ->
-                val (full, short, subject) = line.split("|", limit = 3)
-                val title = (prTitles[full] ?: subject).replace("|", "/")
-                if (title.startsWith("chore(release)")) null else "$short|$title|"
-            }
-            return log("--merges").ifEmpty { log("--no-merges") }
-        }
-        val lines = runCatching {
-            val tags = git("-c", "versionsort.suffix=-BETA", "tag", "--list", "v*", "--sort=-v:refname")
-            val unreleased = tags.firstOrNull()?.let { entries("$it..HEAD") } ?: entries("HEAD")
-            unreleased + tags.flatMapIndexed { i, tag ->
-                val previous = tags.getOrNull(i + 1)
-                listOf("||tag: $tag") + entries(if (previous != null) "$previous..$tag" else tag)
-            }
-        }.getOrDefault(emptyList())
+        val source = listOf(released, published).firstOrNull { it.exists() }
+        val content = source?.readText().orEmpty()
         // Rewritten only when it changes: a touched resource makes devtools restart the running app
-        val content = lines.joinToString("\n")
         if (!outputFile.exists() || outputFile.readText() != content) {
             outputFile.writeText(content)
         }

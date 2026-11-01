@@ -69,7 +69,7 @@ La version d'une release est calculée à partir de ces messages : un titre pré
 3. À la fusion, le tag `vX.Y.Z-BETA.N` est créé, la pré-release GitHub est publiée et les images Docker sont
    poussées (`:<version>` et `:beta`). Le bot régénère ensuite [`CHANGELOG.md`](CHANGELOG.md) sur `dev` à partir
    des notes de toutes les releases : pour corriger une entrée déjà publiée, modifie les notes de la release
-   GitHub, le fichier suivra à la prochaine release.
+   GitHub, le fichier et la page `/changelog` du site suivront à la prochaine release.
 4. La promotion `beta` → `main` suit le même cycle (`chore(release): vX.Y.Z`) et publie une release stable
    (images `:<version>` et `:latest`). Le bot ouvre ensuite une PR de report `beta` → `dev` (label `backport`) :
    fusionne-la par commit de merge, la promotion `dev` → `beta` est refusée tant qu'elle est ouverte.
