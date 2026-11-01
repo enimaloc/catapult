@@ -4,6 +4,14 @@ Toutes les versions publiées de Catapult, la plus récente en premier.
 
 Ce fichier est régénéré par le bot à chaque release à partir des notes des [GitHub Releases](https://github.com/enimaloc/catapult/releases) : pour corriger une entrée, modifie les notes de la release (ou le changelog de la PR de release avant sa publication), pas ce fichier.
 
+## [v1.0.0-BETA.100](https://github.com/enimaloc/catapult/releases/tag/v1.0.0-BETA.100) - 2026-11-01
+
+### Fixes
+- **api:** build the changelog from every version's merged pull requests (cb8fdcb)
+- **web:** give the landing page's platform cards their descriptions (648ecce)
+- **api:** show every version's release notes on the changelog page (411d033)
+- merge the changelog release notes and the landing page descriptions into dev (a82d8d8)
+
 ## [v1.0.0-BETA.99](https://github.com/enimaloc/catapult/releases/tag/v1.0.0-BETA.99) - 2026-10-31
 
 ### Features
