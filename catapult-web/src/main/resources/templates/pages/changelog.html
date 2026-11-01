@@ -1,5 +1,5 @@
 <!--/*@thymesVar id="changelog" type="java.util.List<fr.enimaloc.catapult.dto.changelog.ChangelogSection>"*/-->
-<!--/* catapult-api's versions, newest first (ChangelogController): each one's commits by kind. */-->
+<!--/* catapult-api's versions, newest first (ChangelogController): each one's release notes by kind. */-->
 <mdui-layout-main th:fragment="changelog">
     <section class="section privacy-section changelog-section">
         <div class="section-header">
@@ -13,6 +13,7 @@
 
         <mdui-card th:each="version : ${changelog}" class="privacy-card changelog-card" variant="outlined">
             <h2 class="changelog-version" th:text="${version.version()} ?: #{changelog.unreleased}">1.0.0</h2>
+            <p th:if="${version.groups().isEmpty()}" class="changelog-no-notes" th:text="#{changelog.no-notes}">changelog.no-notes</p>
             <th:block th:each="group : ${version.groups()}">
                 <h3 class="changelog-kind" th:text="#{${'changelog.kind.' + group.kind()}}">changelog.kind</h3>
                 <ul class="changelog-entries">

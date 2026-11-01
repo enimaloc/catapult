@@ -4,6 +4,18 @@ Toutes les versions publiées de Catapult, la plus récente en premier.
 
 Ce fichier est régénéré par le bot à chaque release à partir des notes des [GitHub Releases](https://github.com/enimaloc/catapult/releases) : pour corriger une entrée, modifie les notes de la release (ou le changelog de la PR de release avant sa publication), pas ce fichier.
 
+## [v1.0.0-BETA.99](https://github.com/enimaloc/catapult/releases/tag/v1.0.0-BETA.99) - 2026-10-31
+
+### Features
+- **api:** migrate the stored tokens to a new encryption key (63a7385)
+- **api:** merge the token encryption key migration into dev (9ef45ca)
+
+### Fixes
+- **api:** recover EventSub sessions refused or stuck without a socket (43040ff)
+- **web:** end a stream quietly when its session went away (edd4401)
+- **web:** renew a session before its streams time out (a3128fe)
+- merge the EventSub session recovery and quiet stream endings into dev (69905fa)
+
 ## [v1.0.0-BETA.98](https://github.com/enimaloc/catapult/releases/tag/v1.0.0-BETA.98) - 2026-10-30
 
 ### Features
