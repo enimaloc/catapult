@@ -8,22 +8,24 @@ import org.springframework.stereotype.Service;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/** The release notes, as built into the jar in {@code CHANGELOG.md}'s format (see catapult-api's generateChangelog). */
 @Slf4j
 @Service
 public class ChangelogService {
 
-    private static final Pattern CONVENTIONAL = Pattern.compile(
-        "^(feat|fix|docs|chore|refactor|test|perf|ci|build|style)(\\([^)]+\\))?(!)?:\\s*(.+)$",
-        Pattern.CASE_INSENSITIVE
-    );
+    private static final Pattern VERSION = Pattern.compile("^## \\[?(v[^]\\s]+)]?.*$");
+    private static final Pattern KIND = Pattern.compile("^#{3,}\\s+(.+?)\\s*$");
+    private static final Pattern BULLET = Pattern.compile("^[-*]\\s+(.+)$");
+    private static final Pattern SCOPE = Pattern.compile("^\\*\\*([^*]+):\\*\\*\\s+(.+)$");
+    private static final Pattern HASH = Pattern.compile("^(.+)\\s+\\(([0-9a-f]{7,40})\\)$");
 
     public record ChangelogEntry(String hash, String type, String scope, String subject, boolean breaking) {}
 
-    /** {@code version} is null for the commits after the last tag. */
     public record ChangelogSection(String version, List<ChangelogEntry> entries) {}
 
     @Getter
@@ -32,32 +34,16 @@ public class ChangelogService {
     @PostConstruct
     public void load() {
         try {
-            List<String> lines;
-            try {
-                lines = runGitLog();
-            } catch (Exception e) {
-                log.debug("git not available, loading changelog from classpath: {}", e.getMessage());
-                lines = readFromClasspath();
-            }
-            sections = parse(lines);
+            sections = parse(readFromClasspath());
         } catch (Exception e) {
             log.warn("Could not load changelog: {}", e.getMessage());
         }
     }
 
-    private List<String> runGitLog() throws Exception {
-        Process process = new ProcessBuilder(
-            "git", "log", "--format=%h|%s|%D", "--no-merges", "-n", "100"
-        ).start();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-            return reader.lines().toList();
-        }
-    }
-
     private List<String> readFromClasspath() throws Exception {
-        InputStream is = getClass().getResourceAsStream("/changelog.log");
+        InputStream is = getClass().getResourceAsStream("/changelog.md");
         if (is == null) return List.of();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(is))) {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
             return reader.lines().toList();
         }
     }
@@ -65,48 +51,72 @@ public class ChangelogService {
     static List<ChangelogSection> parse(List<String> lines) {
         List<ChangelogSection> result = new ArrayList<>();
         String currentVersion = null;
+        String currentType = "chore";
         List<ChangelogEntry> currentEntries = new ArrayList<>();
 
-        for (String line : lines) {
-            String[] parts = line.split("\\|", 3);
-            if (parts.length < 2) continue;
+        for (String raw : lines) {
+            String line = raw.trim();
 
-            String hash = parts[0].trim();
-            String subject = parts[1].trim();
-            String refs = parts.length == 3 ? parts[2].trim() : "";
-
-            // Detect version tag in refs (e.g. "tag: v1.0.0")
-            String tag = extractTag(refs);
-            if (tag != null) {
-                if (!currentEntries.isEmpty()) {
+            Matcher version = VERSION.matcher(line);
+            if (version.matches()) {
+                // Every version stays listed, even one published without notes
+                if (currentVersion != null) {
                     result.add(new ChangelogSection(currentVersion, List.copyOf(currentEntries)));
                     currentEntries.clear();
                 }
-                currentVersion = tag;
+                currentVersion = version.group(1);
+                currentType = "chore";
+                continue;
             }
 
-            Matcher m = CONVENTIONAL.matcher(subject);
-            if (m.matches()) {
-                String type = m.group(1).toLowerCase();
-                String scope = m.group(2) != null ? m.group(2).replaceAll("[()]", "") : null;
-                boolean breaking = m.group(3) != null;
-                String msg = m.group(4);
-                currentEntries.add(new ChangelogEntry(hash, type, scope, msg, breaking));
+            Matcher kind = KIND.matcher(line);
+            if (kind.matches()) {
+                currentType = typeOf(kind.group(1));
+                continue;
             }
+
+            // Before the first version: the file's own introduction
+            if (currentVersion == null || isNotAnEntry(line)) continue;
+            currentEntries.add(entry(line, currentType));
         }
 
-        if (!currentEntries.isEmpty()) {
+        if (currentVersion != null) {
             result.add(new ChangelogSection(currentVersion, List.copyOf(currentEntries)));
         }
         return Collections.unmodifiableList(result);
     }
 
-    private static String extractTag(String refs) {
-        if (refs.isBlank()) return null;
-        for (String ref : refs.split(",")) {
-            ref = ref.trim();
-            if (ref.startsWith("tag: v")) return ref.substring(5);
+    /** The notes' section, written by the release bot or by hand. */
+    private static String typeOf(String heading) {
+        return switch (heading.toLowerCase(Locale.ROOT)) {
+            case "features" -> "feat";
+            case "fixes", "corrections" -> "fix";
+            default -> "chore";
+        };
+    }
+
+    private static boolean isNotAnEntry(String line) {
+        return line.isEmpty() || line.startsWith("<!--") || line.startsWith("**Full Changelog**")
+                || line.equals("_Aucune note._");
+    }
+
+    private static ChangelogEntry entry(String line, String type) {
+        Matcher bullet = BULLET.matcher(line);
+        String subject = bullet.matches() ? bullet.group(1) : line;
+
+        String hash = null;
+        Matcher withHash = HASH.matcher(subject);
+        if (withHash.matches()) {
+            subject = withHash.group(1);
+            hash = withHash.group(2);
         }
-        return null;
+
+        String scope = null;
+        Matcher withScope = SCOPE.matcher(subject);
+        if (withScope.matches()) {
+            scope = withScope.group(1);
+            subject = withScope.group(2);
+        }
+        return new ChangelogEntry(hash, type, scope, subject, false);
     }
 }

@@ -96,16 +96,16 @@ dependencies {
 }
 
 val generateChangelog = tasks.register("generateChangelog") {
-    val outputFile = file("src/main/resources/changelog.log")
+    // Written by the release workflow with the version being released; CHANGELOG.md otherwise
+    val released = file("src/main/changelog.md")
+    val published = rootProject.file("CHANGELOG.md")
+    val outputFile = file("src/main/resources/changelog.md")
     outputs.file(outputFile)
+    outputs.upToDateWhen { false }
     doLast {
-        val lines = runCatching {
-            ProcessBuilder("git", "log", "--format=%h|%s|%D", "--no-merges", "-n", "100")
-                .directory(rootProject.projectDir)
-                .start().inputStream.bufferedReader().readLines()
-        }.getOrDefault(emptyList())
+        val source = listOf(released, published).firstOrNull { it.exists() }
+        val content = source?.readText().orEmpty()
         // Rewritten only when it changes: a touched resource makes devtools restart the running app
-        val content = lines.joinToString("\n")
         if (!outputFile.exists() || outputFile.readText() != content) {
             outputFile.writeText(content)
         }

@@ -5,9 +5,27 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Properties;
+import java.util.stream.Stream;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class SiteCatalogTest {
+
+    @ParameterizedTest
+    @ValueSource(strings = {"messages", "messages_en", "messages_fr"})
+    void everyLandingCardHasItsTextInEveryLanguage(String bundle) throws IOException {
+        Properties messages = new Properties();
+        try (InputStream in = getClass().getResourceAsStream("/lang/" + bundle + ".properties")) {
+            messages.load(in);
+        }
+
+        Stream<String> features = SiteCatalog.FEATURES.stream().flatMap(f -> Stream.of(f.titleKey(), f.descriptionKey()));
+        Stream<String> platforms = SiteCatalog.PLATFORMS.stream().flatMap(p -> Stream.of(p.titleKey(), p.descriptionKey()));
+        assertThat(Stream.concat(features, platforms)).allSatisfy(key -> assertThat(messages).containsKey(key));
+    }
 
     @ParameterizedTest
     @ValueSource(strings = {"", "privacy", "changelog", "docs/api", "channel", "admin", "notifications", "login", "join"})
