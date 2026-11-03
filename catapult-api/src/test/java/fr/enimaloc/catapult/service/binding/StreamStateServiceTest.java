@@ -106,4 +106,16 @@ class StreamStateServiceTest {
 
         verifyNoInteractions(twitchatEventDispatcher);
     }
+
+    @Test
+    void restoreLive_neverDispatchesTwitchatStreamStarted() {
+        UserAccount botEnabledUser = new UserAccount();
+        botEnabledUser.setId(UUID.randomUUID());
+        botEnabledUser.setBotEnabled(true);
+
+        service.restoreLive(botEnabledUser, true);
+
+        assertThat(service.isLive(botEnabledUser)).isTrue();
+        verifyNoInteractions(twitchatEventDispatcher);
+    }
 }

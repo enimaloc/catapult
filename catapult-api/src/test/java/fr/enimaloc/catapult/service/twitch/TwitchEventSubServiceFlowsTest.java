@@ -85,7 +85,7 @@ class TwitchEventSubServiceFlowsTest {
         helix = MockRestServiceServer.bindTo(builder).build();
         service = new TwitchEventSubService(tokens, users, tokenService, streamState, publisher, builder.build(),
                 new ObjectMapper(), twitchat, selfChanges, DebugRecording.OFF, SimulationGates.none(), SiteRoles.active(),
-                streamSessions);
+                streamSessions, new fr.enimaloc.catapult.service.stream.StreamCatchUp(streamSessions, streamState, publisher));
         ReflectionTestUtils.setField(service, "twitchClientId", "client-id");
         ReflectionTestUtils.setField(ReflectionTestUtils.getField(service, "connections"), "httpClient", httpClient);
 
@@ -239,7 +239,7 @@ class TwitchEventSubServiceFlowsTest {
             service.handleMessage(user, token, WELCOME, false);
 
             helix.verify();
-            verify(streamState).setLive(user, true);
+            verify(streamState).restoreLive(user, true);
 
             // The loaded state is the baseline: an identical update is not a change
             service.handleMessage(user, token, channelUpdate("509658", "Just Chatting", "Gambling"), false);
@@ -282,7 +282,7 @@ class TwitchEventSubServiceFlowsTest {
             service.handleMessage(user, token, WELCOME, false);
 
             helix.verify();
-            verify(streamState).setLive(user, false);
+            verify(streamState).restoreLive(user, false);
         }
     }
 

@@ -112,7 +112,7 @@ class InboundDebugTest {
                 RestClient.create(), new ObjectMapper(), mock(TwitchatEventDispatcher.class),
                 mock(CatapultCategoryChangeStateService.class), new DebugRecording(registry, recorder),
                 SimulationGates.none(), SiteRoles.active(),
-                mock(StreamSessionService.class));
+                mock(StreamSessionService.class), mock(fr.enimaloc.catapult.service.stream.StreamCatchUp.class));
         return eventSub;
     }
 

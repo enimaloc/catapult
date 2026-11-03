@@ -62,6 +62,7 @@ class TwitchEventSubServiceTest {
     @Mock private TwitchTokenService twitchTokenService;
     @Mock private StreamStateService streamStateService;
     @Mock private StreamSessionService streamSessionService;
+    @Mock private fr.enimaloc.catapult.service.stream.StreamCatchUp streamCatchUp;
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private RestClient restClient;
     @Mock private TwitchatEventDispatcher twitchatEventDispatcher;
@@ -344,7 +345,8 @@ class TwitchEventSubServiceTest {
         // first call is initChannelState (empty object, returns early), second is initStreamState
         when(getResponseSpec.body(String.class))
             .thenReturn("{}")
-            .thenReturn("{\"data\":[{\"id\":\"42\",\"user_id\":\"broadcaster-123\"}]}");
+            .thenReturn("{\"data\":[{\"id\":\"42\",\"user_id\":\"broadcaster-123\","
+                + "\"started_at\":\"2026-11-03T10:00:00Z\"}]}");
 
         String message = """
             {
@@ -355,7 +357,29 @@ class TwitchEventSubServiceTest {
 
         service.handleMessage(user, token, message, false);
 
-        verify(streamStateService).setLive(user, true);
+        verify(streamCatchUp).reconcile(user, Optional.of(new fr.enimaloc.catapult.service.stream.StreamCatchUp
+            .LiveStream("42", java.time.Instant.parse("2026-11-03T10:00:00Z"))));
+    }
+
+    @Test
+    void handleMessage_sessionWelcome_whenLiveStreamHasNoStartTime_restoresLiveWithoutCatchUp() {
+        when(restClient.get()).thenReturn(getUriSpec);
+        when(getUriSpec.uri(anyString())).thenReturn(getHeaderSpec);
+        when(getHeaderSpec.header(anyString(), anyString())).thenReturn(getHeaderSpec);
+        when(getHeaderSpec.retrieve()).thenReturn(getResponseSpec);
+        when(getResponseSpec.body(String.class))
+            .thenReturn("{}")
+            .thenReturn("{\"data\":[{\"id\":\"42\"}]}");
+
+        service.handleMessage(user, token, """
+            {
+              "metadata": { "message_type": "session_welcome" },
+              "payload": { "session": { "id": "session-abc" } }
+            }
+            """, false);
+
+        verify(streamStateService).restoreLive(user, true);
+        verifyNoInteractions(streamCatchUp);
     }
 
     @Test
@@ -377,7 +401,7 @@ class TwitchEventSubServiceTest {
 
         service.handleMessage(user, token, message, false);
 
-        verify(streamStateService).setLive(user, false);
+        verify(streamCatchUp).reconcile(user, Optional.empty());
     }
 
     @Test
@@ -398,7 +422,7 @@ class TwitchEventSubServiceTest {
             """;
 
         assertThatNoException().isThrownBy(() -> service.handleMessage(user, token, message, false));
-        verify(streamStateService, never()).setLive(any(), anyBoolean());
+        verifyNoInteractions(streamCatchUp);
     }
 
     @Test

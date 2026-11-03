@@ -95,7 +95,7 @@ class SimulatedTwitchServiceTest {
                 mock(StreamStateService.class), mock(ApplicationEventPublisher.class), RestClient.create(),
                 new ObjectMapper(), twitchat, categoryChangeState, DebugRecording.OFF,
                 beans.getBeanProvider(SimulationGate.class), SiteRoles.active(),
-                mock(StreamSessionService.class));
+                mock(StreamSessionService.class), mock(fr.enimaloc.catapult.service.stream.StreamCatchUp.class));
     }
 
     @Test

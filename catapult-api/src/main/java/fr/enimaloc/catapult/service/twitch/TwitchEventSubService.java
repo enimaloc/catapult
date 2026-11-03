@@ -14,6 +14,7 @@ import fr.enimaloc.catapult.event.StreamOnlineEvent;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
+import fr.enimaloc.catapult.service.stream.StreamCatchUp;
 import fr.enimaloc.catapult.service.stream.StreamSessionService;
 import fr.enimaloc.catapult.service.debug.DebugContext;
 import fr.enimaloc.catapult.service.debug.DebugRecording;
@@ -74,6 +75,7 @@ public class TwitchEventSubService implements EventSubService {
     private final ObjectProvider<SimulationGate> simulationGate;
     private final SiteRole siteRole;
     private final StreamSessionService streamSessionService;
+    private final StreamCatchUp streamCatchUp;
 
     public TwitchEventSubService(OAuthTokenRepository oAuthTokenRepository,
                                  UserAccountRepository userAccountRepository,
@@ -87,7 +89,8 @@ public class TwitchEventSubService implements EventSubService {
                                  DebugRecording debug,
                                  ObjectProvider<SimulationGate> simulationGate,
                                  SiteRole siteRole,
-                                 StreamSessionService streamSessionService) {
+                                 StreamSessionService streamSessionService,
+                                 StreamCatchUp streamCatchUp) {
         this.oAuthTokenRepository = oAuthTokenRepository;
         this.userAccountRepository = userAccountRepository;
         this.twitchTokenService = twitchTokenService;
@@ -101,6 +104,7 @@ public class TwitchEventSubService implements EventSubService {
         this.simulationGate = simulationGate;
         this.siteRole = siteRole;
         this.streamSessionService = streamSessionService;
+        this.streamCatchUp = streamCatchUp;
         this.connections = new EventSubConnections(
             "[EventSub]", "twitch-eventsub-watchdog", oAuthTokenRepository, this::handleMessage);
     }
@@ -480,11 +484,32 @@ public class TwitchEventSubService implements EventSubService {
                 .body(String.class);
             JsonNode response = objectMapper.readTree(raw);
             if (response == null || !response.has("data")) return;
-            boolean isLive = !response.path("data").isEmpty();
-            streamStateService.setLive(user, isLive);
-            log.debug("Initialized stream state for user {}: live={}", user.getId(), isLive);
+            JsonNode stream = response.path("data").path(0);
+            if (stream.isMissingNode()) {
+                streamCatchUp.reconcile(user, Optional.empty());
+            } else {
+                Optional<StreamCatchUp.LiveStream> live = parseLiveStream(stream);
+                if (live.isPresent()) {
+                    streamCatchUp.reconcile(user, live);
+                } else {
+                    log.debug("Live stream of user {} has no usable id or start time — no catch-up", user.getId());
+                    streamStateService.restoreLive(user, true);
+                }
+            }
+            log.debug("Initialized stream state for user {}: live={}", user.getId(), !stream.isMissingNode());
         } catch (Exception e) {
             log.warn("Failed to initialize stream state for user {}: {}", user.getId(), e.getMessage(), e);
+        }
+    }
+
+    private Optional<StreamCatchUp.LiveStream> parseLiveStream(JsonNode stream) {
+        String id = stream.path("id").asText("");
+        String startedAt = stream.path("started_at").asText("");
+        if (id.isBlank() || startedAt.isBlank()) return Optional.empty();
+        try {
+            return Optional.of(new StreamCatchUp.LiveStream(id, Instant.parse(startedAt)));
+        } catch (java.time.format.DateTimeParseException e) {
+            return Optional.empty();
         }
     }
 
