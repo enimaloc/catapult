@@ -11,6 +11,7 @@ import fr.enimaloc.catapult.event.ChannelCclChangedEvent;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
+import fr.enimaloc.catapult.service.stream.StreamSessionService;
 import fr.enimaloc.catapult.service.notification.CatapultCategoryChangeStateService;
 import fr.enimaloc.catapult.service.notification.TwitchatEventDispatcher;
 import fr.enimaloc.catapult.simulation.SimulationGates;
@@ -66,6 +67,7 @@ class TwitchEventSubServiceFlowsTest {
     private final UserAccountRepository users = mock(UserAccountRepository.class);
     private final TwitchTokenService tokenService = mock(TwitchTokenService.class);
     private final StreamStateService streamState = mock(StreamStateService.class);
+    private final StreamSessionService streamSessions = mock(StreamSessionService.class);
     private final ApplicationEventPublisher publisher = mock(ApplicationEventPublisher.class);
     private final TwitchatEventDispatcher twitchat = mock(TwitchatEventDispatcher.class);
     private final CatapultCategoryChangeStateService selfChanges = mock(CatapultCategoryChangeStateService.class);
@@ -82,7 +84,8 @@ class TwitchEventSubServiceFlowsTest {
         RestClient.Builder builder = RestClient.builder();
         helix = MockRestServiceServer.bindTo(builder).build();
         service = new TwitchEventSubService(tokens, users, tokenService, streamState, publisher, builder.build(),
-                new ObjectMapper(), twitchat, selfChanges, DebugRecording.OFF, SimulationGates.none(), SiteRoles.active());
+                new ObjectMapper(), twitchat, selfChanges, DebugRecording.OFF, SimulationGates.none(), SiteRoles.active(),
+                streamSessions);
         ReflectionTestUtils.setField(service, "twitchClientId", "client-id");
         ReflectionTestUtils.setField(ReflectionTestUtils.getField(service, "connections"), "httpClient", httpClient);
 

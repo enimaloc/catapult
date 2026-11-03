@@ -12,6 +12,7 @@ import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.debug.DebugExchangeRepository;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
+import fr.enimaloc.catapult.service.stream.StreamSessionService;
 import fr.enimaloc.catapult.service.debug.DebugMemberRegistry.DebugMode;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
 import fr.enimaloc.catapult.service.notification.CatapultCategoryChangeStateService;
@@ -110,7 +111,8 @@ class InboundDebugTest {
                 mock(TwitchTokenService.class), streamState, mock(ApplicationEventPublisher.class),
                 RestClient.create(), new ObjectMapper(), mock(TwitchatEventDispatcher.class),
                 mock(CatapultCategoryChangeStateService.class), new DebugRecording(registry, recorder),
-                SimulationGates.none(), SiteRoles.active());
+                SimulationGates.none(), SiteRoles.active(),
+                mock(StreamSessionService.class));
         return eventSub;
     }
 

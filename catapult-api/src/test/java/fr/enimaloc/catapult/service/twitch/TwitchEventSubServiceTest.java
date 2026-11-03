@@ -18,6 +18,7 @@ import fr.enimaloc.catapult.event.StreamOnlineEvent;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
+import fr.enimaloc.catapult.service.stream.StreamSessionService;
 import fr.enimaloc.catapult.service.notification.CatapultCategoryChangeStateService;
 import fr.enimaloc.catapult.service.notification.TwitchatEventDispatcher;
 import fr.enimaloc.catapult.simulation.SimulatedCalls;
@@ -41,6 +42,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestClient;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -59,6 +61,7 @@ class TwitchEventSubServiceTest {
     @Mock private UserAccountRepository userAccountRepository;
     @Mock private TwitchTokenService twitchTokenService;
     @Mock private StreamStateService streamStateService;
+    @Mock private StreamSessionService streamSessionService;
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private RestClient restClient;
     @Mock private TwitchatEventDispatcher twitchatEventDispatcher;
@@ -126,6 +129,52 @@ class TwitchEventSubServiceTest {
         ArgumentCaptor<StreamOnlineEvent> captor = ArgumentCaptor.forClass(StreamOnlineEvent.class);
         verify(eventPublisher).publishEvent(captor.capture());
         assertThat(captor.getValue().getUser()).isEqualTo(user);
+    }
+
+    @Test
+    void handleMessage_streamOnline_recordsTheStreamBeforePublishing() {
+        String message = """
+            {
+              "metadata": { "message_type": "notification", "subscription_type": "stream.online" },
+              "payload": { "event": { "id": "9001", "started_at": "2026-11-03T10:00:00Z" } }
+            }
+            """;
+
+        service.handleMessage(user, token, message, false);
+
+        var order = inOrder(streamSessionService, eventPublisher);
+        order.verify(streamSessionService).recordStart(user, "9001", Instant.parse("2026-11-03T10:00:00Z"));
+        order.verify(eventPublisher).publishEvent(any(StreamOnlineEvent.class));
+    }
+
+    @Test
+    void handleMessage_streamOnline_markerFailureStillPublishesEvent() {
+        doThrow(new IllegalStateException("db down")).when(streamSessionService).recordStart(any(), any(), any());
+        String message = """
+            {
+              "metadata": { "message_type": "notification", "subscription_type": "stream.online" },
+              "payload": { "event": { "id": "9001", "started_at": "2026-11-03T10:00:00Z" } }
+            }
+            """;
+
+        service.handleMessage(user, token, message, false);
+
+        verify(eventPublisher).publishEvent(any(StreamOnlineEvent.class));
+    }
+
+    @Test
+    void handleMessage_streamOffline_recordsTheEnd() {
+        String message = """
+            {
+              "metadata": { "message_type": "notification", "subscription_type": "stream.offline" },
+              "payload": { "event": {} }
+            }
+            """;
+
+        service.handleMessage(user, token, message, false);
+
+        verify(streamSessionService).recordEnd(eq(user), any(Instant.class));
+        verify(eventPublisher).publishEvent(any(StreamOfflineEvent.class));
     }
 
     @Test

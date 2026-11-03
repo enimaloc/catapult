@@ -14,6 +14,7 @@ import fr.enimaloc.catapult.event.StreamOnlineEvent;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
+import fr.enimaloc.catapult.service.stream.StreamSessionService;
 import fr.enimaloc.catapult.service.debug.DebugContext;
 import fr.enimaloc.catapult.service.debug.DebugRecording;
 import fr.enimaloc.catapult.service.notification.CatapultCategoryChangeStateService;
@@ -72,6 +73,7 @@ public class TwitchEventSubService implements EventSubService {
     private final DebugRecording debug;
     private final ObjectProvider<SimulationGate> simulationGate;
     private final SiteRole siteRole;
+    private final StreamSessionService streamSessionService;
 
     public TwitchEventSubService(OAuthTokenRepository oAuthTokenRepository,
                                  UserAccountRepository userAccountRepository,
@@ -84,7 +86,8 @@ public class TwitchEventSubService implements EventSubService {
                                  CatapultCategoryChangeStateService categoryChangeStateService,
                                  DebugRecording debug,
                                  ObjectProvider<SimulationGate> simulationGate,
-                                 SiteRole siteRole) {
+                                 SiteRole siteRole,
+                                 StreamSessionService streamSessionService) {
         this.oAuthTokenRepository = oAuthTokenRepository;
         this.userAccountRepository = userAccountRepository;
         this.twitchTokenService = twitchTokenService;
@@ -97,6 +100,7 @@ public class TwitchEventSubService implements EventSubService {
         this.debug = debug;
         this.simulationGate = simulationGate;
         this.siteRole = siteRole;
+        this.streamSessionService = streamSessionService;
         this.connections = new EventSubConnections(
             "[EventSub]", "twitch-eventsub-watchdog", oAuthTokenRepository, this::handleMessage);
     }
@@ -251,10 +255,12 @@ public class TwitchEventSubService implements EventSubService {
                     switch (subscriptionType) {
                         case "stream.online" -> {
                             streamStateService.setLive(user, true);
+                            recordStreamStart(user, root.path("payload").path("event"));
                             eventPublisher.publishEvent(new StreamOnlineEvent(this, user));
                         }
                         case "stream.offline" -> {
                             streamStateService.setLive(user, false);
+                            recordStreamEnd(user);
                             eventPublisher.publishEvent(new StreamOfflineEvent(this, user));
                         }
                         case "channel.update" -> handleChannelUpdate(user, root.path("payload").path("event"));
@@ -267,6 +273,24 @@ public class TwitchEventSubService implements EventSubService {
             }
         } catch (Exception e) {
             log.error("Failed to parse EventSub message for user {}: {}", user.getId(), e.getMessage());
+        }
+    }
+
+    /** Remembers the stream that just started; a failure here must not stop the online event from being published. */
+    private void recordStreamStart(UserAccount user, JsonNode event) {
+        try {
+            streamSessionService.recordStart(user, event.path("id").asText(), Instant.parse(event.path("started_at").asText()));
+        } catch (Exception e) {
+            log.warn("Could not remember the stream start for user {}: {}", user.getId(), e.getMessage());
+        }
+    }
+
+    /** Remembers the stream that just ended; a failure here must not stop the offline event from being published. */
+    private void recordStreamEnd(UserAccount user) {
+        try {
+            streamSessionService.recordEnd(user, Instant.now());
+        } catch (Exception e) {
+            log.warn("Could not remember the stream end for user {}: {}", user.getId(), e.getMessage());
         }
     }
 

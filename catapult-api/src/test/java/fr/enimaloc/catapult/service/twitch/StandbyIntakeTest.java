@@ -20,7 +20,7 @@ class StandbyIntakeTest {
 
     private TwitchEventSubService eventSub() {
         return new TwitchEventSubService(tokens, users, null, null, null, restClient, null, null, null, null, null,
-            SiteRoles.standby());
+            SiteRoles.standby(), null);
     }
 
     @Test

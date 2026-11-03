@@ -10,6 +10,7 @@ import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.account.BotToggleService;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
+import fr.enimaloc.catapult.service.stream.StreamSessionService;
 import fr.enimaloc.catapult.service.debug.DebugRecording;
 import fr.enimaloc.catapult.service.notification.CatapultCategoryChangeStateService;
 import fr.enimaloc.catapult.service.notification.TwitchatEventDispatcher;
@@ -93,7 +94,8 @@ class SimulatedTwitchServiceTest {
         return new TwitchEventSubService(fx.tokens, fx.accounts, mock(TwitchTokenService.class),
                 mock(StreamStateService.class), mock(ApplicationEventPublisher.class), RestClient.create(),
                 new ObjectMapper(), twitchat, categoryChangeState, DebugRecording.OFF,
-                beans.getBeanProvider(SimulationGate.class), SiteRoles.active());
+                beans.getBeanProvider(SimulationGate.class), SiteRoles.active(),
+                mock(StreamSessionService.class));
     }
 
     @Test

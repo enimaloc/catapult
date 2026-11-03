@@ -16,6 +16,7 @@ import fr.enimaloc.catapult.repository.minecraft.MinecraftServiceAccountReposito
 import fr.enimaloc.catapult.service.account.BotToggleService;
 import fr.enimaloc.catapult.service.binding.SchedulerService;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
+import fr.enimaloc.catapult.service.stream.StreamSessionService;
 import fr.enimaloc.catapult.service.debug.DebugRecording;
 import fr.enimaloc.catapult.service.notification.CatapultCategoryChangeStateService;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
@@ -99,7 +100,8 @@ class SimulationActionsTest {
         beans.addBean("simulationGate", new SimulationGate(registry));
         eventSub = new TwitchEventSubService(tokens, accounts, mock(TwitchTokenService.class), streamState,
                 publisher, RestClient.create(), new ObjectMapper(), twitchat, selfChanges, DebugRecording.OFF,
-                beans.getBeanProvider(SimulationGate.class), SiteRoles.active());
+                beans.getBeanProvider(SimulationGate.class), SiteRoles.active(),
+                mock(StreamSessionService.class));
         beans.addBean("twitchEventSubService", eventSub);
         actions = new SimulationActions(registry, journal, beans.getBeanProvider(TwitchEventSubService.class),
                 scheduler, getterConfigs, botToggle, twitch);
