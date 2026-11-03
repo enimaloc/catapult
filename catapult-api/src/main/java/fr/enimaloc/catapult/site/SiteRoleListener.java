@@ -28,20 +28,28 @@ public class SiteRoleListener {
 
     @EventListener
     public void onSiteRoleChanged(SiteRoleChangedEvent event) {
-        List<UserAccount> users = userAccountRepository.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE);
         if (event.isActive()) {
             log.info("Site is active — reopening the Twitch intakes");
             attempt("EventSub init", null, twitchEventSubService::init);
-            for (UserAccount user : users) {
+            for (UserAccount user : botUsers()) {
                 attempt("chat connect", user, () -> twitchChatService.connect(user));
             }
         } else {
             log.info("Site is on standby — closing the Twitch intakes");
-            for (UserAccount user : users) {
+            for (UserAccount user : botUsers()) {
                 attempt("EventSub disconnect", user, () -> twitchEventSubService.disconnect(user));
                 attempt("chat disconnect", user, () -> twitchChatService.disconnect(user));
                 attempt("game state clear", user, () -> gameStateService.clearState(user));
             }
+        }
+    }
+
+    private List<UserAccount> botUsers() {
+        try {
+            return userAccountRepository.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE);
+        } catch (RuntimeException e) {
+            log.warn("Site role change: could not list the bot users", e);
+            return List.of();
         }
     }
 

@@ -81,4 +81,14 @@ class SiteRoleListenerTest {
         verify(chat).connect(a);
         verify(chat).connect(b);
     }
+
+    @Test
+    void active_userLookupFailing_stillInitsEventSub() {
+        when(users.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE))
+            .thenThrow(new IllegalStateException("db down"));
+
+        listener.onSiteRoleChanged(new SiteRoleChangedEvent(this, true));
+
+        verify(eventSub).init();
+    }
 }
