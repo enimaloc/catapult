@@ -157,6 +157,11 @@ public class EventSubTwitchChatService implements TwitchChatService {
         connections.close(user, "bot disabled");
     }
 
+    @Override
+    public void disconnectAll(String reason) {
+        connections.closeAll(reason);
+    }
+
     void handleMessage(UserAccount user, OAuthToken token, String message, boolean reconnectSession) {
         DebugContext.runAs(user.getId(), () -> {
             debug.inbound(user.getId(), "twitch", "WS", EventSubConnections.WS_URI, message,
@@ -171,6 +176,14 @@ public class EventSubTwitchChatService implements TwitchChatService {
             String messageType = root.path("metadata").path("message_type").asText();
             switch (messageType) {
                 case "session_welcome" -> {
+                    if (!siteRole.isActive()) {
+                        // A socket reopened past the standby (a scheduled reconnect): subscribe nothing, keep it shut
+                        log.info("[EventSub Chat] Standby site — closing the session just opened for user {}",
+                                user.getId());
+                        connections.forbidReconnect(user);
+                        connections.close(user, "standby");
+                        return;
+                    }
                     JsonNode session = root.path(PAYLOAD).path("session");
                     String sessionId = session.path("id").asText();
                     long timeout = session.path("keepalive_timeout_seconds").asLong(EventSubConnections.DEFAULT_KEEPALIVE_SECONDS);

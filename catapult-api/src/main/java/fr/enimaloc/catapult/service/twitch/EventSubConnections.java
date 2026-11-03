@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.WebSocket;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -121,11 +122,29 @@ final class EventSubConnections {
 
     /** Closes the user's socket and forgets its watchdog, keepalive and backoff state. */
     void close(UserAccount user, String reason) {
-        cancelWatchdog(user.getId());
-        keepaliveTimeoutSeconds.remove(user.getId());
-        retryDelaySeconds.remove(user.getId());
-        WebSocket ws = connections.remove(user.getId());
+        close(user.getId(), reason);
+    }
+
+    private void close(UUID userId, String reason) {
+        cancelWatchdog(userId);
+        keepaliveTimeoutSeconds.remove(userId);
+        retryDelaySeconds.remove(userId);
+        WebSocket ws = connections.remove(userId);
         if (ws != null) ws.sendClose(WebSocket.NORMAL_CLOSURE, reason);
+    }
+
+    /**
+     * Closes every socket this registry knows of and forbids reopening any of them, including the users only waiting
+     * for a reconnection attempt. Unlike {@link #shutdown}, the watchdog executor keeps running for later sessions.
+     */
+    void closeAll(String reason) {
+        Set<UUID> known = new HashSet<>(connections.keySet());
+        known.addAll(retryDelaySeconds.keySet());
+        known.addAll(keepaliveTimeoutSeconds.keySet());
+        known.addAll(watchdogs.keySet());
+        // Forbid first: a socket dropping meanwhile must not schedule its reopening
+        intentionallyDisconnected.addAll(known);
+        known.forEach(id -> close(id, reason));
     }
 
     void shutdown(String reason) {

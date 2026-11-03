@@ -91,4 +91,28 @@ class SiteRoleListenerTest {
 
         verify(eventSub).init();
     }
+
+    @Test
+    void standby_userLookupFailing_stillClosesEveryOpenSocket() {
+        when(users.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE))
+            .thenThrow(new IllegalStateException("db down"));
+
+        listener.onSiteRoleChanged(new SiteRoleChangedEvent(this, false));
+
+        verify(eventSub).disconnectAll("standby");
+        verify(chat).disconnectAll("standby");
+    }
+
+    @Test
+    void standby_disconnectAllFailing_stillDisconnectsEachUser() {
+        when(users.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE)).thenReturn(List.of(a));
+        doThrow(new IllegalStateException("boom")).when(eventSub).disconnectAll("standby");
+
+        listener.onSiteRoleChanged(new SiteRoleChangedEvent(this, false));
+
+        verify(chat).disconnectAll("standby");
+        verify(eventSub).disconnect(a);
+        verify(chat).disconnect(a);
+        verify(gameState).clearState(a);
+    }
 }

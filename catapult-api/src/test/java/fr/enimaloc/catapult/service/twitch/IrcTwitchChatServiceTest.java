@@ -231,4 +231,30 @@ class IrcTwitchChatServiceTest {
     private IrcTwitchChatService buildService(ApplicationEventPublisher publisher) {
         return new IrcTwitchChatService(null, null, null, publisher, null, METER_REGISTRY, newRateLimiter(), SiteRoles.active());
     }
+
+    @Test
+    void disconnectAll_closesEverySocketAndForbidsReconnect() throws Exception {
+        IrcTwitchChatService service = buildService(mock(ApplicationEventPublisher.class));
+        UUID a = UUID.randomUUID();
+        UUID b = UUID.randomUUID();
+        java.net.Socket socketA = mock(java.net.Socket.class);
+        java.net.Socket socketB = mock(java.net.Socket.class);
+        @SuppressWarnings("unchecked")
+        Map<UUID, java.net.Socket> sockets =
+            (Map<UUID, java.net.Socket>) ReflectionTestUtils.getField(service, "sockets");
+        sockets.put(a, socketA);
+        sockets.put(b, socketB);
+        writersOf(service).put(a, new PrintWriter(new StringWriter(), true));
+
+        service.disconnectAll("standby");
+
+        verify(socketA).close();
+        verify(socketB).close();
+        assertThat(sockets).isEmpty();
+        assertThat(writersOf(service)).isEmpty();
+        @SuppressWarnings("unchecked")
+        java.util.Set<UUID> forbidden =
+            (java.util.Set<UUID>) ReflectionTestUtils.getField(service, "intentionallyDisconnected");
+        assertThat(forbidden).contains(a, b);
+    }
 }

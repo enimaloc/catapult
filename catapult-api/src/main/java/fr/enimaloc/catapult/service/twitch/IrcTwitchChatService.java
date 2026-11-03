@@ -109,9 +109,23 @@ public class IrcTwitchChatService implements TwitchChatService {
         doDisconnect(user);
     }
 
+    @Override
+    public void disconnectAll(String reason) {
+        Set<UUID> known = new HashSet<>(sockets.keySet());
+        known.addAll(writers.keySet());
+        // Forbid first: a connection lost meanwhile must not schedule its reopening
+        intentionallyDisconnected.addAll(known);
+        log.info("[IRC] Closing {} connection(s): {}", known.size(), reason);
+        known.forEach(this::doDisconnect);
+    }
+
     private void doDisconnect(UserAccount user) {
-        Optional.ofNullable(writers.remove(user.getId())).ifPresent(PrintWriter::close);
-        Optional.ofNullable(sockets.remove(user.getId())).ifPresent(this::closeQuietly);
+        doDisconnect(user.getId());
+    }
+
+    private void doDisconnect(UUID userId) {
+        Optional.ofNullable(writers.remove(userId)).ifPresent(PrintWriter::close);
+        Optional.ofNullable(sockets.remove(userId)).ifPresent(this::closeQuietly);
     }
 
     private void openConnection(UserAccount user, OAuthToken token, long retryDelaySeconds) {
@@ -152,6 +166,10 @@ public class IrcTwitchChatService implements TwitchChatService {
     private void scheduleReconnect(UserAccount user, OAuthToken token, long delaySeconds) {
         long nextDelay = Math.min(delaySeconds * 2, MAX_RETRY_SECONDS);
         CompletableFuture.delayedExecutor(delaySeconds, TimeUnit.SECONDS).execute(() -> {
+            if (!siteRole.isActive()) {
+                log.debug("[IRC] Standby site — not reconnecting user {}", user.getId());
+                return;
+            }
             if (!sockets.containsKey(user.getId()) && !intentionallyDisconnected.contains(user.getId())) {
                 openConnection(user, token, nextDelay);
             }

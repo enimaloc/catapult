@@ -721,4 +721,26 @@ class TwitchEventSubServiceTest {
         // channel.update and stream.* are simulated: their initial state comes from the simulated data
         verify(restClient, never()).get();
     }
+
+    @Test
+    void sessionWelcome_onStandby_closesAndSubscribesNothing() {
+        when(siteRole.isActive()).thenReturn(false);
+        WebSocket socket = mock(WebSocket.class);
+        Map<UUID, WebSocket> sockets = (Map<UUID, WebSocket>) connectionState("connections");
+        sockets.put(user.getId(), socket);
+
+        service.handleMessage(user, token, """
+            {
+              "metadata": { "message_type": "session_welcome" },
+              "payload": { "session": { "id": "session-abc" } }
+            }
+            """, false);
+
+        verify(restClient, never()).post();
+        verify(restClient, never()).get();
+        verify(streamCatchUp, never()).reconcile(any(), any());
+        verify(socket).sendClose(eq(WebSocket.NORMAL_CLOSURE), eq("standby"));
+        assertThat(sockets).doesNotContainKey(user.getId());
+        assertThat((java.util.Set<UUID>) connectionState("intentionallyDisconnected")).contains(user.getId());
+    }
 }

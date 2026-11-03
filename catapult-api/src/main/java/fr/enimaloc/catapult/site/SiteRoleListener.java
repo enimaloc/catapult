@@ -21,6 +21,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SiteRoleListener {
 
+    private static final String STANDBY = "standby";
+
     private final UserAccountRepository userAccountRepository;
     private final TwitchEventSubService twitchEventSubService;
     private final TwitchChatService twitchChatService;
@@ -36,6 +38,9 @@ public class SiteRoleListener {
             }
         } else {
             log.info("Site is on standby — closing the Twitch intakes");
+            // Every open socket, even when the bot users cannot be listed (a database failure may be the cause)
+            attempt("EventSub disconnect all", null, () -> twitchEventSubService.disconnectAll(STANDBY));
+            attempt("chat disconnect all", null, () -> twitchChatService.disconnectAll(STANDBY));
             for (UserAccount user : botUsers()) {
                 attempt("EventSub disconnect", user, () -> twitchEventSubService.disconnect(user));
                 attempt("chat disconnect", user, () -> twitchChatService.disconnect(user));

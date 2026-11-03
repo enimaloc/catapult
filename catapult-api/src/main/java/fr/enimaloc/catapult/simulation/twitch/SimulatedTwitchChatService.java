@@ -60,6 +60,14 @@ public class SimulatedTwitchChatService implements TwitchChatService {
     }
 
     @Override
+    public void disconnectAll(String reason) {
+        TwitchChatService transport = transport();
+        if (transport != null) {
+            transport.disconnectAll(reason);
+        }
+    }
+
+    @Override
     public void sendMessage(UserAccount user, String message) {
         if (message == null || message.isBlank()) {
             return;

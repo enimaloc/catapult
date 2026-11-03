@@ -160,6 +160,16 @@ public class TwitchEventSubService implements EventSubService {
             );
     }
 
+    /**
+     * Closes every EventSub socket and forbids reopening them, whether or not their user can still be looked up:
+     * {@link #disconnect} per user needs the database, which may be what put the site on standby.
+     */
+    public void disconnectAll(String reason) {
+        connections.closeAll(reason);
+        channelStates.clear();
+        channelStateWarnedUsers.clear();
+    }
+
     public void disconnect(UserAccount user) {
         // Also cancels a reconnect already scheduled for a dropped socket
         connections.forbidReconnect(user);
@@ -232,6 +242,13 @@ public class TwitchEventSubService implements EventSubService {
             String messageType = root.path("metadata").path("message_type").asText();
             switch (messageType) {
                 case "session_welcome" -> {
+                    if (!siteRole.isActive()) {
+                        // A socket reopened past the standby (a scheduled reconnect): subscribe nothing, keep it shut
+                        log.info("[EventSub] Standby site — closing the session just opened for user {}", user.getId());
+                        connections.forbidReconnect(user);
+                        connections.close(user, "standby");
+                        return;
+                    }
                     JsonNode session = root.path("payload").path("session");
                     String sessionId = session.path("id").asText();
                     long timeout = session.path("keepalive_timeout_seconds").asLong(EventSubConnections.DEFAULT_KEEPALIVE_SECONDS);

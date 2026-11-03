@@ -8,6 +8,12 @@ import java.util.Optional;
 public interface TwitchChatService {
     void connect(UserAccount user);
     void disconnect(UserAccount user);
+
+    /**
+     * Closes every chat connection this instance holds and keeps them from reconnecting, without looking any user
+     * up: the standby uses it when the database cannot list them.
+     */
+    void disconnectAll(String reason);
     void sendMessage(UserAccount user, String message);
     void timeout(UserAccount user, String targetLogin, int durationSeconds, String reason);
     void ban(UserAccount user, String targetLogin, String reason);
