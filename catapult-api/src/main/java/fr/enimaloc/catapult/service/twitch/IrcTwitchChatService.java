@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.twitch;
 
+import fr.enimaloc.catapult.site.SiteRole;
 import fr.enimaloc.catapult.chat.ChatCommandEvent;
 import fr.enimaloc.catapult.chat.ChatMessageSplitter;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
@@ -45,6 +46,7 @@ public class IrcTwitchChatService implements TwitchChatService {
     private final TwitchHelixChannelClient helix;
     private final MeterRegistry meterRegistry;
     private final TwitchChatRateLimiter chatRateLimiter;
+    private final SiteRole siteRole;
 
     private final Map<UUID, PrintWriter> writers = new ConcurrentHashMap<>();
     private final Map<UUID, Socket> sockets = new ConcurrentHashMap<>();
@@ -217,6 +219,7 @@ public class IrcTwitchChatService implements TwitchChatService {
 
     @Override
     public void sendMessage(UserAccount user, String message) {
+        siteRole.requireActive("twitch chat message");
         PrintWriter writer = writers.get(user.getId());
         if (writer == null) {
             log.warn("[IRC] Cannot send message for user {} — not connected", user.getId());
@@ -239,17 +242,20 @@ public class IrcTwitchChatService implements TwitchChatService {
 
     @Override
     public void timeout(UserAccount user, String targetLogin, int durationSeconds, String reason) {
+        siteRole.requireActive("twitch timeout");
         if (durationSeconds <= 0) return;
         withAccessToken(user, accessToken -> helix.moderate(user, accessToken, targetLogin, durationSeconds, reason));
     }
 
     @Override
     public void ban(UserAccount user, String targetLogin, String reason) {
+        siteRole.requireActive("twitch ban");
         withAccessToken(user, accessToken -> helix.moderate(user, accessToken, targetLogin, 0, reason));
     }
 
     @Override
     public void unban(UserAccount user, String targetLogin) {
+        siteRole.requireActive("twitch unban");
         withAccessToken(user, accessToken -> helix.unban(user, accessToken, targetLogin));
     }
 
@@ -275,6 +281,7 @@ public class IrcTwitchChatService implements TwitchChatService {
 
     @Override
     public void shoutout(UserAccount user, String targetLogin) {
+        siteRole.requireActive("twitch shoutout");
         withAccessToken(user, accessToken -> helix.shoutout(user, accessToken, targetLogin));
     }
 

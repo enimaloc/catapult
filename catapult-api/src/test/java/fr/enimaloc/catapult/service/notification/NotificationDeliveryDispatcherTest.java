@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.notification;
 
+import fr.enimaloc.catapult.site.StandbyException;
 import fr.enimaloc.catapult.common.dto.notification.NotificationChannel;
 import fr.enimaloc.catapult.common.dto.notification.Severity;
 import fr.enimaloc.catapult.domain.account.UserAccount;
@@ -260,6 +261,20 @@ class NotificationDeliveryDispatcherTest {
         NotificationDelivery d = delivery("T", "b", null, null, STREAM_START_CHAT);
         when(deliveryRepo.findPending(user.getId(), STREAM_START_CHAT)).thenReturn(List.of(d));
         doThrow(new IllegalStateException("chat down")).when(chatService).sendMessage(any(), any());
+
+        dispatcher.onStreamOnline(new StreamOnlineEvent(this, user));
+        scheduled.forEach(Runnable::run);
+
+        verifyClaimed(d);
+        verifyRestored(d);
+    }
+
+    @Test
+    void standbyChatSend_restoresClaimedDelivery() {
+        user.setBotEnabled(true);
+        NotificationDelivery d = delivery("T", "b", null, null, STREAM_START_CHAT);
+        when(deliveryRepo.findPending(user.getId(), STREAM_START_CHAT)).thenReturn(List.of(d));
+        doThrow(new StandbyException("twitch chat message")).when(chatService).sendMessage(any(), any());
 
         dispatcher.onStreamOnline(new StreamOnlineEvent(this, user));
         scheduled.forEach(Runnable::run);

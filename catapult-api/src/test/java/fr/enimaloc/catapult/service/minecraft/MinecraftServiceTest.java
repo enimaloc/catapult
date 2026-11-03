@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.minecraft;
 
+import fr.enimaloc.catapult.site.SiteRole;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,6 +30,7 @@ class MinecraftServiceTest {
     @Mock private RestClient.RequestHeadersSpec headersSpec;
     @Mock private RestClient.ResponseSpec responseSpec;
 
+    @Mock private SiteRole siteRole;
     @InjectMocks private MinecraftService service;
 
     @BeforeEach

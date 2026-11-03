@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.twitch;
 
+import fr.enimaloc.catapult.site.SiteRole;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.account.UserSettings;
@@ -69,6 +70,7 @@ class TwitchServiceTest {
     @Mock private RestClient.RequestHeadersSpec headersSpec;
     @Mock private RestClient.ResponseSpec getResponseSpec;
 
+    @Mock private SiteRole siteRole;
     @InjectMocks private TwitchServiceImpl twitchService;
 
     private UserAccount user;

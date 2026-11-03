@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.xbox;
 
+import fr.enimaloc.catapult.site.SiteRole;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
@@ -43,7 +44,7 @@ class XboxUserTokenServiceTest {
     @BeforeEach
     void setup() {
         service = new XboxUserTokenService(clientRegistrationRepository, oAuthTokenRepository,
-                encryption, xboxService, refreshClient, new SimpleMeterRegistry());
+                encryption, xboxService, refreshClient, new SimpleMeterRegistry(), mock(SiteRole.class));
 
         user = new UserAccount();
         user.setId(UUID.randomUUID());

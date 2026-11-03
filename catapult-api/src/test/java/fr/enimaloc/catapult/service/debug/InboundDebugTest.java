@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.debug;
 
+import fr.enimaloc.catapult.site.SiteRole;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.enimaloc.catapult.api.connect.ApiSteamConnectController;
 import fr.enimaloc.catapult.service.steam.SteamOpenIdLinkService;
@@ -120,7 +121,7 @@ class InboundDebugTest {
                 mock(TwitchHelixChannelClient.class), RestClient.create(), new ObjectMapper(),
                 mock(SystemTwitchAccountService.class), meters,
                 new ExternalApiObservations(ObservationRegistry.NOOP, meters), mock(TwitchChatRateLimiter.class),
-                new DebugRecording(registry, recorder), SimulationGates.none());
+                new DebugRecording(registry, recorder), SimulationGates.none(), mock(SiteRole.class));
         return chat;
     }
 

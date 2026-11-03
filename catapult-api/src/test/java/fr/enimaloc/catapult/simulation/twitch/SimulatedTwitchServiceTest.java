@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.simulation.twitch;
 
+import fr.enimaloc.catapult.site.SiteRole;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.account.UserSettings;
@@ -77,7 +78,7 @@ class SimulatedTwitchServiceTest {
 
     private SimulatedTwitchService service(ChannelUpdateEcho echo) {
         SimulatedTwitchTokenService tokenService =
-                new SimulatedTwitchTokenService(fx.tokens, encryption, restClient, fx.runner);
+                new SimulatedTwitchTokenService(fx.tokens, encryption, restClient, fx.runner, mock(SiteRole.class));
         SimulatedTwitchCategoryService categories =
                 new SimulatedTwitchCategoryService(SimulationFixture.providerOf(realCategories), fx.runner);
         return new SimulatedTwitchService(SimulationFixture.providerOf(realTwitch), fx.runner, fx.registry,

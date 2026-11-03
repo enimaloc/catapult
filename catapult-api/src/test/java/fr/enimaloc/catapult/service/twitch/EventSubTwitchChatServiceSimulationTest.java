@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.twitch;
 
+import fr.enimaloc.catapult.site.SiteRole;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
@@ -47,7 +48,7 @@ class EventSubTwitchChatServiceSimulationTest {
                 mock(ApplicationEventPublisher.class), mock(TwitchHelixChannelClient.class), RestClient.create(),
                 new ObjectMapper(), mock(SystemTwitchAccountService.class), meters,
                 new ExternalApiObservations(ObservationRegistry.NOOP, meters), mock(TwitchChatRateLimiter.class),
-                DebugRecording.OFF, provider);
+                DebugRecording.OFF, provider, mock(SiteRole.class));
     }
 
     @Test

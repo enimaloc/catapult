@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.twitch;
 
+import fr.enimaloc.catapult.site.SiteRole;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
@@ -29,6 +30,7 @@ public class TwitchTokenService {
     private final OAuthTokenRepository oAuthTokenRepository;
     private final TokenEncryptionService tokenEncryptionService;
     private final RestClient restClient;
+    private final SiteRole siteRole;
 
     @Value("${twitch.client-id:}")
     private String twitchClientId;
@@ -49,6 +51,7 @@ public class TwitchTokenService {
 
     @SuppressWarnings("unchecked")
     public String refreshAccessToken(OAuthToken token, UserAccount user) {
+        siteRole.requireActive("twitch token refresh");
         if (token.getRefreshToken() == null) {
             if (refreshWarnedUsers.add(user.getId())) {
                 log.warn("No refresh token stored for user {} — cannot refresh", user.getId());

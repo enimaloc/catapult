@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.service.minecraft;
 
+import static org.mockito.Mockito.mock;
+import fr.enimaloc.catapult.site.SiteRole;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -43,7 +45,7 @@ class MsaAuthClientTest {
         doReturn(bodySpec).when(bodySpec).contentType(any());
         doReturn(bodySpec).when(bodySpec).accept(any());
         doReturn(responseSpec).when(bodySpec).retrieve();
-        client = new MsaAuthClient(restClient, "client-id-test");
+        client = new MsaAuthClient(restClient, "client-id-test", mock(SiteRole.class));
     }
 
     @Test
@@ -61,7 +63,7 @@ class MsaAuthClientTest {
         MultiValueMap<String, String> form = (MultiValueMap<String, String>) body.getValue();
         assertThat(form.getFirst("grant_type")).isEqualTo("refresh_token");
         assertThat(form.getFirst("refresh_token")).isEqualTo("refresh-1");
-        assertThat(form.getFirst("client_id")).isEqualTo("client-id-test");
+        assertThat(form.getFirst("client_id")).isEqualTo("client-id-test", mock(SiteRole.class));
         assertThat(form.getFirst("scope")).isEqualTo("XboxLive.signin offline_access");
     }
 

@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.notification;
 
+import fr.enimaloc.catapult.site.SiteRole;
 import fr.enimaloc.catapult.common.event.ChannelEvents;
 import fr.enimaloc.catapult.service.metrics.CatapultApiMetrics;
 import lombok.extern.slf4j.Slf4j;
@@ -37,11 +38,13 @@ public class RedisEventPublisher {
     private final ObjectMapper jackson;
 
     private final CatapultApiMetrics apiMetrics;
+    private final SiteRole siteRole;
 
-    public RedisEventPublisher(StringRedisTemplate redis, ObjectMapper jackson, CatapultApiMetrics apiMetrics) {
+    public RedisEventPublisher(StringRedisTemplate redis, ObjectMapper jackson, CatapultApiMetrics apiMetrics, SiteRole siteRole) {
         this.redis = redis;
         this.jackson = jackson;
         this.apiMetrics = apiMetrics;
+        this.siteRole = siteRole;
     }
 
     public void publishGlobal(String name, Object data) {
@@ -61,6 +64,7 @@ public class RedisEventPublisher {
     }
 
     public void publishTwitchat(UUID channelOwnerId, String name, Object data) {
+        siteRole.requireActive("twitchat push");
         publish(CHANNEL_TWITCHAT_PREFIX + channelOwnerId, name, data);
     }
 

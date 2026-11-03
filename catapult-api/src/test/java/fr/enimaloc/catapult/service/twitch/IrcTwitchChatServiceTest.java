@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.twitch;
 
+import fr.enimaloc.catapult.site.SiteRole;
 import fr.enimaloc.catapult.chat.ChatCommandEvent;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
@@ -136,7 +137,7 @@ class IrcTwitchChatServiceTest {
         TokenEncryptionService encSvc = mock(TokenEncryptionService.class);
         TwitchHelixChannelClient helix = mock(TwitchHelixChannelClient.class);
         IrcTwitchChatService service = new IrcTwitchChatService(
-            tokenRepo, null, encSvc, mock(ApplicationEventPublisher.class), helix, METER_REGISTRY, newRateLimiter());
+            tokenRepo, null, encSvc, mock(ApplicationEventPublisher.class), helix, METER_REGISTRY, newRateLimiter(), mock(SiteRole.class));
         UserAccount user = new UserAccount();
         user.setId(UUID.randomUUID());
         OAuthToken token = new OAuthToken();
@@ -172,7 +173,7 @@ class IrcTwitchChatServiceTest {
         OAuthTokenRepository tokenRepo = mock(OAuthTokenRepository.class);
         TwitchHelixChannelClient helix = mock(TwitchHelixChannelClient.class);
         IrcTwitchChatService service = new IrcTwitchChatService(
-            tokenRepo, null, null, mock(ApplicationEventPublisher.class), helix, METER_REGISTRY, newRateLimiter());
+            tokenRepo, null, null, mock(ApplicationEventPublisher.class), helix, METER_REGISTRY, newRateLimiter(), mock(SiteRole.class));
         UserAccount user = new UserAccount();
         when(tokenRepo.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)).thenReturn(Optional.empty());
 
@@ -187,7 +188,7 @@ class IrcTwitchChatServiceTest {
     @Test
     void sendMessageWritesPrivmsgWhenRateLimiterHasCapacity() {
         IrcTwitchChatService service = new IrcTwitchChatService(
-            null, null, null, mock(ApplicationEventPublisher.class), null, METER_REGISTRY, newRateLimiter());
+            null, null, null, mock(ApplicationEventPublisher.class), null, METER_REGISTRY, newRateLimiter(), mock(SiteRole.class));
         UserAccount user = new UserAccount();
         user.setId(UUID.randomUUID());
         user.setTwitchId("bcast-id");
@@ -205,7 +206,7 @@ class IrcTwitchChatServiceTest {
         // permitsPerWindow=0, maxWaitMs=0 -> acquire() always fails immediately
         TwitchChatRateLimiter exhaustedLimiter = new TwitchChatRateLimiter(0, 0, METER_REGISTRY);
         IrcTwitchChatService service = new IrcTwitchChatService(
-            null, null, null, mock(ApplicationEventPublisher.class), null, METER_REGISTRY, exhaustedLimiter);
+            null, null, null, mock(ApplicationEventPublisher.class), null, METER_REGISTRY, exhaustedLimiter, mock(SiteRole.class));
         UserAccount user = new UserAccount();
         user.setId(UUID.randomUUID());
         user.setTwitchId("bcast-id");
@@ -228,6 +229,6 @@ class IrcTwitchChatServiceTest {
     }
 
     private IrcTwitchChatService buildService(ApplicationEventPublisher publisher) {
-        return new IrcTwitchChatService(null, null, null, publisher, null, METER_REGISTRY, newRateLimiter());
+        return new IrcTwitchChatService(null, null, null, publisher, null, METER_REGISTRY, newRateLimiter(), mock(SiteRole.class));
     }
 }

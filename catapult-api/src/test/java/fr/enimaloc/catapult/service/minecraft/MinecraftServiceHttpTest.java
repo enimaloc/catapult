@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.service.minecraft;
 
+import static org.mockito.Mockito.mock;
+import fr.enimaloc.catapult.site.SiteRole;
 import fr.enimaloc.catapult.service.xbox.XboxService;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -38,7 +40,7 @@ class MinecraftServiceHttpTest {
     void setUp() {
         RestClient.Builder builder = RestClient.builder();
         mojang = MockRestServiceServer.bindTo(builder).build();
-        service = new MinecraftService(builder.build());
+        service = new MinecraftService(builder.build(), mock(SiteRole.class));
     }
 
     private void friendsUpdate(String expectedBody) {

@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.twitch;
 
+import fr.enimaloc.catapult.site.SiteRole;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.enimaloc.catapult.chat.ChatCommandEvent;
@@ -68,6 +69,7 @@ public class EventSubTwitchChatService implements TwitchChatService {
 
     private final DebugRecording debug;
     private final ObjectProvider<SimulationGate> simulationGate;
+    private final SiteRole siteRole;
 
     public EventSubTwitchChatService(OAuthTokenRepository oAuthTokenRepository,
                                      UserAccountRepository userAccountRepository,
@@ -81,7 +83,8 @@ public class EventSubTwitchChatService implements TwitchChatService {
                                      ExternalApiObservations apiObservations,
                                      TwitchChatRateLimiter chatRateLimiter,
                                      DebugRecording debug,
-                                     ObjectProvider<SimulationGate> simulationGate) {
+                                     ObjectProvider<SimulationGate> simulationGate,
+                                     SiteRole siteRole) {
         this.oAuthTokenRepository = oAuthTokenRepository;
         this.userAccountRepository = userAccountRepository;
         this.twitchTokenService = twitchTokenService;
@@ -95,6 +98,7 @@ public class EventSubTwitchChatService implements TwitchChatService {
         this.chatRateLimiter = chatRateLimiter;
         this.debug = debug;
         this.simulationGate = simulationGate;
+        this.siteRole = siteRole;
         this.connections = new EventSubConnections(
             "[EventSub Chat]", "twitch-chat-watchdog", oAuthTokenRepository, this::handleMessage);
     }
@@ -298,6 +302,7 @@ public class EventSubTwitchChatService implements TwitchChatService {
 
     @Override
     public void sendMessage(UserAccount user, String message) {
+        siteRole.requireActive("twitch chat message");
         // Twitch caps a single chat message at 500 chars. Anything longer is
         // sliced into [i/N]-prefixed parts so the streamer's full response
         // reaches the channel instead of being silently truncated by Helix.
@@ -398,17 +403,20 @@ public class EventSubTwitchChatService implements TwitchChatService {
 
     @Override
     public void timeout(UserAccount user, String targetLogin, int durationSeconds, String reason) {
+        siteRole.requireActive("twitch timeout");
         if (durationSeconds <= 0) return;
         withAccessToken(user, accessToken -> helix.moderate(user, accessToken, targetLogin, durationSeconds, reason));
     }
 
     @Override
     public void ban(UserAccount user, String targetLogin, String reason) {
+        siteRole.requireActive("twitch ban");
         withAccessToken(user, accessToken -> helix.moderate(user, accessToken, targetLogin, 0, reason));
     }
 
     @Override
     public void unban(UserAccount user, String targetLogin) {
+        siteRole.requireActive("twitch unban");
         withAccessToken(user, accessToken -> helix.unban(user, accessToken, targetLogin));
     }
 
@@ -434,6 +442,7 @@ public class EventSubTwitchChatService implements TwitchChatService {
 
     @Override
     public void shoutout(UserAccount user, String targetLogin) {
+        siteRole.requireActive("twitch shoutout");
         withAccessToken(user, accessToken -> helix.shoutout(user, accessToken, targetLogin));
     }
 

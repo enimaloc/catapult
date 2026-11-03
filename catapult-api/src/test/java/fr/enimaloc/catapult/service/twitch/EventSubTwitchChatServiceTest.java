@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.twitch;
 
+import fr.enimaloc.catapult.site.SiteRole;
 import static org.mockito.Mockito.mock;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -61,6 +62,7 @@ class EventSubTwitchChatServiceTest {
     @Mock private RestClient.ResponseSpec postResponseSpec;
 
     @Spy private DebugRecording debug = DebugRecording.OFF;
+    @Mock private SiteRole siteRole;
     @InjectMocks private EventSubTwitchChatService service;
 
     private UserAccount user;
