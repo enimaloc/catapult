@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.api.error;
 import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.service.minecraft.MsaAuthClient;
 import fr.enimaloc.catapult.service.notification.TwitchatValidationException;
+import fr.enimaloc.catapult.site.StandbyException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.nio.charset.StandardCharsets;
@@ -98,6 +99,20 @@ public class ProblemAdvice extends ResponseEntityExceptionHandler {
                 ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "The device code expired");
         problem.setProperty(ErrorCode.PROPERTY, ErrorCode.MINECRAFT_DEVICE_CODE_EXPIRED.code());
         return ResponseEntity.badRequest().body(problem);
+    }
+
+    /**
+     * A write refused because this site is on standby: an expected answer while the other site is active, so it is
+     * neither logged as a failure nor reported as an unhandled error.
+     */
+    @ExceptionHandler(StandbyException.class)
+    @SneakyThrows
+    public ResponseEntity<ProblemDetail> standby(StandbyException ex, HttpServletRequest request) {
+        if (FrozenRoutes.isFrozen(request)) {
+            throw ex;
+        }
+        log.debug("{} {} refused on standby: {}", request.getMethod(), request.getRequestURI(), ex.getMessage());
+        return declared(HttpStatus.SERVICE_UNAVAILABLE, "This site is on standby", ErrorCode.SERVICE_UNAVAILABLE);
     }
 
     @ExceptionHandler(Exception.class)

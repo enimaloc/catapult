@@ -294,4 +294,35 @@ class NotificationDeliveryDispatcherTest {
         verifyClaimed(expired);
         assertThat(scheduled).isEmpty();
     }
+
+    @Test
+    void standby_isLoggedAtDebug_andTheDeliveryRestored() {
+        ch.qos.logback.classic.Logger logger =
+            (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(NotificationDeliveryDispatcher.class);
+        ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> logs =
+            new ch.qos.logback.core.read.ListAppender<>();
+        logs.start();
+        logger.addAppender(logs);
+        try {
+            user.setBotEnabled(true);
+            NotificationDelivery chat = delivery("T", "b", null, null, STREAM_START_CHAT);
+            NotificationDelivery widget = delivery("W", "w", null, null, TWITCHAT);
+            when(deliveryRepo.findPending(user.getId(), STREAM_START_CHAT)).thenReturn(List.of(chat));
+            when(deliveryRepo.findPending(user.getId(), TWITCHAT)).thenReturn(List.of(widget));
+            doThrow(new StandbyException("twitch chat message")).when(chatService).sendMessage(any(), any());
+            when(twitchatDispatcher.onNotification(eq(user), any(), any(), any(), any()))
+                .thenThrow(new StandbyException("twitchat push"));
+
+            dispatcher.onStreamOnline(new StreamOnlineEvent(this, user));
+            scheduled.forEach(Runnable::run);
+            assertThat(dispatcher.flushTwitchat(user)).isZero();
+
+            verifyRestored(chat);
+            verifyRestored(widget);
+            assertThat(logs.list)
+                .noneMatch(e -> e.getLevel().isGreaterOrEqual(ch.qos.logback.classic.Level.INFO));
+        } finally {
+            logger.detachAppender(logs);
+        }
+    }
 }
