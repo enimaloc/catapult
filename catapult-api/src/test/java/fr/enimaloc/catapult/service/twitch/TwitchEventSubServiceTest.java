@@ -148,6 +148,21 @@ class TwitchEventSubServiceTest {
     }
 
     @Test
+    void streamOnline_withoutStreamId_recordsNothingButStillPublishes() {
+        String message = """
+            {
+              "metadata": { "message_type": "notification", "subscription_type": "stream.online" },
+              "payload": { "event": {} }
+            }
+            """;
+
+        service.handleMessage(user, token, message, false);
+
+        verify(streamSessionService, never()).recordStart(any(), any(), any());
+        verify(eventPublisher).publishEvent(any(StreamOnlineEvent.class));
+    }
+
+    @Test
     void handleMessage_streamOnline_markerFailureStillPublishesEvent() {
         doThrow(new IllegalStateException("db down")).when(streamSessionService).recordStart(any(), any(), any());
         String message = """

@@ -276,10 +276,20 @@ public class TwitchEventSubService implements EventSubService {
         }
     }
 
-    /** Remembers the stream that just started; a failure here must not stop the online event from being published. */
+    /**
+     * Remembers the stream that just started; a failure here must not stop the online event from being published.
+     * Nothing is recorded without a stream id and a start time (injected or simulated events carry neither).
+     */
     private void recordStreamStart(UserAccount user, JsonNode event) {
+        String streamId = event.path("id").asText("");
+        String startedAt = event.path("started_at").asText("");
+        if (streamId.isBlank() || startedAt.isBlank()) {
+            log.debug("EventSub stream.online for user {} has no stream id or start time — not remembered",
+                user.getId());
+            return;
+        }
         try {
-            streamSessionService.recordStart(user, event.path("id").asText(), Instant.parse(event.path("started_at").asText()));
+            streamSessionService.recordStart(user, streamId, Instant.parse(startedAt));
         } catch (Exception e) {
             log.warn("Could not remember the stream start for user {}: {}", user.getId(), e.getMessage());
         }
