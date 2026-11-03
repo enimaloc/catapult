@@ -10,6 +10,7 @@ GET,/api/internal/health,,,PASS,PASS,PASS,PASS,PASS,PASS,401
 GET,/api/internal/meta-tags,,,PASS,PASS,PASS,PASS,PASS,PASS,401
 GET,/api/internal/social-links,,,PASS,PASS,PASS,PASS,PASS,PASS,401
 GET,/api/internal/status/degraded,,,PASS,PASS,PASS,PASS,PASS,PASS,401
+GET,/api/internal/status/site,,,PASS,PASS,PASS,PASS,PASS,PASS,401
 POST,/api/twitchat/actions/{token},,,PASS,PASS,PASS,PASS,PASS,PASS,401
 GET,/api/twitchat/widget/{uuid},,,PASS,PASS,PASS,PASS,PASS,PASS,401
 GET,/api/twitchat/widget/{uuid}/access,,,PASS,PASS,PASS,PASS,PASS,PASS,401
