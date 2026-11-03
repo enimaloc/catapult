@@ -743,4 +743,20 @@ class TwitchEventSubServiceTest {
         assertThat(sockets).doesNotContainKey(user.getId());
         assertThat((java.util.Set<UUID>) connectionState("intentionallyDisconnected")).contains(user.getId());
     }
+
+    @Test
+    void init_oneUserFailing_stillConnectsTheOthers() {
+        UserAccount failing = new UserAccount();
+        failing.setId(UUID.randomUUID());
+        when(userAccountRepository.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE))
+            .thenReturn(List.of(failing, user));
+        when(oAuthTokenRepository.findByUserAndProvider(failing, OAuthToken.Provider.TWITCH))
+            .thenThrow(new IllegalStateException("db hiccup"));
+        // No token: the lookup proves the connection was attempted, without opening a socket
+        when(oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)).thenReturn(Optional.empty());
+
+        assertThatNoException().isThrownBy(service::init);
+
+        verify(oAuthTokenRepository).findByUserAndProvider(user, OAuthToken.Provider.TWITCH);
+    }
 }

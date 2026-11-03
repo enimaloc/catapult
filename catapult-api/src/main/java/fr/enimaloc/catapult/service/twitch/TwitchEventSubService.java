@@ -117,8 +117,14 @@ public class TwitchEventSubService implements EventSubService {
             log.info("[EventSub] Standby site — no EventSub connection opened");
             return;
         }
-        userAccountRepository.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE)
-            .forEach(this::connect);
+        for (UserAccount user : userAccountRepository.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE)) {
+            // One member failing must not leave the others without their EventSub connection
+            try {
+                connect(user);
+            } catch (RuntimeException e) {
+                log.warn("[EventSub] Could not connect user {}", user.getId(), e);
+            }
+        }
     }
 
     @PreDestroy
