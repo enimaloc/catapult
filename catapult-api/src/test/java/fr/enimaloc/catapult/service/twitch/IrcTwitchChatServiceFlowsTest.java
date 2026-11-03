@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.service.twitch;
 
-import fr.enimaloc.catapult.site.SiteRole;
+import fr.enimaloc.catapult.site.SiteRoles;
 import fr.enimaloc.catapult.chat.ChatCommandEvent;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
@@ -58,7 +58,7 @@ class IrcTwitchChatServiceFlowsTest {
         server = new ServerSocket(0, 5, InetAddress.getLoopbackAddress());
         server.setSoTimeout(5000);
         service = new IrcTwitchChatService(tokens, users, encryption, publisher, mock(TwitchHelixChannelClient.class),
-                meters, new TwitchChatRateLimiter(18, 3000, meters), mock(SiteRole.class));
+                meters, new TwitchChatRateLimiter(18, 3000, meters), SiteRoles.active());
         service.socketFactory = new LocalSocketFactory(server.getLocalPort());
 
         user = new UserAccount();

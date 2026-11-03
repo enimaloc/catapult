@@ -111,6 +111,10 @@ public class EventSubTwitchChatService implements TwitchChatService {
     public void init() {
         // Pre-registers the counter so it is exported as 0 before the first message
         meterRegistry.counter("catapult.chat.messages", "transport", "eventsub");
+        if (!siteRole.isActive()) {
+            log.info("[EventSub Chat] Standby site — no connection opened");
+            return;
+        }
         var users = userAccountRepository.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE);
         log.info("[EventSub Chat] Bootstrapping connections for {} active bot-enabled user(s)", users.size());
         users.forEach(this::connect);
@@ -128,6 +132,10 @@ public class EventSubTwitchChatService implements TwitchChatService {
 
     @Override
     public void connect(UserAccount user) {
+        if (!siteRole.isActive()) {
+            log.debug("[EventSub Chat] Standby site — skipping connect for user {}", user.getId());
+            return;
+        }
         if (SimulationGate.blocks(simulationGate, user.getId(), SimulatedCalls.TWITCH_CHAT_CONNECT)) {
             log.debug("[EventSub Chat] connect skipped for user {} — the simulated chat connection is not REAL",
                     user.getId());

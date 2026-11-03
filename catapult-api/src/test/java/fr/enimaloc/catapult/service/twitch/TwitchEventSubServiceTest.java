@@ -23,6 +23,7 @@ import fr.enimaloc.catapult.service.notification.TwitchatEventDispatcher;
 import fr.enimaloc.catapult.simulation.SimulatedCalls;
 import fr.enimaloc.catapult.simulation.SimulatedData;
 import fr.enimaloc.catapult.simulation.SimulationGate;
+import fr.enimaloc.catapult.site.SiteRole;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -74,6 +75,7 @@ class TwitchEventSubServiceTest {
     @Spy private DebugRecording debug = DebugRecording.OFF;
     /** Absent by default (answers {@code null}): no simulation. */
     @Mock private ObjectProvider<SimulationGate> simulationGate;
+    @Mock private SiteRole siteRole;
     @Mock private SimulationGate gate;
     @InjectMocks private TwitchEventSubService service;
 
@@ -83,6 +85,7 @@ class TwitchEventSubServiceTest {
 
     @BeforeEach
     void setUp() {
+        when(siteRole.isActive()).thenReturn(true);
         user = new UserAccount();
         user.setId(UUID.randomUUID());
         user.setTwitchId("broadcaster-123");

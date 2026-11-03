@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.simulation.twitch;
 
+import fr.enimaloc.catapult.site.SiteRoles;
 import fr.enimaloc.catapult.site.SiteRole;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.enimaloc.catapult.domain.account.UserAccount;
@@ -92,7 +93,7 @@ class SimulatedTwitchServiceTest {
         return new TwitchEventSubService(fx.tokens, fx.accounts, mock(TwitchTokenService.class),
                 mock(StreamStateService.class), mock(ApplicationEventPublisher.class), RestClient.create(),
                 new ObjectMapper(), twitchat, categoryChangeState, DebugRecording.OFF,
-                beans.getBeanProvider(SimulationGate.class));
+                beans.getBeanProvider(SimulationGate.class), SiteRoles.active());
     }
 
     @Test

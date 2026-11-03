@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.debug;
 
+import fr.enimaloc.catapult.site.SiteRoles;
 import fr.enimaloc.catapult.service.category.ExtensionLayoutApplier;
 import fr.enimaloc.catapult.service.category.CategoryChain;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
@@ -264,7 +265,7 @@ class DebugAttributionTest {
         when(state.getLastKnownGame(any())).thenReturn(Optional.empty());
         return new SchedulerService(accounts, chain, state, mock(ApplicationEventPublisher.class),
                 new SimpleMeterRegistry(), Optional.empty(), Optional.empty(), mock(BindingService.class),
-                SimulationGates.none());
+                SimulationGates.none(), SiteRoles.active());
     }
 
     @Test

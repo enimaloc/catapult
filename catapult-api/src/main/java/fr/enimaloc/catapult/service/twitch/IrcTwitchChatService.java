@@ -63,6 +63,10 @@ public class IrcTwitchChatService implements TwitchChatService {
     public void init() {
         // Pre-registers the counter so it is exported as 0 before the first message
         meterRegistry.counter("catapult.chat.messages", "transport", "irc");
+        if (!siteRole.isActive()) {
+            log.info("[IRC] Standby site — no connection opened");
+            return;
+        }
         userAccountRepository.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE)
             .forEach(this::connect);
     }
@@ -86,6 +90,10 @@ public class IrcTwitchChatService implements TwitchChatService {
 
     @Override
     public void connect(UserAccount user) {
+        if (!siteRole.isActive()) {
+            log.debug("[IRC] Standby site — skipping connect for user {}", user.getId());
+            return;
+        }
         intentionallyDisconnected.remove(user.getId());
         doDisconnect(user);
         oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)

@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.twitch;
 
+import fr.enimaloc.catapult.site.SiteRoles;
 import fr.enimaloc.catapult.service.debug.DebugRecording;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
@@ -81,7 +82,7 @@ class TwitchEventSubServiceFlowsTest {
         RestClient.Builder builder = RestClient.builder();
         helix = MockRestServiceServer.bindTo(builder).build();
         service = new TwitchEventSubService(tokens, users, tokenService, streamState, publisher, builder.build(),
-                new ObjectMapper(), twitchat, selfChanges, DebugRecording.OFF, SimulationGates.none());
+                new ObjectMapper(), twitchat, selfChanges, DebugRecording.OFF, SimulationGates.none(), SiteRoles.active());
         ReflectionTestUtils.setField(service, "twitchClientId", "client-id");
         ReflectionTestUtils.setField(ReflectionTestUtils.getField(service, "connections"), "httpClient", httpClient);
 

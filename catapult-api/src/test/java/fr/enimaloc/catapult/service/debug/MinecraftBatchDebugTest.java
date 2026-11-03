@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.debug;
 
+import fr.enimaloc.catapult.site.SiteRoles;
 import fr.enimaloc.catapult.site.SiteRole;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.enimaloc.catapult.config.HttpTraceLoggingInterceptor;
@@ -150,7 +151,7 @@ class MinecraftBatchDebugTest {
     private MinecraftFriendService friendService() {
         MinecraftFriendService friends = new MinecraftFriendService(minecraft, tokens, serviceAccounts, links,
                 mock(MinecraftAccountLimitMarker.class), mock(GetterConfigRepository.class), new ObjectMapper(),
-                mock(ChannelEventPublisher.class), new DebugRecording(registry, recorder), SimulationGates.none());
+                mock(ChannelEventPublisher.class), new DebugRecording(registry, recorder), SimulationGates.none(), SiteRoles.active());
         return friends;
     }
 

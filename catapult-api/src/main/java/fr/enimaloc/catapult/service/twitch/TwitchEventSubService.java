@@ -22,6 +22,7 @@ import fr.enimaloc.catapult.simulation.CallKey;
 import fr.enimaloc.catapult.simulation.SimulatedCalls;
 import fr.enimaloc.catapult.simulation.SimulatedData;
 import fr.enimaloc.catapult.simulation.SimulationGate;
+import fr.enimaloc.catapult.site.SiteRole;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
@@ -70,6 +71,7 @@ public class TwitchEventSubService implements EventSubService {
 
     private final DebugRecording debug;
     private final ObjectProvider<SimulationGate> simulationGate;
+    private final SiteRole siteRole;
 
     public TwitchEventSubService(OAuthTokenRepository oAuthTokenRepository,
                                  UserAccountRepository userAccountRepository,
@@ -81,7 +83,8 @@ public class TwitchEventSubService implements EventSubService {
                                  TwitchatEventDispatcher twitchatEventDispatcher,
                                  CatapultCategoryChangeStateService categoryChangeStateService,
                                  DebugRecording debug,
-                                 ObjectProvider<SimulationGate> simulationGate) {
+                                 ObjectProvider<SimulationGate> simulationGate,
+                                 SiteRole siteRole) {
         this.oAuthTokenRepository = oAuthTokenRepository;
         this.userAccountRepository = userAccountRepository;
         this.twitchTokenService = twitchTokenService;
@@ -93,6 +96,7 @@ public class TwitchEventSubService implements EventSubService {
         this.categoryChangeStateService = categoryChangeStateService;
         this.debug = debug;
         this.simulationGate = simulationGate;
+        this.siteRole = siteRole;
         this.connections = new EventSubConnections(
             "[EventSub]", "twitch-eventsub-watchdog", oAuthTokenRepository, this::handleMessage);
     }
@@ -101,6 +105,10 @@ public class TwitchEventSubService implements EventSubService {
 
     @PostConstruct
     public void init() {
+        if (!siteRole.isActive()) {
+            log.info("[EventSub] Standby site — no EventSub connection opened");
+            return;
+        }
         userAccountRepository.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE)
             .forEach(this::connect);
     }
@@ -121,6 +129,10 @@ public class TwitchEventSubService implements EventSubService {
      * it, a fictitious account of the mock profile is skipped.
      */
     public void connect(UserAccount user) {
+        if (!siteRole.isActive()) {
+            log.debug("[EventSub] Standby site — skipping connect for user {}", user.getId());
+            return;
+        }
         if (SimulationGate.ignoresFictitious(simulationGate, user)) {
             log.debug("User {} is a fictitious account and the simulation is off — skipping EventSub connect",
                 user.getId());

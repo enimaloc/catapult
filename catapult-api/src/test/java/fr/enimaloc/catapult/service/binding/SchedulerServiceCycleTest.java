@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.binding;
 
+import fr.enimaloc.catapult.site.SiteRoles;
 import fr.enimaloc.catapult.simulation.SimulationGates;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
@@ -44,7 +45,7 @@ class SchedulerServiceCycleTest {
     private final MinecraftPresenceGetter minecraft = mock(MinecraftPresenceGetter.class);
     private final SchedulerService scheduler = new SchedulerService(accounts, chain, gameState, events,
             new SimpleMeterRegistry(), Optional.of(steam), Optional.of(minecraft), bindings,
-            SimulationGates.none());
+            SimulationGates.none(), SiteRoles.active());
     private final DetectedGame portal = new DetectedGame("620", GameBinding.SourceType.STEAM, "Portal 2");
     private UserAccount user;
 
