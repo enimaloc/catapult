@@ -13,6 +13,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -53,5 +54,31 @@ class SiteRoleListenerTest {
         verify(chat).connect(a);
         verify(chat).connect(b);
         verify(chat, never()).disconnect(a);
+    }
+
+    @Test
+    void standby_oneUserFailing_stillDisconnectsTheOthers() {
+        when(users.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE)).thenReturn(List.of(a, b));
+        doThrow(new IllegalStateException("boom")).when(eventSub).disconnect(a);
+        doThrow(new IllegalStateException("boom")).when(gameState).clearState(a);
+
+        listener.onSiteRoleChanged(new SiteRoleChangedEvent(this, false));
+
+        verify(chat).disconnect(a);
+        verify(eventSub).disconnect(b);
+        verify(chat).disconnect(b);
+        verify(gameState).clearState(b);
+    }
+
+    @Test
+    void active_eventSubInitFailing_stillReconnectsChat() {
+        when(users.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE)).thenReturn(List.of(a, b));
+        doThrow(new IllegalStateException("boom")).when(eventSub).init();
+        doThrow(new IllegalStateException("boom")).when(chat).connect(a);
+
+        listener.onSiteRoleChanged(new SiteRoleChangedEvent(this, true));
+
+        verify(chat).connect(a);
+        verify(chat).connect(b);
     }
 }
