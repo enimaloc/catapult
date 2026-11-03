@@ -18,6 +18,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -31,6 +32,7 @@ class StreamCatchUpTest {
     private StreamSessionService sessions;
     private StreamStateService streamState;
     private ApplicationEventPublisher publisher;
+    private java.time.Clock clock;
     private StreamCatchUp catchUp;
     private UserAccount user;
 
@@ -39,7 +41,8 @@ class StreamCatchUpTest {
         sessions = mock(StreamSessionService.class);
         streamState = mock(StreamStateService.class);
         publisher = mock(ApplicationEventPublisher.class);
-        catchUp = new StreamCatchUp(sessions, streamState, publisher);
+        clock = java.time.Clock.fixed(STARTED.plus(java.time.Duration.ofHours(1)), java.time.ZoneOffset.UTC);
+        catchUp = new StreamCatchUp(sessions, streamState, publisher, clock);
         user = new UserAccount();
         user.setId(UUID.randomUUID());
     }
@@ -96,14 +99,41 @@ class StreamCatchUpTest {
     }
 
     @Test
-    void live_afterEndedSession_publishesOnline() {
+    void live_sameStreamAlreadyEnded_staysOfflineAndPublishesNothing() {
         when(sessions.find(user)).thenReturn(Optional.of(session("7", STARTED.plusSeconds(60))));
 
         catchUp.reconcile(user, Optional.of(new StreamCatchUp.LiveStream("7", STARTED)));
 
-        verify(sessions).recordStart(user, "7", STARTED);
+        verify(streamState).restoreLive(user, false);
+        verify(streamState, never()).setLive(any(), anyBoolean());
+        verify(sessions, never()).recordStart(any(), any(), any());
+        verifyNoInteractions(publisher);
+    }
+
+    @Test
+    void live_differentStreamAfterEndedSession_publishesOnline() {
+        when(sessions.find(user)).thenReturn(Optional.of(session("7", STARTED.plusSeconds(60))));
+        Instant later = STARTED.plusSeconds(1800);
+
+        catchUp.reconcile(user, Optional.of(new StreamCatchUp.LiveStream("8", later)));
+
+        verify(sessions).recordStart(user, "8", later);
         verify(streamState).setLive(user, true);
         assertThat(publishedEvent()).isInstanceOf(StreamOnlineEvent.class);
+    }
+
+    @Test
+    void offline_sessionStartedMomentsAgo_isTreatedAsHelixLag() {
+        StreamCatchUp recent = new StreamCatchUp(sessions, streamState, publisher,
+            java.time.Clock.fixed(STARTED.plusSeconds(60), java.time.ZoneOffset.UTC));
+        when(sessions.find(user)).thenReturn(Optional.of(session("7", null)));
+
+        recent.reconcile(user, Optional.empty());
+
+        verify(streamState).restoreLive(user, true);
+        verify(streamState, never()).setLive(any(), anyBoolean());
+        verify(sessions, never()).recordEnd(any(), any());
+        verifyNoInteractions(publisher);
     }
 
     @Test
@@ -112,7 +142,7 @@ class StreamCatchUpTest {
 
         catchUp.reconcile(user, Optional.empty());
 
-        verify(sessions).recordEnd(any(), any());
+        verify(sessions).recordEnd(eq(user), any());
         verify(streamState).setLive(user, false);
         assertThat(publishedEvent()).isInstanceOfSatisfying(StreamOfflineEvent.class,
             e -> assertThat(e.getUser()).isSameAs(user));

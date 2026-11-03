@@ -149,6 +149,26 @@ class TwitchEventSubServiceTest {
     }
 
     @Test
+    void streamOnline_alreadyRecordedSameStream_doesNotPublishAgain() {
+        var session = new fr.enimaloc.catapult.domain.stream.StreamSession();
+        session.setStreamId("9001");
+        session.setStartedAt(Instant.parse("2026-11-03T10:00:00Z"));
+        when(streamSessionService.find(user)).thenReturn(Optional.of(session));
+        String message = """
+            {
+              "metadata": { "message_type": "notification", "subscription_type": "stream.online" },
+              "payload": { "event": { "id": "9001", "started_at": "2026-11-03T10:00:00Z" } }
+            }
+            """;
+
+        service.handleMessage(user, token, message, false);
+
+        verify(streamStateService).setLive(user, true);
+        verify(streamSessionService, never()).recordStart(any(), any(), any());
+        verify(eventPublisher, never()).publishEvent(any(StreamOnlineEvent.class));
+    }
+
+    @Test
     void streamOnline_withoutStreamId_recordsNothingButStillPublishes() {
         String message = """
             {

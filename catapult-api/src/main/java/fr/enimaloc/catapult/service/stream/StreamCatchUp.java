@@ -5,11 +5,13 @@ import fr.enimaloc.catapult.domain.stream.StreamSession;
 import fr.enimaloc.catapult.event.StreamOfflineEvent;
 import fr.enimaloc.catapult.event.StreamOnlineEvent;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 
@@ -19,7 +21,6 @@ import java.util.Optional;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class StreamCatchUp {
 
     /** The stream Twitch reports as live. */
@@ -28,15 +29,38 @@ public class StreamCatchUp {
     private final StreamSessionService streamSessionService;
     private final StreamStateService streamStateService;
     private final ApplicationEventPublisher eventPublisher;
+    private final Clock clock;
+
+    /** Helix /streams can trail EventSub by a few minutes: an offline answer this soon after a start is not an end. */
+    static final Duration HELIX_LAG_GRACE = Duration.ofMinutes(5);
+
+    @Autowired
+    public StreamCatchUp(StreamSessionService streamSessionService, StreamStateService streamStateService,
+                         ApplicationEventPublisher eventPublisher) {
+        this(streamSessionService, streamStateService, eventPublisher, Clock.systemUTC());
+    }
+
+    StreamCatchUp(StreamSessionService streamSessionService, StreamStateService streamStateService,
+                  ApplicationEventPublisher eventPublisher, Clock clock) {
+        this.streamSessionService = streamSessionService;
+        this.streamStateService = streamStateService;
+        this.eventPublisher = eventPublisher;
+        this.clock = clock;
+    }
 
     public void reconcile(UserAccount user, Optional<LiveStream> live) {
         Optional<StreamSession> session = streamSessionService.find(user);
         if (live.isPresent()) {
             reconcileLive(user, live.get(), session);
+        } else if (session.isPresent() && session.get().isOngoing()
+                && session.get().getStartedAt().plus(HELIX_LAG_GRACE).isAfter(clock.instant())) {
+            log.debug("Helix reports user {} offline right after a start — taken as lag", user.getId());
+            streamStateService.restoreLive(user, true);
         } else if (session.isPresent() && session.get().isOngoing()) {
             log.info("Catching up the end of the stream of user {} missed while away", user.getId());
             streamStateService.setLive(user, false);
-            streamSessionService.recordEnd(user, Instant.now());
+            // The real end time is unknown here, so the moment of the catch-up stands in for it
+            streamSessionService.recordEnd(user, clock.instant());
             eventPublisher.publishEvent(new StreamOfflineEvent(this, user));
         } else {
             streamStateService.restoreLive(user, false);
@@ -50,6 +74,9 @@ public class StreamCatchUp {
             streamStateService.restoreLive(user, true);
         } else if (session.get().isOngoing() && stream.id().equals(session.get().getStreamId())) {
             streamStateService.restoreLive(user, true);
+        } else if (!session.get().isOngoing() && stream.id().equals(session.get().getStreamId())) {
+            // Stream ids are never reused: Helix still lists the broadcast that already ended
+            streamStateService.restoreLive(user, false);
         } else {
             log.info("Catching up the start of stream {} of user {} missed while away", stream.id(), user.getId());
             streamSessionService.recordStart(user, stream.id(), stream.startedAt());

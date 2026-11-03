@@ -258,9 +258,16 @@ public class TwitchEventSubService implements EventSubService {
                     }
                     switch (subscriptionType) {
                         case "stream.online" -> {
+                            JsonNode onlineEvent = root.path("payload").path("event");
+                            boolean alreadyHandled = alreadyRecordedAsOngoing(user, onlineEvent);
                             streamStateService.setLive(user, true);
-                            recordStreamStart(user, root.path("payload").path("event"));
-                            eventPublisher.publishEvent(new StreamOnlineEvent(this, user));
+                            if (alreadyHandled) {
+                                log.debug("EventSub stream.online for user {} already handled — not published again",
+                                    user.getId());
+                            } else {
+                                recordStreamStart(user, onlineEvent);
+                                eventPublisher.publishEvent(new StreamOnlineEvent(this, user));
+                            }
                         }
                         case "stream.offline" -> {
                             streamStateService.setLive(user, false);
@@ -277,6 +284,19 @@ public class TwitchEventSubService implements EventSubService {
             }
         } catch (Exception e) {
             log.error("Failed to parse EventSub message for user {}: {}", user.getId(), e.getMessage());
+        }
+    }
+
+    /** Whether this stream is the one already remembered as ongoing (a catch-up got there first, or a redelivery). */
+    private boolean alreadyRecordedAsOngoing(UserAccount user, JsonNode event) {
+        String streamId = event.path("id").asText("");
+        if (streamId.isBlank()) return false;
+        try {
+            return streamSessionService.find(user)
+                .filter(s -> s.isOngoing() && streamId.equals(s.getStreamId())).isPresent();
+        } catch (Exception e) {
+            log.warn("Could not read the remembered stream for user {}: {}", user.getId(), e.getMessage());
+            return false;
         }
     }
 
