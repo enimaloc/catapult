@@ -37,7 +37,7 @@ class SiteRoleTest {
     private final SiteProperties properties = new SiteProperties();
     private Set<String> answer = Set.of(OURS);
     private boolean dnsFails;
-    private boolean writable = true;
+    private DatabaseRole databaseRole = DatabaseRole.WRITABLE;
     private int dnsCalls;
     private MutableClock clock;
     private SiteRole role;
@@ -53,7 +53,7 @@ class SiteRoleTest {
             }
             return answer;
         };
-        role = new SiteRole(properties, resolver, () -> writable, events, new SimpleMeterRegistry(), clock);
+        role = new SiteRole(properties, resolver, () -> databaseRole, events, new SimpleMeterRegistry(), clock);
     }
 
     @Test
@@ -102,7 +102,7 @@ class SiteRoleTest {
 
     @Test
     void databaseInRecovery_isNotActive() {
-        writable = false;
+        databaseRole = DatabaseRole.IN_RECOVERY;
         role.check();
         assertFalse(role.isActive());
     }
@@ -131,6 +131,60 @@ class SiteRoleTest {
             role.check();
         }
         assertEquals(List.of(true), publishedStates(1));
+    }
+
+    @Test
+    void databaseProbeUnknown_withinGrace_keepsActive() {
+        role.check();
+        databaseRole = DatabaseRole.UNKNOWN;
+        clock.advance(Duration.ofSeconds(149));
+        role.check();
+        assertTrue(role.isActive());
+        assertEquals(List.of(true), publishedStates(1));
+    }
+
+    @Test
+    void databaseProbeUnknown_afterGrace_goesStandby() {
+        role.check();
+        databaseRole = DatabaseRole.UNKNOWN;
+        clock.advance(Duration.ofSeconds(100));
+        role.check();
+        clock.advance(Duration.ofSeconds(51));
+        role.check();
+        assertFalse(role.isActive());
+        assertEquals(List.of(true, false), publishedStates(2));
+    }
+
+    @Test
+    void databaseProbeUnknown_neverConfirmed_staysStandby() {
+        databaseRole = DatabaseRole.UNKNOWN;
+        role.check();
+        assertFalse(role.isActive());
+    }
+
+    @Test
+    void databaseInRecovery_duringDnsGrace_goesStandbyImmediately() {
+        role.check();
+        dnsFails = true;
+        databaseRole = DatabaseRole.IN_RECOVERY;
+        clock.advance(Duration.ofSeconds(10));
+        role.check();
+        assertFalse(role.isActive());
+        assertEquals(List.of(true, false), publishedStates(2));
+    }
+
+    @Test
+    void graceCountsFromTheLastFullySuccessfulCheck() {
+        role.check();
+        // DNS answers but the database role stays unknown: not a fully successful check
+        databaseRole = DatabaseRole.UNKNOWN;
+        clock.advance(Duration.ofSeconds(100));
+        role.check();
+        databaseRole = DatabaseRole.WRITABLE;
+        dnsFails = true;
+        clock.advance(Duration.ofSeconds(51));
+        role.check();
+        assertFalse(role.isActive());
     }
 
     @Test

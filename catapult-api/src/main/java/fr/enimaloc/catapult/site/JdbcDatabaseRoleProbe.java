@@ -14,18 +14,33 @@ public class JdbcDatabaseRoleProbe implements DatabaseRoleProbe {
 
     private final JdbcTemplate jdbc;
 
+    /** Whether the database is PostgreSQL, looked up once; {@code null} until a lookup succeeds. */
+    private volatile Boolean postgres;
+
     @Override
-    public boolean writable() {
+    public DatabaseRole role() {
         try {
-            boolean postgres = Boolean.TRUE.equals(jdbc.execute((Connection c) ->
-                "PostgreSQL".equals(c.getMetaData().getDatabaseProductName())));
-            if (!postgres) {
-                return true;
+            if (!isPostgres()) {
+                // H2 (tests, local runs) has no replica
+                return DatabaseRole.WRITABLE;
             }
-            return Boolean.FALSE.equals(jdbc.queryForObject("select pg_is_in_recovery()", Boolean.class));
+            return Boolean.TRUE.equals(jdbc.queryForObject("select pg_is_in_recovery()", Boolean.class))
+                ? DatabaseRole.IN_RECOVERY
+                : DatabaseRole.WRITABLE;
         } catch (RuntimeException e) {
-            log.warn("Could not read the database role, treating it as not writable", e);
-            return false;
+            // A doubt, not a confirmed replica: SiteRole decides how long to wait on it
+            log.debug("Could not read the database role", e);
+            return DatabaseRole.UNKNOWN;
         }
+    }
+
+    private boolean isPostgres() {
+        Boolean known = postgres;
+        if (known == null) {
+            known = Boolean.TRUE.equals(jdbc.execute((Connection c) ->
+                "PostgreSQL".equals(c.getMetaData().getDatabaseProductName())));
+            postgres = known;
+        }
+        return known;
     }
 }

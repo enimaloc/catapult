@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.site;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import javax.naming.NamingEnumeration;
@@ -15,6 +16,7 @@ import java.util.List;
 import java.util.Set;
 
 /** Asks every authoritative name server of the zone directly, so no resolver cache can hide a switch. */
+@Slf4j
 @Component
 public class AuthoritativeDnsResolver implements DnsTargetResolver {
 
@@ -26,14 +28,21 @@ public class AuthoritativeDnsResolver implements DnsTargetResolver {
             boolean answered = false;
             for (String server : servers) {
                 try {
-                    addresses.addAll(query(name, "A", "dns://" + server));
+                    List<String> answer = query(name, "A", "dns://" + server);
+                    if (answer.isEmpty()) {
+                        // No record is no answer: the name never stops pointing somewhere on purpose
+                        log.debug("Authoritative server {} returned no A record for {}", server, name);
+                        continue;
+                    }
+                    addresses.addAll(answer);
                     answered = true;
-                } catch (NamingException ignored) {
+                } catch (NamingException e) {
                     // another authoritative server may still answer
+                    log.debug("Authoritative server {} failed for {}: {}", server, name, e.getMessage());
                 }
             }
             if (!answered) {
-                throw new IOException("No authoritative server answered for " + name);
+                throw new IOException("No authoritative server returned an A record for " + name);
             }
             return addresses;
         } catch (NamingException e) {

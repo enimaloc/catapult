@@ -16,7 +16,8 @@ import java.util.Set;
 
 /**
  * Whether this site is the active one: the public DNS name must resolve, on every authoritative server, to this
- * site's public IP, and the database must be writable. Anything doubtful means standby.
+ * site's public IP, and the database must be writable. A confirmed contrary answer means standby at once; a doubt (no
+ * DNS answer, a database role that could not be read) only once it outlasts the grace period.
  */
 @Slf4j
 @Component
@@ -35,6 +36,7 @@ public class SiteRole {
     private volatile String reason = "not checked yet";
     private volatile Instant since;
     private volatile Instant lastSuccess;
+    private volatile boolean doubtWarned;
 
     @Autowired
     public SiteRole(SiteProperties properties, DnsTargetResolver resolver, DatabaseRoleProbe databaseProbe,
@@ -79,25 +81,55 @@ public class SiteRole {
             return;
         }
         Instant now = clock.instant();
-        Set<String> addresses;
+        Set<String> addresses = null;
+        Exception dnsFailure = null;
         try {
             addresses = resolver.resolveA(properties.getDnsName());
         } catch (IOException | RuntimeException e) {
-            if (lastSuccess != null && Duration.between(lastSuccess, now).toMillis() < properties.getGraceMs()) {
-                log.debug("DNS resolution failed, keeping the current state within the grace period", e);
-                return;
-            }
-            transition(false, "DNS resolution failing beyond the grace period: " + e.getMessage());
-            return;
+            dnsFailure = e;
         }
-        lastSuccess = now;
-        if (!addresses.equals(Set.of(properties.getPublicIp()))) {
+        // Probed even when DNS failed: a confirmed replica must not wait for DNS to come back
+        DatabaseRole databaseRole = probeDatabase();
+        if (addresses != null && databaseRole != DatabaseRole.UNKNOWN) {
+            lastSuccess = now;
+            doubtWarned = false;
+        }
+        if (databaseRole == DatabaseRole.IN_RECOVERY) {
+            transition(false, "database is in recovery");
+        } else if (addresses != null && !addresses.equals(Set.of(properties.getPublicIp()))) {
             transition(false, properties.getDnsName() + " resolves to " + addresses);
-        } else if (!databaseProbe.writable()) {
-            transition(false, "database is not writable");
+        } else if (addresses == null) {
+            doubt(now, "DNS resolution failing: " + dnsFailure.getMessage(), dnsFailure);
+        } else if (databaseRole == DatabaseRole.UNKNOWN) {
+            doubt(now, "database role unknown", null);
         } else {
             transition(true, properties.getDnsName() + " points at this site and the database is writable");
         }
+    }
+
+    private DatabaseRole probeDatabase() {
+        try {
+            return databaseProbe.role();
+        } catch (RuntimeException e) {
+            log.debug("Database role probe failed", e);
+            return DatabaseRole.UNKNOWN;
+        }
+    }
+
+    /**
+     * A failed DNS resolution or database probe: keeps the current state while within the grace period of the last
+     * fully successful check, then goes standby.
+     */
+    private void doubt(Instant now, String why, Exception cause) {
+        if (lastSuccess != null && Duration.between(lastSuccess, now).toMillis() < properties.getGraceMs()) {
+            log.debug("{}, keeping the current state within the grace period", why, cause);
+            return;
+        }
+        if (!doubtWarned) {
+            doubtWarned = true;
+            log.warn("{} beyond the grace period, going standby", why);
+        }
+        transition(false, why + " beyond the grace period");
     }
 
     private synchronized void transition(boolean toActive, String why) {
