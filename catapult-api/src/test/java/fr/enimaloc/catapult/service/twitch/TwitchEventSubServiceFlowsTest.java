@@ -85,7 +85,8 @@ class TwitchEventSubServiceFlowsTest {
         helix = MockRestServiceServer.bindTo(builder).build();
         service = new TwitchEventSubService(tokens, users, tokenService, streamState, publisher, builder.build(),
                 new ObjectMapper(), twitchat, selfChanges, DebugRecording.OFF, SimulationGates.none(), SiteRoles.active(),
-                streamSessions, new fr.enimaloc.catapult.service.stream.StreamCatchUp(streamSessions, streamState, publisher));
+                streamSessions, new fr.enimaloc.catapult.service.stream.StreamCatchUp(streamSessions, streamState,
+                    mock(fr.enimaloc.catapult.service.binding.GameStateService.class), publisher));
         ReflectionTestUtils.setField(service, "twitchClientId", "client-id");
         ReflectionTestUtils.setField(ReflectionTestUtils.getField(service, "connections"), "httpClient", httpClient);
 

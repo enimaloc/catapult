@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.stream.StreamSession;
 import fr.enimaloc.catapult.event.StreamOfflineEvent;
 import fr.enimaloc.catapult.event.StreamOnlineEvent;
+import fr.enimaloc.catapult.service.binding.GameStateService;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +29,7 @@ public class StreamCatchUp {
 
     private final StreamSessionService streamSessionService;
     private final StreamStateService streamStateService;
+    private final GameStateService gameStateService;
     private final ApplicationEventPublisher eventPublisher;
     private final Clock clock;
 
@@ -36,14 +38,15 @@ public class StreamCatchUp {
 
     @Autowired
     public StreamCatchUp(StreamSessionService streamSessionService, StreamStateService streamStateService,
-                         ApplicationEventPublisher eventPublisher) {
-        this(streamSessionService, streamStateService, eventPublisher, Clock.systemUTC());
+                         GameStateService gameStateService, ApplicationEventPublisher eventPublisher) {
+        this(streamSessionService, streamStateService, gameStateService, eventPublisher, Clock.systemUTC());
     }
 
     StreamCatchUp(StreamSessionService streamSessionService, StreamStateService streamStateService,
-                  ApplicationEventPublisher eventPublisher, Clock clock) {
+                  GameStateService gameStateService, ApplicationEventPublisher eventPublisher, Clock clock) {
         this.streamSessionService = streamSessionService;
         this.streamStateService = streamStateService;
+        this.gameStateService = gameStateService;
         this.eventPublisher = eventPublisher;
         this.clock = clock;
     }
@@ -71,9 +74,9 @@ public class StreamCatchUp {
         if (session.isEmpty()) {
             // First run with the marker: remember the stream without announcing it
             streamSessionService.recordStart(user, stream.id(), stream.startedAt());
-            streamStateService.restoreLive(user, true);
+            restoreOngoingLive(user);
         } else if (session.get().isOngoing() && stream.id().equals(session.get().getStreamId())) {
-            streamStateService.restoreLive(user, true);
+            restoreOngoingLive(user);
         } else if (!session.get().isOngoing() && stream.id().equals(session.get().getStreamId())) {
             // Stream ids are never reused: Helix still lists the broadcast that already ended
             streamStateService.restoreLive(user, false);
@@ -82,6 +85,19 @@ public class StreamCatchUp {
             streamSessionService.recordStart(user, stream.id(), stream.startedAt());
             streamStateService.setLive(user, true);
             eventPublisher.publishEvent(new StreamOnlineEvent(this, user));
+        }
+    }
+
+    /**
+     * Puts back the live state of a stream already handled. When this instance did not know it was live (a takeover,
+     * a restart), a poll may already have seen the channel offline, kept its binding pending and remembered the game:
+     * forgetting the game makes the next poll detect it again, now live, and apply it.
+     */
+    private void restoreOngoingLive(UserAccount user) {
+        boolean knownLive = streamStateService.isLive(user);
+        streamStateService.restoreLive(user, true);
+        if (!knownLive) {
+            gameStateService.clearState(user);
         }
     }
 }

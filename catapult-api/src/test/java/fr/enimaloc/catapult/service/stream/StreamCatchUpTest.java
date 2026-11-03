@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.stream.StreamSession;
 import fr.enimaloc.catapult.event.StreamOfflineEvent;
 import fr.enimaloc.catapult.event.StreamOnlineEvent;
+import fr.enimaloc.catapult.service.binding.GameStateService;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,6 +32,7 @@ class StreamCatchUpTest {
 
     private StreamSessionService sessions;
     private StreamStateService streamState;
+    private GameStateService gameState;
     private ApplicationEventPublisher publisher;
     private java.time.Clock clock;
     private StreamCatchUp catchUp;
@@ -40,9 +42,10 @@ class StreamCatchUpTest {
     void setUp() {
         sessions = mock(StreamSessionService.class);
         streamState = mock(StreamStateService.class);
+        gameState = mock(GameStateService.class);
         publisher = mock(ApplicationEventPublisher.class);
         clock = java.time.Clock.fixed(STARTED.plus(java.time.Duration.ofHours(1)), java.time.ZoneOffset.UTC);
-        catchUp = new StreamCatchUp(sessions, streamState, publisher, clock);
+        catchUp = new StreamCatchUp(sessions, streamState, gameState, publisher, clock);
         user = new UserAccount();
         user.setId(UUID.randomUUID());
     }
@@ -124,7 +127,7 @@ class StreamCatchUpTest {
 
     @Test
     void offline_sessionStartedMomentsAgo_isTreatedAsHelixLag() {
-        StreamCatchUp recent = new StreamCatchUp(sessions, streamState, publisher,
+        StreamCatchUp recent = new StreamCatchUp(sessions, streamState, gameState, publisher,
             java.time.Clock.fixed(STARTED.plusSeconds(60), java.time.ZoneOffset.UTC));
         when(sessions.find(user)).thenReturn(Optional.of(session("7", null)));
 
@@ -158,5 +161,45 @@ class StreamCatchUpTest {
         verify(streamState, never()).setLive(any(), anyBoolean());
         verify(sessions, never()).recordEnd(any(), any());
         verifyNoInteractions(publisher);
+    }
+
+    @Test
+    void live_sameStreamOngoing_clearsGameStateSoNextPollReapplies() {
+        when(sessions.find(user)).thenReturn(Optional.of(session("7", null)));
+
+        catchUp.reconcile(user, Optional.of(new StreamCatchUp.LiveStream("7", STARTED)));
+
+        verify(streamState).restoreLive(user, true);
+        verify(gameState).clearState(user);
+    }
+
+    @Test
+    void live_noSession_clearsGameStateSoNextPollReapplies() {
+        when(sessions.find(user)).thenReturn(Optional.empty());
+
+        catchUp.reconcile(user, Optional.of(new StreamCatchUp.LiveStream("7", STARTED)));
+
+        verify(streamState).restoreLive(user, true);
+        verify(gameState).clearState(user);
+    }
+
+    @Test
+    void live_sameStreamAlreadyKnownLive_keepsGameState() {
+        // A plain reconnection on the active site: this instance never lost the live state
+        when(streamState.isLive(user)).thenReturn(true);
+        when(sessions.find(user)).thenReturn(Optional.of(session("7", null)));
+
+        catchUp.reconcile(user, Optional.of(new StreamCatchUp.LiveStream("7", STARTED)));
+
+        verify(gameState, never()).clearState(any());
+    }
+
+    @Test
+    void offline_noOngoingSession_keepsGameState() {
+        when(sessions.find(user)).thenReturn(Optional.empty());
+
+        catchUp.reconcile(user, Optional.empty());
+
+        verify(gameState, never()).clearState(any());
     }
 }
