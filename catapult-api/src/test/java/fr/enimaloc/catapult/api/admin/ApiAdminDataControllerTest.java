@@ -4,10 +4,13 @@ import fr.enimaloc.catapult.chat.ChatCommandEvent;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.account.UserGroup;
 import fr.enimaloc.catapult.domain.chatcommand.ChatCommandDefinition;
+import fr.enimaloc.catapult.domain.feature.SeenFeature;
+import fr.enimaloc.catapult.domain.feature.SeenFeatureId;
 import fr.enimaloc.catapult.domain.tw.TwDefinition;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.account.UserGroupRepository;
 import fr.enimaloc.catapult.repository.chatcommand.ChatCommandDefinitionRepository;
+import fr.enimaloc.catapult.repository.feature.SeenFeatureRepository;
 import fr.enimaloc.catapult.repository.tw.TwDefinitionRepository;
 import fr.enimaloc.catapult.service.dtdd.DtddMappingEvents;
 import org.junit.jupiter.api.Test;
@@ -21,6 +24,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.time.Instant;
 
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -45,6 +49,7 @@ class ApiAdminDataControllerTest {
     @Autowired UserGroupRepository userGroupRepository;
     @Autowired UserAccountRepository userAccountRepository;
     @Autowired ChatCommandDefinitionRepository chatCommandDefinitionRepository;
+    @Autowired SeenFeatureRepository seenFeatureRepository;
     @MockitoBean DtddMappingEvents dtddMappingEvents;
 
     @Test
@@ -142,6 +147,28 @@ class ApiAdminDataControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("detail-row"))
                 .andExpect(jsonPath("$.description").value("A description"));
+    }
+
+    @Test
+    void embeddedId_listRowIdOpensItsDetail() throws Exception {
+        UserAccount user = new UserAccount();
+        user.setTwitchUsername("seen-user-" + java.util.UUID.randomUUID());
+        user = userAccountRepository.save(user);
+        SeenFeature seen = new SeenFeature();
+        seen.setId(new SeenFeatureId(user.getId(), "channel.commands"));
+        seen.setSeenAt(Instant.now());
+        seenFeatureRepository.save(seen);
+
+        // Components in attribute name order: featureKey, then userId.
+        String encodedId = "channel.commands~" + user.getId();
+        MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
+        mvc.perform(get("/api/internal/admin/data/seen-feature").param("size", "500"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[?(@.id=='" + encodedId + "')]").exists());
+
+        mvc.perform(get("/api/internal/admin/data/seen-feature/{id}", encodedId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(encodedId));
     }
 
     @Test
