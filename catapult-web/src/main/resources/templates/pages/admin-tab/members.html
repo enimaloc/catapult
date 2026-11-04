@@ -84,8 +84,8 @@
             <span class="admin-member-status">
                 <mdui-chip th:text="#{|admin.members.status.${m.status()}|}">ACTIVE</mdui-chip>
                 <mdui-chip th:if="${m.premium()}" icon="workspace_premium" class="admin-member-premium"
-                           th:text="${m.premiumUntil() == null} ? #{admin.members.badge.premium}
-                                    : #{admin.members.badge.premium_until(${#temporals.format(m.premiumUntil(), #messages.msg('format.date'))})}">Premium</mdui-chip>
+                           th:attr="title=${m.premiumUntil() != null} ? #{admin.members.badge.premium_until(${#temporals.format(m.premiumUntil(), #messages.msg('format.date'))})}"
+                           th:text="#{admin.members.badge.premium}">Premium</mdui-chip>
             </span>
 
             <span class="admin-member-created"

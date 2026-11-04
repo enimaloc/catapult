@@ -1067,6 +1067,13 @@ a[data-link].active {
     overflow-wrap: anywhere;
 }
 
+.admin-member-status {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    min-width: 0;
+}
+
 .admin-member-live {
     --mdui-color-secondary-container: 239, 68, 68;
 }
