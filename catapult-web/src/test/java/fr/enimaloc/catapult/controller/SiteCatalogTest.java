@@ -28,7 +28,7 @@ class SiteCatalogTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"", "privacy", "changelog", "docs/api", "channel", "admin", "notifications", "login", "join"})
+    @ValueSource(strings = {"", "privacy", "changelog", "docs/api", "channel", "admin", "notifications", "premium", "login", "join"})
     void knowsEveryPage(String path) {
         assertThat(SiteCatalog.isPage(path)).isTrue();
     }

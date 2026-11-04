@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.common.dto.InvitePageData;
 import fr.enimaloc.catapult.common.dto.UserInfoResponse;
 import fr.enimaloc.catapult.common.dto.AppConfigResponse;
 import fr.enimaloc.catapult.common.dto.channel.BindingDto;
+import fr.enimaloc.catapult.common.dto.premium.PremiumStatusDto;
 import fr.enimaloc.catapult.common.dto.channel.DeleteAccountRequest;
 import fr.enimaloc.catapult.common.dto.TokenResponse;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberDto;
@@ -815,6 +816,13 @@ public class RealApiService implements ApiService {
         UUID me = me();
         if (me == null) return HttpStatus.UNAUTHORIZED.value();
         return client.call(HttpMethod.POST, "/api/internal/users/{userId}/notifications/read-all", null, Void.class, me).status();
+    }
+
+    @Override
+    public PremiumStatusDto premiumStatus() {
+        UUID me = me();
+        if (me == null) return null;
+        return client.get("/api/internal/users/{userId}/premium", PremiumStatusDto.class, me);
     }
 
     @Override

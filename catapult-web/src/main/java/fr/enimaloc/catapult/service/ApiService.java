@@ -45,6 +45,7 @@ import fr.enimaloc.catapult.common.dto.notification.NotificationChannel;
 import fr.enimaloc.catapult.common.dto.notification.NotificationChannelsDto;
 import fr.enimaloc.catapult.common.dto.notification.NotificationDto;
 import fr.enimaloc.catapult.common.dto.notification.NotificationSnapshotDto;
+import fr.enimaloc.catapult.common.dto.premium.PremiumStatusDto;
 import fr.enimaloc.catapult.common.dto.admin.CacheEntryDetailDto;
 import fr.enimaloc.catapult.common.dto.admin.CacheEntryDto;
 import fr.enimaloc.catapult.common.dto.admin.CacheSummaryDto;
@@ -259,6 +260,9 @@ public interface ApiService {
     int adminDeleteSocialLink(long id);
     /** catapult-api's status (200; 400 ids not the exact set of links), 502 when unreachable. */
     int adminOrderSocialLinks(List<Long> ids);
+
+    /** The logged-in member's premium status and what each tier gets; null when catapult-api fails. */
+    PremiumStatusDto premiumStatus();
 
     // --- notifications and broadcasts ---
 

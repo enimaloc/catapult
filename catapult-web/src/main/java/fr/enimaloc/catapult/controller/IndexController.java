@@ -104,6 +104,21 @@ public class IndexController {
         return "index";
     }
 
+    /** The member's premium status; a visitor who is logged out gets the 401 error page in its place. */
+    @GetMapping("/premium")
+    String premium(Model model, Locale locale, HttpServletResponse response) throws IOException {
+        boolean refused = !ApiClient.hasSession();
+        model.addAttribute("error", refused);
+        if (refused) {
+            response.setStatus(HttpStatus.UNAUTHORIZED.value());
+            filler.error(model, HttpStatus.UNAUTHORIZED.value());
+        } else {
+            filler.premium(model);
+        }
+        filler.fill(model, "premium", locale);
+        return "index";
+    }
+
     /** The channel's page, or its OBS dock when opened in OBS or asked for (see {@link ObsDock}). */
     @GetMapping("/channel/{username}")
     String channel(Model model, @PathVariable String username,

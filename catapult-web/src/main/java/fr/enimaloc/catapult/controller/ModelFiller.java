@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.controller;
 
+import fr.enimaloc.catapult.common.dto.premium.PremiumOfferDto;
+import fr.enimaloc.catapult.common.dto.premium.PremiumStatusDto;
 import fr.enimaloc.catapult.common.dto.channel.ChannelDto;
 import fr.enimaloc.catapult.common.dto.channel.ChannelListResponse;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
@@ -328,6 +330,19 @@ public class ModelFiller {
     public void notifications(Model model, int page) {
         model.addAttribute("notifications", apiService.notifications(page));
         model.addAttribute("notificationChannels", apiService.notificationChannels());
+    }
+
+    /** The premium page model: the member's status (null when catapult-api fails) and each interval ready to display. */
+    public void premium(Model model) {
+        PremiumStatusDto status = apiService.premiumStatus();
+        model.addAttribute("premium", status);
+        if (status != null) {
+            PremiumOfferDto offer = status.offer();
+            model.addAttribute("premiumFree", PremiumDuration.of(offer.freeIntervalSeconds()));
+            model.addAttribute("premiumPremium", PremiumDuration.of(offer.premiumIntervalSeconds()));
+            model.addAttribute("premiumDegradedFree", PremiumDuration.of(offer.degradedFreeIntervalSeconds()));
+            model.addAttribute("premiumDegradedPremium", PremiumDuration.of(offer.degradedPremiumIntervalSeconds()));
+        }
     }
 
     /** Error page model for the status the servlet container forwarded (500 when absent). */

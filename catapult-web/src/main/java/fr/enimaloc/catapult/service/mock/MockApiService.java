@@ -44,6 +44,8 @@ import fr.enimaloc.catapult.common.dto.notification.NotificationChannel;
 import fr.enimaloc.catapult.common.dto.notification.NotificationChannelsDto;
 import fr.enimaloc.catapult.common.dto.notification.NotificationDto;
 import fr.enimaloc.catapult.common.dto.notification.NotificationSnapshotDto;
+import fr.enimaloc.catapult.common.dto.premium.PremiumOfferDto;
+import fr.enimaloc.catapult.common.dto.premium.PremiumStatusDto;
 import fr.enimaloc.catapult.common.dto.admin.CacheEntryDetailDto;
 import fr.enimaloc.catapult.common.dto.admin.CacheEntryDto;
 import fr.enimaloc.catapult.common.dto.admin.CacheSummaryDto;
@@ -160,6 +162,8 @@ public class MockApiService implements ApiService {
      */
     private final Map<String, MockData> data = new ConcurrentHashMap<>();
     private final MockWellKnownStore wellKnown = new MockWellKnownStore();
+    /** The free tier's custom binding limit, as catapult-api's default. */
+    private static final int MOCK_FREE_BINDING_LIMIT = 5;
     /** Application-wide too: every page shows them, logged in or not. */
     private final MockMetaTagStore metaTags = new MockMetaTagStore();
     private final MockSocialLinkStore socialLinks = new MockSocialLinkStore();
@@ -1265,6 +1269,17 @@ public class MockApiService implements ApiService {
         log.trace("notificationSnapshot()");
         UUID account = currentUserId();
         return account == null ? null : notifications().snapshot(account);
+    }
+
+    /** The mock account is a free one: its custom bindings count against the free limit. */
+    @Override
+    public PremiumStatusDto premiumStatus() {
+        log.trace("premiumStatus()");
+        MockData current = currentData();
+        if (current == null) return null;
+        int count = current.customBindings().state().bindings().size();
+        return new PremiumStatusDto(false, null, count, MOCK_FREE_BINDING_LIMIT,
+                new PremiumOfferDto(60, 30, 90, 60, MOCK_FREE_BINDING_LIMIT));
     }
 
     @Override

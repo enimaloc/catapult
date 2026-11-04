@@ -144,6 +144,19 @@ public class SpaFragmentController {
         return "pages/notifications :: notifications";
     }
 
+    /** The premium page; only "logged in" matters, every member sees their own status. */
+    @GetMapping("/premium")
+    String premium(Model model, HttpServletResponse response) {
+        if (!ApiClient.hasSession()) {
+            response.setStatus(HttpStatus.UNAUTHORIZED.value());
+            filler.error(model, HttpStatus.UNAUTHORIZED.value());
+            return "pages/error :: error";
+        }
+        filler.premium(model);
+        filler.defaultAttr(model, "premium");
+        return "pages/premium :: premium";
+    }
+
     @GetMapping("/login")
     String login(Model model, @RequestParam(required = false) String error) {
         String channel = ModelFiller.loggedInChannelPath();

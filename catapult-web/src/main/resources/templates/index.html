@@ -78,6 +78,10 @@
                 </span>
                 <div class="notifications-dropdown" id="notifications-dropdown"></div>
             </mdui-dropdown>
+            <a th:if="${loggedIn}" id="nav-premium" data-link class="nav-channel nav-premium" href="/premium" th:title="#{nav.premium}">
+                <mdui-icon name="workspace_premium"></mdui-icon>
+                <span th:text="#{nav.premium}">nav.premium</span>
+            </a>
             <!--/* Admins only (ROLE_ADMIN): opens the admin page, marked active there by spa.js like a channel. */-->
             <a th:if="${admin}" id="nav-admin" data-link class="nav-channel nav-admin" href="/admin" th:title="#{nav.admin}">
                 <mdui-icon name="admin_panel_settings"></mdui-icon>

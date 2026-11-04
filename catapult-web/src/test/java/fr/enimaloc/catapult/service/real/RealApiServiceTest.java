@@ -1175,6 +1175,20 @@ class RealApiServiceTest {
         }
     }
 
+    @Test
+    void premiumStatus_readsTheMembersStatus() {
+        respond(HttpMethod.GET, OWN + "/premium", "{\"premium\":true,\"until\":\"2026-12-31\",\"customBindingCount\":7,"
+                + "\"customBindingLimit\":null,\"offer\":{\"freeIntervalSeconds\":60,\"premiumIntervalSeconds\":30,"
+                + "\"degradedFreeIntervalSeconds\":90,\"degradedPremiumIntervalSeconds\":60,\"freeCustomBindingLimit\":5}}");
+
+        var status = service.premiumStatus();
+
+        assertThat(status.premium()).isTrue();
+        assertThat(status.until()).isEqualTo(java.time.LocalDate.of(2026, 12, 31));
+        assertThat(status.customBindingLimit()).isNull();
+        assertThat(status.offer().degradedFreeIntervalSeconds()).isEqualTo(90);
+    }
+
     // --- notifications and broadcasts ---------------------------------------------------------
 
     private static final String NOTIF = "{\"id\":\"00000000-0000-0000-0000-000000000009\",\"title\":\"t\",\"bodyHtml\":\"<p>b</p>\","
