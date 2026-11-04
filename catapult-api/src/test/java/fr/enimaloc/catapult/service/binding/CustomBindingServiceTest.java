@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.service.binding;
 import fr.enimaloc.catapult.api.error.ApiProblem;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest;
 import fr.enimaloc.catapult.common.dto.channel.TwitchExtensionsDto;
+import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.account.UserSettings;
@@ -23,6 +24,7 @@ import fr.enimaloc.catapult.service.category.CategoryOutcome;
 import fr.enimaloc.catapult.service.category.CategoryRule;
 import fr.enimaloc.catapult.service.category.ExtensionLayoutApplier;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
+import fr.enimaloc.catapult.service.premium.PremiumService;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import fr.enimaloc.catapult.service.twitch.ChannelUpdateOutcome;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
@@ -40,6 +42,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.UUID;
 
@@ -73,6 +76,7 @@ class CustomBindingServiceTest {
     @Mock private GameEventListener gameEventListener;
     @Mock private ChannelEventPublisher channelEventPublisher;
     @Mock private ExtensionLayoutApplier layouts;
+    @Mock private PremiumService premiumService;
 
     private CustomBindingService service;
 
@@ -86,11 +90,12 @@ class CustomBindingServiceTest {
                 new CategoryApplier(twitchService, streamStateService), mock(RaidRestoreGateService.class), mock(GameBindingLookup.class), mock(ExtensionLayoutApplier.class));
         service = new CustomBindingService(bindings, activations, experimentService, gameStateService,
                 streamStateService, userAccountRepository, oAuthTokenRepository, gameEventListener,
-                channelEventPublisher, chain, layouts);
+                channelEventPublisher, chain, layouts, premiumService);
         user = new UserAccount();
         user.setId(UUID.randomUUID());
         user.setBotEnabled(true);
         user.setStatus(UserAccount.Status.ACTIVE);
+        lenient().when(premiumService.customBindingLimit(user)).thenReturn(OptionalInt.of(5));
         lenient().when(userAccountRepository.findById(user.getId())).thenReturn(Optional.of(user));
         lenient().when(experimentService.evaluateGate(user, CustomBindingService.EXPERIMENT_KEY)).thenReturn(true);
         // The detection path answers its outcome, which the deactivation only checks for an exception
@@ -184,11 +189,41 @@ class CustomBindingServiceTest {
     }
 
     @Test
-    void create_21st_isRejected() {
-        when(bindings.countByUser(user)).thenReturn(20L);
+    void create_freeAccountAt5_limitReached() {
+        when(bindings.countByUser(user)).thenReturn(5L);
 
-        assertStatus(() -> service.create(user, request("Art")), HttpStatus.CONFLICT);
+        assertCode(() -> service.create(user, request("Art")), ErrorCode.LIMIT_REACHED.code());
+        assertThatThrownBy(() -> service.create(user, request("Art")))
+                .hasMessageContaining("At most 5 custom bindings on a free account");
         verify(bindings, never()).save(any());
+    }
+
+    @Test
+    void create_premiumAccountAt25_succeeds() {
+        when(premiumService.customBindingLimit(user)).thenReturn(OptionalInt.empty());
+        lenient().when(bindings.countByUser(user)).thenReturn(25L);
+
+        assertThat(service.create(user, request("Art")).getName()).isEqualTo("Art");
+    }
+
+    @Test
+    void freeAccountWith12_updateActivateDelete_stillWork() {
+        lenient().when(bindings.countByUser(user)).thenReturn(12L);
+        CustomBinding art = binding("Art");
+        when(bindings.findByIdAndUser(art.getId(), user)).thenReturn(Optional.of(art));
+
+        assertThat(service.update(user, art.getId(), request("Art")).binding()).isSameAs(art);
+        service.delete(user, art.getId());
+        verify(bindings).delete(art);
+        assertCode(() -> service.create(user, request("Dev")), ErrorCode.LIMIT_REACHED.code());
+    }
+
+    @Test
+    void limit_isFiveForAFreeAccount_andNullForPremium() {
+        assertThat(service.limit(user)).hasValue(5);
+
+        when(premiumService.customBindingLimit(user)).thenReturn(OptionalInt.empty());
+        assertThat(service.limit(user)).isEmpty();
     }
 
     @Test

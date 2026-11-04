@@ -272,7 +272,7 @@ class ChannelCustomBindingsRenderingTest {
     /** Art's layout: Build Guide in the second panel, the overlay emptied; the other slots are kept. */
     private static CustomBindingsStateDto stateWithExtensions() {
         CustomBindingsStateDto plain = state();
-        return new CustomBindingsStateDto(plain.enabled(), plain.bindings(), plain.activeId(), plain.activatedAt(),
+        return new CustomBindingsStateDto(plain.enabled(), plain.bindings(), plain.activeId(), plain.activatedAt(), null,
                 Map.of(ART, List.of(
                         new ExtensionSlotDto(TwitchExtensionsDto.Type.PANEL, 2, "mock-panel", "Build Guide"),
                         new ExtensionSlotDto(TwitchExtensionsDto.Type.OVERLAY, 1, null, null))));

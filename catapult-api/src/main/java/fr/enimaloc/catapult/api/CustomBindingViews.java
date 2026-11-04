@@ -21,6 +21,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.UUID;
 
 /**
@@ -43,9 +44,11 @@ public class CustomBindingViews {
         for (CustomBinding binding : listed) {
             extensions.put(binding.getId(), ExtensionSlotSetting.toDtos(binding.getExtensionSlots()));
         }
+        OptionalInt limit = service.limit(user);
         return new CustomBindingsStateDto(true, bindings,
                 active.map(activation -> activation.getCustomBinding().getId()).orElse(null),
-                active.map(CustomBindingActivation::getActivatedAt).orElse(null), extensions);
+                active.map(CustomBindingActivation::getActivatedAt).orElse(null),
+                limit.isPresent() ? limit.getAsInt() : null, extensions);
     }
 
     /** {@link #state} as the token API answers it: without the dashboard-only extension layouts. */

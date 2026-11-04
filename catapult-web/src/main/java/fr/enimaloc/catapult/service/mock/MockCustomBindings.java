@@ -48,7 +48,7 @@ class MockCustomBindings {
     }
 
     synchronized CustomBindingsStateDto state() {
-        return new CustomBindingsStateDto(true, List.copyOf(bindings), activeId, activatedAt,
+        return new CustomBindingsStateDto(true, List.copyOf(bindings), activeId, activatedAt, null,
                 Map.copyOf(extensions));
     }
 

@@ -6,9 +6,10 @@ import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springframework.stereotype.Component;
 
 /**
- * Keeps the dashboard-only extension layouts out of the documented token API. The custom bindings' list is shared with
- * the dashboard, whose {@code CustomBindingsStateDto#extensions} the token API never fills (see
- * {@code CustomBindingViews#publicState}), so the documented schema stays the one the token API has always had.
+ * Keeps the dashboard-only extension layouts and binding limit out of the documented token API. The custom
+ * bindings' list is shared with the dashboard, whose {@code CustomBindingsStateDto#extensions} and {@code limit}
+ * the token API never fills (see {@code CustomBindingViews#publicState}), so the documented schema stays the one
+ * the token API has always had.
  */
 @Component
 public class DashboardOnlySchemaCustomizer implements OpenApiCustomizer {
@@ -21,6 +22,7 @@ public class DashboardOnlySchemaCustomizer implements OpenApiCustomizer {
         Schema<?> state = openApi.getComponents().getSchemas().get("CustomBindingsStateDto");
         if (state != null && state.getProperties() != null) {
             state.getProperties().remove("extensions");
+            state.getProperties().remove("limit");
         }
         // Safe by name: springdoc only scans api.userapi, and no route there uses ExtensionSlotDto otherwise
         openApi.getComponents().getSchemas().remove("ExtensionSlotDto");

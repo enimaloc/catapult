@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.event.listener;
 
 import fr.enimaloc.catapult.site.SiteRoles;
 import fr.enimaloc.catapult.simulation.SimulationGates;
+import fr.enimaloc.catapult.service.premium.PremiumService;
 import fr.enimaloc.catapult.service.category.ExtensionLayoutApplier;
 import fr.enimaloc.catapult.service.binding.PollCadences;
 import fr.enimaloc.catapult.service.binding.RaidRestoreGateService;
@@ -200,7 +201,7 @@ class CustomBindingDetectionTest {
         CustomBindingService service = new CustomBindingService(mock(CustomBindingRepository.class), activations,
                 experimentService, gameStateService, streamStateService, mock(UserAccountRepository.class),
                 mock(OAuthTokenRepository.class), listener, channelEventPublisher, chain,
-                mock(ExtensionLayoutApplier.class));
+                mock(ExtensionLayoutApplier.class), mock(PremiumService.class));
 
         service.deactivate(user);
 
@@ -229,7 +230,7 @@ class CustomBindingDetectionTest {
         CustomBindingService service = new CustomBindingService(mock(CustomBindingRepository.class), activations,
                 experimentService, gameStateService, streamStateService, mock(UserAccountRepository.class),
                 mock(OAuthTokenRepository.class), listener, channelEventPublisher, chain,
-                mock(ExtensionLayoutApplier.class));
+                mock(ExtensionLayoutApplier.class), mock(PremiumService.class));
 
         service.deactivate(user);
 
