@@ -78,7 +78,8 @@
                 </span>
                 <div class="notifications-dropdown" id="notifications-dropdown"></div>
             </mdui-dropdown>
-            <a th:if="${loggedIn}" id="nav-premium" data-link class="nav-channel nav-premium" href="/premium" th:title="#{nav.premium}">
+            <!--/* Hidden until /spa/nav-channels says premium is shown to the member (experiment premium.ui, spa.js). */-->
+            <a th:if="${loggedIn}" id="nav-premium" data-link class="nav-channel nav-premium" href="/premium" th:title="#{nav.premium}" hidden>
                 <mdui-icon name="workspace_premium"></mdui-icon>
                 <span th:text="#{nav.premium}">nav.premium</span>
             </a>

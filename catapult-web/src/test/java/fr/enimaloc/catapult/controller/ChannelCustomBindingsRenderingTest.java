@@ -156,7 +156,10 @@ class ChannelCustomBindingsRenderingTest {
         assertThat(byClass(dev, "custom-binding-uninterruptible").attr("checked")).isNotNull();
         assertThat(byClass(row(overview, ART), "custom-binding-uninterruptible").attr("checked")).isNull();
         assertThat(overview).contains("Activate", "Deactivate", "Save", "Delete");
-        assertThat(overview).contains("You&#39;ve reached the 5-binding limit of a free account", "Twitch did not apply the category",
+        // No limit given (premium, or premium hidden from the member): the refusal doesn't speak of premium.
+        assertThat(byId(overview, "channel-custom-bindings-list").attr("data-error-limit-reached"))
+                .isEqualTo("You&#39;ve reached the 5-binding limit.");
+        assertThat(overview).contains("Twitch did not apply the category",
                 "Another custom binding already has this name");
         // The empty notice is hidden while bindings exist.
         assertThat(byId(overview, "channel-custom-bindings-empty").hasClass("hidden")).isTrue();
@@ -184,6 +187,8 @@ class ChannelCustomBindingsRenderingTest {
         assertThat(upgrade.hasClass("hidden")).isTrue();
         assertThat(upgrade.attr("href")).isEqualTo("/premium");
         assertThat(upgrade.text()).isEqualTo("Go premium");
+        assertThat(byId(overview, "channel-custom-bindings-list").attr("data-error-limit-reached"))
+                .isEqualTo("You&#39;ve reached the 5-binding limit of a free account: go premium to create more.");
     }
 
     @Test
@@ -196,7 +201,7 @@ class ChannelCustomBindingsRenderingTest {
     }
 
     @Test
-    void aPremiumOwner_hasNoCounter_andNeverALockedButton() throws Exception {
+    void anOwnerWithoutALimit_premiumOrWithPremiumHidden_hasNoCounter_andNeverALockedButton() throws Exception {
         String overview = panel(render(true, stateOf(9, null)), "overview");
 
         assertThat(byId(overview, "custom-bindings-count").hasClass("hidden")).isTrue();
@@ -397,7 +402,7 @@ class ChannelCustomBindingsRenderingTest {
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
 
         assertThat(html).contains("Reconnecte ton compte Twitch", "Catapult est en pause sur cette chaîne",
-                "Limite de 5 bindings atteinte sur un compte gratuit", "Twitch n&#39;a pas appliqué la catégorie", "Nouveau", "Activer",
+                "Limite de 5 bindings atteinte.", "Twitch n&#39;a pas appliqué la catégorie", "Nouveau", "Activer",
                 "Bindings personnalisés");
     }
 }

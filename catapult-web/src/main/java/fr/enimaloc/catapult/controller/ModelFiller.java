@@ -128,14 +128,22 @@ public class ModelFiller {
     }
 
     /**
-     * The channels the member can act on, for the navbar; none when logged out or when the API
-     * fails. Fetched by the page once shown, so a full load never waits on catapult-api for them.
+     * The channels the member can act on, for the navbar, and whether it shows the premium entry; none
+     * (and no entry) when logged out or when the API fails. Fetched by the page once shown, so a full
+     * load never waits on catapult-api for them.
      */
     public List<ChannelDto> navChannels(Model model) {
         ChannelListResponse list = ApiClient.hasSession() ? apiService.channelList() : null;
         List<ChannelDto> channels = list == null ? List.of() : list.channels();
         model.addAttribute("navChannels", channels);
+        model.addAttribute("navPremium", list != null && list.premiumUi());
         return channels;
+    }
+
+    /** Whether premium is shown to the logged-in member (experiment premium.ui); false when the API fails. */
+    public boolean premiumShown() {
+        ChannelListResponse list = ApiClient.hasSession() ? apiService.channelList() : null;
+        return list != null && list.premiumUi();
     }
 
     /** An error, a member's page or an unknown one is not indexed; the channel's title names it. */

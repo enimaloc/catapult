@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.controller;
 
+import fr.enimaloc.catapult.common.dto.channel.ChannelListResponse;
 import fr.enimaloc.catapult.common.dto.premium.PremiumOfferDto;
 import fr.enimaloc.catapult.common.dto.premium.PremiumStatusDto;
 import fr.enimaloc.catapult.config.I18nConfiguration;
@@ -7,6 +8,7 @@ import fr.enimaloc.catapult.config.TwitchatCatalogConfig;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -26,7 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
-/** The premium page: the member's status, what each tier gets, and its 401 / unavailable states. */
+/** The premium page: the member's status, what each tier gets, and its 401 / 404 (premium hidden) / unavailable states. */
 @WebMvcTest(controllers = {IndexController.class, SpaFragmentController.class})
 @Import({ModelFiller.class, SiteMetaTags.class, LocalInstanceBusConfig.class, WebSecurityConfig.class, TwitchatCatalogConfig.class, I18nConfiguration.class})
 class PremiumPageTest {
@@ -36,6 +38,11 @@ class PremiumPageTest {
     @Autowired MockMvc mvc;
     @MockitoBean ApiService apiService;
     @MockitoBean NavEventStreamController navEvents;
+
+    @BeforeEach
+    void premiumShown() {
+        when(apiService.channelList()).thenReturn(new ChannelListResponse("1", List.of(), true));
+    }
 
     private String fragment(PremiumStatusDto status) throws Exception {
         when(apiService.premiumStatus()).thenReturn(status);
@@ -114,5 +121,19 @@ class PremiumPageTest {
                     .andReturn().getResponse().getContentAsString();
             assertThat(html).contains("id=\"premium-page-unavailable\"").doesNotContain("id=\"premium-page\"");
         }
+    }
+
+    @Test
+    void page_isNotFound_whilePremiumIsHiddenFromTheMember() throws Exception {
+        when(apiService.channelList()).thenReturn(new ChannelListResponse("1", List.of(), false));
+
+        mvc.perform(get("/premium").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+                .andExpect(status().isNotFound())
+                .andExpect(view().name("index"))
+                .andExpect(model().attribute("error", true));
+        mvc.perform(get("/spa/premium").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+                .andExpect(status().isNotFound())
+                .andExpect(view().name("pages/error :: error"));
+        verify(apiService, never()).premiumStatus();
     }
 }

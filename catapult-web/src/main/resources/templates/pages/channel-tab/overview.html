@@ -264,7 +264,7 @@
         </div>
 
         <mdui-list id="channel-custom-bindings-list"
-                   th:attr="data-limit=${cb.limit()},data-error-twitch-unavailable=#{channel.custom_bindings.error.twitch_unavailable},data-error-bot-disabled=#{channel.custom_bindings.error.bot_disabled},data-error-twitch-failed=#{channel.custom_bindings.error.twitch_failed},data-error-name-taken=#{channel.custom_bindings.error.name_taken},data-error-limit-reached=#{channel.custom_bindings.error.limit_reached},data-error-invalid=#{channel.custom_bindings.error.invalid}">
+                   th:attr="data-limit=${cb.limit()},data-error-twitch-unavailable=#{channel.custom_bindings.error.twitch_unavailable},data-error-bot-disabled=#{channel.custom_bindings.error.bot_disabled},data-error-twitch-failed=#{channel.custom_bindings.error.twitch_failed},data-error-name-taken=#{channel.custom_bindings.error.name_taken},data-error-limit-reached=(${cb.limit() != null} ? #{channel.custom_bindings.error.limit_reached} : #{channel.custom_bindings.error.limit_reached_plain}),data-error-invalid=#{channel.custom_bindings.error.invalid}">
             <mdui-collapse accordion>
                 <!--/* A row per binding, then the hidden empty one "New" reveals (no data-custom-binding-id: a save creates). */-->
                 <mdui-collapse-item th:each="b : ${cb.bindings()}" class="custom-binding-item"
