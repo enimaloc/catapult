@@ -166,6 +166,9 @@ public interface ApiService {
     /** Makes the member the account posting chat command replies, in place of the previous one. */
     int adminPromoteMemberToSystem(java.util.UUID memberId);
     int adminDeleteMember(java.util.UUID memberId);
+    /** Grants the member premium until {@code until} (the last premium day); null means no end date. */
+    int adminGrantMemberPremium(java.util.UUID memberId, java.time.LocalDate until);
+    int adminRevokeMemberPremium(java.util.UUID memberId);
     // --- admin: a member's debug mode ---
     /** The member's debug mode; null when it was never on or catapult-api fails. */
     fr.enimaloc.catapult.common.dto.admin.MemberDebugStateDto memberDebug(java.util.UUID memberId);

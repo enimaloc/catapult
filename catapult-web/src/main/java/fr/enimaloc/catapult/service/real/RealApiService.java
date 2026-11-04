@@ -74,6 +74,7 @@ import fr.enimaloc.catapult.common.dto.admin.WellKnownResponseDto;
 import fr.enimaloc.catapult.service.WellKnownContent;
 import fr.enimaloc.catapult.common.dto.admin.SaveMappingsRequest;
 import fr.enimaloc.catapult.common.dto.admin.MigrateRequest;
+import fr.enimaloc.catapult.common.dto.premium.GrantPremiumRequest;
 import fr.enimaloc.catapult.common.dto.channel.CclSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.CclToggleRequest;
 import fr.enimaloc.catapult.common.dto.channel.ChannelListResponse;
@@ -603,6 +604,16 @@ public class RealApiService implements ApiService {
     @Override
     public int adminDeleteMember(UUID memberId) {
         return client.delete("/api/internal/admin/members/{id}", memberId);
+    }
+
+    @Override
+    public int adminGrantMemberPremium(UUID memberId, java.time.LocalDate until) {
+        return client.postVoid("/api/internal/admin/members/{id}/premium", new GrantPremiumRequest(until), memberId);
+    }
+
+    @Override
+    public int adminRevokeMemberPremium(UUID memberId) {
+        return client.delete("/api/internal/admin/members/{id}/premium", memberId);
     }
 
     @Override

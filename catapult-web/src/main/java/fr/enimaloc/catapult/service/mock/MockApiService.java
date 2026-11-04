@@ -1071,6 +1071,21 @@ public class MockApiService implements ApiService {
     }
 
     @Override
+    public int adminGrantMemberPremium(UUID memberId, java.time.LocalDate until) {
+        log.trace("adminGrantMemberPremium({}, {})", memberId, until);
+        if (until != null && until.isBefore(java.time.LocalDate.now(java.time.ZoneId.of("Europe/Paris")))) return 400;
+        members.setPremium(memberId, true, until);
+        return NO_CONTENT;
+    }
+
+    @Override
+    public int adminRevokeMemberPremium(UUID memberId) {
+        log.trace("adminRevokeMemberPremium({})", memberId);
+        members.setPremium(memberId, false, null);
+        return NO_CONTENT;
+    }
+
+    @Override
     public int adminMigrateMember(UUID memberId, UUID targetId, boolean settings, boolean getters, boolean bindings) {
         log.trace("adminMigrateMember({}, {}, {}, {}, {})", memberId, targetId, settings, getters, bindings);
         // no-op in mock mode: a mock session holds a single channel's data

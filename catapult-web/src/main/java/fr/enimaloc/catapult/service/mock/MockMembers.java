@@ -146,6 +146,11 @@ public class MockMembers {
         return status;
     }
 
+    public synchronized void setPremium(UUID id, boolean premium, java.time.LocalDate until) {
+        update(id, m -> new AdminMemberDto(m.id(), m.twitchId(), m.twitchUsername(), m.profileImageUrl(), m.steamId(),
+                m.systemAccount(), m.botEnabled(), m.status(), m.createdAt(), m.debug(), premium, until));
+    }
+
     public synchronized void delete(UUID id) {
         members.removeIf(m -> m.id().equals(id));
         live.remove(id);

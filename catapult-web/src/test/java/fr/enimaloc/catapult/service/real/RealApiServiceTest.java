@@ -945,6 +945,19 @@ class RealApiServiceTest {
         service.adminMigrateMember(id, UUID.fromString("00000000-0000-0000-0000-000000000002"), true, false, true);
     }
 
+    @Test
+    void adminMemberPremium() {
+        UUID id = UUID.fromString("00000000-0000-0000-0000-000000000001");
+        String path = "/api/internal/admin/members/" + id + "/premium";
+        expectPost(path, "{\"until\":\"2026-12-31\"}");
+        expectPost(path, "{\"until\":null}");
+        expectDelete(path);
+
+        assertThat(service.adminGrantMemberPremium(id, java.time.LocalDate.of(2026, 12, 31))).isEqualTo(204);
+        assertThat(service.adminGrantMemberPremium(id, null)).isEqualTo(204);
+        assertThat(service.adminRevokeMemberPremium(id)).isEqualTo(204);
+    }
+
     // --- admin: CCL, caches, data --------------------------------------------------------------
 
     @Test
