@@ -879,7 +879,8 @@ class RealApiServiceTest {
         respond(HttpMethod.GET, "/api/internal/admin/members?page=2&q=enim", """
                 {"members":[{"id":"00000000-0000-0000-0000-000000000001","twitchId":"1","twitchUsername":"enimaloc",
                   "profileImageUrl":"img","steamId":"765","steamPersonalToken":"secret","systemAccount":false,
-                  "botEnabled":true,"status":"ACTIVE","createdAt":"2025-03-01T12:00:00Z"}],
+                  "botEnabled":true,"status":"ACTIVE","createdAt":"2025-03-01T12:00:00Z",
+                  "premium":true,"premiumUntil":"2026-12-31"}],
                  "liveStatus":{"00000000-0000-0000-0000-000000000001":true},"isMockProfile":false,
                  "number":2,"totalPages":3,"totalElements":101}""");
 
@@ -887,11 +888,25 @@ class RealApiServiceTest {
 
         UUID id = UUID.fromString("00000000-0000-0000-0000-000000000001");
         assertThat(page.members()).containsExactly(new fr.enimaloc.catapult.common.dto.admin.AdminMemberDto(
-                id, "1", "enimaloc", "img", "765", false, true, "ACTIVE", java.time.Instant.parse("2025-03-01T12:00:00Z"), null, false, null));
+                id, "1", "enimaloc", "img", "765", false, true, "ACTIVE", java.time.Instant.parse("2025-03-01T12:00:00Z"), null, true,
+                java.time.LocalDate.of(2026, 12, 31)));
         assertThat(page.isLive(id)).isTrue();
         assertThat(page.number()).isEqualTo(2);
         assertThat(page.totalPages()).isEqualTo(3);
         assertThat(page.totalElements()).isEqualTo(101);
+    }
+
+    @Test
+    void adminMembers_fromAnOlderApiWithoutThePremiumFields_readAsFree() {
+        respond(HttpMethod.GET, "/api/internal/admin/members?page=0&q=", """
+                {"members":[{"id":"00000000-0000-0000-0000-000000000001","twitchId":"1","twitchUsername":"enimaloc",
+                  "systemAccount":false,"botEnabled":true,"status":"ACTIVE"}],
+                 "liveStatus":{},"isMockProfile":false,"number":0,"totalPages":1,"totalElements":1}""");
+
+        var member = service.adminMembers(null, 0).members().getFirst();
+
+        assertThat(member.premium()).isFalse();
+        assertThat(member.premiumUntil()).isNull();
     }
 
     @Test

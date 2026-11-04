@@ -11,7 +11,12 @@ import java.util.UUID;
 public record AdminMemberDto(UUID id, String twitchId, String twitchUsername, String profileImageUrl,
                              String steamId, boolean systemAccount, boolean botEnabled, String status,
                              Instant createdAt, MemberDebugStateDto debug,
-                             boolean premium, LocalDate premiumUntil) {
+                             Boolean premium, LocalDate premiumUntil) {
+
+    /** A boxed {@code premium} so an older API that doesn't send it reads as false rather than failing the whole page. */
+    public AdminMemberDto {
+        premium = premium != null && premium;
+    }
 
     public boolean isActive() {
         return "ACTIVE".equals(status);
