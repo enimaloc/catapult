@@ -133,7 +133,7 @@ class ModelFillerTest {
         when(degradedLabels.getIfAvailable()).thenReturn(new DegradedLabels("lang/messages"));
         filler().defaultAttr(model, "", Locale.FRENCH);
         assertThat(model.get("degradedLabels")).asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.MAP)
-                .containsEntry("app.polling.free-interval-seconds", "Le changement de catégorie peut prendre jusqu'à {0} (gratuit)");
+                .containsEntry("app.polling.free-interval-seconds", "Le changement de catégorie peut prendre jusqu'à {0}");
     }
 
     @Test

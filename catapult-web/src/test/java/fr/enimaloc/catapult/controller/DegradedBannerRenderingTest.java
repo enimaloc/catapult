@@ -134,7 +134,7 @@ class DegradedBannerRenderingTest {
         String banner = tag(render(DegradedView.NONE), "id=\"degraded-banner\"");
 
         assertThat(attr(banner, "data-labels"))
-                .contains("\"app.polling.free-interval-seconds\":\"Category changes can take up to {0} (free)\"");
+                .contains("\"app.polling.free-interval-seconds\":\"Category changes can take up to {0}\"");
         assertThat(attr(banner, "data-label-normal")).isEqualTo("({0} normally)");
     }
 
