@@ -7,6 +7,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.UUID;
 
 @Entity
@@ -52,6 +53,13 @@ public class UserAccount {
     // a token per feature, so rotating it revokes access everywhere at once.
     @Column(name = "widget_token", unique = true)
     private UUID widgetToken;
+
+    @Column(nullable = false)
+    private boolean premium = false;
+
+    // Last day (Europe/Paris, inclusive) the premium holds; null means no end.
+    @Column(name = "premium_until")
+    private LocalDate premiumUntil;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
