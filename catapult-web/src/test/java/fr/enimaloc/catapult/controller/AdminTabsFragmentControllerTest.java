@@ -774,9 +774,9 @@ class AdminTabsFragmentControllerTest {
         when(apiService.currentUserId()).thenReturn(MEMBER);
         when(apiService.adminMembers("", 0)).thenReturn(new AdminMembersPage(List.of(
                 new AdminMemberDto(other, "2", "viewer", "img", null, false, true, "ACTIVE",
-                        Instant.parse("2025-03-01T12:00:00Z"), null),
+                        Instant.parse("2025-03-01T12:00:00Z"), null, false, null),
                 new AdminMemberDto(MEMBER, "1", "catapult_bot", "img", null, true, true, "ACTIVE",
-                        Instant.parse("2025-03-01T12:00:00Z"), null)), Map.of(), false, 0, 1, 1));
+                        Instant.parse("2025-03-01T12:00:00Z"), null, false, null)), Map.of(), false, 0, 1, 1));
 
         String html = asAdmin("/spa/admin/members");
 
@@ -792,7 +792,7 @@ class AdminTabsFragmentControllerTest {
         UUID other = UUID.fromString("00000000-0000-0000-0000-000000000002");
         when(apiService.adminMembers("vie", 1)).thenReturn(new AdminMembersPage(List.of(
                 new AdminMemberDto(other, "2", "viewer", "img", null, false, true, "ACTIVE",
-                        Instant.parse("2025-03-01T12:00:00Z"), null)), Map.of(), false, 1, 3, 101));
+                        Instant.parse("2025-03-01T12:00:00Z"), null, false, null)), Map.of(), false, 1, 3, 101));
 
         String html = asAdmin("/spa/admin/members?q=vie&page=1");
 
@@ -824,9 +824,9 @@ class AdminTabsFragmentControllerTest {
         UUID id = UUID.fromString("00000000-0000-0000-0000-000000000002");
         Instant at = Instant.parse("2025-03-01T12:00:00Z");
         when(apiService.adminSearchMembers("vie")).thenReturn(List.of(
-                new AdminMemberDto(id, "2", "viewer", "img", null, false, true, "ACTIVE", at, null),
-                new AdminMemberDto(UUID.randomUUID(), null, null, null, null, false, false, "INACTIVE", at, null),
-                new AdminMemberDto(UUID.randomUUID(), "99", "catapult_bot", "img", null, true, true, "ACTIVE", at, null)));
+                new AdminMemberDto(id, "2", "viewer", "img", null, false, true, "ACTIVE", at, null, false, null),
+                new AdminMemberDto(UUID.randomUUID(), null, null, null, null, false, false, "INACTIVE", at, null, false, null),
+                new AdminMemberDto(UUID.randomUUID(), "99", "catapult_bot", "img", null, true, true, "ACTIVE", at, null, false, null)));
 
         String json = asAdmin("/spa/admin/members/search?q=vie");
 
@@ -851,10 +851,10 @@ class AdminTabsFragmentControllerTest {
         Instant at = Instant.parse("2025-03-01T12:00:00Z");
         when(apiService.currentUserId()).thenReturn(MEMBER);
         when(apiService.adminMembers("", 0)).thenReturn(new AdminMembersPage(List.of(
-                new AdminMemberDto(MEMBER, "1", "me", "img", null, false, true, "ACTIVE", at, null),
-                new AdminMemberDto(other, "2", "viewer", "img", null, false, true, "ACTIVE", at, null),
-                new AdminMemberDto(inactive, "3", "gone", "img", null, false, false, "INACTIVE", at, null),
-                new AdminMemberDto(bot, "4", "catapult_bot", "img", null, true, true, "ACTIVE", at, null)), Map.of(), false, 0, 1, 1));
+                new AdminMemberDto(MEMBER, "1", "me", "img", null, false, true, "ACTIVE", at, null, false, null),
+                new AdminMemberDto(other, "2", "viewer", "img", null, false, true, "ACTIVE", at, null, false, null),
+                new AdminMemberDto(inactive, "3", "gone", "img", null, false, false, "INACTIVE", at, null, false, null),
+                new AdminMemberDto(bot, "4", "catapult_bot", "img", null, true, true, "ACTIVE", at, null, false, null)), Map.of(), false, 0, 1, 1));
 
         String html = asAdmin("/spa/admin/members");
 
@@ -870,7 +870,7 @@ class AdminTabsFragmentControllerTest {
         when(apiService.currentUserId()).thenReturn(MEMBER);
         when(apiService.adminMembers("", 0)).thenReturn(new AdminMembersPage(List.of(
                 new AdminMemberDto(MEMBER, "1", "catapult_bot", "img", null, true, true, "ACTIVE",
-                        Instant.parse("2025-03-01T12:00:00Z"), null)), Map.of(), false, 0, 1, 1));
+                        Instant.parse("2025-03-01T12:00:00Z"), null, false, null)), Map.of(), false, 0, 1, 1));
 
         String html = asAdmin("/spa/admin/members");
 

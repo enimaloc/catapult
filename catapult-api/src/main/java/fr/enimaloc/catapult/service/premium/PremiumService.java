@@ -1,46 +1,68 @@
 package fr.enimaloc.catapult.service.premium;
 
 import fr.enimaloc.catapult.api.error.ApiProblem;
+import fr.enimaloc.catapult.common.dto.premium.PremiumOfferDto;
+import fr.enimaloc.catapult.common.dto.premium.PremiumStatusDto;
 import fr.enimaloc.catapult.common.error.ErrorCode;
+import fr.enimaloc.catapult.config.DegradedMode;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.repository.binding.CustomBindingRepository;
 import fr.enimaloc.catapult.service.ActivityLogService;
+import fr.enimaloc.catapult.service.binding.PollCadence;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.support.PropertiesLoaderUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.OptionalInt;
+import java.util.Properties;
 import java.util.UUID;
 
 /**
  * Whether an account has the premium features, and who may grant or revoke them. The end date is
  * a day in {@link #ZONE}, valid until the end of that day; no end date means premium for good.
  */
+@Slf4j
 @Service
 public class PremiumService {
     public static final ZoneId ZONE = ZoneId.of("Europe/Paris");
 
     private final UserAccountRepository users;
     private final ActivityLogService activityLog;
+    private final CustomBindingRepository bindings;
+    private final Environment env;
     private final int freeCustomBindingLimit;
     private final Clock clock;
 
     @Autowired
     public PremiumService(UserAccountRepository users, ActivityLogService activityLog,
+                          CustomBindingRepository bindings, Environment env,
                           @Value("${catapult.premium.free-custom-binding-limit:5}") int freeCustomBindingLimit) {
-        this(users, activityLog, freeCustomBindingLimit, Clock.systemUTC());
+        this(users, activityLog, bindings, env, freeCustomBindingLimit, Clock.systemUTC());
     }
 
-    PremiumService(UserAccountRepository users, ActivityLogService activityLog, int freeCustomBindingLimit,
-                   Clock clock) {
+    PremiumService(UserAccountRepository users, ActivityLogService activityLog, CustomBindingRepository bindings,
+                   Environment env, int freeCustomBindingLimit, Clock clock) {
         this.users = users;
         this.activityLog = activityLog;
+        this.bindings = bindings;
+        this.env = env;
         this.freeCustomBindingLimit = freeCustomBindingLimit;
         this.clock = clock;
+    }
+
+    /** Today in {@link #ZONE}, the day an end date is compared with. */
+    public LocalDate today() {
+        return LocalDate.now(clock.withZone(ZONE));
     }
 
     public boolean isPremium(UserAccount user) {
@@ -48,12 +70,56 @@ public class PremiumService {
             return false;
         }
         LocalDate until = user.getPremiumUntil();
-        return until == null || !LocalDate.now(clock.withZone(ZONE)).isAfter(until);
+        return until == null || !today().isAfter(until);
     }
 
     /** The most custom bindings the account may have; empty means unlimited. */
     public OptionalInt customBindingLimit(UserAccount user) {
         return isPremium(user) ? OptionalInt.empty() : OptionalInt.of(freeCustomBindingLimit);
+    }
+
+    /** The account's tier, its custom bindings against the limit (counted even while the feature is gated) and the offer. */
+    public PremiumStatusDto status(UserAccount user) {
+        OptionalInt limit = customBindingLimit(user);
+        return new PremiumStatusDto(isPremium(user), user.getPremiumUntil(), (int) bindings.countByUser(user),
+                limit.isPresent() ? limit.getAsInt() : null, offer());
+    }
+
+    /**
+     * What each tier gets. The current mode's intervals are the effective ones (admin overrides
+     * included); the other mode's come from its properties file, as nothing overrides them.
+     */
+    public PremiumOfferDto offer() {
+        boolean degraded = env.matchesProfiles(DegradedMode.PROFILE);
+        int free = effective(PollCadence.FREE_KEY);
+        int premium = effective(PollCadence.PREMIUM_KEY);
+        Properties other = fileProperties(degraded ? "application.properties" : "application-degraded.properties");
+        int otherFree = fromFile(other, PollCadence.FREE_KEY, free);
+        int otherPremium = fromFile(other, PollCadence.PREMIUM_KEY, premium);
+        return degraded
+                ? new PremiumOfferDto(otherFree, otherPremium, free, premium, freeCustomBindingLimit)
+                : new PremiumOfferDto(free, premium, otherFree, otherPremium, freeCustomBindingLimit);
+    }
+
+    private int effective(String key) {
+        return Math.max(1, env.getProperty(key, Integer.class, 1));
+    }
+
+    private static int fromFile(Properties properties, String key, int fallback) {
+        try {
+            return Math.max(1, Integer.parseInt(properties.getProperty(key, String.valueOf(fallback)).trim()));
+        } catch (NumberFormatException e) {
+            return fallback;
+        }
+    }
+
+    private static Properties fileProperties(String name) {
+        try {
+            return PropertiesLoaderUtils.loadProperties(new ClassPathResource(name));
+        } catch (IOException e) {
+            log.warn("Cannot read {} for the premium offer: {}", name, e.getMessage());
+            return new Properties();
+        }
     }
 
     @Transactional

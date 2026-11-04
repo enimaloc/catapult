@@ -23,8 +23,8 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 @Component
 public class PollCadence {
-    static final String PREMIUM_KEY = "app.polling.premium-interval-seconds";
-    static final String FREE_KEY = "app.polling.free-interval-seconds";
+    public static final String PREMIUM_KEY = "app.polling.premium-interval-seconds";
+    public static final String FREE_KEY = "app.polling.free-interval-seconds";
     private static final long DEFAULT_PREMIUM_SECONDS = 30;
     private static final long DEFAULT_FREE_SECONDS = 60;
 

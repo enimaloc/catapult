@@ -3,12 +3,16 @@ package fr.enimaloc.catapult.service.premium;
 import fr.enimaloc.catapult.api.error.ApiProblem;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.common.dto.premium.PremiumOfferDto;
+import fr.enimaloc.catapult.common.dto.premium.PremiumStatusDto;
+import fr.enimaloc.catapult.repository.binding.CustomBindingRepository;
 import fr.enimaloc.catapult.service.ActivityLogService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.env.MockEnvironment;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -29,9 +33,14 @@ class PremiumServiceTest {
 
     @Mock UserAccountRepository users;
     @Mock ActivityLogService activityLog;
+    @Mock CustomBindingRepository bindings;
+
+    private final MockEnvironment env = new MockEnvironment()
+            .withProperty("app.polling.free-interval-seconds", "60")
+            .withProperty("app.polling.premium-interval-seconds", "30");
 
     private PremiumService service(String instant) {
-        return new PremiumService(users, activityLog, 5, Clock.fixed(Instant.parse(instant), PremiumService.ZONE));
+        return new PremiumService(users, activityLog, bindings, env, 5, Clock.fixed(Instant.parse(instant), PremiumService.ZONE));
     }
 
     private static UserAccount user(boolean premium, LocalDate until) {
@@ -106,5 +115,59 @@ class PremiumServiceTest {
 
         assertThatThrownBy(() -> service("2026-11-04T12:00:00Z").grant(id, null, "admin-bob"))
                 .isInstanceOf(ApiProblem.class);
+    }
+
+    @Test
+    void status_ofAFreeAccount_countsBindingsAndShowsTheLimit() {
+        UserAccount account = user(false, null);
+        when(bindings.countByUser(account)).thenReturn(3L);
+
+        PremiumStatusDto status = service("2026-11-04T12:00:00Z").status(account);
+
+        assertThat(status.premium()).isFalse();
+        assertThat(status.until()).isNull();
+        assertThat(status.customBindingCount()).isEqualTo(3);
+        assertThat(status.customBindingLimit()).isEqualTo(5);
+    }
+
+    @Test
+    void status_ofAPremiumAccount_isUnlimitedAndShowsTheEndDate() {
+        UserAccount account = user(true, LocalDate.of(2026, 12, 31));
+        when(bindings.countByUser(account)).thenReturn(12L);
+
+        PremiumStatusDto status = service("2026-11-04T12:00:00Z").status(account);
+
+        assertThat(status.premium()).isTrue();
+        assertThat(status.until()).isEqualTo(LocalDate.of(2026, 12, 31));
+        assertThat(status.customBindingCount()).isEqualTo(12);
+        assertThat(status.customBindingLimit()).isNull();
+    }
+
+    @Test
+    void status_ofAnExpiredAccount_isFree() {
+        UserAccount account = user(true, LocalDate.of(2026, 11, 3));
+
+        PremiumStatusDto status = service("2026-11-04T12:00:00Z").status(account);
+
+        assertThat(status.premium()).isFalse();
+        assertThat(status.until()).isEqualTo(LocalDate.of(2026, 11, 3));
+        assertThat(status.customBindingLimit()).isEqualTo(5);
+    }
+
+    @Test
+    void offer_inNormalMode_isTheEffectiveValuesAndTheDegradedFile() {
+        assertThat(service("2026-11-04T12:00:00Z").offer()).isEqualTo(new PremiumOfferDto(60, 30, 90, 60, 5));
+    }
+
+    @Test
+    void offer_followsAnAdminOverrideOfTheCurrentMode() {
+        env.setProperty("app.polling.free-interval-seconds", "45");
+
+        assertThat(service("2026-11-04T12:00:00Z").offer().freeIntervalSeconds()).isEqualTo(45);
+    }
+
+    @Test
+    void today_isTheDayInParis() {
+        assertThat(service("2026-11-04T23:30:00Z").today()).isEqualTo(LocalDate.of(2026, 11, 5));
     }
 }
