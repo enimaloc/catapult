@@ -79,6 +79,10 @@ class TwitchatRevertTokenFailureTest {
         final RestClient.Builder builder = RestClient.builder();
         final MockRestServiceServer twitch = MockRestServiceServer.bindTo(builder).build();
 
+        @Bean fr.enimaloc.catapult.site.SiteRole siteRole() {
+            return org.mockito.Mockito.mock(fr.enimaloc.catapult.site.SiteRole.class);
+        }
+
         @Bean RestClient restClient() {
             return builder.build();
         }

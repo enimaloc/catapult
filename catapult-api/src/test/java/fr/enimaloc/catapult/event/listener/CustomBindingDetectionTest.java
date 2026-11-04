@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.event.listener;
 
+import fr.enimaloc.catapult.site.SiteRoles;
 import fr.enimaloc.catapult.simulation.SimulationGates;
 import fr.enimaloc.catapult.service.category.ExtensionLayoutApplier;
 import fr.enimaloc.catapult.service.binding.RaidRestoreGateService;
@@ -347,7 +348,7 @@ class CustomBindingDetectionTest {
         GameStateService freshState = new GameStateService(channelEventPublisher);
         return new SchedulerService(mock(UserAccountRepository.class), chain, freshState, this::dispatch,
                 new SimpleMeterRegistry(), Optional.empty(), Optional.empty(), bindingService,
-                SimulationGates.none());
+                SimulationGates.none(), SiteRoles.active());
     }
 
     private void dispatch(Object event) {

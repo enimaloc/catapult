@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.simulation.twitch;
 
+import fr.enimaloc.catapult.site.SiteRoles;
+import fr.enimaloc.catapult.site.SiteRole;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.account.UserSettings;
@@ -8,6 +10,7 @@ import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.account.BotToggleService;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
+import fr.enimaloc.catapult.service.stream.StreamSessionService;
 import fr.enimaloc.catapult.service.debug.DebugRecording;
 import fr.enimaloc.catapult.service.notification.CatapultCategoryChangeStateService;
 import fr.enimaloc.catapult.service.notification.TwitchatEventDispatcher;
@@ -77,7 +80,7 @@ class SimulatedTwitchServiceTest {
 
     private SimulatedTwitchService service(ChannelUpdateEcho echo) {
         SimulatedTwitchTokenService tokenService =
-                new SimulatedTwitchTokenService(fx.tokens, encryption, restClient, fx.runner);
+                new SimulatedTwitchTokenService(fx.tokens, encryption, restClient, fx.runner, mock(SiteRole.class));
         SimulatedTwitchCategoryService categories =
                 new SimulatedTwitchCategoryService(SimulationFixture.providerOf(realCategories), fx.runner);
         return new SimulatedTwitchService(SimulationFixture.providerOf(realTwitch), fx.runner, fx.registry,
@@ -91,7 +94,8 @@ class SimulatedTwitchServiceTest {
         return new TwitchEventSubService(fx.tokens, fx.accounts, mock(TwitchTokenService.class),
                 mock(StreamStateService.class), mock(ApplicationEventPublisher.class), RestClient.create(),
                 new ObjectMapper(), twitchat, categoryChangeState, DebugRecording.OFF,
-                beans.getBeanProvider(SimulationGate.class));
+                beans.getBeanProvider(SimulationGate.class), SiteRoles.active(),
+                mock(StreamSessionService.class), mock(fr.enimaloc.catapult.service.stream.StreamCatchUp.class));
     }
 
     @Test

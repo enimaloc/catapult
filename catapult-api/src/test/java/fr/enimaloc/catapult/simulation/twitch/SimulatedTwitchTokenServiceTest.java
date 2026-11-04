@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.simulation.twitch;
 
+import fr.enimaloc.catapult.site.SiteRole;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
@@ -35,9 +36,9 @@ class SimulatedTwitchTokenServiceTest {
     @BeforeEach
     void setUp() {
         fx = new SimulationFixture(dir);
-        tokens = new SimulatedTwitchTokenService(fx.tokens, encryption, restClient, fx.runner);
+        tokens = new SimulatedTwitchTokenService(fx.tokens, encryption, restClient, fx.runner, mock(SiteRole.class));
         systemBot = new SimulatedSystemTwitchAccountService(fx.accounts, fx.tokens, encryption, restClient,
-                fx.runner);
+                fx.runner, mock(SiteRole.class));
         fx.realToken.setAccessToken("encrypted-access");
         fx.realToken.setRefreshToken("encrypted-refresh");
         when(encryption.decrypt("encrypted-access")).thenReturn("current-access");

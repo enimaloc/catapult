@@ -12,6 +12,7 @@ import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.simulation.SimulationGate;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
+import fr.enimaloc.catapult.site.SiteRole;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
@@ -45,6 +46,7 @@ public class SchedulerService {
     private final Optional<MinecraftPresenceGetter> minecraftPresenceGetter;
     private final BindingService bindingService;
     private final ObjectProvider<SimulationGate> simulationGate;
+    private final SiteRole siteRole;
 
     /**
      * Guards the prefetch→process→clear cycle so a manual {@link #triggerManualCheck}
@@ -58,6 +60,9 @@ public class SchedulerService {
 
     @Scheduled(fixedRateString = "${app.polling.interval-seconds:60}000")
     public void poll() {
+        if (!siteRole.isActive()) {
+            return;
+        }
         Timer.Sample sample = Timer.start(meterRegistry);
         cycleLock.lock();
         try {

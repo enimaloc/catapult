@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.twitch;
 
+import fr.enimaloc.catapult.site.SiteRole;
 import static org.mockito.Mockito.mock;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -61,6 +62,7 @@ class EventSubTwitchChatServiceTest {
     @Mock private RestClient.ResponseSpec postResponseSpec;
 
     @Spy private DebugRecording debug = DebugRecording.OFF;
+    @Mock private SiteRole siteRole;
     @InjectMocks private EventSubTwitchChatService service;
 
     private UserAccount user;
@@ -75,6 +77,7 @@ class EventSubTwitchChatServiceTest {
 
     @BeforeEach
     void setUp() {
+        when(siteRole.isActive()).thenReturn(true);
         user = new UserAccount();
         user.setId(UUID.randomUUID());
         user.setTwitchId("broadcaster-123");
@@ -244,5 +247,20 @@ class EventSubTwitchChatServiceTest {
 
         assertThat(seen).isNotEmpty().containsOnly(user.getId());
         assertThat(fr.enimaloc.catapult.service.debug.DebugContext.subject()).isEmpty();
+    }
+
+    @Test
+    void sessionWelcome_onStandby_closesAndSubscribesNothing() {
+        when(siteRole.isActive()).thenReturn(false);
+        WebSocket socket = mock(WebSocket.class);
+        Map<UUID, WebSocket> sockets = (Map<UUID, WebSocket>) connectionState("connections");
+        sockets.put(user.getId(), socket);
+
+        service.handleMessage(user, token, WELCOME_MESSAGE, false);
+
+        verify(restClient, never()).post();
+        verify(socket).sendClose(eq(WebSocket.NORMAL_CLOSURE), eq("standby"));
+        assertThat(sockets).doesNotContainKey(user.getId());
+        assertThat((java.util.Set<UUID>) connectionState("intentionallyDisconnected")).contains(user.getId());
     }
 }

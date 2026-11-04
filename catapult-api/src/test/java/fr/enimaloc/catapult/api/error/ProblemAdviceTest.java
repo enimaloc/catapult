@@ -110,6 +110,17 @@ class ProblemAdviceTest {
     }
 
     @Test
+    void standbyException_isServiceUnavailable() throws Exception {
+        mvc.perform(get("/api/probe/standby"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.code").value("service_unavailable"))
+                .andExpect(jsonPath("$.detail").value("This site is on standby"));
+
+        assertThat(logs.list).noneMatch(e -> e.getLevel().isGreaterOrEqual(Level.WARN));
+    }
+
+    @Test
     void declaredStatusIsAProblemAndNotLogged() throws Exception {
         mvc.perform(get("/api/probe/declared"))
                 .andExpect(status().isBadRequest())
@@ -261,6 +272,11 @@ class ProblemAdviceTest {
         @GetMapping("/wrapped-auth")
         String wrappedAuth() {
             throw WRAPPED_AUTH;
+        }
+
+        @GetMapping("/standby")
+        String standby() {
+            throw new fr.enimaloc.catapult.site.StandbyException("twitch channel update");
         }
 
         @GetMapping("/rse")

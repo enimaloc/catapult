@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.service.twitch;
 
+import static org.mockito.Mockito.mock;
+import fr.enimaloc.catapult.site.SiteRole;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
@@ -35,7 +37,7 @@ class SystemTwitchAccountServiceTest {
 
     @BeforeEach
     void setup() {
-        service = new SystemTwitchAccountService(userAccountRepository, tokenRepo, encryption, restClient);
+        service = new SystemTwitchAccountService(userAccountRepository, tokenRepo, encryption, restClient, mock(SiteRole.class));
         ReflectionTestUtils.setField(service, "twitchClientId", "client");
         ReflectionTestUtils.setField(service, "twitchClientSecret", "secret");
         ReflectionTestUtils.setField(service, "modCacheTtlSeconds", 600L);

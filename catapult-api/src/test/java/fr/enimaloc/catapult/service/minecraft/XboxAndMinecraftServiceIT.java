@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.service.minecraft;
 
+import static org.mockito.Mockito.mock;
+import fr.enimaloc.catapult.site.SiteRole;
 import fr.enimaloc.catapult.service.xbox.XboxService;
 
 import org.junit.jupiter.api.Test;
@@ -36,7 +38,7 @@ class XboxAndMinecraftServiceIT {
         }
 
         var xboxService = new XboxService(RestClient.create());
-        var minecraftService = new MinecraftService(RestClient.create());
+        var minecraftService = new MinecraftService(RestClient.create(), mock(SiteRole.class));
 
         var token = xboxService.getXboxToken(rpsTicket);
 

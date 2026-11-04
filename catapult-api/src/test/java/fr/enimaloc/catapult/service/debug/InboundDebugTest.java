@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.debug;
 
+import fr.enimaloc.catapult.site.SiteRoles;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.enimaloc.catapult.api.connect.ApiSteamConnectController;
 import fr.enimaloc.catapult.service.steam.SteamOpenIdLinkService;
@@ -11,6 +12,7 @@ import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.debug.DebugExchangeRepository;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
+import fr.enimaloc.catapult.service.stream.StreamSessionService;
 import fr.enimaloc.catapult.service.debug.DebugMemberRegistry.DebugMode;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
 import fr.enimaloc.catapult.service.notification.CatapultCategoryChangeStateService;
@@ -109,7 +111,8 @@ class InboundDebugTest {
                 mock(TwitchTokenService.class), streamState, mock(ApplicationEventPublisher.class),
                 RestClient.create(), new ObjectMapper(), mock(TwitchatEventDispatcher.class),
                 mock(CatapultCategoryChangeStateService.class), new DebugRecording(registry, recorder),
-                SimulationGates.none());
+                SimulationGates.none(), SiteRoles.active(),
+                mock(StreamSessionService.class), mock(fr.enimaloc.catapult.service.stream.StreamCatchUp.class));
         return eventSub;
     }
 
@@ -120,7 +123,7 @@ class InboundDebugTest {
                 mock(TwitchHelixChannelClient.class), RestClient.create(), new ObjectMapper(),
                 mock(SystemTwitchAccountService.class), meters,
                 new ExternalApiObservations(ObservationRegistry.NOOP, meters), mock(TwitchChatRateLimiter.class),
-                new DebugRecording(registry, recorder), SimulationGates.none());
+                new DebugRecording(registry, recorder), SimulationGates.none(), SiteRoles.active());
         return chat;
     }
 

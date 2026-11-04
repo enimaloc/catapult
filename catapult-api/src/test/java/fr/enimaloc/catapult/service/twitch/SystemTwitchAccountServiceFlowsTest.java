@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.twitch;
 
+import fr.enimaloc.catapult.site.SiteRole;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
@@ -53,7 +54,7 @@ class SystemTwitchAccountServiceFlowsTest {
     void setUp() {
         RestClient.Builder builder = RestClient.builder();
         twitch = MockRestServiceServer.bindTo(builder).build();
-        service = new SystemTwitchAccountService(accounts, tokens, encryption, builder.build());
+        service = new SystemTwitchAccountService(accounts, tokens, encryption, builder.build(), mock(SiteRole.class));
         ReflectionTestUtils.setField(service, "twitchClientId", "client id");
         ReflectionTestUtils.setField(service, "twitchClientSecret", "secret");
         ReflectionTestUtils.setField(service, "modCacheTtlSeconds", 600L);

@@ -14,6 +14,7 @@ import fr.enimaloc.catapult.service.debug.DebugRecording;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import fr.enimaloc.catapult.simulation.SimulatedCalls;
 import fr.enimaloc.catapult.simulation.SimulationGate;
+import fr.enimaloc.catapult.site.SiteRole;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -64,6 +65,7 @@ public class MinecraftFriendService {
 
     private final DebugRecording debug;
     private final ObjectProvider<SimulationGate> simulationGate;
+    private final SiteRole siteRole;
 
     @Transactional
     public MinecraftFriendLink enroll(UserAccount user, String playerName) {
@@ -217,6 +219,9 @@ public class MinecraftFriendService {
     // each save() runs in its own transaction and the reconciliation is idempotent.
     @Scheduled(fixedRateString = "${minecraft.friends-sync-interval-ms:300000}")
     public void syncFriendLinks() {
+        if (!siteRole.isActive()) {
+            return;
+        }
         for (MinecraftServiceAccount account : accountRepository.findByEnabledTrueOrderByFillOrderAsc()) {
             List<MinecraftFriendLink> links = linkRepository.findByServiceAccount(account);
             if (links.isEmpty()) continue;

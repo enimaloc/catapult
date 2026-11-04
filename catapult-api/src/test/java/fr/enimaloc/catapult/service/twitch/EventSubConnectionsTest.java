@@ -383,4 +383,34 @@ class EventSubConnectionsTest {
         verify(builder, after(1500).times(1)).buildAsync(any(), any());
         verify(builder, times(1)).buildAsync(any(), any());
     }
+
+    @Test
+    void closeAll_forbidsReconnectForEveryRegisteredUser() {
+        handshakesSucceed();
+        UserAccount other = new UserAccount();
+        other.setId(UUID.randomUUID());
+        UserAccount backingOff = new UserAccount();
+        backingOff.setId(UUID.randomUUID());
+        connections.open(user, token);
+        connections.open(other, token);
+        List<WebSocket> sockets = listeners.stream().map(this::socketOf).toList();
+        // A user whose socket dropped and who only waits for its next reconnection attempt
+        @SuppressWarnings("unchecked")
+        Map<UUID, Long> retryDelays = (Map<UUID, Long>) ReflectionTestUtils.getField(connections, "retryDelaySeconds");
+        retryDelays.put(backingOff.getId(), 4L);
+
+        connections.closeAll("standby");
+
+        assertThat(registered()).isEmpty();
+        sockets.forEach(ws -> verify(ws).sendClose(WebSocket.NORMAL_CLOSURE, "standby"));
+        @SuppressWarnings("unchecked")
+        java.util.Set<UUID> forbidden =
+            (java.util.Set<UUID>) ReflectionTestUtils.getField(connections, "intentionallyDisconnected");
+        assertThat(forbidden).contains(user.getId(), other.getId(), backingOff.getId());
+        // A handshake still in flight is closed instead of registered
+        WebSocket late = mock(WebSocket.class);
+        connections.new Listener(other, token, false).onOpen(late);
+        assertThat(registered()).isEmpty();
+        verify(late).sendClose(eq(WebSocket.NORMAL_CLOSURE), anyString());
+    }
 }

@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.twitch;
 
+import fr.enimaloc.catapult.site.SiteRole;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
@@ -40,6 +41,7 @@ public class TwitchServiceImpl implements TwitchService {
     private final ExternalApiObservations apiObservations;
     private final BotToggleService botToggleService;
     private final CatapultCategoryChangeStateService categoryChangeStateService;
+    private final SiteRole siteRole;
 
     public static final String CLIENT_ID = "Client-Id";
     public static final String AUTHORIZATION = "Authorization";
@@ -50,6 +52,7 @@ public class TwitchServiceImpl implements TwitchService {
 
     @Override
     public ChannelUpdateOutcome updateChannelReporting(UserAccount user, GameBinding binding) {
+        siteRole.requireActive("twitch channel update");
         if (!canActOnTwitch(user)) {
             log.debug("Skipping Twitch channel update for user {} — bot disabled or account not active", user.getId());
             return ChannelUpdateOutcome.SKIPPED;
@@ -81,6 +84,7 @@ public class TwitchServiceImpl implements TwitchService {
 
     @Override
     public ChannelUpdateOutcome setCategory(UserAccount user, String twitchGameId, String twitchGameName) {
+        siteRole.requireActive("twitch channel update");
         if (!canActOnTwitch(user)) {
             log.debug("Skipping Twitch category set for user {} — bot disabled or account not active", user.getId());
             return ChannelUpdateOutcome.SKIPPED;
@@ -303,6 +307,7 @@ public class TwitchServiceImpl implements TwitchService {
 
     @Override
     public ChannelUpdateOutcome resetToDefault(UserAccount user) {
+        siteRole.requireActive("twitch channel update");
         if (!canActOnTwitch(user)) {
             log.debug("Skipping Twitch channel reset for user {} — bot disabled or account not active", user.getId());
             return ChannelUpdateOutcome.SKIPPED;
@@ -397,6 +402,7 @@ public class TwitchServiceImpl implements TwitchService {
 
     @Override
     public TwitchExtensionPlacement setActiveExtensions(UserAccount user, TwitchExtensionPlacement placement) {
+        siteRole.requireActive("twitch extensions update");
         if (!canActOnTwitch(user)) {
             throw new IllegalStateException(
                 "Twitch extensions not set for user " + user.getId() + ": bot disabled or account not active");

@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.minecraft;
 
+import fr.enimaloc.catapult.site.SiteRoles;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.minecraft.MinecraftFriendLink;
@@ -65,7 +66,7 @@ class MinecraftFriendServiceSimulationTest {
     private MinecraftFriendService service(ObjectProvider<SimulationGate> provider) {
         return new MinecraftFriendService(minecraft, tokens, serviceAccounts, links,
                 mock(MinecraftAccountLimitMarker.class), mock(GetterConfigRepository.class), new ObjectMapper(),
-                mock(ChannelEventPublisher.class), DebugRecording.OFF, provider);
+                mock(ChannelEventPublisher.class), DebugRecording.OFF, provider, SiteRoles.active());
     }
 
     @Test

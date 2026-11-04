@@ -38,6 +38,7 @@ GET,/api/internal/health,,anon,0,fixed:no data
 GET,/api/internal/meta-tags,,anon,1,
 GET,/api/internal/social-links,,anon,1,
 GET,/api/internal/status/degraded,,anon,0,fixed:no data
+GET,/api/internal/status/site,,anon,0,fixed:no data
 GET,/api/twitchat/widget/{uuid},,anon,2,fixed:one widget
 GET,/api/twitchat/widget/{uuid}/access,,anon,2,fixed:one widget
 GET,/api/games/dtdd/{dtddId},dtddId=1,anon,1,fixed:one DTDD title

@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.simulation.twitch;
 
+import fr.enimaloc.catapult.site.SiteRole;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
@@ -41,8 +42,8 @@ public class SimulatedSystemTwitchAccountService extends SystemTwitchAccountServ
 
     public SimulatedSystemTwitchAccountService(UserAccountRepository userAccountRepository,
                                                OAuthTokenRepository tokenRepo, TokenEncryptionService encryption,
-                                               RestClient restClient, SimulatedCallRunner runner) {
-        super(userAccountRepository, tokenRepo, encryption, restClient);
+                                               RestClient restClient, SimulatedCallRunner runner, SiteRole siteRole) {
+        super(userAccountRepository, tokenRepo, encryption, restClient, siteRole);
         this.userAccountRepository = userAccountRepository;
         this.tokenRepo = tokenRepo;
         this.encryption = encryption;
