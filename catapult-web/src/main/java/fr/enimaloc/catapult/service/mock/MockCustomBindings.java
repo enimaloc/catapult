@@ -22,11 +22,12 @@ import java.util.UUID;
 
 /**
  * One mock member's custom bindings and personal API tokens (full and read-only), answering like catapult-api: a name is trimmed, 1-40
- * characters and unique whatever its case (400 invalid, 409 taken), a Twitch category is required (400), 20 at most
- * (409), a single binding active at a time. Starts with two bindings, the first one active.
+ * characters and unique whatever its case (400 invalid, 409 taken), a Twitch category is required (400), the free
+ * limit at most (409; the mock account is a free one), a single binding active at a time. Starts with two bindings, the first one active.
  */
 class MockCustomBindings {
-    static final int MAX = 20;
+    /** The free tier's cap, which the mock account is held to. */
+    static final int FREE_LIMIT = 5;
     private static final int NAME_MAX = 40;
     private static final SecureRandom RANDOM = new SecureRandom();
 
@@ -48,14 +49,14 @@ class MockCustomBindings {
     }
 
     synchronized CustomBindingsStateDto state() {
-        return new CustomBindingsStateDto(true, List.copyOf(bindings), activeId, activatedAt, null,
+        return new CustomBindingsStateDto(true, List.copyOf(bindings), activeId, activatedAt, FREE_LIMIT,
                 Map.copyOf(extensions));
     }
 
     synchronized CustomBindingSave<CustomBindingDto> create(CustomBindingRequest request) {
         CustomBindingSave<CustomBindingDto> refused = refusal(request, null);
         if (refused != null) return refused;
-        if (bindings.size() >= MAX) return new CustomBindingSave<>(409, null, ErrorCode.LIMIT_REACHED);
+        if (bindings.size() >= FREE_LIMIT) return new CustomBindingSave<>(409, null, ErrorCode.LIMIT_REACHED);
         CustomBindingDto created = dto(UUID.randomUUID(), request);
         bindings.add(created);
         return new CustomBindingSave<>(201, created, null);

@@ -163,7 +163,7 @@ public class MockApiService implements ApiService {
     private final Map<String, MockData> data = new ConcurrentHashMap<>();
     private final MockWellKnownStore wellKnown = new MockWellKnownStore();
     /** The free tier's custom binding limit, as catapult-api's default. */
-    private static final int MOCK_FREE_BINDING_LIMIT = 5;
+    private static final int MOCK_FREE_BINDING_LIMIT = MockCustomBindings.FREE_LIMIT;
     /** Application-wide too: every page shows them, logged in or not. */
     private final MockMetaTagStore metaTags = new MockMetaTagStore();
     private final MockSocialLinkStore socialLinks = new MockSocialLinkStore();

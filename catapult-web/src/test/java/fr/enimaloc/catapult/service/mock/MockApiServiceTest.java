@@ -981,8 +981,9 @@ class MockApiServiceTest {
         assertThat(service.createCustomBinding(username, customBinding("x".repeat(41))).status()).isEqualTo(400);
         assertThat(service.createCustomBinding(username, new fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest(
                 "No category", null, null, Set.of(), Set.of(), false)).status()).isEqualTo(400);
-        for (int i = 0; i < 17; i++) assertThat(service.createCustomBinding(username, customBinding("n" + i)).status()).isEqualTo(201);
-        assertThat(service.customBindings(username).bindings()).hasSize(20);
+        for (int i = 0; i < 2; i++) assertThat(service.createCustomBinding(username, customBinding("n" + i)).status()).isEqualTo(201);
+        assertThat(service.customBindings(username).bindings()).hasSize(5);
+        assertThat(service.customBindings(username).limit()).isEqualTo(5);
         assertThat(service.createCustomBinding(username, customBinding("one more")).code()).isEqualTo(fr.enimaloc.catapult.common.error.ErrorCode.LIMIT_REACHED);
     }
 
