@@ -2,6 +2,8 @@ package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.service.binding.CustomBindingService;
+import fr.enimaloc.catapult.service.premium.PremiumUiGate;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -15,18 +17,31 @@ import static org.mockito.Mockito.when;
 class CustomBindingViewsTest {
 
     private final CustomBindingService service = mock(CustomBindingService.class);
-    private final CustomBindingViews views = new CustomBindingViews(service);
+    private final PremiumUiGate gate = mock(PremiumUiGate.class);
+    private final CustomBindingViews views = new CustomBindingViews(service, gate);
     private final UserAccount user = new UserAccount();
+
+    @BeforeEach
+    void noBindings() {
+        when(service.list(user)).thenReturn(List.of());
+        when(service.active(user)).thenReturn(Optional.empty());
+    }
 
     @Test
     void state_carriesLimit() {
-        when(service.list(user)).thenReturn(List.of());
-        when(service.active(user)).thenReturn(Optional.empty());
+        when(gate.isOpenFor(user)).thenReturn(true);
 
         when(service.limit(user)).thenReturn(OptionalInt.of(5));
         assertThat(views.state(user).limit()).isEqualTo(5);
 
         when(service.limit(user)).thenReturn(OptionalInt.empty());
+        assertThat(views.state(user).limit()).isNull();
+    }
+
+    @Test
+    void state_leavesTheLimitOutWhilePremiumIsHidden() {
+        when(service.limit(user)).thenReturn(OptionalInt.of(5));
+
         assertThat(views.state(user).limit()).isNull();
     }
 }

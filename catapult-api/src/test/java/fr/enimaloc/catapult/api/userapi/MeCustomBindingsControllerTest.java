@@ -15,6 +15,7 @@ import fr.enimaloc.catapult.security.ApiSecurityConfig;
 import fr.enimaloc.catapult.service.account.ApiTokenOwner;
 import fr.enimaloc.catapult.service.account.UserApiTokenService;
 import fr.enimaloc.catapult.service.binding.CustomBindingService;
+import fr.enimaloc.catapult.service.premium.PremiumUiGate;
 import fr.enimaloc.catapult.service.binding.CustomBindingService.ActivationResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -68,6 +69,7 @@ class MeCustomBindingsControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean UserApiTokenService tokens;
     @MockitoBean CustomBindingService service;
+    @MockitoBean PremiumUiGate premiumUiGate;
     @MockitoBean UserAccountRepository accounts;
 
     private UserAccount user;

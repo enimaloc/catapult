@@ -13,6 +13,7 @@ import fr.enimaloc.catapult.domain.binding.CustomBindingActivation;
 import fr.enimaloc.catapult.service.binding.CustomBindingService;
 import fr.enimaloc.catapult.service.binding.CustomBindingService.ActivationResult;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
+import fr.enimaloc.catapult.service.premium.PremiumUiGate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
@@ -34,8 +35,12 @@ import java.util.UUID;
 public class CustomBindingViews {
 
     private final CustomBindingService service;
+    private final PremiumUiGate premiumUiGate;
 
-    /** {@code user}'s bindings and the active one; 403 while the experiment is closed to them. */
+    /**
+     * {@code user}'s bindings and the active one; 403 while the experiment is closed to them. The limit is
+     * left out while premium is hidden from them: the dashboard then shows no counter (creating stays capped).
+     */
     public CustomBindingsStateDto state(UserAccount user) {
         List<CustomBinding> listed = service.list(user);
         List<CustomBindingDto> bindings = listed.stream().map(CustomBindingViews::toDto).toList();
@@ -44,7 +49,7 @@ public class CustomBindingViews {
         for (CustomBinding binding : listed) {
             extensions.put(binding.getId(), ExtensionSlotSetting.toDtos(binding.getExtensionSlots()));
         }
-        OptionalInt limit = service.limit(user);
+        OptionalInt limit = premiumUiGate.isOpenFor(user) ? service.limit(user) : OptionalInt.empty();
         return new CustomBindingsStateDto(true, bindings,
                 active.map(activation -> activation.getCustomBinding().getId()).orElse(null),
                 active.map(CustomBindingActivation::getActivatedAt).orElse(null),

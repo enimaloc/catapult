@@ -12,6 +12,7 @@ import fr.enimaloc.catapult.security.Authz;
 import fr.enimaloc.catapult.security.MethodSecurityConfig;
 import fr.enimaloc.catapult.service.account.ChannelAccessService;
 import fr.enimaloc.catapult.service.binding.CustomBindingService;
+import fr.enimaloc.catapult.service.premium.PremiumUiGate;
 import fr.enimaloc.catapult.service.binding.CustomBindingService.ActivationResult;
 import fr.enimaloc.catapult.service.binding.CustomBindingService.UpdateResult;
 import org.junit.jupiter.api.BeforeEach;
@@ -69,6 +70,7 @@ class ApiChannelCustomBindingsControllerTest {
     @MockitoBean UserAccountRepository accounts;
     @MockitoBean ChannelAccessService channelAccess;
     @MockitoBean CustomBindingService service;
+    @MockitoBean PremiumUiGate premiumUiGate;
 
     private UserAccount owner;
     private UserAccount other;
