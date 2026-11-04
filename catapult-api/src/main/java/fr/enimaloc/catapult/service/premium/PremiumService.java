@@ -25,7 +25,9 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.OptionalInt;
 import java.util.Properties;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Whether an account has the premium features, and who may grant or revoke them. The end date is
@@ -42,6 +44,8 @@ public class PremiumService {
     private final Environment env;
     private final int freeCustomBindingLimit;
     private final Clock clock;
+    // Unreadable intervals already logged, shared with the offer reads only
+    private final Set<String> reported = ConcurrentHashMap.newKeySet();
 
     @Autowired
     public PremiumService(UserAccountRepository users, ActivityLogService activityLog,
@@ -87,30 +91,28 @@ public class PremiumService {
 
     /**
      * What each tier gets. The current mode's intervals are the effective ones (admin overrides
-     * included); the other mode's come from its properties file, as nothing overrides them.
+     * included), read with the scheduler's own rule; the other mode's come from its properties
+     * file, as nothing overrides them. ({@link PollCadence} depends on this service, hence the
+     * shared static parser rather than an injected instance.)
      */
     public PremiumOfferDto offer() {
         boolean degraded = env.matchesProfiles(DegradedMode.PROFILE);
         int free = effective(PollCadence.FREE_KEY);
         int premium = effective(PollCadence.PREMIUM_KEY);
         Properties other = fileProperties(degraded ? "application.properties" : "application-degraded.properties");
-        int otherFree = fromFile(other, PollCadence.FREE_KEY, free);
-        int otherPremium = fromFile(other, PollCadence.PREMIUM_KEY, premium);
+        int otherFree = fromFile(other, PollCadence.FREE_KEY);
+        int otherPremium = fromFile(other, PollCadence.PREMIUM_KEY);
         return degraded
                 ? new PremiumOfferDto(otherFree, otherPremium, free, premium, freeCustomBindingLimit)
                 : new PremiumOfferDto(free, premium, otherFree, otherPremium, freeCustomBindingLimit);
     }
 
     private int effective(String key) {
-        return Math.max(1, env.getProperty(key, Integer.class, 1));
+        return (int) PollCadence.parseSeconds(key, env.getProperty(key), PollCadence.defaultSeconds(key), reported);
     }
 
-    private static int fromFile(Properties properties, String key, int fallback) {
-        try {
-            return Math.max(1, Integer.parseInt(properties.getProperty(key, String.valueOf(fallback)).trim()));
-        } catch (NumberFormatException e) {
-            return fallback;
-        }
+    private int fromFile(Properties properties, String key) {
+        return (int) PollCadence.parseSeconds(key, properties.getProperty(key), PollCadence.defaultSeconds(key), reported);
     }
 
     private static Properties fileProperties(String name) {

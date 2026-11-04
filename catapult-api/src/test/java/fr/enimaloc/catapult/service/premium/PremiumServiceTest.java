@@ -167,6 +167,36 @@ class PremiumServiceTest {
     }
 
     @Test
+    void offer_unparseableOverride_fallsBackWithoutThrowing() {
+        env.setProperty("app.polling.free-interval-seconds", "30s");
+        env.setProperty("app.polling.premium-interval-seconds", "");
+
+        assertThat(service("2026-11-04T12:00:00Z").offer()).isEqualTo(new PremiumOfferDto(60, 30, 90, 60, 5));
+    }
+
+    @Test
+    void offer_missingKeys_useTheSchedulerDefaults() {
+        MockEnvironment bare = new MockEnvironment();
+        PremiumService bareService = new PremiumService(users, activityLog, bindings, bare, 5,
+                Clock.fixed(Instant.parse("2026-11-04T12:00:00Z"), PremiumService.ZONE));
+
+        assertThat(bareService.offer()).isEqualTo(new PremiumOfferDto(60, 30, 90, 60, 5));
+    }
+
+    @Test
+    void offer_inDegradedMode_takesTheDegradedColumnsFromTheEnvironmentAndTheNormalOnesFromTheFile() {
+        MockEnvironment degraded = new MockEnvironment()
+                .withProperty("app.polling.free-interval-seconds", "120")
+                .withProperty("app.polling.premium-interval-seconds", "75");
+        degraded.setActiveProfiles("degraded");
+        PremiumService degradedService = new PremiumService(users, activityLog, bindings, degraded, 5,
+                Clock.fixed(Instant.parse("2026-11-04T12:00:00Z"), PremiumService.ZONE));
+
+        // The normal columns come from the test classpath's application.properties (60 / 60)
+        assertThat(degradedService.offer()).isEqualTo(new PremiumOfferDto(60, 60, 120, 75, 5));
+    }
+
+    @Test
     void today_isTheDayInParis() {
         assertThat(service("2026-11-04T23:30:00Z").today()).isEqualTo(LocalDate.of(2026, 11, 5));
     }

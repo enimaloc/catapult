@@ -42,8 +42,8 @@ public class PollCadence {
 
     /** Seconds between two runs of the loop: the GCD of both intervals. */
     public long tickSeconds() {
-        long premium = interval(PREMIUM_KEY, DEFAULT_PREMIUM_SECONDS);
-        long free = interval(FREE_KEY, DEFAULT_FREE_SECONDS);
+        long premium = premiumSeconds();
+        long free = freeSeconds();
         while (free != 0) {
             long rest = premium % free;
             premium = free;
@@ -58,9 +58,7 @@ public class PollCadence {
         if (last == null) {
             return true;
         }
-        long intervalMs = premiumService.isPremium(user)
-                ? interval(PREMIUM_KEY, DEFAULT_PREMIUM_SECONDS) * 1000
-                : interval(FREE_KEY, DEFAULT_FREE_SECONDS) * 1000;
+        long intervalMs = (premiumService.isPremium(user) ? premiumSeconds() : freeSeconds()) * 1000;
         long toleranceMs = tickSeconds() * 1000 / 2;
         return Duration.between(last, now).toMillis() >= intervalMs - toleranceMs;
     }
@@ -69,18 +67,41 @@ public class PollCadence {
         lastPolled.put(userId, at);
     }
 
+    /** Seconds between two polls of a premium account, as the loop applies them. */
+    public long premiumSeconds() {
+        return interval(PREMIUM_KEY, DEFAULT_PREMIUM_SECONDS);
+    }
+
+    /** Seconds between two polls of a free account, as the loop applies them. */
+    public long freeSeconds() {
+        return interval(FREE_KEY, DEFAULT_FREE_SECONDS);
+    }
+
     /** The configured interval, at least 1 s; the default when the value is not a number. */
     private long interval(String key, long fallback) {
-        long seconds;
+        return parseSeconds(key, env.getProperty(key), fallback, reported);
+    }
+
+    /**
+     * Reads an interval the way the loop does: at least 1 s, the fallback (logged once per
+     * distinct value) when the raw value is not a number, and the fallback when it is absent.
+     */
+    public static long parseSeconds(String key, String raw, long fallback, Set<String> reported) {
+        if (raw == null) {
+            return Math.max(1, fallback);
+        }
         try {
-            seconds = env.getProperty(key, Long.class, fallback);
-        } catch (RuntimeException e) {
-            String raw = env.getProperty(key);
+            return Math.max(1, Long.parseLong(raw.trim()));
+        } catch (NumberFormatException e) {
             if (reported.add(key + '=' + raw)) {
                 log.warn("Unreadable {} '{}', using {}s", key, raw, fallback);
             }
-            seconds = fallback;
+            return Math.max(1, fallback);
         }
-        return Math.max(1, seconds);
+    }
+
+    /** The built-in default of one of the two keys. */
+    public static long defaultSeconds(String key) {
+        return PREMIUM_KEY.equals(key) ? DEFAULT_PREMIUM_SECONDS : DEFAULT_FREE_SECONDS;
     }
 }

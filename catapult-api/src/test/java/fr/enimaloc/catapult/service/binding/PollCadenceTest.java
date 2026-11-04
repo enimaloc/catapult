@@ -136,6 +136,14 @@ class PollCadenceTest {
     }
 
     @Test
+    void seconds_areTheValuesTheLoopUses() {
+        intervals("0", "30s");
+
+        assertThat(cadence.premiumSeconds()).isEqualTo(1);
+        assertThat(cadence.freeSeconds()).isEqualTo(60);
+    }
+
+    @Test
     void overrideChange_appliesOnNextCall() {
         intervals("30", "60");
         assertThat(cadence.tickSeconds()).isEqualTo(30);
