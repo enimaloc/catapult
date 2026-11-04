@@ -35,7 +35,7 @@ class DegradedBannerRenderingTest {
     private static final String INCIDENT = "https://status.example.test/incident/abc";
     private static final String STATUS_PAGE = "https://status.example.test";
     private static final List<DegradedEffectDto> EFFECTS = List.of(
-            new DegradedEffectDto("app.polling.interval-seconds", "60", "30"));
+            new DegradedEffectDto("app.polling.free-interval-seconds", "60", "30"));
 
     @Autowired MockMvc mvc;
     @MockitoBean ApiService apiService;
@@ -134,7 +134,7 @@ class DegradedBannerRenderingTest {
         String banner = tag(render(DegradedView.NONE), "id=\"degraded-banner\"");
 
         assertThat(attr(banner, "data-labels"))
-                .contains("\"app.polling.interval-seconds\":\"Category changes can take up to {0}\"");
+                .contains("\"app.polling.free-interval-seconds\":\"Category changes can take up to {0} (free)\"");
         assertThat(attr(banner, "data-label-normal")).isEqualTo("({0} normally)");
     }
 

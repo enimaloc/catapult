@@ -44,30 +44,30 @@ class DatabaseOverridePropertySourceTest {
     @Test
     void pinnedKey_hidesItsOverride() {
         DatabaseOverridePropertySource src = new DatabaseOverridePropertySource();
-        src.put("app.polling.interval-seconds", "30");
-        src.pin(Set.of("app.polling.interval-seconds"));
+        src.put("app.polling.free-interval-seconds", "30");
+        src.pin(Set.of("app.polling.free-interval-seconds"));
 
-        assertThat(src.getProperty("app.polling.interval-seconds")).isNull();
-        assertThat(src.getPropertyNames()).doesNotContain("app.polling.interval-seconds");
-        assertThat(src.ignores("app.polling.interval-seconds")).isTrue();
-        assertThat(src.keys()).contains("app.polling.interval-seconds"); // still stored, still counted
+        assertThat(src.getProperty("app.polling.free-interval-seconds")).isNull();
+        assertThat(src.getPropertyNames()).doesNotContain("app.polling.free-interval-seconds");
+        assertThat(src.ignores("app.polling.free-interval-seconds")).isTrue();
+        assertThat(src.keys()).contains("app.polling.free-interval-seconds"); // still stored, still counted
     }
 
     @Test
     void unpinnedKey_keepsItsOverride() {
         DatabaseOverridePropertySource src = new DatabaseOverridePropertySource();
-        src.put("app.polling.interval-seconds", "30");
+        src.put("app.polling.free-interval-seconds", "30");
 
-        assertThat(src.getProperty("app.polling.interval-seconds")).isEqualTo("30");
-        assertThat(src.ignores("app.polling.interval-seconds")).isFalse();
+        assertThat(src.getProperty("app.polling.free-interval-seconds")).isEqualTo("30");
+        assertThat(src.ignores("app.polling.free-interval-seconds")).isFalse();
     }
 
     @Test
     void pinnedKeyWithoutOverride_isNotIgnored() {
         DatabaseOverridePropertySource src = new DatabaseOverridePropertySource();
-        src.pin(Set.of("app.polling.interval-seconds"));
+        src.pin(Set.of("app.polling.free-interval-seconds"));
 
-        assertThat(src.ignores("app.polling.interval-seconds")).isFalse();
+        assertThat(src.ignores("app.polling.free-interval-seconds")).isFalse();
     }
 
     @Test

@@ -1686,7 +1686,8 @@ public class MockApiService implements ApiService {
         log.trace("degradedStatus()");
         return degraded
                 ? new DegradedStatusDto(true, List.of(
-                        new DegradedEffectDto("app.polling.interval-seconds", "60", "30"),
+                        new DegradedEffectDto("app.polling.premium-interval-seconds", "60", "30"),
+                        new DegradedEffectDto("app.polling.free-interval-seconds", "90", "60"),
                         new DegradedEffectDto("minecraft.friends-sync-interval-ms", "900000", "300000")))
                 : new DegradedStatusDto(false, null);
     }

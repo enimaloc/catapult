@@ -45,10 +45,10 @@ class ConfigOverrideRefreshIT {
             return userRepo.save(u);
         });
 
-        overrideService.apply("app.polling.interval-seconds", "999", actor);
+        overrideService.apply("app.polling.free-interval-seconds", "999", actor);
 
-        assertThat(env.getProperty("app.polling.interval-seconds")).isEqualTo("999");
+        assertThat(env.getProperty("app.polling.free-interval-seconds")).isEqualTo("999");
 
-        overrideService.clear("app.polling.interval-seconds", actor);
+        overrideService.clear("app.polling.free-interval-seconds", actor);
     }
 }

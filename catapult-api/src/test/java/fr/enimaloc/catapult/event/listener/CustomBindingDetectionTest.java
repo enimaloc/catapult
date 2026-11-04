@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.event.listener;
 import fr.enimaloc.catapult.site.SiteRoles;
 import fr.enimaloc.catapult.simulation.SimulationGates;
 import fr.enimaloc.catapult.service.category.ExtensionLayoutApplier;
+import fr.enimaloc.catapult.service.binding.PollCadences;
 import fr.enimaloc.catapult.service.binding.RaidRestoreGateService;
 import static org.assertj.core.api.Assertions.assertThat;
 import fr.enimaloc.catapult.service.twitch.ChannelUpdateOutcome;
@@ -348,7 +349,7 @@ class CustomBindingDetectionTest {
         GameStateService freshState = new GameStateService(channelEventPublisher);
         return new SchedulerService(mock(UserAccountRepository.class), chain, freshState, this::dispatch,
                 new SimpleMeterRegistry(), Optional.empty(), Optional.empty(), bindingService,
-                SimulationGates.none(), SiteRoles.active());
+                SimulationGates.none(), SiteRoles.active(), PollCadences.always());
     }
 
     private void dispatch(Object event) {

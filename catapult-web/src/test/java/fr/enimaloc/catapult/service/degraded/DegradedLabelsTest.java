@@ -15,16 +15,20 @@ class DegradedLabelsTest {
     void listsEveryEffectLabel_butRest() {
         Map<String, String> french = labels.labels(Locale.FRENCH);
 
-        assertThat(french).containsOnlyKeys("app.polling.interval-seconds", "minecraft.friends-sync-interval-ms",
+        assertThat(french).containsOnlyKeys("app.polling.premium-interval-seconds",
+                "app.polling.free-interval-seconds", "minecraft.friends-sync-interval-ms",
                 "app.retry.incomplete-interval-ms");
-        assertThat(french.get("app.polling.interval-seconds"))
-                .isEqualTo("Le changement de catégorie peut prendre jusqu'à {0}");
+        assertThat(french.get("app.polling.premium-interval-seconds"))
+                .isEqualTo("Le changement de catégorie peut prendre jusqu'à {0} (premium)");
+        assertThat(french.get("app.polling.free-interval-seconds"))
+                .isEqualTo("Le changement de catégorie peut prendre jusqu'à {0} (gratuit)");
     }
 
     @Test
     void english_hasItsOwnWording() {
         assertThat(labels.labels(Locale.ENGLISH))
-                .containsEntry("app.polling.interval-seconds", "Category changes can take up to {0}");
+                .containsEntry("app.polling.premium-interval-seconds", "Category changes can take up to {0} (premium)")
+                .containsEntry("app.polling.free-interval-seconds", "Category changes can take up to {0} (free)");
     }
 
     @Test
