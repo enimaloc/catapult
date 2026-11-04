@@ -156,7 +156,7 @@ class ChannelCustomBindingsRenderingTest {
         assertThat(byClass(dev, "custom-binding-uninterruptible").attr("checked")).isNotNull();
         assertThat(byClass(row(overview, ART), "custom-binding-uninterruptible").attr("checked")).isNull();
         assertThat(overview).contains("Activate", "Deactivate", "Save", "Delete");
-        assertThat(overview).contains("20 bindings maximum", "Twitch did not apply the category",
+        assertThat(overview).contains("You&#39;ve reached the 5-binding limit of a free account", "Twitch did not apply the category",
                 "Another custom binding already has this name");
         // The empty notice is hidden while bindings exist.
         assertThat(byId(overview, "channel-custom-bindings-empty").hasClass("hidden")).isTrue();
@@ -397,7 +397,7 @@ class ChannelCustomBindingsRenderingTest {
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
 
         assertThat(html).contains("Reconnecte ton compte Twitch", "Catapult est en pause sur cette chaîne",
-                "20 bindings maximum", "Twitch n&#39;a pas appliqué la catégorie", "Nouveau", "Activer",
+                "Limite de 5 bindings atteinte sur un compte gratuit", "Twitch n&#39;a pas appliqué la catégorie", "Nouveau", "Activer",
                 "Bindings personnalisés");
     }
 }
