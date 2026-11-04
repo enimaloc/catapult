@@ -246,18 +246,25 @@
     <!--/* The owner's custom bindings, while the experiment is open to the channel (customBindings is null otherwise,
          and for anyone but the owner): listed like the associations above, each row opening its edit form with
          activate/deactivate, save and delete; "New" opens an empty row. channel-custom-bindings.js. */-->
-    <th:block th:if="${ch.isOwner() and ch.customBindings() != null}" th:with="cb=${ch.customBindings()}">
+    <th:block th:if="${ch.isOwner() and ch.customBindings() != null}"
+              th:with="cb=${ch.customBindings()},atLimit=${cb.limit() != null and cb.bindings().size() >= cb.limit()}">
         <div class="section-header" id="channel-custom-bindings-header">
             <div class="title-row">
                 <h2 th:text="#{channel.custom_bindings.title}">Bindings personnalisés</h2>
+                <!--/* "n/limit" on a free account only (limit is null for premium); channel-custom-bindings.js keeps it,
+                     the New button and the upgrade link in step with the list. */-->
+                <span id="custom-bindings-count" th:classappend="${cb.limit() == null} ? 'hidden'"
+                      th:text="${cb.limit() != null} ? ${cb.bindings().size()} + '/' + ${cb.limit()} : ''"></span>
             </div>
             <p th:text="#{channel.custom_bindings.description}">Description</p>
-            <mdui-button id="custom-binding-new-btn" variant="tonal" icon="add"
+            <mdui-button id="custom-binding-new-btn" variant="tonal" icon="add" th:disabled="${atLimit}"
                          th:text="#{channel.custom_bindings.new}">Nouveau</mdui-button>
+            <a id="custom-bindings-upgrade" data-link href="/premium" th:classappend="${atLimit} ? '' : 'hidden'"
+               th:text="#{channel.custom_bindings.upgrade}">Passer premium</a>
         </div>
 
         <mdui-list id="channel-custom-bindings-list"
-                   th:attr="data-error-twitch-unavailable=#{channel.custom_bindings.error.twitch_unavailable},data-error-bot-disabled=#{channel.custom_bindings.error.bot_disabled},data-error-twitch-failed=#{channel.custom_bindings.error.twitch_failed},data-error-name-taken=#{channel.custom_bindings.error.name_taken},data-error-limit-reached=#{channel.custom_bindings.error.limit_reached},data-error-invalid=#{channel.custom_bindings.error.invalid}">
+                   th:attr="data-limit=${cb.limit()},data-error-twitch-unavailable=#{channel.custom_bindings.error.twitch_unavailable},data-error-bot-disabled=#{channel.custom_bindings.error.bot_disabled},data-error-twitch-failed=#{channel.custom_bindings.error.twitch_failed},data-error-name-taken=#{channel.custom_bindings.error.name_taken},data-error-limit-reached=#{channel.custom_bindings.error.limit_reached},data-error-invalid=#{channel.custom_bindings.error.invalid}">
             <mdui-collapse accordion>
                 <!--/* A row per binding, then the hidden empty one "New" reveals (no data-custom-binding-id: a save creates). */-->
                 <mdui-collapse-item th:each="b : ${cb.bindings()}" class="custom-binding-item"

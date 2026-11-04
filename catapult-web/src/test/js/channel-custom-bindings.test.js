@@ -62,7 +62,7 @@ function form(binding) {
         ${actions}`;
 }
 
-function overview({ empty = false, extra = "" } = {}) {
+function overview({ empty = false, extra = "", limit = null } = {}) {
     const rows = empty ? "" : `
         <mdui-collapse-item class="custom-binding-item is-active" data-custom-binding-id="${ART}" value="${ART}">
             <span class="custom-binding-name-label">Art</span><span class="custom-binding-game-label">Art</span>
@@ -77,8 +77,10 @@ function overview({ empty = false, extra = "" } = {}) {
                      uninterruptible: true })}
         </mdui-collapse-item>`;
     html(`
+        <span id="custom-bindings-count" class="hidden"></span>
         <mdui-button id="custom-binding-new-btn"></mdui-button>
-        <mdui-list id="channel-custom-bindings-list"
+        <a id="custom-bindings-upgrade" class="hidden" href="/premium"></a>
+        <mdui-list id="channel-custom-bindings-list"${limit === null ? "" : ` data-limit="${limit}"`}
                    data-error-twitch-unavailable="Reconnecte ton compte Twitch"
                    data-error-bot-disabled="Catapult est en pause sur cette chaîne"
                    data-error-twitch-failed="Twitch n'a pas appliqué la catégorie"
@@ -767,5 +769,58 @@ describe("overview list: live updates", () => {
         html("<p></p>");
 
         expect(apply([art])).toBe(true);
+    });
+});
+
+describe("overview list: the free limit", () => {
+    const count = () => byId("custom-bindings-count");
+    const newBtn = () => byId("custom-binding-new-btn");
+    const upgrade = () => byId("custom-bindings-upgrade");
+
+    it("counts the bindings against the limit and offers New below it", () => {
+        overview({ limit: 5 });
+
+        expect(count().textContent).toBe("2/5");
+        expect(isHidden(count())).toBe(false);
+        expect(newBtn().disabled).toBeFalsy();
+        expect(isHidden(upgrade())).toBe(true);
+    });
+
+    it("disables New and shows the premium link once the limit is reached by a live update", () => {
+        overview({ limit: 3, extra: TEMPLATE });
+        window.CatapultCustomBindings.apply([art, dev, games], ART);
+
+        expect(count().textContent).toBe("3/3");
+        expect(newBtn().disabled).toBe(true);
+        expect(isHidden(upgrade())).toBe(false);
+    });
+
+    it("frees New again when a live update drops a binding", () => {
+        overview({ limit: 2 });
+        expect(newBtn().disabled).toBe(true);
+        window.CatapultCustomBindings.apply([art], ART);
+
+        expect(count().textContent).toBe("1/2");
+        expect(newBtn().disabled).toBe(false);
+        expect(isHidden(upgrade())).toBe(true);
+    });
+
+    it("frees New after a confirmed deletion", async () => {
+        overview({ limit: 2 });
+        item(DEV).querySelector(".custom-binding-delete").click();
+        document.querySelector(".custom-binding-delete-confirm").click();
+        await flush();
+
+        expect(count().textContent).toBe("1/2");
+        expect(newBtn().disabled).toBe(false);
+    });
+
+    it("shows no counter and never locks New without a limit (premium)", () => {
+        overview();
+        window.CatapultCustomBindings.apply([art, dev, games], ART);
+
+        expect(isHidden(count())).toBe(true);
+        expect(newBtn().disabled).toBeFalsy();
+        expect(isHidden(upgrade())).toBe(true);
     });
 });

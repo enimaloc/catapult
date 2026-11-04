@@ -162,6 +162,49 @@ class ChannelCustomBindingsRenderingTest {
         assertThat(byId(overview, "channel-custom-bindings-empty").hasClass("hidden")).isTrue();
     }
 
+    private static CustomBindingsStateDto stateOf(int count, Integer limit) {
+        List<CustomBindingDto> bindings = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            bindings.add(new CustomBindingDto(UUID.randomUUID(), "Binding " + i, "509660", "Art", List.of(),
+                    List.of(), false));
+        }
+        return new CustomBindingsStateDto(true, bindings, null, null, limit);
+    }
+
+    @Test
+    void aFreeOwnerBelowTheLimit_seesTheCount_andANewButtonWithoutTheUpgradeLink() throws Exception {
+        String overview = panel(render(true, stateOf(3, 5)), "overview");
+
+        Tag count = byId(overview, "custom-bindings-count");
+        assertThat(count.text()).isEqualTo("3/5");
+        assertThat(count.hasClass("hidden")).isFalse();
+        assertThat(byId(overview, "channel-custom-bindings-list").attr("data-limit")).isEqualTo("5");
+        assertThat(byId(overview, "custom-binding-new-btn").attr("disabled")).isNull();
+        Tag upgrade = byId(overview, "custom-bindings-upgrade");
+        assertThat(upgrade.hasClass("hidden")).isTrue();
+        assertThat(upgrade.attr("href")).isEqualTo("/premium");
+        assertThat(upgrade.text()).isEqualTo("Go premium");
+    }
+
+    @Test
+    void aFreeOwnerAtTheLimit_hasTheNewButtonDisabled_andTheUpgradeLinkShown() throws Exception {
+        String overview = panel(render(true, stateOf(5, 5)), "overview");
+
+        assertThat(byId(overview, "custom-bindings-count").text()).isEqualTo("5/5");
+        assertThat(byId(overview, "custom-binding-new-btn").attr("disabled")).isNotNull();
+        assertThat(byId(overview, "custom-bindings-upgrade").hasClass("hidden")).isFalse();
+    }
+
+    @Test
+    void aPremiumOwner_hasNoCounter_andNeverALockedButton() throws Exception {
+        String overview = panel(render(true, stateOf(9, null)), "overview");
+
+        assertThat(byId(overview, "custom-bindings-count").hasClass("hidden")).isTrue();
+        assertThat(byId(overview, "channel-custom-bindings-list").attr("data-limit")).isNull();
+        assertThat(byId(overview, "custom-binding-new-btn").attr("disabled")).isNull();
+        assertThat(byId(overview, "custom-bindings-upgrade").hasClass("hidden")).isTrue();
+    }
+
     @Test
     void theActiveRowIsMarked_andOnlyTheUninterruptibleOneHasTheChip() throws Exception {
         String overview = panel(render(true, state()), "overview");
