@@ -86,7 +86,7 @@ GET,/api/internal/users/{userId}/api-token/read,userId=self,,401,401,PASS,PASS,P
 POST,/api/internal/users/{userId}/api-token/read,userId=self,,401,401,PASS,PASS,PASS,PASS,401
 DELETE,/api/internal/users/{userId}/api-token/read,userId=self,,401,401,PASS,PASS,PASS,PASS,401
 GET,/api/internal/users/{userId}/debug,userId=self,,401,401,PASS,PASS,PASS,PASS,401
-GET,/api/internal/users/{userId}/premium,userId=self,,401,401,PASS,PASS,PASS,PASS,401
+GET,/api/internal/users/{userId}/premium,userId=self,,401,401,GATED,GATED,GATED,GATED,401
 GET,/api/internal/users/{userId}/notification-channels,userId=self,,401,401,PASS,PASS,PASS,PASS,401
 PUT,/api/internal/users/{userId}/notification-channels,userId=self,,401,401,PASS,PASS,PASS,PASS,401
 GET,/api/internal/users/{userId}/obs,userId=self,,401,401,PASS,PASS,PASS,PASS,401
@@ -127,7 +127,7 @@ POST,/api/internal/users/{userId}/api-token/read,unmapped,,401,401,403,403,PASS,
 DELETE,/api/internal/users/{userId}/api-token/read,unmapped,,401,401,403,403,PASS,403,401
 GET,/api/internal/users/{userId}/channels,unmapped,,401,401,403,403,PASS,403,401
 GET,/api/internal/users/{userId}/debug,unmapped,,401,401,403,403,PASS,403,401
-GET,/api/internal/users/{userId}/premium,unmapped,,401,401,403,403,PASS,403,401
+GET,/api/internal/users/{userId}/premium,unmapped,,401,401,403,403,GATED,403,401
 GET,/api/internal/users/{userId}/chat-commands/enabled,unmapped,,401,401,403,403,PASS,403,401
 POST,/api/internal/users/{userId}/chat-commands,unmapped,"{""name"":""!matrix"",""template"":""matrix"",""permission"":""VIEWERS"",""enabled"":false}",401,401,403,403,GATED,403,401
 POST,/api/internal/users/{userId}/chat-commands/{id}/test,unmapped,,401,401,403,403,GATED,403,401
@@ -260,8 +260,8 @@ GET,/api/internal/admin/members,,,401,PASS,403,403,403,PASS,401
 GET,/api/internal/admin/members/search,,,401,PASS,403,403,403,PASS,401
 GET,/api/internal/admin/members/{id},,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/members/{id}/bot/toggle,,,401,PASS,403,403,403,PASS,401
-POST,/api/internal/admin/members/{id}/premium,,"{}",401,PASS,403,403,403,PASS,401
-DELETE,/api/internal/admin/members/{id}/premium,,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/members/{id}/premium,,"{}",401,401,403,403,403,PASS,401
+DELETE,/api/internal/admin/members/{id}/premium,,,401,401,403,403,403,PASS,401
 GET,/api/internal/admin/members/{id}/debug,,,401,PASS,403,403,403,PASS,401
 DELETE,/api/internal/admin/members/{id}/debug/exchanges,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/members/{id}/debug/disable,,,401,PASS,403,403,403,PASS,401

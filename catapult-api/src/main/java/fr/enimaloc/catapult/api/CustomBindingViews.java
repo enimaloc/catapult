@@ -42,6 +42,10 @@ public class CustomBindingViews {
      * left out while premium is hidden from them: the dashboard then shows no counter (creating stays capped).
      */
     public CustomBindingsStateDto state(UserAccount user) {
+        return state(user, premiumUiGate.isOpenFor(user));
+    }
+
+    private CustomBindingsStateDto state(UserAccount user, boolean withLimit) {
         List<CustomBinding> listed = service.list(user);
         List<CustomBindingDto> bindings = listed.stream().map(CustomBindingViews::toDto).toList();
         Optional<CustomBindingActivation> active = service.active(user);
@@ -49,16 +53,16 @@ public class CustomBindingViews {
         for (CustomBinding binding : listed) {
             extensions.put(binding.getId(), ExtensionSlotSetting.toDtos(binding.getExtensionSlots()));
         }
-        OptionalInt limit = premiumUiGate.isOpenFor(user) ? service.limit(user) : OptionalInt.empty();
+        OptionalInt limit = withLimit ? service.limit(user) : OptionalInt.empty();
         return new CustomBindingsStateDto(true, bindings,
                 active.map(activation -> activation.getCustomBinding().getId()).orElse(null),
                 active.map(CustomBindingActivation::getActivatedAt).orElse(null),
                 limit.isPresent() ? limit.getAsInt() : null, extensions);
     }
 
-    /** {@link #state} as the token API answers it: without the dashboard-only extension layouts. */
+    /** {@link #state} as the token API answers it: without the dashboard-only limit and extension layouts. */
     public CustomBindingsStateDto publicState(UserAccount user) {
-        CustomBindingsStateDto state = state(user);
+        CustomBindingsStateDto state = state(user, false);
         return new CustomBindingsStateDto(state.enabled(), state.bindings(), state.activeId(), state.activatedAt());
     }
 
