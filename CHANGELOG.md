@@ -4,6 +4,50 @@ Toutes les versions publiées de Catapult, la plus récente en premier.
 
 Ce fichier est régénéré par le bot à chaque release à partir des notes des [GitHub Releases](https://github.com/enimaloc/catapult/releases) : pour corriger une entrée, modifie les notes de la release (ou le changelog de la PR de release avant sa publication), pas ce fichier.
 
+## [v1.0.0-BETA.101](https://github.com/enimaloc/catapult/releases/tag/v1.0.0-BETA.101) - 2026-11-06
+
+### Features
+- **api:** decide whether this site is the active one from DNS (596bd5d)
+- **api:** block outbound writes and token refreshes while on standby (011bef4)
+- **api:** close Twitch intakes and skip outbound jobs while on standby (9d3b144)
+- **api:** remember each member's last handled stream (2788eb7)
+- **api:** catch up on stream starts and ends missed while on standby (33da751)
+- **api:** expose whether this site is active (b99afbd)
+- merge split-brain standby guard into dev (4771155)
+- **api:** add a premium status to accounts (594a4fb)
+- **api:** poll premium accounts more often than free ones (e4aa44c)
+- **api:** cap custom bindings at five on a free account (979a42d)
+- **api:** expose the premium status and let admins grant it (9a153c9)
+- **web:** add the premium page (7cbcc30)
+- **web:** show the custom binding count against the free limit (7af3828)
+- **web:** let admins grant and revoke premium (a565e19)
+- **api:** hide premium behind the premium.ui experiment (b20f7ae)
+- **web:** show premium only while its experiment is open (91f25b8)
+- merge premium mechanics into dev (7c4b09e)
+
+### Fixes
+- **api:** keep switching every member when one fails during a site role change (f6b0c55)
+- **api:** guard the bot user lookup during a site role change (d032691)
+- **api:** do not remember a stream that has no id or start time (32b56f5)
+- **api:** do not replay ended streams or Helix lag as catch-up starts and ends (7bd49ce)
+- **api:** keep every Twitch socket shut on a standby site (3608247)
+- **api:** treat an unreadable database role as doubt, not standby (04777c8)
+- **api:** reapply the game binding after a takeover of an ongoing stream (b83cd6f)
+- **api:** answer a standby refusal with 503 instead of an unhandled error (6ac7e6b)
+- **api:** connect the other members when one EventSub connection fails at init (7c76e00)
+- **api:** open admin data rows keyed by an embedded id (3537d93)
+- merge admin data embedded id fix into dev (06df3cd)
+- **web:** read admin members without the premium fields (17ee36a)
+- **web:** state the free limit when a binding creation is refused (4f470d6)
+- **web:** keep the premium chip inside the members status column (0139c91)
+- **api:** read the premium offer intervals like the scheduler does (651e611)
+- **web:** show only the worst-case polling delay in the degraded banner (5a8e04b)
+- **web:** give the mock free account its binding limit (fa28dd2)
+- **api:** pin the gated premium routes and their query budgets (a2f4e06)
+
+### Other
+- **api:** provide the premium service to the admin member slices (2f321f8)
+
 ## [v1.0.0-BETA.100](https://github.com/enimaloc/catapult/releases/tag/v1.0.0-BETA.100) - 2026-11-01
 
 ### Fixes
