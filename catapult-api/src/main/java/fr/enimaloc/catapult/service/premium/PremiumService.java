@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.service.premium;
 
 import fr.enimaloc.catapult.api.error.ApiProblem;
+import fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleDto;
 import fr.enimaloc.catapult.common.dto.premium.PremiumOfferDto;
 import fr.enimaloc.catapult.common.dto.premium.PremiumStatusDto;
 import fr.enimaloc.catapult.common.error.ErrorCode;
@@ -39,9 +40,9 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 @Service
 public class PremiumService {
-    public static final ZoneId ZONE = ZoneId.of("Europe/Paris");
+    public static final ZoneId ZONE = ZoneId.of(CustomBindingScheduleDto.ZONE);
     /** Twitch "Special Events", the only category a free account may schedule (once). */
-    public static final String SPECIAL_EVENTS_TWITCH_GAME_ID = "509663";
+    public static final String SPECIAL_EVENTS_TWITCH_GAME_ID = CustomBindingScheduleDto.FREE_TWITCH_GAME_ID;
 
     private final UserAccountRepository users;
     private final ActivityLogService activityLog;
