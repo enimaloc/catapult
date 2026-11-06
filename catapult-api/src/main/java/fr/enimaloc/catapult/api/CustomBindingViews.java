@@ -57,6 +57,7 @@ public class CustomBindingViews {
         return state(user, premiumUiGate.isOpenFor(user), true);
     }
 
+    /** {@code withLimit}: premium is shown to {@code user}, which the dashboard is also told (premiumUi). */
     private CustomBindingsStateDto state(UserAccount user, boolean withLimit, boolean dashboard) {
         List<CustomBinding> listed = service.list(user);
         List<CustomBindingDto> bindings = listed.stream().map(CustomBindingViews::toDto).toList();
@@ -71,7 +72,8 @@ public class CustomBindingViews {
                 active.map(CustomBindingActivation::getActivatedAt).orElse(null),
                 limit.isPresent() ? limit.getAsInt() : null, extensions,
                 dashboard ? schedules(user, listed) : Map.of(),
-                dashboard ? premiumService.canRepeatSchedules(user) : null);
+                dashboard ? premiumService.canRepeatSchedules(user) : null,
+                dashboard ? withLimit : null);
     }
 
     /** Every binding's slots by id, from one query for all of {@code user}'s. */

@@ -100,7 +100,15 @@ class DtoJsonContractTest {
     void scheduleFieldsOfTheStateAreOmittedWhenEmpty() {
         String written = json.writeValueAsString(new CustomBindingsStateDto(true, List.of(), null, null));
 
-        assertThat(written).doesNotContain("schedules").doesNotContain("canRepeat");
+        assertThat(written).doesNotContain("schedules").doesNotContain("canRepeat").doesNotContain("premiumUi");
+    }
+
+    @Test
+    void premiumUiOfTheStateIsWrittenWhenKnown() {
+        String written = json.writeValueAsString(new CustomBindingsStateDto(true, List.of(), null, null, null,
+                Map.of(), Map.of(), false, true));
+
+        assertThat(written).contains("\"premiumUi\":true").contains("\"canRepeat\":false");
     }
 
     // --- sample values ------------------------------------------------------------------------

@@ -316,7 +316,7 @@
         </template>
 
         <!--/* A schedule slot's row, empty: channel-custom-binding-schedules.js shows a saved list with copies. */-->
-        <template id="custom-binding-schedule-template" th:with="premium=${navPremium == true}">
+        <template id="custom-binding-schedule-template" th:with="premium=${cb.premiumUi() == true}">
             <mdui-list-item th:replace="~{pages/channel-tab/overview :: customBindingSchedule(null)}"></mdui-list-item>
         </template>
 
@@ -391,13 +391,13 @@
      the next activation and the slot editor.
      Saved apart, the whole list at each change (channel-custom-binding-schedules.js, which reads the slots from their
      data-* and shows them in the same words). A free account may only schedule one-off slots of Special Events: no
-     repeat, nor adding on another category. Premium is only named while the member is shown premium (navPremium). */-->
+     repeat, nor adding on another category. Premium is only named while the member is shown premium (premiumUi of the state). */-->
 <th:block th:fragment="customBindingSchedules(b)">
 <div class="custom-binding-schedules"
      th:with="cb=${channelPage.customBindings()},
               dto=${T(fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleDto)},
               zone=${dto.ZONE}, freeGameId=${dto.FREE_TWITCH_GAME_ID},
-              canRepeat=${cb.canRepeat() == true}, premium=${navPremium == true},
+              canRepeat=${cb.canRepeat() == true}, premium=${cb.premiumUi() == true},
               canAdd=${canRepeat or (b != null and b.twitchGameId() == freeGameId)},
               slots=${b == null or cb.schedules().get(b.id()) == null ? {} : cb.schedules().get(b.id())},
               due=${slots.?[!paused() and !suspended() and nextStart() != null].![nextStart()]},

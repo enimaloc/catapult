@@ -79,6 +79,8 @@ class CustomBindingViewsTest {
         var state = views.state(user);
 
         assertThat(state.canRepeat()).isTrue();
+        // Premium hidden from the owner (the gate is closed by default): the dashboard doesn't name it.
+        assertThat(state.premiumUi()).isFalse();
         List<CustomBindingScheduleDto> dtos = state.schedules().get(art.getId());
         assertThat(dtos).extracting(CustomBindingScheduleDto::id).containsExactly(past.getId(), weekly.getId());
         assertThat(dtos.get(0).suspended()).isTrue();
@@ -98,6 +100,7 @@ class CustomBindingViewsTest {
 
         assertThat(state.schedules()).isEmpty();
         assertThat(state.canRepeat()).isNull();
+        assertThat(state.premiumUi()).isNull();
         org.mockito.Mockito.verifyNoInteractions(scheduleRepository);
     }
 
@@ -107,6 +110,8 @@ class CustomBindingViewsTest {
 
         when(service.limit(user)).thenReturn(OptionalInt.of(5));
         assertThat(views.state(user).limit()).isEqualTo(5);
+        // The dashboard is told premium is shown, to name it.
+        assertThat(views.state(user).premiumUi()).isTrue();
 
         when(service.limit(user)).thenReturn(OptionalInt.empty());
         assertThat(views.state(user).limit()).isNull();
