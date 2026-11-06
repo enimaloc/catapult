@@ -6,6 +6,8 @@ import fr.enimaloc.catapult.common.dto.premium.PremiumStatusDto;
 import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.config.DegradedMode;
 import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.binding.CustomBindingSchedule;
+import fr.enimaloc.catapult.event.CustomBindingSchedulesChangedEvent;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.binding.CustomBindingRepository;
 import fr.enimaloc.catapult.service.ActivityLogService;
@@ -13,6 +15,7 @@ import fr.enimaloc.catapult.service.binding.PollCadence;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.env.Environment;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.support.PropertiesLoaderUtils;
@@ -37,12 +40,15 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 public class PremiumService {
     public static final ZoneId ZONE = ZoneId.of("Europe/Paris");
+    /** Twitch "Special Events", the only category a free account may schedule (once). */
+    public static final String SPECIAL_EVENTS_TWITCH_GAME_ID = "509663";
 
     private final UserAccountRepository users;
     private final ActivityLogService activityLog;
     private final CustomBindingRepository bindings;
     private final Environment env;
     private final int freeCustomBindingLimit;
+    private final ApplicationEventPublisher publisher;
     private final Clock clock;
     // Unreadable intervals already logged, shared with the offer reads only
     private final Set<String> reported = ConcurrentHashMap.newKeySet();
@@ -50,17 +56,20 @@ public class PremiumService {
     @Autowired
     public PremiumService(UserAccountRepository users, ActivityLogService activityLog,
                           CustomBindingRepository bindings, Environment env,
-                          @Value("${catapult.premium.free-custom-binding-limit:5}") int freeCustomBindingLimit) {
-        this(users, activityLog, bindings, env, freeCustomBindingLimit, Clock.systemUTC());
+                          @Value("${catapult.premium.free-custom-binding-limit:5}") int freeCustomBindingLimit,
+                          ApplicationEventPublisher publisher) {
+        this(users, activityLog, bindings, env, freeCustomBindingLimit, publisher, Clock.systemUTC());
     }
 
     PremiumService(UserAccountRepository users, ActivityLogService activityLog, CustomBindingRepository bindings,
-                   Environment env, int freeCustomBindingLimit, Clock clock) {
+                   Environment env, int freeCustomBindingLimit,
+                   ApplicationEventPublisher publisher, Clock clock) {
         this.users = users;
         this.activityLog = activityLog;
         this.bindings = bindings;
         this.env = env;
         this.freeCustomBindingLimit = freeCustomBindingLimit;
+        this.publisher = publisher;
         this.clock = clock;
     }
 
@@ -75,6 +84,16 @@ public class PremiumService {
         }
         LocalDate until = user.getPremiumUntil();
         return until == null || !today().isAfter(until);
+    }
+
+    /** Premium may schedule anything; a free account only one-off slots on {@link #SPECIAL_EVENTS_TWITCH_GAME_ID}. */
+    public boolean canSchedule(UserAccount user, String twitchGameId, CustomBindingSchedule.Repeat repeat) {
+        return isPremium(user)
+                || (repeat == CustomBindingSchedule.Repeat.NONE && SPECIAL_EVENTS_TWITCH_GAME_ID.equals(twitchGameId));
+    }
+
+    public boolean canRepeatSchedules(UserAccount user) {
+        return isPremium(user);
     }
 
     /** The most custom bindings the account may have; empty means unlimited. */
@@ -132,6 +151,7 @@ public class PremiumService {
         users.save(user);
         activityLog.addEntry(userId, "INFO", "Premium granted by " + actor
                 + (until == null ? " with no end date" : " until " + until));
+        publisher.publishEvent(new CustomBindingSchedulesChangedEvent(userId));
     }
 
     @Transactional
@@ -141,6 +161,7 @@ public class PremiumService {
         user.setPremiumUntil(null);
         users.save(user);
         activityLog.addEntry(userId, "INFO", "Premium revoked by " + actor);
+        publisher.publishEvent(new CustomBindingSchedulesChangedEvent(userId));
     }
 
     private UserAccount existing(UUID userId) {
