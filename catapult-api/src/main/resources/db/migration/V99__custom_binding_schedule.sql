@@ -18,16 +18,18 @@ CREATE TABLE custom_binding_schedule_day (
     PRIMARY KEY (schedule_id, day_of_week)
 );
 
+-- Occurrences are instants (TIMESTAMPTZ): read back as written whatever the JVM's zone, so the scheduler
+-- recognises the occurrence it already applied.
 -- Occurrences a streamer refused (stopped by hand): not re-activated. Purged once the occurrence is over.
 CREATE TABLE custom_binding_schedule_refusal (
     schedule_id      UUID      NOT NULL REFERENCES custom_binding_schedule (id) ON DELETE CASCADE,
-    occurrence_start TIMESTAMP NOT NULL,
-    occurrence_end   TIMESTAMP NOT NULL,
+    occurrence_start TIMESTAMPTZ NOT NULL,
+    occurrence_end   TIMESTAMPTZ NOT NULL,
     PRIMARY KEY (schedule_id, occurrence_start)
 );
 
 ALTER TABLE custom_binding_activation
     ADD COLUMN origin           VARCHAR(10) NOT NULL DEFAULT 'MANUAL',
     ADD COLUMN schedule_id      UUID REFERENCES custom_binding_schedule (id) ON DELETE SET NULL,
-    ADD COLUMN occurrence_start TIMESTAMP,
-    ADD COLUMN occurrence_end   TIMESTAMP;
+    ADD COLUMN occurrence_start TIMESTAMPTZ,
+    ADD COLUMN occurrence_end   TIMESTAMPTZ;
