@@ -102,10 +102,8 @@ public class CustomBindingViews {
 
     /** {@code slots} (of one binding, already ordered) as the schedule endpoints answer them. */
     public List<CustomBindingScheduleDto> scheduleDtos(UserAccount user, List<CustomBindingSchedule> slots) {
-        Instant now = Instant.now();
-        return slots.stream()
-                .map(slot -> toDto(slot, scheduleService.suspended(user, slot.getCustomBinding(), slot), now))
-                .toList();
+        return slots.isEmpty() ? List.of()
+                : toDtos(user, slots.get(0).getCustomBinding(), slots, Instant.now());
     }
 
     private static CustomBindingScheduleDto toDto(CustomBindingSchedule slot, boolean suspended, Instant now) {

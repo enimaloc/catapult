@@ -271,7 +271,7 @@ class ApiChannelCustomBindingsControllerTest {
     }
 
     private static final String SCHEDULES = """
-            [{"startsAt":"2026-11-10T20:00:00","endsAt":"2026-11-10T22:00:00","repeat":"NONE","days":[],
+            [{"startsAt":"2099-11-10T20:00:00","endsAt":"2099-11-10T22:00:00","repeat":"NONE","days":[],
               "paused":false}]""";
 
     private MockHttpServletRequestBuilder putSchedules(UserAccount as) {
@@ -284,14 +284,14 @@ class ApiChannelCustomBindingsControllerTest {
         CustomBindingSchedule saved = new CustomBindingSchedule();
         saved.setId(UUID.randomUUID());
         saved.setCustomBinding(art);
-        saved.setStartsAt(java.time.LocalDateTime.of(2026, 11, 10, 20, 0));
-        saved.setEndsAt(java.time.LocalDateTime.of(2026, 11, 10, 22, 0));
+        saved.setStartsAt(java.time.LocalDateTime.of(2099, 11, 10, 20, 0));
+        saved.setEndsAt(java.time.LocalDateTime.of(2099, 11, 10, 22, 0));
         when(scheduleService.replace(eq(owner), eq(art.getId()), any())).thenReturn(List.of(saved));
 
         mvc.perform(putSchedules(owner))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(saved.getId().toString()))
-                .andExpect(jsonPath("$[0].startsAt").value("2026-11-10T20:00:00"))
+                .andExpect(jsonPath("$[0].startsAt").value("2099-11-10T20:00:00"))
                 .andExpect(jsonPath("$[0].repeat").value("NONE"))
                 .andExpect(jsonPath("$[0].suspended").value(false))
                 .andExpect(jsonPath("$[0].nextStart").exists());
