@@ -645,7 +645,7 @@ public class MockApiService implements ApiService {
     public int saveCustomBindingExtensions(String username, UUID id, List<ExtensionSlotDto> slots) {
         log.trace("saveCustomBindingExtensions({}, {}, {})", username, id, slots);
         int status = currentData().customBindings().saveExtensions(id, slots);
-        if (status == NO_CONTENT) eventPublisher.publishEvent(new CustomBindingsUpdatedEvent(username));
+        if (status == NO_CONTENT) publishCustomBindings(username);
         return status;
     }
 
@@ -1741,6 +1741,16 @@ public class MockApiService implements ApiService {
                     new ChangelogSection.Entry("bead001", "fix", null, "open an OBS widget on its owner's Twitchat branch", false),
                     new ChangelogSection.Entry("bead002", "perf", "web", "build each expanded message's format once", false))));
 
+    /**
+     * The custom bindings' live event, carrying the list as catapult-api's does: the dashboard applies it in place.
+     * Without it, the page re-renders and closes the row being edited.
+     */
+    private void publishCustomBindings(String username) {
+        CustomBindingsStateDto state = currentData().customBindings().state();
+        eventPublisher.publishEvent(new CustomBindingsUpdatedEvent(username, state.bindings(),
+                state.activeId() == null ? null : state.activeId().toString()));
+    }
+
     @Override
     public CustomBindingsStateDto customBindings(String username) {
         log.trace("customBindings({})", username);
@@ -1751,7 +1761,7 @@ public class MockApiService implements ApiService {
     public CustomBindingSave<CustomBindingDto> createCustomBinding(String username, CustomBindingRequest request) {
         log.trace("createCustomBinding({})", username);
         CustomBindingSave<CustomBindingDto> result = currentData().customBindings().create(request);
-        if (result.ok()) eventPublisher.publishEvent(new CustomBindingsUpdatedEvent(username));
+        if (result.ok()) publishCustomBindings(username);
         return result;
     }
 
@@ -1759,7 +1769,7 @@ public class MockApiService implements ApiService {
     public CustomBindingSave<CustomBindingSaveResult> updateCustomBinding(String username, UUID id, CustomBindingRequest request) {
         log.trace("updateCustomBinding({}, {})", username, id);
         CustomBindingSave<CustomBindingSaveResult> result = currentData().customBindings().update(id, request);
-        if (result.ok()) eventPublisher.publishEvent(new CustomBindingsUpdatedEvent(username));
+        if (result.ok()) publishCustomBindings(username);
         return result;
     }
 
@@ -1768,7 +1778,7 @@ public class MockApiService implements ApiService {
                                                                                       List<CustomBindingScheduleRequest> schedules) {
         log.trace("saveCustomBindingSchedules({}, {})", username, id);
         CustomBindingSave<List<CustomBindingScheduleDto>> result = currentData().customBindings().saveSchedules(id, schedules);
-        if (result.ok()) eventPublisher.publishEvent(new CustomBindingsUpdatedEvent(username));
+        if (result.ok()) publishCustomBindings(username);
         return result;
     }
 
@@ -1780,7 +1790,7 @@ public class MockApiService implements ApiService {
         int status = store.delete(id);
         if (status == NO_CONTENT) {
             if (wasActive) eventPublisher.publishEvent(new CustomBindingChangedEvent(username, null));
-            eventPublisher.publishEvent(new CustomBindingsUpdatedEvent(username));
+            publishCustomBindings(username);
         }
         return status;
     }

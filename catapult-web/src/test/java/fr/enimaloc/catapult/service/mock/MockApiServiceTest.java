@@ -957,6 +957,13 @@ class MockApiServiceTest {
         assertThat(service.readApiTokenStatus().exists()).isFalse();
     }
 
+    /** The custom bindings' live event as the mock publishes it now: the whole list and the active one. */
+    private fr.enimaloc.catapult.event.binding.CustomBindingsUpdatedEvent listed() {
+        var state = service.customBindings(username);
+        return new fr.enimaloc.catapult.event.binding.CustomBindingsUpdatedEvent(username, state.bindings(),
+                state.activeId() == null ? null : state.activeId().toString());
+    }
+
     @Test
     void customBindings_startWithArtActiveAndDeveloppement_andShowOnTheOwnersPage() {
         var state = service.customBindings(username);
@@ -990,7 +997,8 @@ class MockApiServiceTest {
         assertThat(kept.status()).isEqualTo(200);
         assertThat(kept.body()).hasSize(1);
         assertThat(kept.body().get(0).id()).isNotNull();
-        assertThat(events).contains(new fr.enimaloc.catapult.event.binding.CustomBindingsUpdatedEvent(username));
+        // Carrying the list, as catapult-api's does: the page applies it in place, its open row stays open
+        assertThat(events).contains(listed()).doesNotContain(new fr.enimaloc.catapult.event.binding.CustomBindingsUpdatedEvent(username));
         var state = service.customBindings(username);
         assertThat(state.schedules().get(special.id())).hasSize(1);
         assertThat(state.canRepeat()).isFalse();
@@ -1034,7 +1042,7 @@ class MockApiServiceTest {
         var created = service.createCustomBinding(username, customBinding("  Musique "));
         assertThat(created.status()).isEqualTo(201);
         assertThat(created.body().name()).isEqualTo("Musique");
-        assertThat(events).contains(new fr.enimaloc.catapult.event.binding.CustomBindingsUpdatedEvent(username));
+        assertThat(events).contains(listed());
 
         assertThat(service.createCustomBinding(username, customBinding("musique")).code()).isEqualTo(fr.enimaloc.catapult.common.error.ErrorCode.NAME_TAKEN);
         assertThat(service.createCustomBinding(username, customBinding("   ")).code()).isEqualTo(fr.enimaloc.catapult.common.error.ErrorCode.INVALID);
@@ -1078,7 +1086,7 @@ class MockApiServiceTest {
         assertThat(service.customBindings(username).activeId()).isNull();
         assertThat(service.customBindings(username).bindings()).hasSize(1);
         assertThat(events).contains(new fr.enimaloc.catapult.event.binding.CustomBindingChangedEvent(username, null),
-                new fr.enimaloc.catapult.event.binding.CustomBindingsUpdatedEvent(username));
+                listed());
         assertThat(service.deleteCustomBinding(username, dev.id())).isEqualTo(404);
 
         var art = service.customBindings(username).bindings().get(0);

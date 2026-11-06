@@ -677,6 +677,7 @@ describe("overview list: live updates", () => {
     it("keeps what the owner is typing in an open row, and an open dialog open", () => {
         overview({ extra: TEMPLATE });
         const row = item(DEV);
+        document.querySelector("mdui-collapse").value = DEV;
         row.classList.add("is-open");
         row.querySelector(".custom-binding-name").value = "Dév en cours";
         item(ART).querySelector(".custom-binding-delete").click();
@@ -688,6 +689,8 @@ describe("overview list: live updates", () => {
         expect(row.querySelector(".custom-binding-name-label").textContent).toBe("Dev");
         expect(byId("custom-binding-delete-dialog").open).toBe(true);
         expect(item(DEV)).toBe(row);
+        // Applied in place (a schedule saved in the row, for one): the row stays open
+        expect(document.querySelector("mdui-collapse").value).toBe(DEV);
     });
 
     it("closes the deletion dialog of a binding that went away", async () => {
