@@ -343,4 +343,16 @@ class CustomBindingSchedulerTest {
 
         verify(customBindingService, times(1)).activateScheduled(any(), any(), any(), any());
     }
+
+    @Test
+    void aRejectedHandOffIsLoggedNotThrown() {
+        var rejecting = new CustomBindingScheduler(schedules, refusals, activationRepository, activations,
+                customBindingService, streamStateService, premiumService, users, siteRole,
+                r -> { throw new java.util.concurrent.RejectedExecutionException("full"); },
+                Clock.fixed(at(21, 30), ZoneOffset.UTC));
+
+        rejecting.onSchedulesChanged(new CustomBindingSchedulesChangedEvent(user.getId()));
+
+        verifyNoInteractions(customBindingService);
+    }
 }

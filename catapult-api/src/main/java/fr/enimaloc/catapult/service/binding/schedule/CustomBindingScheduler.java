@@ -18,7 +18,6 @@ import fr.enimaloc.catapult.service.premium.PremiumService;
 import fr.enimaloc.catapult.site.SiteRole;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -26,6 +25,9 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
+
+import jakarta.annotation.PreDestroy;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -37,6 +39,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
@@ -67,10 +70,9 @@ public class CustomBindingScheduler {
                                   CustomBindingActivationRepository activationRepository,
                                   CustomBindingActivations activations, CustomBindingService customBindingService,
                                   StreamStateService streamStateService, PremiumService premiumService,
-                                  UserAccountRepository users, SiteRole siteRole,
-                                  @Qualifier("customBindingScheduleExecutor") Executor executor) {
+                                  UserAccountRepository users, SiteRole siteRole) {
         this(schedules, refusals, activationRepository, activations, customBindingService, streamStateService,
-                premiumService, users, siteRole, executor, Clock.systemUTC());
+                premiumService, users, siteRole, newExecutor(), Clock.systemUTC());
     }
 
     CustomBindingScheduler(CustomBindingScheduleRepository schedules,
@@ -91,6 +93,25 @@ public class CustomBindingScheduler {
         this.siteRole = siteRole;
         this.executor = executor;
         this.clock = clock;
+    }
+
+    /** Private on purpose: a second TaskExecutor bean would make the unqualified {@code @Async} lookups ambiguous. */
+    private static ThreadPoolTaskExecutor newExecutor() {
+        ThreadPoolTaskExecutor exec = new ThreadPoolTaskExecutor();
+        exec.setCorePoolSize(1);
+        exec.setMaxPoolSize(1);
+        exec.setQueueCapacity(1000);
+        exec.setThreadNamePrefix("custom-binding-schedule-");
+        exec.setTaskDecorator(DebugContext::wrap);
+        exec.initialize();
+        return exec;
+    }
+
+    @PreDestroy
+    void shutdown() {
+        if (executor instanceof ThreadPoolTaskExecutor pool) {
+            pool.shutdown();
+        }
     }
 
     private record Due(CustomBindingSchedule schedule, ScheduleOccurrences.Occurrence occurrence) {}
@@ -136,8 +157,13 @@ public class CustomBindingScheduler {
      */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void onSchedulesChanged(CustomBindingSchedulesChangedEvent event) {
-        executor.execute(() -> users.findById(event.userId())
-                .ifPresent(user -> DebugContext.runAs(user.getId(), () -> evaluate(user, clock.instant()))));
+        try {
+            executor.execute(() -> users.findById(event.userId())
+                    .ifPresent(user -> DebugContext.runAs(user.getId(), () -> evaluate(user, clock.instant()))));
+        } catch (RejectedExecutionException e) {
+            // The next tick catches up
+            log.warn("Custom binding schedule evaluation for user {} rejected", event.userId(), e);
+        }
     }
 
     void evaluate(UserAccount user, Instant now) {

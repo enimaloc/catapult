@@ -21,17 +21,4 @@ public class AsyncConfig {
         exec.initialize();
         return exec;
     }
-
-    /** Runs the custom binding schedule evaluations triggered by events, one at a time, outside any transaction. */
-    @Bean(name = "customBindingScheduleExecutor")
-    public Executor customBindingScheduleExecutor() {
-        ThreadPoolTaskExecutor exec = new ThreadPoolTaskExecutor();
-        exec.setCorePoolSize(1);
-        exec.setMaxPoolSize(1);
-        exec.setQueueCapacity(1000);
-        exec.setThreadNamePrefix("custom-binding-schedule-");
-        exec.setTaskDecorator(DebugContext::wrap);
-        exec.initialize();
-        return exec;
-    }
 }
