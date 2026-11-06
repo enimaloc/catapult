@@ -1001,6 +1001,33 @@ class MockApiServiceTest {
                 .isEqualTo(fr.enimaloc.catapult.common.error.ErrorCode.INVALID);
     }
 
+    /** As catapult-api: a slot kept as saved stays (paused or not) once no longer allowed, suspended. */
+    @Test
+    void mockKeepsAnUnchangedSlotOnceNoLongerAllowed() {
+        var start = java.time.LocalDateTime.now().plusDays(1).withNano(0);
+        var special = service.createCustomBinding(username, new fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest(
+                "Special", "509663", "Special Events", Set.of(), Set.of(), false)).body();
+        var once = new fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleRequest(null, start,
+                start.plusHours(2), "NONE", null, null, false);
+        var saved = service.saveCustomBindingSchedules(username, special.id(), List.of(once)).body().get(0);
+        assertThat(service.updateCustomBinding(username, special.id(), new fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest(
+                "Special", "509660", "Art", Set.of(), Set.of(), false)).status()).isEqualTo(200);
+
+        var paused = new fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleRequest(saved.id(), start,
+                start.plusHours(2), "NONE", null, null, true);
+        var kept = service.saveCustomBindingSchedules(username, special.id(), List.of(paused));
+        assertThat(kept.status()).isEqualTo(200);
+        assertThat(kept.body().get(0).paused()).isTrue();
+        assertThat(kept.body().get(0).suspended()).isTrue();
+        assertThat(kept.body().get(0).nextStart()).isNull();
+
+        var moved = new fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleRequest(saved.id(), start,
+                start.plusHours(3), "NONE", null, null, true);
+        assertThat(service.saveCustomBindingSchedules(username, special.id(), List.of(moved)).code())
+                .isEqualTo(fr.enimaloc.catapult.common.error.ErrorCode.PREMIUM_REQUIRED);
+        assertThat(service.customBindings(username).premiumUi()).isTrue();
+    }
+
     @Test
     void customBindings_createValidatesLikeCatapultApi_andTellsThePage() {
         events.clear();

@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -60,8 +61,9 @@ class MockCustomBindings {
     }
 
     /**
-     * The free account's rules: only a one-off slot on Twitch's "Special Events" category, else PREMIUM_REQUIRED;
-     * an end not after its start is INVALID. It is a demo, so a slot's next start is its start while that is
+     * The free account's rules: only a one-off slot on Twitch's "Special Events" category, else PREMIUM_REQUIRED,
+     * but for a slot kept as it was saved (paused or not), as catapult-api does: it stays, suspended when no longer
+     * allowed. An end not after its start is INVALID. It is a demo, so a slot's next start is its start while that is
      * still ahead (null otherwise): the mock does not expand repeats.
      */
     synchronized CustomBindingSave<List<CustomBindingScheduleDto>> saveSchedules(UUID id, List<CustomBindingScheduleRequest> requests) {
@@ -74,9 +76,15 @@ class MockCustomBindings {
             }
         }
         boolean freeCategory = CustomBindingScheduleDto.FREE_TWITCH_GAME_ID.equals(bindings.get(index).twitchGameId());
-        boolean repeats = slots.stream().anyMatch(slot -> slot.repeat() != null && !"NONE".equals(slot.repeat()));
-        if (!slots.isEmpty() && (repeats || !freeCategory)) return new CustomBindingSave<>(403, null, ErrorCode.PREMIUM_REQUIRED);
-        List<CustomBindingScheduleDto> kept = slots.stream().map(MockCustomBindings::scheduleDto).toList();
+        Map<UUID, CustomBindingScheduleDto> saved = new HashMap<>();
+        schedules.getOrDefault(id, List.of()).forEach(slot -> saved.put(slot.id(), slot));
+        List<CustomBindingScheduleDto> kept = new ArrayList<>();
+        for (CustomBindingScheduleRequest slot : slots) {
+            boolean allowed = freeCategory && (slot.repeat() == null || "NONE".equals(slot.repeat()));
+            boolean unchanged = slot.id() != null && sameSlot(saved.get(slot.id()), slot);
+            if (!allowed && !unchanged) return new CustomBindingSave<>(403, null, ErrorCode.PREMIUM_REQUIRED);
+            kept.add(scheduleDto(slot, !allowed));
+        }
         if (kept.isEmpty()) schedules.remove(id);
         else schedules.put(id, kept);
         return new CustomBindingSave<>(200, kept, null);
@@ -181,12 +189,20 @@ class MockCustomBindings {
         return taken ? new CustomBindingSave<>(409, null, ErrorCode.NAME_TAKEN) : null;
     }
 
-    private static CustomBindingScheduleDto scheduleDto(CustomBindingScheduleRequest slot) {
+    /** Whether {@code slot} is {@code saved} as it was, but for its pause. */
+    private static boolean sameSlot(CustomBindingScheduleDto saved, CustomBindingScheduleRequest slot) {
+        return saved != null && saved.startsAt().equals(slot.startsAt()) && saved.endsAt().equals(slot.endsAt())
+                && saved.repeat().equals(slot.repeat() == null ? "NONE" : slot.repeat())
+                && saved.days().equals(sorted(slot.days()))
+                && Objects.equals(saved.repeatUntil(), slot.repeatUntil());
+    }
+
+    private static CustomBindingScheduleDto scheduleDto(CustomBindingScheduleRequest slot, boolean suspended) {
         LocalDateTime start = slot.startsAt();
         Instant next = start.atZone(ZONE).toInstant();
         return new CustomBindingScheduleDto(slot.id() == null ? UUID.randomUUID() : slot.id(), start, slot.endsAt(),
                 slot.repeat() == null ? "NONE" : slot.repeat(), sorted(slot.days()), slot.repeatUntil(), slot.paused(),
-                false, next.isAfter(Instant.now()) ? next : null);
+                suspended, !suspended && next.isAfter(Instant.now()) ? next : null);
     }
 
     private static boolean blank(String value) {
