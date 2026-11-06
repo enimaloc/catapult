@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.service.binding;
 import fr.enimaloc.catapult.chat.command.registry.catapult.CatapultSetGameFunction;
 import fr.enimaloc.catapult.event.listener.GameEventListener;
 import fr.enimaloc.catapult.service.account.BotToggleService;
+import fr.enimaloc.catapult.service.binding.schedule.CustomBindingScheduler;
 import fr.enimaloc.catapult.service.category.CategoryApplier;
 import fr.enimaloc.catapult.service.category.ExtensionLayoutApplier;
 import fr.enimaloc.catapult.service.category.CategoryChain;
@@ -14,6 +15,8 @@ import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
 import fr.enimaloc.catapult.repository.binding.CustomBindingActivationRepository;
 import fr.enimaloc.catapult.repository.binding.CustomBindingRepository;
 import fr.enimaloc.catapult.repository.binding.CustomBindingScheduleRefusalRepository;
+import fr.enimaloc.catapult.repository.binding.CustomBindingScheduleRepository;
+import fr.enimaloc.catapult.site.SiteRole;
 import org.springframework.context.ApplicationEventPublisher;
 import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
 import fr.enimaloc.catapult.repository.binding.GameMappingRepository;
@@ -44,6 +47,9 @@ class CustomBindingWiringTest {
             .withBean("flyway", Object.class, Object::new)
             .withBean(CustomBindingActivations.class)
             .withBean(CustomBindingService.class)
+            .withBean(CustomBindingScheduler.class)
+            .withBean(CustomBindingScheduleRepository.class, () -> mock(CustomBindingScheduleRepository.class))
+            .withBean(SiteRole.class, () -> mock(SiteRole.class))
             .withBean(GameEventListener.class)
             .withBean(BindingService.class)
             .withBean(GameBindingLookup.class)
@@ -86,6 +92,7 @@ class CustomBindingWiringTest {
             assertThat(context).hasSingleBean(CustomBindingService.class);
             assertThat(context).hasSingleBean(CustomBindingActivations.class);
             assertThat(context).hasSingleBean(GameEventListener.class);
+            assertThat(context).hasSingleBean(CustomBindingScheduler.class);
             assertThat(context).hasSingleBean(CatapultSetGameFunction.class);
             assertThat(context).hasSingleBean(TwitchatActionExecutor.class);
         });

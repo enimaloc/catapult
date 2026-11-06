@@ -24,6 +24,8 @@ import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 @Slf4j
@@ -86,7 +88,9 @@ public class GameEventListener {
         categoryChain.apply(user, new GameClosed()).orThrow();
     }
 
+    // Just before the custom binding scheduler, which must see the channel as this leaves it
     @EventListener
+    @Order(Ordered.LOWEST_PRECEDENCE - 1)
     public void onStreamOnline(StreamOnlineEvent event) {
         UserAccount user = event.getUser();
         log.debug("StreamOnlineEvent for user {}", user.getId());
