@@ -28,10 +28,10 @@ import java.util.UUID;
 /**
  * One mock member's custom bindings and personal API tokens (full and read-only), answering like catapult-api: a name is trimmed, 1-40
  * characters and unique whatever its case (400 invalid, 409 taken), a Twitch category is required (400), the free
- * limit at most (409; the mock account is a free one), a single binding active at a time. Starts with two bindings, the first one active.
+ * limit at most on a free account (409), a single binding active at a time. Starts with two bindings, the first one active.
  */
 class MockCustomBindings {
-    /** The free tier's cap, which the mock account is held to. */
+    /** The free tier's cap, which the mock account is held to unless premium. */
     static final int FREE_LIMIT = 5;
     private static final ZoneId ZONE = ZoneId.of(CustomBindingScheduleDto.ZONE);
     private static final int NAME_MAX = 40;
@@ -44,6 +44,8 @@ class MockCustomBindings {
     private Instant activatedAt;
     private Instant tokenCreatedAt;
     private Instant readTokenCreatedAt;
+    /** Set from the mock admin page; free by default, like most accounts. */
+    private boolean premium;
 
     MockCustomBindings() {
         CustomBindingDto art = new CustomBindingDto(UUID.randomUUID(), "Art", "509660", "Art",
@@ -56,15 +58,26 @@ class MockCustomBindings {
     }
 
     synchronized CustomBindingsStateDto state() {
-        return new CustomBindingsStateDto(true, List.copyOf(bindings), activeId, activatedAt, FREE_LIMIT,
-                Map.copyOf(extensions), Map.copyOf(schedules), false, true);
+        Map<UUID, List<CustomBindingScheduleDto>> current = new HashMap<>();
+        schedules.forEach((id, slots) -> current.put(id, refreshed(id, slots)));
+        return new CustomBindingsStateDto(true, List.copyOf(bindings), activeId, activatedAt,
+                premium ? null : FREE_LIMIT, Map.copyOf(extensions), Map.copyOf(current), premium, true);
+    }
+
+    synchronized boolean isPremium() {
+        return premium;
+    }
+
+    /** Losing premium suspends the slots a free account may not have; getting it back resumes them. */
+    synchronized void setPremium(boolean premium) {
+        this.premium = premium;
     }
 
     /**
-     * The free account's rules: only a one-off slot on Twitch's "Special Events" category, else PREMIUM_REQUIRED,
-     * but for a slot kept as it was saved (paused or not), as catapult-api does: it stays, suspended when no longer
-     * allowed. An end not after its start is INVALID. It is a demo, so a slot's next start is its start while that is
-     * still ahead (null otherwise): the mock does not expand repeats.
+     * The account's rules: anything when premium; when free, only a one-off slot on Twitch's "Special Events"
+     * category, else PREMIUM_REQUIRED, but for a slot kept as it was saved (paused or not), as catapult-api does: it
+     * stays, suspended while no longer allowed. An end not after its start is INVALID. It is a demo, so a slot's next
+     * start is its start while that is still ahead (null otherwise): the mock does not expand repeats.
      */
     synchronized CustomBindingSave<List<CustomBindingScheduleDto>> saveSchedules(UUID id, List<CustomBindingScheduleRequest> requests) {
         int index = indexOf(id);
@@ -75,12 +88,11 @@ class MockCustomBindings {
                 return new CustomBindingSave<>(400, null, ErrorCode.INVALID);
             }
         }
-        boolean freeCategory = CustomBindingScheduleDto.FREE_TWITCH_GAME_ID.equals(bindings.get(index).twitchGameId());
         Map<UUID, CustomBindingScheduleDto> saved = new HashMap<>();
         schedules.getOrDefault(id, List.of()).forEach(slot -> saved.put(slot.id(), slot));
         List<CustomBindingScheduleDto> kept = new ArrayList<>();
         for (CustomBindingScheduleRequest slot : slots) {
-            boolean allowed = freeCategory && (slot.repeat() == null || "NONE".equals(slot.repeat()));
+            boolean allowed = allowed(bindings.get(index), slot.repeat());
             boolean unchanged = slot.id() != null && sameSlot(saved.get(slot.id()), slot);
             if (!allowed && !unchanged) return new CustomBindingSave<>(403, null, ErrorCode.PREMIUM_REQUIRED);
             kept.add(scheduleDto(slot, !allowed));
@@ -93,7 +105,7 @@ class MockCustomBindings {
     synchronized CustomBindingSave<CustomBindingDto> create(CustomBindingRequest request) {
         CustomBindingSave<CustomBindingDto> refused = refusal(request, null);
         if (refused != null) return refused;
-        if (bindings.size() >= FREE_LIMIT) return new CustomBindingSave<>(409, null, ErrorCode.LIMIT_REACHED);
+        if (!premium && bindings.size() >= FREE_LIMIT) return new CustomBindingSave<>(409, null, ErrorCode.LIMIT_REACHED);
         CustomBindingDto created = dto(UUID.randomUUID(), request);
         bindings.add(created);
         return new CustomBindingSave<>(201, created, null);
@@ -187,6 +199,25 @@ class MockCustomBindings {
         }
         boolean taken = bindings.stream().anyMatch(b -> !b.id().equals(self) && b.name().toLowerCase(Locale.ROOT).equals(name.toLowerCase(Locale.ROOT)));
         return taken ? new CustomBindingSave<>(409, null, ErrorCode.NAME_TAKEN) : null;
+    }
+
+    /** Whether the account may have a slot repeating so on {@code binding}, as catapult-api's PremiumService decides. */
+    private boolean allowed(CustomBindingDto binding, String repeat) {
+        return premium || CustomBindingScheduleDto.FREE_TWITCH_GAME_ID.equals(binding.twitchGameId())
+                && (repeat == null || "NONE".equals(repeat));
+    }
+
+    /** {@code slots} as the account's current rights make them: a slot is suspended while no longer allowed. */
+    private List<CustomBindingScheduleDto> refreshed(UUID id, List<CustomBindingScheduleDto> slots) {
+        int index = indexOf(id);
+        if (index < 0) return slots;
+        return slots.stream().map(slot -> {
+            boolean suspended = !allowed(bindings.get(index), slot.repeat());
+            Instant next = slot.startsAt().atZone(ZONE).toInstant();
+            return new CustomBindingScheduleDto(slot.id(), slot.startsAt(), slot.endsAt(), slot.repeat(), slot.days(),
+                    slot.repeatUntil(), slot.paused(), suspended,
+                    !suspended && next.isAfter(Instant.now()) ? next : null);
+        }).toList();
     }
 
     /** Whether {@code slot} is {@code saved} as it was, but for its pause. */

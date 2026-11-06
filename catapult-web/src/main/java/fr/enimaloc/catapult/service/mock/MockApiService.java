@@ -1288,14 +1288,15 @@ public class MockApiService implements ApiService {
         return account == null ? null : notifications().snapshot(account);
     }
 
-    /** The mock account is a free one: its custom bindings count against the free limit. */
+    /** Free by default (its custom bindings count against the free limit); the mock admin page makes it premium. */
     @Override
     public PremiumStatusDto premiumStatus() {
         log.trace("premiumStatus()");
         MockData current = currentData();
         if (current == null) return null;
         int count = current.customBindings().state().bindings().size();
-        return new PremiumStatusDto(false, null, count, MOCK_FREE_BINDING_LIMIT,
+        boolean premium = current.isPremium();
+        return new PremiumStatusDto(premium, null, count, premium ? null : MOCK_FREE_BINDING_LIMIT,
                 new PremiumOfferDto(60, 30, 90, 60, MOCK_FREE_BINDING_LIMIT));
     }
 

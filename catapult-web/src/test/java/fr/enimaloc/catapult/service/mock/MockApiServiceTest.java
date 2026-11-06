@@ -1009,6 +1009,32 @@ class MockApiServiceTest {
                 .isEqualTo(fr.enimaloc.catapult.common.error.ErrorCode.INVALID);
     }
 
+    /** Made premium from the mock admin page: no limit, any slot; back to free, its repeating slots are suspended. */
+    @Test
+    void mockPremiumAccountRepeatsAndLosingItSuspends() {
+        var art = service.customBindings(username).bindings().get(0);
+        var start = java.time.LocalDateTime.now().plusDays(1);
+        var weekly = new fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleRequest(null, start,
+                start.plusHours(2), "WEEKLY", Set.of("MONDAY"), null, false);
+
+        service.getData().setPremium(true);
+        var saved = service.saveCustomBindingSchedules(username, art.id(), List.of(weekly));
+        assertThat(saved.status()).isEqualTo(200);
+        var premium = service.customBindings(username);
+        assertThat(premium.canRepeat()).isTrue();
+        assertThat(premium.limit()).isNull();
+        assertThat(premium.schedules().get(art.id()).get(0).suspended()).isFalse();
+        assertThat(service.premiumStatus().premium()).isTrue();
+        assertThat(service.premiumStatus().customBindingLimit()).isNull();
+
+        service.getData().setPremium(false);
+        var free = service.customBindings(username);
+        assertThat(free.canRepeat()).isFalse();
+        assertThat(free.limit()).isEqualTo(5);
+        assertThat(free.schedules().get(art.id()).get(0).suspended()).isTrue();
+        assertThat(free.schedules().get(art.id()).get(0).nextStart()).isNull();
+    }
+
     /** As catapult-api: a slot kept as saved stays (paused or not) once no longer allowed, suspended. */
     @Test
     void mockKeepsAnUnchangedSlotOnceNoLongerAllowed() {
