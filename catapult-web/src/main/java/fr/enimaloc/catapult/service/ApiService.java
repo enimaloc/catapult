@@ -505,6 +505,10 @@ public interface ApiService {
     CustomBindingSave<fr.enimaloc.catapult.common.dto.binding.CustomBindingSaveResult> updateCustomBinding(
             String username, UUID id, fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest request);
     /** catapult-api's status (204), 502 when unreachable. */
+    /** Replaces the binding's schedule slots; the saved slots, or the refusal code (premium required, invalid). */
+    CustomBindingSave<java.util.List<fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleDto>> saveCustomBindingSchedules(
+            String username, UUID id, java.util.List<fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleRequest> schedules);
+
     int deleteCustomBinding(String username, UUID id);
     /** Makes the binding the active one, applying its category on Twitch. */
     ActivationOutcome activateCustomBinding(String username, UUID id);

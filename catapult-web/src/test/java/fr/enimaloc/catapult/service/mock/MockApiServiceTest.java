@@ -969,6 +969,39 @@ class MockApiServiceTest {
     }
 
     @Test
+    void mockFreeAccountCannotRepeat() {
+        var art = service.customBindings(username).bindings().get(0);
+        var start = java.time.LocalDateTime.now().plusDays(1);
+        var once = new fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleRequest(null, start,
+                start.plusHours(2), "NONE", null, null, false);
+        var weekly = new fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleRequest(null, start,
+                start.plusHours(2), "WEEKLY", Set.of("MON"), null, false);
+
+        assertThat(service.saveCustomBindingSchedules(username, art.id(), List.of(weekly)).code())
+                .isEqualTo(fr.enimaloc.catapult.common.error.ErrorCode.PREMIUM_REQUIRED);
+        assertThat(service.saveCustomBindingSchedules(username, art.id(), List.of(once)).code())
+                .isEqualTo(fr.enimaloc.catapult.common.error.ErrorCode.PREMIUM_REQUIRED);
+        assertThat(service.saveCustomBindingSchedules(username, UUID.randomUUID(), List.of()).status()).isEqualTo(404);
+
+        var special = service.createCustomBinding(username, new fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest(
+                "Special", "509663", "Special Events", Set.of(), Set.of(), false)).body();
+        events.clear();
+        var kept = service.saveCustomBindingSchedules(username, special.id(), List.of(once));
+        assertThat(kept.status()).isEqualTo(200);
+        assertThat(kept.body()).hasSize(1);
+        assertThat(kept.body().get(0).id()).isNotNull();
+        assertThat(events).contains(new fr.enimaloc.catapult.event.binding.CustomBindingsUpdatedEvent(username));
+        var state = service.customBindings(username);
+        assertThat(state.schedules().get(special.id())).hasSize(1);
+        assertThat(state.canRepeat()).isFalse();
+
+        var backwards = new fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleRequest(null, start,
+                start.minusHours(1), "NONE", null, null, false);
+        assertThat(service.saveCustomBindingSchedules(username, special.id(), List.of(backwards)).code())
+                .isEqualTo(fr.enimaloc.catapult.common.error.ErrorCode.INVALID);
+    }
+
+    @Test
     void customBindings_createValidatesLikeCatapultApi_andTellsThePage() {
         events.clear();
         var created = service.createCustomBinding(username, customBinding("  Musique "));

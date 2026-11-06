@@ -168,6 +168,9 @@ public class RealApiService implements ApiService {
 
     private static final tools.jackson.databind.json.JsonMapper SAVE_JSON = tools.jackson.databind.json.JsonMapper.builder().build();
 
+    private static final tools.jackson.core.type.TypeReference<List<fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleDto>> SCHEDULES =
+            new tools.jackson.core.type.TypeReference<>() {};
+
     private final ApiClient client;
     private final ApiErrorText errorText;
     private final ChannelIds channelIds;
@@ -1391,6 +1394,16 @@ public class RealApiService implements ApiService {
         return save(onChannel(username, userId -> client.call(HttpMethod.PUT,
                 "/api/internal/users/{userId}/custom-bindings/{customBindingId}", request, JsonNode.class, userId, id),
                 status -> new ApiClient.Result<>(status, null)), CustomBindingSaveResult.class);
+    }
+
+    @Override
+    public CustomBindingSave<List<fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleDto>> saveCustomBindingSchedules(
+            String username, UUID id, List<fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleRequest> schedules) {
+        CustomBindingSave<JsonNode> saved = save(onChannel(username, userId -> client.call(HttpMethod.PUT,
+                "/api/internal/users/{userId}/custom-bindings/{customBindingId}/schedules", schedules, JsonNode.class, userId, id),
+                status -> new ApiClient.Result<>(status, null)), JsonNode.class);
+        return new CustomBindingSave<>(saved.status(), saved.body() == null ? null
+                : SAVE_JSON.treeToValue(saved.body(), SCHEDULES), saved.code());
     }
 
     /** The saved binding when catapult-api took it; else the code of its problem. */

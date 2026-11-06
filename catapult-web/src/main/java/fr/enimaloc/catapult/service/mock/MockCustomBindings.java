@@ -5,6 +5,8 @@ import fr.enimaloc.catapult.common.dto.account.ApiTokenStatusDto;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingDto;
 import fr.enimaloc.catapult.common.dto.channel.ExtensionSlotDto;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest;
+import fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleDto;
+import fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleRequest;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingSaveResult;
 import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto;
@@ -12,6 +14,8 @@ import fr.enimaloc.catapult.service.CustomBindingSave;
 
 import java.security.SecureRandom;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
@@ -28,11 +32,15 @@ import java.util.UUID;
 class MockCustomBindings {
     /** The free tier's cap, which the mock account is held to. */
     static final int FREE_LIMIT = 5;
+    /** Twitch's "Special Events" category, the only one a free account may schedule. */
+    private static final String FREE_CATEGORY = "509663";
+    private static final ZoneId ZONE = ZoneId.of("Europe/Paris");
     private static final int NAME_MAX = 40;
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private final List<CustomBindingDto> bindings = new ArrayList<>();
     private final Map<UUID, List<ExtensionSlotDto>> extensions = new HashMap<>();
+    private final Map<UUID, List<CustomBindingScheduleDto>> schedules = new HashMap<>();
     private UUID activeId;
     private Instant activatedAt;
     private Instant tokenCreatedAt;
@@ -50,7 +58,30 @@ class MockCustomBindings {
 
     synchronized CustomBindingsStateDto state() {
         return new CustomBindingsStateDto(true, List.copyOf(bindings), activeId, activatedAt, FREE_LIMIT,
-                Map.copyOf(extensions));
+                Map.copyOf(extensions), Map.copyOf(schedules), false);
+    }
+
+    /**
+     * The free account's rules: only a one-off slot on Twitch's "Special Events" category, else PREMIUM_REQUIRED;
+     * an end not after its start is INVALID. It is a demo, so a slot's next start is its start while that is
+     * still ahead (null otherwise): the mock does not expand repeats.
+     */
+    synchronized CustomBindingSave<List<CustomBindingScheduleDto>> saveSchedules(UUID id, List<CustomBindingScheduleRequest> requests) {
+        int index = indexOf(id);
+        if (index < 0) return new CustomBindingSave<>(404, null, null);
+        List<CustomBindingScheduleRequest> slots = requests == null ? List.of() : requests;
+        for (CustomBindingScheduleRequest slot : slots) {
+            if (slot.startsAt() == null || slot.endsAt() == null || !slot.endsAt().isAfter(slot.startsAt())) {
+                return new CustomBindingSave<>(400, null, ErrorCode.INVALID);
+            }
+        }
+        boolean freeCategory = FREE_CATEGORY.equals(bindings.get(index).twitchGameId());
+        boolean repeats = slots.stream().anyMatch(slot -> slot.repeat() != null && !"NONE".equals(slot.repeat()));
+        if (!slots.isEmpty() && (repeats || !freeCategory)) return new CustomBindingSave<>(403, null, ErrorCode.PREMIUM_REQUIRED);
+        List<CustomBindingScheduleDto> kept = slots.stream().map(MockCustomBindings::scheduleDto).toList();
+        if (kept.isEmpty()) schedules.remove(id);
+        else schedules.put(id, kept);
+        return new CustomBindingSave<>(200, kept, null);
     }
 
     synchronized CustomBindingSave<CustomBindingDto> create(CustomBindingRequest request) {
@@ -80,6 +111,7 @@ class MockCustomBindings {
         if (id.equals(activeId)) deactivate();
         bindings.remove(index);
         extensions.remove(id);
+        schedules.remove(id);
         return 204;
     }
 
@@ -149,6 +181,14 @@ class MockCustomBindings {
         }
         boolean taken = bindings.stream().anyMatch(b -> !b.id().equals(self) && b.name().toLowerCase(Locale.ROOT).equals(name.toLowerCase(Locale.ROOT)));
         return taken ? new CustomBindingSave<>(409, null, ErrorCode.NAME_TAKEN) : null;
+    }
+
+    private static CustomBindingScheduleDto scheduleDto(CustomBindingScheduleRequest slot) {
+        LocalDateTime start = slot.startsAt();
+        Instant next = start.atZone(ZONE).toInstant();
+        return new CustomBindingScheduleDto(slot.id() == null ? UUID.randomUUID() : slot.id(), start, slot.endsAt(),
+                slot.repeat() == null ? "NONE" : slot.repeat(), sorted(slot.days()), slot.repeatUntil(), slot.paused(),
+                false, next.isAfter(Instant.now()) ? next : null);
     }
 
     private static boolean blank(String value) {

@@ -1978,6 +1978,35 @@ class RealApiServiceTest {
     }
 
     @Test
+    void savesSchedulesThroughTheInternalRoute() {
+        var slot = new fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleRequest(null,
+                java.time.LocalDateTime.of(2026, 11, 7, 20, 0), java.time.LocalDateTime.of(2026, 11, 7, 22, 0),
+                "NONE", null, null, false);
+        expect(HttpMethod.PUT, channel("streamer") + "/custom-bindings/" + CB_ID + "/schedules")
+                .andExpect(content().json("[{\"startsAt\":\"2026-11-07T20:00:00\",\"endsAt\":\"2026-11-07T22:00:00\","
+                        + "\"repeat\":\"NONE\",\"paused\":false}]"))
+                .andRespond(withSuccess("[{\"startsAt\":\"2026-11-07T20:00:00\",\"endsAt\":\"2026-11-07T22:00:00\","
+                        + "\"repeat\":\"NONE\",\"days\":[],\"paused\":false,\"suspended\":false}]", MediaType.APPLICATION_JSON));
+
+        var saved = service.saveCustomBindingSchedules("streamer", CB_ID, List.of(slot));
+
+        assertThat(saved.status()).isEqualTo(200);
+        assertThat(saved.body()).hasSize(1);
+    }
+
+    @Test
+    void savingSchedules_relaysTheRefusalCode() {
+        expect(HttpMethod.PUT, channel("streamer") + "/custom-bindings/" + CB_ID + "/schedules")
+                .andRespond(withStatus(HttpStatus.FORBIDDEN).contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                        .body("{\"status\":403,\"code\":\"premium_required\"}"));
+
+        var refused = service.saveCustomBindingSchedules("streamer", CB_ID, List.of());
+
+        assertThat(refused.status()).isEqualTo(403);
+        assertThat(refused.code()).isEqualTo(fr.enimaloc.catapult.common.error.ErrorCode.PREMIUM_REQUIRED);
+    }
+
+    @Test
     void deleteCustomBinding_deletesIt() {
         expectDelete(channel("streamer") + "/custom-bindings/" + CB_ID);
         assertThat(service.deleteCustomBinding("streamer", CB_ID)).isEqualTo(204);
