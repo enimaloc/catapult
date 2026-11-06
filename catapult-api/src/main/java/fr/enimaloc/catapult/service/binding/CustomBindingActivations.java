@@ -54,7 +54,6 @@ public class CustomBindingActivations {
         Optional<CustomBindingActivation> previous = repository.findById(user.getId());
         if (previous.filter(activation -> activation.getOrigin() == CustomBindingActivation.Origin.SCHEDULED
                 && activation.getCustomBinding().getId().equals(binding.getId())).isPresent()) {
-            repository.save(previous.get());
             channelEventPublisher.customBindingChanged(user.getId(), binding.getId());
             return;
         }
@@ -65,7 +64,7 @@ public class CustomBindingActivations {
 
     /** {@code binding} is now the active one, set by the schedule's {@code occurrence}. */
     public void recordScheduled(UserAccount user, CustomBinding binding, UUID scheduleId, Occurrence occurrence) {
-        repository.findById(user.getId()).ifPresent(this::refuse);
+        // Replacing a scheduled activation is the schedule's own doing, never a refusal
         CustomBindingActivation activation = new CustomBindingActivation(user.getId(), binding, Instant.now());
         activation.setOrigin(CustomBindingActivation.Origin.SCHEDULED);
         activation.setScheduleId(scheduleId);
@@ -82,6 +81,14 @@ public class CustomBindingActivations {
      */
     public boolean clear(UserAccount user) {
         return clear(user, true);
+    }
+
+    /** {@link #clear(UserAccount)} on an activation the caller already loaded, to spare a read. */
+    public boolean clear(UserAccount user, CustomBindingActivation loaded) {
+        refuse(loaded);
+        repository.deleteById(user.getId());
+        channelEventPublisher.customBindingChanged(user.getId(), null);
+        return true;
     }
 
     /** {@link #clear} without refusing the occurrence: the end of a stream, or of an occurrence, is not a refusal. */

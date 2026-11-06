@@ -24,6 +24,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -144,16 +145,14 @@ class CustomBindingActivationsTest {
 
     @Test
     void reTriggeringTheScheduledBindingKeepsItScheduled() {
-        CustomBindingActivation current = scheduled(art, UUID.randomUUID());
-        when(repository.findById(user.getId())).thenReturn(Optional.of(current));
+        when(repository.findById(user.getId())).thenReturn(Optional.of(scheduled(art, UUID.randomUUID())));
 
         activations.record(user, art);
 
-        ArgumentCaptor<CustomBindingActivation> saved = ArgumentCaptor.forClass(CustomBindingActivation.class);
-        verify(repository).save(saved.capture());
-        assertThat(saved.getValue().getOrigin()).isEqualTo(CustomBindingActivation.Origin.SCHEDULED);
-        assertThat(saved.getValue().getOccurrenceStart()).isEqualTo(START);
+        // Left as it is: still scheduled, same occurrence, nothing refused
+        verify(repository, never()).save(any());
         verifyNoInteractions(refusals);
+        verify(channelEventPublisher).customBindingChanged(user.getId(), art.getId());
     }
 
     @Test
@@ -208,5 +207,27 @@ class CustomBindingActivationsTest {
 
         assertThat(activations.current(user)).contains(activation);
         verifyNoInteractions(experimentService);
+    }
+
+    @Test
+    void recordScheduledOverAScheduledActivation_refusesNothing() {
+        CustomBindingActivation current = scheduled(art, UUID.randomUUID());
+        lenient().when(repository.findById(user.getId())).thenReturn(Optional.of(current));
+
+        activations.recordScheduled(user, art, current.getScheduleId(), new Occurrence(START, END));
+        activations.recordScheduled(user, art, UUID.randomUUID(), new Occurrence(START, END));
+
+        verifyNoInteractions(refusals);
+    }
+
+    @Test
+    void clearWithTheLoadedActivation_refusesItWithoutReadingAgain() {
+        UUID schedule = UUID.randomUUID();
+
+        activations.clear(user, scheduled(art, schedule));
+
+        verify(refusals).save(argThat((CustomBindingScheduleRefusal r) -> r.getScheduleId().equals(schedule)));
+        verify(repository, never()).findById(any());
+        verify(repository).deleteById(user.getId());
     }
 }

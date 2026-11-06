@@ -150,7 +150,11 @@ public class CategoryChain {
      * relaunched too.
      */
     public DetectionGuard detectionGuard(UserAccount user, boolean firstSinceStart) {
-        Optional<CustomBindingActivation> active = customBindingActivations.active(user);
+        return detectionGuard(customBindingActivations.active(user), firstSinceStart);
+    }
+
+    /** {@link #detectionGuard(UserAccount, boolean)} on an activation the caller already loaded. */
+    public DetectionGuard detectionGuard(Optional<CustomBindingActivation> active, boolean firstSinceStart) {
         if (active.isEmpty()) return DetectionGuard.NO_CUSTOM_BINDING;
         if (active.get().getCustomBinding().isUninterruptible() || firstSinceStart) {
             return DetectionGuard.KEEPS_CUSTOM_BINDING;

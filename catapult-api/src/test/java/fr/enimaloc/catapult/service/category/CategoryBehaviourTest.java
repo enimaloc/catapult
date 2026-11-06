@@ -1184,12 +1184,12 @@ class CategoryBehaviourTest {
 
     @Test
     void eachTriggerReadsTheCustomBindingAtMostOnce() {
-        // Except the triggers that clear it, which read it to refuse a scheduled occurrence to refuse a scheduled occurrence
+        // Except the triggers that clear it, which read it to refuse a scheduled occurrence
         f.settings.setApplyDefaultOnStreamStart(false);
         GameBinding other = f.binding("g2", GameBinding.Status.AUTO, "32982", "Grand Theft Auto V");
         f.live(true);
 
-        assertThat(readsOf(() -> f.detect(f.gameOf(g1), false))).as("detection").isEqualTo(2);
+        assertThat(readsOf(() -> f.detect(f.gameOf(g1), false))).as("detection").isEqualTo(1);
         assertThat(readsOf(f::closeGame)).as("game closed").isEqualTo(1);
         assertThat(readsOf(f::streamOnline)).as("stream start").isEqualTo(1);
         assertThat(readsOf(f::streamOffline)).as("stream end").isZero();
