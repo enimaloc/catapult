@@ -3,12 +3,15 @@ package fr.enimaloc.catapult.service.binding;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.CustomBinding;
 import fr.enimaloc.catapult.domain.binding.CustomBindingActivation;
+import fr.enimaloc.catapult.domain.binding.CustomBindingSchedule;
 import fr.enimaloc.catapult.domain.binding.CustomBindingScheduleRefusal;
 import fr.enimaloc.catapult.repository.binding.CustomBindingActivationRepository;
 import fr.enimaloc.catapult.repository.binding.CustomBindingScheduleRefusalRepository;
+import fr.enimaloc.catapult.repository.binding.CustomBindingScheduleRepository;
 import fr.enimaloc.catapult.service.binding.schedule.ScheduleOccurrences.Occurrence;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
+import fr.enimaloc.catapult.service.premium.PremiumService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,6 +21,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -26,6 +32,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -35,6 +42,8 @@ class CustomBindingActivationsTest {
 
     @Mock private CustomBindingActivationRepository repository;
     @Mock private CustomBindingScheduleRefusalRepository refusals;
+    @Mock private CustomBindingScheduleRepository schedules;
+    @Mock private StreamStateService streamStateService;
     @Mock private ExperimentService experimentService;
     @Mock private ChannelEventPublisher channelEventPublisher;
 
@@ -145,6 +154,8 @@ class CustomBindingActivationsTest {
 
     @Test
     void reTriggeringTheScheduledBindingKeepsItScheduled() {
+        lenient().when(streamStateService.isLive(user)).thenReturn(true);
+        lenient().when(schedules.findByCustomBindingUserId(user.getId())).thenReturn(List.of(slot(-1, 1, false)));
         when(repository.findById(user.getId())).thenReturn(Optional.of(scheduled(art, UUID.randomUUID())));
 
         activations.record(user, art);
@@ -229,5 +240,113 @@ class CustomBindingActivationsTest {
         verify(refusals).save(argThat((CustomBindingScheduleRefusal r) -> r.getScheduleId().equals(schedule)));
         verify(repository, never()).findById(any());
         verify(repository).deleteById(user.getId());
+    }
+
+    /** A one-off slot of {@code art} from {@code fromHours} to {@code toHours} hours from now. */
+    private CustomBindingSchedule slot(int fromHours, int toHours, boolean paused) {
+        LocalDateTime now = LocalDateTime.now(PremiumService.ZONE).truncatedTo(ChronoUnit.MINUTES);
+        CustomBindingSchedule s = new CustomBindingSchedule();
+        s.setId(UUID.randomUUID());
+        s.setCustomBinding(art);
+        s.setStartsAt(now.plusHours(fromHours));
+        s.setEndsAt(now.plusHours(toHours));
+        s.setPaused(paused);
+        return s;
+    }
+
+    private void refused(CustomBindingSchedule schedule, int times) {
+        verify(refusals, times(times)).save(argThat((CustomBindingScheduleRefusal r) ->
+                r.getScheduleId().equals(schedule.getId())));
+    }
+
+    @Test
+    void manualSwitchWhileLive_refusesEveryRunningOccurrence() {
+        // B (scheduled, active) runs inside A: stopping B must not hand the channel back to A
+        CustomBindingSchedule a = slot(-2, 2, false);
+        CustomBindingSchedule b = slot(-1, 1, false);
+        CustomBindingSchedule paused = slot(-1, 1, true);
+        CustomBindingSchedule later = slot(1, 2, false);
+        CustomBindingActivation active = scheduled(art, b.getId());
+        active.setOccurrenceStart(b.getStartsAt().atZone(PremiumService.ZONE).toInstant());
+        when(repository.findById(user.getId())).thenReturn(Optional.of(active));
+        when(streamStateService.isLive(user)).thenReturn(true);
+        when(schedules.findByCustomBindingUserId(user.getId())).thenReturn(List.of(a, b, paused, later));
+        CustomBinding other = new CustomBinding();
+        other.setId(UUID.randomUUID());
+
+        activations.record(user, other);
+
+        refused(a, 1);
+        refused(b, 1);
+        refused(paused, 0);
+        refused(later, 0);
+        verify(repository, times(1)).findById(user.getId());
+    }
+
+    @Test
+    void manualPickWhileLiveDuringAnOccurrence_refusesIt_evenWithNothingScheduledActive() {
+        // The scheduled activation failed, the streamer picked by hand: a restart must not take it back
+        CustomBindingSchedule a = slot(-1, 1, false);
+        when(repository.findById(user.getId())).thenReturn(Optional.empty());
+        when(streamStateService.isLive(user)).thenReturn(true);
+        when(schedules.findByCustomBindingUserId(user.getId())).thenReturn(List.of(a));
+
+        activations.record(user, art);
+
+        refused(a, 1);
+    }
+
+    @Test
+    void manualPickOffline_refusesNothing() {
+        when(repository.findById(user.getId())).thenReturn(Optional.empty());
+        when(streamStateService.isLive(user)).thenReturn(false);
+
+        activations.record(user, art);
+
+        verifyNoInteractions(refusals, schedules);
+    }
+
+    @Test
+    void clearWhileLive_refusesTheRunningOccurrences_evenWithNothingActive() {
+        CustomBindingSchedule a = slot(-1, 1, false);
+        when(repository.findById(user.getId())).thenReturn(Optional.empty());
+        when(streamStateService.isLive(user)).thenReturn(true);
+        when(schedules.findByCustomBindingUserId(user.getId())).thenReturn(List.of(a));
+
+        assertThat(activations.clear(user)).isFalse();
+
+        refused(a, 1);
+        verifyNoInteractions(channelEventPublisher);
+    }
+
+    @Test
+    void clearWithTheLoadedActivationWhileLive_refusesTheOtherRunningOccurrences() {
+        CustomBindingSchedule a = slot(-2, 2, false);
+        when(streamStateService.isLive(user)).thenReturn(true);
+        when(schedules.findByCustomBindingUserId(user.getId())).thenReturn(List.of(a));
+
+        activations.clear(user, scheduled(art, UUID.randomUUID()));
+
+        refused(a, 1);
+        verify(repository, never()).findById(any());
+    }
+
+    @Test
+    void clearWithoutRefusalWhileLive_refusesNothing() {
+        lenient().when(streamStateService.isLive(user)).thenReturn(true);
+        when(repository.existsById(user.getId())).thenReturn(true);
+
+        activations.clearWithoutRefusal(user);
+
+        verifyNoInteractions(refusals, schedules);
+    }
+
+    @Test
+    void recordScheduledWhileLive_refusesNothing() {
+        lenient().when(streamStateService.isLive(user)).thenReturn(true);
+
+        activations.recordScheduled(user, art, UUID.randomUUID(), new Occurrence(START, END));
+
+        verifyNoInteractions(refusals, schedules);
     }
 }

@@ -219,12 +219,13 @@ public class ChannelFixture {
 
         IgdbService igdbService = mock(IgdbService.class);
         GameBindingLookup lookup = new GameBindingLookup(bindingRepository);
+        gameStateService = new GameStateService(publisher);
+        streamStateService = new StreamStateService(publisher, dispatcher);
         CustomBindingActivations activations =
                 new CustomBindingActivations(activationRepository,
                         mock(fr.enimaloc.catapult.repository.binding.CustomBindingScheduleRefusalRepository.class),
-                        experimentService, publisher);
-        gameStateService = new GameStateService(publisher);
-        streamStateService = new StreamStateService(publisher, dispatcher);
+                        mock(fr.enimaloc.catapult.repository.binding.CustomBindingScheduleRepository.class),
+                        streamStateService, experimentService, publisher);
         categoryChain = new CategoryChain(activations, streamStateService, settingsRepository,
                 raidRestoreHold, gameStateService, accountRepository,
                 new CategoryApplier(twitch, streamStateService), new RaidRestoreGateService(experimentService), lookup, mock(ExtensionLayoutApplier.class));

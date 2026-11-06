@@ -123,7 +123,8 @@ class CustomBindingDetectionTest {
         when(experimentService.evaluateGate(user, CustomBindingService.EXPERIMENT_KEY)).thenReturn(true);
         activations = new CustomBindingActivations(activationRepository,
                 mock(fr.enimaloc.catapult.repository.binding.CustomBindingScheduleRefusalRepository.class),
-                experimentService, channelEventPublisher);
+                mock(fr.enimaloc.catapult.repository.binding.CustomBindingScheduleRepository.class),
+                streamStateService, experimentService, channelEventPublisher);
         RaidRestoreHold hold = mock(RaidRestoreHold.class);
         chain = new CategoryChain(activations, streamStateService, userSettingsRepository, hold,
                 gameStateService, mock(UserAccountRepository.class), new CategoryApplier(twitchService, streamStateService), mock(RaidRestoreGateService.class), mock(GameBindingLookup.class),
