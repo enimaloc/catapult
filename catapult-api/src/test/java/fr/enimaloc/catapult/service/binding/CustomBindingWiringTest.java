@@ -13,6 +13,8 @@ import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
 import fr.enimaloc.catapult.repository.binding.CustomBindingActivationRepository;
 import fr.enimaloc.catapult.repository.binding.CustomBindingRepository;
+import fr.enimaloc.catapult.repository.binding.CustomBindingScheduleRefusalRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
 import fr.enimaloc.catapult.repository.binding.GameMappingRepository;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
@@ -56,6 +58,9 @@ class CustomBindingWiringTest {
             .withBean(GameMappingRepository.class, () -> mock(GameMappingRepository.class))
             .withBean(CustomBindingRepository.class, () -> mock(CustomBindingRepository.class))
             .withBean(CustomBindingActivationRepository.class, () -> mock(CustomBindingActivationRepository.class))
+            .withBean(CustomBindingScheduleRefusalRepository.class,
+                    () -> mock(CustomBindingScheduleRefusalRepository.class))
+            .withBean(ApplicationEventPublisher.class, () -> mock(ApplicationEventPublisher.class))
             .withBean(GameBindingRepository.class, () -> mock(GameBindingRepository.class))
             .withBean(UserSettingsRepository.class, () -> mock(UserSettingsRepository.class))
             .withBean(UserAccountRepository.class, () -> mock(UserAccountRepository.class))

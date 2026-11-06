@@ -8,6 +8,7 @@ import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.account.UserSettings;
 import fr.enimaloc.catapult.domain.binding.CustomBinding;
+import fr.enimaloc.catapult.event.CustomBindingSchedulesChangedEvent;
 import fr.enimaloc.catapult.domain.binding.CustomBindingActivation;
 import fr.enimaloc.catapult.domain.binding.ExtensionSlotSetting;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
@@ -40,6 +41,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -77,6 +79,7 @@ class CustomBindingServiceTest {
     @Mock private ChannelEventPublisher channelEventPublisher;
     @Mock private ExtensionLayoutApplier layouts;
     @Mock private PremiumService premiumService;
+    @Mock private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     private CustomBindingService service;
 
@@ -90,7 +93,7 @@ class CustomBindingServiceTest {
                 new CategoryApplier(twitchService, streamStateService), mock(RaidRestoreGateService.class), mock(GameBindingLookup.class), mock(ExtensionLayoutApplier.class));
         service = new CustomBindingService(bindings, activations, experimentService, gameStateService,
                 streamStateService, userAccountRepository, oAuthTokenRepository, gameEventListener,
-                channelEventPublisher, chain, layouts, premiumService);
+                channelEventPublisher, chain, layouts, premiumService, eventPublisher);
         user = new UserAccount();
         user.setId(UUID.randomUUID());
         user.setBotEnabled(true);
@@ -569,6 +572,47 @@ class CustomBindingServiceTest {
 
         verify(activations, never()).clear(any());
         verifyNoInteractions(gameEventListener, twitchService, channelEventPublisher);
+    }
+
+    @Test
+    void endScheduledLeavesAManualActivationAlone() {
+        givenActive(binding("Art"));
+
+        service.endScheduled(user);
+
+        verify(activations, never()).clear(any());
+        verify(activations, never()).clearWithoutRefusal(any());
+        verifyNoInteractions(gameEventListener, twitchService);
+    }
+
+    @Test
+    void endScheduledClearsAScheduledActivationWithoutRefusing() {
+        CustomBinding art = binding("Art");
+        CustomBindingActivation activation = new CustomBindingActivation(user.getId(), art, Instant.EPOCH);
+        activation.setOrigin(CustomBindingActivation.Origin.SCHEDULED);
+        when(activations.active(user)).thenReturn(Optional.of(activation));
+        when(streamStateService.isLive(user)).thenReturn(true);
+        when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.empty());
+        givenNoGameFallback();
+        when(twitchService.updateChannelReporting(eq(user), any())).thenReturn(ChannelUpdateOutcome.APPLIED);
+
+        service.endScheduled(user);
+
+        verify(activations).clearWithoutRefusal(user);
+        verify(activations, never()).clear(any());
+    }
+
+    @Test
+    void updatePublishesSchedulesChanged() {
+        CustomBinding art = binding("Art");
+        when(bindings.findByIdAndUser(art.getId(), user)).thenReturn(Optional.of(art));
+        when(bindings.findByUserAndNameIgnoreCase(user, "Art")).thenReturn(Optional.of(art));
+        when(activations.active(user)).thenReturn(Optional.empty());
+
+        service.update(user, art.getId(), new CustomBindingRequest("Art", "1469308723",
+                "Software and Game Development", Set.of(), Set.of(), false));
+
+        verify(eventPublisher).publishEvent(new CustomBindingSchedulesChangedEvent(user.getId()));
     }
 
     // ── Deletion ─────────────────────────────────────────────────────────────

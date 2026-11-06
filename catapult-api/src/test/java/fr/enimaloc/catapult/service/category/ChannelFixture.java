@@ -220,7 +220,9 @@ public class ChannelFixture {
         IgdbService igdbService = mock(IgdbService.class);
         GameBindingLookup lookup = new GameBindingLookup(bindingRepository);
         CustomBindingActivations activations =
-                new CustomBindingActivations(activationRepository, experimentService, publisher);
+                new CustomBindingActivations(activationRepository,
+                        mock(fr.enimaloc.catapult.repository.binding.CustomBindingScheduleRefusalRepository.class),
+                        experimentService, publisher);
         gameStateService = new GameStateService(publisher);
         streamStateService = new StreamStateService(publisher, dispatcher);
         categoryChain = new CategoryChain(activations, streamStateService, settingsRepository,
@@ -236,7 +238,7 @@ public class ChannelFixture {
         customBindingService = new CustomBindingService(customBindingRepository, activations,
                 experimentService, gameStateService, streamStateService, accountRepository,
                 tokenRepository, listener, publisher, categoryChain, mock(ExtensionLayoutApplier.class),
-                mock(PremiumService.class));
+                mock(PremiumService.class), mock(org.springframework.context.ApplicationEventPublisher.class));
         setGameFunction = new CatapultSetGameFunction(twitch, categoryChain, gameStateService, igdbService,
                 activations);
         twitchatActionExecutor = new TwitchatActionExecutor(actionTokenService, accountRepository, categoryChain,

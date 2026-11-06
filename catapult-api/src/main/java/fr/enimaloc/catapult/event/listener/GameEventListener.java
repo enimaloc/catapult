@@ -99,7 +99,7 @@ public class GameEventListener {
         UserAccount user = event.getUser();
         log.debug("StreamOfflineEvent for user {}", user.getId());
         // A custom binding, interruptible or not, ends with the stream; then the usual end of stream
-        customBindingActivations.clear(user);
+        customBindingActivations.clearWithoutRefusal(user);
         streamStateService.clearPending(user);
         raidRestoreHold.release(user);
         categoryChain.apply(user, new StreamEnded()).orThrow();

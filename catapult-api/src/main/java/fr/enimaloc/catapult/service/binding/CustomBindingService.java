@@ -9,11 +9,13 @@ import fr.enimaloc.catapult.domain.binding.CustomBinding;
 import fr.enimaloc.catapult.domain.binding.CustomBindingActivation;
 import fr.enimaloc.catapult.domain.binding.ExtensionSlotSetting;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
+import fr.enimaloc.catapult.event.CustomBindingSchedulesChangedEvent;
 import fr.enimaloc.catapult.event.listener.GameEventListener;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.binding.CustomBindingRepository;
+import fr.enimaloc.catapult.service.binding.schedule.ScheduleOccurrences.Occurrence;
 import fr.enimaloc.catapult.service.category.CategoryChain;
 import fr.enimaloc.catapult.service.category.CategoryOutcome;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.CustomBindingTriggered;
@@ -27,6 +29,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -93,6 +96,7 @@ public class CustomBindingService {
     private final CategoryChain categoryChain;
     private final ExtensionLayoutApplier extensionLayoutApplier;
     private final PremiumService premiumService;
+    private final ApplicationEventPublisher eventPublisher;
 
     /** Created DRAFT, so closed to everyone until the admin opens it. */
     @EventListener(ApplicationReadyEvent.class)
@@ -149,6 +153,8 @@ public class CustomBindingService {
                 });
         CustomBinding saved = save(fill(binding, name, request));
         publishList(user);
+        // A category change can suspend or free the binding's slots
+        eventPublisher.publishEvent(new CustomBindingSchedulesChangedEvent(user.getId()));
         boolean active = activations.active(user)
                 .filter(activation -> activation.getCustomBinding().getId().equals(saved.getId()))
                 .isPresent();
@@ -175,7 +181,7 @@ public class CustomBindingService {
         CustomBinding binding = existing(user, id);
         activations.active(user)
                 .filter(activation -> activation.getCustomBinding().getId().equals(binding.getId()))
-                .ifPresent(activation -> doDeactivate(user));
+                .ifPresent(activation -> doDeactivate(user, true));
         bindings.delete(binding);
         publishList(user, binding.getId());
     }
@@ -210,6 +216,16 @@ public class CustomBindingService {
      * accepted it; re-triggering the active one applies it again. A failure records nothing.
      */
     public ActivationResult activate(UserAccount user, CustomBinding binding) {
+        return activate(user, binding, () -> activations.record(user, binding));
+    }
+
+    /** {@link #activate} for the scheduler: recorded as coming from {@code occurrence} of the slot. */
+    public ActivationResult activateScheduled(UserAccount user, CustomBinding binding, UUID scheduleId,
+                                              Occurrence occurrence) {
+        return activate(user, binding, () -> activations.recordScheduled(user, binding, scheduleId, occurrence));
+    }
+
+    private ActivationResult activate(UserAccount user, CustomBinding binding, Runnable record) {
         requireEnabled(user);
         if (binding.getUser() == null || !user.getId().equals(binding.getUser().getId())) {
             throw notFound();
@@ -219,7 +235,7 @@ public class CustomBindingService {
             log.info("Custom binding {} not activated for user {}: {}", binding.getId(), user.getId(), result);
             return result;
         }
-        activations.record(user, binding);
+        record.run();
         log.debug("Custom binding {} activated for user {}", binding.getId(), user.getId());
         return result;
     }
@@ -236,7 +252,20 @@ public class CustomBindingService {
     public void deactivate(UserAccount user) {
         requireEnabled(user);
         if (activations.active(user).isPresent()) {
-            doDeactivate(user);
+            doDeactivate(user, true);
+        }
+    }
+
+    /**
+     * Ends the active binding when the schedule put it there, without refusing its occurrence; a manual activation
+     * is left alone.
+     */
+    public void endScheduled(UserAccount user) {
+        requireEnabled(user);
+        if (activations.active(user)
+                .filter(activation -> activation.getOrigin() == CustomBindingActivation.Origin.SCHEDULED)
+                .isPresent()) {
+            doDeactivate(user, false);
         }
     }
 
@@ -245,8 +274,12 @@ public class CustomBindingService {
         return activations.active(user);
     }
 
-    private void doDeactivate(UserAccount user) {
-        activations.clear(user);
+    private void doDeactivate(UserAccount user, boolean refuse) {
+        if (refuse) {
+            activations.clear(user);
+        } else {
+            activations.clearWithoutRefusal(user);
+        }
         Optional<DetectedGame> open = gameStateService.getLastKnownGame(user);
         if (streamStateService.isLive(user)) {
             if (open.isPresent()) {

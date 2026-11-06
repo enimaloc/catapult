@@ -3,7 +3,10 @@ package fr.enimaloc.catapult.service.binding;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.CustomBinding;
 import fr.enimaloc.catapult.domain.binding.CustomBindingActivation;
+import fr.enimaloc.catapult.domain.binding.CustomBindingScheduleRefusal;
 import fr.enimaloc.catapult.repository.binding.CustomBindingActivationRepository;
+import fr.enimaloc.catapult.repository.binding.CustomBindingScheduleRefusalRepository;
+import fr.enimaloc.catapult.service.binding.schedule.ScheduleOccurrences.Occurrence;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,6 +23,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -29,6 +33,7 @@ import static org.mockito.Mockito.when;
 class CustomBindingActivationsTest {
 
     @Mock private CustomBindingActivationRepository repository;
+    @Mock private CustomBindingScheduleRefusalRepository refusals;
     @Mock private ExperimentService experimentService;
     @Mock private ChannelEventPublisher channelEventPublisher;
 
@@ -88,7 +93,8 @@ class CustomBindingActivationsTest {
 
     @Test
     void clear_deletesIt_andPublishesNoneActive() {
-        when(repository.existsById(user.getId())).thenReturn(true);
+        when(repository.findById(user.getId()))
+                .thenReturn(Optional.of(new CustomBindingActivation(user.getId(), art, Instant.EPOCH)));
 
         assertThat(activations.clear(user)).isTrue();
 
@@ -99,11 +105,108 @@ class CustomBindingActivationsTest {
 
     @Test
     void clear_withNothingActive_publishesNothing() {
-        when(repository.existsById(user.getId())).thenReturn(false);
+        when(repository.findById(user.getId())).thenReturn(Optional.empty());
 
         assertThat(activations.clear(user)).isFalse();
 
         verify(repository, never()).deleteById(any());
         verifyNoInteractions(channelEventPublisher);
+    }
+
+    private static final Instant START = Instant.parse("2026-11-06T19:00:00Z");
+    private static final Instant END = Instant.parse("2026-11-06T21:00:00Z");
+
+    private CustomBindingActivation scheduled(CustomBinding binding, UUID scheduleId) {
+        CustomBindingActivation activation = new CustomBindingActivation(user.getId(), binding, Instant.EPOCH);
+        activation.setOrigin(CustomBindingActivation.Origin.SCHEDULED);
+        activation.setScheduleId(scheduleId);
+        activation.setOccurrenceStart(START);
+        activation.setOccurrenceEnd(END);
+        return activation;
+    }
+
+    @Test
+    void manualSwitchRefusesTheScheduledOccurrence() {
+        UUID schedule = UUID.randomUUID();
+        CustomBinding other = new CustomBinding();
+        other.setId(UUID.randomUUID());
+        when(repository.findById(user.getId())).thenReturn(Optional.of(scheduled(art, schedule)));
+
+        activations.record(user, other);
+
+        verify(refusals).save(argThat((CustomBindingScheduleRefusal r) -> r.getScheduleId().equals(schedule)
+                && r.getOccurrenceStart().equals(START) && r.getOccurrenceEnd().equals(END)));
+        ArgumentCaptor<CustomBindingActivation> saved = ArgumentCaptor.forClass(CustomBindingActivation.class);
+        verify(repository).save(saved.capture());
+        assertThat(saved.getValue().getOrigin()).isEqualTo(CustomBindingActivation.Origin.MANUAL);
+        assertThat(saved.getValue().getCustomBinding()).isSameAs(other);
+    }
+
+    @Test
+    void reTriggeringTheScheduledBindingKeepsItScheduled() {
+        CustomBindingActivation current = scheduled(art, UUID.randomUUID());
+        when(repository.findById(user.getId())).thenReturn(Optional.of(current));
+
+        activations.record(user, art);
+
+        ArgumentCaptor<CustomBindingActivation> saved = ArgumentCaptor.forClass(CustomBindingActivation.class);
+        verify(repository).save(saved.capture());
+        assertThat(saved.getValue().getOrigin()).isEqualTo(CustomBindingActivation.Origin.SCHEDULED);
+        assertThat(saved.getValue().getOccurrenceStart()).isEqualTo(START);
+        verifyNoInteractions(refusals);
+    }
+
+    @Test
+    void recordScheduled_storesTheOccurrence() {
+        UUID schedule = UUID.randomUUID();
+
+        activations.recordScheduled(user, art, schedule, new Occurrence(START, END));
+
+        ArgumentCaptor<CustomBindingActivation> saved = ArgumentCaptor.forClass(CustomBindingActivation.class);
+        verify(repository).save(saved.capture());
+        assertThat(saved.getValue().getOrigin()).isEqualTo(CustomBindingActivation.Origin.SCHEDULED);
+        assertThat(saved.getValue().getScheduleId()).isEqualTo(schedule);
+        assertThat(saved.getValue().getOccurrenceEnd()).isEqualTo(END);
+        verify(channelEventPublisher).customBindingChanged(user.getId(), art.getId());
+    }
+
+    @Test
+    void clearRefusesAScheduledOccurrence() {
+        UUID schedule = UUID.randomUUID();
+        when(repository.findById(user.getId())).thenReturn(Optional.of(scheduled(art, schedule)));
+
+        assertThat(activations.clear(user)).isTrue();
+
+        verify(refusals).save(argThat((CustomBindingScheduleRefusal r) -> r.getScheduleId().equals(schedule)));
+        verify(repository).deleteById(user.getId());
+    }
+
+    @Test
+    void clearWithoutRefusalDoesNot() {
+        when(repository.existsById(user.getId())).thenReturn(true);
+
+        assertThat(activations.clearWithoutRefusal(user)).isTrue();
+
+        verifyNoInteractions(refusals);
+        verify(repository).deleteById(user.getId());
+        verify(channelEventPublisher).customBindingChanged(user.getId(), null);
+    }
+
+    @Test
+    void clearOfADeletedSlotsActivation_refusesNothing() {
+        when(repository.findById(user.getId())).thenReturn(Optional.of(scheduled(art, null)));
+
+        activations.clear(user);
+
+        verifyNoInteractions(refusals);
+    }
+
+    @Test
+    void current_ignoresTheExperiment() {
+        CustomBindingActivation activation = new CustomBindingActivation(user.getId(), art, Instant.EPOCH);
+        when(repository.findById(user.getId())).thenReturn(Optional.of(activation));
+
+        assertThat(activations.current(user)).contains(activation);
+        verifyNoInteractions(experimentService);
     }
 }
