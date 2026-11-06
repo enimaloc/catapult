@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.domain.binding.CustomBinding;
 import fr.enimaloc.catapult.domain.binding.CustomBindingActivation;
 import fr.enimaloc.catapult.domain.binding.CustomBindingSchedule;
 import fr.enimaloc.catapult.domain.binding.CustomBindingScheduleRefusal;
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +35,7 @@ class CustomBindingScheduleRepositoryTest {
     @Autowired CustomBindingScheduleRefusalRepository refusals;
     @Autowired CustomBindingActivationRepository activations;
     @Autowired CustomBindingRepository bindings;
+    @Autowired UserAccountRepository users;
     @Autowired TestEntityManager em;
 
     private UserAccount user(String login) {
@@ -130,5 +132,32 @@ class CustomBindingScheduleRepositoryTest {
     void purgeRunsOutsideACallersTransaction() {
         // The scheduler tick calls it with no transaction around
         refusals.deleteByOccurrenceEndBefore(Instant.now());
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void schedulesOfAUserCarryTheirBindingOutsideATransaction() {
+        // The scheduler reads them on its tick, an event or its own thread: no session stays open
+        UserAccount user = new UserAccount();
+        user.setTwitchUsername("graph");
+        user.setStatus(UserAccount.Status.ACTIVE);
+        user = users.save(user);
+        CustomBinding art = binding(user, "Art");
+        art.getCcls().add("DrugsIntoxication");
+        art = bindings.save(art);
+        // Paused: committed rows outlive this test, the other ones must not see it as due
+        CustomBindingSchedule slot = schedule(art, LocalDateTime.of(2026, 11, 10, 20, 0),
+                CustomBindingSchedule.Repeat.NONE, true);
+        try {
+            var found = schedules.findByCustomBindingUserId(user.getId());
+
+            assertThat(found).hasSize(1);
+            assertThat(found.get(0).getCustomBinding().getTwitchGameId()).isEqualTo("509660");
+            assertThat(found.get(0).getCustomBinding().getCcls()).containsExactly("DrugsIntoxication");
+        } finally {
+            schedules.delete(slot);
+            bindings.delete(art);
+            users.delete(user);
+        }
     }
 }
