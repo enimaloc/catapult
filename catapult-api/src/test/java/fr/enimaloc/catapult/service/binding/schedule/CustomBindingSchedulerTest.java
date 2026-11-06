@@ -74,7 +74,7 @@ class CustomBindingSchedulerTest {
         binding = binding();
         lenient().when(customBindingService.enabled(user)).thenReturn(true);
         lenient().when(streamStateService.isLive(user)).thenReturn(true);
-        lenient().when(schedules.findByCustomBindingUserId(user.getId())).thenAnswer(i -> List.copyOf(stored));
+        lenient().when(schedules.findWithBindingByCustomBindingUserId(user.getId())).thenAnswer(i -> List.copyOf(stored));
         lenient().when(premiumService.canSchedule(eq(user), any(), any())).thenReturn(true);
         lenient().when(activations.current(user)).thenReturn(Optional.empty());
         lenient().when(customBindingService.activateScheduled(any(), any(), any(), any()))

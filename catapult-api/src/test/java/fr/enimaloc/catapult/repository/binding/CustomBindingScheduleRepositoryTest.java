@@ -149,7 +149,7 @@ class CustomBindingScheduleRepositoryTest {
         CustomBindingSchedule slot = schedule(art, LocalDateTime.of(2026, 11, 10, 20, 0),
                 CustomBindingSchedule.Repeat.NONE, true);
         try {
-            var found = schedules.findByCustomBindingUserId(user.getId());
+            var found = schedules.findWithBindingByCustomBindingUserId(user.getId());
 
             assertThat(found).hasSize(1);
             assertThat(found.get(0).getCustomBinding().getTwitchGameId()).isEqualTo("509660");

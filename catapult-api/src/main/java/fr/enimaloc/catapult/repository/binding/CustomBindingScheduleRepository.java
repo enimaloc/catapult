@@ -13,12 +13,14 @@ public interface CustomBindingScheduleRepository extends JpaRepository<CustomBin
 
     List<CustomBindingSchedule> findByCustomBindingOrderByStartsAtAsc(CustomBinding customBinding);
 
+    List<CustomBindingSchedule> findByCustomBindingUserId(UUID userId);
+
     /**
-     * With their binding: the scheduler reads it with no session open. A load graph, so the binding's eager
-     * collections (read by {@code toGameBinding}) are still fetched.
+     * {@link #findByCustomBindingUserId}, with their binding: the scheduler reads it with no session open. A load
+     * graph, so the binding's eager collections (read by {@code toGameBinding}) are still fetched.
      */
     @EntityGraph(attributePaths = "customBinding", type = EntityGraph.EntityGraphType.LOAD)
-    List<CustomBindingSchedule> findByCustomBindingUserId(UUID userId);
+    List<CustomBindingSchedule> findWithBindingByCustomBindingUserId(UUID userId);
 
     /** The streamers the scheduler has something to look at for. */
     @Query("select distinct s.customBinding.user.id from CustomBindingSchedule s where s.paused = false")

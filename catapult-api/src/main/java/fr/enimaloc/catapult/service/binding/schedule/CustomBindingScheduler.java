@@ -185,7 +185,7 @@ public class CustomBindingScheduler {
         if (!customBindingService.enabled(user) || !streamStateService.isLive(user)) {
             return;
         }
-        Optional<Due> due = schedules.findByCustomBindingUserId(user.getId()).stream()
+        Optional<Due> due = schedules.findWithBindingByCustomBindingUserId(user.getId()).stream()
                 .filter(s -> !s.isPaused()
                         && premiumService.canSchedule(user, s.getCustomBinding().getTwitchGameId(), s.getRepeat()))
                 .map(s -> ScheduleOccurrences.current(s, now, PremiumService.ZONE)
