@@ -22,11 +22,13 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
@@ -36,8 +38,8 @@ import java.util.stream.Collectors;
  * The time slots of a custom binding, edited as a whole list. Behind the same experiment as
  * {@link CustomBindingService}; what a free account may schedule is {@link PremiumService#canSchedule}'s call.
  *
- * <p>A slot a streamer is no longer entitled to (premium ended) stays stored but is
- * {@linkplain #suspended suspended}; it may be kept as it is or paused, never edited, so the others can still be changed.</p>
+ * <p>A slot a streamer is no longer entitled to (premium ended) stays stored but is {@linkplain #suspended
+ * suspended}; it may be kept as it is or paused, never edited, so the others can still be changed.</p>
  */
 @Service
 @RequiredArgsConstructor
@@ -107,7 +109,7 @@ public class CustomBindingScheduleService {
             result.add(schedules.save(schedule));
         }
         eventPublisher.publishEvent(new CustomBindingSchedulesChangedEvent(user.getId()));
-        result.sort(java.util.Comparator.comparing(CustomBindingSchedule::getStartsAt));
+        result.sort(Comparator.comparing(CustomBindingSchedule::getStartsAt));
         return result;
     }
 
@@ -127,7 +129,8 @@ public class CustomBindingScheduleService {
         }
         Repeat repeat;
         try {
-            repeat = request.repeat() == null ? Repeat.NONE : Repeat.valueOf(request.repeat().trim().toUpperCase(Locale.ROOT));
+            repeat = request.repeat() == null ? Repeat.NONE
+                    : Repeat.valueOf(request.repeat().trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
             throw invalid("Unknown repeat " + request.repeat());
         }
@@ -141,7 +144,8 @@ public class CustomBindingScheduleService {
                 }
             }
         }
-        if (repeat != Repeat.NONE && Duration.between(request.startsAt(), request.endsAt()).compareTo(MAX_REPEATING_DURATION) > 0) {
+        if (repeat != Repeat.NONE
+                && Duration.between(request.startsAt(), request.endsAt()).compareTo(MAX_REPEATING_DURATION) > 0) {
             throw invalid("A repeating schedule lasts at most 24 hours");
         }
         if (repeat == Repeat.WEEKLY && days.isEmpty()) {
@@ -160,7 +164,7 @@ public class CustomBindingScheduleService {
                 && existing.getEndsAt().equals(r.endsAt())
                 && existing.getRepeat() == slot.repeat()
                 && existing.getDays().equals(slot.days())
-                && java.util.Objects.equals(existing.getRepeatUntil(), r.repeatUntil());
+                && Objects.equals(existing.getRepeatUntil(), r.repeatUntil());
     }
 
     private CustomBinding binding(UserAccount user, UUID id) {
