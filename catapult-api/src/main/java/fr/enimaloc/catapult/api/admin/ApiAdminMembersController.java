@@ -9,7 +9,11 @@ import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
 import fr.enimaloc.catapult.common.dto.admin.MigrateRequest;
 import fr.enimaloc.catapult.common.dto.admin.SetFlagRequest;
+import fr.enimaloc.catapult.api.error.ApiProblem;
+import fr.enimaloc.catapult.common.dto.premium.GrantPremiumRequest;
+import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.service.account.AdminMemberService;
+import fr.enimaloc.catapult.service.premium.PremiumService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -24,6 +28,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -33,6 +38,7 @@ import java.util.UUID;
 public class ApiAdminMembersController {
 
     private final AdminMemberService members;
+    private final PremiumService premium;
 
     /**
      * One page of members as catapult-web's admin page reads them (not the entity: no tokens, no
@@ -123,5 +129,30 @@ public class ApiAdminMembersController {
     @GetMapping("/{id}/targeting")
     public MemberTargetingDto targeting(@PathVariable UUID id) {
         return members.targeting(id);
+    }
+
+    /** Premium for the member until {@code body.until} (that day included), or for good without a date. */
+    @PostMapping("/{id}/premium")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void grantPremium(@PathVariable UUID id, @RequestBody(required = false) GrantPremiumRequest body,
+                             @AuthenticationPrincipal Jwt jwt) {
+        LocalDate until = body == null ? null : body.until();
+        if (until != null && until.isBefore(premium.today())) {
+            throw new ApiProblem(ErrorCode.INVALID, "The premium end date is in the past");
+        }
+        premium.grant(id, until, actor(jwt));
+    }
+
+    @DeleteMapping("/{id}/premium")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void revokePremium(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
+        premium.revoke(id, actor(jwt));
+    }
+
+    /** The admin's Twitch username, their account id when the token has none. */
+    private static String actor(Jwt jwt) {
+        Jwt token = ApiUserResolver.requireJwt(jwt);
+        String username = token.getClaimAsString("username");
+        return username != null ? username : token.getSubject();
     }
 }

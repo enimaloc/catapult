@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.service.debug;
 
+import fr.enimaloc.catapult.site.SiteRoles;
+import fr.enimaloc.catapult.site.SiteRole;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.enimaloc.catapult.config.HttpTraceLoggingInterceptor;
 import fr.enimaloc.catapult.domain.account.UserAccount;
@@ -90,7 +92,7 @@ class MinecraftBatchDebugTest {
         RestClient.Builder builder = RestClient.builder()
                 .requestInterceptor(new HttpTraceLoggingInterceptor(registry, recorder));
         mojang = MockRestServiceServer.bindTo(builder).build();
-        minecraft = new MinecraftService(builder.build());
+        minecraft = new MinecraftService(builder.build(), mock(SiteRole.class));
         when(serviceAccounts.findByEnabledTrueOrderByFillOrderAsc()).thenReturn(List.of(account));
         when(links.existsByServiceAccountAndStatus(account, MinecraftFriendLink.Status.ACCEPTED)).thenReturn(true);
         when(links.findByServiceAccount(account)).thenReturn(List.of(aliceLink, bobLink));
@@ -149,7 +151,7 @@ class MinecraftBatchDebugTest {
     private MinecraftFriendService friendService() {
         MinecraftFriendService friends = new MinecraftFriendService(minecraft, tokens, serviceAccounts, links,
                 mock(MinecraftAccountLimitMarker.class), mock(GetterConfigRepository.class), new ObjectMapper(),
-                mock(ChannelEventPublisher.class), new DebugRecording(registry, recorder), SimulationGates.none());
+                mock(ChannelEventPublisher.class), new DebugRecording(registry, recorder), SimulationGates.none(), SiteRoles.active());
         return friends;
     }
 

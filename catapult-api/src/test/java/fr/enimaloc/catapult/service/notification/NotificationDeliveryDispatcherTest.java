@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.notification;
 
+import fr.enimaloc.catapult.site.StandbyException;
 import fr.enimaloc.catapult.common.dto.notification.NotificationChannel;
 import fr.enimaloc.catapult.common.dto.notification.Severity;
 import fr.enimaloc.catapult.domain.account.UserAccount;
@@ -269,6 +270,20 @@ class NotificationDeliveryDispatcherTest {
     }
 
     @Test
+    void standbyChatSend_restoresClaimedDelivery() {
+        user.setBotEnabled(true);
+        NotificationDelivery d = delivery("T", "b", null, null, STREAM_START_CHAT);
+        when(deliveryRepo.findPending(user.getId(), STREAM_START_CHAT)).thenReturn(List.of(d));
+        doThrow(new StandbyException("twitch chat message")).when(chatService).sendMessage(any(), any());
+
+        dispatcher.onStreamOnline(new StreamOnlineEvent(this, user));
+        scheduled.forEach(Runnable::run);
+
+        verifyClaimed(d);
+        verifyRestored(d);
+    }
+
+    @Test
     void streamStart_expired_isClaimedWithoutBeingScheduled() {
         user.setBotEnabled(true);
         NotificationDelivery expired = delivery("T", "b", null, Instant.now().minusSeconds(5), STREAM_START_CHAT);
@@ -278,5 +293,36 @@ class NotificationDeliveryDispatcherTest {
 
         verifyClaimed(expired);
         assertThat(scheduled).isEmpty();
+    }
+
+    @Test
+    void standby_isLoggedAtDebug_andTheDeliveryRestored() {
+        ch.qos.logback.classic.Logger logger =
+            (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(NotificationDeliveryDispatcher.class);
+        ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> logs =
+            new ch.qos.logback.core.read.ListAppender<>();
+        logs.start();
+        logger.addAppender(logs);
+        try {
+            user.setBotEnabled(true);
+            NotificationDelivery chat = delivery("T", "b", null, null, STREAM_START_CHAT);
+            NotificationDelivery widget = delivery("W", "w", null, null, TWITCHAT);
+            when(deliveryRepo.findPending(user.getId(), STREAM_START_CHAT)).thenReturn(List.of(chat));
+            when(deliveryRepo.findPending(user.getId(), TWITCHAT)).thenReturn(List.of(widget));
+            doThrow(new StandbyException("twitch chat message")).when(chatService).sendMessage(any(), any());
+            when(twitchatDispatcher.onNotification(eq(user), any(), any(), any(), any()))
+                .thenThrow(new StandbyException("twitchat push"));
+
+            dispatcher.onStreamOnline(new StreamOnlineEvent(this, user));
+            scheduled.forEach(Runnable::run);
+            assertThat(dispatcher.flushTwitchat(user)).isZero();
+
+            verifyRestored(chat);
+            verifyRestored(widget);
+            assertThat(logs.list)
+                .noneMatch(e -> e.getLevel().isGreaterOrEqual(ch.qos.logback.classic.Level.INFO));
+        } finally {
+            logger.detachAppender(logs);
+        }
     }
 }

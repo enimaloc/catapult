@@ -39,6 +39,7 @@ public final class SiteCatalog {
             new SpaPage("help", "pages/help", "help", "/spa/help-page", "page.title.help", null, true),
             new SpaPage("admin", "pages/admin", "admin", "/spa/admin", "page.title.admin", null),
             new SpaPage("notifications", "pages/notifications", "notifications", "/spa/notifications", "page.title.notifications", null),
+            new SpaPage("premium", "pages/premium", "premium", "/spa/premium", "page.title.premium", null),
             new SpaPage("login", "pages/login", "login", "/spa/login", "page.title.login", null),
             new SpaPage("join", "pages/join", "join", "/spa/join", "page.title.join", null)
     );

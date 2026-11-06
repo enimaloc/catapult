@@ -23,6 +23,8 @@ function page() {
                 <mdui-menu-item data-action="delete" data-confirm="Delete enimaloc?"></mdui-menu-item>
                 <mdui-menu-item data-action="steam/unlink" data-confirm="Unlink?"></mdui-menu-item>
                 <mdui-menu-item data-action="migrate"></mdui-menu-item>
+                <mdui-menu-item data-action="premium-grant"></mdui-menu-item>
+                <mdui-menu-item data-action="premium/revoke" data-confirm="Remove premium?"></mdui-menu-item>
                 <mdui-menu-item data-action="debug-enable"></mdui-menu-item>
                 <mdui-menu-item data-action="debug/disable"></mdui-menu-item>
                 <mdui-menu-item data-action="debug/clear" data-confirm="Delete the recording?"></mdui-menu-item>
@@ -36,6 +38,12 @@ function page() {
             <input type="range" id="admin-debug-replay" min="0" max="100" step="5" value="100">
             <button id="admin-debug-cancel"></button>
             <button id="admin-debug-submit"></button>
+        </div>
+        <div id="admin-premium-dialog" data-headline="Premium for {0}">
+            <span id="admin-premium-headline"></span>
+            <input type="date" id="admin-premium-until">
+            <button id="admin-premium-cancel"></button>
+            <button id="admin-premium-submit"></button>
         </div>
         <div id="admin-migrate-dialog" data-headline="Migrate the data of {0}" data-incomplete="Pick">
             <span id="admin-migrate-headline"></span>
@@ -128,6 +136,61 @@ describe("admin-members", () => {
         expect(posts()).toEqual([[`/admin/members/${ID}/migrate`,
             { targetId: OTHER, migrateSettings: false, migrateGetters: false, migrateBindings: true }]]);
         expect(dialog.open).toBe(false);
+    });
+
+    describe("premium", () => {
+        it("grants through its dialog, with the chosen end date", async () => {
+            page();
+            await click('[data-action="premium-grant"]');
+            const dialog = document.getElementById("admin-premium-dialog");
+
+            expect(dialog.open).toBe(true);
+            expect(document.getElementById("admin-premium-headline").textContent).toBe("Premium for enimaloc");
+            expect(document.getElementById("admin-premium-until").min).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+
+            document.getElementById("admin-premium-until").value = "2099-12-31";
+            await click("#admin-premium-submit");
+
+            expect(posts()).toEqual([[`/admin/members/${ID}/premium`, { until: "2099-12-31" }]]);
+            expect(dialog.open).toBe(false);
+            expect(refreshed()).toBe(1);
+        });
+
+        it("grants without an end when the date is left empty", async () => {
+            page();
+            await click('[data-action="premium-grant"]');
+            await click("#admin-premium-submit");
+
+            expect(posts()).toEqual([[`/admin/members/${ID}/premium`, { until: null }]]);
+        });
+
+        it("prefills the current end date, and empties it for a member without one", async () => {
+            page();
+            document.querySelector(".admin-member").dataset.premiumUntil = "2099-01-02";
+            await click('[data-action="premium-grant"]');
+            expect(document.getElementById("admin-premium-until").value).toBe("2099-01-02");
+
+            delete document.querySelector(".admin-member").dataset.premiumUntil;
+            await click('[data-action="premium-grant"]');
+            expect(document.getElementById("admin-premium-until").value).toBe("");
+        });
+
+        it("keeps the dialog open and the list as it was when the API refuses the date", async () => {
+            posted.mockResolvedValueOnce(response(400));
+            page();
+            await click('[data-action="premium-grant"]');
+            await click("#admin-premium-submit");
+
+            expect(document.getElementById("admin-premium-dialog").open).toBe(true);
+            expect(refreshed()).toBe(0);
+        });
+
+        it("removes premium once confirmed", async () => {
+            page();
+            await click('[data-action="premium/revoke"]');
+
+            expect(posts()).toEqual([[`/admin/members/${ID}/premium/revoke`, {}]]);
+        });
     });
 
     /** The page inside the members tab panel, its patch stubbed. */

@@ -8,6 +8,7 @@ import fr.enimaloc.catapult.domain.minecraft.MinecraftServiceAccount;
 import fr.enimaloc.catapult.repository.minecraft.MinecraftFriendLinkRepository;
 import fr.enimaloc.catapult.repository.minecraft.MinecraftServiceAccountRepository;
 import fr.enimaloc.catapult.simulation.SimulationGate;
+import fr.enimaloc.catapult.site.SiteRole;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -44,6 +45,7 @@ class MinecraftFriendServiceTest {
     @Mock private fr.enimaloc.catapult.service.notification.ChannelEventPublisher channelEventPublisher;
 
     @Mock private ObjectProvider<SimulationGate> simulationGate;
+    @Mock private SiteRole siteRole;
     @Spy private DebugRecording debug = DebugRecording.OFF;
     @InjectMocks private MinecraftFriendService service;
 
@@ -53,6 +55,7 @@ class MinecraftFriendServiceTest {
 
     @BeforeEach
     void setup() {
+        when(siteRole.isActive()).thenReturn(true);
         user = new UserAccount();
         user.setId(UUID.randomUUID());
         bot1 = account("CatapultBot1", 0);

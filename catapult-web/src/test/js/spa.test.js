@@ -400,6 +400,17 @@ describe("the navbar's channels", () => {
         expect(document.getElementById("c1").classList.contains("active")).toBe(true);
     });
 
+    it("shows the premium entry only while the fragment carries its marker", async () => {
+        document.body.insertAdjacentHTML("afterbegin", '<a id="nav-premium" href="/premium" hidden></a>');
+        fetchMock.mockImplementation(async () => response(200, '<template data-nav-premium></template>' + NAV));
+        await loadWithNav("/");
+        expect(document.getElementById("nav-premium").hidden).toBe(false);
+
+        fetchMock.mockImplementation(async () => response(200, NAV));
+        await CatapultSpa.loadNavChannels();
+        expect(document.getElementById("nav-premium").hidden).toBe(true);
+    });
+
     it("isn't fetched without a navbar to fill (logged out)", async () => {
         expect(fetchMock).not.toHaveBeenCalledWith("/spa/nav-channels");
     });

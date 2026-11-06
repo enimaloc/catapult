@@ -38,6 +38,17 @@ public class StreamStateService {
         }
     }
 
+    /**
+     * Puts back a live state this site already handled (a reconnection or a takeover), without telling Twitchat the
+     * stream started again.
+     */
+    public void restoreLive(UserAccount user, boolean live) {
+        Boolean previous = liveStatus.put(user.getId(), live);
+        if (previous == null || previous != live) {
+            channelEventPublisher.streamStateChanged(user.getId(), live);
+        }
+    }
+
     public void storePending(UserAccount user, GameBinding binding) {
         pendingBinding.put(user.getId(), binding);
     }

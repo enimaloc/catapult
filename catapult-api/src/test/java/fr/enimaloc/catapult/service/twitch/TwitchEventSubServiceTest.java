@@ -18,11 +18,13 @@ import fr.enimaloc.catapult.event.StreamOnlineEvent;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
+import fr.enimaloc.catapult.service.stream.StreamSessionService;
 import fr.enimaloc.catapult.service.notification.CatapultCategoryChangeStateService;
 import fr.enimaloc.catapult.service.notification.TwitchatEventDispatcher;
 import fr.enimaloc.catapult.simulation.SimulatedCalls;
 import fr.enimaloc.catapult.simulation.SimulatedData;
 import fr.enimaloc.catapult.simulation.SimulationGate;
+import fr.enimaloc.catapult.site.SiteRole;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -40,6 +42,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestClient;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -58,6 +61,8 @@ class TwitchEventSubServiceTest {
     @Mock private UserAccountRepository userAccountRepository;
     @Mock private TwitchTokenService twitchTokenService;
     @Mock private StreamStateService streamStateService;
+    @Mock private StreamSessionService streamSessionService;
+    @Mock private fr.enimaloc.catapult.service.stream.StreamCatchUp streamCatchUp;
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private RestClient restClient;
     @Mock private TwitchatEventDispatcher twitchatEventDispatcher;
@@ -74,6 +79,7 @@ class TwitchEventSubServiceTest {
     @Spy private DebugRecording debug = DebugRecording.OFF;
     /** Absent by default (answers {@code null}): no simulation. */
     @Mock private ObjectProvider<SimulationGate> simulationGate;
+    @Mock private SiteRole siteRole;
     @Mock private SimulationGate gate;
     @InjectMocks private TwitchEventSubService service;
 
@@ -83,6 +89,7 @@ class TwitchEventSubServiceTest {
 
     @BeforeEach
     void setUp() {
+        when(siteRole.isActive()).thenReturn(true);
         user = new UserAccount();
         user.setId(UUID.randomUUID());
         user.setTwitchId("broadcaster-123");
@@ -123,6 +130,87 @@ class TwitchEventSubServiceTest {
         ArgumentCaptor<StreamOnlineEvent> captor = ArgumentCaptor.forClass(StreamOnlineEvent.class);
         verify(eventPublisher).publishEvent(captor.capture());
         assertThat(captor.getValue().getUser()).isEqualTo(user);
+    }
+
+    @Test
+    void handleMessage_streamOnline_recordsTheStreamBeforePublishing() {
+        String message = """
+            {
+              "metadata": { "message_type": "notification", "subscription_type": "stream.online" },
+              "payload": { "event": { "id": "9001", "started_at": "2026-11-03T10:00:00Z" } }
+            }
+            """;
+
+        service.handleMessage(user, token, message, false);
+
+        var order = inOrder(streamSessionService, eventPublisher);
+        order.verify(streamSessionService).recordStart(user, "9001", Instant.parse("2026-11-03T10:00:00Z"));
+        order.verify(eventPublisher).publishEvent(any(StreamOnlineEvent.class));
+    }
+
+    @Test
+    void streamOnline_alreadyRecordedSameStream_doesNotPublishAgain() {
+        var session = new fr.enimaloc.catapult.domain.stream.StreamSession();
+        session.setStreamId("9001");
+        session.setStartedAt(Instant.parse("2026-11-03T10:00:00Z"));
+        when(streamSessionService.find(user)).thenReturn(Optional.of(session));
+        String message = """
+            {
+              "metadata": { "message_type": "notification", "subscription_type": "stream.online" },
+              "payload": { "event": { "id": "9001", "started_at": "2026-11-03T10:00:00Z" } }
+            }
+            """;
+
+        service.handleMessage(user, token, message, false);
+
+        verify(streamStateService).setLive(user, true);
+        verify(streamSessionService, never()).recordStart(any(), any(), any());
+        verify(eventPublisher, never()).publishEvent(any(StreamOnlineEvent.class));
+    }
+
+    @Test
+    void streamOnline_withoutStreamId_recordsNothingButStillPublishes() {
+        String message = """
+            {
+              "metadata": { "message_type": "notification", "subscription_type": "stream.online" },
+              "payload": { "event": {} }
+            }
+            """;
+
+        service.handleMessage(user, token, message, false);
+
+        verify(streamSessionService, never()).recordStart(any(), any(), any());
+        verify(eventPublisher).publishEvent(any(StreamOnlineEvent.class));
+    }
+
+    @Test
+    void handleMessage_streamOnline_markerFailureStillPublishesEvent() {
+        doThrow(new IllegalStateException("db down")).when(streamSessionService).recordStart(any(), any(), any());
+        String message = """
+            {
+              "metadata": { "message_type": "notification", "subscription_type": "stream.online" },
+              "payload": { "event": { "id": "9001", "started_at": "2026-11-03T10:00:00Z" } }
+            }
+            """;
+
+        service.handleMessage(user, token, message, false);
+
+        verify(eventPublisher).publishEvent(any(StreamOnlineEvent.class));
+    }
+
+    @Test
+    void handleMessage_streamOffline_recordsTheEnd() {
+        String message = """
+            {
+              "metadata": { "message_type": "notification", "subscription_type": "stream.offline" },
+              "payload": { "event": {} }
+            }
+            """;
+
+        service.handleMessage(user, token, message, false);
+
+        verify(streamSessionService).recordEnd(eq(user), any(Instant.class));
+        verify(eventPublisher).publishEvent(any(StreamOfflineEvent.class));
     }
 
     @Test
@@ -277,7 +365,8 @@ class TwitchEventSubServiceTest {
         // first call is initChannelState (empty object, returns early), second is initStreamState
         when(getResponseSpec.body(String.class))
             .thenReturn("{}")
-            .thenReturn("{\"data\":[{\"id\":\"42\",\"user_id\":\"broadcaster-123\"}]}");
+            .thenReturn("{\"data\":[{\"id\":\"42\",\"user_id\":\"broadcaster-123\","
+                + "\"started_at\":\"2026-11-03T10:00:00Z\"}]}");
 
         String message = """
             {
@@ -288,7 +377,29 @@ class TwitchEventSubServiceTest {
 
         service.handleMessage(user, token, message, false);
 
-        verify(streamStateService).setLive(user, true);
+        verify(streamCatchUp).reconcile(user, Optional.of(new fr.enimaloc.catapult.service.stream.StreamCatchUp
+            .LiveStream("42", java.time.Instant.parse("2026-11-03T10:00:00Z"))));
+    }
+
+    @Test
+    void handleMessage_sessionWelcome_whenLiveStreamHasNoStartTime_restoresLiveWithoutCatchUp() {
+        when(restClient.get()).thenReturn(getUriSpec);
+        when(getUriSpec.uri(anyString())).thenReturn(getHeaderSpec);
+        when(getHeaderSpec.header(anyString(), anyString())).thenReturn(getHeaderSpec);
+        when(getHeaderSpec.retrieve()).thenReturn(getResponseSpec);
+        when(getResponseSpec.body(String.class))
+            .thenReturn("{}")
+            .thenReturn("{\"data\":[{\"id\":\"42\"}]}");
+
+        service.handleMessage(user, token, """
+            {
+              "metadata": { "message_type": "session_welcome" },
+              "payload": { "session": { "id": "session-abc" } }
+            }
+            """, false);
+
+        verify(streamStateService).restoreLive(user, true);
+        verifyNoInteractions(streamCatchUp);
     }
 
     @Test
@@ -310,7 +421,7 @@ class TwitchEventSubServiceTest {
 
         service.handleMessage(user, token, message, false);
 
-        verify(streamStateService).setLive(user, false);
+        verify(streamCatchUp).reconcile(user, Optional.empty());
     }
 
     @Test
@@ -331,7 +442,7 @@ class TwitchEventSubServiceTest {
             """;
 
         assertThatNoException().isThrownBy(() -> service.handleMessage(user, token, message, false));
-        verify(streamStateService, never()).setLive(any(), anyBoolean());
+        verifyNoInteractions(streamCatchUp);
     }
 
     @Test
@@ -609,5 +720,43 @@ class TwitchEventSubServiceTest {
         assertThat(((Map<String, Object>) bodies.getValue()).get("type")).isEqualTo("channel.raid");
         // channel.update and stream.* are simulated: their initial state comes from the simulated data
         verify(restClient, never()).get();
+    }
+
+    @Test
+    void sessionWelcome_onStandby_closesAndSubscribesNothing() {
+        when(siteRole.isActive()).thenReturn(false);
+        WebSocket socket = mock(WebSocket.class);
+        Map<UUID, WebSocket> sockets = (Map<UUID, WebSocket>) connectionState("connections");
+        sockets.put(user.getId(), socket);
+
+        service.handleMessage(user, token, """
+            {
+              "metadata": { "message_type": "session_welcome" },
+              "payload": { "session": { "id": "session-abc" } }
+            }
+            """, false);
+
+        verify(restClient, never()).post();
+        verify(restClient, never()).get();
+        verify(streamCatchUp, never()).reconcile(any(), any());
+        verify(socket).sendClose(eq(WebSocket.NORMAL_CLOSURE), eq("standby"));
+        assertThat(sockets).doesNotContainKey(user.getId());
+        assertThat((java.util.Set<UUID>) connectionState("intentionallyDisconnected")).contains(user.getId());
+    }
+
+    @Test
+    void init_oneUserFailing_stillConnectsTheOthers() {
+        UserAccount failing = new UserAccount();
+        failing.setId(UUID.randomUUID());
+        when(userAccountRepository.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE))
+            .thenReturn(List.of(failing, user));
+        when(oAuthTokenRepository.findByUserAndProvider(failing, OAuthToken.Provider.TWITCH))
+            .thenThrow(new IllegalStateException("db hiccup"));
+        // No token: the lookup proves the connection was attempted, without opening a socket
+        when(oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)).thenReturn(Optional.empty());
+
+        assertThatNoException().isThrownBy(service::init);
+
+        verify(oAuthTokenRepository).findByUserAndProvider(user, OAuthToken.Provider.TWITCH);
     }
 }

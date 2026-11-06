@@ -290,7 +290,7 @@ public class MockData {
     }
 
     public ChannelListResponse getChannelList() {
-        return new ChannelListResponse(channelDto.twitchId(), withFirst(channelDto, moderatedChannels));
+        return new ChannelListResponse(channelDto.twitchId(), withFirst(channelDto, moderatedChannels), true);
     }
 
     /** The dashboard as {@code username} sees it, bindings filtered by status and/or source. */

@@ -59,9 +59,9 @@ class DegradedStatusServiceTest {
 
     @Test
     void effect_carriesAppliedAndNormalValues() {
-        assertThat(degraded(Map.of("app.polling.interval-seconds", "60"), Map.of("app.polling.interval-seconds", "30"))
+        assertThat(degraded(Map.of("app.polling.free-interval-seconds", "60"), Map.of("app.polling.free-interval-seconds", "30"))
                 .status().effects())
-                .containsExactly(new DegradedEffectDto("app.polling.interval-seconds", "60", "30"));
+                .containsExactly(new DegradedEffectDto("app.polling.free-interval-seconds", "60", "30"));
     }
 
     @Test
@@ -132,10 +132,10 @@ class DegradedStatusServiceTest {
 
     @Test
     void onlyTheFirstSegmentSwitch_hidesEffects() {
-        assertThat(degraded(Map.of("app.polling.interval-seconds", "60"),
-                Map.of("app.polling.interval-seconds", "30", "app.polling.enabled", "false"))
+        assertThat(degraded(Map.of("app.polling.free-interval-seconds", "60"),
+                Map.of("app.polling.free-interval-seconds", "30", "app.polling.enabled", "false"))
                 .status().effects())
-                .containsExactly(new DegradedEffectDto("app.polling.interval-seconds", "60", "30"));
+                .containsExactly(new DegradedEffectDto("app.polling.free-interval-seconds", "60", "30"));
     }
 
     @Test

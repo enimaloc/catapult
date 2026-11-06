@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.minecraft;
 
+import fr.enimaloc.catapult.site.SiteRole;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.extern.slf4j.Slf4j;
@@ -33,13 +34,17 @@ public class MsaAuthClient {
 
     private final RestClient restClient;
     private final String clientId;
+    private final SiteRole siteRole;
 
-    public MsaAuthClient(RestClient restClient, @Value("${minecraft.msa-client-id:}") String clientId) {
+    public MsaAuthClient(RestClient restClient, @Value("${minecraft.msa-client-id:}") String clientId,
+                         SiteRole siteRole) {
         this.restClient = restClient;
         this.clientId = clientId;
+        this.siteRole = siteRole;
     }
 
     public MsaTokens refresh(String refreshToken) {
+        siteRole.requireActive("msa token refresh");
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("client_id", clientId);
         form.add("grant_type", "refresh_token");

@@ -234,7 +234,8 @@ public class AdminDataService {
 
     private Map<String, Object> toRowMap(Object entity, EntityType<?> entityType) {
         Map<String, Object> row = new LinkedHashMap<>();
-        row.put("id", IdCodec.encode(readId(entity, entityType), entityType));
+        String encodedId = IdCodec.encode(readId(entity, entityType), entityType);
+        row.put("id", encodedId);
         for (Attribute<?, ?> attribute : entityType.getAttributes()) {
             AttributeKind kind = AttributeClassifier.classify(attribute);
             if (kind == AttributeKind.COLLECTION_RELATION) {
@@ -267,6 +268,8 @@ public class AdminDataService {
                 default -> row.put(attribute.getName(), ValueCoercion.toString(value));
             }
         }
+        // An id attribute named "id" (an @EmbeddedId above all) must not shadow the encoded id.
+        row.put("id", encodedId);
         return row;
     }
 

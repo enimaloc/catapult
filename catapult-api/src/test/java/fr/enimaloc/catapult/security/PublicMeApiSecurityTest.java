@@ -15,6 +15,7 @@ import fr.enimaloc.catapult.service.account.ChannelAccessService;
 import fr.enimaloc.catapult.service.account.ApiTokenOwner;
 import fr.enimaloc.catapult.service.account.UserApiTokenService;
 import fr.enimaloc.catapult.service.binding.CustomBindingService;
+import fr.enimaloc.catapult.service.premium.PremiumUiGate;
 import fr.enimaloc.catapult.service.binding.CustomBindingService.ActivationResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -79,6 +80,7 @@ class PublicMeApiSecurityTest {
         @Autowired MockMvc mvc;
         @MockitoBean UserApiTokenService tokens;
         @MockitoBean CustomBindingService customBindings;
+        @MockitoBean PremiumUiGate premiumUiGate;
         @MockitoBean UserAccountRepository accounts;
         @MockitoBean ChannelAccessService channelAccess;
         @MockitoBean GameInfoAssembler games;

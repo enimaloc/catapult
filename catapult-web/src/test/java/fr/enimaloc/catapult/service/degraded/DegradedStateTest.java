@@ -27,7 +27,7 @@ import static org.mockito.Mockito.when;
 class DegradedStateTest {
     private static final String PAGE = "https://s";
     private static final List<DegradedEffectDto> EFFECTS = List.of(
-            new DegradedEffectDto("app.polling.interval-seconds", "60", "30"),
+            new DegradedEffectDto("app.polling.free-interval-seconds", "60", "30"),
             new DegradedEffectDto("minecraft.friends-sync-interval-ms", "900000", "300000"));
     private static final DegradedStatusDto DEGRADED = new DegradedStatusDto(true, EFFECTS);
     private static final DegradedStatusDto HEALTHY = new DegradedStatusDto(false, null);

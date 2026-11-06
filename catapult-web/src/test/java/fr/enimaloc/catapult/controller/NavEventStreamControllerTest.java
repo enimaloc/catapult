@@ -335,12 +335,12 @@ class NavEventStreamControllerTest {
     @Test
     void aNewStream_getsTheDegradedState() throws Exception {
         when(degradedState.current()).thenReturn(new DegradedView(true,
-                List.of(new DegradedEffectDto("app.polling.interval-seconds", "60", "30")), "https://s/inc", true));
+                List.of(new DegradedEffectDto("app.polling.free-interval-seconds", "60", "30")), "https://s/inc", true));
 
         String sent = sent(anonymous("1.2.3.20"));
 
         assertThat(sent).contains("event:Degraded").contains("\"link\":\"https://s/inc\"")
-                .contains("\"effects\":[{\"key\":\"app.polling.interval-seconds\",\"value\":\"60\",\"normalValue\":\"30\"}]");
+                .contains("\"effects\":[{\"key\":\"app.polling.free-interval-seconds\",\"value\":\"60\",\"normalValue\":\"30\"}]");
     }
 
     @Test
@@ -364,7 +364,7 @@ class NavEventStreamControllerTest {
         MvcResult visitor = anonymous("1.2.3.21");
 
         controller.onDegraded(new DegradedStateChangedEvent(new DegradedView(true,
-                List.of(new DegradedEffectDto("app.polling.interval-seconds", "60", "30")), "https://s/inc", true)));
+                List.of(new DegradedEffectDto("app.polling.free-interval-seconds", "60", "30")), "https://s/inc", true)));
 
         assertThat(sent(member)).contains("\"degraded\":true");
         assertThat(sent(visitor)).contains("\"degraded\":true");

@@ -14,6 +14,8 @@ import fr.enimaloc.catapult.event.StreamOnlineEvent;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
+import fr.enimaloc.catapult.service.stream.StreamCatchUp;
+import fr.enimaloc.catapult.service.stream.StreamSessionService;
 import fr.enimaloc.catapult.service.debug.DebugContext;
 import fr.enimaloc.catapult.service.debug.DebugRecording;
 import fr.enimaloc.catapult.service.notification.CatapultCategoryChangeStateService;
@@ -22,6 +24,7 @@ import fr.enimaloc.catapult.simulation.CallKey;
 import fr.enimaloc.catapult.simulation.SimulatedCalls;
 import fr.enimaloc.catapult.simulation.SimulatedData;
 import fr.enimaloc.catapult.simulation.SimulationGate;
+import fr.enimaloc.catapult.site.SiteRole;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
@@ -70,6 +73,9 @@ public class TwitchEventSubService implements EventSubService {
 
     private final DebugRecording debug;
     private final ObjectProvider<SimulationGate> simulationGate;
+    private final SiteRole siteRole;
+    private final StreamSessionService streamSessionService;
+    private final StreamCatchUp streamCatchUp;
 
     public TwitchEventSubService(OAuthTokenRepository oAuthTokenRepository,
                                  UserAccountRepository userAccountRepository,
@@ -81,7 +87,10 @@ public class TwitchEventSubService implements EventSubService {
                                  TwitchatEventDispatcher twitchatEventDispatcher,
                                  CatapultCategoryChangeStateService categoryChangeStateService,
                                  DebugRecording debug,
-                                 ObjectProvider<SimulationGate> simulationGate) {
+                                 ObjectProvider<SimulationGate> simulationGate,
+                                 SiteRole siteRole,
+                                 StreamSessionService streamSessionService,
+                                 StreamCatchUp streamCatchUp) {
         this.oAuthTokenRepository = oAuthTokenRepository;
         this.userAccountRepository = userAccountRepository;
         this.twitchTokenService = twitchTokenService;
@@ -93,6 +102,9 @@ public class TwitchEventSubService implements EventSubService {
         this.categoryChangeStateService = categoryChangeStateService;
         this.debug = debug;
         this.simulationGate = simulationGate;
+        this.siteRole = siteRole;
+        this.streamSessionService = streamSessionService;
+        this.streamCatchUp = streamCatchUp;
         this.connections = new EventSubConnections(
             "[EventSub]", "twitch-eventsub-watchdog", oAuthTokenRepository, this::handleMessage);
     }
@@ -101,8 +113,18 @@ public class TwitchEventSubService implements EventSubService {
 
     @PostConstruct
     public void init() {
-        userAccountRepository.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE)
-            .forEach(this::connect);
+        if (!siteRole.isActive()) {
+            log.info("[EventSub] Standby site — no EventSub connection opened");
+            return;
+        }
+        for (UserAccount user : userAccountRepository.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE)) {
+            // One member failing must not leave the others without their EventSub connection
+            try {
+                connect(user);
+            } catch (RuntimeException e) {
+                log.warn("[EventSub] Could not connect user {}", user.getId(), e);
+            }
+        }
     }
 
     @PreDestroy
@@ -121,6 +143,10 @@ public class TwitchEventSubService implements EventSubService {
      * it, a fictitious account of the mock profile is skipped.
      */
     public void connect(UserAccount user) {
+        if (!siteRole.isActive()) {
+            log.debug("[EventSub] Standby site — skipping connect for user {}", user.getId());
+            return;
+        }
         if (SimulationGate.ignoresFictitious(simulationGate, user)) {
             log.debug("User {} is a fictitious account and the simulation is off — skipping EventSub connect",
                 user.getId());
@@ -138,6 +164,16 @@ public class TwitchEventSubService implements EventSubService {
                 token -> connections.open(user, token),
                 () -> log.debug("No Twitch token for user {} — skipping EventSub connect", user.getId())
             );
+    }
+
+    /**
+     * Closes every EventSub socket and forbids reopening them, whether or not their user can still be looked up:
+     * {@link #disconnect} per user needs the database, which may be what put the site on standby.
+     */
+    public void disconnectAll(String reason) {
+        connections.closeAll(reason);
+        channelStates.clear();
+        channelStateWarnedUsers.clear();
     }
 
     public void disconnect(UserAccount user) {
@@ -212,6 +248,13 @@ public class TwitchEventSubService implements EventSubService {
             String messageType = root.path("metadata").path("message_type").asText();
             switch (messageType) {
                 case "session_welcome" -> {
+                    if (!siteRole.isActive()) {
+                        // A socket reopened past the standby (a scheduled reconnect): subscribe nothing, keep it shut
+                        log.info("[EventSub] Standby site — closing the session just opened for user {}", user.getId());
+                        connections.forbidReconnect(user);
+                        connections.close(user, "standby");
+                        return;
+                    }
                     JsonNode session = root.path("payload").path("session");
                     String sessionId = session.path("id").asText();
                     long timeout = session.path("keepalive_timeout_seconds").asLong(EventSubConnections.DEFAULT_KEEPALIVE_SECONDS);
@@ -238,11 +281,20 @@ public class TwitchEventSubService implements EventSubService {
                     }
                     switch (subscriptionType) {
                         case "stream.online" -> {
+                            JsonNode onlineEvent = root.path("payload").path("event");
+                            boolean alreadyHandled = alreadyRecordedAsOngoing(user, onlineEvent);
                             streamStateService.setLive(user, true);
-                            eventPublisher.publishEvent(new StreamOnlineEvent(this, user));
+                            if (alreadyHandled) {
+                                log.debug("EventSub stream.online for user {} already handled — not published again",
+                                    user.getId());
+                            } else {
+                                recordStreamStart(user, onlineEvent);
+                                eventPublisher.publishEvent(new StreamOnlineEvent(this, user));
+                            }
                         }
                         case "stream.offline" -> {
                             streamStateService.setLive(user, false);
+                            recordStreamEnd(user);
                             eventPublisher.publishEvent(new StreamOfflineEvent(this, user));
                         }
                         case "channel.update" -> handleChannelUpdate(user, root.path("payload").path("event"));
@@ -255,6 +307,47 @@ public class TwitchEventSubService implements EventSubService {
             }
         } catch (Exception e) {
             log.error("Failed to parse EventSub message for user {}: {}", user.getId(), e.getMessage());
+        }
+    }
+
+    /** Whether this stream is the one already remembered as ongoing (a catch-up got there first, or a redelivery). */
+    private boolean alreadyRecordedAsOngoing(UserAccount user, JsonNode event) {
+        String streamId = event.path("id").asText("");
+        if (streamId.isBlank()) return false;
+        try {
+            return streamSessionService.find(user)
+                .filter(s -> s.isOngoing() && streamId.equals(s.getStreamId())).isPresent();
+        } catch (Exception e) {
+            log.warn("Could not read the remembered stream for user {}: {}", user.getId(), e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Remembers the stream that just started; a failure here must not stop the online event from being published.
+     * Nothing is recorded without a stream id and a start time (injected or simulated events carry neither).
+     */
+    private void recordStreamStart(UserAccount user, JsonNode event) {
+        String streamId = event.path("id").asText("");
+        String startedAt = event.path("started_at").asText("");
+        if (streamId.isBlank() || startedAt.isBlank()) {
+            log.debug("EventSub stream.online for user {} has no stream id or start time — not remembered",
+                user.getId());
+            return;
+        }
+        try {
+            streamSessionService.recordStart(user, streamId, Instant.parse(startedAt));
+        } catch (Exception e) {
+            log.warn("Could not remember the stream start for user {}: {}", user.getId(), e.getMessage());
+        }
+    }
+
+    /** Remembers the stream that just ended; a failure here must not stop the offline event from being published. */
+    private void recordStreamEnd(UserAccount user) {
+        try {
+            streamSessionService.recordEnd(user, Instant.now());
+        } catch (Exception e) {
+            log.warn("Could not remember the stream end for user {}: {}", user.getId(), e.getMessage());
         }
     }
 
@@ -434,11 +527,32 @@ public class TwitchEventSubService implements EventSubService {
                 .body(String.class);
             JsonNode response = objectMapper.readTree(raw);
             if (response == null || !response.has("data")) return;
-            boolean isLive = !response.path("data").isEmpty();
-            streamStateService.setLive(user, isLive);
-            log.debug("Initialized stream state for user {}: live={}", user.getId(), isLive);
+            JsonNode stream = response.path("data").path(0);
+            if (stream.isMissingNode()) {
+                streamCatchUp.reconcile(user, Optional.empty());
+            } else {
+                Optional<StreamCatchUp.LiveStream> live = parseLiveStream(stream);
+                if (live.isPresent()) {
+                    streamCatchUp.reconcile(user, live);
+                } else {
+                    log.debug("Live stream of user {} has no usable id or start time — no catch-up", user.getId());
+                    streamStateService.restoreLive(user, true);
+                }
+            }
+            log.debug("Initialized stream state for user {}: live={}", user.getId(), !stream.isMissingNode());
         } catch (Exception e) {
             log.warn("Failed to initialize stream state for user {}: {}", user.getId(), e.getMessage(), e);
+        }
+    }
+
+    private Optional<StreamCatchUp.LiveStream> parseLiveStream(JsonNode stream) {
+        String id = stream.path("id").asText("");
+        String startedAt = stream.path("started_at").asText("");
+        if (id.isBlank() || startedAt.isBlank()) return Optional.empty();
+        try {
+            return Optional.of(new StreamCatchUp.LiveStream(id, Instant.parse(startedAt)));
+        } catch (java.time.format.DateTimeParseException e) {
+            return Optional.empty();
         }
     }
 

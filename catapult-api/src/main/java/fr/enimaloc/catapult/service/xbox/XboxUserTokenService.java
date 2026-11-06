@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.service.xbox;
 
+import fr.enimaloc.catapult.site.SiteRole;
+import fr.enimaloc.catapult.site.StandbyException;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
@@ -53,6 +55,7 @@ public class XboxUserTokenService {
     private final Map<UUID, CachedSession> cache = new ConcurrentHashMap<>();
     // 1 = token OK, 0 = chain failing; per user UUID
     private final Map<UUID, Integer> tokenState = new ConcurrentHashMap<>();
+    private final SiteRole siteRole;
     private final Map<UUID, Object> refreshLocks = new ConcurrentHashMap<>();
 
     public XboxUserTokenService(ClientRegistrationRepository clientRegistrationRepository,
@@ -60,12 +63,14 @@ public class XboxUserTokenService {
                                  TokenEncryptionService encryption,
                                  XboxService xboxService,
                                  OAuth2AccessTokenResponseClient<OAuth2RefreshTokenGrantRequest> refreshClient,
-                                 MeterRegistry meterRegistry) {
+                                 MeterRegistry meterRegistry,
+                                 SiteRole siteRole) {
         this.clientRegistrationRepository = clientRegistrationRepository;
         this.oAuthTokenRepository = oAuthTokenRepository;
         this.encryption = encryption;
         this.xboxService = xboxService;
         this.refreshClient = refreshClient;
+        this.siteRole = siteRole;
         Gauge.builder("catapult.xbox.token.ok",
                         tokenState, m -> m.values().stream().mapToInt(Integer::intValue).sum())
                 .description("Number of Xbox users with a valid XSTS token")
@@ -104,6 +109,7 @@ public class XboxUserTokenService {
             }
 
             try {
+                siteRole.requireActive("msa token refresh");
                 String msaAccessToken = refreshMicrosoftToken(tokenOpt.get());
                 XboxService.Token xbox = xboxService.getXboxToken("d=" + msaAccessToken);
                 XboxService.Token xsts = xboxService.getXstsToken(XboxService.XBOX_LIVE_RELYING_PARTY, xbox);
@@ -113,6 +119,10 @@ public class XboxUserTokenService {
                 cache.put(user.getId(), new CachedSession(session, xsts.notAfter()));
                 tokenState.put(user.getId(), 1);
                 return Optional.of(session);
+            } catch (StandbyException e) {
+                tokenState.put(user.getId(), 0);
+                log.debug("Xbox auth chain skipped for user {}: {}", user.getId(), e.getMessage());
+                return Optional.empty();
             } catch (Exception e) {
                 tokenState.put(user.getId(), 0);
                 log.warn("Xbox auth chain failed for user {}: {}", user.getId(), e.getMessage());

@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.notification;
 
+import fr.enimaloc.catapult.site.StandbyException;
 import fr.enimaloc.catapult.service.debug.DebugContext;
 import fr.enimaloc.catapult.common.dto.notification.NotificationChannel;
 import fr.enimaloc.catapult.domain.account.UserAccount;
@@ -76,6 +77,9 @@ public class NotificationDeliveryDispatcher {
                         nullToEmpty(n.getCtaUrl()), nullToEmpty(n.getCtaLabel()))) {
                     delivered++;
                 }
+            } catch (StandbyException e) {
+                log.debug("Twitchat notification {} kept pending for {}: {}", n.getId(), user.getId(), e.getMessage());
+                restore(delivery);
             } catch (RuntimeException e) {
                 log.warn("Twitchat notification {} not delivered to {}: {}", n.getId(), user.getId(), e.getMessage(), e);
                 restore(delivery);
@@ -126,6 +130,9 @@ public class NotificationDeliveryDispatcher {
         }
         try {
             chatService.sendMessage(user, chatText(n));
+        } catch (StandbyException e) {
+            log.debug("Notification {} kept pending for {}'s chat: {}", n.getId(), user.getId(), e.getMessage());
+            restore(delivery);
         } catch (RuntimeException e) {
             log.warn("Notification {} not posted in {}'s chat: {}", n.getId(), user.getId(), e.getMessage(), e);
             restore(delivery);

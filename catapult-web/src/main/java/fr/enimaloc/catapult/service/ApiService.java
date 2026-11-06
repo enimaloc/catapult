@@ -45,6 +45,7 @@ import fr.enimaloc.catapult.common.dto.notification.NotificationChannel;
 import fr.enimaloc.catapult.common.dto.notification.NotificationChannelsDto;
 import fr.enimaloc.catapult.common.dto.notification.NotificationDto;
 import fr.enimaloc.catapult.common.dto.notification.NotificationSnapshotDto;
+import fr.enimaloc.catapult.common.dto.premium.PremiumStatusDto;
 import fr.enimaloc.catapult.common.dto.admin.CacheEntryDetailDto;
 import fr.enimaloc.catapult.common.dto.admin.CacheEntryDto;
 import fr.enimaloc.catapult.common.dto.admin.CacheSummaryDto;
@@ -165,6 +166,9 @@ public interface ApiService {
     /** Makes the member the account posting chat command replies, in place of the previous one. */
     int adminPromoteMemberToSystem(java.util.UUID memberId);
     int adminDeleteMember(java.util.UUID memberId);
+    /** Grants the member premium until {@code until} (the last premium day); null means no end date. */
+    int adminGrantMemberPremium(java.util.UUID memberId, java.time.LocalDate until);
+    int adminRevokeMemberPremium(java.util.UUID memberId);
     // --- admin: a member's debug mode ---
     /** The member's debug mode; null when it was never on or catapult-api fails. */
     fr.enimaloc.catapult.common.dto.admin.MemberDebugStateDto memberDebug(java.util.UUID memberId);
@@ -259,6 +263,9 @@ public interface ApiService {
     int adminDeleteSocialLink(long id);
     /** catapult-api's status (200; 400 ids not the exact set of links), 502 when unreachable. */
     int adminOrderSocialLinks(List<Long> ids);
+
+    /** The logged-in member's premium status and what each tier gets; null when catapult-api fails. */
+    PremiumStatusDto premiumStatus();
 
     // --- notifications and broadcasts ---
 

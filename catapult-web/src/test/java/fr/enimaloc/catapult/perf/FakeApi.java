@@ -302,7 +302,7 @@ public final class FakeApi extends Dispatcher {
 
     private AdminMembersPage members() {
         List<AdminMemberDto> members = list(i -> new AdminMemberDto(id("member", i), "6" + i, "budget-member-" + i,
-                avatar(OWNER), null, false, true, "ACTIVE", AT, null));
+                avatar(OWNER), null, false, true, "ACTIVE", AT, null, false, null));
         Map<UUID, Boolean> live = new LinkedHashMap<>();
         members.forEach(member -> live.put(member.id(), true));
         return new AdminMembersPage(members, live, false, 0, 1, members.size());

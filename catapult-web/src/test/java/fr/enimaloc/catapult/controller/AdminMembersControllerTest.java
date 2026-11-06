@@ -96,6 +96,44 @@ class AdminMembersControllerTest {
     }
 
     @Test
+    void grantPremium_forwardsTheEndDate() throws Exception {
+        mvc.perform(asAdmin("premium").contentType(MediaType.APPLICATION_JSON).content("{\"until\":\"2026-12-31\"}"))
+                .andExpect(status().isNoContent());
+        mvc.perform(asAdmin("premium").contentType(MediaType.APPLICATION_JSON).content("{\"until\":null}"))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).adminGrantMemberPremium(ID, java.time.LocalDate.of(2026, 12, 31));
+        verify(apiService).adminGrantMemberPremium(ID, null);
+    }
+
+    @Test
+    void grantAndRevokePremium_answerCatapultApisStatus() throws Exception {
+        when(apiService.adminGrantMemberPremium(any(), any())).thenReturn(400);
+        when(apiService.adminRevokeMemberPremium(ID)).thenReturn(404);
+
+        mvc.perform(asAdmin("premium").contentType(MediaType.APPLICATION_JSON).content("{\"until\":\"2020-01-01\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(asAdmin("premium/revoke")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void revokePremium_isForwarded() throws Exception {
+        mvc.perform(asAdmin("premium/revoke")).andExpect(status().isNoContent());
+
+        verify(apiService).adminRevokeMemberPremium(ID);
+    }
+
+    @Test
+    void premiumActions_areRefusedToANonAdmin() throws Exception {
+        when(apiService.isAdmin()).thenReturn(false);
+
+        mvc.perform(asMember("premium/revoke")).andExpect(status().isForbidden());
+        mvc.perform(asMember("premium").contentType(MediaType.APPLICATION_JSON).content("{}")).andExpect(status().isForbidden());
+
+        verify(apiService, never()).adminRevokeMemberPremium(any());
+    }
+
+    @Test
     void targeting_actionsRelayTheirStatus() throws Exception {
         when(apiService.adminSetMemberFlag(ID, "tier", "2")).thenReturn(204);
         when(apiService.adminDeleteMemberFlag(ID, "a/b %é")).thenReturn(204);

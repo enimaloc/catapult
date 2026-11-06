@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.common.dto.InvitePageData;
 import fr.enimaloc.catapult.common.dto.UserInfoResponse;
 import fr.enimaloc.catapult.common.dto.AppConfigResponse;
 import fr.enimaloc.catapult.common.dto.channel.BindingDto;
+import fr.enimaloc.catapult.common.dto.premium.PremiumStatusDto;
 import fr.enimaloc.catapult.common.dto.channel.DeleteAccountRequest;
 import fr.enimaloc.catapult.common.dto.TokenResponse;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberDto;
@@ -73,6 +74,7 @@ import fr.enimaloc.catapult.common.dto.admin.WellKnownResponseDto;
 import fr.enimaloc.catapult.service.WellKnownContent;
 import fr.enimaloc.catapult.common.dto.admin.SaveMappingsRequest;
 import fr.enimaloc.catapult.common.dto.admin.MigrateRequest;
+import fr.enimaloc.catapult.common.dto.premium.GrantPremiumRequest;
 import fr.enimaloc.catapult.common.dto.channel.CclSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.CclToggleRequest;
 import fr.enimaloc.catapult.common.dto.channel.ChannelListResponse;
@@ -605,6 +607,16 @@ public class RealApiService implements ApiService {
     }
 
     @Override
+    public int adminGrantMemberPremium(UUID memberId, java.time.LocalDate until) {
+        return client.postVoid("/api/internal/admin/members/{id}/premium", new GrantPremiumRequest(until), memberId);
+    }
+
+    @Override
+    public int adminRevokeMemberPremium(UUID memberId) {
+        return client.delete("/api/internal/admin/members/{id}/premium", memberId);
+    }
+
+    @Override
     public int adminMigrateMember(UUID memberId, UUID targetId, boolean settings, boolean getters, boolean bindings) {
         return client.postVoid("/api/internal/admin/members/{id}/migrate", new MigrateRequest(targetId, settings, getters, bindings), memberId);
     }
@@ -815,6 +827,13 @@ public class RealApiService implements ApiService {
         UUID me = me();
         if (me == null) return HttpStatus.UNAUTHORIZED.value();
         return client.call(HttpMethod.POST, "/api/internal/users/{userId}/notifications/read-all", null, Void.class, me).status();
+    }
+
+    @Override
+    public PremiumStatusDto premiumStatus() {
+        UUID me = me();
+        if (me == null) return null;
+        return client.get("/api/internal/users/{userId}/premium", PremiumStatusDto.class, me);
     }
 
     @Override

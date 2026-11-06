@@ -17,6 +17,11 @@ import fr.enimaloc.catapult.service.account.AdminMemberService;
 import fr.enimaloc.catapult.service.account.AdminMigrationService;
 import fr.enimaloc.catapult.service.account.BotToggleService;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
+import fr.enimaloc.catapult.service.premium.PremiumService;
+import fr.enimaloc.catapult.common.dto.premium.GrantPremiumRequest;
+import fr.enimaloc.catapult.api.error.ApiProblem;
+import fr.enimaloc.catapult.common.error.ErrorCode;
+import java.time.LocalDate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -52,8 +57,10 @@ class ApiAdminMembersControllerTest {
     private final UserGroupRepository groups = mock(UserGroupRepository.class);
     private final fr.enimaloc.catapult.service.debug.MemberDebugService debug =
             mock(fr.enimaloc.catapult.service.debug.MemberDebugService.class);
+    private final PremiumService premium = mock(PremiumService.class);
     private final ApiAdminMembersController controller = new ApiAdminMembersController(new AdminMemberService(
-            accounts, streamState, accountService, botToggle, migrations, environment, flags, groups, debug));
+            accounts, streamState, accountService, botToggle, migrations, environment, flags, groups, debug, premium),
+            premium);
 
     private UserAccount member;
 
@@ -118,7 +125,7 @@ class ApiAdminMembersControllerTest {
 
         assertThat(page.members()).containsExactly(new fr.enimaloc.catapult.common.dto.admin.AdminMemberDto(
                 member.getId(), member.getTwitchId(), member.getTwitchUsername(), "https://img/member", "7656",
-                false, member.isBotEnabled(), "ACTIVE", member.getCreatedAt(), null));
+                false, member.isBotEnabled(), "ACTIVE", member.getCreatedAt(), null, false, null));
         assertThat(page.liveStatus()).containsEntry(member.getId(), true);
         assertThat(page.isMockProfile()).isTrue();
         assertThat(page.number()).isZero();
@@ -425,6 +432,80 @@ class ApiAdminMembersControllerTest {
 
             assertThat(targeting.flags()).containsExactly(new MemberTargetingDto.Flag("beta", "on"));
             assertThat(targeting.groupKeys()).containsExactly("testers");
+        }
+    }
+
+    @Nested
+    class Premium {
+        private final UUID id = UUID.randomUUID();
+
+        private static Jwt admin() {
+            return Jwt.withTokenValue("t").header("alg", "none").subject(UUID.randomUUID().toString())
+                    .claim("username", "admin-bob").build();
+        }
+
+        @BeforeEach
+        void today() {
+            when(premium.today()).thenReturn(LocalDate.of(2026, 11, 4));
+        }
+
+        @Test
+        void grant_withAnEndDate_passesTheActorAndTheDate() {
+            controller.grantPremium(id, new GrantPremiumRequest(LocalDate.of(2026, 12, 31)), admin());
+
+            verify(premium).grant(id, LocalDate.of(2026, 12, 31), "admin-bob");
+        }
+
+        @Test
+        void grant_withoutADate_hasNoEnd() {
+            controller.grantPremium(id, new GrantPremiumRequest(null), admin());
+
+            verify(premium).grant(id, null, "admin-bob");
+        }
+
+        @Test
+        void grant_untilToday_isAllowed() {
+            controller.grantPremium(id, new GrantPremiumRequest(LocalDate.of(2026, 11, 4)), admin());
+
+            verify(premium).grant(id, LocalDate.of(2026, 11, 4), "admin-bob");
+        }
+
+        @Test
+        void grant_untilAPastDay_isRejected() {
+            assertThatThrownBy(() -> controller.grantPremium(id,
+                    new GrantPremiumRequest(LocalDate.of(2026, 11, 3)), admin()))
+                    .isInstanceOfSatisfying(ApiProblem.class,
+                            e -> assertThat(e.code()).isEqualTo(ErrorCode.INVALID));
+            verify(premium, never()).grant(any(), any(), anyString());
+        }
+
+        @Test
+        void grant_withoutABody_hasNoEnd() {
+            controller.grantPremium(id, null, admin());
+
+            verify(premium).grant(id, null, "admin-bob");
+        }
+
+        @Test
+        void actor_fallsBackToTheSubjectWithoutAUsername() {
+            Jwt jwt = Jwt.withTokenValue("t").header("alg", "none").subject("sub-1").build();
+
+            controller.revokePremium(id, jwt);
+
+            verify(premium).revoke(id, "sub-1");
+        }
+
+        @Test
+        void membersPage_carriesThePremiumStatus() {
+            member.setPremium(true);
+            member.setPremiumUntil(LocalDate.of(2026, 12, 31));
+            when(premium.isPremium(member)).thenReturn(true);
+            when(accounts.findMembersPage(any())).thenReturn(pageOf(List.of(member), 0, 1));
+
+            var dto = controller.page(0, null).members().getFirst();
+
+            assertThat(dto.premium()).isTrue();
+            assertThat(dto.premiumUntil()).isEqualTo(LocalDate.of(2026, 12, 31));
         }
     }
 }

@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.minecraft;
 
+import fr.enimaloc.catapult.site.SiteRole;
 import fr.enimaloc.catapult.service.xbox.XboxService;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -27,6 +28,7 @@ import java.util.Optional;
 public class MinecraftService {
     public static final String MINECRAFT_SERVICE_URL = "https://api.minecraftservices.com";
     private final RestClient restClient;
+    private final SiteRole siteRole;
 
     public Token getMinecraftToken(XboxService.Token token) {
         return restClient.post()
@@ -67,6 +69,7 @@ public class MinecraftService {
     }
 
     public FriendsList manageFriends(String token, @Nullable String playerName, @Nullable String profileId, String action) {
+        siteRole.requireActive("minecraft friends");
         Map<String, String> body = new HashMap<>();
         if (playerName != null) body.put("name", playerName);
         if (profileId != null) body.put("profileId", profileId);
@@ -111,6 +114,7 @@ public class MinecraftService {
      * (the API has no separate GET, the exchange is bidirectional).
      */
     public PresenceList updatePresence(String token, PresenceUpdate update) {
+        siteRole.requireActive("minecraft presence");
         return restClient.post()
                 .uri(URI.create(MINECRAFT_SERVICE_URL + "/presence"))
                 .body(update)

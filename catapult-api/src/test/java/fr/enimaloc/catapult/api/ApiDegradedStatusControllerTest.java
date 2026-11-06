@@ -31,12 +31,12 @@ class ApiDegradedStatusControllerTest {
     @Test
     void answersTheStatus_withItsEffects() throws Exception {
         when(service.status()).thenReturn(new DegradedStatusDto(true,
-                List.of(new DegradedEffectDto("app.polling.interval-seconds", "60", "30"))));
+                List.of(new DegradedEffectDto("app.polling.free-interval-seconds", "60", "30"))));
 
         mvc.perform(get("/api/internal/status/degraded"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.degraded").value(true))
-                .andExpect(jsonPath("$.effects[0].key").value("app.polling.interval-seconds"))
+                .andExpect(jsonPath("$.effects[0].key").value("app.polling.free-interval-seconds"))
                 .andExpect(jsonPath("$.effects[0].value").value("60"))
                 .andExpect(jsonPath("$.effects[0].normalValue").value("30"));
     }

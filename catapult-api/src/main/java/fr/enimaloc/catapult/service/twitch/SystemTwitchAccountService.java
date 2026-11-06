@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.twitch;
 
+import fr.enimaloc.catapult.site.SiteRole;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
@@ -52,6 +53,7 @@ public class SystemTwitchAccountService {
     private final OAuthTokenRepository tokenRepo;
     private final TokenEncryptionService encryption;
     private final RestClient restClient;
+    private final SiteRole siteRole;
 
     @Value("${twitch.client-id:}")
     private String twitchClientId;
@@ -92,6 +94,7 @@ public class SystemTwitchAccountService {
     // self-invocation the proxy never intercepts), and tokenRepo.save() is transactional on
     // its own — wrapping it would also hold a DB connection across the Twitch HTTP call.
     public synchronized Optional<String> refresh() {
+        siteRole.requireActive("bot token refresh");
         Optional<UserAccount> systemAccount = userAccountRepository.findBySystemAccountTrue();
         if (systemAccount.isEmpty() || systemAccount.get().getTwitchId() == null) {
             return Optional.empty();

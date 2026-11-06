@@ -133,7 +133,7 @@ class ModelFillerTest {
         when(degradedLabels.getIfAvailable()).thenReturn(new DegradedLabels("lang/messages"));
         filler().defaultAttr(model, "", Locale.FRENCH);
         assertThat(model.get("degradedLabels")).asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.MAP)
-                .containsEntry("app.polling.interval-seconds", "Le changement de catégorie peut prendre jusqu'à {0}");
+                .containsEntry("app.polling.free-interval-seconds", "Le changement de catégorie peut prendre jusqu'à {0}");
     }
 
     @Test
@@ -153,7 +153,7 @@ class ModelFillerTest {
         Map<String, String> titles = (Map<String, String>) model.get("titles");
         assertThat(titles).containsEntry("privacy", "Confidentialité")
                 .containsEntry("channel", "page.title.channel")
-                .containsOnlyKeys("", "privacy", "changelog", "docs/api", "channel", "channel-dock", "help", "admin", "notifications", "login", "join");
+                .containsOnlyKeys("", "privacy", "changelog", "docs/api", "channel", "channel-dock", "help", "admin", "notifications", "premium", "login", "join");
     }
 
     @Test

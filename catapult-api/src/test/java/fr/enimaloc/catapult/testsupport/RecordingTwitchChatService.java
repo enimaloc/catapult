@@ -47,6 +47,11 @@ public class RecordingTwitchChatService implements TwitchChatService {
     }
 
     @Override
+    public void disconnectAll(String reason) {
+        // no chat to disconnect from
+    }
+
+    @Override
     public void timeout(UserAccount user, String targetLogin, int durationSeconds, String reason) {
         // no chat to moderate
     }

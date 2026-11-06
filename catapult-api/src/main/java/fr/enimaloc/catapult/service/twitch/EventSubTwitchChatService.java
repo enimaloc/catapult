@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.twitch;
 
+import fr.enimaloc.catapult.site.SiteRole;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.enimaloc.catapult.chat.ChatCommandEvent;
@@ -68,6 +69,7 @@ public class EventSubTwitchChatService implements TwitchChatService {
 
     private final DebugRecording debug;
     private final ObjectProvider<SimulationGate> simulationGate;
+    private final SiteRole siteRole;
 
     public EventSubTwitchChatService(OAuthTokenRepository oAuthTokenRepository,
                                      UserAccountRepository userAccountRepository,
@@ -81,7 +83,8 @@ public class EventSubTwitchChatService implements TwitchChatService {
                                      ExternalApiObservations apiObservations,
                                      TwitchChatRateLimiter chatRateLimiter,
                                      DebugRecording debug,
-                                     ObjectProvider<SimulationGate> simulationGate) {
+                                     ObjectProvider<SimulationGate> simulationGate,
+                                     SiteRole siteRole) {
         this.oAuthTokenRepository = oAuthTokenRepository;
         this.userAccountRepository = userAccountRepository;
         this.twitchTokenService = twitchTokenService;
@@ -95,6 +98,7 @@ public class EventSubTwitchChatService implements TwitchChatService {
         this.chatRateLimiter = chatRateLimiter;
         this.debug = debug;
         this.simulationGate = simulationGate;
+        this.siteRole = siteRole;
         this.connections = new EventSubConnections(
             "[EventSub Chat]", "twitch-chat-watchdog", oAuthTokenRepository, this::handleMessage);
     }
@@ -107,6 +111,10 @@ public class EventSubTwitchChatService implements TwitchChatService {
     public void init() {
         // Pre-registers the counter so it is exported as 0 before the first message
         meterRegistry.counter("catapult.chat.messages", "transport", "eventsub");
+        if (!siteRole.isActive()) {
+            log.info("[EventSub Chat] Standby site — no connection opened");
+            return;
+        }
         var users = userAccountRepository.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE);
         log.info("[EventSub Chat] Bootstrapping connections for {} active bot-enabled user(s)", users.size());
         users.forEach(this::connect);
@@ -124,6 +132,10 @@ public class EventSubTwitchChatService implements TwitchChatService {
 
     @Override
     public void connect(UserAccount user) {
+        if (!siteRole.isActive()) {
+            log.debug("[EventSub Chat] Standby site — skipping connect for user {}", user.getId());
+            return;
+        }
         if (SimulationGate.blocks(simulationGate, user.getId(), SimulatedCalls.TWITCH_CHAT_CONNECT)) {
             log.debug("[EventSub Chat] connect skipped for user {} — the simulated chat connection is not REAL",
                     user.getId());
@@ -145,6 +157,11 @@ public class EventSubTwitchChatService implements TwitchChatService {
         connections.close(user, "bot disabled");
     }
 
+    @Override
+    public void disconnectAll(String reason) {
+        connections.closeAll(reason);
+    }
+
     void handleMessage(UserAccount user, OAuthToken token, String message, boolean reconnectSession) {
         DebugContext.runAs(user.getId(), () -> {
             debug.inbound(user.getId(), "twitch", "WS", EventSubConnections.WS_URI, message,
@@ -159,6 +176,14 @@ public class EventSubTwitchChatService implements TwitchChatService {
             String messageType = root.path("metadata").path("message_type").asText();
             switch (messageType) {
                 case "session_welcome" -> {
+                    if (!siteRole.isActive()) {
+                        // A socket reopened past the standby (a scheduled reconnect): subscribe nothing, keep it shut
+                        log.info("[EventSub Chat] Standby site — closing the session just opened for user {}",
+                                user.getId());
+                        connections.forbidReconnect(user);
+                        connections.close(user, "standby");
+                        return;
+                    }
                     JsonNode session = root.path(PAYLOAD).path("session");
                     String sessionId = session.path("id").asText();
                     long timeout = session.path("keepalive_timeout_seconds").asLong(EventSubConnections.DEFAULT_KEEPALIVE_SECONDS);
@@ -298,6 +323,7 @@ public class EventSubTwitchChatService implements TwitchChatService {
 
     @Override
     public void sendMessage(UserAccount user, String message) {
+        siteRole.requireActive("twitch chat message");
         // Twitch caps a single chat message at 500 chars. Anything longer is
         // sliced into [i/N]-prefixed parts so the streamer's full response
         // reaches the channel instead of being silently truncated by Helix.
@@ -398,17 +424,20 @@ public class EventSubTwitchChatService implements TwitchChatService {
 
     @Override
     public void timeout(UserAccount user, String targetLogin, int durationSeconds, String reason) {
+        siteRole.requireActive("twitch timeout");
         if (durationSeconds <= 0) return;
         withAccessToken(user, accessToken -> helix.moderate(user, accessToken, targetLogin, durationSeconds, reason));
     }
 
     @Override
     public void ban(UserAccount user, String targetLogin, String reason) {
+        siteRole.requireActive("twitch ban");
         withAccessToken(user, accessToken -> helix.moderate(user, accessToken, targetLogin, 0, reason));
     }
 
     @Override
     public void unban(UserAccount user, String targetLogin) {
+        siteRole.requireActive("twitch unban");
         withAccessToken(user, accessToken -> helix.unban(user, accessToken, targetLogin));
     }
 
@@ -434,6 +463,7 @@ public class EventSubTwitchChatService implements TwitchChatService {
 
     @Override
     public void shoutout(UserAccount user, String targetLogin) {
+        siteRole.requireActive("twitch shoutout");
         withAccessToken(user, accessToken -> helix.shoutout(user, accessToken, targetLogin));
     }
 
