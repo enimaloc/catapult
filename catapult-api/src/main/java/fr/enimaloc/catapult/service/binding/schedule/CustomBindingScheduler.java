@@ -18,6 +18,7 @@ import fr.enimaloc.catapult.service.premium.PremiumService;
 import fr.enimaloc.catapult.site.SiteRole;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -30,9 +31,13 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Switches custom bindings on and off along their schedule while the stream is live. Nothing depends on it: the
@@ -51,7 +56,10 @@ public class CustomBindingScheduler {
     private final PremiumService premiumService;
     private final UserAccountRepository users;
     private final SiteRole siteRole;
+    private final Executor executor;
     private final Clock clock;
+    /** One lock per streamer, so the tick and the events never evaluate the same one at once. */
+    private final Map<UUID, ReentrantLock> locks = new ConcurrentHashMap<>();
 
     @Autowired
     public CustomBindingScheduler(CustomBindingScheduleRepository schedules,
@@ -59,9 +67,10 @@ public class CustomBindingScheduler {
                                   CustomBindingActivationRepository activationRepository,
                                   CustomBindingActivations activations, CustomBindingService customBindingService,
                                   StreamStateService streamStateService, PremiumService premiumService,
-                                  UserAccountRepository users, SiteRole siteRole) {
+                                  UserAccountRepository users, SiteRole siteRole,
+                                  @Qualifier("customBindingScheduleExecutor") Executor executor) {
         this(schedules, refusals, activationRepository, activations, customBindingService, streamStateService,
-                premiumService, users, siteRole, Clock.systemUTC());
+                premiumService, users, siteRole, executor, Clock.systemUTC());
     }
 
     CustomBindingScheduler(CustomBindingScheduleRepository schedules,
@@ -69,7 +78,8 @@ public class CustomBindingScheduler {
                            CustomBindingActivationRepository activationRepository,
                            CustomBindingActivations activations, CustomBindingService customBindingService,
                            StreamStateService streamStateService, PremiumService premiumService,
-                           UserAccountRepository users, SiteRole siteRole, Clock clock) {
+                           UserAccountRepository users, SiteRole siteRole, Executor executor,
+                           Clock clock) {
         this.schedules = schedules;
         this.refusals = refusals;
         this.activationRepository = activationRepository;
@@ -79,6 +89,7 @@ public class CustomBindingScheduler {
         this.premiumService = premiumService;
         this.users = users;
         this.siteRole = siteRole;
+        this.executor = executor;
         this.clock = clock;
     }
 
@@ -91,7 +102,11 @@ public class CustomBindingScheduler {
             return;
         }
         Instant now = clock.instant();
-        refusals.deleteByOccurrenceEndBefore(now);
+        try {
+            refusals.deleteByOccurrenceEndBefore(now);
+        } catch (Exception e) {
+            log.error("Custom binding schedule refusal purge failed", e);
+        }
         Set<UUID> userIds = new LinkedHashSet<>(schedules.findUserIdsWithUnpausedSchedules());
         userIds.addAll(activationRepository.findUserIdsByOrigin(Origin.SCHEDULED));
         for (UUID userId : userIds) {
@@ -110,16 +125,32 @@ public class CustomBindingScheduler {
     @EventListener
     @Order(Ordered.LOWEST_PRECEDENCE)
     public void onStreamOnline(StreamOnlineEvent event) {
-        evaluate(event.getUser(), clock.instant());
+        UserAccount user = event.getUser();
+        DebugContext.runAs(user.getId(), () -> evaluate(user, clock.instant()));
     }
 
-    /** After commit: the change is published from inside transactions and must see what they wrote. */
+    /**
+     * After commit: the change is published from inside transactions and must see what they wrote. The evaluation is
+     * handed to another thread: on this one the finished transaction's resources are still bound, and the writes of
+     * an evaluation would join it and be lost.
+     */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void onSchedulesChanged(CustomBindingSchedulesChangedEvent event) {
-        users.findById(event.userId()).ifPresent(user -> evaluate(user, clock.instant()));
+        executor.execute(() -> users.findById(event.userId())
+                .ifPresent(user -> DebugContext.runAs(user.getId(), () -> evaluate(user, clock.instant()))));
     }
 
     void evaluate(UserAccount user, Instant now) {
+        ReentrantLock lock = locks.computeIfAbsent(user.getId(), id -> new ReentrantLock());
+        lock.lock();
+        try {
+            doEvaluate(user, now);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    private void doEvaluate(UserAccount user, Instant now) {
         if (!customBindingService.enabled(user) || !streamStateService.isLive(user)) {
             return;
         }

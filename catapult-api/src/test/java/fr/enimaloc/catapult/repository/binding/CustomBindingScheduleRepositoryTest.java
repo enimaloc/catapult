@@ -6,6 +6,8 @@ import fr.enimaloc.catapult.domain.binding.CustomBindingActivation;
 import fr.enimaloc.catapult.domain.binding.CustomBindingSchedule;
 import fr.enimaloc.catapult.domain.binding.CustomBindingScheduleRefusal;
 import org.junit.jupiter.api.Test;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
@@ -121,5 +123,12 @@ class CustomBindingScheduleRepositoryTest {
         assertThat(refusals.findAll()).hasSize(1);
         assertThat(refusals.existsByScheduleIdAndOccurrenceStart(s.getId(), now.minus(1, ChronoUnit.HOURS))).isTrue();
         assertThat(refusals.existsByScheduleIdAndOccurrenceStart(s.getId(), now.minus(3, ChronoUnit.HOURS))).isFalse();
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void purgeRunsOutsideACallersTransaction() {
+        // The scheduler tick calls it with no transaction around
+        refusals.deleteByOccurrenceEndBefore(Instant.now());
     }
 }

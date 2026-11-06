@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
@@ -56,6 +57,8 @@ class CustomBindingSchedulerTest {
     @Mock UserAccountRepository users;
     @Mock SiteRole siteRole;
 
+    private final java.util.List<Runnable> handedOff = new java.util.ArrayList<>();
+    private final java.util.concurrent.Executor executor = handedOff::add;
     private CustomBindingScheduler scheduler;
     private UserAccount user;
     private CustomBinding binding;
@@ -64,7 +67,7 @@ class CustomBindingSchedulerTest {
     @BeforeEach
     void setUp() {
         scheduler = new CustomBindingScheduler(schedules, refusals, activationRepository, activations,
-                customBindingService, streamStateService, premiumService, users, siteRole,
+                customBindingService, streamStateService, premiumService, users, siteRole, executor,
                 Clock.fixed(at(21, 30), ZoneOffset.UTC));
         user = new UserAccount();
         user.setId(UUID.randomUUID());
@@ -268,6 +271,10 @@ class CustomBindingSchedulerTest {
         when(users.findById(user.getId())).thenReturn(Optional.of(user));
 
         scheduler.onSchedulesChanged(new CustomBindingSchedulesChangedEvent(user.getId()));
+        // Handed to another thread, where no transaction resource of the committed one is bound
+        assertThat(handedOff).hasSize(1);
+        verifyNoInteractions(customBindingService);
+        handedOff.get(0).run();
 
         verify(customBindingService).activateScheduled(eq(user), eq(binding), eq(s.getId()), any());
     }
@@ -307,5 +314,33 @@ class CustomBindingSchedulerTest {
 
         verify(refusals).deleteByOccurrenceEndBefore(at(21, 30));
         verify(customBindingService, times(1)).activateScheduled(eq(user), eq(binding), eq(s.getId()), any());
+    }
+
+    @Test
+    void concurrentEvaluationsOfTheSameUserActivateOnce() throws Exception {
+        CustomBindingSchedule s = slot(binding, 20, 23);
+        java.util.concurrent.atomic.AtomicReference<CustomBindingActivation> current =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        when(activations.current(user)).thenAnswer(i -> Optional.ofNullable(current.get()));
+        when(customBindingService.activateScheduled(any(), any(), any(), any())).thenAnswer(i -> {
+            Thread.sleep(200);
+            CustomBindingActivation a = new CustomBindingActivation(user.getId(), binding, at(21, 30));
+            a.setOrigin(Origin.SCHEDULED);
+            a.setScheduleId(s.getId());
+            a.setOccurrenceStart(at(20, 0));
+            current.set(a);
+            return ActivationResult.APPLIED;
+        });
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            var f1 = pool.submit(() -> evaluateAt(21, 30));
+            var f2 = pool.submit(() -> evaluateAt(21, 30));
+            f1.get();
+            f2.get();
+        } finally {
+            pool.shutdownNow();
+        }
+
+        verify(customBindingService, times(1)).activateScheduled(any(), any(), any(), any());
     }
 }
