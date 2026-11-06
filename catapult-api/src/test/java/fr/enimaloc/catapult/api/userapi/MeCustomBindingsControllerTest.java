@@ -1,5 +1,8 @@
 package fr.enimaloc.catapult.api.userapi;
 
+import fr.enimaloc.catapult.repository.binding.CustomBindingScheduleRepository;
+import fr.enimaloc.catapult.service.binding.schedule.CustomBindingScheduleService;
+import fr.enimaloc.catapult.service.premium.PremiumService;
 import fr.enimaloc.catapult.domain.account.ApiTokenScope;
 import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.api.CustomBindingViews;
@@ -70,6 +73,9 @@ class MeCustomBindingsControllerTest {
     @MockitoBean UserApiTokenService tokens;
     @MockitoBean CustomBindingService service;
     @MockitoBean PremiumUiGate premiumUiGate;
+    @MockitoBean CustomBindingScheduleService scheduleService;
+    @MockitoBean CustomBindingScheduleRepository scheduleRepository;
+    @MockitoBean PremiumService premiumService;
     @MockitoBean UserAccountRepository accounts;
 
     private UserAccount user;

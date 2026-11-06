@@ -6,9 +6,12 @@ import fr.enimaloc.catapult.api.CustomBindingViews;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingDto;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingSaveResult;
+import fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleDto;
+import fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleRequest;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.service.binding.CustomBindingService;
+import fr.enimaloc.catapult.service.binding.schedule.CustomBindingScheduleService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +27,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -38,6 +42,7 @@ public class ApiChannelCustomBindingsController {
 
     private final ApiUserResolver userResolver;
     private final CustomBindingService customBindingService;
+    private final CustomBindingScheduleService scheduleService;
     private final CustomBindingViews views;
 
     @PreAuthorize("@authz.ownsChannel(#userId)")
@@ -83,5 +88,15 @@ public class ApiChannelCustomBindingsController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deactivate(@PathVariable UUID userId) {
         customBindingService.deactivate(userResolver.user(userId));
+    }
+
+    /** Replaces the binding's whole list of time slots; 403 {@code premium_required} for one the owner may not set. */
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @PutMapping("/{customBindingId}/schedules")
+    public List<CustomBindingScheduleDto> replaceSchedules(@PathVariable UUID userId,
+                                                           @PathVariable UUID customBindingId,
+                                                           @RequestBody List<CustomBindingScheduleRequest> body) {
+        UserAccount owner = userResolver.user(userId);
+        return views.scheduleDtos(owner, scheduleService.replace(owner, customBindingId, body));
     }
 }
