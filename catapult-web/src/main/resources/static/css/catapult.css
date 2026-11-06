@@ -1239,7 +1239,8 @@ a[data-link].active {
 
 /* Every content block inside a card is separated from the previous one by a rule. */
 :is(.bot-toggle-row, .settings-switch-group, .connection-card > div, #dtdd-search-dialog,
-    .binding-edit-panel, .binding-ccl-panel, .binding-tw-panel, .binding-extensions-panel) {
+    .binding-edit-panel, .binding-ccl-panel, .binding-tw-panel, .binding-extensions-panel,
+    .custom-binding-schedules) {
     border-top: 1px solid var(--catapult-border);
 }
 
@@ -1395,6 +1396,51 @@ a[data-link].active {
     flex-wrap: wrap;
     gap: 8px;
     margin-top: 16px;
+}
+
+/* A custom binding's schedule: its slots, "Add a slot" (or why not) and the next activation, then the slot editor,
+ * whose fields go two by two and whose repeat, days and actions span the whole width. */
+.custom-binding-schedules {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 12px;
+    padding-top: 16px;
+}
+
+.custom-binding-schedule-add-row,
+.custom-binding-schedule-repeat-row,
+.custom-binding-schedule-weekly {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.custom-binding-schedule-add-unavailable,
+.custom-binding-schedule-empty,
+.custom-binding-schedule-next,
+.custom-binding-schedule-suspended {
+    color: var(--catapult-text-muted);
+    font-size: 0.9rem;
+}
+
+.custom-binding-schedule-premium {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.custom-binding-schedule-editor {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 16px;
+}
+
+.custom-binding-schedule-repeat-row,
+.custom-binding-schedule-weekly,
+.custom-binding-schedule-until {
+    grid-column: 1 / -1;
 }
 
 /* A custom binding's form starts right under its header: no rule there, unlike an association's. */

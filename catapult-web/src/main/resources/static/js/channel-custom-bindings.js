@@ -17,6 +17,8 @@
  * - On a free account (data-limit on the list, absent for premium) the header counts the bindings against the limit;
  *   at the limit "New" is disabled and a link to the premium page is shown (syncLimit, after each change of the list).
  *   The live event doesn't carry the limit: the page's is kept.
+ * - A saved binding's schedule, in its form, is channel-custom-binding-schedules.js's: wired with its row, told its
+ *   category as it changes (showHeader), and brought to the schedules a live event carries, when it does (apply).
  * - The personal API token card (Account tab) is api-token-cards.js's.
  *
  * Every text goes in through textContent or a property, never as markup.
@@ -179,6 +181,7 @@ window.CatapultCustomBindings = (function () {
                 `${CatapultChannel.baseUrl()}/games/search`, picked => { gameId.value = picked.id; },
                 { initial: { id: gameId.value, name: gameInput.value } });
             games.set(item, game);
+            window.CatapultCustomBindingSchedules?.attach(item);
 
             item.addEventListener("open", event => { if (event.target === item) item.classList.add("is-open"); });
             item.addEventListener("close", event => {
@@ -291,6 +294,9 @@ window.CatapultCustomBindings = (function () {
         wired.attachItem(row);
         // The template's extension layout has no binding to save to: this one has now.
         window.CatapultExtensions?.enable(row, `${CatapultChannel.baseUrl()}/custom-bindings/${binding.id}/extensions`);
+        // Its schedule too.
+        window.CatapultCustomBindingSchedules?.enable(row,
+            `${CatapultChannel.baseUrl()}/custom-bindings/${binding.id}/schedules`, binding.twitchGameId);
         return row;
     }
 
@@ -305,6 +311,8 @@ window.CatapultCustomBindings = (function () {
         set(item.querySelector(".custom-binding-name-label"), "textContent", binding.name ?? "");
         set(item.querySelector(".custom-binding-game-label"), "textContent", binding.twitchGameName || "—");
         show(item.querySelector(".custom-binding-uninterruptible-chip"), !!binding.uninterruptible);
+        // Its category tells whether a free account may schedule it.
+        window.CatapultCustomBindingSchedules?.setGame(item, binding.twitchGameId);
     }
 
     /** Puts `binding` in its row's form; `game`, its category search once wired. */
@@ -327,12 +335,13 @@ window.CatapultCustomBindings = (function () {
 
     /**
      * Brings the list to `bindings` (all of them, oldest first, as a CustomBindingsUpdatedEvent carries them) and
-     * `activeId`. False when it can't be done in place, for the page to be re-rendered: no bindings (an older
+     * `activeId`, and each binding's schedule to `schedules` (by id, as the state carries them) when given: an event
+     * without them leaves the schedules as they are. False when it can't be done in place, for the page to be re-rendered: no bindings (an older
      * catapult-api), the list not wired yet, or no row template to add one from. A page without the list (anyone but
      * the owner, or the experiment closed to the channel) has nothing to update, nor has an event published before the
      * last one applied (`ts`, see inOrder): what it tells is outdated.
      */
-    function apply(bindings, activeId, ts) {
+    function apply(bindings, activeId, ts, schedules) {
         const list = byId("channel-custom-bindings-list");
         if (!list) return true;
         if (!inOrder(ts)) return true;
@@ -364,6 +373,9 @@ window.CatapultCustomBindings = (function () {
             } else {
                 row = addRow(list, binding, next && next.parentElement === parent ? next : null);
             }
+            if (schedules && typeof schedules === "object") {
+                window.CatapultCustomBindingSchedules?.show(row, schedules[binding.id] ?? []);
+            }
             next = row;
         }
         showEmpty(list);
@@ -377,5 +389,5 @@ window.CatapultCustomBindings = (function () {
         if (list) attachList(list);
     });
 
-    return { setActive, apply };
+    return { setActive, apply, post, readCode, refusalText };
 })();

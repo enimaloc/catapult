@@ -1,7 +1,9 @@
 package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingDto;
+import fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleDto;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto;
+import fr.enimaloc.catapult.common.dto.channel.ChannelListResponse;
 import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.channel.ChannelUserDto;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
@@ -12,6 +14,7 @@ import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
 import fr.enimaloc.catapult.config.TwitchatCatalogConfig;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
 import fr.enimaloc.catapult.service.ApiService;
+import fr.enimaloc.catapult.service.http.ApiClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,6 +24,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -404,5 +408,130 @@ class ChannelCustomBindingsRenderingTest {
         assertThat(html).contains("Reconnecte ton compte Twitch", "Catapult est en pause sur cette chaîne",
                 "Limite de 5 bindings atteinte.", "Twitch n&#39;a pas appliqué la catégorie", "Nouveau", "Activer",
                 "Bindings personnalisés");
+    }
+
+    private static final UUID SLOT = UUID.fromString("33333333-3333-3333-3333-333333333333");
+
+    /** Tuesdays and Thursdays, 20:00 to 23:00 (Paris), next on Tuesday 10 November 2026. */
+    private static CustomBindingScheduleDto weekly(boolean suspended) {
+        return new CustomBindingScheduleDto(SLOT, LocalDateTime.parse("2026-11-10T20:00:00"),
+                LocalDateTime.parse("2026-11-10T23:00:00"), "WEEKLY", List.of("TUESDAY", "THURSDAY"), null, false,
+                suspended, suspended ? null : Instant.parse("2026-11-10T19:00:00Z"));
+    }
+
+    /** Art (on {@code artGame}) with {@code slots}; canRepeat true on a premium account. */
+    private static CustomBindingsStateDto scheduled(String artGame, Boolean canRepeat,
+                                                    List<CustomBindingScheduleDto> slots) {
+        return new CustomBindingsStateDto(true, List.of(
+                new CustomBindingDto(ART, "Art", artGame, "Art", List.of(), List.of(), false),
+                new CustomBindingDto(DEV, "Développement", "1469308723", "Software and Game Development",
+                        List.of(), List.of(), true)), null, null, null, Map.of(),
+                slots.isEmpty() ? Map.of() : Map.of(ART, slots), canRepeat);
+    }
+
+    /** The overview, rendered for a logged-in owner whose premium UI is shown or not. */
+    private String overview(CustomBindingsStateDto bindings, boolean premiumUi) throws Exception {
+        when(apiService.channelList()).thenReturn(new ChannelListResponse("1", List.of(), premiumUi));
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(new ChannelPageData(
+                new ChannelUserDto("id-1", "twitch-1", "enimaloc", "https://example.test/avatar.png"),
+                "enimaloc", true, true, true, null,
+                new PagedBindings(0, 1, 0, List.of()),
+                List.of(), Set.of(), List.of(), Set.of(),
+                null, null, null, null, null, null, null, bindings));
+        String html = mvc.perform(get("/spa/channel/enimaloc").locale(Locale.ENGLISH)
+                        .sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        return panel(html, "overview");
+    }
+
+    /** A row's schedule section: from its root to the form's actions. */
+    private static String schedules(String row) {
+        int start = row.lastIndexOf("<div", row.indexOf("custom-binding-schedules"));
+        assertThat(start).as("schedule section").isNotNegative();
+        return row.substring(start, row.indexOf("custom-binding-actions", start));
+    }
+
+    @Test
+    void scheduleSectionListsTheSlots() throws Exception {
+        String overview = overview(scheduled("509660", true, List.of(weekly(false))), false);
+        String art = row(overview, ART);
+        String section = schedules(art);
+
+        Tag root = byClass(section, "custom-binding-schedules");
+        assertThat(root.attr("data-save-url")).isEqualTo("/channel/enimaloc/custom-bindings/" + ART + "/schedules");
+        assertThat(root.attr("data-can-repeat")).isEqualTo("true");
+        assertThat(section).contains("Schedule");
+        Tag slot = byClass(section, "custom-binding-schedule");
+        assertThat(slot.attr("data-schedule-id")).isEqualTo(SLOT.toString());
+        assertThat(slot.attr("data-repeat")).isEqualTo("WEEKLY");
+        assertThat(slot.attr("data-days")).isEqualTo("TUESDAY,THURSDAY");
+        assertThat(byClass(section, "custom-binding-schedule-summary").text())
+                .isEqualTo("Tuesday, Thursday · 8:00 PM → 11:00 PM · every week");
+        Tag pause = byClass(section, "custom-binding-schedule-pause");
+        assertThat(pause.name()).isEqualTo("mdui-switch");
+        assertThat(pause.attr("checked")).isNotNull();
+        assertThat(byClass(section, "custom-binding-schedule-edit").attr("disabled")).isNull();
+        assertThat(byClass(section, "custom-binding-schedule-add").hasClass("hidden")).isFalse();
+        Tag next = byClass(section, "custom-binding-schedule-next");
+        assertThat(next.hasClass("hidden")).isFalse();
+        assertThat(next.text()).isEqualTo("Next activation: Tuesday, November 10, 8:00 PM");
+        // Dev has none; the "New" row's form has no schedule (nothing saved to schedule).
+        assertThat(schedules(row(overview, DEV))).doesNotContain("data-schedule-id=");
+        int start = overview.lastIndexOf("<mdui-collapse-item", overview.indexOf("custom-binding-new hidden"));
+        assertThat(overview.substring(start, overview.indexOf("</mdui-collapse-item>", start)))
+                .doesNotContain("custom-binding-schedules");
+        // The row template has one, without a binding to save to yet (channel-custom-bindings.js gives it).
+        int template = overview.indexOf("<template id=\"custom-binding-item-template\">");
+        String templateRow = overview.substring(template, overview.indexOf("</template>", template));
+        assertThat(byClass(templateRow, "custom-binding-schedules").attr("data-save-url")).isNull();
+    }
+
+    @Test
+    void premiumMentionsOnlyWithPremiumUi() throws Exception {
+        CustomBindingsStateDto free = scheduled("509660", false, List.of(weekly(true)));
+
+        String hidden = schedules(row(overview(free, false), ART));
+        // Neither said nor linked to (a data-* name may still spell it).
+        assertThat(hidden.replaceAll("<[^>]*>", " ")).doesNotContainIgnoringCase("premium");
+        assertThat(hidden).doesNotContain("/premium");
+        assertThat(byClass(hidden, "custom-binding-schedule-suspended").text()).isEqualTo("suspended");
+        assertThat(byClass(hidden, "custom-binding-schedule-repeat-unavailable").text())
+                .isEqualTo("Repeat unavailable");
+        // A suspended slot can only be paused or deleted.
+        assertThat(byClass(hidden, "custom-binding-schedule-edit").attr("disabled")).isNotNull();
+        assertThat(byClass(hidden, "custom-binding-schedule-delete").attr("disabled")).isNull();
+        assertThat(byClass(hidden, "custom-binding-schedule-next").hasClass("hidden")).isTrue();
+
+        String shown = schedules(row(overview(free, true), ART));
+        assertThat(byClass(shown, "custom-binding-schedule-suspended").text())
+                .isEqualTo("suspended — premium required");
+        Tag lock = byClass(shown, "custom-binding-schedule-premium");
+        assertThat(lock.attr("href")).isEqualTo("/premium");
+        assertThat(shown).contains("Premium");
+    }
+
+    @Test
+    void freeAccountOutsideSpecialEventsCannotAdd() throws Exception {
+        String outside = schedules(row(overview(scheduled("509660", false, List.of()), false), ART));
+        Tag root = byClass(outside, "custom-binding-schedules");
+        assertThat(root.attr("data-free-game-id")).isEqualTo("509663");
+        assertThat(root.attr("data-game-id")).isEqualTo("509660");
+        assertThat(root.attr("data-can-repeat")).isEqualTo("false");
+        assertThat(byClass(outside, "custom-binding-schedule-add").hasClass("hidden")).isTrue();
+        Tag note = byClass(outside, "custom-binding-schedule-add-unavailable");
+        assertThat(note.hasClass("hidden")).isFalse();
+        assertThat(note.text()).isEqualTo("Only the Special Events category can be scheduled.");
+
+        String special = schedules(row(overview(scheduled("509663", false, List.of()), false), ART));
+        assertThat(byClass(special, "custom-binding-schedule-add").hasClass("hidden")).isFalse();
+        assertThat(byClass(special, "custom-binding-schedule-add-unavailable").hasClass("hidden")).isTrue();
+        // Repeating stays out of reach: a one-off slot only.
+        assertThat(tag(special, "daily option", t -> "DAILY".equals(t.attr("value"))).attr("disabled")).isNotNull();
+        assertThat(tag(special, "weekly option", t -> "WEEKLY".equals(t.attr("value"))).attr("disabled")).isNotNull();
+
+        String premium = schedules(row(overview(scheduled("509660", true, List.of()), false), ART));
+        assertThat(byClass(premium, "custom-binding-schedule-add").hasClass("hidden")).isFalse();
+        assertThat(tag(premium, "weekly option", t -> "WEEKLY".equals(t.attr("value"))).attr("disabled")).isNull();
+        assertThat(premium).doesNotContain("custom-binding-schedule-repeat-unavailable\"");
     }
 }

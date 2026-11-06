@@ -32,9 +32,7 @@ import java.util.UUID;
 class MockCustomBindings {
     /** The free tier's cap, which the mock account is held to. */
     static final int FREE_LIMIT = 5;
-    /** Twitch's "Special Events" category, the only one a free account may schedule. */
-    private static final String FREE_CATEGORY = "509663";
-    private static final ZoneId ZONE = ZoneId.of("Europe/Paris");
+    private static final ZoneId ZONE = ZoneId.of(CustomBindingScheduleDto.ZONE);
     private static final int NAME_MAX = 40;
     private static final SecureRandom RANDOM = new SecureRandom();
 
@@ -75,7 +73,7 @@ class MockCustomBindings {
                 return new CustomBindingSave<>(400, null, ErrorCode.INVALID);
             }
         }
-        boolean freeCategory = FREE_CATEGORY.equals(bindings.get(index).twitchGameId());
+        boolean freeCategory = CustomBindingScheduleDto.FREE_TWITCH_GAME_ID.equals(bindings.get(index).twitchGameId());
         boolean repeats = slots.stream().anyMatch(slot -> slot.repeat() != null && !"NONE".equals(slot.repeat()));
         if (!slots.isEmpty() && (repeats || !freeCategory)) return new CustomBindingSave<>(403, null, ErrorCode.PREMIUM_REQUIRED);
         List<CustomBindingScheduleDto> kept = slots.stream().map(MockCustomBindings::scheduleDto).toList();

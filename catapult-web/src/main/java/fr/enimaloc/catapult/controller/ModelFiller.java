@@ -291,6 +291,8 @@ public class ModelFiller {
             model.addAttribute("dangerZone",
                     DangerZoneView.of(apiService.accountInfo(), apiService.accountDeletionDelayDays()));
             model.addAttribute("invite", apiService.invitePage());
+            // The custom bindings' schedule speaks of premium only while the member is shown premium.
+            if (channelPage.customBindings() != null) model.addAttribute("navPremium", premiumShown());
         }
         return 0;
     }

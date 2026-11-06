@@ -22,4 +22,8 @@ public record CustomBindingScheduleDto(
         boolean suspended,
         Instant nextStart
 ) {
+    /** The time zone slots are typed, stored and shown in. */
+    public static final String ZONE = "Europe/Paris";
+    /** Twitch's "Special Events" category, the only one a free account may schedule (one-off slots only). */
+    public static final String FREE_TWITCH_GAME_ID = "509663";
 }
