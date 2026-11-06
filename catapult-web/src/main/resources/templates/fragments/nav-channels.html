@@ -1,6 +1,8 @@
 <!--/*@thymesVar id="navChannels" type="java.util.List<fr.enimaloc.catapult.common.dto.channel.ChannelDto>"*/-->
-<!--/* The navbar's channels (ModelFiller#navChannels); spa.js marks the open one active. */-->
+<!--/* The navbar's channels (ModelFiller#navChannels); spa.js marks the open one active, and shows the premium
+     entry when the marker is there (experiment premium.ui open to the member). */-->
 <th:block th:fragment="channels">
+    <template th:if="${navPremium}" data-nav-premium></template>
     <a th:each="channel : ${navChannels}" data-link class="nav-channel"
        th:href="|/channel/${channel.twitchUsername()}|" th:title="${channel.twitchUsername()}"
        th:classappend="${channel.live()} ? 'live'">

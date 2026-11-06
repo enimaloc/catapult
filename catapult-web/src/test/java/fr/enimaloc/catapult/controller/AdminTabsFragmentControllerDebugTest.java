@@ -64,7 +64,7 @@ class AdminTabsFragmentControllerDebugTest {
 
     private String members(MemberDebugStateDto debug, Locale locale) throws Exception {
         when(apiService.adminMembers("", 0)).thenReturn(new AdminMembersPage(List.of(
-                new AdminMemberDto(ID, "2", "viewer", "img", null, false, true, "ACTIVE", NOW, debug)),
+                new AdminMemberDto(ID, "2", "viewer", "img", null, false, true, "ACTIVE", NOW, debug, false, null)),
                 Map.of(), false, 0, 1, 1));
         return fetch("/spa/admin/members", locale);
     }

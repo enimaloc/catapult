@@ -16,6 +16,9 @@
  * turning it on; the share of pages replayed, all by default); "turn off" and the recording's deletion (confirmed) are plain actions. The exchanges page is
  * admin-member-debug.js's.
  *
+ * Premium: "grant" (and "change the end date") goes through its dialog, whose date is optional (empty = no end);
+ * "remove" is a confirmed plain action. A refusal (a date in the past) shows catapult-api's snackbar and keeps the dialog open.
+ *
  * "Impersonate" logs the admin in as a member and opens their channel (see impersonate()).
  */
 window.CatapultAdminMembers = (function () {
@@ -130,6 +133,31 @@ window.CatapultAdminMembers = (function () {
         }
         const response = await CatapultChannel.postJson(`/admin/members/${dialog.dataset.memberId}/migrate`, body);
         if (response.ok) dialog.open = false;
+    }
+
+    // --- premium -----------------------------------------------------------------------------
+
+    /** Today's date in Paris, as yyyy-mm-dd: the earliest end date catapult-api accepts. */
+    function todayInParis() {
+        return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" }).format(new Date());
+    }
+
+    /** Opens the premium dialog on the row's member, prefilled with their current end date if they have one. */
+    function openPremium(dialog, row) {
+        dialog.dataset.memberId = row.dataset.memberId;
+        document.getElementById("admin-premium-headline").textContent =
+            dialog.dataset.headline.replace("{0}", row.dataset.memberName);
+        const until = document.getElementById("admin-premium-until");
+        until.min = todayInParis();
+        until.value = row.dataset.premiumUntil ?? "";
+        dialog.open = true;
+    }
+
+    async function submitPremium(dialog, card) {
+        const until = document.getElementById("admin-premium-until").value || null;
+        // closed before the list is swapped: the dialog goes with it, and mdui can't close a detached one
+        await postThenRefresh(card, `/admin/members/${dialog.dataset.memberId}/premium`, { until },
+            () => { dialog.open = false; });
     }
 
     // --- debug mode --------------------------------------------------------------------------
@@ -324,12 +352,20 @@ window.CatapultAdminMembers = (function () {
         unbound(root, "#admin-debug-cancel").forEach(button => button.addEventListener("click", () => { debugDialog.open = false; }));
         unbound(root, "#admin-debug-submit").forEach(button => button.addEventListener("click", () => submitDebug(debugDialog, card)));
 
+        const premiumDialog = document.getElementById("admin-premium-dialog");
+        unbound(root, "#admin-premium-cancel").forEach(button => button.addEventListener("click", () => { premiumDialog.open = false; }));
+        unbound(root, "#admin-premium-submit").forEach(button => button.addEventListener("click", () => submitPremium(premiumDialog, card)));
+
         unbound(root, "mdui-menu-item[data-action]").forEach(item => {
             item.addEventListener("click", async () => {
                 if (item.disabled) return;
                 const row = rowOf(item);
                 if (item.dataset.action === "debug-enable") {
                     openDebug(debugDialog, row);
+                    return;
+                }
+                if (item.dataset.action === "premium-grant") {
+                    openPremium(premiumDialog, row);
                     return;
                 }
                 if (item.dataset.action === "migrate") {

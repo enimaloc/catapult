@@ -45,7 +45,7 @@ class SchedulerServiceCycleTest {
     private final MinecraftPresenceGetter minecraft = mock(MinecraftPresenceGetter.class);
     private final SchedulerService scheduler = new SchedulerService(accounts, chain, gameState, events,
             new SimpleMeterRegistry(), Optional.of(steam), Optional.of(minecraft), bindings,
-            SimulationGates.none(), SiteRoles.active());
+            SimulationGates.none(), SiteRoles.active(), PollCadences.always());
     private final DetectedGame portal = new DetectedGame("620", GameBinding.SourceType.STEAM, "Portal 2");
     private UserAccount user;
 

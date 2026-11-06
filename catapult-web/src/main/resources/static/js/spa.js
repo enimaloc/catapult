@@ -1,6 +1,7 @@
 const app = document.querySelector("#app");
 const progress = document.querySelector("#nav-progress");
 const navChannels = document.querySelector("#nav-channels");
+const navPremium = document.querySelector("#nav-premium");
 // Twitch tells no one when a member becomes or stops being a moderator: the navbar catches up
 // now and then, and when its tab comes back after a while.
 const NAV_REFRESH_MS = 5 * 60_000;
@@ -294,6 +295,8 @@ async function loadNavChannels(force = false) {
         const stale = navPatches !== patchesAtStart;
         if (force || (!stale && markup !== navMarkup)) {
             navChannels.innerHTML = markup;
+            // The fragment carries a marker when premium is shown to the member (experiment premium.ui)
+            if (navPremium) navPremium.hidden = !navChannels.querySelector("[data-nav-premium]");
             // A stale response is never the reference: the next poll rewrites.
             navMarkup = stale ? null : markup;
         }

@@ -20,9 +20,13 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.Trigger;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.scheduling.annotation.SchedulingConfigurer;
+import org.springframework.scheduling.config.ScheduledTaskRegistrar;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -35,7 +39,7 @@ import java.util.concurrent.locks.ReentrantLock;
 @Service
 @DependsOn("flyway")
 @RequiredArgsConstructor
-public class SchedulerService {
+public class SchedulerService implements SchedulingConfigurer {
 
     private final UserAccountRepository userAccountRepository;
     private final GameGetterChain gameGetterChain;
@@ -47,6 +51,7 @@ public class SchedulerService {
     private final BindingService bindingService;
     private final ObjectProvider<SimulationGate> simulationGate;
     private final SiteRole siteRole;
+    private final PollCadence pollCadence;
 
     /**
      * Guards the prefetch→process→clear cycle so a manual {@link #triggerManualCheck}
@@ -58,7 +63,20 @@ public class SchedulerService {
 
     private static final long PREFETCH_TIMEOUT_SECONDS = 5;
 
-    @Scheduled(fixedRateString = "${app.polling.interval-seconds:60}000")
+    @Override
+    public void configureTasks(ScheduledTaskRegistrar registrar) {
+        registrar.addTriggerTask(this::poll, pollTrigger());
+    }
+
+    /** Runs the poll every {@link PollCadence#tickSeconds()}, re-read after each run so an override applies live. */
+    Trigger pollTrigger() {
+        return context -> {
+            Instant last = context.lastActualExecution();
+            return last == null ? context.getClock().instant() : last.plusSeconds(pollCadence.tickSeconds());
+        };
+    }
+
+    /** One cycle of the loop: polls the active accounts whose tier interval has elapsed. */
     public void poll() {
         if (!siteRole.isActive()) {
             return;
@@ -67,14 +85,17 @@ public class SchedulerService {
         cycleLock.lock();
         try {
             // Without the simulation, the fictitious accounts of the mock profile are left alone: no platform knows them
-            List<UserAccount> activeUsers = userAccountRepository
+            Instant now = Instant.now();
+            List<UserAccount> dueUsers = userAccountRepository
                 .findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE).stream()
                 .filter(user -> !SimulationGate.ignoresFictitious(simulationGate, user))
+                .filter(user -> pollCadence.isDue(user, now))
                 .toList();
 
-            prefetch(activeUsers);
+            prefetch(dueUsers);
 
-            for (UserAccount user : activeUsers) {
+            for (UserAccount user : dueUsers) {
+                pollCadence.markPolled(user.getId(), now);
                 try {
                     processUser(user);
                 } catch (Exception e) {

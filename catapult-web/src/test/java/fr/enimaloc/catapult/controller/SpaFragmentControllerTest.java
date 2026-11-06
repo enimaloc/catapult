@@ -81,6 +81,18 @@ class SpaFragmentControllerTest {
     }
 
     @Test
+    void navChannels_carryThePremiumMarker_onlyWhilePremiumIsShownToTheMember() throws Exception {
+        for (boolean shown : new boolean[]{true, false}) {
+            when(apiService.channelList()).thenReturn(new ChannelListResponse("1", List.of(), shown));
+
+            String html = mvc.perform(get("/spa/nav-channels").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+                    .andReturn().getResponse().getContentAsString();
+
+            assertThat(html.contains("data-nav-premium")).isEqualTo(shown);
+        }
+    }
+
+    @Test
     void navChannels_areRememberedForTheirLiveUpdates() throws Exception {
         List<ChannelDto> channels = List.of(new ChannelDto(UUID.randomUUID(), "1", "enimaloc", "img", true));
         when(apiService.channelList()).thenReturn(new ChannelListResponse("1", channels));

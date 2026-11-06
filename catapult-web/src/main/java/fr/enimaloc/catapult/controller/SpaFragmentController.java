@@ -144,6 +144,21 @@ public class SpaFragmentController {
         return "pages/notifications :: notifications";
     }
 
+    /** The premium page: every member sees their own status, once premium is shown to them (experiment premium.ui). */
+    @GetMapping("/premium")
+    String premium(Model model, HttpServletResponse response) {
+        HttpStatus refused = !ApiClient.hasSession() ? HttpStatus.UNAUTHORIZED
+                : !filler.premiumShown() ? HttpStatus.NOT_FOUND : null;
+        if (refused != null) {
+            response.setStatus(refused.value());
+            filler.error(model, refused.value());
+            return "pages/error :: error";
+        }
+        filler.premium(model);
+        filler.defaultAttr(model, "premium");
+        return "pages/premium :: premium";
+    }
+
     @GetMapping("/login")
     String login(Model model, @RequestParam(required = false) String error) {
         String channel = ModelFiller.loggedInChannelPath();

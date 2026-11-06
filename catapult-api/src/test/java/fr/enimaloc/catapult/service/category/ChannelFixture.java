@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.category;
 
+import fr.enimaloc.catapult.service.premium.PremiumService;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.MappingChanged;
 import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.api.channel.ApiChannelActionsController;
@@ -234,7 +235,8 @@ public class ChannelFixture {
                 raidRestoreHold, activations, categoryChain);
         customBindingService = new CustomBindingService(customBindingRepository, activations,
                 experimentService, gameStateService, streamStateService, accountRepository,
-                tokenRepository, listener, publisher, categoryChain, mock(ExtensionLayoutApplier.class));
+                tokenRepository, listener, publisher, categoryChain, mock(ExtensionLayoutApplier.class),
+                mock(PremiumService.class));
         setGameFunction = new CatapultSetGameFunction(twitch, categoryChain, gameStateService, igdbService,
                 activations);
         twitchatActionExecutor = new TwitchatActionExecutor(actionTokenService, accountRepository, categoryChain,

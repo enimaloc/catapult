@@ -156,10 +156,58 @@ class ChannelCustomBindingsRenderingTest {
         assertThat(byClass(dev, "custom-binding-uninterruptible").attr("checked")).isNotNull();
         assertThat(byClass(row(overview, ART), "custom-binding-uninterruptible").attr("checked")).isNull();
         assertThat(overview).contains("Activate", "Deactivate", "Save", "Delete");
-        assertThat(overview).contains("20 bindings maximum", "Twitch did not apply the category",
+        // No limit given (premium, or premium hidden from the member): the refusal doesn't speak of premium.
+        assertThat(byId(overview, "channel-custom-bindings-list").attr("data-error-limit-reached"))
+                .isEqualTo("You&#39;ve reached the 5-binding limit.");
+        assertThat(overview).contains("Twitch did not apply the category",
                 "Another custom binding already has this name");
         // The empty notice is hidden while bindings exist.
         assertThat(byId(overview, "channel-custom-bindings-empty").hasClass("hidden")).isTrue();
+    }
+
+    private static CustomBindingsStateDto stateOf(int count, Integer limit) {
+        List<CustomBindingDto> bindings = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            bindings.add(new CustomBindingDto(UUID.randomUUID(), "Binding " + i, "509660", "Art", List.of(),
+                    List.of(), false));
+        }
+        return new CustomBindingsStateDto(true, bindings, null, null, limit);
+    }
+
+    @Test
+    void aFreeOwnerBelowTheLimit_seesTheCount_andANewButtonWithoutTheUpgradeLink() throws Exception {
+        String overview = panel(render(true, stateOf(3, 5)), "overview");
+
+        Tag count = byId(overview, "custom-bindings-count");
+        assertThat(count.text()).isEqualTo("3/5");
+        assertThat(count.hasClass("hidden")).isFalse();
+        assertThat(byId(overview, "channel-custom-bindings-list").attr("data-limit")).isEqualTo("5");
+        assertThat(byId(overview, "custom-binding-new-btn").attr("disabled")).isNull();
+        Tag upgrade = byId(overview, "custom-bindings-upgrade");
+        assertThat(upgrade.hasClass("hidden")).isTrue();
+        assertThat(upgrade.attr("href")).isEqualTo("/premium");
+        assertThat(upgrade.text()).isEqualTo("Go premium");
+        assertThat(byId(overview, "channel-custom-bindings-list").attr("data-error-limit-reached"))
+                .isEqualTo("You&#39;ve reached the 5-binding limit of a free account: go premium to create more.");
+    }
+
+    @Test
+    void aFreeOwnerAtTheLimit_hasTheNewButtonDisabled_andTheUpgradeLinkShown() throws Exception {
+        String overview = panel(render(true, stateOf(5, 5)), "overview");
+
+        assertThat(byId(overview, "custom-bindings-count").text()).isEqualTo("5/5");
+        assertThat(byId(overview, "custom-binding-new-btn").attr("disabled")).isNotNull();
+        assertThat(byId(overview, "custom-bindings-upgrade").hasClass("hidden")).isFalse();
+    }
+
+    @Test
+    void anOwnerWithoutALimit_premiumOrWithPremiumHidden_hasNoCounter_andNeverALockedButton() throws Exception {
+        String overview = panel(render(true, stateOf(9, null)), "overview");
+
+        assertThat(byId(overview, "custom-bindings-count").hasClass("hidden")).isTrue();
+        assertThat(byId(overview, "channel-custom-bindings-list").attr("data-limit")).isNull();
+        assertThat(byId(overview, "custom-binding-new-btn").attr("disabled")).isNull();
+        assertThat(byId(overview, "custom-bindings-upgrade").hasClass("hidden")).isTrue();
     }
 
     @Test
@@ -272,7 +320,7 @@ class ChannelCustomBindingsRenderingTest {
     /** Art's layout: Build Guide in the second panel, the overlay emptied; the other slots are kept. */
     private static CustomBindingsStateDto stateWithExtensions() {
         CustomBindingsStateDto plain = state();
-        return new CustomBindingsStateDto(plain.enabled(), plain.bindings(), plain.activeId(), plain.activatedAt(),
+        return new CustomBindingsStateDto(plain.enabled(), plain.bindings(), plain.activeId(), plain.activatedAt(), null,
                 Map.of(ART, List.of(
                         new ExtensionSlotDto(TwitchExtensionsDto.Type.PANEL, 2, "mock-panel", "Build Guide"),
                         new ExtensionSlotDto(TwitchExtensionsDto.Type.OVERLAY, 1, null, null))));
@@ -354,7 +402,7 @@ class ChannelCustomBindingsRenderingTest {
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
 
         assertThat(html).contains("Reconnecte ton compte Twitch", "Catapult est en pause sur cette chaîne",
-                "20 bindings maximum", "Twitch n&#39;a pas appliqué la catégorie", "Nouveau", "Activer",
+                "Limite de 5 bindings atteinte.", "Twitch n&#39;a pas appliqué la catégorie", "Nouveau", "Activer",
                 "Bindings personnalisés");
     }
 }

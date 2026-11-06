@@ -17,6 +17,7 @@ import fr.enimaloc.catapult.repository.account.UserFlagRepository;
 import fr.enimaloc.catapult.repository.account.UserGroupRepository;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
 import fr.enimaloc.catapult.service.debug.MemberDebugService;
+import fr.enimaloc.catapult.service.premium.PremiumService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.env.Environment;
@@ -56,6 +57,7 @@ public class AdminMemberService {
     private final UserFlagRepository userFlagRepository;
     private final UserGroupRepository userGroupRepository;
     private final MemberDebugService memberDebugService;
+    private final PremiumService premiumService;
 
     /**
      * One page of members as catapult-web's admin page reads them (not the entity: no tokens, no
@@ -89,10 +91,11 @@ public class AdminMemberService {
         return found.stream().map(u -> toDto(u, debug.get(u.getId()))).toList();
     }
 
-    private static AdminMemberDto toDto(UserAccount user, MemberDebugStateDto debug) {
+    private AdminMemberDto toDto(UserAccount user, MemberDebugStateDto debug) {
         return new AdminMemberDto(user.getId(), user.getTwitchId(), user.getTwitchUsername(), user.getProfileImageUrl(),
                 user.getSteamId(), user.isSystemAccount(), user.isBotEnabled(),
-                user.getStatus() == null ? null : user.getStatus().name(), user.getCreatedAt(), debug);
+                user.getStatus() == null ? null : user.getStatus().name(), user.getCreatedAt(), debug,
+                premiumService.isPremium(user), user.getPremiumUntil());
     }
 
     public void toggleBot(UUID id) {

@@ -19,6 +19,7 @@ import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import fr.enimaloc.catapult.service.igdb.IgdbGameDetailsService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
+import fr.enimaloc.catapult.service.premium.PremiumService;
 import fr.enimaloc.catapult.service.notification.TwitchatEventDispatcher;
 import fr.enimaloc.catapult.service.tw.TwResolverService;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
@@ -61,6 +62,7 @@ class CustomBindingWiringTest {
             .withBean(OAuthTokenRepository.class, () -> mock(OAuthTokenRepository.class))
             .withBean(TwitchService.class, () -> mock(TwitchService.class))
             .withBean(ExperimentService.class, () -> mock(ExperimentService.class))
+            .withBean(PremiumService.class, () -> mock(PremiumService.class))
             .withBean(ChannelEventPublisher.class, () -> mock(ChannelEventPublisher.class))
             .withBean(TwitchatEventDispatcher.class, () -> mock(TwitchatEventDispatcher.class))
             .withBean(IgdbService.class, () -> mock(IgdbService.class))

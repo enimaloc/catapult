@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.common.dto.admin.MigrateRequest;
 import fr.enimaloc.catapult.common.dto.admin.DebugEnableRequest;
+import fr.enimaloc.catapult.common.dto.premium.GrantPremiumRequest;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.debug.DebugMembers;
 import lombok.RequiredArgsConstructor;
@@ -52,6 +53,19 @@ public class AdminMembersController {
     public ResponseEntity<Void> promoteToSystem(@PathVariable UUID id) {
         requireAdmin();
         return ApiStatus.answer(apiService.adminPromoteMemberToSystem(id));
+    }
+
+    /** Grants premium until the body's date (the last premium day); a missing date grants it with no end. */
+    @PostMapping("/premium")
+    public ResponseEntity<Void> grantPremium(@PathVariable UUID id, @RequestBody GrantPremiumRequest body) {
+        requireAdmin();
+        return ApiStatus.answer(apiService.adminGrantMemberPremium(id, body.until()));
+    }
+
+    @PostMapping("/premium/revoke")
+    public ResponseEntity<Void> revokePremium(@PathVariable UUID id) {
+        requireAdmin();
+        return ApiStatus.answer(apiService.adminRevokeMemberPremium(id));
     }
 
     @PostMapping("/delete")

@@ -1,6 +1,6 @@
 method,pattern,vars,caller,sql,notes
 # owner
-GET,/api/internal/users/{userId}/dashboard,,owner,29,
+GET,/api/internal/users/{userId}/dashboard,,owner,30,
 GET,/api/internal/users/{userId}/seen-features,,owner,2,
 GET,/api/internal/users/{userId}/settings,,owner,5,fixed:one settings row; the CCL and TW catalogs are global
 GET,/api/internal/users/{userId}/dtdd-mapping,,owner,5,fixed:the mapping of the one game the channel plays
@@ -11,7 +11,7 @@ GET,/api/internal/users/{userId}/notification-channels,,owner,2,fixed:there are 
 GET,/api/internal/users/{userId}/notifications,,owner,2,
 GET,/api/internal/users/{userId}/notifications/snapshot,,owner,3,
 GET,/api/internal/users/{userId}/invite,,owner,4,
-GET,/api/internal/users/{userId}/channels,,owner,2,
+GET,/api/internal/users/{userId}/channels,,owner,3,
 GET,/api/internal/users/{userId}/api-token,,owner,6,fixed:one token
 GET,/api/internal/users/{userId}/api-token/read,,owner,6,fixed:one token
 GET,/api/internal/users/{userId}/bindings/current,,owner,6,fixed:the binding of the one game the channel plays

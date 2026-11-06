@@ -44,6 +44,8 @@ import fr.enimaloc.catapult.common.dto.notification.NotificationChannel;
 import fr.enimaloc.catapult.common.dto.notification.NotificationChannelsDto;
 import fr.enimaloc.catapult.common.dto.notification.NotificationDto;
 import fr.enimaloc.catapult.common.dto.notification.NotificationSnapshotDto;
+import fr.enimaloc.catapult.common.dto.premium.PremiumOfferDto;
+import fr.enimaloc.catapult.common.dto.premium.PremiumStatusDto;
 import fr.enimaloc.catapult.common.dto.admin.CacheEntryDetailDto;
 import fr.enimaloc.catapult.common.dto.admin.CacheEntryDto;
 import fr.enimaloc.catapult.common.dto.admin.CacheSummaryDto;
@@ -160,6 +162,8 @@ public class MockApiService implements ApiService {
      */
     private final Map<String, MockData> data = new ConcurrentHashMap<>();
     private final MockWellKnownStore wellKnown = new MockWellKnownStore();
+    /** The free tier's custom binding limit, as catapult-api's default. */
+    private static final int MOCK_FREE_BINDING_LIMIT = MockCustomBindings.FREE_LIMIT;
     /** Application-wide too: every page shows them, logged in or not. */
     private final MockMetaTagStore metaTags = new MockMetaTagStore();
     private final MockSocialLinkStore socialLinks = new MockSocialLinkStore();
@@ -1067,6 +1071,21 @@ public class MockApiService implements ApiService {
     }
 
     @Override
+    public int adminGrantMemberPremium(UUID memberId, java.time.LocalDate until) {
+        log.trace("adminGrantMemberPremium({}, {})", memberId, until);
+        if (until != null && until.isBefore(java.time.LocalDate.now(java.time.ZoneId.of("Europe/Paris")))) return 400;
+        members.setPremium(memberId, true, until);
+        return NO_CONTENT;
+    }
+
+    @Override
+    public int adminRevokeMemberPremium(UUID memberId) {
+        log.trace("adminRevokeMemberPremium({})", memberId);
+        members.setPremium(memberId, false, null);
+        return NO_CONTENT;
+    }
+
+    @Override
     public int adminMigrateMember(UUID memberId, UUID targetId, boolean settings, boolean getters, boolean bindings) {
         log.trace("adminMigrateMember({}, {}, {}, {}, {})", memberId, targetId, settings, getters, bindings);
         // no-op in mock mode: a mock session holds a single channel's data
@@ -1265,6 +1284,17 @@ public class MockApiService implements ApiService {
         log.trace("notificationSnapshot()");
         UUID account = currentUserId();
         return account == null ? null : notifications().snapshot(account);
+    }
+
+    /** The mock account is a free one: its custom bindings count against the free limit. */
+    @Override
+    public PremiumStatusDto premiumStatus() {
+        log.trace("premiumStatus()");
+        MockData current = currentData();
+        if (current == null) return null;
+        int count = current.customBindings().state().bindings().size();
+        return new PremiumStatusDto(false, null, count, MOCK_FREE_BINDING_LIMIT,
+                new PremiumOfferDto(60, 30, 90, 60, MOCK_FREE_BINDING_LIMIT));
     }
 
     @Override
@@ -1686,7 +1716,8 @@ public class MockApiService implements ApiService {
         log.trace("degradedStatus()");
         return degraded
                 ? new DegradedStatusDto(true, List.of(
-                        new DegradedEffectDto("app.polling.interval-seconds", "60", "30"),
+                        new DegradedEffectDto("app.polling.premium-interval-seconds", "60", "30"),
+                        new DegradedEffectDto("app.polling.free-interval-seconds", "90", "60"),
                         new DegradedEffectDto("minecraft.friends-sync-interval-ms", "900000", "300000")))
                 : new DegradedStatusDto(false, null);
     }

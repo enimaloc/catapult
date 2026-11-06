@@ -14,6 +14,9 @@
  *   before the last one applied (its ts: events published apart may arrive out of order) is dropped. A save or a
  *   deletion shows its result at once from its answer (the created row added from the same template, the
  *   edited one brought up to date, the deleted one removed): its live event then finds nothing to change.
+ * - On a free account (data-limit on the list, absent for premium) the header counts the bindings against the limit;
+ *   at the limit "New" is disabled and a link to the premium page is shown (syncLimit, after each change of the list).
+ *   The live event doesn't carry the limit: the page's is kept.
  * - The personal API token card (Account tab) is api-token-cards.js's.
  *
  * Every text goes in through textContent or a property, never as markup.
@@ -200,6 +203,7 @@ window.CatapultCustomBindings = (function () {
         }
 
         list.querySelectorAll(".custom-binding-item").forEach(attachItem);
+        syncLimit(list);
         wired = {
             list, attachItem, games,
             /** A row gone: the deletion it was being confirmed for has nothing left to delete. */
@@ -249,8 +253,21 @@ window.CatapultCustomBindings = (function () {
             .find(row => row.dataset.customBindingId === id) ?? null;
     }
 
+    /** The count, the "New" button and the upgrade link, from the number of bindings listed and the list's limit. */
+    function syncLimit(list) {
+        const limit = Number.parseInt(list.dataset.limit ?? "", 10);
+        if (!Number.isFinite(limit)) return;
+        const size = list.querySelectorAll(".custom-binding-item[data-custom-binding-id]").length;
+        const count = byId("custom-bindings-count");
+        set(count, "textContent", `${size}/${limit}`);
+        show(count, true);
+        set(byId("custom-binding-new-btn"), "disabled", size >= limit);
+        show(byId("custom-bindings-upgrade"), size >= limit);
+    }
+
     /** The empty notice, shown when no binding is listed and the "New" row isn't open in its place. */
     function showEmpty(list) {
+        syncLimit(list);
         const fresh = list.querySelector(".custom-binding-new");
         show(byId("channel-custom-bindings-empty"), !list.querySelector(".custom-binding-item[data-custom-binding-id]")
             && (!fresh || fresh.classList.contains("hidden")));

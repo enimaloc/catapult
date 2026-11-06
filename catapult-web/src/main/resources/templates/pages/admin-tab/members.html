@@ -51,7 +51,7 @@
 
         <div class="admin-member" th:each="m : ${page.members()}"
              th:with="name=${m.twitchUsername() ?: '—'}, isSelf=${m.id() == currentUserId}"
-             th:attr="data-member-id=${m.id()},data-admin-key=${m.id()},data-member-name=${name}"
+             th:attr="data-member-id=${m.id()},data-admin-key=${m.id()},data-member-name=${name},data-premium-until=${m.premium() ? m.premiumUntil() : null}"
              th:classappend="${m.systemAccount()} ? 'admin-member-system'">
             <div class="admin-member-identity">
                 <mdui-avatar th:unless="${m.profileImageUrl() == null}"><img th:src="${avatars.url(m.profileImageUrl(), 64)}" alt="" width="40" height="40" loading="lazy" decoding="async"></mdui-avatar>
@@ -83,6 +83,9 @@
 
             <span class="admin-member-status">
                 <mdui-chip th:text="#{|admin.members.status.${m.status()}|}">ACTIVE</mdui-chip>
+                <mdui-chip th:if="${m.premium()}" icon="workspace_premium" class="admin-member-premium"
+                           th:attr="title=${m.premiumUntil() != null} ? #{admin.members.badge.premium_until(${#temporals.format(m.premiumUntil(), #messages.msg('format.date'))})}"
+                           th:text="#{admin.members.badge.premium}">Premium</mdui-chip>
             </span>
 
             <span class="admin-member-created"
@@ -108,6 +111,11 @@
                     <mdui-menu-item icon="link_off" data-action="twitch/unlink" th:if="${m.isActive()}"
                                     th:attr="data-confirm=#{admin.members.actions.twitch_unlink.confirm(${name})}"
                                     th:text="#{admin.members.actions.twitch_unlink}">twitch</mdui-menu-item>
+                    <mdui-menu-item icon="workspace_premium" data-action="premium-grant"
+                                    th:text="${m.premium()} ? #{admin.members.actions.premium_edit} : #{admin.members.actions.premium_grant}">premium</mdui-menu-item>
+                    <mdui-menu-item icon="remove_circle_outline" data-action="premium/revoke" th:if="${m.premium()}"
+                                    th:attr="data-confirm=#{admin.members.actions.premium_revoke.confirm(${name})}"
+                                    th:text="#{admin.members.actions.premium_revoke}">premium off</mdui-menu-item>
                     <mdui-menu-item icon="move_down" data-action="migrate"
                                     th:text="#{admin.members.actions.migrate}">migrate</mdui-menu-item>
                     <!--/* The debug mode follows the member's recording: on, off but still kept (purge pending), or never on. */-->
@@ -141,6 +149,18 @@
     <div data-admin-value="pagination" th:if="${page != null}">
         <th:block th:replace="~{pages/admin-tab/common :: pagination(${page})}"></th:block>
     </div>
+
+    <!--/* Opened by the "grant premium" and "change the end date" actions: an empty date means no end. */-->
+    <mdui-dialog id="admin-premium-dialog" th:if="${page != null}" close-on-overlay-click
+                 th:attr="data-headline=#{admin.members.premium.title('{0}')}">
+        <span slot="headline" id="admin-premium-headline"></span>
+        <div class="admin-migrate-form">
+            <mdui-text-field id="admin-premium-until" type="date" variant="outlined" clearable
+                             th:attr="label=#{admin.members.premium.until},helper=#{admin.members.premium.until.hint}"></mdui-text-field>
+        </div>
+        <mdui-button slot="action" variant="text" id="admin-premium-cancel" th:text="#{admin.members.cancel}">Annuler</mdui-button>
+        <mdui-button slot="action" id="admin-premium-submit" th:text="#{admin.members.confirm}">Confirmer</mdui-button>
+    </mdui-dialog>
 
     <!--/* Opened by the "migrate" action, on the member it was picked from. */-->
     <mdui-dialog id="admin-migrate-dialog" th:if="${page != null}" close-on-overlay-click

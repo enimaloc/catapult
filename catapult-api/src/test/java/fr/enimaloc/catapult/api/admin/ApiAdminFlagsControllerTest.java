@@ -44,6 +44,7 @@ class ApiAdminFlagsControllerTest {
     @MockitoBean BotToggleService botToggle;
     @MockitoBean AdminMigrationService migrations;
     @MockitoBean MemberDebugService memberDebug;
+    @MockitoBean fr.enimaloc.catapult.service.premium.PremiumService premiumService;
 
     @Test
     void groupsValuesUnderEachKeyAndLeavesABareTagWithNone() throws Exception {

@@ -22,6 +22,7 @@ import fr.enimaloc.catapult.service.category.CategoryTrigger.StreamEnded;
 import fr.enimaloc.catapult.service.category.ExtensionLayoutApplier;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
+import fr.enimaloc.catapult.service.premium.PremiumService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.exception.ConstraintViolationException;
@@ -37,6 +38,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.UUID;
 
@@ -58,7 +60,6 @@ import java.util.UUID;
 public class CustomBindingService {
 
     public static final String EXPERIMENT_KEY = "custom.bindings";
-    public static final int MAX_PER_STREAMER = 20;
     public static final int MAX_NAME_LENGTH = 40;
     static final int MAX_TW_LENGTH = 40;
     /** {@link GameBinding#getSourceName()} prefix of the transient binding a custom binding is applied through. */
@@ -91,6 +92,7 @@ public class CustomBindingService {
     private final ChannelEventPublisher channelEventPublisher;
     private final CategoryChain categoryChain;
     private final ExtensionLayoutApplier extensionLayoutApplier;
+    private final PremiumService premiumService;
 
     /** Created DRAFT, so closed to everyone until the admin opens it. */
     @EventListener(ApplicationReadyEvent.class)
@@ -107,13 +109,19 @@ public class CustomBindingService {
         return bindings.findByUserOrderByCreatedAtAsc(user);
     }
 
+    /** How many bindings {@code user} may have; empty when unlimited. Only creating is capped, never keeping. */
+    public OptionalInt limit(UserAccount user) {
+        return premiumService.customBindingLimit(user);
+    }
+
     public CustomBinding create(UserAccount user, CustomBindingRequest request) {
         requireEnabled(user);
         String name = validName(request);
         validCategory(request);
-        if (bindings.countByUser(user) >= MAX_PER_STREAMER) {
+        OptionalInt limit = limit(user);
+        if (limit.isPresent() && bindings.countByUser(user) >= limit.getAsInt()) {
             throw new ApiProblem(ErrorCode.LIMIT_REACHED,
-                    "At most " + MAX_PER_STREAMER + " custom bindings per channel");
+                    "At most " + limit.getAsInt() + " custom bindings on a free account");
         }
         if (bindings.findByUserAndNameIgnoreCase(user, name).isPresent()) {
             throw nameTaken();
