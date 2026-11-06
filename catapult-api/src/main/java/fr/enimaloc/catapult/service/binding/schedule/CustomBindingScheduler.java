@@ -132,7 +132,7 @@ public class CustomBindingScheduler {
         userIds.addAll(activationRepository.findUserIdsByOrigin(Origin.SCHEDULED));
         for (UUID userId : userIds) {
             try {
-                users.findById(userId).ifPresent(user -> DebugContext.runAs(userId, () -> evaluate(user, now)));
+                users.findById(userId).ifPresent(user -> DebugContext.runAs(userId, () -> evaluate(user, now, false)));
             } catch (Exception e) {
                 log.error("Custom binding schedule evaluation failed for user {}", userId, e);
             }
@@ -141,13 +141,14 @@ public class CustomBindingScheduler {
 
     /**
      * Ordered after the game detection's own stream-start handling, which would otherwise replace the binding this
-     * puts in place.
+     * puts in place. A manual activation does not hold back the running occurrence here: one made while live during
+     * it refused it already, so this one was made before the occurrence or offline.
      */
     @EventListener
     @Order(Ordered.LOWEST_PRECEDENCE)
     public void onStreamOnline(StreamOnlineEvent event) {
         UserAccount user = event.getUser();
-        DebugContext.runAs(user.getId(), () -> evaluate(user, clock.instant()));
+        DebugContext.runAs(user.getId(), () -> evaluate(user, clock.instant(), true));
     }
 
     /**
@@ -159,7 +160,7 @@ public class CustomBindingScheduler {
     public void onSchedulesChanged(CustomBindingSchedulesChangedEvent event) {
         try {
             executor.execute(() -> users.findById(event.userId())
-                    .ifPresent(user -> DebugContext.runAs(user.getId(), () -> evaluate(user, clock.instant()))));
+                    .ifPresent(user -> DebugContext.runAs(user.getId(), () -> evaluate(user, clock.instant(), false))));
         } catch (RejectedExecutionException e) {
             // The next tick catches up
             log.warn("Custom binding schedule evaluation for user {} rejected", event.userId(), e);
@@ -167,16 +168,20 @@ public class CustomBindingScheduler {
     }
 
     void evaluate(UserAccount user, Instant now) {
+        evaluate(user, now, false);
+    }
+
+    private void evaluate(UserAccount user, Instant now, boolean goingLive) {
         ReentrantLock lock = locks.computeIfAbsent(user.getId(), id -> new ReentrantLock());
         lock.lock();
         try {
-            doEvaluate(user, now);
+            doEvaluate(user, now, goingLive);
         } finally {
             lock.unlock();
         }
     }
 
-    private void doEvaluate(UserAccount user, Instant now) {
+    private void doEvaluate(UserAccount user, Instant now, boolean goingLive) {
         if (!customBindingService.enabled(user) || !streamStateService.isLive(user)) {
             return;
         }
@@ -194,7 +199,8 @@ public class CustomBindingScheduler {
         Optional<CustomBindingActivation> active = activations.current(user);
         if (due.isPresent()) {
             Due d = due.get();
-            if (active.isPresent() && (alreadyServes(active.get(), d) || manualChoiceDuring(active.get(), d))) {
+            if (active.isPresent() && (alreadyServes(active.get(), d)
+                    || !goingLive && manualChoiceDuring(active.get(), d))) {
                 return;
             }
             // A failed activation is retried by the next tick
@@ -205,7 +211,7 @@ public class CustomBindingScheduler {
         }
     }
 
-    /** A manual choice made during the occurrence stands: the schedule does not take it back. */
+    /** A manual choice made live during the occurrence stands: the schedule does not take it back. */
     private static boolean manualChoiceDuring(CustomBindingActivation activation, Due due) {
         return activation.getOrigin() == Origin.MANUAL
                 && !activation.getActivatedAt().isBefore(due.occurrence().start());

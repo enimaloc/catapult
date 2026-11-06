@@ -266,6 +266,17 @@ class CustomBindingSchedulerTest {
     }
 
     @Test
+    void manualPickedOfflineIsReplacedAtGoLive() {
+        // Clock at 21:30: picked at 20:30, during the occurrence, while the stream was offline
+        CustomBindingSchedule s = slot(binding, 20, 23);
+        active(Origin.MANUAL, at(20, 30), null, 0);
+
+        scheduler.onStreamOnline(new StreamOnlineEvent(this, user));
+
+        verify(customBindingService).activateScheduled(eq(user), eq(binding), eq(s.getId()), any());
+    }
+
+    @Test
     void aChangeEventReevaluatesTheUser() {
         CustomBindingSchedule s = slot(binding, 20, 23);
         when(users.findById(user.getId())).thenReturn(Optional.of(user));
