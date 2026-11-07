@@ -10,11 +10,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 class DashboardOnlySchemaCustomizerTest {
 
     @Test
-    void theDocumentedStateKeepsNeitherTheExtensionsNorTheLimit() {
+    void theDocumentedStateKeepsNoDashboardOnlyField() {
         Schema<?> state = new Schema<>();
         state.addProperty("enabled", new Schema<>());
         state.addProperty("extensions", new Schema<>());
         state.addProperty("limit", new Schema<>());
+        state.addProperty("schedules", new Schema<>());
+        state.addProperty("canRepeat", new Schema<>());
+        state.addProperty("premiumUi", new Schema<>());
         OpenAPI openApi = new OpenAPI().components(new Components().addSchemas("CustomBindingsStateDto", state));
 
         new DashboardOnlySchemaCustomizer().customise(openApi);

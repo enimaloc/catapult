@@ -1,5 +1,8 @@
 package fr.enimaloc.catapult.security;
 
+import fr.enimaloc.catapult.repository.binding.CustomBindingScheduleRepository;
+import fr.enimaloc.catapult.service.binding.schedule.CustomBindingScheduleService;
+import fr.enimaloc.catapult.service.premium.PremiumService;
 import fr.enimaloc.catapult.domain.account.ApiTokenScope;
 import fr.enimaloc.catapult.api.ApiMeApiTokenController;
 import fr.enimaloc.catapult.api.ApiUserResolver;
@@ -81,6 +84,9 @@ class PublicMeApiSecurityTest {
         @MockitoBean UserApiTokenService tokens;
         @MockitoBean CustomBindingService customBindings;
         @MockitoBean PremiumUiGate premiumUiGate;
+        @MockitoBean CustomBindingScheduleService scheduleService;
+        @MockitoBean CustomBindingScheduleRepository scheduleRepository;
+        @MockitoBean PremiumService premiumService;
         @MockitoBean UserAccountRepository accounts;
         @MockitoBean ChannelAccessService channelAccess;
         @MockitoBean GameInfoAssembler games;

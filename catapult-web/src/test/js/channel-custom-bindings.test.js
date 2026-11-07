@@ -1,6 +1,6 @@
 /*
  * The custom bindings: the overview list (activate, deactivate, the error told per code, create through
- * "New", edit in a row's form, confirmed delete). The personal API token card is api-token-cards.test.js's.
+ * "New", edit in a row's form, confirmed delete) and the status card's active binding line. The personal API token card is api-token-cards.test.js's.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { flush, html, load, render, response } from "./helpers.js";
@@ -64,12 +64,14 @@ function form(binding) {
 
 function overview({ empty = false, extra = "", limit = null } = {}) {
     const rows = empty ? "" : `
-        <mdui-collapse-item class="custom-binding-item is-active" data-custom-binding-id="${ART}" value="${ART}">
+        <mdui-collapse-item class="custom-binding-item is-active" id="custom-binding-${ART}"
+                            data-custom-binding-id="${ART}" value="${ART}">
             <span class="custom-binding-name-label">Art</span><span class="custom-binding-game-label">Art</span>
             <span class="custom-binding-active-chip"></span><span class="custom-binding-uninterruptible-chip hidden"></span>
             ${form({ name: "Art", gameId: "509660", gameName: "Art", ccls: ["Violence"], tws: ["spoiler"], active: true })}
         </mdui-collapse-item>
-        <mdui-collapse-item class="custom-binding-item" data-custom-binding-id="${DEV}" value="${DEV}">
+        <mdui-collapse-item class="custom-binding-item" id="custom-binding-${DEV}"
+                            data-custom-binding-id="${DEV}" value="${DEV}">
             <span class="custom-binding-name-label">Développement</span>
             <span class="custom-binding-game-label">Software and Game Development</span>
             <span class="custom-binding-active-chip hidden"></span><span class="custom-binding-uninterruptible-chip"></span>
@@ -677,6 +679,7 @@ describe("overview list: live updates", () => {
     it("keeps what the owner is typing in an open row, and an open dialog open", () => {
         overview({ extra: TEMPLATE });
         const row = item(DEV);
+        document.querySelector("mdui-collapse").value = DEV;
         row.classList.add("is-open");
         row.querySelector(".custom-binding-name").value = "Dév en cours";
         item(ART).querySelector(".custom-binding-delete").click();
@@ -688,6 +691,8 @@ describe("overview list: live updates", () => {
         expect(row.querySelector(".custom-binding-name-label").textContent).toBe("Dev");
         expect(byId("custom-binding-delete-dialog").open).toBe(true);
         expect(item(DEV)).toBe(row);
+        // Applied in place (a schedule saved in the row, for one): the row stays open
+        expect(document.querySelector("mdui-collapse").value).toBe(DEV);
     });
 
     it("closes the deletion dialog of a binding that went away", async () => {
@@ -822,5 +827,61 @@ describe("overview list: the free limit", () => {
         expect(isHidden(count())).toBe(true);
         expect(newBtn().disabled).toBeFalsy();
         expect(isHidden(upgrade())).toBe(true);
+    });
+});
+
+describe("status card: the active binding", () => {
+    const STATUS = `
+        <div id="channel-active-binding">
+            <span>Binding actif</span><a id="channel-active-binding-link" href="#custom-binding-${ART}">Art</a>
+        </div>`;
+    const line = () => byId("channel-active-binding");
+    const link = () => byId("channel-active-binding-link");
+
+    it("follows the active binding, and hides while none is", () => {
+        overview({ extra: STATUS });
+
+        CatapultCustomBindings.setActive(DEV);
+        expect(link().textContent).toBe("Développement");
+        expect(link().getAttribute("href")).toBe(`#custom-binding-${DEV}`);
+        expect(isHidden(line())).toBe(false);
+
+        CatapultCustomBindings.setActive(null);
+        expect(isHidden(line())).toBe(true);
+    });
+
+    it("names an active binding added or renamed by a live event", () => {
+        overview({ extra: STATUS + TEMPLATE });
+
+        window.CatapultCustomBindings.apply([art, dev, games], GAMES);
+        expect(link().textContent).toBe("Jeux");
+        expect(link().getAttribute("href")).toBe(`#custom-binding-${GAMES}`);
+        expect(item(GAMES).id).toBe(`custom-binding-${GAMES}`);
+
+        window.CatapultCustomBindings.apply([art, dev, { ...games, name: "Jeux vidéo" }], GAMES);
+        expect(link().textContent).toBe("Jeux vidéo");
+    });
+
+    it("opens the active binding's row and scrolls to it, the URL left alone", () => {
+        overview({ extra: STATUS });
+        const scroll = vi.fn();
+        item(ART).scrollIntoView = scroll;
+
+        const click = new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 });
+        link().dispatchEvent(click);
+
+        expect(click.defaultPrevented).toBe(true);
+        expect(document.querySelector("mdui-collapse").value).toBe(ART);
+        expect(scroll).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
+        expect(location.hash).toBe("");
+    });
+
+    it("leaves a modified click to the browser", () => {
+        overview({ extra: STATUS });
+
+        const click = new MouseEvent("click", { bubbles: true, cancelable: true, button: 0, ctrlKey: true });
+        link().dispatchEvent(click);
+
+        expect(click.defaultPrevented).toBe(false);
     });
 });

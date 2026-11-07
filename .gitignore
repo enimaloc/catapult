@@ -65,6 +65,7 @@ catapult-api/src/main/changelog.md
 .run/
 /*.sql
 /data/
+catapult-web/data/
 catapult-api/src/test/java/Tmp.java
 docs/
 scripts/*

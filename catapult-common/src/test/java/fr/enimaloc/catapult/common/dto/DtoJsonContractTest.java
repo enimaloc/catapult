@@ -1,7 +1,10 @@
 package fr.enimaloc.catapult.common.dto;
 
 
+import fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleDto;
+import fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto;
 import fr.enimaloc.catapult.common.event.ChannelEvents;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import tools.jackson.databind.ObjectMapper;
@@ -19,6 +22,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -80,6 +84,33 @@ class DtoJsonContractTest {
         assertThat(read).usingRecursiveComparison().isEqualTo(instance);
     }
 
+    @Test
+    void scheduleDtoWritesLocalAndInstantTimesAsIso() {
+        var dto = new CustomBindingScheduleDto(UUID.fromString("00000000-0000-0000-0000-000000000001"),
+                LocalDateTime.parse("2026-11-10T20:00:00"), LocalDateTime.parse("2026-11-10T22:00:00"), "NONE",
+                List.of(), null, "Europe/Paris", false, false, Instant.parse("2026-11-10T19:00:00Z"));
+
+        String written = json.writeValueAsString(dto);
+
+        assertThat(written).contains("\"startsAt\":\"2026-11-10T20:00:00\"")
+                .contains("\"nextStart\":\"2026-11-10T19:00:00Z\"");
+    }
+
+    @Test
+    void scheduleFieldsOfTheStateAreOmittedWhenEmpty() {
+        String written = json.writeValueAsString(new CustomBindingsStateDto(true, List.of(), null, null));
+
+        assertThat(written).doesNotContain("schedules").doesNotContain("canRepeat").doesNotContain("premiumUi");
+    }
+
+    @Test
+    void premiumUiOfTheStateIsWrittenWhenKnown() {
+        String written = json.writeValueAsString(new CustomBindingsStateDto(true, List.of(), null, null, null,
+                Map.of(), Map.of(), false, true));
+
+        assertThat(written).contains("\"premiumUi\":true").contains("\"canRepeat\":false");
+    }
+
     // --- sample values ------------------------------------------------------------------------
 
     private static Object sample(Type type) {
@@ -119,6 +150,7 @@ class DtoJsonContractTest {
         if (cls == boolean.class || cls == Boolean.class) return true;
         if (cls == Instant.class) return Instant.parse("2026-01-02T03:04:05Z");
         if (cls == LocalDate.class) return LocalDate.parse("2026-01-02");
+        if (cls == LocalDateTime.class) return LocalDateTime.parse("2026-11-10T20:00:00");
         if (cls == UUID.class) return UUID.fromString("00000000-0000-0000-0000-000000000001");
         if (cls == Object.class) return "value";
         if (cls.isEnum()) return cls.getEnumConstants()[0];

@@ -58,6 +58,7 @@
                 <label><mdui-switch name="live" th:checked="${channel.live()}"></mdui-switch> En live</label>
                 <label><mdui-switch name="botEnabled" th:checked="${botEnabled}"></mdui-switch> Bot actif</label>
                 <label><mdui-switch name="admin" th:checked="${admin}"></mdui-switch> Administrateur</label>
+                <label><mdui-switch name="premium" th:checked="${premium}"></mdui-switch> Premium</label>
             </div>
             <mdui-text-field variant="outlined" name="avatarUrl" label="URL de l'avatar" th:value="${channel.profileImageUrl()}"></mdui-text-field>
             <p class="mock-hint">

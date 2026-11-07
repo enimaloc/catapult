@@ -957,6 +957,13 @@ class MockApiServiceTest {
         assertThat(service.readApiTokenStatus().exists()).isFalse();
     }
 
+    /** The custom bindings' live event as the mock publishes it now: the whole list and the active one. */
+    private fr.enimaloc.catapult.event.binding.CustomBindingsUpdatedEvent listed() {
+        var state = service.customBindings(username);
+        return new fr.enimaloc.catapult.event.binding.CustomBindingsUpdatedEvent(username, state.bindings(),
+                state.activeId() == null ? null : state.activeId().toString(), null, state.schedules());
+    }
+
     @Test
     void customBindings_startWithArtActiveAndDeveloppement_andShowOnTheOwnersPage() {
         var state = service.customBindings(username);
@@ -969,12 +976,147 @@ class MockApiServiceTest {
     }
 
     @Test
+    void mockFreeAccountCannotRepeat() {
+        var art = service.customBindings(username).bindings().get(0);
+        var start = java.time.LocalDateTime.now().plusDays(1);
+        var once = new fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleRequest(null, start,
+                start.plusHours(2), "NONE", null, null, null, false);
+        var weekly = new fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleRequest(null, start,
+                start.plusHours(2), "WEEKLY", Set.of("MON"), null, null, false);
+
+        assertThat(service.saveCustomBindingSchedules(username, art.id(), List.of(weekly)).code())
+                .isEqualTo(fr.enimaloc.catapult.common.error.ErrorCode.PREMIUM_REQUIRED);
+        assertThat(service.saveCustomBindingSchedules(username, art.id(), List.of(once)).code())
+                .isEqualTo(fr.enimaloc.catapult.common.error.ErrorCode.PREMIUM_REQUIRED);
+        assertThat(service.saveCustomBindingSchedules(username, UUID.randomUUID(), List.of()).status()).isEqualTo(404);
+
+        var special = service.createCustomBinding(username, new fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest(
+                "Special", "509663", "Special Events", Set.of(), Set.of(), false)).body();
+        events.clear();
+        var kept = service.saveCustomBindingSchedules(username, special.id(), List.of(once));
+        assertThat(kept.status()).isEqualTo(200);
+        assertThat(kept.body()).hasSize(1);
+        assertThat(kept.body().get(0).id()).isNotNull();
+        // Carrying the list, as catapult-api's does: the page applies it in place, its open row stays open
+        assertThat(events).contains(listed()).doesNotContain(new fr.enimaloc.catapult.event.binding.CustomBindingsUpdatedEvent(username));
+        var state = service.customBindings(username);
+        assertThat(state.schedules().get(special.id())).hasSize(1);
+        assertThat(state.canRepeat()).isFalse();
+
+        var backwards = new fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleRequest(null, start,
+                start.minusHours(1), "NONE", null, null, null, false);
+        assertThat(service.saveCustomBindingSchedules(username, special.id(), List.of(backwards)).code())
+                .isEqualTo(fr.enimaloc.catapult.common.error.ErrorCode.INVALID);
+    }
+
+    /** As catapult-api: a slot keeps the browser's zone (the default one without), an unknown zone is invalid. */
+    @Test
+    void mockSlotKeepsItsZone() {
+        var start = java.time.LocalDateTime.now().plusDays(1).withNano(0);
+        var special = service.createCustomBinding(username, new fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest(
+                "Special", "509663", "Special Events", Set.of(), Set.of(), false)).body();
+        var tokyo = new fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleRequest(null, start,
+                start.plusHours(2), "NONE", null, null, "Asia/Tokyo", false);
+        var plain = new fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleRequest(null, start,
+                start.plusHours(2), "NONE", null, null, null, false);
+        var mars = new fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleRequest(null, start,
+                start.plusHours(2), "NONE", null, null, "Mars/Olympus", false);
+
+        var saved = service.saveCustomBindingSchedules(username, special.id(), List.of(tokyo, plain)).body();
+        assertThat(saved).extracting(fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleDto::timeZone)
+                .containsExactly("Asia/Tokyo", "Europe/Paris");
+        assertThat(service.saveCustomBindingSchedules(username, special.id(), List.of(mars)).code())
+                .isEqualTo(fr.enimaloc.catapult.common.error.ErrorCode.INVALID);
+        var tooLong = new fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleRequest(null, start,
+                start.plusDays(8), "NONE", null, null, null, false);
+        assertThat(service.saveCustomBindingSchedules(username, special.id(), List.of(tooLong)).code())
+                .isEqualTo(fr.enimaloc.catapult.common.error.ErrorCode.INVALID);
+        assertThat(service.saveCustomBindingSchedules(username, special.id(),
+                java.util.Collections.nCopies(21, plain)).code())
+                .isEqualTo(fr.enimaloc.catapult.common.error.ErrorCode.INVALID);
+    }
+
+    /** As catapult-api: a list edited from other slots than the binding's is refused, the slots kept. */
+    @Test
+    void mockRefusesAListEditedFromAnother() {
+        var start = java.time.LocalDateTime.now().plusDays(1).withNano(0);
+        var special = service.createCustomBinding(username, new fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest(
+                "Special", "509663", "Special Events", Set.of(), Set.of(), false)).body();
+        var once = new fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleRequest(null, start,
+                start.plusHours(2), "NONE", null, null, null, false);
+        var saved = service.saveCustomBindingSchedules(username, special.id(), List.of(once)).body().get(0);
+
+        var stale = service.saveCustomBindingSchedules(username, special.id(),
+                new fr.enimaloc.catapult.common.dto.binding.CustomBindingSchedulesRequest(List.of(), List.of()));
+        assertThat(stale.status()).isEqualTo(409);
+        assertThat(stale.code()).isEqualTo(fr.enimaloc.catapult.common.error.ErrorCode.STALE);
+        assertThat(service.customBindings(username).schedules().get(special.id())).hasSize(1);
+
+        assertThat(service.saveCustomBindingSchedules(username, special.id(),
+                new fr.enimaloc.catapult.common.dto.binding.CustomBindingSchedulesRequest(List.of(saved.id()), List.of()))
+                .status()).isEqualTo(200);
+    }
+
+    /** Made premium from the mock admin page: no limit, any slot; back to free, its repeating slots are suspended. */
+    @Test
+    void mockPremiumAccountRepeatsAndLosingItSuspends() {
+        var art = service.customBindings(username).bindings().get(0);
+        var start = java.time.LocalDateTime.now().plusDays(1);
+        var weekly = new fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleRequest(null, start,
+                start.plusHours(2), "WEEKLY", Set.of("MONDAY"), null, null, false);
+
+        service.getData().setPremium(true);
+        var saved = service.saveCustomBindingSchedules(username, art.id(), List.of(weekly));
+        assertThat(saved.status()).isEqualTo(200);
+        var premium = service.customBindings(username);
+        assertThat(premium.canRepeat()).isTrue();
+        assertThat(premium.limit()).isNull();
+        assertThat(premium.schedules().get(art.id()).get(0).suspended()).isFalse();
+        assertThat(service.premiumStatus().premium()).isTrue();
+        assertThat(service.premiumStatus().customBindingLimit()).isNull();
+
+        service.getData().setPremium(false);
+        var free = service.customBindings(username);
+        assertThat(free.canRepeat()).isFalse();
+        assertThat(free.limit()).isEqualTo(5);
+        assertThat(free.schedules().get(art.id()).get(0).suspended()).isTrue();
+        assertThat(free.schedules().get(art.id()).get(0).nextStart()).isNull();
+    }
+
+    /** As catapult-api: a slot kept as saved stays (paused or not) once no longer allowed, suspended. */
+    @Test
+    void mockKeepsAnUnchangedSlotOnceNoLongerAllowed() {
+        var start = java.time.LocalDateTime.now().plusDays(1).withNano(0);
+        var special = service.createCustomBinding(username, new fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest(
+                "Special", "509663", "Special Events", Set.of(), Set.of(), false)).body();
+        var once = new fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleRequest(null, start,
+                start.plusHours(2), "NONE", null, null, null, false);
+        var saved = service.saveCustomBindingSchedules(username, special.id(), List.of(once)).body().get(0);
+        assertThat(service.updateCustomBinding(username, special.id(), new fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest(
+                "Special", "509660", "Art", Set.of(), Set.of(), false)).status()).isEqualTo(200);
+
+        var paused = new fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleRequest(saved.id(), start,
+                start.plusHours(2), "NONE", null, null, null, true);
+        var kept = service.saveCustomBindingSchedules(username, special.id(), List.of(paused));
+        assertThat(kept.status()).isEqualTo(200);
+        assertThat(kept.body().get(0).paused()).isTrue();
+        assertThat(kept.body().get(0).suspended()).isTrue();
+        assertThat(kept.body().get(0).nextStart()).isNull();
+
+        var moved = new fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleRequest(saved.id(), start,
+                start.plusHours(3), "NONE", null, null, null, true);
+        assertThat(service.saveCustomBindingSchedules(username, special.id(), List.of(moved)).code())
+                .isEqualTo(fr.enimaloc.catapult.common.error.ErrorCode.PREMIUM_REQUIRED);
+        assertThat(service.customBindings(username).premiumUi()).isTrue();
+    }
+
+    @Test
     void customBindings_createValidatesLikeCatapultApi_andTellsThePage() {
         events.clear();
         var created = service.createCustomBinding(username, customBinding("  Musique "));
         assertThat(created.status()).isEqualTo(201);
         assertThat(created.body().name()).isEqualTo("Musique");
-        assertThat(events).contains(new fr.enimaloc.catapult.event.binding.CustomBindingsUpdatedEvent(username));
+        assertThat(events).contains(listed());
 
         assertThat(service.createCustomBinding(username, customBinding("musique")).code()).isEqualTo(fr.enimaloc.catapult.common.error.ErrorCode.NAME_TAKEN);
         assertThat(service.createCustomBinding(username, customBinding("   ")).code()).isEqualTo(fr.enimaloc.catapult.common.error.ErrorCode.INVALID);
@@ -1018,7 +1160,7 @@ class MockApiServiceTest {
         assertThat(service.customBindings(username).activeId()).isNull();
         assertThat(service.customBindings(username).bindings()).hasSize(1);
         assertThat(events).contains(new fr.enimaloc.catapult.event.binding.CustomBindingChangedEvent(username, null),
-                new fr.enimaloc.catapult.event.binding.CustomBindingsUpdatedEvent(username));
+                listed());
         assertThat(service.deleteCustomBinding(username, dev.id())).isEqualTo(404);
 
         var art = service.customBindings(username).bindings().get(0);

@@ -79,6 +79,7 @@ class MockAdminControllerTest {
         if (data.getChannelDto().live()) fields.put("live", "on");
         if (data.isBotEnabled()) fields.put("botEnabled", "on");
         if (data.isAdmin()) fields.put("admin", "on");
+        if (data.isPremium()) fields.put("premium", "on");
         fields.put("avatarUrl", data.getChannelDto().profileImageUrl());
         fields.put("detectedSourceType", data.getGameDto().sourceType());
         fields.put("detectedSourceName", data.getGameDto().sourceName());
@@ -325,6 +326,18 @@ class MockAdminControllerTest {
 
         mvc.perform(form("admin", null)).andExpect(flash().attribute("appReload", true));
         assertThat(data.isAdmin()).isFalse();
+    }
+
+    @Test
+    void apply_premium_switchesIt_andHasTheAppReloadOnlyWhenItChanged() throws Exception {
+        mvc.perform(get("/mock/admin")).andExpect(model().attribute("premium", false));
+
+        mvc.perform(form("premium", "on")).andExpect(flash().attribute("appReload", true));
+        assertThat(data.isPremium()).isTrue();
+        mvc.perform(form()).andExpect(flash().attributeCount(0));
+
+        mvc.perform(form("premium", null)).andExpect(flash().attribute("appReload", true));
+        assertThat(data.isPremium()).isFalse();
     }
 
     @Test

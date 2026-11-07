@@ -4,20 +4,29 @@ import fr.enimaloc.catapult.common.dto.binding.CustomBindingDto;
 import fr.enimaloc.catapult.api.error.ApiProblem;
 import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingSaveResult;
+import fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleDto;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto;
 import fr.enimaloc.catapult.common.dto.channel.ExtensionSlotDto;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.ExtensionSlotSetting;
 import fr.enimaloc.catapult.domain.binding.CustomBinding;
 import fr.enimaloc.catapult.domain.binding.CustomBindingActivation;
+import fr.enimaloc.catapult.domain.binding.CustomBindingSchedule;
+import fr.enimaloc.catapult.repository.binding.CustomBindingScheduleRepository;
 import fr.enimaloc.catapult.service.binding.CustomBindingService;
 import fr.enimaloc.catapult.service.binding.CustomBindingService.ActivationResult;
+import fr.enimaloc.catapult.service.binding.schedule.CustomBindingScheduleService;
+import fr.enimaloc.catapult.service.binding.schedule.ScheduleOccurrences;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
+import fr.enimaloc.catapult.service.premium.PremiumService;
 import fr.enimaloc.catapult.service.premium.PremiumUiGate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 
+import java.time.DayOfWeek;
+import java.time.Instant;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,16 +45,20 @@ public class CustomBindingViews {
 
     private final CustomBindingService service;
     private final PremiumUiGate premiumUiGate;
+    private final CustomBindingScheduleService scheduleService;
+    private final CustomBindingScheduleRepository scheduleRepository;
+    private final PremiumService premiumService;
 
     /**
      * {@code user}'s bindings and the active one; 403 while the experiment is closed to them. The limit is
      * left out while premium is hidden from them: the dashboard then shows no counter (creating stays capped).
      */
     public CustomBindingsStateDto state(UserAccount user) {
-        return state(user, premiumUiGate.isOpenFor(user));
+        return state(user, premiumUiGate.isOpenFor(user), true);
     }
 
-    private CustomBindingsStateDto state(UserAccount user, boolean withLimit) {
+    /** {@code withLimit}: premium is shown to {@code user}, which the dashboard is also told (premiumUi). */
+    private CustomBindingsStateDto state(UserAccount user, boolean withLimit, boolean dashboard) {
         List<CustomBinding> listed = service.list(user);
         List<CustomBindingDto> bindings = listed.stream().map(CustomBindingViews::toDto).toList();
         Optional<CustomBindingActivation> active = service.active(user);
@@ -57,12 +70,58 @@ public class CustomBindingViews {
         return new CustomBindingsStateDto(true, bindings,
                 active.map(activation -> activation.getCustomBinding().getId()).orElse(null),
                 active.map(CustomBindingActivation::getActivatedAt).orElse(null),
-                limit.isPresent() ? limit.getAsInt() : null, extensions);
+                limit.isPresent() ? limit.getAsInt() : null, extensions,
+                dashboard ? schedules(user, listed) : Map.of(),
+                dashboard ? premiumService.canRepeatSchedules(user) : null,
+                dashboard ? withLimit : null);
+    }
+
+    /** Every binding's slots by id, from one query for all of {@code user}'s. */
+    private Map<UUID, List<CustomBindingScheduleDto>> schedules(UserAccount user, List<CustomBinding> listed) {
+        Map<UUID, List<CustomBindingSchedule>> byBinding = new LinkedHashMap<>();
+        for (CustomBindingSchedule schedule : scheduleRepository.findByCustomBindingUserId(user.getId())) {
+            byBinding.computeIfAbsent(schedule.getCustomBinding().getId(), id -> new java.util.ArrayList<>())
+                    .add(schedule);
+        }
+        Instant now = Instant.now();
+        Map<UUID, List<CustomBindingScheduleDto>> result = new LinkedHashMap<>();
+        for (CustomBinding binding : listed) {
+            List<CustomBindingSchedule> slots = byBinding.get(binding.getId());
+            if (slots != null) {
+                result.put(binding.getId(), toDtos(user, binding, slots, now));
+            }
+        }
+        return result;
+    }
+
+    private List<CustomBindingScheduleDto> toDtos(UserAccount user, CustomBinding binding,
+                                                  List<CustomBindingSchedule> slots, Instant now) {
+        return slots.stream()
+                .sorted(Comparator.comparing(CustomBindingSchedule::getStartsAt))
+                .map(slot -> toDto(slot, scheduleService.suspended(user, binding, slot), now))
+                .toList();
+    }
+
+    /** {@code slots} (of one binding, already ordered) as the schedule endpoints answer them. */
+    public List<CustomBindingScheduleDto> scheduleDtos(UserAccount user, List<CustomBindingSchedule> slots) {
+        return slots.isEmpty() ? List.of()
+                : toDtos(user, slots.get(0).getCustomBinding(), slots, Instant.now());
+    }
+
+    private static CustomBindingScheduleDto toDto(CustomBindingSchedule slot, boolean suspended, Instant now) {
+        Instant nextStart = ScheduleOccurrences.current(slot, now, slot.zone())
+                .or(() -> ScheduleOccurrences.next(slot, now, slot.zone()))
+                .map(ScheduleOccurrences.Occurrence::start)
+                .orElse(null);
+        List<String> days = slot.getDays().stream().sorted().map(DayOfWeek::name).toList();
+        return new CustomBindingScheduleDto(slot.getId(), slot.getStartsAt(), slot.getEndsAt(),
+                slot.getRepeat().name(), days, slot.getRepeatUntil(), slot.getTimeZone(), slot.isPaused(), suspended,
+                nextStart);
     }
 
     /** {@link #state} as the token API answers it: without the dashboard-only limit and extension layouts. */
     public CustomBindingsStateDto publicState(UserAccount user) {
-        CustomBindingsStateDto state = state(user, false);
+        CustomBindingsStateDto state = state(user, false, false);
         return new CustomBindingsStateDto(state.enabled(), state.bindings(), state.activeId(), state.activatedAt());
     }
 

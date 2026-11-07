@@ -108,6 +108,22 @@ class ChannelEventRedisBridgeTest {
                 .containsExactly(new CustomBindingsUpdatedEvent("streamer", List.of(art), art.id().toString(), 1L));
     }
 
+    /** Their schedule slots too, when they changed: the dashboard shows them in place. */
+    @Test
+    void customBindings_theListCarriesTheSchedulesWhenTheyChanged() {
+        CustomBindingDto art = new CustomBindingDto(UUID.randomUUID(), "Art", "509660", "Art", List.of(), List.of(),
+                false);
+        var slot = new fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleDto(UUID.randomUUID(),
+                java.time.LocalDateTime.parse("2026-11-10T20:00:00"), java.time.LocalDateTime.parse("2026-11-10T22:00:00"),
+                "NONE", List.of(), null, "Europe/Paris", false, false, java.time.Instant.parse("2026-11-10T19:00:00Z"));
+
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.CUSTOM_BINDINGS_UPDATED,
+                new ChannelEvents.CustomBindingsUpdated(owner.toString(), "Streamer", List.of(art), null,
+                        Map.of(art.id(), List.of(slot))))))
+                .containsExactly(new CustomBindingsUpdatedEvent("streamer", List.of(art), null, 1L,
+                        Map.of(art.id(), List.of(slot))));
+    }
+
     @Test
     void dtddMapping_theMappingAndWhetherAProposalIsPending() {
         DtddMappingCurrentDto current = new DtddMappingCurrentDto(7L, "Valheim", 0.8, false);

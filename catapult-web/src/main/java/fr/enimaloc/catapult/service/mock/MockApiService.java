@@ -104,6 +104,9 @@ import fr.enimaloc.catapult.common.dto.account.ApiTokenStatusDto;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingDto;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingSaveResult;
+import fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleDto;
+import fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleRequest;
+import fr.enimaloc.catapult.common.dto.binding.CustomBindingSchedulesRequest;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto;
 import fr.enimaloc.catapult.event.binding.CustomBindingChangedEvent;
 import fr.enimaloc.catapult.event.binding.CustomBindingsUpdatedEvent;
@@ -643,7 +646,7 @@ public class MockApiService implements ApiService {
     public int saveCustomBindingExtensions(String username, UUID id, List<ExtensionSlotDto> slots) {
         log.trace("saveCustomBindingExtensions({}, {}, {})", username, id, slots);
         int status = currentData().customBindings().saveExtensions(id, slots);
-        if (status == NO_CONTENT) eventPublisher.publishEvent(new CustomBindingsUpdatedEvent(username));
+        if (status == NO_CONTENT) publishCustomBindings(username);
         return status;
     }
 
@@ -1286,14 +1289,15 @@ public class MockApiService implements ApiService {
         return account == null ? null : notifications().snapshot(account);
     }
 
-    /** The mock account is a free one: its custom bindings count against the free limit. */
+    /** Free by default (its custom bindings count against the free limit); the mock admin page makes it premium. */
     @Override
     public PremiumStatusDto premiumStatus() {
         log.trace("premiumStatus()");
         MockData current = currentData();
         if (current == null) return null;
         int count = current.customBindings().state().bindings().size();
-        return new PremiumStatusDto(false, null, count, MOCK_FREE_BINDING_LIMIT,
+        boolean premium = current.isPremium();
+        return new PremiumStatusDto(premium, null, count, premium ? null : MOCK_FREE_BINDING_LIMIT,
                 new PremiumOfferDto(60, 30, 90, 60, MOCK_FREE_BINDING_LIMIT));
     }
 
@@ -1739,6 +1743,16 @@ public class MockApiService implements ApiService {
                     new ChangelogSection.Entry("bead001", "fix", null, "open an OBS widget on its owner's Twitchat branch", false),
                     new ChangelogSection.Entry("bead002", "perf", "web", "build each expanded message's format once", false))));
 
+    /**
+     * The custom bindings' live event, carrying the list as catapult-api's does: the dashboard applies it in place.
+     * Without it, the page re-renders and closes the row being edited.
+     */
+    private void publishCustomBindings(String username) {
+        CustomBindingsStateDto state = currentData().customBindings().state();
+        eventPublisher.publishEvent(new CustomBindingsUpdatedEvent(username, state.bindings(),
+                state.activeId() == null ? null : state.activeId().toString(), null, state.schedules()));
+    }
+
     @Override
     public CustomBindingsStateDto customBindings(String username) {
         log.trace("customBindings({})", username);
@@ -1749,7 +1763,7 @@ public class MockApiService implements ApiService {
     public CustomBindingSave<CustomBindingDto> createCustomBinding(String username, CustomBindingRequest request) {
         log.trace("createCustomBinding({})", username);
         CustomBindingSave<CustomBindingDto> result = currentData().customBindings().create(request);
-        if (result.ok()) eventPublisher.publishEvent(new CustomBindingsUpdatedEvent(username));
+        if (result.ok()) publishCustomBindings(username);
         return result;
     }
 
@@ -1757,7 +1771,17 @@ public class MockApiService implements ApiService {
     public CustomBindingSave<CustomBindingSaveResult> updateCustomBinding(String username, UUID id, CustomBindingRequest request) {
         log.trace("updateCustomBinding({}, {})", username, id);
         CustomBindingSave<CustomBindingSaveResult> result = currentData().customBindings().update(id, request);
-        if (result.ok()) eventPublisher.publishEvent(new CustomBindingsUpdatedEvent(username));
+        if (result.ok()) publishCustomBindings(username);
+        return result;
+    }
+
+    @Override
+    public CustomBindingSave<List<CustomBindingScheduleDto>> saveCustomBindingSchedules(String username, UUID id,
+                                                                                      CustomBindingSchedulesRequest schedules) {
+        log.trace("saveCustomBindingSchedules({}, {})", username, id);
+        CustomBindingSave<List<CustomBindingScheduleDto>> result = currentData().customBindings()
+                .saveSchedules(id, schedules.known(), schedules.slots());
+        if (result.ok()) publishCustomBindings(username);
         return result;
     }
 
@@ -1769,7 +1793,7 @@ public class MockApiService implements ApiService {
         int status = store.delete(id);
         if (status == NO_CONTENT) {
             if (wasActive) eventPublisher.publishEvent(new CustomBindingChangedEvent(username, null));
-            eventPublisher.publishEvent(new CustomBindingsUpdatedEvent(username));
+            publishCustomBindings(username);
         }
         return status;
     }

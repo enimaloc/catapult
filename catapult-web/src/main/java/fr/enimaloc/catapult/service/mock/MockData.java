@@ -289,6 +289,15 @@ public class MockData {
         return customBindings;
     }
 
+    /** Whether the member has the premium features; only the mock admin page sets it. */
+    public boolean isPremium() {
+        return customBindings.isPremium();
+    }
+
+    public void setPremium(boolean premium) {
+        customBindings.setPremium(premium);
+    }
+
     public ChannelListResponse getChannelList() {
         return new ChannelListResponse(channelDto.twitchId(), withFirst(channelDto, moderatedChannels), true);
     }

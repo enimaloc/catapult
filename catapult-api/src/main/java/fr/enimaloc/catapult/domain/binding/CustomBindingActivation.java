@@ -16,6 +16,9 @@ import java.util.UUID;
 @NoArgsConstructor
 public class CustomBindingActivation {
 
+    /** Who switched the binding on: the streamer, or the scheduler on a slot. */
+    public enum Origin { MANUAL, SCHEDULED }
+
     @Id
     @Column(name = "user_id")
     private UUID userId;
@@ -26,6 +29,20 @@ public class CustomBindingActivation {
 
     @Column(name = "activated_at", nullable = false)
     private Instant activatedAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Origin origin = Origin.MANUAL;
+
+    /** The slot and occurrence a {@link Origin#SCHEDULED} activation comes from; null once the slot is deleted. */
+    @Column(name = "schedule_id")
+    private UUID scheduleId;
+
+    @Column(name = "occurrence_start")
+    private Instant occurrenceStart;
+
+    @Column(name = "occurrence_end")
+    private Instant occurrenceEnd;
 
     public CustomBindingActivation(UUID userId, CustomBinding customBinding, Instant activatedAt) {
         this.userId = userId;
