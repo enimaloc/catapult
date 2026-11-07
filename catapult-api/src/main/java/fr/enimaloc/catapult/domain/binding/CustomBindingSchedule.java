@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.domain.binding;
 
+import fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleDto;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -10,11 +11,12 @@ import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
-/** A time slot at which a custom binding switches itself on and off, once or repeated (local Europe/Paris time). */
+/** A time slot at which a custom binding switches itself on and off, once or repeated, in wall time of its zone. */
 @Entity
 @Table(name = "custom_binding_schedule")
 @Getter
@@ -53,8 +55,16 @@ public class CustomBindingSchedule {
     @Column(name = "repeat_until")
     private LocalDate repeatUntil;
 
+    /** IANA zone of {@code startsAt}, {@code endsAt} and {@code repeatUntil}: the browser's it was saved from. */
+    @Column(name = "time_zone", nullable = false)
+    private String timeZone = CustomBindingScheduleDto.ZONE;
+
     @Column(nullable = false)
     private boolean paused = false;
+
+    public ZoneId zone() {
+        return ZoneId.of(timeZone);
+    }
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

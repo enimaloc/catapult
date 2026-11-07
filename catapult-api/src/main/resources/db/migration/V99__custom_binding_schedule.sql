@@ -1,5 +1,6 @@
--- Time slots at which a custom binding switches itself on and off. Local times (Europe/Paris), like the
--- premium window; NONE is a one-off slot, DAILY/WEEKLY repeat it until repeat_until (inclusive, optional).
+-- Time slots at which a custom binding switches itself on and off. Wall times of time_zone (the IANA zone of the
+-- browser the slot was saved from, so a repeated slot follows its daylight saving time); NONE is a one-off slot,
+-- DAILY/WEEKLY repeat it until repeat_until (inclusive, optional).
 CREATE TABLE custom_binding_schedule (
     id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     custom_binding_id UUID        NOT NULL REFERENCES custom_binding (id) ON DELETE CASCADE,
@@ -7,6 +8,7 @@ CREATE TABLE custom_binding_schedule (
     ends_at           TIMESTAMP   NOT NULL,
     repeat            VARCHAR(10) NOT NULL DEFAULT 'NONE',
     repeat_until      DATE,
+    time_zone         VARCHAR(64) NOT NULL DEFAULT 'Europe/Paris',
     paused            BOOLEAN     NOT NULL DEFAULT FALSE,
     created_at        TIMESTAMP   NOT NULL DEFAULT now()
 );

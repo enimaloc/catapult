@@ -1981,10 +1981,10 @@ class RealApiServiceTest {
     void savesSchedulesThroughTheInternalRoute() {
         var slot = new fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleRequest(null,
                 java.time.LocalDateTime.of(2026, 11, 7, 20, 0), java.time.LocalDateTime.of(2026, 11, 7, 22, 0),
-                "NONE", null, null, false);
+                "NONE", null, null, "America/New_York", false);
         expect(HttpMethod.PUT, channel("streamer") + "/custom-bindings/" + CB_ID + "/schedules")
                 .andExpect(content().json("[{\"startsAt\":\"2026-11-07T20:00:00\",\"endsAt\":\"2026-11-07T22:00:00\","
-                        + "\"repeat\":\"NONE\",\"paused\":false}]"))
+                        + "\"repeat\":\"NONE\",\"timeZone\":\"America/New_York\",\"paused\":false}]"))
                 .andRespond(withSuccess("[{\"startsAt\":\"2026-11-07T20:00:00\",\"endsAt\":\"2026-11-07T22:00:00\","
                         + "\"repeat\":\"NONE\",\"days\":[],\"paused\":false,\"suspended\":false}]", MediaType.APPLICATION_JSON));
 

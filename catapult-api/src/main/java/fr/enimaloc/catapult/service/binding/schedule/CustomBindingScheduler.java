@@ -188,7 +188,7 @@ public class CustomBindingScheduler {
         Optional<Due> due = schedules.findWithBindingByCustomBindingUserId(user.getId()).stream()
                 .filter(s -> !s.isPaused()
                         && premiumService.canSchedule(user, s.getCustomBinding().getTwitchGameId(), s.getRepeat()))
-                .map(s -> ScheduleOccurrences.current(s, now, PremiumService.ZONE)
+                .map(s -> ScheduleOccurrences.current(s, now, s.zone())
                         .map(occurrence -> new Due(s, occurrence)))
                 .flatMap(Optional::stream)
                 .filter(d -> !refusals.existsByScheduleIdAndOccurrenceStart(d.schedule().getId(),

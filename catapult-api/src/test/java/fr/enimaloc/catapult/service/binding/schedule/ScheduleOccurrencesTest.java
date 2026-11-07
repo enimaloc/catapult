@@ -77,6 +77,18 @@ class ScheduleOccurrencesTest {
         assertThat(next.get().start()).isEqualTo(at("2027-03-28T03:00:00+02:00"));
     }
 
+    /** Typed 01:00 in a browser at +02:00: it fires at 23:00 UTC the day before. */
+    @Test
+    void wallTimeIsReadInTheSlotsZone() {
+        CustomBindingSchedule s = slot(Repeat.NONE, "2027-07-10T01:00", "2027-07-10T03:00");
+        Optional<Occurrence> next = ScheduleOccurrences.next(s, at("2027-07-09T12:00:00Z"), PARIS);
+        assertThat(next).map(Occurrence::start).contains(at("2027-07-09T23:00:00Z"));
+
+        Optional<Occurrence> ny = ScheduleOccurrences.next(s, at("2027-07-09T12:00:00Z"),
+                ZoneId.of("America/New_York"));
+        assertThat(ny).map(Occurrence::start).contains(at("2027-07-10T05:00:00Z"));
+    }
+
     @Test
     void fallBackKeepsTheNominalDuration() {
         CustomBindingSchedule s = slot(Repeat.DAILY, "2026-10-01T01:00", "2026-10-01T03:00");

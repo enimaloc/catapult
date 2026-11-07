@@ -76,7 +76,7 @@ class CustomBindingScheduleServiceTest {
 
     private static CustomBindingScheduleRequest request(UUID id, LocalDateTime start, LocalDateTime end, String repeat,
                                                         Set<String> days, boolean paused) {
-        return new CustomBindingScheduleRequest(id, start, end, repeat, days, null, paused);
+        return new CustomBindingScheduleRequest(id, start, end, repeat, days, null, null, paused);
     }
 
     private static CustomBindingScheduleRequest oneOff() {
@@ -174,6 +174,33 @@ class CustomBindingScheduleServiceTest {
         service.replace(user, binding.getId(), List.of(keep));
 
         verify(schedules).deleteAll(List.of(dropped));
+    }
+
+    @Test
+    void theSlotKeepsTheBrowsersZone_orTheDefaultOne() {
+        var tokyo = new CustomBindingScheduleRequest(null, START, START.plusHours(2), "NONE", Set.of(), null,
+                "Asia/Tokyo", false);
+
+        assertThat(service.replace(user, binding.getId(), List.of(tokyo)).get(0).getTimeZone())
+                .isEqualTo("Asia/Tokyo");
+        assertThat(service.replace(user, binding.getId(), List.of(oneOff())).get(0).getTimeZone())
+                .isEqualTo("Europe/Paris");
+    }
+
+    @Test
+    void unknownZoneIsInvalid() {
+        var bad = new CustomBindingScheduleRequest(null, START, START.plusHours(2), "NONE", Set.of(), null,
+                "Mars/Olympus", false);
+        assertProblem(() -> service.replace(user, binding.getId(), List.of(bad)), ErrorCode.INVALID);
+    }
+
+    /** Moved to another zone is a change: a suspended slot cannot be. */
+    @Test
+    void movingASuspendedScheduleToAnotherZoneNeedsPremium() {
+        CustomBindingSchedule weekly = existing(Repeat.WEEKLY, Set.of(DayOfWeek.MONDAY));
+        var moved = new CustomBindingScheduleRequest(weekly.getId(), START, START.plusHours(2), "WEEKLY",
+                Set.of("MONDAY"), null, "Asia/Tokyo", false);
+        assertProblem(() -> service.replace(user, binding.getId(), List.of(moved)), ErrorCode.PREMIUM_REQUIRED);
     }
 
     @Test

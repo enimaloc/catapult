@@ -109,13 +109,14 @@ public class CustomBindingViews {
     }
 
     private static CustomBindingScheduleDto toDto(CustomBindingSchedule slot, boolean suspended, Instant now) {
-        Instant nextStart = ScheduleOccurrences.current(slot, now, PremiumService.ZONE)
-                .or(() -> ScheduleOccurrences.next(slot, now, PremiumService.ZONE))
+        Instant nextStart = ScheduleOccurrences.current(slot, now, slot.zone())
+                .or(() -> ScheduleOccurrences.next(slot, now, slot.zone()))
                 .map(ScheduleOccurrences.Occurrence::start)
                 .orElse(null);
         List<String> days = slot.getDays().stream().sorted().map(DayOfWeek::name).toList();
         return new CustomBindingScheduleDto(slot.getId(), slot.getStartsAt(), slot.getEndsAt(),
-                slot.getRepeat().name(), days, slot.getRepeatUntil(), slot.isPaused(), suspended, nextStart);
+                slot.getRepeat().name(), days, slot.getRepeatUntil(), slot.getTimeZone(), slot.isPaused(), suspended,
+                nextStart);
     }
 
     /** {@link #state} as the token API answers it: without the dashboard-only limit and extension layouts. */

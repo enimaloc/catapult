@@ -33,7 +33,6 @@ import java.util.UUID;
 class MockCustomBindings {
     /** The free tier's cap, which the mock account is held to unless premium. */
     static final int FREE_LIMIT = 5;
-    private static final ZoneId ZONE = ZoneId.of(CustomBindingScheduleDto.ZONE);
     private static final int NAME_MAX = 40;
     private static final SecureRandom RANDOM = new SecureRandom();
 
@@ -76,7 +75,7 @@ class MockCustomBindings {
     /**
      * The account's rules: anything when premium; when free, only a one-off slot on Twitch's "Special Events"
      * category, else PREMIUM_REQUIRED, but for a slot kept as it was saved (paused or not), as catapult-api does: it
-     * stays, suspended while no longer allowed. An end not after its start is INVALID. It is a demo, so a slot's next
+     * stays, suspended while no longer allowed. An end not after its start, or an unknown time zone, is INVALID. It is a demo, so a slot's next
      * start is its start while that is still ahead (null otherwise): the mock does not expand repeats.
      */
     synchronized CustomBindingSave<List<CustomBindingScheduleDto>> saveSchedules(UUID id, List<CustomBindingScheduleRequest> requests) {
@@ -84,7 +83,8 @@ class MockCustomBindings {
         if (index < 0) return new CustomBindingSave<>(404, null, null);
         List<CustomBindingScheduleRequest> slots = requests == null ? List.of() : requests;
         for (CustomBindingScheduleRequest slot : slots) {
-            if (slot.startsAt() == null || slot.endsAt() == null || !slot.endsAt().isAfter(slot.startsAt())) {
+            if (slot.startsAt() == null || slot.endsAt() == null || !slot.endsAt().isAfter(slot.startsAt())
+                    || (!blank(slot.timeZone()) && !ZoneId.getAvailableZoneIds().contains(slot.timeZone()))) {
                 return new CustomBindingSave<>(400, null, ErrorCode.INVALID);
             }
         }
@@ -213,9 +213,9 @@ class MockCustomBindings {
         if (index < 0) return slots;
         return slots.stream().map(slot -> {
             boolean suspended = !allowed(bindings.get(index), slot.repeat());
-            Instant next = slot.startsAt().atZone(ZONE).toInstant();
+            Instant next = slot.startsAt().atZone(ZoneId.of(slot.timeZone())).toInstant();
             return new CustomBindingScheduleDto(slot.id(), slot.startsAt(), slot.endsAt(), slot.repeat(), slot.days(),
-                    slot.repeatUntil(), slot.paused(), suspended,
+                    slot.repeatUntil(), slot.timeZone(), slot.paused(), suspended,
                     !suspended && next.isAfter(Instant.now()) ? next : null);
         }).toList();
     }
@@ -225,15 +225,22 @@ class MockCustomBindings {
         return saved != null && saved.startsAt().equals(slot.startsAt()) && saved.endsAt().equals(slot.endsAt())
                 && saved.repeat().equals(slot.repeat() == null ? "NONE" : slot.repeat())
                 && saved.days().equals(sorted(slot.days()))
-                && Objects.equals(saved.repeatUntil(), slot.repeatUntil());
+                && Objects.equals(saved.repeatUntil(), slot.repeatUntil())
+                && saved.timeZone().equals(zone(slot).getId());
     }
 
     private static CustomBindingScheduleDto scheduleDto(CustomBindingScheduleRequest slot, boolean suspended) {
         LocalDateTime start = slot.startsAt();
-        Instant next = start.atZone(ZONE).toInstant();
+        ZoneId zone = zone(slot);
+        Instant next = start.atZone(zone).toInstant();
         return new CustomBindingScheduleDto(slot.id() == null ? UUID.randomUUID() : slot.id(), start, slot.endsAt(),
-                slot.repeat() == null ? "NONE" : slot.repeat(), sorted(slot.days()), slot.repeatUntil(), slot.paused(),
-                suspended, !suspended && next.isAfter(Instant.now()) ? next : null);
+                slot.repeat() == null ? "NONE" : slot.repeat(), sorted(slot.days()), slot.repeatUntil(), zone.getId(),
+                slot.paused(), suspended, !suspended && next.isAfter(Instant.now()) ? next : null);
+    }
+
+    /** The zone a slot was typed in: the browser's, else the default one. */
+    private static ZoneId zone(CustomBindingScheduleRequest slot) {
+        return ZoneId.of(blank(slot.timeZone()) ? CustomBindingScheduleDto.ZONE : slot.timeZone());
     }
 
     private static boolean blank(String value) {

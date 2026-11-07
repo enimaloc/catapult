@@ -88,7 +88,7 @@ class DtoJsonContractTest {
     void scheduleDtoWritesLocalAndInstantTimesAsIso() {
         var dto = new CustomBindingScheduleDto(UUID.fromString("00000000-0000-0000-0000-000000000001"),
                 LocalDateTime.parse("2026-11-10T20:00:00"), LocalDateTime.parse("2026-11-10T22:00:00"), "NONE",
-                List.of(), null, false, false, Instant.parse("2026-11-10T19:00:00Z"));
+                List.of(), null, "Europe/Paris", false, false, Instant.parse("2026-11-10T19:00:00Z"));
 
         String written = json.writeValueAsString(dto);
 

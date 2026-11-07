@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.service.binding.schedule;
 
 import fr.enimaloc.catapult.api.error.ApiProblem;
+import fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleDto;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleRequest;
 import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.domain.account.UserAccount;
@@ -19,8 +20,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.DateTimeException;
 import java.time.DayOfWeek;
 import java.time.Duration;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumSet;
@@ -105,6 +108,7 @@ public class CustomBindingScheduleService {
             schedule.setRepeat(slot.repeat());
             schedule.setDays(new HashSet<>(slot.days()));
             schedule.setRepeatUntil(slot.request().repeatUntil());
+            schedule.setTimeZone(slot.zone().getId());
             schedule.setPaused(slot.request().paused());
             result.add(schedules.save(schedule));
         }
@@ -113,10 +117,10 @@ public class CustomBindingScheduleService {
         return result;
     }
 
-    private record Parsed(CustomBindingScheduleRequest request, Repeat repeat, Set<DayOfWeek> days,
+    private record Parsed(CustomBindingScheduleRequest request, Repeat repeat, Set<DayOfWeek> days, ZoneId zone,
                           CustomBindingSchedule target) {
         Parsed withTarget(CustomBindingSchedule schedule) {
-            return new Parsed(request, repeat, days, schedule);
+            return new Parsed(request, repeat, days, zone, schedule);
         }
     }
 
@@ -154,7 +158,14 @@ public class CustomBindingScheduleService {
         if (request.repeatUntil() != null && request.repeatUntil().isBefore(request.startsAt().toLocalDate())) {
             throw invalid("A schedule cannot stop repeating before it starts");
         }
-        return new Parsed(request, repeat, days, null);
+        ZoneId zone;
+        try {
+            zone = request.timeZone() == null ? ZoneId.of(CustomBindingScheduleDto.ZONE)
+                    : ZoneId.of(request.timeZone().trim());
+        } catch (DateTimeException e) {
+            throw invalid("Unknown time zone " + request.timeZone());
+        }
+        return new Parsed(request, repeat, days, zone, null);
     }
 
     /** Same slot but for {@code paused}: what an unchanged suspended slot looks like. */
@@ -164,7 +175,8 @@ public class CustomBindingScheduleService {
                 && existing.getEndsAt().equals(r.endsAt())
                 && existing.getRepeat() == slot.repeat()
                 && existing.getDays().equals(slot.days())
-                && Objects.equals(existing.getRepeatUntil(), r.repeatUntil());
+                && Objects.equals(existing.getRepeatUntil(), r.repeatUntil())
+                && existing.getTimeZone().equals(slot.zone().getId());
     }
 
     private CustomBinding binding(UserAccount user, UUID id) {

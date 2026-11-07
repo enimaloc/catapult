@@ -12,7 +12,6 @@ import fr.enimaloc.catapult.service.binding.schedule.ScheduleOccurrences;
 import fr.enimaloc.catapult.service.binding.schedule.ScheduleOccurrences.Occurrence;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
-import fr.enimaloc.catapult.service.premium.PremiumService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -137,7 +136,7 @@ public class CustomBindingActivations {
         Instant now = Instant.now();
         for (CustomBindingSchedule schedule : schedules.findByCustomBindingUserId(user.getId())) {
             if (schedule.isPaused()) continue;
-            ScheduleOccurrences.current(schedule, now, PremiumService.ZONE)
+            ScheduleOccurrences.current(schedule, now, schedule.zone())
                     .filter(occurrence -> own.filter(refusal -> refusal.getScheduleId().equals(schedule.getId())
                             && refusal.getOccurrenceStart().equals(occurrence.start())).isEmpty())
                     .ifPresent(occurrence -> refusals.save(new CustomBindingScheduleRefusal(schedule.getId(),
