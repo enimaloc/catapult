@@ -188,6 +188,15 @@ class CustomBindingScheduleServiceTest {
     }
 
     @Test
+    void aOneOffSlotLastsAtMostSevenDays() {
+        var week = request(null, START, START.plusDays(7), "NONE", Set.of(), false);
+        var longer = request(null, START, START.plusDays(7).plusMinutes(1), "NONE", Set.of(), false);
+
+        assertThat(service.replace(user, binding.getId(), List.of(week))).hasSize(1);
+        assertProblem(() -> service.replace(user, binding.getId(), List.of(longer)), ErrorCode.INVALID);
+    }
+
+    @Test
     void unknownZoneIsInvalid() {
         var bad = new CustomBindingScheduleRequest(null, START, START.plusHours(2), "NONE", Set.of(), null,
                 "Mars/Olympus", false);

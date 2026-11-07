@@ -49,6 +49,8 @@ import java.util.stream.Collectors;
 public class CustomBindingScheduleService {
 
     private static final Duration MAX_REPEATING_DURATION = Duration.ofHours(24);
+    /** Long enough for a charity marathon (a ZEvent lasts three days). */
+    private static final Duration MAX_ONE_OFF_DURATION = Duration.ofDays(7);
 
     private final CustomBindingScheduleRepository schedules;
     private final CustomBindingRepository bindings;
@@ -151,6 +153,10 @@ public class CustomBindingScheduleService {
         if (repeat != Repeat.NONE
                 && Duration.between(request.startsAt(), request.endsAt()).compareTo(MAX_REPEATING_DURATION) > 0) {
             throw invalid("A repeating schedule lasts at most 24 hours");
+        }
+        if (repeat == Repeat.NONE
+                && Duration.between(request.startsAt(), request.endsAt()).compareTo(MAX_ONE_OFF_DURATION) > 0) {
+            throw invalid("A one-off schedule lasts at most 7 days");
         }
         if (repeat == Repeat.WEEKLY && days.isEmpty()) {
             throw invalid("A weekly schedule needs at least one day");

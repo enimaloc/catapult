@@ -13,6 +13,7 @@ import fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto;
 import fr.enimaloc.catapult.service.CustomBindingSave;
 
 import java.security.SecureRandom;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -75,7 +76,8 @@ class MockCustomBindings {
     /**
      * The account's rules: anything when premium; when free, only a one-off slot on Twitch's "Special Events"
      * category, else PREMIUM_REQUIRED, but for a slot kept as it was saved (paused or not), as catapult-api does: it
-     * stays, suspended while no longer allowed. An end not after its start, or an unknown time zone, is INVALID. It is a demo, so a slot's next
+     * stays, suspended while no longer allowed. An end not after its start, a slot longer than catapult-api allows
+     * (24 hours repeated, 7 days once), or an unknown time zone, is INVALID. It is a demo, so a slot's next
      * start is its start while that is still ahead (null otherwise): the mock does not expand repeats.
      */
     synchronized CustomBindingSave<List<CustomBindingScheduleDto>> saveSchedules(UUID id, List<CustomBindingScheduleRequest> requests) {
@@ -84,6 +86,7 @@ class MockCustomBindings {
         List<CustomBindingScheduleRequest> slots = requests == null ? List.of() : requests;
         for (CustomBindingScheduleRequest slot : slots) {
             if (slot.startsAt() == null || slot.endsAt() == null || !slot.endsAt().isAfter(slot.startsAt())
+                    || tooLong(slot)
                     || (!blank(slot.timeZone()) && !ZoneId.getAvailableZoneIds().contains(slot.timeZone()))) {
                 return new CustomBindingSave<>(400, null, ErrorCode.INVALID);
             }
@@ -236,6 +239,12 @@ class MockCustomBindings {
         return new CustomBindingScheduleDto(slot.id() == null ? UUID.randomUUID() : slot.id(), start, slot.endsAt(),
                 slot.repeat() == null ? "NONE" : slot.repeat(), sorted(slot.days()), slot.repeatUntil(), zone.getId(),
                 slot.paused(), suspended, !suspended && next.isAfter(Instant.now()) ? next : null);
+    }
+
+    /** Longer than catapult-api takes a slot: 24 hours when repeated, 7 days once. */
+    private static boolean tooLong(CustomBindingScheduleRequest slot) {
+        boolean once = slot.repeat() == null || "NONE".equals(slot.repeat());
+        return Duration.between(slot.startsAt(), slot.endsAt()).compareTo(once ? Duration.ofDays(7) : Duration.ofHours(24)) > 0;
     }
 
     /** The zone a slot was typed in: the browser's, else the default one. */

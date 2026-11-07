@@ -1027,6 +1027,10 @@ class MockApiServiceTest {
                 .containsExactly("Asia/Tokyo", "Europe/Paris");
         assertThat(service.saveCustomBindingSchedules(username, special.id(), List.of(mars)).code())
                 .isEqualTo(fr.enimaloc.catapult.common.error.ErrorCode.INVALID);
+        var tooLong = new fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleRequest(null, start,
+                start.plusDays(8), "NONE", null, null, null, false);
+        assertThat(service.saveCustomBindingSchedules(username, special.id(), List.of(tooLong)).code())
+                .isEqualTo(fr.enimaloc.catapult.common.error.ErrorCode.INVALID);
     }
 
     /** Made premium from the mock admin page: no limit, any slot; back to free, its repeating slots are suspended. */

@@ -77,6 +77,15 @@ class ScheduleOccurrencesTest {
         assertThat(next.get().start()).isEqualTo(at("2027-03-28T03:00:00+02:00"));
     }
 
+    /** A one-off slot is its single occurrence, found at once however far it ends. */
+    @Test
+    void aOneOffSlotIsFoundWithoutWalkingItsDays() {
+        CustomBindingSchedule s = slot(Repeat.NONE, "2026-09-04T18:00", "+200000-01-01T00:00");
+        assertThat(ScheduleOccurrences.current(s, at("2030-01-01T00:00:00Z"), PARIS)).isPresent();
+        assertThat(ScheduleOccurrences.next(s, at("2026-09-04T00:00:00Z"), PARIS)).isPresent();
+        assertThat(ScheduleOccurrences.next(s, at("2026-09-05T00:00:00Z"), PARIS)).isEmpty();
+    }
+
     /** Typed 01:00 in a browser at +02:00: it fires at 23:00 UTC the day before. */
     @Test
     void wallTimeIsReadInTheSlotsZone() {

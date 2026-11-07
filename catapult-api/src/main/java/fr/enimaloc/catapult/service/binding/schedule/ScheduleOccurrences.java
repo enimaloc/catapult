@@ -25,11 +25,19 @@ public final class ScheduleOccurrences {
 
     /** The occurrence with {@code start <= now < end}, the most recent one if several overlap. */
     public static Optional<Occurrence> current(CustomBindingSchedule s, Instant now, ZoneId zone) {
+        if (s.getRepeat() == Repeat.NONE) {
+            Occurrence once = occurrence(s, s.getStartsAt().toLocalDate(), zone);
+            return Optional.of(once).filter(o -> !o.start().isAfter(now) && now.isBefore(o.end()));
+        }
         LocalDate today = now.atZone(zone).toLocalDate();
-        // One extra day absorbs offset changes between the nominal duration and the calendar.
-        long lookBack = (duration(s).toSeconds() + 86_399) / 86_400 + 1;
+        // An occurrence may have started as many days before as its slot spans, plus one for offset changes
+        long lookBack = ChronoUnit.DAYS.between(s.getStartsAt().toLocalDate(), s.getEndsAt().toLocalDate()) + 1;
+        LocalDate from = today.minusDays(lookBack);
+        if (from.isBefore(s.getStartsAt().toLocalDate())) {
+            from = s.getStartsAt().toLocalDate();
+        }
         Occurrence best = null;
-        for (LocalDate d = today.minusDays(lookBack); !d.isAfter(today); d = d.plusDays(1)) {
+        for (LocalDate d = from; !d.isAfter(today); d = d.plusDays(1)) {
             Occurrence o = occurrenceOn(s, d, zone);
             if (o != null && !o.start().isAfter(now) && now.isBefore(o.end())
                     && (best == null || o.start().isAfter(best.start()))) {
@@ -41,6 +49,10 @@ public final class ScheduleOccurrences {
 
     /** The first occurrence starting strictly after {@code now}. */
     public static Optional<Occurrence> next(CustomBindingSchedule s, Instant now, ZoneId zone) {
+        if (s.getRepeat() == Repeat.NONE) {
+            Occurrence once = occurrence(s, s.getStartsAt().toLocalDate(), zone);
+            return Optional.of(once).filter(o -> o.start().isAfter(now));
+        }
         LocalDate from = now.atZone(zone).toLocalDate().minusDays(1);
         LocalDate first = s.getStartsAt().toLocalDate();
         if (from.isBefore(first)) {
