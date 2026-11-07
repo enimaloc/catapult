@@ -147,7 +147,7 @@ POST,/api/internal/users/{userId}/custom-bindings/deactivate,,,401,401,403,403,P
 PUT,/api/internal/users/{userId}/custom-bindings/{customBindingId},,"{""name"":""matrix"",""uninterruptible"":false}",401,401,403,403,PASS,403,401
 POST,/api/internal/users/{userId}/custom-bindings/{customBindingId}/activate,,,401,401,403,403,PASS,403,401
 DELETE,/api/internal/users/{userId}/custom-bindings/{customBindingId},,,401,401,403,403,PASS,403,401
-PUT,/api/internal/users/{userId}/custom-bindings/{customBindingId}/schedules,,[],401,401,403,403,PASS,403,401
+PUT,/api/internal/users/{userId}/custom-bindings/{customBindingId}/schedules,,"{""known"":[],""slots"":[]}",401,401,403,403,PASS,403,401
 GET,/api/internal/users/{userId}/dtdd-mapping,,,401,401,403,PASS,PASS,403,401
 POST,/api/internal/users/{userId}/game/recheck,,,401,401,403,403,PASS,403,401
 GET,/api/internal/users/{userId}/games,,,401,401,403,PASS,PASS,403,401

@@ -47,6 +47,7 @@ class CustomBindingWiringTest {
             .withBean("flyway", Object.class, Object::new)
             .withBean(CustomBindingActivations.class)
             .withBean(CustomBindingService.class)
+            .withBean(CustomBindingUserLocks.class)
             .withBean(CustomBindingScheduler.class)
             .withBean(CustomBindingScheduleRepository.class, () -> mock(CustomBindingScheduleRepository.class))
             .withBean(SiteRole.class, () -> mock(SiteRole.class))
