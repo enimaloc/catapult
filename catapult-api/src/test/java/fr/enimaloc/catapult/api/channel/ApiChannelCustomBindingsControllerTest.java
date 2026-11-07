@@ -11,7 +11,12 @@ import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.security.Authz;
 import fr.enimaloc.catapult.security.MethodSecurityConfig;
 import fr.enimaloc.catapult.service.account.ChannelAccessService;
+import fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleRequest;
+import fr.enimaloc.catapult.domain.binding.CustomBindingSchedule;
+import fr.enimaloc.catapult.repository.binding.CustomBindingScheduleRepository;
 import fr.enimaloc.catapult.service.binding.CustomBindingService;
+import fr.enimaloc.catapult.service.binding.schedule.CustomBindingScheduleService;
+import fr.enimaloc.catapult.service.premium.PremiumService;
 import fr.enimaloc.catapult.service.premium.PremiumUiGate;
 import fr.enimaloc.catapult.service.binding.CustomBindingService.ActivationResult;
 import fr.enimaloc.catapult.service.binding.CustomBindingService.UpdateResult;
@@ -71,6 +76,9 @@ class ApiChannelCustomBindingsControllerTest {
     @MockitoBean ChannelAccessService channelAccess;
     @MockitoBean CustomBindingService service;
     @MockitoBean PremiumUiGate premiumUiGate;
+    @MockitoBean CustomBindingScheduleService scheduleService;
+    @MockitoBean CustomBindingScheduleRepository scheduleRepository;
+    @MockitoBean PremiumService premiumService;
 
     private UserAccount owner;
     private UserAccount other;
@@ -260,5 +268,60 @@ class ApiChannelCustomBindingsControllerTest {
         mvc.perform(get(base()).with(as(owner)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("feature_disabled"));
+    }
+
+    private static final String SCHEDULES = """
+            {"known":[],"slots":[{"startsAt":"2099-11-10T20:00:00","endsAt":"2099-11-10T22:00:00","repeat":"NONE",
+              "days":[],"paused":false}]}""";
+
+    private MockHttpServletRequestBuilder putSchedules(UserAccount as) {
+        return put(base() + "/" + art.getId() + "/schedules").contentType(MediaType.APPLICATION_JSON)
+                .content(SCHEDULES).with(as(as)).with(csrf());
+    }
+
+    @Test
+    void ownerReplacesSchedules() throws Exception {
+        CustomBindingSchedule saved = new CustomBindingSchedule();
+        saved.setId(UUID.randomUUID());
+        saved.setCustomBinding(art);
+        saved.setStartsAt(java.time.LocalDateTime.of(2099, 11, 10, 20, 0));
+        saved.setEndsAt(java.time.LocalDateTime.of(2099, 11, 10, 22, 0));
+        when(scheduleService.replace(eq(owner), eq(art.getId()), eq(List.of()), any())).thenReturn(List.of(saved));
+
+        mvc.perform(putSchedules(owner))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(saved.getId().toString()))
+                .andExpect(jsonPath("$[0].startsAt").value("2099-11-10T20:00:00"))
+                .andExpect(jsonPath("$[0].repeat").value("NONE"))
+                .andExpect(jsonPath("$[0].suspended").value(false))
+                .andExpect(jsonPath("$[0].nextStart").exists());
+        verify(scheduleService).replace(eq(owner), eq(art.getId()), eq(List.of()),
+                org.mockito.ArgumentMatchers.<List<CustomBindingScheduleRequest>>argThat(slots -> slots.size() == 1));
+    }
+
+    @Test
+    void aListEditedFromAnOlderOneIs409Stale() throws Exception {
+        when(scheduleService.replace(eq(owner), eq(art.getId()), any(), any()))
+                .thenThrow(new ApiProblem(ErrorCode.STALE, "changed"));
+
+        mvc.perform(putSchedules(owner))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("stale"));
+    }
+
+    @Test
+    void premiumRequiredIs403WithItsCode() throws Exception {
+        when(scheduleService.replace(eq(owner), eq(art.getId()), any(), any()))
+                .thenThrow(new ApiProblem(ErrorCode.PREMIUM_REQUIRED, "needs premium"));
+
+        mvc.perform(putSchedules(owner))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("premium_required"));
+    }
+
+    @Test
+    void strangerIsRefused() throws Exception {
+        mvc.perform(putSchedules(other)).andExpect(status().isForbidden());
+        verifyNoInteractions(scheduleService);
     }
 }

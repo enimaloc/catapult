@@ -193,7 +193,12 @@ describe("events the page catches up on", () => {
 
         current().emit("CustomBindingsUpdatedEvent", { username: "enimaloc", bindings, activeId: "b1", ts: 1000 });
         await flush();
-        expect(CatapultCustomBindings.apply).toHaveBeenCalledWith(bindings, "b1", 1000);
+        // without schedules: the card leaves them as they are
+        expect(CatapultCustomBindings.apply).toHaveBeenCalledWith(bindings, "b1", 1000, undefined);
+        const schedules = { b1: [{ id: "s1" }] };
+        current().emit("CustomBindingsUpdatedEvent", { username: "enimaloc", bindings, activeId: "b1", ts: 1001, schedules });
+        await flush();
+        expect(CatapultCustomBindings.apply).toHaveBeenLastCalledWith(bindings, "b1", 1001, schedules);
         expect(CatapultSpa.navigate).not.toHaveBeenCalled();
 
         CatapultCustomBindings.apply.mockReturnValue(false);
@@ -550,7 +555,7 @@ describe("catching up on the channel's state", () => {
         expect(row.querySelector(".ccl").checked).toBe(true);
         expect(row.querySelector(".binding-game-name").textContent).toBe("New name");
         expect(document.querySelector("[data-binding-id=b1]")).toBe(row);
-        expect(custom.apply).toHaveBeenCalledWith([{ id: "c1" }], null, undefined);
+        expect(custom.apply).toHaveBeenCalledWith([{ id: "c1" }], null, undefined, undefined);
         // Only the renamed binding's text
         expect(changes.flatMap(r => [...r.addedNodes, ...r.removedNodes]).every(n => n.nodeType === Node.TEXT_NODE))
             .toBe(true);

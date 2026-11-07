@@ -66,6 +66,7 @@ public class MockAdminController {
         private String avatarUrl;
         private boolean botEnabled;
         private boolean admin;
+        private boolean premium;
         private String detectedSourceType;
         private String detectedSourceName;
         private boolean hasSteamProvider;
@@ -134,6 +135,7 @@ public class MockAdminController {
         model.addAttribute("channel", data.getChannelDto());
         model.addAttribute("botEnabled", data.isBotEnabled());
         model.addAttribute("admin", data.isAdmin());
+        model.addAttribute("premium", data.isPremium());
         model.addAttribute("game", data.getGameDto());
         model.addAttribute("bindings", data.getBinding());
         model.addAttribute("moderated", data.getModeratedChannels());
@@ -218,6 +220,11 @@ public class MockAdminController {
         }
         if (data.isAdmin() != form.isAdmin()) {
             data.setAdmin(form.isAdmin());
+            redirect.addFlashAttribute("appReload", true);
+        }
+        if (data.isPremium() != form.isPremium()) {
+            // The limits, the counter and the schedules' rights all change: the app is rendered again
+            data.setPremium(form.isPremium());
             redirect.addFlashAttribute("appReload", true);
         }
 

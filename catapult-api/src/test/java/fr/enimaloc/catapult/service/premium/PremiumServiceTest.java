@@ -9,6 +9,9 @@ import fr.enimaloc.catapult.repository.binding.CustomBindingRepository;
 import fr.enimaloc.catapult.service.ActivityLogService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.context.ApplicationEventPublisher;
+import fr.enimaloc.catapult.domain.binding.CustomBindingSchedule.Repeat;
+import fr.enimaloc.catapult.event.CustomBindingSchedulesChangedEvent;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -34,13 +37,14 @@ class PremiumServiceTest {
     @Mock UserAccountRepository users;
     @Mock ActivityLogService activityLog;
     @Mock CustomBindingRepository bindings;
+    @Mock ApplicationEventPublisher publisher;
 
     private final MockEnvironment env = new MockEnvironment()
             .withProperty("app.polling.free-interval-seconds", "60")
             .withProperty("app.polling.premium-interval-seconds", "30");
 
     private PremiumService service(String instant) {
-        return new PremiumService(users, activityLog, bindings, env, 5, Clock.fixed(Instant.parse(instant), PremiumService.ZONE));
+        return new PremiumService(users, activityLog, bindings, env, 5, publisher, Clock.fixed(Instant.parse(instant), PremiumService.ZONE));
     }
 
     private static UserAccount user(boolean premium, LocalDate until) {
@@ -177,7 +181,7 @@ class PremiumServiceTest {
     @Test
     void offer_missingKeys_useTheSchedulerDefaults() {
         MockEnvironment bare = new MockEnvironment();
-        PremiumService bareService = new PremiumService(users, activityLog, bindings, bare, 5,
+        PremiumService bareService = new PremiumService(users, activityLog, bindings, bare, 5, publisher,
                 Clock.fixed(Instant.parse("2026-11-04T12:00:00Z"), PremiumService.ZONE));
 
         assertThat(bareService.offer()).isEqualTo(new PremiumOfferDto(60, 30, 90, 60, 5));
@@ -189,7 +193,7 @@ class PremiumServiceTest {
                 .withProperty("app.polling.free-interval-seconds", "120")
                 .withProperty("app.polling.premium-interval-seconds", "75");
         degraded.setActiveProfiles("degraded");
-        PremiumService degradedService = new PremiumService(users, activityLog, bindings, degraded, 5,
+        PremiumService degradedService = new PremiumService(users, activityLog, bindings, degraded, 5, publisher,
                 Clock.fixed(Instant.parse("2026-11-04T12:00:00Z"), PremiumService.ZONE));
 
         // The normal columns come from the test classpath's application.properties (60 / 60)
@@ -199,5 +203,44 @@ class PremiumServiceTest {
     @Test
     void today_isTheDayInParis() {
         assertThat(service("2026-11-04T23:30:00Z").today()).isEqualTo(LocalDate.of(2026, 11, 5));
+    }
+
+    @Test
+    void freeAccountSchedulesOnlyOneOffSpecialEvents() {
+        PremiumService service = service("2026-11-04T12:00:00Z");
+        UserAccount free = user(false, null);
+
+        assertThat(service.canSchedule(free, "509663", Repeat.NONE)).isTrue();
+        assertThat(service.canSchedule(free, "509663", Repeat.WEEKLY)).isFalse();
+        assertThat(service.canSchedule(free, "509660", Repeat.NONE)).isFalse();
+    }
+
+    @Test
+    void premiumAccountSchedulesAnything() {
+        PremiumService service = service("2026-11-04T12:00:00Z");
+
+        assertThat(service.canSchedule(user(true, null), "509660", Repeat.DAILY)).isTrue();
+        assertThat(service.canRepeatSchedules(user(true, null))).isTrue();
+    }
+
+    @Test
+    void expiredPremiumSchedulesLikeAFreeAccount() {
+        PremiumService service = service("2026-11-04T12:00:00Z");
+        UserAccount expired = user(true, LocalDate.of(2026, 11, 3));
+
+        assertThat(service.canSchedule(expired, "509660", Repeat.NONE)).isFalse();
+        assertThat(service.canRepeatSchedules(expired)).isFalse();
+    }
+
+    @Test
+    void grantAndRevokeTellTheScheduler() {
+        UUID id = UUID.randomUUID();
+        when(users.findById(id)).thenReturn(Optional.of(user(false, null)));
+        PremiumService service = service("2026-11-04T12:00:00Z");
+
+        service.grant(id, null, "admin");
+        service.revoke(id, "admin");
+
+        verify(publisher, org.mockito.Mockito.times(2)).publishEvent(new CustomBindingSchedulesChangedEvent(id));
     }
 }

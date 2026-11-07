@@ -504,6 +504,19 @@ public interface ApiService {
     /** Saves an edit; catapult-api's status with how re-applying the active binding went on success. */
     CustomBindingSave<fr.enimaloc.catapult.common.dto.binding.CustomBindingSaveResult> updateCustomBinding(
             String username, UUID id, fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest request);
+    /**
+     * Replaces the binding's schedule slots; the saved slots, or the refusal code (premium required, invalid, stale:
+     * the slots are no longer those the list was edited from).
+     */
+    CustomBindingSave<java.util.List<fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleDto>> saveCustomBindingSchedules(
+            String username, UUID id, fr.enimaloc.catapult.common.dto.binding.CustomBindingSchedulesRequest schedules);
+
+    /** {@link #saveCustomBindingSchedules(String, UUID, fr.enimaloc.catapult.common.dto.binding.CustomBindingSchedulesRequest)}, unchecked. */
+    default CustomBindingSave<java.util.List<fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleDto>> saveCustomBindingSchedules(
+            String username, UUID id, java.util.List<fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleRequest> slots) {
+        return saveCustomBindingSchedules(username, id,
+                new fr.enimaloc.catapult.common.dto.binding.CustomBindingSchedulesRequest(null, slots));
+    }
     /** catapult-api's status (204), 502 when unreachable. */
     int deleteCustomBinding(String username, UUID id);
     /** Makes the binding the active one, applying its category on Twitch. */

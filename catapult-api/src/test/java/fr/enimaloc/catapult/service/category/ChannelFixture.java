@@ -39,6 +39,7 @@ import fr.enimaloc.catapult.service.account.ChannelSettingsService;
 import fr.enimaloc.catapult.service.binding.BindingService;
 import fr.enimaloc.catapult.service.binding.ChannelDashboardActions;
 import fr.enimaloc.catapult.service.binding.CustomBindingActivations;
+import fr.enimaloc.catapult.service.binding.CustomBindingUserLocks;
 import fr.enimaloc.catapult.service.binding.CustomBindingService;
 import fr.enimaloc.catapult.service.binding.CustomBindingService.ActivationResult;
 import fr.enimaloc.catapult.service.binding.CustomBindingService.UpdateResult;
@@ -219,10 +220,13 @@ public class ChannelFixture {
 
         IgdbService igdbService = mock(IgdbService.class);
         GameBindingLookup lookup = new GameBindingLookup(bindingRepository);
-        CustomBindingActivations activations =
-                new CustomBindingActivations(activationRepository, experimentService, publisher);
         gameStateService = new GameStateService(publisher);
         streamStateService = new StreamStateService(publisher, dispatcher);
+        CustomBindingActivations activations =
+                new CustomBindingActivations(activationRepository,
+                        mock(fr.enimaloc.catapult.repository.binding.CustomBindingScheduleRefusalRepository.class),
+                        mock(fr.enimaloc.catapult.repository.binding.CustomBindingScheduleRepository.class),
+                        streamStateService, experimentService, publisher);
         categoryChain = new CategoryChain(activations, streamStateService, settingsRepository,
                 raidRestoreHold, gameStateService, accountRepository,
                 new CategoryApplier(twitch, streamStateService), new RaidRestoreGateService(experimentService), lookup, mock(ExtensionLayoutApplier.class));
@@ -236,7 +240,7 @@ public class ChannelFixture {
         customBindingService = new CustomBindingService(customBindingRepository, activations,
                 experimentService, gameStateService, streamStateService, accountRepository,
                 tokenRepository, listener, publisher, categoryChain, mock(ExtensionLayoutApplier.class),
-                mock(PremiumService.class));
+                mock(PremiumService.class), mock(org.springframework.context.ApplicationEventPublisher.class), new CustomBindingUserLocks());
         setGameFunction = new CatapultSetGameFunction(twitch, categoryChain, gameStateService, igdbService,
                 activations);
         twitchatActionExecutor = new TwitchatActionExecutor(actionTokenService, accountRepository, categoryChain,

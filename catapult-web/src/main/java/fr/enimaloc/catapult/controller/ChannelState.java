@@ -74,7 +74,7 @@ public final class ChannelState {
         CustomBindingsStateDto custom = ch.customBindings();
         if (custom != null) {
             events.add(new CustomBindingsUpdatedEvent(login, custom.bindings(),
-                    custom.activeId() == null ? null : custom.activeId().toString()));
+                    custom.activeId() == null ? null : custom.activeId().toString(), null, custom.schedules()));
         }
         if (dtdd != null && dtdd.igdbId() != null) {
             events.add(new DtddMappingChangedEvent(login, dtdd.igdbId(), dtdd.current(), null,

@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.event.listener;
 
 import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.binding.CustomBindingActivation;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.event.GameDetectedEvent;
 import fr.enimaloc.catapult.event.NoGameDetectedEvent;
@@ -19,9 +20,12 @@ import fr.enimaloc.catapult.service.category.CategoryTrigger.GameDetected;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.StreamEnded;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.StreamStarted;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 @Slf4j
@@ -42,7 +46,8 @@ public class GameEventListener {
         log.debug("GameDetectedEvent for user {}: {}", user.getId(), event.getDetectedGame().getSourceName());
         // A new game: a raid's restored game no longer has to be kept
         raidRestoreHold.release(user);
-        switch (categoryChain.detectionGuard(user, event.isFirstSinceStart())) {
+        Optional<CustomBindingActivation> active = customBindingActivations.active(user);
+        switch (categoryChain.detectionGuard(active, event.isFirstSinceStart())) {
             case KEEPS_CUSTOM_BINDING -> {
                 // Ignored: the game's binding is created or refreshed for the channel page, the channel left alone
                 GameBinding binding = bindingService.resolveOrCreate(user, event.getDetectedGame());
@@ -53,7 +58,7 @@ public class GameEventListener {
             }
             case INTERRUPTS_CUSTOM_BINDING -> {
                 log.debug("Detection interrupts the custom binding of user {}", user.getId());
-                customBindingActivations.clear(user);
+                customBindingActivations.clear(user, active.orElseThrow());
             }
             case NO_CUSTOM_BINDING -> { }
         }
@@ -83,7 +88,9 @@ public class GameEventListener {
         categoryChain.apply(user, new GameClosed()).orThrow();
     }
 
+    // Just before the custom binding scheduler, which must see the channel as this leaves it
     @EventListener
+    @Order(Ordered.LOWEST_PRECEDENCE - 1)
     public void onStreamOnline(StreamOnlineEvent event) {
         UserAccount user = event.getUser();
         log.debug("StreamOnlineEvent for user {}", user.getId());
@@ -99,7 +106,7 @@ public class GameEventListener {
         UserAccount user = event.getUser();
         log.debug("StreamOfflineEvent for user {}", user.getId());
         // A custom binding, interruptible or not, ends with the stream; then the usual end of stream
-        customBindingActivations.clear(user);
+        customBindingActivations.clearWithoutRefusal(user);
         streamStateService.clearPending(user);
         raidRestoreHold.release(user);
         categoryChain.apply(user, new StreamEnded()).orThrow();

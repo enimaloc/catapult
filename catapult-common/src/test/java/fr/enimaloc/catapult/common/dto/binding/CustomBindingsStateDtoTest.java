@@ -24,4 +24,15 @@ class CustomBindingsStateDtoTest {
 
         assertThat(body).contains("\"limit\":5");
     }
+
+    @Test
+    void theActiveBindingIsFoundByItsId_andNeverWritten() {
+        var art = new CustomBindingDto(java.util.UUID.randomUUID(), "Art", "509660", "Art", List.of(), List.of(), false);
+        var state = new CustomBindingsStateDto(true, List.of(art), art.id(), null);
+
+        assertThat(state.active()).isEqualTo(art);
+        assertThat(new CustomBindingsStateDto(true, List.of(art), null, null).active()).isNull();
+        assertThat(new CustomBindingsStateDto(true, List.of(art), java.util.UUID.randomUUID(), null).active()).isNull();
+        assertThat(json.writeValueAsString(state)).doesNotContain("\"active\"");
+    }
 }

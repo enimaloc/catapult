@@ -1184,6 +1184,7 @@ class CategoryBehaviourTest {
 
     @Test
     void eachTriggerReadsTheCustomBindingAtMostOnce() {
+        // Except the triggers that clear it, which read it to refuse a scheduled occurrence
         f.settings.setApplyDefaultOnStreamStart(false);
         GameBinding other = f.binding("g2", GameBinding.Status.AUTO, "32982", "Grand Theft Auto V");
         f.live(true);
@@ -1199,9 +1200,9 @@ class CategoryBehaviourTest {
         f.live(true);
         assertThat(readsOf(() -> f.mappingChanged(g1))).as("mapping").isEqualTo(1);
         assertThat(readsOf(() -> f.raid("509658"))).as("raid").isEqualTo(1);
-        assertThat(readsOf(() -> f.setGame("Celeste", null))).as("!setgame").isZero();
+        assertThat(readsOf(() -> f.setGame("Celeste", null))).as("!setgame").isEqualTo(1);
         assertThat(readsOf(() -> f.twitchat(TwitchatActionType.REVERT_CATEGORY,
-                Map.of("gameId", "509658", "gameName", "Just Chatting")))).as("revert").isZero();
+                Map.of("gameId", "509658", "gameName", "Just Chatting")))).as("revert").isEqualTo(1);
         assertThat(gateChecks).as("custom bindings gate, per trigger in the same order")
                 .containsExactly(1, 1, 1, 0, 1, 1, 1, 1, 0, 0);
     }

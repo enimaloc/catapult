@@ -107,7 +107,10 @@ class ChannelDashboardAssemblerTest {
                 gameState, ccls, tws, encryption, steamClient, diagnostics, igdb, dtddMappings, dtddCache,
                 dtddProposals, oauthTokens, minecraftService, twitchat, raidRestoreGate,
                 new fr.enimaloc.catapult.api.CustomBindingViews(customBindings,
-                        org.mockito.Mockito.mock(fr.enimaloc.catapult.service.premium.PremiumUiGate.class)), categoryCache);
+                        org.mockito.Mockito.mock(fr.enimaloc.catapult.service.premium.PremiumUiGate.class),
+                        org.mockito.Mockito.mock(fr.enimaloc.catapult.service.binding.schedule.CustomBindingScheduleService.class),
+                        org.mockito.Mockito.mock(fr.enimaloc.catapult.repository.binding.CustomBindingScheduleRepository.class),
+                        org.mockito.Mockito.mock(fr.enimaloc.catapult.service.premium.PremiumService.class)), categoryCache);
         ReflectionTestUtils.setField(assembler, "xboxEnabled", xboxEnabled);
         return assembler;
     }

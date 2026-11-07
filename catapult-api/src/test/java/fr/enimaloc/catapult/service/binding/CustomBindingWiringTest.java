@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.service.binding;
 import fr.enimaloc.catapult.chat.command.registry.catapult.CatapultSetGameFunction;
 import fr.enimaloc.catapult.event.listener.GameEventListener;
 import fr.enimaloc.catapult.service.account.BotToggleService;
+import fr.enimaloc.catapult.service.binding.schedule.CustomBindingScheduler;
 import fr.enimaloc.catapult.service.category.CategoryApplier;
 import fr.enimaloc.catapult.service.category.ExtensionLayoutApplier;
 import fr.enimaloc.catapult.service.category.CategoryChain;
@@ -13,6 +14,10 @@ import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
 import fr.enimaloc.catapult.repository.binding.CustomBindingActivationRepository;
 import fr.enimaloc.catapult.repository.binding.CustomBindingRepository;
+import fr.enimaloc.catapult.repository.binding.CustomBindingScheduleRefusalRepository;
+import fr.enimaloc.catapult.repository.binding.CustomBindingScheduleRepository;
+import fr.enimaloc.catapult.site.SiteRole;
+import org.springframework.context.ApplicationEventPublisher;
 import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
 import fr.enimaloc.catapult.repository.binding.GameMappingRepository;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
@@ -42,6 +47,10 @@ class CustomBindingWiringTest {
             .withBean("flyway", Object.class, Object::new)
             .withBean(CustomBindingActivations.class)
             .withBean(CustomBindingService.class)
+            .withBean(CustomBindingUserLocks.class)
+            .withBean(CustomBindingScheduler.class)
+            .withBean(CustomBindingScheduleRepository.class, () -> mock(CustomBindingScheduleRepository.class))
+            .withBean(SiteRole.class, () -> mock(SiteRole.class))
             .withBean(GameEventListener.class)
             .withBean(BindingService.class)
             .withBean(GameBindingLookup.class)
@@ -56,6 +65,9 @@ class CustomBindingWiringTest {
             .withBean(GameMappingRepository.class, () -> mock(GameMappingRepository.class))
             .withBean(CustomBindingRepository.class, () -> mock(CustomBindingRepository.class))
             .withBean(CustomBindingActivationRepository.class, () -> mock(CustomBindingActivationRepository.class))
+            .withBean(CustomBindingScheduleRefusalRepository.class,
+                    () -> mock(CustomBindingScheduleRefusalRepository.class))
+            .withBean(ApplicationEventPublisher.class, () -> mock(ApplicationEventPublisher.class))
             .withBean(GameBindingRepository.class, () -> mock(GameBindingRepository.class))
             .withBean(UserSettingsRepository.class, () -> mock(UserSettingsRepository.class))
             .withBean(UserAccountRepository.class, () -> mock(UserAccountRepository.class))
@@ -81,6 +93,7 @@ class CustomBindingWiringTest {
             assertThat(context).hasSingleBean(CustomBindingService.class);
             assertThat(context).hasSingleBean(CustomBindingActivations.class);
             assertThat(context).hasSingleBean(GameEventListener.class);
+            assertThat(context).hasSingleBean(CustomBindingScheduler.class);
             assertThat(context).hasSingleBean(CatapultSetGameFunction.class);
             assertThat(context).hasSingleBean(TwitchatActionExecutor.class);
         });

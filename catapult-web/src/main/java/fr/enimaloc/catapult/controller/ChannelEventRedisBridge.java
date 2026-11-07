@@ -125,7 +125,8 @@ public class ChannelEventRedisBridge {
                     read(data, ChannelEvents.CustomBindingChanged.class).activeId(), ts));
             case ChannelEvents.CUSTOM_BINDINGS_UPDATED -> {
                 var updated = read(data, ChannelEvents.CustomBindingsUpdated.class);
-                yield List.of(new CustomBindingsUpdatedEvent(login, updated.bindings(), updated.activeId(), ts));
+                yield List.of(new CustomBindingsUpdatedEvent(login, updated.bindings(), updated.activeId(), ts,
+                        updated.schedules()));
             }
             case ChannelEvents.SETTINGS_UPDATED -> List.of(new ChannelSettingsUpdatedEvent(login,
                     read(data, ChannelEvents.SettingsUpdated.class).settings()));

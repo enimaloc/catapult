@@ -121,7 +121,10 @@ class CustomBindingDetectionTest {
         when(bindingService.resolveOrCreate(user, game)).thenReturn(gameBinding);
 
         when(experimentService.evaluateGate(user, CustomBindingService.EXPERIMENT_KEY)).thenReturn(true);
-        activations = new CustomBindingActivations(activationRepository, experimentService, channelEventPublisher);
+        activations = new CustomBindingActivations(activationRepository,
+                mock(fr.enimaloc.catapult.repository.binding.CustomBindingScheduleRefusalRepository.class),
+                mock(fr.enimaloc.catapult.repository.binding.CustomBindingScheduleRepository.class),
+                streamStateService, experimentService, channelEventPublisher);
         RaidRestoreHold hold = mock(RaidRestoreHold.class);
         chain = new CategoryChain(activations, streamStateService, userSettingsRepository, hold,
                 gameStateService, mock(UserAccountRepository.class), new CategoryApplier(twitchService, streamStateService), mock(RaidRestoreGateService.class), mock(GameBindingLookup.class),
@@ -201,7 +204,9 @@ class CustomBindingDetectionTest {
         CustomBindingService service = new CustomBindingService(mock(CustomBindingRepository.class), activations,
                 experimentService, gameStateService, streamStateService, mock(UserAccountRepository.class),
                 mock(OAuthTokenRepository.class), listener, channelEventPublisher, chain,
-                mock(ExtensionLayoutApplier.class), mock(PremiumService.class));
+                mock(ExtensionLayoutApplier.class), mock(PremiumService.class),
+                mock(org.springframework.context.ApplicationEventPublisher.class),
+                new fr.enimaloc.catapult.service.binding.CustomBindingUserLocks());
 
         service.deactivate(user);
 
@@ -230,7 +235,9 @@ class CustomBindingDetectionTest {
         CustomBindingService service = new CustomBindingService(mock(CustomBindingRepository.class), activations,
                 experimentService, gameStateService, streamStateService, mock(UserAccountRepository.class),
                 mock(OAuthTokenRepository.class), listener, channelEventPublisher, chain,
-                mock(ExtensionLayoutApplier.class), mock(PremiumService.class));
+                mock(ExtensionLayoutApplier.class), mock(PremiumService.class),
+                mock(org.springframework.context.ApplicationEventPublisher.class),
+                new fr.enimaloc.catapult.service.binding.CustomBindingUserLocks());
 
         service.deactivate(user);
 

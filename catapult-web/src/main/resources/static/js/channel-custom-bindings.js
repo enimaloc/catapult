@@ -17,6 +17,11 @@
  * - On a free account (data-limit on the list, absent for premium) the header counts the bindings against the limit;
  *   at the limit "New" is disabled and a link to the premium page is shown (syncLimit, after each change of the list).
  *   The live event doesn't carry the limit: the page's is kept.
+ * - A saved binding's schedule, in its form, is channel-custom-binding-schedules.js's: wired with its row, told its
+ *   category as it changes (showHeader), and brought to the schedules a live event carries, when it does (apply).
+ * - The status card's "active binding" line names the active one and links to its row (#custom-binding-<id>), which
+ *   a click opens and scrolls to; hidden while none is (showActiveStatus, after each change of the active one or
+ *   its name).
  * - The personal API token card (Account tab) is api-token-cards.js's.
  *
  * Every text goes in through textContent or a property, never as markup.
@@ -93,7 +98,33 @@ window.CatapultCustomBindings = (function () {
             show(item.querySelector(".custom-binding-activate"), !active);
             show(item.querySelector(".custom-binding-stop"), active);
         });
+        showActiveStatus();
     }
+
+    /** The status card's line: the active binding's name, linking to its row; hidden while none is. */
+    function showActiveStatus() {
+        const line = byId("channel-active-binding");
+        if (!line) return;
+        const row = document.querySelector(".custom-binding-item.is-active[data-custom-binding-id]");
+        const link = byId("channel-active-binding-link");
+        if (row && link) {
+            set(link, "textContent", row.querySelector(".custom-binding-name-label")?.textContent ?? "");
+            link.setAttribute("href", `#${row.id}`);
+        }
+        show(line, !!row);
+    }
+
+    /** Opens the active binding's row and scrolls to it: the hash isn't followed, the page's router owns the URL. */
+    document.addEventListener("click", event => {
+        const link = event.target instanceof Element ? event.target.closest("#channel-active-binding-link") : null;
+        if (!link || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        const row = document.getElementById(link.getAttribute("href").slice(1));
+        if (!row) return;
+        event.preventDefault();
+        const collapse = row.closest("mdui-collapse");
+        if (collapse && row.hasAttribute("value")) collapse.value = row.getAttribute("value");
+        row.scrollIntoView?.({ behavior: "smooth", block: "start" });
+    });
 
     function attachList(list) {
         const base = `${CatapultChannel.baseUrl()}/custom-bindings`;
@@ -179,6 +210,7 @@ window.CatapultCustomBindings = (function () {
                 `${CatapultChannel.baseUrl()}/games/search`, picked => { gameId.value = picked.id; },
                 { initial: { id: gameId.value, name: gameInput.value } });
             games.set(item, game);
+            window.CatapultCustomBindingSchedules?.attach(item);
 
             item.addEventListener("open", event => { if (event.target === item) item.classList.add("is-open"); });
             item.addEventListener("close", event => {
@@ -283,6 +315,7 @@ window.CatapultCustomBindings = (function () {
         const parent = before?.parentElement ?? list.querySelector("mdui-collapse");
         const row = template.content.firstElementChild.cloneNode(true);
         row.dataset.customBindingId = binding.id;
+        row.id = `custom-binding-${binding.id}`;
         row.setAttribute("value", binding.id);
         showHeader(row, binding);
         parent.insertBefore(row, before && before.parentElement === parent ? before : null);
@@ -291,6 +324,9 @@ window.CatapultCustomBindings = (function () {
         wired.attachItem(row);
         // The template's extension layout has no binding to save to: this one has now.
         window.CatapultExtensions?.enable(row, `${CatapultChannel.baseUrl()}/custom-bindings/${binding.id}/extensions`);
+        // Its schedule too.
+        window.CatapultCustomBindingSchedules?.enable(row,
+            `${CatapultChannel.baseUrl()}/custom-bindings/${binding.id}/schedules`, binding.twitchGameId);
         return row;
     }
 
@@ -305,6 +341,9 @@ window.CatapultCustomBindings = (function () {
         set(item.querySelector(".custom-binding-name-label"), "textContent", binding.name ?? "");
         set(item.querySelector(".custom-binding-game-label"), "textContent", binding.twitchGameName || "—");
         show(item.querySelector(".custom-binding-uninterruptible-chip"), !!binding.uninterruptible);
+        if (item.classList.contains("is-active")) showActiveStatus();
+        // Its category tells whether a free account may schedule it.
+        window.CatapultCustomBindingSchedules?.setGame(item, binding.twitchGameId);
     }
 
     /** Puts `binding` in its row's form; `game`, its category search once wired. */
@@ -327,12 +366,13 @@ window.CatapultCustomBindings = (function () {
 
     /**
      * Brings the list to `bindings` (all of them, oldest first, as a CustomBindingsUpdatedEvent carries them) and
-     * `activeId`. False when it can't be done in place, for the page to be re-rendered: no bindings (an older
+     * `activeId`, and each binding's schedule to `schedules` (by id, as the state carries them) when given: an event
+     * without them leaves the schedules as they are. False when it can't be done in place, for the page to be re-rendered: no bindings (an older
      * catapult-api), the list not wired yet, or no row template to add one from. A page without the list (anyone but
      * the owner, or the experiment closed to the channel) has nothing to update, nor has an event published before the
      * last one applied (`ts`, see inOrder): what it tells is outdated.
      */
-    function apply(bindings, activeId, ts) {
+    function apply(bindings, activeId, ts, schedules) {
         const list = byId("channel-custom-bindings-list");
         if (!list) return true;
         if (!inOrder(ts)) return true;
@@ -364,6 +404,9 @@ window.CatapultCustomBindings = (function () {
             } else {
                 row = addRow(list, binding, next && next.parentElement === parent ? next : null);
             }
+            if (schedules && typeof schedules === "object") {
+                window.CatapultCustomBindingSchedules?.show(row, schedules[binding.id] ?? []);
+            }
             next = row;
         }
         showEmpty(list);
@@ -377,5 +420,5 @@ window.CatapultCustomBindings = (function () {
         if (list) attachList(list);
     });
 
-    return { setActive, apply };
+    return { setActive, apply, post, readCode, refusalText };
 })();
