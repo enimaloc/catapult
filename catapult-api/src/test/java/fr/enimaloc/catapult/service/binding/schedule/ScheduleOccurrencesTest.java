@@ -89,11 +89,31 @@ class ScheduleOccurrencesTest {
         assertThat(ny).map(Occurrence::start).contains(at("2027-07-10T05:00:00Z"));
     }
 
+    /** 01:00 → 03:00 on the fall-back night: three real hours, ending at 03:00 as the slot says. */
     @Test
-    void fallBackKeepsTheNominalDuration() {
+    void fallBackEndsAtTheSlotsWallTime() {
         CustomBindingSchedule s = slot(Repeat.DAILY, "2026-10-01T01:00", "2026-10-01T03:00");
         Optional<Occurrence> next = ScheduleOccurrences.next(s, at("2026-10-25T00:00:00+02:00"), PARIS);
         assertThat(next).isPresent();
-        assertThat(Duration.between(next.get().start(), next.get().end())).isEqualTo(Duration.ofHours(2));
+        assertThat(next.get().end()).isEqualTo(at("2026-10-25T03:00:00+01:00"));
+        assertThat(Duration.between(next.get().start(), next.get().end())).isEqualTo(Duration.ofHours(3));
+    }
+
+    /** 22:00 → 04:00 across the spring-forward night: ends at 04:00 summer time, after five real hours. */
+    @Test
+    void springForwardEndsAtTheSlotsWallTime() {
+        CustomBindingSchedule s = slot(Repeat.NONE, "2026-03-28T22:00", "2026-03-29T04:00");
+        Optional<Occurrence> next = ScheduleOccurrences.next(s, at("2026-03-28T12:00:00+01:00"), PARIS);
+        assertThat(next).isPresent();
+        assertThat(next.get().end()).isEqualTo(at("2026-03-29T04:00:00+02:00"));
+    }
+
+    /** A slot the offset change swallows (02:00 → 02:30 in the skipped hour) keeps its nominal length. */
+    @Test
+    void aSlotInsideTheSkippedHourKeepsItsNominalLength() {
+        CustomBindingSchedule s = slot(Repeat.DAILY, "2027-03-01T02:00", "2027-03-01T02:30");
+        Optional<Occurrence> next = ScheduleOccurrences.next(s, at("2027-03-28T00:00:00+01:00"), PARIS);
+        assertThat(next).isPresent();
+        assertThat(Duration.between(next.get().start(), next.get().end())).isEqualTo(Duration.ofMinutes(30));
     }
 }

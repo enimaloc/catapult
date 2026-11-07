@@ -9,6 +9,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
 import java.time.zone.ZoneOffsetTransition;
 import java.util.Optional;
 
@@ -76,8 +77,23 @@ public final class ScheduleOccurrences {
                 return null;
             }
         }
+        return occurrence(s, date, zone);
+    }
+
+    /**
+     * The occurrence starting on {@code date}: its start and end are the slot's wall times read in {@code zone}, so
+     * one spanning a change of offset ends when the slot says, not a nominal duration after its start.
+     */
+    private static Occurrence occurrence(CustomBindingSchedule s, LocalDate date, ZoneId zone) {
         Instant start = resolve(date.atTime(s.getStartsAt().toLocalTime()), zone);
-        return new Occurrence(start, start.plus(duration(s)));
+        LocalDate endDate = date.plusDays(ChronoUnit.DAYS.between(s.getStartsAt().toLocalDate(),
+                s.getEndsAt().toLocalDate()));
+        Instant end = resolve(endDate.atTime(s.getEndsAt().toLocalTime()), zone);
+        // Wall times so close that a change of offset swallows the slot (01:30 to 02:30 on a fall-back night)
+        if (!end.isAfter(start)) {
+            end = start.plus(duration(s));
+        }
+        return new Occurrence(start, end);
     }
 
     /** Resolves a local time; one falling in a spring-forward gap starts when the gap ends. */
