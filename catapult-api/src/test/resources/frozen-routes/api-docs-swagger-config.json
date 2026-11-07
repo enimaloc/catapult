@@ -1,0 +1,8 @@
+{
+  "status" : 200,
+  "headers" : {
+    "Cache-Control" : [ "no-cache, no-store, max-age=0, must-revalidate" ],
+    "Content-Type" : [ "application/json" ]
+  },
+  "body" : "{\"configUrl\":\"/api/v3/api-docs/swagger-config\",\"oauth2RedirectUrl\":\"http://localhost:38569/swagger-ui/oauth2-redirect.html\",\"url\":\"/api/v3/api-docs\",\"validatorUrl\":\"\"}"
+}

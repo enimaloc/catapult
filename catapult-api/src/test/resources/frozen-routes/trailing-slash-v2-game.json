@@ -1,0 +1,8 @@
+{
+  "status" : 404,
+  "headers" : {
+    "Cache-Control" : [ "no-cache, no-store, max-age=0, must-revalidate" ],
+    "Content-Type" : [ "application/json" ]
+  },
+  "body" : "{\"timestamp\":\"2026-10-26T03:02:15.755Z\",\"status\":404,\"error\":\"Not Found\",\"path\":\"/api/user/game/25e19f83-f0f4-438f-87f2-38bd46a45aef/\"}"
+}

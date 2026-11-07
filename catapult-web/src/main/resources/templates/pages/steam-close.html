@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<!--/* Standalone (no SPA shell): the Steam login popup's last page (SteamConnectController#close). Linked,
+     it closes itself: the Steam card follows from the connection's live event. */-->
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="#{app.brand}">Catapult</title>
+    <meta name="robots" content="noindex">
+    <style>
+        body { font-family: system-ui, sans-serif; display: grid; place-items: center; min-height: 100vh; margin: 0; padding: 16px; box-sizing: border-box; }
+        main { max-width: 32rem; text-align: center; }
+    </style>
+</head>
+<body>
+<main th:attr="data-linked=${!steamError}">
+    <p th:if="${steamError}" th:text="#{steam_close.error}">La connexion Steam a échoué. Réessaie.</p>
+    <p th:unless="${steamError}" th:text="#{steam_close.success}">Compte Steam lié. Tu peux fermer cette page.</p>
+    <button type="button" onclick="window.close()" th:text="#{steam_close.close}">Fermer</button>
+    <!--/* Not a popup (the browser blocked it): the tab itself went to Steam, and can't close. */-->
+    <p><a href="/" th:text="#{steam_close.back}">Retour à Catapult</a></p>
+</main>
+<script th:unless="${steamError}">window.close();</script>
+</body>
+</html>

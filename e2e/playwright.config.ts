@@ -1,0 +1,52 @@
+import { defineConfig, devices } from "@playwright/test";
+
+/**
+ * Playwright config for the catapult WebSocket E2E suite.
+ *
+ * Assumes the docker compose stack is up and reachable at `BASE_URL`
+ * (default: http://localhost, catapult-web's published port, WEB_PORTS).
+ *
+ *   docker compose up -d
+ *   cd e2e && npx playwright test
+ *
+ * Scenarios that interact with `docker compose` (kill/restart/SIGTERM
+ * `catapult-web`) require docker access from the host running the tests.
+ */
+export default defineConfig({
+  testDir: "./tests",
+  fullyParallel: false, // we mutate the shared compose stack — keep tests sequential
+  workers: 1,
+  retries: process.env.CI ? 1 : 0,
+  reporter: process.env.CI ? [["line"], ["html", { open: "never" }]] : "list",
+  timeout: 90_000,
+  expect: {
+    timeout: 10_000,
+  },
+  use: {
+    baseURL: process.env.BASE_URL || "http://localhost",
+    trace: "retain-on-failure",
+    screenshot: "only-on-failure",
+    video: "retain-on-failure",
+    actionTimeout: 10_000,
+    navigationTimeout: 30_000,
+  },
+  projects: [
+    {
+      name: "chromium",
+      use: { ...devices["Desktop Chrome"] },
+      testIgnore: "perf/**",
+    },
+    // Timing run under the perf profile: perf/run.sh --pages-only. Only declared when PERF_BASE_URL
+    // names a perf stack, so that the default run never measures (or fails against) a real one.
+    ...(process.env.PERF_BASE_URL
+      ? [
+          {
+            name: "perf",
+            testDir: "./tests/perf",
+            timeout: 600_000, // 21 page loads per tab
+            use: { ...devices["Desktop Chrome"], baseURL: process.env.PERF_BASE_URL },
+          },
+        ]
+      : []),
+  ],
+});

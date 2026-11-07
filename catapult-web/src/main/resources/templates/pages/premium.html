@@ -1,0 +1,64 @@
+<!--/*@thymesVar id="premium" type="fr.enimaloc.catapult.common.dto.premium.PremiumStatusDto"*/-->
+<!--/* The member's premium status and what each tier gets. Intervals arrive as PremiumDuration (ModelFiller#premium): the message key and its minutes / seconds. */-->
+<mdui-layout-main th:fragment="premium">
+    <section class="section channel-section">
+        <div class="section-header channel-header">
+            <div>
+                <span class="eyebrow" th:text="#{premium.eyebrow}">premium.eyebrow</span>
+                <h1 th:text="#{premium.title}">premium.title</h1>
+            </div>
+        </div>
+
+        <mdui-card th:if="${premium == null}" id="premium-page-unavailable" class="settings-card admin-placeholder" variant="outlined">
+            <mdui-icon name="error_outline"></mdui-icon>
+            <span th:text="#{premium.unavailable}">premium.unavailable</span>
+        </mdui-card>
+
+        <th:block th:if="${premium != null}">
+            <div id="premium-page" class="premium-page">
+                <mdui-card class="settings-card" variant="outlined"
+                           th:attr="data-premium-status=${premium.premium() ? 'premium' : 'free'}">
+                    <h2 th:text="${premium.premium() ? #messages.msg('premium.status.premium') : #messages.msg('premium.status.free')}">premium.status.free</h2>
+                    <p th:if="${premium.premium() and premium.until() != null}" data-premium-until
+                       th:text="#{premium.status.until(${#temporals.format(premium.until(), #messages.msg('format.date'))})}">premium.status.until</p>
+                    <p th:if="${premium.premium()}" data-premium-usage
+                       th:text="#{premium.usage(${premium.customBindingCount()})}">premium.usage</p>
+                </mdui-card>
+
+                <mdui-card class="settings-card" variant="outlined">
+                    <table class="premium-table">
+                        <thead>
+                        <tr>
+                            <th scope="col" th:text="#{premium.table.benefit}">premium.table.benefit</th>
+                            <th scope="col" th:text="#{premium.table.free}">premium.table.free</th>
+                            <th scope="col" th:text="#{premium.table.premium}">premium.table.premium</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr>
+                            <th scope="row" th:text="#{premium.row.detection}">premium.row.detection</th>
+                            <td th:text="#{${premiumFree.key}(${premiumFree.minutes}, ${premiumFree.seconds})}">1 min</td>
+                            <td th:text="#{${premiumPremium.key}(${premiumPremium.minutes}, ${premiumPremium.seconds})}">30 s</td>
+                        </tr>
+                        <tr>
+                            <th scope="row" th:text="#{premium.row.degraded}">premium.row.degraded</th>
+                            <td th:text="#{${premiumDegradedFree.key}(${premiumDegradedFree.minutes}, ${premiumDegradedFree.seconds})}">1 min 30</td>
+                            <td th:text="#{${premiumDegradedPremium.key}(${premiumDegradedPremium.minutes}, ${premiumDegradedPremium.seconds})}">1 min</td>
+                        </tr>
+                        <tr>
+                            <th scope="row" th:text="#{premium.row.bindings}">premium.row.bindings</th>
+                            <td th:text="${premium.offer().freeCustomBindingLimit()}">5</td>
+                            <td th:text="#{premium.unlimited}">premium.unlimited</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </mdui-card>
+
+                <mdui-card id="premium-obtain" class="settings-card" variant="outlined">
+                    <h2 th:text="#{premium.obtain.title}">premium.obtain.title</h2>
+                    <p th:text="#{premium.obtain.soon}">premium.obtain.soon</p>
+                </mdui-card>
+            </div>
+        </th:block>
+    </section>
+</mdui-layout-main>

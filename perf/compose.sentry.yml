@@ -1,0 +1,7 @@
+# Added by perf/run.sh only when API_SENTRY_DSN is set: catapult-api needs a route out to reach Sentry.
+# perf/compose.yml keeps it on the internal network otherwise.
+services:
+  api:
+    networks:
+      - perf-internal
+      - edge

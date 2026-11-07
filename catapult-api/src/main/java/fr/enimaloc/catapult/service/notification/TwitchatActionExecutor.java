@@ -1,0 +1,80 @@
+package fr.enimaloc.catapult.service.notification;
+
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.twitchat.TwitchatActionToken;
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.service.account.BotToggleService;
+import fr.enimaloc.catapult.service.binding.BindingService;
+import fr.enimaloc.catapult.service.binding.CustomBindingActivations;
+import fr.enimaloc.catapult.service.category.CategoryChain;
+import fr.enimaloc.catapult.service.category.CategoryTrigger.RevertCategory;
+import fr.enimaloc.catapult.service.debug.DebugContext;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Map;
+import java.util.UUID;
+
+@Component
+@RequiredArgsConstructor
+public class TwitchatActionExecutor {
+
+    public enum Result { EXECUTED, ALREADY_USED_OR_EXPIRED, USER_NOT_FOUND, INVALID_PAYLOAD }
+
+    private final TwitchatActionTokenService actionTokenService;
+    private final UserAccountRepository userAccountRepository;
+    private final CategoryChain categoryChain;
+    private final BindingService bindingService;
+    private final BotToggleService botToggleService;
+    private final CustomBindingActivations customBindingActivations;
+
+    @Transactional
+    public Result execute(UUID actionToken) {
+        var tokenOpt = actionTokenService.consume(actionToken);
+        if (tokenOpt.isEmpty()) {
+            return Result.ALREADY_USED_OR_EXPIRED;
+        }
+        TwitchatActionToken token = tokenOpt.get();
+        var userOpt = userAccountRepository.findById(token.getUserId());
+        if (userOpt.isEmpty()) {
+            return Result.USER_NOT_FOUND;
+        }
+        UserAccount user = userOpt.get();
+        Map<String, String> payload = actionTokenService.readPayload(token.getPayloadJson());
+
+        switch (token.getActionType()) {
+            case REVERT_CATEGORY, REVERT_TO_APP_CATEGORY -> {
+                // The widget route has no subject: the change is recorded in the channel's debug log
+                DebugContext.runAs(user.getId(), () -> categoryChain.apply(user,
+                        new RevertCategory(payload.get("gameId"), payload.get("gameName"))).orThrow());
+                // A category chosen by hand ends the active custom binding, whatever its kind
+                customBindingActivations.clear(user);
+            }
+            case BIND_GAME_CATEGORY -> {
+                UUID bindingId = parseUuid(payload.get("bindingId"));
+                // The token is already burned at this point — a malformed payload must yield a
+                // clean result, not a 500.
+                if (bindingId == null) {
+                    return Result.INVALID_PAYLOAD;
+                }
+                bindingService.setTwitchGame(user, bindingId,
+                        payload.get("newGameId"), payload.get("newGameName"));
+            }
+            case DISABLE_BOT -> botToggleService.setBotEnabled(user, false);
+            case ENABLE_BOT -> botToggleService.setBotEnabled(user, true);
+        }
+        return Result.EXECUTED;
+    }
+
+    private static UUID parseUuid(String value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return UUID.fromString(value);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+}

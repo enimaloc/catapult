@@ -1,0 +1,26 @@
+{
+  "idle-60s": {
+    "nodes": 10
+  },
+  "nav-refresh": {
+    "nodes": 0
+  },
+  "dock-events": {
+    "nodes": 948
+  },
+  "channel-live-events": {
+    "nodes": 7
+  },
+  "channel-reconnect": {
+    "nodes": 0
+  },
+  "custom-binding-crud": {
+    "nodes": 928
+  },
+  "channel-actions": {
+    "nodes": 6
+  },
+  "admin-edit": {
+    "nodes": 66
+  }
+}

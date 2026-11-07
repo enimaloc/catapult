@@ -1,0 +1,12 @@
+{
+  "metrics": {
+    "http_reqs": { "count": 1200, "rate": 10.04 },
+    "http_req_duration{kind:request}": { "med": 40, "p(95)": 210, "count": 1200, "thresholds": { "p(95)<500": false } },
+    "http_req_failed": { "passes": 3, "fails": 1197, "value": 0.0025, "thresholds": { "rate<0.01": false } },
+    "ws_unexpected_close": { "count": 2, "rate": 0.01, "thresholds": { "count==0": true } },
+    "http_req_duration{group:widget}": { "med": 12.34, "p(95)": 30.06, "count": 800, "thresholds": { "max>=0": false } },
+    "http_req_failed{group:widget}": { "passes": 2, "fails": 798, "value": 0.0025, "thresholds": { "rate>=0": false } },
+    "http_req_duration{group:channel}": { "med": 80, "p(95)": 300, "count": 40, "thresholds": { "max>=0": false } },
+    "http_req_failed{group:channel}": { "passes": 0, "fails": 40, "value": 0, "thresholds": { "rate>=0": false } }
+  }
+}

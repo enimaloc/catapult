@@ -1,0 +1,18 @@
+name: Release scripts
+
+on:
+  pull_request:
+  # Branches only: a version tag push runs release.yml, not the checks again
+  push:
+    branches: ['**']
+
+jobs:
+  # Not `test`: ready.mjs requires the check named `test` (Tests workflow) before merging a release.
+  release-scripts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test ".github/release/test/*.test.mjs"

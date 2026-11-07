@@ -1,0 +1,104 @@
+package fr.enimaloc.catapult.service.steam;
+
+import fr.enimaloc.catapult.service.debug.DebugContext;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.event.SteamLinkedEvent;
+import fr.enimaloc.catapult.getter.steam.SteamApiClient;
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.security.TokenEncryptionService;
+import fr.enimaloc.catapult.service.igdb.IgdbService;
+import fr.enimaloc.catapult.simulation.SimulatedCalls;
+import fr.enimaloc.catapult.simulation.SimulationGate;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.annotation.DependsOn;
+import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+
+@Slf4j
+@Service
+@DependsOn("flyway")
+@RequiredArgsConstructor
+public class SteamLibraryCacheService {
+
+    private final SteamApiClient steamApiClient;
+    private final IgdbService igdbService;
+    private final UserAccountRepository userAccountRepository;
+    private final TokenEncryptionService tokenEncryptionService;
+    private final ObjectProvider<SimulationGate> simulationGate;
+
+    @Async
+    @EventListener(ApplicationReadyEvent.class)
+    public void preloadAllUserLibraries() {
+        if (simulated()) {
+            return;
+        }
+        // A fictitious account's Steam id is made up: without the simulation, nothing asks Steam about it
+        List<UserAccount> users = userAccountRepository.findBySteamIdNotNull().stream()
+            .filter(user -> !SimulationGate.ignoresFictitious(simulationGate, user))
+            .toList();
+        if (users.isEmpty()) {
+            log.info("No users with Steam linked — skipping library preload");
+            igdbService.prewarmCclCache();
+            return;
+        }
+
+        log.info("Pre-caching Steam libraries for {} user(s) at startup", users.size());
+        List<CompletableFuture<Void>> futures = users.stream()
+            .map(user -> DebugContext.callAs(user.getId(), () -> cacheLibraryAsync(user)))
+            .toList();
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+
+        igdbService.prewarmCclCache();
+    }
+
+    @Async
+    @EventListener
+    public void onSteamLinked(SteamLinkedEvent event) {
+        if (simulated()) {
+            return;
+        }
+        UserAccount user = event.getUser();
+        if (SimulationGate.ignoresFictitious(simulationGate, user)) {
+            return;
+        }
+        DebugContext.runAs(user.getId(), () -> cacheLibraryAsync(user).join());
+        igdbService.prewarmCclCache();
+    }
+
+    /** Whether the simulation keeps the library preload (owned games, then IGDB) from running. */
+    private boolean simulated() {
+        if (SimulationGate.blocks(simulationGate, null, SimulatedCalls.STEAM_STORE_LIBRARY)) {
+            log.debug("Steam library preload skipped — steam.store.library is simulated");
+            return true;
+        }
+        return false;
+    }
+
+    private CompletableFuture<Void> cacheLibraryAsync(UserAccount user) {
+        if (user.getSteamId() == null) return CompletableFuture.completedFuture(null);
+
+        log.info("Pre-caching Steam library for user {} (steamId={})", user.getId(), user.getSteamId());
+        String personalToken = user.getSteamPersonalToken() != null
+            ? tokenEncryptionService.decrypt(user.getSteamPersonalToken())
+            : null;
+        return steamApiClient.getOwnedGameIds(user.getSteamId(), personalToken)
+            .thenAccept(appIds -> {
+                if (appIds.isEmpty()) {
+                    log.warn("No owned games returned for steamId={} (private profile?)", user.getSteamId());
+                    return;
+                }
+                igdbService.prewarmSteamAppIds(appIds);
+            })
+            .exceptionally(e -> {
+                log.warn("Failed to cache Steam library for steamId={}: {}", user.getSteamId(), e.getMessage());
+                return null;
+            });
+    }
+}
