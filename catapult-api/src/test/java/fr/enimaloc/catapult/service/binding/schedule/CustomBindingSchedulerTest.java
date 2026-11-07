@@ -317,6 +317,35 @@ class CustomBindingSchedulerTest {
         verify(customBindingService, times(2)).activateScheduled(any(), any(), any(), any());
     }
 
+    /** Picked offline during the occurrence, then the stream start's replacement failed: the ticks retry it. */
+    @Test
+    void aFailedReplacementOfAnOfflineChoiceIsRetried() {
+        CustomBindingSchedule s = slot(binding, 20, 23);
+        active(Origin.MANUAL, at(20, 30), null, 0);
+        when(customBindingService.activateScheduled(any(), any(), any(), any()))
+                .thenReturn(ActivationResult.TWITCH_UNAVAILABLE, ActivationResult.APPLIED);
+
+        scheduler.onStreamOnline(new StreamOnlineEvent(this, user));
+        evaluateAt(21, 31);
+
+        verify(customBindingService, times(2)).activateScheduled(eq(user), eq(binding), eq(s.getId()), any());
+    }
+
+    /** A choice made live after that stands, though: it refused the occurrence, or is newer than the one replaced. */
+    @Test
+    void aNewerManualChoiceStandsAfterAFailedReplacement() {
+        slot(binding, 20, 23);
+        active(Origin.MANUAL, at(20, 30), null, 0);
+        when(customBindingService.activateScheduled(any(), any(), any(), any()))
+                .thenReturn(ActivationResult.TWITCH_UNAVAILABLE);
+        scheduler.onStreamOnline(new StreamOnlineEvent(this, user));
+
+        active(Origin.MANUAL, at(21, 31), null, 0);
+        evaluateAt(21, 32);
+
+        verify(customBindingService, times(1)).activateScheduled(any(), any(), any(), any());
+    }
+
     @Test
     void tickSkipsWhenTheSiteIsNotActive() {
         when(siteRole.isActive()).thenReturn(false);

@@ -65,6 +65,11 @@ public class CustomBindingScheduler {
     private final Clock clock;
     /** One lock per streamer, shared with the manual choices, so nothing else decides for them mid-evaluation. */
     private final CustomBindingUserLocks locks;
+    /**
+     * Per streamer, when the manual activation the stream start set out to replace was made: picked offline during
+     * the occurrence, it does not stand, and the ticks retry a replacement that failed.
+     */
+    private final Map<UUID, Instant> replacedManual = new ConcurrentHashMap<>();
 
     @Autowired
     public CustomBindingScheduler(CustomBindingScheduleRepository schedules,
@@ -204,18 +209,29 @@ public class CustomBindingScheduler {
                 .max(Comparator.comparing((Due d) -> d.occurrence().start())
                         .thenComparing(d -> d.schedule().getId()));
         Optional<CustomBindingActivation> active = activations.current(user);
-        if (due.isPresent()) {
-            Due d = due.get();
-            if (active.isPresent() && (alreadyServes(active.get(), d)
-                    || !goingLive && manualChoiceDuring(active.get(), d))) {
+        if (due.isEmpty()) {
+            replacedManual.remove(user.getId());
+            if (active.filter(a -> a.getOrigin() == Origin.SCHEDULED).isPresent()) {
+                customBindingService.endScheduled(user);
+            }
+            return;
+        }
+        Due d = due.get();
+        if (active.isPresent() && alreadyServes(active.get(), d)) {
+            replacedManual.remove(user.getId());
+            return;
+        }
+        if (active.isPresent() && manualChoiceDuring(active.get(), d)) {
+            Instant activatedAt = active.get().getActivatedAt();
+            if (goingLive) {
+                replacedManual.put(user.getId(), activatedAt);
+            } else if (!activatedAt.equals(replacedManual.get(user.getId()))) {
                 return;
             }
-            // A failed activation is retried by the next tick
-            customBindingService.activateScheduled(user, d.schedule().getCustomBinding(), d.schedule().getId(),
-                    d.occurrence());
-        } else if (active.filter(a -> a.getOrigin() == Origin.SCHEDULED).isPresent()) {
-            customBindingService.endScheduled(user);
         }
+        // A failed activation is retried by the next tick
+        customBindingService.activateScheduled(user, d.schedule().getCustomBinding(), d.schedule().getId(),
+                d.occurrence());
     }
 
     /** A manual choice made live during the occurrence stands: the schedule does not take it back. */
