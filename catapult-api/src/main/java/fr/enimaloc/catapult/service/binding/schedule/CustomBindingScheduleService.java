@@ -76,6 +76,9 @@ public class CustomBindingScheduleService {
     public List<CustomBindingSchedule> replace(UserAccount user, UUID customBindingId,
                                                List<CustomBindingScheduleRequest> requests) {
         CustomBinding binding = binding(user, customBindingId);
+        if (requests.size() > CustomBindingScheduleDto.MAX_SLOTS) {
+            throw invalid("At most " + CustomBindingScheduleDto.MAX_SLOTS + " schedule slots per binding");
+        }
         Map<UUID, CustomBindingSchedule> current = schedules.findByCustomBindingOrderByStartsAtAsc(binding).stream()
                 .collect(Collectors.toMap(CustomBindingSchedule::getId, Function.identity()));
 

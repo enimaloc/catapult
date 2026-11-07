@@ -8,8 +8,9 @@
  *   summary built as the template does, from the section's data-format-* patterns and data-label-*, the day names from
  *   the editor's chips. A refusal is told through CatapultChannel.showError, in the section's data-error-* text for its
  *   code (refusalText); a switch that failed goes back.
- * - "Add a slot" is offered on a premium account (data-can-repeat) or on the free category (data-free-game-id) only;
- *   repeating is disabled in the editor by the template when the account can't.
+ * - "Add a slot" is offered on a premium account (data-can-repeat) or on the free category (data-free-game-id) only,
+ *   while the binding has fewer than data-max-slots; repeating is disabled in the editor by the template when the
+ *   account can't.
  * - Slots are shown and typed in the browser's zone: one saved from another zone is said in this one (its days and end
  *   date moved with its start), and a slot saved from the editor takes the browser's zone. One not edited is posted
  *   back as it was saved. The server says the slots in their own zone: said again when the browser's differs.
@@ -180,6 +181,7 @@ window.CatapultCustomBindingSchedules = (function () {
         });
         show(section.querySelector(".custom-binding-schedule-empty"), !(slots ?? []).length);
         showNext(section);
+        showAdd(section);
     }
 
     function showNext(section) {
@@ -201,7 +203,9 @@ window.CatapultCustomBindingSchedules = (function () {
     function showAdd(section) {
         const allowed = canAdd(section);
         const editing = !section.querySelector(".custom-binding-schedule-editor")?.classList.contains("hidden");
-        show(section.querySelector(".custom-binding-schedule-add"), allowed && !editing);
+        const max = Number(section.dataset.maxSlots);
+        const full = max > 0 && rows(section).length >= max;
+        show(section.querySelector(".custom-binding-schedule-add"), allowed && !editing && !full);
         show(section.querySelector(".custom-binding-schedule-add-unavailable"), !allowed);
         show(section.querySelector(".custom-binding-schedule-add-premium"), !allowed);
     }

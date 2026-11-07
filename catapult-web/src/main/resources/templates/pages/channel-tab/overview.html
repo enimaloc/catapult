@@ -409,8 +409,9 @@
               dto=${T(fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleDto)},
               zone=${dto.ZONE}, freeGameId=${dto.FREE_TWITCH_GAME_ID},
               canRepeat=${cb.canRepeat() == true}, premium=${cb.premiumUi() == true},
-              canAdd=${canRepeat or (b != null and b.twitchGameId() == freeGameId)},
               slots=${b == null or cb.schedules().get(b.id()) == null ? {} : cb.schedules().get(b.id())},
+              allowed=${canRepeat or (b != null and b.twitchGameId() == freeGameId)},
+              canAdd=${allowed and #lists.size(slots) < dto.MAX_SLOTS},
               due=${slots.?[!paused() and !suspended() and nextStart() != null].![nextStart()]},
               next=${#lists.isEmpty(due) ? null : #lists.sort(due)[0]},
               time=#{format.time}, date=#{format.date},
@@ -420,6 +421,7 @@
               weekly=#{channel.custom_bindings.schedule.repeat.weekly}"
      th:attr="data-save-url=${b == null} ? null : @{/channel/{u}/custom-bindings/{id}/schedules(u=${channelPage.channelUsername()},id=${b.id()})},
               data-game-id=${b?.twitchGameId()},data-free-game-id=${freeGameId},data-can-repeat=${canRepeat},
+              data-max-slots=${dto.MAX_SLOTS},
               data-zone=${zone},data-format-time=${time},data-format-date=${date},data-format-day-time=${dayTime},
               data-format-next=${nextFormat},data-label-daily=${daily},data-label-weekly=${weekly},
               data-label-until=#{channel.custom_bindings.schedule.until('{0}')},
@@ -439,10 +441,10 @@
     <div class="custom-binding-schedule-add-row">
         <mdui-button class="custom-binding-schedule-add" variant="text" icon="add" th:classappend="${canAdd} ? '' : 'hidden'"
                      th:text="#{channel.custom_bindings.schedule.add}">Ajouter un créneau</mdui-button>
-        <span class="custom-binding-schedule-add-unavailable" th:classappend="${canAdd} ? 'hidden'"
+        <span class="custom-binding-schedule-add-unavailable" th:classappend="${allowed} ? 'hidden'"
               th:text="${premium} ? #{channel.custom_bindings.schedule.add_unavailable_premium} : #{channel.custom_bindings.schedule.add_unavailable}">Seule la catégorie Special Events peut être programmée.</span>
         <a class="custom-binding-schedule-premium custom-binding-schedule-add-premium" data-link href="/premium"
-           th:if="${premium}" th:classappend="${canAdd} ? 'hidden'">
+           th:if="${premium}" th:classappend="${allowed} ? 'hidden'">
             <mdui-icon name="lock"></mdui-icon><span th:text="#{channel.custom_bindings.schedule.premium}">Premium</span></a>
     </div>
     <p class="custom-binding-schedule-next" th:classappend="${next == null} ? 'hidden'"

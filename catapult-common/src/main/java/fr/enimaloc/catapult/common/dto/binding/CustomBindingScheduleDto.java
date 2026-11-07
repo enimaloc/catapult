@@ -25,6 +25,8 @@ public record CustomBindingScheduleDto(
 ) {
     /** The zone of a slot saved without one, and the premium window's. */
     public static final String ZONE = "Europe/Paris";
+    /** How many slots a binding may have. */
+    public static final int MAX_SLOTS = 20;
     /** Twitch's "Special Events" category, the only one a free account may schedule (one-off slots only). */
     public static final String FREE_TWITCH_GAME_ID = "509663";
 }

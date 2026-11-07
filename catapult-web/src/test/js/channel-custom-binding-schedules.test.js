@@ -44,7 +44,7 @@ function slotRow(slot) {
         </mdui-list-item>`;
 }
 
-function page({ slot = weekly, gameId = "509660", canRepeat = true } = {}) {
+function page({ slot = weekly, gameId = "509660", canRepeat = true, maxSlots = 20 } = {}) {
     html(`
         <mdui-list id="channel-custom-bindings-list" data-error-invalid="Binding invalide">
             <mdui-collapse accordion>
@@ -59,6 +59,7 @@ function page({ slot = weekly, gameId = "509660", canRepeat = true } = {}) {
                     <mdui-switch class="custom-binding-uninterruptible"></mdui-switch>
                     <div class="custom-binding-schedules" data-save-url="${URL}" data-game-id="${gameId}"
                          data-free-game-id="509663" data-can-repeat="${canRepeat}" data-zone="Europe/Paris"
+                         data-max-slots="${maxSlots}"
                          data-format-time="HH:mm" data-format-date="dd/MM/yyyy" data-format-day-time="dd/MM HH:mm"
                          data-format-next="EEEE d MMMM, HH:mm" data-label-daily="chaque jour"
                          data-label-weekly="chaque semaine" data-label-until="jusqu'au {0}"
@@ -238,6 +239,18 @@ describe("custom binding schedule", () => {
             ccls: [], tws: [], uninterruptible: false }], null);
         expect(isHidden(add)).toBe(false);
         expect(isHidden(unavailable)).toBe(true);
+    });
+
+    it("stops offering to add once the binding has as many slots as allowed, and again after a deletion", async () => {
+        page({ maxSlots: 1 });
+        const add = section().querySelector(".custom-binding-schedule-add");
+        expect(isHidden(add)).toBe(true);
+        expect(isHidden(section().querySelector(".custom-binding-schedule-add-unavailable"))).toBe(true);
+
+        postJson.mockResolvedValueOnce(response(200, []));
+        slots()[0].querySelector(".custom-binding-schedule-delete").click();
+        await flush();
+        expect(isHidden(add)).toBe(false);
     });
 
     it("shows the schedules a live event carries, and leaves them when it carries none", () => {

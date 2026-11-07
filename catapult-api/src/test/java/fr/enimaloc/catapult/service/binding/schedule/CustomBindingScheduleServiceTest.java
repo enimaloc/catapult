@@ -188,6 +188,16 @@ class CustomBindingScheduleServiceTest {
     }
 
     @Test
+    void aBindingHasAtMostTwentySlots() {
+        List<CustomBindingScheduleRequest> slots = java.util.stream.IntStream.range(0, 21)
+                .mapToObj(i -> request(null, START.plusDays(i), START.plusDays(i).plusHours(1), "NONE", Set.of(), false))
+                .toList();
+
+        assertThat(service.replace(user, binding.getId(), slots.subList(0, 20))).hasSize(20);
+        assertProblem(() -> service.replace(user, binding.getId(), slots), ErrorCode.INVALID);
+    }
+
+    @Test
     void aOneOffSlotLastsAtMostSevenDays() {
         var week = request(null, START, START.plusDays(7), "NONE", Set.of(), false);
         var longer = request(null, START, START.plusDays(7).plusMinutes(1), "NONE", Set.of(), false);
