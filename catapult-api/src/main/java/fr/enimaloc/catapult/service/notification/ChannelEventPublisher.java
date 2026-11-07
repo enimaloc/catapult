@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.service.notification;
 
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingDto;
+import fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto;
 import fr.enimaloc.catapult.common.dto.channel.BindingDto;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingCurrentDto;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatDispatch;
@@ -135,6 +136,16 @@ public class ChannelEventPublisher {
         String active = activeId == null ? null : activeId.toString();
         publish(channelOwnerId, ChannelEvents.CUSTOM_BINDINGS_UPDATED,
                 (id, login) -> new ChannelEvents.CustomBindingsUpdated(id, login, dtos, active));
+    }
+
+    /**
+     * {@link #customBindingsUpdated} from the dashboard's state, its bindings' schedule slots with them: they changed
+     * (edited, or suspended or resumed with premium).
+     */
+    public void customBindingSchedulesUpdated(UUID channelOwnerId, CustomBindingsStateDto state) {
+        String active = state.activeId() == null ? null : state.activeId().toString();
+        publish(channelOwnerId, ChannelEvents.CUSTOM_BINDINGS_UPDATED, (id, login) ->
+                new ChannelEvents.CustomBindingsUpdated(id, login, state.bindings(), active, state.schedules()));
     }
 
     public void twitchatDispatch(UUID channelOwnerId, TwitchatDispatch dispatch) {

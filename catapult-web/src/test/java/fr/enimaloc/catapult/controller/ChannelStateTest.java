@@ -36,6 +36,7 @@ import fr.enimaloc.catapult.event.tw.TwUpdatedEvent;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -87,7 +88,7 @@ class ChannelStateTest {
                 new SteamTokenSavedEvent("enimaloc", true),
                 new ChannelConnectionChangedEvent("enimaloc", "XBOX", true),
                 new MinecraftSyncEvent("enimaloc", "ACCEPTED", "jeb_"),
-                new CustomBindingsUpdatedEvent("enimaloc", List.of(art), active.toString()),
+                new CustomBindingsUpdatedEvent("enimaloc", List.of(art), active.toString(), null, Map.of()),
                 new DtddMappingChangedEvent("enimaloc", "42", current, null, true, false));
     }
 
@@ -114,7 +115,7 @@ class ChannelStateTest {
                 new SteamTokenDeletedEvent("enimaloc"),
                 new ChannelConnectionChangedEvent("enimaloc", "XBOX", false),
                 new MinecraftDisconnectedEvent("enimaloc"),
-                new CustomBindingsUpdatedEvent("enimaloc", List.of(), null),
+                new CustomBindingsUpdatedEvent("enimaloc", List.of(), null, null, Map.of()),
                 new DtddMappingChangedEvent("enimaloc", "42", null, null, false, true));
         assertThat(events(ChannelState.of(page(null, null, null, null, new MinecraftData("NONE", null, null), null),
                 null, null))).contains(new MinecraftDisconnectedEvent("enimaloc"));

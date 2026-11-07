@@ -1749,7 +1749,7 @@ public class MockApiService implements ApiService {
     private void publishCustomBindings(String username) {
         CustomBindingsStateDto state = currentData().customBindings().state();
         eventPublisher.publishEvent(new CustomBindingsUpdatedEvent(username, state.bindings(),
-                state.activeId() == null ? null : state.activeId().toString()));
+                state.activeId() == null ? null : state.activeId().toString(), null, state.schedules()));
     }
 
     @Override

@@ -197,6 +197,23 @@ class ChannelEventPublisherTest {
     }
 
     @Test
+    void customBindingSchedulesUpdated_publishesTheStatesBindingsWithTheirSchedules() {
+        UUID art = UUID.randomUUID();
+        var binding = new CustomBindingDto(art, "Art", "509660", "Art", List.of(), List.of(), false);
+        var slot = new fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleDto(UUID.randomUUID(),
+                java.time.LocalDateTime.parse("2026-11-10T20:00:00"), java.time.LocalDateTime.parse("2026-11-10T22:00:00"),
+                "NONE", List.of(), null, "Europe/Paris", false, false, null);
+        var state = new fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto(true, List.of(binding), art,
+                null, null, java.util.Map.of(), java.util.Map.of(art, List.of(slot)), true);
+
+        publisher.customBindingSchedulesUpdated(ownerId, state);
+
+        assertThat(published(ChannelEvents.CUSTOM_BINDINGS_UPDATED)).isEqualTo(
+                new ChannelEvents.CustomBindingsUpdated(ownerId.toString(), "streamername", List.of(binding),
+                        art.toString(), java.util.Map.of(art, List.of(slot))));
+    }
+
+    @Test
     void dtddMappingChanged_publishesTheMappingAndWhetherAProposalIsPending() {
         DtddMappingCurrentDto current = new DtddMappingCurrentDto(7L, "Valheim", 0.8, false);
 

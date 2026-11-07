@@ -1,10 +1,12 @@
 package fr.enimaloc.catapult.common.event;
 
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingDto;
+import fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleDto;
 import fr.enimaloc.catapult.common.dto.channel.BindingDto;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingCurrentDto;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -102,10 +104,17 @@ public final class ChannelEvents {
     /**
      * The channel's custom bindings were created, changed or deleted: all of them now, oldest first, and the active
      * one ({@code activeId}, null when none is). {@code bindings} is null from a catapult-api that predates it: the
-     * dashboard then reloads their list.
+     * dashboard then reloads their list. {@code schedules}: each binding's slots by id, when they changed (null:
+     * the dashboard keeps the ones it shows).
      */
     public record CustomBindingsUpdated(String channelId, String channelLogin, List<CustomBindingDto> bindings,
-                                        String activeId) {}
+                                        String activeId, Map<UUID, List<CustomBindingScheduleDto>> schedules) {
+
+        public CustomBindingsUpdated(String channelId, String channelLogin, List<CustomBindingDto> bindings,
+                                     String activeId) {
+            this(channelId, channelLogin, bindings, activeId, null);
+        }
+    }
 
     /** A channel's Steam profile state, as the dashboard shows it. */
     public record SteamProfile(boolean hasSteam, boolean profilePrivate, boolean offlineMode, boolean rateLimited,

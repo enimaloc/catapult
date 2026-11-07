@@ -961,7 +961,7 @@ class MockApiServiceTest {
     private fr.enimaloc.catapult.event.binding.CustomBindingsUpdatedEvent listed() {
         var state = service.customBindings(username);
         return new fr.enimaloc.catapult.event.binding.CustomBindingsUpdatedEvent(username, state.bindings(),
-                state.activeId() == null ? null : state.activeId().toString());
+                state.activeId() == null ? null : state.activeId().toString(), null, state.schedules());
     }
 
     @Test
