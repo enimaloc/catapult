@@ -39,6 +39,7 @@ import fr.enimaloc.catapult.service.account.ChannelSettingsService;
 import fr.enimaloc.catapult.service.binding.BindingService;
 import fr.enimaloc.catapult.service.binding.ChannelDashboardActions;
 import fr.enimaloc.catapult.service.binding.CustomBindingActivations;
+import fr.enimaloc.catapult.service.binding.CustomBindingUserLocks;
 import fr.enimaloc.catapult.service.binding.CustomBindingService;
 import fr.enimaloc.catapult.service.binding.CustomBindingService.ActivationResult;
 import fr.enimaloc.catapult.service.binding.CustomBindingService.UpdateResult;
@@ -239,7 +240,7 @@ public class ChannelFixture {
         customBindingService = new CustomBindingService(customBindingRepository, activations,
                 experimentService, gameStateService, streamStateService, accountRepository,
                 tokenRepository, listener, publisher, categoryChain, mock(ExtensionLayoutApplier.class),
-                mock(PremiumService.class), mock(org.springframework.context.ApplicationEventPublisher.class));
+                mock(PremiumService.class), mock(org.springframework.context.ApplicationEventPublisher.class), new CustomBindingUserLocks());
         setGameFunction = new CatapultSetGameFunction(twitch, categoryChain, gameStateService, igdbService,
                 activations);
         twitchatActionExecutor = new TwitchatActionExecutor(actionTokenService, accountRepository, categoryChain,

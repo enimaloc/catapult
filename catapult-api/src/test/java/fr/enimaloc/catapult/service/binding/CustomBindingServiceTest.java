@@ -85,6 +85,8 @@ class CustomBindingServiceTest {
 
     private UserAccount user;
 
+    private final CustomBindingUserLocks locks = new CustomBindingUserLocks();
+
     @BeforeEach
     void setUp() {
         // The real chain and applier: the Twitch stubs below are what the category decision ends up calling
@@ -93,7 +95,7 @@ class CustomBindingServiceTest {
                 new CategoryApplier(twitchService, streamStateService), mock(RaidRestoreGateService.class), mock(GameBindingLookup.class), mock(ExtensionLayoutApplier.class));
         service = new CustomBindingService(bindings, activations, experimentService, gameStateService,
                 streamStateService, userAccountRepository, oAuthTokenRepository, gameEventListener,
-                channelEventPublisher, chain, layouts, premiumService, eventPublisher);
+                channelEventPublisher, chain, layouts, premiumService, eventPublisher, locks);
         user = new UserAccount();
         user.setId(UUID.randomUUID());
         user.setBotEnabled(true);
@@ -345,6 +347,35 @@ class CustomBindingServiceTest {
 
         verify(activations).record(user, art);
         verify(streamStateService, never()).storePending(any(), any());
+    }
+
+    /** A scheduler evaluation of the streamer under way would record its binding over this one: it is waited for. */
+    @Test
+    void activate_waitsForAnEvaluationOfTheStreamerUnderWay() throws Exception {
+        CustomBinding art = binding("Art");
+        lenient().when(streamStateService.isLive(user)).thenReturn(false);
+        when(twitchService.updateChannelReporting(eq(user), any())).thenReturn(ChannelUpdateOutcome.APPLIED);
+        var held = new java.util.concurrent.CountDownLatch(1);
+        var release = new java.util.concurrent.CountDownLatch(1);
+        Thread evaluation = new Thread(() -> locks.run(user.getId(), () -> {
+            held.countDown();
+            try {
+                release.await();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }));
+        evaluation.start();
+        held.await();
+
+        var manual = java.util.concurrent.CompletableFuture.supplyAsync(() -> service.activate(user, art));
+        Thread.sleep(200);
+        assertThat(manual).isNotDone();
+        verify(twitchService, never()).updateChannelReporting(any(), any());
+
+        release.countDown();
+        assertThat(manual.get(5, java.util.concurrent.TimeUnit.SECONDS)).isEqualTo(ActivationResult.APPLIED);
+        evaluation.join();
     }
 
     @Test

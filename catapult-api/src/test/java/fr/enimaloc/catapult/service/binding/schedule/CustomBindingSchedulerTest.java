@@ -15,6 +15,7 @@ import fr.enimaloc.catapult.repository.binding.CustomBindingScheduleRepository;
 import fr.enimaloc.catapult.service.binding.CustomBindingActivations;
 import fr.enimaloc.catapult.service.binding.CustomBindingService;
 import fr.enimaloc.catapult.service.binding.CustomBindingService.ActivationResult;
+import fr.enimaloc.catapult.service.binding.CustomBindingUserLocks;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
 import fr.enimaloc.catapult.service.premium.PremiumService;
 import fr.enimaloc.catapult.site.SiteRole;
@@ -69,7 +70,8 @@ class CustomBindingSchedulerTest {
     @BeforeEach
     void setUp() {
         scheduler = new CustomBindingScheduler(schedules, refusals, activationRepository, activations,
-                customBindingService, streamStateService, premiumService, users, siteRole, executor,
+                customBindingService, streamStateService, premiumService, users, siteRole,
+                new CustomBindingUserLocks(), executor,
                 Clock.fixed(at(21, 30), ZoneOffset.UTC));
         user = new UserAccount();
         user.setId(UUID.randomUUID());
@@ -372,7 +374,7 @@ class CustomBindingSchedulerTest {
     void aRejectedHandOffIsLoggedNotThrown() {
         var rejecting = new CustomBindingScheduler(schedules, refusals, activationRepository, activations,
                 customBindingService, streamStateService, premiumService, users, siteRole,
-                r -> { throw new java.util.concurrent.RejectedExecutionException("full"); },
+                new CustomBindingUserLocks(), r -> { throw new java.util.concurrent.RejectedExecutionException("full"); },
                 Clock.fixed(at(21, 30), ZoneOffset.UTC));
 
         rejecting.onSchedulesChanged(new CustomBindingSchedulesChangedEvent(user.getId()));

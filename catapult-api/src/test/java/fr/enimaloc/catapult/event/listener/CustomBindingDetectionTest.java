@@ -205,7 +205,8 @@ class CustomBindingDetectionTest {
                 experimentService, gameStateService, streamStateService, mock(UserAccountRepository.class),
                 mock(OAuthTokenRepository.class), listener, channelEventPublisher, chain,
                 mock(ExtensionLayoutApplier.class), mock(PremiumService.class),
-                mock(org.springframework.context.ApplicationEventPublisher.class));
+                mock(org.springframework.context.ApplicationEventPublisher.class),
+                new fr.enimaloc.catapult.service.binding.CustomBindingUserLocks());
 
         service.deactivate(user);
 
@@ -235,7 +236,8 @@ class CustomBindingDetectionTest {
                 experimentService, gameStateService, streamStateService, mock(UserAccountRepository.class),
                 mock(OAuthTokenRepository.class), listener, channelEventPublisher, chain,
                 mock(ExtensionLayoutApplier.class), mock(PremiumService.class),
-                mock(org.springframework.context.ApplicationEventPublisher.class));
+                mock(org.springframework.context.ApplicationEventPublisher.class),
+                new fr.enimaloc.catapult.service.binding.CustomBindingUserLocks());
 
         service.deactivate(user);
 

@@ -97,6 +97,7 @@ public class CustomBindingService {
     private final ExtensionLayoutApplier extensionLayoutApplier;
     private final PremiumService premiumService;
     private final ApplicationEventPublisher eventPublisher;
+    private final CustomBindingUserLocks locks;
 
     /** Created DRAFT, so closed to everyone until the admin opens it. */
     @EventListener(ApplicationReadyEvent.class)
@@ -179,10 +180,12 @@ public class CustomBindingService {
     public void delete(UserAccount user, UUID id) {
         requireEnabled(user);
         CustomBinding binding = existing(user, id);
-        activations.active(user)
-                .filter(activation -> activation.getCustomBinding().getId().equals(binding.getId()))
-                .ifPresent(activation -> doDeactivate(user, true));
-        bindings.delete(binding);
+        locks.run(user.getId(), () -> {
+            activations.active(user)
+                    .filter(activation -> activation.getCustomBinding().getId().equals(binding.getId()))
+                    .ifPresent(activation -> doDeactivate(user, true));
+            bindings.delete(binding);
+        });
         publishList(user, binding.getId());
     }
 
@@ -213,16 +216,18 @@ public class CustomBindingService {
 
     /**
      * Applies {@code binding} to the channel now, live or not, and records it as the active one once Twitch has
-     * accepted it; re-triggering the active one applies it again. A failure records nothing.
+     * accepted it; re-triggering the active one applies it again. A failure records nothing. Waits for a scheduler
+     * evaluation of the streamer under way, which would otherwise record its binding over this one.
      */
     public ActivationResult activate(UserAccount user, CustomBinding binding) {
-        return activate(user, binding, () -> activations.record(user, binding));
+        return locks.call(user.getId(), () -> activate(user, binding, () -> activations.record(user, binding)));
     }
 
     /** {@link #activate} for the scheduler: recorded as coming from {@code occurrence} of the slot. */
     public ActivationResult activateScheduled(UserAccount user, CustomBinding binding, UUID scheduleId,
                                               Occurrence occurrence) {
-        return activate(user, binding, () -> activations.recordScheduled(user, binding, scheduleId, occurrence));
+        return locks.call(user.getId(), () -> activate(user, binding,
+                () -> activations.recordScheduled(user, binding, scheduleId, occurrence)));
     }
 
     private ActivationResult activate(UserAccount user, CustomBinding binding, Runnable record) {
@@ -251,9 +256,11 @@ public class CustomBindingService {
     /** Ends the active binding, if any, as if the game open now had just been detected. */
     public void deactivate(UserAccount user) {
         requireEnabled(user);
-        if (activations.active(user).isPresent()) {
-            doDeactivate(user, true);
-        }
+        locks.run(user.getId(), () -> {
+            if (activations.active(user).isPresent()) {
+                doDeactivate(user, true);
+            }
+        });
     }
 
     /**
@@ -262,11 +269,13 @@ public class CustomBindingService {
      */
     public void endScheduled(UserAccount user) {
         requireEnabled(user);
-        if (activations.active(user)
-                .filter(activation -> activation.getOrigin() == CustomBindingActivation.Origin.SCHEDULED)
-                .isPresent()) {
-            doDeactivate(user, false);
-        }
+        locks.run(user.getId(), () -> {
+            if (activations.active(user)
+                    .filter(activation -> activation.getOrigin() == CustomBindingActivation.Origin.SCHEDULED)
+                    .isPresent()) {
+                doDeactivate(user, false);
+            }
+        });
     }
 
     /** The active custom binding; none while the streamer is outside the experiment. */

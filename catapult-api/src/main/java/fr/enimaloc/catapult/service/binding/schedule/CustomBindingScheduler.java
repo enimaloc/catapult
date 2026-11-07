@@ -12,6 +12,7 @@ import fr.enimaloc.catapult.repository.binding.CustomBindingScheduleRefusalRepos
 import fr.enimaloc.catapult.repository.binding.CustomBindingScheduleRepository;
 import fr.enimaloc.catapult.service.binding.CustomBindingActivations;
 import fr.enimaloc.catapult.service.binding.CustomBindingService;
+import fr.enimaloc.catapult.service.binding.CustomBindingUserLocks;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
 import fr.enimaloc.catapult.service.debug.DebugContext;
 import fr.enimaloc.catapult.service.premium.PremiumService;
@@ -42,7 +43,6 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Switches custom bindings on and off along their schedule while the stream is live. Nothing depends on it: the
@@ -63,8 +63,8 @@ public class CustomBindingScheduler {
     private final SiteRole siteRole;
     private final Executor executor;
     private final Clock clock;
-    /** One lock per streamer, so the tick and the events never evaluate the same one at once. */
-    private final Map<UUID, ReentrantLock> locks = new ConcurrentHashMap<>();
+    /** One lock per streamer, shared with the manual choices, so nothing else decides for them mid-evaluation. */
+    private final CustomBindingUserLocks locks;
 
     @Autowired
     public CustomBindingScheduler(CustomBindingScheduleRepository schedules,
@@ -72,9 +72,9 @@ public class CustomBindingScheduler {
                                   CustomBindingActivationRepository activationRepository,
                                   CustomBindingActivations activations, CustomBindingService customBindingService,
                                   StreamStateService streamStateService, PremiumService premiumService,
-                                  UserAccountRepository users, SiteRole siteRole) {
+                                  UserAccountRepository users, SiteRole siteRole, CustomBindingUserLocks locks) {
         this(schedules, refusals, activationRepository, activations, customBindingService, streamStateService,
-                premiumService, users, siteRole, newExecutor(), Clock.systemUTC());
+                premiumService, users, siteRole, locks, newExecutor(), Clock.systemUTC());
     }
 
     CustomBindingScheduler(CustomBindingScheduleRepository schedules,
@@ -82,8 +82,8 @@ public class CustomBindingScheduler {
                            CustomBindingActivationRepository activationRepository,
                            CustomBindingActivations activations, CustomBindingService customBindingService,
                            StreamStateService streamStateService, PremiumService premiumService,
-                           UserAccountRepository users, SiteRole siteRole, Executor executor,
-                           Clock clock) {
+                           UserAccountRepository users, SiteRole siteRole, CustomBindingUserLocks locks,
+                           Executor executor, Clock clock) {
         this.schedules = schedules;
         this.refusals = refusals;
         this.activationRepository = activationRepository;
@@ -93,6 +93,7 @@ public class CustomBindingScheduler {
         this.premiumService = premiumService;
         this.users = users;
         this.siteRole = siteRole;
+        this.locks = locks;
         this.executor = executor;
         this.clock = clock;
     }
@@ -184,13 +185,7 @@ public class CustomBindingScheduler {
     }
 
     private void evaluate(UserAccount user, Instant now, boolean goingLive) {
-        ReentrantLock lock = locks.computeIfAbsent(user.getId(), id -> new ReentrantLock());
-        lock.lock();
-        try {
-            doEvaluate(user, now, goingLive);
-        } finally {
-            lock.unlock();
-        }
+        locks.run(user.getId(), () -> doEvaluate(user, now, goingLive));
     }
 
     private void doEvaluate(UserAccount user, Instant now, boolean goingLive) {
