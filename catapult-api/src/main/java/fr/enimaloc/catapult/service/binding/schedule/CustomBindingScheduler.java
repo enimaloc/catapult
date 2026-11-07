@@ -116,8 +116,11 @@ public class CustomBindingScheduler {
 
     private record Due(CustomBindingSchedule schedule, ScheduleOccurrences.Occurrence occurrence) {}
 
-    /** Evaluates every streamer with a slot to look at or a scheduled activation to end. */
-    @Scheduled(fixedDelayString = "${catapult.custom-binding-schedule.tick-ms:60000}")
+    /**
+     * Evaluates every streamer with a slot to look at or a scheduled activation to end. At second 0 of every minute,
+     * when the slots (typed to the minute) start and end, not a minute after the API started.
+     */
+    @Scheduled(cron = "0 * * * * *")
     void tick() {
         if (!siteRole.isActive()) {
             return;

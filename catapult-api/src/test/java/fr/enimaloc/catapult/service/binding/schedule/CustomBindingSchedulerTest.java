@@ -23,6 +23,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.scheduling.support.CronExpression;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -365,5 +367,14 @@ class CustomBindingSchedulerTest {
         rejecting.onSchedulesChanged(new CustomBindingSchedulesChangedEvent(user.getId()));
 
         verifyNoInteractions(customBindingService);
+    }
+
+    /** Slots start and end on the minute: the tick runs at second 0, not a minute after the API started. */
+    @Test
+    void tickRunsAtTheTopOfEveryMinute() throws NoSuchMethodException {
+        Scheduled scheduled = CustomBindingScheduler.class.getDeclaredMethod("tick").getAnnotation(Scheduled.class);
+
+        assertThat(CronExpression.parse(scheduled.cron()).next(LocalDateTime.of(2026, 11, 7, 20, 59, 50)))
+                .isEqualTo(LocalDateTime.of(2026, 11, 7, 21, 0, 0));
     }
 }
