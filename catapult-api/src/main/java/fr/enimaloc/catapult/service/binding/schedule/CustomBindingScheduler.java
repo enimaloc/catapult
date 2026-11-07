@@ -12,6 +12,7 @@ import fr.enimaloc.catapult.repository.binding.CustomBindingScheduleRefusalRepos
 import fr.enimaloc.catapult.repository.binding.CustomBindingScheduleRepository;
 import fr.enimaloc.catapult.service.binding.CustomBindingActivations;
 import fr.enimaloc.catapult.service.binding.CustomBindingService;
+import fr.enimaloc.catapult.service.binding.CustomBindingService.ActivationResult;
 import fr.enimaloc.catapult.service.binding.CustomBindingUserLocks;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
 import fr.enimaloc.catapult.service.debug.DebugContext;
@@ -31,6 +32,7 @@ import jakarta.annotation.PreDestroy;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -70,6 +72,16 @@ public class CustomBindingScheduler {
      * the occurrence, it does not stand, and the ticks retry a replacement that failed.
      */
     private final Map<UUID, Instant> replacedManual = new ConcurrentHashMap<>();
+    /** The occurrences whose activation failed, until they end: retried less and less often, then given up. */
+    private final Map<OccurrenceKey, Failures> failures = new ConcurrentHashMap<>();
+
+    /** Activation attempts for an occurrence, the first one included: then it is given up. */
+    static final int MAX_ATTEMPTS = 5;
+
+    private record OccurrenceKey(UUID scheduleId, Instant start) {}
+
+    /** {@code count} attempts failed; the next one not before {@code nextTry}; forgotten once {@code end} is past. */
+    private record Failures(int count, Instant nextTry, Instant end) {}
 
     @Autowired
     public CustomBindingScheduler(CustomBindingScheduleRepository schedules,
@@ -134,6 +146,7 @@ public class CustomBindingScheduler {
             return;
         }
         Instant now = clock.instant();
+        failures.values().removeIf(failed -> !failed.end().isAfter(now));
         try {
             refusals.deleteByOccurrenceEndBefore(now);
         } catch (Exception e) {
@@ -229,9 +242,37 @@ public class CustomBindingScheduler {
                 return;
             }
         }
-        // A failed activation is retried by the next tick
-        customBindingService.activateScheduled(user, d.schedule().getCustomBinding(), d.schedule().getId(),
-                d.occurrence());
+        activate(user, d, now);
+    }
+
+    /** Activates {@code d}'s binding, unless its occurrence failed too often or too recently. */
+    private void activate(UserAccount user, Due d, Instant now) {
+        OccurrenceKey key = new OccurrenceKey(d.schedule().getId(), d.occurrence().start());
+        Failures failed = failures.get(key);
+        if (failed != null && (failed.count() >= MAX_ATTEMPTS || now.isBefore(failed.nextTry()))) {
+            return;
+        }
+        ActivationResult result = null;
+        try {
+            result = customBindingService.activateScheduled(user, d.schedule().getCustomBinding(),
+                    d.schedule().getId(), d.occurrence());
+        } finally {
+            if (result == ActivationResult.APPLIED) {
+                failures.remove(key);
+            } else {
+                failed(user, key, failed, d, now);
+            }
+        }
+    }
+
+    /** One more failed attempt: the next one waits 1, 2, 4 then 8 minutes, after which the occurrence is given up. */
+    private void failed(UserAccount user, OccurrenceKey key, Failures before, Due d, Instant now) {
+        int count = before == null ? 1 : before.count() + 1;
+        failures.put(key, new Failures(count, now.plus(Duration.ofMinutes(1L << (count - 1))), d.occurrence().end()));
+        if (count == MAX_ATTEMPTS) {
+            log.warn("Custom binding schedule {} given up for user {} until {}: {} activations failed",
+                    d.schedule().getId(), user.getId(), d.occurrence().end(), count);
+        }
     }
 
     /** A manual choice made live during the occurrence stands: the schedule does not take it back. */

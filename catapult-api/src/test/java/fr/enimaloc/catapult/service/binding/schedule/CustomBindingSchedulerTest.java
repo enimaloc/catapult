@@ -317,6 +317,52 @@ class CustomBindingSchedulerTest {
         verify(customBindingService, times(2)).activateScheduled(any(), any(), any(), any());
     }
 
+    /** Failed again and again: retried after 1, 2, 4 then 8 minutes, then given up until the occurrence ends. */
+    @Test
+    void failedActivationsBackOffThenGiveUp() {
+        slot(binding, 20, 23);
+        when(customBindingService.activateScheduled(any(), any(), any(), any()))
+                .thenReturn(ActivationResult.FAILED);
+
+        int[] minutes = {30, 31, 32, 33, 35, 37, 40, 45, 52, 53, 59};
+        for (int minute : minutes) {
+            evaluateAt(21, minute);
+        }
+        evaluateAt(22, 30);
+
+        // Tried at 21:30, 21:31, 21:33, 21:37 and 21:45
+        verify(customBindingService, times(CustomBindingScheduler.MAX_ATTEMPTS))
+                .activateScheduled(any(), any(), any(), any());
+    }
+
+    @Test
+    void aThrowingActivationCountsAsAFailure() {
+        slot(binding, 20, 23);
+        when(customBindingService.activateScheduled(any(), any(), any(), any()))
+                .thenThrow(new IllegalStateException("Twitch is down"));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> evaluateAt(21, 30));
+        evaluateAt(21, 30);
+
+        verify(customBindingService, times(1)).activateScheduled(any(), any(), any(), any());
+    }
+
+    @Test
+    void anotherOccurrenceIsTriedAfresh() {
+        CustomBindingSchedule s = slot(binding, 20, 23);
+        s.setRepeat(Repeat.DAILY);
+        when(customBindingService.activateScheduled(any(), any(), any(), any()))
+                .thenReturn(ActivationResult.FAILED);
+        for (int minute : new int[] {30, 31, 33, 37, 45}) {
+            evaluateAt(21, minute);
+        }
+
+        scheduler.evaluate(user, at(21, 30).plus(java.time.Duration.ofDays(1)));
+
+        verify(customBindingService, times(CustomBindingScheduler.MAX_ATTEMPTS + 1))
+                .activateScheduled(any(), any(), any(), any());
+    }
+
     /** Picked offline during the occurrence, then the stream start's replacement failed: the ticks retry it. */
     @Test
     void aFailedReplacementOfAnOfflineChoiceIsRetried() {
