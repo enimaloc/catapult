@@ -267,6 +267,17 @@ class CustomBindingSchedulerTest {
         verify(customBindingService).activateScheduled(eq(user), eq(binding), eq(s.getId()), any());
     }
 
+    /** Thrown, a failure would stop the stream start's other listeners (its chat notifications). */
+    @Test
+    void aFailureAtStreamStartIsNotThrown() {
+        slot(binding, 20, 23);
+        when(customBindingService.activateScheduled(any(), any(), any(), any()))
+                .thenThrow(new IllegalStateException("Twitch is down"));
+
+        org.assertj.core.api.Assertions.assertThatCode(
+                () -> scheduler.onStreamOnline(new StreamOnlineEvent(this, user))).doesNotThrowAnyException();
+    }
+
     @Test
     void manualPickedOfflineIsReplacedAtGoLive() {
         // Clock at 21:30: picked at 20:30, during the occurrence, while the stream was offline

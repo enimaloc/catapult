@@ -149,13 +149,18 @@ public class CustomBindingScheduler {
     /**
      * Ordered after the game detection's own stream-start handling, which would otherwise replace the binding this
      * puts in place. A manual activation does not hold back the running occurrence here: one made while live during
-     * it refused it already, so this one was made before the occurrence or offline.
+     * it refused it already, so this one was made before the occurrence or offline. A failure is logged, not
+     * thrown: the stream start's other listeners still run, and the next tick tries again.
      */
     @EventListener
     @Order(Ordered.LOWEST_PRECEDENCE)
     public void onStreamOnline(StreamOnlineEvent event) {
         UserAccount user = event.getUser();
-        DebugContext.runAs(user.getId(), () -> evaluate(user, clock.instant(), true));
+        try {
+            DebugContext.runAs(user.getId(), () -> evaluate(user, clock.instant(), true));
+        } catch (Exception e) {
+            log.error("Custom binding schedule evaluation failed at stream start for user {}", user.getId(), e);
+        }
     }
 
     /**
