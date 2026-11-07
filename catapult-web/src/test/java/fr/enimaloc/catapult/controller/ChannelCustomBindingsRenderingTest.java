@@ -263,6 +263,28 @@ class ChannelCustomBindingsRenderingTest {
         assertThat(overview.indexOf("custom-binding-stop")).isBetween(0, form);
     }
 
+    /** The status card names the active binding, linking to its row. */
+    @Test
+    void theStatusCardLinksToTheActiveBinding() throws Exception {
+        String overview = panel(render(true, state()), "overview");
+
+        assertThat(byId(overview, "channel-active-binding").hasClass("hidden")).isFalse();
+        assertThat(overview).contains(">Active binding</span>");
+        Tag link = byId(overview, "channel-active-binding-link");
+        assertThat(link.attr("href")).isEqualTo("#custom-binding-" + ART);
+        assertThat(link.text()).isEqualTo("Art");
+        assertThat(row(overview, ART)).contains("id=\"custom-binding-" + ART + "\"");
+    }
+
+    @Test
+    void theStatusCardHidesTheLine_whileNoBindingIsActive() throws Exception {
+        CustomBindingsStateDto plain = state();
+        String overview = panel(render(true, new CustomBindingsStateDto(true, plain.bindings(), null, null)),
+                "overview");
+
+        assertThat(byId(overview, "channel-active-binding").hasClass("hidden")).isTrue();
+    }
+
     @Test
     void noBindingsYet_showsTheEmptyNoticeAndTheNewRowOnly() throws Exception {
         String overview = panel(render(true, new CustomBindingsStateDto(true, List.of(), null, null)), "overview");
@@ -316,7 +338,8 @@ class ChannelCustomBindingsRenderingTest {
 
     @Test
     void aModeratorIsShownNothing_evenWhenGivenTheBindings() throws Exception {
-        assertThat(render(false, state())).doesNotContain("channel-custom-bindings-list");
+        assertThat(render(false, state())).doesNotContain("channel-custom-bindings-list")
+                .doesNotContain("channel-active-binding");
     }
 
     /** Art's layout: Build Guide in the second panel, the overlay emptied; the other slots are kept. */

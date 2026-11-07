@@ -19,6 +19,9 @@
  *   The live event doesn't carry the limit: the page's is kept.
  * - A saved binding's schedule, in its form, is channel-custom-binding-schedules.js's: wired with its row, told its
  *   category as it changes (showHeader), and brought to the schedules a live event carries, when it does (apply).
+ * - The status card's "active binding" line names the active one and links to its row (#custom-binding-<id>), which
+ *   a click opens and scrolls to; hidden while none is (showActiveStatus, after each change of the active one or
+ *   its name).
  * - The personal API token card (Account tab) is api-token-cards.js's.
  *
  * Every text goes in through textContent or a property, never as markup.
@@ -95,7 +98,33 @@ window.CatapultCustomBindings = (function () {
             show(item.querySelector(".custom-binding-activate"), !active);
             show(item.querySelector(".custom-binding-stop"), active);
         });
+        showActiveStatus();
     }
+
+    /** The status card's line: the active binding's name, linking to its row; hidden while none is. */
+    function showActiveStatus() {
+        const line = byId("channel-active-binding");
+        if (!line) return;
+        const row = document.querySelector(".custom-binding-item.is-active[data-custom-binding-id]");
+        const link = byId("channel-active-binding-link");
+        if (row && link) {
+            set(link, "textContent", row.querySelector(".custom-binding-name-label")?.textContent ?? "");
+            link.setAttribute("href", `#${row.id}`);
+        }
+        show(line, !!row);
+    }
+
+    /** Opens the active binding's row and scrolls to it: the hash isn't followed, the page's router owns the URL. */
+    document.addEventListener("click", event => {
+        const link = event.target instanceof Element ? event.target.closest("#channel-active-binding-link") : null;
+        if (!link || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        const row = document.getElementById(link.getAttribute("href").slice(1));
+        if (!row) return;
+        event.preventDefault();
+        const collapse = row.closest("mdui-collapse");
+        if (collapse && row.hasAttribute("value")) collapse.value = row.getAttribute("value");
+        row.scrollIntoView?.({ behavior: "smooth", block: "start" });
+    });
 
     function attachList(list) {
         const base = `${CatapultChannel.baseUrl()}/custom-bindings`;
@@ -286,6 +315,7 @@ window.CatapultCustomBindings = (function () {
         const parent = before?.parentElement ?? list.querySelector("mdui-collapse");
         const row = template.content.firstElementChild.cloneNode(true);
         row.dataset.customBindingId = binding.id;
+        row.id = `custom-binding-${binding.id}`;
         row.setAttribute("value", binding.id);
         showHeader(row, binding);
         parent.insertBefore(row, before && before.parentElement === parent ? before : null);
@@ -311,6 +341,7 @@ window.CatapultCustomBindings = (function () {
         set(item.querySelector(".custom-binding-name-label"), "textContent", binding.name ?? "");
         set(item.querySelector(".custom-binding-game-label"), "textContent", binding.twitchGameName || "—");
         show(item.querySelector(".custom-binding-uninterruptible-chip"), !!binding.uninterruptible);
+        if (item.classList.contains("is-active")) showActiveStatus();
         // Its category tells whether a free account may schedule it.
         window.CatapultCustomBindingSchedules?.setGame(item, binding.twitchGameId);
     }

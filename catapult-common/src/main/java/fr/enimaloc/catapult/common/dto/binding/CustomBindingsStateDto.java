@@ -32,6 +32,12 @@ public record CustomBindingsStateDto(
         if (schedules == null) schedules = Map.of();
     }
 
+    /** The active binding, null when none is (or it isn't listed). */
+    public CustomBindingDto active() {
+        if (activeId == null || bindings == null) return null;
+        return bindings.stream().filter(binding -> activeId.equals(binding.id())).findFirst().orElse(null);
+    }
+
     public CustomBindingsStateDto(boolean enabled, List<CustomBindingDto> bindings, UUID activeId,
                                   Instant activatedAt, Integer limit,
                                   Map<UUID, List<ExtensionSlotDto>> extensions) {

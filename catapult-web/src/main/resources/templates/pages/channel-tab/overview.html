@@ -45,6 +45,16 @@
                          id="channel-bot-toggle"></mdui-switch>
             <label for="channel-bot-toggle" th:text="#{channel.status.bot_enabled}">Bot activé</label>
         </div>
+
+        <!--/* The active custom binding (owner only, while the experiment is open), a link to its row below, which it
+             opens: hidden while none is. channel-custom-bindings.js keeps it in step with the list. */-->
+        <div id="channel-active-binding" class="status-binding-row"
+             th:if="${ch.isOwner() and ch.customBindings() != null}" th:with="active=${ch.customBindings().active()}"
+             th:classappend="${active == null} ? 'hidden'">
+            <span th:text="#{channel.status.active_binding}">Binding actif</span>
+            <a id="channel-active-binding-link" th:href="${active == null} ? '#channel-custom-bindings-header' : '#custom-binding-' + ${active.id()}"
+               th:text="${active?.name()}">Binding</a>
+        </div>
     </mdui-card>
 
     <mdui-card id="channel-dtdd-mapping-card" class="settings-card" variant="outlined"
@@ -270,7 +280,8 @@
                 <mdui-collapse-item th:each="b : ${cb.bindings()}" class="custom-binding-item"
                                     th:with="active=${b.id() == cb.activeId()}"
                                     th:classappend="${active} ? 'is-active'"
-                                    th:attr="data-custom-binding-id=${b.id()}" th:value="${b.id()}">
+                                    th:attr="data-custom-binding-id=${b.id()}" th:id="${'custom-binding-' + b.id()}"
+                                    th:value="${b.id()}">
                     <mdui-list-item slot="header" nonclickable>
                         <span class="custom-binding-name-label" th:text="${b.name()}">Binding</span>
                         <span class="custom-binding-game-label" th:text="${b.twitchGameName() ?: '—'}">Game</span>
