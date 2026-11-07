@@ -1036,6 +1036,27 @@ class MockApiServiceTest {
                 .isEqualTo(fr.enimaloc.catapult.common.error.ErrorCode.INVALID);
     }
 
+    /** As catapult-api: a list edited from other slots than the binding's is refused, the slots kept. */
+    @Test
+    void mockRefusesAListEditedFromAnother() {
+        var start = java.time.LocalDateTime.now().plusDays(1).withNano(0);
+        var special = service.createCustomBinding(username, new fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest(
+                "Special", "509663", "Special Events", Set.of(), Set.of(), false)).body();
+        var once = new fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleRequest(null, start,
+                start.plusHours(2), "NONE", null, null, null, false);
+        var saved = service.saveCustomBindingSchedules(username, special.id(), List.of(once)).body().get(0);
+
+        var stale = service.saveCustomBindingSchedules(username, special.id(),
+                new fr.enimaloc.catapult.common.dto.binding.CustomBindingSchedulesRequest(List.of(), List.of()));
+        assertThat(stale.status()).isEqualTo(409);
+        assertThat(stale.code()).isEqualTo(fr.enimaloc.catapult.common.error.ErrorCode.STALE);
+        assertThat(service.customBindings(username).schedules().get(special.id())).hasSize(1);
+
+        assertThat(service.saveCustomBindingSchedules(username, special.id(),
+                new fr.enimaloc.catapult.common.dto.binding.CustomBindingSchedulesRequest(List.of(saved.id()), List.of()))
+                .status()).isEqualTo(200);
+    }
+
     /** Made premium from the mock admin page: no limit, any slot; back to free, its repeating slots are suspended. */
     @Test
     void mockPremiumAccountRepeatsAndLosingItSuspends() {

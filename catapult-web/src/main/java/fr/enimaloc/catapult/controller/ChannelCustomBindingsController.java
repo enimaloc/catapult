@@ -60,10 +60,10 @@ public class ChannelCustomBindingsController {
         return ApiStatus.answer(apiService.saveCustomBindingExtensions(username, id, body));
     }
 
-    /** The saved slots, or the refusal whose {@code code} the card translates (premium required, invalid). */
+    /** The saved slots, or the refusal whose {@code code} the card translates (premium required, invalid, stale). */
     @PostMapping("/channel/{username}/custom-bindings/{id}/schedules")
     public ResponseEntity<?> saveSchedules(@PathVariable String username, @PathVariable UUID id,
-                                           @RequestBody List<fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleRequest> body) {
+                                           @RequestBody fr.enimaloc.catapult.common.dto.binding.CustomBindingSchedulesRequest body) {
         return relay(apiService.saveCustomBindingSchedules(username, id, body));
     }
 

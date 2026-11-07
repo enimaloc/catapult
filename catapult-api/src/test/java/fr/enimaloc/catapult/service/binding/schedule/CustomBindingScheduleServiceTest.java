@@ -222,6 +222,21 @@ class CustomBindingScheduleServiceTest {
         assertProblem(() -> service.replace(user, binding.getId(), List.of(moved)), ErrorCode.PREMIUM_REQUIRED);
     }
 
+    /** Edited from a list that lacked a slot saved elsewhere since: refused, the slot kept. */
+    @Test
+    void aListEditedFromAnotherIsStale() {
+        CustomBindingSchedule savedElsewhere = existing(Repeat.NONE, Set.of());
+        CustomBindingSchedule shown = existing(Repeat.NONE, Set.of());
+        var paused = request(shown.getId(), START, START.plusHours(2), "NONE", Set.of(), true);
+
+        assertProblem(() -> service.replace(user, binding.getId(), List.of(shown.getId()), List.of(paused)),
+                ErrorCode.STALE);
+        verify(schedules, org.mockito.Mockito.never()).deleteAll(anyList());
+
+        assertThat(service.replace(user, binding.getId(), List.of(shown.getId(), savedElsewhere.getId()),
+                List.of(paused))).hasSize(1);
+    }
+
     @Test
     void disabledExperimentIsRefused() {
         when(customBindingService.enabled(user)).thenReturn(false);

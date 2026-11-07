@@ -1983,12 +1983,14 @@ class RealApiServiceTest {
                 java.time.LocalDateTime.of(2026, 11, 7, 20, 0), java.time.LocalDateTime.of(2026, 11, 7, 22, 0),
                 "NONE", null, null, "America/New_York", false);
         expect(HttpMethod.PUT, channel("streamer") + "/custom-bindings/" + CB_ID + "/schedules")
-                .andExpect(content().json("[{\"startsAt\":\"2026-11-07T20:00:00\",\"endsAt\":\"2026-11-07T22:00:00\","
-                        + "\"repeat\":\"NONE\",\"timeZone\":\"America/New_York\",\"paused\":false}]"))
+                .andExpect(content().json("{\"known\":[\"" + CB_ID + "\"],\"slots\":[{\"startsAt\":\"2026-11-07T20:00:00\","
+                        + "\"endsAt\":\"2026-11-07T22:00:00\",\"repeat\":\"NONE\",\"timeZone\":\"America/New_York\","
+                        + "\"paused\":false}]}"))
                 .andRespond(withSuccess("[{\"startsAt\":\"2026-11-07T20:00:00\",\"endsAt\":\"2026-11-07T22:00:00\","
                         + "\"repeat\":\"NONE\",\"days\":[],\"paused\":false,\"suspended\":false}]", MediaType.APPLICATION_JSON));
 
-        var saved = service.saveCustomBindingSchedules("streamer", CB_ID, List.of(slot));
+        var saved = service.saveCustomBindingSchedules("streamer", CB_ID,
+                new fr.enimaloc.catapult.common.dto.binding.CustomBindingSchedulesRequest(List.of(CB_ID), List.of(slot)));
 
         assertThat(saved.status()).isEqualTo(200);
         assertThat(saved.body()).hasSize(1);
@@ -2004,6 +2006,18 @@ class RealApiServiceTest {
 
         assertThat(refused.status()).isEqualTo(403);
         assertThat(refused.code()).isEqualTo(fr.enimaloc.catapult.common.error.ErrorCode.PREMIUM_REQUIRED);
+    }
+
+    @Test
+    void savingSchedules_relaysAStaleList() {
+        expect(HttpMethod.PUT, channel("streamer") + "/custom-bindings/" + CB_ID + "/schedules")
+                .andRespond(withStatus(HttpStatus.CONFLICT).contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                        .body("{\"status\":409,\"code\":\"stale\"}"));
+
+        var refused = service.saveCustomBindingSchedules("streamer", CB_ID, List.of());
+
+        assertThat(refused.status()).isEqualTo(409);
+        assertThat(refused.code()).isEqualTo(fr.enimaloc.catapult.common.error.ErrorCode.STALE);
     }
 
     @Test

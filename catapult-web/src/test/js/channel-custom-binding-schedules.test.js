@@ -65,7 +65,8 @@ function page({ slot = weekly, gameId = "509660", canRepeat = true, maxSlots = 2
                          data-label-weekly="chaque semaine" data-label-until="jusqu'au {0}"
                          data-label-next="Prochaine activation : {0}"
                          data-error-premium-required="Ce créneau n'est pas disponible pour ce binding."
-                         data-error-invalid="Créneau invalide">
+                         data-error-invalid="Créneau invalide"
+                         data-error-stale="La programmation a changé ailleurs">
                         <mdui-list class="custom-binding-schedule-list">${slotRow(slot)}</mdui-list>
                         <p class="custom-binding-schedule-empty${slot ? " hidden" : ""}"></p>
                         <mdui-button class="custom-binding-schedule-add"></mdui-button>
@@ -128,10 +129,10 @@ describe("custom binding schedule", () => {
         pause.dispatchEvent(new Event("change"));
         await flush();
 
-        expect(postJson).toHaveBeenCalledWith(URL, [{
+        expect(postJson).toHaveBeenCalledWith(URL, { known: [SLOT], slots: [{
             id: SLOT, startsAt: "2026-11-10T20:00", endsAt: "2026-11-10T23:00", repeat: "WEEKLY",
             days: ["TUESDAY", "THURSDAY"], repeatUntil: null, timeZone: "Europe/Paris", paused: true
-        }]);
+        }] });
         expect(slots()).toHaveLength(1);
         expect(slots()[0].dataset.paused).toBe("true");
         expect(slots()[0].querySelector(".custom-binding-schedule-pause").checked).toBe(false);
@@ -158,7 +159,7 @@ describe("custom binding schedule", () => {
         slots()[0].querySelector(".custom-binding-schedule-delete").click();
         await flush();
 
-        expect(postJson).toHaveBeenCalledWith(URL, []);
+        expect(postJson).toHaveBeenCalledWith(URL, { known: [SLOT], slots: [] });
         expect(slots()).toHaveLength(0);
         expect(isHidden(section().querySelector(".custom-binding-schedule-empty"))).toBe(false);
     });
@@ -176,10 +177,10 @@ describe("custom binding schedule", () => {
         editor().querySelector(".custom-binding-schedule-save").click();
         await flush();
 
-        expect(postJson).toHaveBeenCalledWith(URL, [{
+        expect(postJson).toHaveBeenCalledWith(URL, { known: [], slots: [{
             id: null, startsAt: "2026-09-04T18:00:00", endsAt: "2026-09-07T00:00:00", repeat: "NONE", days: [],
             repeatUntil: null, timeZone: "Europe/Paris", paused: false
-        }]);
+        }] });
         expect(isHidden(editor())).toBe(true);
         expect(summary(slots()[0])).toBe("04/09 18:00 → 07/09 00:00");
         expect(next().textContent).toBe("Prochaine activation : vendredi 4 septembre, 18:00");
@@ -201,10 +202,10 @@ describe("custom binding schedule", () => {
         editor().querySelector(".custom-binding-schedule-save").click();
         await flush();
 
-        expect(postJson.mock.calls[0][1]).toEqual([{
+        expect(postJson.mock.calls[0][1]).toEqual({ known: [SLOT], slots: [{
             id: SLOT, startsAt: "2026-11-10T20:00:00", endsAt: "2026-11-10T23:00:00", repeat: "WEEKLY",
             days: ["MONDAY", "TUESDAY", "THURSDAY"], repeatUntil: "2026-12-31", timeZone: "Europe/Paris", paused: false
-        }]);
+        }] });
         expect(summary(slots()[0])).toBe("Lundi, mardi, jeudi · 20:00 → 23:00 · chaque semaine · jusqu'au 31/12/2026");
         expect(next().textContent).toBe("Prochaine activation : mardi 10 novembre, 20:00");
     });
@@ -253,6 +254,19 @@ describe("custom binding schedule", () => {
         expect(isHidden(add)).toBe(false);
     });
 
+    it("tells a list changed elsewhere, and shows the page again", async () => {
+        page();
+        CatapultChannel.refresh = vi.fn();
+        CatapultChannel.showError = showError;
+        postJson.mockResolvedValueOnce(response(409, { code: "stale" }));
+        slots()[0].querySelector(".custom-binding-schedule-delete").click();
+        await flush();
+
+        expect(showError).toHaveBeenCalledWith("La programmation a changé ailleurs");
+        expect(CatapultChannel.refresh).toHaveBeenCalled();
+        expect(slots()).toHaveLength(1);
+    });
+
     it("shows the schedules a live event carries, and leaves them when it carries none", () => {
         page();
         const art = { id: ART, name: "Art", twitchGameId: "509660", twitchGameName: "Art", ccls: [], tws: [],
@@ -290,10 +304,10 @@ describe("custom binding schedule", () => {
             pause.dispatchEvent(new Event("change"));
             await flush();
 
-            expect(postJson.mock.calls[0][1]).toEqual([{
+            expect(postJson.mock.calls[0][1]).toEqual({ known: [SLOT], slots: [{
                 id: SLOT, startsAt: "2026-11-10T01:00", endsAt: "2026-11-10T03:00", repeat: "WEEKLY",
                 days: ["TUESDAY", "THURSDAY"], repeatUntil: "2026-12-31", timeZone: "Europe/Paris", paused: true
-            }]);
+            }] });
         });
 
         it("edits the slot in the browser's zone and saves it there", async () => {
@@ -309,10 +323,10 @@ describe("custom binding schedule", () => {
             editor().querySelector(".custom-binding-schedule-save").click();
             await flush();
 
-            expect(postJson.mock.calls[0][1]).toEqual([{
+            expect(postJson.mock.calls[0][1]).toEqual({ known: [SLOT], slots: [{
                 id: SLOT, startsAt: "2026-11-09T19:00:00", endsAt: "2026-11-09T21:00:00", repeat: "WEEKLY",
                 days: ["MONDAY", "WEDNESDAY"], repeatUntil: "2026-12-30", timeZone: "America/New_York", paused: false
-            }]);
+            }] });
         });
     });
 });

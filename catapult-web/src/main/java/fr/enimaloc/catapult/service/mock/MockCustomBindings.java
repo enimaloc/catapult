@@ -76,13 +76,18 @@ class MockCustomBindings {
     /**
      * The account's rules: anything when premium; when free, only a one-off slot on Twitch's "Special Events"
      * category, else PREMIUM_REQUIRED, but for a slot kept as it was saved (paused or not), as catapult-api does: it
-     * stays, suspended while no longer allowed. More than MAX_SLOTS slots, an end not after its start, a slot longer than catapult-api allows
+     * stays, suspended while no longer allowed. A list edited from other slots than the binding's is STALE. More than MAX_SLOTS slots, an end not after its start, a slot longer than catapult-api allows
      * (24 hours repeated, 7 days once), or an unknown time zone, is INVALID. It is a demo, so a slot's next
      * start is its start while that is still ahead (null otherwise): the mock does not expand repeats.
      */
-    synchronized CustomBindingSave<List<CustomBindingScheduleDto>> saveSchedules(UUID id, List<CustomBindingScheduleRequest> requests) {
+    synchronized CustomBindingSave<List<CustomBindingScheduleDto>> saveSchedules(UUID id, List<UUID> known,
+                                                                               List<CustomBindingScheduleRequest> requests) {
         int index = indexOf(id);
         if (index < 0) return new CustomBindingSave<>(404, null, null);
+        if (known != null && !new java.util.HashSet<>(known).equals(schedules.getOrDefault(id, List.of()).stream()
+                .map(CustomBindingScheduleDto::id).collect(java.util.stream.Collectors.toSet()))) {
+            return new CustomBindingSave<>(409, null, ErrorCode.STALE);
+        }
         List<CustomBindingScheduleRequest> slots = requests == null ? List.of() : requests;
         if (slots.size() > CustomBindingScheduleDto.MAX_SLOTS) return new CustomBindingSave<>(400, null, ErrorCode.INVALID);
         for (CustomBindingScheduleRequest slot : slots) {

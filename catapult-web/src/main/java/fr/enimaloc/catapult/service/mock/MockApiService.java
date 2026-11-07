@@ -106,6 +106,7 @@ import fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingSaveResult;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleDto;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleRequest;
+import fr.enimaloc.catapult.common.dto.binding.CustomBindingSchedulesRequest;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto;
 import fr.enimaloc.catapult.event.binding.CustomBindingChangedEvent;
 import fr.enimaloc.catapult.event.binding.CustomBindingsUpdatedEvent;
@@ -1776,9 +1777,10 @@ public class MockApiService implements ApiService {
 
     @Override
     public CustomBindingSave<List<CustomBindingScheduleDto>> saveCustomBindingSchedules(String username, UUID id,
-                                                                                      List<CustomBindingScheduleRequest> schedules) {
+                                                                                      CustomBindingSchedulesRequest schedules) {
         log.trace("saveCustomBindingSchedules({}, {})", username, id);
-        CustomBindingSave<List<CustomBindingScheduleDto>> result = currentData().customBindings().saveSchedules(id, schedules);
+        CustomBindingSave<List<CustomBindingScheduleDto>> result = currentData().customBindings()
+                .saveSchedules(id, schedules.known(), schedules.slots());
         if (result.ok()) publishCustomBindings(username);
         return result;
     }

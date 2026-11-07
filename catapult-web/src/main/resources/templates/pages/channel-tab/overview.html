@@ -427,7 +427,8 @@
               data-label-until=#{channel.custom_bindings.schedule.until('{0}')},
               data-label-next=#{channel.custom_bindings.schedule.next('{0}')},
               data-error-premium-required=(${premium} ? #{channel.custom_bindings.schedule.error.premium_required} : #{channel.custom_bindings.schedule.error.premium_required_plain}),
-              data-error-invalid=#{channel.custom_bindings.schedule.error.invalid}">
+              data-error-invalid=#{channel.custom_bindings.schedule.error.invalid},
+              data-error-stale=#{channel.custom_bindings.schedule.error.stale}">
     <span class="eyebrow custom-binding-panel-title" th:text="#{channel.custom_bindings.schedule.title}">Programmation</span>
 
     <mdui-list class="custom-binding-schedule-list">

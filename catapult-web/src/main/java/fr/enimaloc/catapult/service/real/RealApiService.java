@@ -1398,7 +1398,7 @@ public class RealApiService implements ApiService {
 
     @Override
     public CustomBindingSave<List<fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleDto>> saveCustomBindingSchedules(
-            String username, UUID id, List<fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleRequest> schedules) {
+            String username, UUID id, fr.enimaloc.catapult.common.dto.binding.CustomBindingSchedulesRequest schedules) {
         CustomBindingSave<JsonNode> saved = save(onChannel(username, userId -> client.call(HttpMethod.PUT,
                 "/api/internal/users/{userId}/custom-bindings/{customBindingId}/schedules", schedules, JsonNode.class, userId, id),
                 status -> new ApiClient.Result<>(status, null)), JsonNode.class);

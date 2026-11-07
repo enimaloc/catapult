@@ -271,8 +271,8 @@ class ApiChannelCustomBindingsControllerTest {
     }
 
     private static final String SCHEDULES = """
-            [{"startsAt":"2099-11-10T20:00:00","endsAt":"2099-11-10T22:00:00","repeat":"NONE","days":[],
-              "paused":false}]""";
+            {"known":[],"slots":[{"startsAt":"2099-11-10T20:00:00","endsAt":"2099-11-10T22:00:00","repeat":"NONE",
+              "days":[],"paused":false}]}""";
 
     private MockHttpServletRequestBuilder putSchedules(UserAccount as) {
         return put(base() + "/" + art.getId() + "/schedules").contentType(MediaType.APPLICATION_JSON)
@@ -286,7 +286,7 @@ class ApiChannelCustomBindingsControllerTest {
         saved.setCustomBinding(art);
         saved.setStartsAt(java.time.LocalDateTime.of(2099, 11, 10, 20, 0));
         saved.setEndsAt(java.time.LocalDateTime.of(2099, 11, 10, 22, 0));
-        when(scheduleService.replace(eq(owner), eq(art.getId()), any())).thenReturn(List.of(saved));
+        when(scheduleService.replace(eq(owner), eq(art.getId()), eq(List.of()), any())).thenReturn(List.of(saved));
 
         mvc.perform(putSchedules(owner))
                 .andExpect(status().isOk())
@@ -295,12 +295,23 @@ class ApiChannelCustomBindingsControllerTest {
                 .andExpect(jsonPath("$[0].repeat").value("NONE"))
                 .andExpect(jsonPath("$[0].suspended").value(false))
                 .andExpect(jsonPath("$[0].nextStart").exists());
-        verify(scheduleService).replace(eq(owner), eq(art.getId()), org.mockito.ArgumentMatchers.<List<CustomBindingScheduleRequest>>any());
+        verify(scheduleService).replace(eq(owner), eq(art.getId()), eq(List.of()),
+                org.mockito.ArgumentMatchers.<List<CustomBindingScheduleRequest>>argThat(slots -> slots.size() == 1));
+    }
+
+    @Test
+    void aListEditedFromAnOlderOneIs409Stale() throws Exception {
+        when(scheduleService.replace(eq(owner), eq(art.getId()), any(), any()))
+                .thenThrow(new ApiProblem(ErrorCode.STALE, "changed"));
+
+        mvc.perform(putSchedules(owner))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("stale"));
     }
 
     @Test
     void premiumRequiredIs403WithItsCode() throws Exception {
-        when(scheduleService.replace(eq(owner), eq(art.getId()), any()))
+        when(scheduleService.replace(eq(owner), eq(art.getId()), any(), any()))
                 .thenThrow(new ApiProblem(ErrorCode.PREMIUM_REQUIRED, "needs premium"));
 
         mvc.perform(putSchedules(owner))

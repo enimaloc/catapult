@@ -40,6 +40,8 @@ public enum ErrorCode {
     LIMIT_REACHED(409),
     PREMIUM_REQUIRED(403),
     INVALID(400),
+    // a list saved whole was edited from one that changed since
+    STALE(409),
 
     TWITCHAT_INVALID_PAYLOAD(400),
     TWITCHAT_WIDGET_DISABLED(409),

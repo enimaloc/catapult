@@ -8,6 +8,7 @@ import fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingSaveResult;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleDto;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleRequest;
+import fr.enimaloc.catapult.common.dto.binding.CustomBindingSchedulesRequest;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.service.binding.CustomBindingService;
@@ -90,13 +91,17 @@ public class ApiChannelCustomBindingsController {
         customBindingService.deactivate(userResolver.user(userId));
     }
 
-    /** Replaces the binding's whole list of time slots; 403 {@code premium_required} for one the owner may not set. */
+    /**
+     * Replaces the binding's whole list of time slots; 403 {@code premium_required} for one the owner may not set,
+     * 409 {@code stale} when the slots are no longer the ones it was edited from.
+     */
     @PreAuthorize("@authz.ownsChannel(#userId)")
     @PutMapping("/{customBindingId}/schedules")
     public List<CustomBindingScheduleDto> replaceSchedules(@PathVariable UUID userId,
                                                            @PathVariable UUID customBindingId,
-                                                           @RequestBody List<CustomBindingScheduleRequest> body) {
+                                                           @RequestBody CustomBindingSchedulesRequest body) {
         UserAccount owner = userResolver.user(userId);
-        return views.scheduleDtos(owner, scheduleService.replace(owner, customBindingId, body));
+        List<CustomBindingScheduleRequest> slots = body.slots() == null ? List.of() : body.slots();
+        return views.scheduleDtos(owner, scheduleService.replace(owner, customBindingId, body.known(), slots));
     }
 }

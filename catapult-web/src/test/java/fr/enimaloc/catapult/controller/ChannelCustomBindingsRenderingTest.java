@@ -481,6 +481,8 @@ class ChannelCustomBindingsRenderingTest {
 
         Tag root = byClass(section, "custom-binding-schedules");
         assertThat(root.attr("data-save-url")).isEqualTo("/channel/enimaloc/custom-bindings/" + ART + "/schedules");
+        assertThat(root.attr("data-max-slots")).isEqualTo("20");
+        assertThat(root.attr("data-error-stale")).startsWith("The schedule changed elsewhere");
         assertThat(root.attr("data-can-repeat")).isEqualTo("true");
         assertThat(section).contains("Schedule");
         Tag slot = byClass(section, "custom-binding-schedule");

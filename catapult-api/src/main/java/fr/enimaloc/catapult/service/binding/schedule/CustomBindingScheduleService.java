@@ -68,12 +68,20 @@ public class CustomBindingScheduleService {
         return !premiumService.canSchedule(user, binding.getTwitchGameId(), schedule.getRepeat());
     }
 
+    /** {@link #replace(UserAccount, UUID, List, List)} without checking what the list was edited from. */
+    public List<CustomBindingSchedule> replace(UserAccount user, UUID customBindingId,
+                                               List<CustomBindingScheduleRequest> requests) {
+        return replace(user, customBindingId, null, requests);
+    }
+
     /**
      * Makes {@code requests} the binding's slots: known ids are updated, absent ones deleted, null ids created.
-     * Everything is validated before anything is written.
+     * Everything is validated before anything is written. {@code known}: the ids of the slots the list was edited
+     * from (null: not checked); STALE when the binding's are others now, so a slot saved elsewhere meanwhile is
+     * never deleted by a list that did not show it.
      */
     @Transactional
-    public List<CustomBindingSchedule> replace(UserAccount user, UUID customBindingId,
+    public List<CustomBindingSchedule> replace(UserAccount user, UUID customBindingId, List<UUID> known,
                                                List<CustomBindingScheduleRequest> requests) {
         CustomBinding binding = binding(user, customBindingId);
         if (requests.size() > CustomBindingScheduleDto.MAX_SLOTS) {
@@ -81,6 +89,9 @@ public class CustomBindingScheduleService {
         }
         Map<UUID, CustomBindingSchedule> current = schedules.findByCustomBindingOrderByStartsAtAsc(binding).stream()
                 .collect(Collectors.toMap(CustomBindingSchedule::getId, Function.identity()));
+        if (known != null && !new HashSet<>(known).equals(current.keySet())) {
+            throw new ApiProblem(ErrorCode.STALE, "The schedule changed since it was read");
+        }
 
         Set<UUID> seen = new HashSet<>();
         List<Parsed> parsed = new ArrayList<>();

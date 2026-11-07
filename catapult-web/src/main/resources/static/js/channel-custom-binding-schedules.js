@@ -3,8 +3,10 @@
  * the row, and keeps its category in step).
  *
  * - The slots are the section's rows, their data-* the slot as saved (startsAt/endsAt wall time of its timeZone,
- *   repeat, days, repeatUntil, paused, suspended, nextStart). Every change (a pause switched, a slot deleted, the editor saved) posts
- *   the whole list to the section's data-save-url and shows the list the answer gives back, in the page's words: the
+ *   repeat, days, repeatUntil, paused, suspended, nextStart). Every change (a pause switched, a slot deleted, the
+ *   editor saved) posts the whole list to the section's data-save-url, with the ids of the slots it was edited from
+ *   (known: refused as stale when they changed elsewhere meanwhile, and the page is then reloaded), and shows the
+ *   list the answer gives back, in the page's words: the
  *   summary built as the template does, from the section's data-format-* patterns and data-label-*, the day names from
  *   the editor's chips. A refusal is told through CatapultChannel.showError, in the section's data-error-* text for its
  *   code (refusalText); a switch that failed goes back.
@@ -220,10 +222,14 @@ window.CatapultCustomBindingSchedules = (function () {
         section.dataset.pending = "true";
         try {
             const bindings = window.CatapultCustomBindings;
-            const response = await bindings.post(url, slots.map(request));
+            const known = rows(section).map(row => row.dataset.scheduleId).filter(Boolean);
+            const response = await bindings.post(url, { known, slots: slots.map(request) });
             if (!response) return false;
             if (!response.ok) {
-                CatapultChannel.showError(bindings.refusalText(section, await bindings.readCode(response), response.status));
+                const code = await bindings.readCode(response);
+                CatapultChannel.showError(bindings.refusalText(section, code, response.status));
+                // Saved elsewhere since this list was shown: shown again as it is
+                if (code === "stale") CatapultChannel.refresh();
                 return false;
             }
             let answer = null;
