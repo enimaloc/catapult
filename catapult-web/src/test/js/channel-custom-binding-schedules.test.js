@@ -1,12 +1,14 @@
 /*
  * A custom binding's schedule, in its row's form: the slots said in words, pause, delete, the editor (add, edit),
- * the next activation, the refusals told per code, and what is offered to a free account.
+ * the next activation, the refusals told per code, what is offered to a free account, and the browser's zone.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { flush, html, load, render, response } from "./helpers.js";
 
 let postJson;
 let showError;
+/** The browser's zone, as Intl tells it. */
+let browserZone;
 
 const ART = "11111111-1111-1111-1111-111111111111";
 const SLOT = "33333333-3333-3333-3333-333333333333";
@@ -16,7 +18,7 @@ const DAYS = [["MONDAY", "L", "lundi"], ["TUESDAY", "Ma", "mardi"], ["WEDNESDAY"
 
 const weekly = {
     id: SLOT, startsAt: "2026-11-10T20:00:00", endsAt: "2026-11-10T23:00:00", repeat: "WEEKLY",
-    days: ["TUESDAY", "THURSDAY"], repeatUntil: null, paused: false, suspended: false,
+    days: ["TUESDAY", "THURSDAY"], repeatUntil: null, timeZone: "Europe/Paris", paused: false, suspended: false,
     nextStart: "2026-11-10T19:00:00Z"
 };
 
@@ -31,7 +33,8 @@ function slotRow(slot) {
     if (!slot) return "";
     return `<mdui-list-item class="custom-binding-schedule" data-schedule-id="${slot.id}"
                 data-starts-at="${slot.startsAt.slice(0, 16)}" data-ends-at="${slot.endsAt.slice(0, 16)}"
-                data-repeat="${slot.repeat}" data-days="${slot.days.join(",")}" data-paused="${slot.paused}"
+                data-repeat="${slot.repeat}" data-days="${slot.days.join(",")}" data-time-zone="${slot.timeZone}"
+                data-repeat-until="${slot.repeatUntil ?? ""}" data-paused="${slot.paused}"
                 data-suspended="${slot.suspended}" data-next-start="${slot.nextStart}">
             <mdui-switch class="custom-binding-schedule-pause"${slot.paused ? "" : " checked"}></mdui-switch>
             <span class="custom-binding-schedule-summary">server</span>
@@ -95,6 +98,11 @@ beforeEach(async () => {
     document.documentElement.lang = "fr";
     postJson = vi.fn(async () => response(204));
     showError = vi.fn();
+    browserZone = "Europe/Paris";
+    const resolvedOptions = Intl.DateTimeFormat.prototype.resolvedOptions;
+    vi.spyOn(Intl.DateTimeFormat.prototype, "resolvedOptions").mockImplementation(function () {
+        return { ...resolvedOptions.call(this), timeZone: browserZone };
+    });
     window.CatapultCsrf = { postJson };
     window.CatapultChannel = {
         baseUrl: () => "/channel/enimaloc", refresh: vi.fn(), showError,
@@ -121,7 +129,7 @@ describe("custom binding schedule", () => {
 
         expect(postJson).toHaveBeenCalledWith(URL, [{
             id: SLOT, startsAt: "2026-11-10T20:00", endsAt: "2026-11-10T23:00", repeat: "WEEKLY",
-            days: ["TUESDAY", "THURSDAY"], repeatUntil: null, paused: true
+            days: ["TUESDAY", "THURSDAY"], repeatUntil: null, timeZone: "Europe/Paris", paused: true
         }]);
         expect(slots()).toHaveLength(1);
         expect(slots()[0].dataset.paused).toBe("true");
@@ -169,7 +177,7 @@ describe("custom binding schedule", () => {
 
         expect(postJson).toHaveBeenCalledWith(URL, [{
             id: null, startsAt: "2026-09-04T18:00:00", endsAt: "2026-09-07T00:00:00", repeat: "NONE", days: [],
-            repeatUntil: null, paused: false
+            repeatUntil: null, timeZone: "Europe/Paris", paused: false
         }]);
         expect(isHidden(editor())).toBe(true);
         expect(summary(slots()[0])).toBe("04/09 18:00 → 07/09 00:00");
@@ -194,7 +202,7 @@ describe("custom binding schedule", () => {
 
         expect(postJson.mock.calls[0][1]).toEqual([{
             id: SLOT, startsAt: "2026-11-10T20:00:00", endsAt: "2026-11-10T23:00:00", repeat: "WEEKLY",
-            days: ["MONDAY", "TUESDAY", "THURSDAY"], repeatUntil: "2026-12-31", paused: false
+            days: ["MONDAY", "TUESDAY", "THURSDAY"], repeatUntil: "2026-12-31", timeZone: "Europe/Paris", paused: false
         }]);
         expect(summary(slots()[0])).toBe("Lundi, mardi, jeudi · 20:00 → 23:00 · chaque semaine · jusqu'au 31/12/2026");
         expect(next().textContent).toBe("Prochaine activation : mardi 10 novembre, 20:00");
@@ -241,5 +249,57 @@ describe("custom binding schedule", () => {
 
         CatapultCustomBindings.apply([art], null, undefined, { [ART]: [{ ...weekly, repeat: "DAILY", days: [] }] });
         expect(summary(slots()[0])).toBe("20:00 → 23:00 · chaque jour");
+    });
+
+    describe("in a browser in another zone than the slot's", () => {
+        // Saved in Paris (UTC+1 in November): Tuesday and Thursday 01:00 → 03:00, until 31/12. In New York (UTC-5),
+        // six hours earlier: the evening before.
+        const paris = { ...weekly, startsAt: "2026-11-10T01:00:00", endsAt: "2026-11-10T03:00:00",
+            repeatUntil: "2026-12-31", nextStart: "2026-11-10T00:00:00Z" };
+
+        beforeEach(() => {
+            browserZone = "America/New_York";
+        });
+
+        it("says the slot and its next activation in the browser's zone, days and end date moved along", () => {
+            page({ slot: paris });
+
+            expect(summary(slots()[0]))
+                .toBe("Lundi, mercredi · 19:00 → 21:00 · chaque semaine · jusqu'au 30/12/2026");
+            expect(next().textContent).toBe("Prochaine activation : lundi 9 novembre, 19:00");
+        });
+
+        it("posts a slot not edited as it was saved, in its own zone", async () => {
+            page({ slot: paris });
+            postJson.mockResolvedValueOnce(response(200, [{ ...paris, paused: true }]));
+            const pause = slots()[0].querySelector(".custom-binding-schedule-pause");
+            pause.checked = false;
+            pause.dispatchEvent(new Event("change"));
+            await flush();
+
+            expect(postJson.mock.calls[0][1]).toEqual([{
+                id: SLOT, startsAt: "2026-11-10T01:00", endsAt: "2026-11-10T03:00", repeat: "WEEKLY",
+                days: ["TUESDAY", "THURSDAY"], repeatUntil: "2026-12-31", timeZone: "Europe/Paris", paused: true
+            }]);
+        });
+
+        it("edits the slot in the browser's zone and saves it there", async () => {
+            page({ slot: paris });
+            slots()[0].querySelector(".custom-binding-schedule-edit").click();
+            expect(editor().querySelector(".custom-binding-schedule-start").value).toBe("2026-11-09T19:00");
+            expect(editor().querySelector(".custom-binding-schedule-end").value).toBe("2026-11-09T21:00");
+            expect(editor().querySelector(".custom-binding-schedule-until").value).toBe("2026-12-30");
+            const chips = Array.from(editor().querySelectorAll(".custom-binding-schedule-day"));
+            expect(chips.filter(chip => chip.selected).map(chip => chip.getAttribute("value")))
+                .toEqual(["MONDAY", "WEDNESDAY"]);
+            postJson.mockResolvedValueOnce(response(200, []));
+            editor().querySelector(".custom-binding-schedule-save").click();
+            await flush();
+
+            expect(postJson.mock.calls[0][1]).toEqual([{
+                id: SLOT, startsAt: "2026-11-09T19:00:00", endsAt: "2026-11-09T21:00:00", repeat: "WEEKLY",
+                days: ["MONDAY", "WEDNESDAY"], repeatUntil: "2026-12-30", timeZone: "America/New_York", paused: false
+            }]);
+        });
     });
 });

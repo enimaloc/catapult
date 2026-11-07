@@ -2,15 +2,18 @@
  * A saved custom binding's schedule, in its row's form on the channel page (channel-custom-bindings.js wires it with
  * the row, and keeps its category in step).
  *
- * - The slots are the section's rows, their data-* the slot as saved (startsAt/endsAt Paris wall time, repeat, days,
- *   repeatUntil, paused, suspended, nextStart). Every change (a pause switched, a slot deleted, the editor saved) posts
+ * - The slots are the section's rows, their data-* the slot as saved (startsAt/endsAt wall time of its timeZone,
+ *   repeat, days, repeatUntil, paused, suspended, nextStart). Every change (a pause switched, a slot deleted, the editor saved) posts
  *   the whole list to the section's data-save-url and shows the list the answer gives back, in the page's words: the
  *   summary built as the template does, from the section's data-format-* patterns and data-label-*, the day names from
  *   the editor's chips. A refusal is told through CatapultChannel.showError, in the section's data-error-* text for its
  *   code (refusalText); a switch that failed goes back.
  * - "Add a slot" is offered on a premium account (data-can-repeat) or on the free category (data-free-game-id) only;
  *   repeating is disabled in the editor by the template when the account can't.
- * - "Next activation" is the earliest nextStart of the slots neither paused nor suspended, in the section's zone.
+ * - Slots are shown and typed in the browser's zone: one saved from another zone is said in this one (its days and end
+ *   date moved with its start), and a slot saved from the editor takes the browser's zone. One not edited is posted
+ *   back as it was saved. The server says the slots in their own zone: said again when the browser's differs.
+ * - "Next activation" is the earliest nextStart of the slots neither paused nor suspended, in the browser's zone.
  *
  * Every text goes in through textContent or a property, never as markup.
  */
@@ -42,6 +45,50 @@ window.CatapultCustomBindingSchedules = (function () {
 
     const pad = n => String(n).padStart(2, "0");
 
+    /** The IANA zone the browser shows times in (the section's, the server's default, when unknown). */
+    function browserZone(section) {
+        try {
+            return Intl.DateTimeFormat().resolvedOptions().timeZone || section.dataset.zone;
+        } catch {
+            return section.dataset.zone;
+        }
+    }
+
+    const dayNumber = t => Date.UTC(t.y, t.M - 1, t.d) / 86_400_000;
+    const iso = t => `${t.y}-${pad(t.M)}-${pad(t.d)}`;
+    const isoTime = t => `${iso(t)}T${pad(t.H)}:${pad(t.m)}:00`;
+
+    /** The instant `t` (wall time) is in `zone`: the offset is read where the guess lands, twice for a DST change. */
+    function instant(t, zone) {
+        const wall = Date.UTC(t.y, t.M - 1, t.d, t.H, t.m);
+        let guess = wall;
+        for (let i = 0; i < 2; i++) {
+            const seen = zoned(guess, zone);
+            guess = wall - (Date.UTC(seen.y, seen.M - 1, seen.d, seen.H, seen.m) - guess);
+        }
+        return guess;
+    }
+
+    /** `slot` in the browser's zone: as saved when it was saved there, else moved, its days and end date with it. */
+    function shown(section, slot) {
+        const from = slot.timeZone || section.dataset.zone;
+        const to = browserZone(section);
+        const start = local(slot.startsAt);
+        const end = local(slot.endsAt);
+        if (from === to || !start || !end) return slot;
+        const movedStart = zoned(instant(start, from), to);
+        const movedEnd = zoned(instant(end, from), to);
+        const shift = dayNumber(movedStart) - dayNumber(start);
+        const until = local(slot.repeatUntil);
+        return {
+            ...slot,
+            startsAt: isoTime(movedStart),
+            endsAt: isoTime(movedEnd),
+            days: (slot.days ?? []).map(day => DAYS[(DAYS.indexOf(day) + shift + 7) % 7]),
+            repeatUntil: until ? iso(zoned(Date.UTC(until.y, until.M - 1, until.d + shift), "UTC")) : slot.repeatUntil,
+        };
+    }
+
     /** `t` in a DateTimeFormatter `pattern` (the letters the bundles use: y M d E H h m a, 'quoted' text). */
     function format(t, pattern) {
         if (!t) return "";
@@ -62,9 +109,10 @@ window.CatapultCustomBindingSchedules = (function () {
         });
     }
 
-    /** A slot in words, as the template says it. */
-    function summary(section, slot) {
+    /** A slot in words, as the template says it, in the browser's zone. */
+    function summary(section, saved) {
         const data = section.dataset;
+        const slot = shown(section, saved);
         if (slot.repeat !== "DAILY" && slot.repeat !== "WEEKLY") {
             return `${format(local(slot.startsAt), data.formatDayTime)} → ${format(local(slot.endsAt), data.formatDayTime)}`;
         }
@@ -88,6 +136,7 @@ window.CatapultCustomBindingSchedules = (function () {
             repeat: data.repeat || "NONE",
             days: data.days ? data.days.split(",") : [],
             repeatUntil: data.repeatUntil || null,
+            timeZone: data.timeZone || null,
             paused: data.paused === "true",
             suspended: data.suspended === "true",
             nextStart: data.nextStart || null,
@@ -98,8 +147,8 @@ window.CatapultCustomBindingSchedules = (function () {
 
     /** What is posted for a slot: catapult-api works the rest out. */
     function request(slot) {
-        const { id, startsAt, endsAt, repeat, days, repeatUntil, paused } = slot;
-        return { id, startsAt, endsAt, repeat, days, repeatUntil, paused };
+        const { id, startsAt, endsAt, repeat, days, repeatUntil, timeZone, paused } = slot;
+        return { id, startsAt, endsAt, repeat, days, repeatUntil, timeZone, paused };
     }
 
     /** Brings the section to `slots` (the DTOs catapult-api answers), its next activation with them. */
@@ -117,6 +166,7 @@ window.CatapultCustomBindingSchedules = (function () {
             data.repeat = slot.repeat ?? "NONE";
             data.days = (slot.days ?? []).join(",");
             if (slot.repeatUntil) data.repeatUntil = slot.repeatUntil;
+            if (slot.timeZone) data.timeZone = slot.timeZone;
             data.paused = String(!!slot.paused);
             data.suspended = String(!!slot.suspended);
             if (slot.nextStart) data.nextStart = slot.nextStart;
@@ -137,7 +187,7 @@ window.CatapultCustomBindingSchedules = (function () {
         if (!next) return;
         const due = rows(section).map(slotOf).filter(slot => !slot.paused && !slot.suspended && slot.nextStart)
             .map(slot => slot.nextStart).sort((a, b) => Date.parse(a) - Date.parse(b));
-        const when = due.length ? format(zoned(due[0], section.dataset.zone), section.dataset.formatNext) : "";
+        const when = due.length ? format(zoned(due[0], browserZone(section)), section.dataset.formatNext) : "";
         next.textContent = when ? (section.dataset.labelNext ?? "{0}").replace("{0}", when) : "";
         show(next, !!when);
     }
@@ -210,10 +260,11 @@ window.CatapultCustomBindingSchedules = (function () {
         show(editor.querySelector(".custom-binding-schedule-until"), repeat !== "NONE");
     }
 
-    /** Opens the editor on `slot` (null: a new one). */
-    function openEditor(section, slot) {
+    /** Opens the editor on `saved` (null: a new one), in the browser's zone. */
+    function openEditor(section, saved) {
         const editor = editorOf(section);
         if (!editor) return;
+        const slot = saved && shown(section, saved);
         editor.dataset.editing = slot?.id ?? "";
         editor.dataset.paused = String(!!slot?.paused);
         editor.querySelector(".custom-binding-schedule-start").value = (slot?.startsAt ?? "").slice(0, 16);
@@ -250,7 +301,8 @@ window.CatapultCustomBindingSchedules = (function () {
         const until = value(editor.querySelector(".custom-binding-schedule-until"));
         const slot = {
             id: editor.dataset.editing || null, startsAt, endsAt, repeat, days,
-            repeatUntil: repeat !== "NONE" && until ? until : null, paused: editor.dataset.paused === "true"
+            repeatUntil: repeat !== "NONE" && until ? until : null, timeZone: browserZone(section),
+            paused: editor.dataset.paused === "true"
         };
         const current = rows(section).map(slotOf);
         const slots = slot.id ? current.map(s => (s.id === slot.id ? slot : s)) : [...current, slot];
@@ -263,6 +315,13 @@ window.CatapultCustomBindingSchedules = (function () {
         if (!section || wired.has(section)) return;
         wired.add(section);
         rows(section).forEach(row => wireRow(section, row));
+        const zone = browserZone(section);
+        if (zone !== section.dataset.zone || rows(section).some(row => (row.dataset.timeZone || zone) !== zone)) {
+            rows(section).forEach(row => {
+                row.querySelector(".custom-binding-schedule-summary").textContent = summary(section, slotOf(row));
+            });
+            showNext(section);
+        }
         const editor = editorOf(section);
         section.querySelector(".custom-binding-schedule-add")?.addEventListener("click", () => openEditor(section, null));
         editor?.querySelector(".custom-binding-schedule-repeat")?.addEventListener("change", () => showRepeat(editor));

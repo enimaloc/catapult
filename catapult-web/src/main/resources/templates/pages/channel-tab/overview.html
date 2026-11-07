@@ -482,7 +482,7 @@
 <mdui-list-item th:fragment="customBindingSchedule(s)" class="custom-binding-schedule" nonclickable
                 th:attr="data-schedule-id=${s?.id()},data-starts-at=${s?.startsAt()},data-ends-at=${s?.endsAt()},
                          data-repeat=${s?.repeat()},data-days=${s == null ? null : #strings.listJoin(s.days(), ',')},
-                         data-repeat-until=${s?.repeatUntil()},data-paused=${s?.paused()},
+                         data-repeat-until=${s?.repeatUntil()},data-time-zone=${s?.timeZone()},data-paused=${s?.paused()},
                          data-suspended=${s?.suspended()},data-next-start=${s?.nextStart()}">
     <mdui-switch slot="icon" class="custom-binding-schedule-pause" th:checked="${s != null and !s.paused()}"
                  th:attr="aria-label=#{channel.custom_bindings.schedule.scheduled}"></mdui-switch>

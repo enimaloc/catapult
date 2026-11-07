@@ -413,7 +413,7 @@ class ChannelCustomBindingsRenderingTest {
     /** Tuesdays and Thursdays, 20:00 to 23:00 (Paris), next on Tuesday 10 November 2026. */
     private static CustomBindingScheduleDto weekly(boolean suspended) {
         return new CustomBindingScheduleDto(SLOT, LocalDateTime.parse("2026-11-10T20:00:00"),
-                LocalDateTime.parse("2026-11-10T23:00:00"), "WEEKLY", List.of("TUESDAY", "THURSDAY"), null, false,
+                LocalDateTime.parse("2026-11-10T23:00:00"), "WEEKLY", List.of("TUESDAY", "THURSDAY"), null, "Europe/Paris", false,
                 suspended, suspended ? null : Instant.parse("2026-11-10T19:00:00Z"));
     }
 
@@ -464,6 +464,7 @@ class ChannelCustomBindingsRenderingTest {
         assertThat(slot.attr("data-schedule-id")).isEqualTo(SLOT.toString());
         assertThat(slot.attr("data-repeat")).isEqualTo("WEEKLY");
         assertThat(slot.attr("data-days")).isEqualTo("TUESDAY,THURSDAY");
+        assertThat(slot.attr("data-time-zone")).isEqualTo("Europe/Paris");
         assertThat(byClass(section, "custom-binding-schedule-summary").text())
                 .isEqualTo("Tuesday, Thursday · 8:00 PM → 11:00 PM · every week");
         Tag pause = byClass(section, "custom-binding-schedule-pause");
