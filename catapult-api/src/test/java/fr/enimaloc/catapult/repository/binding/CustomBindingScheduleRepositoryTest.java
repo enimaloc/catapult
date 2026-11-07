@@ -94,7 +94,29 @@ class CustomBindingScheduleRepositoryTest {
         em.flush();
         em.clear();
 
-        assertThat(schedules.findUserIdsWithUnpausedSchedules()).containsExactly(a.getId());
+        assertThat(schedules.findUserIdsWithSchedulesStillDue(LocalDateTime.of(2026, 11, 1, 0, 0)))
+                .containsExactly(a.getId());
+    }
+
+    /** Over, a slot is nothing more to look at: a one-off ended, a repeated one past its last day. */
+    @Test
+    void slotsThatCanNoLongerFireNameNobody() {
+        UserAccount a = user("a");
+        UserAccount b = user("b");
+        UserAccount c = user("c");
+        schedule(binding(a, "Art"), LocalDateTime.of(2026, 11, 10, 20, 0), CustomBindingSchedule.Repeat.NONE, false);
+        CustomBindingSchedule ended = schedule(binding(b, "Art"), LocalDateTime.of(2026, 11, 1, 20, 0),
+                CustomBindingSchedule.Repeat.DAILY, false);
+        ended.setRepeatUntil(java.time.LocalDate.of(2026, 11, 5));
+        schedule(binding(c, "Art"), LocalDateTime.of(2026, 11, 1, 20, 0), CustomBindingSchedule.Repeat.WEEKLY, false);
+        em.flush();
+        em.clear();
+
+        // The one-off ends at 22:00
+        assertThat(schedules.findUserIdsWithSchedulesStillDue(LocalDateTime.of(2026, 11, 10, 21, 0)))
+                .containsExactlyInAnyOrder(a.getId(), c.getId());
+        assertThat(schedules.findUserIdsWithSchedulesStillDue(LocalDateTime.of(2026, 11, 10, 22, 1)))
+                .containsExactly(c.getId());
     }
 
     @Test

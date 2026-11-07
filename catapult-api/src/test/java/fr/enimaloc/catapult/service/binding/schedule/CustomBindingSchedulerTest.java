@@ -317,7 +317,7 @@ class CustomBindingSchedulerTest {
     void tickPurgesAndEvaluatesTheUnionOfUsersDespiteAFailure() {
         when(siteRole.isActive()).thenReturn(true);
         UUID broken = UUID.randomUUID();
-        when(schedules.findUserIdsWithUnpausedSchedules()).thenReturn(List.of(broken, user.getId()));
+        when(schedules.findUserIdsWithSchedulesStillDue(any(LocalDateTime.class))).thenReturn(List.of(broken, user.getId()));
         when(activationRepository.findUserIdsByOrigin(Origin.SCHEDULED)).thenReturn(List.of(user.getId()));
         when(users.findById(broken)).thenThrow(new IllegalStateException("boom"));
         when(users.findById(user.getId())).thenReturn(Optional.of(user));

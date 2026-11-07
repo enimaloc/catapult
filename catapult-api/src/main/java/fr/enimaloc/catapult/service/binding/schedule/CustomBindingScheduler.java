@@ -31,6 +31,8 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -131,7 +133,9 @@ public class CustomBindingScheduler {
         } catch (Exception e) {
             log.error("Custom binding schedule refusal purge failed", e);
         }
-        Set<UUID> userIds = new LinkedHashSet<>(schedules.findUserIdsWithUnpausedSchedules());
+        // Wall times of any zone (UTC-12 to UTC+14), and a repeated slot running past midnight: two days back
+        Set<UUID> userIds = new LinkedHashSet<>(schedules.findUserIdsWithSchedulesStillDue(
+                LocalDateTime.ofInstant(now, ZoneOffset.UTC).minusDays(2)));
         userIds.addAll(activationRepository.findUserIdsByOrigin(Origin.SCHEDULED));
         for (UUID userId : userIds) {
             try {
