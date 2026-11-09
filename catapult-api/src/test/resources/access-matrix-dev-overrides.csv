@@ -1,0 +1,8 @@
+method,pattern,vars,body,anon,loop,member,mod,owner,admin,ptoken
+# dev bearer resolver ignores Authorization here, so a personal token is no longer refused
+GET,/api/internal/config/app,,,PASS,PASS,PASS,PASS,PASS,PASS,PASS
+GET,/api/internal/config/providers,,,PASS,PASS,PASS,PASS,PASS,PASS,PASS
+# dev-only routes: the production anyRequest rule
+GET,/api/internal/dev/igdb,,,401,PASS,PASS,PASS,PASS,PASS,401
+# ERROR: the mocked IgdbService has no token (test artefact)
+POST,/api/internal/dev/igdb/query,,"{""endpoint"":""games"",""query"":""fields name;""}",401,ERROR,ERROR,ERROR,ERROR,ERROR,401

@@ -1,0 +1,8 @@
+<!--/*@thymesVar id="helpTitle" type="java.lang.String"*/-->
+<!--/*@thymesVar id="helpBody" type="java.lang.String"*/-->
+<!--/* One card's help, loaded into the side sheet. The body is catapult-api's own message text (HTML),
+     never anything a visitor wrote, hence th:utext; the title is plain text. */-->
+<th:block th:fragment="content">
+    <h3 class="help-title" th:text="${helpTitle}">Help</h3>
+    <div class="help-body" th:utext="${helpBody}"></div>
+</th:block>

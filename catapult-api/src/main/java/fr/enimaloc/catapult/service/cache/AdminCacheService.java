@@ -1,0 +1,182 @@
+package fr.enimaloc.catapult.service.cache;
+
+import fr.enimaloc.catapult.chat.DynamicCommandResolver;
+import fr.enimaloc.catapult.chat.TwPlaceholderRegistry;
+import fr.enimaloc.catapult.common.dto.admin.CacheEntryDetailDto;
+import fr.enimaloc.catapult.common.dto.admin.CacheEntryDto;
+import fr.enimaloc.catapult.common.dto.admin.CacheSummaryDto;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.igdb.IgdbGameDetails;
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.repository.chatcommand.ChatCommandDefinitionRepository;
+import fr.enimaloc.catapult.repository.igdb.IgdbGameCclRepository;
+import fr.enimaloc.catapult.repository.igdb.IgdbGameDetailsRepository;
+import fr.enimaloc.catapult.repository.tw.TwDefinitionRepository;
+import fr.enimaloc.catapult.service.igdb.IgdbService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+
+/**
+ * In-memory caches (IGDB lookups, per-user resolved chat commands, the TW registry snapshot) have
+ * no admin visibility today — a stale or wrong entry can only be cleared by restarting the whole
+ * app. This lets an admin inspect and selectively evict individual entries instead.
+ */
+@Service
+@RequiredArgsConstructor
+public class AdminCacheService {
+
+    private final IgdbService igdbService;
+    private final DynamicCommandResolver dynamicCommandResolver;
+    private final TwPlaceholderRegistry twPlaceholderRegistry;
+    private final IgdbGameDetailsRepository igdbGameDetailsRepository;
+    private final IgdbGameCclRepository igdbGameCclRepository;
+    private final TwDefinitionRepository twDefinitionRepository;
+    private final ChatCommandDefinitionRepository chatCommandDefinitionRepository;
+    private final UserAccountRepository userAccountRepository;
+
+    @Value("${app.igdb.details-cache-ttl-hours:168}")
+    private int detailsCacheTtlHours;
+
+    private static final Set<String> IGDB_DETAILS_TTL_CACHES =
+        Set.of("igdb-game-cache", "igdb-name-index", "igdb-exe-index");
+
+    public List<CacheSummaryDto> list() {
+        return List.of(
+            new CacheSummaryDto("igdb-game-cache", igdbService.getGameCache().size(), true),
+            new CacheSummaryDto("igdb-name-index", igdbService.getNameIndex().size(), true),
+            new CacheSummaryDto("igdb-exe-index", igdbService.getExeIndex().size(), true),
+            new CacheSummaryDto("igdb-ccl-cache", igdbService.getCclCache().size(), true),
+            new CacheSummaryDto("chat-command-user-cache", dynamicCommandResolver.cacheSnapshot().size(), true),
+            new CacheSummaryDto("tw-known-paths", twPlaceholderRegistry.getKnownPaths().size(), false),
+            new CacheSummaryDto("tw-all-options", twPlaceholderRegistry.getAllOptions().size(), false)
+        );
+    }
+
+    public Page<CacheEntryDto> entries(String name, String q, int page, int size) {
+        List<CacheEntryDto> filtered = filter(allEntries(name), q);
+        return paginate(filtered, page, size);
+    }
+
+    public CacheEntryDetailDto entry(String name, String key) {
+        Object detail = resolveDetail(name, key);
+        return new CacheEntryDetailDto(key, detail, expiresInSeconds(name, detail));
+    }
+
+    private Object resolveDetail(String name, String key) {
+        return switch (name) {
+            case "igdb-game-cache" -> igdbGameDetailsRepository.findById(key).orElse(null);
+            case "igdb-name-index" -> igdbGameDetailsRepository.findById(igdbIdFromIndex(igdbService.getNameIndex(), key)).orElse(null);
+            case "igdb-exe-index" -> igdbGameDetailsRepository.findById(igdbIdFromIndex(igdbService.getExeIndex(), key)).orElse(null);
+            case "igdb-ccl-cache" -> igdbGameCclRepository.findById(key).orElse(null);
+            case "chat-command-user-cache" -> chatCommandDefinitionRepository.findByUser(requireUser(key));
+            case "tw-known-paths", "tw-all-options" -> twDefinitionRepository.findById(key).orElse(null);
+            default -> throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown cache " + name);
+        };
+    }
+
+    private static String igdbIdFromIndex(Map<String, IgdbService.IgdbGame> index, String key) {
+        IgdbService.IgdbGame game = index.get(key);
+        if (game == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown entry " + key);
+        }
+        return game.id();
+    }
+
+    private UserAccount requireUser(String key) {
+        return userAccountRepository.findById(parseUserId(key))
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown user " + key));
+    }
+
+    private Long expiresInSeconds(String name, Object detail) {
+        if (!IGDB_DETAILS_TTL_CACHES.contains(name)
+                || !(detail instanceof IgdbGameDetails d)
+                || d.getFetchedAt() == null) {
+            return null;
+        }
+        Instant expiresAt = d.getFetchedAt().plus(Duration.ofHours(detailsCacheTtlHours));
+        return Duration.between(Instant.now(), expiresAt).getSeconds();
+    }
+
+    private List<CacheEntryDto> allEntries(String name) {
+        return switch (name) {
+            case "igdb-game-cache" -> igdbService.getGameCache().entrySet().stream()
+                .map(e -> new CacheEntryDto(e.getKey(), e.getValue())).toList();
+            case "igdb-name-index" -> indexEntries(igdbService.getNameIndex());
+            case "igdb-exe-index" -> indexEntries(igdbService.getExeIndex());
+            case "igdb-ccl-cache" -> igdbService.getCclCache().entrySet().stream()
+                .map(e -> new CacheEntryDto(e.getKey(), String.join(", ", e.getValue()))).toList();
+            case "chat-command-user-cache" -> dynamicCommandResolver.cacheSnapshot().entrySet().stream()
+                .map(e -> new CacheEntryDto(e.getKey().toString(), String.join(", ", e.getValue()))).toList();
+            case "tw-known-paths" -> twPlaceholderRegistry.getKnownPaths().stream()
+                .map(id -> new CacheEntryDto(id, id)).toList();
+            case "tw-all-options" -> twPlaceholderRegistry.getAllOptions().stream()
+                .map(o -> new CacheEntryDto(o.get("id"), o.get("label"))).toList();
+            default -> throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown cache " + name);
+        };
+    }
+
+    /** A lookup index entry shown as {@code "<igdbId> / <name>"}. */
+    private static List<CacheEntryDto> indexEntries(Map<String, IgdbService.IgdbGame> index) {
+        return index.entrySet().stream()
+            .map(e -> new CacheEntryDto(e.getKey(), e.getValue().id() + " / " + e.getValue().name())).toList();
+    }
+
+    private static List<CacheEntryDto> filter(List<CacheEntryDto> entries, String q) {
+        if (q == null || q.isBlank()) {
+            return entries;
+        }
+        String needle = q.toLowerCase(Locale.ROOT);
+        return entries.stream()
+            .filter(e -> e.key().toLowerCase(Locale.ROOT).contains(needle)
+                      || e.value().toLowerCase(Locale.ROOT).contains(needle))
+            .toList();
+    }
+
+    private static Page<CacheEntryDto> paginate(List<CacheEntryDto> entries, int page, int size) {
+        int fromIndex = Math.min(page * size, entries.size());
+        int toIndex = Math.min(fromIndex + size, entries.size());
+        return new PageImpl<>(
+            entries.subList(fromIndex, toIndex),
+            PageRequest.of(page, size),
+            entries.size());
+    }
+
+    /** 404 for an unknown cache or entry, 400 for a read-only cache. */
+    public void evict(String name, String key) {
+        boolean removed = switch (name) {
+            case "igdb-game-cache" -> igdbService.evictGameCache(key);
+            case "igdb-name-index" -> igdbService.evictNameIndex(key);
+            case "igdb-exe-index" -> igdbService.evictExeIndex(key);
+            case "igdb-ccl-cache" -> igdbService.evictCclCache(key);
+            case "chat-command-user-cache" -> dynamicCommandResolver.evictUser(parseUserId(key));
+            case "tw-known-paths", "tw-all-options" ->
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cache " + name + " is read-only");
+            default -> throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown cache " + name);
+        };
+        if (!removed) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown entry " + key);
+        }
+    }
+
+    private static UUID parseUserId(String key) {
+        try {
+            return UUID.fromString(key);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid user id " + key);
+        }
+    }
+}

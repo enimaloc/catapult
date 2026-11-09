@@ -1,0 +1,8 @@
+{
+  "status" : 401,
+  "headers" : {
+    "Cache-Control" : [ "no-cache, no-store, max-age=0, must-revalidate" ],
+    "WWW-Authenticate" : [ "Bearer error=\"invalid_token\", error_description=\"An error occurred while attempting to decode the Jwt: Malformed token\", error_uri=\"https://tools.ietf.org/html/rfc6750#section-3.1\", resource_metadata=\"http://localhost:<port>/.well-known/oauth-protected-resource\"" ]
+  },
+  "body" : ""
+}

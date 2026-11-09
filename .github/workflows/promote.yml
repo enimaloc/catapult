@@ -1,0 +1,37 @@
+name: Promote
+
+on:
+  push:
+    branches: [dev, beta]
+  # Lets renovate-merge.yml run it on dev after a checkbox merge, which GITHUB_TOKEN pushes cannot trigger
+  workflow_dispatch:
+
+concurrency:
+  group: promote-${{ github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  promote:
+    if: github.ref_name == 'dev' || github.ref_name == 'beta'
+    runs-on: ubuntu-latest
+    steps:
+      - id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+      # The script reads everything through the API: no git history needed
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Open or refresh the promotion pull request
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+          SOURCE: ${{ github.ref_name }}
+          TARGET: ${{ github.ref_name == 'dev' && 'beta' || 'main' }}
+        run: node .github/release/promote.mjs --source "$SOURCE" --target "$TARGET"

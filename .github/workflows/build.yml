@@ -1,20 +1,32 @@
 name: Build
 
 on:
+  # Branches only: a version tag push runs release.yml, not the checks again
   push:
+    branches: ['**']
+  # Lets renovate-merge.yml run it on dev after a checkbox merge, which GITHUB_TOKEN pushes cannot trigger
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - master # until it is renamed dev
+      - dev
+      - beta
+      - main
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
+      - name: Set up JDK 21
+        uses: actions/setup-java@v6
         with:
-          java-version: '17'
+          java-version: '25'
           distribution: 'temurin'
           cache: 'gradle'
 
+      # assemble: compile and package every module (catapult-common included) without `check`,
+      # which the Tests workflow runs (catapult-web's would need Node for jsTest)
       - name: Build with Gradle
-        run: ./gradlew build -x test
+        run: ./gradlew assemble

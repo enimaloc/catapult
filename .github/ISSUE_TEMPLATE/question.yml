@@ -1,0 +1,35 @@
+name: ❓ Question
+description: Poser une question sur l'utilisation ou la configuration de Catapult
+labels: ["question"]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Ta question
+      description: Décris ce que tu essaies de faire et ce qui te bloque.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Domaine
+      options:
+        - "area: api"
+        - "area: web"
+        - "area: obs"
+        - "area: twitch"
+        - "area: twitchat"
+        - "area: chat-commands"
+        - "area: ci"
+        - Autre / inconnu
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version de Catapult
+      placeholder: ex. v1.0.0-BETA.97
+    validations:
+      required: false

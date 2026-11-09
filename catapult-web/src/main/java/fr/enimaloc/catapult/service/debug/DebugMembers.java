@@ -1,0 +1,122 @@
+package fr.enimaloc.catapult.service.debug;
+
+import fr.enimaloc.catapult.common.dto.MyDebugDto;
+import fr.enimaloc.catapult.service.ApiService;
+import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Map;
+import java.util.OptionalDouble;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * Whether a member is in debug mode, and the share of their pages replayed, as catapult-api answers for the logged-in member, remembered for
+ * {@link #TTL} so a page render does not call it every time. A member the admin toggles through this
+ * instance is {@link #evict forgotten} at once. A failed call counts as "not debugged" (the page
+ * must render) and is remembered only for {@link #FAILURE_TTL}, so a down catapult-api is not hammered.
+ */
+@Component
+public class DebugMembers {
+    static final Duration TTL = Duration.ofSeconds(30);
+    static final Duration FAILURE_TTL = Duration.ofSeconds(5);
+    private static final Logger log = LoggerFactory.getLogger(DebugMembers.class);
+
+    private record Entry(boolean active, double replayRate, Instant expiresAt) {}
+
+    private static final Entry OFF = new Entry(false, 0, Instant.MAX);
+
+    // Kept lazy on purpose: SentryConfig.tracesSampler -> DebugMembers -> RealApiService -> ApiClient -> Sentry
+    // RestClient customizer -> sentryHub is a cycle if ApiService is injected directly.
+    private final ObjectProvider<ApiService> apiService;
+    private final Clock clock;
+    private final Map<UUID, Entry> cache = new ConcurrentHashMap<>();
+
+    @Autowired
+    public DebugMembers(ObjectProvider<ApiService> apiService) {
+        this(apiService, Clock.systemUTC());
+    }
+
+    DebugMembers(ObjectProvider<ApiService> apiService, Clock clock) {
+        this.apiService = apiService;
+        this.clock = clock;
+    }
+
+    /** Whether {@code member}, the logged-in one, is in debug mode. */
+    public boolean isActive(UUID member) {
+        return lookup(member).active();
+    }
+
+    /** The share of {@code member}'s pages, the logged-in one's, replayed whole; empty when not in debug mode. */
+    public OptionalDouble replayRate(UUID member) {
+        Entry entry = lookup(member);
+        return entry.active() ? OptionalDouble.of(entry.replayRate()) : OptionalDouble.empty();
+    }
+
+    private Entry lookup(UUID member) {
+        if (member == null) return OFF;
+        Instant now = clock.instant();
+        Entry cached = cache.get(member);
+        if (cached != null && now.isBefore(cached.expiresAt())) {
+            return cached;
+        }
+        Entry fresh;
+        try {
+            ApiService api = apiService.getIfAvailable();
+            MyDebugDto debug = api == null ? null : api.myDebug();
+            // null: catapult-api could not tell, which is remembered only briefly
+            fresh = debug == null ? new Entry(false, 0, now.plus(FAILURE_TTL))
+                    : new Entry(debug.active(), debug.replayRate(), now.plus(TTL));
+        } catch (RuntimeException e) {
+            log.debug("Could not tell whether {} is in debug mode: {}", member, e.toString());
+            fresh = new Entry(false, 0, now.plus(FAILURE_TTL));
+        }
+        cache.put(member, fresh);
+        return fresh;
+    }
+
+    /** Whether the member of the request being served is in debug mode; false when nobody is, or on any failure. */
+    public boolean isCurrentActive() {
+        try {
+            ApiService api = apiService.getIfAvailable();
+            return api != null && isActive(api.currentUserId());
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Whether the member logged in on {@code request} is in debug mode, even while that request is not yet bound to
+     * the thread (Sentry samples a request's trace before it is): the request is bound for the time of the question,
+     * so its session's JWT is read, and catapult-api asked on a cache miss, as for any page. False without a
+     * session, and on any failure.
+     */
+    public boolean isActiveOn(HttpServletRequest request) {
+        if (request == null) return false;
+        RequestAttributes bound = RequestContextHolder.getRequestAttributes();
+        try {
+            if (request.getSession(false) == null) return false;
+            RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+            return isCurrentActive();
+        } catch (RuntimeException e) {
+            return false;
+        } finally {
+            RequestContextHolder.setRequestAttributes(bound);
+        }
+    }
+
+    /** Forgets what is known of {@code member}: the next page asks catapult-api again. */
+    public void evict(UUID member) {
+        cache.remove(member);
+    }
+}

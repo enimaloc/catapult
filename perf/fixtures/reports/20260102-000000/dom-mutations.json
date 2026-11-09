@@ -1,0 +1,4 @@
+[
+  { "scenario": "idle-60s", "nodes": 600, "attributes": 0, "text": 0, "budget": 600 },
+  { "scenario": "dock-events", "nodes": 9300, "attributes": 1300, "text": 2, "budget": 9282 }
+]

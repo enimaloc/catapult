@@ -1,0 +1,1 @@
+ALTER TABLE user_account ADD COLUMN steam_id VARCHAR UNIQUE;

@@ -1,0 +1,74 @@
+package fr.enimaloc.catapult.api;
+
+import fr.enimaloc.catapult.common.dto.TokenResponse;
+import fr.enimaloc.catapult.common.dto.UserInfoResponse;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.security.AuthCodeStore;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.util.List;
+import java.util.Map;
+
+/**
+ * REST endpoints for JWT-based authentication used by catapult-web.
+ * /api/internal/auth/validate is called by catapult-web to confirm a JWT is valid and retrieve user info.
+ */
+@RestController
+@RequestMapping(ApiPaths.INTERNAL + "/auth")
+@RequiredArgsConstructor
+public class ApiAuthController {
+
+    private final AuthCodeStore codeStore;
+    private final ApiUserResolver userResolver;
+
+    /**
+     * Single-use token exchange: catapult-web calls this server-to-server after receiving
+     * the opaque code in /auth/callback. Returns 410 Gone if the code is expired or already used.
+     */
+    @PostMapping("/exchange")
+    public ResponseEntity<TokenResponse> exchange(@RequestParam String code) {
+        return codeStore.consume(code)
+                .map(jwt -> ResponseEntity.ok(new TokenResponse(jwt)))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.GONE, "The code is expired or already used"));
+    }
+
+    @GetMapping("/validate")
+    public UserInfoResponse validate(@AuthenticationPrincipal Jwt jwt) {
+        // 401 for no JWT or an account deleted since the token was issued
+        UserAccount account = userResolver.viewer(jwt);
+
+        List<String> roles = jwt.getClaim("roles");
+
+        return new UserInfoResponse(
+                account.getId(),
+                account.getTwitchId(),
+                account.getTwitchUsername(),
+                account.getProfileImageUrl(),
+                account.getStatus().name(),
+                roles != null ? roles : List.of(),
+                account.getDeletionRequestedAt() != null
+                        ? account.getDeletionRequestedAt().toString() : null
+        );
+    }
+
+    @GetMapping("/me")
+    public UserInfoResponse me(@AuthenticationPrincipal Jwt jwt) {
+        return validate(jwt);
+    }
+
+    public static Map<String, Object> toClaimsMap(UserInfoResponse r) {
+        return Map.of(
+                "id", r.id().toString(),
+                "twitchId", r.twitchId(),
+                "username", r.username(),
+                "status", r.status(),
+                "roles", r.roles()
+        );
+    }
+}

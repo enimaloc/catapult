@@ -1,0 +1,516 @@
+package fr.enimaloc.catapult.controller;
+
+import fr.enimaloc.catapult.common.dto.admin.TwDefinitionDto;
+import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider;
+import fr.enimaloc.catapult.common.dto.admin.AdminMemberDto;
+import fr.enimaloc.catapult.common.dto.admin.AdminPage;
+import fr.enimaloc.catapult.common.dto.admin.AdminCclPage;
+import fr.enimaloc.catapult.common.dto.admin.CacheSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.FlagKeyDto;
+import fr.enimaloc.catapult.common.dto.admin.GroupSummaryDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentAssignmentsDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentSettingsDto;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentStatus;
+import fr.enimaloc.catapult.common.dto.experiment.ExperimentVariantDto;
+import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
+import fr.enimaloc.catapult.common.dto.admin.WellKnownFileDetailDto;
+import fr.enimaloc.catapult.common.dto.admin.WellKnownFileDto;
+import fr.enimaloc.catapult.common.dto.admin.WellKnownHeader;
+import fr.enimaloc.catapult.common.dto.admin.WellKnownLocation;
+import fr.enimaloc.catapult.common.dto.admin.DebugExchangeDto;
+import fr.enimaloc.catapult.common.dto.admin.DebugExchangeSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.MemberDebugStateDto;
+import fr.enimaloc.catapult.service.ApiService;
+import fr.enimaloc.catapult.service.DebugExchangeFilter;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+
+import java.time.Instant;
+import java.time.format.DateTimeParseException;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.function.Supplier;
+
+/**
+ * The admin tabs admin-tabs.js loads when first shown (and their sub-views and dialogs), each
+ * refused, like the admin page itself, to anyone but an admin.
+ */
+@Controller
+@RequestMapping("/spa/admin")
+@RequiredArgsConstructor
+public class AdminTabsFragmentController {
+    private final ModelFiller filler;
+    private final ApiService apiService;
+    private final BroadcastState broadcastState;
+
+    /**
+     * The members list, for the way back from a member's targeting (the page itself comes with its
+     * first page already) and, searched and paged by admin-tabs.js, one page of members matching {@code q}.
+     */
+    @GetMapping("/members")
+    String members(Model model, HttpServletResponse response, @RequestParam(required = false, defaultValue = "") String q,
+                   @RequestParam(defaultValue = "0") int page) {
+        return guarded(model, response, () -> {
+            filler.admin(model, q, Math.max(0, page));
+            return "pages/admin-tab/members :: content";
+        });
+    }
+
+    /** A member the notification picker offers: the id to send to and the login to show. */
+    record MemberOption(String id, String login) {}
+
+    /** Up to 20 members matching {@code q} for the notification picker; none for a blank one, 503 when catapult-api fails. */
+    @GetMapping(value = "/members/search", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    ResponseEntity<List<MemberOption>> searchMembers(@RequestParam(required = false, defaultValue = "") String q) {
+        int refused = AdminAccess.refusal(filler);
+        if (refused != 0) return ResponseEntity.status(refused).build();
+        List<AdminMemberDto> found = apiService.adminSearchMembers(q);
+        if (found == null) return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
+        return ResponseEntity.ok(found.stream().filter(m -> m.twitchUsername() != null && !m.systemAccount())
+                .map(m -> new MemberOption(m.id().toString(), m.twitchUsername())).toList());
+    }
+
+    /** {@code targeting} with no flag nor group where catapult-api left them out; null stays null (unavailable). */
+    private static MemberTargetingDto complete(MemberTargetingDto targeting) {
+        if (targeting == null || (targeting.flags() != null && targeting.groupKeys() != null)) return targeting;
+        return new MemberTargetingDto(targeting.flags() == null ? List.of() : targeting.flags(),
+                targeting.groupKeys() == null ? List.of() : targeting.groupKeys());
+    }
+
+    /** One member's targeting: custom flags and groups, with the groups still to join; 404 when the member is unknown. */
+    @GetMapping("/members/{id}")
+    String memberTargeting(Model model, HttpServletResponse response, @PathVariable UUID id) {
+        return guarded(model, response, () -> {
+            AdminMemberSummaryDto member = apiService.adminMember(id);
+            if (member == null) {
+                response.setStatus(HttpStatus.NOT_FOUND.value());
+                return "pages/admin-tab/members :: missing";
+            }
+            List<GroupSummaryDto> groups = apiService.adminGroups();
+            MemberTargetingDto targeting = complete(apiService.adminMemberTargeting(id));
+            model.addAttribute("member", member);
+            model.addAttribute("targeting", targeting);
+            model.addAttribute("groups", groups == null ? List.of() : groups);
+            model.addAttribute("groupIds", groups == null ? Map.of()
+                    : groups.stream().collect(Collectors.toMap(GroupSummaryDto::key, GroupSummaryDto::id, (a, b) -> a)));
+            model.addAttribute("joinable", groups == null || targeting == null ? List.of()
+                    : groups.stream().filter(g -> !targeting.groupKeys().contains(g.key())).toList());
+            return "pages/admin-tab/members :: targeting";
+        });
+    }
+
+    /**
+     * A member's debug mode and one page of what it recorded, narrowed by the filters of the query string (a blank or
+     * unreadable one is no filter; {@code from} and {@code to} are ISO instants); 404 when the member is unknown, the
+     * unavailable card when catapult-api can't tell the member's mode.
+     */
+    @GetMapping("/members/{id}/debug")
+    String memberDebug(Model model, HttpServletResponse response, @PathVariable UUID id,
+                       @RequestParam(required = false) String service, @RequestParam(required = false) String direction,
+                       @RequestParam(required = false) String outcome, @RequestParam(required = false) String from,
+                       @RequestParam(required = false) String to, @RequestParam(defaultValue = "0") int page) {
+        return guarded(model, response, () -> {
+            AdminMemberSummaryDto member = apiService.adminMember(id);
+            if (member == null) {
+                response.setStatus(HttpStatus.NOT_FOUND.value());
+                return "pages/admin-tab/members :: missing";
+            }
+            MemberDebugStateDto state = apiService.memberDebug(id);
+            DebugExchangeFilter filter = new DebugExchangeFilter(blankToNull(service),
+                    oneOf(direction, "IN", "OUT"), oneOf(outcome, "error", "success"), instant(from), instant(to));
+            AdminPage<DebugExchangeSummaryDto> exchanges = state == null ? null
+                    : apiService.memberDebugExchanges(id, filter, Math.max(0, page));
+            List<String> services = state == null ? null : apiService.memberDebugServices(id);
+            model.addAttribute("member", member);
+            model.addAttribute("debugState", state);
+            model.addAttribute("exchanges", exchanges);
+            model.addAttribute("services", services == null ? List.of() : services);
+            model.addAttribute("filter", filter);
+            return "pages/admin-tab/member-debug :: content";
+        });
+    }
+
+    /** One recorded exchange in full, for the exchanges page's dialog; 404 when it isn't that member's. */
+    @GetMapping(value = "/members/{id}/debug/{exchangeId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    ResponseEntity<DebugExchangeDto> memberDebugExchange(@PathVariable UUID id, @PathVariable UUID exchangeId) {
+        int refused = AdminAccess.refusal(filler);
+        if (refused != 0) return ResponseEntity.status(refused).build();
+        DebugExchangeDto exchange = apiService.memberDebugExchange(id, exchangeId);
+        return exchange == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(exchange);
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    /** {@code value} when it is one of {@code allowed}, else null. */
+    private static String oneOf(String value, String... allowed) {
+        String trimmed = blankToNull(value);
+        return trimmed != null && List.of(allowed).contains(trimmed) ? trimmed : null;
+    }
+
+    private static Instant instant(String value) {
+        String trimmed = blankToNull(value);
+        if (trimmed == null) return null;
+        try {
+            return Instant.parse(trimmed);
+        } catch (DateTimeParseException e) {
+            return null;
+        }
+    }
+
+    @GetMapping("/ccl")
+    String ccl(Model model, HttpServletResponse response) {
+        return guarded(model, response, () -> {
+            model.addAttribute("ccl", apiService.adminCcl());
+            return "pages/admin-tab/ccl :: content";
+        });
+    }
+
+    @GetMapping("/caches")
+    String caches(Model model, HttpServletResponse response) {
+        return guarded(model, response, () -> {
+            model.addAttribute("caches", apiService.adminCaches());
+            return "pages/admin-tab/caches :: list";
+        });
+    }
+
+    @GetMapping("/caches/{name}")
+    String cacheEntries(Model model, HttpServletResponse response, @PathVariable String name,
+                        @RequestParam(required = false) String q, @RequestParam(defaultValue = "0") int page) {
+        return guarded(model, response, () -> {
+            List<CacheSummaryDto> caches = apiService.adminCaches();
+            model.addAttribute("name", name);
+            model.addAttribute("q", q == null ? "" : q);
+            model.addAttribute("deletable", caches != null
+                    && caches.stream().anyMatch(c -> c.name().equals(name) && c.deletable()));
+            model.addAttribute("entries", apiService.adminCacheEntries(name, q, page));
+            return "pages/admin-tab/caches :: entries";
+        });
+    }
+
+    @GetMapping("/caches/{name}/entry")
+    String cacheEntry(Model model, HttpServletResponse response, @PathVariable String name, @RequestParam String key) {
+        return guarded(model, response, () -> {
+            model.addAttribute("key", key);
+            model.addAttribute("entry", AdminCacheEntryView.of(apiService.adminCacheEntry(name, key)));
+            return "pages/admin-tab/caches :: entry";
+        });
+    }
+
+    @GetMapping("/data")
+    String data(Model model, HttpServletResponse response) {
+        return guarded(model, response, () -> {
+            model.addAttribute("repos", apiService.adminDataRepos());
+            return "pages/admin-tab/data :: repos";
+        });
+    }
+
+    @GetMapping("/data/{repo}")
+    String dataRows(Model model, HttpServletResponse response, @PathVariable String repo,
+                    @RequestParam(required = false) String q, @RequestParam(defaultValue = "0") int page) {
+        return guarded(model, response, () -> {
+            AdminPage<Map<String, Object>> rows = apiService.adminDataRows(repo, q, page);
+            model.addAttribute("repo", repo);
+            model.addAttribute("q", q == null ? "" : q);
+            model.addAttribute("rows", rows);
+            model.addAttribute("table", rows == null ? null : AdminDataViews.table(rows.content()));
+            return "pages/admin-tab/data :: rows";
+        });
+    }
+
+    /** A row's edit dialog; without an id, a new row's, laid out on the repository's first row. */
+    @GetMapping("/data/{repo}/row")
+    String dataRow(Model model, HttpServletResponse response, @PathVariable String repo,
+                   @RequestParam(required = false) String id) {
+        return guarded(model, response, () -> {
+            Map<String, Object> row = id == null ? template(repo) : apiService.adminDataRow(repo, id);
+            if (row == null) {
+                response.setStatus(HttpStatus.NOT_FOUND.value());
+                return "pages/admin-tab/data :: missing";
+            }
+            model.addAttribute("form", AdminDataViews.form(repo, id, row));
+            return "pages/admin-tab/data :: row";
+        });
+    }
+
+    /** The repository's first row, to lay a new one out on; just an id when it has none. */
+    private Map<String, Object> template(String repo) {
+        AdminPage<Map<String, Object>> rows = apiService.adminDataRows(repo, null, 0);
+        if (rows == null) return null;
+        return rows.content().isEmpty() ? Map.of("id", "") : rows.content().getFirst();
+    }
+
+    @GetMapping("/links")
+    String links(Model model, HttpServletResponse response) {
+        return guarded(model, response, () -> {
+            model.addAttribute("links", apiService.adminSocialLinks());
+            return "pages/admin-tab/links :: content";
+        });
+    }
+
+    @GetMapping("/meta")
+    String wellKnown(Model model, HttpServletResponse response) {
+        return guarded(model, response, () -> {
+            model.addAttribute("metaTags", apiService.metaTags());
+            List<WellKnownFileDto> files = apiService.adminWellKnownFiles();
+            model.addAttribute("files", files);
+            model.addAttribute("registry", apiService.adminIanaRegistry());
+            model.addAttribute("configured", files == null ? Set.of() : AdminWellKnownViews.configured(files));
+            return "pages/admin-tab/meta :: content";
+        });
+    }
+
+    /** A file's dialog; without an id, a new file's, prefilled from the registry's {@code path} when given. */
+    @GetMapping("/meta/file")
+    String wellKnownFile(Model model, HttpServletResponse response, @RequestParam(required = false) Long id,
+                         @RequestParam(required = false) WellKnownLocation location,
+                         @RequestParam(required = false) String path) {
+        return guarded(model, response, () -> {
+            WellKnownFileDetailDto file;
+            String preset = null;
+            if (id != null) {
+                file = apiService.adminWellKnownFile(id);
+                if (file == null) {
+                    response.setStatus(HttpStatus.NOT_FOUND.value());
+                    return "pages/admin-tab/meta :: missing";
+                }
+                // a redirect or an empty file has no content to edit: it opens on the Response tab
+                if (file.status() >= 300 && file.status() < 400 || file.content() == null || file.content().isEmpty()) {
+                    preset = "redirect";
+                }
+            } else {
+                String p = path == null ? "" : path;
+                WellKnownLocation where = location == null ? WellKnownLocation.WELL_KNOWN : location;
+                boolean redirect = where == WellKnownLocation.WELL_KNOWN && "change-password".equals(p);
+                if (redirect) preset = "redirect";
+                file = new WellKnownFileDetailDto(0, where, p, redirect ? 302 : 200,
+                        redirect ? List.of(new WellKnownHeader("Location", "")) : List.of(),
+                        AdminWellKnownViews.contentType(p), "", null);
+            }
+            model.addAttribute("file", file);
+            model.addAttribute("preset", preset);
+            model.addAttribute("url", AdminWellKnownViews.url(file.location(), file.path()));
+            model.addAttribute("creating", id == null);
+            return "pages/admin-tab/meta :: file";
+        });
+    }
+
+    /** SchemaStore's schema for a well-known path, for the dialog's generated form; 404 when none. */
+    @GetMapping(value = "/meta/schema", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    ResponseEntity<String> wellKnownSchema(@RequestParam String path) {
+        int refused = AdminAccess.refusal(filler);
+        if (refused != 0) return ResponseEntity.status(refused).build();
+        String schema = apiService.adminWellKnownSchema(path);
+        return schema == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(schema);
+    }
+
+    @GetMapping("/notifications")
+    String notifications(Model model, HttpServletResponse response, @RequestParam(defaultValue = "0") int page) {
+        return guarded(model, response, () -> {
+            model.addAttribute("notifications", apiService.adminNotifications(page));
+            // for the "experiment participants" audience; null (no experiment to pick) when catapult-api fails
+            model.addAttribute("experiments", apiService.adminExperiments());
+            return "pages/admin-tab/notifications :: content";
+        });
+    }
+
+    /** The proposals of one status (PENDING by default, also for any unknown value) with the status chips. */
+    @GetMapping("/dtdd-mapping")
+    String dtddMapping(Model model, HttpServletResponse response, @RequestParam(defaultValue = "PENDING") String status) {
+        return guarded(model, response, () -> {
+            String shown = "APPROVED".equals(status) || "REJECTED".equals(status) ? status : "PENDING";
+            model.addAttribute("status", shown);
+            model.addAttribute("proposals", apiService.adminDtddProposals(shown));
+            return "pages/admin-tab/dtdd-mapping :: content";
+        });
+    }
+
+    /**
+     * One page of the game mappings and one of the detected games still missing one, each with its own page number,
+     * and what the form offers to replace IGDB's with: every CCL ({@code cclNames}, id to name) and every enabled TW
+     * ({@code twLabels}, id to label, in their order), as the streamers choose from; either empty when catapult-api failed.
+     */
+    @GetMapping("/game-mappings")
+    String gameMappings(Model model, HttpServletResponse response, @RequestParam(defaultValue = "0") int page,
+                        @RequestParam(defaultValue = "0") int missingPage) {
+        return guarded(model, response, () -> {
+            model.addAttribute("mappings", apiService.adminGameMappings(Math.max(0, page)));
+            model.addAttribute("missing", apiService.adminMissingGameMappings(Math.max(0, missingPage)));
+            AdminCclPage ccl = apiService.adminCcl();
+            Map<String, String> cclNames = new LinkedHashMap<>();
+            if (ccl != null && ccl.ccls() != null) ccl.ccls().forEach(c -> cclNames.put(c.id(), c.name()));
+            List<TwDefinitionDto> tws = apiService.adminTws();
+            Map<String, String> twLabels = new LinkedHashMap<>();
+            if (tws != null) tws.stream().filter(TwDefinitionDto::enabled)
+                    .sorted(Comparator.comparingInt(TwDefinitionDto::sortOrder))
+                    .forEach(t -> twLabels.put(t.id(), t.label()));
+            model.addAttribute("cclNames", cclNames);
+            model.addAttribute("twLabels", twLabels);
+            return "pages/admin-tab/game-mappings :: content";
+        });
+    }
+
+    @GetMapping("/groups")
+    String groups(Model model, HttpServletResponse response) {
+        return guarded(model, response, () -> {
+            model.addAttribute("groups", apiService.adminGroups());
+            return "pages/admin-tab/groups :: content";
+        });
+    }
+
+    @GetMapping("/whitelist")
+    String whitelist(Model model, HttpServletResponse response) {
+        return guarded(model, response, () -> {
+            model.addAttribute("whitelist", apiService.adminWhitelist());
+            return "pages/admin-tab/whitelist :: content";
+        });
+    }
+
+    /** The trigger warning definitions. */
+    @GetMapping("/tw")
+    String tw(Model model, HttpServletResponse response) {
+        return guarded(model, response, () -> {
+            model.addAttribute("definitions", apiService.adminTws());
+            return "pages/admin-tab/tw :: content";
+        });
+    }
+
+    /** One definition's Steam keywords and the tester; the missing fragment (404) when it is unknown. */
+    @GetMapping("/tw/{id}")
+    String twKeywords(Model model, HttpServletResponse response, @PathVariable String id) {
+        return guarded(model, response, () -> {
+            TwDefinitionDto definition = apiService.adminTw(id);
+            if (definition == null) {
+                response.setStatus(HttpStatus.NOT_FOUND.value());
+                return "pages/admin-tab/tw :: missing";
+            }
+            model.addAttribute("definition", definition);
+            model.addAttribute("keywords", apiService.adminTwKeywords(id));
+            return "pages/admin-tab/tw :: keywords";
+        });
+    }
+
+    /** Steam and DTDD keys cards, then the Minecraft service accounts card. */
+    @GetMapping("/keys")
+    String keys(Model model, HttpServletResponse response) {
+        return guarded(model, response, () -> {
+            model.addAttribute("steam", apiService.adminApiKeys(ApiKeyProvider.STEAM));
+            model.addAttribute("dtdd", apiService.adminApiKeys(ApiKeyProvider.DTDD));
+            model.addAttribute("minecraft", apiService.adminMinecraftAccounts());
+            return "pages/admin-tab/keys :: content";
+        });
+    }
+
+    @GetMapping("/broadcast")
+    String broadcast(Model model, HttpServletResponse response) {
+        return guarded(model, response, () -> {
+            model.addAttribute("maintenance", broadcastState.maintenance().orElse(null));
+            return "pages/admin-tab/broadcast :: content";
+        });
+    }
+
+    @GetMapping("/experiments")
+    String experiments(Model model, HttpServletResponse response) {
+        return guarded(model, response, () -> {
+            model.addAttribute("experiments", apiService.adminExperiments());
+            return "pages/admin-tab/experiments :: content";
+        });
+    }
+
+    /** One experiment's settings; 404 when it is unknown (or catapult-api can't tell). */
+    @GetMapping("/experiments/{id}")
+    String experiment(Model model, HttpServletResponse response, @PathVariable UUID id) {
+        return guarded(model, response, () -> {
+            ExperimentSettingsDto experiment = apiService.adminExperiment(id);
+            if (experiment == null) {
+                response.setStatus(HttpStatus.NOT_FOUND.value());
+                return "pages/admin-tab/experiments :: missing";
+            }
+            List<GroupSummaryDto> groups = apiService.adminGroups();
+            List<FlagKeyDto> flagKeys = apiService.adminFlagKeys();
+            model.addAttribute("experiment", experiment);
+            model.addAttribute("variantKeys", experiment.variants().stream()
+                    .collect(Collectors.toMap(ExperimentVariantDto::id, ExperimentVariantDto::key, (a, b) -> a)));
+            model.addAttribute("groups", groups == null ? List.of() : groups);
+            model.addAttribute("flagKeys", flagKeys == null ? List.of() : flagKeys);
+            participantsModel(model, experiment, null, "", 0);
+            return "pages/admin-tab/experiments :: detail";
+        });
+    }
+
+    /** The participants card's list, narrowed to a variant and a login search, for a page of it; 404 when the experiment is unknown. */
+    @GetMapping("/experiments/{id}/participants")
+    String experimentParticipants(Model model, HttpServletResponse response, @PathVariable UUID id,
+                                  @RequestParam(required = false) UUID variant,
+                                  @RequestParam(required = false, defaultValue = "") String q,
+                                  @RequestParam(defaultValue = "0") int page) {
+        return guarded(model, response, () -> {
+            ExperimentSettingsDto experiment = apiService.adminExperiment(id);
+            if (experiment == null) {
+                response.setStatus(HttpStatus.NOT_FOUND.value());
+                return "pages/admin-tab/experiments :: missing";
+            }
+            participantsModel(model, experiment, variant, q, Math.max(0, page));
+            return "pages/admin-tab/experiments :: participants";
+        });
+    }
+
+    /**
+     * What the participants card shows: the page (null when catapult-api failed) and, per variant, the palette
+     * slot the weight bar uses (the control apart, the others numbered 1 to 4 in turn).
+     */
+    private void participantsModel(Model model, ExperimentSettingsDto experiment, UUID variant, String q, int page) {
+        ExperimentAssignmentsDto assignments = apiService.adminExperimentAssignments(
+                experiment.id(), variant, q.isBlank() ? null : q.trim(), page);
+        // a page the list has shrunk below (a move emptied the last one): land on the last one left
+        if (assignments != null && page > 0 && assignments.page().content().isEmpty()) {
+            assignments = apiService.adminExperimentAssignments(experiment.id(), variant, q.isBlank() ? null : q.trim(),
+                    Math.max(0, assignments.page().totalPages() - 1));
+        }
+        Map<UUID, String> colors = new HashMap<>();
+        int others = 0;
+        for (ExperimentVariantDto v : experiment.variants()) {
+            colors.put(v.id(), v.control() ? "control" : String.valueOf(others++ % 4 + 1));
+        }
+        model.addAttribute("experiment", experiment);
+        model.addAttribute("assignments", assignments);
+        model.addAttribute("selectedVariant", variant);
+        model.addAttribute("participantsQ", q);
+        model.addAttribute("variantColors", colors);
+        model.addAttribute("variantKeys", experiment.variants().stream()
+                .collect(Collectors.toMap(ExperimentVariantDto::id, ExperimentVariantDto::key, (a, b) -> a)));
+        model.addAttribute("editable", experiment.status() != ExperimentStatus.ENDED);
+    }
+
+    /** {@code view}'s fragment for an admin; the 401 / 403 error fragment for anyone else. */
+    private String guarded(Model model, HttpServletResponse response, Supplier<String> view) {
+        int refused = AdminAccess.refusal(filler);
+        if (refused != 0) {
+            response.setStatus(refused);
+            filler.error(model, refused);
+            return "pages/error :: error";
+        }
+        return view.get();
+    }
+}

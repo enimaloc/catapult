@@ -1,0 +1,8 @@
+{
+  "status" : 200,
+  "headers" : {
+    "Cache-Control" : [ "no-cache, no-store, max-age=0, must-revalidate" ],
+    "Content-Type" : [ "application/json" ]
+  },
+  "body" : "{\"storeUrl\":\"https://store.steampowered.com/app/480\",\"ccls\":[],\"ia\":{\"hasDisclosure\":false,\"note\":null},\"parentApp\":null,\"page\":{\"demo\":null,\"dlc\":null,\"fullgame\":null,\"type\":\"game\",\"name\":\"Spacewar\",\"steamAppId\":480,\"requiredAge\":0,\"isFree\":true,\"controllerSupport\":null,\"detailedDescription\":null,\"aboutTheGame\":null,\"shortDescription\":\"A test app\",\"supportedLanguages\":null,\"reviews\":null,\"headerImage\":null,\"capsuleImage\":null,\"capsuleImageV5\":null,\"website\":null,\"pcRequirements\":null,\"macRequirements\":null,\"linuxRequirements\":null,\"legalNotice\":null,\"developers\":null,\"publishers\":null,\"demos\":null,\"priceOverview\":null,\"packages\":null,\"packageGroups\":null,\"platforms\":null,\"metacritic\":null,\"categories\":null,\"genres\":null,\"screenshots\":null,\"movies\":null,\"recommendations\":null,\"achievements\":null,\"supportInfo\":null,\"background\":null,\"backgroundRaw\":null,\"contentDescriptors\":null,\"ratings\":null,\"releaseDate\":null}}"
+}

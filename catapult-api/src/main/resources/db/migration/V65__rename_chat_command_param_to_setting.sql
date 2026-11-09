@@ -1,0 +1,4 @@
+ALTER TABLE chat_command_param RENAME TO chat_command_setting;
+ALTER TABLE chat_command_setting RENAME CONSTRAINT chat_command_param_pkey TO chat_command_setting_pkey;
+ALTER TABLE chat_command_setting RENAME CONSTRAINT chat_command_param_user_id_key_key TO chat_command_setting_user_id_key_key;
+ALTER TABLE chat_command_setting RENAME CONSTRAINT chat_command_param_user_id_fkey TO chat_command_setting_user_id_fkey;

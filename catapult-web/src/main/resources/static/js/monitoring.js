@@ -1,0 +1,134 @@
+/*
+ * Reports the page's errors to Sentry, its own and the 5xx catapult-web answers it with, along with
+ * what led to them, so a bug can be replayed step by step: the clicks, SPA navigations and fetches (Sentry's own breadcrumbs), the live update events
+ * received (below), and the trace that follows each fetch into catapult-web and catapult-api. Loaded
+ * with the SDK only when a DSN is set (see SentryBrowser).
+ *
+ * Only the pages the config asks for are replayed whole (replaysSessionSampleRate), none on error
+ * alone: buffering the last minute of every page keeps a MutationObserver on each web component's
+ * shadow root, which SPA navigations never let go of, so each page left stays in memory whole (the
+ * channel page's 3,000 components: +16 MB and 3x the CPU per navigation).
+ * Replays show the page's text, which is the member's own dashboard, but never what is typed in a
+ * field (a Steam token...), nor what grants access (the OBS widget's link, invitation codes: the
+ * templates mark them .sentry-block, recorded as an empty box). A URL's read-only API token
+ * ("?token=", as in the API docs' examples) never leaves the page: masked as "***" in every
+ * breadcrumb, span and request sent, by the same rule as the server's TokenParameterMask.
+ */
+(function () {
+    const config = window.Catapult?.sentry;
+    const Sentry = window.Sentry;
+    if (!config || !Sentry) {
+        return;
+    }
+
+    // "token=" as a parameter of its own (not "widget_token="), its value up to the next separator:
+    // TokenParameterMask's pattern.
+    const TOKEN_PARAMETER = /(?<![\w.%-])(token=)[^&#\s"']*/g;
+    const mask = (value) => (typeof value === "string" ? value.replace(TOKEN_PARAMETER, "$1***") : value);
+    /** Every string value of {@code data} (a breadcrumb's or a span's) masked, in place. */
+    const maskValues = (data) => {
+        if (data && typeof data === "object") {
+            for (const key of Object.keys(data)) {
+                data[key] = mask(data[key]);
+            }
+        }
+    };
+    /** An event's request: its URL and query string, the latter a string or [name, value] pairs. */
+    const maskRequest = (request) => {
+        if (!request) {
+            return;
+        }
+        request.url = mask(request.url);
+        if (Array.isArray(request.query_string)) {
+            request.query_string = request.query_string.map(([name, value]) => [name, name === "token" ? "***" : value]);
+        } else if (request.query_string !== undefined) {
+            request.query_string = mask(request.query_string);
+        }
+    };
+
+    Sentry.init({
+        dsn: config.dsn,
+        environment: config.environment,
+        release: config.release ?? undefined,
+        // Through catapult-web (SentryTunnelController): blockers let it by.
+        tunnel: "/monitoring/tunnel",
+        sendDefaultPii: false,
+        integrations: [
+            Sentry.browserTracingIntegration(),
+            // Dark Reader's style sheets left out: it rewrites them as the page loads, and the
+            // replay would serialize each version (and may not read them anyway). .sentry-block:
+            // what grants access, its attributes (a field's value, data-widget-url) included.
+            Sentry.replayIntegration({
+                maskAllText: false, maskAllInputs: true, blockAllMedia: false, block: [".darkreader", ".sentry-block"],
+            }),
+            // A request to catapult-web answered with a 5xx is an error of the page too, so what
+            // led to it comes along with the server's own report, on the same trace.
+            Sentry.httpClientIntegration({
+                failedRequestStatusCodes: [[500, 599]],
+                failedRequestTargets: [window.location.origin],
+            }),
+        ],
+        tracesSampleRate: config.tracesSampleRate,
+        replaysSessionSampleRate: config.replaysSessionSampleRate ?? 0,
+        replaysOnErrorSampleRate: 0,
+        beforeBreadcrumb(breadcrumb) {
+            maskValues(breadcrumb.data);
+            return breadcrumb;
+        },
+        beforeSendTransaction(transaction) {
+            maskRequest(transaction.request);
+            for (const span of transaction.spans ?? []) {
+                span.description = mask(span.description);
+                maskValues(span.data);
+            }
+            return transaction;
+        },
+        beforeSend(event) {
+            maskRequest(event.request);
+            return event;
+        },
+    });
+    if (config.user) {
+        Sentry.setUser({ id: config.user });
+    }
+
+    // The replay warns of each style sheet it may not read (an extension's, Dark Reader's...) and
+    // records its text instead: silenced here, over Sentry's own console hook, so that dozens of
+    // them don't crowd the bug's breadcrumbs out.
+    const warn = console.warn;
+    console.warn = function (message, ...rest) {
+        if (typeof message === "string" && message.startsWith("Cannot get CSS styles from text's parentNode")) {
+            return;
+        }
+        return warn.call(this, message, ...rest);
+    };
+
+    // Sentry sees none of the server's pushes: each event a live update stream delivers leaves a
+    // breadcrumb (its name, not its data), as do the stream's drops and reconnections.
+    const NativeEventSource = window.EventSource;
+    if (!NativeEventSource) {
+        return;
+    }
+    const crumb = (url, message, level = "info") =>
+        Sentry.addBreadcrumb({ category: "sse", message, level, data: { url } });
+
+    window.EventSource = class extends NativeEventSource {
+        constructor(url, init) {
+            super(url, init);
+            super.addEventListener("open", () => crumb(String(url), "open"));
+            super.addEventListener("error", () => crumb(String(url), "error", "warning"));
+        }
+
+        addEventListener(type, listener, options) {
+            if (type === "open" || type === "error" || typeof listener !== "function") {
+                super.addEventListener(type, listener, options);
+                return;
+            }
+            const url = this.url;
+            super.addEventListener(type, function (event) {
+                crumb(url, type);
+                return listener.call(this, event);
+            }, options);
+        }
+    };
+})();

@@ -1,0 +1,69 @@
+package fr.enimaloc.catapult.experiment.targeting.resolver;
+
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.account.UserFlag;
+import fr.enimaloc.catapult.experiment.targeting.AttributeValue;
+import fr.enimaloc.catapult.repository.account.UserFlagRepository;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class FlagResolverTest {
+
+    @Mock UserFlagRepository flagRepository;
+    @InjectMocks FlagResolver resolver;
+
+    @Test
+    void resolvesFlagValueAsText() {
+        UserAccount user = new UserAccount();
+        UserFlag flag = new UserFlag();
+        flag.setFlagKey("tier");
+        flag.setFlagValue("vip");
+        when(flagRepository.findByUserAndFlagKey(user, "tier")).thenReturn(Optional.of(flag));
+
+        assertThat(resolver.supports("flag:tier")).isTrue();
+        assertThat(resolver.resolve(user, "flag:tier")).isEqualTo(AttributeValue.text("vip"));
+    }
+
+    @Test
+    void missingFlagReturnsMissing() {
+        UserAccount user = new UserAccount();
+        when(flagRepository.findByUserAndFlagKey(user, "tier")).thenReturn(Optional.empty());
+        assertThat(resolver.resolve(user, "flag:tier")).isEqualTo(AttributeValue.missing());
+    }
+
+    @Test
+    void aFlagWithoutValue_isPresent() {
+        UserAccount user = new UserAccount();
+        UserFlag flag = new UserFlag();
+        flag.setFlagKey("beta");
+        flag.setFlagValue(null);
+        when(flagRepository.findByUserAndFlagKey(user, "beta")).thenReturn(Optional.of(flag));
+        assertThat(resolver.resolve(user, "flag:beta")).isEqualTo(AttributeValue.present());
+    }
+
+    @Test
+    void aFlagWithValue_isItsText() {
+        UserAccount user = new UserAccount();
+        UserFlag flag = new UserFlag();
+        flag.setFlagKey("beta");
+        flag.setFlagValue("beta");
+        when(flagRepository.findByUserAndFlagKey(user, "beta")).thenReturn(Optional.of(flag));
+        assertThat(resolver.resolve(user, "flag:beta")).isEqualTo(AttributeValue.text("beta"));
+    }
+
+    @Test
+    void anAbsentFlag_isMissing() {
+        UserAccount user = new UserAccount();
+        when(flagRepository.findByUserAndFlagKey(user, "beta")).thenReturn(Optional.empty());
+        assertThat(resolver.resolve(user, "flag:beta")).isEqualTo(AttributeValue.missing());
+    }
+}

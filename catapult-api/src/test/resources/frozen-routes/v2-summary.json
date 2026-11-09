@@ -1,0 +1,9 @@
+{
+  "status" : 200,
+  "headers" : {
+    "Cache-Control" : [ "no-cache, no-store, max-age=0, must-revalidate" ],
+    "Content-Type" : [ "application/json" ],
+    "Vary" : [ "Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers" ]
+  },
+  "body" : "{\"inGame\":true,\"description\":\"A game kept for the contract tests\",\"ia\":null,\"igdbUrl\":\"https://www.igdb.com/games/frozen-game\",\"name\":\"Frozen Game\",\"releaseDate\":{\"releaseDate\":\"2020-01-01T00:00:00Z\",\"comingSoon\":false},\"storeUrl\":null,\"tws\":\"flashing-lights\"}"
+}

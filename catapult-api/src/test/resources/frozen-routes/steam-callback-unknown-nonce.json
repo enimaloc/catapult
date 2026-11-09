@@ -1,0 +1,8 @@
+{
+  "status" : 302,
+  "headers" : {
+    "Cache-Control" : [ "no-cache, no-store, max-age=0, must-revalidate" ],
+    "Location" : [ "http://localhost/connect/steam/close?error=nonce" ]
+  },
+  "body" : ""
+}
