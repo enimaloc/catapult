@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.getter.steam;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.getter.DetectedGame;
+import fr.enimaloc.catapult.getter.DetectionTimeoutException;
 import fr.enimaloc.catapult.getter.GameGetter;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.debug.BatchDebugFilter;
@@ -19,6 +20,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.TimeUnit;
@@ -109,11 +111,22 @@ public class SteamGameGetter implements GameGetter {
             return steamApiClient.getPlayerSummary(user.getSteamId(), decryptedPersonalToken)
                 .orTimeout(2, TimeUnit.SECONDS)
                 .exceptionally(e -> {
-                    log.warn("Steam getPlayerSummary timed out or failed for {}: {}", user.getSteamId(), e.getMessage());
+                    if (DetectionTimeoutException.isTimeout(e)) {
+                        throw new DetectionTimeoutException(name(), e);
+                    }
+                    log.warn("Steam getPlayerSummary failed for {}: {}", user.getSteamId(), e.getMessage());
                     return Optional.empty();
                 })
                 .thenApply(opt -> opt.map(this::toDetectedGame))
                 .join();
+        } catch (CompletionException e) {
+            if (e.getCause() instanceof DetectionTimeoutException timeout) {
+                throw timeout;
+            }
+            log.warn("Failed to fetch current game from Steam for user {}: {}", user.getId(), e.getMessage());
+            return Optional.empty();
+        } catch (DetectionTimeoutException e) {
+            throw e;
         } catch (Exception e) {
             log.warn("Failed to fetch current game from Steam for user {}: {}", user.getId(), e.getMessage());
             return Optional.empty();

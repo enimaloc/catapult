@@ -19,6 +19,7 @@ import java.util.Optional;
  * Runs the chain of game getters in the user's priority order.
  * Stops at the first getter that returns a result.
  * When a getter fails, moves on to the next without interrupting the cycle.
+ * When a getter times out, throws {@link DetectionTimeoutException}: its silence is not a "no game".
  */
 @Slf4j
 @Service
@@ -49,6 +50,10 @@ public class GameGetterChain {
                     stopSample(sample, config.getProvider().name().toLowerCase());
                     return result;
                 }
+            } catch (DetectionTimeoutException e) {
+                // A lower-priority getter's answer could be the wrong one: the whole detection is dropped
+                stopSample(sample, "timeout");
+                throw e;
             } catch (Exception e) {
                 log.warn("Getter {} failed for user {}, trying next: {}", config.getProvider(), user.getId(), e.getMessage());
             }

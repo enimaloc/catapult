@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.site.SiteRoles;
 import fr.enimaloc.catapult.simulation.SimulationGate;
 import fr.enimaloc.catapult.simulation.SimulationGates;
 import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.getter.DetectionTimeoutException;
 import fr.enimaloc.catapult.getter.GameGetterChain;
 import fr.enimaloc.catapult.getter.steam.SteamGameGetter;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
@@ -94,6 +95,23 @@ class SchedulerServiceTest {
 
         assertThat(registry.get("catapult.scheduler.users.polled").counter().count())
             .isEqualTo(1.0);
+    }
+
+    @Test
+    void poll_keepsTheUsersState_whenAProviderTimesOut() {
+        UserAccount u1 = new UserAccount(); u1.setId(UUID.randomUUID());
+        when(userAccountRepository.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE))
+            .thenReturn(List.of(u1));
+        when(gameGetterChain.resolve(any()))
+            .thenThrow(new DetectionTimeoutException("Steam", new java.util.concurrent.TimeoutException()));
+
+        schedulerService.poll();
+
+        verify(gameStateService, never()).markObserved(any());
+        verify(gameStateService, never()).clearState(any());
+        verify(gameStateService, never()).updateState(any(), any());
+        verifyNoInteractions(eventPublisher);
+        assertThat(registry.get("catapult.scheduler.detection.timeouts").counter().count()).isEqualTo(1.0);
     }
 
     @Test

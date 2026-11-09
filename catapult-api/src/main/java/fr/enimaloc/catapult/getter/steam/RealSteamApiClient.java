@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.getter.steam;
 
+import fr.enimaloc.catapult.getter.DetectionTimeoutException;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -70,13 +71,13 @@ public class RealSteamApiClient implements SteamApiClient {
     @Override
     public CompletableFuture<Optional<PlayerSummary>> getPlayerSummary(String steamId, String personalToken) {
         return CompletableFuture.supplyAsync(
-            () -> fetchPlayer(steamId, personalToken).flatMap(RealSteamApiClient::whilePlaying), steamExecutor);
+            () -> fetchPlayer(steamId, personalToken, true).flatMap(RealSteamApiClient::whilePlaying), steamExecutor);
     }
 
     @Override
     public CompletableFuture<Optional<PlayerSummary>> getPlayerProfile(String steamId, String personalToken) {
         return CompletableFuture.supplyAsync(
-            () -> fetchPlayer(steamId, personalToken).map(RealSteamApiClient::summaryOf), steamExecutor);
+            () -> fetchPlayer(steamId, personalToken, false).map(RealSteamApiClient::summaryOf), steamExecutor);
     }
 
     @Override
@@ -151,7 +152,7 @@ public class RealSteamApiClient implements SteamApiClient {
         return apiObservations.observe("steam", "get_player_summaries", () -> {
             Map<String, Optional<PlayerSummary>> result = steamIds.stream()
                 .collect(Collectors.toMap(id -> id, id -> Optional.empty()));
-            return attempt("player batch fetch", steamIds.size() + " users", null, result, key -> {
+            return attempt("player batch fetch", steamIds.size() + " users", null, result, true, key -> {
                 List<Map<String, Object>> players = fetchList("players",
                     PLAYER_SUMMARIES_URL + "?key={key}&steamids={steamids}", key, String.join(",", steamIds));
                 if (players != null) {
@@ -164,9 +165,10 @@ public class RealSteamApiClient implements SteamApiClient {
         });
     }
 
-    private Optional<Map<String, Object>> fetchPlayer(String steamId, String personalToken) {
+    /** {@code timeoutsFail}: a timeout fails the call instead of answering "no player" (game detection). */
+    private Optional<Map<String, Object>> fetchPlayer(String steamId, String personalToken, boolean timeoutsFail) {
         return apiObservations.observe("steam", "get_player_summary", () ->
-            attempt("player fetch", steamId, personalToken, Optional.empty(), key -> {
+            attempt("player fetch", steamId, personalToken, Optional.empty(), timeoutsFail, key -> {
                 List<Map<String, Object>> players = fetchList("players",
                     PLAYER_SUMMARIES_URL + "?key={key}&steamids={steamids}", key, steamId);
                 return players == null || players.isEmpty() ? Optional.empty() : Optional.of(players.getFirst());
@@ -174,7 +176,7 @@ public class RealSteamApiClient implements SteamApiClient {
     }
 
     private SteamApiClient.SteamProfileStatus fetchProfileStatus(String steamId, String personalToken) {
-        Optional<Map<String, Object>> playerOpt = fetchPlayer(steamId, personalToken);
+        Optional<Map<String, Object>> playerOpt = fetchPlayer(steamId, personalToken, false);
         if (playerOpt.isEmpty()) {
             return new SteamApiClient.SteamProfileStatus(false, false);
         }
@@ -195,7 +197,7 @@ public class RealSteamApiClient implements SteamApiClient {
     /** Steam only reports a {@code game_count} when the profile's game list is public. */
     private boolean isGameListVisible(String steamId, String personalToken) {
         return apiObservations.observe("steam", "check_game_list_visibility", () ->
-            attempt("game list visibility check", steamId, personalToken, false, key -> {
+            attempt("game list visibility check", steamId, personalToken, false, false, key -> {
                 Map<String, Object> body = fetchResponse(OWNED_GAMES_URL + "?key={key}&steamid={steamid}", key, steamId);
                 return body != null && body.containsKey("game_count");
             }));
@@ -235,9 +237,11 @@ public class RealSteamApiClient implements SteamApiClient {
 
     /**
      * A single non-blocking call under the caller's key: no key, no rate budget, a 429 (which
-     * throttles that key) or any other failure all yield {@code none}.
+     * throttles that key) or any other failure all yield {@code none} — except a timeout when
+     * {@code timeoutsFail}, which throws a {@link DetectionTimeoutException} since it tells nothing.
      */
-    private <T> T attempt(String purpose, String target, String personalToken, T none, Function<String, T> call) {
+    private <T> T attempt(String purpose, String target, String personalToken, T none, boolean timeoutsFail,
+                          Function<String, T> call) {
         Optional<ApiKey> picked = pickKey(personalToken, purpose, target);
         if (picked.isEmpty()) return none;
         ApiKey key = picked.get();
@@ -253,6 +257,9 @@ public class RealSteamApiClient implements SteamApiClient {
             log.warn("Steam API 429 during {} for {}: retry after {}s", purpose, target, retryAfter);
             return none;
         } catch (Exception e) {
+            if (timeoutsFail && DetectionTimeoutException.isTimeout(e)) {
+                throw new DetectionTimeoutException("Steam", e);
+            }
             log.warn("Steam {} failed for {}: {}", purpose, target, e.getMessage());
             return none;
         }
