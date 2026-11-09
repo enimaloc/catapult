@@ -4,6 +4,32 @@ Toutes les versions publiées de Catapult, la plus récente en premier.
 
 Ce fichier est régénéré par le bot à chaque release à partir des notes des [GitHub Releases](https://github.com/enimaloc/catapult/releases) : pour corriger une entrée, modifie les notes de la release (ou le changelog de la PR de release avant sa publication), pas ce fichier.
 
+## [v1.0.0](https://github.com/enimaloc/catapult/releases/tag/v1.0.0) - 2026-11-09
+
+### Features
+- **Détection des jeux:** Catapult reconnaît tout seul le jeu auquel tu joues sur Steam, Xbox et Minecraft (pour Minecraft, il suffit d'accepter une demande d'ami en jeu).
+- **Catégorie Twitch:** dès que tu changes de jeu en live, ta catégorie Twitch suit, sans que tu aies à y toucher. Au lancement du live, le jeu en cours est appliqué tout de suite.
+- **Catégorie Twitch:** choisis la catégorie à afficher quand tu ne joues à aucun jeu, et celle à utiliser pour un jeu que Catapult ne sait pas encore associer.
+- **Associations:** retrouve chaque jeu détecté avec sa catégorie Twitch et sa jaquette. Corrige-la, ignore un jeu ou remets-le par défaut en un clic, et filtre la liste par plateforme.
+- **Labels de contenu:** les labels de classification de contenu de Twitch sont posés selon le jeu, et tu peux en écarter certains pour qu'ils ne soient jamais ajoutés (les jeux d'argent, par exemple).
+- **Avertissements:** Catapult propose les avertissements de contenu (trigger warnings) de chaque jeu en croisant plusieurs sources, dont DoesTheDogDie.com. Tu peux valider ou corriger la fiche retenue.
+- **Raid:** au lancement d'un raid, Catapult peut remettre le dernier jeu auquel tu as joué, s'il est récent.
+- **Extensions Twitch:** choisis les extensions à afficher pour chaque jeu ; elles changent en même temps que ta catégorie.
+- **Twitchat et OBS:** relie Catapult à Twitchat et à OBS pour faire passer notifications et actions dans ton overlay, avec un lien de widget prêt à coller dans OBS.
+- **OBS:** ouvre ta chaîne dans un dock OBS pour en garder une version compacte sous les yeux pendant le live.
+- **Notifications:** une cloche te prévient des nouveautés et des annonces, et tu peux aussi les recevoir dans Twitchat ou dans ton chat au début du live.
+- **Temps réel:** le tableau de bord se met à jour tout seul : passage en live, jeu détecté, réglages modifiés depuis un autre appareil.
+- **Modération:** tes modérateurs peuvent gérer les réglages et les associations de ta chaîne.
+- **Bots de chat:** un jeton de lecture permet à ton bot de chat ou à tes scripts d'afficher le jeu en cours, sans rien pouvoir modifier.
+- **Contenu généré par IA:** pour un jeu Steam, Catapult repère si sa page déclare du contenu généré par IA et récupère l'explication du développeur, que ton bot de chat peut afficher.
+- **Compte:** invite tes proches avec ton lien d'invitation, et supprime ton compte quand tu le souhaites, avec un délai pour changer d'avis.
+- **Aide:** chaque carte du site a son bouton d'aide, qui explique ce qu'elle fait et comment s'en servir.
+
+### Autres changements
+- **Interface:** le site est disponible en français et en anglais, et s'utilise aussi bien sur ordinateur que sur mobile.
+- **Fiabilité:** en cas de souci, Catapult peut basculer sur un serveur de secours ; un bandeau t'indique alors ce qui fonctionne au ralenti.
+- **Fiabilité:** quand le service est momentanément indisponible, une page de maintenance s'affiche au lieu d'une erreur.
+
 ## [v1.0.0-BETA.102](https://github.com/enimaloc/catapult/releases/tag/v1.0.0-BETA.102) - 2026-11-07
 
 ### Features
