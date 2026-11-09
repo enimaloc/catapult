@@ -5,7 +5,9 @@ import fr.enimaloc.catapult.domain.account.UserSettings;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Optional;
 
@@ -57,6 +59,19 @@ public class StreamTitleService {
         }
         // Twitch refuses an empty title
         return title.isEmpty() ? Optional.empty() : Optional.of(title);
+    }
+
+    /**
+     * A title or template as typed: trimmed, null when blank; longer than {@value #MAX_LENGTH} characters is a
+     * 400, since it would never fit in a title.
+     */
+    public static String cleaned(String typed) {
+        if (!hasText(typed)) return null;
+        String title = typed.strip();
+        if (title.codePointCount(0, title.length()) > MAX_LENGTH) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A title is at most " + MAX_LENGTH + " characters");
+        }
+        return title;
     }
 
     private boolean sendsTitles(UserAccount user, UserSettings settings) {

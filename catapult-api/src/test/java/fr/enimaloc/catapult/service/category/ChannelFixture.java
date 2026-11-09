@@ -248,11 +248,12 @@ public class ChannelFixture {
         channelActionsController = new ApiChannelActionsController(
                 new ApiUserResolver(accountRepository),
                 new ChannelDashboardActions(bindingService, mock(SchedulerService.class), gameStateService,
-                        publisher),
+                        publisher, new fr.enimaloc.catapult.service.title.StreamTitleService(experimentService)),
                 mock(BotToggleService.class),
                 new ChannelSettingsService(settingsRepository, categoryChain,
                         new RaidRestoreGateService(experimentService), publisher,
-                        mock(ExtensionLayoutApplier.class)),
+                        mock(ExtensionLayoutApplier.class),
+                        new fr.enimaloc.catapult.service.title.StreamTitleService(experimentService)),
                 new SteamPersonalTokenService(
                         new SteamPersonalTokenStore(accountRepository, mock(SteamApiKeyRepository.class)),
                         mock(TokenEncryptionService.class), publisher, mock(SteamProfileDiagnostics.class),

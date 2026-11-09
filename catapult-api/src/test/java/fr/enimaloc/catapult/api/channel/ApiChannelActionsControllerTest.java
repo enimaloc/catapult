@@ -110,6 +110,49 @@ class ApiChannelActionsControllerTest extends ApiChannelActionsTestSupport {
         }
 
         @Test
+        void title_byAModerator_isTrimmedSavedAndPublished() throws Exception {
+            GameBinding binding = storedBinding();
+            when(streamTitle.isAvailableFor(owner)).thenReturn(true);
+
+            mvc.perform(as(moderator, HttpMethod.PUT, "/bindings/" + bindingId + "/title", "{\"title\":\" {game} speedrun \"}"))
+                    .andExpect(status().isNoContent());
+
+            verify(bindingService).setTitle(owner, bindingId, "{game} speedrun");
+            verify(channelEventPublisher).bindingUpserted(owner.getId(), binding);
+        }
+
+        @Test
+        void title_blankIsBackToTheChannelWideOne() throws Exception {
+            storedBinding();
+            when(streamTitle.isAvailableFor(owner)).thenReturn(true);
+
+            mvc.perform(as(owner, HttpMethod.PUT, "/bindings/" + bindingId + "/title", "{\"title\":\"  \"}"))
+                    .andExpect(status().isNoContent());
+
+            verify(bindingService).setTitle(owner, bindingId, null);
+        }
+
+        @Test
+        void title_isAFeatureGate() throws Exception {
+            when(streamTitle.isAvailableFor(owner)).thenReturn(false);
+
+            mvc.perform(as(owner, HttpMethod.PUT, "/bindings/" + bindingId + "/title", "{\"title\":\"x\"}"))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("feature_disabled"));
+            verify(bindingService, never()).setTitle(any(), any(), any());
+        }
+
+        @Test
+        void title_longerThanATitle_isRefused() throws Exception {
+            when(streamTitle.isAvailableFor(owner)).thenReturn(true);
+
+            mvc.perform(as(owner, HttpMethod.PUT, "/bindings/" + bindingId + "/title",
+                            "{\"title\":\"" + "x".repeat(141) + "\"}"))
+                    .andExpect(status().isBadRequest());
+            verify(bindingService, never()).setTitle(any(), any(), any());
+        }
+
+        @Test
         void vanishedBinding_isNotPublished() throws Exception {
             mvc.perform(as(moderator, HttpMethod.PUT, "/bindings/" + bindingId + "/ignored", "{\"ignored\":true}"))
                     .andExpect(status().isNoContent());
@@ -269,6 +312,30 @@ class ApiChannelActionsControllerTest extends ApiChannelActionsTestSupport {
                     .andExpect(status().isNoContent());
 
             verify(twitchService, never()).resetToDefault(any());
+        }
+
+        @Test
+        void title_savesTheSwitchAndTheTemplate() throws Exception {
+            when(streamTitle.isAvailableFor(owner)).thenReturn(true);
+
+            mvc.perform(as(moderator, HttpMethod.PUT, "/settings/title", "{\"enabled\":true,\"template\":\"Playing {game}\"}"))
+                    .andExpect(status().isNoContent());
+
+            UserSettings settings = saved();
+            assertThat(settings.isTitleFeatureEnabled()).isTrue();
+            assertThat(settings.getTitleTemplate()).isEqualTo("Playing {game}");
+            verify(channelEventPublisher).settingsUpdated(owner.getId(), settings);
+        }
+
+        @Test
+        void title_isAFeatureGate() throws Exception {
+            when(streamTitle.isAvailableFor(owner)).thenReturn(false);
+
+            mvc.perform(as(owner, HttpMethod.PUT, "/settings/title", "{\"enabled\":true,\"template\":\"x\"}"))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("feature_disabled"))
+                    .andExpect(jsonPath("$.detail").value("Title settings not available for this channel"));
+            verify(userSettingsRepository, never()).save(any());
         }
 
         @Test

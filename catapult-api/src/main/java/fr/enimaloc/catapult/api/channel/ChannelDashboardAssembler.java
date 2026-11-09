@@ -40,6 +40,7 @@ import fr.enimaloc.catapult.repository.twitch.TwitchCategoryCacheRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.binding.GameStateService;
 import fr.enimaloc.catapult.service.binding.RaidRestoreGateService;
+import fr.enimaloc.catapult.service.title.StreamTitleService;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
 import fr.enimaloc.catapult.service.connections.SteamProfileDiagnostics;
 import fr.enimaloc.catapult.service.connections.SteamProfileDto;
@@ -91,6 +92,7 @@ public class ChannelDashboardAssembler {
     private final RaidRestoreGateService raidRestoreGate;
     private final CustomBindingViews customBindingViews;
     private final TwitchCategoryCacheRepository twitchCategoryCache;
+    private final StreamTitleService streamTitle;
 
     @Value("${xbox.enabled:false}")
     private boolean xboxEnabled;
@@ -180,7 +182,8 @@ public class ChannelDashboardAssembler {
         return new BindingDto(binding.getId().toString(), binding.getStatus().name(), binding.getSourceType().name(),
                 binding.getSourceName(), binding.getTwitchGameId(), binding.getTwitchGameName(), binding.isIgnored(),
                 binding.isCclEnabled(), binding.getCcls(), binding.isTwEnabled(), binding.isTwOverride(),
-                binding.getTws(), boxArtUrl, ExtensionSlotSetting.toDtos(binding.getExtensionSlots()));
+                binding.getTws(), boxArtUrl, ExtensionSlotSetting.toDtos(binding.getExtensionSlots()),
+                binding.getTitle());
     }
 
     /** Steam state, null without Steam; only the owner's profile is probed live. */
@@ -245,7 +248,10 @@ public class ChannelDashboardAssembler {
                 // Asked of the channel's owner, whose raids it acts on (and who it may enrol)
                 raidRestoreGate.isAvailableFor(channel),
                 ExtensionSlotSetting.toDtos(settings.getNoGameExtensionSlots()),
-                ExtensionSlotSetting.toDtos(settings.getIncompleteFallbackExtensionSlots()));
+                ExtensionSlotSetting.toDtos(settings.getIncompleteFallbackExtensionSlots()),
+                settings.isTitleFeatureEnabled(),
+                settings.getTitleTemplate(),
+                streamTitle.isAvailableFor(channel));
     }
 
     // --- DTDD mapping ----------------------------------------------------------------------------
