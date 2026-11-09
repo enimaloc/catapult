@@ -11,6 +11,7 @@ import fr.enimaloc.catapult.event.ChannelSettingsUpdatedEvent;
 import fr.enimaloc.catapult.event.DtddMappingChangedEvent;
 import fr.enimaloc.catapult.event.binding.BindingDeletedEvent;
 import fr.enimaloc.catapult.event.binding.BindingIgnoredStateEvent;
+import fr.enimaloc.catapult.event.binding.BindingTitleEvent;
 import fr.enimaloc.catapult.event.binding.BindingUpdatedEvent;
 import fr.enimaloc.catapult.event.binding.CclStateEvent;
 import fr.enimaloc.catapult.event.binding.CustomBindingChangedEvent;
@@ -156,8 +157,19 @@ class ChannelEventRedisBridgeTest {
                 new BindingUpdatedEvent("streamer", "b1", "7", "DOOM", Set.of("ccl1")),
                 new CclStateEvent("streamer", "b1", false),
                 new BindingIgnoredStateEvent("streamer", "b1", true),
+                new BindingTitleEvent("streamer", "b1", ""),
                 new TwEnabledStateEvent("streamer", "b1", true),
                 new TwUpdatedEvent("streamer", "b1", Set.of("tw1")));
+    }
+
+    @Test
+    void aBindingsOwnTitle_isItsTitleEvent() {
+        BindingDto binding = new BindingDto("b1", "AUTO", "STEAM", "Doom", "7", "DOOM", false, true,
+                Set.of(), true, false, Set.of(), null, List.of(), "{game} nightmare");
+
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.BINDING_UPSERTED,
+                new ChannelEvents.BindingUpserted(owner.toString(), "streamer", binding))))
+                .contains(new BindingTitleEvent("streamer", "b1", "{game} nightmare"));
     }
 
     @Test
@@ -176,7 +188,7 @@ class ChannelEventRedisBridgeTest {
                 new ChannelEvents.BindingDeleted(owner.toString(), "streamer", "b1"))))
                 .containsExactly(new BindingDeletedEvent("streamer", "b1"));
         ChannelEvents.Settings settings = new ChannelEvents.Settings(new ChannelEvents.Settings.Ccl(true, Set.of()),
-                new ChannelEvents.Settings.Tw(false, Set.of()), null, null, null);
+                new ChannelEvents.Settings.Tw(false, Set.of()), null, null, null, null);
         assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.SETTINGS_UPDATED,
                 new ChannelEvents.SettingsUpdated(owner.toString(), "streamer", settings))))
                 .containsExactly(new ChannelSettingsUpdatedEvent("streamer", settings));

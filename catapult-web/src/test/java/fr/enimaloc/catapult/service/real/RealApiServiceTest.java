@@ -125,6 +125,7 @@ class RealApiServiceTest {
         // api.verify() in the teardown, and the mock server refusing any request it did not expect: none was sent.
     }
 
+    // As a catapult-api that predates the stream title answers it: still read, the title off and not offered.
     private static final String SETTINGS_JSON = """
             {"cclFeatureEnabled":true,"blockedCcls":[],"noGameCcls":[],"applyDefaultOnStreamStart":false,
              "applyDefaultOnNoGame":false,"applyDefaultOnStreamEnd":false,"incompleteFallbackCcls":[],
@@ -528,6 +529,21 @@ class RealApiServiceTest {
     }
 
     @Test
+    void channelSettings_carryTheStreamTitle_andReadWithoutIt() {
+        respond(HttpMethod.GET, channel("enimaloc") + "/settings", SETTINGS_JSON.replace("}",
+                ",\"titleFeatureEnabled\":true,\"titleTemplate\":\"Playing {game}\",\"titleAvailable\":true}"));
+        assertThat(service.channelSettings("enimaloc"))
+                .extracting(UserSettingsDto::titleFeatureEnabled, UserSettingsDto::titleTemplate, UserSettingsDto::titleAvailable)
+                .containsExactly(true, "Playing {game}", true);
+
+        api.reset();
+        respond(HttpMethod.GET, channel("enimaloc") + "/settings", SETTINGS_JSON);
+        assertThat(service.channelSettings("enimaloc"))
+                .extracting(UserSettingsDto::titleFeatureEnabled, UserSettingsDto::titleAvailable)
+                .containsExactly(null, null);
+    }
+
+    @Test
     void currentBinding_isTheGamePlayedNows_nullOnNoContent() {
         respond(HttpMethod.GET, channel("enimaloc") + "/bindings/current", """
                 {"id":"b1","status":"AUTO","sourceType":"STEAM","sourceName":"Valheim","twitchGameId":"508455",
@@ -779,6 +795,18 @@ class RealApiServiceTest {
         api.reset();
         expectPut(channel("enimaloc") + "/settings/raid", "{\"restoreGameMinutes\":null}");
         service.saveRaidSettings("enimaloc", null);
+    }
+
+    @Test
+    void saveTitleSettings() {
+        expectPut(channel("enimaloc") + "/settings/title", "{\"enabled\":true,\"template\":\"Playing {game}\"}");
+        service.saveTitleSettings("enimaloc", true, "Playing {game}");
+    }
+
+    @Test
+    void bindingTitle() {
+        expectPut(channel("enimaloc") + "/bindings/b1/title", "{\"title\":\"{game} blind\"}");
+        service.bindingTitle("enimaloc", "b1", "{game} blind");
     }
 
     @Test

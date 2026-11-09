@@ -432,6 +432,28 @@ class ChannelActionsControllerTest {
     }
 
     @Test
+    void saveTitleSettings_callsApiServiceWithParsedBody() throws Exception {
+        when(apiService.saveTitleSettings("enimaloc", true, "Playing {game}")).thenReturn(204);
+
+        mvc.perform(post("/channel/enimaloc/settings/title").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\":true,\"template\":\"Playing {game}\"}"))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).saveTitleSettings("enimaloc", true, "Playing {game}");
+    }
+
+    @Test
+    void bindingTitle_passesCatapultApisGateOn() throws Exception {
+        when(apiService.bindingTitle("enimaloc", "b1", "{game} blind")).thenReturn(403);
+
+        mvc.perform(post("/channel/enimaloc/bindings/b1/title").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"{game} blind\"}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void saveRaidSettings_passesCatapultApisRefusalOn() throws Exception {
         when(apiService.saveRaidSettings("enimaloc", 500)).thenReturn(400);
 

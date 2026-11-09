@@ -212,7 +212,8 @@ public class MockData {
                 null, null, Set.of(), false, false, false,
                 null, null, Set.of(),
                 AVAILABLE_CCLS, config.settings.twFeatureEnabled, Set.copyOf(config.settings.blockedTws), AVAILABLE_TWS,
-                null, true);
+                // raid.restore-game and stream.title: the mock has no experiments, the settings are offered
+                null, true, List.of(), List.of(), false, null, true);
 
         MockConfig.Steam steam = config.steam;
         MockData data = new MockData(channel, List.of(binding), settings, List.of(),
@@ -360,6 +361,10 @@ public class MockData {
         updateBinding(bindingId, b -> BindingCopy.of(b).ignored(ignored).build());
     }
 
+    public void setBindingTitle(String bindingId, String title) {
+        updateBinding(bindingId, b -> BindingCopy.of(b).title(title).build());
+    }
+
     public void deleteBinding(String bindingId) {
         binding = binding.stream().filter(b -> !b.id().equals(bindingId)).toList();
     }
@@ -380,7 +385,7 @@ public class MockData {
 
     public void resetBinding(String bindingId) {
         updateBinding(bindingId, b -> BindingCopy.of(b).ignored(false).cclEnabled(true).twEnabled(true)
-                .tws(false, Set.of()).extensions(List.of()).build());
+                .tws(false, Set.of()).extensions(List.of()).title(null).build());
     }
 
     public void setBindingTwEnabled(String bindingId, boolean enabled) {
@@ -423,6 +428,10 @@ public class MockData {
 
     public void saveRaidSettings(Integer restoreGameMinutes) {
         userSettingsDto = SettingsCopy.of(userSettingsDto).raid(restoreGameMinutes).build();
+    }
+
+    public void saveTitleSettings(boolean enabled, String template) {
+        userSettingsDto = SettingsCopy.of(userSettingsDto).title(enabled, template).build();
     }
 
     public void saveIncompleteFallbackSettings(String twitchGameId, String twitchGameName, Set<String> ccls) {
@@ -670,6 +679,7 @@ public class MockData {
         private boolean twOverride;
         private Set<String> tws;
         private List<ExtensionSlotDto> extensions;
+        private String title;
 
         private BindingCopy(BindingDto from) {
             this.from = from;
@@ -682,6 +692,7 @@ public class MockData {
             this.twOverride = from.twOverride();
             this.tws = from.tws();
             this.extensions = from.extensions();
+            this.title = from.title();
         }
 
         static BindingCopy of(BindingDto from) {
@@ -725,9 +736,15 @@ public class MockData {
             return this;
         }
 
+        BindingCopy title(String title) {
+            this.title = title;
+            return this;
+        }
+
         BindingDto build() {
             return new BindingDto(from.id(), from.status(), from.sourceType(), from.sourceName(), twitchGameId,
-                    twitchGameName, ignored, cclEnabled, ccls, twEnabled, twOverride, tws, from.boxArtUrl(), extensions);
+                    twitchGameName, ignored, cclEnabled, ccls, twEnabled, twOverride, tws, from.boxArtUrl(), extensions,
+                    title);
         }
     }
 
@@ -750,6 +767,8 @@ public class MockData {
         private Integer raidMinutes;
         private List<ExtensionSlotDto> noGameExtensions;
         private List<ExtensionSlotDto> fallbackExtensions;
+        private boolean titleEnabled;
+        private String titleTemplate;
 
         private SettingsCopy(UserSettingsDto from) {
             this.from = from;
@@ -769,6 +788,8 @@ public class MockData {
             this.raidMinutes = from.raidRestoreGameMinutes();
             this.noGameExtensions = from.noGameExtensions();
             this.fallbackExtensions = from.incompleteFallbackExtensions();
+            this.titleEnabled = Boolean.TRUE.equals(from.titleFeatureEnabled());
+            this.titleTemplate = from.titleTemplate();
         }
 
         static SettingsCopy of(UserSettingsDto from) {
@@ -798,6 +819,12 @@ public class MockData {
             return this;
         }
 
+        SettingsCopy title(boolean enabled, String template) {
+            this.titleEnabled = enabled;
+            this.titleTemplate = template;
+            return this;
+        }
+
         SettingsCopy raid(Integer minutes) {
             this.raidMinutes = minutes;
             return this;
@@ -824,7 +851,8 @@ public class MockData {
             return new UserSettingsDto(cclEnabled, blockedCcls, noGameId, noGameName, noGameCcls,
                     applyOnStreamStart, applyOnNoGame, applyOnStreamEnd, fallbackId, fallbackName, fallbackCcls,
                     from.availableCcls(), twEnabled, blockedTws, from.availableTws(),
-                    raidMinutes, from.raidRestoreGameAvailable(), noGameExtensions, fallbackExtensions);
+                    raidMinutes, from.raidRestoreGameAvailable(), noGameExtensions, fallbackExtensions,
+                    titleEnabled, titleTemplate, from.titleAvailable());
         }
     }
 }

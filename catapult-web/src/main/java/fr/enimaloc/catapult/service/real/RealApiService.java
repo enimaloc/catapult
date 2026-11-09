@@ -84,10 +84,12 @@ import fr.enimaloc.catapult.common.dto.channel.ExtensionSlotDto;
 import fr.enimaloc.catapult.common.dto.channel.TwitchExtensionsDto;
 import fr.enimaloc.catapult.common.dto.channel.DtddProposalRequest;
 import fr.enimaloc.catapult.common.dto.channel.IgnoredToggleRequest;
+import fr.enimaloc.catapult.common.dto.channel.BindingTitleRequest;
 import fr.enimaloc.catapult.common.dto.channel.IncompleteFallbackRequest;
 import fr.enimaloc.catapult.common.dto.channel.NoGameSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.ObsSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.RaidSettingsRequest;
+import fr.enimaloc.catapult.common.dto.channel.TitleSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.TwitchatBranchRequest;
 import fr.enimaloc.catapult.common.dto.channel.SaveBody;
 import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
@@ -225,6 +227,12 @@ public class RealApiService implements ApiService {
     public int ignoredToggle(String username, String bindingId, boolean ignored) {
         return onChannel(username, id -> client.putVoid("/api/internal/users/{userId}/bindings/{bindingId}/ignored",
                 new IgnoredToggleRequest(ignored), id, bindingId), status -> status);
+    }
+
+    @Override
+    public int bindingTitle(String username, String bindingId, String title) {
+        return onChannel(username, id -> client.putVoid("/api/internal/users/{userId}/bindings/{bindingId}/title",
+                new BindingTitleRequest(title), id, bindingId), status -> status);
     }
 
     @Override
@@ -422,6 +430,12 @@ public class RealApiService implements ApiService {
     public int saveRaidSettings(String username, Integer restoreGameMinutes) {
         return onChannel(username, id -> client.putVoid("/api/internal/users/{userId}/settings/raid",
                 new RaidSettingsRequest(restoreGameMinutes), id), status -> status);
+    }
+
+    @Override
+    public int saveTitleSettings(String username, boolean enabled, String template) {
+        return onChannel(username, id -> client.putVoid("/api/internal/users/{userId}/settings/title",
+                new TitleSettingsRequest(enabled, template), id), status -> status);
     }
 
     @Override

@@ -81,6 +81,7 @@ import fr.enimaloc.catapult.common.twitchat.TwitchatPayloadValidator;
 import fr.enimaloc.catapult.event.BotStateChangedEvent;
 import fr.enimaloc.catapult.event.binding.BindingDeletedEvent;
 import fr.enimaloc.catapult.event.binding.BindingIgnoredStateEvent;
+import fr.enimaloc.catapult.event.binding.BindingTitleEvent;
 import fr.enimaloc.catapult.event.binding.BindingUpdatedEvent;
 import fr.enimaloc.catapult.event.binding.CclStateEvent;
 import fr.enimaloc.catapult.event.binding.GameChangedEvent;
@@ -342,6 +343,17 @@ public class MockApiService implements ApiService {
         return NO_CONTENT;
     }
 
+    /** Checked like catapult-api: at most 140 characters, blank for the channel-wide title. */
+    @Override
+    public int bindingTitle(String username, String bindingId, String title) {
+        log.trace("bindingTitle({}, {}, {})", username, bindingId, title);
+        String cleaned = title == null || title.isBlank() ? null : title.strip();
+        if (cleaned != null && cleaned.codePointCount(0, cleaned.length()) > 140) return 400;
+        currentData().setBindingTitle(bindingId, cleaned);
+        eventPublisher.publishEvent(new BindingTitleEvent(username, bindingId, cleaned == null ? "" : cleaned));
+        return NO_CONTENT;
+    }
+
     @Override
     public int deleteBinding(String username, String bindingId) {
         log.trace("deleteBinding({}, {})", username, bindingId);
@@ -598,6 +610,17 @@ public class MockApiService implements ApiService {
         log.trace("saveNoGameSettings({}, {}, {}, {}, {}, {}, {})", username, twitchGameId, twitchGameName,
                 ccls, applyOnStreamStart, applyOnNoGame, applyOnStreamEnd);
         currentData().saveNoGameSettings(twitchGameId, twitchGameName, ccls, applyOnStreamStart, applyOnNoGame, applyOnStreamEnd);
+        publishSettings(username);
+        return NO_CONTENT;
+    }
+
+    /** Checked like catapult-api: a template of at most 140 characters, blank for none. */
+    @Override
+    public int saveTitleSettings(String username, boolean enabled, String template) {
+        log.trace("saveTitleSettings({}, {}, {})", username, enabled, template);
+        String cleaned = template == null || template.isBlank() ? null : template.strip();
+        if (cleaned != null && cleaned.codePointCount(0, cleaned.length()) > 140) return 400;
+        currentData().saveTitleSettings(enabled, cleaned);
         publishSettings(username);
         return NO_CONTENT;
     }

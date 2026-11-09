@@ -1,6 +1,8 @@
 package fr.enimaloc.catapult.controller;
 
+import fr.enimaloc.catapult.common.dto.channel.BindingTitleRequest;
 import fr.enimaloc.catapult.common.dto.channel.CclSettingsRequest;
+import fr.enimaloc.catapult.common.dto.channel.TitleSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.CclToggleRequest;
 import fr.enimaloc.catapult.common.dto.channel.DeleteAccountRequest;
 import fr.enimaloc.catapult.common.dto.channel.ExtensionSlotDto;
@@ -74,6 +76,12 @@ public class ChannelActionsController {
     public ResponseEntity<Void> ignoredToggle(@PathVariable String username, @PathVariable String bindingId,
                                @RequestBody IgnoredToggleRequest body) {
         return ApiStatus.answer(apiService.ignoredToggle(username, bindingId, body.ignored()));
+    }
+
+    @PostMapping("/channel/{username}/bindings/{bindingId}/title")
+    public ResponseEntity<Void> bindingTitle(@PathVariable String username, @PathVariable String bindingId,
+                                             @RequestBody BindingTitleRequest body) {
+        return ApiStatus.answer(apiService.bindingTitle(username, bindingId, body.title()));
     }
 
     @PostMapping("/channel/{username}/bindings/{bindingId}/delete")
@@ -257,6 +265,11 @@ public class ChannelActionsController {
     @PostMapping("/channel/{username}/settings/raid")
     public ResponseEntity<Void> saveRaidSettings(@PathVariable String username, @RequestBody RaidSettingsRequest body) {
         return ApiStatus.answer(apiService.saveRaidSettings(username, body.restoreGameMinutes()));
+    }
+
+    @PostMapping("/channel/{username}/settings/title")
+    public ResponseEntity<Void> saveTitleSettings(@PathVariable String username, @RequestBody TitleSettingsRequest body) {
+        return ApiStatus.answer(apiService.saveTitleSettings(username, body.enabled(), body.template()));
     }
 
     @PostMapping("/channel/{username}/settings/incomplete-fallback")

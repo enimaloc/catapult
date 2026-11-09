@@ -59,6 +59,19 @@ window.CatapultSettings = (function () {
         }
     }
 
+    /** The title card set to the server's `title`, unless the visitor changed its switch or template. */
+    function applyTitle(title) {
+        const sw = byId("title-enabled-checkbox");
+        const field = byId("title-template-input");
+        check(sw, !!title.enabled);
+        if (field) {
+            const template = title.template ?? "";
+            if (field.value === template) dirty.delete(field);
+            else if (!dirty.has(field)) field.value = template;
+            field.disabled = !sw?.checked;
+        }
+    }
+
     /** The raid card set to the server's `minutes`, unless the visitor changed its switch or delay. */
     function applyRaid(minutes) {
         const sw = byId("raid-restore-enabled");
@@ -113,7 +126,7 @@ window.CatapultSettings = (function () {
     /** Sets every settings card to `settings` (ChannelEvents.Settings: one entry per card). */
     function apply(settings) {
         if (!settings || !byId("channel-ccl-settings-form")) return;
-        const { ccl, tw, noGame, incompleteFallback, raid } = settings;
+        const { ccl, tw, noGame, incompleteFallback, raid, title } = settings;
         if (ccl) {
             setChecked("ccl-enabled-checkbox", ccl.enabled);
             setGrid("channel-ccl-settings-form", "ccl-block-checkbox", ccl.blockedCcls);
@@ -135,6 +148,7 @@ window.CatapultSettings = (function () {
                 incompleteFallback.ccls);
         }
         if (raid) applyRaid(raid.restoreGameMinutes ?? null);
+        if (title) applyTitle(title);
     }
 
     function track(prefix, game) {
@@ -180,6 +194,16 @@ function bindSettings() {
         event.target.checked ? (byId("raid-restore-minutes")?.value || CatapultSettings.RAID_DEFAULT_MINUTES) : null));
     on("raid-settings-save-btn", "click", () => save("channel-raid-settings-form", `${baseUrl}/settings/raid`, {
         restoreGameMinutes: CatapultSettings.raidMinutes()
+    }));
+
+    // Only offered while the channel is in the stream.title experiment: absent otherwise. Off greys the template.
+    on("title-enabled-checkbox", "change", event => {
+        const field = byId("title-template-input");
+        if (field) field.disabled = !event.target.checked;
+    });
+    on("title-settings-save-btn", "click", () => save("channel-title-settings-form", `${baseUrl}/settings/title`, {
+        enabled: byId("title-enabled-checkbox").checked,
+        template: byId("title-template-input").value
     }));
 
     on("tw-settings-save-btn", "click", () => save("channel-tw-settings-form", `${baseUrl}/settings/tws`, {

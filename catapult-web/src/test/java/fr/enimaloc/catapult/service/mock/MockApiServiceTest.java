@@ -508,6 +508,34 @@ class MockApiServiceTest {
     }
 
     @Test
+    void titleSettings_areOfferedInMock_savedPerChannel_andToldAsAnEvent() {
+        assertThat(data.getUserSettings().titleAvailable()).isTrue();
+
+        assertThat(service.saveTitleSettings(username, true, "  Playing {game} ")).isEqualTo(204);
+        assertThat(data.getUserSettings().titleFeatureEnabled()).isTrue();
+        assertThat(data.getUserSettings().titleTemplate()).isEqualTo("Playing {game}");
+        var settings = ((fr.enimaloc.catapult.event.ChannelSettingsUpdatedEvent) events.getLast()).settings();
+        assertThat(settings.title()).isEqualTo(new fr.enimaloc.catapult.common.event.ChannelEvents.Settings.Title(
+                true, "Playing {game}"));
+
+        assertThat(service.saveTitleSettings(username, true, "x".repeat(141))).isEqualTo(400);
+        assertThat(data.getUserSettings().titleTemplate()).isEqualTo("Playing {game}");
+    }
+
+    @Test
+    void bindingTitle_isSaved_andToldAsAnEvent_blankBeingNone() {
+        assertThat(service.bindingTitle(username, bindingId, "{game} blind")).isEqualTo(204);
+        assertThat(binding().title()).isEqualTo("{game} blind");
+
+        service.bindingTitle(username, bindingId, "  ");
+        assertThat(binding().title()).isNull();
+        assertThat(events).containsExactly(
+                new fr.enimaloc.catapult.event.binding.BindingTitleEvent(username, bindingId, "{game} blind"),
+                new fr.enimaloc.catapult.event.binding.BindingTitleEvent(username, bindingId, ""));
+        assertThat(service.bindingTitle(username, bindingId, "x".repeat(141))).isEqualTo(400);
+    }
+
+    @Test
     void raidSettings_areOfferedInMock_savedPerChannel_andToldAsAnEvent() {
         assertThat(data.getUserSettings().raidRestoreGameAvailable()).isTrue();
 

@@ -26,12 +26,13 @@ public record UserSettingsDto(
         // The Twitch extension layouts of the two fallbacks (empty: they change nothing)
         List<ExtensionSlotDto> noGameExtensions,
         List<ExtensionSlotDto> incompleteFallbackExtensions,
-        // Off: Catapult never touches the stream title
-        boolean titleFeatureEnabled,
+        // Off: Catapult never touches the stream title. Boxed, like titleAvailable, so a catapult-api that predates
+        // them still reads (null: off, not offered) instead of failing as a missing primitive
+        Boolean titleFeatureEnabled,
         // The channel-wide title ({game}: the category's name); null: none
         String titleTemplate,
         // Whether the channel is offered the title setting at all (experiment stream.title)
-        boolean titleAvailable
+        Boolean titleAvailable
 ) {
     /** Settings without the stream title (off, and not offered). */
     public UserSettingsDto(boolean cclFeatureEnabled, Set<String> blockedCcls, String noGameTwitchGameId,

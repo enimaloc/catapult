@@ -179,6 +179,17 @@
                         <mdui-list class="binding-edit-game-results"></mdui-list>
                     </div>
 
+                    <!--/* Only while the channel is in the stream.title experiment; blank: the channel-wide title. */-->
+                    <div class="binding-title-panel"
+                         th:if="${channelSettings != null and channelSettings.titleAvailable() == true}">
+                        <mdui-text-field class="binding-title-input" variant="outlined" maxlength="140" counter
+                                         th:value="${b.title()}"
+                                         spa:value="value:BindingTitleEvent.title"
+                                         th:attr="label=#{channel.bindings.title.label},helper=#{channel.bindings.title.helper}"></mdui-text-field>
+                        <mdui-button class="binding-title-save-btn" variant="tonal"
+                                     th:text="#{channel.settings.save}">Enregistrer</mdui-button>
+                    </div>
+
                     <div class="binding-ccl-panel">
                         <label class="binding-toggle">
                             <mdui-switch class="binding-ccl-enabled"

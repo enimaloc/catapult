@@ -85,6 +85,10 @@ describe("channel-bindings", () => {
                       <input type="hidden" class="binding-edit-game-id" value="10">
                       <ul class="binding-edit-game-results"></ul>
                     </div>
+                    <div class="binding-title-panel">
+                      <input class="binding-title-input" value="{game} blind">
+                      <button class="binding-title-save-btn"></button>
+                    </div>
                     <div class="binding-ccl-panel">
                       <mdui-switch class="binding-ccl-enabled" data-post="ccl-toggle" data-key="enabled"></mdui-switch>
                       <input type="checkbox" class="binding-edit-ccl-checkbox" value="Drugs">
@@ -104,6 +108,17 @@ describe("channel-bindings", () => {
     });
 
     const row = selector => document.querySelector(`[data-binding-id=b1] ${selector}`);
+
+    it("saves the game's own title as typed, a blank one too", async () => {
+        await click("[data-binding-id=b1] .binding-title-save-btn");
+        row(".binding-title-input").value = "  ";
+        await click("[data-binding-id=b1] .binding-title-save-btn");
+
+        expect(posts()).toEqual([
+            ["/channel/enimaloc/bindings/b1/title", { title: "{game} blind" }],
+            ["/channel/enimaloc/bindings/b1/title", { title: "  " }]]);
+        expect(refreshed()).toBe(0);
+    });
 
     it("posts generic boolean switches to their data-post endpoint", async () => {
         toggle(row(".binding-ignored-toggle"), true);
@@ -663,6 +678,70 @@ describe("channel-settings raid card", () => {
         renderRaidCard({ card: false });
 
         expect(() => CatapultSettings.apply({ raid: { restoreGameMinutes: 10 } })).not.toThrow();
+    });
+});
+
+describe("channel-settings title card", () => {
+    const enabled = () => document.getElementById("title-enabled-checkbox");
+    const template = () => document.getElementById("title-template-input");
+
+    function renderTitleCard({ on = false, value = "", card = true } = {}) {
+        html(`
+            <div id="channel-ccl-settings-form"><button id="ccl-settings-save-btn"></button></div>
+            ${["no-game", "incomplete-fallback"].map(prefix => `
+              <div id="channel-${prefix}-settings-form">
+                <input id="${prefix}-game-input"><input type="hidden" id="${prefix}-game-id">
+                <ul id="${prefix}-game-results"></ul>
+              </div>`).join("")}
+            ${card ? `<div id="channel-title-settings-form">
+              <input type="checkbox" id="title-enabled-checkbox" ${on ? "checked" : ""}>
+              <input id="title-template-input" value="${value}" ${on ? "" : "disabled"}>
+              <button id="title-settings-save-btn"></button>
+            </div>` : ""}`);
+        render();
+    }
+
+    it("switching it on frees the template, and saves both", async () => {
+        renderTitleCard({ value: "Playing {game}" });
+
+        toggle(enabled(), true);
+        expect(template().disabled).toBe(false);
+        await click("#title-settings-save-btn");
+
+        expect(posts()).toEqual([["/channel/enimaloc/settings/title", { enabled: true, template: "Playing {game}" }]]);
+        expect(refreshed()).toBe(0);
+    });
+
+    it("switching it off greys the template out but keeps it", async () => {
+        renderTitleCard({ on: true, value: "Playing {game}" });
+
+        toggle(enabled(), false);
+        expect(template().disabled).toBe(true);
+        await click("#title-settings-save-btn");
+
+        expect(posts()).toEqual([["/channel/enimaloc/settings/title", { enabled: false, template: "Playing {game}" }]]);
+    });
+
+    it("follows the title settings saved elsewhere, keeping an unsaved template", async () => {
+        renderTitleCard();
+
+        CatapultSettings.apply({ title: { enabled: true, template: "Live {game}" } });
+        expect([enabled().checked, template().value, template().disabled]).toEqual([true, "Live {game}", false]);
+
+        template().value = "Mine";
+        template().dispatchEvent(new Event("input", { bubbles: true }));
+        CatapultSettings.apply({ title: { enabled: true, template: null } });
+        expect(template().value).toBe("Mine");
+
+        await click("#title-settings-save-btn");
+        CatapultSettings.apply({ title: { enabled: false, template: null } });
+        expect([enabled().checked, template().value, template().disabled]).toEqual([false, "", true]);
+    });
+
+    it("leaves pages without the card alone", () => {
+        renderTitleCard({ card: false });
+
+        expect(() => CatapultSettings.apply({ title: { enabled: true, template: "x" } })).not.toThrow();
     });
 });
 
