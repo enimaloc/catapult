@@ -12,6 +12,7 @@ import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
 import fr.enimaloc.catapult.service.account.BotToggleService;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
 import fr.enimaloc.catapult.service.notification.CatapultCategoryChangeStateService;
+import fr.enimaloc.catapult.service.title.StreamTitleService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -42,6 +43,7 @@ public class TwitchServiceImpl implements TwitchService {
     private final BotToggleService botToggleService;
     private final CatapultCategoryChangeStateService categoryChangeStateService;
     private final SiteRole siteRole;
+    private final StreamTitleService streamTitleService;
 
     public static final String CLIENT_ID = "Client-Id";
     public static final String AUTHORIZATION = "Authorization";
@@ -193,11 +195,12 @@ public class TwitchServiceImpl implements TwitchService {
             Set<String> blocked = (userSettings != null && binding.getId() != null) ? userSettings.getBlockedCcls() : Set.of();
             body.put("content_classification_labels", buildCclPayload(binding.getCcls(), blocked));
         }
+        streamTitleService.titleFor(user, userSettings, binding).ifPresent(title -> body.put("title", title));
 
         try {
             patchRefreshingTheToken(user, token, accessToken, body);
-            log.info("Twitch channel updated for user {} — game_id={}, ccls={}",
-                user.getId(), binding.getTwitchGameId(), binding.getCcls());
+            log.info("Twitch channel updated for user {} — game_id={}, ccls={}, title={}",
+                user.getId(), binding.getTwitchGameId(), binding.getCcls(), body.get("title"));
             // Marker only: the Twitchat notification is emitted once, from
             // TwitchEventSubService's channel.update handler, when Twitch confirms the change.
             categoryChangeStateService.recordCatapultChangeAndReturnPrevious(user, binding.getTwitchGameId());
@@ -335,6 +338,7 @@ public class TwitchServiceImpl implements TwitchService {
         if (settings.isCclFeatureEnabled() && !settings.getNoGameCcls().isEmpty()) {
             body.put("content_classification_labels", buildCclPayload(settings.getNoGameCcls(), Set.of()));
         }
+        streamTitleService.titleForNoGame(user, settings).ifPresent(title -> body.put("title", title));
         try {
             patchRefreshingTheToken(user, token, accessToken, body);
             log.info("Twitch channel reset to default for user {} — game_id={}, ccls={}",

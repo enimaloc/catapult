@@ -98,6 +98,10 @@ public class GameBinding {
     @Column(name = "tw")
     private Set<String> tws = new HashSet<>();
 
+    /** This game's own stream title, winning over the channel-wide one; null: the channel-wide one. */
+    @Column(length = 140)
+    private String title;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

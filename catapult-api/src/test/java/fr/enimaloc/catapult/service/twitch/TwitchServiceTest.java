@@ -12,6 +12,7 @@ import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.account.BotToggleService;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
 import fr.enimaloc.catapult.service.notification.CatapultCategoryChangeStateService;
+import fr.enimaloc.catapult.service.title.StreamTitleService;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.observation.DefaultMeterObservationHandler;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -71,6 +72,7 @@ class TwitchServiceTest {
     @Mock private RestClient.ResponseSpec getResponseSpec;
 
     @Mock private SiteRole siteRole;
+    @Mock private StreamTitleService streamTitleService;
     @InjectMocks private TwitchServiceImpl twitchService;
 
     private UserAccount user;
@@ -317,6 +319,41 @@ class TwitchServiceTest {
         assertThat(twitchService.resetToDefault(user)).isEqualTo(ChannelUpdateOutcome.SKIPPED);
 
         verify(restClient, never()).patch();
+    }
+
+    @Test
+    void updateChannel_sendsTheTitle_whenThereIsOne() {
+        GameBinding binding = binding(GameBinding.Status.AUTO, false, true, Set.of());
+        when(streamTitleService.titleFor(eq(user), any(), eq(binding))).thenReturn(Optional.of("Elden Ring tonight"));
+
+        twitchService.updateChannelReporting(user, binding);
+
+        ArgumentCaptor<Map> bodyCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(bodySpec).body(bodyCaptor.capture());
+        assertThat(bodyCaptor.getValue()).containsEntry("title", "Elden Ring tonight");
+    }
+
+    @Test
+    void updateChannel_leavesTheTitleAlone_whenThereIsNone() {
+        twitchService.updateChannelReporting(user, binding(GameBinding.Status.AUTO, false, true, Set.of()));
+
+        ArgumentCaptor<Map> bodyCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(bodySpec).body(bodyCaptor.capture());
+        assertThat(bodyCaptor.getValue()).doesNotContainKey("title");
+    }
+
+    @Test
+    void resetToDefault_sendsTheNoGameTitle_whenThereIsOne() {
+        UserSettings settings = new UserSettings();
+        settings.setNoGameTwitchGameId("12345");
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
+        when(streamTitleService.titleForNoGame(user, settings)).thenReturn(Optional.of("Just Chatting time"));
+
+        twitchService.resetToDefault(user);
+
+        ArgumentCaptor<Map> bodyCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(bodySpec).body(bodyCaptor.capture());
+        assertThat(bodyCaptor.getValue()).containsEntry("title", "Just Chatting time");
     }
 
     @Test

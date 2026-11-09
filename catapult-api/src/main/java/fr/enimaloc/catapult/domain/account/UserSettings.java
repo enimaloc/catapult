@@ -103,4 +103,12 @@ public class UserSettings {
      */
     @Column(name = "raid_restore_game_minutes")
     private Integer raidRestoreGameMinutes;
+
+    /** Off: Catapult never touches the stream title. */
+    @Column(name = "title_feature_enabled", nullable = false)
+    private boolean titleFeatureEnabled = false;
+
+    /** The title sent with the category ({@code {game}}: its name) when the game has none of its own; null: none. */
+    @Column(name = "title_template", length = 140)
+    private String titleTemplate;
 }

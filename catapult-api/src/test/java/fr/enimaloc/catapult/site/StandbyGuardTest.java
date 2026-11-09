@@ -76,7 +76,7 @@ class StandbyGuardTest {
 
     @Test
     void twitchChannelUpdateIsRefused() {
-        var service = new TwitchServiceImpl(null, null, null, restClient, null, null, null, null, null, siteRole);
+        var service = new TwitchServiceImpl(null, null, null, restClient, null, null, null, null, null, siteRole, null);
         assertThrows(StandbyException.class, () -> service.updateChannelReporting(user, new GameBinding()));
         assertThrows(StandbyException.class, () -> service.setCategory(user, "1", "g"));
         assertThrows(StandbyException.class, () -> service.resetToDefault(user));
