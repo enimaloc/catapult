@@ -46,9 +46,11 @@ public class TitlePreviewService {
      */
     @Transactional(readOnly = true)
     public Optional<String> preview(UserAccount user, TitlePreviewRequest request) {
-        String template = StreamTitleService.cleaned(request.template());
+        String typed = StreamTitleService.cleaned(request.template());
         UserSettings settings = userSettingsRepository.findById(user.getId()).orElseGet(UserSettings::new);
         String kind = request.kind() == null ? "TEMPLATE" : request.kind();
+        // An empty own title sends the channel-wide one, as StreamTitleService.titleFor does
+        String template = typed != null || "TEMPLATE".equals(kind) ? typed : settings.getTitleTemplate();
         boolean noGame = "NO_GAME".equals(kind);
         GameBinding binding = noGame ? null : bindingFor(user, settings, kind, request);
         Optional<String> lastSent = stateRepository.findById(user.getId()).map(StreamTitleState::getLastSentTitle);

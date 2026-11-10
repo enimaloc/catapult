@@ -123,6 +123,19 @@ class TitlePreviewServiceTest {
     }
 
     @Test
+    void anEmptyOwnTitle_isPreviewedAsTheOneThatWouldBeSent_theChannelWideOne() {
+        settings.setTitleTemplate("Live {{GAME}}");
+        settings.setNoGameTwitchGameName("Just Chatting");
+        GameBinding doom = binding("Doom", "DOOM");
+        when(bindings.findByIdAndUser(doom.getId(), user)).thenReturn(Optional.of(doom));
+
+        assertThat(preview("  ", "BINDING", doom.getId(), null)).contains("Live Doom");
+        assertThat(preview("", "INCOMPLETE", null, null)).contains("Live " + TitlePreviewService.EXAMPLE_GAME);
+        assertThat(preview(null, "NO_GAME", null, null)).contains("Live");
+        assertThat(preview("", "TEMPLATE", null, null)).as("the template itself has none behind it").isEmpty();
+    }
+
+    @Test
     void preview_refusesATextLongerThanATitle_beforeRenderingIt() {
         String deep = "{{HAS_GAME ? [[".repeat(5000) + "x" + "]] : [[]]}}".repeat(5000);
 
