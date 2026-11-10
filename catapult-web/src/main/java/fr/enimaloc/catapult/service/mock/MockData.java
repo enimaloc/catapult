@@ -434,6 +434,14 @@ public class MockData {
         userSettingsDto = SettingsCopy.of(userSettingsDto).title(enabled, template).build();
     }
 
+    public void saveNoGameTitle(String title) {
+        userSettingsDto = SettingsCopy.of(userSettingsDto).noGameTitle(title).build();
+    }
+
+    public void saveIncompleteFallbackTitle(String title) {
+        userSettingsDto = SettingsCopy.of(userSettingsDto).incompleteFallbackTitle(title).build();
+    }
+
     public void saveIncompleteFallbackSettings(String twitchGameId, String twitchGameName, Set<String> ccls) {
         userSettingsDto = SettingsCopy.of(userSettingsDto)
                 .incompleteFallback(twitchGameId, twitchGameName, Set.copyOf(ccls)).build();
@@ -769,6 +777,8 @@ public class MockData {
         private List<ExtensionSlotDto> fallbackExtensions;
         private boolean titleEnabled;
         private String titleTemplate;
+        private String noGameTitle;
+        private String incompleteFallbackTitle;
 
         private SettingsCopy(UserSettingsDto from) {
             this.from = from;
@@ -790,6 +800,8 @@ public class MockData {
             this.fallbackExtensions = from.incompleteFallbackExtensions();
             this.titleEnabled = Boolean.TRUE.equals(from.titleFeatureEnabled());
             this.titleTemplate = from.titleTemplate();
+            this.noGameTitle = from.noGameTitle();
+            this.incompleteFallbackTitle = from.incompleteFallbackTitle();
         }
 
         static SettingsCopy of(UserSettingsDto from) {
@@ -825,6 +837,16 @@ public class MockData {
             return this;
         }
 
+        SettingsCopy noGameTitle(String title) {
+            this.noGameTitle = title;
+            return this;
+        }
+
+        SettingsCopy incompleteFallbackTitle(String title) {
+            this.incompleteFallbackTitle = title;
+            return this;
+        }
+
         SettingsCopy raid(Integer minutes) {
             this.raidMinutes = minutes;
             return this;
@@ -852,7 +874,7 @@ public class MockData {
                     applyOnStreamStart, applyOnNoGame, applyOnStreamEnd, fallbackId, fallbackName, fallbackCcls,
                     from.availableCcls(), twEnabled, blockedTws, from.availableTws(),
                     raidMinutes, from.raidRestoreGameAvailable(), noGameExtensions, fallbackExtensions,
-                    titleEnabled, titleTemplate, from.titleAvailable());
+                    titleEnabled, titleTemplate, from.titleAvailable(), noGameTitle, incompleteFallbackTitle);
         }
     }
 }

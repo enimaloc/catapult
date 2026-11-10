@@ -102,6 +102,13 @@ public class GameBinding {
     @Column(length = 140)
     private String title;
 
+    /**
+     * What a title's {@code {{GAME}}} stands for on a transient binding (a fallback, a custom binding), never
+     * saved; null: the source name, the detected game's.
+     */
+    @Transient
+    private String gameName;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

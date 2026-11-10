@@ -48,6 +48,10 @@
                 ${settings.noGameTwitchGameId()}, ${settings.noGameTwitchGameName()})}"></th:block>
         <div th:replace="~{fragments/controls :: switchGrid(${settings.availableCcls()}, 'no-game-ccl-checkbox',
                 ${settings.noGameCcls()}, 'name')}"></div>
+        <!--/* Only while the channel is offered titles: without the field, a save leaves it as it is. */-->
+        <mdui-text-field th:if="${settings.titleAvailable() == true}" id="no-game-title-input" variant="outlined"
+                         maxlength="140" counter data-title-highlight th:value="${settings.noGameTitle()}"
+                         th:attr="label=#{channel.settings.fallback_title},helper=#{channel.settings.fallback_title_helper}"></mdui-text-field>
         <div class="settings-switch-grid settings-switch-group">
             <label th:replace="~{fragments/controls :: labelledSwitch('no-game-apply-start',
                     ${settings.applyDefaultOnStreamStart()}, 'channel.settings.no_game.apply_start', null)}"></label>
@@ -72,6 +76,10 @@
                 ${settings.incompleteFallbackTwitchGameId()}, ${settings.incompleteFallbackTwitchGameName()})}"></th:block>
         <div th:replace="~{fragments/controls :: switchGrid(${settings.availableCcls()},
                 'incomplete-fallback-ccl-checkbox', ${settings.incompleteFallbackCcls()}, 'name')}"></div>
+        <mdui-text-field th:if="${settings.titleAvailable() == true}" id="incomplete-fallback-title-input"
+                         variant="outlined" maxlength="140" counter data-title-highlight
+                         th:value="${settings.incompleteFallbackTitle()}"
+                         th:attr="label=#{channel.settings.fallback_title},helper=#{channel.settings.fallback_title_helper}"></mdui-text-field>
         <mdui-button id="incomplete-fallback-settings-save-btn" th:text="#{channel.settings.save}">Enregistrer</mdui-button>
         <th:block th:replace="~{fragments/extensions :: extensionLayout('incomplete-fallback',
                 @{/channel/{u}/settings/incomplete-fallback/extensions(u=${channelPage.channelUsername()})},

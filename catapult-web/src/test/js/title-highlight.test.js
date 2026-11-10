@@ -38,9 +38,11 @@ async function field(value, highlighted = true) {
 
 describe("segments", () => {
     it("cuts a title into its plain and variable parts", () => {
-        expect(window.CatapultTitleHighlight.segments("Live {{GAME}} | {{ORIGINAL_TITLE}}{{TITLE}}!")).toEqual([
+        expect(window.CatapultTitleHighlight.segments("Live {{GAME}} | {{CATEGORY}} | {{ORIGINAL_TITLE}}{{TITLE}}!")).toEqual([
             { text: "Live ", variable: false },
             { text: "{{GAME}}", variable: true },
+            { text: " | ", variable: false },
+            { text: "{{CATEGORY}}", variable: true },
             { text: " | ", variable: false },
             { text: "{{ORIGINAL_TITLE}}", variable: true },
             { text: "{{TITLE}}", variable: true },

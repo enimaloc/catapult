@@ -420,9 +420,11 @@ public class RealApiService implements ApiService {
 
     @Override
     public int saveNoGameSettings(String username, String twitchGameId, String twitchGameName, Set<String> ccls,
-                                    boolean applyOnStreamStart, boolean applyOnNoGame, boolean applyOnStreamEnd) {
+                                    boolean applyOnStreamStart, boolean applyOnNoGame, boolean applyOnStreamEnd,
+                                    String title) {
         return onChannel(username, id -> client.putVoid("/api/internal/users/{userId}/settings/no-game",
-                new NoGameSettingsRequest(twitchGameId, twitchGameName, ccls, applyOnStreamStart, applyOnNoGame, applyOnStreamEnd),
+                new NoGameSettingsRequest(twitchGameId, twitchGameName, ccls, applyOnStreamStart, applyOnNoGame,
+                        applyOnStreamEnd, title),
                 id), status -> status);
     }
 
@@ -439,9 +441,10 @@ public class RealApiService implements ApiService {
     }
 
     @Override
-    public int saveIncompleteFallbackSettings(String username, String twitchGameId, String twitchGameName, Set<String> ccls) {
+    public int saveIncompleteFallbackSettings(String username, String twitchGameId, String twitchGameName,
+                                              Set<String> ccls, String title) {
         return onChannel(username, id -> client.putVoid("/api/internal/users/{userId}/settings/incomplete-fallback",
-                new IncompleteFallbackRequest(twitchGameId, twitchGameName, ccls), id), status -> status);
+                new IncompleteFallbackRequest(twitchGameId, twitchGameName, ccls, title), id), status -> status);
     }
 
     @Override

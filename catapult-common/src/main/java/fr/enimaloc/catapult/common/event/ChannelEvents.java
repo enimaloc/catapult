@@ -136,7 +136,16 @@ public final class ChannelEvents {
         /** {@code restoreGameMinutes}: how recent a game an outgoing raid puts back; null when off. */
         public record Raid(Integer restoreGameMinutes) {}
 
-        /** {@code template}: the channel-wide stream title (its {{GAME}}/{{TITLE}} variables as typed), null when none. */
-        public record Title(boolean enabled, String template) {}
+        /**
+         * {@code template}: the channel-wide stream title (its variables as typed), {@code noGame} and
+         * {@code incompleteFallback} the fallbacks' own; each null when none.
+         */
+        public record Title(boolean enabled, String template, String noGame, String incompleteFallback) {
+
+            /** Without the fallbacks' own titles. */
+            public Title(boolean enabled, String template) {
+                this(enabled, template, null, null);
+            }
+        }
     }
 }

@@ -443,9 +443,9 @@ describe("channel-settings", () => {
             ["/channel/enimaloc/settings/tws", { enabled: false, blockedTws: ["flashing"] }],
             ["/channel/enimaloc/settings/no-game", {
                 twitchGameId: "509658", twitchGameName: "Just Chatting", ccls: ["Gore"],
-                applyOnStreamStart: true, applyOnNoGame: false, applyOnStreamEnd: true,
+                applyOnStreamStart: true, applyOnNoGame: false, applyOnStreamEnd: true, title: null,
             }],
-            ["/channel/enimaloc/settings/incomplete-fallback", { twitchGameId: null, twitchGameName: null, ccls: [] }],
+            ["/channel/enimaloc/settings/incomplete-fallback", { twitchGameId: null, twitchGameName: null, ccls: [], title: null }],
         ]);
         expect(refreshed()).toBe(0);
     });
@@ -507,9 +507,9 @@ describe("channel-settings", () => {
             ["/channel/enimaloc/settings/tws", { enabled: true, blockedTws: ["spiders"] }],
             ["/channel/enimaloc/settings/no-game", {
                 twitchGameId: "33214", twitchGameName: "Fortnite", ccls: [],
-                applyOnStreamStart: false, applyOnNoGame: true, applyOnStreamEnd: false,
+                applyOnStreamStart: false, applyOnNoGame: true, applyOnStreamEnd: false, title: null,
             }],
-            ["/channel/enimaloc/settings/incomplete-fallback", { twitchGameId: null, twitchGameName: null, ccls: ["Drugs"] }],
+            ["/channel/enimaloc/settings/incomplete-fallback", { twitchGameId: null, twitchGameName: null, ccls: ["Drugs"], title: null }],
         ]);
     });
 
@@ -736,6 +736,35 @@ describe("channel-settings title card", () => {
         await click("#title-settings-save-btn");
         CatapultSettings.apply({ title: { enabled: false, template: null } });
         expect([enabled().checked, template().value, template().disabled]).toEqual([false, "", true]);
+    });
+
+    it("follows the fallbacks' own titles saved elsewhere, and saves each with its card", async () => {
+        renderTitleCard();
+        document.getElementById("channel-no-game-settings-form").insertAdjacentHTML("beforeend", `
+            <input type="checkbox" id="no-game-apply-start"><input type="checkbox" id="no-game-apply-no-game">
+            <input type="checkbox" id="no-game-apply-end"><input id="no-game-title-input">
+            <button id="no-game-settings-save-btn"></button>`);
+        document.getElementById("channel-incomplete-fallback-settings-form").insertAdjacentHTML("beforeend", `
+            <input id="incomplete-fallback-title-input"><button id="incomplete-fallback-settings-save-btn"></button>`);
+        render();
+
+        CatapultSettings.apply({ title: { enabled: true, template: null, noGame: "Chatting", incompleteFallback: "{{GAME}} soon" } });
+        expect(document.getElementById("no-game-title-input").value).toBe("Chatting");
+        expect(document.getElementById("incomplete-fallback-title-input").value).toBe("{{GAME}} soon");
+
+        await click("#incomplete-fallback-settings-save-btn");
+        expect(posts().at(-1)[1].title).toBe("{{GAME}} soon");
+    });
+
+    it("leaves a fallback's title as it is when its card has no title field", async () => {
+        renderTitleCard({ card: false });
+        document.getElementById("channel-incomplete-fallback-settings-form").insertAdjacentHTML("beforeend",
+            `<button id="incomplete-fallback-settings-save-btn"></button>`);
+        render();
+
+        await click("#incomplete-fallback-settings-save-btn");
+
+        expect(posts().at(-1)[1].title).toBeNull();
     });
 
     it("leaves pages without the card alone", () => {

@@ -416,7 +416,7 @@ class ChannelActionsControllerTest {
                 .andExpect(status().isNoContent());
 
         verify(apiService).saveNoGameSettings("enimaloc", "509658", "Celeste",
-                java.util.Set.of("violent-graphic"), true, false, true);
+                java.util.Set.of("violent-graphic"), true, false, true, null);
     }
 
     @Test
@@ -464,6 +464,16 @@ class ChannelActionsControllerTest {
     }
 
     @Test
+    void saveIncompleteFallbackSettings_passesItsTitleOn() throws Exception {
+        mvc.perform(post("/channel/enimaloc/settings/incomplete-fallback").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"twitchGameId\":\"1\",\"twitchGameName\":\"Art\",\"ccls\":[],\"title\":\"{{GAME}}, soon\"}"))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).saveIncompleteFallbackSettings("enimaloc", "1", "Art", java.util.Set.of(), "{{GAME}}, soon");
+    }
+
+    @Test
     void saveIncompleteFallbackSettings_callsApiServiceWithParsedBody() throws Exception {
         mvc.perform(post("/channel/enimaloc/settings/incomplete-fallback").with(csrf())
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
@@ -471,7 +481,7 @@ class ChannelActionsControllerTest {
                 .andExpect(status().isNoContent());
 
         verify(apiService).saveIncompleteFallbackSettings("enimaloc", "509658", "Celeste",
-                java.util.Set.of("violent-graphic"));
+                java.util.Set.of("violent-graphic"), null);
     }
 
     @Test

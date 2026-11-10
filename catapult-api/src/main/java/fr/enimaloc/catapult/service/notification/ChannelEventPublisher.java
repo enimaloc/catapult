@@ -196,7 +196,8 @@ public class ChannelEventPublisher {
                 new ChannelEvents.Settings.IncompleteFallback(s.getIncompleteFallbackTwitchGameId(),
                         s.getIncompleteFallbackTwitchGameName(), Set.copyOf(s.getIncompleteFallbackCcls())),
                 new ChannelEvents.Settings.Raid(s.getRaidRestoreGameMinutes()),
-                new ChannelEvents.Settings.Title(s.isTitleFeatureEnabled(), s.getTitleTemplate()));
+                new ChannelEvents.Settings.Title(s.isTitleFeatureEnabled(), s.getTitleTemplate(), s.getNoGameTitle(),
+                        s.getIncompleteFallbackTitle()));
     }
 
     static ChannelEvents.SteamProfile toDto(SteamProfileDto p) {

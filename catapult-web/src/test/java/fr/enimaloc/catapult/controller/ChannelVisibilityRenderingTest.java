@@ -373,7 +373,8 @@ class ChannelVisibilityRenderingTest {
         assertThat(openingTagForId(offered, "title-enabled-checkbox")).contains("checked");
         assertThat(openingTagForId(offered, "title-template-input")).contains("value=\"Playing {{GAME}}\"", "maxlength=\"140\"")
                 .doesNotContain("disabled");
-        assertThat(offered).contains("value=\"{{GAME}} blind run\"", "data-value=\"value:BindingTitleEvent.title\"");
+        assertThat(offered).contains("value=\"{{GAME}} blind run\"", "data-value=\"value:BindingTitleEvent.title\"",
+                "id=\"no-game-title-input\"", "id=\"incomplete-fallback-title-input\"");
 
         // A catapult-api that predates the title: nothing of it shown
         when(apiService.channelSettings(any())).thenReturn(new UserSettingsDto(
@@ -384,7 +385,8 @@ class ChannelVisibilityRenderingTest {
                 .andReturn().getResponse().getContentAsString();
 
         assertThat(hidden).contains("id=\"channel-ccl-settings-form\"")
-                .doesNotContain("channel-title-settings-form", "binding-title-panel");
+                .doesNotContain("channel-title-settings-form", "binding-title-panel", "no-game-title-input",
+                        "incomplete-fallback-title-input");
     }
 
     @Test

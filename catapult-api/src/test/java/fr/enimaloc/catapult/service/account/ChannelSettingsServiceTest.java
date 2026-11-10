@@ -83,6 +83,27 @@ class ChannelSettingsServiceTest {
     }
 
     @Test
+    void fallbackTitles_savedWhenGivenAndOffered_keptOtherwise() {
+        when(streamTitle.isAvailableFor(channel)).thenReturn(true);
+        service.saveIncompleteFallback(channel, new fr.enimaloc.catapult.common.dto.channel.IncompleteFallbackRequest(
+                "1", "Art", Set.of(), " {{GAME}}, soon "));
+        assertThat(settings.getIncompleteFallbackTitle()).isEqualTo("{{GAME}}, soon");
+
+        service.saveIncompleteFallback(channel, new fr.enimaloc.catapult.common.dto.channel.IncompleteFallbackRequest(
+                "1", "Art", Set.of(), null));
+        assertThat(settings.getIncompleteFallbackTitle()).isEqualTo("{{GAME}}, soon");
+
+        service.saveIncompleteFallback(channel, new fr.enimaloc.catapult.common.dto.channel.IncompleteFallbackRequest(
+                "1", "Art", Set.of(), ""));
+        assertThat(settings.getIncompleteFallbackTitle()).isNull();
+
+        when(streamTitle.isAvailableFor(channel)).thenReturn(false);
+        service.saveIncompleteFallback(channel, new fr.enimaloc.catapult.common.dto.channel.IncompleteFallbackRequest(
+                "1", "Art", Set.of(), "Not offered"));
+        assertThat(settings.getIncompleteFallbackTitle()).isNull();
+    }
+
+    @Test
     void saveTitle_aBlankTemplateIsNone() {
         when(streamTitle.isAvailableFor(channel)).thenReturn(true);
         settings.setTitleTemplate("old");

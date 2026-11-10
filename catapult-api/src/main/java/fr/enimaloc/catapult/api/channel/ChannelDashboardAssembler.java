@@ -251,7 +251,9 @@ public class ChannelDashboardAssembler {
                 ExtensionSlotSetting.toDtos(settings.getIncompleteFallbackExtensionSlots()),
                 settings.isTitleFeatureEnabled(),
                 settings.getTitleTemplate(),
-                streamTitle.isAvailableFor(channel));
+                streamTitle.isAvailableFor(channel),
+                settings.getNoGameTitle(),
+                settings.getIncompleteFallbackTitle());
     }
 
     // --- DTDD mapping ----------------------------------------------------------------------------

@@ -57,8 +57,10 @@ class StreamTitleServiceTest {
         return () -> Optional.ofNullable(title);
     }
 
+    /** A detected game's binding, its category named as Twitch names the game. */
     private static GameBinding binding(String gameName, String title) {
         GameBinding binding = new GameBinding();
+        binding.setSourceName(gameName);
         binding.setTwitchGameName(gameName);
         binding.setTitle(title);
         return binding;
@@ -121,11 +123,36 @@ class StreamTitleServiceTest {
     }
 
     @Test
-    void theNoGameTitle_usesTheTemplateWithTheNoGameCategory() {
-        settings.setNoGameTwitchGameName("Just Chatting");
+    void gameIsTheGameDetected_categoryTheTwitchCategory() {
+        settings.setTitleTemplate("{{GAME}} in {{CATEGORY}}");
+        GameBinding binding = binding("Hades II", null);
+        binding.setSourceName("Hades II: Early Access");
 
+        assertThat(titleFor(binding, current("Old"))).contains("Hades II: Early Access in Hades II");
+    }
+
+    @Test
+    void aTransientBindingsGame_isTheOneItNames() {
+        settings.setTitleTemplate("{{GAME}}|{{CATEGORY}}");
+        GameBinding fallback = binding("Just Chatting", null);
+        fallback.setSourceName("incomplete-fallback");
+        fallback.setGameName("Some Indie Game");
+        assertThat(titleFor(fallback, current("Old"))).contains("Some Indie Game|Just Chatting");
+
+        fallback.setGameName("");
+        assertThat(titleFor(fallback, current("Old"))).contains("|Just Chatting");
+    }
+
+    @Test
+    void theNoGameTitle_isItsOwn_elseTheTemplate_withNoGame() {
+        settings.setNoGameTwitchGameName("Just Chatting");
+        settings.setTitleTemplate("Playing {{GAME}} in {{CATEGORY}}");
         assertThat(service.titleForNoGame(user, settings, current("Old")).map(PlannedTitle::title))
-                .contains("Playing Just Chatting with chat");
+                .contains("Playing  in Just Chatting");
+
+        settings.setNoGameTitle("Chatting in {{CATEGORY}}");
+        assertThat(service.titleForNoGame(user, settings, current("Old")).map(PlannedTitle::title))
+                .contains("Chatting in Just Chatting");
     }
 
     @Test
@@ -201,17 +228,17 @@ class StreamTitleServiceTest {
 
     @Test
     void render_onlyTheExactFormIsAVariable() {
-        assertThat(StreamTitleService.render("{{GAME}} {{game}} {{ GAME }} {GAME} $1", "Doom", Optional.empty(),
-                Optional.empty())).contains("Doom {{game}} {{ GAME }} {GAME} $1");
+        assertThat(StreamTitleService.render("{{GAME}} {{game}} {{ GAME }} {GAME} {{category}} $1", "Doom", "DOOM",
+                Optional.empty(), Optional.empty())).contains("Doom {{game}} {{ GAME }} {GAME} {{category}} $1");
     }
 
     @Test
     void render_cutsToTwitchsLimit_andNeverSendsAnEmptyTitle() {
         Optional<String> none = Optional.empty();
-        assertThat(StreamTitleService.render("x".repeat(150), "g", none, none))
+        assertThat(StreamTitleService.render("x".repeat(150), "g", "c", none, none))
                 .hasValueSatisfying(t -> assertThat(t).hasSize(140));
-        assertThat(StreamTitleService.render("  {{GAME}}  ", null, none, none)).isEmpty();
-        assertThat(StreamTitleService.render("🎮".repeat(141), "g", none, none))
+        assertThat(StreamTitleService.render("  {{GAME}}{{CATEGORY}}  ", null, null, none, none)).isEmpty();
+        assertThat(StreamTitleService.render("🎮".repeat(141), "g", "c", none, none))
                 .hasValueSatisfying(t -> assertThat(t.codePointCount(0, t.length())).isEqualTo(140));
     }
 

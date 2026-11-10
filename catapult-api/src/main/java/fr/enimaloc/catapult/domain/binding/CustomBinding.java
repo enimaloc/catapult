@@ -91,6 +91,7 @@ public class CustomBinding {
         applied.getExtensionSlots().addAll(extensionSlots);
         applied.getTws().addAll(tws);
         applied.setTitle(title);
+        applied.setGameName(name);
         return applied;
     }
 }

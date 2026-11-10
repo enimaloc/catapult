@@ -606,10 +606,13 @@ public class MockApiService implements ApiService {
 
     @Override
     public int saveNoGameSettings(String username, String twitchGameId, String twitchGameName, Set<String> ccls,
-                                    boolean applyOnStreamStart, boolean applyOnNoGame, boolean applyOnStreamEnd) {
-        log.trace("saveNoGameSettings({}, {}, {}, {}, {}, {}, {})", username, twitchGameId, twitchGameName,
-                ccls, applyOnStreamStart, applyOnNoGame, applyOnStreamEnd);
+                                    boolean applyOnStreamStart, boolean applyOnNoGame, boolean applyOnStreamEnd,
+                                    String title) {
+        log.trace("saveNoGameSettings({}, {}, {}, {}, {}, {}, {}, {})", username, twitchGameId, twitchGameName,
+                ccls, applyOnStreamStart, applyOnNoGame, applyOnStreamEnd, title);
+        if (!validTitle(title == null ? null : title.strip())) return 400;
         currentData().saveNoGameSettings(twitchGameId, twitchGameName, ccls, applyOnStreamStart, applyOnNoGame, applyOnStreamEnd);
+        if (title != null) currentData().saveNoGameTitle(title.isBlank() ? null : title.strip());
         publishSettings(username);
         return NO_CONTENT;
     }
@@ -643,9 +646,12 @@ public class MockApiService implements ApiService {
     }
 
     @Override
-    public int saveIncompleteFallbackSettings(String username, String twitchGameId, String twitchGameName, Set<String> ccls) {
-        log.trace("saveIncompleteFallbackSettings({}, {}, {}, {})", username, twitchGameId, twitchGameName, ccls);
+    public int saveIncompleteFallbackSettings(String username, String twitchGameId, String twitchGameName,
+                                              Set<String> ccls, String title) {
+        log.trace("saveIncompleteFallbackSettings({}, {}, {}, {}, {})", username, twitchGameId, twitchGameName, ccls, title);
+        if (!validTitle(title == null ? null : title.strip())) return 400;
         currentData().saveIncompleteFallbackSettings(twitchGameId, twitchGameName, ccls);
+        if (title != null) currentData().saveIncompleteFallbackTitle(title.isBlank() ? null : title.strip());
         publishSettings(username);
         return NO_CONTENT;
     }

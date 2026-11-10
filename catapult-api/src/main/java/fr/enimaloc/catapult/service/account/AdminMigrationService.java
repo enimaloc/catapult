@@ -60,6 +60,8 @@ public class AdminMigrationService {
         // Same for stream.title: the title is only sent once the target is in it
         tgt.setTitleFeatureEnabled(src.isTitleFeatureEnabled());
         tgt.setTitleTemplate(src.getTitleTemplate());
+        tgt.setNoGameTitle(src.getNoGameTitle());
+        tgt.setIncompleteFallbackTitle(src.getIncompleteFallbackTitle());
         userSettingsRepository.save(tgt);
     }
 

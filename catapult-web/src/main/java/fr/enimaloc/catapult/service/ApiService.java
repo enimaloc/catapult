@@ -124,9 +124,12 @@ public interface ApiService {
     BindingDto currentBinding(String username);
     /** The logged-in streamer's enabled chat commands, to move to another chat bot; empty on failure. */
     java.util.List<fr.enimaloc.catapult.common.dto.chatcommand.EnabledChatCommandDto> enabledChatCommands();
+    /** {@code title}: the stream title sent with it, null to leave it as it is, blank to clear it. */
     int saveNoGameSettings(String username, String twitchGameId, String twitchGameName, java.util.Set<String> ccls,
-                             boolean applyOnStreamStart, boolean applyOnNoGame, boolean applyOnStreamEnd);
-    int saveIncompleteFallbackSettings(String username, String twitchGameId, String twitchGameName, java.util.Set<String> ccls);
+                             boolean applyOnStreamStart, boolean applyOnNoGame, boolean applyOnStreamEnd, String title);
+    /** {@code title}: as the "no game" card's. */
+    int saveIncompleteFallbackSettings(String username, String twitchGameId, String twitchGameName,
+                                       java.util.Set<String> ccls, String title);
     /** How recent (1..120 minutes) a game an outgoing raid puts back, null or 0 for off; catapult-api's status, 502 when unreachable. */
     int saveRaidSettings(String username, Integer restoreGameMinutes);
     /** Whether Catapult sets the stream title, and the channel-wide template; catapult-api's status, 502 when unreachable. */

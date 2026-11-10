@@ -129,7 +129,7 @@ public class CategoryChain {
         return switch (trigger) {
             case GameDetected detected -> gameBinding(user, detected.binding(), true);
             case GameClosed closed -> gameClosed(user);
-            case NoGameAfterCustomBinding after -> noGameFallback(user);
+            case NoGameAfterCustomBinding after -> noGameFallback(user, null);
             case StreamStarted started -> streamStarted(user);
             case StreamEnded ended -> streamEnded(user);
             case BindingEdited edited -> bindingEdited(user, edited.binding());
@@ -304,7 +304,7 @@ public class CategoryChain {
             log.debug("Custom binding active for user {} — skipping no-game fallback", user.getId());
             return CategoryDecision.none(CategoryRule.CUSTOM_BINDING, Reason.CUSTOM_BINDING_ACTIVE);
         }
-        return noGameFallback(user);
+        return noGameFallback(user, null);
     }
 
     /**
@@ -319,12 +319,12 @@ public class CategoryChain {
 
         if (binding.isIgnored()) {
             log.debug("Binding is ignored — applying no-game fallback for user {}", user.getId());
-            return noGameFallback(user);
+            return noGameFallback(user, binding.getSourceName());
         }
 
         if (binding.getStatus() == GameBinding.Status.INCOMPLETE) {
             log.debug("Binding is INCOMPLETE — checking fallback for user {}", user.getId());
-            return incompleteFallback(user, pendingWhenOffline);
+            return incompleteFallback(user, binding.getSourceName(), pendingWhenOffline);
         }
 
         if (streamStateService.isLive(user)) {
@@ -335,8 +335,11 @@ public class CategoryChain {
         return CategoryDecision.storePending(CategoryRule.GAME_BINDING, binding);
     }
 
-    /** The usual "no game" category, applied when live and enabled in the streamer's settings. */
-    private CategoryDecision noGameFallback(UserAccount user) {
+    /**
+     * The usual "no game" category, applied when live and enabled in the streamer's settings; {@code gameName}: the
+     * game being played (an ignored one), null when none is.
+     */
+    private CategoryDecision noGameFallback(UserAccount user, String gameName) {
         if (!streamStateService.isLive(user)) {
             log.debug("User {} not live — skipping no-game fallback", user.getId());
             return CategoryDecision.none(CategoryRule.NO_GAME_FALLBACK, Reason.OFFLINE);
@@ -361,6 +364,8 @@ public class CategoryChain {
         fallbackBinding.setSourceName(NO_GAME_FALLBACK_SOURCE);
         fallbackBinding.setTwitchGameId(settings.getNoGameTwitchGameId());
         fallbackBinding.setTwitchGameName(settings.getNoGameTwitchGameName());
+        fallbackBinding.setTitle(settings.getNoGameTitle());
+        fallbackBinding.setGameName(gameName == null ? "" : gameName);
         // The configured "no game" CCLs, sent like the reset sends them: only when there are some (the channel's
         // CCLs are otherwise left as they are), under the same CCL feature switch (applied by the Twitch layer), and
         // without the blocklist (a transient binding)
@@ -376,8 +381,11 @@ public class CategoryChain {
         return CategoryDecision.update(CategoryRule.NO_GAME_FALLBACK, fallbackBinding);
     }
 
-    /** Nothing when no fallback is configured, or the stream is offline and nothing is kept pending. */
-    private CategoryDecision incompleteFallback(UserAccount user, boolean pendingWhenOffline) {
+    /**
+     * Nothing when no fallback is configured, or the stream is offline and nothing is kept pending; {@code gameName}:
+     * the game whose category isn't known yet.
+     */
+    private CategoryDecision incompleteFallback(UserAccount user, String gameName, boolean pendingWhenOffline) {
         Optional<UserSettings> found = userSettingsRepository.findById(user.getId());
         if (found.isEmpty()) return CategoryDecision.none(CategoryRule.INCOMPLETE_FALLBACK, Reason.NO_SETTINGS);
         UserSettings settings = found.get();
@@ -392,6 +400,8 @@ public class CategoryChain {
         fallback.setSourceName(INCOMPLETE_FALLBACK_SOURCE);
         fallback.setTwitchGameId(settings.getIncompleteFallbackTwitchGameId());
         fallback.setTwitchGameName(settings.getIncompleteFallbackTwitchGameName());
+        fallback.setTitle(settings.getIncompleteFallbackTitle());
+        fallback.setGameName(gameName);
         // Like the no-game fallback and the reset: CCLs are sent only when some are configured, otherwise the
         // channel's CCLs are left as they are
         fallback.getCcls().addAll(settings.getIncompleteFallbackCcls());

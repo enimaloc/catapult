@@ -492,8 +492,8 @@ class MockApiServiceTest {
     void settings_areSaved_eachSaveTellingTheirWholeState() {
         service.saveCclSettings(username, false, Set.of("Gore"));
         service.saveTwSettings(username, true, Set.of("spiders"));
-        service.saveNoGameSettings(username, "1", "Just Chatting", Set.of(), true, true, false);
-        service.saveIncompleteFallbackSettings(username, "2", "Other", Set.of("Drugs"));
+        service.saveNoGameSettings(username, "1", "Just Chatting", Set.of(), true, true, false, null);
+        service.saveIncompleteFallbackSettings(username, "2", "Other", Set.of("Drugs"), null);
 
         assertThat(data.getUserSettings().cclFeatureEnabled()).isFalse();
         assertThat(data.getUserSettings().twFeatureEnabled()).isTrue();
@@ -505,6 +505,25 @@ class MockApiServiceTest {
         assertThat(last.tw().enabled()).isTrue();
         assertThat(last.noGame().twitchGameName()).isEqualTo("Just Chatting");
         assertThat(last.incompleteFallback().ccls()).containsExactly("Drugs");
+    }
+
+    @Test
+    void fallbackTitles_keptWhenNull_clearedWhenBlank_likeCatapultApi() {
+        assertThat(service.saveIncompleteFallbackSettings(username, "2", "Other", Set.of(), " {{GAME}} soon ")).isEqualTo(204);
+        assertThat(data.getUserSettings().incompleteFallbackTitle()).isEqualTo("{{GAME}} soon");
+        service.saveIncompleteFallbackSettings(username, "2", "Other", Set.of(), null);
+        assertThat(data.getUserSettings().incompleteFallbackTitle()).isEqualTo("{{GAME}} soon");
+
+        service.saveNoGameSettings(username, "1", "Just Chatting", Set.of(), true, true, false, "Chatting");
+        assertThat(data.getUserSettings().noGameTitle()).isEqualTo("Chatting");
+        var settings = ((fr.enimaloc.catapult.event.ChannelSettingsUpdatedEvent) events.getLast()).settings();
+        assertThat(settings.title().noGame()).isEqualTo("Chatting");
+        assertThat(settings.title().incompleteFallback()).isEqualTo("{{GAME}} soon");
+
+        service.saveNoGameSettings(username, "1", "Just Chatting", Set.of(), true, true, false, "");
+        assertThat(data.getUserSettings().noGameTitle()).isNull();
+        assertThat(service.saveNoGameSettings(username, "1", "Just Chatting", Set.of(), true, true, false,
+                "x".repeat(141))).isEqualTo(400);
     }
 
     @Test

@@ -18,11 +18,12 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * The stream title sent with a category, behind experiment {@value #EXPERIMENT_KEY}: the game's own title, else the
- * channel-wide template. A template's variables are written {@code {{NAME}}} exactly: {@code {{GAME}}} the category's
- * name, {@code {{TITLE}}} the title the stream has just before the change, {@code {{ORIGINAL_TITLE}}} the one the
- * streamer set themselves, before Catapult changed it; anything else (another case, spaces, another name) stays as
- * typed. Nothing while the streamer hasn't turned it on, so their title is left alone.
+ * The stream title sent with a category, behind experiment {@value #EXPERIMENT_KEY}: the binding's own title (a
+ * game's, a custom binding's, a fallback's), else the channel-wide template. A template's variables are written
+ * {@code {{NAME}}} exactly: {@code {{GAME}}} the game detected (a custom binding's name, nothing without a game),
+ * {@code {{CATEGORY}}} the Twitch category's name, {@code {{TITLE}}} the title the stream has just before the change,
+ * {@code {{ORIGINAL_TITLE}}} the one the streamer set themselves, before Catapult changed it; anything else (another
+ * case, spaces, another name) stays as typed. Nothing while the streamer hasn't turned it on, so their title is left alone.
  */
 @Slf4j
 @Service
@@ -33,7 +34,7 @@ public class StreamTitleService {
     /** Twitch refuses a longer title. */
     public static final int MAX_LENGTH = 140;
 
-    private static final Pattern VARIABLE = Pattern.compile("\\{\\{(GAME|TITLE|ORIGINAL_TITLE)}}");
+    private static final Pattern VARIABLE = Pattern.compile("\\{\\{(GAME|CATEGORY|TITLE|ORIGINAL_TITLE)}}");
 
     private final ExperimentService experimentService;
     private final StreamTitleStateRepository stateRepository;
@@ -62,14 +63,16 @@ public class StreamTitleService {
                                            Supplier<Optional<String>> currentTitle) {
         if (!sendsTitles(user, settings)) return Optional.empty();
         String template = hasText(binding.getTitle()) ? binding.getTitle() : settings.getTitleTemplate();
-        return plan(user, template, binding.getTwitchGameName(), currentTitle);
+        String game = binding.getGameName() != null ? binding.getGameName() : binding.getSourceName();
+        return plan(user, template, game, binding.getTwitchGameName(), currentTitle);
     }
 
-    /** The title to send with the "no game" category, from the channel-wide template only. */
+    /** The title to send with the "no game" category (its own, else the channel-wide one), no game being played. */
     public Optional<PlannedTitle> titleForNoGame(UserAccount user, UserSettings settings,
                                                  Supplier<Optional<String>> currentTitle) {
         if (!sendsTitles(user, settings)) return Optional.empty();
-        return plan(user, settings.getTitleTemplate(), settings.getNoGameTwitchGameName(), currentTitle);
+        String template = hasText(settings.getNoGameTitle()) ? settings.getNoGameTitle() : settings.getTitleTemplate();
+        return plan(user, template, "", settings.getNoGameTwitchGameName(), currentTitle);
     }
 
     /**
@@ -90,7 +93,7 @@ public class StreamTitleService {
         }
     }
 
-    private Optional<PlannedTitle> plan(UserAccount user, String template, String gameName,
+    private Optional<PlannedTitle> plan(UserAccount user, String template, String gameName, String categoryName,
                                         Supplier<Optional<String>> currentTitle) {
         if (!hasText(template)) return Optional.empty();
         Optional<String> before = currentTitle.get();
@@ -99,21 +102,22 @@ public class StreamTitleService {
                 .filter(state -> current.equals(state.getLastSentTitle()) && state.getOriginalTitle() != null)
                 .map(StreamTitleState::getOriginalTitle)
                 .orElse(current));
-        return render(template, gameName, before, original).map(title -> new PlannedTitle(title, before));
+        return render(template, gameName, categoryName, before, original).map(title -> new PlannedTitle(title, before));
     }
 
     /**
      * {@code template} with its variables replaced, trimmed and cut to Twitch's limit; empty when blank, or when it
      * uses a title that couldn't be read (better left alone than half-rewritten).
      */
-    public static Optional<String> render(String template, String gameName, Optional<String> title,
-                                          Optional<String> originalTitle) {
+    public static Optional<String> render(String template, String gameName, String categoryName,
+                                          Optional<String> title, Optional<String> originalTitle) {
         if (!hasText(template)) return Optional.empty();
         Matcher variables = VARIABLE.matcher(template);
         StringBuilder rendered = new StringBuilder();
         while (variables.find()) {
             Optional<String> value = switch (variables.group(1)) {
                 case "GAME" -> Optional.of(gameName == null ? "" : gameName);
+                case "CATEGORY" -> Optional.of(categoryName == null ? "" : categoryName);
                 case "TITLE" -> title;
                 default -> originalTitle;
             };

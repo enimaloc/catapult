@@ -237,7 +237,7 @@ public class ChannelActionsController {
     @PostMapping("/channel/{username}/settings/no-game")
     public ResponseEntity<Void> saveNoGameSettings(@PathVariable String username, @RequestBody NoGameSettingsRequest body) {
         return ApiStatus.answer(apiService.saveNoGameSettings(username, body.twitchGameId(), body.twitchGameName(), body.ccls(),
-                body.applyOnStreamStart(), body.applyOnNoGame(), body.applyOnStreamEnd()));
+                body.applyOnStreamStart(), body.applyOnNoGame(), body.applyOnStreamEnd(), body.title()));
     }
 
     @GetMapping("/channel/{username}/twitch/extensions")
@@ -274,7 +274,8 @@ public class ChannelActionsController {
 
     @PostMapping("/channel/{username}/settings/incomplete-fallback")
     public ResponseEntity<Void> saveIncompleteFallbackSettings(@PathVariable String username, @RequestBody IncompleteFallbackRequest body) {
-        return ApiStatus.answer(apiService.saveIncompleteFallbackSettings(username, body.twitchGameId(), body.twitchGameName(), body.ccls()));
+        return ApiStatus.answer(apiService.saveIncompleteFallbackSettings(username, body.twitchGameId(),
+                body.twitchGameName(), body.ccls(), body.title()));
     }
 
     // Unlike the sibling channel endpoints above, the upstream ApiChannelDtddMappingController

@@ -736,8 +736,8 @@ class RealApiServiceTest {
     void saveNoGameSettings() {
         expectPut(channel("enimaloc") + "/settings/no-game", """
                 {"twitchGameId":"1","twitchGameName":"Just Chatting","ccls":[],
-                 "applyOnStreamStart":true,"applyOnNoGame":false,"applyOnStreamEnd":true}""");
-        service.saveNoGameSettings("enimaloc", "1", "Just Chatting", Set.of(), true, false, true);
+                 "applyOnStreamStart":true,"applyOnNoGame":false,"applyOnStreamEnd":true,"title":"Chatting"}""");
+        service.saveNoGameSettings("enimaloc", "1", "Just Chatting", Set.of(), true, false, true, "Chatting");
     }
 
     private static final List<fr.enimaloc.catapult.common.dto.channel.ExtensionSlotDto> SLOTS = List.of(
@@ -812,8 +812,8 @@ class RealApiServiceTest {
     @Test
     void saveIncompleteFallbackSettings() {
         expectPut(channel("enimaloc") + "/settings/incomplete-fallback",
-                "{\"twitchGameId\":null,\"twitchGameName\":null,\"ccls\":[\"Drugs\"]}");
-        service.saveIncompleteFallbackSettings("enimaloc", null, null, Set.of("Drugs"));
+                "{\"twitchGameId\":null,\"twitchGameName\":null,\"ccls\":[\"Drugs\"],\"title\":null}");
+        service.saveIncompleteFallbackSettings("enimaloc", null, null, Set.of("Drugs"), null);
     }
 
     @Test

@@ -59,8 +59,12 @@ public class ChannelSettingsService {
         channelEventPublisher.settingsUpdated(channel.getId(), settings);
     }
 
+    /** Its title only changes when given, and while the channel is offered titles (the card shows it then). */
     public void saveNoGame(UserAccount channel, NoGameSettingsRequest body) {
+        boolean titled = titled(channel, body.title());
+        String title = titled ? StreamTitleService.cleaned(body.title()) : null;
         UserSettings settings = settings(channel, s -> {
+            if (titled) s.setNoGameTitle(title);
             s.setNoGameTwitchGameId(body.twitchGameId());
             s.setNoGameTwitchGameName(body.twitchGameName());
             replace(s.getNoGameCcls(), body.ccls());
@@ -76,8 +80,12 @@ public class ChannelSettingsService {
         channelEventPublisher.settingsUpdated(channel.getId(), settings);
     }
 
+    /** Its title as the "no game" one's: only changed when given and offered. */
     public void saveIncompleteFallback(UserAccount channel, IncompleteFallbackRequest body) {
+        boolean titled = titled(channel, body.title());
+        String title = titled ? StreamTitleService.cleaned(body.title()) : null;
         UserSettings settings = settings(channel, s -> {
+            if (titled) s.setIncompleteFallbackTitle(title);
             s.setIncompleteFallbackTwitchGameId(body.twitchGameId());
             s.setIncompleteFallbackTwitchGameName(body.twitchGameName());
             replace(s.getIncompleteFallbackCcls(), body.ccls());
@@ -134,6 +142,11 @@ public class ChannelSettingsService {
             s.setTitleTemplate(template);
         });
         channelEventPublisher.settingsUpdated(channel.getId(), settings);
+    }
+
+    /** Whether a fallback's {@code title} is to be saved: given, and titles offered to the channel. */
+    private boolean titled(UserAccount channel, String title) {
+        return title != null && streamTitle.isAvailableFor(channel);
     }
 
     /** Loads the channel's settings (new ones when it has none), applies {@code changes} and saves them. */

@@ -59,17 +59,27 @@ window.CatapultSettings = (function () {
         }
     }
 
-    /** The title card set to the server's `title`, unless the visitor changed its switch or template. */
+    /** Sets text field `id` to `value` (empty for none), unless the visitor changed it (until it holds that again). */
+    function setText(id, value) {
+        const field = byId(id);
+        if (!field) return;
+        const text = value ?? "";
+        if (field.value === text) dirty.delete(field);
+        else if (!dirty.has(field)) field.value = text;
+    }
+
+    /**
+     * The titles set to the server's `title`, unless the visitor changed them: the title card's switch and template,
+     * and the fallback cards' own titles.
+     */
     function applyTitle(title) {
         const sw = byId("title-enabled-checkbox");
-        const field = byId("title-template-input");
         check(sw, !!title.enabled);
-        if (field) {
-            const template = title.template ?? "";
-            if (field.value === template) dirty.delete(field);
-            else if (!dirty.has(field)) field.value = template;
-            field.disabled = !sw?.checked;
-        }
+        setText("title-template-input", title.template);
+        const template = byId("title-template-input");
+        if (template) template.disabled = !sw?.checked;
+        setText("no-game-title-input", title.noGame);
+        setText("incomplete-fallback-title-input", title.incompleteFallback);
     }
 
     /** The raid card set to the server's `minutes`, unless the visitor changed its switch or delay. */
@@ -230,10 +240,14 @@ function bindSettings() {
         }));
     }
 
+    // A card's title field is there only while the channel is offered titles: without it, null leaves it as it is.
     attachDefaultGameCard("no-game", "no-game", () => ({
         applyOnStreamStart: byId("no-game-apply-start").checked,
         applyOnNoGame: byId("no-game-apply-no-game").checked,
-        applyOnStreamEnd: byId("no-game-apply-end").checked
+        applyOnStreamEnd: byId("no-game-apply-end").checked,
+        title: byId("no-game-title-input")?.value ?? null
     }));
-    attachDefaultGameCard("incomplete-fallback", "incomplete-fallback");
+    attachDefaultGameCard("incomplete-fallback", "incomplete-fallback", () => ({
+        title: byId("incomplete-fallback-title-input")?.value ?? null
+    }));
 }

@@ -1,6 +1,6 @@
 /**
- * Stream title fields (mdui-text-field[data-title-highlight]): the variables Catapult replaces, {{GAME}}, {{TITLE}}
- * and {{ORIGINAL_TITLE}} written exactly, shown in the primary color; anything else, another way of writing them
+ * Stream title fields (mdui-text-field[data-title-highlight]): the variables Catapult replaces, {{GAME}},
+ * {{CATEGORY}}, {{TITLE}} and {{ORIGINAL_TITLE}} written exactly, shown in the primary color; anything else, another way of writing them
  * included, as plain text, as it will be sent.
  *
  * An <input> can't color part of its text: the field's own text is made transparent (its caret, selection and
@@ -10,7 +10,7 @@
  * usual.
  */
 window.CatapultTitleHighlight = (function () {
-    const VARIABLE = /\{\{(?:GAME|TITLE|ORIGINAL_TITLE)}}/g;
+    const VARIABLE = /\{\{(?:GAME|CATEGORY|TITLE|ORIGINAL_TITLE)}}/g;
     const SELECTOR = "mdui-text-field[data-title-highlight]";
     // On the field itself: wired once, whichever copy of this script (a reloaded one) sees it
     const ATTACHED = Symbol.for("catapult.titleHighlight");

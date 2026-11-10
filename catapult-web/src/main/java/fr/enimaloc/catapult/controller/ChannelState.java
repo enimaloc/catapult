@@ -93,7 +93,8 @@ public final class ChannelState {
                 new ChannelEvents.Settings.IncompleteFallback(s.incompleteFallbackTwitchGameId(),
                         s.incompleteFallbackTwitchGameName(), s.incompleteFallbackCcls()),
                 new ChannelEvents.Settings.Raid(s.raidRestoreGameMinutes()),
-                new ChannelEvents.Settings.Title(Boolean.TRUE.equals(s.titleFeatureEnabled()), s.titleTemplate()));
+                new ChannelEvents.Settings.Title(Boolean.TRUE.equals(s.titleFeatureEnabled()), s.titleTemplate(),
+                        s.noGameTitle(), s.incompleteFallbackTitle()));
     }
 
     private static List<ChannelUpdatedEvent> steam(String login, SteamData steam) {
