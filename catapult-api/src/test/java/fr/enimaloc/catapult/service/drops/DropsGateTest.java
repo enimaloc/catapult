@@ -41,6 +41,21 @@ class DropsGateTest {
     }
 
     @Test
+    void theTitlesExperiments_onlyTakeTheChannelsStreamTitleEnabled_dropsTakeAnyone() {
+        for (Class<?> experiment : new Class<?>[]{StreamTitleConditionsExperiment.class, StreamTitlePreviewExperiment.class}) {
+            assertThat(experiment.getAnnotation(ExperimentSpec.class).rules())
+                    .as(experiment.getSimpleName())
+                    .anySatisfy(rule -> {
+                        assertThat(rule.type()).isEqualTo(fr.enimaloc.catapult.domain.experiment.ExperimentAssignmentRule.RuleType.EXPERIMENT);
+                        assertThat(rule.experiment()).isEqualTo(StreamTitleService.EXPERIMENT_KEY);
+                        assertThat(rule.variant()).isEqualTo("enabled");
+                    });
+        }
+        assertThat(DropsExperiment.class.getAnnotation(ExperimentSpec.class).rules())
+                .noneMatch(rule -> rule.type() == fr.enimaloc.catapult.domain.experiment.ExperimentAssignmentRule.RuleType.EXPERIMENT);
+    }
+
+    @Test
     void isAvailableFor_evaluatesTheGate() {
         when(experiments.evaluateGate(user, DropsGate.EXPERIMENT_KEY)).thenReturn(true);
         when(experiments.evaluateGate(user, StreamTitleService.PREVIEW_KEY)).thenReturn(true);
