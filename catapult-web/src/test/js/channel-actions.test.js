@@ -85,6 +85,10 @@ describe("channel-bindings", () => {
                       <input type="hidden" class="binding-edit-game-id" value="10">
                       <ul class="binding-edit-game-results"></ul>
                     </div>
+                    <div class="binding-title-panel">
+                      <input class="binding-title-input" value="{{GAME}} blind">
+                      <button class="binding-title-save-btn"></button>
+                    </div>
                     <div class="binding-ccl-panel">
                       <mdui-switch class="binding-ccl-enabled" data-post="ccl-toggle" data-key="enabled"></mdui-switch>
                       <input type="checkbox" class="binding-edit-ccl-checkbox" value="Drugs">
@@ -104,6 +108,17 @@ describe("channel-bindings", () => {
     });
 
     const row = selector => document.querySelector(`[data-binding-id=b1] ${selector}`);
+
+    it("saves the game's own title as typed, a blank one too", async () => {
+        await click("[data-binding-id=b1] .binding-title-save-btn");
+        row(".binding-title-input").value = "  ";
+        await click("[data-binding-id=b1] .binding-title-save-btn");
+
+        expect(posts()).toEqual([
+            ["/channel/enimaloc/bindings/b1/title", { title: "{{GAME}} blind" }],
+            ["/channel/enimaloc/bindings/b1/title", { title: "  " }]]);
+        expect(refreshed()).toBe(0);
+    });
 
     it("posts generic boolean switches to their data-post endpoint", async () => {
         toggle(row(".binding-ignored-toggle"), true);
@@ -428,9 +443,9 @@ describe("channel-settings", () => {
             ["/channel/enimaloc/settings/tws", { enabled: false, blockedTws: ["flashing"] }],
             ["/channel/enimaloc/settings/no-game", {
                 twitchGameId: "509658", twitchGameName: "Just Chatting", ccls: ["Gore"],
-                applyOnStreamStart: true, applyOnNoGame: false, applyOnStreamEnd: true,
+                applyOnStreamStart: true, applyOnNoGame: false, applyOnStreamEnd: true, title: null,
             }],
-            ["/channel/enimaloc/settings/incomplete-fallback", { twitchGameId: null, twitchGameName: null, ccls: [] }],
+            ["/channel/enimaloc/settings/incomplete-fallback", { twitchGameId: null, twitchGameName: null, ccls: [], title: null }],
         ]);
         expect(refreshed()).toBe(0);
     });
@@ -492,9 +507,9 @@ describe("channel-settings", () => {
             ["/channel/enimaloc/settings/tws", { enabled: true, blockedTws: ["spiders"] }],
             ["/channel/enimaloc/settings/no-game", {
                 twitchGameId: "33214", twitchGameName: "Fortnite", ccls: [],
-                applyOnStreamStart: false, applyOnNoGame: true, applyOnStreamEnd: false,
+                applyOnStreamStart: false, applyOnNoGame: true, applyOnStreamEnd: false, title: null,
             }],
-            ["/channel/enimaloc/settings/incomplete-fallback", { twitchGameId: null, twitchGameName: null, ccls: ["Drugs"] }],
+            ["/channel/enimaloc/settings/incomplete-fallback", { twitchGameId: null, twitchGameName: null, ccls: ["Drugs"], title: null }],
         ]);
     });
 
@@ -663,6 +678,99 @@ describe("channel-settings raid card", () => {
         renderRaidCard({ card: false });
 
         expect(() => CatapultSettings.apply({ raid: { restoreGameMinutes: 10 } })).not.toThrow();
+    });
+});
+
+describe("channel-settings title card", () => {
+    const enabled = () => document.getElementById("title-enabled-checkbox");
+    const template = () => document.getElementById("title-template-input");
+
+    function renderTitleCard({ on = false, value = "", card = true } = {}) {
+        html(`
+            <div id="channel-ccl-settings-form"><button id="ccl-settings-save-btn"></button></div>
+            ${["no-game", "incomplete-fallback"].map(prefix => `
+              <div id="channel-${prefix}-settings-form">
+                <input id="${prefix}-game-input"><input type="hidden" id="${prefix}-game-id">
+                <ul id="${prefix}-game-results"></ul>
+              </div>`).join("")}
+            ${card ? `<div id="channel-title-settings-form">
+              <input type="checkbox" id="title-enabled-checkbox" ${on ? "checked" : ""}>
+              <input id="title-template-input" value="${value}" ${on ? "" : "disabled"}>
+              <button id="title-settings-save-btn"></button>
+            </div>` : ""}`);
+        render();
+    }
+
+    it("switching it on frees the template, and saves both", async () => {
+        renderTitleCard({ value: "Playing {{GAME}}" });
+
+        toggle(enabled(), true);
+        expect(template().disabled).toBe(false);
+        await click("#title-settings-save-btn");
+
+        expect(posts()).toEqual([["/channel/enimaloc/settings/title", { enabled: true, template: "Playing {{GAME}}" }]]);
+        expect(refreshed()).toBe(0);
+    });
+
+    it("switching it off greys the template out but keeps it", async () => {
+        renderTitleCard({ on: true, value: "Playing {{GAME}}" });
+
+        toggle(enabled(), false);
+        expect(template().disabled).toBe(true);
+        await click("#title-settings-save-btn");
+
+        expect(posts()).toEqual([["/channel/enimaloc/settings/title", { enabled: false, template: "Playing {{GAME}}" }]]);
+    });
+
+    it("follows the title settings saved elsewhere, keeping an unsaved template", async () => {
+        renderTitleCard();
+
+        CatapultSettings.apply({ title: { enabled: true, template: "Live {{GAME}}" } });
+        expect([enabled().checked, template().value, template().disabled]).toEqual([true, "Live {{GAME}}", false]);
+
+        template().value = "Mine";
+        template().dispatchEvent(new Event("input", { bubbles: true }));
+        CatapultSettings.apply({ title: { enabled: true, template: null } });
+        expect(template().value).toBe("Mine");
+
+        await click("#title-settings-save-btn");
+        CatapultSettings.apply({ title: { enabled: false, template: null } });
+        expect([enabled().checked, template().value, template().disabled]).toEqual([false, "", true]);
+    });
+
+    it("follows the fallbacks' own titles saved elsewhere, and saves each with its card", async () => {
+        renderTitleCard();
+        document.getElementById("channel-no-game-settings-form").insertAdjacentHTML("beforeend", `
+            <input type="checkbox" id="no-game-apply-start"><input type="checkbox" id="no-game-apply-no-game">
+            <input type="checkbox" id="no-game-apply-end"><input id="no-game-title-input">
+            <button id="no-game-settings-save-btn"></button>`);
+        document.getElementById("channel-incomplete-fallback-settings-form").insertAdjacentHTML("beforeend", `
+            <input id="incomplete-fallback-title-input"><button id="incomplete-fallback-settings-save-btn"></button>`);
+        render();
+
+        CatapultSettings.apply({ title: { enabled: true, template: null, noGame: "Chatting", incompleteFallback: "{{GAME}} soon" } });
+        expect(document.getElementById("no-game-title-input").value).toBe("Chatting");
+        expect(document.getElementById("incomplete-fallback-title-input").value).toBe("{{GAME}} soon");
+
+        await click("#incomplete-fallback-settings-save-btn");
+        expect(posts().at(-1)[1].title).toBe("{{GAME}} soon");
+    });
+
+    it("leaves a fallback's title as it is when its card has no title field", async () => {
+        renderTitleCard({ card: false });
+        document.getElementById("channel-incomplete-fallback-settings-form").insertAdjacentHTML("beforeend",
+            `<button id="incomplete-fallback-settings-save-btn"></button>`);
+        render();
+
+        await click("#incomplete-fallback-settings-save-btn");
+
+        expect(posts().at(-1)[1].title).toBeNull();
+    });
+
+    it("leaves pages without the card alone", () => {
+        renderTitleCard({ card: false });
+
+        expect(() => CatapultSettings.apply({ title: { enabled: true, template: "x" } })).not.toThrow();
     });
 });
 

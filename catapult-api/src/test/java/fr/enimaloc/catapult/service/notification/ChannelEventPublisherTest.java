@@ -120,6 +120,8 @@ class ChannelEventPublisherTest {
         settings.getBlockedCcls().add("ccl1");
         settings.setNoGameTwitchGameName("Just Chatting");
         settings.setRaidRestoreGameMinutes(20);
+        settings.setTitleFeatureEnabled(true);
+        settings.setTitleTemplate("Playing {{GAME}}");
 
         publisher.settingsUpdated(ownerId, settings);
 
@@ -127,6 +129,7 @@ class ChannelEventPublisherTest {
         assertThat(payload.settings().ccl()).isEqualTo(new ChannelEvents.Settings.Ccl(true, Set.of("ccl1")));
         assertThat(payload.settings().noGame().twitchGameName()).isEqualTo("Just Chatting");
         assertThat(payload.settings().raid()).isEqualTo(new ChannelEvents.Settings.Raid(20));
+        assertThat(payload.settings().title()).isEqualTo(new ChannelEvents.Settings.Title(true, "Playing {{GAME}}"));
     }
 
     @Test
@@ -178,13 +181,15 @@ class ChannelEventPublisherTest {
         art.setCcls(new HashSet<>(Set.of("ProfanityVulgarity", "DrugsIntoxication")));
         art.setTws(new HashSet<>(Set.of("chill", "calm")));
         art.setUninterruptible(true);
+        art.setTitle("{{GAME}} doodles");
 
         publisher.customBindingsUpdated(ownerId, List.of(art), art.getId());
 
         assertThat(published(ChannelEvents.CUSTOM_BINDINGS_UPDATED)).isEqualTo(
                 new ChannelEvents.CustomBindingsUpdated(ownerId.toString(), "streamername", List.of(
                         new CustomBindingDto(art.getId(), "Art", "509660", "Art",
-                                List.of("DrugsIntoxication", "ProfanityVulgarity"), List.of("calm", "chill"), true)),
+                                List.of("DrugsIntoxication", "ProfanityVulgarity"), List.of("calm", "chill"), true,
+                                "{{GAME}} doodles")),
                         art.getId().toString()));
     }
 

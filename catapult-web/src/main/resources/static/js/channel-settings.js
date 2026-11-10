@@ -59,6 +59,29 @@ window.CatapultSettings = (function () {
         }
     }
 
+    /** Sets text field `id` to `value` (empty for none), unless the visitor changed it (until it holds that again). */
+    function setText(id, value) {
+        const field = byId(id);
+        if (!field) return;
+        const text = value ?? "";
+        if (field.value === text) dirty.delete(field);
+        else if (!dirty.has(field)) field.value = text;
+    }
+
+    /**
+     * The titles set to the server's `title`, unless the visitor changed them: the title card's switch and template,
+     * and the fallback cards' own titles.
+     */
+    function applyTitle(title) {
+        const sw = byId("title-enabled-checkbox");
+        check(sw, !!title.enabled);
+        setText("title-template-input", title.template);
+        const template = byId("title-template-input");
+        if (template) template.disabled = !sw?.checked;
+        setText("no-game-title-input", title.noGame);
+        setText("incomplete-fallback-title-input", title.incompleteFallback);
+    }
+
     /** The raid card set to the server's `minutes`, unless the visitor changed its switch or delay. */
     function applyRaid(minutes) {
         const sw = byId("raid-restore-enabled");
@@ -113,7 +136,7 @@ window.CatapultSettings = (function () {
     /** Sets every settings card to `settings` (ChannelEvents.Settings: one entry per card). */
     function apply(settings) {
         if (!settings || !byId("channel-ccl-settings-form")) return;
-        const { ccl, tw, noGame, incompleteFallback, raid } = settings;
+        const { ccl, tw, noGame, incompleteFallback, raid, title } = settings;
         if (ccl) {
             setChecked("ccl-enabled-checkbox", ccl.enabled);
             setGrid("channel-ccl-settings-form", "ccl-block-checkbox", ccl.blockedCcls);
@@ -135,6 +158,7 @@ window.CatapultSettings = (function () {
                 incompleteFallback.ccls);
         }
         if (raid) applyRaid(raid.restoreGameMinutes ?? null);
+        if (title) applyTitle(title);
     }
 
     function track(prefix, game) {
@@ -182,6 +206,16 @@ function bindSettings() {
         restoreGameMinutes: CatapultSettings.raidMinutes()
     }));
 
+    // Only offered while the channel is in the stream.title experiment: absent otherwise. Off greys the template.
+    on("title-enabled-checkbox", "change", event => {
+        const field = byId("title-template-input");
+        if (field) field.disabled = !event.target.checked;
+    });
+    on("title-settings-save-btn", "click", () => save("channel-title-settings-form", `${baseUrl}/settings/title`, {
+        enabled: byId("title-enabled-checkbox").checked,
+        template: byId("title-template-input").value
+    }));
+
     on("tw-settings-save-btn", "click", () => save("channel-tw-settings-form", `${baseUrl}/settings/tws`, {
         enabled: byId("tw-enabled-checkbox").checked,
         blockedTws: checkedValues(byId("channel-tw-settings-form"), ".tw-block-checkbox")
@@ -206,10 +240,14 @@ function bindSettings() {
         }));
     }
 
+    // A card's title field is there only while the channel is offered titles: without it, null leaves it as it is.
     attachDefaultGameCard("no-game", "no-game", () => ({
         applyOnStreamStart: byId("no-game-apply-start").checked,
         applyOnNoGame: byId("no-game-apply-no-game").checked,
-        applyOnStreamEnd: byId("no-game-apply-end").checked
+        applyOnStreamEnd: byId("no-game-apply-end").checked,
+        title: byId("no-game-title-input")?.value ?? null
     }));
-    attachDefaultGameCard("incomplete-fallback", "incomplete-fallback");
+    attachDefaultGameCard("incomplete-fallback", "incomplete-fallback", () => ({
+        title: byId("incomplete-fallback-title-input")?.value ?? null
+    }));
 }

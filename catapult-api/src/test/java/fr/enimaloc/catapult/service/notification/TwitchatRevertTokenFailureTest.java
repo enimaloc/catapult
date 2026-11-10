@@ -122,6 +122,7 @@ class TwitchatRevertTokenFailureTest {
     @MockitoBean StreamStateService streamStateService;
     @MockitoBean GameStateService gameStateService;
     @MockitoBean RaidRestoreGateService raidRestoreGateService;
+    @MockitoBean fr.enimaloc.catapult.service.title.StreamTitleService streamTitleService;
     @MockitoBean ExtensionLayoutApplier extensionLayoutApplier;
     @MockitoBean GameBindingLookup gameBindingLookup;
 

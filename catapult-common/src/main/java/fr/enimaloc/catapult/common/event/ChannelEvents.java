@@ -121,7 +121,8 @@ public final class ChannelEvents {
                                Long ttlMinutes, boolean hasPersonalToken, boolean tokenShared) {}
 
     /** A channel's settings, one record per settings panel. */
-    public record Settings(Ccl ccl, Tw tw, NoGame noGame, IncompleteFallback incompleteFallback, Raid raid) {
+    public record Settings(Ccl ccl, Tw tw, NoGame noGame, IncompleteFallback incompleteFallback, Raid raid,
+                           Title title) {
 
         public record Ccl(boolean enabled, Set<String> blockedCcls) {}
 
@@ -134,5 +135,17 @@ public final class ChannelEvents {
 
         /** {@code restoreGameMinutes}: how recent a game an outgoing raid puts back; null when off. */
         public record Raid(Integer restoreGameMinutes) {}
+
+        /**
+         * {@code template}: the channel-wide stream title (its variables as typed), {@code noGame} and
+         * {@code incompleteFallback} the fallbacks' own; each null when none.
+         */
+        public record Title(boolean enabled, String template, String noGame, String incompleteFallback) {
+
+            /** Without the fallbacks' own titles. */
+            public Title(boolean enabled, String template) {
+                this(enabled, template, null, null);
+            }
+        }
     }
 }

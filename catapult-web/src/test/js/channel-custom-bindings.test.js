@@ -346,7 +346,7 @@ describe("overview list: create, edit, delete", () => {
 
         expect(postJson).toHaveBeenCalledWith("/channel/enimaloc/custom-bindings", {
             name: "Musique", twitchGameId: "26936", twitchGameName: "Music",
-            ccls: ["Drugs"], tws: [], uninterruptible: true
+            ccls: ["Drugs"], tws: [], uninterruptible: true, title: null
         });
         expect(fresh().querySelector(".custom-binding-game-id").value).toBe("26936");
         expect(refresh).not.toHaveBeenCalled();
@@ -467,7 +467,7 @@ describe("overview list: create, edit, delete", () => {
 
         expect(postJson).toHaveBeenCalledWith(`/channel/enimaloc/custom-bindings/${ART}`, {
             name: "Dessin", twitchGameId: "509660", twitchGameName: "Art",
-            ccls: ["Violence"], tws: ["spoiler"], uninterruptible: false
+            ccls: ["Violence"], tws: ["spoiler"], uninterruptible: false, title: null
         });
         expect(refresh).not.toHaveBeenCalled();
     });
@@ -493,6 +493,22 @@ describe("overview list: create, edit, delete", () => {
         expect(refresh).not.toHaveBeenCalled();
     });
 
+    it("saves the title field's value when the row has one, blank too", async () => {
+        overview();
+        const row = item(ART);
+        row.querySelector(".custom-binding-uninterruptible").insertAdjacentHTML("afterend",
+            `<input class="custom-binding-title" value="{{GAME}} doodles">`);
+        postJson.mockResolvedValue(response(200, { binding: {}, reapplyOutcome: null }));
+
+        row.querySelector(".custom-binding-save").click();
+        await flush();
+        row.querySelector(".custom-binding-title").value = "";
+        row.querySelector(".custom-binding-save").click();
+        await flush();
+
+        expect(postJson.mock.calls.map(([, body]) => body.title)).toEqual(["{{GAME}} doodles", ""]);
+    });
+
     it("saves only the row's own switches", async () => {
         overview();
         postJson.mockResolvedValueOnce(response(200, { binding: {}, reapplyOutcome: "applied" }));
@@ -502,7 +518,7 @@ describe("overview list: create, edit, delete", () => {
 
         expect(postJson).toHaveBeenCalledWith(`/channel/enimaloc/custom-bindings/${DEV}`, {
             name: "Développement", twitchGameId: "1469308723", twitchGameName: "Software and Game Development",
-            ccls: [], tws: [], uninterruptible: true
+            ccls: [], tws: [], uninterruptible: true, title: null
         });
         expect(showError).not.toHaveBeenCalled();
     });

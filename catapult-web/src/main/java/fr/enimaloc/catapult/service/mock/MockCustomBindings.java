@@ -115,7 +115,7 @@ class MockCustomBindings {
         CustomBindingSave<CustomBindingDto> refused = refusal(request, null);
         if (refused != null) return refused;
         if (!premium && bindings.size() >= FREE_LIMIT) return new CustomBindingSave<>(409, null, ErrorCode.LIMIT_REACHED);
-        CustomBindingDto created = dto(UUID.randomUUID(), request);
+        CustomBindingDto created = dto(UUID.randomUUID(), request, null);
         bindings.add(created);
         return new CustomBindingSave<>(201, created, null);
     }
@@ -126,7 +126,7 @@ class MockCustomBindings {
         if (index < 0) return new CustomBindingSave<>(404, null, null);
         CustomBindingSave<CustomBindingSaveResult> refused = refusal(request, id);
         if (refused != null) return refused;
-        CustomBindingDto saved = dto(id, request);
+        CustomBindingDto saved = dto(id, request, bindings.get(index).title());
         bindings.set(index, saved);
         return new CustomBindingSave<>(200, new CustomBindingSaveResult(saved, id.equals(activeId) ? CustomBindingSaveResult.APPLIED : null), null);
     }
@@ -206,6 +206,9 @@ class MockCustomBindings {
         if (name.isEmpty() || name.length() > NAME_MAX || blank(request.twitchGameId()) || blank(request.twitchGameName())) {
             return new CustomBindingSave<>(400, null, ErrorCode.INVALID);
         }
+        if (request.title() != null && request.title().strip().codePointCount(0, request.title().strip().length()) > 140) {
+            return new CustomBindingSave<>(400, null, ErrorCode.INVALID);
+        }
         boolean taken = bindings.stream().anyMatch(b -> !b.id().equals(self) && b.name().toLowerCase(Locale.ROOT).equals(name.toLowerCase(Locale.ROOT)));
         return taken ? new CustomBindingSave<>(409, null, ErrorCode.NAME_TAKEN) : null;
     }
@@ -262,9 +265,11 @@ class MockCustomBindings {
         return value == null || value.isBlank();
     }
 
-    private static CustomBindingDto dto(UUID id, CustomBindingRequest request) {
+    /** {@code request} as saved, its title as catapult-api keeps it: null leaves {@code title}, blank clears it. */
+    private static CustomBindingDto dto(UUID id, CustomBindingRequest request, String title) {
+        String saved = request.title() == null ? title : request.title().isBlank() ? null : request.title().strip();
         return new CustomBindingDto(id, request.name().trim(), request.twitchGameId(), request.twitchGameName(),
-                sorted(request.ccls()), sorted(request.tws()), request.uninterruptible());
+                sorted(request.ccls()), sorted(request.tws()), request.uninterruptible(), saved);
     }
 
     private static List<String> sorted(java.util.Collection<String> values) {

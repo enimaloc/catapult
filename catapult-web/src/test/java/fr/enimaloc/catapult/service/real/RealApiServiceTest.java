@@ -125,6 +125,7 @@ class RealApiServiceTest {
         // api.verify() in the teardown, and the mock server refusing any request it did not expect: none was sent.
     }
 
+    // As a catapult-api that predates the stream title answers it: still read, the title off and not offered.
     private static final String SETTINGS_JSON = """
             {"cclFeatureEnabled":true,"blockedCcls":[],"noGameCcls":[],"applyDefaultOnStreamStart":false,
              "applyDefaultOnNoGame":false,"applyDefaultOnStreamEnd":false,"incompleteFallbackCcls":[],
@@ -528,6 +529,21 @@ class RealApiServiceTest {
     }
 
     @Test
+    void channelSettings_carryTheStreamTitle_andReadWithoutIt() {
+        respond(HttpMethod.GET, channel("enimaloc") + "/settings", SETTINGS_JSON.replace("}",
+                ",\"titleFeatureEnabled\":true,\"titleTemplate\":\"Playing {{GAME}}\",\"titleAvailable\":true}"));
+        assertThat(service.channelSettings("enimaloc"))
+                .extracting(UserSettingsDto::titleFeatureEnabled, UserSettingsDto::titleTemplate, UserSettingsDto::titleAvailable)
+                .containsExactly(true, "Playing {{GAME}}", true);
+
+        api.reset();
+        respond(HttpMethod.GET, channel("enimaloc") + "/settings", SETTINGS_JSON);
+        assertThat(service.channelSettings("enimaloc"))
+                .extracting(UserSettingsDto::titleFeatureEnabled, UserSettingsDto::titleAvailable)
+                .containsExactly(null, null);
+    }
+
+    @Test
     void currentBinding_isTheGamePlayedNows_nullOnNoContent() {
         respond(HttpMethod.GET, channel("enimaloc") + "/bindings/current", """
                 {"id":"b1","status":"AUTO","sourceType":"STEAM","sourceName":"Valheim","twitchGameId":"508455",
@@ -720,8 +736,8 @@ class RealApiServiceTest {
     void saveNoGameSettings() {
         expectPut(channel("enimaloc") + "/settings/no-game", """
                 {"twitchGameId":"1","twitchGameName":"Just Chatting","ccls":[],
-                 "applyOnStreamStart":true,"applyOnNoGame":false,"applyOnStreamEnd":true}""");
-        service.saveNoGameSettings("enimaloc", "1", "Just Chatting", Set.of(), true, false, true);
+                 "applyOnStreamStart":true,"applyOnNoGame":false,"applyOnStreamEnd":true,"title":"Chatting"}""");
+        service.saveNoGameSettings("enimaloc", "1", "Just Chatting", Set.of(), true, false, true, "Chatting");
     }
 
     private static final List<fr.enimaloc.catapult.common.dto.channel.ExtensionSlotDto> SLOTS = List.of(
@@ -782,10 +798,34 @@ class RealApiServiceTest {
     }
 
     @Test
+    void previewTitle_postsTheText_andReadsTheTitle() {
+        expect(HttpMethod.POST, channel("enimaloc") + "/title/preview")
+                .andExpect(content().json("{\"template\":\"Live {{GAME}}\",\"kind\":\"TEMPLATE\",\"bindingId\":null,\"customBindingId\":null}",
+                        org.springframework.test.json.JsonCompareMode.STRICT))
+                .andRespond(withSuccess("{\"title\":\"Live Doom\"}", MediaType.APPLICATION_JSON));
+
+        assertThat(service.previewTitle("enimaloc", new fr.enimaloc.catapult.common.dto.channel.TitlePreviewRequest(
+                "Live {{GAME}}", "TEMPLATE", null, null)))
+                .isEqualTo(new fr.enimaloc.catapult.common.dto.channel.TitlePreviewDto("Live Doom"));
+    }
+
+    @Test
+    void saveTitleSettings() {
+        expectPut(channel("enimaloc") + "/settings/title", "{\"enabled\":true,\"template\":\"Playing {{GAME}}\"}");
+        service.saveTitleSettings("enimaloc", true, "Playing {{GAME}}");
+    }
+
+    @Test
+    void bindingTitle() {
+        expectPut(channel("enimaloc") + "/bindings/b1/title", "{\"title\":\"{{GAME}} blind\"}");
+        service.bindingTitle("enimaloc", "b1", "{{GAME}} blind");
+    }
+
+    @Test
     void saveIncompleteFallbackSettings() {
         expectPut(channel("enimaloc") + "/settings/incomplete-fallback",
-                "{\"twitchGameId\":null,\"twitchGameName\":null,\"ccls\":[\"Drugs\"]}");
-        service.saveIncompleteFallbackSettings("enimaloc", null, null, Set.of("Drugs"));
+                "{\"twitchGameId\":null,\"twitchGameName\":null,\"ccls\":[\"Drugs\"],\"title\":null}");
+        service.saveIncompleteFallbackSettings("enimaloc", null, null, Set.of("Drugs"), null);
     }
 
     @Test

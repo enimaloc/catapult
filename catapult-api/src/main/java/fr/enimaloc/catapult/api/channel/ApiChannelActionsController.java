@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.api.channel;
 
 import fr.enimaloc.catapult.api.ApiPaths;
 import fr.enimaloc.catapult.api.ApiUserResolver;
+import fr.enimaloc.catapult.common.dto.channel.BindingTitleRequest;
 import fr.enimaloc.catapult.common.dto.channel.CclSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.CclToggleRequest;
 import fr.enimaloc.catapult.common.dto.channel.DeleteAccountRequest;
@@ -13,6 +14,7 @@ import fr.enimaloc.catapult.common.dto.channel.RaidSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.TwitchatBranchRequest;
 import fr.enimaloc.catapult.common.dto.channel.SteamTokenRequest;
 import fr.enimaloc.catapult.common.dto.channel.SteamTokenSharingRequest;
+import fr.enimaloc.catapult.common.dto.channel.TitleSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.TwSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.UpdateBindingRequest;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
@@ -28,6 +30,7 @@ import fr.enimaloc.catapult.service.account.ChannelAccountActions;
 import fr.enimaloc.catapult.service.account.ChannelSettingsService;
 import fr.enimaloc.catapult.service.binding.ChannelDashboardActions;
 import fr.enimaloc.catapult.service.binding.RaidRestoreGateService;
+import fr.enimaloc.catapult.service.title.StreamTitleService;
 import fr.enimaloc.catapult.service.notification.TwitchatEventActionService;
 import fr.enimaloc.catapult.service.notification.TwitchatEventDispatcher;
 import fr.enimaloc.catapult.service.notification.TwitchatWidgetSettingsService;
@@ -100,6 +103,18 @@ public class ApiChannelActionsController {
             @RequestBody IgnoredToggleRequest body) {
 
         dashboardActions.toggleIgnored(userResolver.user(userId), bindingId, body.ignored());
+    }
+
+    /** Blank or null: back to the channel-wide title; refused (403) outside the stream.title experiment. */
+    @PreAuthorize("@authz.canAccessChannel(#userId)")
+    @PutMapping("/bindings/{bindingId}/title")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void setBindingTitle(
+            @PathVariable UUID userId,
+            @PathVariable UUID bindingId,
+            @RequestBody BindingTitleRequest body) {
+
+        dashboardActions.setTitle(userResolver.user(userId), bindingId, body.title());
     }
 
     @PreAuthorize("@authz.canAccessChannel(#userId)")
@@ -292,6 +307,17 @@ public class ApiChannelActionsController {
             @RequestBody RaidSettingsRequest body) {
 
         settingsService.saveRaid(userResolver.user(userId), body);
+    }
+
+    /** Refused (403) while the channel isn't in the {@value StreamTitleService#EXPERIMENT_KEY} experiment. */
+    @PreAuthorize("@authz.canAccessChannel(#userId)")
+    @PutMapping("/settings/title")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void saveTitleSettings(
+            @PathVariable UUID userId,
+            @RequestBody TitleSettingsRequest body) {
+
+        settingsService.saveTitle(userResolver.user(userId), body);
     }
 
     @PreAuthorize("@authz.ownsChannel(#userId)")

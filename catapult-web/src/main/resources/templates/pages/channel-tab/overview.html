@@ -120,6 +120,11 @@
                                    th:classappend="${ch.filterSource() == platform.id().toUpperCase()} ? 'filter-active'"
                                    th:text="#{${platform.titleKey()}}">platform
             </mdui-segmented-button>
+            <mdui-segmented-button data-link th:if="${ch.drops() != null}"
+                                   th:href="@{/channel/{u}(u=${ch.channelUsername()},source='DROPS')}"
+                                   th:classappend="${ch.filterSource() == 'DROPS'} ? 'filter-active'"
+                                   th:text="#{channel.bindings.filter.drops}">Avec drops
+            </mdui-segmented-button>
         </mdui-segmented-button-group>
     </div>
 
@@ -148,6 +153,14 @@
                     <span class="binding-platform-chips" th:text="${b.sourceType()}"></span>
                     <!--/* MAPPED is an automatic binding whose category an admin mapping set. */-->
                     <span th:text="${b.status() == 'MAPPED' ? 'AUTO' : b.status()}"></span>
+                    <!--/* The drops campaign running for the channel on its category, while the drops experiment is open to it. */-->
+                    <th:block th:if="${ch.drops() != null}"
+                              th:with="drop=${b.twitchGameId() == null ? null : ch.drops()[b.twitchGameId()]}">
+                        <a th:if="${drop != null}" class="binding-drops-chip" th:href="${drop.detailsUrl()}"
+                           target="_blank" rel="noopener noreferrer"
+                           th:title="#{channel.bindings.drops.until(${drop.name()},${#temporals.format(drop.endAt(), 'dd/MM')})}"
+                           th:text="#{channel.bindings.drops}">Drops</a>
+                    </th:block>
                     <span class="binding-mapped-note" th:if="${b.status() == 'MAPPED'}"
                           th:text="#{binding.mapped}">Catégorie fixée par l'admin</span>
                 </mdui-list-item>
@@ -177,6 +190,20 @@
                                th:value="${b.twitchGameName()}"/>
                         <input type="hidden" class="binding-edit-game-id" th:value="${b.twitchGameId()}"/>
                         <mdui-list class="binding-edit-game-results"></mdui-list>
+                    </div>
+
+                    <!--/* Only while the channel is in the stream.title experiment; blank: the channel-wide title. */-->
+                    <div class="binding-title-panel"
+                         th:if="${channelSettings != null and channelSettings.titleAvailable() == true}">
+                        <mdui-text-field class="binding-title-input" variant="outlined" maxlength="140" counter data-title-highlight
+                                         th:value="${b.title()}"
+                                         spa:value="value:BindingTitleEvent.title"
+                                         th:attr="label=#{channel.bindings.title.label},helper=#{channel.bindings.title.helper}"></mdui-text-field>
+                        <p class="title-preview" data-title-preview th:if="${channelSettings != null and channelSettings.titlePreviewAvailable() == true}" data-preview-kind="BINDING" data-preview-lazy th:data-binding-id="${b.id()}"
+                           th:attr="data-none=#{channel.settings.stream_title.preview_none}"><span
+                                th:text="#{channel.settings.stream_title.preview}">Aperçu :</span> <span class="title-preview-text"></span></p>
+                        <mdui-button class="binding-title-save-btn" variant="tonal"
+                                     th:text="#{channel.settings.save}">Enregistrer</mdui-button>
                     </div>
 
                     <div class="binding-ccl-panel">
@@ -289,6 +316,14 @@
                               th:text="#{channel.custom_bindings.active}">Actif</span>
                         <span class="custom-binding-uninterruptible-chip" th:classappend="${b.uninterruptible()} ? '' : 'hidden'"
                               th:text="#{channel.custom_bindings.uninterruptible}">Ininterruptible</span>
+                        <!--/* The drops campaign running for the channel on its category, while the drops experiment is open to it. */-->
+                        <th:block th:if="${channelPage.drops() != null}"
+                                  th:with="drop=${b.twitchGameId() == null ? null : channelPage.drops()[b.twitchGameId()]}">
+                            <a th:if="${drop != null}" class="binding-drops-chip" th:href="${drop.detailsUrl()}"
+                               target="_blank" rel="noopener noreferrer"
+                               th:title="#{channel.bindings.drops.until(${drop.name()},${#temporals.format(drop.endAt(), 'dd/MM')})}"
+                               th:text="#{channel.bindings.drops}">Drops</a>
+                        </th:block>
                         <th:block th:replace="~{pages/channel-tab/overview :: customBindingRunButtons(${active})}"></th:block>
                     </mdui-list-item>
                     <mdui-list-item nonclickable>
@@ -356,6 +391,15 @@
                th:value="${b?.twitchGameName()}"/>
         <input type="hidden" class="custom-binding-game-id" th:value="${b?.twitchGameId()}"/>
         <mdui-list class="binding-edit-game-results custom-binding-game-results"></mdui-list>
+        <!--/* Only while the channel is in the stream.title experiment: without the field, a save leaves the title as
+             it is; blank: the channel-wide one. */-->
+        <mdui-text-field th:if="${channelSettings != null and channelSettings.titleAvailable() == true}"
+                         class="custom-binding-title" variant="outlined" maxlength="140" counter data-title-highlight
+                         th:value="${b?.title()}"
+                         th:attr="label=#{channel.custom_bindings.settings.title},helper=#{channel.bindings.title.helper}"></mdui-text-field>
+        <p class="title-preview" data-title-preview th:if="${channelSettings != null and channelSettings.titlePreviewAvailable() == true and channelSettings.titleAvailable() == true}" data-preview-kind="CUSTOM" data-preview-lazy th:data-custom-binding-id="${b?.id()}"
+           th:attr="data-none=#{channel.settings.stream_title.preview_none}"><span
+                th:text="#{channel.settings.stream_title.preview}">Aperçu :</span> <span class="title-preview-text"></span></p>
     </div>
 
     <div class="binding-ccl-panel">

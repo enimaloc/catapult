@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.common.dto.channel.CclSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.IncompleteFallbackRequest;
 import fr.enimaloc.catapult.common.dto.channel.NoGameSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.RaidSettingsRequest;
+import fr.enimaloc.catapult.common.dto.channel.TitleSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.TwSettingsRequest;
 import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.domain.account.UserAccount;
@@ -18,6 +19,7 @@ import fr.enimaloc.catapult.service.category.CategoryTrigger.NoGameSettingsSaved
 import fr.enimaloc.catapult.service.category.ExtensionLayoutApplier;
 import fr.enimaloc.catapult.service.debug.DebugContext;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
+import fr.enimaloc.catapult.service.title.StreamTitleService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -39,6 +41,7 @@ public class ChannelSettingsService {
     private final RaidRestoreGateService raidRestoreGate;
     private final ChannelEventPublisher channelEventPublisher;
     private final ExtensionLayoutApplier extensionLayoutApplier;
+    private final StreamTitleService streamTitle;
 
     public void saveCcl(UserAccount channel, CclSettingsRequest body) {
         UserSettings settings = settings(channel, s -> {
@@ -56,8 +59,12 @@ public class ChannelSettingsService {
         channelEventPublisher.settingsUpdated(channel.getId(), settings);
     }
 
+    /** Its title only changes when given, and while the channel is offered titles (the card shows it then). */
     public void saveNoGame(UserAccount channel, NoGameSettingsRequest body) {
+        boolean titled = titled(channel, body.title());
+        String title = titled ? StreamTitleService.cleaned(body.title()) : null;
         UserSettings settings = settings(channel, s -> {
+            if (titled) s.setNoGameTitle(title);
             s.setNoGameTwitchGameId(body.twitchGameId());
             s.setNoGameTwitchGameName(body.twitchGameName());
             replace(s.getNoGameCcls(), body.ccls());
@@ -73,8 +80,12 @@ public class ChannelSettingsService {
         channelEventPublisher.settingsUpdated(channel.getId(), settings);
     }
 
+    /** Its title as the "no game" one's: only changed when given and offered. */
     public void saveIncompleteFallback(UserAccount channel, IncompleteFallbackRequest body) {
+        boolean titled = titled(channel, body.title());
+        String title = titled ? StreamTitleService.cleaned(body.title()) : null;
         UserSettings settings = settings(channel, s -> {
+            if (titled) s.setIncompleteFallbackTitle(title);
             s.setIncompleteFallbackTwitchGameId(body.twitchGameId());
             s.setIncompleteFallbackTwitchGameName(body.twitchGameName());
             replace(s.getIncompleteFallbackCcls(), body.ccls());
@@ -115,6 +126,27 @@ public class ChannelSettingsService {
         UserSettings settings = settings(channel,
                 s -> s.setRaidRestoreGameMinutes(minutes == null || minutes == 0 ? null : minutes));
         channelEventPublisher.settingsUpdated(channel.getId(), settings);
+    }
+
+    /**
+     * Whether Catapult sets the title, and the channel-wide template (blank: none); sent with the next category
+     * change. Refused (403) while the channel isn't in the {@value StreamTitleService#EXPERIMENT_KEY} experiment.
+     */
+    public void saveTitle(UserAccount channel, TitleSettingsRequest body) {
+        if (!streamTitle.isAvailableFor(channel)) {
+            throw new ApiProblem(ErrorCode.FEATURE_DISABLED, "Title settings not available for this channel");
+        }
+        String template = StreamTitleService.cleaned(body.template());
+        UserSettings settings = settings(channel, s -> {
+            s.setTitleFeatureEnabled(body.enabled());
+            s.setTitleTemplate(template);
+        });
+        channelEventPublisher.settingsUpdated(channel.getId(), settings);
+    }
+
+    /** Whether a fallback's {@code title} is to be saved: given, and titles offered to the channel. */
+    private boolean titled(UserAccount channel, String title) {
+        return title != null && streamTitle.isAvailableFor(channel);
     }
 
     /** Loads the channel's settings (new ones when it has none), applies {@code changes} and saves them. */

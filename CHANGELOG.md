@@ -4,6 +4,24 @@ Toutes les versions publiées de Catapult, la plus récente en premier.
 
 Ce fichier est régénéré par le bot à chaque release à partir des notes des [GitHub Releases](https://github.com/enimaloc/catapult/releases) : pour corriger une entrée, modifie les notes de la release (ou le changelog de la PR de release avant sa publication), pas ce fichier.
 
+## [v1.0.1](https://github.com/enimaloc/catapult/releases/tag/v1.0.1) - 2026-11-10
+
+### Fixes
+- **api:** skip a detection cycle when Steam times out instead of reading it as no game (ad6b714)
+- merge steam detection timeout handling into dev (99aa7ab)
+
+### Other
+- **release:** merge the v1.0.0 backport into dev (494f7c7)
+
+## [v1.0.1-BETA.1](https://github.com/enimaloc/catapult/releases/tag/v1.0.1-BETA.1) - 2026-11-10
+
+### Fixes
+- **api:** skip a detection cycle when Steam times out instead of reading it as no game (ad6b714)
+- merge steam detection timeout handling into dev (99aa7ab)
+
+### Other
+- **release:** merge the v1.0.0 backport into dev (494f7c7)
+
 ## [v1.0.0](https://github.com/enimaloc/catapult/releases/tag/v1.0.0) - 2026-11-09
 
 ### Features

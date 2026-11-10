@@ -76,6 +76,8 @@ public interface ApiService {
     int recheckGame(String username);
     int cclToggle(String username, String bindingId, boolean enabled);
     int ignoredToggle(String username, String bindingId, boolean ignored);
+    /** A game's own stream title, blank for the channel-wide one; catapult-api's status (204, or 400/403/404). */
+    int bindingTitle(String username, String bindingId, String title);
     int deleteBinding(String username, String bindingId);
     Object searchGames(String username, String q);
     int updateBinding(String username, String bindingId, String twitchGameId, String twitchGameName, java.util.Set<String> ccls);
@@ -122,11 +124,19 @@ public interface ApiService {
     BindingDto currentBinding(String username);
     /** The logged-in streamer's enabled chat commands, to move to another chat bot; empty on failure. */
     java.util.List<fr.enimaloc.catapult.common.dto.chatcommand.EnabledChatCommandDto> enabledChatCommands();
+    /** {@code title}: the stream title sent with it, null to leave it as it is, blank to clear it. */
     int saveNoGameSettings(String username, String twitchGameId, String twitchGameName, java.util.Set<String> ccls,
-                             boolean applyOnStreamStart, boolean applyOnNoGame, boolean applyOnStreamEnd);
-    int saveIncompleteFallbackSettings(String username, String twitchGameId, String twitchGameName, java.util.Set<String> ccls);
+                             boolean applyOnStreamStart, boolean applyOnNoGame, boolean applyOnStreamEnd, String title);
+    /** {@code title}: as the "no game" card's. */
+    int saveIncompleteFallbackSettings(String username, String twitchGameId, String twitchGameName,
+                                       java.util.Set<String> ccls, String title);
     /** How recent (1..120 minutes) a game an outgoing raid puts back, null or 0 for off; catapult-api's status, 502 when unreachable. */
     int saveRaidSettings(String username, Integer restoreGameMinutes);
+    /** A title field's text as it would be sent now; null when catapult-api refuses or can't be reached. */
+    fr.enimaloc.catapult.common.dto.channel.TitlePreviewDto previewTitle(String username,
+            fr.enimaloc.catapult.common.dto.channel.TitlePreviewRequest request);
+    /** Whether Catapult sets the stream title, and the channel-wide template; catapult-api's status, 502 when unreachable. */
+    int saveTitleSettings(String username, boolean enabled, String template);
     /** The channel's installed and active Twitch extensions, for the layout menus; empty on failure. */
     fr.enimaloc.catapult.common.dto.channel.TwitchExtensionsDto twitchExtensions(String username);
     /** Saves a game binding's extension layout (empty: keep); catapult-api's status (204, or 400/403/404). */

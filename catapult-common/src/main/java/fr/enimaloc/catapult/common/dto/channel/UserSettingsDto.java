@@ -25,9 +25,74 @@ public record UserSettingsDto(
         boolean raidRestoreGameAvailable,
         // The Twitch extension layouts of the two fallbacks (empty: they change nothing)
         List<ExtensionSlotDto> noGameExtensions,
-        List<ExtensionSlotDto> incompleteFallbackExtensions
+        List<ExtensionSlotDto> incompleteFallbackExtensions,
+        // Off: Catapult never touches the stream title. Boxed, like titleAvailable, so a catapult-api that predates
+        // them still reads (null: off, not offered) instead of failing as a missing primitive
+        Boolean titleFeatureEnabled,
+        // The channel-wide title ({{GAME}}: the category's name, {{TITLE}}: the title before); null: none
+        String titleTemplate,
+        // Whether the channel is offered the title setting at all (experiment stream.title)
+        Boolean titleAvailable,
+        // The titles sent with the two fallbacks' categories; null: the channel-wide one
+        String noGameTitle,
+        String incompleteFallbackTitle,
+        // Whether the title fields get their preview (experiment stream.title.preview); null: not offered
+        Boolean titlePreviewAvailable
 ) {
-    /** Settings without extension layouts. */
+    /** Settings without the title's preview. */
+    public UserSettingsDto(boolean cclFeatureEnabled, Set<String> blockedCcls, String noGameTwitchGameId,
+                           String noGameTwitchGameName, Set<String> noGameCcls, boolean applyDefaultOnStreamStart,
+                           boolean applyDefaultOnNoGame, boolean applyDefaultOnStreamEnd,
+                           String incompleteFallbackTwitchGameId, String incompleteFallbackTwitchGameName,
+                           Set<String> incompleteFallbackCcls, List<CclDto> availableCcls, boolean twFeatureEnabled,
+                           Set<String> blockedTws, List<TwDto> availableTws, Integer raidRestoreGameMinutes,
+                           boolean raidRestoreGameAvailable, List<ExtensionSlotDto> noGameExtensions,
+                           List<ExtensionSlotDto> incompleteFallbackExtensions, Boolean titleFeatureEnabled,
+                           String titleTemplate, Boolean titleAvailable, String noGameTitle,
+                           String incompleteFallbackTitle) {
+        this(cclFeatureEnabled, blockedCcls, noGameTwitchGameId, noGameTwitchGameName, noGameCcls,
+                applyDefaultOnStreamStart, applyDefaultOnNoGame, applyDefaultOnStreamEnd,
+                incompleteFallbackTwitchGameId, incompleteFallbackTwitchGameName, incompleteFallbackCcls,
+                availableCcls, twFeatureEnabled, blockedTws, availableTws, raidRestoreGameMinutes,
+                raidRestoreGameAvailable, noGameExtensions, incompleteFallbackExtensions, titleFeatureEnabled,
+                titleTemplate, titleAvailable, noGameTitle, incompleteFallbackTitle, null);
+    }
+
+    /** Settings without the fallbacks' own titles. */
+    public UserSettingsDto(boolean cclFeatureEnabled, Set<String> blockedCcls, String noGameTwitchGameId,
+                           String noGameTwitchGameName, Set<String> noGameCcls, boolean applyDefaultOnStreamStart,
+                           boolean applyDefaultOnNoGame, boolean applyDefaultOnStreamEnd,
+                           String incompleteFallbackTwitchGameId, String incompleteFallbackTwitchGameName,
+                           Set<String> incompleteFallbackCcls, List<CclDto> availableCcls, boolean twFeatureEnabled,
+                           Set<String> blockedTws, List<TwDto> availableTws, Integer raidRestoreGameMinutes,
+                           boolean raidRestoreGameAvailable, List<ExtensionSlotDto> noGameExtensions,
+                           List<ExtensionSlotDto> incompleteFallbackExtensions, Boolean titleFeatureEnabled,
+                           String titleTemplate, Boolean titleAvailable) {
+        this(cclFeatureEnabled, blockedCcls, noGameTwitchGameId, noGameTwitchGameName, noGameCcls,
+                applyDefaultOnStreamStart, applyDefaultOnNoGame, applyDefaultOnStreamEnd,
+                incompleteFallbackTwitchGameId, incompleteFallbackTwitchGameName, incompleteFallbackCcls,
+                availableCcls, twFeatureEnabled, blockedTws, availableTws, raidRestoreGameMinutes,
+                raidRestoreGameAvailable, noGameExtensions, incompleteFallbackExtensions, titleFeatureEnabled,
+                titleTemplate, titleAvailable, null, null, null);
+    }
+
+    /** Settings without the stream title (off, and not offered). */
+    public UserSettingsDto(boolean cclFeatureEnabled, Set<String> blockedCcls, String noGameTwitchGameId,
+                           String noGameTwitchGameName, Set<String> noGameCcls, boolean applyDefaultOnStreamStart,
+                           boolean applyDefaultOnNoGame, boolean applyDefaultOnStreamEnd,
+                           String incompleteFallbackTwitchGameId, String incompleteFallbackTwitchGameName,
+                           Set<String> incompleteFallbackCcls, List<CclDto> availableCcls, boolean twFeatureEnabled,
+                           Set<String> blockedTws, List<TwDto> availableTws, Integer raidRestoreGameMinutes,
+                           boolean raidRestoreGameAvailable, List<ExtensionSlotDto> noGameExtensions,
+                           List<ExtensionSlotDto> incompleteFallbackExtensions) {
+        this(cclFeatureEnabled, blockedCcls, noGameTwitchGameId, noGameTwitchGameName, noGameCcls,
+                applyDefaultOnStreamStart, applyDefaultOnNoGame, applyDefaultOnStreamEnd,
+                incompleteFallbackTwitchGameId, incompleteFallbackTwitchGameName, incompleteFallbackCcls,
+                availableCcls, twFeatureEnabled, blockedTws, availableTws, raidRestoreGameMinutes,
+                raidRestoreGameAvailable, noGameExtensions, incompleteFallbackExtensions, false, null, false, null, null);
+    }
+
+    /** Settings without extension layouts nor the stream title. */
     public UserSettingsDto(boolean cclFeatureEnabled, Set<String> blockedCcls, String noGameTwitchGameId,
                            String noGameTwitchGameName, Set<String> noGameCcls, boolean applyDefaultOnStreamStart,
                            boolean applyDefaultOnNoGame, boolean applyDefaultOnStreamEnd,

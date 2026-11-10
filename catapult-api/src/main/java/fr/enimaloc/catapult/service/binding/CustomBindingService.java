@@ -25,6 +25,7 @@ import fr.enimaloc.catapult.service.category.ExtensionLayoutApplier;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import fr.enimaloc.catapult.service.premium.PremiumService;
+import fr.enimaloc.catapult.service.title.StreamTitleService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.exception.ConstraintViolationException;
@@ -360,6 +361,7 @@ public class CustomBindingService {
         binding.setTwitchGameId(request.twitchGameId().trim());
         binding.setTwitchGameName(request.twitchGameName().trim());
         binding.setUninterruptible(request.uninterruptible());
+        if (request.title() != null) binding.setTitle(validTitle(request.title()));
         binding.getCcls().clear();
         binding.getCcls().addAll(cleaned(request.ccls()));
         Set<String> tws = cleaned(request.tws());
@@ -379,6 +381,15 @@ public class CustomBindingService {
                     "Name must be 1 to " + MAX_NAME_LENGTH + " characters");
         }
         return name;
+    }
+
+    /** Trimmed, null when blank (the channel-wide title); longer than a Twitch title is refused. */
+    private static String validTitle(String title) {
+        String trimmed = title.strip();
+        if (trimmed.codePointCount(0, trimmed.length()) > StreamTitleService.MAX_LENGTH) {
+            throw new ApiProblem(ErrorCode.INVALID, "A title is at most " + StreamTitleService.MAX_LENGTH + " characters");
+        }
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private static void validCategory(CustomBindingRequest request) {

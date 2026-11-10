@@ -178,11 +178,11 @@ class SpaFragmentControllerTest {
         JsonNode state = JsonMapper.builder().build().readTree(json);
         assertThat(java.util.stream.IntStream.range(0, state.size()).mapToObj(i -> state.get(i).get("name").asString()))
                 .containsExactly("ChannelLiveStateEvent", "BotStateChangedEvent",
-                "GameChangedEvent", "BindingUpdatedEvent", "CclStateEvent", "BindingIgnoredStateEvent",
+                "GameChangedEvent", "BindingUpdatedEvent", "CclStateEvent", "BindingIgnoredStateEvent", "BindingTitleEvent",
                 "TwEnabledStateEvent", "TwResetEvent", "DtddMappingChangedEvent");
         assertThat(state.get(0).get("data").get("state").asBoolean()).isTrue();
         assertThat(state.get(2).get("data").get("bindingId").asString()).isEqualTo("b1");
-        JsonNode dtdd = state.get(8).get("data");
+        JsonNode dtdd = state.get(9).get("data");
         assertThat(dtdd.get("igdbId").asString()).isEqualTo("42");
         assertThat(dtdd.get("current").get("verified").asBoolean()).isTrue();
         assertThat(dtdd.get("proposed").asBoolean()).isFalse();

@@ -103,4 +103,20 @@ public class UserSettings {
      */
     @Column(name = "raid_restore_game_minutes")
     private Integer raidRestoreGameMinutes;
+
+    /** Off: Catapult never touches the stream title. */
+    @Column(name = "title_feature_enabled", nullable = false)
+    private boolean titleFeatureEnabled = false;
+
+    /** The title sent with the category when the game has none of its own (see StreamTitleService); null: none. */
+    @Column(name = "title_template", length = 140)
+    private String titleTemplate;
+
+    /** The title sent with the "no game" category; null: the channel-wide one. */
+    @Column(name = "no_game_title", length = 140)
+    private String noGameTitle;
+
+    /** The title sent with the incomplete fallback's category; null: the channel-wide one. */
+    @Column(name = "incomplete_fallback_title", length = 140)
+    private String incompleteFallbackTitle;
 }

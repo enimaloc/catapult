@@ -203,6 +203,25 @@ class CategoryChainTest {
     }
 
     @Test
+    void theFallbacks_carryTheirOwnTitle_andTheGameBeingPlayed() {
+        withSettings();
+        settings.setIncompleteFallbackTitle("{{GAME}}, soon");
+        settings.setNoGameTitle("Chatting");
+        live(true);
+
+        binding.setStatus(GameBinding.Status.INCOMPLETE);
+        GameBinding incomplete = chain.decide(user, new GameDetected(binding)).binding();
+        assertThat(incomplete.getTitle()).isEqualTo("{{GAME}}, soon");
+        assertThat(incomplete.getGameName()).isEqualTo("Dota 2");
+
+        binding.setStatus(GameBinding.Status.AUTO);
+        binding.setIgnored(true);
+        GameBinding ignored = chain.decide(user, new GameDetected(binding)).binding();
+        assertThat(ignored.getTitle()).isEqualTo("Chatting");
+        assertThat(ignored.getGameName()).isEqualTo("Dota 2");
+    }
+
+    @Test
     void gameDetected_incompleteLive_sendsTheIncompleteCcls() {
         binding.setStatus(GameBinding.Status.INCOMPLETE);
         withSettings();

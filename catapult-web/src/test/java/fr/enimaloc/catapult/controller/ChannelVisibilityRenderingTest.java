@@ -351,6 +351,81 @@ class ChannelVisibilityRenderingTest {
     }
 
     @Test
+    void streamTitle_cardAndGameFields_onlyWhenTheExperimentOffersThem() throws Exception {
+        BindingDto binding = new BindingDto("binding-1", "AUTO", "STEAM", "Game A", "123", "Game A",
+                false, true, Set.of(), true, false, Set.of(), null, List.of(), "{{GAME}} blind run");
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(new ChannelPageData(
+                new ChannelUserDto("id-1", "twitch-1", "enimaloc", "https://example.test/avatar.png"),
+                "enimaloc", false, true, true, null,
+                new PagedBindings(0, 1, 1, List.of(binding)),
+                List.of(), Set.of(), List.of(), Set.of(),
+                null, null, null, null, null, null, null, null));
+        when(apiService.channelSettings(any())).thenReturn(new UserSettingsDto(
+                false, Set.of(), null, null, Set.of(), false, false, false,
+                null, null, Set.of(), List.of(), false, Set.of(), List.of(), null, false, List.of(), List.of(),
+                true, "Playing {{GAME}}", true, null, null, true));
+
+        String offered = mvc.perform(get("/spa/channel/enimaloc")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(offered).contains("id=\"channel-title-settings-form\"", "id=\"title-settings-save-btn\"",
+                "data-help=\"title-settings\"", "class=\"binding-title-panel\"");
+        assertThat(openingTagForId(offered, "title-enabled-checkbox")).contains("checked");
+        assertThat(openingTagForId(offered, "title-template-input")).contains("value=\"Playing {{GAME}}\"", "maxlength=\"140\"")
+                .doesNotContain("disabled");
+        assertThat(offered).contains("data-title-preview", "data-preview-kind=\"TEMPLATE\"",
+                "data-preview-kind=\"BINDING\"", "data-preview-kind=\"NO_GAME\"", "data-preview-kind=\"INCOMPLETE\"");
+        assertThat(offered).contains("value=\"{{GAME}} blind run\"", "data-value=\"value:BindingTitleEvent.title\"",
+                "id=\"no-game-title-input\"", "id=\"incomplete-fallback-title-input\"");
+
+        // A catapult-api that predates the title: nothing of it shown
+        when(apiService.channelSettings(any())).thenReturn(new UserSettingsDto(
+                false, Set.of(), null, null, Set.of(), false, false, false,
+                null, null, Set.of(), List.of(), false, Set.of(), List.of(), null, false, List.of(), List.of(),
+                null, null, null));
+        String hidden = mvc.perform(get("/spa/channel/enimaloc")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(hidden).contains("id=\"channel-ccl-settings-form\"")
+                .doesNotContain("data-title-preview", "channel-title-settings-form", "binding-title-panel", "no-game-title-input",
+                        "incomplete-fallback-title-input");
+    }
+
+    private ChannelPageData pageWithDrops(java.util.Map<String, fr.enimaloc.catapult.common.dto.channel.DropDto> drops) {
+        BindingDto delta = new BindingDto("binding-1", "AUTO", "STEAM", "Delta Force", "1282866981", "Delta Force",
+                false, true, Set.of(), true, false, Set.of());
+        BindingDto other = new BindingDto("binding-2", "AUTO", "STEAM", "Other", "7", "Other",
+                false, true, Set.of(), true, false, Set.of());
+        return new ChannelPageData(
+                new ChannelUserDto("id-1", "twitch-1", "enimaloc", "https://example.test/avatar.png"),
+                "enimaloc", false, true, true, null,
+                new PagedBindings(0, 1, 2, List.of(delta, other)),
+                List.of(), Set.of(), List.of(), Set.of(),
+                null, null, null, null, null, null, null, null, drops);
+    }
+
+    @Test
+    void dropsChipAndFilter_onlyWhenTheExperimentOffersThem() throws Exception {
+        when(apiService.channelSettings(any())).thenReturn(null);
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(pageWithDrops(java.util.Map.of(
+                "1282866981", new fr.enimaloc.catapult.common.dto.channel.DropDto("SEASON AURORA",
+                        java.time.Instant.parse("2026-11-25T12:00:00Z"), "https://example.test/aurora"))));
+
+        String offered = mvc.perform(get("/spa/channel/enimaloc")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(countOccurrences(offered, "class=\"binding-drops-chip\"")).isEqualTo(1);
+        assertThat(offered).contains("href=\"https://example.test/aurora\"", "target=\"_blank\"",
+                "rel=\"noopener noreferrer\"", "SEASON AURORA", "25/11", "source=DROPS");
+
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(pageWithDrops(null));
+        String hidden = mvc.perform(get("/spa/channel/enimaloc")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(hidden).doesNotContain("binding-drops-chip", "source=DROPS");
+    }
+
+    @Test
     void raidCard_offSuggestsFifteenMinutes() throws Exception {
         when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(channelPageData(false));
         when(apiService.channelSettings(any())).thenReturn(new UserSettingsDto(

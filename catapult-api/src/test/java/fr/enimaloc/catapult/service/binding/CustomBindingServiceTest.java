@@ -295,6 +295,31 @@ class CustomBindingServiceTest {
     }
 
     @Test
+    void title_isSavedTrimmed_keptWhenNull_clearedWhenBlank_andAppliedWithTheBinding() {
+        when(bindings.findByUserAndNameIgnoreCase(user, "Art")).thenReturn(Optional.empty());
+        CustomBinding art = service.create(user,
+                new CustomBindingRequest("Art", "509660", "Art", null, null, false, "  {{GAME}} doodles  "));
+        assertThat(art.getTitle()).isEqualTo("{{GAME}} doodles");
+        assertThat(art.toGameBinding(user).getTitle()).isEqualTo("{{GAME}} doodles");
+
+        when(bindings.findByIdAndUser(art.getId(), user)).thenReturn(Optional.of(art));
+        when(bindings.findByUserAndNameIgnoreCase(user, "Art")).thenReturn(Optional.of(art));
+        service.update(user, art.getId(), new CustomBindingRequest("Art", "509660", "Art", null, null, false, null));
+        assertThat(art.getTitle()).isEqualTo("{{GAME}} doodles");
+
+        service.update(user, art.getId(), new CustomBindingRequest("Art", "509660", "Art", null, null, false, "  "));
+        assertThat(art.getTitle()).isNull();
+    }
+
+    @Test
+    void title_longerThanATitle_isRefused() {
+        when(bindings.findByUserAndNameIgnoreCase(user, "Art")).thenReturn(Optional.empty());
+
+        assertCode(() -> service.create(user,
+                new CustomBindingRequest("Art", "509660", "Art", null, null, false, "x".repeat(141))), "invalid");
+    }
+
+    @Test
     void update_unknown_isNotFound() {
         UUID id = UUID.randomUUID();
         when(bindings.findByIdAndUser(id, user)).thenReturn(Optional.empty());

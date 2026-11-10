@@ -44,6 +44,10 @@ public class CustomBinding {
     @Column(nullable = false)
     private boolean uninterruptible = false;
 
+    /** Its own stream title, winning over the channel-wide one; null: the channel-wide one. */
+    @Column(length = 140)
+    private String title;
+
     // a channel's bindings read their CCLs in one query, not one per binding
     @ElementCollection(fetch = FetchType.EAGER)
     @BatchSize(size = 100)
@@ -86,6 +90,8 @@ public class CustomBinding {
         applied.getCcls().addAll(ccls);
         applied.getExtensionSlots().addAll(extensionSlots);
         applied.getTws().addAll(tws);
+        applied.setTitle(title);
+        applied.setGameName(name);
         return applied;
     }
 }
