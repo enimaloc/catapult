@@ -31,6 +31,10 @@ import java.util.regex.Pattern;
 public class StreamTitleService {
 
     public static final String EXPERIMENT_KEY = "stream.title";
+    /** Conditions ({@code {{COND ? [[…]] : [[…]]}}}) in the titles, within {@value #EXPERIMENT_KEY}. */
+    public static final String CONDITIONS_KEY = "stream.title.conditions";
+    /** The title's preview under its fields, within {@value #EXPERIMENT_KEY}. */
+    public static final String PREVIEW_KEY = "stream.title.preview";
     /** Twitch refuses a longer title. */
     public static final int MAX_LENGTH = 140;
 
@@ -53,6 +57,16 @@ public class StreamTitleService {
     /** Background paths (the channel update): read-only, never assigns. */
     public boolean isAvailableReadOnly(UserAccount user) {
         return experimentService.isRolledOut(user, EXPERIMENT_KEY);
+    }
+
+    /** Whether the titles sent for {@code user} read their conditions; read-only, never assigns. */
+    public boolean conditionsAvailableReadOnly(UserAccount user) {
+        return experimentService.isRolledOut(user, CONDITIONS_KEY);
+    }
+
+    /** Whether the settings page offers {@code user} the title's preview: may assign the channel. */
+    public boolean previewAvailableFor(UserAccount user) {
+        return experimentService.evaluateGate(user, PREVIEW_KEY);
     }
 
     /**
