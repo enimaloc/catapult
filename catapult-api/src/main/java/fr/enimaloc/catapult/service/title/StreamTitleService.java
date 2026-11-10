@@ -14,8 +14,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Optional;
 import java.util.function.Supplier;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * The stream title sent with a category, behind experiment {@value #EXPERIMENT_KEY}: the binding's own title (a
@@ -36,9 +34,8 @@ public class StreamTitleService {
     /** The title's preview under its fields, within {@value #EXPERIMENT_KEY}. */
     public static final String PREVIEW_KEY = "stream.title.preview";
     /** Twitch refuses a longer title. */
-    public static final int MAX_LENGTH = 140;
+    public static final int MAX_LENGTH = TitleTemplate.MAX_LENGTH;
 
-    private static final Pattern VARIABLE = Pattern.compile("\\{\\{(GAME|CATEGORY|TITLE|ORIGINAL_TITLE)}}");
 
     private final ExperimentService experimentService;
     private final StreamTitleStateRepository stateRepository;
@@ -125,26 +122,8 @@ public class StreamTitleService {
      */
     public static Optional<String> render(String template, String gameName, String categoryName,
                                           Optional<String> title, Optional<String> originalTitle) {
-        if (!hasText(template)) return Optional.empty();
-        Matcher variables = VARIABLE.matcher(template);
-        StringBuilder rendered = new StringBuilder();
-        while (variables.find()) {
-            Optional<String> value = switch (variables.group(1)) {
-                case "GAME" -> Optional.of(gameName == null ? "" : gameName);
-                case "CATEGORY" -> Optional.of(categoryName == null ? "" : categoryName);
-                case "TITLE" -> title;
-                default -> originalTitle;
-            };
-            if (value.isEmpty()) return Optional.empty();
-            variables.appendReplacement(rendered, Matcher.quoteReplacement(value.get()));
-        }
-        variables.appendTail(rendered);
-        String result = rendered.toString().strip();
-        if (result.codePointCount(0, result.length()) > MAX_LENGTH) {
-            result = result.substring(0, result.offsetByCodePoints(0, MAX_LENGTH)).strip();
-        }
-        // Twitch refuses an empty title
-        return result.isEmpty() ? Optional.empty() : Optional.of(result);
+        return TitleTemplate.render(template, new TitleContext(gameName, categoryName, () -> title,
+                () -> originalTitle, java.util.Map.of(), null, null), false);
     }
 
     /**
