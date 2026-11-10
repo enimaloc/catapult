@@ -181,13 +181,15 @@ class ChannelEventPublisherTest {
         art.setCcls(new HashSet<>(Set.of("ProfanityVulgarity", "DrugsIntoxication")));
         art.setTws(new HashSet<>(Set.of("chill", "calm")));
         art.setUninterruptible(true);
+        art.setTitle("{{GAME}} doodles");
 
         publisher.customBindingsUpdated(ownerId, List.of(art), art.getId());
 
         assertThat(published(ChannelEvents.CUSTOM_BINDINGS_UPDATED)).isEqualTo(
                 new ChannelEvents.CustomBindingsUpdated(ownerId.toString(), "streamername", List.of(
                         new CustomBindingDto(art.getId(), "Art", "509660", "Art",
-                                List.of("DrugsIntoxication", "ProfanityVulgarity"), List.of("calm", "chill"), true)),
+                                List.of("DrugsIntoxication", "ProfanityVulgarity"), List.of("calm", "chill"), true,
+                                "{{GAME}} doodles")),
                         art.getId().toString()));
     }
 

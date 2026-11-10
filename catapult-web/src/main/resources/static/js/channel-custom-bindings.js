@@ -174,7 +174,9 @@ window.CatapultCustomBindings = (function () {
                 twitchGameName: selected.name,
                 ccls: CatapultChannel.checkedValues(item, ".custom-binding-ccl-checkbox"),
                 tws: CatapultChannel.checkedValues(item, ".custom-binding-tw-checkbox"),
-                uninterruptible: !!item.querySelector(".custom-binding-uninterruptible").checked
+                uninterruptible: !!item.querySelector(".custom-binding-uninterruptible").checked,
+                // No field (the stream.title experiment is off): null, the title left as it is
+                title: item.querySelector(".custom-binding-title")?.value ?? null
             });
             if (!response) return;
             if (!response.ok) {
@@ -251,6 +253,7 @@ window.CatapultCustomBindings = (function () {
             show(fresh, false);
             fresh.querySelector(".custom-binding-name").value = "";
             fresh.querySelector(".custom-binding-game-id").value = "";
+            set(fresh.querySelector(".custom-binding-title"), "value", "");
             game.select(null);
             fresh.querySelectorAll("mdui-switch").forEach(sw => { sw.checked = false; });
             showEmpty(list);
@@ -362,6 +365,7 @@ window.CatapultCustomBindings = (function () {
         item.querySelectorAll(".custom-binding-ccl-checkbox").forEach(sw => set(sw, "checked", ccls.includes(value(sw))));
         item.querySelectorAll(".custom-binding-tw-checkbox").forEach(sw => set(sw, "checked", tws.includes(value(sw))));
         set(item.querySelector(".custom-binding-uninterruptible"), "checked", !!binding.uninterruptible);
+        set(item.querySelector(".custom-binding-title"), "value", binding.title ?? "");
     }
 
     /**

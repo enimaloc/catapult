@@ -177,6 +177,22 @@ class ChannelCustomBindingsRenderingTest {
     }
 
     @Test
+    void theTitleField_onlyWhileTheStreamTitleExperimentOffersIt_withEachBindingsOwnTitle() throws Exception {
+        assertThat(panel(render(true, state()), "overview")).doesNotContain("custom-binding-title");
+
+        when(apiService.channelSettings(any())).thenReturn(new UserSettingsDto(
+                false, Set.of(), null, null, Set.of(), false, false, false,
+                null, null, Set.of(), List.of(), false, Set.of(), List.of(), null, false, List.of(), List.of(),
+                true, null, true));
+        CustomBindingsStateDto titled = new CustomBindingsStateDto(true, List.of(
+                new CustomBindingDto(ART, "Art", "509660", "Art", List.of(), List.of(), false, "{{GAME}} doodles")),
+                ART, Instant.parse("2026-10-24T10:00:00Z"));
+        String overview = panel(render(true, titled), "overview");
+
+        assertThat(overview).contains("class=\"custom-binding-title\"", "value=\"{{GAME}} doodles\"");
+    }
+
+    @Test
     void aFreeOwnerBelowTheLimit_seesTheCount_andANewButtonWithoutTheUpgradeLink() throws Exception {
         String overview = panel(render(true, stateOf(3, 5)), "overview");
 

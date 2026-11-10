@@ -183,7 +183,7 @@ public class ChannelEventPublisher {
     public static CustomBindingDto toDto(CustomBinding binding) {
         return new CustomBindingDto(binding.getId(), binding.getName(), binding.getTwitchGameId(),
                 binding.getTwitchGameName(), binding.getCcls().stream().sorted().toList(),
-                binding.getTws().stream().sorted().toList(), binding.isUninterruptible());
+                binding.getTws().stream().sorted().toList(), binding.isUninterruptible(), binding.getTitle());
     }
 
     static ChannelEvents.Settings toDto(UserSettings s) {

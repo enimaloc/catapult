@@ -508,6 +508,23 @@ class MockApiServiceTest {
     }
 
     @Test
+    void customBindingTitle_keptWhenNull_clearedWhenBlank_likeCatapultApi() {
+        var created = service.createCustomBinding(username, new fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest(
+                "Titled", "509663", "Special Events", Set.of(), Set.of(), false, " {{GAME}} live ")).body();
+        assertThat(created.title()).isEqualTo("{{GAME}} live");
+
+        var kept = service.updateCustomBinding(username, created.id(), new fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest(
+                "Titled", "509663", "Special Events", Set.of(), Set.of(), false, null)).body().binding();
+        assertThat(kept.title()).isEqualTo("{{GAME}} live");
+
+        var cleared = service.updateCustomBinding(username, created.id(), new fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest(
+                "Titled", "509663", "Special Events", Set.of(), Set.of(), false, "")).body().binding();
+        assertThat(cleared.title()).isNull();
+        assertThat(service.updateCustomBinding(username, created.id(), new fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest(
+                "Titled", "509663", "Special Events", Set.of(), Set.of(), false, "x".repeat(141))).status()).isEqualTo(400);
+    }
+
+    @Test
     void titleSettings_areOfferedInMock_savedPerChannel_andToldAsAnEvent() {
         assertThat(data.getUserSettings().titleAvailable()).isTrue();
 
