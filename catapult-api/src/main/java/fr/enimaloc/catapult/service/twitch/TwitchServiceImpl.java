@@ -196,7 +196,7 @@ public class TwitchServiceImpl implements TwitchService {
             body.put("content_classification_labels", buildCclPayload(binding.getCcls(), blocked));
         }
         Optional<StreamTitleService.PlannedTitle> title =
-            streamTitleService.titleFor(user, userSettings, binding, () -> currentTitle(user, accessToken));
+            streamTitleService.titleFor(user, userSettings, binding, labelSent(body), () -> currentTitle(user, accessToken));
         title.ifPresent(planned -> body.put("title", planned.title()));
 
         try {
@@ -342,7 +342,7 @@ public class TwitchServiceImpl implements TwitchService {
             body.put("content_classification_labels", buildCclPayload(settings.getNoGameCcls(), Set.of()));
         }
         Optional<StreamTitleService.PlannedTitle> title =
-            streamTitleService.titleForNoGame(user, settings, () -> currentTitle(user, accessToken));
+            streamTitleService.titleForNoGame(user, settings, labelSent(body), () -> currentTitle(user, accessToken));
         title.ifPresent(planned -> body.put("title", planned.title()));
         try {
             patchRefreshingTheToken(user, token, accessToken, body);
@@ -475,6 +475,14 @@ public class TwitchServiceImpl implements TwitchService {
             log.warn("Could not read the Twitch title of user {}, leaving it alone: {}", user.getId(), e.getMessage());
             return Optional.empty();
         }
+    }
+
+    /** Whether {@code body} sends at least one content label switched on (a title's {@code IS_MATURE}). */
+    @SuppressWarnings("unchecked")
+    static boolean labelSent(Map<String, Object> body) {
+        Object labels = body.get("content_classification_labels");
+        return labels instanceof List<?> list && list.stream()
+                .anyMatch(label -> label instanceof Map<?, ?> m && Boolean.TRUE.equals(m.get("is_enabled")));
     }
 
     record ChannelInformation(String title) {}

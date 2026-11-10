@@ -51,6 +51,7 @@ class ExternalRouteSetTest {
             "GET /api/me/custom-bindings",
             "PUT /api/me/custom-bindings/active",
             "DELETE /api/me/custom-bindings/active",
+            "GET /api/me/drops",
             "GET /api/games/igdb/{igdbId}",
             "GET /api/games/steam/{appId}",
             "GET /api/games/xbox/{productId}",

@@ -325,7 +325,7 @@ class TwitchServiceTest {
     void updateChannel_sendsTheTitle_whenThereIsOne() {
         GameBinding binding = binding(GameBinding.Status.AUTO, false, true, Set.of());
         StreamTitleService.PlannedTitle planned = new StreamTitleService.PlannedTitle("Elden Ring tonight", Optional.of("Old"));
-        when(streamTitleService.titleFor(eq(user), any(), eq(binding), any())).thenReturn(Optional.of(planned));
+        when(streamTitleService.titleFor(eq(user), any(), eq(binding), anyBoolean(), any())).thenReturn(Optional.of(planned));
 
         twitchService.updateChannelReporting(user, binding);
 
@@ -338,7 +338,7 @@ class TwitchServiceTest {
     @Test
     void updateChannel_aRefusedPatch_remembersNoTitle() {
         GameBinding binding = binding(GameBinding.Status.AUTO, false, true, Set.of());
-        when(streamTitleService.titleFor(eq(user), any(), eq(binding), any()))
+        when(streamTitleService.titleFor(eq(user), any(), eq(binding), anyBoolean(), any()))
                 .thenReturn(Optional.of(new StreamTitleService.PlannedTitle("Elden Ring tonight", Optional.empty())));
         doThrow(new HttpServerErrorException(HttpStatus.BAD_GATEWAY)).when(responseSpec).toBodilessEntity();
 
@@ -350,8 +350,8 @@ class TwitchServiceTest {
     @Test
     void updateChannel_theCurrentTitle_isReadFromTwitch_forATitleTemplate() {
         GameBinding binding = binding(GameBinding.Status.AUTO, false, true, Set.of());
-        when(streamTitleService.titleFor(eq(user), any(), eq(binding), any())).thenAnswer(call ->
-                call.<java.util.function.Supplier<Optional<String>>>getArgument(3).get()
+        when(streamTitleService.titleFor(eq(user), any(), eq(binding), anyBoolean(), any())).thenAnswer(call ->
+                call.<java.util.function.Supplier<Optional<String>>>getArgument(4).get()
                         .map(t -> new StreamTitleService.PlannedTitle(t + " | Doom", Optional.of(t))));
         doReturn(new TwitchServiceImpl.WrappedListResponse<>(List.of(new TwitchServiceImpl.ChannelInformation("Chill"))))
                 .when(getResponseSpec).body(any(ParameterizedTypeReference.class));
@@ -367,8 +367,8 @@ class TwitchServiceTest {
     @Test
     void updateChannel_anUnreadableCurrentTitle_stillSendsTheCategory() {
         GameBinding binding = binding(GameBinding.Status.AUTO, false, true, Set.of());
-        when(streamTitleService.titleFor(eq(user), any(), eq(binding), any())).thenAnswer(call ->
-                call.<java.util.function.Supplier<Optional<String>>>getArgument(3).get()
+        when(streamTitleService.titleFor(eq(user), any(), eq(binding), anyBoolean(), any())).thenAnswer(call ->
+                call.<java.util.function.Supplier<Optional<String>>>getArgument(4).get()
                         .map(t -> new StreamTitleService.PlannedTitle(t, Optional.of(t))));
         doThrow(new HttpServerErrorException(HttpStatus.BAD_GATEWAY))
                 .when(getResponseSpec).body(any(ParameterizedTypeReference.class));
@@ -378,6 +378,17 @@ class TwitchServiceTest {
         ArgumentCaptor<Map> bodyCaptor = ArgumentCaptor.forClass(Map.class);
         verify(bodySpec).body(bodyCaptor.capture());
         assertThat(bodyCaptor.getValue()).containsEntry("game_id", "game-456").doesNotContainKey("title");
+    }
+
+    @Test
+    void updateChannel_labelSent_isAnEnabledLabelInThePayload() {
+        GameBinding withLabel = binding(GameBinding.Status.AUTO, false, true, Set.of("Gambling"));
+        twitchService.updateChannelReporting(user, withLabel);
+        verify(streamTitleService).titleFor(eq(user), any(), eq(withLabel), eq(true), any());
+
+        GameBinding withoutLabel = binding(GameBinding.Status.AUTO, false, true, Set.of());
+        twitchService.updateChannelReporting(user, withoutLabel);
+        verify(streamTitleService).titleFor(eq(user), any(), eq(withoutLabel), eq(false), any());
     }
 
     @Test
@@ -394,7 +405,7 @@ class TwitchServiceTest {
         UserSettings settings = new UserSettings();
         settings.setNoGameTwitchGameId("12345");
         when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
-        when(streamTitleService.titleForNoGame(eq(user), eq(settings), any()))
+        when(streamTitleService.titleForNoGame(eq(user), eq(settings), anyBoolean(), any()))
                 .thenReturn(Optional.of(new StreamTitleService.PlannedTitle("Just Chatting time", Optional.empty())));
 
         twitchService.resetToDefault(user);

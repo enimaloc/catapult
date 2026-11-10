@@ -55,6 +55,46 @@ describe("segments", () => {
         expect(window.CatapultTitleHighlight.segments("")).toEqual([]);
         expect(window.CatapultTitleHighlight.segments(null)).toEqual([]);
     });
+
+    it("colors the drop variables too", () => {
+        expect(window.CatapultTitleHighlight.segments("{{DROP_NAME}} until {{DROP_END}}")).toEqual([
+            { text: "{{DROP_NAME}}", variable: true },
+            { text: " until ", variable: false },
+            { text: "{{DROP_END}}", variable: true }]);
+    });
+
+    it("marks a ternary's syntax, its branches' variables colored as anywhere", () => {
+        expect(window.CatapultTitleHighlight.segments("{{DROP_ENABLED ? [[[Drop]]] : [[]]}} {{GAME}} | !catapult")).toEqual([
+            { text: "{{DROP_ENABLED ? [[", variable: false, syntax: true },
+            { text: "[Drop]", variable: false },
+            { text: "]] : [[", variable: false, syntax: true },
+            { text: "]]}}", variable: false, syntax: true },
+            { text: " ", variable: false },
+            { text: "{{GAME}}", variable: true },
+            { text: " | !catapult", variable: false }]);
+    });
+
+    it("reads the operators and a ternary nested in a branch", () => {
+        expect(window.CatapultTitleHighlight.segments("{{!HAS_GAME || (IS_CUSTOM && HAS_TW) ? [[{{IS_MATURE ? [[18+ ]] : [[]]}}{{GAME}}]] : [[x]]}}")).toEqual([
+            { text: "{{!HAS_GAME || (IS_CUSTOM && HAS_TW) ? [[", variable: false, syntax: true },
+            { text: "{{IS_MATURE ? [[", variable: false, syntax: true },
+            { text: "18+ ", variable: false },
+            { text: "]] : [[", variable: false, syntax: true },
+            { text: "]]}}", variable: false, syntax: true },
+            { text: "{{GAME}}", variable: true },
+            { text: "]] : [[", variable: false, syntax: true },
+            { text: "x", variable: false },
+            { text: "]]}}", variable: false, syntax: true }]);
+    });
+
+    it("leaves a ternary the server won't read as plain text, as it will be sent", () => {
+        for (const raw of ["{{DROPS ? [[a]] : [[b]]}}", "{{DROP_ENABLED ? [[a]]}}", "{{DROP_ENABLED ? [[a]] : [[b]]",
+            "{{DROP_ENABLED && ? [[a]] : [[b]]}}"]) {
+            expect(window.CatapultTitleHighlight.segments(raw)).toEqual([{ text: raw, variable: false }]);
+        }
+        expect(window.CatapultTitleHighlight.segments("{{HAS_GAME ? [[a]] : [[b]]}} {{GAME}}").at(-1))
+            .toEqual({ text: "{{GAME}}", variable: true });
+    });
 });
 
 describe("the field's copy", () => {
@@ -66,6 +106,15 @@ describe("the field's copy", () => {
         expect(mirror(el).getAttribute("aria-hidden")).toBe("true");
         expect(mirror(el).style.pointerEvents).toBe("none");
         expect(el.classList.contains("title-highlighted")).toBe(true);
+    });
+
+    it("colors a ternary's syntax apart from its variables", async () => {
+        const el = await field("{{DROP_ENABLED ? [[[Drop]]] : [[]]}} {{GAME}}");
+
+        expect(mirror(el).textContent).toBe("{{DROP_ENABLED ? [[[Drop]]] : [[]]}} {{GAME}}");
+        expect([...mirror(el).querySelectorAll(".title-highlight-syntax")].map(s => s.textContent))
+            .toEqual(["{{DROP_ENABLED ? [[", "]] : [[", "]]}}"]);
+        expect(variables(el)).toEqual(["{{GAME}}"]);
     });
 
     it("follows the typing and a value set by a script", async () => {

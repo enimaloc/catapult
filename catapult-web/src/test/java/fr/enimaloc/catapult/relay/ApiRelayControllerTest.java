@@ -183,6 +183,11 @@ class ApiRelayControllerTest {
         mvc.perform(get("/api/me/custom-bindings").header("Authorization", "Bearer cat_TOKEN"))
                 .andExpect(status().isOk()).andExpect(content().string("{\"bindings\":[]}"));
         assertThat(RECEIVED.get().uri()).isEqualTo("/api/me/custom-bindings");
+
+        answer = exchange -> respond(exchange, 200, "[]", Map.of("Content-Type", List.of("application/json")));
+        mvc.perform(get("/api/me/drops?categoryId=7").header("Authorization", "Bearer catr_TOKEN"))
+                .andExpect(status().isOk()).andExpect(content().string("[]"));
+        assertThat(RECEIVED.get().uri()).isEqualTo("/api/me/drops?categoryId=7");
     }
 
     /** The public API by resource, the read-only token in the query included: relayed as sent. */

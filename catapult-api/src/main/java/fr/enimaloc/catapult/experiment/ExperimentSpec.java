@@ -63,6 +63,10 @@ public @interface ExperimentSpec {
         ExperimentAssignmentRule.RuleType type() default ExperimentAssignmentRule.RuleType.RANDOM;
         int priority() default 0;
         int percent() default 100;
+        /** An EXPERIMENT rule's experiment: only the members it assigned {@link #variant()} match. */
+        String experiment() default "";
+        /** An EXPERIMENT rule's variant of {@link #experiment()}. */
+        String variant() default "";
     }
 
     @Retention(RetentionPolicy.RUNTIME)

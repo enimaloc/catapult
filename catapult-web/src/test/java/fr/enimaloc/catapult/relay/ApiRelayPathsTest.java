@@ -26,6 +26,7 @@ class ApiRelayPathsTest {
         "/api/me/bindings/**",
         "/api/me/custom-bindings",
         "/api/me/custom-bindings/**",
+        "/api/me/drops",
         "/api/games/**",
         "/api/v3/api-docs",
         "/api/v3/api-docs/**",

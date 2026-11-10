@@ -2869,3 +2869,32 @@ mdui-text-field[data-title-highlight].title-highlighted::part(input) {
     color: transparent;
     caret-color: rgb(var(--mdui-color-on-surface));
 }
+
+/* A binding's running Twitch drops campaign: a link to its page, its name and end in its tooltip */
+.binding-drops-chip {
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    background-color: rgba(145, 70, 255, 0.18);
+    color: var(--catapult-text);
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.binding-drops-chip:hover,
+.binding-drops-chip:focus-visible {
+    background-color: rgba(145, 70, 255, 0.32);
+}
+
+/* A title field's preview: the title it would send now (title-preview.js) */
+.title-preview {
+    margin: 4px 0 0;
+    font-size: 0.85rem;
+    color: var(--catapult-text-muted, inherit);
+    overflow-wrap: anywhere;
+}
+
+.binding-edit-panel .title-preview {
+    grid-column: 1 / -1;
+}

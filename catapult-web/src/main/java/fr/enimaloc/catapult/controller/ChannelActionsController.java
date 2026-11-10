@@ -267,6 +267,14 @@ public class ChannelActionsController {
         return ApiStatus.answer(apiService.saveRaidSettings(username, body.restoreGameMinutes()));
     }
 
+    /** The title the field's text would send now; 502 when catapult-api refuses or can't be reached. */
+    @PostMapping("/channel/{username}/title/preview")
+    public ResponseEntity<fr.enimaloc.catapult.common.dto.channel.TitlePreviewDto> previewTitle(
+            @PathVariable String username, @RequestBody fr.enimaloc.catapult.common.dto.channel.TitlePreviewRequest body) {
+        var preview = apiService.previewTitle(username, body);
+        return preview == null ? ResponseEntity.status(HttpStatus.BAD_GATEWAY).build() : ResponseEntity.ok(preview);
+    }
+
     @PostMapping("/channel/{username}/settings/title")
     public ResponseEntity<Void> saveTitleSettings(@PathVariable String username, @RequestBody TitleSettingsRequest body) {
         return ApiStatus.answer(apiService.saveTitleSettings(username, body.enabled(), body.template()));

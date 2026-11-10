@@ -49,7 +49,7 @@ public class ApiRelayController {
     public static final String[] PATHS = {
             "/oauth2/**", "/login/oauth2/**", "/api/connect/steam/callback", "/api/game/**", "/api/user/**",
             "/api/me/game", "/api/me/game/**", "/api/me/bindings/**",
-            "/api/me/custom-bindings", "/api/me/custom-bindings/**", "/api/games/**",
+            "/api/me/custom-bindings", "/api/me/custom-bindings/**", "/api/me/drops", "/api/games/**",
             "/api/v3/api-docs", "/api/v3/api-docs/**",
     };
     /** A relayed request's body is read whole: these endpoints only take small ones. */
@@ -86,7 +86,7 @@ public class ApiRelayController {
     @RequestMapping({
             "/oauth2/**", "/login/oauth2/**", "/api/connect/steam/callback", "/api/game/**", "/api/user/**",
             "/api/me/game", "/api/me/game/**", "/api/me/bindings/**",
-            "/api/me/custom-bindings", "/api/me/custom-bindings/**", "/api/games/**",
+            "/api/me/custom-bindings", "/api/me/custom-bindings/**", "/api/me/drops", "/api/games/**",
             "/api/v3/api-docs", "/api/v3/api-docs/**",
     })
     public void relay(HttpServletRequest request, HttpServletResponse response) throws IOException {

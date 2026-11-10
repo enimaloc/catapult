@@ -83,6 +83,22 @@ class ChannelCustomBindingsRenderingTest {
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
     }
 
+    @Test
+    void aCustomBindingsCategoryWithRunningDrops_carriesTheChip() throws Exception {
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(new ChannelPageData(
+                new ChannelUserDto("id-1", "twitch-1", "enimaloc", "https://example.test/avatar.png"),
+                "enimaloc", true, true, true, null,
+                new PagedBindings(0, 1, 0, List.of()),
+                List.of(), Set.of(), List.of(), Set.of(),
+                null, null, null, null, null, null, null, state(),
+                java.util.Map.of("509660", new fr.enimaloc.catapult.common.dto.channel.DropDto("Art Drops",
+                        java.time.Instant.parse("2026-11-25T12:00:00Z"), "https://example.test/art"))));
+        String overview = panel(mvc.perform(get("/spa/channel/enimaloc").locale(Locale.ENGLISH))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(), "overview");
+
+        assertThat(overview).contains("href=\"https://example.test/art\"", "Drops: Art Drops, until 25/11");
+    }
+
     private static String panel(String html, String tab) {
         int start = html.indexOf("<mdui-tab-panel slot=\"panel\" value=\"" + tab + "\"");
         assertThat(start).as("%s panel", tab).isNotNegative();

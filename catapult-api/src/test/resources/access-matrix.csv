@@ -34,6 +34,7 @@ GET,/api/me/bindings/{bindingId},,,401,401,401,401,401,401,PASS
 GET,/api/me/custom-bindings,,,401,401,401,401,401,401,PASS
 PUT,/api/me/custom-bindings/active,,"{""idOrName"":""matrix""}",401,401,401,401,401,401,PASS
 DELETE,/api/me/custom-bindings/active,,,401,401,401,401,401,401,PASS
+GET,/api/me/drops,,,401,401,401,401,401,401,GATED
 GET,/api/me/game,,,401,401,401,401,401,401,PASS
 GET,/api/me/game/summary,,,401,401,401,401,401,401,PASS
 # member
@@ -164,6 +165,7 @@ PUT,/api/internal/users/{userId}/settings/no-game,,"{""applyOnStreamStart"":fals
 PUT,/api/internal/users/{userId}/settings/obs,,"{""enabled"":false}",401,401,403,403,PASS,403,401
 PUT,/api/internal/users/{userId}/settings/raid,,,401,401,403,GATED,GATED,403,401
 PUT,/api/internal/users/{userId}/settings/title,,"{""enabled"":false}",401,401,403,GATED,GATED,403,401
+POST,/api/internal/users/{userId}/title/preview,,"{""template"":""Live""}",401,401,403,GATED,GATED,403,401
 PUT,/api/internal/users/{userId}/settings/steam-personal-token,,"{""token"":""matrix"",""shared"":false}",401,401,403,403,PASS,403,401
 DELETE,/api/internal/users/{userId}/settings/steam-personal-token,,,401,401,403,403,PASS,403,401
 PUT,/api/internal/users/{userId}/settings/steam-personal-token/sharing,,"{""shared"":false}",401,401,403,403,PASS,403,401

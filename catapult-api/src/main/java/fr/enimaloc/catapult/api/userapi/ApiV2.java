@@ -29,6 +29,7 @@ public final class ApiV2 {
     // The other mount points under /api/me: the caller's own game, their custom bindings.
     static final String ME_GAME_PATH = "/api/me/game";
     static final String ME_CUSTOM_BINDINGS_PATH = "/api/me/custom-bindings";
+    static final String ME_DROPS_PATH = "/api/me/drops";
 
     // The widget token of the dev backdoor (DevBackdoorResolver) that names no real game, and the
     // example the legacy routes' "uuid" path parameter documents. LegacyRoutesGate does not read it:

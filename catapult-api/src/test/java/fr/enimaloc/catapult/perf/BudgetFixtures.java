@@ -193,6 +193,7 @@ public class BudgetFixtures {
             UserAccount visitor = account(PREFIX + "-visitor");
             UserAccount admin = account(PREFIX + "-admin");
             openCustomBindingsTo(owner);
+            assign(owner, fr.enimaloc.catapult.service.drops.DropsGate.EXPERIMENT_KEY, "enabled");
             openLegacyRoutesTo(owner);
             deliveries.replaceChannels(owner, EnumSet.allOf(NotificationChannel.class));
             widgetSettings.updateSettings(owner, true, "127.0.0.1", 4455, "budget-obs-password");

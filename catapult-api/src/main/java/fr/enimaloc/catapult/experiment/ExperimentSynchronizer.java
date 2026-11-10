@@ -144,6 +144,12 @@ public class ExperimentSynchronizer implements ApplicationRunner {
         rule.setRuleType(rd.type());
         rule.setPriority(rd.priority());
         if (rd.type() == ExperimentAssignmentRule.RuleType.RANDOM) rule.setPercentage(rd.percent());
+        if (rd.type() == ExperimentAssignmentRule.RuleType.EXPERIMENT) {
+            // Matched against the variant the other experiment assigned (AssignedExperimentResolver)
+            rule.setAttributeKey(rd.experiment());
+            rule.setAttributeOperator("eq");
+            rule.setAttributeValue(rd.variant());
+        }
         return rule;
     }
 }

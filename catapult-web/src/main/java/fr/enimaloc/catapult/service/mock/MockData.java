@@ -1,5 +1,9 @@
 package fr.enimaloc.catapult.service.mock;
 
+import java.time.Duration;
+import java.util.Objects;
+import java.util.HashMap;
+import fr.enimaloc.catapult.common.dto.channel.DropDto;
 import fr.enimaloc.catapult.common.dto.channel.BindingDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberDto;
 import fr.enimaloc.catapult.common.dto.channel.ChannelDto;
@@ -213,7 +217,7 @@ public class MockData {
                 null, null, Set.of(),
                 AVAILABLE_CCLS, config.settings.twFeatureEnabled, Set.copyOf(config.settings.blockedTws), AVAILABLE_TWS,
                 // raid.restore-game and stream.title: the mock has no experiments, the settings are offered
-                null, true, List.of(), List.of(), false, null, true);
+                null, true, List.of(), List.of(), false, null, true, null, null, true);
 
         MockConfig.Steam steam = config.steam;
         MockData data = new MockData(channel, List.of(binding), settings, List.of(),
@@ -309,7 +313,9 @@ public class MockData {
                 // Like the API, the automatic filter also returns the bindings an admin mapping set.
                 .filter(b -> status == null || status.equalsIgnoreCase(b.status())
                         || ("AUTO".equalsIgnoreCase(status) && "MAPPED".equals(b.status())))
-                .filter(b -> source == null || source.equalsIgnoreCase(b.sourceType()))
+                // The "with drops" filter (source DROPS): the mock's campaign runs on the first binding's category
+                .filter(b -> source == null || source.equalsIgnoreCase(b.sourceType())
+                        || "DROPS".equalsIgnoreCase(source) && drops().containsKey(b.twitchGameId()))
                 .toList();
         // A moderated channel shows as itself; its dashboard otherwise reuses the member's data.
         ChannelDto shown = moderatedChannels.stream().filter(c -> c.twitchUsername().equals(username)).findFirst()
@@ -321,7 +327,18 @@ public class MockData {
                 AVAILABLE_CCLS, userSettingsDto.blockedCcls(), AVAILABLE_TWS, userSettingsDto.blockedTws(),
                 status, source, steamData(), hasXboxProvider ? new XboxData(hasXbox) : null, minecraftData(), obsData,
                 obsData == null ? null : TwitchatData.of(twitchatBranch),
-                username.equals(channelDto.twitchUsername()) ? customBindings.state() : null);
+                username.equals(channelDto.twitchUsername()) ? customBindings.state() : null,
+                // drops: the mock has no experiments, they are offered
+                drops());
+    }
+
+    /** The mock's one running drops campaign, on the first binding's category. */
+    private Map<String, DropDto> drops() {
+        Map<String, DropDto> drops = new HashMap<>();
+        binding.stream().map(BindingDto::twitchGameId).filter(Objects::nonNull).findFirst().ifPresent(category ->
+                drops.put(category, new DropDto("Mock Season", Instant.now().plus(Duration.ofDays(5)),
+                        "https://www.twitch.tv/drops/campaigns")));
+        return drops;
     }
 
     private SteamData steamData() {
@@ -874,7 +891,8 @@ public class MockData {
                     applyOnStreamStart, applyOnNoGame, applyOnStreamEnd, fallbackId, fallbackName, fallbackCcls,
                     from.availableCcls(), twEnabled, blockedTws, from.availableTws(),
                     raidMinutes, from.raidRestoreGameAvailable(), noGameExtensions, fallbackExtensions,
-                    titleEnabled, titleTemplate, from.titleAvailable(), noGameTitle, incompleteFallbackTitle);
+                    titleEnabled, titleTemplate, from.titleAvailable(), noGameTitle, incompleteFallbackTitle,
+                    from.titlePreviewAvailable());
         }
     }
 }

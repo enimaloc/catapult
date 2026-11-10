@@ -1,8 +1,8 @@
 method,pattern,vars,caller,sql,notes
 # owner
-GET,/api/internal/users/{userId}/dashboard,,owner,31,
+GET,/api/internal/users/{userId}/dashboard,,owner,35,
 GET,/api/internal/users/{userId}/seen-features,,owner,2,
-GET,/api/internal/users/{userId}/settings,,owner,6,fixed:one settings row and one gate per experimented card; the CCL and TW catalogs are global
+GET,/api/internal/users/{userId}/settings,,owner,7,fixed:one settings row and one gate per experimented card; the CCL and TW catalogs are global
 GET,/api/internal/users/{userId}/dtdd-mapping,,owner,5,fixed:the mapping of the one game the channel plays
 GET,/api/internal/users/{userId}/twitchat-events,,owner,2,
 GET,/api/internal/users/{userId}/chat-commands/enabled,,owner,3,
@@ -18,7 +18,7 @@ GET,/api/internal/users/{userId}/bindings/current,,owner,6,fixed:the binding of 
 GET,/api/internal/auth/validate,,owner,1,fixed:the caller's own account
 GET,/api/internal/config/app,,owner,0,fixed:configuration only
 # visitor
-GET,/api/internal/users/{userId}/dashboard,,visitor,15,
+GET,/api/internal/users/{userId}/dashboard,,visitor,19,
 # admin
 GET,/api/internal/admin/members,?page=0&q=,admin,2,
 GET,/api/internal/admin/members/search,?q=budget,admin,2,
@@ -27,6 +27,7 @@ GET,/api/internal/admin/experiments/{id}/settings,,admin,4,
 GET,/api/internal/admin/experiments/{id}/assignments,?page=0,admin,6,
 # personal API token
 GET,/api/me/custom-bindings,,ptoken,12,
+GET,/api/me/drops,,ptoken,11,fixed:the token and the drops gate then the current game's binding; the campaigns are Catapult's copy of ttvdrops
 GET,/api/me/game,,ptoken,8,fixed:the one game the channel plays
 GET,/api/me/game/summary,,ptoken,8,fixed:the one game the channel plays
 GET,/api/me/bindings/{bindingId},,ptoken,5,fixed:one binding

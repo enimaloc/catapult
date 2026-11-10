@@ -1,7 +1,10 @@
 /**
  * Stream title fields (mdui-text-field[data-title-highlight]): the variables Catapult replaces, {{GAME}},
- * {{CATEGORY}}, {{TITLE}} and {{ORIGINAL_TITLE}} written exactly, shown in the primary color; anything else, another way of writing them
- * included, as plain text, as it will be sent.
+ * {{CATEGORY}}, {{TITLE}}, {{ORIGINAL_TITLE}}, {{DROP_NAME}} and {{DROP_END}} written exactly, shown in the primary
+ * color, and a ternary's syntax ({{COND ? [[…]] : [[…]]}}) in the tertiary one; anything else, another way of writing
+ * them included, as plain text, as it will be sent. A ternary is read as catapult-api's TitleTemplate reads it: known
+ * conditions, !, && before ||, parentheses, a run of ] closing a branch on its last two, ternaries nested in a branch;
+ * one that doesn't read through stays plain, up to its matching }}.
  *
  * An <input> can't color part of its text: the field's own text is made transparent (its caret, selection and
  * scrolling stay the input's) and a copy of it, colored, is laid over it, out of the pointer's way. The copy goes in
@@ -10,22 +13,154 @@
  * usual.
  */
 window.CatapultTitleHighlight = (function () {
-    const VARIABLE = /\{\{(?:GAME|CATEGORY|TITLE|ORIGINAL_TITLE)}}/g;
+    const VARIABLES = ["GAME", "CATEGORY", "TITLE", "ORIGINAL_TITLE", "DROP_NAME", "DROP_END"];
+    const CONDITIONS = ["DROP_ENABLED", "HAS_GAME", "IS_CUSTOM", "IS_INCOMPLETE", "IS_NO_GAME", "HAS_TW", "IS_MATURE"];
     const SELECTOR = "mdui-text-field[data-title-highlight]";
     // On the field itself: wired once, whichever copy of this script (a reloaded one) sees it
     const ATTACHED = Symbol.for("catapult.titleHighlight");
 
-    /** `text` cut into its plain and variable parts, in order: [{ text, variable }]. */
+    /** `text` cut into its plain, variable and ternary syntax parts, in order: [{ text, variable, syntax? }]. */
     function segments(text) {
         const parts = [];
-        let last = 0;
-        for (const match of (text ?? "").matchAll(VARIABLE)) {
-            if (match.index > last) parts.push({ text: text.slice(last, match.index), variable: false });
-            parts.push({ text: match[0], variable: true });
-            last = match.index + match[0].length;
-        }
-        if (last < (text ?? "").length) parts.push({ text: text.slice(last), variable: false });
+        const push = (part, kind) => {
+            if (!part) return;
+            const last = parts.at(-1);
+            if (kind === "plain" && last && !last.variable && !last.syntax) last.text += part;
+            else if (kind === "syntax") parts.push({ text: part, variable: false, syntax: true });
+            else parts.push({ text: part, variable: kind === "variable" });
+        };
+        cut(text ?? "", push);
         return parts;
+    }
+
+    /** `text`'s parts given to `push`, as TitleTemplate.expand walks it. */
+    function cut(text, push) {
+        let i = 0;
+        while (i < text.length) {
+            const open = text.indexOf("{{", i);
+            if (open < 0) {
+                push(text.slice(i), "plain");
+                return;
+            }
+            push(text.slice(i, open), "plain");
+            const close = text.indexOf("}}", open + 2);
+            const ternary = ternaryAt(text, open);
+            let failed;
+            if (close >= 0 && VARIABLES.includes(text.slice(open + 2, close))) {
+                push(text.slice(open, close + 2), "variable");
+                i = close + 2;
+            } else if (ternary) {
+                push(text.slice(open, ternary.whenTrue[0]), "syntax");
+                cut(text.slice(ternary.whenTrue[0], ternary.whenTrue[1] - 2), push);
+                push(text.slice(ternary.whenTrue[1] - 2, ternary.whenFalse[0]), "syntax");
+                cut(text.slice(ternary.whenFalse[0], ternary.whenFalse[1] - 2), push);
+                push(text.slice(ternary.whenFalse[1] - 2, ternary.end), "syntax");
+                i = ternary.end;
+            } else if ((failed = failedTernaryEnd(text, open)) > 0) {
+                push(text.slice(open, failed), "plain");
+                i = failed;
+            } else {
+                push("{", "plain");
+                i = open + 1;
+            }
+        }
+    }
+
+    /** {{COND ? [[a]] : [[b]]}} at `open`: its branches' [text start, end after ]] ] and its end; null otherwise. */
+    function ternaryAt(text, open) {
+        const question = text.indexOf("?", open + 2);
+        if (question < 0 || !isCondition(text.slice(open + 2, question))) return null;
+        const whenTrue = branch(text, skipSpaces(text, question + 1));
+        if (!whenTrue) return null;
+        const colon = skipSpaces(text, whenTrue[1]);
+        if (text[colon] !== ":") return null;
+        const whenFalse = branch(text, skipSpaces(text, colon + 1));
+        if (!whenFalse) return null;
+        const close = skipSpaces(text, whenFalse[1]);
+        return text.startsWith("}}", close) ? { whenTrue, whenFalse, end: close + 2 } : null;
+    }
+
+    /** [[…]] at `at`, nested pairs counted, a run of ] closing on its last two: [text start, end after ]]], or null. */
+    function branch(text, at) {
+        if (!text.startsWith("[[", at)) return null;
+        let depth = 1;
+        let i = at + 2;
+        while (i < text.length) {
+            if (text.startsWith("[[", i)) {
+                depth++;
+                i += 2;
+            } else if (text.startsWith("]]", i)) {
+                depth--;
+                i += 2;
+                if (depth === 0) {
+                    while (text[i] === "]") i++;
+                    return [at + 2, i];
+                }
+            } else {
+                i++;
+            }
+        }
+        return null;
+    }
+
+    function skipSpaces(text, i) {
+        while (text[i] === " ") i++;
+        return i;
+    }
+
+    /** Whether `text` reads as a condition: or := and ("||" and)*, and := not ("&&" not)*, not := "!" not | atom. */
+    function isCondition(text) {
+        let at = 0;
+        const spaces = () => { while (text[at] === " ") at++; };
+        const take = token => {
+            spaces();
+            if (!text.startsWith(token, at)) return false;
+            at += token.length;
+            return true;
+        };
+        const not = () => {
+            if (take("!")) return not();
+            if (take("(")) return or() && take(")");
+            spaces();
+            const start = at;
+            while (at < text.length && /[A-Z_]/.test(text[at])) at++;
+            return CONDITIONS.includes(text.slice(start, at));
+        };
+        const and = () => {
+            let ok = not();
+            while (ok && take("&&")) ok = not();
+            return ok;
+        };
+        const or = () => {
+            let ok = and();
+            while (ok && take("||")) ok = and();
+            return ok;
+        };
+        const ok = or();
+        spaces();
+        return ok && at === text.length;
+    }
+
+    /** The end of the {{…}} at `open` when written as a ternary (a ? and a [[) that doesn't read through; else -1. */
+    function failedTernaryEnd(text, open) {
+        let depth = 0;
+        let i = open;
+        while (i < text.length - 1) {
+            if (text.startsWith("{{", i)) {
+                depth++;
+                i += 2;
+            } else if (text.startsWith("}}", i)) {
+                depth--;
+                i += 2;
+                if (depth === 0) {
+                    const span = text.slice(open, i);
+                    return span.indexOf("?") > 0 && span.includes("[[") ? i : -1;
+                }
+            } else {
+                i++;
+            }
+        }
+        return -1;
     }
 
     /** The mirror's content for `text`: text nodes, a variable in a colored span. */
@@ -33,15 +168,15 @@ window.CatapultTitleHighlight = (function () {
         const line = document.createElement("span");
         line.style.whiteSpace = "pre";
         for (const part of segments(text)) {
-            if (!part.variable) {
+            if (!part.variable && !part.syntax) {
                 line.append(part.text);
                 continue;
             }
-            const variable = document.createElement("span");
-            variable.className = "title-highlight-variable";
-            variable.style.color = "rgb(var(--mdui-color-primary))";
-            variable.textContent = part.text;
-            line.append(variable);
+            const span = document.createElement("span");
+            span.className = part.syntax ? "title-highlight-syntax" : "title-highlight-variable";
+            span.style.color = part.syntax ? "rgb(var(--mdui-color-tertiary))" : "rgb(var(--mdui-color-primary))";
+            span.textContent = part.text;
+            line.append(span);
         }
         mirror.replaceChildren(line);
         return line;
