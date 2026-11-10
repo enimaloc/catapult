@@ -52,8 +52,8 @@ class TtvDropsClientTest {
 
     @Test
     void parsesPagesAndRestrictedDetails() {
-        page(1, 101, campaign("a", "1", false));
-        page(2, 101, campaign("b", "2", true));
+        page(1, 2, campaign("a", "1", false));
+        page(2, 2, campaign("b", "2", true));
         ttv.expect(once(), requestTo(BASE + "campaigns/b/")).andRespond(withSuccess("""
                 {"twitch_id":"b","allowed_channels":[{"twitch_id":"42","name":"x"},{"twitch_id":"43","name":"y"}]}""",
                 MediaType.APPLICATION_JSON));
@@ -102,5 +102,33 @@ class TtvDropsClientTest {
         page(1, 1, campaign("a", "1", false).replace("/media/campaigns/a.png", "https://elsewhere.example/a.png"));
 
         assertThat(client.activeCampaigns().getFirst().imageUrl()).isNull();
+    }
+
+    @Test
+    void aFailingCampaignDetail_onlyLeavesThatRestrictedCampaignForNobody() {
+        page(1, 2, campaign("a", "1", false), campaign("b", "2", true));
+        ttv.expect(once(), requestTo(BASE + "campaigns/b/")).andRespond(withServerError());
+
+        List<DropCampaign> campaigns = client.activeCampaigns();
+
+        assertThat(campaigns).extracting(DropCampaign::id).containsExactly("a", "b");
+        assertThat(campaigns.get(1).restricted()).isTrue();
+        assertThat(campaigns.get(1).allowedChannelIds()).isEmpty();
+    }
+
+    @Test
+    void stopsOnceEveryCampaignIsRead_evenWhenPagesAreSmallerThanAsked() {
+        page(1, 2, campaign("a", "1", false));
+        page(2, 2, campaign("b", "2", false));
+
+        assertThat(client.activeCampaigns()).extracting(DropCampaign::id).containsExactly("a", "b");
+        ttv.verify();
+    }
+
+    @Test
+    void anEndlessListing_isCutAtTwentyPages_andFails() {
+        for (int p = 1; p <= 20; p++) page(p, 1_000_000, campaign("p" + p, "1", false));
+
+        assertThatThrownBy(client::activeCampaigns).isInstanceOf(IllegalStateException.class);
     }
 }
