@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.getter.steam;
 
+import fr.enimaloc.catapult.getter.DetectionTimeoutException;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.observation.ObservationRegistry;
@@ -13,6 +14,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
+import java.net.SocketTimeoutException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -21,6 +23,7 @@ import java.util.Optional;
 import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -63,6 +66,12 @@ class RealSteamApiClientTest {
         HttpHeaders headers = new HttpHeaders();
         if (retryAfter != null) headers.add("Retry-After", retryAfter);
         steam.expect(once(), requestTo(url)).andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS).headers(headers));
+    }
+
+    private void timesOut(String url) {
+        steam.expect(once(), requestTo(url)).andRespond(request -> {
+            throw new SocketTimeoutException("Read timed out");
+        });
     }
 
     private static String summary(String key, String ids) {
@@ -183,6 +192,13 @@ class RealSteamApiClientTest {
 
             assertThat(client.getPlayerProfile("123", null).join()).isEmpty();
         }
+
+        @Test
+        void timeout_isEmpty() {
+            timesOut(summary("api-key", "123"));
+
+            assertThat(client.getPlayerProfile("123", null).join()).isEmpty();
+        }
     }
 
     @Nested
@@ -200,6 +216,14 @@ class RealSteamApiClientTest {
             assertThat(client.getPlayerSummary("2", null).join()).isEmpty();
             assertThat(client.getPlayerSummary("3", null).join()).isEmpty();
             assertThat(client.getPlayerSummary("4", null).join()).isEmpty();
+        }
+
+        @Test
+        void timeout_failsRatherThanReadingAsNotPlaying() {
+            timesOut(summary("api-key", "1"));
+
+            assertThatThrownBy(() -> client.getPlayerSummary("1", null).join())
+                    .hasCauseInstanceOf(DetectionTimeoutException.class);
         }
     }
 
@@ -248,6 +272,14 @@ class RealSteamApiClientTest {
             assertThat(client.getPlayerSummaries(List.of("1")).join()).containsEntry("1", Optional.empty());
             assertThat(client.getPlayerSummaries(List.of("2")).join()).containsEntry("2", Optional.empty());
             verify(rotator).onKeyRateLimited("api-key", 5);
+        }
+
+        @Test
+        void timeout_failsRatherThanReadingEveryoneAsNotPlaying() {
+            timesOut(summary("api-key", "1%2C2"));
+
+            assertThatThrownBy(() -> client.getPlayerSummaries(List.of("1", "2")).join())
+                    .hasCauseInstanceOf(DetectionTimeoutException.class);
         }
     }
 

@@ -15,8 +15,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -53,5 +55,24 @@ class GameGetterChainTest {
 
         assertThat(registry.get("catapult.game.detection.duration")
                 .tag("resolved_by", "steam").timer().count()).isEqualTo(1);
+    }
+
+    @Test
+    void resolve_rethrowsATimeout_ratherThanTryingTheNextGetter() {
+        UserAccount user = new UserAccount();
+        user.setId(UUID.randomUUID());
+
+        GetterConfig steamConfig = new GetterConfig();
+        steamConfig.setProvider(GetterConfig.Provider.STEAM);
+        steamConfig.setEnabled(true);
+        steamConfig.setPriority(1);
+
+        when(getterConfigRepository.findByUserOrderByPriorityAsc(user)).thenReturn(List.of(steamConfig));
+        when(steamGameGetter.getCurrentGame(user))
+            .thenThrow(new DetectionTimeoutException("Steam", new TimeoutException()));
+
+        assertThatThrownBy(() -> chain.resolve(user)).isInstanceOf(DetectionTimeoutException.class);
+        assertThat(registry.get("catapult.game.detection.duration")
+                .tag("resolved_by", "timeout").timer().count()).isEqualTo(1);
     }
 }
