@@ -46,3 +46,30 @@ jobs:
           APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
           NUMBER: ${{ github.event.pull_request.number }}
         run: node .github/release/publish.mjs --number "$NUMBER"
+
+  # The beta -> main promotion was titled before this beta's tag existed: retitled once it is. In promote.yml's
+  # promote-beta group, as that workflow's run for the same push to beta is: two refreshes in parallel would both
+  # open the promotion. Apart from the publish job, whose run the group's single pending slot must never drop.
+  refresh-stable:
+    needs: publish
+    if: github.event.pull_request.base.ref == 'beta' && github.event.pull_request.head.ref == 'dev'
+    concurrency:
+      group: promote-beta
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    steps:
+      - id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+      # The script reads everything through the API: no git history needed
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Retitle the beta -> main promotion
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+        run: node .github/release/promote.mjs --source beta --target main
