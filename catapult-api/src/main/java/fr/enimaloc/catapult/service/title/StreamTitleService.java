@@ -73,6 +73,11 @@ public class StreamTitleService {
         return experimentService.isRolledOut(user, CONDITIONS_KEY);
     }
 
+    /** Whether the titles {@code user} writes read their conditions, asked by the settings page: may assign the channel. */
+    public boolean conditionsAvailableFor(UserAccount user) {
+        return experimentService.evaluateGate(user, CONDITIONS_KEY);
+    }
+
     /** Whether the settings page offers {@code user} the title's preview: may assign the channel. */
     public boolean previewAvailableFor(UserAccount user) {
         return experimentService.evaluateGate(user, PREVIEW_KEY);

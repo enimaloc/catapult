@@ -264,6 +264,11 @@ public class ChannelDashboardAssembler {
             defaults.setUserId(channel.getId());
             return defaults;
         });
+        boolean titleAvailable = streamTitle.isAvailableFor(channel);
+        if (titleAvailable) {
+            // The title's fields are where the conditions are written: offered them, the channel may be enrolled
+            streamTitle.conditionsAvailableFor(channel);
+        }
         return new UserSettingsDto(
                 settings.isCclFeatureEnabled(),
                 settings.getBlockedCcls(),
@@ -287,7 +292,7 @@ public class ChannelDashboardAssembler {
                 ExtensionSlotSetting.toDtos(settings.getIncompleteFallbackExtensionSlots()),
                 settings.isTitleFeatureEnabled(),
                 settings.getTitleTemplate(),
-                streamTitle.isAvailableFor(channel),
+                titleAvailable,
                 settings.getNoGameTitle(),
                 settings.getIncompleteFallbackTitle(),
                 streamTitle.previewAvailableFor(channel));

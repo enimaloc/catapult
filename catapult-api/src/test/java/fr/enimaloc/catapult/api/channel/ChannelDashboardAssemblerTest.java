@@ -64,6 +64,7 @@ import java.util.concurrent.CompletableFuture;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -627,6 +628,19 @@ class ChannelDashboardAssemblerTest {
             assertThat(on.titleFeatureEnabled()).isTrue();
             assertThat(on.titleTemplate()).isEqualTo("Playing {{GAME}}");
             assertThat(off.titleAvailable()).isFalse();
+        }
+
+        /** The title's settings are where the conditions are used: reading them may enrol the channel. */
+        @Test
+        void streamTitle_enrolsTheChannelInTheConditions_onlyWhileTheTitleIsOffered() {
+            when(streamTitle.isAvailableFor(owner)).thenReturn(true);
+            assembler().settings(owner);
+            verify(streamTitle).conditionsAvailableFor(owner);
+
+            clearInvocations(streamTitle);
+            when(streamTitle.isAvailableFor(owner)).thenReturn(false);
+            assembler().settings(owner);
+            verify(streamTitle, never()).conditionsAvailableFor(owner);
         }
 
         @Test
