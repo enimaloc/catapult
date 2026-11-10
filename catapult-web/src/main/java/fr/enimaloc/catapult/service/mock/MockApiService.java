@@ -625,15 +625,9 @@ public class MockApiService implements ApiService {
         return NO_CONTENT;
     }
 
-    // Anything written like a title variable: only {{GAME}}, {{TITLE}} and {{ORIGINAL_TITLE}} are, as in catapult-api
-    private static final java.util.regex.Pattern TITLE_VARIABLE_LIKE = java.util.regex.Pattern.compile("\\{\\{([^{}]*)}}");
-
-    /** A title or template catapult-api would take: at most 140 characters, its variables written exactly. */
+    /** A title or template catapult-api would take: at most 140 characters. */
     private static boolean validTitle(String title) {
-        if (title == null) return true;
-        if (title.codePointCount(0, title.length()) > 140) return false;
-        return TITLE_VARIABLE_LIKE.matcher(title).results()
-                .allMatch(m -> Set.of("GAME", "TITLE", "ORIGINAL_TITLE").contains(m.group(1)));
+        return title == null || title.codePointCount(0, title.length()) <= 140;
     }
 
     /** Validated like catapult-api: 1..120 minutes, null or 0 for off, else 400. */

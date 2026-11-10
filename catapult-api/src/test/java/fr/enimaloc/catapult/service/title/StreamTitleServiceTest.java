@@ -10,8 +10,6 @@ import fr.enimaloc.catapult.service.title.StreamTitleService.PlannedTitle;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -218,18 +216,11 @@ class StreamTitleServiceTest {
     }
 
     @Test
-    void cleaned_keepsTheExactVariables_andTrims() {
-        assertThat(StreamTitleService.cleaned("  {{ORIGINAL_TITLE}} | {{TITLE}} | {{GAME}} {braces} ok "))
-                .isEqualTo("{{ORIGINAL_TITLE}} | {{TITLE}} | {{GAME}} {braces} ok");
+    void cleaned_trims_andKeepsVariablesNotWrittenExactlyAsTyped() {
+        assertThat(StreamTitleService.cleaned("  {{ORIGINAL_TITLE}} | {{game}} | {{ STREAMER }} {braces} ok "))
+                .isEqualTo("{{ORIGINAL_TITLE}} | {{game}} | {{ STREAMER }} {braces} ok");
         assertThat(StreamTitleService.cleaned("   ")).isNull();
-    }
-
-    @ParameterizedTest
-    @ValueSource(strings = {"{{game}}", "{{ GAME }}", "{{Game}}", "{{STREAMER}}", "{{}}", "Live {{GAME}} {{title}}"})
-    void cleaned_refusesAnythingElseWrittenAsAVariable(String typed) {
-        assertThatThrownBy(() -> StreamTitleService.cleaned(typed))
-                .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("400")
-                .hasMessageContaining("Unknown title variable");
+        assertThatThrownBy(() -> StreamTitleService.cleaned("x".repeat(141)))
+                .isInstanceOf(ResponseStatusException.class).hasMessageContaining("400");
     }
 }

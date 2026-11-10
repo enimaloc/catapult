@@ -13,7 +13,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Optional;
-import java.util.Set;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -22,8 +21,8 @@ import java.util.regex.Pattern;
  * The stream title sent with a category, behind experiment {@value #EXPERIMENT_KEY}: the game's own title, else the
  * channel-wide template. A template's variables are written {@code {{NAME}}} exactly: {@code {{GAME}}} the category's
  * name, {@code {{TITLE}}} the title the stream has just before the change, {@code {{ORIGINAL_TITLE}}} the one the
- * streamer set themselves, before Catapult changed it. Nothing while the streamer hasn't turned it on, so their title
- * is left alone.
+ * streamer set themselves, before Catapult changed it; anything else (another case, spaces, another name) stays as
+ * typed. Nothing while the streamer hasn't turned it on, so their title is left alone.
  */
 @Slf4j
 @Service
@@ -31,13 +30,10 @@ import java.util.regex.Pattern;
 public class StreamTitleService {
 
     public static final String EXPERIMENT_KEY = "stream.title";
-    public static final Set<String> VARIABLES = Set.of("GAME", "TITLE", "ORIGINAL_TITLE");
     /** Twitch refuses a longer title. */
     public static final int MAX_LENGTH = 140;
 
     private static final Pattern VARIABLE = Pattern.compile("\\{\\{(GAME|TITLE|ORIGINAL_TITLE)}}");
-    // Anything written like a variable, to refuse what isn't one of VARIABLES
-    private static final Pattern VARIABLE_LIKE = Pattern.compile("\\{\\{([^{}]*)}}");
 
     private final ExperimentService experimentService;
     private final StreamTitleStateRepository stateRepository;
@@ -134,22 +130,14 @@ public class StreamTitleService {
     }
 
     /**
-     * A title or template as typed: trimmed, null when blank. A 400 when longer than {@value #MAX_LENGTH} characters
-     * (it would never fit in a title) or when it writes a variable other than {@code {{GAME}}}, {@code {{TITLE}}} or
-     * {@code {{ORIGINAL_TITLE}}} exactly (another case, spaces, another name).
+     * A title or template as typed: trimmed, null when blank; longer than {@value #MAX_LENGTH} characters is a
+     * 400, since it would never fit in a title.
      */
     public static String cleaned(String typed) {
         if (!hasText(typed)) return null;
         String title = typed.strip();
         if (title.codePointCount(0, title.length()) > MAX_LENGTH) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A title is at most " + MAX_LENGTH + " characters");
-        }
-        Matcher variables = VARIABLE_LIKE.matcher(title);
-        while (variables.find()) {
-            if (!VARIABLES.contains(variables.group(1))) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown title variable " + variables.group()
-                        + ": only {{GAME}}, {{TITLE}} and {{ORIGINAL_TITLE}}");
-            }
         }
         return title;
     }
