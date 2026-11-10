@@ -2851,3 +2851,14 @@ mdui-dialog::part(description) { white-space: pre-line; }
 .premium-table { width: 100%; border-collapse: collapse; }
 .premium-table :is(th, td) { padding: 8px 12px; text-align: left; border-bottom: 1px solid rgb(var(--mdui-color-outline-variant)); }
 .premium-table tbody tr:last-child :is(th, td) { border-bottom: 0; }
+
+/* Stream title fields: their recognized variables colored by a copy laid over the text (title-highlight.js), the
+   field's own text made transparent only once that copy is in place */
+mdui-text-field[data-title-highlight] {
+    position: relative;
+}
+
+mdui-text-field[data-title-highlight].title-highlighted::part(input) {
+    color: transparent;
+    caret-color: rgb(var(--mdui-color-on-surface));
+}
