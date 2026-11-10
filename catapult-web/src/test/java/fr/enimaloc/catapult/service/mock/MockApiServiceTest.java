@@ -527,6 +527,17 @@ class MockApiServiceTest {
     }
 
     @Test
+    void drops_areOffered_andFilterTheBindings() {
+        var page = service.channelPage(username, 0, null, null);
+        assertThat(page.drops()).hasSize(1);
+        String category = page.drops().keySet().iterator().next();
+
+        var filtered = service.channelPage(username, 0, null, "DROPS");
+        assertThat(filtered.bindings().content()).extracting(b -> b.twitchGameId()).containsOnly(category);
+        assertThat(filtered.filterSource()).isEqualTo("DROPS");
+    }
+
+    @Test
     void customBindingTitle_keptWhenNull_clearedWhenBlank_likeCatapultApi() {
         var created = service.createCustomBinding(username, new fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest(
                 "Titled", "509663", "Special Events", Set.of(), Set.of(), false, " {{GAME}} live ")).body();

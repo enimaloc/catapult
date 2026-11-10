@@ -389,6 +389,40 @@ class ChannelVisibilityRenderingTest {
                         "incomplete-fallback-title-input");
     }
 
+    private ChannelPageData pageWithDrops(java.util.Map<String, fr.enimaloc.catapult.common.dto.channel.DropDto> drops) {
+        BindingDto delta = new BindingDto("binding-1", "AUTO", "STEAM", "Delta Force", "1282866981", "Delta Force",
+                false, true, Set.of(), true, false, Set.of());
+        BindingDto other = new BindingDto("binding-2", "AUTO", "STEAM", "Other", "7", "Other",
+                false, true, Set.of(), true, false, Set.of());
+        return new ChannelPageData(
+                new ChannelUserDto("id-1", "twitch-1", "enimaloc", "https://example.test/avatar.png"),
+                "enimaloc", false, true, true, null,
+                new PagedBindings(0, 1, 2, List.of(delta, other)),
+                List.of(), Set.of(), List.of(), Set.of(),
+                null, null, null, null, null, null, null, null, drops);
+    }
+
+    @Test
+    void dropsChipAndFilter_onlyWhenTheExperimentOffersThem() throws Exception {
+        when(apiService.channelSettings(any())).thenReturn(null);
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(pageWithDrops(java.util.Map.of(
+                "1282866981", new fr.enimaloc.catapult.common.dto.channel.DropDto("SEASON AURORA",
+                        java.time.Instant.parse("2026-11-25T12:00:00Z"), "https://example.test/aurora"))));
+
+        String offered = mvc.perform(get("/spa/channel/enimaloc")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(countOccurrences(offered, "class=\"binding-drops-chip\"")).isEqualTo(1);
+        assertThat(offered).contains("href=\"https://example.test/aurora\"", "target=\"_blank\"",
+                "rel=\"noopener noreferrer\"", "SEASON AURORA", "25/11", "source=DROPS");
+
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(pageWithDrops(null));
+        String hidden = mvc.perform(get("/spa/channel/enimaloc")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(hidden).doesNotContain("binding-drops-chip", "source=DROPS");
+    }
+
     @Test
     void raidCard_offSuggestsFifteenMinutes() throws Exception {
         when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(channelPageData(false));

@@ -41,6 +41,10 @@ import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.binding.GameStateService;
 import fr.enimaloc.catapult.service.binding.RaidRestoreGateService;
 import fr.enimaloc.catapult.service.title.StreamTitleService;
+import fr.enimaloc.catapult.service.drops.DropsCatalog;
+import fr.enimaloc.catapult.service.drops.DropsGate;
+import fr.enimaloc.catapult.common.dto.channel.DropDto;
+import fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
 import fr.enimaloc.catapult.service.connections.SteamProfileDiagnostics;
 import fr.enimaloc.catapult.service.connections.SteamProfileDto;
@@ -93,6 +97,8 @@ public class ChannelDashboardAssembler {
     private final CustomBindingViews customBindingViews;
     private final TwitchCategoryCacheRepository twitchCategoryCache;
     private final StreamTitleService streamTitle;
+    private final DropsGate dropsGate;
+    private final DropsCatalog dropsCatalog;
 
     @Value("${xbox.enabled:false}")
     private boolean xboxEnabled;
@@ -117,6 +123,12 @@ public class ChannelDashboardAssembler {
         Optional<UserSettings> settings = userSettingsRepository.findById(channel.getId());
         // One read (or creation, on a first view) for both the OBS and the Twitchat parts
         TwitchatWidgetSettings widget = owner ? twitchatWidgetSettingsService.getOrCreate(channel) : null;
+        // Asked of the channel, whose drops they are; the "with drops" filter is the DROPS source, only with them
+        boolean drops = dropsGate.isAvailableFor(channel);
+        boolean dropsFilter = DROPS_FILTER.equalsIgnoreCase(source);
+        String shownSource = dropsFilter ? (drops ? DROPS_FILTER : null) : source;
+        PagedBindings shown = bindings(channel, page, status, dropsFilter ? null : source, dropsFilter && drops);
+        CustomBindingsStateDto custom = owner ? customBindingViews.stateIfEnabled(channel) : null;
 
         return new ChannelPageData(
                 channelUser(channel),
@@ -125,19 +137,37 @@ public class ChannelDashboardAssembler {
                 streamStateService.isLive(channel),
                 channel.isBotEnabled(),
                 detected.map(game -> toGameDto(channel, game)).orElse(null),
-                bindings(channel, page, status, source),
+                shown,
                 availableCcls(),
                 settings.map(UserSettings::getBlockedCcls).orElse(Set.of()),
                 availableTws(),
                 settings.map(UserSettings::getBlockedTws).orElse(Set.of()),
                 status,
-                source,
+                shownSource,
                 steamData(channel, owner),
                 xboxEnabled ? new XboxData(hasXboxToken(channel)) : null,
                 owner ? minecraftData(channel) : null,
                 owner ? obsData(widget) : null,
                 owner ? TwitchatData.of(widget.getTwitchatBranch()) : null,
-                owner ? customBindingViews.stateIfEnabled(channel) : null);
+                custom,
+                drops ? drops(channel, shown, custom) : null);
+    }
+
+    /** The source value of the "with drops" filter. */
+    static final String DROPS_FILTER = "DROPS";
+
+    /** By category, the campaign running for the channel that ends the soonest, for the categories on the page. */
+    private Map<String, DropDto> drops(UserAccount channel, PagedBindings bindings, CustomBindingsStateDto custom) {
+        Set<String> categories = new java.util.HashSet<>();
+        bindings.content().stream().map(BindingDto::twitchGameId).filter(Objects::nonNull).forEach(categories::add);
+        if (custom != null) {
+            custom.bindings().stream().map(b -> b.twitchGameId()).filter(Objects::nonNull).forEach(categories::add);
+        }
+        // A HashMap: the page looks a binding without a category up too
+        Map<String, DropDto> drops = new java.util.HashMap<>();
+        dropsCatalog.firstEndingFor(channel.getTwitchId(), categories).forEach((category, campaign) ->
+                drops.put(category, new DropDto(campaign.name(), campaign.endAt(), campaign.detailsUrl())));
+        return drops;
     }
 
     private static ChannelUserDto channelUser(UserAccount channel) {
@@ -145,11 +175,17 @@ public class ChannelDashboardAssembler {
                 channel.getProfileImageUrl());
     }
 
-    /** One page of bindings, filtered by status (which wins; AUTO includes MAPPED) or source type. */
-    private PagedBindings bindings(UserAccount channel, int page, String status, String source) {
+    /**
+     * One page of bindings, filtered by status (which wins; AUTO includes MAPPED), source type, or to the categories
+     * with a drops campaign running for the channel ({@code withDrops}).
+     */
+    private PagedBindings bindings(UserAccount channel, int page, String status, String source, boolean withDrops) {
         PageRequest request = PageRequest.of(page, BINDINGS_PAGE_SIZE);
         Page<GameBinding> bindings;
-        if (status != null && !status.isBlank()) {
+        if (withDrops && (status == null || status.isBlank())) {
+            bindings = gameBindingRepository.findByUserAndTwitchGameIdIn(channel,
+                    dropsCatalog.runningCategoryIds(channel.getTwitchId()), request);
+        } else if (status != null && !status.isBlank()) {
             GameBinding.Status wanted = GameBinding.Status.valueOf(status.toUpperCase());
             Set<GameBinding.Status> statuses = wanted == GameBinding.Status.AUTO
                     ? Set.of(GameBinding.Status.AUTO, GameBinding.Status.MAPPED)

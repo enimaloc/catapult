@@ -91,6 +91,14 @@ class DropsCatalogTest {
     }
 
     @Test
+    void runningCategoryIds_forTheChannel() {
+        listed(campaign("a", "1", NOW.plusSeconds(60), false), campaign("b", "2", NOW.plusSeconds(60), true, "43"),
+                campaign("c", "3", NOW.minusSeconds(1), false));
+
+        assertThat(catalog.runningCategoryIds("42")).containsExactly("1");
+    }
+
+    @Test
     void refreshOff_neverCallsTtvdrops() {
         DropsCatalog off = new DropsCatalog(client, clock, false, Duration.ofHours(2));
         when(client.activeCampaigns()).thenThrow(new AssertionError("called"));

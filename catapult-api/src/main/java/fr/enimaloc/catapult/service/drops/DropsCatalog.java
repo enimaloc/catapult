@@ -68,6 +68,13 @@ public class DropsCatalog {
                 .toList();
     }
 
+    /** The categories with a campaign running for the channel. */
+    public java.util.Set<String> runningCategoryIds(String channelTwitchId) {
+        Instant now = clock.instant();
+        return campaigns().stream().filter(c -> c.runningFor(channelTwitchId, now)).map(DropCampaign::gameId)
+                .collect(java.util.stream.Collectors.toSet());
+    }
+
     /** For each of {@code categoryIds} with one, the campaign running for the channel that ends the soonest. */
     public Map<String, DropCampaign> firstEndingFor(String channelTwitchId, Collection<String> categoryIds) {
         Map<String, DropCampaign> first = new LinkedHashMap<>();
