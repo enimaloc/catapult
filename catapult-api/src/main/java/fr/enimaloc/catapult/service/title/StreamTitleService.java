@@ -2,9 +2,14 @@ package fr.enimaloc.catapult.service.title;
 
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.account.UserSettings;
+import fr.enimaloc.catapult.domain.binding.CustomBinding;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.title.StreamTitleState;
 import fr.enimaloc.catapult.repository.title.StreamTitleStateRepository;
+import fr.enimaloc.catapult.service.category.CategoryChain;
+import fr.enimaloc.catapult.service.drops.DropCampaign;
+import fr.enimaloc.catapult.service.drops.DropsCatalog;
+import fr.enimaloc.catapult.service.drops.DropsGate;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -12,6 +17,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
 
@@ -37,8 +44,13 @@ public class StreamTitleService {
     public static final int MAX_LENGTH = TitleTemplate.MAX_LENGTH;
 
 
+    private static final java.time.format.DateTimeFormatter DROP_END =
+            java.time.format.DateTimeFormatter.ofPattern("dd/MM").withZone(java.time.ZoneId.of("Europe/Paris"));
+
     private final ExperimentService experimentService;
     private final StreamTitleStateRepository stateRepository;
+    private final DropsGate dropsGate;
+    private final DropsCatalog dropsCatalog;
 
     /**
      * A title to send, with the one the stream had before ({@code before}, empty when it couldn't be read), what
@@ -67,23 +79,60 @@ public class StreamTitleService {
     }
 
     /**
-     * The title to send with {@code binding}'s category, empty when none is to be sent. {@code currentTitle} (the
-     * stream's title on Twitch) is read once whenever a title is to be sent: it tells a title changed by hand.
+     * The title to send with {@code binding}'s category, empty when none is to be sent. {@code labelSent}: a content
+     * label goes out with it ({@code IS_MATURE}). {@code currentTitle} (the stream's title on Twitch) is read once
+     * whenever a title is to be sent: it tells a title changed by hand.
      */
     public Optional<PlannedTitle> titleFor(UserAccount user, UserSettings settings, GameBinding binding,
-                                           Supplier<Optional<String>> currentTitle) {
+                                           boolean labelSent, Supplier<Optional<String>> currentTitle) {
         if (!sendsTitles(user, settings)) return Optional.empty();
         String template = hasText(binding.getTitle()) ? binding.getTitle() : settings.getTitleTemplate();
-        String game = binding.getGameName() != null ? binding.getGameName() : binding.getSourceName();
-        return plan(user, template, game, binding.getTwitchGameName(), currentTitle);
+        return plan(user, template, before -> context(user, settings, binding, false, labelSent, before), currentTitle);
     }
 
     /** The title to send with the "no game" category (its own, else the channel-wide one), no game being played. */
-    public Optional<PlannedTitle> titleForNoGame(UserAccount user, UserSettings settings,
+    public Optional<PlannedTitle> titleForNoGame(UserAccount user, UserSettings settings, boolean labelSent,
                                                  Supplier<Optional<String>> currentTitle) {
         if (!sendsTitles(user, settings)) return Optional.empty();
         String template = hasText(settings.getNoGameTitle()) ? settings.getNoGameTitle() : settings.getTitleTemplate();
-        return plan(user, template, "", settings.getNoGameTwitchGameName(), currentTitle);
+        return plan(user, template, before -> context(user, settings, null, true, labelSent, before), currentTitle);
+    }
+
+    /**
+     * What a title is rendered with for {@code binding} ({@code noGame}: the "no game" reset, without a binding):
+     * its game and category, the title {@code before} it and the streamer's own, and its conditions — the drops ones
+     * only while the channel is in both {@value DropsGate#EXPERIMENT_KEY} and {@value #CONDITIONS_KEY}.
+     */
+    TitleContext context(UserAccount user, UserSettings settings, GameBinding binding, boolean noGame,
+                         boolean labelSent, Optional<String> before) {
+        String source = binding == null ? null : binding.getSourceName();
+        boolean isNoGame = noGame || CategoryChain.NO_GAME_FALLBACK_SOURCE.equals(source);
+        String game = binding == null ? "" : binding.getGameName() != null ? binding.getGameName() : source;
+        String category = binding == null ? settings.getNoGameTwitchGameName() : binding.getTwitchGameName();
+        String categoryId = binding == null ? settings.getNoGameTwitchGameId() : binding.getTwitchGameId();
+
+        Map<String, Boolean> conditions = new HashMap<>();
+        conditions.put("IS_NO_GAME", isNoGame);
+        conditions.put("HAS_GAME", !isNoGame && hasText(game));
+        conditions.put("IS_CUSTOM", source != null && source.startsWith(CustomBinding.SOURCE_NAME_PREFIX));
+        conditions.put("IS_INCOMPLETE", CategoryChain.INCOMPLETE_FALLBACK_SOURCE.equals(source));
+        conditions.put("HAS_TW", binding != null && settings.isTwFeatureEnabled() && binding.isTwEnabled()
+                && !binding.getTws().isEmpty());
+        conditions.put("IS_MATURE", labelSent);
+
+        DropCampaign drop = null;
+        if (conditionsAvailableReadOnly(user) && dropsGate.isAvailableReadOnly(user)) {
+            drop = dropsCatalog.runningFor(user.getTwitchId(), categoryId).stream().findFirst().orElse(null);
+        }
+        conditions.put("DROP_ENABLED", drop != null);
+
+        Optional<String> original = before.map(current -> stateRepository.findById(user.getId())
+                // Still the title Catapult sent last: the streamer's own is the one remembered
+                .filter(state -> current.equals(state.getLastSentTitle()) && state.getOriginalTitle() != null)
+                .map(StreamTitleState::getOriginalTitle)
+                .orElse(current));
+        return new TitleContext(game, category, () -> before, () -> original, conditions,
+                drop == null ? null : drop.name(), drop == null ? null : DROP_END.format(drop.endAt()));
     }
 
     /**
@@ -104,16 +153,13 @@ public class StreamTitleService {
         }
     }
 
-    private Optional<PlannedTitle> plan(UserAccount user, String template, String gameName, String categoryName,
+    private Optional<PlannedTitle> plan(UserAccount user, String template,
+                                        java.util.function.Function<Optional<String>, TitleContext> context,
                                         Supplier<Optional<String>> currentTitle) {
         if (!hasText(template)) return Optional.empty();
         Optional<String> before = currentTitle.get();
-        Optional<String> original = before.map(current -> stateRepository.findById(user.getId())
-                // Still the title Catapult sent last: the streamer's own is the one remembered
-                .filter(state -> current.equals(state.getLastSentTitle()) && state.getOriginalTitle() != null)
-                .map(StreamTitleState::getOriginalTitle)
-                .orElse(current));
-        return render(template, gameName, categoryName, before, original).map(title -> new PlannedTitle(title, before));
+        return TitleTemplate.render(template, context.apply(before), conditionsAvailableReadOnly(user))
+                .map(title -> new PlannedTitle(title, before));
     }
 
     /**

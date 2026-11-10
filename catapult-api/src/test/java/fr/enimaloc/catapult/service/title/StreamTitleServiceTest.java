@@ -36,6 +36,8 @@ class StreamTitleServiceTest {
 
     @Mock ExperimentService experimentService;
     @Mock StreamTitleStateRepository stateRepository;
+    @Mock fr.enimaloc.catapult.service.drops.DropsGate dropsGate;
+    @Mock fr.enimaloc.catapult.service.drops.DropsCatalog dropsCatalog;
 
     StreamTitleService service;
     UserAccount user;
@@ -43,7 +45,7 @@ class StreamTitleServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new StreamTitleService(experimentService, stateRepository);
+        service = new StreamTitleService(experimentService, stateRepository, dropsGate, dropsCatalog);
         user = new UserAccount();
         user.setId(UUID.randomUUID());
         settings = new UserSettings();
@@ -74,7 +76,7 @@ class StreamTitleServiceTest {
     }
 
     private Optional<String> titleFor(GameBinding binding, Supplier<Optional<String>> current) {
-        return service.titleFor(user, settings, binding, current).map(PlannedTitle::title);
+        return service.titleFor(user, settings, binding, false, current).map(PlannedTitle::title);
     }
 
     @Test
@@ -102,8 +104,8 @@ class StreamTitleServiceTest {
         };
 
         assertThat(titleFor(binding("Hades II", "Mine"), counted)).isEmpty();
-        assertThat(service.titleForNoGame(user, settings, counted)).isEmpty();
-        assertThat(service.titleFor(user, null, binding("Hades II", "Mine"), counted)).isEmpty();
+        assertThat(service.titleForNoGame(user, settings, false, counted)).isEmpty();
+        assertThat(service.titleFor(user, null, binding("Hades II", "Mine"), false, counted)).isEmpty();
         assertThat(reads).hasValue(0);
     }
 
@@ -147,11 +149,11 @@ class StreamTitleServiceTest {
     void theNoGameTitle_isItsOwn_elseTheTemplate_withNoGame() {
         settings.setNoGameTwitchGameName("Just Chatting");
         settings.setTitleTemplate("Playing {{GAME}} in {{CATEGORY}}");
-        assertThat(service.titleForNoGame(user, settings, current("Old")).map(PlannedTitle::title))
+        assertThat(service.titleForNoGame(user, settings, false, current("Old")).map(PlannedTitle::title))
                 .contains("Playing  in Just Chatting");
 
         settings.setNoGameTitle("Chatting in {{CATEGORY}}");
-        assertThat(service.titleForNoGame(user, settings, current("Old")).map(PlannedTitle::title))
+        assertThat(service.titleForNoGame(user, settings, false, current("Old")).map(PlannedTitle::title))
                 .contains("Chatting in Just Chatting");
     }
 
@@ -160,7 +162,7 @@ class StreamTitleServiceTest {
         settings.setTitleTemplate("{{TITLE}} | {{GAME}} | {{TITLE}}");
         AtomicInteger reads = new AtomicInteger();
 
-        Optional<PlannedTitle> planned = service.titleFor(user, settings, binding("Doom", null), () -> {
+        Optional<PlannedTitle> planned = service.titleFor(user, settings, binding("Doom", null), false, () -> {
             reads.incrementAndGet();
             return Optional.of("Chill $ night");
         });
@@ -175,7 +177,7 @@ class StreamTitleServiceTest {
         assertThat(titleFor(binding("Doom", null), Optional::empty)).isEmpty();
 
         settings.setTitleTemplate("Now: {{GAME}}");
-        assertThat(service.titleFor(user, settings, binding("Doom", null), Optional::empty))
+        assertThat(service.titleFor(user, settings, binding("Doom", null), false, Optional::empty))
                 .contains(new PlannedTitle("Now: Doom", Optional.empty()));
     }
 
@@ -217,6 +219,82 @@ class StreamTitleServiceTest {
         verify(stateRepository, org.mockito.Mockito.times(2)).save(saved.capture());
         assertThat(saved.getAllValues()).allSatisfy(s -> assertThat(s.getOriginalTitle()).isEqualTo("Chill night"));
         assertThat(saved.getValue().getLastSentTitle()).isEqualTo("Chill night — Celeste");
+    }
+
+    /** With the conditions experiment on, {@code template} rendered for {@code binding} ({@code labelSent} as given). */
+    private Optional<String> conditioned(String template, GameBinding binding, boolean labelSent) {
+        when(experimentService.isRolledOut(user, StreamTitleService.CONDITIONS_KEY)).thenReturn(true);
+        settings.setTitleTemplate(template);
+        return service.titleFor(user, settings, binding, labelSent, current("Old")).map(PlannedTitle::title);
+    }
+
+    @Test
+    void conditions_ofTheBindingApplied() {
+        String t = "{{HAS_GAME ? [[g]] : [[-]]}}{{IS_CUSTOM ? [[c]] : [[-]]}}{{IS_INCOMPLETE ? [[i]] : [[-]]}}"
+                + "{{IS_NO_GAME ? [[n]] : [[-]]}}";
+        assertThat(conditioned(t, binding("Doom", null), false)).contains("g---");
+
+        GameBinding custom = binding("Art", null);
+        custom.setSourceName(fr.enimaloc.catapult.domain.binding.CustomBinding.SOURCE_NAME_PREFIX + "Art");
+        custom.setGameName("Art");
+        assertThat(conditioned(t, custom, false)).contains("gc--");
+
+        GameBinding incomplete = binding("Just Chatting", null);
+        incomplete.setSourceName(fr.enimaloc.catapult.service.category.CategoryChain.INCOMPLETE_FALLBACK_SOURCE);
+        incomplete.setGameName("Indie");
+        assertThat(conditioned(t, incomplete, false)).contains("g-i-");
+
+        GameBinding noGame = binding("Just Chatting", null);
+        noGame.setSourceName(fr.enimaloc.catapult.service.category.CategoryChain.NO_GAME_FALLBACK_SOURCE);
+        noGame.setGameName("Ignored Game");
+        assertThat(conditioned(t, noGame, false)).as("an ignored game is no game").contains("---n");
+    }
+
+    @Test
+    void hasTw_needsTheBindingsTwsSwitchedOnAndTheChannels() {
+        String t = "{{HAS_TW ? [[tw]] : [[none]]}}";
+        GameBinding b = binding("Doom", null);
+        b.getTws().add("spiders");
+        settings.setTwFeatureEnabled(true);
+        assertThat(conditioned(t, b, false)).contains("tw");
+
+        b.setTwEnabled(false);
+        assertThat(conditioned(t, b, false)).contains("none");
+        b.setTwEnabled(true);
+        settings.setTwFeatureEnabled(false);
+        assertThat(conditioned(t, b, false)).contains("none");
+        settings.setTwFeatureEnabled(true);
+        b.getTws().clear();
+        assertThat(conditioned(t, b, false)).contains("none");
+    }
+
+    @Test
+    void isMature_isALabelSent() {
+        assertThat(conditioned("{{IS_MATURE ? [[18+]] : [[all]]}}", binding("Doom", null), true)).contains("18+");
+        assertThat(conditioned("{{IS_MATURE ? [[18+]] : [[all]]}}", binding("Doom", null), false)).contains("all");
+    }
+
+    @Test
+    void dropEnabled_needsBothExperiments_andNamesTheSoonestCampaign() {
+        user.setTwitchId("42");
+        GameBinding b = binding("Delta Force", null);
+        b.setTwitchGameId("1282866981");
+        when(dropsCatalog.runningFor("42", "1282866981")).thenReturn(java.util.List.of(new fr.enimaloc.catapult.service.drops.DropCampaign(
+                "c", "SEASON AURORA", "1282866981", "Delta Force", java.time.Instant.parse("2026-11-10T02:00:00Z"),
+                java.time.Instant.parse("2026-11-25T23:30:00Z"), "https://example.test", null, false, java.util.Set.of())));
+        String t = "{{DROP_ENABLED ? [[[Drops] {{DROP_NAME}} {{DROP_END}}]] : [[no drops]]}}";
+
+        assertThat(conditioned(t, b, false)).as("drops experiment off").contains("no drops");
+
+        when(dropsGate.isAvailableReadOnly(user)).thenReturn(true);
+        assertThat(conditioned(t, b, false)).as("25/11 23:30 UTC is 26/11 in Paris").contains("[Drops] SEASON AURORA 26/11");
+    }
+
+    @Test
+    void conditionsExperimentOff_leavesTheTernaryRaw() {
+        settings.setTitleTemplate("{{HAS_GAME ? [[g]] : [[-]]}}");
+
+        assertThat(titleFor(binding("Doom", null), current("Old"))).contains("{{HAS_GAME ? [[g]] : [[-]]}}");
     }
 
     @Test
