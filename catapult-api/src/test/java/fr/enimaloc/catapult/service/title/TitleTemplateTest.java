@@ -128,4 +128,31 @@ class TitleTemplateTest {
                 .hasValueSatisfying(t -> assertThat(t).hasSize(140));
         assertThat(render("{{HAS_GAME ? [[x]] : [[  ]]}}", Map.of())).isEmpty();
     }
+
+    /** The renderer before conditions: the leftmost exact variable, everything else as typed. */
+    private static String before(String template) {
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("\\{\\{(GAME|CATEGORY|TITLE|ORIGINAL_TITLE)}}").matcher(template);
+        StringBuilder out = new StringBuilder();
+        while (m.find()) m.appendReplacement(out, switch (m.group(1)) {
+            case "GAME" -> "Doom";
+            case "CATEGORY" -> "DOOM";
+            default -> "T";
+        });
+        return m.appendTail(out).toString().strip();
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"{{{GAME}}}", "{{GAME}}}", "{{{GAME}}", "Hi {{ oops {{GAME}} end",
+            "{{ {{GAME}}", "{{GAME}}{{CATEGORY}}", "a {{ b }} {{GAME}}", "x}} {{GAME}} {{", "{{{{GAME}}}}"})
+    void braceAdjacentAndStrayBraces_renderAsBefore_inBothModes(String template) {
+        TitleContext ctx = new TitleContext("Doom", "DOOM", () -> Optional.of("T"), () -> Optional.of("T"), Map.of(), null, null);
+
+        assertThat(TitleTemplate.render(template, ctx, false)).as("conditions off").contains(before(template));
+        assertThat(TitleTemplate.render(template, ctx, true)).as("conditions on").contains(before(template));
+    }
+
+    @Test
+    void aStrayDoubleBrace_afterAResolvedTernary_leavesTheRestRendered() {
+        assertThat(render("{{HAS_GAME ? [[a]] : [[b]]}} {{ {{GAME}}", Map.of("HAS_GAME", true))).contains("a {{ Doom");
+    }
 }

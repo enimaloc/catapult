@@ -52,22 +52,22 @@ public final class TitleTemplate {
             out.append(text, i, open);
             int close = text.indexOf("}}", open + 2);
             String name = close < 0 ? null : text.substring(open + 2, close);
+            Ternary ternary;
+            int failed;
             if (name != null && VARIABLES.contains(name)) {
                 out.append(value(name, context));
                 i = close + 2;
-            } else if (conditions) {
-                Ternary ternary = Ternary.read(text, open, context);
-                if (ternary != null) {
-                    out.append(expand(ternary.chosen(), context, true));
-                    i = ternary.end();
-                } else {
-                    int end = matchingClose(text, open);
-                    out.append(text, open, end);
-                    i = end;
-                }
+            } else if (conditions && (ternary = Ternary.read(text, open, context)) != null) {
+                out.append(expand(ternary.chosen(), context, true));
+                i = ternary.end();
+            } else if (conditions && (failed = failedTernaryEnd(text, open)) > 0) {
+                // A ternary that doesn't read through stays as typed, the rest of the title still rendered
+                out.append(text, open, failed);
+                i = failed;
             } else {
-                out.append("{{");
-                i = open + 2;
+                // Not one of ours: one brace as typed, a variable may start at the next one ({{{GAME}}})
+                out.append('{');
+                i = open + 1;
             }
         }
         return out.toString();
@@ -84,7 +84,18 @@ public final class TitleTemplate {
         };
     }
 
-    /** The end (exclusive) of the {@code {{…}}} opened at {@code open}, nested pairs counted; the text's end when none. */
+    /**
+     * The end of the {@code {{…}}} opened at {@code open} when it was written as a ternary (a {@code ?} and a
+     * {@code [[}) that doesn't read through; -1 otherwise, a stray {@code {{} included.
+     */
+    private static int failedTernaryEnd(String text, int open) {
+        int end = matchingClose(text, open);
+        if (end < 0) return -1;
+        String span = text.substring(open, end);
+        return span.indexOf('?') > 0 && span.contains("[[") ? end : -1;
+    }
+
+    /** The end (exclusive) of the {@code {{…}}} opened at {@code open}, nested pairs counted; -1 when unbalanced. */
     private static int matchingClose(String text, int open) {
         int depth = 0;
         int i = open;
@@ -100,7 +111,7 @@ public final class TitleTemplate {
                 i++;
             }
         }
-        return text.length();
+        return -1;
     }
 
     private static String orEmpty(String s) {
