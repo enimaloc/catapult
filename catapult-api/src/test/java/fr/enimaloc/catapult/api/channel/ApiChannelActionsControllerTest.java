@@ -143,6 +143,15 @@ class ApiChannelActionsControllerTest extends ApiChannelActionsTestSupport {
         }
 
         @Test
+        void title_withAVariableNotWrittenExactly_isRefused() throws Exception {
+            when(streamTitle.isAvailableFor(owner)).thenReturn(true);
+
+            mvc.perform(as(owner, HttpMethod.PUT, "/bindings/" + bindingId + "/title", "{\"title\":\"{{game}} run\"}"))
+                    .andExpect(status().isBadRequest());
+            verify(bindingService, never()).setTitle(any(), any(), any());
+        }
+
+        @Test
         void title_longerThanATitle_isRefused() throws Exception {
             when(streamTitle.isAvailableFor(owner)).thenReturn(true);
 

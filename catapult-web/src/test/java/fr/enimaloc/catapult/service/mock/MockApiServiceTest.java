@@ -533,6 +533,9 @@ class MockApiServiceTest {
                 new fr.enimaloc.catapult.event.binding.BindingTitleEvent(username, bindingId, "{{GAME}} blind"),
                 new fr.enimaloc.catapult.event.binding.BindingTitleEvent(username, bindingId, ""));
         assertThat(service.bindingTitle(username, bindingId, "x".repeat(141))).isEqualTo(400);
+        assertThat(service.bindingTitle(username, bindingId, "{{ GAME }}")).isEqualTo(400);
+        assertThat(service.saveTitleSettings(username, true, "{{ORIGINAL_TITLE}} {{game}}")).isEqualTo(400);
+        assertThat(service.saveTitleSettings(username, true, "{{ORIGINAL_TITLE}} — {{GAME}}")).isEqualTo(204);
     }
 
     @Test

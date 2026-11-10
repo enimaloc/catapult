@@ -195,13 +195,15 @@ public class TwitchServiceImpl implements TwitchService {
             Set<String> blocked = (userSettings != null && binding.getId() != null) ? userSettings.getBlockedCcls() : Set.of();
             body.put("content_classification_labels", buildCclPayload(binding.getCcls(), blocked));
         }
-        streamTitleService.titleFor(user, userSettings, binding, () -> currentTitle(user, accessToken))
-                .ifPresent(title -> body.put("title", title));
+        Optional<StreamTitleService.PlannedTitle> title =
+            streamTitleService.titleFor(user, userSettings, binding, () -> currentTitle(user, accessToken));
+        title.ifPresent(planned -> body.put("title", planned.title()));
 
         try {
             patchRefreshingTheToken(user, token, accessToken, body);
             log.info("Twitch channel updated for user {} — game_id={}, ccls={}, title={}",
                 user.getId(), binding.getTwitchGameId(), binding.getCcls(), body.get("title"));
+            title.ifPresent(planned -> streamTitleService.sent(user, planned));
             // Marker only: the Twitchat notification is emitted once, from
             // TwitchEventSubService's channel.update handler, when Twitch confirms the change.
             categoryChangeStateService.recordCatapultChangeAndReturnPrevious(user, binding.getTwitchGameId());
@@ -339,12 +341,14 @@ public class TwitchServiceImpl implements TwitchService {
         if (settings.isCclFeatureEnabled() && !settings.getNoGameCcls().isEmpty()) {
             body.put("content_classification_labels", buildCclPayload(settings.getNoGameCcls(), Set.of()));
         }
-        streamTitleService.titleForNoGame(user, settings, () -> currentTitle(user, accessToken))
-                .ifPresent(title -> body.put("title", title));
+        Optional<StreamTitleService.PlannedTitle> title =
+            streamTitleService.titleForNoGame(user, settings, () -> currentTitle(user, accessToken));
+        title.ifPresent(planned -> body.put("title", planned.title()));
         try {
             patchRefreshingTheToken(user, token, accessToken, body);
-            log.info("Twitch channel reset to default for user {} — game_id={}, ccls={}",
-                user.getId(), settings.getNoGameTwitchGameId(), settings.getNoGameCcls());
+            log.info("Twitch channel reset to default for user {} — game_id={}, ccls={}, title={}",
+                user.getId(), settings.getNoGameTwitchGameId(), settings.getNoGameCcls(), body.get("title"));
+            title.ifPresent(planned -> streamTitleService.sent(user, planned));
             // The default category is Catapult's change, like any other: the channel.update it
             // triggers must not be reported to the streamer as a manual change.
             categoryChangeStateService.recordCatapultChangeAndReturnPrevious(user, settings.getNoGameTwitchGameId());
@@ -451,8 +455,8 @@ public class TwitchServiceImpl implements TwitchService {
     }
 
     /**
-     * The channel's title as Twitch has it now, for a {@code {{TITLE}}} template; empty when it can't be read (logged:
-     * the title is then left alone, the category still sent).
+     * The channel's title as Twitch has it now, read before sending a title; empty when it can't be read (logged: a
+     * template using it is then left alone, the category still sent).
      */
     private Optional<String> currentTitle(UserAccount user, String accessToken) {
         try {

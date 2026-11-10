@@ -348,7 +348,7 @@ public class MockApiService implements ApiService {
     public int bindingTitle(String username, String bindingId, String title) {
         log.trace("bindingTitle({}, {}, {})", username, bindingId, title);
         String cleaned = title == null || title.isBlank() ? null : title.strip();
-        if (cleaned != null && cleaned.codePointCount(0, cleaned.length()) > 140) return 400;
+        if (!validTitle(cleaned)) return 400;
         currentData().setBindingTitle(bindingId, cleaned);
         eventPublisher.publishEvent(new BindingTitleEvent(username, bindingId, cleaned == null ? "" : cleaned));
         return NO_CONTENT;
@@ -619,10 +619,21 @@ public class MockApiService implements ApiService {
     public int saveTitleSettings(String username, boolean enabled, String template) {
         log.trace("saveTitleSettings({}, {}, {})", username, enabled, template);
         String cleaned = template == null || template.isBlank() ? null : template.strip();
-        if (cleaned != null && cleaned.codePointCount(0, cleaned.length()) > 140) return 400;
+        if (!validTitle(cleaned)) return 400;
         currentData().saveTitleSettings(enabled, cleaned);
         publishSettings(username);
         return NO_CONTENT;
+    }
+
+    // Anything written like a title variable: only {{GAME}}, {{TITLE}} and {{ORIGINAL_TITLE}} are, as in catapult-api
+    private static final java.util.regex.Pattern TITLE_VARIABLE_LIKE = java.util.regex.Pattern.compile("\\{\\{([^{}]*)}}");
+
+    /** A title or template catapult-api would take: at most 140 characters, its variables written exactly. */
+    private static boolean validTitle(String title) {
+        if (title == null) return true;
+        if (title.codePointCount(0, title.length()) > 140) return false;
+        return TITLE_VARIABLE_LIKE.matcher(title).results()
+                .allMatch(m -> Set.of("GAME", "TITLE", "ORIGINAL_TITLE").contains(m.group(1)));
     }
 
     /** Validated like catapult-api: 1..120 minutes, null or 0 for off, else 400. */

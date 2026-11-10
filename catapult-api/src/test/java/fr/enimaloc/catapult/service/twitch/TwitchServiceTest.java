@@ -324,20 +324,35 @@ class TwitchServiceTest {
     @Test
     void updateChannel_sendsTheTitle_whenThereIsOne() {
         GameBinding binding = binding(GameBinding.Status.AUTO, false, true, Set.of());
-        when(streamTitleService.titleFor(eq(user), any(), eq(binding), any())).thenReturn(Optional.of("Elden Ring tonight"));
+        StreamTitleService.PlannedTitle planned = new StreamTitleService.PlannedTitle("Elden Ring tonight", Optional.of("Old"));
+        when(streamTitleService.titleFor(eq(user), any(), eq(binding), any())).thenReturn(Optional.of(planned));
 
         twitchService.updateChannelReporting(user, binding);
 
         ArgumentCaptor<Map> bodyCaptor = ArgumentCaptor.forClass(Map.class);
         verify(bodySpec).body(bodyCaptor.capture());
         assertThat(bodyCaptor.getValue()).containsEntry("title", "Elden Ring tonight");
+        verify(streamTitleService).sent(user, planned);
+    }
+
+    @Test
+    void updateChannel_aRefusedPatch_remembersNoTitle() {
+        GameBinding binding = binding(GameBinding.Status.AUTO, false, true, Set.of());
+        when(streamTitleService.titleFor(eq(user), any(), eq(binding), any()))
+                .thenReturn(Optional.of(new StreamTitleService.PlannedTitle("Elden Ring tonight", Optional.empty())));
+        doThrow(new HttpServerErrorException(HttpStatus.BAD_GATEWAY)).when(responseSpec).toBodilessEntity();
+
+        assertThat(twitchService.updateChannelReporting(user, binding)).isEqualTo(ChannelUpdateOutcome.FAILED);
+
+        verify(streamTitleService, never()).sent(any(), any());
     }
 
     @Test
     void updateChannel_theCurrentTitle_isReadFromTwitch_forATitleTemplate() {
         GameBinding binding = binding(GameBinding.Status.AUTO, false, true, Set.of());
         when(streamTitleService.titleFor(eq(user), any(), eq(binding), any())).thenAnswer(call ->
-                call.<java.util.function.Supplier<Optional<String>>>getArgument(3).get().map(t -> t + " | Doom"));
+                call.<java.util.function.Supplier<Optional<String>>>getArgument(3).get()
+                        .map(t -> new StreamTitleService.PlannedTitle(t + " | Doom", Optional.of(t))));
         doReturn(new TwitchServiceImpl.WrappedListResponse<>(List.of(new TwitchServiceImpl.ChannelInformation("Chill"))))
                 .when(getResponseSpec).body(any(ParameterizedTypeReference.class));
 
@@ -353,7 +368,8 @@ class TwitchServiceTest {
     void updateChannel_anUnreadableCurrentTitle_stillSendsTheCategory() {
         GameBinding binding = binding(GameBinding.Status.AUTO, false, true, Set.of());
         when(streamTitleService.titleFor(eq(user), any(), eq(binding), any())).thenAnswer(call ->
-                call.<java.util.function.Supplier<Optional<String>>>getArgument(3).get());
+                call.<java.util.function.Supplier<Optional<String>>>getArgument(3).get()
+                        .map(t -> new StreamTitleService.PlannedTitle(t, Optional.of(t))));
         doThrow(new HttpServerErrorException(HttpStatus.BAD_GATEWAY))
                 .when(getResponseSpec).body(any(ParameterizedTypeReference.class));
 
@@ -378,7 +394,8 @@ class TwitchServiceTest {
         UserSettings settings = new UserSettings();
         settings.setNoGameTwitchGameId("12345");
         when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
-        when(streamTitleService.titleForNoGame(eq(user), eq(settings), any())).thenReturn(Optional.of("Just Chatting time"));
+        when(streamTitleService.titleForNoGame(eq(user), eq(settings), any()))
+                .thenReturn(Optional.of(new StreamTitleService.PlannedTitle("Just Chatting time", Optional.empty())));
 
         twitchService.resetToDefault(user);
 
