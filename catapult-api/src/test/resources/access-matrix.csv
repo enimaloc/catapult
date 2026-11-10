@@ -34,6 +34,7 @@ GET,/api/me/bindings/{bindingId},,,401,401,401,401,401,401,PASS
 GET,/api/me/custom-bindings,,,401,401,401,401,401,401,PASS
 PUT,/api/me/custom-bindings/active,,"{""idOrName"":""matrix""}",401,401,401,401,401,401,PASS
 DELETE,/api/me/custom-bindings/active,,,401,401,401,401,401,401,PASS
+GET,/api/me/drops,,,401,401,401,401,401,401,GATED
 GET,/api/me/game,,,401,401,401,401,401,401,PASS
 GET,/api/me/game/summary,,,401,401,401,401,401,401,PASS
 # member
