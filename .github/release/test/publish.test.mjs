@@ -51,10 +51,7 @@ function mergedPull({
   return { number: 7, title, body, state: "closed", merged, base, head, headRepo, mergeCommitSha: sha("m") };
 }
 
-// promote.mjs stand-in: records the refreshes publish.mjs asks for, in the call order.
-const fakePromote = (gh) => async ({ source, target, appSlug }) => gh.calls.push(["promote", { source, target, appSlug }]);
-const run = (gh, pr, promote = fakePromote(gh)) =>
-  publish({ gh, pr, owner: OWNER, repo: REPO, appSlug: "catapult-release", promote });
+const run = (gh, pr) => publish({ gh, pr, owner: OWNER, repo: REPO });
 const named = (gh, name) => gh.calls.filter((c) => c[0] === name);
 const commit = (c, subject) => ({ sha: sha(c), subject, message: subject, author: OWNER, parents: [sha("0")] });
 
@@ -194,7 +191,6 @@ test("mergedBackportToBeta_opensTheBackportToDev", async () => {
   assert.equal(result.backports.length, 1);
   assert.deepEqual(opened(gh), [backport("dev", "beta", "v1.0.1")]);
   assert.deepEqual(named(gh, "createTag"), [], "a backport tags nothing");
-  assert.deepEqual(named(gh, "promote"), []);
 });
 
 test("mergedBackportToBeta_withoutBackportLabel_isRejected", async () => {
@@ -203,27 +199,13 @@ test("mergedBackportToBeta_withoutBackportLabel_isRejected", async () => {
   assert.deepEqual(named(gh, "createPull"), []);
 });
 
-test("betaTag_refreshesTheStablePromotionWithTheNewTag", async () => {
+// The beta -> main promotion is publish.yml's refresh-stable job's, under promote-beta: a beta's publication
+// opens no pull request itself, else it races promote.yml's run for the same push to beta.
+test("betaTag_opensNoPullRequest", async () => {
   const gh = fakeGitHub();
-  await run(gh, mergedPull());
-  const names = gh.calls.map(([name]) => name);
-  assert.deepEqual(named(gh, "promote"), [["promote", { source: "beta", target: "main", appSlug: "catapult-release" }]]);
-  assert.ok(names.indexOf("createTag") < names.indexOf("promote"), "refreshed once the tag exists");
-});
-
-test("stableTag_doesNotRefreshTheStablePromotion", async () => {
-  const gh = fakeGitHub();
-  await run(gh, mergedPull({ base: "main", head: "beta", title: "chore(release): v1.0.0" }));
-  assert.deepEqual(named(gh, "promote"), []);
-});
-
-test("refreshFailure_afterTheBetaTag_isOnlyLogged", async () => {
-  const gh = fakeGitHub();
-  const failing = async () => {
-    throw new Error("promote exploded");
-  };
-  assert.deepEqual(await run(gh, mergedPull(), failing), { tag: "v1.0.0-BETA.97", backports: [] });
-  assert.deepEqual(named(gh, "comment"), []);
+  assert.deepEqual(await run(gh, mergedPull()), { tag: "v1.0.0-BETA.97", backports: [] });
+  assert.deepEqual(named(gh, "createPull"), []);
+  assert.deepEqual(named(gh, "listPulls"), []);
 });
 
 test("mergedHotfixWithoutVersion_isReportedOnThePr", async () => {

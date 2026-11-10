@@ -55,6 +55,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -63,6 +64,7 @@ import java.util.concurrent.CompletableFuture;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -95,6 +97,12 @@ class ChannelDashboardAssemblerTest {
     private final fr.enimaloc.catapult.service.binding.CustomBindingService customBindings =
             mock(fr.enimaloc.catapult.service.binding.CustomBindingService.class);
     private final TwitchCategoryCacheRepository categoryCache = mock(TwitchCategoryCacheRepository.class);
+    private final fr.enimaloc.catapult.service.title.StreamTitleService streamTitle =
+            mock(fr.enimaloc.catapult.service.title.StreamTitleService.class);
+    private final fr.enimaloc.catapult.service.drops.DropsGate dropsGate =
+            mock(fr.enimaloc.catapult.service.drops.DropsGate.class);
+    private final fr.enimaloc.catapult.service.drops.DropsCatalog dropsCatalog =
+            mock(fr.enimaloc.catapult.service.drops.DropsCatalog.class);
 
     private UserAccount owner;
     private UserAccount moderator;
@@ -110,7 +118,8 @@ class ChannelDashboardAssemblerTest {
                         org.mockito.Mockito.mock(fr.enimaloc.catapult.service.premium.PremiumUiGate.class),
                         org.mockito.Mockito.mock(fr.enimaloc.catapult.service.binding.schedule.CustomBindingScheduleService.class),
                         org.mockito.Mockito.mock(fr.enimaloc.catapult.repository.binding.CustomBindingScheduleRepository.class),
-                        org.mockito.Mockito.mock(fr.enimaloc.catapult.service.premium.PremiumService.class)), categoryCache);
+                        org.mockito.Mockito.mock(fr.enimaloc.catapult.service.premium.PremiumService.class)), categoryCache,
+                streamTitle, dropsGate, dropsCatalog);
         ReflectionTestUtils.setField(assembler, "xboxEnabled", xboxEnabled);
         return assembler;
     }
@@ -170,6 +179,63 @@ class ChannelDashboardAssemblerTest {
 
     @Nested
     class Page {
+        private GameBinding bound(String categoryId) {
+            GameBinding binding = new GameBinding();
+            binding.setId(UUID.randomUUID());
+            binding.setUser(owner);
+            binding.setSourceType(GameBinding.SourceType.STEAM);
+            binding.setSourceName("Game " + categoryId);
+            binding.setStatus(GameBinding.Status.AUTO);
+            binding.setTwitchGameId(categoryId);
+            return binding;
+        }
+
+        private fr.enimaloc.catapult.service.drops.DropCampaign campaign(String categoryId) {
+            return new fr.enimaloc.catapult.service.drops.DropCampaign("c" + categoryId, "Season " + categoryId,
+                    categoryId, "Game", java.time.Instant.EPOCH, java.time.Instant.parse("2026-11-25T23:59:59Z"),
+                    "https://example.test/c", null, false, Set.of());
+        }
+
+        @Test
+        void drops_offeredOnlyWithTheExperiment_forThePagesCategories() {
+            owner.setTwitchId("42");
+            GameBinding delta = bound("1282866981");
+            GameBinding other = bound("7");
+            when(bindings.findByUser(eq(owner), any())).thenReturn(new PageImpl<>(List.of(delta, other)));
+            when(dropsCatalog.firstEndingFor(eq("42"), any())).thenReturn(Map.of("1282866981", campaign("1282866981")));
+
+            assertThat(assembler().page(owner, owner, "streamer", 0, null, null).drops()).isNull();
+
+            when(dropsGate.isAvailableFor(owner)).thenReturn(true);
+            ChannelPageData page = assembler().page(owner, owner, "streamer", 0, null, null);
+            assertThat(page.drops()).containsOnlyKeys("1282866981");
+            assertThat(page.drops().get("1282866981")).isEqualTo(new fr.enimaloc.catapult.common.dto.channel.DropDto(
+                    "Season 1282866981", java.time.Instant.parse("2026-11-25T23:59:59Z"), "https://example.test/c"));
+            assertThat(page.drops().get(null)).as("a binding without a category looks it up").isNull();
+        }
+
+        @Test
+        void withDrops_filtersToCategoriesWithACampaign() {
+            owner.setTwitchId("42");
+            GameBinding delta = bound("1282866981");
+            when(dropsGate.isAvailableFor(owner)).thenReturn(true);
+            when(dropsCatalog.runningCategoryIds("42")).thenReturn(Set.of("1282866981"));
+            when(bindings.findByUserAndTwitchGameIdIn(eq(owner), eq(Set.of("1282866981")), any()))
+                    .thenReturn(new PageImpl<>(List.of(delta)));
+
+            ChannelPageData page = assembler().page(owner, owner, "streamer", 0, null, "drops");
+
+            assertThat(page.bindings().content()).extracting(b -> b.twitchGameId()).containsExactly("1282866981");
+            assertThat(page.filterSource()).isEqualTo("DROPS");
+        }
+
+        @Test
+        void withDrops_outsideTheExperiment_isEveryBinding() {
+            when(bindings.findByUser(eq(owner), any())).thenReturn(new PageImpl<>(List.of(bound("7"))));
+
+            assertThat(assembler().page(owner, owner, "streamer", 0, null, "DROPS").bindings().content()).hasSize(1);
+        }
+
         @Test
         void customBindings_areTheOwnersOnly_andOnlyOnceTheExperimentIsOpen() {
             fr.enimaloc.catapult.domain.binding.CustomBinding art = new fr.enimaloc.catapult.domain.binding.CustomBinding();
@@ -544,6 +610,37 @@ class ChannelDashboardAssemblerTest {
             assertThat(dto.cclFeatureEnabled()).isEqualTo(defaults.isCclFeatureEnabled());
             assertThat(dto.twFeatureEnabled()).isEqualTo(defaults.isTwFeatureEnabled());
             assertThat(dto.raidRestoreGameMinutes()).isNull();
+        }
+
+        @Test
+        void streamTitle_isOfferedOnlyWhileTheExperimentIsOnForTheChannel() {
+            UserSettings saved = new UserSettings();
+            saved.setTitleFeatureEnabled(true);
+            saved.setTitleTemplate("Playing {{GAME}}");
+            when(settingsRepository.findById(owner.getId())).thenReturn(Optional.of(saved));
+
+            when(streamTitle.isAvailableFor(owner)).thenReturn(true);
+            UserSettingsDto on = assembler().settings(owner);
+            when(streamTitle.isAvailableFor(owner)).thenReturn(false);
+            UserSettingsDto off = assembler().settings(owner);
+
+            assertThat(on.titleAvailable()).isTrue();
+            assertThat(on.titleFeatureEnabled()).isTrue();
+            assertThat(on.titleTemplate()).isEqualTo("Playing {{GAME}}");
+            assertThat(off.titleAvailable()).isFalse();
+        }
+
+        /** The title's settings are where the conditions are used: reading them may enrol the channel. */
+        @Test
+        void streamTitle_enrolsTheChannelInTheConditions_onlyWhileTheTitleIsOffered() {
+            when(streamTitle.isAvailableFor(owner)).thenReturn(true);
+            assembler().settings(owner);
+            verify(streamTitle).conditionsAvailableFor(owner);
+
+            clearInvocations(streamTitle);
+            when(streamTitle.isAvailableFor(owner)).thenReturn(false);
+            assembler().settings(owner);
+            verify(streamTitle, never()).conditionsAvailableFor(owner);
         }
 
         @Test

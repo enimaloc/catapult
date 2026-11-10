@@ -1,6 +1,7 @@
 // A promotion (or hotfix) PR was merged: tag its merge commit, and after a stable or a hotfix open
 // the backport PRs that bring it back to dev (main -> beta, then beta -> dev once that one is merged). The tag is pushed with the App token, so its push event runs
-// release.yml, the single publication path (it reads the PR's notes itself).
+// release.yml, the single publication path (it reads the PR's notes itself). After a beta, the beta -> main
+// promotion is retitled by publish.yml's own job, in the promote-beta concurrency group, not here.
 // CLI: node .github/release/publish.mjs --number 12
 // (env: GH_TOKEN = the App token, GITHUB_REPOSITORY=owner/repo, APP_SLUG = the release App's slug)
 
@@ -9,7 +10,6 @@ import { pathToFileURL } from "node:url";
 import { createGitHub } from "./lib/github.mjs";
 import { refreshDashboardSafely } from "./dashboard.mjs";
 import { kindOf, titleVersion } from "./ready.mjs";
-import { promote as promoteImpl } from "./promote.mjs";
 
 const short = (sha) => sha.slice(0, 7);
 const pattern = (kind) => (kind === "beta" ? "vX.Y.Z-BETA.N" : "vX.Y.Z");
@@ -74,13 +74,12 @@ async function openBackports(gh, tag, pr, kind) {
   return toDev?.number ? [toDev.number] : [];
 }
 
-async function release(gh, pr, kind, refreshStable) {
+async function release(gh, pr, kind) {
   if (!pr.merged || !pr.mergeCommitSha) throw new Error(`#${pr.number} is not merged`);
   const tag = titleVersion(pr.title, kind);
   if (tag === null) throw new Error(`#${pr.number}: the title does not carry the version to publish: ${pr.title}`);
 
   await ensureTag(gh, tag, pr.mergeCommitSha, pr.title);
-  if (kind === "beta") await refreshStable();
   const backports = kind === "beta" ? [] : await openBackports(gh, tag, pr, kind);
   return { tag, backports };
 }
@@ -89,7 +88,7 @@ async function release(gh, pr, kind, refreshStable) {
  * -> {tag, backports} (numbers of the backport PRs opened). Throws on an unmerged or unrelated PR; a
  * failure on a release PR is also reported on it.
  */
-export async function publish({ gh, pr, owner, repo, appSlug, promote = promoteImpl }) {
+export async function publish({ gh, pr, owner, repo }) {
   if (isBackportToBeta(pr, `${owner}/${repo}`)) {
     if (!pr.merged) throw new Error(`#${pr.number} is not merged`);
     const tag = BACKPORT_TITLE.exec(pr.title)?.[1];
@@ -98,16 +97,8 @@ export async function publish({ gh, pr, owner, repo, appSlug, promote = promoteI
   }
   const kind = kindOf(pr, `${owner}/${repo}`);
   if (kind === null) throw new Error(`#${pr.number} is not a promotion or hotfix pull request`);
-  // The beta -> main PR was titled before this beta's tag existed: retitle it now (best effort).
-  const refreshStable = async () => {
-    try {
-      await promote({ gh, source: "beta", target: "main", owner, repo, appSlug });
-    } catch (error) {
-      console.warn(`::warning::could not refresh the beta -> main promotion: ${error.message}`);
-    }
-  };
   try {
-    return await release(gh, pr, kind, refreshStable);
+    return await release(gh, pr, kind);
   } catch (error) {
     const version = titleVersion(pr.title, kind);
     if (pr.merged) {
@@ -135,6 +126,6 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   const [owner, repo] = (process.env.GITHUB_REPOSITORY ?? "").split("/");
   const gh = createGitHub({ token: process.env.GH_TOKEN, owner, repo });
   const pr = await gh.getPull(Number(values.number));
-  console.log(JSON.stringify(await publish({ gh, pr, owner, repo, appSlug: process.env.APP_SLUG })));
+  console.log(JSON.stringify(await publish({ gh, pr, owner, repo })));
   await refreshDashboardSafely({ gh });
 }

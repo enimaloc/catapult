@@ -119,6 +119,13 @@ document.addEventListener("catapult:render", function () {
             });
         });
 
+        // A blank title is sent as such: catapult-api takes it as "back to the channel-wide one".
+        row.querySelectorAll(".binding-title-panel").forEach(panel => {
+            const input = panel.querySelector(".binding-title-input");
+            panel.querySelector(".binding-title-save-btn").addEventListener("click", () =>
+                postJson(bindingUrl(row, "title"), { title: input.value }));
+        });
+
         row.querySelectorAll(".binding-tw-panel").forEach(panel => {
 
             panel.querySelector(".binding-tw-enabled-checkbox").addEventListener("change", event =>

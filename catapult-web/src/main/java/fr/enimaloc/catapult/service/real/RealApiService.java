@@ -84,10 +84,12 @@ import fr.enimaloc.catapult.common.dto.channel.ExtensionSlotDto;
 import fr.enimaloc.catapult.common.dto.channel.TwitchExtensionsDto;
 import fr.enimaloc.catapult.common.dto.channel.DtddProposalRequest;
 import fr.enimaloc.catapult.common.dto.channel.IgnoredToggleRequest;
+import fr.enimaloc.catapult.common.dto.channel.BindingTitleRequest;
 import fr.enimaloc.catapult.common.dto.channel.IncompleteFallbackRequest;
 import fr.enimaloc.catapult.common.dto.channel.NoGameSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.ObsSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.RaidSettingsRequest;
+import fr.enimaloc.catapult.common.dto.channel.TitleSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.TwitchatBranchRequest;
 import fr.enimaloc.catapult.common.dto.channel.SaveBody;
 import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
@@ -225,6 +227,12 @@ public class RealApiService implements ApiService {
     public int ignoredToggle(String username, String bindingId, boolean ignored) {
         return onChannel(username, id -> client.putVoid("/api/internal/users/{userId}/bindings/{bindingId}/ignored",
                 new IgnoredToggleRequest(ignored), id, bindingId), status -> status);
+    }
+
+    @Override
+    public int bindingTitle(String username, String bindingId, String title) {
+        return onChannel(username, id -> client.putVoid("/api/internal/users/{userId}/bindings/{bindingId}/title",
+                new BindingTitleRequest(title), id, bindingId), status -> status);
     }
 
     @Override
@@ -412,9 +420,11 @@ public class RealApiService implements ApiService {
 
     @Override
     public int saveNoGameSettings(String username, String twitchGameId, String twitchGameName, Set<String> ccls,
-                                    boolean applyOnStreamStart, boolean applyOnNoGame, boolean applyOnStreamEnd) {
+                                    boolean applyOnStreamStart, boolean applyOnNoGame, boolean applyOnStreamEnd,
+                                    String title) {
         return onChannel(username, id -> client.putVoid("/api/internal/users/{userId}/settings/no-game",
-                new NoGameSettingsRequest(twitchGameId, twitchGameName, ccls, applyOnStreamStart, applyOnNoGame, applyOnStreamEnd),
+                new NoGameSettingsRequest(twitchGameId, twitchGameName, ccls, applyOnStreamStart, applyOnNoGame,
+                        applyOnStreamEnd, title),
                 id), status -> status);
     }
 
@@ -425,9 +435,24 @@ public class RealApiService implements ApiService {
     }
 
     @Override
-    public int saveIncompleteFallbackSettings(String username, String twitchGameId, String twitchGameName, Set<String> ccls) {
+    public fr.enimaloc.catapult.common.dto.channel.TitlePreviewDto previewTitle(String username,
+            fr.enimaloc.catapult.common.dto.channel.TitlePreviewRequest request) {
+        return readChannel(username, id -> client.call(HttpMethod.POST,
+                "/api/internal/users/{userId}/title/preview", request,
+                fr.enimaloc.catapult.common.dto.channel.TitlePreviewDto.class, id));
+    }
+
+    @Override
+    public int saveTitleSettings(String username, boolean enabled, String template) {
+        return onChannel(username, id -> client.putVoid("/api/internal/users/{userId}/settings/title",
+                new TitleSettingsRequest(enabled, template), id), status -> status);
+    }
+
+    @Override
+    public int saveIncompleteFallbackSettings(String username, String twitchGameId, String twitchGameName,
+                                              Set<String> ccls, String title) {
         return onChannel(username, id -> client.putVoid("/api/internal/users/{userId}/settings/incomplete-fallback",
-                new IncompleteFallbackRequest(twitchGameId, twitchGameName, ccls), id), status -> status);
+                new IncompleteFallbackRequest(twitchGameId, twitchGameName, ccls, title), id), status -> status);
     }
 
     @Override

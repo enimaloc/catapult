@@ -12,6 +12,7 @@ import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
 import fr.enimaloc.catapult.service.account.BotToggleService;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
 import fr.enimaloc.catapult.service.notification.CatapultCategoryChangeStateService;
+import fr.enimaloc.catapult.service.title.StreamTitleService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -42,6 +43,7 @@ public class TwitchServiceImpl implements TwitchService {
     private final BotToggleService botToggleService;
     private final CatapultCategoryChangeStateService categoryChangeStateService;
     private final SiteRole siteRole;
+    private final StreamTitleService streamTitleService;
 
     public static final String CLIENT_ID = "Client-Id";
     public static final String AUTHORIZATION = "Authorization";
@@ -193,11 +195,15 @@ public class TwitchServiceImpl implements TwitchService {
             Set<String> blocked = (userSettings != null && binding.getId() != null) ? userSettings.getBlockedCcls() : Set.of();
             body.put("content_classification_labels", buildCclPayload(binding.getCcls(), blocked));
         }
+        Optional<StreamTitleService.PlannedTitle> title =
+            streamTitleService.titleFor(user, userSettings, binding, labelSent(body), () -> currentTitle(user, accessToken));
+        title.ifPresent(planned -> body.put("title", planned.title()));
 
         try {
             patchRefreshingTheToken(user, token, accessToken, body);
-            log.info("Twitch channel updated for user {} — game_id={}, ccls={}",
-                user.getId(), binding.getTwitchGameId(), binding.getCcls());
+            log.info("Twitch channel updated for user {} — game_id={}, ccls={}, title={}",
+                user.getId(), binding.getTwitchGameId(), binding.getCcls(), body.get("title"));
+            title.ifPresent(planned -> streamTitleService.sent(user, planned));
             // Marker only: the Twitchat notification is emitted once, from
             // TwitchEventSubService's channel.update handler, when Twitch confirms the change.
             categoryChangeStateService.recordCatapultChangeAndReturnPrevious(user, binding.getTwitchGameId());
@@ -335,10 +341,14 @@ public class TwitchServiceImpl implements TwitchService {
         if (settings.isCclFeatureEnabled() && !settings.getNoGameCcls().isEmpty()) {
             body.put("content_classification_labels", buildCclPayload(settings.getNoGameCcls(), Set.of()));
         }
+        Optional<StreamTitleService.PlannedTitle> title =
+            streamTitleService.titleForNoGame(user, settings, labelSent(body), () -> currentTitle(user, accessToken));
+        title.ifPresent(planned -> body.put("title", planned.title()));
         try {
             patchRefreshingTheToken(user, token, accessToken, body);
-            log.info("Twitch channel reset to default for user {} — game_id={}, ccls={}",
-                user.getId(), settings.getNoGameTwitchGameId(), settings.getNoGameCcls());
+            log.info("Twitch channel reset to default for user {} — game_id={}, ccls={}, title={}",
+                user.getId(), settings.getNoGameTwitchGameId(), settings.getNoGameCcls(), body.get("title"));
+            title.ifPresent(planned -> streamTitleService.sent(user, planned));
             // The default category is Catapult's change, like any other: the channel.update it
             // triggers must not be reported to the streamer as a manual change.
             categoryChangeStateService.recordCatapultChangeAndReturnPrevious(user, settings.getNoGameTwitchGameId());
@@ -444,6 +454,38 @@ public class TwitchServiceImpl implements TwitchService {
         );
     }
 
+    /**
+     * The channel's title as Twitch has it now, read before sending a title; empty when it can't be read (logged: a
+     * template using it is then left alone, the category still sent).
+     */
+    private Optional<String> currentTitle(UserAccount user, String accessToken) {
+        try {
+            return apiObservations.observe("twitch", "get_channel_information", () -> {
+                WrappedListResponse<ChannelInformation> response = restClient.get()
+                    .uri(TWITCH_API_URL + "/channels?broadcaster_id=" + user.getTwitchId())
+                    .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
+                    .header(CLIENT_ID, twitchClientId)
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<>() {});
+                return response == null || response.data() == null || response.data().isEmpty()
+                    ? Optional.<String>empty()
+                    : Optional.ofNullable(response.data().getFirst().title());
+            });
+        } catch (RuntimeException e) {
+            log.warn("Could not read the Twitch title of user {}, leaving it alone: {}", user.getId(), e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    /** Whether {@code body} sends at least one content label switched on (a title's {@code IS_MATURE}). */
+    @SuppressWarnings("unchecked")
+    static boolean labelSent(Map<String, Object> body) {
+        Object labels = body.get("content_classification_labels");
+        return labels instanceof List<?> list && list.stream()
+                .anyMatch(label -> label instanceof Map<?, ?> m && Boolean.TRUE.equals(m.get("is_enabled")));
+    }
+
+    record ChannelInformation(String title) {}
     record WrappedResponse<T>(T data) {}
     record WrappedListResponse<T>(List<T> data) {}
     record ModeratedChannel(@JsonProperty("broadcaster_id") String broadcasterId) {}

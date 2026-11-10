@@ -347,6 +347,7 @@ public class BindingService {
         binding.setIgnored(false);
         binding.setCclEnabled(true);
         binding.setTwEnabled(true);
+        binding.setTitle(null);
         binding.getExtensionSlots().clear();
         GameBinding resolved = resolveAnew(user, binding);
         extensionLayoutApplier.applyIfCurrent(user, ExtensionLayoutApplier.keyOf(resolved), Set.of());
@@ -391,6 +392,12 @@ public class BindingService {
                 .flatMap(binding -> igdbService.resolveIgdbIdForBinding(binding)
                         .map(igdbId -> suggestTws(igdbId, detectedOf(binding))))
                 .orElse(Set.of());
+    }
+
+    /** The game's own stream title (null: the channel-wide one), sent at once when it's the game in place. */
+    @Transactional
+    public void setTitle(UserAccount user, UUID bindingId, String title) {
+        editBinding(user, bindingId, binding -> binding.setTitle(title));
     }
 
     @Transactional
