@@ -65,6 +65,8 @@ class AdminMigrationServiceTest {
         src.setApplyDefaultOnNoGame(false);
         src.setApplyDefaultOnStreamEnd(false);
         src.setRaidRestoreGameMinutes(25);
+        src.setTitleFeatureEnabled(true);
+        src.setTitleTemplate("Playing {{GAME}}");
 
         UserSettings tgt = new UserSettings();
         tgt.setUser(target);
@@ -88,6 +90,8 @@ class AdminMigrationServiceTest {
         assertThat(saved.isApplyDefaultOnNoGame()).isFalse();
         assertThat(saved.isApplyDefaultOnStreamEnd()).isFalse();
         assertThat(saved.getRaidRestoreGameMinutes()).isEqualTo(25);
+        assertThat(saved.isTitleFeatureEnabled()).isTrue();
+        assertThat(saved.getTitleTemplate()).isEqualTo("Playing {{GAME}}");
     }
 
     @Test
@@ -216,6 +220,7 @@ class AdminMigrationServiceTest {
         srcGb.setStatus(GameBinding.Status.MANUAL);
         srcGb.setIgnored(true);
         srcGb.setCclEnabled(false);
+        srcGb.setTitle("{{GAME}} chill");
         srcGb.setCcls(new HashSet<>());
 
         GameBinding tgtGb = new GameBinding();
@@ -242,6 +247,7 @@ class AdminMigrationServiceTest {
         assertThat(tgtGb.getStatus()).isEqualTo(GameBinding.Status.MANUAL);
         assertThat(tgtGb.isIgnored()).isTrue();
         assertThat(tgtGb.isCclEnabled()).isFalse();
+        assertThat(tgtGb.getTitle()).isEqualTo("{{GAME}} chill");
         assertThat(tgtGb.getCcls()).isEmpty();
         assertThat(tgtGb.getSourceName()).isEqualTo("Half-Life 2");
     }

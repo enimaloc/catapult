@@ -1,9 +1,12 @@
 package fr.enimaloc.catapult.service.binding;
 
+import fr.enimaloc.catapult.api.error.ApiProblem;
 import fr.enimaloc.catapult.common.dto.channel.UpdateBindingRequest;
+import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.ExtensionSlotSetting;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
+import fr.enimaloc.catapult.service.title.StreamTitleService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -25,6 +28,7 @@ public class ChannelDashboardActions {
     private final SchedulerService schedulerService;
     private final GameStateService gameStateService;
     private final ChannelEventPublisher channelEventPublisher;
+    private final StreamTitleService streamTitle;
 
     public void toggleCcl(UserAccount channel, UUID bindingId, boolean enabled) {
         bindingService.toggleCclEnabled(channel, bindingId, enabled);
@@ -33,6 +37,18 @@ public class ChannelDashboardActions {
 
     public void toggleIgnored(UserAccount channel, UUID bindingId, boolean ignored) {
         bindingService.toggleIgnored(channel, bindingId, ignored);
+        publishBinding(channel, bindingId);
+    }
+
+    /**
+     * The game's own stream title (blank: the channel-wide one); refused (403) while the channel isn't in the
+     * {@value StreamTitleService#EXPERIMENT_KEY} experiment.
+     */
+    public void setTitle(UserAccount channel, UUID bindingId, String title) {
+        if (!streamTitle.isAvailableFor(channel)) {
+            throw new ApiProblem(ErrorCode.FEATURE_DISABLED, "Title settings not available for this channel");
+        }
+        bindingService.setTitle(channel, bindingId, StreamTitleService.cleaned(title));
         publishBinding(channel, bindingId);
     }
 

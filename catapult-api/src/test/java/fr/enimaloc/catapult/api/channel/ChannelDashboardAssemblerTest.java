@@ -95,6 +95,8 @@ class ChannelDashboardAssemblerTest {
     private final fr.enimaloc.catapult.service.binding.CustomBindingService customBindings =
             mock(fr.enimaloc.catapult.service.binding.CustomBindingService.class);
     private final TwitchCategoryCacheRepository categoryCache = mock(TwitchCategoryCacheRepository.class);
+    private final fr.enimaloc.catapult.service.title.StreamTitleService streamTitle =
+            mock(fr.enimaloc.catapult.service.title.StreamTitleService.class);
 
     private UserAccount owner;
     private UserAccount moderator;
@@ -110,7 +112,8 @@ class ChannelDashboardAssemblerTest {
                         org.mockito.Mockito.mock(fr.enimaloc.catapult.service.premium.PremiumUiGate.class),
                         org.mockito.Mockito.mock(fr.enimaloc.catapult.service.binding.schedule.CustomBindingScheduleService.class),
                         org.mockito.Mockito.mock(fr.enimaloc.catapult.repository.binding.CustomBindingScheduleRepository.class),
-                        org.mockito.Mockito.mock(fr.enimaloc.catapult.service.premium.PremiumService.class)), categoryCache);
+                        org.mockito.Mockito.mock(fr.enimaloc.catapult.service.premium.PremiumService.class)), categoryCache,
+                streamTitle);
         ReflectionTestUtils.setField(assembler, "xboxEnabled", xboxEnabled);
         return assembler;
     }
@@ -544,6 +547,24 @@ class ChannelDashboardAssemblerTest {
             assertThat(dto.cclFeatureEnabled()).isEqualTo(defaults.isCclFeatureEnabled());
             assertThat(dto.twFeatureEnabled()).isEqualTo(defaults.isTwFeatureEnabled());
             assertThat(dto.raidRestoreGameMinutes()).isNull();
+        }
+
+        @Test
+        void streamTitle_isOfferedOnlyWhileTheExperimentIsOnForTheChannel() {
+            UserSettings saved = new UserSettings();
+            saved.setTitleFeatureEnabled(true);
+            saved.setTitleTemplate("Playing {{GAME}}");
+            when(settingsRepository.findById(owner.getId())).thenReturn(Optional.of(saved));
+
+            when(streamTitle.isAvailableFor(owner)).thenReturn(true);
+            UserSettingsDto on = assembler().settings(owner);
+            when(streamTitle.isAvailableFor(owner)).thenReturn(false);
+            UserSettingsDto off = assembler().settings(owner);
+
+            assertThat(on.titleAvailable()).isTrue();
+            assertThat(on.titleFeatureEnabled()).isTrue();
+            assertThat(on.titleTemplate()).isEqualTo("Playing {{GAME}}");
+            assertThat(off.titleAvailable()).isFalse();
         }
 
         @Test

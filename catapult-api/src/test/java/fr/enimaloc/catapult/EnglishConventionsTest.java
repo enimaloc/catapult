@@ -78,6 +78,9 @@ class EnglishConventionsTest {
                     API + "experiment/RaidRestoreGameExperiment.java LITERAL",
                     "experiment name, description and variants, seeded once into the DB"),
             Map.entry(
+                    API + "experiment/StreamTitleExperiment.java LITERAL",
+                    "experiment name, description and variants, seeded once into the DB"),
+            Map.entry(
                     API + "service/steam/SteamIADisclosure.java LITERAL",
                     "Steam's own localized headings in 20+ languages, matched against store pages"),
             Map.entry(

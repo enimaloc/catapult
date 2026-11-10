@@ -22,6 +22,7 @@ import fr.enimaloc.catapult.event.ChannelSettingsUpdatedEvent;
 import fr.enimaloc.catapult.event.ChannelUpdatedEvent;
 import fr.enimaloc.catapult.event.DtddMappingChangedEvent;
 import fr.enimaloc.catapult.event.binding.BindingIgnoredStateEvent;
+import fr.enimaloc.catapult.event.binding.BindingTitleEvent;
 import fr.enimaloc.catapult.event.binding.BindingUpdatedEvent;
 import fr.enimaloc.catapult.event.binding.CclStateEvent;
 import fr.enimaloc.catapult.event.binding.CustomBindingsUpdatedEvent;
@@ -81,6 +82,7 @@ class ChannelStateTest {
                 new BindingUpdatedEvent("enimaloc", "b1", "1", "Valheim", Set.of("Violence")),
                 new CclStateEvent("enimaloc", "b1", true),
                 new BindingIgnoredStateEvent("enimaloc", "b1", false),
+                new BindingTitleEvent("enimaloc", "b1", ""),
                 new TwEnabledStateEvent("enimaloc", "b1", true),
                 new TwUpdatedEvent("enimaloc", "b1", Set.of("spoiler")),
                 new ChannelSettingsUpdatedEvent("enimaloc", ChannelState.settings(SETTINGS)),
@@ -128,6 +130,7 @@ class ChannelStateTest {
                 new ChannelEvents.Settings.Tw(false, Set.of()),
                 new ChannelEvents.Settings.NoGame("2", "Just Chatting", Set.of(), true, false, true),
                 new ChannelEvents.Settings.IncompleteFallback("3", "Art", Set.of("Drugs")),
-                new ChannelEvents.Settings.Raid(30)));
+                new ChannelEvents.Settings.Raid(30),
+                new ChannelEvents.Settings.Title(false, null)));
     }
 }

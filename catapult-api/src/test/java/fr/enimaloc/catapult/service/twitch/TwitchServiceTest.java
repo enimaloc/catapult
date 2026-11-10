@@ -12,6 +12,7 @@ import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.account.BotToggleService;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
 import fr.enimaloc.catapult.service.notification.CatapultCategoryChangeStateService;
+import fr.enimaloc.catapult.service.title.StreamTitleService;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.observation.DefaultMeterObservationHandler;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -71,6 +72,7 @@ class TwitchServiceTest {
     @Mock private RestClient.ResponseSpec getResponseSpec;
 
     @Mock private SiteRole siteRole;
+    @Mock private StreamTitleService streamTitleService;
     @InjectMocks private TwitchServiceImpl twitchService;
 
     private UserAccount user;
@@ -317,6 +319,89 @@ class TwitchServiceTest {
         assertThat(twitchService.resetToDefault(user)).isEqualTo(ChannelUpdateOutcome.SKIPPED);
 
         verify(restClient, never()).patch();
+    }
+
+    @Test
+    void updateChannel_sendsTheTitle_whenThereIsOne() {
+        GameBinding binding = binding(GameBinding.Status.AUTO, false, true, Set.of());
+        StreamTitleService.PlannedTitle planned = new StreamTitleService.PlannedTitle("Elden Ring tonight", Optional.of("Old"));
+        when(streamTitleService.titleFor(eq(user), any(), eq(binding), any())).thenReturn(Optional.of(planned));
+
+        twitchService.updateChannelReporting(user, binding);
+
+        ArgumentCaptor<Map> bodyCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(bodySpec).body(bodyCaptor.capture());
+        assertThat(bodyCaptor.getValue()).containsEntry("title", "Elden Ring tonight");
+        verify(streamTitleService).sent(user, planned);
+    }
+
+    @Test
+    void updateChannel_aRefusedPatch_remembersNoTitle() {
+        GameBinding binding = binding(GameBinding.Status.AUTO, false, true, Set.of());
+        when(streamTitleService.titleFor(eq(user), any(), eq(binding), any()))
+                .thenReturn(Optional.of(new StreamTitleService.PlannedTitle("Elden Ring tonight", Optional.empty())));
+        doThrow(new HttpServerErrorException(HttpStatus.BAD_GATEWAY)).when(responseSpec).toBodilessEntity();
+
+        assertThat(twitchService.updateChannelReporting(user, binding)).isEqualTo(ChannelUpdateOutcome.FAILED);
+
+        verify(streamTitleService, never()).sent(any(), any());
+    }
+
+    @Test
+    void updateChannel_theCurrentTitle_isReadFromTwitch_forATitleTemplate() {
+        GameBinding binding = binding(GameBinding.Status.AUTO, false, true, Set.of());
+        when(streamTitleService.titleFor(eq(user), any(), eq(binding), any())).thenAnswer(call ->
+                call.<java.util.function.Supplier<Optional<String>>>getArgument(3).get()
+                        .map(t -> new StreamTitleService.PlannedTitle(t + " | Doom", Optional.of(t))));
+        doReturn(new TwitchServiceImpl.WrappedListResponse<>(List.of(new TwitchServiceImpl.ChannelInformation("Chill"))))
+                .when(getResponseSpec).body(any(ParameterizedTypeReference.class));
+
+        twitchService.updateChannelReporting(user, binding);
+
+        verify(getSpec).uri(eq("https://api.twitch.tv/helix/channels?broadcaster_id=twitch-123"), any(Object[].class));
+        ArgumentCaptor<Map> bodyCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(bodySpec).body(bodyCaptor.capture());
+        assertThat(bodyCaptor.getValue()).containsEntry("title", "Chill | Doom");
+    }
+
+    @Test
+    void updateChannel_anUnreadableCurrentTitle_stillSendsTheCategory() {
+        GameBinding binding = binding(GameBinding.Status.AUTO, false, true, Set.of());
+        when(streamTitleService.titleFor(eq(user), any(), eq(binding), any())).thenAnswer(call ->
+                call.<java.util.function.Supplier<Optional<String>>>getArgument(3).get()
+                        .map(t -> new StreamTitleService.PlannedTitle(t, Optional.of(t))));
+        doThrow(new HttpServerErrorException(HttpStatus.BAD_GATEWAY))
+                .when(getResponseSpec).body(any(ParameterizedTypeReference.class));
+
+        assertThat(twitchService.updateChannelReporting(user, binding)).isEqualTo(ChannelUpdateOutcome.APPLIED);
+
+        ArgumentCaptor<Map> bodyCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(bodySpec).body(bodyCaptor.capture());
+        assertThat(bodyCaptor.getValue()).containsEntry("game_id", "game-456").doesNotContainKey("title");
+    }
+
+    @Test
+    void updateChannel_leavesTheTitleAlone_whenThereIsNone() {
+        twitchService.updateChannelReporting(user, binding(GameBinding.Status.AUTO, false, true, Set.of()));
+
+        ArgumentCaptor<Map> bodyCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(bodySpec).body(bodyCaptor.capture());
+        assertThat(bodyCaptor.getValue()).doesNotContainKey("title");
+    }
+
+    @Test
+    void resetToDefault_sendsTheNoGameTitle_whenThereIsOne() {
+        UserSettings settings = new UserSettings();
+        settings.setNoGameTwitchGameId("12345");
+        when(userSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
+        when(streamTitleService.titleForNoGame(eq(user), eq(settings), any()))
+                .thenReturn(Optional.of(new StreamTitleService.PlannedTitle("Just Chatting time", Optional.empty())));
+
+        twitchService.resetToDefault(user);
+
+        ArgumentCaptor<Map> bodyCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(bodySpec).body(bodyCaptor.capture());
+        assertThat(bodyCaptor.getValue()).containsEntry("title", "Just Chatting time");
     }
 
     @Test

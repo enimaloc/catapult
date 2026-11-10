@@ -179,6 +179,17 @@
                         <mdui-list class="binding-edit-game-results"></mdui-list>
                     </div>
 
+                    <!--/* Only while the channel is in the stream.title experiment; blank: the channel-wide title. */-->
+                    <div class="binding-title-panel"
+                         th:if="${channelSettings != null and channelSettings.titleAvailable() == true}">
+                        <mdui-text-field class="binding-title-input" variant="outlined" maxlength="140" counter data-title-highlight
+                                         th:value="${b.title()}"
+                                         spa:value="value:BindingTitleEvent.title"
+                                         th:attr="label=#{channel.bindings.title.label},helper=#{channel.bindings.title.helper}"></mdui-text-field>
+                        <mdui-button class="binding-title-save-btn" variant="tonal"
+                                     th:text="#{channel.settings.save}">Enregistrer</mdui-button>
+                    </div>
+
                     <div class="binding-ccl-panel">
                         <label class="binding-toggle">
                             <mdui-switch class="binding-ccl-enabled"
@@ -356,6 +367,12 @@
                th:value="${b?.twitchGameName()}"/>
         <input type="hidden" class="custom-binding-game-id" th:value="${b?.twitchGameId()}"/>
         <mdui-list class="binding-edit-game-results custom-binding-game-results"></mdui-list>
+        <!--/* Only while the channel is in the stream.title experiment: without the field, a save leaves the title as
+             it is; blank: the channel-wide one. */-->
+        <mdui-text-field th:if="${channelSettings != null and channelSettings.titleAvailable() == true}"
+                         class="custom-binding-title" variant="outlined" maxlength="140" counter data-title-highlight
+                         th:value="${b?.title()}"
+                         th:attr="label=#{channel.custom_bindings.settings.title},helper=#{channel.bindings.title.helper}"></mdui-text-field>
     </div>
 
     <div class="binding-ccl-panel">

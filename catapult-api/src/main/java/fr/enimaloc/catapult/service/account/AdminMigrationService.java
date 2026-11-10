@@ -57,6 +57,11 @@ public class AdminMigrationService {
         // The raid.restore-game experiment assignment isn't copied: the gate is evaluated for the target
         // the next time its settings are opened, and the delay only acts once it is on.
         tgt.setRaidRestoreGameMinutes(src.getRaidRestoreGameMinutes());
+        // Same for stream.title: the title is only sent once the target is in it
+        tgt.setTitleFeatureEnabled(src.isTitleFeatureEnabled());
+        tgt.setTitleTemplate(src.getTitleTemplate());
+        tgt.setNoGameTitle(src.getNoGameTitle());
+        tgt.setIncompleteFallbackTitle(src.getIncompleteFallbackTitle());
         userSettingsRepository.save(tgt);
     }
 
@@ -97,6 +102,7 @@ public class AdminMigrationService {
                         tgt.setCclEnabled(src.isCclEnabled());
                         tgt.setCcls(new HashSet<>(src.getCcls()));
                         tgt.setExtensionSlots(new HashSet<>(src.getExtensionSlots()));
+                        tgt.setTitle(src.getTitle());
                         gameBindingRepository.save(tgt);
                     },
                     () -> {
@@ -112,6 +118,7 @@ public class AdminMigrationService {
                         tgt.setCclEnabled(src.isCclEnabled());
                         tgt.setCcls(new HashSet<>(src.getCcls()));
                         tgt.setExtensionSlots(new HashSet<>(src.getExtensionSlots()));
+                        tgt.setTitle(src.getTitle());
                         gameBindingRepository.save(tgt);
                     }
                 );

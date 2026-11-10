@@ -1,6 +1,8 @@
 package fr.enimaloc.catapult.controller;
 
+import fr.enimaloc.catapult.common.dto.channel.BindingTitleRequest;
 import fr.enimaloc.catapult.common.dto.channel.CclSettingsRequest;
+import fr.enimaloc.catapult.common.dto.channel.TitleSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.CclToggleRequest;
 import fr.enimaloc.catapult.common.dto.channel.DeleteAccountRequest;
 import fr.enimaloc.catapult.common.dto.channel.ExtensionSlotDto;
@@ -74,6 +76,12 @@ public class ChannelActionsController {
     public ResponseEntity<Void> ignoredToggle(@PathVariable String username, @PathVariable String bindingId,
                                @RequestBody IgnoredToggleRequest body) {
         return ApiStatus.answer(apiService.ignoredToggle(username, bindingId, body.ignored()));
+    }
+
+    @PostMapping("/channel/{username}/bindings/{bindingId}/title")
+    public ResponseEntity<Void> bindingTitle(@PathVariable String username, @PathVariable String bindingId,
+                                             @RequestBody BindingTitleRequest body) {
+        return ApiStatus.answer(apiService.bindingTitle(username, bindingId, body.title()));
     }
 
     @PostMapping("/channel/{username}/bindings/{bindingId}/delete")
@@ -229,7 +237,7 @@ public class ChannelActionsController {
     @PostMapping("/channel/{username}/settings/no-game")
     public ResponseEntity<Void> saveNoGameSettings(@PathVariable String username, @RequestBody NoGameSettingsRequest body) {
         return ApiStatus.answer(apiService.saveNoGameSettings(username, body.twitchGameId(), body.twitchGameName(), body.ccls(),
-                body.applyOnStreamStart(), body.applyOnNoGame(), body.applyOnStreamEnd()));
+                body.applyOnStreamStart(), body.applyOnNoGame(), body.applyOnStreamEnd(), body.title()));
     }
 
     @GetMapping("/channel/{username}/twitch/extensions")
@@ -259,9 +267,15 @@ public class ChannelActionsController {
         return ApiStatus.answer(apiService.saveRaidSettings(username, body.restoreGameMinutes()));
     }
 
+    @PostMapping("/channel/{username}/settings/title")
+    public ResponseEntity<Void> saveTitleSettings(@PathVariable String username, @RequestBody TitleSettingsRequest body) {
+        return ApiStatus.answer(apiService.saveTitleSettings(username, body.enabled(), body.template()));
+    }
+
     @PostMapping("/channel/{username}/settings/incomplete-fallback")
     public ResponseEntity<Void> saveIncompleteFallbackSettings(@PathVariable String username, @RequestBody IncompleteFallbackRequest body) {
-        return ApiStatus.answer(apiService.saveIncompleteFallbackSettings(username, body.twitchGameId(), body.twitchGameName(), body.ccls()));
+        return ApiStatus.answer(apiService.saveIncompleteFallbackSettings(username, body.twitchGameId(),
+                body.twitchGameName(), body.ccls(), body.title()));
     }
 
     // Unlike the sibling channel endpoints above, the upstream ApiChannelDtddMappingController

@@ -1395,6 +1395,7 @@ a[data-link].active {
 /* Custom bindings: the associations' list and panels, plus a name field, panel titles and the actions row
  * spanning the whole width; the active binding's pill is tinted. */
 .binding-edit-panel .custom-binding-name,
+.binding-edit-panel .custom-binding-title,
 .custom-binding-panel-title,
 .custom-binding-actions {
     grid-column: 1 / -1;
@@ -2851,3 +2852,20 @@ mdui-dialog::part(description) { white-space: pre-line; }
 .premium-table { width: 100%; border-collapse: collapse; }
 .premium-table :is(th, td) { padding: 8px 12px; text-align: left; border-bottom: 1px solid rgb(var(--mdui-color-outline-variant)); }
 .premium-table tbody tr:last-child :is(th, td) { border-bottom: 0; }
+
+/* Stream title fields: their recognized variables colored by a copy laid over the text (title-highlight.js), the
+   field's own text made transparent only once that copy is in place */
+mdui-text-field[data-title-highlight] {
+    position: relative;
+}
+
+/* In a form's grid, a title field keeps its own height: stretched to its row (its helper included), mdui's box would
+   grow with it, the helper overflowing below */
+.binding-edit-panel mdui-text-field[data-title-highlight] {
+    align-self: start;
+}
+
+mdui-text-field[data-title-highlight].title-highlighted::part(input) {
+    color: transparent;
+    caret-color: rgb(var(--mdui-color-on-surface));
+}

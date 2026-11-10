@@ -175,14 +175,15 @@ public class ChannelEventPublisher {
         return new BindingDto(binding.getId().toString(), binding.getStatus().name(), binding.getSourceType().name(),
                 binding.getSourceName(), binding.getTwitchGameId(), binding.getTwitchGameName(), binding.isIgnored(),
                 binding.isCclEnabled(), Set.copyOf(binding.getCcls()), binding.isTwEnabled(), binding.isTwOverride(),
-                Set.copyOf(binding.getTws()), null, ExtensionSlotSetting.toDtos(binding.getExtensionSlots()));
+                Set.copyOf(binding.getTws()), null, ExtensionSlotSetting.toDtos(binding.getExtensionSlots()),
+                binding.getTitle());
     }
 
     /** A custom binding as the API answers it, CCLs and TWs sorted. */
     public static CustomBindingDto toDto(CustomBinding binding) {
         return new CustomBindingDto(binding.getId(), binding.getName(), binding.getTwitchGameId(),
                 binding.getTwitchGameName(), binding.getCcls().stream().sorted().toList(),
-                binding.getTws().stream().sorted().toList(), binding.isUninterruptible());
+                binding.getTws().stream().sorted().toList(), binding.isUninterruptible(), binding.getTitle());
     }
 
     static ChannelEvents.Settings toDto(UserSettings s) {
@@ -194,7 +195,9 @@ public class ChannelEventPublisher {
                         s.isApplyDefaultOnStreamEnd()),
                 new ChannelEvents.Settings.IncompleteFallback(s.getIncompleteFallbackTwitchGameId(),
                         s.getIncompleteFallbackTwitchGameName(), Set.copyOf(s.getIncompleteFallbackCcls())),
-                new ChannelEvents.Settings.Raid(s.getRaidRestoreGameMinutes()));
+                new ChannelEvents.Settings.Raid(s.getRaidRestoreGameMinutes()),
+                new ChannelEvents.Settings.Title(s.isTitleFeatureEnabled(), s.getTitleTemplate(), s.getNoGameTitle(),
+                        s.getIncompleteFallbackTitle()));
     }
 
     static ChannelEvents.SteamProfile toDto(SteamProfileDto p) {

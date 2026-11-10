@@ -81,6 +81,7 @@ import fr.enimaloc.catapult.common.twitchat.TwitchatPayloadValidator;
 import fr.enimaloc.catapult.event.BotStateChangedEvent;
 import fr.enimaloc.catapult.event.binding.BindingDeletedEvent;
 import fr.enimaloc.catapult.event.binding.BindingIgnoredStateEvent;
+import fr.enimaloc.catapult.event.binding.BindingTitleEvent;
 import fr.enimaloc.catapult.event.binding.BindingUpdatedEvent;
 import fr.enimaloc.catapult.event.binding.CclStateEvent;
 import fr.enimaloc.catapult.event.binding.GameChangedEvent;
@@ -342,6 +343,17 @@ public class MockApiService implements ApiService {
         return NO_CONTENT;
     }
 
+    /** Checked like catapult-api: at most 140 characters, blank for the channel-wide title. */
+    @Override
+    public int bindingTitle(String username, String bindingId, String title) {
+        log.trace("bindingTitle({}, {}, {})", username, bindingId, title);
+        String cleaned = title == null || title.isBlank() ? null : title.strip();
+        if (!validTitle(cleaned)) return 400;
+        currentData().setBindingTitle(bindingId, cleaned);
+        eventPublisher.publishEvent(new BindingTitleEvent(username, bindingId, cleaned == null ? "" : cleaned));
+        return NO_CONTENT;
+    }
+
     @Override
     public int deleteBinding(String username, String bindingId) {
         log.trace("deleteBinding({}, {})", username, bindingId);
@@ -594,12 +606,31 @@ public class MockApiService implements ApiService {
 
     @Override
     public int saveNoGameSettings(String username, String twitchGameId, String twitchGameName, Set<String> ccls,
-                                    boolean applyOnStreamStart, boolean applyOnNoGame, boolean applyOnStreamEnd) {
-        log.trace("saveNoGameSettings({}, {}, {}, {}, {}, {}, {})", username, twitchGameId, twitchGameName,
-                ccls, applyOnStreamStart, applyOnNoGame, applyOnStreamEnd);
+                                    boolean applyOnStreamStart, boolean applyOnNoGame, boolean applyOnStreamEnd,
+                                    String title) {
+        log.trace("saveNoGameSettings({}, {}, {}, {}, {}, {}, {}, {})", username, twitchGameId, twitchGameName,
+                ccls, applyOnStreamStart, applyOnNoGame, applyOnStreamEnd, title);
+        if (!validTitle(title == null ? null : title.strip())) return 400;
         currentData().saveNoGameSettings(twitchGameId, twitchGameName, ccls, applyOnStreamStart, applyOnNoGame, applyOnStreamEnd);
+        if (title != null) currentData().saveNoGameTitle(title.isBlank() ? null : title.strip());
         publishSettings(username);
         return NO_CONTENT;
+    }
+
+    /** Checked like catapult-api: a template of at most 140 characters, blank for none. */
+    @Override
+    public int saveTitleSettings(String username, boolean enabled, String template) {
+        log.trace("saveTitleSettings({}, {}, {})", username, enabled, template);
+        String cleaned = template == null || template.isBlank() ? null : template.strip();
+        if (!validTitle(cleaned)) return 400;
+        currentData().saveTitleSettings(enabled, cleaned);
+        publishSettings(username);
+        return NO_CONTENT;
+    }
+
+    /** A title or template catapult-api would take: at most 140 characters. */
+    private static boolean validTitle(String title) {
+        return title == null || title.codePointCount(0, title.length()) <= 140;
     }
 
     /** Validated like catapult-api: 1..120 minutes, null or 0 for off, else 400. */
@@ -615,9 +646,12 @@ public class MockApiService implements ApiService {
     }
 
     @Override
-    public int saveIncompleteFallbackSettings(String username, String twitchGameId, String twitchGameName, Set<String> ccls) {
-        log.trace("saveIncompleteFallbackSettings({}, {}, {}, {})", username, twitchGameId, twitchGameName, ccls);
+    public int saveIncompleteFallbackSettings(String username, String twitchGameId, String twitchGameName,
+                                              Set<String> ccls, String title) {
+        log.trace("saveIncompleteFallbackSettings({}, {}, {}, {}, {})", username, twitchGameId, twitchGameName, ccls, title);
+        if (!validTitle(title == null ? null : title.strip())) return 400;
         currentData().saveIncompleteFallbackSettings(twitchGameId, twitchGameName, ccls);
+        if (title != null) currentData().saveIncompleteFallbackTitle(title.isBlank() ? null : title.strip());
         publishSettings(username);
         return NO_CONTENT;
     }

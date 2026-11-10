@@ -492,8 +492,8 @@ class MockApiServiceTest {
     void settings_areSaved_eachSaveTellingTheirWholeState() {
         service.saveCclSettings(username, false, Set.of("Gore"));
         service.saveTwSettings(username, true, Set.of("spiders"));
-        service.saveNoGameSettings(username, "1", "Just Chatting", Set.of(), true, true, false);
-        service.saveIncompleteFallbackSettings(username, "2", "Other", Set.of("Drugs"));
+        service.saveNoGameSettings(username, "1", "Just Chatting", Set.of(), true, true, false, null);
+        service.saveIncompleteFallbackSettings(username, "2", "Other", Set.of("Drugs"), null);
 
         assertThat(data.getUserSettings().cclFeatureEnabled()).isFalse();
         assertThat(data.getUserSettings().twFeatureEnabled()).isTrue();
@@ -505,6 +505,72 @@ class MockApiServiceTest {
         assertThat(last.tw().enabled()).isTrue();
         assertThat(last.noGame().twitchGameName()).isEqualTo("Just Chatting");
         assertThat(last.incompleteFallback().ccls()).containsExactly("Drugs");
+    }
+
+    @Test
+    void fallbackTitles_keptWhenNull_clearedWhenBlank_likeCatapultApi() {
+        assertThat(service.saveIncompleteFallbackSettings(username, "2", "Other", Set.of(), " {{GAME}} soon ")).isEqualTo(204);
+        assertThat(data.getUserSettings().incompleteFallbackTitle()).isEqualTo("{{GAME}} soon");
+        service.saveIncompleteFallbackSettings(username, "2", "Other", Set.of(), null);
+        assertThat(data.getUserSettings().incompleteFallbackTitle()).isEqualTo("{{GAME}} soon");
+
+        service.saveNoGameSettings(username, "1", "Just Chatting", Set.of(), true, true, false, "Chatting");
+        assertThat(data.getUserSettings().noGameTitle()).isEqualTo("Chatting");
+        var settings = ((fr.enimaloc.catapult.event.ChannelSettingsUpdatedEvent) events.getLast()).settings();
+        assertThat(settings.title().noGame()).isEqualTo("Chatting");
+        assertThat(settings.title().incompleteFallback()).isEqualTo("{{GAME}} soon");
+
+        service.saveNoGameSettings(username, "1", "Just Chatting", Set.of(), true, true, false, "");
+        assertThat(data.getUserSettings().noGameTitle()).isNull();
+        assertThat(service.saveNoGameSettings(username, "1", "Just Chatting", Set.of(), true, true, false,
+                "x".repeat(141))).isEqualTo(400);
+    }
+
+    @Test
+    void customBindingTitle_keptWhenNull_clearedWhenBlank_likeCatapultApi() {
+        var created = service.createCustomBinding(username, new fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest(
+                "Titled", "509663", "Special Events", Set.of(), Set.of(), false, " {{GAME}} live ")).body();
+        assertThat(created.title()).isEqualTo("{{GAME}} live");
+
+        var kept = service.updateCustomBinding(username, created.id(), new fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest(
+                "Titled", "509663", "Special Events", Set.of(), Set.of(), false, null)).body().binding();
+        assertThat(kept.title()).isEqualTo("{{GAME}} live");
+
+        var cleared = service.updateCustomBinding(username, created.id(), new fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest(
+                "Titled", "509663", "Special Events", Set.of(), Set.of(), false, "")).body().binding();
+        assertThat(cleared.title()).isNull();
+        assertThat(service.updateCustomBinding(username, created.id(), new fr.enimaloc.catapult.common.dto.binding.CustomBindingRequest(
+                "Titled", "509663", "Special Events", Set.of(), Set.of(), false, "x".repeat(141))).status()).isEqualTo(400);
+    }
+
+    @Test
+    void titleSettings_areOfferedInMock_savedPerChannel_andToldAsAnEvent() {
+        assertThat(data.getUserSettings().titleAvailable()).isTrue();
+
+        assertThat(service.saveTitleSettings(username, true, "  Playing {{GAME}} ")).isEqualTo(204);
+        assertThat(data.getUserSettings().titleFeatureEnabled()).isTrue();
+        assertThat(data.getUserSettings().titleTemplate()).isEqualTo("Playing {{GAME}}");
+        var settings = ((fr.enimaloc.catapult.event.ChannelSettingsUpdatedEvent) events.getLast()).settings();
+        assertThat(settings.title()).isEqualTo(new fr.enimaloc.catapult.common.event.ChannelEvents.Settings.Title(
+                true, "Playing {{GAME}}"));
+
+        assertThat(service.saveTitleSettings(username, true, "x".repeat(141))).isEqualTo(400);
+        assertThat(data.getUserSettings().titleTemplate()).isEqualTo("Playing {{GAME}}");
+    }
+
+    @Test
+    void bindingTitle_isSaved_andToldAsAnEvent_blankBeingNone() {
+        assertThat(service.bindingTitle(username, bindingId, "{{GAME}} blind")).isEqualTo(204);
+        assertThat(binding().title()).isEqualTo("{{GAME}} blind");
+
+        service.bindingTitle(username, bindingId, "  ");
+        assertThat(binding().title()).isNull();
+        assertThat(events).containsExactly(
+                new fr.enimaloc.catapult.event.binding.BindingTitleEvent(username, bindingId, "{{GAME}} blind"),
+                new fr.enimaloc.catapult.event.binding.BindingTitleEvent(username, bindingId, ""));
+        assertThat(service.bindingTitle(username, bindingId, "x".repeat(141))).isEqualTo(400);
+        // A variable not written exactly is kept as typed
+        assertThat(service.saveTitleSettings(username, true, "{{ORIGINAL_TITLE}} {{game}}")).isEqualTo(204);
     }
 
     @Test

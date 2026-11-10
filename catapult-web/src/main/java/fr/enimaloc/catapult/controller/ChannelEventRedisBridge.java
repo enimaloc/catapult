@@ -10,6 +10,7 @@ import fr.enimaloc.catapult.event.ChannelUpdatedEvent;
 import fr.enimaloc.catapult.event.DtddMappingChangedEvent;
 import fr.enimaloc.catapult.event.binding.BindingDeletedEvent;
 import fr.enimaloc.catapult.event.binding.BindingIgnoredStateEvent;
+import fr.enimaloc.catapult.event.binding.BindingTitleEvent;
 import fr.enimaloc.catapult.event.binding.BindingUpdatedEvent;
 import fr.enimaloc.catapult.event.binding.CclStateEvent;
 import fr.enimaloc.catapult.event.binding.CustomBindingChangedEvent;
@@ -156,6 +157,7 @@ public class ChannelEventRedisBridge {
         events.add(new BindingUpdatedEvent(login, id, binding.twitchGameId(), binding.twitchGameName(), ccls));
         events.add(new CclStateEvent(login, id, binding.cclEnabled()));
         events.add(new BindingIgnoredStateEvent(login, id, binding.ignored()));
+        events.add(new BindingTitleEvent(login, id, binding.title() == null ? "" : binding.title()));
         events.add(new TwEnabledStateEvent(login, id, binding.twEnabled()));
         // Without an override, its TWs are the ones it resolved to: what a reset leaves it with.
         events.add(binding.twOverride() ? new TwUpdatedEvent(login, id, tws) : new TwResetEvent(login, id, tws));
