@@ -76,4 +76,19 @@ describe("title preview", () => {
         expect(text()).toBe("(left as it is)");
         expect(document.querySelector("mdui-snackbar")).toBeNull();
     });
+
+    it("waits for a lazy one's field to be used before asking", async () => {
+        const input = field("Live {{GAME}}", `data-preview-kind="BINDING" data-binding-id="b1" data-preview-lazy`);
+        await settle();
+        expect(posted).not.toHaveBeenCalled();
+
+        input.dispatchEvent(new Event("focus"));
+        await settle();
+        expect(posted).toHaveBeenCalledTimes(1);
+        expect(text()).toBe("rendered: Live {{GAME}}");
+
+        input.dispatchEvent(new Event("focus"));
+        await settle();
+        expect(posted).toHaveBeenCalledTimes(1);
+    });
 });

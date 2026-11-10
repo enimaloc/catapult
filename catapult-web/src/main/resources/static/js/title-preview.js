@@ -1,7 +1,8 @@
 /**
  * Title fields' previews ([data-title-preview], right after their field): the title the field's text would send now,
  * rendered by catapult-api with what it is the title of (data-preview-kind, data-binding-id, data-custom-binding-id).
- * Asked at once, then once typing pauses (400 ms); a title that wouldn't be sent shows data-none. A failed preview
+ * Asked at once (a data-preview-lazy one, as each binding row's, only once its field is first used), then once typing
+ * pauses (400 ms); a title that wouldn't be sent shows data-none. A failed preview
  * keeps the last one shown, quietly: it is a hint, not an action.
  */
 window.CatapultTitlePreview = (function () {
@@ -40,7 +41,9 @@ window.CatapultTitlePreview = (function () {
             clearTimeout(timer);
             timer = setTimeout(ask, DELAY_MS);
         });
-        ask();
+        // A dashboard lists dozens of bindings, their panels closed: theirs are asked for once used
+        if ("previewLazy" in preview.dataset) field.addEventListener("focus", ask, { once: true });
+        else ask();
     }
 
     function scan(root) {
