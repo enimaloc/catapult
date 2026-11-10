@@ -77,4 +77,30 @@ class TtvDropsClientTest {
 
         assertThatThrownBy(client::activeCampaigns).isInstanceOf(RuntimeException.class);
     }
+
+    @Test
+    void untrustedUrls_andIds_areDropped() {
+        page(1, 2, """
+                {"twitch_id":"a","name":"A","status":"active","image_url":"javascript:alert(1)",
+                 "details_url":"javascript:alert(1)","start_at":"2026-11-10T02:00:00Z","end_at":"2026-11-25T23:59:59Z",
+                 "allow_is_enabled":false,"game":{"twitch_id":"1","display_name":"G"}}""",
+                """
+                {"twitch_id":"../../admin","name":"B","status":"active","image_url":"//evil.example/x.png",
+                 "details_url":"https://ok.example/b","start_at":"2026-11-10T02:00:00Z","end_at":"2026-11-25T23:59:59Z",
+                 "allow_is_enabled":true,"game":{"twitch_id":"2","display_name":"G"}}""");
+
+        List<DropCampaign> campaigns = client.activeCampaigns();
+
+        assertThat(campaigns).extracting(DropCampaign::id).containsExactly("a");
+        assertThat(campaigns.getFirst().detailsUrl()).isNull();
+        assertThat(campaigns.getFirst().imageUrl()).isNull();
+        ttv.verify();
+    }
+
+    @Test
+    void imageUrl_onlyOnTtvdropsItself() {
+        page(1, 1, campaign("a", "1", false).replace("/media/campaigns/a.png", "https://elsewhere.example/a.png"));
+
+        assertThat(client.activeCampaigns().getFirst().imageUrl()).isNull();
+    }
 }

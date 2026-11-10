@@ -18,6 +18,8 @@ import java.util.stream.Collectors;
 public class TtvDropsClient {
 
     private static final int PAGE_SIZE = 100;
+    // ttvdrops is a third party: a campaign id goes in a request path, its links in the dashboard's pages
+    private static final java.util.regex.Pattern ID = java.util.regex.Pattern.compile("[A-Za-z0-9-]+");
 
     private final RestClient restClient;
     private final ExternalApiObservations observations;
@@ -47,26 +49,47 @@ public class TtvDropsClient {
         }
         List<DropCampaign> campaigns = new ArrayList<>();
         for (Item item : items) {
-            if (!"active".equals(item.status()) || item.game() == null || item.game().twitchId() == null) continue;
+            if (!"active".equals(item.status()) || item.game() == null || item.game().twitchId() == null
+                    || item.twitchId() == null || !ID.matcher(item.twitchId()).matches()) continue;
             boolean restricted = Boolean.TRUE.equals(item.allowIsEnabled());
             Set<String> allowed = restricted ? allowedChannels(item.twitchId()) : Set.of();
             campaigns.add(new DropCampaign(item.twitchId(), item.name(), item.game().twitchId(),
-                    item.game().displayName(), item.startAt(), item.endAt(), item.detailsUrl(),
-                    absolute(item.imageUrl()), restricted, allowed));
+                    item.game().displayName(), item.startAt(), item.endAt(), web(item.detailsUrl()),
+                    image(item.imageUrl()), restricted, allowed));
         }
         return campaigns;
     }
 
     private Set<String> allowedChannels(String campaignId) {
         Detail detail = observations.observe("ttvdrops", "get_campaign", () -> restClient.get()
-                .uri(baseUrl + "campaigns/" + campaignId + "/").retrieve().body(Detail.class));
+                .uri(baseUrl + "campaigns/{id}/", campaignId).retrieve().body(Detail.class));
         if (detail == null || detail.allowedChannels() == null) return Set.of();
         return detail.allowedChannels().stream().map(Channel::twitchId).collect(Collectors.toUnmodifiableSet());
     }
 
-    private String absolute(String path) {
+    /** An http(s) link, null otherwise (a javascript: one would run from the dashboard's link). */
+    private static String web(String url) {
+        if (url == null || url.isBlank()) return null;
+        try {
+            URI uri = URI.create(url.strip());
+            return ("https".equals(uri.getScheme()) || "http".equals(uri.getScheme())) && uri.getHost() != null
+                    ? uri.toString() : null;
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    /** A campaign image, made absolute: only one served by ttvdrops itself, null otherwise. */
+    private String image(String path) {
         if (path == null || path.isBlank()) return null;
-        return URI.create(baseUrl).resolve(path).toString();
+        try {
+            URI base = URI.create(baseUrl);
+            URI image = base.resolve(path.strip());
+            String absolute = web(image.toString());
+            return absolute != null && base.getHost().equalsIgnoreCase(image.getHost()) ? absolute : null;
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     record Page(long total, List<Item> items) {}
