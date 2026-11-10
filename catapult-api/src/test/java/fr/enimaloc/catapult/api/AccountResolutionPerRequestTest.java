@@ -97,6 +97,7 @@ class AccountResolutionPerRequestTest {
     @MockitoBean TwitchatEventDispatcher twitchatEventDispatcher;
     @MockitoBean SteamProfileDiagnostics steamProfileDiagnostics;
     @MockitoBean RaidRestoreGateService raidRestoreGate;
+    @MockitoBean fr.enimaloc.catapult.service.title.StreamTitleService streamTitle;
     @MockitoBean ExtensionLayoutApplier extensionLayoutApplier;
     @MockitoBean GameBindingLookup gameBindingLookup;
     @MockitoBean CustomBindingActivations customBindingActivations;
