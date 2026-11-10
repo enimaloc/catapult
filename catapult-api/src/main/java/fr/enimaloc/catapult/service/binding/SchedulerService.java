@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.event.GameDetectedEvent;
 import fr.enimaloc.catapult.event.NoGameDetectedEvent;
 import fr.enimaloc.catapult.getter.DetectedGame;
+import fr.enimaloc.catapult.getter.DetectionTimeoutException;
 import fr.enimaloc.catapult.getter.GameGetterChain;
 import fr.enimaloc.catapult.getter.MinecraftPresenceGetter;
 import fr.enimaloc.catapult.getter.steam.SteamGameGetter;
@@ -178,7 +179,15 @@ public class SchedulerService implements SchedulingConfigurer {
     }
 
     private void detect(UserAccount user) {
-        Optional<DetectedGame> detected = gameGetterChain.resolve(user);
+        Optional<DetectedGame> detected;
+        try {
+            detected = gameGetterChain.resolve(user);
+        } catch (DetectionTimeoutException e) {
+            // Nothing learnt this cycle: the user keeps their state until a provider answers
+            log.warn("Detection skipped for user {}: {}", user.getId(), e.getMessage());
+            meterRegistry.counter("catapult.scheduler.detection.timeouts").increment();
+            return;
+        }
         boolean firstSinceStart = gameStateService.markObserved(user);
 
         if (detected.isPresent()) {

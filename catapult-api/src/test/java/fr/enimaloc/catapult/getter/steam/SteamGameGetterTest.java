@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.getter.steam;
 import fr.enimaloc.catapult.service.debug.DebugRecording;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.getter.DetectedGame;
+import fr.enimaloc.catapult.getter.DetectionTimeoutException;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.steam.SteamStoreService;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,8 +17,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeoutException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -110,5 +113,40 @@ class SteamGameGetterTest {
         assertThat(result).isPresent();
         assertThat(result.get().getSourceId()).isEqualTo("4009490");
         assertThat(result.get().getSourceName()).isEqualTo("Arctic Drive");
+    }
+
+    @Test
+    void getCurrentGame_throwsDetectionTimeout_whenSteamTimesOut() {
+        UserAccount user = new UserAccount();
+        user.setId(UUID.randomUUID());
+        user.setSteamId("123");
+
+        when(steamApiClient.getPlayerSummary("123", null))
+            .thenReturn(CompletableFuture.failedFuture(new TimeoutException()));
+
+        assertThatThrownBy(() -> getter.getCurrentGame(user)).isInstanceOf(DetectionTimeoutException.class);
+    }
+
+    @Test
+    void getCurrentGame_throwsDetectionTimeout_whenSteamNeverAnswers() {
+        UserAccount user = new UserAccount();
+        user.setId(UUID.randomUUID());
+        user.setSteamId("123");
+
+        when(steamApiClient.getPlayerSummary("123", null)).thenReturn(new CompletableFuture<>());
+
+        assertThatThrownBy(() -> getter.getCurrentGame(user)).isInstanceOf(DetectionTimeoutException.class);
+    }
+
+    @Test
+    void getCurrentGame_returnsEmpty_whenSteamFailsOtherwise() {
+        UserAccount user = new UserAccount();
+        user.setId(UUID.randomUUID());
+        user.setSteamId("123");
+
+        when(steamApiClient.getPlayerSummary("123", null))
+            .thenReturn(CompletableFuture.failedFuture(new IllegalStateException("boom")));
+
+        assertThat(getter.getCurrentGame(user)).isEmpty();
     }
 }

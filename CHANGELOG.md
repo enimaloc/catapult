@@ -4,6 +4,89 @@ Toutes les versions publiées de Catapult, la plus récente en premier.
 
 Ce fichier est régénéré par le bot à chaque release à partir des notes des [GitHub Releases](https://github.com/enimaloc/catapult/releases) : pour corriger une entrée, modifie les notes de la release (ou le changelog de la PR de release avant sa publication), pas ce fichier.
 
+## [v1.0.0](https://github.com/enimaloc/catapult/releases/tag/v1.0.0) - 2026-11-09
+
+### Features
+- **Détection des jeux:** Catapult reconnaît tout seul le jeu auquel tu joues sur Steam, Xbox et Minecraft (pour Minecraft, il suffit d'accepter une demande d'ami en jeu).
+- **Catégorie Twitch:** dès que tu changes de jeu en live, ta catégorie Twitch suit, sans que tu aies à y toucher. Au lancement du live, le jeu en cours est appliqué tout de suite.
+- **Catégorie Twitch:** choisis la catégorie à afficher quand tu ne joues à aucun jeu, et celle à utiliser pour un jeu que Catapult ne sait pas encore associer.
+- **Associations:** retrouve chaque jeu détecté avec sa catégorie Twitch et sa jaquette. Corrige-la, ignore un jeu ou remets-le par défaut en un clic, et filtre la liste par plateforme.
+- **Labels de contenu:** les labels de classification de contenu de Twitch sont posés selon le jeu, et tu peux en écarter certains pour qu'ils ne soient jamais ajoutés (les jeux d'argent, par exemple).
+- **Avertissements:** Catapult propose les avertissements de contenu (trigger warnings) de chaque jeu en croisant plusieurs sources, dont DoesTheDogDie.com. Tu peux valider ou corriger la fiche retenue.
+- **Raid:** au lancement d'un raid, Catapult peut remettre le dernier jeu auquel tu as joué, s'il est récent.
+- **Extensions Twitch:** choisis les extensions à afficher pour chaque jeu ; elles changent en même temps que ta catégorie.
+- **Twitchat et OBS:** relie Catapult à Twitchat et à OBS pour faire passer notifications et actions dans ton overlay, avec un lien de widget prêt à coller dans OBS.
+- **OBS:** ouvre ta chaîne dans un dock OBS pour en garder une version compacte sous les yeux pendant le live.
+- **Notifications:** une cloche te prévient des nouveautés et des annonces, et tu peux aussi les recevoir dans Twitchat ou dans ton chat au début du live.
+- **Temps réel:** le tableau de bord se met à jour tout seul : passage en live, jeu détecté, réglages modifiés depuis un autre appareil.
+- **Modération:** tes modérateurs peuvent gérer les réglages et les associations de ta chaîne.
+- **Bots de chat:** un jeton de lecture permet à ton bot de chat ou à tes scripts d'afficher le jeu en cours, sans rien pouvoir modifier.
+- **Contenu généré par IA:** pour un jeu Steam, Catapult repère si sa page déclare du contenu généré par IA et récupère l'explication du développeur, que ton bot de chat peut afficher.
+- **Compte:** invite tes proches avec ton lien d'invitation, et supprime ton compte quand tu le souhaites, avec un délai pour changer d'avis.
+- **Aide:** chaque carte du site a son bouton d'aide, qui explique ce qu'elle fait et comment s'en servir.
+
+### Autres changements
+- **Interface:** le site est disponible en français et en anglais, et s'utilise aussi bien sur ordinateur que sur mobile.
+- **Fiabilité:** en cas de souci, Catapult peut basculer sur un serveur de secours ; un bandeau t'indique alors ce qui fonctionne au ralenti.
+- **Fiabilité:** quand le service est momentanément indisponible, une page de maintenance s'affiche au lieu d'une erreur.
+
+## [v1.0.0-BETA.102](https://github.com/enimaloc/catapult/releases/tag/v1.0.0-BETA.102) - 2026-11-07
+
+### Features
+- **api:** store custom binding schedules and activation origin (ae5d149)
+- **api:** compute custom binding schedule occurrences (0bf9300)
+- **api:** decide who may schedule custom bindings (8050f26)
+- **api:** remember why a custom binding is active (4d7c484)
+- **api:** let streamers edit custom binding schedules (e4737a0)
+- **api:** activate custom bindings on their schedule (93eea32)
+- **api:** expose custom binding schedules (7e5dc7c)
+- **web:** relay custom binding schedules (5967d1b)
+- **web:** schedule custom bindings from the channel tab (d423eaf)
+- **web:** let the mock admin page make the member premium (d61d6fb)
+- **api:** schedule custom binding slots in the time zone they were typed in (05a1b02)
+- **web:** show and edit schedule slots in the browser's time zone (c8d9e2f)
+- **web:** name the active custom binding in the status card (d46373e)
+- **api:** tell the dashboards their custom bindings' schedule slots when they change (f964c97)
+- merge custom binding schedules into dev (5f94127)
+
+### Fixes
+- **api:** never refuse a scheduled occurrence the schedule replaces itself (7024513)
+- **api:** keep the custom binding scheduler tick alive and evaluations serialized (18774cb)
+- **api:** keep the scheduler executor private so async lookups stay unambiguous (39df0b2)
+- **api:** keep the schedule endpoint test independent of today's date (e5002da)
+- tell the dashboard whether premium is shown in the custom bindings state (eebc825)
+- **web:** keep an unchanged schedule slot in the mock once no longer allowed (77a52d6)
+- **api:** load the binding with the schedules the scheduler reads outside a session (1b20f91)
+- **api:** store the schedule occurrence instants with their time zone (d50f63b)
+- **api:** refuse every scheduled occurrence running when the streamer chooses (8f9ecb1)
+- **api:** replace a binding picked offline by the running occurrence at go-live (8a348fe)
+- **web:** keep a custom binding's row open after a change in the mock (ee608a9)
+- **api:** run the custom binding schedule tick at second 0 of every minute (5507409)
+- **api:** end a schedule occurrence at the slot's wall time (c66d08b)
+- **api:** bound one-off schedule slots (c2ba9b7)
+- **api:** cap a custom binding at 20 schedule slots (4a1d177)
+- **api:** keep a schedule failure at stream start from stopping its other listeners (1b19a03)
+- **api:** make a manual custom binding choice wait for the scheduler (0820836)
+- **api:** keep retrying a schedule that replaces a binding picked offline (a552b23)
+- **api:** back off then give up a scheduled activation that keeps failing (51062bc)
+- **api:** refuse a schedule list edited from slots that changed since (a0fb547)
+
+### Performance
+- **api:** fetch the schedules' binding for the scheduler only (250808e)
+- **api:** leave slots that can no longer fire out of the schedule tick (33d7316)
+
+### Refactoring
+- **api:** take the free schedule category and zone from catapult-common (91ab109)
+
+### Documentation
+- **web:** give the custom binding deletion its javadoc back (62be2d4)
+
+### Other
+- **api:** import what the schedule service names and wrap its long lines (64eb6cd)
+- **api:** give the owner dashboard its custom binding schedules query (87b86fc)
+- **web:** ignore the web's local data directory (f80c82b)
+- **api:** wire the custom binding locks and post the new schedules body in the access matrix (e76c8e3)
+
 ## [v1.0.0-BETA.101](https://github.com/enimaloc/catapult/releases/tag/v1.0.0-BETA.101) - 2026-11-06
 
 ### Features
