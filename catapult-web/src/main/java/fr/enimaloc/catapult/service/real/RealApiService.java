@@ -437,7 +437,7 @@ public class RealApiService implements ApiService {
     @Override
     public fr.enimaloc.catapult.common.dto.channel.TitlePreviewDto previewTitle(String username,
             fr.enimaloc.catapult.common.dto.channel.TitlePreviewRequest request) {
-        return readChannel(username, id -> client.call(org.springframework.http.HttpMethod.POST,
+        return readChannel(username, id -> client.call(HttpMethod.POST,
                 "/api/internal/users/{userId}/title/preview", request,
                 fr.enimaloc.catapult.common.dto.channel.TitlePreviewDto.class, id));
     }
