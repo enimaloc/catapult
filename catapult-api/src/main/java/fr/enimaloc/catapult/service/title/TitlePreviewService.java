@@ -40,9 +40,13 @@ public class TitlePreviewService {
     private final GameStateService gameStateService;
     private final GameBindingLookup gameBindingLookup;
 
-    /** {@code request}'s text rendered; empty when no title would be sent (blank, or a title it uses is unknown). */
+    /**
+     * {@code request}'s text rendered; empty when no title would be sent (blank, or a title it uses is unknown). A
+     * text longer than a title is a 400, as when it is saved: never rendered, whatever its nesting.
+     */
     @Transactional(readOnly = true)
     public Optional<String> preview(UserAccount user, TitlePreviewRequest request) {
+        String template = StreamTitleService.cleaned(request.template());
         UserSettings settings = userSettingsRepository.findById(user.getId()).orElseGet(UserSettings::new);
         String kind = request.kind() == null ? "TEMPLATE" : request.kind();
         boolean noGame = "NO_GAME".equals(kind);
@@ -50,7 +54,7 @@ public class TitlePreviewService {
         Optional<String> lastSent = stateRepository.findById(user.getId()).map(StreamTitleState::getLastSentTitle);
         TitleContext context = streamTitleService.context(user, settings, binding, noGame,
                 labelSent(settings, binding, noGame), lastSent);
-        return TitleTemplate.render(request.template(), context, streamTitleService.conditionsAvailableReadOnly(user));
+        return TitleTemplate.render(template, context, streamTitleService.conditionsAvailableReadOnly(user));
     }
 
     private GameBinding bindingFor(UserAccount user, UserSettings settings, String kind, TitlePreviewRequest request) {

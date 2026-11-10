@@ -121,4 +121,13 @@ class TitlePreviewServiceTest {
         assertThat(preview("{{HAS_GAME ? [[x]]}}", "NO_GAME", null, null)).contains("{{HAS_GAME ? [[x]]}}");
         assertThat(preview("{{TITLE}}", "NO_GAME", null, null)).isEmpty();
     }
+
+    @Test
+    void preview_refusesATextLongerThanATitle_beforeRenderingIt() {
+        String deep = "{{HAS_GAME ? [[".repeat(5000) + "x" + "]] : [[]]}}".repeat(5000);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> preview(deep, "NO_GAME", null, null))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
+                .hasMessageContaining("400");
+    }
 }
