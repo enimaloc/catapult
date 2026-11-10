@@ -617,6 +617,19 @@ public class MockApiService implements ApiService {
         return NO_CONTENT;
     }
 
+    /** The game a title is previewed with in the mock. */
+    static final String PREVIEW_GAME = "Hades II";
+
+    /** Only the game and category are replaced, by examples: the mock has no conditions to evaluate. */
+    @Override
+    public fr.enimaloc.catapult.common.dto.channel.TitlePreviewDto previewTitle(String username,
+            fr.enimaloc.catapult.common.dto.channel.TitlePreviewRequest request) {
+        log.trace("previewTitle({}, {})", username, request);
+        String template = request.template() == null ? "" : request.template();
+        String title = template.replace("{{GAME}}", PREVIEW_GAME).replace("{{CATEGORY}}", PREVIEW_GAME).strip();
+        return new fr.enimaloc.catapult.common.dto.channel.TitlePreviewDto(title.isEmpty() ? null : title);
+    }
+
     /** Checked like catapult-api: a template of at most 140 characters, blank for none. */
     @Override
     public int saveTitleSettings(String username, boolean enabled, String template) {

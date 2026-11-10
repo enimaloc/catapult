@@ -432,6 +432,27 @@ class ChannelActionsControllerTest {
     }
 
     @Test
+    void previewTitle_relaysTheText_andAnswersTheTitle() throws Exception {
+        var request = new fr.enimaloc.catapult.common.dto.channel.TitlePreviewRequest("Live {{GAME}}", "TEMPLATE", null, null);
+        when(apiService.previewTitle("enimaloc", request))
+                .thenReturn(new fr.enimaloc.catapult.common.dto.channel.TitlePreviewDto("Live Doom"));
+
+        mvc.perform(post("/channel/enimaloc/title/preview").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"template\":\"Live {{GAME}}\",\"kind\":\"TEMPLATE\"}"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.title").value("Live Doom"));
+    }
+
+    @Test
+    void previewTitle_unavailable_isA502() throws Exception {
+        mvc.perform(post("/channel/enimaloc/title/preview").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"template\":\"x\",\"kind\":\"TEMPLATE\"}"))
+                .andExpect(status().isBadGateway());
+    }
+
+    @Test
     void saveTitleSettings_callsApiServiceWithParsedBody() throws Exception {
         when(apiService.saveTitleSettings("enimaloc", true, "Playing {{GAME}}")).thenReturn(204);
 

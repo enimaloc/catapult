@@ -132,6 +132,9 @@ public interface ApiService {
                                        java.util.Set<String> ccls, String title);
     /** How recent (1..120 minutes) a game an outgoing raid puts back, null or 0 for off; catapult-api's status, 502 when unreachable. */
     int saveRaidSettings(String username, Integer restoreGameMinutes);
+    /** A title field's text as it would be sent now; null when catapult-api refuses or can't be reached. */
+    fr.enimaloc.catapult.common.dto.channel.TitlePreviewDto previewTitle(String username,
+            fr.enimaloc.catapult.common.dto.channel.TitlePreviewRequest request);
     /** Whether Catapult sets the stream title, and the channel-wide template; catapult-api's status, 502 when unreachable. */
     int saveTitleSettings(String username, boolean enabled, String template);
     /** The channel's installed and active Twitch extensions, for the layout menus; empty on failure. */

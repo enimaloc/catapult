@@ -289,7 +289,8 @@ public class ChannelDashboardAssembler {
                 settings.getTitleTemplate(),
                 streamTitle.isAvailableFor(channel),
                 settings.getNoGameTitle(),
-                settings.getIncompleteFallbackTitle());
+                settings.getIncompleteFallbackTitle(),
+                streamTitle.previewAvailableFor(channel));
     }
 
     // --- DTDD mapping ----------------------------------------------------------------------------

@@ -798,6 +798,18 @@ class RealApiServiceTest {
     }
 
     @Test
+    void previewTitle_postsTheText_andReadsTheTitle() {
+        expect(HttpMethod.POST, channel("enimaloc") + "/title/preview")
+                .andExpect(content().json("{\"template\":\"Live {{GAME}}\",\"kind\":\"TEMPLATE\",\"bindingId\":null,\"customBindingId\":null}",
+                        org.springframework.test.json.JsonCompareMode.STRICT))
+                .andRespond(withSuccess("{\"title\":\"Live Doom\"}", MediaType.APPLICATION_JSON));
+
+        assertThat(service.previewTitle("enimaloc", new fr.enimaloc.catapult.common.dto.channel.TitlePreviewRequest(
+                "Live {{GAME}}", "TEMPLATE", null, null)))
+                .isEqualTo(new fr.enimaloc.catapult.common.dto.channel.TitlePreviewDto("Live Doom"));
+    }
+
+    @Test
     void saveTitleSettings() {
         expectPut(channel("enimaloc") + "/settings/title", "{\"enabled\":true,\"template\":\"Playing {{GAME}}\"}");
         service.saveTitleSettings("enimaloc", true, "Playing {{GAME}}");

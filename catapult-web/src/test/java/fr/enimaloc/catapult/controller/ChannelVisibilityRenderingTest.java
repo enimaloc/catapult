@@ -363,7 +363,7 @@ class ChannelVisibilityRenderingTest {
         when(apiService.channelSettings(any())).thenReturn(new UserSettingsDto(
                 false, Set.of(), null, null, Set.of(), false, false, false,
                 null, null, Set.of(), List.of(), false, Set.of(), List.of(), null, false, List.of(), List.of(),
-                true, "Playing {{GAME}}", true));
+                true, "Playing {{GAME}}", true, null, null, true));
 
         String offered = mvc.perform(get("/spa/channel/enimaloc")).andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
@@ -373,6 +373,8 @@ class ChannelVisibilityRenderingTest {
         assertThat(openingTagForId(offered, "title-enabled-checkbox")).contains("checked");
         assertThat(openingTagForId(offered, "title-template-input")).contains("value=\"Playing {{GAME}}\"", "maxlength=\"140\"")
                 .doesNotContain("disabled");
+        assertThat(offered).contains("data-title-preview", "data-preview-kind=\"TEMPLATE\"",
+                "data-preview-kind=\"BINDING\"", "data-preview-kind=\"NO_GAME\"", "data-preview-kind=\"INCOMPLETE\"");
         assertThat(offered).contains("value=\"{{GAME}} blind run\"", "data-value=\"value:BindingTitleEvent.title\"",
                 "id=\"no-game-title-input\"", "id=\"incomplete-fallback-title-input\"");
 
@@ -385,7 +387,7 @@ class ChannelVisibilityRenderingTest {
                 .andReturn().getResponse().getContentAsString();
 
         assertThat(hidden).contains("id=\"channel-ccl-settings-form\"")
-                .doesNotContain("channel-title-settings-form", "binding-title-panel", "no-game-title-input",
+                .doesNotContain("data-title-preview", "channel-title-settings-form", "binding-title-panel", "no-game-title-input",
                         "incomplete-fallback-title-input");
     }
 

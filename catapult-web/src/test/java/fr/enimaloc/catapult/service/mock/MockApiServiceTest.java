@@ -527,6 +527,16 @@ class MockApiServiceTest {
     }
 
     @Test
+    void previewTitle_replacesTheVariablesWithExamples() {
+        var preview = service.previewTitle(username, new fr.enimaloc.catapult.common.dto.channel.TitlePreviewRequest(
+                "Live {{GAME}} {{HAS_GAME ? [[x]] : [[y]]}}", "TEMPLATE", null, null));
+
+        assertThat(preview.title()).isEqualTo("Live " + MockApiService.PREVIEW_GAME + " {{HAS_GAME ? [[x]] : [[y]]}}");
+        assertThat(service.previewTitle(username, new fr.enimaloc.catapult.common.dto.channel.TitlePreviewRequest(
+                "  ", "TEMPLATE", null, null)).title()).isNull();
+    }
+
+    @Test
     void drops_areOffered_andFilterTheBindings() {
         var page = service.channelPage(username, 0, null, null);
         assertThat(page.drops()).hasSize(1);

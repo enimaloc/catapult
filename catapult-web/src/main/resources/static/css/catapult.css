@@ -2886,3 +2886,15 @@ mdui-text-field[data-title-highlight].title-highlighted::part(input) {
 .binding-drops-chip:focus-visible {
     background-color: rgba(145, 70, 255, 0.32);
 }
+
+/* A title field's preview: the title it would send now (title-preview.js) */
+.title-preview {
+    margin: 4px 0 0;
+    font-size: 0.85rem;
+    color: var(--catapult-text-muted, inherit);
+    overflow-wrap: anywhere;
+}
+
+.binding-edit-panel .title-preview {
+    grid-column: 1 / -1;
+}

@@ -317,7 +317,7 @@ class MockDataTest {
                     "1", "Just Chatting", Set.of("Drugs"), true, false, true,
                     "2", "Other", Set.of("Gambling"),
                     MockPresets.AVAILABLE_CCLS, true, Set.of("spiders"), MockPresets.AVAILABLE_TWS, null, true,
-                    java.util.List.of(), java.util.List.of(), true, "Playing {{GAME}}", true));
+                    java.util.List.of(), java.util.List.of(), true, "Playing {{GAME}}", true, null, null, true));
         }
     }
 
