@@ -310,14 +310,14 @@ class MockDataTest {
             data.saveTwSettings(true, Set.of("spiders"));
             data.saveNoGameSettings("1", "Just Chatting", Set.of("Drugs"), true, false, true);
             data.saveIncompleteFallbackSettings("2", "Other", Set.of("Gambling"));
-            data.saveTitleSettings(true, "Playing {game}");
+            data.saveTitleSettings(true, "Playing {{GAME}}");
 
             UserSettingsDto settings = data.getUserSettings();
             assertThat(settings).isEqualTo(new UserSettingsDto(false, Set.of("Gore"),
                     "1", "Just Chatting", Set.of("Drugs"), true, false, true,
                     "2", "Other", Set.of("Gambling"),
                     MockPresets.AVAILABLE_CCLS, true, Set.of("spiders"), MockPresets.AVAILABLE_TWS, null, true,
-                    java.util.List.of(), java.util.List.of(), true, "Playing {game}", true));
+                    java.util.List.of(), java.util.List.of(), true, "Playing {{GAME}}", true));
         }
     }
 

@@ -114,10 +114,10 @@ class ApiChannelActionsControllerTest extends ApiChannelActionsTestSupport {
             GameBinding binding = storedBinding();
             when(streamTitle.isAvailableFor(owner)).thenReturn(true);
 
-            mvc.perform(as(moderator, HttpMethod.PUT, "/bindings/" + bindingId + "/title", "{\"title\":\" {game} speedrun \"}"))
+            mvc.perform(as(moderator, HttpMethod.PUT, "/bindings/" + bindingId + "/title", "{\"title\":\" {{GAME}} speedrun \"}"))
                     .andExpect(status().isNoContent());
 
-            verify(bindingService).setTitle(owner, bindingId, "{game} speedrun");
+            verify(bindingService).setTitle(owner, bindingId, "{{GAME}} speedrun");
             verify(channelEventPublisher).bindingUpserted(owner.getId(), binding);
         }
 
@@ -318,12 +318,12 @@ class ApiChannelActionsControllerTest extends ApiChannelActionsTestSupport {
         void title_savesTheSwitchAndTheTemplate() throws Exception {
             when(streamTitle.isAvailableFor(owner)).thenReturn(true);
 
-            mvc.perform(as(moderator, HttpMethod.PUT, "/settings/title", "{\"enabled\":true,\"template\":\"Playing {game}\"}"))
+            mvc.perform(as(moderator, HttpMethod.PUT, "/settings/title", "{\"enabled\":true,\"template\":\"Playing {{GAME}}\"}"))
                     .andExpect(status().isNoContent());
 
             UserSettings settings = saved();
             assertThat(settings.isTitleFeatureEnabled()).isTrue();
-            assertThat(settings.getTitleTemplate()).isEqualTo("Playing {game}");
+            assertThat(settings.getTitleTemplate()).isEqualTo("Playing {{GAME}}");
             verify(channelEventPublisher).settingsUpdated(owner.getId(), settings);
         }
 

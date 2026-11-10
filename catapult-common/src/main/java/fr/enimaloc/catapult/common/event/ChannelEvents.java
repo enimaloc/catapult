@@ -136,7 +136,7 @@ public final class ChannelEvents {
         /** {@code restoreGameMinutes}: how recent a game an outgoing raid puts back; null when off. */
         public record Raid(Integer restoreGameMinutes) {}
 
-        /** {@code template}: the channel-wide stream title ({game}: the category's name), null when none. */
+        /** {@code template}: the channel-wide stream title (its {{GAME}}/{{TITLE}} variables as typed), null when none. */
         public record Title(boolean enabled, String template) {}
     }
 }

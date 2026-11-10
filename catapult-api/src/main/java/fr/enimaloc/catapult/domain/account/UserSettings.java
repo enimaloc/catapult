@@ -108,7 +108,7 @@ public class UserSettings {
     @Column(name = "title_feature_enabled", nullable = false)
     private boolean titleFeatureEnabled = false;
 
-    /** The title sent with the category ({@code {game}}: its name) when the game has none of its own; null: none. */
+    /** The title sent with the category when the game has none of its own (see StreamTitleService); null: none. */
     @Column(name = "title_template", length = 140)
     private String titleTemplate;
 }

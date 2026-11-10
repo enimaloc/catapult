@@ -29,7 +29,7 @@ public record UserSettingsDto(
         // Off: Catapult never touches the stream title. Boxed, like titleAvailable, so a catapult-api that predates
         // them still reads (null: off, not offered) instead of failing as a missing primitive
         Boolean titleFeatureEnabled,
-        // The channel-wide title ({game}: the category's name); null: none
+        // The channel-wide title ({{GAME}}: the category's name, {{TITLE}}: the title before); null: none
         String titleTemplate,
         // Whether the channel is offered the title setting at all (experiment stream.title)
         Boolean titleAvailable

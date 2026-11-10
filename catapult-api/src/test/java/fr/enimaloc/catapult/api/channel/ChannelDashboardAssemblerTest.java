@@ -553,7 +553,7 @@ class ChannelDashboardAssemblerTest {
         void streamTitle_isOfferedOnlyWhileTheExperimentIsOnForTheChannel() {
             UserSettings saved = new UserSettings();
             saved.setTitleFeatureEnabled(true);
-            saved.setTitleTemplate("Playing {game}");
+            saved.setTitleTemplate("Playing {{GAME}}");
             when(settingsRepository.findById(owner.getId())).thenReturn(Optional.of(saved));
 
             when(streamTitle.isAvailableFor(owner)).thenReturn(true);
@@ -563,7 +563,7 @@ class ChannelDashboardAssemblerTest {
 
             assertThat(on.titleAvailable()).isTrue();
             assertThat(on.titleFeatureEnabled()).isTrue();
-            assertThat(on.titleTemplate()).isEqualTo("Playing {game}");
+            assertThat(on.titleTemplate()).isEqualTo("Playing {{GAME}}");
             assertThat(off.titleAvailable()).isFalse();
         }
 

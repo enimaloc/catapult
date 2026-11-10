@@ -38,7 +38,7 @@ class StreamTitleColumnsIT {
         UserSettings on = new UserSettings();
         on.setUser(user("title-on"));
         on.setTitleFeatureEnabled(true);
-        on.setTitleTemplate("Playing {game}");
+        on.setTitleTemplate("Playing {{GAME}}");
         settingsRepo.save(on);
         UserSettings off = new UserSettings();
         off.setUser(user("title-off"));
@@ -46,7 +46,7 @@ class StreamTitleColumnsIT {
 
         assertThat(settingsRepo.findById(on.getUserId())).get().satisfies(s -> {
             assertThat(s.isTitleFeatureEnabled()).isTrue();
-            assertThat(s.getTitleTemplate()).isEqualTo("Playing {game}");
+            assertThat(s.getTitleTemplate()).isEqualTo("Playing {{GAME}}");
         });
         assertThat(settingsRepo.findById(off.getUserId())).get().satisfies(s -> {
             assertThat(s.isTitleFeatureEnabled()).isFalse();
@@ -62,11 +62,11 @@ class StreamTitleColumnsIT {
         binding.setSourceId("730");
         binding.setSourceName("Counter-Strike 2");
         binding.setStatus(GameBinding.Status.AUTO);
-        binding.setTitle("{game} ranked grind");
+        binding.setTitle("{{GAME}} ranked grind");
         binding = bindingRepo.save(binding);
 
         assertThat(bindingRepo.findById(binding.getId())).get()
-                .extracting(GameBinding::getTitle).isEqualTo("{game} ranked grind");
+                .extracting(GameBinding::getTitle).isEqualTo("{{GAME}} ranked grind");
     }
 
     private UserAccount user(String username) {

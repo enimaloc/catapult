@@ -531,10 +531,10 @@ class RealApiServiceTest {
     @Test
     void channelSettings_carryTheStreamTitle_andReadWithoutIt() {
         respond(HttpMethod.GET, channel("enimaloc") + "/settings", SETTINGS_JSON.replace("}",
-                ",\"titleFeatureEnabled\":true,\"titleTemplate\":\"Playing {game}\",\"titleAvailable\":true}"));
+                ",\"titleFeatureEnabled\":true,\"titleTemplate\":\"Playing {{GAME}}\",\"titleAvailable\":true}"));
         assertThat(service.channelSettings("enimaloc"))
                 .extracting(UserSettingsDto::titleFeatureEnabled, UserSettingsDto::titleTemplate, UserSettingsDto::titleAvailable)
-                .containsExactly(true, "Playing {game}", true);
+                .containsExactly(true, "Playing {{GAME}}", true);
 
         api.reset();
         respond(HttpMethod.GET, channel("enimaloc") + "/settings", SETTINGS_JSON);
@@ -799,14 +799,14 @@ class RealApiServiceTest {
 
     @Test
     void saveTitleSettings() {
-        expectPut(channel("enimaloc") + "/settings/title", "{\"enabled\":true,\"template\":\"Playing {game}\"}");
-        service.saveTitleSettings("enimaloc", true, "Playing {game}");
+        expectPut(channel("enimaloc") + "/settings/title", "{\"enabled\":true,\"template\":\"Playing {{GAME}}\"}");
+        service.saveTitleSettings("enimaloc", true, "Playing {{GAME}}");
     }
 
     @Test
     void bindingTitle() {
-        expectPut(channel("enimaloc") + "/bindings/b1/title", "{\"title\":\"{game} blind\"}");
-        service.bindingTitle("enimaloc", "b1", "{game} blind");
+        expectPut(channel("enimaloc") + "/bindings/b1/title", "{\"title\":\"{{GAME}} blind\"}");
+        service.bindingTitle("enimaloc", "b1", "{{GAME}} blind");
     }
 
     @Test

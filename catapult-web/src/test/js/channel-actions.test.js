@@ -86,7 +86,7 @@ describe("channel-bindings", () => {
                       <ul class="binding-edit-game-results"></ul>
                     </div>
                     <div class="binding-title-panel">
-                      <input class="binding-title-input" value="{game} blind">
+                      <input class="binding-title-input" value="{{GAME}} blind">
                       <button class="binding-title-save-btn"></button>
                     </div>
                     <div class="binding-ccl-panel">
@@ -115,7 +115,7 @@ describe("channel-bindings", () => {
         await click("[data-binding-id=b1] .binding-title-save-btn");
 
         expect(posts()).toEqual([
-            ["/channel/enimaloc/bindings/b1/title", { title: "{game} blind" }],
+            ["/channel/enimaloc/bindings/b1/title", { title: "{{GAME}} blind" }],
             ["/channel/enimaloc/bindings/b1/title", { title: "  " }]]);
         expect(refreshed()).toBe(0);
     });
@@ -702,31 +702,31 @@ describe("channel-settings title card", () => {
     }
 
     it("switching it on frees the template, and saves both", async () => {
-        renderTitleCard({ value: "Playing {game}" });
+        renderTitleCard({ value: "Playing {{GAME}}" });
 
         toggle(enabled(), true);
         expect(template().disabled).toBe(false);
         await click("#title-settings-save-btn");
 
-        expect(posts()).toEqual([["/channel/enimaloc/settings/title", { enabled: true, template: "Playing {game}" }]]);
+        expect(posts()).toEqual([["/channel/enimaloc/settings/title", { enabled: true, template: "Playing {{GAME}}" }]]);
         expect(refreshed()).toBe(0);
     });
 
     it("switching it off greys the template out but keeps it", async () => {
-        renderTitleCard({ on: true, value: "Playing {game}" });
+        renderTitleCard({ on: true, value: "Playing {{GAME}}" });
 
         toggle(enabled(), false);
         expect(template().disabled).toBe(true);
         await click("#title-settings-save-btn");
 
-        expect(posts()).toEqual([["/channel/enimaloc/settings/title", { enabled: false, template: "Playing {game}" }]]);
+        expect(posts()).toEqual([["/channel/enimaloc/settings/title", { enabled: false, template: "Playing {{GAME}}" }]]);
     });
 
     it("follows the title settings saved elsewhere, keeping an unsaved template", async () => {
         renderTitleCard();
 
-        CatapultSettings.apply({ title: { enabled: true, template: "Live {game}" } });
-        expect([enabled().checked, template().value, template().disabled]).toEqual([true, "Live {game}", false]);
+        CatapultSettings.apply({ title: { enabled: true, template: "Live {{GAME}}" } });
+        expect([enabled().checked, template().value, template().disabled]).toEqual([true, "Live {{GAME}}", false]);
 
         template().value = "Mine";
         template().dispatchEvent(new Event("input", { bubbles: true }));

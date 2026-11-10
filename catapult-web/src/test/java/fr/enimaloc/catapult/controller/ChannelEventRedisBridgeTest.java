@@ -165,11 +165,11 @@ class ChannelEventRedisBridgeTest {
     @Test
     void aBindingsOwnTitle_isItsTitleEvent() {
         BindingDto binding = new BindingDto("b1", "AUTO", "STEAM", "Doom", "7", "DOOM", false, true,
-                Set.of(), true, false, Set.of(), null, List.of(), "{game} nightmare");
+                Set.of(), true, false, Set.of(), null, List.of(), "{{GAME}} nightmare");
 
         assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.BINDING_UPSERTED,
                 new ChannelEvents.BindingUpserted(owner.toString(), "streamer", binding))))
-                .contains(new BindingTitleEvent("streamer", "b1", "{game} nightmare"));
+                .contains(new BindingTitleEvent("streamer", "b1", "{{GAME}} nightmare"));
     }
 
     @Test

@@ -10,18 +10,22 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Optional;
+import java.util.function.Supplier;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * The stream title sent with a category, behind experiment {@value #EXPERIMENT_KEY}: the game's own title, else the
- * channel-wide template, {@value #GAME_PLACEHOLDER} standing for the category's name. Nothing while the streamer
- * hasn't turned it on, so their title is left alone.
+ * channel-wide template, {@code {{GAME}}} standing for the category's name and {@code {{TITLE}}} for the title the
+ * stream has before the change (any case, spaces inside the braces allowed; another name is left as typed). Nothing
+ * while the streamer hasn't turned it on, so their title is left alone.
  */
 @Service
 @RequiredArgsConstructor
 public class StreamTitleService {
 
     public static final String EXPERIMENT_KEY = "stream.title";
-    public static final String GAME_PLACEHOLDER = "{game}";
+    private static final Pattern VARIABLE = Pattern.compile("\\{\\{\\s*(GAME|TITLE)\\s*}}", Pattern.CASE_INSENSITIVE);
     /** Twitch refuses a longer title. */
     public static final int MAX_LENGTH = 140;
 
@@ -37,23 +41,50 @@ public class StreamTitleService {
         return experimentService.isRolledOut(user, EXPERIMENT_KEY);
     }
 
-    /** The title to send with {@code binding}'s category, empty when none is to be sent. */
-    public Optional<String> titleFor(UserAccount user, UserSettings settings, GameBinding binding) {
+    /**
+     * The title to send with {@code binding}'s category, empty when none is to be sent; {@code currentTitle} is only
+     * asked for when the template uses {@code {{TITLE}}}.
+     */
+    public Optional<String> titleFor(UserAccount user, UserSettings settings, GameBinding binding,
+                                     Supplier<Optional<String>> currentTitle) {
         if (!sendsTitles(user, settings)) return Optional.empty();
         String template = hasText(binding.getTitle()) ? binding.getTitle() : settings.getTitleTemplate();
-        return render(template, binding.getTwitchGameName());
+        return render(template, binding.getTwitchGameName(), currentTitle);
     }
 
     /** The title to send with the "no game" category, from the channel-wide template only. */
-    public Optional<String> titleForNoGame(UserAccount user, UserSettings settings) {
+    public Optional<String> titleForNoGame(UserAccount user, UserSettings settings,
+                                           Supplier<Optional<String>> currentTitle) {
         if (!sendsTitles(user, settings)) return Optional.empty();
-        return render(settings.getTitleTemplate(), settings.getNoGameTwitchGameName());
+        return render(settings.getTitleTemplate(), settings.getNoGameTwitchGameName(), currentTitle);
     }
 
-    /** {@code template} with {@value #GAME_PLACEHOLDER} replaced, trimmed and cut to Twitch's limit; empty when blank. */
-    public static Optional<String> render(String template, String gameName) {
+    /**
+     * {@code template} with its variables replaced, trimmed and cut to Twitch's limit; empty when blank, or when it
+     * uses {@code {{TITLE}}} and the current title can't be read (better left alone than half-rewritten).
+     */
+    public static Optional<String> render(String template, String gameName, Supplier<Optional<String>> currentTitle) {
         if (!hasText(template)) return Optional.empty();
-        String title = template.replace(GAME_PLACEHOLDER, gameName == null ? "" : gameName).strip();
+        Matcher variables = VARIABLE.matcher(template);
+        Optional<String> current = Optional.empty();
+        boolean currentRead = false;
+        StringBuilder rendered = new StringBuilder();
+        while (variables.find()) {
+            String value;
+            if ("GAME".equalsIgnoreCase(variables.group(1))) {
+                value = gameName == null ? "" : gameName;
+            } else {
+                if (!currentRead) {
+                    current = currentTitle.get();
+                    currentRead = true;
+                }
+                if (current.isEmpty()) return Optional.empty();
+                value = current.get();
+            }
+            variables.appendReplacement(rendered, Matcher.quoteReplacement(value));
+        }
+        variables.appendTail(rendered);
+        String title = rendered.toString().strip();
         if (title.codePointCount(0, title.length()) > MAX_LENGTH) {
             title = title.substring(0, title.offsetByCodePoints(0, MAX_LENGTH)).strip();
         }

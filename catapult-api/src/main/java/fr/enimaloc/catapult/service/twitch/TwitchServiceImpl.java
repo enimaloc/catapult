@@ -195,7 +195,8 @@ public class TwitchServiceImpl implements TwitchService {
             Set<String> blocked = (userSettings != null && binding.getId() != null) ? userSettings.getBlockedCcls() : Set.of();
             body.put("content_classification_labels", buildCclPayload(binding.getCcls(), blocked));
         }
-        streamTitleService.titleFor(user, userSettings, binding).ifPresent(title -> body.put("title", title));
+        streamTitleService.titleFor(user, userSettings, binding, () -> currentTitle(user, accessToken))
+                .ifPresent(title -> body.put("title", title));
 
         try {
             patchRefreshingTheToken(user, token, accessToken, body);
@@ -338,7 +339,8 @@ public class TwitchServiceImpl implements TwitchService {
         if (settings.isCclFeatureEnabled() && !settings.getNoGameCcls().isEmpty()) {
             body.put("content_classification_labels", buildCclPayload(settings.getNoGameCcls(), Set.of()));
         }
-        streamTitleService.titleForNoGame(user, settings).ifPresent(title -> body.put("title", title));
+        streamTitleService.titleForNoGame(user, settings, () -> currentTitle(user, accessToken))
+                .ifPresent(title -> body.put("title", title));
         try {
             patchRefreshingTheToken(user, token, accessToken, body);
             log.info("Twitch channel reset to default for user {} — game_id={}, ccls={}",
@@ -448,6 +450,30 @@ public class TwitchServiceImpl implements TwitchService {
         );
     }
 
+    /**
+     * The channel's title as Twitch has it now, for a {@code {{TITLE}}} template; empty when it can't be read (logged:
+     * the title is then left alone, the category still sent).
+     */
+    private Optional<String> currentTitle(UserAccount user, String accessToken) {
+        try {
+            return apiObservations.observe("twitch", "get_channel_information", () -> {
+                WrappedListResponse<ChannelInformation> response = restClient.get()
+                    .uri(TWITCH_API_URL + "/channels?broadcaster_id=" + user.getTwitchId())
+                    .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
+                    .header(CLIENT_ID, twitchClientId)
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<>() {});
+                return response == null || response.data() == null || response.data().isEmpty()
+                    ? Optional.<String>empty()
+                    : Optional.ofNullable(response.data().getFirst().title());
+            });
+        } catch (RuntimeException e) {
+            log.warn("Could not read the Twitch title of user {}, leaving it alone: {}", user.getId(), e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    record ChannelInformation(String title) {}
     record WrappedResponse<T>(T data) {}
     record WrappedListResponse<T>(List<T> data) {}
     record ModeratedChannel(@JsonProperty("broadcaster_id") String broadcasterId) {}

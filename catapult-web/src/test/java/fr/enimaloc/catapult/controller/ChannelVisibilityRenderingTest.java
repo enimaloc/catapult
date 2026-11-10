@@ -353,7 +353,7 @@ class ChannelVisibilityRenderingTest {
     @Test
     void streamTitle_cardAndGameFields_onlyWhenTheExperimentOffersThem() throws Exception {
         BindingDto binding = new BindingDto("binding-1", "AUTO", "STEAM", "Game A", "123", "Game A",
-                false, true, Set.of(), true, false, Set.of(), null, List.of(), "{game} blind run");
+                false, true, Set.of(), true, false, Set.of(), null, List.of(), "{{GAME}} blind run");
         when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(new ChannelPageData(
                 new ChannelUserDto("id-1", "twitch-1", "enimaloc", "https://example.test/avatar.png"),
                 "enimaloc", false, true, true, null,
@@ -363,7 +363,7 @@ class ChannelVisibilityRenderingTest {
         when(apiService.channelSettings(any())).thenReturn(new UserSettingsDto(
                 false, Set.of(), null, null, Set.of(), false, false, false,
                 null, null, Set.of(), List.of(), false, Set.of(), List.of(), null, false, List.of(), List.of(),
-                true, "Playing {game}", true));
+                true, "Playing {{GAME}}", true));
 
         String offered = mvc.perform(get("/spa/channel/enimaloc")).andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
@@ -371,9 +371,9 @@ class ChannelVisibilityRenderingTest {
         assertThat(offered).contains("id=\"channel-title-settings-form\"", "id=\"title-settings-save-btn\"",
                 "data-help=\"title-settings\"", "class=\"binding-title-panel\"");
         assertThat(openingTagForId(offered, "title-enabled-checkbox")).contains("checked");
-        assertThat(openingTagForId(offered, "title-template-input")).contains("value=\"Playing {game}\"", "maxlength=\"140\"")
+        assertThat(openingTagForId(offered, "title-template-input")).contains("value=\"Playing {{GAME}}\"", "maxlength=\"140\"")
                 .doesNotContain("disabled");
-        assertThat(offered).contains("value=\"{game} blind run\"", "data-value=\"value:BindingTitleEvent.title\"");
+        assertThat(offered).contains("value=\"{{GAME}} blind run\"", "data-value=\"value:BindingTitleEvent.title\"");
 
         // A catapult-api that predates the title: nothing of it shown
         when(apiService.channelSettings(any())).thenReturn(new UserSettingsDto(

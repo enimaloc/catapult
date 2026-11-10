@@ -75,10 +75,10 @@ class ChannelSettingsServiceTest {
     void saveTitle_storesTheSwitchAndTheTrimmedTemplate() {
         when(streamTitle.isAvailableFor(channel)).thenReturn(true);
 
-        service.saveTitle(channel, new TitleSettingsRequest(true, "  Playing {game}  "));
+        service.saveTitle(channel, new TitleSettingsRequest(true, "  Playing {{GAME}}  "));
 
         assertThat(settings.isTitleFeatureEnabled()).isTrue();
-        assertThat(settings.getTitleTemplate()).isEqualTo("Playing {game}");
+        assertThat(settings.getTitleTemplate()).isEqualTo("Playing {{GAME}}");
         verify(publisher).settingsUpdated(channel.getId(), settings);
     }
 

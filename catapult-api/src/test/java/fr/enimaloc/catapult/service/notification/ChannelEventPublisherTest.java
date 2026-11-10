@@ -121,7 +121,7 @@ class ChannelEventPublisherTest {
         settings.setNoGameTwitchGameName("Just Chatting");
         settings.setRaidRestoreGameMinutes(20);
         settings.setTitleFeatureEnabled(true);
-        settings.setTitleTemplate("Playing {game}");
+        settings.setTitleTemplate("Playing {{GAME}}");
 
         publisher.settingsUpdated(ownerId, settings);
 
@@ -129,7 +129,7 @@ class ChannelEventPublisherTest {
         assertThat(payload.settings().ccl()).isEqualTo(new ChannelEvents.Settings.Ccl(true, Set.of("ccl1")));
         assertThat(payload.settings().noGame().twitchGameName()).isEqualTo("Just Chatting");
         assertThat(payload.settings().raid()).isEqualTo(new ChannelEvents.Settings.Raid(20));
-        assertThat(payload.settings().title()).isEqualTo(new ChannelEvents.Settings.Title(true, "Playing {game}"));
+        assertThat(payload.settings().title()).isEqualTo(new ChannelEvents.Settings.Title(true, "Playing {{GAME}}"));
     }
 
     @Test

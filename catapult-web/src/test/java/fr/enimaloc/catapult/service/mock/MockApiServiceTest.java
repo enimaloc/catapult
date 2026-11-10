@@ -511,26 +511,26 @@ class MockApiServiceTest {
     void titleSettings_areOfferedInMock_savedPerChannel_andToldAsAnEvent() {
         assertThat(data.getUserSettings().titleAvailable()).isTrue();
 
-        assertThat(service.saveTitleSettings(username, true, "  Playing {game} ")).isEqualTo(204);
+        assertThat(service.saveTitleSettings(username, true, "  Playing {{GAME}} ")).isEqualTo(204);
         assertThat(data.getUserSettings().titleFeatureEnabled()).isTrue();
-        assertThat(data.getUserSettings().titleTemplate()).isEqualTo("Playing {game}");
+        assertThat(data.getUserSettings().titleTemplate()).isEqualTo("Playing {{GAME}}");
         var settings = ((fr.enimaloc.catapult.event.ChannelSettingsUpdatedEvent) events.getLast()).settings();
         assertThat(settings.title()).isEqualTo(new fr.enimaloc.catapult.common.event.ChannelEvents.Settings.Title(
-                true, "Playing {game}"));
+                true, "Playing {{GAME}}"));
 
         assertThat(service.saveTitleSettings(username, true, "x".repeat(141))).isEqualTo(400);
-        assertThat(data.getUserSettings().titleTemplate()).isEqualTo("Playing {game}");
+        assertThat(data.getUserSettings().titleTemplate()).isEqualTo("Playing {{GAME}}");
     }
 
     @Test
     void bindingTitle_isSaved_andToldAsAnEvent_blankBeingNone() {
-        assertThat(service.bindingTitle(username, bindingId, "{game} blind")).isEqualTo(204);
-        assertThat(binding().title()).isEqualTo("{game} blind");
+        assertThat(service.bindingTitle(username, bindingId, "{{GAME}} blind")).isEqualTo(204);
+        assertThat(binding().title()).isEqualTo("{{GAME}} blind");
 
         service.bindingTitle(username, bindingId, "  ");
         assertThat(binding().title()).isNull();
         assertThat(events).containsExactly(
-                new fr.enimaloc.catapult.event.binding.BindingTitleEvent(username, bindingId, "{game} blind"),
+                new fr.enimaloc.catapult.event.binding.BindingTitleEvent(username, bindingId, "{{GAME}} blind"),
                 new fr.enimaloc.catapult.event.binding.BindingTitleEvent(username, bindingId, ""));
         assertThat(service.bindingTitle(username, bindingId, "x".repeat(141))).isEqualTo(400);
     }
