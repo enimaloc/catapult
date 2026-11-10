@@ -4,6 +4,60 @@ Toutes les versions publiées de Catapult, la plus récente en premier.
 
 Ce fichier est régénéré par le bot à chaque release à partir des notes des [GitHub Releases](https://github.com/enimaloc/catapult/releases) : pour corriger une entrée, modifie les notes de la release (ou le changelog de la PR de release avant sa publication), pas ce fichier.
 
+## [v1.1.0-BETA.1](https://github.com/enimaloc/catapult/releases/tag/v1.1.0-BETA.1) - 2026-11-10
+
+### Features
+- **api:** send the stream title along with the category (7fee7ca)
+- **api:** let channels edit their stream title settings (0cdb5b4)
+- **web:** let streamers set their stream title per game or for every game (df86277)
+- **api:** write stream title variables as {{GAME}} and add {{TITLE}} (8bbfcd0)
+- **api:** add {{ORIGINAL_TITLE}} and accept only exactly written title variables (653a1aa)
+- **api:** keep title variables not written exactly as typed instead of refusing them (1a5fb6c)
+- give custom bindings a stream title of their own (c9f1fe7)
+- **web:** color the variables Catapult replaces in the stream title fields (62eb121)
+- add {{CATEGORY}} and titles for the "no game" and incomplete game categories (2cfb76a)
+- merge stream title into dev (7ed07b3)
+- **api:** gate drops, title conditions and title preview behind their experiments (7d16eaf)
+- **api:** render conditions in stream titles (5acd43c)
+- **api:** keep the running Twitch drops campaigns from ttvdrops (8621d5a)
+- **api:** evaluate drops and binding conditions when sending the stream title (1f3dd9f)
+- show running Twitch drops on the channel bindings (22ea797)
+- **api:** expose running drops at /api/me/drops (b49d8a4)
+- **web:** relay /api/me/drops like the other public routes (1958811)
+- preview the stream title as it would be sent (48e49d4)
+- **api:** let an experiment spec target the members another experiment gave a variant (1b5bbfa)
+- **api:** offer the title conditions and preview only to the channels stream.title enabled (e1aacd8)
+- merge stream title conditions and Twitch drops into dev (5464a77)
+
+### Fixes
+- **web:** give the custom binding title field the form's full width and its own height (88c4a0b)
+- **ci:** refresh the beta -> main promotion in the promote-beta concurrency group (44d3ae8)
+- **ci:** merge the promote-beta concurrency fix into dev (60d1654)
+- **api:** show how to send the personal token in the API docs (1511746)
+- **api:** merge the API docs token guide into dev (c9989db)
+- **api:** keep only http links, ttvdrops' own images and plain ids from the drops campaigns (8074cf5)
+- **api:** refuse a title preview longer than a title before rendering it (58e56ef)
+- **api:** render brace-adjacent title variables as before and keep only a failed ternary raw (ef47535)
+- **api:** preview an empty own title as the channel-wide one that would be sent (8d1a5f7)
+- **api:** keep the drops when one campaign's channels can't be read and cap the listing (4f74b60)
+- **api:** enrol the channels in stream.title.conditions from their settings (e08d937)
+- **web:** highlight the title ternaries and the drop variables (76fdaed)
+
+### Performance
+- **web:** ask a binding row's title preview only once its field is used (22d1e45)
+
+### Documentation
+- **api:** explain the stream title conditions and drops variables in the card's help (8bc67fe)
+
+### Other
+- **api:** roll the stream title out to one channel in ten (a3bc4b6)
+- **api:** mock the stream title service in the controller and Twitchat revert slices (6cbe9c7)
+- **api:** budget the settings route's stream title gate lookup (6acae3c)
+- **common:** cover the stream title DTO constructors and older settings payloads (748c327)
+- **release:** merge the v1.0.1 backport into dev (5bbb792)
+- **api:** declare /api/me/drops among the public routes (fb8c440)
+- merge dev into feat/stream-title-conditions (5ce9b3f)
+
 ## [v1.0.1](https://github.com/enimaloc/catapult/releases/tag/v1.0.1) - 2026-11-10
 
 ### Fixes
