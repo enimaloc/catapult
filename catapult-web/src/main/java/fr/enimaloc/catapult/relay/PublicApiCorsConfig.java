@@ -19,7 +19,7 @@ class PublicApiCorsConfig implements WebMvcConfigurer {
     /** The {@code /api/me} paths relayed (see {@link ApiRelayController#PATHS}). */
     static final String[] ME_PATHS = {
             "/api/me/game", "/api/me/game/**", "/api/me/bindings/**",
-            "/api/me/custom-bindings", "/api/me/custom-bindings/**",
+            "/api/me/custom-bindings", "/api/me/custom-bindings/**", "/api/me/drops",
     };
     static final String GAMES_PATH = "/api/games/**";
     /** The request header choosing the API version, next to the credential and the body's type. */
