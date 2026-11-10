@@ -145,6 +145,32 @@ class OpenApiDocsTest {
         }));
     }
 
+    /** The schemes alone only show as a padlock: the page's header tells how to send a token, with examples. */
+    @Test
+    void docs_explainHowToSendTheTokenInTheirHeader() throws Exception {
+        JsonNode info = docs().get("info");
+
+        assertThat(info.get("title").asString()).isEqualTo("Catapult API");
+        assertThat(info.get("description").asString())
+                .contains("Authorization: Bearer cat_")
+                .contains("Authorization: Bearer catr_")
+                .contains("?token=catr_")
+                .contains("curl ");
+    }
+
+    /** An opened operation names the token it takes, how to send it, and that the read-only one opens no write. */
+    @Test
+    void docs_tellEachMeOperationWhichTokenItTakes() throws Exception {
+        JsonNode docs = docs();
+
+        String read = docs.at("/paths/~1api~1me~1game/get/description").asString();
+        assertThat(read).contains("Authorization: Bearer").contains("cat_").contains("catr_").contains("?token=");
+        String write = docs.at("/paths/~1api~1me~1custom-bindings~1active/put/description").asString();
+        assertThat(write).contains("Authorization: Bearer cat_").doesNotContain("?token=");
+        assertThat(docs.at("/paths/~1api~1games~1igdb~1{igdbId}/get/description").asString())
+                .doesNotContain("Authorization");
+    }
+
     @Test
     void docs_keepTheApiVersionDocumentation() throws Exception {
         JsonNode parameters = docs().at("/paths/~1api~1me~1game/get/parameters");
