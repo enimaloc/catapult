@@ -265,10 +265,10 @@ public class ChannelDashboardAssembler {
             return defaults;
         });
         boolean titleAvailable = streamTitle.isAvailableFor(channel);
-        if (titleAvailable) {
-            // The title's fields are where the conditions are written: offered them, the channel may be enrolled
-            streamTitle.conditionsAvailableFor(channel);
-        }
+        // The title's fields are where the conditions are written: offered them, the channel may be enrolled
+        boolean titleConditions = titleAvailable && streamTitle.conditionsAvailableFor(channel);
+        // What the title reads of the drops (StreamTitleService#context): the conditions and the drops both on
+        boolean titleDrops = titleConditions && dropsGate.isAvailableFor(channel);
         return new UserSettingsDto(
                 settings.isCclFeatureEnabled(),
                 settings.getBlockedCcls(),
@@ -295,7 +295,9 @@ public class ChannelDashboardAssembler {
                 titleAvailable,
                 settings.getNoGameTitle(),
                 settings.getIncompleteFallbackTitle(),
-                streamTitle.previewAvailableFor(channel));
+                streamTitle.previewAvailableFor(channel),
+                titleConditions,
+                titleDrops);
     }
 
     // --- DTDD mapping ----------------------------------------------------------------------------
