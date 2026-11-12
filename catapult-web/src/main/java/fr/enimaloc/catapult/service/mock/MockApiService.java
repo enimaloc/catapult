@@ -177,6 +177,7 @@ public class MockApiService implements ApiService {
     /** Application-wide: the game mappings an admin edits are the same for every mock session. */
     private final MockGameMappingsStore gameMappings = new MockGameMappingsStore();
     private final MockDtddCachesStore dtddCaches = new MockDtddCachesStore();
+    private final MockRateLimitsStore rateLimits = new MockRateLimitsStore(Clock.systemUTC());
     /** Application-wide: the groups an admin creates are the same for every mock session. */
     private final MockGroupsStore groups = new MockGroupsStore();
     /** Application-wide: the experiments an admin edits are the same for every mock session. */
@@ -870,6 +871,25 @@ public class MockApiService implements ApiService {
     public List<DtddProposalDto> adminDtddProposals(String status) {
         log.trace("adminDtddProposals({})", status);
         return dtddProposals.list(status);
+    }
+
+    @Override
+    public List<fr.enimaloc.catapult.common.dto.admin.LearnedRateLimitDto> adminRateLimits() {
+        log.trace("adminRateLimits()");
+        return rateLimits.list();
+    }
+
+    @Override
+    public int adminCorrectRateLimit(String id,
+                                     fr.enimaloc.catapult.common.dto.admin.LearnedRateLimitCorrectionDto correction) {
+        log.trace("adminCorrectRateLimit({}, {})", id, correction);
+        return rateLimits.correct(id, correction);
+    }
+
+    @Override
+    public int adminResetRateLimit(String id) {
+        log.trace("adminResetRateLimit({})", id);
+        return rateLimits.reset(id);
     }
 
     @Override

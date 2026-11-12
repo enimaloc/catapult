@@ -2,6 +2,8 @@ package fr.enimaloc.catapult.service.steam;
 
 import fr.enimaloc.catapult.domain.steam.SteamAppParentEntry;
 import fr.enimaloc.catapult.getter.steam.SteamPlaytestRedirectResolver;
+import fr.enimaloc.catapult.ratelimit.LearnedRateLimiter;
+import fr.enimaloc.catapult.ratelimit.RateLimitPriority;
 import fr.enimaloc.catapult.repository.steam.SteamAppParentRepository;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
 import lombok.AccessLevel;
@@ -15,11 +17,7 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
 import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.*;
 
 @Slf4j
@@ -27,7 +25,9 @@ import java.util.*;
 @RequiredArgsConstructor
 public class SteamStoreServiceImpl implements SteamStoreService {
 
-    private static final String APP_DETAILS_URL = "https://store.steampowered.com/api/appdetails";
+    private static final String STORE_HOST = "store.steampowered.com";
+    private static final String APP_DETAILS_PATH = "/api/appdetails";
+    private static final String APP_DETAILS_URL = "https://" + STORE_HOST + APP_DETAILS_PATH;
 
     private static final Map<String, Set<String>> KEYWORDS = Map.of(
         "ViolentGraphic",    Set.of("blood", "gore", "violence", "violent", "killing", "combat", "death", "injury"),
@@ -41,53 +41,49 @@ public class SteamStoreServiceImpl implements SteamStoreService {
     private final ExternalApiObservations apiObservations;
     private final SteamAppParentRepository steamAppParentRepository;
     private final SteamPlaytestRedirectResolver redirectResolver;
+    private final LearnedRateLimiter rateLimiter;
 
     private static final java.time.Duration PARENT_CACHE_TTL = java.time.Duration.ofDays(30);
 
-    /** Without a Retry-After, the first wait after a 429; it doubles while they follow each other, up to the max. */
-    private static final Duration RATE_LIMIT_FIRST = Duration.ofSeconds(60);
-    private static final Duration RATE_LIMIT_MAX = Duration.ofMinutes(10);
-
     @Setter(AccessLevel.PACKAGE)
     private Clock clock = Clock.systemUTC();
-    /** Until when the store asked to be left alone; null: it may be called. */
-    private volatile Instant rateLimitedUntil;
-    /** The wait the next 429 without a Retry-After gets: doubled by each, reset by an answer. */
-    private volatile Duration nextWait = RATE_LIMIT_FIRST;
+    /** Until when the learned rate limit refused the store's calls without sending them (live calls don't wait). */
+    private volatile Instant refusedUntil;
+    /** How long a 429 nothing learned from (the learning off) leaves the store alone without a Retry-After. */
+    private static final java.time.Duration UNBLOCKED_429_WAIT = java.time.Duration.ofMinutes(1);
 
+    /**
+     * Until when the store's {@code appdetails} isn't called: its learned rate limit blocks it after a 429, or
+     * refused a live call without sending it.
+     */
     @Override
     public Optional<Instant> rateLimitedUntil() {
-        Instant until = rateLimitedUntil;
-        return until != null && until.isAfter(clock.instant()) ? Optional.of(until) : Optional.empty();
-    }
-
-    /** The store answered 429: left alone for its Retry-After (seconds or an HTTP date), else the next wait. */
-    private void onRateLimited(HttpHeaders headers) {
         Instant now = clock.instant();
-        Duration wait = retryAfter(headers == null ? null : headers.getFirst("Retry-After"), now)
-                .orElse(nextWait);
-        if (wait.compareTo(RATE_LIMIT_MAX) > 0) wait = RATE_LIMIT_MAX;
-        Instant until = now.plus(wait);
-        if (rateLimitedUntil == null || until.isAfter(rateLimitedUntil)) rateLimitedUntil = until;
-        Duration doubled = nextWait.multipliedBy(2);
-        nextWait = doubled.compareTo(RATE_LIMIT_MAX) > 0 ? RATE_LIMIT_MAX : doubled;
-        log.warn("Steam store rate limited (429): left alone until {}", rateLimitedUntil);
+        Instant refused = refusedUntil;
+        Optional<Instant> blocked = rateLimiter.blockedUntil(STORE_HOST, APP_DETAILS_PATH);
+        if (refused == null || !refused.isAfter(now)) return blocked;
+        return blocked.filter(b -> b.isAfter(refused)).or(() -> Optional.of(refused));
     }
 
-    static Optional<Duration> retryAfter(String header, Instant now) {
-        if (header == null || header.isBlank()) return Optional.empty();
-        String value = header.trim();
-        try {
-            return Optional.of(Duration.ofSeconds(Math.max(1, Long.parseLong(value))));
-        } catch (NumberFormatException notSeconds) {
-            try {
-                Instant at = ZonedDateTime.parse(value,
-                        DateTimeFormatter.RFC_1123_DATE_TIME).toInstant();
-                return Optional.of(at.isAfter(now) ? Duration.between(now, at) : Duration.ofSeconds(1));
-            } catch (DateTimeParseException notADate) {
-                return Optional.empty();
-            }
-        }
+    /**
+     * A 429 on {@code appdetails} ({@code appDetails}; another route's never stops it): a live call the learned rate
+     * limit refused (no call sent) tells until when, bulk work it gave up on (cancelled) doesn't. A real one is
+     * already learned; while nothing blocks the route (the learning off), it is left alone for its Retry-After, else
+     * a minute, so the TWs resolved meanwhile know Steam's signals were missed.
+     */
+    private void onRateLimited(HttpClientErrorException.TooManyRequests e, boolean appDetails) {
+        HttpHeaders headers = e.getResponseHeaders();
+        boolean local = headers != null && headers.containsHeader(LearnedRateLimiter.LOCAL_REFUSAL_HEADER);
+        if (!local) log.warn("Steam store rate limited (429): left alone until {}", rateLimitedUntil().orElse(null));
+        if (!appDetails) return;
+        if (local && RateLimitPriority.current() != RateLimitPriority.LIVE) return;
+        if (!local && rateLimiter.blockedUntil(STORE_HOST, APP_DETAILS_PATH).isPresent()) return;
+        Instant now = clock.instant();
+        java.time.Duration wait = LearnedRateLimiter.retryAfter(headers == null ? null
+                : headers.getFirst(HttpHeaders.RETRY_AFTER), now).orElse(UNBLOCKED_429_WAIT);
+        Instant until = now.plus(wait);
+        Instant refused = refusedUntil;
+        if (refused == null || until.isAfter(refused)) refusedUntil = until;
     }
 
     /** One app's entry in an {@code appdetails} response, keyed by appId. */
@@ -268,15 +264,14 @@ public class SteamStoreServiceImpl implements SteamStoreService {
             }
             try {
                 Map<String, AppDetailsEntry> response = restClient.get()
-                        .uri(APP_DETAILS_URL + "?appids=" + effectiveAppId + "&l=" + lang)
+                        .uri(APP_DETAILS_URL + "?appids={appId}&l={lang}", effectiveAppId, lang)
                         .retrieve()
                         .body(new ParameterizedTypeReference<>() {});
-                nextWait = RATE_LIMIT_FIRST;
                 AppDetailsEntry entry = response == null ? null : response.get(effectiveAppId);
                 if (entry == null || !entry.success()) return Optional.empty();
                 return Optional.ofNullable(entry.data());
             } catch (HttpClientErrorException.TooManyRequests e) {
-                onRateLimited(e.getResponseHeaders());
+                onRateLimited(e, true);
                 return Optional.empty();
             } catch (Exception e) {
                 log.warn("Steam fetchData failed for appId={}: {}", appId, e.getMessage(), e);
@@ -295,13 +290,13 @@ public class SteamStoreServiceImpl implements SteamStoreService {
             if (rateLimitedUntil().isPresent()) return Optional.empty();
             try {
                 String response = restClient.get()
-                        .uri("https://store.steampowered.com/app/" + effectiveAppId + "?l=" + lang)
+                        .uri("https://" + STORE_HOST + "/app/{appId}?l={lang}", effectiveAppId, lang)
                         .retrieve()
                         .body(String.class);
                 if (response == null || response.isBlank()) return Optional.empty();
                 return Optional.of(response);
             } catch (HttpClientErrorException.TooManyRequests e) {
-                onRateLimited(e.getResponseHeaders());
+                onRateLimited(e, false);
                 return Optional.empty();
             } catch (Exception e) {
                 log.warn("Steam fetchIADisclosure failed for appId={}: {}", appId, e.getMessage(), e);

@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.common.dto.admin.TwRebuildStatusDto;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.binding.GameMapping;
 import fr.enimaloc.catapult.domain.config.AppState;
+import fr.enimaloc.catapult.ratelimit.RateLimitPriority;
 import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
 import fr.enimaloc.catapult.repository.binding.GameMappingRepository;
 import fr.enimaloc.catapult.repository.config.AppStateRepository;
@@ -260,7 +261,9 @@ public class TwBackfillService {
         try {
             for (int waits = 0; ; waits++) {
                 AtomicReference<Instant> limited = new AtomicReference<>();
-                DebugContext.runAs(b.getUser().getId(), () -> limited.set(resolveTws(b, metric, c)));
+                // Bulk traffic: kept under the learned rate limits with a margin for live calls, waiting its turn
+                RateLimitPriority.run(RateLimitPriority.BULK, () -> cancelled,
+                        () -> DebugContext.runAs(b.getUser().getId(), () -> limited.set(resolveTws(b, metric, c))));
                 if (limited.get() == null) break;
                 if (waits >= MAX_STEAM_WAITS) {
                     log.warn("TW {} gave up on binding {}: the Steam store stayed rate limited", metric, b.getId());

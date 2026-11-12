@@ -8,6 +8,8 @@ import fr.enimaloc.catapult.common.dto.channel.BindingDto;
 import fr.enimaloc.catapult.common.dto.premium.PremiumStatusDto;
 import fr.enimaloc.catapult.common.dto.channel.DeleteAccountRequest;
 import fr.enimaloc.catapult.common.dto.TokenResponse;
+import fr.enimaloc.catapult.common.dto.admin.LearnedRateLimitCorrectionDto;
+import fr.enimaloc.catapult.common.dto.admin.LearnedRateLimitDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminCclPage;
@@ -173,6 +175,7 @@ public class RealApiService implements ApiService {
     private static final ParameterizedTypeReference<List<TwDefinitionDto>> TWS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<fr.enimaloc.catapult.common.dto.chatcommand.EnabledChatCommandDto>> ENABLED_COMMANDS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<GroupSummaryDto>> GROUPS = new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<List<LearnedRateLimitDto>> RATE_LIMITS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<ExperimentSummaryDto>> EXPERIMENTS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<FlagKeyDto>> FLAG_KEYS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<AdminPage<AdminNotificationDto>> ADMIN_NOTIFICATIONS = new ParameterizedTypeReference<>() {};
@@ -1050,6 +1053,23 @@ public class RealApiService implements ApiService {
     public ApiClient.Result<DtddRefetchJobDto> adminCancelDtddRefetch() {
         return client.call(HttpMethod.DELETE, "/api/internal/admin/dtdd-caches/refetch-all", null,
                 DtddRefetchJobDto.class);
+    }
+
+    @Override
+    public List<LearnedRateLimitDto> adminRateLimits() {
+        return client.get("/api/internal/admin/rate-limits", RATE_LIMITS);
+    }
+
+    @Override
+    public int adminCorrectRateLimit(String id, LearnedRateLimitCorrectionDto correction) {
+        return client.call(HttpMethod.PUT, "/api/internal/admin/rate-limits/entry?id={id}", correction,
+                LearnedRateLimitDto.class, id).status();
+    }
+
+    @Override
+    public int adminResetRateLimit(String id) {
+        return client.call(HttpMethod.DELETE, "/api/internal/admin/rate-limits/entry?id={id}", null,
+                LearnedRateLimitDto.class, id).status();
     }
 
     @Override

@@ -77,10 +77,19 @@ class TwBackfillServiceTest {
         when(igdb.resolveIgdbIdForBinding(b1)).thenReturn(Optional.of("igdb42"));
         when(igdb.fetchDescriptorIds("igdb42")).thenReturn(Set.of(10L));
         TwResolverService res = mock(TwResolverService.class);
-        when(res.suggestReporting(any())).thenReturn(new TwResolverService.Suggestion(Set.of("violence_graphic"), Optional.empty()));
+        java.util.List<fr.enimaloc.catapult.ratelimit.RateLimitPriority> priorities = new java.util.ArrayList<>();
+        when(res.suggestReporting(any())).thenAnswer(i -> {
+            priorities.add(fr.enimaloc.catapult.ratelimit.RateLimitPriority.current());
+            return new TwResolverService.Suggestion(Set.of("violence_graphic"), Optional.empty());
+        });
 
         TwBackfillService svc = build(appRepo, bRepo, igdb, res);
         svc.run();
+
+        // Resolved as bulk traffic: under the learned rate limits' margin, leaving room for live calls
+        assertThat(priorities).containsOnly(fr.enimaloc.catapult.ratelimit.RateLimitPriority.BULK);
+        assertThat(fr.enimaloc.catapult.ratelimit.RateLimitPriority.current())
+                .isEqualTo(fr.enimaloc.catapult.ratelimit.RateLimitPriority.LIVE);
 
         verify(bRepo, atLeastOnce()).save(b1);
         assertThat(b1.getTws()).containsExactly("violence_graphic");

@@ -1,0 +1,93 @@
+<!--/*@thymesVar id="limits" type="java.util.List<fr.enimaloc.catapult.common.dto.admin.LearnedRateLimitDto>"*/-->
+<!--/*
+  The rate limits catapult-api learned from the platforms' 429s (list): each host (the budget its routes share), then
+  its routes (in the host's budget, or with a limit of their own). Each one corrected in the view's dialog or reset
+  (admin-rate-limits.js); the rows are [data-admin-list] keyed by their ID, patched after.
+*/-->
+
+<div th:fragment="list" class="admin-view admin-rate-limits"
+     th:attr="data-confirm-text=#{admin.rate-limits.reset},data-cancel-text=#{admin.cancel},data-error=#{admin.error.generic},
+              data-error-400=#{admin.rate-limits.error.400},data-error-404=#{admin.rate-limits.error.404},
+              data-reset-confirm=#{admin.rate-limits.reset.confirm},data-reset-description=#{admin.rate-limits.reset.description},
+              data-saved=#{admin.rate-limits.saved}">
+    <div class="section-header">
+        <h2 th:text="#{admin.tab.rate-limits}">Rate limits</h2>
+    </div>
+    <p class="admin-cell-muted admin-rl-hint" th:text="#{admin.rate-limits.hint}">hint</p>
+    <th:block th:if="${limits == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
+    <th:block th:if="${limits != null and limits.isEmpty()}">
+        <th:block th:replace="~{pages/admin-tab/common :: empty('speed', #{admin.rate-limits.none})}"></th:block>
+    </th:block>
+    <mdui-card class="admin-table" variant="outlined" data-admin-list="limits" th:if="${limits != null and !limits.isEmpty()}">
+        <div class="admin-row admin-rl-row admin-row-head" aria-hidden="true">
+            <span th:text="#{admin.rate-limits.column.scope}">Host / route</span>
+            <span th:text="#{admin.rate-limits.column.limit}">Limit</span>
+            <span th:text="#{admin.rate-limits.column.resume}">Resume after</span>
+            <span th:text="#{admin.rate-limits.column.rate_limited}">429s</span>
+            <span th:text="#{admin.rate-limits.column.used}">Used</span>
+            <span></span>
+        </div>
+        <div class="admin-row admin-rl-row" th:each="l : ${limits}"
+             th:classappend="${l.hostScope()} ? 'admin-rl-host' : 'admin-rl-route'"
+             th:attr="data-admin-key=${l.id()},data-id=${l.id()},data-host=${l.hostScope()},data-scope=${l.scope()},
+                      data-calls=${l.limitCorrected() ? l.limitCalls() : ''},data-window=${l.limitCorrected() ? l.limitWindowSeconds() : ''},
+                      data-resume=${l.resumeCorrected() ? l.resumeMs() / 1000 : ''},data-scope-pinned=${l.scopePinned()}">
+            <span class="admin-cell" th:attr="data-label=#{admin.rate-limits.column.scope}">
+                <strong th:if="${l.hostScope()}" th:text="${l.host()}">store.steampowered.com</strong>
+                <th:block th:unless="${l.hostScope()}">
+                    <code th:text="|${l.method()} ${l.path()}|">GET /app/{id}</code>
+                    <mdui-chip th:attr="icon=${l.scope() == 'ROUTE' ? 'call_split' : 'merge_type'}"
+                               th:text="#{|admin.rate-limits.scope.${l.scope()}|}">host's budget</mdui-chip>
+                    <span class="admin-cell-muted" th:if="${l.scopePinned()}" th:text="#{admin.rate-limits.scope.pinned}">chosen</span>
+                </th:block>
+            </span>
+            <span class="admin-cell" th:attr="data-label=#{admin.rate-limits.column.limit}">
+                <th:block th:if="${l.limitCalls() == null}"><span class="admin-cell-muted" th:text="#{admin.rate-limits.limit.none}">none known</span></th:block>
+                <th:block th:if="${l.limitCalls() != null}">
+                    <span th:with="w=${#messages.msgOrNull('admin.rate-limits.window.' + l.limitWindowSeconds()) ?: l.limitWindowSeconds() + ' s'}"
+                          th:text="${#messages.msg('admin.rate-limits.limit', l.limitCalls(), w)}">20 / min</span>
+                    <mdui-chip th:if="${l.limitCorrected()}" icon="edit" class="admin-rl-corrected" th:text="#{admin.rate-limits.corrected}">corrected</mdui-chip>
+                </th:block>
+            </span>
+            <span class="admin-cell" th:attr="data-label=#{admin.rate-limits.column.resume}">
+                <span th:text="#{admin.rate-limits.seconds(${#numbers.formatDecimal(l.resumeMs() / 1000.0, 1, 1)})}">60 s</span>
+                <mdui-chip th:if="${l.resumeCorrected()}" icon="edit" class="admin-rl-corrected" th:text="#{admin.rate-limits.corrected}">corrected</mdui-chip>
+            </span>
+            <span class="admin-cell" th:attr="data-label=#{admin.rate-limits.column.rate_limited}">
+                <span th:text="${l.rateLimitedCount()}">0</span>
+                <span class="admin-cell-muted" th:if="${l.lastRateLimitedAt() != null}"
+                      th:text="#{admin.rate-limits.last(${#temporals.format(l.lastRateLimitedAt(), #messages.msg('format.datetime'))})}">last</span>
+            </span>
+            <span class="admin-cell" th:attr="data-label=#{admin.rate-limits.column.used}">
+                <span th:text="${l.usedCalls()}">0</span>
+                <span class="admin-rl-blocked" th:if="${l.blockedUntil() != null}"
+                      th:text="#{admin.rate-limits.blocked(${#temporals.format(l.blockedUntil(), 'HH:mm:ss')})}">waiting</span>
+            </span>
+            <span class="admin-cell admin-data-actions">
+                <mdui-button-icon icon="edit" class="admin-rl-edit" th:attr="aria-label=#{admin.rate-limits.edit}"></mdui-button-icon>
+                <mdui-button-icon icon="restart_alt" class="admin-rl-reset" th:attr="aria-label=#{admin.rate-limits.reset}"></mdui-button-icon>
+            </span>
+        </div>
+    </mdui-card>
+
+    <!--/* The correction of one scope, filled from its row (admin-rate-limits.js); an empty field leaves it to the learning. */-->
+    <mdui-dialog id="admin-rl-dialog" class="admin-dialog admin-rl-dialog" close-on-overlay-click
+                 th:attr="headline=#{admin.rate-limits.edit}">
+        <p class="admin-cell-muted" th:text="#{admin.rate-limits.edit.hint}">hint</p>
+        <p class="admin-rl-dialog-id"><code></code></p>
+        <div class="admin-rl-fields">
+            <mdui-text-field name="calls" type="number" min="1" variant="outlined" th:attr="label=#{admin.rate-limits.field.calls}"></mdui-text-field>
+            <mdui-select name="window" variant="outlined" th:attr="label=#{admin.rate-limits.field.window}">
+                <mdui-menu-item th:each="w : ${ {10, 60, 300, 3600} }" th:value="${w}" th:text="#{|admin.rate-limits.window.${w}|}">min</mdui-menu-item>
+            </mdui-select>
+            <mdui-text-field name="resume" type="number" min="1" variant="outlined" th:attr="label=#{admin.rate-limits.field.resume}"></mdui-text-field>
+            <mdui-select name="scope" variant="outlined" th:attr="label=#{admin.rate-limits.field.scope}">
+                <mdui-menu-item value="LEARNED" th:text="#{admin.rate-limits.scope.learned}">learned</mdui-menu-item>
+                <mdui-menu-item value="HOST" th:text="#{admin.rate-limits.scope.HOST}">host</mdui-menu-item>
+                <mdui-menu-item value="ROUTE" th:text="#{admin.rate-limits.scope.ROUTE}">route</mdui-menu-item>
+            </mdui-select>
+        </div>
+        <mdui-button slot="action" variant="text" class="admin-dialog-close" th:text="#{admin.cancel}">Cancel</mdui-button>
+        <mdui-button slot="action" variant="filled" class="admin-rl-save" th:text="#{admin.rate-limits.save}">Save</mdui-button>
+    </mdui-dialog>
+</div>
