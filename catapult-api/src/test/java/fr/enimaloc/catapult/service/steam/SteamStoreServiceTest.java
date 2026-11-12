@@ -67,7 +67,7 @@ class SteamStoreServiceTest {
     void setUp() {
         LearnedRateLimitRepository limits = org.mockito.Mockito.mock(LearnedRateLimitRepository.class);
         doReturn(Optional.empty()).when(limits).findById(any());
-        rateLimiter = new LearnedRateLimiter(new LearnedRateLimitProperties(), limits, clock);
+        rateLimiter = new LearnedRateLimiter(new LearnedRateLimitProperties(), limits, Optional.of(clock));
         RestClient.Builder builder = RestClient.builder().requestInterceptor(new LearnedRateLimitInterceptor(rateLimiter));
         steam = MockRestServiceServer.bindTo(builder).ignoreExpectOrder(true).build();
         ExternalApiObservations observations =

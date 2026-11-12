@@ -53,7 +53,7 @@ class LearnedRateLimiterTest {
             stored.put(e.getId(), e);
             return e;
         });
-        limiter = new LearnedRateLimiter(props, repository, clock);
+        limiter = new LearnedRateLimiter(props, repository, Optional.of(clock));
         limiter.setSleeper(ms -> {
             slept.addAndGet((int) ms);
             clock.advance(Duration.ofMillis(ms));
@@ -277,7 +277,7 @@ class LearnedRateLimiterTest {
         known();
         calls(APPDETAILS, 10);
         tooMany(APPDETAILS, null);
-        LearnedRateLimiter other = new LearnedRateLimiter(props, repository, clock);
+        LearnedRateLimiter other = new LearnedRateLimiter(props, repository, Optional.of(clock));
 
         assertThat(other.blockedUntil(STORE, "/api/appdetails")).isEmpty();
         assertThat(other.list()).extracting(LearnedRateLimitDto::id)

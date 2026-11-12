@@ -53,10 +53,12 @@ public class LearnedRateLimiter {
     @Setter(AccessLevel.PACKAGE)
     private Sleeper sleeper = Thread::sleep;
 
-    public LearnedRateLimiter(LearnedRateLimitProperties props, LearnedRateLimitRepository repository, Clock clock) {
+    /** {@code clock}: the application's when there is one (not every profile defines it), else the system's. */
+    public LearnedRateLimiter(LearnedRateLimitProperties props, LearnedRateLimitRepository repository,
+                              Optional<Clock> clock) {
         this.props = props;
         this.repository = repository;
-        this.clock = clock;
+        this.clock = clock.orElseGet(Clock::systemUTC);
     }
 
     /** Whether calls to {@code host} are learned from (not one of the hosts left to their documented limits). */
