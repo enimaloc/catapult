@@ -17,7 +17,8 @@ import static org.mockito.Mockito.mock;
 class ApiAdminTwControllerWithoutBackfillTest {
 
     private final ApiAdminTwController controller = new ApiAdminTwController(
-            mock(AdminTwService.class), Optional.empty(), mock(AdminEventPublisher.class));
+            mock(AdminTwService.class), Optional.empty(), mock(AdminEventPublisher.class),
+            mock(fr.enimaloc.catapult.service.tw.TwDtddTopicLevels.class));
 
     @Test
     void rebuildNonOverridden_withoutBackfill_isServiceUnavailable() {

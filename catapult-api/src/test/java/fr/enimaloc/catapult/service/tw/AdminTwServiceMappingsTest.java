@@ -219,4 +219,23 @@ class AdminTwServiceMappingsTest {
         assertThat(result.draftKeywordMatch()).isNull();
         assertThat(result.matchedContentDescriptorIds()).isEmpty();
     }
+
+    @Test
+    void dtddTopics_keepTheirLeastSevereLevel_trimmedAndOncePerTopic() {
+        service.replaceDtddTopics("gore", new java.util.LinkedHashSet<>(List.of(" there's blood/gore ", "THERE'S BLOOD/GORE",
+                "someone dies")), java.util.Map.of(" there's blood/gore ", " Depicted ", "someone dies", " "));
+
+        var saved = org.mockito.ArgumentCaptor.forClass(fr.enimaloc.catapult.domain.tw.TwDtddTopicMapping.class);
+        verify(dtdd, times(2)).save(saved.capture());
+        assertThat(saved.getAllValues()).extracting(fr.enimaloc.catapult.domain.tw.TwDtddTopicMapping::getDtddTopicName,
+                fr.enimaloc.catapult.domain.tw.TwDtddTopicMapping::getMinSeverity)
+            .containsExactly(org.assertj.core.api.Assertions.tuple("there's blood/gore", "Depicted"),
+                org.assertj.core.api.Assertions.tuple("someone dies", null));
+    }
+
+    @Test
+    void aTooLongLevel_isRefused() {
+        assertThatThrownBy(() -> service.replaceDtddTopics("gore", Set.of("x"), java.util.Map.of("x", "y".repeat(41))))
+            .isInstanceOf(IllegalArgumentException.class);
+    }
 }

@@ -337,6 +337,7 @@ DELETE,/api/internal/admin/tws/{id},,,401,PASS,403,403,403,PASS,401
 GET,/api/internal/admin/tws/{id},,,401,PASS,403,403,403,PASS,401
 # ERROR: the dead id is no TW, and the handler throws IllegalArgumentException for it (test artefact)
 PATCH,/api/internal/admin/tws/{id},,,401,ERROR,403,403,403,ERROR,401
+GET,/api/internal/admin/tws/{id}/dtdd-topics,,,401,PASS,403,403,403,PASS,401
 # ERROR: the dead id is no TW, and the handler throws IllegalArgumentException for it (test artefact)
 PUT,/api/internal/admin/tws/{id}/dtdd-topics,,,401,ERROR,403,403,403,ERROR,401
 # ERROR: the dead id is no TW, and the handler throws IllegalArgumentException for it (test artefact)
