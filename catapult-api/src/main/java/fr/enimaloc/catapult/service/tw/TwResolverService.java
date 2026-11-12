@@ -43,6 +43,11 @@ public class TwResolverService {
      */
     public record Suggestion(Set<String> tws, Optional<Instant> steamLimitedUntil) {}
 
+    /** Until when the Steam store is rate limited (a Steam game's TWs resolved meanwhile miss its signals). */
+    public Optional<Instant> steamRateLimitedUntil() {
+        return steamStoreService.rateLimitedUntil();
+    }
+
     /** Computes the set of TW slugs that should be pre-activated for this binding input. */
     public Set<String> suggest(SuggestInput in) {
         return suggestReporting(in).tws();

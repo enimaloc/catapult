@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.domain.binding.ExtensionSlotSetting;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.binding.GameMapping;
 import fr.enimaloc.catapult.domain.igdb.IgdbGameDetails;
+import fr.enimaloc.catapult.event.TwsMissedSteamEvent;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
 import fr.enimaloc.catapult.repository.binding.GameMappingRepository;
@@ -17,7 +18,10 @@ import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.tw.TwResolverService;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,6 +48,9 @@ public class BindingService {
     private final GameBindingLookup gameBindingLookup;
     private final CategoryChain categoryChain;
     private final ExtensionLayoutApplier extensionLayoutApplier;
+    /** Tells a binding whose Steam signals were missed (the store rate limited); null outside Spring. */
+    @Setter(onMethod_ = @Autowired)
+    private ApplicationEventPublisher events;
 
     /**
      * Applies {@code change} to the user's binding (if it exists), saves it, and applies it when it is the game
@@ -62,10 +69,13 @@ public class BindingService {
 
     /** The TWs suggested for a game from its IGDB descriptors, Steam signals (Steam games only) and name. */
     private Set<String> suggestTws(String igdbId, DetectedGame game) {
+        return twResolverService.suggest(twInput(igdbId, game));
+    }
+
+    private TwResolverService.SuggestInput twInput(String igdbId, DetectedGame game) {
         Set<Long> descriptorIds = igdbService.fetchDescriptorIds(igdbId);
         String steamAppId = game.getSourceType() == GameBinding.SourceType.STEAM ? game.getSourceId() : null;
-        return twResolverService.suggest(new TwResolverService.SuggestInput(
-                igdbId, descriptorIds, steamAppId, game.getSourceName()));
+        return new TwResolverService.SuggestInput(igdbId, descriptorIds, steamAppId, game.getSourceName());
     }
 
     private static DetectedGame detectedOf(GameBinding binding) {
@@ -142,9 +152,56 @@ public class BindingService {
             applyMapping(binding, mapping.get());
             log.info("Binding updated as MAPPED for user {} — game '{}' mapped by an admin to '{}' (twitchId={})",
                     user.getId(), detectedGame.getSourceName(), binding.getTwitchGameName(), binding.getTwitchGameId());
-            return gameBindingRepository.save(binding);
+            return missedSteam(gameBindingRepository.save(binding), mapping.get().isTwsOverridden());
         }
-        return updateWithoutMapping(user, detectedGame, binding);
+        return missedSteam(updateWithoutMapping(user, detectedGame, binding), false);
+    }
+
+    /**
+     * A Steam game's binding just resolved while the Steam store is rate limited: its TWs (when the detection chose
+     * them: not the streamer's, nor an admin's) miss Steam's signals, and are resolved again once it may be called.
+     */
+    private GameBinding missedSteam(GameBinding saved, boolean adminTws) {
+        if (events == null || adminTws || saved.isTwOverride()
+                || saved.getSourceType() != GameBinding.SourceType.STEAM || saved.getId() == null) {
+            return saved;
+        }
+        twResolverService.steamRateLimitedUntil()
+                .ifPresent(until -> events.publishEvent(new TwsMissedSteamEvent(saved.getId(), until)));
+        return saved;
+    }
+
+    /**
+     * Resolves again the TWs of a binding whose Steam signals were missed (the store rate limited), when the detection
+     * still chooses them; saved when they changed. Still limited, it is told again for later.
+     *
+     * @return the binding when its TWs changed, to push to its dashboard
+     */
+    @Transactional
+    public Optional<GameBinding> retryTwsAfterSteamLimit(UUID bindingId) {
+        Optional<GameBinding> found = gameBindingRepository.findById(bindingId);
+        if (found.isEmpty()) return Optional.empty();
+        GameBinding binding = found.get();
+        boolean adminTws = binding.getStatus() == GameBinding.Status.MAPPED && binding.getSourceId() != null
+                && gameMappingRepository.findBySourceTypeAndSourceId(binding.getSourceType(), binding.getSourceId())
+                        .map(GameMapping::isTwsOverridden).orElse(false);
+        if (binding.isTwOverride() || adminTws || binding.getStatus() == GameBinding.Status.MANUAL) {
+            return Optional.empty();
+        }
+        Optional<String> igdbId = igdbService.resolveIgdbIdForBinding(binding);
+        if (igdbId.isEmpty()) return Optional.empty();
+        TwResolverService.Suggestion suggestion = twResolverService.suggestReporting(twInput(igdbId.get(), detectedOf(binding)));
+        if (suggestion.steamLimitedUntil().isPresent()) {
+            if (events != null) {
+                events.publishEvent(new TwsMissedSteamEvent(bindingId, suggestion.steamLimitedUntil().get()));
+            }
+            return Optional.empty();
+        }
+        if (binding.getTws().equals(suggestion.tws())) return Optional.empty();
+        binding.getTws().clear();
+        binding.getTws().addAll(suggestion.tws());
+        log.info("[TW] binding {} resolved again after the Steam store's rate limit: {}", bindingId, suggestion.tws());
+        return Optional.of(gameBindingRepository.save(binding));
     }
 
     /**
