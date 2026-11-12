@@ -1,12 +1,16 @@
 /**
- * The admin rate limits tab. A learned limit is corrected in the view's dialog, filled from its row (an empty field
- * leaves that part to the learning; a host has no scope to choose), or reset once confirmed; the list is then patched
- * (admin-tabs.js). A refusal is told with the view's data-error-{status}, else its data-error ({0}: the status).
- * Listeners are delegated to the panel: its content comes and goes.
+ * The learned rate limits, in the admin Keys tab. A learned limit is corrected in the view's dialog, filled from its
+ * row (an empty field leaves that part to the learning; a host has no scope to choose), or reset once confirmed; the
+ * tab is then patched (admin-tabs.js). A refusal is told with the view's data-error-{status}, else its data-error
+ * ({0}: the status). While the tab is shown, it is patched every few seconds (the keys' usage, the limits), unless a
+ * dialog is open or the page hidden. Listeners are delegated to the panel: its content comes and goes.
  */
 window.CatapultAdminRateLimits = (function () {
-    const TAB = "rate-limits";
+    const TAB = "keys";
     const BASE = "/admin/rate-limits";
+    const POLL_MS = 3000;
+
+    let timer = null;
 
     const panelOf = () => document.querySelector(`mdui-tab-panel[value="${TAB}"]`);
 
@@ -63,10 +67,32 @@ window.CatapultAdminRateLimits = (function () {
         await CatapultAdminTabs.patch(panel);
     }
 
+    /** Whether the tab is shown, its view loaded, and nothing being edited in a dialog. */
+    function live(panel) {
+        return panel.isConnected && document.getElementById("admin-tabs")?.value === TAB
+            && document.visibilityState !== "hidden" && !!panel.querySelector(".admin-rate-limits")
+            && !panel.querySelector("mdui-dialog[open]");
+    }
+
+    /** Patches the tab every POLL_MS while it is shown; stops by itself when it no longer is. */
+    function follow(panel) {
+        clearTimeout(timer);
+        timer = null;
+        if (!panel?.isConnected || document.getElementById("admin-tabs")?.value !== TAB) return;
+        timer = setTimeout(async () => {
+            if (live(panel)) await CatapultAdminTabs.patch(panel);
+            follow(panel);
+        }, POLL_MS);
+    }
+
     function attach() {
         const panel = panelOf();
         if (!panel || panel.dataset.rateLimitsWired) return;
         panel.dataset.rateLimitsWired = "true";
+        // Back on the tab: followed again (left, it stopped being)
+        document.getElementById("admin-tabs")?.addEventListener("change", event => {
+            if (event.target.id === "admin-tabs") follow(panel);
+        });
 
         panel.addEventListener("click", event => {
             const button = event.target.closest(".admin-rl-edit, .admin-rl-reset, .admin-rl-save, .admin-dialog-close");
@@ -81,6 +107,10 @@ window.CatapultAdminRateLimits = (function () {
     }
 
     document.addEventListener("catapult:render", attach);
+    // The tab's view shown: followed
+    document.addEventListener("catapult:admin-panel", event => {
+        if (event.detail?.tab === TAB) follow(event.detail.panel);
+    });
 
-    return { attach, correctionOf };
+    return { attach, correctionOf, follow };
 })();

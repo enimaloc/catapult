@@ -248,6 +248,17 @@ describe("tab <-> location.hash", () => {
         expect(location.pathname + location.hash).toBe("/admin");
     });
 
+    it("opens the tab a former tab's hash went into, and names it in the hash", () => {
+        history.replaceState(null, "", "/admin#rate-limits");
+        html(`<mdui-tabs data-hash-tabs data-hash-aliases='{"rate-limits": "keys"}'><mdui-tab value="members"></mdui-tab><mdui-tab value="keys"></mdui-tab></mdui-tabs>`);
+        const el = document.querySelector("mdui-tabs");
+        el.value = "members";
+        render();
+
+        expect(el.value).toBe("keys");
+        expect(location.hash).toBe("#keys");
+    });
+
     it("selects the tab of a hash naming a sub-view", () => {
         history.replaceState(null, "", "/admin#caches/igdb-game-cache");
         html(`<mdui-tabs data-hash-tabs><mdui-tab value="members"></mdui-tab><mdui-tab value="caches"></mdui-tab></mdui-tabs>`);

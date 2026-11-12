@@ -932,6 +932,27 @@ class AdminTabsFragmentControllerTest {
     }
 
     @Test
+    void eachKey_tellsItsUsage_andTheLearnedLimitsFollowTheKeys() throws Exception {
+        var steam = new fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto.Key("id-1", "abcd…wxyz", null, false, 0,
+                new fr.enimaloc.catapult.common.dto.admin.KeyUsageDto(2, 3, 5, null, "DAY", 1234, 100_000L, null));
+        var dtdd = new fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto.Key("id-2", "ddd_…mnop", null, false, 0,
+                new fr.enimaloc.catapult.common.dto.admin.KeyUsageDto(4, 30, 60, 26, "MONTH", 120, 5000L, 4880));
+        var bare = new fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto.Key("id-3", "efgh…ijkl", null, false, 0);
+        when(apiService.adminApiKeys(fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.STEAM)).thenReturn(keys(true, steam, bare));
+        when(apiService.adminApiKeys(fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.DTDD)).thenReturn(keys(true, dtdd));
+        when(apiService.adminRateLimits()).thenReturn(List.of(new fr.enimaloc.catapult.common.dto.admin.LearnedRateLimitDto(
+                "HOST store.steampowered.com", "store.steampowered.com", null, null, null, false, 190, 300, false,
+                60_000, false, 1, null, 3, null)));
+
+        String html = asAdmin("/spa/admin/keys");
+
+        assertThat(html).contains("2 / 3 in 5 s", "1,234 / 100,000 today", "4 / 30 in 60 s", "(26 left)",
+                "120 / 5,000 this month", "(4,880 left)", "admin-rate-limits", "data-admin-list=\"limits\"",
+                "190 per 5 min");
+        assertThat(html.indexOf("admin-rate-limits")).isGreaterThan(html.indexOf("id=\"admin-minecraft\""));
+    }
+
+    @Test
     void unreachableApi_showsThePlaceholder() throws Exception {
         when(apiService.adminApiKeys(org.mockito.ArgumentMatchers.any())).thenReturn(null);
 

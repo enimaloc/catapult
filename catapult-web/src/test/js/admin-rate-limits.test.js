@@ -11,7 +11,8 @@ let confirmAnswer;
 
 function list() {
     html(`
-        <mdui-tab-panel value="rate-limits">
+        <mdui-tabs id="admin-tabs"></mdui-tabs>
+        <mdui-tab-panel value="keys">
             <div class="admin-view admin-rate-limits" data-saved="Saved." data-reset-confirm="Reset?" data-reset-description="Forgets">
                 <div class="admin-row" data-id="HOST store.steampowered.com" data-host="true" data-calls="20" data-window="60" data-resume="">
                     <button class="admin-rl-edit" id="edit-host"></button>
@@ -32,10 +33,11 @@ function list() {
                 </mdui-dialog>
             </div>
         </mdui-tab-panel>`);
+    document.getElementById("admin-tabs").value = "keys";
     render();
 }
 
-const panel = () => document.querySelector('mdui-tab-panel[value="rate-limits"]');
+const panel = () => document.querySelector('mdui-tab-panel[value="keys"]');
 const dialog = () => document.getElementById("admin-rl-dialog");
 const field = name => dialog().querySelector(`[name="${name}"]`);
 const tick = () => new Promise(resolve => setTimeout(resolve, 0));
@@ -132,5 +134,34 @@ describe("admin-rate-limits", () => {
         sent = 502;
         await click("#reset-host");
         expect(tabs.patch).toHaveBeenCalledTimes(2);
+    });
+
+    it("patches the tab every few seconds while it is shown, not while a dialog is open", async () => {
+        vi.useFakeTimers();
+        try {
+            list();
+            document.dispatchEvent(new CustomEvent("catapult:admin-panel", { detail: { tab: "keys", panel: panel() } }));
+            await vi.advanceTimersByTimeAsync(3000);
+            expect(tabs.patch).toHaveBeenCalledTimes(1);
+
+            dialog().setAttribute("open", "");
+            await vi.advanceTimersByTimeAsync(3000);
+            expect(tabs.patch).toHaveBeenCalledTimes(1);
+            dialog().removeAttribute("open");
+
+            document.getElementById("admin-tabs").value = "tw";
+            await vi.advanceTimersByTimeAsync(9000);
+            expect(tabs.patch).toHaveBeenCalledTimes(1);
+
+            document.getElementById("admin-tabs").value = "keys";
+            document.getElementById("admin-tabs").dispatchEvent(new Event("change"));
+            await vi.advanceTimersByTimeAsync(3000);
+            expect(tabs.patch).toHaveBeenCalledTimes(2);
+
+            // an event for another tab changes nothing
+            document.dispatchEvent(new CustomEvent("catapult:admin-panel", { detail: { tab: "tw", panel: panel() } }));
+        } finally {
+            vi.useRealTimers();
+        }
     });
 });

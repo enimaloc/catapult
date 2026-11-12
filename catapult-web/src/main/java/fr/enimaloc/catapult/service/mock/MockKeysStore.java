@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.service.mock;
 
 import fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider;
 import fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto;
+import fr.enimaloc.catapult.common.dto.admin.KeyUsageDto;
 
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -35,9 +36,19 @@ class MockKeysStore {
         return Integer.toHexString(key.hashCode());
     }
 
+    /** A key's usage moving with the clock, so that the tab's live update shows. */
+    private static KeyUsageDto usage(ApiKeyProvider provider) {
+        long tick = System.currentTimeMillis() / 3000;
+        int window = (int) (tick % 4);
+        return provider == ApiKeyProvider.STEAM
+                ? new KeyUsageDto(window % 3, 3, 5, null, "DAY", 1200 + tick % 100, 100_000L, null)
+                : new KeyUsageDto(window, 30, 60, 30 - window, "MONTH", 120 + tick % 50, 5000L,
+                        (int) (4880 - tick % 50));
+    }
+
     synchronized ApiKeysPageDto page(ApiKeyProvider provider) {
         return new ApiKeysPageDto(true, keys.get(provider).stream()
-                .map(k -> new ApiKeysPageDto.Key(id(k), mask(k), null, false, 0L)).toList());
+                .map(k -> new ApiKeysPageDto.Key(id(k), mask(k), null, false, 0L, usage(provider))).toList());
     }
 
     synchronized int add(ApiKeyProvider provider, String apiKey) {

@@ -23,7 +23,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** The admin rate limits tab as it renders: each host, then its routes, with what was learned or corrected. */
+/** The learned rate limits as the admin Keys tab renders them: each host, then its routes, learned or corrected. */
 @WebMvcTest(controllers = AdminTabsFragmentController.class)
 @Import({ModelFiller.class, WebSecurityConfig.class, TwitchatCatalogConfig.class, I18nConfiguration.class})
 class AdminRateLimitsRenderingTest {
@@ -41,7 +41,7 @@ class AdminRateLimitsRenderingTest {
     }
 
     private String render(Locale locale) throws Exception {
-        return mvc.perform(get("/spa/admin/rate-limits").locale(locale).sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+        return mvc.perform(get("/spa/admin/keys").locale(locale).sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
     }
 
@@ -69,7 +69,11 @@ class AdminRateLimitsRenderingTest {
     @Test
     void nothingLearned_orCatapultApiDown_isTold() throws Exception {
         when(apiService.adminRateLimits()).thenReturn(List.of());
-        assertThat(render(Locale.FRENCH)).contains("Aucune plateforme n&#39;a encore limité Catapult.");
+        String none = render(Locale.FRENCH);
+        assertThat(none).contains("Aucune plateforme n&#39;a encore limité Catapult.", "data-admin-value=\"limits-empty\"");
+        // the (empty) list is rendered hidden, so that a patch shows the first limit learned
+        String list = none.substring(none.indexOf("data-admin-list=\"limits\""));
+        assertThat(list.substring(0, list.indexOf('>'))).contains("hidden");
 
         when(apiService.adminRateLimits()).thenReturn(null);
         assertThat(render(Locale.FRENCH)).doesNotContain("admin-rl-row\"");
