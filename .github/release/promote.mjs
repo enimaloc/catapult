@@ -1,10 +1,12 @@
 // Opens (in draft) or refreshes the single promotion PR from `source` to `target`.
-// CLI: node .github/release/promote.mjs --source dev --target beta
-// (env: GH_TOKEN, GITHUB_REPOSITORY=owner/repo, APP_SLUG = the release App's slug)
+// CLI: node .github/release/promote.mjs --source dev [--target main]
+// (--target defaults to the source's next branch in lib/flow.mjs; env: GH_TOKEN,
+// GITHUB_REPOSITORY=owner/repo, APP_SLUG = the release App's slug)
 
 import { parseArgs } from "node:util";
 import { pathToFileURL } from "node:url";
-import { parseVersion, bumpKind, nextBeta, nextStable } from "./lib/version.mjs";
+import { parseVersion, bumpKind, nextBeta, nextDirectStable, nextStable } from "./lib/version.mjs";
+import { promotionTarget } from "./lib/flow.mjs";
 import { buildBody, parseBody, scheduledText, seenId, setPromotedHead, setScheduledText, updateBody } from "./lib/pr-body.mjs";
 import { activeSchedule, NO_SCHEDULE } from "./lib/schedule.mjs";
 import { createGitHub } from "./lib/github.mjs";
@@ -37,16 +39,20 @@ export function compareVersions(a, b) {
 }
 
 /**
- * Stable for a promotion to `main`, beta otherwise; null when there is nothing to release. `commits`
- * are the promoted ones (release commits left out). ready.mjs checks the PR title against it.
+ * Stable for a promotion to `main` (dev -> main bumps the last stable, beta -> main finishes the last
+ * beta), beta otherwise; null when there is nothing to release. `commits` are the promoted ones
+ * (release commits left out). ready.mjs checks the PR title against it.
  */
-export function releaseVersion(target, tags, commits) {
+export function releaseVersion(source, target, tags, commits) {
   const versions = versionTags(tags).sort(compareVersions);
   const stables = versions.filter((v) => v.beta === null);
   const lastStable = stables.length ? stables[stables.length - 1] : { tag: "v0.0.0", ...parseVersion("v0.0.0") };
   const betas = versions.filter((v) => v.beta !== null && compareVersions(v, lastStable) > 0);
-  if (target === "main") return betas.length ? nextStable(betas[betas.length - 1].tag) : null;
   const messages = commits.map((c) => c.message);
+  if (target === "main" && source === "dev") {
+    return nextDirectStable(lastStable.tag, betas.map((v) => v.tag), messages);
+  }
+  if (target === "main") return betas.length ? nextStable(betas[betas.length - 1].tag) : null;
   if (bumpKind(messages, lastStable.tag) === null && betas.length === 0) return null;
   return nextBeta(lastStable.tag, betas.map((v) => v.tag), messages);
 }
@@ -97,7 +103,7 @@ export async function promote({ gh, source, target, owner, repo, appSlug }) {
     return { action: "closed", number: pull.number };
   }
 
-  const version = releaseVersion(target, await gh.listTags(), commits);
+  const version = releaseVersion(source, target, await gh.listTags(), commits);
   if (version === null) return withNumber("none");
   const title = `chore(release): ${version}`;
 
@@ -137,7 +143,8 @@ export async function promote({ gh, source, target, owner, repo, appSlug }) {
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   const { values } = parseArgs({ options: { source: { type: "string" }, target: { type: "string" } } });
-  if (!values.source || !values.target) throw new Error("Usage: promote.mjs --source <branch> --target <branch>");
+  values.target ??= values.source ? (promotionTarget(values.source) ?? undefined) : undefined;
+  if (!values.source || !values.target) throw new Error("Usage: promote.mjs --source <branch> [--target <branch>]");
   const [owner, repo] = (process.env.GITHUB_REPOSITORY ?? "").split("/");
   const gh = createGitHub({ token: process.env.GH_TOKEN, owner, repo });
   const result = await promote({ ...values, gh, owner, repo, appSlug: process.env.APP_SLUG });

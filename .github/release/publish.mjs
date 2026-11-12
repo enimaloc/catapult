@@ -1,5 +1,6 @@
 // A promotion (or hotfix) PR was merged: tag its merge commit, and after a stable or a hotfix open
-// the backport PRs that bring it back to dev (main -> beta, then beta -> dev once that one is merged). The tag is pushed with the App token, so its push event runs
+// the backport PRs that bring it back to dev (main -> dev while beta is skipped, else
+// main -> beta, then beta -> dev once that one is merged). The tag is pushed with the App token, so its push event runs
 // release.yml, the single publication path (it reads the PR's notes itself). After a beta, the beta -> main
 // promotion is retitled by publish.yml's own job, in the promote-beta concurrency group, not here.
 // CLI: node .github/release/publish.mjs --number 12
@@ -10,6 +11,7 @@ import { pathToFileURL } from "node:url";
 import { createGitHub } from "./lib/github.mjs";
 import { refreshDashboardSafely } from "./dashboard.mjs";
 import { kindOf, titleVersion } from "./ready.mjs";
+import { BETA } from "./lib/flow.mjs";
 
 const short = (sha) => sha.slice(0, 7);
 const pattern = (kind) => (kind === "beta" ? "vX.Y.Z-BETA.N" : "vX.Y.Z");
@@ -62,10 +64,15 @@ async function openBackport(gh, tag, pr, from, to) {
 
 /**
  * Brings the release back to dev, whose version line would otherwise conflict with the next
- * promotion: a stable through beta -> dev; a hotfix through main -> beta first, beta -> dev being
- * opened once that one is merged (or right away when beta needs nothing). Returns the PRs opened.
+ * promotion. Beta skipped (lib/flow.mjs): main -> dev. Otherwise a stable through beta -> dev; a hotfix
+ * through main -> beta first, beta -> dev being opened once that one is merged (or right away when beta
+ * needs nothing). Returns the PRs opened.
  */
-async function openBackports(gh, tag, pr, kind) {
+async function openBackports(gh, tag, pr, kind, beta) {
+  if (!beta && kind !== "backport") {
+    const toDev = await openBackport(gh, tag, pr, "main", "dev");
+    return toDev?.number ? [toDev.number] : [];
+  }
   if (kind === "hotfix") {
     const toBeta = await openBackport(gh, tag, pr, "main", "beta");
     if (toBeta !== null) return toBeta.number ? [toBeta.number] : [];
@@ -74,31 +81,33 @@ async function openBackports(gh, tag, pr, kind) {
   return toDev?.number ? [toDev.number] : [];
 }
 
-async function release(gh, pr, kind) {
+async function release(gh, pr, kind, beta) {
   if (!pr.merged || !pr.mergeCommitSha) throw new Error(`#${pr.number} is not merged`);
   const tag = titleVersion(pr.title, kind);
   if (tag === null) throw new Error(`#${pr.number}: the title does not carry the version to publish: ${pr.title}`);
 
   await ensureTag(gh, tag, pr.mergeCommitSha, pr.title);
-  const backports = kind === "beta" ? [] : await openBackports(gh, tag, pr, kind);
+  // A stable promoted from beta goes back through beta -> dev, whatever the current chain.
+  const through = kind === "stable" && pr.head === "beta" ? true : beta;
+  const backports = kind === "beta" ? [] : await openBackports(gh, tag, pr, kind, through);
   return { tag, backports };
 }
 
 /**
  * -> {tag, backports} (numbers of the backport PRs opened). Throws on an unmerged or unrelated PR; a
- * failure on a release PR is also reported on it.
+ * failure on a release PR is also reported on it. `beta`: whether the chain goes through beta.
  */
-export async function publish({ gh, pr, owner, repo }) {
+export async function publish({ gh, pr, owner, repo, beta = BETA }) {
   if (isBackportToBeta(pr, `${owner}/${repo}`)) {
     if (!pr.merged) throw new Error(`#${pr.number} is not merged`);
     const tag = BACKPORT_TITLE.exec(pr.title)?.[1];
     if (!tag) throw new Error(`#${pr.number}: the title does not carry the backported version: ${pr.title}`);
-    return { tag, backports: await openBackports(gh, tag, pr, "stable") };
+    return { tag, backports: await openBackports(gh, tag, pr, "backport", true) };
   }
   const kind = kindOf(pr, `${owner}/${repo}`);
   if (kind === null) throw new Error(`#${pr.number} is not a promotion or hotfix pull request`);
   try {
-    return await release(gh, pr, kind);
+    return await release(gh, pr, kind, beta);
   } catch (error) {
     const version = titleVersion(pr.title, kind);
     if (pr.merged) {

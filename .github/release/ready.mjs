@@ -30,11 +30,14 @@ export function bumpGradleVersion(text, version) {
   return text.replace(VERSION_LINE, (_, prefix) => `${prefix}"${version}"`);
 }
 
-/** Promotions dev -> beta and beta -> main, and hotfixes into main, all from this repository. */
+/**
+ * Promotions dev -> main (beta skipped, lib/flow.mjs), dev -> beta and beta -> main, and hotfixes into
+ * main, all from this repository.
+ */
 export function kindOf(pull, repository) {
   if (pull.headRepo !== repository) return null;
   if (pull.head === "dev" && pull.base === "beta") return "beta";
-  if (pull.head === "beta" && pull.base === "main") return "stable";
+  if ((pull.head === "dev" || pull.head === "beta") && pull.base === "main") return "stable";
   if (pull.head.startsWith("hotfix/") && pull.base === "main") return "hotfix";
   return null;
 }
@@ -164,7 +167,7 @@ async function prepare({ gh, pr, pull, kind, owner, repo, appSlug, promote, wait
   if (promotion) {
     const [tags, compared] = await Promise.all([gh.listTags(), gh.compareCommits(pull.base, pull.head)]);
     const promoted = compared.filter((c) => !isReleaseCommit(c, appSlug));
-    const expected = releaseVersion(pull.base, tags, promoted);
+    const expected = releaseVersion(pull.head, pull.base, tags, promoted);
     if (expected !== version) return refuseAndRefresh(gh, pull, MESSAGES.staleVersion(version, expected), refresh);
   }
 
