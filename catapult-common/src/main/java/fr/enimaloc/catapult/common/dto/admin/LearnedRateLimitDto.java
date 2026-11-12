@@ -17,7 +17,7 @@ public record LearnedRateLimitDto(String id, String host, String method, String 
                                   Instant blockedUntil) {
 
     /** A host's row rather than a route's. */
-    public boolean isHost() {
+    public boolean hostScope() {
         return path == null;
     }
 }

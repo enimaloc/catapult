@@ -283,7 +283,7 @@ class LearnedRateLimiterTest {
         assertThat(other.list()).extracting(LearnedRateLimitDto::id)
                 .containsExactly("HOST " + STORE, APPDETAILS.id(), PAGE.id());
         assertThat(other.list().getFirst().limitCalls()).isEqualTo(10);
-        assertThat(other.list().getFirst().isHost()).isTrue();
+        assertThat(other.list().getFirst().hostScope()).isTrue();
 
         other.correct(APPDETAILS.id(), 3, 10, 5, "ROUTE");
         limiter.sync();

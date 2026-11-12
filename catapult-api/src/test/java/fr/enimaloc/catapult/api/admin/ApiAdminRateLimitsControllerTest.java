@@ -28,6 +28,6 @@ class ApiAdminRateLimitsControllerTest {
         assertThat(controller.list()).containsExactly(ROW);
         assertThat(controller.correct(HOST, new LearnedRateLimitCorrectionDto(20, 60, null, "ROUTE"))).isEqualTo(ROW);
         assertThat(controller.reset(HOST)).isEqualTo(ROW);
-        assertThat(ROW.isHost()).isTrue();
+        assertThat(ROW.hostScope()).isTrue();
     }
 }

@@ -166,7 +166,7 @@ public class LearnedRateLimiter {
         scopes.values().forEach(s -> out.putIfAbsent(s.id(), s.toDto(now)));
         return out.values().stream()
                 .sorted(Comparator.comparing(LearnedRateLimitDto::host)
-                        .thenComparing(d -> d.isHost() ? "" : d.path() + " " + d.method()))
+                        .thenComparing(d -> d.hostScope() ? "" : d.path() + " " + d.method()))
                 .toList();
     }
 
