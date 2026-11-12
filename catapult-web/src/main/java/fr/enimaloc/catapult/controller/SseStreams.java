@@ -194,7 +194,7 @@ public class SseStreams implements DisposableBean {
             if (size.incrementAndGet() > MAX_PENDING) {
                 log.debug("Closing an SSE stream that does not keep up");
                 closed();
-                emitter.complete();
+                complete();
                 return;
             }
             pending.add(event);
@@ -226,15 +226,20 @@ public class SseStreams implements DisposableBean {
                     size.decrementAndGet();
                     if (event == CLOSE) {
                         closed();
-                        emitter.complete();
+                        complete();
                         return;
                     }
                     try {
                         emitter.send(event);
-                    } catch (IOException | IllegalStateException e) {
-                        // Gone, or completed meanwhile.
+                    } catch (IOException e) {
+                        // Gone: the container reports the error itself (onError) and ends the request; completing
+                        // it from here as well is refused (Spring: not to be used after an error while sending).
                         closed();
-                        emitter.complete();
+                        return;
+                    } catch (IllegalStateException e) {
+                        // Completed meanwhile.
+                        closed();
+                        complete();
                         return;
                     }
                 }
@@ -243,6 +248,18 @@ public class SseStreams implements DisposableBean {
             }
             // An event offered after the loop's last poll, before writing was released.
             if (!closed.get() && !pending.isEmpty()) schedule();
+        }
+
+        /**
+         * Ends the request, unless the container ended it first: a client gone between our last write and this
+         * call has the container fail it (onError), after which Tomcat refuses an application thread's dispatch.
+         */
+        private void complete() {
+            try {
+                emitter.complete();
+            } catch (IllegalStateException e) {
+                log.debug("SSE stream already ended by the container: {}", e.getMessage());
+            }
         }
 
         /** Forgotten, once; {@code onClosed} told. */
