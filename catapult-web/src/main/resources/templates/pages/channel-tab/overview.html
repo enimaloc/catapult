@@ -1,6 +1,6 @@
 <!--/*@thymesVar id="channelPage" type="fr.enimaloc.catapult.common.dto.channel.ChannelPageData"*/-->
 <!--/*@thymesVar id="app" type="fr.enimaloc.catapult.controller.ModelFiller$AppModel"*/-->
-<mdui-tab-panel slot="panel" value="overview" th:with="ch=${channelPage}" th:fragment="panel" xmlns:spa="urn:fr.enimaloc.catapult:spa">
+<mdui-tab-panel slot="panel" value="overview" th:with="ch=${channelPage},titleHelperExtra=${(channelSettings?.titleConditionsAvailable() == true ? ' ' + #messages.msg('channel.title.helper_conditions') : '') + (channelSettings?.titleDropsAvailable() == true ? ' ' + #messages.msg('channel.title.helper_drops') : '')}" th:fragment="panel" xmlns:spa="urn:fr.enimaloc.catapult:spa">
     <div class="section-header">
         <div class="title-row">
             <h2 th:text="#{channel.status.title}">Statut</h2>
@@ -198,7 +198,7 @@
                         <mdui-text-field class="binding-title-input" variant="outlined" maxlength="140" counter data-title-highlight
                                          th:value="${b.title()}"
                                          spa:value="value:BindingTitleEvent.title"
-                                         th:attr="label=#{channel.bindings.title.label},helper=#{channel.bindings.title.helper}"></mdui-text-field>
+                                         th:attr="label=#{channel.bindings.title.label},helper=|#{channel.bindings.title.helper}${titleHelperExtra}|"></mdui-text-field>
                         <p class="title-preview" data-title-preview th:if="${channelSettings != null and channelSettings.titlePreviewAvailable() == true}" data-preview-kind="BINDING" data-preview-lazy th:data-binding-id="${b.id()}"
                            th:attr="data-none=#{channel.settings.stream_title.preview_none}"><span
                                 th:text="#{channel.settings.stream_title.preview}">Aperçu :</span> <span class="title-preview-text"></span></p>
@@ -396,7 +396,7 @@
         <mdui-text-field th:if="${channelSettings != null and channelSettings.titleAvailable() == true}"
                          class="custom-binding-title" variant="outlined" maxlength="140" counter data-title-highlight
                          th:value="${b?.title()}"
-                         th:attr="label=#{channel.custom_bindings.settings.title},helper=#{channel.bindings.title.helper}"></mdui-text-field>
+                         th:attr="label=#{channel.custom_bindings.settings.title},helper=|#{channel.bindings.title.helper}${titleHelperExtra}|"></mdui-text-field>
         <p class="title-preview" data-title-preview th:if="${channelSettings != null and channelSettings.titlePreviewAvailable() == true and channelSettings.titleAvailable() == true}" data-preview-kind="CUSTOM" data-preview-lazy th:data-custom-binding-id="${b?.id()}"
            th:attr="data-none=#{channel.settings.stream_title.preview_none}"><span
                 th:text="#{channel.settings.stream_title.preview}">Aperçu :</span> <span class="title-preview-text"></span></p>

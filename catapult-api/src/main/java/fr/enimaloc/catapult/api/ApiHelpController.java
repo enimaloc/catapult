@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.common.dto.HelpContent;
 import fr.enimaloc.catapult.service.minecraft.MinecraftGateService;
+import fr.enimaloc.catapult.service.title.TitleHelpSections;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
@@ -22,6 +23,7 @@ public class ApiHelpController {
 
     private final MessageSource messageSource;
     private final MinecraftGateService gateService;
+    private final TitleHelpSections titleHelpSections;
 
     @Value("${app.account.deletion-delay-days:7}")
     private int accountDeletionDelayDays;
@@ -49,7 +51,25 @@ public class ApiHelpController {
                 body += messageSource.getMessage("help.connections.body.minecraft", args, "", locale);
             }
         }
+        if ("title-settings".equals(cardId)) {
+            TitleHelpSections.Offered offered = titleSections(jwt);
+            if (offered.conditions()) {
+                body += messageSource.getMessage("help.title-settings.body.conditions", args, "", locale);
+            }
+            if (offered.drops()) {
+                body += messageSource.getMessage("help.title-settings.body.drops", args, "", locale);
+            }
+        }
         return new HelpContent(title, body);
+    }
+
+    private TitleHelpSections.Offered titleSections(Jwt jwt) {
+        if (jwt == null) return TitleHelpSections.Offered.NONE;
+        try {
+            return titleHelpSections.forAccount(UUID.fromString(jwt.getSubject()));
+        } catch (IllegalArgumentException e) {
+            return TitleHelpSections.Offered.NONE;
+        }
     }
 
     private boolean isMinecraftVisible(Jwt jwt) {
