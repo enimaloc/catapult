@@ -512,6 +512,13 @@ public interface ApiService {
     int adminRebuildTws(TwRebuild mode);
     /** A definition's Steam keywords, sorted; null when unknown or when catapult-api fails. */
     List<String> adminTwKeywords(String id);
+    /** A TW's DTDD topics with their least severe level and the levels known for each; null when catapult-api fails. */
+    List<fr.enimaloc.catapult.common.dto.admin.TwDtddTopicDto> adminTwDtddTopics(String id);
+    /**
+     * Replaces a TW's DTDD topics, each with its least severe level ({@code minByTopic}: null or blank, any):
+     * catapult-api's status (204), 502 when unreachable.
+     */
+    int adminSetTwDtddTopics(String id, Map<String, String> minByTopic);
     /** Adds a keyword (already there changes nothing); catapult-api's status (204), 502 when unreachable. */
     int adminAddTwKeyword(String id, String keyword);
     /** Removes a keyword (also an absent one); catapult-api's status (204), 502 when unreachable. */

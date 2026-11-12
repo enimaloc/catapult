@@ -1747,6 +1747,18 @@ public class MockApiService implements ApiService {
     }
 
     @Override
+    public List<fr.enimaloc.catapult.common.dto.admin.TwDtddTopicDto> adminTwDtddTopics(String id) {
+        log.trace("adminTwDtddTopics({})", id);
+        return tws.dtddTopics(id);
+    }
+
+    @Override
+    public int adminSetTwDtddTopics(String id, Map<String, String> minByTopic) {
+        log.trace("adminSetTwDtddTopics({}, {})", id, minByTopic);
+        return tws.setDtddTopics(id, minByTopic);
+    }
+
+    @Override
     public int adminAddTwKeyword(String id, String keyword) {
         log.trace("adminAddTwKeyword({}, {})", id, keyword);
         return tws.addKeyword(id, keyword);

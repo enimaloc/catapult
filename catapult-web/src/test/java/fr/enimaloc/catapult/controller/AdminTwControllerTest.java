@@ -168,4 +168,33 @@ class AdminTwControllerTest {
         }
         verify(apiService, org.mockito.Mockito.times(2)).adminTestTwKeyword(any(), any(), any());
     }
+
+    @Test
+    void dtddTopics_areSentInOrder_onceEach_withTheirLevel() throws Exception {
+        when(apiService.isAdmin()).thenReturn(true);
+        when(apiService.adminSetTwDtddTopics(org.mockito.ArgumentMatchers.eq("gore"), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(204);
+
+        mvc.perform(admin(post(BASE + "/gore/dtdd"), "{\"topics\":[{\"topic\":\" there's blood/gore \",\"minSeverity\":\" Depicted \"},"
+                + "{\"topic\":\"THERE'S BLOOD/GORE\",\"minSeverity\":\"\"},{\"topic\":\"someone dies\",\"minSeverity\":\"\"}]}"))
+                .andExpect(status().isNoContent());
+
+        var sent = org.mockito.ArgumentCaptor.<java.util.Map<String, String>>captor();
+        org.mockito.Mockito.verify(apiService).adminSetTwDtddTopics(org.mockito.ArgumentMatchers.eq("gore"), sent.capture());
+        org.assertj.core.api.Assertions.assertThat(sent.getValue()).containsExactly(
+                java.util.Map.entry("there's blood/gore", "Depicted"),
+                new java.util.AbstractMap.SimpleEntry<>("someone dies", null));
+    }
+
+    @Test
+    void dtddTopics_checkTheirLength() throws Exception {
+        when(apiService.isAdmin()).thenReturn(true);
+        for (String body : new String[]{"{\"topics\":[{\"topic\":\" \"}]}",
+                "{\"topics\":[{\"topic\":\"" + "x".repeat(201) + "\"}]}",
+                "{\"topics\":[{\"topic\":\"x\",\"minSeverity\":\"" + "y".repeat(41) + "\"}]}"}) {
+            mvc.perform(admin(post(BASE + "/gore/dtdd"), body)).andExpect(status().isBadRequest());
+        }
+        org.mockito.Mockito.verify(apiService, org.mockito.Mockito.never())
+                .adminSetTwDtddTopics(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
 }

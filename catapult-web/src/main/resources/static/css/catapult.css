@@ -2549,6 +2549,11 @@ mdui-snackbar.broadcast-warning { --mdui-color-inverse-surface: var(--mdui-color
 .admin-tw-kw-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 4px 0; }
 .admin-tw-kw-row + .admin-tw-kw-row { border-top: 1px solid var(--catapult-border, rgba(127, 127, 127, 0.2)); }
 .admin-tw-kw-row > .admin-member-id { min-width: 0; overflow-wrap: anywhere; }
+.admin-tw-dtdd-row { grid-template-columns: minmax(0, 1fr) minmax(10rem, 14rem) auto; }
+@media (max-width: 650px) {
+    .admin-tw-dtdd-row { grid-template-columns: minmax(0, 1fr) auto; }
+    .admin-tw-dtdd-row > .admin-tw-dtdd-min { grid-column: 1 / -1; grid-row: 2; }
+}
 .admin-tw-kw-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: start; }
 .admin-tw-test-result { margin-top: 12px; overflow-wrap: anywhere; }
 .admin-tw-test-result p { margin: 4px 0; }

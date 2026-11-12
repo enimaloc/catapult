@@ -1400,6 +1400,23 @@ public class RealApiService implements ApiService {
     }
 
     @Override
+    public List<fr.enimaloc.catapult.common.dto.admin.TwDtddTopicDto> adminTwDtddTopics(String id) {
+        return client.get("/api/internal/admin/tws/{id}/dtdd-topics",
+                new ParameterizedTypeReference<List<fr.enimaloc.catapult.common.dto.admin.TwDtddTopicDto>>() {}, id);
+    }
+
+    @Override
+    public int adminSetTwDtddTopics(String id, Map<String, String> minByTopic) {
+        Map<String, String> thresholds = new java.util.LinkedHashMap<>();
+        minByTopic.forEach((topic, min) -> {
+            if (min != null && !min.isBlank()) thresholds.put(topic, min);
+        });
+        return client.call(HttpMethod.PUT, "/api/internal/admin/tws/{id}/dtdd-topics",
+                new fr.enimaloc.catapult.common.dto.admin.DtddTopicsBody(minByTopic.keySet(), thresholds), Void.class,
+                id).status();
+    }
+
+    @Override
     public int adminAddTwKeyword(String id, String keyword) {
         return client.call(HttpMethod.POST, "/api/internal/admin/tws/{id}/steam-keywords", new SteamKeywordBody(keyword), Void.class, id).status();
     }

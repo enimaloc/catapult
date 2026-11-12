@@ -13,7 +13,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 import static org.springframework.http.HttpStatus.NOT_FOUND;
@@ -40,6 +45,8 @@ public class AdminTwController {
     private static final int KEYWORD_MIN = 2;
     private static final int KEYWORD_MAX = 50;
     private static final Pattern APP_ID = Pattern.compile("[0-9]{1,12}");
+    private static final int DTDD_TOPIC_MAX = 200;
+    private static final int DTDD_LEVEL_MAX = 40;
 
     private final ApiService apiService;
     private final ModelFiller filler;
@@ -91,6 +98,31 @@ public class AdminTwController {
         }
         TwKeywordTestDto result = apiService.adminTestTwKeyword(id, body.appId(), draft == null || draft.isEmpty() ? null : draft);
         return result == null ? ResponseEntity.status(502).build() : ResponseEntity.ok(result);
+    }
+
+    /** A DTDD topic and the least severe level of it that turns the TW on (null or blank: any). */
+    public record DtddTopicBody(String topic, String minSeverity) {}
+
+    public record DtddTopicsBody(List<DtddTopicBody> topics) {}
+
+    /**
+     * Replaces the definition's DTDD topics with {@code topics}, in order, each one once (by name, ignoring case);
+     * a topic of 1 to 200 characters and a level of 40 at most, else 400.
+     */
+    @PostMapping("/{id}/dtdd")
+    public ResponseEntity<Void> setDtddTopics(@PathVariable String id, @RequestBody DtddTopicsBody body) {
+        AdminAccess.require(filler);
+        Map<String, String> minByTopic = new LinkedHashMap<>();
+        Set<String> seen = new HashSet<>();
+        for (DtddTopicBody t : body.topics() == null ? List.<DtddTopicBody>of() : body.topics()) {
+            String topic = t == null || t.topic() == null ? "" : t.topic().trim();
+            String min = t == null || t.minSeverity() == null ? "" : t.minSeverity().trim();
+            if (topic.isEmpty() || topic.length() > DTDD_TOPIC_MAX || min.length() > DTDD_LEVEL_MAX) {
+                return ResponseEntity.badRequest().build();
+            }
+            if (seen.add(topic.toLowerCase(Locale.ROOT))) minByTopic.put(topic, min.isEmpty() ? null : min);
+        }
+        return ResponseEntity.status(apiService.adminSetTwDtddTopics(id, minByTopic)).build();
     }
 
     @PostMapping("/rebuild/{mode}")
