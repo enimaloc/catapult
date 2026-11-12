@@ -37,8 +37,32 @@ public record UserSettingsDto(
         String noGameTitle,
         String incompleteFallbackTitle,
         // Whether the title fields get their preview (experiment stream.title.preview); null: not offered
-        Boolean titlePreviewAvailable
+        Boolean titlePreviewAvailable,
+        // Whether the titles read their conditions (experiment stream.title.conditions); null: not offered
+        Boolean titleConditionsAvailable,
+        // Whether the titles get the drops ({{DROP_NAME}}, {{DROP_END}}, DROP_ENABLED): the conditions and the
+        // experiment drops; null: not offered
+        Boolean titleDropsAvailable
 ) {
+    /** Settings without the title's conditions nor drops. */
+    public UserSettingsDto(boolean cclFeatureEnabled, Set<String> blockedCcls, String noGameTwitchGameId,
+                           String noGameTwitchGameName, Set<String> noGameCcls, boolean applyDefaultOnStreamStart,
+                           boolean applyDefaultOnNoGame, boolean applyDefaultOnStreamEnd,
+                           String incompleteFallbackTwitchGameId, String incompleteFallbackTwitchGameName,
+                           Set<String> incompleteFallbackCcls, List<CclDto> availableCcls, boolean twFeatureEnabled,
+                           Set<String> blockedTws, List<TwDto> availableTws, Integer raidRestoreGameMinutes,
+                           boolean raidRestoreGameAvailable, List<ExtensionSlotDto> noGameExtensions,
+                           List<ExtensionSlotDto> incompleteFallbackExtensions, Boolean titleFeatureEnabled,
+                           String titleTemplate, Boolean titleAvailable, String noGameTitle,
+                           String incompleteFallbackTitle, Boolean titlePreviewAvailable) {
+        this(cclFeatureEnabled, blockedCcls, noGameTwitchGameId, noGameTwitchGameName, noGameCcls,
+                applyDefaultOnStreamStart, applyDefaultOnNoGame, applyDefaultOnStreamEnd,
+                incompleteFallbackTwitchGameId, incompleteFallbackTwitchGameName, incompleteFallbackCcls,
+                availableCcls, twFeatureEnabled, blockedTws, availableTws, raidRestoreGameMinutes,
+                raidRestoreGameAvailable, noGameExtensions, incompleteFallbackExtensions, titleFeatureEnabled,
+                titleTemplate, titleAvailable, noGameTitle, incompleteFallbackTitle, titlePreviewAvailable, null, null);
+    }
+
     /** Settings without the title's preview. */
     public UserSettingsDto(boolean cclFeatureEnabled, Set<String> blockedCcls, String noGameTwitchGameId,
                            String noGameTwitchGameName, Set<String> noGameCcls, boolean applyDefaultOnStreamStart,
@@ -55,7 +79,7 @@ public record UserSettingsDto(
                 incompleteFallbackTwitchGameId, incompleteFallbackTwitchGameName, incompleteFallbackCcls,
                 availableCcls, twFeatureEnabled, blockedTws, availableTws, raidRestoreGameMinutes,
                 raidRestoreGameAvailable, noGameExtensions, incompleteFallbackExtensions, titleFeatureEnabled,
-                titleTemplate, titleAvailable, noGameTitle, incompleteFallbackTitle, null);
+                titleTemplate, titleAvailable, noGameTitle, incompleteFallbackTitle, null, null, null);
     }
 
     /** Settings without the fallbacks' own titles. */
@@ -73,7 +97,7 @@ public record UserSettingsDto(
                 incompleteFallbackTwitchGameId, incompleteFallbackTwitchGameName, incompleteFallbackCcls,
                 availableCcls, twFeatureEnabled, blockedTws, availableTws, raidRestoreGameMinutes,
                 raidRestoreGameAvailable, noGameExtensions, incompleteFallbackExtensions, titleFeatureEnabled,
-                titleTemplate, titleAvailable, null, null, null);
+                titleTemplate, titleAvailable, null, null, null, null, null);
     }
 
     /** Settings without the stream title (off, and not offered). */
