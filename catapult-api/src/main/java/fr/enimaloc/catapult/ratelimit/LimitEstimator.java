@@ -61,23 +61,26 @@ final class LimitEstimator {
 
     /**
      * A 429: the window is the shortest one at least as long as the wait the platform asks or the one learned
-     * ({@code resumeHint}), the limit the calls sent in it before the refused one. Never loosened by a 429.
+     * ({@code resumeHint}), the limit the calls sent in it before the refused one. Never loosened by a 429, and at
+     * most halved by one in the same window: a 429 after few calls tells more of a longer window than of a tiny limit.
      */
     void on429(Instant now, Duration resumeHint) {
         last429 = now;
         Duration window = WINDOWS.stream().filter(w -> w.compareTo(resumeHint) >= 0).findFirst().orElse(KEPT);
         int limit = Math.max(1, countWithin(window, now) - 1);
-        if (estimate == null || !estimate.window().equals(window) || limit < estimate.calls()) {
-            estimate = estimate != null && estimate.window().equals(window)
-                    ? new Estimate(Math.min(limit, estimate.calls()), window)
-                    : new Estimate(limit, window);
+        if (estimate != null && estimate.window().equals(window)) {
+            int halved = (estimate.calls() + 1) / 2;
+            estimate = new Estimate(Math.min(estimate.calls(), Math.max(limit, halved)), window);
+        } else {
+            estimate = new Estimate(limit, window);
         }
     }
 
     /** Raises the limit by a tenth (at least one call) when it was nearly reached for long without a 429. */
     void maybeRaise(Instant now) {
         if (estimate == null) return;
-        Instant since = last429 == null ? lastRaise : (lastRaise == null || last429.isAfter(lastRaise) ? last429 : lastRaise);
+        Instant since = last429 == null ? lastRaise
+                : lastRaise == null || last429.isAfter(lastRaise) ? last429 : lastRaise;
         if (since != null && since.plus(raiseAfter).isAfter(now)) return;
         if (countWithin(estimate.window(), now) * 10 < estimate.calls() * 8) return;
         estimate = new Estimate(estimate.calls() + Math.max(1, estimate.calls() / 10), estimate.window());

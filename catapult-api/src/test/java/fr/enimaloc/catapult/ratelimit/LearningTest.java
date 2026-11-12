@@ -45,6 +45,17 @@ class LearningTest {
     }
 
     @Test
+    void oneFewCalls429_atMostHalvesTheLimit() {
+        LimitEstimator e = calls(30, Duration.ofSeconds(50));
+        e.on429(T0.plusSeconds(50), Duration.ofSeconds(60));
+        Instant later = T0.plus(Duration.ofMinutes(10));
+        e.record(later);
+
+        e.on429(later, Duration.ofSeconds(60));
+        assertThat(e.estimate()).contains(new Estimate(15, Duration.ofMinutes(1)));
+    }
+
+    @Test
     void theLimit_isNeverUnderOneCall() {
         LimitEstimator e = new LimitEstimator(Duration.ofHours(1));
         e.on429(T0, Duration.ofSeconds(1));
