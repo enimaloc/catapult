@@ -17,6 +17,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
 
 @Slf4j
@@ -46,7 +48,7 @@ public class DtddService {
         if (cached.isPresent()) {
             DtddTopicsCache c = cached.get();
             if (!isFresh(c.getFetchedAt())) refreshAsync(dtddId);
-            return Optional.of(new DtddTopics(c.getYesTopics(), c.getNoTopics(), c.getMostlyTopics()));
+            return Optional.of(new DtddTopics(c.getYesTopics(), c.getNoTopics(), c.getMostlyTopics(), severities(c)));
         }
 
         Optional<DtddTopics> remote = apiClient.fetchTopics(dtddId);
@@ -66,6 +68,15 @@ public class DtddService {
     private void persist(long dtddId, DtddTopics t) {
         topicsRepo.save(new DtddTopicsCache(
             dtddId, t.yesTopics(), t.noTopics(), t.mostlyTopics(), Instant.now(), DtddCacheRefetcher.severities(t)));
+    }
+
+    /** The cached severities as DTDD gives them, by topic name; null when fetched before they were kept. */
+    static Map<String, DtddApiClient.DtddSeverity> severities(DtddTopicsCache cached) {
+        if (cached.getSeverities() == null) return null;
+        Map<String, DtddApiClient.DtddSeverity> out = new LinkedHashMap<>();
+        cached.getSeverities().forEach((topic, s) -> out.put(topic,
+                new DtddApiClient.DtddSeverity(s.levels(), s.counts(), s.percents(), s.total(), s.verified())));
+        return out;
     }
 
     private boolean isFresh(Instant ts) {

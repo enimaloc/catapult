@@ -1,0 +1,63 @@
+<!--/*@thymesVar id="details" type="fr.enimaloc.catapult.common.dto.channel.TwDetailsDto"*/-->
+<!--/*
+  Why a binding has its TWs (the body of its TW panel's details dialog, channel-bindings.js): each TW with where it
+  comes from — the detection's sources, a DTDD topic with its severity, the streamer's or an admin's choice — then the
+  DTDD topics their severity kept off. Recomputed by catapult-api when asked: it tells the detection as it is now.
+*/-->
+
+<!--/* One source of a TW, told in a sentence; a DTDD topic with its severity's verdict under it. */-->
+<li th:fragment="source(s)" class="tw-details-source">
+    <span th:switch="${s.type()}">
+        <th:block th:case="'IGDB_DESCRIPTOR'" th:text="#{channel.bindings.tw.details.source.igdb(${s.value()})}">IGDB</th:block>
+        <th:block th:case="'STEAM_CONTENT'"
+                  th:text="#{channel.bindings.tw.details.source.steam_content(${#messages.msgOrNull('channel.bindings.tw.details.steam.' + s.value()) ?: s.value()})}">Steam</th:block>
+        <th:block th:case="'STEAM_KEYWORD'" th:text="#{channel.bindings.tw.details.source.steam_keyword(${s.value()})}">Steam</th:block>
+        <th:block th:case="'DTDD_TOPIC'" th:text="#{channel.bindings.tw.details.source.dtdd(${s.value()})}">DTDD</th:block>
+        <th:block th:case="*" th:text="${s.value()}">source</th:block>
+    </span>
+    <span class="tw-details-severity" th:if="${s.severity() != null}" th:with="v=${s.severity()}" th:switch="${v.reason()}">
+        <th:block th:case="'NOT_CACHED'" th:text="#{channel.bindings.tw.details.severity.not_cached}">unknown</th:block>
+        <th:block th:case="'UNKNOWN_LEVEL'" th:text="#{channel.bindings.tw.details.severity.unknown_level(${v.minSeverity()})}">unknown level</th:block>
+        <th:block th:case="'TOO_FEW_VOTES'" th:text="#{channel.bindings.tw.details.severity.too_few_votes(${v.votes()})}">too few</th:block>
+        <th:block th:case="'VERIFIED'" th:text="#{channel.bindings.tw.details.severity.verified(${v.level()}, ${v.minSeverity()})}">verified</th:block>
+        <th:block th:case="'VOTES'" th:text="#{channel.bindings.tw.details.severity.votes(${v.percentAtOrAbove()}, ${v.minSeverity()}, ${v.votes()})}">votes</th:block>
+        <th:block th:case="'BELOW_VERIFIED'" th:text="#{channel.bindings.tw.details.severity.below_verified(${v.level()}, ${v.minSeverity()})}">below</th:block>
+        <th:block th:case="'BELOW_VOTES'" th:text="#{channel.bindings.tw.details.severity.below_votes(${v.percentAtOrAbove()}, ${v.minSeverity()}, ${v.votes()}, ${v.level()})}">below</th:block>
+    </span>
+</li>
+
+<div th:fragment="details" class="tw-details">
+    <p class="admin-placeholder" th:if="${details == null}" th:text="#{channel.bindings.tw.details.unavailable}">unavailable</p>
+    <th:block th:if="${details != null}">
+        <p class="tw-details-hint" th:text="#{channel.bindings.tw.details.hint}">hint</p>
+        <p class="tw-details-hint" th:if="${details.streamerChose()}" th:text="#{channel.bindings.tw.details.streamer_chose}">yours</p>
+        <p th:if="${details.tws().isEmpty()}" th:text="#{channel.bindings.tw.details.none}">none</p>
+
+        <section class="tw-details-tw" th:each="t : ${details.tws()}" th:attr="data-tw=${t.id()}">
+            <h4>
+                <span th:text="${t.label()}">TW</span>
+                <mdui-chip th:unless="${t.active()}" icon="block" class="tw-details-off"
+                           th:text="#{channel.bindings.tw.details.turned_off}">turned off</mdui-chip>
+            </h4>
+            <p th:if="${t.origin() == 'STREAMER'}" th:text="#{channel.bindings.tw.details.origin.streamer}">yours</p>
+            <p th:if="${t.origin() == 'ADMIN'}" th:text="#{channel.bindings.tw.details.origin.admin}">admin</p>
+            <p th:if="${t.origin() == 'NO_SOURCE'}" th:text="#{channel.bindings.tw.details.origin.no_source}">no source</p>
+            <ul th:unless="${t.sources().isEmpty()}">
+                <!--/* th:each outside: th:replace would run first */-->
+                <th:block th:each="s : ${t.sources()}"><li th:replace="~{:: source(${s})}">source</li></th:block>
+            </ul>
+        </section>
+
+        <section class="tw-details-kept-off" th:unless="${details.keptOff().isEmpty()}">
+            <h4 th:text="#{channel.bindings.tw.details.kept_off}">Kept off by their severity</h4>
+            <ul>
+                <th:block th:each="s : ${details.keptOff()}">
+                    <li class="tw-details-source">
+                        <strong th:text="${s.twLabel()}">TW</strong>
+                        <ul><li th:replace="~{:: source(${s})}">source</li></ul>
+                    </li>
+                </th:block>
+            </ul>
+        </section>
+    </th:block>
+</div>

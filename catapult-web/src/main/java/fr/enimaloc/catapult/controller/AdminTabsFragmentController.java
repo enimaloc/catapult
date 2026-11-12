@@ -452,6 +452,21 @@ public class AdminTabsFragmentController {
         });
     }
 
+    /** One definition's DTDD topics with their least severe level; the missing fragment (404) when it is unknown. */
+    @GetMapping("/tw/{id}/dtdd")
+    String twDtddTopics(Model model, HttpServletResponse response, @PathVariable String id) {
+        return guarded(model, response, () -> {
+            TwDefinitionDto definition = apiService.adminTw(id);
+            if (definition == null) {
+                response.setStatus(HttpStatus.NOT_FOUND.value());
+                return "pages/admin-tab/tw :: missing";
+            }
+            model.addAttribute("definition", definition);
+            model.addAttribute("topics", apiService.adminTwDtddTopics(id));
+            return "pages/admin-tab/tw :: dtdd";
+        });
+    }
+
     /** Steam and DTDD keys cards, then the Minecraft service accounts card. */
     @GetMapping("/keys")
     String keys(Model model, HttpServletResponse response) {

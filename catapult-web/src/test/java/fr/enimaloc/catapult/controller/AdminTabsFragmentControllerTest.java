@@ -70,7 +70,7 @@ class AdminTabsFragmentControllerTest {
         for (String url : List.of("/spa/admin/ccl", "/spa/admin/caches", "/spa/admin/caches/igdb-game-cache",
                 "/spa/admin/caches/igdb-game-cache/entry?key=1",
                 "/spa/admin/data", "/spa/admin/data/chat-command", "/spa/admin/data/chat-command/row?id=1",
-                "/spa/admin/members?q=a&page=1", "/spa/admin/members/search?q=a", "/spa/admin/meta", "/spa/admin/meta/file?id=1", "/spa/admin/links", "/spa/admin/notifications?page=1", "/spa/admin/broadcast", "/spa/admin/dtdd-mapping", "/spa/admin/game-mappings?page=1&missingPage=1", "/spa/admin/groups", "/spa/admin/whitelist", "/spa/admin/keys", "/spa/admin/tw", "/spa/admin/tw/gore",
+                "/spa/admin/members?q=a&page=1", "/spa/admin/members/search?q=a", "/spa/admin/meta", "/spa/admin/meta/file?id=1", "/spa/admin/links", "/spa/admin/notifications?page=1", "/spa/admin/broadcast", "/spa/admin/dtdd-mapping", "/spa/admin/game-mappings?page=1&missingPage=1", "/spa/admin/groups", "/spa/admin/whitelist", "/spa/admin/keys", "/spa/admin/tw", "/spa/admin/tw/gore", "/spa/admin/tw/gore/dtdd",
                 "/spa/admin/members", "/spa/admin/members/00000000-0000-0000-0000-000000000001",
                 "/spa/admin/experiments", "/spa/admin/experiments/00000000-0000-0000-0000-000000000001",
                 "/spa/admin/experiments/00000000-0000-0000-0000-000000000001/participants?variant=&q=x&page=1")) {
@@ -993,6 +993,31 @@ class AdminTabsFragmentControllerTest {
                 "data-rebuild=\"untouched\"", "data-rebuild=\"non-overridden\"", "data-rebuild=\"force-pinned\"",
                 "This will OVERWRITE the TW choices");
         assertThat(html.split("admin-tw-danger", -1)).hasSize(2);
+    }
+
+    @Test
+    void twDtddFragment_offersTheKnownLevels_andKeepsASavedOneNoTitleGives() throws Exception {
+        when(apiService.adminTw("gore")).thenReturn(
+                new fr.enimaloc.catapult.common.dto.admin.TwDefinitionDto("gore", "Gore", null, true, 10));
+        when(apiService.adminTwDtddTopics("gore")).thenReturn(List.of(
+                new fr.enimaloc.catapult.common.dto.admin.TwDtddTopicDto("there's blood/gore", "Depicted",
+                        List.of("Minor", "Depicted", "Excessive")),
+                new fr.enimaloc.catapult.common.dto.admin.TwDtddTopicDto("there's excessive gore", "Graphic", List.of())));
+
+        String html = asAdmin("/spa/admin/tw/gore/dtdd");
+
+        assertThat(html).contains("data-tw-id=\"gore\"", "data-topic=\"there&#39;s blood/gore\"", "value=\"Depicted\"",
+                ">Minor<", ">Excessive<", "value=\"Graphic\"", "admin-tw-dtdd-add");
+        when(apiService.adminTws()).thenReturn(List.of(
+                new fr.enimaloc.catapult.common.dto.admin.TwDefinitionDto("gore", "Gore", null, true, 10)));
+        assertThat(asAdmin("/spa/admin/tw")).contains("data-admin-open=\"gore/dtdd\"");
+    }
+
+    @Test
+    void twDtddFragment_ofAnUnknownTw_isTheMissingOne() throws Exception {
+        when(apiService.isAdmin()).thenReturn(true);
+        mvc.perform(get("/spa/admin/tw/nope/dtdd").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+                .andExpect(status().isNotFound());
     }
 
     @Test

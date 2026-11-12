@@ -2551,6 +2551,11 @@ mdui-snackbar.broadcast-warning { --mdui-color-inverse-surface: var(--mdui-color
 .admin-tw-kw-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 4px 0; }
 .admin-tw-kw-row + .admin-tw-kw-row { border-top: 1px solid var(--catapult-border, rgba(127, 127, 127, 0.2)); }
 .admin-tw-kw-row > .admin-member-id { min-width: 0; overflow-wrap: anywhere; }
+.admin-tw-dtdd-row { grid-template-columns: minmax(0, 1fr) minmax(10rem, 14rem) auto; }
+@media (max-width: 650px) {
+    .admin-tw-dtdd-row { grid-template-columns: minmax(0, 1fr) auto; }
+    .admin-tw-dtdd-row > .admin-tw-dtdd-min { grid-column: 1 / -1; grid-row: 2; }
+}
 .admin-tw-kw-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: start; }
 .admin-tw-test-result { margin-top: 12px; overflow-wrap: anywhere; }
 .admin-tw-test-result p { margin: 4px 0; }
@@ -2935,3 +2940,15 @@ mdui-text-field[data-title-highlight].title-highlighted::part(input) {
 .binding-edit-panel .title-preview {
     grid-column: 1 / -1;
 }
+
+/* Why a binding has its TWs (channel page, its TW panel's details dialog). */
+.tw-details-dialog { --mdui-comp-dialog-max-width: min(760px, 100vw - 32px); }
+.tw-details-body { width: min(700px, 100vw - 96px); max-width: 100%; }
+.tw-details-hint { color: var(--catapult-text-secondary); margin: 0 0 12px; }
+.tw-details-tw, .tw-details-kept-off { padding: 8px 0; }
+.tw-details-tw + .tw-details-tw, .tw-details-kept-off { border-top: 1px solid var(--catapult-border, rgba(127, 127, 127, 0.2)); }
+.tw-details-tw h4, .tw-details-kept-off h4 { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 4px; }
+.tw-details-tw p { margin: 0 0 4px; color: var(--catapult-text-secondary); }
+.tw-details-tw ul, .tw-details-kept-off ul { margin: 4px 0 0; padding-left: 20px; }
+.tw-details-source { margin: 2px 0; overflow-wrap: anywhere; }
+.tw-details-severity { display: block; color: var(--catapult-text-secondary); font-size: 0.875rem; }

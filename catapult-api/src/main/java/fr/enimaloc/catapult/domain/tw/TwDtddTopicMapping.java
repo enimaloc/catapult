@@ -19,4 +19,8 @@ public class TwDtddTopicMapping {
 
     @Column(name = "dtdd_topic_name", nullable = false, length = 200)
     private String dtddTopicName;
+
+    /** The least severe level of the topic that turns the TW on (one of its DTDD labels); null: any level. */
+    @Column(name = "min_severity", length = 40)
+    private String minSeverity;
 }

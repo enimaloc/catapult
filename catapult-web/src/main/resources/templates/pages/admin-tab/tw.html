@@ -60,6 +60,8 @@
             <span class="admin-row-actions">
                 <mdui-button variant="text" class="admin-tw-keywords" th:attr="data-admin-open=${d.id()}"
                              th:text="#{admin.tw.action.manage-keywords}">Manage keywords</mdui-button>
+                <mdui-button variant="text" class="admin-tw-dtdd" th:attr="data-admin-open=|${d.id()}/dtdd|"
+                             th:text="#{admin.tw.action.manage-dtdd}">DTDD topics</mdui-button>
             </span>
         </div>
     </mdui-card>
@@ -113,6 +115,46 @@
             <div class="admin-tw-test-result" aria-live="polite"></div>
         </mdui-card>
     </th:block>
+</div>
+
+<!--/*
+  One definition's DTDD topics (#tw/{id}/dtdd): each one with the least severe level of it that turns the TW on,
+  picked among the levels the cached titles give it ("any level" when none does), a remove, and an add field (1 to
+  200 characters). Any change saves them all, in the order shown. Driven by admin-tw-dtdd.js.
+*/-->
+<div th:fragment="dtdd" class="admin-view admin-tw-dtdd-view" th:attr="data-tw-id=${definition.id()},
+        data-error=#{admin.error.generic},data-error-400=#{admin.tw.dtdd.invalid},data-error-404=#{admin.tw.kw.missing},
+        data-saved=#{admin.tw.dtdd.saved}">
+    <div class="section-header admin-subheader">
+        <mdui-button-icon icon="arrow_back" data-admin-back th:attr="aria-label=#{admin.back}"></mdui-button-icon>
+        <h2 th:text="#{admin.tw.dtdd.title(${definition.label()})}">DTDD topics</h2>
+    </div>
+    <p class="admin-cell-muted" th:text="#{admin.tw.dtdd.hint}">hint</p>
+
+    <th:block th:if="${topics == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
+    <mdui-card class="admin-tw-kw-card" variant="outlined" th:if="${topics != null}">
+        <p class="admin-cell-muted" data-admin-value="empty" th:hidden="${!topics.isEmpty()}" th:text="#{admin.tw.dtdd.empty}">No topic.</p>
+        <div class="admin-tw-kw-rows" data-admin-list="topics" th:hidden="${topics.isEmpty()}">
+            <div class="admin-tw-kw-row admin-tw-dtdd-row" th:each="t : ${topics}"
+                 th:attr="data-topic=${t.topic()},data-admin-key=${t.topic()}">
+                <span class="admin-member-id" th:text="${t.topic()}">topic</span>
+                <!--/* "" any level; the levels known, and a saved one no cached title gives (still applied as is) */-->
+                <mdui-select class="admin-tw-dtdd-min" variant="outlined"
+                             th:attr="value=${t.minSeverity() ?: ''},label=#{admin.tw.dtdd.min}">
+                    <mdui-menu-item value="" th:text="#{admin.tw.dtdd.any}">Any level</mdui-menu-item>
+                    <mdui-menu-item th:each="l : ${t.knownLevels()}" th:value="${l}" th:text="${l}">level</mdui-menu-item>
+                    <mdui-menu-item th:if="${t.minSeverity() != null and !t.knownLevels().contains(t.minSeverity())}"
+                                    th:value="${t.minSeverity()}" th:text="${t.minSeverity()}">saved</mdui-menu-item>
+                </mdui-select>
+                <mdui-button-icon icon="delete" class="admin-tw-dtdd-remove" th:attr="aria-label=#{admin.tw.dtdd.remove}"></mdui-button-icon>
+            </div>
+        </div>
+        <div class="admin-tw-kw-form">
+            <mdui-text-field name="topic" variant="outlined" maxlength="200"
+                             th:attr="label=#{admin.tw.dtdd.add.label},placeholder=#{admin.tw.dtdd.add.placeholder}"></mdui-text-field>
+            <mdui-button variant="filled" icon="add" class="admin-tw-dtdd-add" th:text="#{admin.tw.kw.add.button}">Add</mdui-button>
+        </div>
+    </mdui-card>
 </div>
 
 <div th:fragment="missing" class="admin-view">

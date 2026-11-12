@@ -89,6 +89,8 @@ public interface ApiService {
     int updateBinding(String username, String bindingId, String twitchGameId, String twitchGameName, java.util.Set<String> ccls);
     int saveTws(String bindingId, java.util.Set<String> tws);
     int resetTws(String bindingId);
+    /** Why the caller's binding has its TWs, as the detection tells it now; null when it isn't theirs or catapult-api fails. */
+    fr.enimaloc.catapult.common.dto.channel.TwDetailsDto twDetails(String bindingId);
     int resetBinding(String bindingId);
     int toggleTwEnabled(String bindingId, boolean enabled);
     int saveSteamToken(String username, String token, boolean shared);
@@ -512,6 +514,13 @@ public interface ApiService {
     int adminRebuildTws(TwRebuild mode);
     /** A definition's Steam keywords, sorted; null when unknown or when catapult-api fails. */
     List<String> adminTwKeywords(String id);
+    /** A TW's DTDD topics with their least severe level and the levels known for each; null when catapult-api fails. */
+    List<fr.enimaloc.catapult.common.dto.admin.TwDtddTopicDto> adminTwDtddTopics(String id);
+    /**
+     * Replaces a TW's DTDD topics, each with its least severe level ({@code minByTopic}: null or blank, any):
+     * catapult-api's status (204), 502 when unreachable.
+     */
+    int adminSetTwDtddTopics(String id, Map<String, String> minByTopic);
     /** Adds a keyword (already there changes nothing); catapult-api's status (204), 502 when unreachable. */
     int adminAddTwKeyword(String id, String keyword);
     /** Removes a keyword (also an absent one); catapult-api's status (204), 502 when unreachable. */

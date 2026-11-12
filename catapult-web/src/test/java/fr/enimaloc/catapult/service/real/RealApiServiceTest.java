@@ -122,6 +122,7 @@ class RealApiServiceTest {
         assertThat(service.enabledChatCommands()).isEmpty();
         // The TW overrides are the member's own too.
         assertThat(service.saveTws("b1", Set.of("spiders"))).isEqualTo(401);
+        assertThat(service.twDetails("b1")).isNull();
         // api.verify() in the teardown, and the mock server refusing any request it did not expect: none was sent.
     }
 
@@ -619,6 +620,36 @@ class RealApiServiceTest {
     void resetBinding() {
         expectPost(OWN + "/bindings/b1/reset");
         service.resetBinding("b1");
+    }
+
+    @Test
+    void twDetails_readWhyTheBindingHasItsTws() {
+        respond(HttpMethod.GET, OWN + "/bindings/b1/tws/details",
+                "{\"streamerChose\":false,\"tws\":[{\"id\":\"gore\",\"label\":\"Gore\",\"active\":true,"
+                        + "\"origin\":\"DETECTED\",\"sources\":[{\"twId\":\"gore\",\"twLabel\":\"Gore\","
+                        + "\"type\":\"STEAM_KEYWORD\",\"value\":\"blood\"}]}],\"keptOff\":[]}");
+
+        var details = service.twDetails("b1");
+
+        assertThat(details.tws()).singleElement().satisfies(t -> {
+            assertThat(t.origin()).isEqualTo("DETECTED");
+            assertThat(t.sources().getFirst().value()).isEqualTo("blood");
+        });
+    }
+
+    @Test
+    void adminTwDtddTopics_readThem_andReplaceThemWithTheirThresholds() {
+        respond(HttpMethod.GET, "/api/internal/admin/tws/gore/dtdd-topics",
+                "[{\"topic\":\"there's blood/gore\",\"minSeverity\":\"Depicted\",\"knownLevels\":[\"Minor\",\"Depicted\"]}]");
+        expectPut("/api/internal/admin/tws/gore/dtdd-topics",
+                "{\"topics\":[\"there's blood/gore\",\"someone dies\"],\"minSeverities\":{\"there's blood/gore\":\"Depicted\"}}");
+
+        assertThat(service.adminTwDtddTopics("gore")).singleElement()
+                .satisfies(t -> assertThat(t.knownLevels()).containsExactly("Minor", "Depicted"));
+        java.util.Map<String, String> topics = new java.util.LinkedHashMap<>();
+        topics.put("there's blood/gore", "Depicted");
+        topics.put("someone dies", null);
+        assertThat(service.adminSetTwDtddTopics("gore", topics)).isEqualTo(204);
     }
 
     @Test

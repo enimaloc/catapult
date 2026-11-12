@@ -31,6 +31,7 @@ public class AdminTwService {
     private static final Pattern SLUG = Pattern.compile("^[a-z0-9_]{1,40}$");
     private static final int LABEL_MAX = 80;
     private static final int TOPIC_MAX = 200;
+    private static final int MIN_SEVERITY_MAX = 40;
     private static final int KEYWORD_MAX = 50;
     private static final Set<Integer> STEAM_IDS = Set.of(1, 2, 3, 4, 5);
 
@@ -89,17 +90,42 @@ public class AdminTwService {
 
     @Transactional
     public void replaceDtddTopics(String twId, Set<String> topics) {
+        replaceDtddTopics(twId, topics, Map.of());
+    }
+
+    /**
+     * Replaces the TW's DTDD topics, each with the least severe level of it that turns the TW on
+     * ({@code minSeverities}, by topic as given; absent or blank: any level).
+     */
+    @Transactional
+    public void replaceDtddTopics(String twId, Set<String> topics, Map<String, String> minSeverities) {
         requireExists(twId);
         dtddRepo.deleteAllByTwId(twId);
+        Set<String> seen = new HashSet<>();
         for (String t : topics) {
             String trimmed = Objects.requireNonNull(t).trim();
             if (trimmed.isEmpty() || trimmed.length() > TOPIC_MAX) continue;
+            if (!seen.add(trimmed.toLowerCase(Locale.ROOT))) continue;
+            String min = minSeverities == null ? null : minSeverities.get(t);
+            min = min == null || min.isBlank() ? null : min.trim();
+            if (min != null && min.length() > MIN_SEVERITY_MAX) {
+                throw new IllegalArgumentException("Severity level too long: " + min);
+            }
             TwDtddTopicMapping m = new TwDtddTopicMapping();
             m.setTwId(twId);
             m.setDtddTopicName(trimmed);
+            m.setMinSeverity(min);
             dtddRepo.save(m);
         }
         definitionsChanged();
+    }
+
+    /** The TW's DTDD topics with their thresholds, by name. */
+    public List<TwDtddTopicMapping> listDtddTopics(String twId) {
+        requireExists(twId);
+        return dtddRepo.findAllByTwId(twId).stream()
+                .sorted(Comparator.comparing(m -> m.getDtddTopicName().toLowerCase(Locale.ROOT)))
+                .toList();
     }
 
     @Transactional
