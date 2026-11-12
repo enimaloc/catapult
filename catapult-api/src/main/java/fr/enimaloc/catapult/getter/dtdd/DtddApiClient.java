@@ -27,5 +27,25 @@ public interface DtddApiClient {
                     long tmdbId, String imdbId, String backgroundImage, String posterImage, String overview,
                     DtddTopicItemStat[] topicItemStats) {}
 
-    record DtddTopicItemStat(long topicItemId, long yesSum, long noSum, long numComments, long topicId, String topicName, long itemId) {}
+    /** A topic's votes on a title; {@code severity}: its level votes, null when the topic has no levels. */
+    record DtddTopicItemStat(long topicItemId, long yesSum, long noSum, long numComments, long topicId, String topicName,
+                             long itemId, DtddSeverity severity) {}
+
+    /**
+     * How severe a topic is on a title, as DTDD's members voted it: {@code levels} the topic's labels, mildest first
+     * ("Implied", "Depicted", "Excessive"…); {@code counts} and {@code percents} the votes for each, by position;
+     * {@code total} the level votes; {@code verified} the level DTDD's reviewers gave (1-based, as a rating's
+     * severity), null when they gave none.
+     */
+    record DtddSeverity(List<String> levels, List<Integer> counts, List<Integer> percents, int total,
+                        Integer verified) {
+
+        /** The reviewers' level as its label, empty when they gave none (or one out of {@code levels}). */
+        public Optional<String> verifiedLevel() {
+            if (verified == null || levels == null || verified < 1 || verified > levels.size()) {
+                return Optional.empty();
+            }
+            return Optional.of(levels.get(verified - 1));
+        }
+    }
 }
