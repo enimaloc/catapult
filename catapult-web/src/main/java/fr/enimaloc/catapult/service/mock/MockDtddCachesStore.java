@@ -7,6 +7,7 @@ import fr.enimaloc.catapult.common.dto.admin.DtddGameCacheEntryDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddKeyQuotaDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddRefetchJobDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddSearchCacheEntryDto;
+import fr.enimaloc.catapult.common.dto.admin.DtddTopicSeverityDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddTopicsCacheEntryDto;
 import fr.enimaloc.catapult.service.http.ApiClient;
 
@@ -17,6 +18,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
@@ -48,7 +50,11 @@ class MockDtddCachesStore {
         this.pageSize = pageSize;
         Instant now = clock.instant();
         topics.add(new DtddTopicsCacheEntryDto(16758, "Halo Infinite", List.of("a dog dies"), List.of("a cat dies"),
-                List.of("jump scares"), now.minus(Duration.ofDays(9)), false));
+                List.of("jump scares"), now.minus(Duration.ofDays(9)), false, Map.of(
+                        "a dog dies", new DtddTopicSeverityDto(List.of("Implied", "Depicted", "Excessive"),
+                                List.of(2, 9, 1), List.of(17, 75, 8), 12, 2),
+                        "jump scares", new DtddTopicSeverityDto(List.of("Mild", "Shown", "Severe"),
+                                List.of(5, 3, 0), List.of(63, 37, 0), 8, null))));
         topics.add(new DtddTopicsCacheEntryDto(20311, "Elden Ring", List.of("gore", "body horror"), List.of(),
                 List.of("spiders"), now.minus(Duration.ofDays(2)), false));
         topics.add(new DtddTopicsCacheEntryDto(18842, null, List.of(), List.of("a dog dies"), List.of(),
@@ -78,7 +84,7 @@ class MockDtddCachesStore {
     synchronized AdminPage<DtddTopicsCacheEntryDto> topics(String q, int page) {
         return page(topics, t -> matches(q, t.dtddId(), t.name()), DtddTopicsCacheEntryDto::fetchedAt, page,
                 t -> new DtddTopicsCacheEntryDto(t.dtddId(), t.name(), t.yesTopics(), t.noTopics(), t.mostlyTopics(),
-                        t.fetchedAt(), isStale(t.fetchedAt(), TOPICS_TTL_HOURS)));
+                        t.fetchedAt(), isStale(t.fetchedAt(), TOPICS_TTL_HOURS), t.severities()));
     }
 
     synchronized AdminPage<DtddGameCacheEntryDto> games(String q, int page) {
@@ -144,7 +150,7 @@ class MockDtddCachesStore {
                     if (i < 0) return 404;
                     DtddTopicsCacheEntryDto t = topics.get(i);
                     topics.set(i, new DtddTopicsCacheEntryDto(id, t.name(), t.yesTopics(), t.noTopics(),
-                            t.mostlyTopics(), now, false));
+                            t.mostlyTopics(), now, false, t.severities()));
                 } else {
                     int i = indexOf(games, g -> g.dtddId() == id);
                     if (i < 0) return 404;

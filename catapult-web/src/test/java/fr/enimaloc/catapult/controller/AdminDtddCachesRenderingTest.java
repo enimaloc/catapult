@@ -187,4 +187,39 @@ class AdminDtddCachesRenderingTest {
         assertThat(render("/spa/admin/dtdd-caches/games", Locale.ENGLISH))
                 .contains("class=\"admin-dc-detail\"", "id=\"admin-dc-dialog\"");
     }
+
+    @Test
+    void aTitleInFull_showsEachTopicsSeverity_theReviewersLevelMarked() throws Exception {
+        var severity = new fr.enimaloc.catapult.common.dto.admin.DtddTopicSeverityDto(
+                List.of("Implied", "Depicted", "Excessive"), List.of(2, 9, 1), List.of(17, 75, 8), 12, 2);
+        when(apiService.adminDtddCacheEntry("topics", "16758")).thenReturn(new DtddCacheEntryDetailDto(16758L, null,
+                null, new DtddTopicsCacheEntryDto(16758, null, List.of("a dog dies", "gore"), List.of(), List.of(), AT,
+                        false, java.util.Map.of("a dog dies", severity)), List.of(), List.of()));
+
+        String html = render("/spa/admin/dtdd-caches/topics/entry?key=16758", Locale.FRENCH);
+
+        assertThat(html).contains("vérifié : Depicted", "Implied 17 % (2)", "Excessive 8 % (1)",
+                "admin-dc-level admin-dc-level-verified", "sans niveaux", "Sévérité votée par les membres");
+        // Only the reviewers' level is marked
+        assertThat(html.split("admin-dc-level-verified", -1)).hasSize(2);
+    }
+
+    @Test
+    void severitiesNotKeptYet_areToldOnce() throws Exception {
+        when(apiService.adminDtddCacheEntry("topics", "7")).thenReturn(new DtddCacheEntryDetailDto(7L, null, null,
+                new DtddTopicsCacheEntryDto(7, null, List.of("gore"), List.of(), List.of(), AT, false), List.of(),
+                List.of()));
+
+        assertThat(render("/spa/admin/dtdd-caches/topics/entry?key=7", Locale.FRENCH))
+                .contains("Sévérité pas encore en cache : refetch l&#39;entrée pour l&#39;avoir.")
+                .doesNotContain("sans niveaux", "admin-dc-levels");
+    }
+
+    @Test
+    void theEntryDialog_isWiderThanTheOthers() throws Exception {
+        when(apiService.adminDtddTopicsCache(any(), anyInt())).thenReturn(new AdminPage<>(List.of(), 0, 0, 0));
+
+        assertThat(render("/spa/admin/dtdd-caches/topics", Locale.ENGLISH))
+                .contains("class=\"admin-dialog admin-dc-dialog\"");
+    }
 }

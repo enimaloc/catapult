@@ -177,19 +177,35 @@
         <div data-admin-value="pagination"><th:block th:replace="~{pages/admin-tab/common :: pagination(${entries})}"></th:block></div>
     </div>
     <!--/* An entry in full: its body comes from /spa/admin/dtdd-caches/{kind}/entry (admin-dtdd-caches.js) */-->
-    <mdui-dialog id="admin-dc-dialog" class="admin-dialog" close-on-overlay-click>
+    <mdui-dialog id="admin-dc-dialog" class="admin-dialog admin-dc-dialog" close-on-overlay-click>
         <div class="admin-dialog-body"></div>
         <mdui-button slot="action" variant="text" class="admin-dialog-close" th:text="#{admin.close}">Close</mdui-button>
     </mdui-dialog>
 </div>
 
-<!--/* A list of topics as chips, "—" when empty. */-->
-<div th:fragment="topicList(label, topics)" class="admin-dc-topic-list">
+<!--/*
+  A list of topics, "—" when empty, each with its severity: every level's share of the votes (and the votes), the
+  reviewers' one marked; {@code severities} null when they weren't kept (nothing told per topic then).
+*/-->
+<div th:fragment="topicList(label, topics, severities)" class="admin-dc-topic-list">
     <h4 th:text="${label}">Yes</h4>
     <p class="admin-cell-muted" th:if="${topics == null or topics.isEmpty()}">—</p>
-    <div class="admin-dc-chips" th:unless="${topics == null or topics.isEmpty()}">
-        <mdui-chip th:each="t : ${topics}" th:text="${t}">topic</mdui-chip>
-    </div>
+    <ul class="admin-dc-topic-items" th:unless="${topics == null or topics.isEmpty()}">
+        <li th:each="t : ${topics}" th:with="sev=${severities == null ? null : severities.get(t)}">
+            <span class="admin-dc-topic-name" th:text="${t}">topic</span>
+            <th:block th:if="${sev != null}">
+                <mdui-chip th:if="${sev.verifiedLevel() != null}" icon="verified" class="admin-dc-verified"
+                           th:text="#{admin.dtdd-caches.severity.verified(${sev.verifiedLevel()})}">verified</mdui-chip>
+                <div class="admin-dc-levels">
+                    <span th:each="l, it : ${sev.levels()}" class="admin-dc-level"
+                          th:classappend="${sev.verified() != null and sev.verified() == it.count} ? 'admin-dc-level-verified'"
+                          th:text="#{admin.dtdd-caches.severity.level(${l}, ${it.index < sev.percents().size() ? sev.percents()[it.index] : 0}, ${it.index < sev.counts().size() ? sev.counts()[it.index] : 0})}">Implied 17 % (2)</span>
+                </div>
+            </th:block>
+            <span class="admin-cell-muted" th:if="${severities != null and sev == null}"
+                  th:text="#{admin.dtdd-caches.severity.none}">no levels</span>
+        </li>
+    </ul>
 </div>
 
 <!--/*
@@ -223,10 +239,12 @@
         <p class="admin-cell-muted" th:if="${topics == null}" th:text="#{admin.dtdd-caches.detail.not_cached}">not cached</p>
         <th:block th:if="${topics != null}">
             <p><th:block th:replace="~{:: when(${topics.fetchedAt()}, ${topics.stale()})}"></th:block></p>
+            <p class="admin-cell-muted" th:if="${topics.severities() == null}" th:text="#{admin.dtdd-caches.severity.not_kept}">not kept</p>
+            <p class="admin-cell-muted" th:if="${topics.severities() != null}" th:text="#{admin.dtdd-caches.severity.hint}">hint</p>
             <div class="admin-dc-topic-lists">
-                <th:block th:replace="~{:: topicList(#{admin.dtdd-caches.column.yes}, ${topics.yesTopics()})}"></th:block>
-                <th:block th:replace="~{:: topicList(#{admin.dtdd-caches.column.no}, ${topics.noTopics()})}"></th:block>
-                <th:block th:replace="~{:: topicList(#{admin.dtdd-caches.column.mostly}, ${topics.mostlyTopics()})}"></th:block>
+                <th:block th:replace="~{:: topicList(#{admin.dtdd-caches.column.yes}, ${topics.yesTopics()}, ${topics.severities()})}"></th:block>
+                <th:block th:replace="~{:: topicList(#{admin.dtdd-caches.column.no}, ${topics.noTopics()}, ${topics.severities()})}"></th:block>
+                <th:block th:replace="~{:: topicList(#{admin.dtdd-caches.column.mostly}, ${topics.mostlyTopics()}, ${topics.severities()})}"></th:block>
             </div>
         </th:block>
 
