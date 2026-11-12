@@ -176,6 +176,7 @@ public class MockApiService implements ApiService {
     private final MockDtddProposalsStore dtddProposals = new MockDtddProposalsStore();
     /** Application-wide: the game mappings an admin edits are the same for every mock session. */
     private final MockGameMappingsStore gameMappings = new MockGameMappingsStore();
+    private final MockDtddCachesStore dtddCaches = new MockDtddCachesStore();
     /** Application-wide: the groups an admin creates are the same for every mock session. */
     private final MockGroupsStore groups = new MockGroupsStore();
     /** Application-wide: the experiments an admin edits are the same for every mock session. */
@@ -387,6 +388,36 @@ public class MockApiService implements ApiService {
         data.setBindingTws(bindingId, tws);
         eventPublisher.publishEvent(new TwUpdatedEvent(data.getChannelDto().twitchUsername(), bindingId, tws));
         return NO_CONTENT;
+    }
+
+    /**
+     * The mock's TWs explained: each one the binding has detected by a sample source (the first by Steam and a DTDD
+     * topic over its threshold), and jump scares kept off by a DTDD topic under its own.
+     */
+    @Override
+    public fr.enimaloc.catapult.common.dto.channel.TwDetailsDto twDetails(String bindingId) {
+        log.trace("twDetails({})", bindingId);
+        BindingDto binding = currentData().bindingById(bindingId);
+        if (binding == null) return null;
+        Map<String, String> labels = new HashMap<>();
+        MockPresets.AVAILABLE_TWS.forEach(t -> labels.put(t.id(), t.label()));
+        List<fr.enimaloc.catapult.common.dto.channel.TwDetailsDto.Tw> tws = new ArrayList<>();
+        for (String id : binding.tws()) {
+            String label = labels.getOrDefault(id, id);
+            List<fr.enimaloc.catapult.common.dto.channel.TwDetailsDto.Source> sources = tws.isEmpty()
+                    ? List.of(new fr.enimaloc.catapult.common.dto.channel.TwDetailsDto.Source(id, label, "STEAM_CONTENT", "2", null),
+                            new fr.enimaloc.catapult.common.dto.channel.TwDetailsDto.Source(id, label, "DTDD_TOPIC",
+                                    "there's blood/gore", new fr.enimaloc.catapult.common.dto.channel.TwDetailsDto.Severity(
+                                            "VOTES", "Depicted", "Excessive", 12, 83)))
+                    : List.of(new fr.enimaloc.catapult.common.dto.channel.TwDetailsDto.Source(id, label, "STEAM_KEYWORD", id, null));
+            tws.add(new fr.enimaloc.catapult.common.dto.channel.TwDetailsDto.Tw(id, label, true,
+                    binding.twOverride() ? "STREAMER" : "DETECTED", binding.twOverride() ? List.of() : sources));
+        }
+        return new fr.enimaloc.catapult.common.dto.channel.TwDetailsDto(binding.twOverride(), tws, List.of(
+                new fr.enimaloc.catapult.common.dto.channel.TwDetailsDto.Source("jumpscares",
+                        labels.getOrDefault("jumpscares", "Jump scares"), "DTDD_TOPIC", "there are jump scares",
+                        new fr.enimaloc.catapult.common.dto.channel.TwDetailsDto.Severity("BELOW_VOTES", "Startling", "Mild",
+                                9, 22))));
     }
 
     @Override
@@ -785,6 +816,54 @@ public class MockApiService implements ApiService {
     public ApiClient.Result<GameMappingResult> adminDeleteGameMapping(UUID id, boolean applyLive) {
         log.trace("adminDeleteGameMapping({}, {})", id, applyLive);
         return gameMappings.delete(id, applyLive);
+    }
+
+    @Override
+    public fr.enimaloc.catapult.common.dto.admin.DtddCachesSummaryDto adminDtddCaches() {
+        log.trace("adminDtddCaches()");
+        return dtddCaches.summary();
+    }
+
+    @Override
+    public AdminPage<fr.enimaloc.catapult.common.dto.admin.DtddTopicsCacheEntryDto> adminDtddTopicsCache(String q, int page) {
+        log.trace("adminDtddTopicsCache({}, {})", q, page);
+        return dtddCaches.topics(q, page);
+    }
+
+    @Override
+    public AdminPage<fr.enimaloc.catapult.common.dto.admin.DtddGameCacheEntryDto> adminDtddGamesCache(String q, int page) {
+        log.trace("adminDtddGamesCache({}, {})", q, page);
+        return dtddCaches.games(q, page);
+    }
+
+    @Override
+    public AdminPage<fr.enimaloc.catapult.common.dto.admin.DtddSearchCacheEntryDto> adminDtddSearchesCache(String q, int page) {
+        log.trace("adminDtddSearchesCache({}, {})", q, page);
+        return dtddCaches.searches(q, page);
+    }
+
+    @Override
+    public int adminRefetchDtddCache(String kind, String key) {
+        log.trace("adminRefetchDtddCache({}, {})", kind, key);
+        return dtddCaches.refetch(kind, key);
+    }
+
+    @Override
+    public fr.enimaloc.catapult.common.dto.admin.DtddCacheEntryDetailDto adminDtddCacheEntry(String kind, String key) {
+        log.trace("adminDtddCacheEntry({}, {})", kind, key);
+        return dtddCaches.detail(kind, key);
+    }
+
+    @Override
+    public ApiClient.Result<fr.enimaloc.catapult.common.dto.admin.DtddRefetchJobDto> adminStartDtddRefetch() {
+        log.trace("adminStartDtddRefetch()");
+        return dtddCaches.start();
+    }
+
+    @Override
+    public ApiClient.Result<fr.enimaloc.catapult.common.dto.admin.DtddRefetchJobDto> adminCancelDtddRefetch() {
+        log.trace("adminCancelDtddRefetch()");
+        return dtddCaches.cancel();
     }
 
     @Override
@@ -1707,6 +1786,18 @@ public class MockApiService implements ApiService {
     public List<String> adminTwKeywords(String id) {
         log.trace("adminTwKeywords({})", id);
         return tws.keywords(id);
+    }
+
+    @Override
+    public List<fr.enimaloc.catapult.common.dto.admin.TwDtddTopicDto> adminTwDtddTopics(String id) {
+        log.trace("adminTwDtddTopics({})", id);
+        return tws.dtddTopics(id);
+    }
+
+    @Override
+    public int adminSetTwDtddTopics(String id, Map<String, String> minByTopic) {
+        log.trace("adminSetTwDtddTopics({}, {})", id, minByTopic);
+        return tws.setDtddTopics(id, minByTopic);
     }
 
     @Override

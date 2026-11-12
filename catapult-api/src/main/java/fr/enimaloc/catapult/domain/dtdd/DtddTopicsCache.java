@@ -7,6 +7,7 @@ import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 @Entity
 @Table(name = "dtdd_topics_cache")
@@ -34,4 +35,15 @@ public class DtddTopicsCache {
 
     @Column(name = "fetched_at", nullable = false)
     private Instant fetchedAt;
+
+    /** Each topic's severity by its name; null when fetched before they were kept, a topic without levels absent. */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "severities", columnDefinition = "jsonb")
+    private Map<String, DtddTopicSeverity> severities;
+
+    /** Topics without their severities. */
+    public DtddTopicsCache(Long dtddId, List<String> yesTopics, List<String> noTopics, List<String> mostlyTopics,
+                           Instant fetchedAt) {
+        this(dtddId, yesTopics, noTopics, mostlyTopics, fetchedAt, null);
+    }
 }

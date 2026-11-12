@@ -35,6 +35,12 @@ import fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
 import fr.enimaloc.catapult.common.dto.admin.DetectedGameDto;
+import fr.enimaloc.catapult.common.dto.admin.DtddCacheEntryDetailDto;
+import fr.enimaloc.catapult.common.dto.admin.DtddCachesSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.DtddGameCacheEntryDto;
+import fr.enimaloc.catapult.common.dto.admin.DtddRefetchJobDto;
+import fr.enimaloc.catapult.common.dto.admin.DtddSearchCacheEntryDto;
+import fr.enimaloc.catapult.common.dto.admin.DtddTopicsCacheEntryDto;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingDto;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingRequest;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingResult;
@@ -83,6 +89,8 @@ public interface ApiService {
     int updateBinding(String username, String bindingId, String twitchGameId, String twitchGameName, java.util.Set<String> ccls);
     int saveTws(String bindingId, java.util.Set<String> tws);
     int resetTws(String bindingId);
+    /** Why the caller's binding has its TWs, as the detection tells it now; null when it isn't theirs or catapult-api fails. */
+    fr.enimaloc.catapult.common.dto.channel.TwDetailsDto twDetails(String bindingId);
     int resetBinding(String bindingId);
     int toggleTwEnabled(String bindingId, boolean enabled);
     int saveSteamToken(String username, String token, boolean shared);
@@ -345,6 +353,30 @@ public interface ApiService {
     /** catapult-api's status (200; 404 unknown) and result (no mapping), 502 when unreachable. */
     ApiClient.Result<GameMappingResult> adminDeleteGameMapping(UUID id, boolean applyLive);
 
+    /** The DTDD caches' sizes and stale entries, the keys' quotas and the bulk refetch; null when catapult-api fails. */
+    DtddCachesSummaryDto adminDtddCaches();
+    /** One page of the cached DTDD topics matching {@code q}, the oldest first; null when catapult-api fails. */
+    AdminPage<DtddTopicsCacheEntryDto> adminDtddTopicsCache(String q, int page);
+    /** One page of the cached DTDD titles matching {@code q}, the oldest first; null when catapult-api fails. */
+    AdminPage<DtddGameCacheEntryDto> adminDtddGamesCache(String q, int page);
+    /** One page of the cached DTDD searches matching {@code q}, the oldest first; null when catapult-api fails. */
+    AdminPage<DtddSearchCacheEntryDto> adminDtddSearchesCache(String q, int page);
+    /**
+     * Fetches a cached DTDD entry again ({@code kind}: topics, games, searches; {@code key}: the title's ID or the
+     * search's query): catapult-api's status (200; 400 not an ID; 404 not cached; 502 DTDD gave nothing; 503 DTDD
+     * off), 502 when unreachable.
+     */
+    int adminRefetchDtddCache(String kind, String key);
+    /**
+     * Everything the DTDD caches keep about an entry ({@code kind}: topics, games, searches; {@code key}: the title's
+     * ID or the search's query); null when it isn't cached or catapult-api fails.
+     */
+    DtddCacheEntryDetailDto adminDtddCacheEntry(String kind, String key);
+    /** catapult-api's status (202; 409 one runs already; 503 DTDD off) and the refetch, 502 when unreachable. */
+    ApiClient.Result<DtddRefetchJobDto> adminStartDtddRefetch();
+    /** catapult-api's status (200) and the refetch asked to stop, 502 when unreachable. */
+    ApiClient.Result<DtddRefetchJobDto> adminCancelDtddRefetch();
+
     /** The member groups, with their member counts; null when catapult-api fails. */
     List<GroupSummaryDto> adminGroups();
     /** catapult-api's status (201; 400 blank key; 409 key already used), 502 when unreachable. */
@@ -486,6 +518,13 @@ public interface ApiService {
     int adminCancelTwRebuild();
     /** A definition's Steam keywords, sorted; null when unknown or when catapult-api fails. */
     List<String> adminTwKeywords(String id);
+    /** A TW's DTDD topics with their least severe level and the levels known for each; null when catapult-api fails. */
+    List<fr.enimaloc.catapult.common.dto.admin.TwDtddTopicDto> adminTwDtddTopics(String id);
+    /**
+     * Replaces a TW's DTDD topics, each with its least severe level ({@code minByTopic}: null or blank, any):
+     * catapult-api's status (204), 502 when unreachable.
+     */
+    int adminSetTwDtddTopics(String id, Map<String, String> minByTopic);
     /** Adds a keyword (already there changes nothing); catapult-api's status (204), 502 when unreachable. */
     int adminAddTwKeyword(String id, String keyword);
     /** Removes a keyword (also an absent one); catapult-api's status (204), 502 when unreachable. */

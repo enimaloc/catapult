@@ -122,6 +122,7 @@ class RealApiServiceTest {
         assertThat(service.enabledChatCommands()).isEmpty();
         // The TW overrides are the member's own too.
         assertThat(service.saveTws("b1", Set.of("spiders"))).isEqualTo(401);
+        assertThat(service.twDetails("b1")).isNull();
         // api.verify() in the teardown, and the mock server refusing any request it did not expect: none was sent.
     }
 
@@ -622,6 +623,36 @@ class RealApiServiceTest {
     }
 
     @Test
+    void twDetails_readWhyTheBindingHasItsTws() {
+        respond(HttpMethod.GET, OWN + "/bindings/b1/tws/details",
+                "{\"streamerChose\":false,\"tws\":[{\"id\":\"gore\",\"label\":\"Gore\",\"active\":true,"
+                        + "\"origin\":\"DETECTED\",\"sources\":[{\"twId\":\"gore\",\"twLabel\":\"Gore\","
+                        + "\"type\":\"STEAM_KEYWORD\",\"value\":\"blood\"}]}],\"keptOff\":[]}");
+
+        var details = service.twDetails("b1");
+
+        assertThat(details.tws()).singleElement().satisfies(t -> {
+            assertThat(t.origin()).isEqualTo("DETECTED");
+            assertThat(t.sources().getFirst().value()).isEqualTo("blood");
+        });
+    }
+
+    @Test
+    void adminTwDtddTopics_readThem_andReplaceThemWithTheirThresholds() {
+        respond(HttpMethod.GET, "/api/internal/admin/tws/gore/dtdd-topics",
+                "[{\"topic\":\"there's blood/gore\",\"minSeverity\":\"Depicted\",\"knownLevels\":[\"Minor\",\"Depicted\"]}]");
+        expectPut("/api/internal/admin/tws/gore/dtdd-topics",
+                "{\"topics\":[\"there's blood/gore\",\"someone dies\"],\"minSeverities\":{\"there's blood/gore\":\"Depicted\"}}");
+
+        assertThat(service.adminTwDtddTopics("gore")).singleElement()
+                .satisfies(t -> assertThat(t.knownLevels()).containsExactly("Minor", "Depicted"));
+        java.util.Map<String, String> topics = new java.util.LinkedHashMap<>();
+        topics.put("there's blood/gore", "Depicted");
+        topics.put("someone dies", null);
+        assertThat(service.adminSetTwDtddTopics("gore", topics)).isEqualTo(204);
+    }
+
+    @Test
     void resetTws() {
         expectDelete(OWN + "/bindings/b1/tws");
         service.resetTws("b1");
@@ -1059,6 +1090,49 @@ class RealApiServiceTest {
                 "{\"content\":[],\"number\":0,\"totalPages\":0,\"totalElements\":0}");
 
         assertThat(service.adminCacheEntries("igdb-game-cache", null, 0).content()).isEmpty();
+    }
+
+    @Test
+    void adminDtddCaches_readTheSummaryAndEachCachePage() {
+        respond(HttpMethod.GET, "/api/internal/admin/dtdd-caches",
+                "{\"topics\":4,\"topicsStale\":1,\"games\":3,\"gamesStale\":0,\"searches\":2,\"searchesStale\":2,"
+                        + "\"topicsTtlHours\":168,\"gamesTtlHours\":4320,\"searchesTtlHours\":720,\"quotas\":[],"
+                        + "\"monthlyReserve\":500,\"job\":{\"state\":\"IDLE\",\"total\":0,\"done\":0,\"failed\":0}}");
+        respond(HttpMethod.GET, "/api/internal/admin/dtdd-caches/topics?q=halo&page=1&size=20",
+                "{\"content\":[{\"dtddId\":7,\"name\":\"Halo\",\"yesTopics\":[\"gore\"],\"noTopics\":[],"
+                        + "\"mostlyTopics\":[],\"stale\":true}],\"number\":1,\"totalPages\":2,\"totalElements\":21}");
+        respond(HttpMethod.GET, "/api/internal/admin/dtdd-caches/games?q=&page=0&size=20",
+                "{\"content\":[{\"dtddId\":7,\"name\":\"Halo\",\"mediaType\":\"Video Game\",\"stale\":false}],"
+                        + "\"number\":0,\"totalPages\":1,\"totalElements\":1}");
+        respond(HttpMethod.GET, "/api/internal/admin/dtdd-caches/searches?q=&page=0&size=20",
+                "{\"content\":[{\"query\":\"halo\",\"dtddIds\":[7],\"stale\":false}],"
+                        + "\"number\":0,\"totalPages\":1,\"totalElements\":1}");
+
+        assertThat(service.adminDtddCaches().topicsStale()).isEqualTo(1L);
+        assertThat(service.adminDtddTopicsCache("halo", 1).content().getFirst().yesTopics()).containsExactly("gore");
+        assertThat(service.adminDtddGamesCache(null, 0).content().getFirst().mediaType()).isEqualTo("Video Game");
+        assertThat(service.adminDtddSearchesCache(null, 0).content().getFirst().dtddIds()).containsExactly(7L);
+    }
+
+    @Test
+    void adminDtddCaches_refetchAnEntry_andStartOrStopTheFullRefetch() {
+        expect(HttpMethod.POST, "/api/internal/admin/dtdd-caches/searches/refetch?key=halo%20infinite")
+                .andRespond(withStatus(HttpStatus.OK));
+        expect(HttpMethod.POST, "/api/internal/admin/dtdd-caches/refetch-all")
+                .andRespond(withStatus(HttpStatus.ACCEPTED).contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"state\":\"RUNNING\",\"total\":9,\"done\":0,\"failed\":0}"));
+        expect(HttpMethod.DELETE, "/api/internal/admin/dtdd-caches/refetch-all")
+                .andRespond(withSuccess("{\"state\":\"CANCELLED\",\"total\":9,\"done\":2,\"failed\":0}",
+                        MediaType.APPLICATION_JSON));
+        respond(HttpMethod.GET, "/api/internal/admin/dtdd-caches/topics/entry?key=7",
+                "{\"dtddId\":7,\"searches\":[],\"titles\":[]}");
+
+        assertThat(service.adminRefetchDtddCache("searches", "halo infinite")).isEqualTo(200);
+        var started = service.adminStartDtddRefetch();
+        assertThat(started.status()).isEqualTo(202);
+        assertThat(started.body().total()).isEqualTo(9);
+        assertThat(service.adminCancelDtddRefetch().body().state()).isEqualTo("CANCELLED");
+        assertThat(service.adminDtddCacheEntry("topics", "7").dtddId()).isEqualTo(7L);
     }
 
     @Test

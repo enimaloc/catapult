@@ -32,11 +32,16 @@ public class GameMapping {
     @Column(name = "source_id", nullable = false)
     private String sourceId;
 
-    @Column(name = "twitch_game_id", nullable = false)
+    /** null (with {@link #twitchGameName}) only when {@link #ignoredByDefault}: the bindings keep IGDB's category. */
+    @Column(name = "twitch_game_id")
     private String twitchGameId;
 
-    @Column(name = "twitch_game_name", nullable = false)
+    @Column(name = "twitch_game_name")
     private String twitchGameName;
+
+    /** true: the game's bindings are ignored, but those whose streamer chose ({@link GameBinding#isIgnoredOverride}). */
+    @Column(name = "ignored_by_default", nullable = false)
+    private boolean ignoredByDefault = false;
 
     /** false: the bindings keep IGDB's CCLs; true: they get {@link #ccls}, even when empty. */
     @Column(name = "ccls_overridden", nullable = false)
@@ -73,4 +78,9 @@ public class GameMapping {
     /** The admin who last saved it. */
     @Column(name = "updated_by")
     private UUID updatedBy;
+
+    /** Whether it sets its bindings' category, else they keep IGDB's (an ignore-only mapping). */
+    public boolean hasCategory() {
+        return twitchGameId != null;
+    }
 }

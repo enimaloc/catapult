@@ -643,6 +643,23 @@ class ChannelDashboardAssemblerTest {
             verify(streamTitle, never()).conditionsAvailableFor(owner);
         }
 
+        /** The title's drops are read only with its conditions (StreamTitleService#context): the help says the same. */
+        @Test
+        void streamTitle_offersTheDropsOnlyWithTheConditions() {
+            when(streamTitle.isAvailableFor(owner)).thenReturn(true);
+            when(dropsGate.isAvailableFor(owner)).thenReturn(true);
+
+            when(streamTitle.conditionsAvailableFor(owner)).thenReturn(true);
+            UserSettingsDto both = assembler().settings(owner);
+            when(streamTitle.conditionsAvailableFor(owner)).thenReturn(false);
+            UserSettingsDto noConditions = assembler().settings(owner);
+
+            assertThat(both.titleConditionsAvailable()).isTrue();
+            assertThat(both.titleDropsAvailable()).isTrue();
+            assertThat(noConditions.titleConditionsAvailable()).isFalse();
+            assertThat(noConditions.titleDropsAvailable()).isFalse();
+        }
+
         @Test
         void raidRestore_isOfferedOnlyWhileTheExperimentIsOnForTheChannel() {
             UserSettings saved = new UserSettings();

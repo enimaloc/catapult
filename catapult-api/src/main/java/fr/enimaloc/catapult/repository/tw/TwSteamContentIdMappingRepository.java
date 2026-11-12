@@ -15,5 +15,8 @@ public interface TwSteamContentIdMappingRepository extends JpaRepository<TwSteam
     @Query("SELECT DISTINCT m.twId FROM TwSteamContentIdMapping m WHERE m.steamContentId IN :ids")
     Set<String> findTwIdsBySteamContentIdIn(@Param("ids") Set<Integer> contentIds);
 
+    /** The mappings of these Steam content descriptors, each one with its TW. */
+    List<TwSteamContentIdMapping> findAllBySteamContentIdIn(Set<Integer> contentIds);
+
     void deleteAllByTwId(String twId);
 }

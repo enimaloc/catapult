@@ -23,6 +23,7 @@ public class DtddApiKeyRotator {
     private final DtddApiKeyRepository repository;
     private final MeterRegistry meterRegistry;
     private final Map<String, Long> keyBlockedUntil = new ConcurrentHashMap<>();
+    private final Map<String, Quota> quotas = new ConcurrentHashMap<>();
     private final AtomicInteger counter = new AtomicInteger(0);
     private volatile List<String> keys = List.of();
 
@@ -86,6 +87,66 @@ public class DtddApiKeyRotator {
         if (snapshot.isEmpty()) return false;
         long now = System.currentTimeMillis();
         return snapshot.stream().allMatch(k -> keyBlockedUntil.getOrDefault(k, 0L) > now);
+    }
+
+    /**
+     * What DTDD said was left of a key's quota with its last answer ({@code X-RateLimit-Remaining-*}), null when it
+     * didn't say; {@code at} when it said it (epoch ms).
+     */
+    public record Quota(Integer remainingMinute, Integer remainingMonth, long at) {}
+
+    /**
+     * Remembers what DTDD said was left of {@code key}'s quota. Nothing left this minute: the key rests until the
+     * next one instead of asking for a 429.
+     */
+    public void onQuota(String key, Integer remainingMinute, Integer remainingMonth) {
+        if (remainingMinute == null && remainingMonth == null) return;
+        long now = System.currentTimeMillis();
+        quotas.put(key, new Quota(remainingMinute, remainingMonth, now));
+        if (remainingMinute != null && remainingMinute <= 0) {
+            keyBlockedUntil.merge(key, now + 60_000L, Math::max);
+        }
+    }
+
+    /** Each key's last known quota (keys DTDD never answered for are absent). */
+    public Map<String, Quota> getQuotas() {
+        return Map.copyOf(quotas);
+    }
+
+    /**
+     * A key usable now that keeps more than {@code monthlyReserve} requests of its month (one whose month is unknown
+     * counts as keeping them), round robin; empty when none is — for bulk work, which must leave the reserve to the
+     * detection. Unlike {@link #nextKey}, never a blocked one.
+     */
+    public Optional<String> nextKeyAbove(int monthlyReserve) {
+        long now = System.currentTimeMillis();
+        List<String> available = keys.stream()
+            .filter(k -> aboveReserve(k, monthlyReserve))
+            .filter(k -> keyBlockedUntil.getOrDefault(k, 0L) <= now)
+            .toList();
+        if (available.isEmpty()) return Optional.empty();
+        return Optional.of(available.get(Math.floorMod(counter.getAndIncrement(), available.size())));
+    }
+
+    /**
+     * When a key that keeps more than {@code monthlyReserve} requests of its month is usable (epoch ms, now or
+     * earlier when one already is); empty when no key keeps them: the month is spent down to the reserve.
+     */
+    public Optional<Long> nextUsableAt(int monthlyReserve) {
+        return keys.stream()
+            .filter(k -> aboveReserve(k, monthlyReserve))
+            .map(k -> keyBlockedUntil.getOrDefault(k, 0L))
+            .min(Long::compare);
+    }
+
+    /** How many keys keep more than {@code monthlyReserve} requests of their month, blocked or not. */
+    public int keysAbove(int monthlyReserve) {
+        return (int) keys.stream().filter(k -> aboveReserve(k, monthlyReserve)).count();
+    }
+
+    private boolean aboveReserve(String key, int monthlyReserve) {
+        Quota quota = quotas.get(key);
+        return quota == null || quota.remainingMonth() == null || quota.remainingMonth() > monthlyReserve;
     }
 
     public void onKeyRateLimited(String key, int retryAfterSeconds) {

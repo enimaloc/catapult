@@ -99,11 +99,16 @@ describe("channel-bindings", () => {
                       <input type="checkbox" class="binding-tw-checkbox" value="spiders" checked>
                       <input type="checkbox" class="binding-tw-checkbox" value="flashing">
                       <button class="binding-tw-reset-btn"></button>
+                      <button class="binding-tw-details-btn"></button>
                     </div>
                   </mdui-list-item>
                 </mdui-collapse-item>
               </mdui-collapse>
-            </ul>`);
+            </ul>
+            <mdui-dialog id="binding-tw-details-dialog" data-unavailable="No details">
+              <div class="tw-details-body"></div>
+              <button class="binding-tw-details-close"></button>
+            </mdui-dialog>`);
         render();
     });
 
@@ -229,6 +234,28 @@ describe("channel-bindings", () => {
             ["/channel/bindings/b1/tws", { tws: ["spiders", "flashing"] }],
             ["/channel/bindings/b1/tws/reset", {}],
         ]);
+    });
+
+    it("opens why the binding has its TWs in the dialog, and closes it", async () => {
+        fetch.mockResolvedValueOnce(response(200, "<section class='tw-details-tw'>Gore</section>"));
+        await click("[data-binding-id=b1] .binding-tw-details-btn");
+
+        expect(fetch).toHaveBeenCalledWith("/spa/channel/bindings/b1/tw-details");
+        const dialog = document.getElementById("binding-tw-details-dialog");
+        expect(dialog.querySelector(".tw-details-tw").textContent).toBe("Gore");
+        expect(dialog.open).toBe(true);
+        expect(posts()).toEqual([]);
+
+        await click("#binding-tw-details-dialog .binding-tw-details-close");
+        expect(dialog.open).toBe(false);
+    });
+
+    it("tells when the TWs' details can't be had", async () => {
+        fetch.mockResolvedValueOnce(response(502, ""));
+        await click("[data-binding-id=b1] .binding-tw-details-btn");
+
+        expect(document.querySelector("mdui-snackbar")?.textContent).toBe("No details");
+        expect(document.getElementById("binding-tw-details-dialog").open).not.toBe(true);
     });
 
     it("mirrors the accordion's open state as .is-open", () => {

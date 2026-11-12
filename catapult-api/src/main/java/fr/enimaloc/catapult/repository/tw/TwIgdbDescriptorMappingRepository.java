@@ -15,5 +15,8 @@ public interface TwIgdbDescriptorMappingRepository extends JpaRepository<TwIgdbD
     @Query("SELECT DISTINCT m.twId FROM TwIgdbDescriptorMapping m WHERE m.descriptorId IN :ids")
     Set<String> findTwIdsByDescriptorIds(@Param("ids") Set<Long> descriptorIds);
 
+    /** The mappings of these IGDB descriptors, each one with its TW. */
+    List<TwIgdbDescriptorMapping> findAllByDescriptorIdIn(Set<Long> descriptorIds);
+
     void deleteAllByTwId(String twId);
 }

@@ -170,7 +170,8 @@ public class GameInfoAssembler {
                 item.map(DtddApiClient.DtddItem::imdbId).orElse(null),
                 item.map(DtddApiClient.DtddItem::posterImage).orElse(null),
                 item.map(DtddApiClient.DtddItem::backgroundImage).orElse(null),
-                item.map(DtddApiClient.DtddItem::topicItemStats).orElse(null)));
+                item.map(DtddApiClient.DtddItem::topicItemStats).map(DtddDetailResponse.DtddTopicItemStat::of)
+                        .orElse(null)));
     }
 
     /** The binding's tw/ccl configuration, empty when there is no binding with that id. */

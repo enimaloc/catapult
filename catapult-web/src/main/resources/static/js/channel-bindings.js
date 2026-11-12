@@ -8,6 +8,26 @@ document.addEventListener("catapult:render", function () {
     let resetting = null;
 
     resetDialog?.querySelector(".binding-reset-dismiss").addEventListener("click", () => { resetDialog.open = false; });
+
+    // Why a binding has its TWs: catapult-web renders it (as catapult-api tells it now) into the dialog
+    const twDetailsDialog = document.getElementById("binding-tw-details-dialog");
+    twDetailsDialog?.querySelector(".binding-tw-details-close").addEventListener("click", () => { twDetailsDialog.open = false; });
+
+    async function showTwDetails(row) {
+        if (!twDetailsDialog) return;
+        let response = null;
+        try {
+            response = await fetch(`/spa/channel/bindings/${encodeURIComponent(row.dataset.bindingId)}/tw-details`);
+        } catch {
+            // not fetched: told below
+        }
+        if (!response?.ok) {
+            CatapultChannel.showError(twDetailsDialog.dataset.unavailable);
+            return;
+        }
+        twDetailsDialog.querySelector(".tw-details-body").innerHTML = await response.text();
+        twDetailsDialog.open = true;
+    }
     resetDialog?.querySelector(".binding-reset-confirm").addEventListener("click", async () => {
         const row = resetting;
         resetDialog.open = false;
@@ -138,6 +158,8 @@ document.addEventListener("catapult:render", function () {
 
             panel.querySelector(".binding-tw-reset-btn").addEventListener("click", () =>
                 postJson(twUrl(row, "tws/reset"), {}));
+
+            panel.querySelector(".binding-tw-details-btn")?.addEventListener("click", () => showTwDetails(row));
         });
     }
 });

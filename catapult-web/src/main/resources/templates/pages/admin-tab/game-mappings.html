@@ -4,7 +4,7 @@
 <!--/*@thymesVar id="twLabels" type="java.util.Map<java.lang.String, java.lang.String>"*/-->
 <!--/*
   The admin game mappings: a detected game (platform + its ID) set to a Twitch category for every streamer, its
-  CCLs and TWs IGDB's or the admin's. Two paged lists, each with its own page (data-page / data-missing-page, kept
+  CCLs and TWs IGDB's or the admin's, and/or ignored by default (its category then optional). Two paged lists, each with its own page (data-page / data-missing-page, kept
   for the reloads after an action): the mappings, edited or deleted from their row, and the detected games still
   missing one, each a button opening the form filled with its platform and ID. The form and the deletion's
   confirmation are dialogs outside [data-gm-lists], so a reload of the lists leaves an open one (and its result) as is.
@@ -49,7 +49,7 @@
             <div class="admin-row admin-gm-row" th:each="m : ${mappings.content()}"
                  th:attr="data-id=${m.id()},data-admin-key=${m.id()},data-source-type=${m.sourceType()},data-source-id=${m.sourceId()},
                           data-source-name=${m.sourceName()},data-twitch-game-id=${m.twitchGameId()},
-                          data-twitch-game-name=${m.twitchGameName()},
+                          data-twitch-game-name=${m.twitchGameName()},data-ignored-by-default=${m.ignoredByDefault() ? 'true' : null},
                           data-ccls-override=${m.ccls() == null ? null : 'true'},data-ccls=${m.ccls() == null ? null : #strings.setJoin(m.ccls(), ',')},
                           data-tws-override=${m.tws() == null ? null : 'true'},data-tws=${m.tws() == null ? null : #strings.setJoin(m.tws(), ',')}">
                 <span class="admin-cell" th:attr="data-label=#{admin.game-mappings.column.platform}"
@@ -57,7 +57,11 @@
                 <span class="admin-cell admin-member-id" th:attr="data-label=#{admin.game-mappings.column.id}" th:text="${m.sourceId()}">730</span>
                 <span class="admin-cell" th:attr="data-label=#{admin.game-mappings.column.name}"
                       th:text="${m.sourceName() == null ? #messages.msg('admin.game-mappings.never-detected') : m.sourceName()}">name</span>
-                <span class="admin-cell" th:attr="data-label=#{admin.game-mappings.column.category}" th:text="${m.twitchGameName()}">category</span>
+                <span class="admin-cell admin-gm-category" th:attr="data-label=#{admin.game-mappings.column.category}">
+                    <span th:if="${m.twitchGameName() != null}" th:text="${m.twitchGameName()}">category</span>
+                    <mdui-chip th:if="${m.ignoredByDefault()}" icon="visibility_off" class="admin-gm-ignored"
+                               th:text="#{admin.game-mappings.ignored}">Ignored by default</mdui-chip>
+                </span>
                 <span class="admin-gm-labels" th:attr="data-label=#{admin.game-mappings.column.ccls}">
                     <span th:if="${m.ccls() == null}" class="admin-cell-muted" th:text="#{admin.game-mappings.igdb}">IGDB</span>
                     <span th:if="${m.ccls() != null and m.ccls().isEmpty()}" th:text="#{admin.game-mappings.none}">None</span>
@@ -134,6 +138,11 @@
                 <span class="admin-cell-muted admin-gm-game-name"></span>
                 <mdui-list class="admin-gm-suggestions"></mdui-list>
             </div>
+            <label class="admin-gm-switch">
+                <mdui-switch name="ignoredByDefault"></mdui-switch>
+                <span th:text="#{admin.game-mappings.form.ignored}">Ignore this game by default</span>
+            </label>
+            <p class="admin-cell-muted admin-gm-ignored-helper" th:text="#{admin.game-mappings.form.ignored-helper}">helper</p>
             <div class="admin-gm-search">
                 <mdui-text-field name="category" variant="outlined" autocomplete="off" icon="search"
                                  th:attr="label=#{admin.game-mappings.form.category}"></mdui-text-field>

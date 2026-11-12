@@ -76,4 +76,22 @@ class MockTwStoreTest {
         assertThat(store.test("violence", "999", null).matchedKeywords()).isEmpty();
         assertThat(store.test("nope", "730", null)).isNull();
     }
+
+    @Test
+    void dtddTopics_comeWithTheirLevel_andAreReplacedWhole() {
+        assertThat(store.dtddTopics("violence")).extracting(
+                fr.enimaloc.catapult.common.dto.admin.TwDtddTopicDto::topic,
+                fr.enimaloc.catapult.common.dto.admin.TwDtddTopicDto::minSeverity)
+            .contains(org.assertj.core.api.Assertions.tuple("there's blood/gore", "Depicted"));
+        assertThat(store.dtddTopics("nope")).isNull();
+
+        java.util.Map<String, String> topics = new java.util.LinkedHashMap<>();
+        topics.put("there are jump scares", "Startling");
+        assertThat(store.setDtddTopics("jumpscares", topics)).isEqualTo(204);
+        assertThat(store.dtddTopics("jumpscares")).singleElement().satisfies(t -> {
+            assertThat(t.minSeverity()).isEqualTo("Startling");
+            assertThat(t.knownLevels()).containsExactly("Mild", "Startling", "Jarring");
+        });
+        assertThat(store.setDtddTopics("nope", topics)).isEqualTo(404);
+    }
 }

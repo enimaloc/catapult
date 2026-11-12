@@ -131,4 +131,88 @@ class RealDtddApiClientTest {
         assertThat(topics.get().mostlyTopics()).containsExactly("Flashing lights");
         assertThat(topics.get().noTopics()).containsExactly("Bad ending");
     }
+
+    /** DTDD's answer as its v3 docs give it since 2026-11: a severity per topic, and fields we don't model. */
+    @Test
+    void item_readsTheSeverity_andIgnoresUnknownFields() {
+        when(rotator.nextKey()).thenReturn(Optional.of("KEY_A"));
+        server.enqueue(new MockResponse()
+            .setHeader("Content-Type", "application/json")
+            .setBody("""
+                { "id": 10752, "name": "A game", "somethingNew": { "x": 1 },
+                  "topicItemStats": [
+                    { "topicItemId": 395866, "yesSum": 57, "noSum": 3, "numComments": 7, "topicId": 153,
+                      "topicName": "a dog dies", "itemId": 10752,
+                      "severity": { "levels": ["Implied", "Depicted", "Excessive"], "counts": [2, 9, 1],
+                                    "percents": [17, 75, 8], "total": 12, "verified": 2 } },
+                    { "topicItemId": 395867, "yesSum": 1, "noSum": 4, "numComments": 0, "topicId": 154,
+                      "topicName": "a cat dies", "itemId": 10752, "severity": null }
+                ] }
+                """));
+
+        Optional<DtddApiClient.DtddItem> item = client.item(10752L);
+
+        assertThat(item).isPresent();
+        DtddApiClient.DtddTopicItemStat[] stats = item.get().topicItemStats();
+        assertThat(stats).hasSize(2);
+        DtddApiClient.DtddSeverity severity = stats[0].severity();
+        assertThat(severity.levels()).containsExactly("Implied", "Depicted", "Excessive");
+        assertThat(severity.counts()).containsExactly(2, 9, 1);
+        assertThat(severity.percents()).containsExactly(17, 75, 8);
+        assertThat(severity.total()).isEqualTo(12);
+        assertThat(severity.verifiedLevel()).contains("Depicted");
+        assertThat(stats[1].severity()).isNull();
+    }
+
+    @Test
+    void verifiedLevel_isEmpty_withoutAReviewersLevelInRange() {
+        List<String> levels = List.of("Mild", "Shown", "Severe");
+        assertThat(new DtddApiClient.DtddSeverity(levels, List.of(), List.of(), 0, null).verifiedLevel()).isEmpty();
+        assertThat(new DtddApiClient.DtddSeverity(levels, List.of(), List.of(), 0, 0).verifiedLevel()).isEmpty();
+        assertThat(new DtddApiClient.DtddSeverity(levels, List.of(), List.of(), 0, 4).verifiedLevel()).isEmpty();
+        assertThat(new DtddApiClient.DtddSeverity(levels, List.of(), List.of(), 0, 1).verifiedLevel()).contains("Mild");
+    }
+
+    @Test
+    void everyAnswer_tellsTheRotatorWhatIsLeftOfTheKey() {
+        when(rotator.nextKey()).thenReturn(Optional.of("KEY_A"));
+        server.enqueue(new MockResponse()
+            .setHeader("Content-Type", "application/json")
+            .setHeader("X-RateLimit-Remaining-Minute", "28")
+            .setHeader("X-RateLimit-Remaining-Month", "4321")
+            .setBody("[]"));
+
+        client.search("x", null);
+
+        verify(rotator).onQuota("KEY_A", 28, 4321);
+    }
+
+    @Test
+    void aReservingView_takesOnlyKeysAboveTheReserve_andAnswersEmptyWithoutOne() {
+        when(rotator.nextKeyAbove(500)).thenReturn(Optional.empty());
+
+        assertThat(client.reserving(500).item(1L)).isEmpty();
+        assertThat(server.getRequestCount()).isZero();
+        verify(rotator, never()).nextKey();
+    }
+
+    @Test
+    void fetchTopics_keepsEachTopicsSeverity_byItsName() {
+        when(rotator.nextKey()).thenReturn(Optional.of("KEY_A"));
+        server.enqueue(new MockResponse()
+            .setHeader("Content-Type", "application/json")
+            .setBody("""
+                { "id": 7, "topicItemStats": [
+                    { "topicName": "a dog dies", "yesSum": 5, "noSum": 1,
+                      "severity": { "levels": ["Implied", "Depicted"], "counts": [1, 4], "percents": [20, 80],
+                                    "total": 5, "verified": 2 } },
+                    { "topicName": "a cat dies", "yesSum": 0, "noSum": 3, "severity": null }
+                ] }
+                """));
+
+        DtddApiClient.DtddTopics topics = client.fetchTopics(7L).orElseThrow();
+
+        assertThat(topics.severities()).containsOnlyKeys("a dog dies");
+        assertThat(topics.severities().get("a dog dies").verifiedLevel()).contains("Depicted");
+    }
 }

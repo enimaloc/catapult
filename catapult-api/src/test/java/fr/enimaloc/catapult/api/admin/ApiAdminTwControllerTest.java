@@ -28,6 +28,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -45,6 +46,7 @@ class ApiAdminTwControllerTest {
     @MockitoBean AdminCclService adminCclService;
     @MockitoBean TwitchLoginSuccessHandler twitchLoginSuccessHandler;
     @MockitoBean TwBackfillService twBackfillService;
+    @MockitoBean fr.enimaloc.catapult.service.tw.TwDtddTopicLevels topicLevels;
 
     @Test
     void rebuildForcePinned_delegatesToBackfillService() throws Exception {
@@ -144,5 +146,47 @@ class ApiAdminTwControllerTest {
                 .andExpect(jsonPath("$.total").value(10));
         mvc.perform(post("/api/internal/admin/tws/rebuild/cancel").with(csrf())).andExpect(status().isOk());
         verify(twBackfillService).cancel();
+    }
+
+    @Test
+    void dtddTopics_comeWithTheirThresholdAndTheLevelsCached() throws Exception {
+        MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
+        TwDefinition gore = new TwDefinition();
+        gore.setId("gore");
+        when(adminTwService.get("gore")).thenReturn(Optional.of(gore));
+        var blood = new fr.enimaloc.catapult.domain.tw.TwDtddTopicMapping();
+        blood.setTwId("gore");
+        blood.setDtddTopicName("there's blood/gore");
+        blood.setMinSeverity("Depicted");
+        var excessive = new fr.enimaloc.catapult.domain.tw.TwDtddTopicMapping();
+        excessive.setTwId("gore");
+        excessive.setDtddTopicName("there's excessive gore");
+        when(adminTwService.listDtddTopics("gore")).thenReturn(List.of(blood, excessive));
+        when(topicLevels.of(any())).thenReturn(java.util.Map.of("there's blood/gore",
+                List.of("Minor", "Depicted", "Excessive")));
+
+        mvc.perform(get("/api/internal/admin/tws/gore/dtdd-topics"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].topic").value("there's blood/gore"))
+                .andExpect(jsonPath("$[0].minSeverity").value("Depicted"))
+                .andExpect(jsonPath("$[0].knownLevels[2]").value("Excessive"))
+                .andExpect(jsonPath("$[1].minSeverity").doesNotExist())
+                .andExpect(jsonPath("$[1].knownLevels").isEmpty());
+        mvc.perform(get("/api/internal/admin/tws/nope/dtdd-topics")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void dtddTopics_areReplacedWithTheirThresholds_theOldBodyStillRead() throws Exception {
+        MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
+        mvc.perform(put("/api/internal/admin/tws/gore/dtdd-topics").with(csrf()).contentType("application/json")
+                        .content("{\"topics\":[\"there's blood/gore\"],\"minSeverities\":{\"there's blood/gore\":\"Depicted\"}}"))
+                .andExpect(status().isNoContent());
+        verify(adminTwService).replaceDtddTopics("gore", Set.of("there's blood/gore"),
+                java.util.Map.of("there's blood/gore", "Depicted"));
+
+        mvc.perform(put("/api/internal/admin/tws/violence/dtdd-topics").with(csrf()).contentType("application/json")
+                        .content("{\"topics\":[\"someone dies\"]}"))
+                .andExpect(status().isNoContent());
+        verify(adminTwService).replaceDtddTopics("violence", Set.of("someone dies"), java.util.Map.of());
     }
 }

@@ -1271,4 +1271,25 @@ class MockApiServiceTest {
         assertThat(service.revokeApiToken()).isEqualTo(204);
         assertThat(service.apiTokenStatus().exists()).isFalse();
     }
+
+    @Test
+    void dtddCaches_areTheMocksStore() {
+        assertThat(service.adminDtddCaches().topics()).isEqualTo(4);
+        assertThat(service.adminDtddTopicsCache("", 0).content()).isNotEmpty();
+        assertThat(service.adminDtddGamesCache("", 0).content()).isNotEmpty();
+        assertThat(service.adminDtddSearchesCache("", 0).content()).isNotEmpty();
+        assertThat(service.adminRefetchDtddCache("topics", "16758")).isEqualTo(200);
+        assertThat(service.adminDtddCacheEntry("topics", "16758").dtddId()).isEqualTo(16758L);
+        assertThat(service.adminStartDtddRefetch().status()).isEqualTo(202);
+        assertThat(service.adminCancelDtddRefetch().body().state()).isEqualTo("CANCELLED");
+    }
+
+    @Test
+    void twDetailsAndDtddTopics_areTheMocks() {
+        String bindingId = service.channelPage("enimaloc", 0, null, null).bindings().content().getFirst().id();
+        assertThat(service.twDetails(bindingId)).isNotNull();
+        assertThat(service.twDetails("nope")).isNull();
+        assertThat(service.adminTwDtddTopics("violence")).isNotEmpty();
+        assertThat(service.adminSetTwDtddTopics("violence", java.util.Map.of("someone dies", "Depicted"))).isEqualTo(204);
+    }
 }
