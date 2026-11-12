@@ -8,6 +8,7 @@ import fr.enimaloc.catapult.common.dto.admin.SteamIdsBody;
 import fr.enimaloc.catapult.common.dto.admin.SteamKeywordBody;
 import fr.enimaloc.catapult.common.dto.admin.SteamKeywordsBody;
 import fr.enimaloc.catapult.common.dto.admin.SteamSignalTestBody;
+import fr.enimaloc.catapult.common.dto.admin.TwRebuildStatusDto;
 import fr.enimaloc.catapult.common.dto.admin.UpdateBody;
 import fr.enimaloc.catapult.domain.tw.TwDefinition;
 import fr.enimaloc.catapult.service.notification.AdminEventPublisher;
@@ -129,32 +130,39 @@ public class ApiAdminTwController {
     }
 
     @PostMapping("/rebuild")
-    public ResponseEntity<Void> rebuildNonOverriddenMappings() {
-        return backfillService
-                .map(backfill -> {
-                    backfill.rebuildAllNonOverridden();
-                    return ResponseEntity.accepted().<Void>build();
-                })
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "The TW backfill is not available"));
+    public ResponseEntity<TwRebuildStatusDto> rebuildNonOverriddenMappings() {
+        return start(TwBackfillService.Mode.NON_OVERRIDDEN);
     }
 
     @PostMapping("/rebuild/force")
-    public ResponseEntity<Void> rebuildMappings() {
-        return backfillService
-                .map(backfill -> {
-                    backfill.rebuildAll();
-                    return ResponseEntity.accepted().<Void>build();
-                })
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "The TW backfill is not available"));
+    public ResponseEntity<TwRebuildStatusDto> rebuildMappings() {
+        return start(TwBackfillService.Mode.UNTOUCHED);
     }
 
     @PostMapping("/rebuild/force-pinned")
-    public ResponseEntity<Void> rebuildMappingsIncludingPinned() {
-        return backfillService
-                .map(backfill -> {
-                    backfill.forceRebuildAllIncludingPinned();
-                    return ResponseEntity.accepted().<Void>build();
-                })
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "The TW backfill is not available"));
+    public ResponseEntity<TwRebuildStatusDto> rebuildMappingsIncludingPinned() {
+        return start(TwBackfillService.Mode.FORCE_PINNED);
+    }
+
+    /** The TWs' recalculation running or last run (IDLE without the backfill: none ever). */
+    @GetMapping("/rebuild/status")
+    public TwRebuildStatusDto rebuildStatus() {
+        return backfillService.map(TwBackfillService::status).orElse(TwRebuildStatusDto.IDLE);
+    }
+
+    /** Asks the running recalculation to stop after its current binding. */
+    @PostMapping("/rebuild/cancel")
+    public TwRebuildStatusDto cancelRebuild() {
+        return backfill().cancel();
+    }
+
+    /** 202 with the recalculation started; 409 while one runs already, 503 without the backfill. */
+    private ResponseEntity<TwRebuildStatusDto> start(TwBackfillService.Mode mode) {
+        return ResponseEntity.accepted().body(backfill().start(mode));
+    }
+
+    private TwBackfillService backfill() {
+        return backfillService.orElseThrow(
+                () -> new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "The TW backfill is not available"));
     }
 }

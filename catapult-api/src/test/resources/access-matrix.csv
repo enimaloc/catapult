@@ -326,6 +326,8 @@ POST,/api/internal/admin/tws,,"{""id"":""matrix"",""label"":""matrix""}",401,PAS
 POST,/api/internal/admin/tws/rebuild,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/tws/rebuild/force,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/tws/rebuild/force-pinned,,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/tws/rebuild/status,,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/tws/rebuild/cancel,,,401,PASS,403,403,403,PASS,401
 DELETE,/api/internal/admin/tws/{id},,,401,PASS,403,403,403,PASS,401
 GET,/api/internal/admin/tws/{id},,,401,PASS,403,403,403,PASS,401
 # ERROR: the dead id is no TW, and the handler throws IllegalArgumentException for it (test artefact)

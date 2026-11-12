@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -25,6 +26,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.times;
 
 class TwBackfillServiceTest {
 
@@ -75,7 +77,7 @@ class TwBackfillServiceTest {
         when(igdb.resolveIgdbIdForBinding(b1)).thenReturn(Optional.of("igdb42"));
         when(igdb.fetchDescriptorIds("igdb42")).thenReturn(Set.of(10L));
         TwResolverService res = mock(TwResolverService.class);
-        when(res.suggest(any())).thenReturn(Set.of("violence_graphic"));
+        when(res.suggestReporting(any())).thenReturn(new TwResolverService.Suggestion(Set.of("violence_graphic"), Optional.empty()));
 
         TwBackfillService svc = build(appRepo, bRepo, igdb, res);
         svc.run();
@@ -107,7 +109,7 @@ class TwBackfillServiceTest {
         when(igdb.resolveIgdbIdForBinding(pinned)).thenReturn(Optional.of("igdb99"));
         when(igdb.fetchDescriptorIds("igdb99")).thenReturn(Set.of(20L));
         TwResolverService res = mock(TwResolverService.class);
-        when(res.suggest(any())).thenReturn(Set.of("new_tw"));
+        when(res.suggestReporting(any())).thenReturn(new TwResolverService.Suggestion(Set.of("new_tw"), Optional.empty()));
 
         TwBackfillService svc = build(appRepo, bRepo, igdb, res);
         svc.forceRebuildAllIncludingPinned();
@@ -131,7 +133,7 @@ class TwBackfillServiceTest {
         IgdbService igdb = mock(IgdbService.class);
         when(igdb.resolveIgdbIdForBinding(any())).thenReturn(Optional.of("igdb"));
         TwResolverService res = mock(TwResolverService.class);
-        when(res.suggest(any())).thenReturn(Set.of("igdb_tw"));
+        when(res.suggestReporting(any())).thenReturn(new TwResolverService.Suggestion(Set.of("igdb_tw"), Optional.empty()));
         return new MappedPair(adminTws, igdbTws, igdb, res);
     }
 
@@ -199,5 +201,134 @@ class TwBackfillServiceTest {
         s.setBatchSize(50);
         s.setThrottle(1000);
         return s;
+    }
+
+    // --- progress, one at a time, the Steam store's rate limit ---------------------------------
+
+    private static GameBinding steamBinding(String appId) {
+        GameBinding b = new GameBinding();
+        b.setUser(owner());
+        b.setId(UUID.randomUUID());
+        b.setStatus(GameBinding.Status.AUTO);
+        b.setSourceType(GameBinding.SourceType.STEAM);
+        b.setSourceId(appId);
+        b.setSourceName("Game " + appId);
+        return b;
+    }
+
+    @Test
+    void aRebuild_tellsItsProgress_andItsEnd() {
+        GameBindingRepository bRepo = mock(GameBindingRepository.class);
+        GameBinding pinned = steamBinding("1");
+        pinned.setTwOverride(true);
+        GameBinding plain = steamBinding("2");
+        when(bRepo.findCandidatesForTwRebuild(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(pinned, plain)));
+        IgdbService igdb = mock(IgdbService.class);
+        TwResolverService res = mock(TwResolverService.class);
+        when(res.suggestReporting(any())).thenReturn(new TwResolverService.Suggestion(Set.of("gore"), Optional.empty()));
+        TwBackfillService svc = build(mock(AppStateRepository.class), bRepo, igdb, res);
+        svc.setSleeper(ms -> {});
+
+        svc.rebuildAllNonOverridden();
+
+        var status = svc.status();
+        assertThat(status.state()).isEqualTo("DONE");
+        assertThat(status.mode()).isEqualTo("NON_OVERRIDDEN");
+        assertThat(status.total()).isEqualTo(2);
+        assertThat(status.processed()).isEqualTo(1);
+        assertThat(status.skipped()).isEqualTo(1);
+        assertThat(status.done()).isEqualTo(2);
+        assertThat(status.finishedAt()).isNotNull();
+    }
+
+    @Test
+    void theSteamStoresLimit_isWaitedFor_andTheBindingTriedAgain_neverSavedWithoutSteam() {
+        GameBindingRepository bRepo = mock(GameBindingRepository.class);
+        GameBinding plain = steamBinding("2");
+        when(bRepo.findCandidatesForTwRebuild(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(plain)));
+        TwResolverService res = mock(TwResolverService.class);
+        Instant start = Instant.parse("2026-11-12T10:00:00Z");
+        Instant until = start.plusSeconds(5);
+        when(res.suggestReporting(any())).thenReturn(
+            new TwResolverService.Suggestion(Set.of("partial"), Optional.of(until)),
+            new TwResolverService.Suggestion(Set.of("gore"), Optional.empty()));
+        TwBackfillService svc = build(mock(AppStateRepository.class), bRepo, mock(IgdbService.class), res);
+        svc.setClock(java.time.Clock.fixed(start, java.time.ZoneOffset.UTC));
+        List<Instant> waitingShown = new java.util.ArrayList<>();
+        java.util.concurrent.atomic.AtomicLong slept = new java.util.concurrent.atomic.AtomicLong();
+        svc.setSleeper(ms -> {
+            slept.addAndGet(ms);
+            waitingShown.add(svc.status().waitingUntil());
+        });
+
+        svc.rebuildAllNonOverridden();
+
+        assertThat(waitingShown.getFirst()).isEqualTo(until);
+        // Until the limit's end, and a second more
+        assertThat(slept.get()).isGreaterThanOrEqualTo(6_000L);
+        verify(bRepo, times(1)).save(plain);
+        assertThat(plain.getTws()).containsExactly("gore");
+        assertThat(svc.status().processed()).isEqualTo(1);
+    }
+
+    @Test
+    void aBindingTheStoreStaysLimitedFor_isFailed_afterSoManyWaits() {
+        GameBindingRepository bRepo = mock(GameBindingRepository.class);
+        GameBinding plain = steamBinding("2");
+        when(bRepo.findCandidatesForTwRebuild(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(plain)));
+        TwResolverService res = mock(TwResolverService.class);
+        Instant start = Instant.parse("2026-11-12T10:00:00Z");
+        when(res.suggestReporting(any())).thenReturn(
+            new TwResolverService.Suggestion(Set.of(), Optional.of(start.plusSeconds(1))));
+        TwBackfillService svc = build(mock(AppStateRepository.class), bRepo, mock(IgdbService.class), res);
+        svc.setClock(java.time.Clock.fixed(start, java.time.ZoneOffset.UTC));
+        svc.setSleeper(ms -> {});
+
+        svc.rebuildAllNonOverridden();
+
+        verify(res, times(TwBackfillService.MAX_STEAM_WAITS + 1)).suggestReporting(any());
+        verify(bRepo, never()).save(any());
+        assertThat(svc.status().failed()).isEqualTo(1);
+    }
+
+    @Test
+    void aCancel_endsItAfterTheCurrentBinding() {
+        GameBindingRepository bRepo = mock(GameBindingRepository.class);
+        when(bRepo.findCandidatesForTwRebuild(any(Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of(steamBinding("1"), steamBinding("2"))));
+        TwResolverService res = mock(TwResolverService.class);
+        when(res.suggestReporting(any())).thenReturn(new TwResolverService.Suggestion(Set.of("gore"), Optional.empty()));
+        TwBackfillService svc = build(mock(AppStateRepository.class), bRepo, mock(IgdbService.class), res);
+        svc.setSleeper(ms -> svc.cancel());
+
+        svc.rebuildAllNonOverridden();
+
+        assertThat(svc.status().state()).isEqualTo("CANCELLED");
+        assertThat(svc.status().processed()).isEqualTo(1);
+    }
+
+    @Test
+    void oneAtATime() throws Exception {
+        GameBindingRepository bRepo = mock(GameBindingRepository.class);
+        when(bRepo.findCandidatesForTwRebuild(any(Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of(steamBinding("1"))));
+        TwResolverService res = mock(TwResolverService.class);
+        java.util.concurrent.CountDownLatch inside = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
+        when(res.suggestReporting(any())).thenAnswer(inv -> {
+            inside.countDown();
+            release.await();
+            return new TwResolverService.Suggestion(Set.of(), Optional.empty());
+        });
+        TwBackfillService svc = build(mock(AppStateRepository.class), bRepo, mock(IgdbService.class), res);
+        svc.setSleeper(ms -> {});
+
+        assertThat(svc.start(TwBackfillService.Mode.NON_OVERRIDDEN).state()).isEqualTo("RUNNING");
+        assertThat(inside.await(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> svc.start(TwBackfillService.Mode.FORCE_PINNED))
+            .isInstanceOf(org.springframework.web.server.ResponseStatusException.class).hasMessageContaining("409");
+        release.countDown();
+        for (int i = 0; i < 100 && "RUNNING".equals(svc.status().state()); i++) Thread.sleep(20);
+        assertThat(svc.status().state()).isEqualTo("DONE");
     }
 }
