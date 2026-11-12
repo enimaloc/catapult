@@ -217,7 +217,7 @@ public class MockData {
                 null, null, Set.of(),
                 AVAILABLE_CCLS, config.settings.twFeatureEnabled, Set.copyOf(config.settings.blockedTws), AVAILABLE_TWS,
                 // raid.restore-game and stream.title: the mock has no experiments, the settings are offered
-                null, true, List.of(), List.of(), false, null, true, null, null, true);
+                null, true, List.of(), List.of(), false, null, true, null, null, true, true, true);
 
         MockConfig.Steam steam = config.steam;
         MockData data = new MockData(channel, List.of(binding), settings, List.of(),
@@ -892,7 +892,7 @@ public class MockData {
                     from.availableCcls(), twEnabled, blockedTws, from.availableTws(),
                     raidMinutes, from.raidRestoreGameAvailable(), noGameExtensions, fallbackExtensions,
                     titleEnabled, titleTemplate, from.titleAvailable(), noGameTitle, incompleteFallbackTitle,
-                    from.titlePreviewAvailable());
+                    from.titlePreviewAvailable(), from.titleConditionsAvailable(), from.titleDropsAvailable());
         }
     }
 }
