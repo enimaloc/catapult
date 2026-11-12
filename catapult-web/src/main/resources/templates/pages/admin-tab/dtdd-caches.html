@@ -1,0 +1,191 @@
+<!--/*@thymesVar id="summary" type="fr.enimaloc.catapult.common.dto.admin.DtddCachesSummaryDto"*/-->
+<!--/*@thymesVar id="entries" type="fr.enimaloc.catapult.common.dto.admin.AdminPage"*/-->
+<!--/*
+  What catapult-api keeps of DoesTheDogDie (list): the bulk refetch, the three caches (each one opening its entries,
+  admin-tabs.js) and the pooled keys' quotas; one cache's entries (entries: searched and paged by admin-tabs.js),
+  each one fetched again on demand. The parts a refetch changes are [data-admin-value] / [data-admin-list], patched
+  after it; admin-dtdd-caches.js follows a running refetch the same way.
+*/-->
+
+<div th:fragment="list" class="admin-view admin-dtdd-caches"
+     th:attr="data-confirm-text=#{admin.dtdd-caches.job.start},data-cancel-text=#{admin.cancel},data-error=#{admin.error.generic},
+              data-error-409=#{admin.dtdd-caches.error.409},data-error-503=#{admin.dtdd-caches.error.503},
+              data-start-confirm=#{admin.dtdd-caches.job.start.confirm},data-start-description=#{admin.dtdd-caches.job.start.description}">
+    <div class="section-header">
+        <h2 th:text="#{admin.tab.dtdd-caches}">DTDD caches</h2>
+    </div>
+    <p class="admin-cell-muted admin-dc-hint" th:text="#{admin.dtdd-caches.hint}">hint</p>
+    <th:block th:if="${summary == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
+    <th:block th:if="${summary != null}" th:with="job=${summary.job()},running=${summary.job().state() == 'RUNNING'}">
+        <mdui-card class="settings-card admin-dc-job" variant="outlined">
+            <h3 th:text="#{admin.dtdd-caches.job.title}">Refetch everything</h3>
+            <p class="admin-cell-muted" th:text="#{admin.dtdd-caches.job.hint(${summary.monthlyReserve()})}">hint</p>
+            <!--/* data-state: what admin-dtdd-caches.js follows while it runs */-->
+            <div data-admin-value="job" class="admin-dc-job-state" th:attr="data-state=${job.state()}">
+                <strong th:text="#{|admin.dtdd-caches.job.state.${job.state()}|}">Never run</strong>
+                <th:block th:if="${job.total() > 0}">
+                    <mdui-linear-progress th:attr="value=${job.done()},max=${job.total()}"></mdui-linear-progress>
+                    <span th:text="#{admin.dtdd-caches.job.progress(${job.done()}, ${job.total()}, ${job.failed()})}">0 / 0</span>
+                </th:block>
+                <span class="admin-cell-muted" th:if="${job.waitingUntil() != null}"
+                      th:text="#{admin.dtdd-caches.job.waiting(${#temporals.format(job.waitingUntil(), 'HH:mm:ss')})}">waiting</span>
+                <span class="admin-dc-stop" th:if="${job.stopReason() != null}"
+                      th:text="#{|admin.dtdd-caches.job.stop.${job.stopReason()}|}">stopped</span>
+                <span class="admin-cell-muted" th:if="${job.finishedAt() != null}"
+                      th:text="#{admin.dtdd-caches.job.finished(${#temporals.format(job.finishedAt(), #messages.msg('format.datetime'))})}">finished</span>
+                <div class="admin-data-actions">
+                    <mdui-button id="admin-dc-start" variant="tonal" icon="refresh" th:hidden="${running}"
+                                 th:text="#{admin.dtdd-caches.job.start}">Refetch everything</mdui-button>
+                    <mdui-button id="admin-dc-cancel" variant="text" icon="stop" th:hidden="${!running}"
+                                 th:text="#{admin.dtdd-caches.job.cancel}">Stop</mdui-button>
+                </div>
+            </div>
+        </mdui-card>
+
+        <mdui-card class="admin-table admin-list" variant="outlined" data-admin-value="caches">
+            <mdui-list>
+                <mdui-list-item end-icon="chevron_right" data-admin-open="topics">
+                    <span th:text="#{admin.dtdd-caches.kind.topics}">topics</span>
+                    <!--/* its lifetime as "7 d" or "12 h" */-->
+                    <span slot="description" th:with="ttl=${summary.topicsTtlHours()},life=${ttl % 24 == 0 ? #messages.msg('admin.dtdd-caches.lifetime.days', ttl / 24) : #messages.msg('admin.dtdd-caches.lifetime.hours', ttl)}"
+                          th:text="#{admin.dtdd-caches.kind.summary(${summary.topics()}, ${summary.topicsStale()}, ${life})}">0</span>
+                </mdui-list-item>
+                <mdui-list-item end-icon="chevron_right" data-admin-open="games">
+                    <span th:text="#{admin.dtdd-caches.kind.games}">games</span>
+                    <!--/* its lifetime as "7 d" or "12 h" */-->
+                    <span slot="description" th:with="ttl=${summary.gamesTtlHours()},life=${ttl % 24 == 0 ? #messages.msg('admin.dtdd-caches.lifetime.days', ttl / 24) : #messages.msg('admin.dtdd-caches.lifetime.hours', ttl)}"
+                          th:text="#{admin.dtdd-caches.kind.summary(${summary.games()}, ${summary.gamesStale()}, ${life})}">0</span>
+                </mdui-list-item>
+                <mdui-list-item end-icon="chevron_right" data-admin-open="searches">
+                    <span th:text="#{admin.dtdd-caches.kind.searches}">searches</span>
+                    <!--/* its lifetime as "7 d" or "12 h" */-->
+                    <span slot="description" th:with="ttl=${summary.searchesTtlHours()},life=${ttl % 24 == 0 ? #messages.msg('admin.dtdd-caches.lifetime.days', ttl / 24) : #messages.msg('admin.dtdd-caches.lifetime.hours', ttl)}"
+                          th:text="#{admin.dtdd-caches.kind.summary(${summary.searches()}, ${summary.searchesStale()}, ${life})}">0</span>
+                </mdui-list-item>
+            </mdui-list>
+        </mdui-card>
+
+        <div class="section-header admin-dc-quotas-header">
+            <h3 th:text="#{admin.dtdd-caches.quotas.title}">Keys' quotas</h3>
+        </div>
+        <div data-admin-value="quotas">
+            <th:block th:if="${summary.quotas().isEmpty()}">
+                <th:block th:replace="~{pages/admin-tab/common :: empty('key_off', #{admin.dtdd-caches.quotas.none})}"></th:block>
+            </th:block>
+            <mdui-card class="admin-table" variant="outlined" th:unless="${summary.quotas().isEmpty()}">
+                <div class="admin-row admin-dc-quota-row admin-row-head" aria-hidden="true">
+                    <span th:text="#{admin.dtdd-caches.column.key}">Key</span>
+                    <span th:text="#{admin.dtdd-caches.column.minute}">Left this minute</span>
+                    <span th:text="#{admin.dtdd-caches.column.month}">Left this month</span>
+                    <span th:text="#{admin.dtdd-caches.column.at}">Read</span>
+                </div>
+                <div class="admin-row admin-dc-quota-row" th:each="k : ${summary.quotas()}" th:attr="data-key-id=${k.keyId()}">
+                    <span class="admin-cell admin-member-id" th:attr="data-label=#{admin.dtdd-caches.column.key}" th:text="${k.maskedKey()}">ddd_…</span>
+                    <span class="admin-cell" th:attr="data-label=#{admin.dtdd-caches.column.minute}">
+                        <span th:text="${k.remainingMinute() == null ? '—' : k.remainingMinute()}">30</span>
+                        <span class="admin-cell-muted" th:if="${k.blockedUntil() != null}"
+                              th:text="#{admin.dtdd-caches.quotas.rest(${#temporals.format(k.blockedUntil(), 'HH:mm:ss')})}">resting</span>
+                    </span>
+                    <span class="admin-cell" th:attr="data-label=#{admin.dtdd-caches.column.month}">
+                        <span th:text="${k.remainingMonth() == null ? '—' : k.remainingMonth()}">5000</span>
+                        <mdui-chip th:if="${k.remainingMonth() != null and k.remainingMonth() <= summary.monthlyReserve()}"
+                                   icon="warning" class="admin-dc-low" th:text="#{admin.dtdd-caches.quotas.low}">reserve</mdui-chip>
+                    </span>
+                    <span class="admin-cell admin-cell-muted" th:attr="data-label=#{admin.dtdd-caches.column.at}"
+                          th:text="${k.at() == null} ? #{admin.dtdd-caches.quotas.unknown} : ${#temporals.format(k.at(), #messages.msg('format.datetime'))}">when</span>
+                </div>
+            </mdui-card>
+        </div>
+    </th:block>
+</div>
+
+<div th:fragment="entries" class="admin-view admin-dtdd-cache-entries"
+     th:attr="data-kind=${kind},data-error=#{admin.error.generic},data-error-400=#{admin.dtdd-caches.error.400},
+              data-error-404=#{admin.dtdd-caches.error.404},data-error-502=#{admin.dtdd-caches.error.502},
+              data-error-503=#{admin.dtdd-caches.error.503},data-refetched=#{admin.dtdd-caches.refetched}">
+    <th:block th:replace="~{pages/admin-tab/common :: subheader(#{|admin.dtdd-caches.kind.${kind}|}, ${q})}"></th:block>
+    <th:block th:if="${entries == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
+    <!--/* swapped by a search or a page; a refetch patches it (admin-tabs.js, data-admin-*) */-->
+    <div data-admin-results th:if="${entries != null}">
+        <div data-admin-value="empty" th:hidden="${!entries.content().isEmpty()}">
+            <th:block th:replace="~{pages/admin-tab/common :: empty('inbox', ${#strings.isEmpty(q)} ? #{admin.dtdd-caches.empty} : #{admin.no_match})}"></th:block>
+        </div>
+
+        <mdui-card class="admin-table" variant="outlined" data-admin-list="entries" th:hidden="${entries.content().isEmpty()}"
+                   th:if="${kind == 'topics'}">
+            <div class="admin-row admin-dc-topics-row admin-row-head" aria-hidden="true">
+                <span th:text="#{admin.dtdd-caches.column.id}">ID</span>
+                <span th:text="#{admin.dtdd-caches.column.title}">Title</span>
+                <span th:text="#{admin.dtdd-caches.column.yes}">Yes</span>
+                <span th:text="#{admin.dtdd-caches.column.no}">No</span>
+                <span th:text="#{admin.dtdd-caches.column.mostly}">Mixed</span>
+                <span th:text="#{admin.dtdd-caches.column.fetched}">Fetched</span>
+                <span></span>
+            </div>
+            <div class="admin-row admin-dc-topics-row" th:each="e : ${entries.content()}"
+                 th:attr="data-admin-key=${e.dtddId()}">
+                <span class="admin-cell admin-member-id" th:attr="data-label=#{admin.dtdd-caches.column.id}" th:text="${e.dtddId()}">1</span>
+                <span class="admin-cell" th:attr="data-label=#{admin.dtdd-caches.column.title}" th:text="${e.name() ?: '—'}">title</span>
+                <span class="admin-cell admin-dc-topics" th:attr="data-label=#{admin.dtdd-caches.column.yes}"
+                      th:text="${e.yesTopics().isEmpty() ? '—' : #strings.listJoin(e.yesTopics(), ', ')}">yes</span>
+                <span class="admin-cell admin-dc-topics" th:attr="data-label=#{admin.dtdd-caches.column.no}"
+                      th:text="${e.noTopics().isEmpty() ? '—' : #strings.listJoin(e.noTopics(), ', ')}">no</span>
+                <span class="admin-cell admin-dc-topics" th:attr="data-label=#{admin.dtdd-caches.column.mostly}"
+                      th:text="${e.mostlyTopics().isEmpty() ? '—' : #strings.listJoin(e.mostlyTopics(), ', ')}">mixed</span>
+                <th:block th:replace="~{:: fetched(${e.fetchedAt()}, ${e.stale()})}"></th:block>
+                <th:block th:replace="~{:: refetch(${e.dtddId()})}"></th:block>
+            </div>
+        </mdui-card>
+
+        <mdui-card class="admin-table" variant="outlined" data-admin-list="entries" th:hidden="${entries.content().isEmpty()}"
+                   th:if="${kind == 'games'}">
+            <div class="admin-row admin-dc-games-row admin-row-head" aria-hidden="true">
+                <span th:text="#{admin.dtdd-caches.column.id}">ID</span>
+                <span th:text="#{admin.dtdd-caches.column.title}">Title</span>
+                <span th:text="#{admin.dtdd-caches.column.type}">Type</span>
+                <span th:text="#{admin.dtdd-caches.column.fetched}">Fetched</span>
+                <span></span>
+            </div>
+            <div class="admin-row admin-dc-games-row" th:each="e : ${entries.content()}"
+                 th:attr="data-admin-key=${e.dtddId()}">
+                <span class="admin-cell admin-member-id" th:attr="data-label=#{admin.dtdd-caches.column.id}" th:text="${e.dtddId()}">1</span>
+                <span class="admin-cell" th:attr="data-label=#{admin.dtdd-caches.column.title}" th:text="${e.name()}">title</span>
+                <span class="admin-cell admin-cell-muted" th:attr="data-label=#{admin.dtdd-caches.column.type}" th:text="${e.mediaType() ?: '—'}">type</span>
+                <th:block th:replace="~{:: fetched(${e.fetchedAt()}, ${e.stale()})}"></th:block>
+                <th:block th:replace="~{:: refetch(${e.dtddId()})}"></th:block>
+            </div>
+        </mdui-card>
+
+        <mdui-card class="admin-table" variant="outlined" data-admin-list="entries" th:hidden="${entries.content().isEmpty()}"
+                   th:if="${kind == 'searches'}">
+            <div class="admin-row admin-dc-searches-row admin-row-head" aria-hidden="true">
+                <span th:text="#{admin.dtdd-caches.column.query}">Query</span>
+                <span th:text="#{admin.dtdd-caches.column.found}">Titles found</span>
+                <span th:text="#{admin.dtdd-caches.column.fetched}">Fetched</span>
+                <span></span>
+            </div>
+            <div class="admin-row admin-dc-searches-row" th:each="e : ${entries.content()}"
+                 th:attr="data-admin-key=${e.query()}">
+                <span class="admin-cell" th:attr="data-label=#{admin.dtdd-caches.column.query}" th:text="${e.query()}">query</span>
+                <span class="admin-cell admin-member-id" th:attr="data-label=#{admin.dtdd-caches.column.found}"
+                      th:text="${e.dtddIds().isEmpty() ? '—' : #strings.listJoin(e.dtddIds(), ', ')}">1, 2</span>
+                <th:block th:replace="~{:: fetched(${e.searchedAt()}, ${e.stale()})}"></th:block>
+                <th:block th:replace="~{:: refetch(${e.query()})}"></th:block>
+            </div>
+        </mdui-card>
+
+        <div data-admin-value="pagination"><th:block th:replace="~{pages/admin-tab/common :: pagination(${entries})}"></th:block></div>
+    </div>
+</div>
+
+<!--/* When an entry was fetched, "stale" past its cache's lifetime. */-->
+<span th:fragment="fetched(at, stale)" class="admin-cell admin-dc-fetched" th:attr="data-label=#{admin.dtdd-caches.column.fetched}">
+    <span th:text="${at == null ? '—' : #temporals.format(at, #messages.msg('format.datetime'))}">when</span>
+    <mdui-chip th:if="${stale}" icon="schedule" class="admin-dc-stale" th:text="#{admin.dtdd-caches.stale}">Stale</mdui-chip>
+</span>
+
+<!--/* An entry fetched again, by its key: the title's ID or the search's query. */-->
+<span th:fragment="refetch(key)" class="admin-row-actions">
+    <mdui-button-icon icon="refresh" class="admin-dc-refetch"
+                      th:attr="data-key=${key},aria-label=#{admin.dtdd-caches.refetch}" th:title="#{admin.dtdd-caches.refetch}"></mdui-button-icon>
+</span>

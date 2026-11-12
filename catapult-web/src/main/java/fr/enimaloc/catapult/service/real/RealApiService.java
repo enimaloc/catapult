@@ -49,6 +49,11 @@ import fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
 import fr.enimaloc.catapult.common.dto.admin.DetectedGameDto;
+import fr.enimaloc.catapult.common.dto.admin.DtddCachesSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.DtddGameCacheEntryDto;
+import fr.enimaloc.catapult.common.dto.admin.DtddRefetchJobDto;
+import fr.enimaloc.catapult.common.dto.admin.DtddSearchCacheEntryDto;
+import fr.enimaloc.catapult.common.dto.admin.DtddTopicsCacheEntryDto;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingDto;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingRequest;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingResult;
@@ -157,6 +162,9 @@ public class RealApiService implements ApiService {
     private static final ParameterizedTypeReference<AdminPage<fr.enimaloc.catapult.common.dto.admin.DebugExchangeSummaryDto>> DEBUG_EXCHANGES = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<String>> DEBUG_SERVICES = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<AdminPage<GameMappingDto>> GAME_MAPPINGS = new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<AdminPage<DtddTopicsCacheEntryDto>> DTDD_TOPICS = new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<AdminPage<DtddGameCacheEntryDto>> DTDD_GAMES = new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<AdminPage<DtddSearchCacheEntryDto>> DTDD_SEARCHES = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<AdminPage<DetectedGameDto>> MISSING_GAMES = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<DetectedGameDto>> DETECTED_GAMES = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<TwitchCategoryDto>> CATEGORIES = new ParameterizedTypeReference<>() {};
@@ -987,6 +995,45 @@ public class RealApiService implements ApiService {
     public ApiClient.Result<GameMappingResult> adminDeleteGameMapping(UUID id, boolean applyLive) {
         return client.call(HttpMethod.DELETE, "/api/internal/admin/game-mappings/{id}?applyLive={applyLive}", null,
                 GameMappingResult.class, id, applyLive);
+    }
+
+    @Override
+    public DtddCachesSummaryDto adminDtddCaches() {
+        return client.get("/api/internal/admin/dtdd-caches", DtddCachesSummaryDto.class);
+    }
+
+    @Override
+    public AdminPage<DtddTopicsCacheEntryDto> adminDtddTopicsCache(String q, int page) {
+        return client.get(DTDD_CACHE_PAGE, DTDD_TOPICS, "topics", q == null ? "" : q, page);
+    }
+
+    @Override
+    public AdminPage<DtddGameCacheEntryDto> adminDtddGamesCache(String q, int page) {
+        return client.get(DTDD_CACHE_PAGE, DTDD_GAMES, "games", q == null ? "" : q, page);
+    }
+
+    @Override
+    public AdminPage<DtddSearchCacheEntryDto> adminDtddSearchesCache(String q, int page) {
+        return client.get(DTDD_CACHE_PAGE, DTDD_SEARCHES, "searches", q == null ? "" : q, page);
+    }
+
+    private static final String DTDD_CACHE_PAGE = "/api/internal/admin/dtdd-caches/{kind}?q={q}&page={page}&size=20";
+
+    @Override
+    public int adminRefetchDtddCache(String kind, String key) {
+        return client.call(HttpMethod.POST, "/api/internal/admin/dtdd-caches/{kind}/refetch?key={key}", null,
+                Void.class, kind, key).status();
+    }
+
+    @Override
+    public ApiClient.Result<DtddRefetchJobDto> adminStartDtddRefetch() {
+        return client.call(HttpMethod.POST, "/api/internal/admin/dtdd-caches/refetch-all", null, DtddRefetchJobDto.class);
+    }
+
+    @Override
+    public ApiClient.Result<DtddRefetchJobDto> adminCancelDtddRefetch() {
+        return client.call(HttpMethod.DELETE, "/api/internal/admin/dtdd-caches/refetch-all", null,
+                DtddRefetchJobDto.class);
     }
 
     @Override
