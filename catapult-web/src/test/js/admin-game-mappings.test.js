@@ -29,6 +29,7 @@ function page() {
                         <input name="sourceId">
                         <span class="admin-gm-game-name"></span>
                         <div class="admin-gm-suggestions"></div>
+                        <input type="checkbox" name="ignoredByDefault">
                         <input name="category">
                         <div class="admin-gm-category-results"></div>
                         <fieldset data-gm-override="ccls"><input type="checkbox" class="admin-gm-override-switch"><div class="admin-gm-choices"></div></fieldset>
@@ -147,6 +148,7 @@ function fullPage(rows = ROW) {
                         <select name="sourceType"><option>STEAM</option><option>XBOX</option><option>MINECRAFT</option></select>
                         <input name="sourceId"><span class="admin-gm-game-name"></span>
                         <div class="admin-gm-suggestions"></div>
+                        <input type="checkbox" name="ignoredByDefault">
                         <input name="category"><div class="admin-gm-category-results"></div>
                         <fieldset data-gm-override="ccls"><input type="checkbox" class="admin-gm-override-switch">
                             <div class="admin-gm-choices"><mdui-checkbox value="a"></mdui-checkbox><mdui-checkbox value="c"></mdui-checkbox></div></fieldset>
@@ -266,7 +268,7 @@ describe("admin-game-mappings form and lists", () => {
         expect([url, init.method]).toEqual(["/admin/game-mappings", "POST"]);
         expect(JSON.parse(init.body)).toEqual({
             sourceType: "STEAM", sourceId: "s1", twitchGameId: "9", twitchGameName: "Portal TW",
-            ccls: ["a"], tws: null, applyLive: false
+            ccls: ["a"], tws: null, applyLive: false, ignoredByDefault: false
         });
         expect(result().textContent).toBe("B 2 L 1 F 0");
         expect(q(".admin-gm-form-title").textContent).toBe("Edit");
@@ -281,6 +283,32 @@ describe("admin-game-mappings form and lists", () => {
         await vi.advanceTimersByTimeAsync(0);
         expect(fetched.mock.calls[1][0]).toBe("/admin/game-mappings/88");
         expect(fetched.mock.calls[1][1].method).toBe("PUT");
+    });
+
+    it("saves a game ignored by default without a category", async () => {
+        fullPage();
+        click("#admin-gm-new");
+        sourceId().value = "431960";
+        q('[name="ignoredByDefault"]').checked = true;
+        fetched.mockResolvedValueOnce(response(200, { mapping: { id: "89" } }));
+
+        click(".admin-gm-save");
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(error().hidden).toBe(true);
+        expect(JSON.parse(fetched.mock.calls[0][1].body)).toEqual({
+            sourceType: "STEAM", sourceId: "431960", twitchGameId: null, twitchGameName: null,
+            ccls: null, tws: null, applyLive: false, ignoredByDefault: true
+        });
+    });
+
+    it("opens a row's form with its ignore, and a new one without", () => {
+        fullPage(ROW.replace('data-id="7"', 'data-id="7" data-ignored-by-default="true"'));
+        click("[data-gm-edit]");
+        expect(q('[name="ignoredByDefault"]').checked).toBe(true);
+
+        click("#admin-gm-new");
+        expect(q('[name="ignoredByDefault"]').checked).toBe(false);
     });
 
     it("keeps the override values that have no box on a save", async () => {
