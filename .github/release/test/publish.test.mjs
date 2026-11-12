@@ -9,7 +9,7 @@ const sha = (c) => c.repeat(40);
 const CHANGELOG = "### Fonctionnalités\n\n- abc1234 edited by hand";
 
 // In-memory GitHub: tags map name -> commit SHA, pulls the open ones.
-function fakeGitHub({ tags = {}, pulls = [], compare = {} } = {}) {
+function fakeGitHub({ tags = {}, pulls = [], compare = {}, autoMergeFails = false } = {}) {
   const calls = [];
   const record = (name, ...args) => calls.push([name, ...args]);
   return {
@@ -32,7 +32,14 @@ function fakeGitHub({ tags = {}, pulls = [], compare = {} } = {}) {
     },
     async createPull(fields) {
       record("createPull", fields);
-      return { number: 100 + calls.length, ...fields };
+      return { number: 100 + calls.length, nodeId: "PR_N", headSha: sha("h"), ...fields };
+    },
+    async enableAutoMerge(pull, options) {
+      record("enableAutoMerge", pull.number, options);
+      if (autoMergeFails) throw new Error("Pull request is in clean status");
+    },
+    async updatePull(number, fields) {
+      record("updatePull", number, fields);
     },
     async comment(number, text) {
       record("comment", number, text);
@@ -51,7 +58,9 @@ function mergedPull({
   return { number: 7, title, body, state: "closed", merged, base, head, headRepo, mergeCommitSha: sha("m") };
 }
 
-const run = (gh, pr) => publish({ gh, pr, owner: OWNER, repo: REPO });
+// `beta`: whether the chain goes through beta (lib/flow.mjs); left out, the current chain.
+const run = (gh, pr, beta) => publish({ gh, pr, owner: OWNER, repo: REPO, beta });
+const withBeta = (gh, pr) => run(gh, pr, true);
 const named = (gh, name) => gh.calls.filter((c) => c[0] === name);
 const commit = (c, subject) => ({ sha: sha(c), subject, message: subject, author: OWNER, parents: [sha("0")] });
 
@@ -128,7 +137,7 @@ test("hotfixMerge_publishesPatch_andOpensOnlyTheBackportToBeta", async () => {
       "dev...beta": [commit("r", "chore(release): v1.0.1-BETA.1")],
     },
   });
-  const result = await run(gh, hotfix());
+  const result = await withBeta(gh, hotfix());
   assert.equal(result.tag, "v1.0.1");
   assert.equal(result.backports.length, 1);
   assert.deepEqual(named(gh, "createTag"), [
@@ -143,14 +152,14 @@ test("hotfixBackports_skipOpenOrEmptyPairs", async () => {
     pulls: [{ number: 40, base: "beta", head: "main", labels: ["backport"] }],
     compare: { "beta...main": [commit("h", "fix: login")], "dev...beta": [commit("r", "fix: r")] },
   });
-  const result = await run(gh, hotfix());
+  const result = await withBeta(gh, hotfix());
   assert.deepEqual(result.backports, []);
   assert.deepEqual(named(gh, "createPull"), [], "the open main -> beta is reused; beta -> dev waits for it");
 });
 
 test("hotfixWithNothingToBringToBeta_opensTheBackportToDevRightAway", async () => {
   const gh = fakeGitHub({ compare: { "dev...beta": [commit("r", "fix: r")] } });
-  const result = await run(gh, hotfix());
+  const result = await withBeta(gh, hotfix());
   assert.equal(result.backports.length, 1);
   assert.deepEqual(opened(gh), [backport("dev", "beta", "v1.0.1")]);
 });
@@ -171,6 +180,44 @@ test("stableMerge_reusesAnOpenBackportToDev", async () => {
   const result = await run(gh, mergedPull({ base: "main", head: "beta", title: "chore(release): v1.0.0" }));
   assert.deepEqual(result.backports, []);
   assert.deepEqual(named(gh, "createPull"), []);
+});
+
+test("backport_isOpenedWithAutoMergePinnedToItsHead", async () => {
+  const gh = fakeGitHub({ compare: { "dev...beta": [commit("r", "chore(release): v1.0.0")] } });
+  const [number] = (await run(gh, mergedPull({ base: "main", head: "beta", title: "chore(release): v1.0.0" }))).backports;
+  assert.deepEqual(named(gh, "enableAutoMerge"), [
+    ["enableAutoMerge", number, { expectedHeadOid: sha("h"), commitHeadline: "chore(release): backport v1.0.0 to dev" }],
+  ]);
+  assert.match(named(gh, "createPull")[0][1].body, /auto-merge est activé/);
+  assert.deepEqual(named(gh, "updatePull"), []);
+});
+
+test("backportWhoseAutoMergeFails_isLeftToTheOwner", async () => {
+  const gh = fakeGitHub({ compare: { "dev...main": [commit("r", "fix: r")] }, autoMergeFails: true });
+  const result = await run(gh, mergedPull({ base: "main", head: "dev", title: "chore(release): v1.2.0" }), false);
+  assert.equal(result.backports.length, 1, "the backport stays open");
+  const [[, number, { body }]] = named(gh, "updatePull");
+  assert.equal(number, result.backports[0]);
+  assert.match(body, /Fusionne cette PR par commit de merge/);
+});
+
+// Beta skipped (lib/flow.mjs): dev -> main is a stable, brought back to dev straight from main.
+test("devToMainMerge_tagsTheStable_andOpensTheBackportOfMainToDev", async () => {
+  const gh = fakeGitHub({ compare: { "dev...main": [commit("r", "chore(release): v1.2.0")] } });
+  const result = await run(gh, mergedPull({ base: "main", head: "dev", title: "chore(release): v1.2.0" }), false);
+  assert.equal(result.tag, "v1.2.0");
+  assert.deepEqual(named(gh, "createTag"), [
+    ["createTag", { tag: "v1.2.0", sha: sha("m"), message: "chore(release): v1.2.0" }],
+  ]);
+  assert.deepEqual(opened(gh), [backport("dev", "main", "v1.2.0")]);
+  assert.equal(named(gh, "enableAutoMerge").length, 1);
+});
+
+test("hotfixWithoutBeta_opensTheBackportOfMainToDev", async () => {
+  const gh = fakeGitHub({ compare: { "beta...main": [commit("h", "fix: login")], "dev...main": [commit("h", "fix: login")] } });
+  const result = await run(gh, hotfix(), false);
+  assert.equal(result.backports.length, 1);
+  assert.deepEqual(opened(gh), [backport("dev", "main", "v1.0.1")]);
 });
 
 test("betaMerge_opensNoBackport", async () => {

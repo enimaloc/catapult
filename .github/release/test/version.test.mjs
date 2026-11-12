@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseVersion, bumpKind, nextBeta, nextStable } from "../lib/version.mjs";
+import { parseVersion, bumpKind, nextBeta, nextDirectStable, nextStable } from "../lib/version.mjs";
 
 test("parseVersion reads stable and beta tags", () => {
   assert.deepEqual(parseVersion("v1.0.0-BETA.3"), { major: 1, minor: 0, patch: 0, beta: 3 });
@@ -54,6 +54,18 @@ test("nextBeta ignores betas not newer than the last stable", () => {
 test("nextBeta with no new commits continues the existing beta line, else throws", () => {
   assert.equal(nextBeta("v1.0.0", ["v1.0.1-BETA.1"], []), "v1.0.1-BETA.2");
   assert.throws(() => nextBeta("v1.0.0", [], []));
+});
+
+test("nextDirectStable bumps the last stable from the commits, or returns null", () => {
+  assert.equal(nextDirectStable("v1.1.0", [], ["fix: a"]), "v1.1.1");
+  assert.equal(nextDirectStable("v1.1.0", [], ["fix: a", "feat: b"]), "v1.2.0");
+  assert.equal(nextDirectStable("v1.1.0", [], ["feat!: c"]), "v2.0.0");
+  assert.equal(nextDirectStable("v1.1.0", [], ["docs no prefix"]), null);
+});
+
+test("nextDirectStable never goes below a pending beta's target", () => {
+  assert.equal(nextDirectStable("v1.1.0", ["v1.2.0-BETA.1"], ["fix: a"]), "v1.2.0");
+  assert.equal(nextDirectStable("v1.1.0", ["v1.0.0-BETA.9"], ["fix: a"]), "v1.1.1");
 });
 
 test("nextStable strips the beta suffix", () => {

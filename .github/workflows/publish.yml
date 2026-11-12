@@ -2,7 +2,9 @@ name: Publish
 
 # Tags the merge commit only on an actual merge: a closed but unmerged promotion PR releases nothing.
 # The tag is pushed with the App token, whose pushes do trigger workflows: that tag push runs
-# release.yml, the single publication path. A merged hotfix backport main -> beta opens beta -> dev.
+# release.yml, the single publication path. A stable or a hotfix opens its backport to dev:
+# main -> dev while beta is skipped (.github/release/lib/flow.mjs); with beta, a merged hotfix
+# backport main -> beta opens beta -> dev.
 on:
   pull_request:
     types: [closed]
@@ -20,6 +22,7 @@ jobs:
       github.event.pull_request.merged == true &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       (
+        (github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref == 'dev') ||
         (github.event.pull_request.base.ref == 'beta' && github.event.pull_request.head.ref == 'dev') ||
         (github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref == 'beta') ||
         (github.event.pull_request.base.ref == 'main' && startsWith(github.event.pull_request.head.ref, 'hotfix/')) ||

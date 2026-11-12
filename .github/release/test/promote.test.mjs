@@ -171,6 +171,24 @@ test("betaToMain_usesTheStableOfTheLatestBeta", async () => {
   assert.equal(gh.calls[0][1].title, "chore(release): v1.0.0");
 });
 
+test("devToMain_bumpsTheLastStableStraightAway", async () => {
+  const gh = fakeGitHub({
+    tags: ["v1.0.0-BETA.102", "v1.1.0-BETA.1", "v1.1.0"],
+    ahead: { "main...dev": [commit("a", "feat: x"), commit("b", "fix: y")] },
+  });
+  assert.deepEqual(await run(gh, "dev", "main"), { action: "created", number: 100 });
+  const [[, created]] = gh.calls;
+  assert.equal(created.title, "chore(release): v1.2.0");
+  assert.equal(created.base, "main");
+  assert.equal(created.head, "dev");
+});
+
+test("devToMain_withoutReleasableCommit_doesNothing", async () => {
+  const gh = fakeGitHub({ tags: ["v1.1.0"], ahead: { "main...dev": [commit("a", "not conventional")] } });
+  assert.deepEqual(await run(gh, "dev", "main"), { action: "none" });
+  assert.deepEqual(gh.calls, []);
+});
+
 test("betaToMain_withoutBeta_doesNothing", async () => {
   const gh = fakeGitHub({ tags: ["v1.0.0"], ahead: { "main...beta": [commit("a", "fix: x")] } });
   assert.deepEqual(await run(gh, "beta", "main"), { action: "none" });

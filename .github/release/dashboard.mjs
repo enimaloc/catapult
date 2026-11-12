@@ -10,7 +10,7 @@ import { createGitHub } from "./lib/github.mjs";
 const MARKER = "<!-- release-dashboard -->";
 const TITLE = "🚀 Releases en cours";
 const LABEL = "release";
-const PAIRS = new Set(["dev>beta", "beta>main"]);
+const PAIRS = new Set(["dev>main", "dev>beta", "beta>main"]);
 const TITLE_VERSION = /^chore\(release\): (v\S+)$/;
 
 // GitHub turns #N into a link to the pull request.

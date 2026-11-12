@@ -171,8 +171,16 @@ test("the App's own draft changes never cancel", async () => {
 
 test("a release is due only once its date has come", async () => {
   const gh = fakeGitHub({ comments: [said(scheduleMarker(AT, sha("a")))] });
-  assert.deepEqual(await dueSources({ gh, appSlug: APP, now: new Date(AT - 1) }), []);
-  assert.deepEqual(await dueSources({ gh, appSlug: APP, now: AT }), ["dev"]);
+  assert.deepEqual(await dueSources({ gh, appSlug: APP, now: new Date(AT - 1), beta: true }), []);
+  assert.deepEqual(await dueSources({ gh, appSlug: APP, now: AT, beta: true }), ["dev"]);
+});
+
+test("beta skipped, the due release is the dev -> main promotion", async () => {
+  const marker = [said(scheduleMarker(AT, sha("a")))];
+  const direct = fakeGitHub({ pull: { base: "main", title: "chore(release): v1.2.0" }, comments: marker });
+  assert.deepEqual(await dueSources({ gh: direct, appSlug: APP, now: AT }), ["dev"]);
+  const viaBeta = fakeGitHub({ comments: marker });
+  assert.deepEqual(await dueSources({ gh: viaBeta, appSlug: APP, now: AT }), [], "dev -> beta is not scheduled");
 });
 
 test("before the date, the run does nothing", async () => {

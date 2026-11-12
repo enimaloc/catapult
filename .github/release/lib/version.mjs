@@ -1,4 +1,5 @@
-// Version computation for the dev -> beta -> main release flow.
+// Version computation for the release flow: dev -> main while beta is skipped (lib/flow.mjs), else
+// dev -> beta -> main.
 // Tags are `vX.Y.Z` (stable) and `vX.Y.Z-BETA.N` (pre-release).
 
 const TAG = /^v(\d+)\.(\d+)\.(\d+)(?:-BETA\.(\d+))?$/;
@@ -72,6 +73,20 @@ export function nextBeta(lastStable, betaTags, subjects) {
   const sameTarget = betas.filter((v) => compare(v, target) === 0).map((v) => v.beta);
   const n = sameTarget.length ? Math.max(...sameTarget) + 1 : 1;
   return format(target, n);
+}
+
+/**
+ * Next stable promoted straight from dev (beta skipped): lastStable bumped by the commits, or the highest
+ * target among the betas newer than lastStable when that is higher; null when no commit is releasable.
+ */
+export function nextDirectStable(lastStable, betaTags, subjects) {
+  const kind = bumpKind(subjects, lastStable);
+  if (kind === null) return null;
+  let target = bump(parseVersion(lastStable), kind);
+  for (const beta of betaTags.map(parseVersion)) {
+    if (beta.beta !== null && compare(beta, target) > 0) target = beta;
+  }
+  return format(target);
 }
 
 export function nextStable(betaTag) {

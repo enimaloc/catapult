@@ -1,9 +1,10 @@
 // Scheduled releases. --confirm answers the owner's edits of a promotion PR: only the App's comment
 // makes a date active. --due lists the source branches whose date has come, and --run takes their PR
 // out of draft, then follows the same path as the owner doing it.
-// CLI: node .github/release/schedule.mjs --confirm | --due | --run --source dev --target beta
+// CLI: node .github/release/schedule.mjs --confirm | --due | --run --source dev [--target main]
 // (env: GH_TOKEN, GITHUB_REPOSITORY=owner/repo, APP_SLUG = the release App's slug; GITHUB_EVENT_PATH
-// for --confirm, GITHUB_OUTPUT for --due)
+// for --confirm, GITHUB_OUTPUT for --due). --run takes the target from lib/flow.mjs: --target is only
+// a fallback, so an older release-schedule.yml (still on main until the next release) stays right.
 
 import { appendFileSync, readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
@@ -13,11 +14,7 @@ import { activeSchedule, formatParis, NO_SCHEDULE, parseScheduleDate, scheduleMa
 import { createGitHub } from "./lib/github.mjs";
 import { isReleaseCommit } from "./promote.mjs";
 import { kindOf, onReady } from "./ready.mjs";
-
-export const PROMOTIONS = [
-  { source: "dev", target: "beta" },
-  { source: "beta", target: "main" },
-];
+import { BETA, promotions, promotionTarget } from "./lib/flow.mjs";
 // Past this delay, the start of the release says it is late (GitHub's schedules may be delayed).
 export const LATE_NOTICE_MS = 60 * 60 * 1000;
 
@@ -72,9 +69,9 @@ export async function confirm({ gh, event, owner, repo, appSlug, now = new Date(
 }
 
 /** The source branches of the open promotions whose scheduled date has come. */
-export async function dueSources({ gh, appSlug, now = new Date() }) {
+export async function dueSources({ gh, appSlug, now = new Date(), beta = BETA }) {
   const due = [];
-  for (const { source, target } of PROMOTIONS) {
+  for (const { source, target } of promotions(beta)) {
     const [pull] = await gh.listPulls({ base: target, head: source });
     if (!pull) continue;
     const active = activeSchedule(await gh.listComments(pull.number), appSlug);
@@ -156,9 +153,10 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
     const due = await dueSources({ gh, appSlug });
     console.log(due);
     appendFileSync(process.env.GITHUB_OUTPUT, `sources=${JSON.stringify(due)}\n`);
-  } else if (values.run && values.source && values.target) {
-    console.log(await run({ gh, source: values.source, target: values.target, owner, repo, appSlug }));
+  } else if (values.run && values.source && (promotionTarget(values.source) ?? values.target)) {
+    const target = promotionTarget(values.source) ?? values.target;
+    console.log(await run({ gh, source: values.source, target, owner, repo, appSlug }));
   } else {
-    throw new Error("Usage: schedule.mjs --confirm | --due | --run --source <branch> --target <branch>");
+    throw new Error("Usage: schedule.mjs --confirm | --due | --run --source <branch> [--target <branch>]");
   }
 }

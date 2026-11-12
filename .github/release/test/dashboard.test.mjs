@@ -71,15 +71,17 @@ test("refresh_derivesStateFromThePullRequests", async () => {
       pull(1),
       pull(2, { draft: false }),
       pull(3, { draft: false, autoMerge: true, head: "beta", base: "main", title: "chore(release): v1.0.0" }),
-      pull(4, { draft: false, base: "main", head: "dev" }), // not a promotion pair
+      pull(4, { draft: false, base: "main", head: "feat/x" }), // not a promotion pair
       pull(5, { labels: ["backport"], head: "main", base: "beta" }),
       pull(6, { labels: [] }),
+      pull(7, { base: "main", head: "dev", title: "chore(release): v1.2.0" }), // beta skipped
     ],
     mergeStates: { 2: "DIRTY" },
   });
   await refreshDashboard({ gh });
   const body = gh.calls.find(([name]) => name === "create")[1].body;
   assert.match(body, /v1\.0\.0-BETA\.1 \| draft \| #1/);
+  assert.match(body, /`dev` → `main` \| v1\.2\.0 \| draft \| #7/);
   assert.match(body, /v1\.0\.0-BETA\.2 \| en conflit \| #2/);
   assert.match(body, /\| v1\.0\.0 \| prête \(auto-merge\) \| #3/);
   assert.doesNotMatch(body, /#4|#6/);
