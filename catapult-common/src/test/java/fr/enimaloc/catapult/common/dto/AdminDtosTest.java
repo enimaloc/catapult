@@ -72,4 +72,18 @@ class AdminDtosTest {
         assertThat(TwRebuildStatusDto.IDLE.done()).isZero();
         assertThat(TwRebuildStatusDto.IDLE.state()).isEqualTo("IDLE");
     }
+
+    @Test
+    void aKeysUsage_travelsFromItsStatusToThePage() {
+        var usage = new fr.enimaloc.catapult.common.dto.admin.KeyUsageDto(2, 3, 5, null, "DAY", 40, 100_000L, null);
+        var status = new fr.enimaloc.catapult.common.dto.admin.KeyStatus("id", "ab…cd", null, false, 0, usage);
+        var page = fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto.of(
+                new fr.enimaloc.catapult.common.dto.admin.SteamKeysPageData(java.util.List.of(status), true));
+
+        org.assertj.core.api.Assertions.assertThat(page.keys().getFirst().usage()).isEqualTo(usage);
+        org.assertj.core.api.Assertions.assertThat(new fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto.Key(
+                "id", "ab…cd", null, false, 0).usage()).isNull();
+        org.assertj.core.api.Assertions.assertThat(new fr.enimaloc.catapult.common.dto.admin.KeyStatus(
+                "id", "ab…cd", null, false, 0).usage()).isNull();
+    }
 }

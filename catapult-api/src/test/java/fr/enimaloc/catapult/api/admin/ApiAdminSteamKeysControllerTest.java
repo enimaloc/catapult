@@ -38,7 +38,11 @@ class ApiAdminSteamKeysControllerTest {
     private final SteamApiKeyRepository repository = mock(SteamApiKeyRepository.class);
     private final SteamApiKeyRotator rotator = mock(SteamApiKeyRotator.class);
     private final AdminEventPublisher events = mock(AdminEventPublisher.class);
-    private final ApiAdminSteamKeysController controller = new ApiAdminSteamKeysController(new SteamKeyPoolService(repository, Optional.of(rotator), events));
+    private final fr.enimaloc.catapult.getter.steam.SteamRateLimiter limiter =
+            new fr.enimaloc.catapult.getter.steam.SteamRateLimiter(3, 2000, 5000,
+                    new io.micrometer.core.instrument.simple.SimpleMeterRegistry());
+    private final ApiAdminSteamKeysController controller = new ApiAdminSteamKeysController(
+            new SteamKeyPoolService(repository, Optional.of(rotator), events, Optional.of(limiter)));
 
     @BeforeEach
     void setUp() {
@@ -79,7 +83,7 @@ class ApiAdminSteamKeysControllerTest {
 
     @Test
     void withoutRotator_steamIsReportedDisabled_andEditsStillWork() {
-        ApiAdminSteamKeysController bare = new ApiAdminSteamKeysController(new SteamKeyPoolService(repository, Optional.empty(), events));
+        ApiAdminSteamKeysController bare = new ApiAdminSteamKeysController(new SteamKeyPoolService(repository, Optional.empty(), events, Optional.empty()));
         when(repository.findByExclusiveFalseWithOwner()).thenReturn(List.of(entry(KEY, null)));
         when(repository.findByExclusiveFalse()).thenReturn(List.of(entry(KEY, null)));
 

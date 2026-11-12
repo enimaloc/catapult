@@ -1,13 +1,20 @@
 package fr.enimaloc.catapult.getter.steam;
 
+import fr.enimaloc.catapult.common.dto.admin.KeyUsageDto;
+import fr.enimaloc.catapult.getter.KeyCallCounter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -28,6 +35,10 @@ public class SteamRateLimiter {
     private final ConcurrentHashMap<String, Semaphore> keyPermits = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Long> keyBlockedUntil = new ConcurrentHashMap<>();
     private volatile long globalBlockedUntil = 0;
+    /** Steam's documented daily limit per key (100,000 calls), shown against the calls of the day. */
+    @Setter @Value("${steam.rate-limit.daily-limit:100000}") private long dailyLimit = 100_000;
+    private final KeyCallCounter calls =
+            new KeyCallCounter(Duration.ofSeconds(1), at -> LocalDate.ofInstant(at, ZoneOffset.UTC));
 
     public SteamRateLimiter(
         @Value("${steam.rate-limit.permits-per-window:3}") int permitsPerWindow,
@@ -67,7 +78,7 @@ public class SteamRateLimiter {
         long now = System.currentTimeMillis();
         if (now < globalBlockedUntil || now < keyBlockedUntil.getOrDefault(key, 0L)) return false;
         try {
-            return semaphoreFor(key).tryAcquire(maxWaitMs, TimeUnit.MILLISECONDS);
+            return counted(key, semaphoreFor(key).tryAcquire(maxWaitMs, TimeUnit.MILLISECONDS));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return false;
@@ -80,7 +91,7 @@ public class SteamRateLimiter {
     public boolean acquireBlocking(String key) {
         try {
             semaphoreFor(key).acquire();
-            return true;
+            return counted(key, true);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return false;
@@ -128,6 +139,22 @@ public class SteamRateLimiter {
                 if (deficit > 0) semaphore.release(deficit);
             }
         });
+    }
+
+    /**
+     * What {@code key} was used for on this instance: the permits taken in the current window out of
+     * {@code permitsPerWindow}, and the calls of the day (UTC) out of Steam's daily limit.
+     */
+    public KeyUsageDto usage(String key) {
+        Semaphore permits = keyPermits.get(key);
+        int used = permits == null ? 0 : Math.max(0, permitsPerWindow - permits.availablePermits());
+        return new KeyUsageDto(used, permitsPerWindow, (int) Math.max(1, windowMs / 1000), null,
+                "DAY", calls.inPeriod(key, Instant.now()), dailyLimit, null);
+    }
+
+    private boolean counted(String key, boolean acquired) {
+        if (acquired) calls.record(key, Instant.now());
+        return acquired;
     }
 
     private Semaphore semaphoreFor(String key) {

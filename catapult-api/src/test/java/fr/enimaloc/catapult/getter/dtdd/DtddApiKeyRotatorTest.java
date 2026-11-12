@@ -159,4 +159,22 @@ class DtddApiKeyRotatorTest {
         rotator.onQuota("KEY_A", null, null);
         assertThat(rotator.getQuotas()).isEmpty();
     }
+
+    @Test
+    void aKeysUsage_countsItsCalls_againstWhatDtddTold_elseTheFreeTier() {
+        assertThat(rotator.usage("KEY_A")).isEqualTo(new fr.enimaloc.catapult.common.dto.admin.KeyUsageDto(
+                0, 30, 60, null, "MONTH", 0, 5000L, null));
+
+        rotator.onCall("KEY_A");
+        rotator.onCall("KEY_A");
+        rotator.onQuota("KEY_A", 28, 4321, 60, 10000);
+
+        var usage = rotator.usage("KEY_A");
+        assertThat(usage.windowCalls()).isEqualTo(2);
+        assertThat(usage.windowLimit()).isEqualTo(60);
+        assertThat(usage.windowRemaining()).isEqualTo(28);
+        assertThat(usage.periodCalls()).isEqualTo(2);
+        assertThat(usage.periodLimit()).isEqualTo(10000L);
+        assertThat(usage.periodRemaining()).isEqualTo(4321);
+    }
 }

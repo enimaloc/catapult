@@ -6,11 +6,18 @@ import java.util.Objects;
 /**
  * A provider's shared API keys as the admin Keys tab shows them: whether the integration is enabled
  * and each key by its id and masked value only (the raw key never leaves catapult-api), its owner
- * (null for an admin's) and any remaining rate-limit block. Built from a provider's page: none
+ * (null for an admin's), any remaining rate-limit block and what it was used for. Built from a provider's page: none
  * (catapult-api unreachable) gives null, a page without its key list no keys.
  */
 public record ApiKeysPageDto(boolean enabled, List<Key> keys) {
-    public record Key(String id, String masked, String owner, boolean blocked, long blockedForSeconds) {}
+    public record Key(String id, String masked, String owner, boolean blocked, long blockedForSeconds,
+                      KeyUsageDto usage) {
+
+        /** A key without its usage. */
+        public Key(String id, String masked, String owner, boolean blocked, long blockedForSeconds) {
+            this(id, masked, owner, blocked, blockedForSeconds, null);
+        }
+    }
 
     public ApiKeysPageDto {
         keys = keys == null ? List.of() : keys;
@@ -27,7 +34,7 @@ public record ApiKeysPageDto(boolean enabled, List<Key> keys) {
     private static List<Key> keys(List<KeyStatus> keys) {
         return keys == null ? List.of() : keys.stream()
                 .filter(Objects::nonNull)
-                .map(k -> new Key(k.id(), k.masked(), k.owner(), k.blocked(), k.blockedForSeconds()))
+                .map(k -> new Key(k.id(), k.masked(), k.owner(), k.blocked(), k.blockedForSeconds(), k.usage()))
                 .toList();
     }
 }

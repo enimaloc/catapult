@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.common.dto.admin.KeyStatus;
 import fr.enimaloc.catapult.common.dto.admin.SteamKeysPageData;
 import fr.enimaloc.catapult.domain.steam.SteamApiKeyEntry;
 import fr.enimaloc.catapult.getter.steam.SteamApiKeyRotator;
+import fr.enimaloc.catapult.getter.steam.SteamRateLimiter;
 import fr.enimaloc.catapult.repository.steam.SteamApiKeyRepository;
 import fr.enimaloc.catapult.service.ApiKeyHasher;
 import fr.enimaloc.catapult.service.notification.AdminEventPublisher;
@@ -23,24 +24,28 @@ public class SteamKeyPoolService {
     private final SteamApiKeyRepository repository;
     private final Optional<SteamApiKeyRotator> rotator;
     private final AdminEventPublisher events;
+    private final Optional<SteamRateLimiter> rateLimiter;
 
-    /** The rotator only exists when Steam is enabled. */
+    /** The rotator and the rate limiter (each key's usage) only exist when Steam is enabled. */
     public SteamKeyPoolService(SteamApiKeyRepository repository,
                                Optional<SteamApiKeyRotator> rotator,
-                               AdminEventPublisher events) {
+                               AdminEventPublisher events,
+                               Optional<SteamRateLimiter> rateLimiter) {
         this.repository = repository;
         this.rotator = rotator;
         this.events = events;
+        this.rateLimiter = rateLimiter;
     }
 
     /** A shared key's id, masked value, owner and remaining rate-limit block. */
-    private static KeyStatus status(SteamApiKeyEntry entry, Map<String, Long> blockedUntil, long now) {
+    private KeyStatus status(SteamApiKeyEntry entry, Map<String, Long> blockedUntil, long now) {
         String key = entry.getApiKey();
         String owner = entry.getOwner() != null ? entry.getOwner().getTwitchUsername() : null;
         long until = blockedUntil.getOrDefault(key, 0L);
         boolean blocked = until > now;
         long remainingSec = blocked ? TimeUnit.MILLISECONDS.toSeconds(until - now) : 0L;
-        return new KeyStatus(ApiKeyHasher.id(key), mask(key), owner, blocked, remainingSec);
+        return new KeyStatus(ApiKeyHasher.id(key), mask(key), owner, blocked, remainingSec,
+                rateLimiter.map(l -> l.usage(key)).orElse(null));
     }
 
     private void refreshRotator() {

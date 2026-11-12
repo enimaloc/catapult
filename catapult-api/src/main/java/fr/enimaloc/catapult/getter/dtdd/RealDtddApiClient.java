@@ -118,9 +118,12 @@ public class RealDtddApiClient implements DtddApiClient {
             if (keyOpt.isEmpty()) return Optional.empty();
             String key = keyOpt.get();
             try {
+                rotator.onCall(key);
                 ResponseEntity<String> response = call.apply(key);
                 rotator.onQuota(key, header(response.getHeaders(), "X-RateLimit-Remaining-Minute"),
-                        header(response.getHeaders(), "X-RateLimit-Remaining-Month"));
+                        header(response.getHeaders(), "X-RateLimit-Remaining-Month"),
+                        header(response.getHeaders(), "X-RateLimit-Limit-Minute"),
+                        header(response.getHeaders(), "X-RateLimit-Limit-Month"));
                 return Optional.ofNullable(parser.apply(response.getBody()));
             } catch (RestClientResponseException e) {
                 HttpStatusCode status = e.getStatusCode();

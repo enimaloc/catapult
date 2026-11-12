@@ -180,11 +180,13 @@ class RealDtddApiClientTest {
             .setHeader("Content-Type", "application/json")
             .setHeader("X-RateLimit-Remaining-Minute", "28")
             .setHeader("X-RateLimit-Remaining-Month", "4321")
+            .setHeader("X-RateLimit-Limit-Minute", "30")
             .setBody("[]"));
 
         client.search("x", null);
 
-        verify(rotator).onQuota("KEY_A", 28, 4321);
+        verify(rotator).onCall("KEY_A");
+        verify(rotator).onQuota("KEY_A", 28, 4321, 30, null);
     }
 
     @Test
