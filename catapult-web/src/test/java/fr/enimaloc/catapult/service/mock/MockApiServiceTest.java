@@ -1283,4 +1283,13 @@ class MockApiServiceTest {
         assertThat(service.adminStartDtddRefetch().status()).isEqualTo(202);
         assertThat(service.adminCancelDtddRefetch().body().state()).isEqualTo("CANCELLED");
     }
+
+    @Test
+    void twDetailsAndDtddTopics_areTheMocks() {
+        String bindingId = service.channelPage("enimaloc", 0, null, null).bindings().content().getFirst().id();
+        assertThat(service.twDetails(bindingId)).isNotNull();
+        assertThat(service.twDetails("nope")).isNull();
+        assertThat(service.adminTwDtddTopics("violence")).isNotEmpty();
+        assertThat(service.adminSetTwDtddTopics("violence", java.util.Map.of("someone dies", "Depicted"))).isEqualTo(204);
+    }
 }
