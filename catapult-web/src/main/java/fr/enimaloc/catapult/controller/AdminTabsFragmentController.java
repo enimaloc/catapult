@@ -412,15 +412,6 @@ public class AdminTabsFragmentController {
         });
     }
 
-    /** The rate limits learned from the platforms' 429s: each host, then its routes. */
-    @GetMapping("/rate-limits")
-    String rateLimits(Model model, HttpServletResponse response) {
-        return guarded(model, response, () -> {
-            model.addAttribute("limits", apiService.adminRateLimits());
-            return "pages/admin-tab/rate-limits :: list";
-        });
-    }
-
     @GetMapping("/groups")
     String groups(Model model, HttpServletResponse response) {
         return guarded(model, response, () -> {
@@ -484,6 +475,8 @@ public class AdminTabsFragmentController {
             model.addAttribute("steam", apiService.adminApiKeys(ApiKeyProvider.STEAM));
             model.addAttribute("dtdd", apiService.adminApiKeys(ApiKeyProvider.DTDD));
             model.addAttribute("minecraft", apiService.adminMinecraftAccounts());
+            // The rate limits learned from the platforms' 429s: each host, then its routes
+            model.addAttribute("limits", apiService.adminRateLimits());
             return "pages/admin-tab/keys :: content";
         });
     }

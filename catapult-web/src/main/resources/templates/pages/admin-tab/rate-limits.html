@@ -2,7 +2,8 @@
 <!--/*
   The rate limits catapult-api learned from the platforms' 429s (list): each host (the budget its routes share), then
   its routes (in the host's budget, or with a limit of their own). Each one corrected in the view's dialog or reset
-  (admin-rate-limits.js); the rows are [data-admin-list] keyed by their ID, patched after.
+  (admin-rate-limits.js); the rows are [data-admin-list] keyed by their ID, patched after and every few seconds.
+  Shown in the Keys tab, under the keys.
 */-->
 
 <div th:fragment="list" class="admin-view admin-rate-limits"
@@ -15,10 +16,12 @@
     </div>
     <p class="admin-cell-muted admin-rl-hint" th:text="#{admin.rate-limits.hint}">hint</p>
     <th:block th:if="${limits == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
-    <th:block th:if="${limits != null and limits.isEmpty()}">
+    <!--/* Both rendered, one hidden, so that a patch shows the first limit learned */-->
+    <div data-admin-value="limits-empty" th:if="${limits != null}" th:hidden="${!limits.isEmpty()}">
         <th:block th:replace="~{pages/admin-tab/common :: empty('speed', #{admin.rate-limits.none})}"></th:block>
-    </th:block>
-    <mdui-card class="admin-table" variant="outlined" data-admin-list="limits" th:if="${limits != null and !limits.isEmpty()}">
+    </div>
+    <mdui-card class="admin-table" variant="outlined" data-admin-list="limits" th:if="${limits != null}"
+               th:hidden="${limits.isEmpty()}">
         <div class="admin-row admin-rl-row admin-row-head" aria-hidden="true">
             <span th:text="#{admin.rate-limits.column.scope}">Host / route</span>
             <span th:text="#{admin.rate-limits.column.limit}">Limit</span>

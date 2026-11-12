@@ -161,8 +161,12 @@ document.addEventListener("catapult:render", function () {
     if (!tabs) return;
     const first = tabs.value;
 
-    // "#caches/igdb-game-cache": the tab, then the sub-view admin-tabs.js opens in it.
-    const wanted = location.hash.slice(1).split("/")[0];
+    // "#caches/igdb-game-cache": the tab, then the sub-view admin-tabs.js opens in it. A former tab's hash
+    // (data-hash-aliases) opens the tab it went into, and the hash then names that one.
+    const named = location.hash.slice(1).split("/")[0];
+    const aliases = JSON.parse(tabs.dataset.hashAliases || "{}");
+    const wanted = Object.hasOwn(aliases, named) ? aliases[named] : named;
+    if (wanted !== named) history.replaceState(history.state, "", location.pathname + location.search + `#${wanted}`);
     // Non-owners only get the overview tab: ignore a hash naming one they don't have.
     if (wanted && tabs.querySelector(`mdui-tab[value="${CSS.escape(wanted)}"]`)) {
         tabs.value = wanted;
