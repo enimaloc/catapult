@@ -75,6 +75,13 @@ class LearnedRateLimiterTest {
         limiter.onResponse(key, HttpStatus.TOO_MANY_REQUESTS, h);
     }
 
+    /** The store's scopes known for an hour: a 429 then tells a limit. */
+    private void known() {
+        limiter.blockedUntil(STORE, "/api/appdetails");
+        limiter.blockedUntil(STORE, "/app/{id}");
+        clock.advance(Duration.ofHours(1));
+    }
+
     private LearnedRateLimitDto row(String id) {
         return limiter.list().stream().filter(d -> d.id().equals(id)).findFirst().orElseThrow();
     }
@@ -99,6 +106,7 @@ class LearnedRateLimiterTest {
 
     @Test
     void a429_blocksTheWholeHost_andALiveCallElsewhereIsRefusedWithoutWaiting() {
+        known();
         calls(APPDETAILS, 20);
         tooMany(APPDETAILS, null);
 
@@ -129,6 +137,7 @@ class LearnedRateLimiterTest {
 
     @Test
     void theRetryAfter_isFollowed_andTeachesNoResumeDelay() {
+        known();
         calls(APPDETAILS, 5);
         tooMany(APPDETAILS, "7");
         assertThat(limiter.blockedUntil(STORE, "/api/appdetails")).contains(clock.now.plusSeconds(7));
@@ -217,6 +226,7 @@ class LearnedRateLimiterTest {
 
     @Test
     void aRouteWithALimitOfItsOwn_isSplitOffItsHost() {
+        known();
         calls(APPDETAILS, 30);
         tooMany(APPDETAILS, null);
         clock.advance(Duration.ofMinutes(10));
@@ -264,13 +274,14 @@ class LearnedRateLimiterTest {
 
     @Test
     void whatWasStored_isTakenBack_andSyncedFromTheOtherInstances() {
+        known();
         calls(APPDETAILS, 10);
         tooMany(APPDETAILS, null);
         LearnedRateLimiter other = new LearnedRateLimiter(props, repository, clock);
 
         assertThat(other.blockedUntil(STORE, "/api/appdetails")).isEmpty();
         assertThat(other.list()).extracting(LearnedRateLimitDto::id)
-                .containsExactly("HOST " + STORE, APPDETAILS.id());
+                .containsExactly("HOST " + STORE, APPDETAILS.id(), PAGE.id());
         assertThat(other.list().getFirst().limitCalls()).isEqualTo(10);
         assertThat(other.list().getFirst().isHost()).isTrue();
 
@@ -296,6 +307,7 @@ class LearnedRateLimiterTest {
 
     @Test
     void longNearTheLimit_raisesIt() {
+        known();
         limiter.acquire(APPDETAILS);
         tooMany(APPDETAILS, null);
         assertThat(row("HOST " + STORE).limitCalls()).isEqualTo(1);
@@ -304,6 +316,19 @@ class LearnedRateLimiterTest {
         calls(APPDETAILS, 1);
         assertThat(row("HOST " + STORE).limitCalls()).isEqualTo(2);
         verify(repository, atLeast(3)).save(any());
+    }
+
+    @Test
+    void pastTheRoutesAHostMayHave_newOnesShareOne() {
+        props.setMaxRoutesPerHost(2);
+        limiter.acquire(APPDETAILS);
+        limiter.acquire(PAGE);
+        limiter.acquire(new RouteKey(STORE, "GET", "/a"));
+        limiter.acquire(new RouteKey(STORE, "GET", "/b"));
+        limiter.acquire(APPDETAILS);
+
+        assertThat(limiter.list()).extracting(LearnedRateLimitDto::path)
+                .containsExactly(null, "/api/appdetails", "/app/{id}", LearnedRateLimiter.OTHER_PATH);
     }
 
     @Test

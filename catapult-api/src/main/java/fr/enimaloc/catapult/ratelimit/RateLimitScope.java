@@ -39,11 +39,11 @@ final class RateLimitScope {
     /** A host's: when each of its routes was last answered (no 429), by route ID. */
     private final Map<String, Instant> lastAnswerByRoute = new ConcurrentHashMap<>();
 
-    RateLimitScope(String host, RouteKey route, LearnedRateLimitProperties props) {
+    RateLimitScope(String host, RouteKey route, LearnedRateLimitProperties props, Instant now) {
         this.host = host;
         this.route = route;
         this.id = route == null ? hostId(host) : route.id();
-        this.estimator = new LimitEstimator(props.getRaiseAfter());
+        this.estimator = new LimitEstimator(props.getRaiseAfter(), now);
         this.resume = new ResumeDelay(props.getForgetFailAfter());
     }
 
@@ -126,6 +126,8 @@ final class RateLimitScope {
         if (overrideLimit == null && !afterWait) estimator.on429(now, wait);
         Instant until = now.plus(wait);
         if (blockedUntil == null || until.isAfter(blockedUntil)) blockedUntil = until;
+        // When the wait ends the platform counts afresh: the calls before it no longer fill the window
+        estimator.forgetCalls(blockedUntil);
         probing = true;
     }
 

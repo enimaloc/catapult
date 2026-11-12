@@ -24,6 +24,16 @@ class RouteKeyTest {
     }
 
     @Test
+    void aConcatenatedTemplate_isNormalizedToo() {
+        MockClientHttpRequest request = new MockClientHttpRequest(HttpMethod.GET,
+                URI.create("https://displaycatalog.mp.microsoft.com/v7.0/products/9NBLGGH4R315ABCD"));
+        request.getAttributes().put(RouteKey.URI_TEMPLATE_ATTRIBUTE,
+                "https://displaycatalog.mp.microsoft.com/v7.0/products/9NBLGGH4R315ABCD?market=FR");
+
+        assertThat(RouteKey.of(request).path()).isEqualTo("/v7.0/products/{id}");
+    }
+
+    @Test
     void withoutATemplate_identifiersBecomeId() {
         MockClientHttpRequest request = new MockClientHttpRequest(HttpMethod.GET,
                 URI.create("https://displaycatalog.mp.microsoft.com/v7.0/products/9NBLGGH4R315ABCD?market=FR"));

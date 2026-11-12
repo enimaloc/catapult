@@ -14,7 +14,7 @@ class LearningTest {
     private static final Instant T0 = Instant.parse("2026-11-12T10:00:00Z");
 
     private static LimitEstimator calls(int n, Duration spread) {
-        LimitEstimator e = new LimitEstimator(Duration.ofHours(1));
+        LimitEstimator e = new LimitEstimator(Duration.ofHours(1), T0.minus(Duration.ofHours(1)));
         for (int i = 0; i < n; i++) e.record(T0.plusMillis(spread.toMillis() * i / n));
         return e;
     }
@@ -56,8 +56,16 @@ class LearningTest {
     }
 
     @Test
+    void aWindowNotCountedWhole_teachesNoLimit() {
+        LimitEstimator e = new LimitEstimator(Duration.ofHours(1), T0);
+        e.record(T0.plusSeconds(1));
+        e.on429(T0.plusSeconds(2), Duration.ofSeconds(60));
+        assertThat(e.estimate()).isEmpty();
+    }
+
+    @Test
     void theLimit_isNeverUnderOneCall() {
-        LimitEstimator e = new LimitEstimator(Duration.ofHours(1));
+        LimitEstimator e = new LimitEstimator(Duration.ofHours(1), T0.minus(Duration.ofHours(1)));
         e.on429(T0, Duration.ofSeconds(1));
         assertThat(e.estimate()).contains(new Estimate(1, Duration.ofSeconds(10)));
         assertThat(e.oldestWithin(Duration.ofSeconds(10), T0)).isEmpty();
@@ -80,6 +88,10 @@ class LearningTest {
         assertThat(e.estimate()).contains(new Estimate(31, Duration.ofMinutes(1)));
         assertThat(e.oldestWithin(Duration.ofMinutes(1), later)).contains(later.minusSeconds(24));
 
+        e.forgetCalls(later);
+        assertThat(e.countWithin(Duration.ofHours(1), later)).isZero();
+        e.on429(later.plusSeconds(30), Duration.ofSeconds(60));
+        assertThat(e.estimate()).contains(new Estimate(31, Duration.ofMinutes(1)));
         e.reset();
         e.maybeRaise(later);
         assertThat(e.estimate()).isEmpty();

@@ -29,9 +29,12 @@ final class LimitEstimator {
     private Estimate estimate;
     private Instant last429;
     private Instant lastRaise;
+    /** Since when every call is counted: a 429 tells a limit only for a window counted whole. */
+    private Instant countingSince;
 
-    LimitEstimator(Duration raiseAfter) {
+    LimitEstimator(Duration raiseAfter, Instant countingSince) {
         this.raiseAfter = raiseAfter;
+        this.countingSince = countingSince;
     }
 
     void record(Instant at) {
@@ -63,10 +66,13 @@ final class LimitEstimator {
      * A 429: the window is the shortest one at least as long as the wait the platform asks or the one learned
      * ({@code resumeHint}), the limit the calls sent in it before the refused one. Never loosened by a 429, and at
      * most halved by one in the same window: a 429 after few calls tells more of a longer window than of a tiny limit.
+     * Nothing is learned when the window wasn't counted whole (just started, or a wait ended within it): the calls
+     * the platform counted aren't all known.
      */
     void on429(Instant now, Duration resumeHint) {
         last429 = now;
         Duration window = WINDOWS.stream().filter(w -> w.compareTo(resumeHint) >= 0).findFirst().orElse(KEPT);
+        if (countingSince.isAfter(now.minus(window))) return;
         int limit = Math.max(1, countWithin(window, now) - 1);
         if (estimate != null && estimate.window().equals(window)) {
             int halved = (estimate.calls() + 1) / 2;
@@ -85,6 +91,12 @@ final class LimitEstimator {
         if (countWithin(estimate.window(), now) * 10 < estimate.calls() * 8) return;
         estimate = new Estimate(estimate.calls() + Math.max(1, estimate.calls() / 10), estimate.window());
         lastRaise = now;
+    }
+
+    /** Forgets the calls counted: after a 429's wait (ending {@code from}), the platform counts afresh. */
+    void forgetCalls(Instant from) {
+        calls.clear();
+        countingSince = from;
     }
 
     void set(Estimate estimate, Instant last429) {

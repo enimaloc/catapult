@@ -39,6 +39,7 @@ public class LearnedRateLimiter {
     /** The header a refusal made here (no call sent) carries: never learned from. */
     public static final String LOCAL_REFUSAL_HEADER = "X-Catapult-Local-Limit";
     private static final long SLICE_MS = 1_000L;
+    static final String OTHER_PATH = "/{other}";
 
     interface Sleeper {
         void sleep(long millis) throws InterruptedException;
@@ -221,11 +222,19 @@ public class LearnedRateLimiter {
     }
 
     private RateLimitScope host(String host) {
-        return scope(RateLimitScope.hostId(host), () -> new RateLimitScope(host, null, props));
+        return scope(RateLimitScope.hostId(host), () -> new RateLimitScope(host, null, props, clock.instant()));
     }
 
+    /** The route's scope; past the host's {@code maxRoutesPerHost}, a new route shares {@code /{other}}. */
     private RateLimitScope route(RouteKey key) {
-        return scope(key.id(), () -> new RateLimitScope(key.host(), key, props));
+        RouteKey k = key;
+        if (!scopes.containsKey(k.id())) {
+            String prefix = k.method() + " " + k.host() + "/";
+            long known = scopes.keySet().stream().filter(id -> id.startsWith(prefix)).count();
+            if (known >= props.getMaxRoutesPerHost()) k = new RouteKey(k.host(), k.method(), OTHER_PATH);
+        }
+        RouteKey routeKey = k;
+        return scope(routeKey.id(), () -> new RateLimitScope(routeKey.host(), routeKey, props, clock.instant()));
     }
 
     /** The scope, loaded from what was stored the first time it is needed, stored when new. */
@@ -249,8 +258,9 @@ public class LearnedRateLimiter {
 
     private RateLimitScope fromEntity(LearnedRateLimit e) {
         RateLimitScope s = e.getPath() == null
-                ? new RateLimitScope(e.getHost(), null, props)
-                : new RateLimitScope(e.getHost(), new RouteKey(e.getHost(), e.getMethod(), e.getPath()), props);
+                ? new RateLimitScope(e.getHost(), null, props, clock.instant())
+                : new RateLimitScope(e.getHost(), new RouteKey(e.getHost(), e.getMethod(), e.getPath()), props,
+                        clock.instant());
         s.apply(e);
         return s;
     }

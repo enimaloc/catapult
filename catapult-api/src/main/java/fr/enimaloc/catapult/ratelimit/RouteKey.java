@@ -8,8 +8,8 @@ import java.util.regex.Pattern;
 
 /**
  * One route of a platform: the method, the host and the path as written by the caller ({@code /app/{id}}), never the
- * resolved URL, so every app's page counts as the same route. Without the caller's URI template, the path's
- * identifier-looking segments become {@code {id}}.
+ * resolved URL, so every app's page counts as the same route. Identifier-looking segments become {@code {id}}, also
+ * in a template a caller built by concatenating them.
  */
 public record RouteKey(String host, String method, String path) {
 
@@ -22,7 +22,7 @@ public record RouteKey(String host, String method, String path) {
         URI uri = request.getURI();
         String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
         Object template = request.getAttributes().get(URI_TEMPLATE_ATTRIBUTE);
-        String path = template instanceof String t ? templatePath(t) : normalizedPath(uri.getRawPath());
+        String path = normalizedPath(template instanceof String t ? templatePath(t) : uri.getRawPath());
         return new RouteKey(host, request.getMethod().name(), path);
     }
 

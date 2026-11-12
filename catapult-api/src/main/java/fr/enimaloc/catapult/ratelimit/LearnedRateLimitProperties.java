@@ -28,4 +28,6 @@ public class LearnedRateLimitProperties {
     private Duration liveMaxWait = Duration.ofSeconds(2);
     private Duration raiseAfter = Duration.ofHours(1);
     private Duration forgetFailAfter = Duration.ofHours(24);
+    /** Past this many routes, a host's new ones share a single route ({@code /{other}}): what is stored stays bounded. */
+    private int maxRoutesPerHost = 50;
 }
