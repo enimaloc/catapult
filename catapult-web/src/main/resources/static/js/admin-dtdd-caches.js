@@ -1,8 +1,8 @@
 /**
  * The admin DTDD caches tab. Its summary starts the bulk refetch once confirmed, or asks it to stop, and follows it
  * while it runs: the summary is patched every few seconds (admin-tabs.js) as long as its job reads RUNNING and the
- * tab is the one shown. A cache's entries each fetch again on demand, then the results shown are patched (same
- * search, same page). A refusal is told with the view's data-error-{status}, else its data-error ({0}: the status).
+ * tab is the one shown. A cache's entries each open in full in a dialog (what the caches keep about it), or fetch
+ * again on demand, then the results shown are patched (same search, same page). A refusal is told with the view's data-error-{status}, else its data-error ({0}: the status).
  * Listeners are delegated to the panel: its content comes and goes.
  */
 window.CatapultAdminDtddCaches = (function () {
@@ -46,6 +46,24 @@ window.CatapultAdminDtddCaches = (function () {
         await CatapultAdminTabs.patch(panel);
     }
 
+    /** The entry in full, into the view's dialog; a failure is told. */
+    async function detail(root, button) {
+        const dialog = root.querySelector("#admin-dc-dialog");
+        const query = new URLSearchParams({ key: button.dataset.key });
+        let response = null;
+        try {
+            response = await fetch(`/spa/admin/${TAB}/${encodeURIComponent(root.dataset.kind)}/entry?${query}`);
+        } catch {
+            // not fetched: told below
+        }
+        if (!response?.ok || !dialog) {
+            CatapultChannel.showError(CatapultAdminTabs.refusal(root, response?.status));
+            return;
+        }
+        dialog.querySelector(".admin-dialog-body").innerHTML = await response.text();
+        dialog.open = true;
+    }
+
     async function start(panel, root, button) {
         if (!await CatapultAdminTabs.confirmed(root, root.dataset.startConfirm, root.dataset.startDescription)) return;
         const sent = await CatapultAdminTabs.post(root, button, `${BASE}/refetch-all/start`, {});
@@ -68,11 +86,13 @@ window.CatapultAdminDtddCaches = (function () {
         panel.dataset.dtddCachesWired = "true";
 
         panel.addEventListener("click", event => {
-            const button = event.target.closest(".admin-dc-refetch, #admin-dc-start, #admin-dc-cancel");
+            const button = event.target.closest(".admin-dc-detail, .admin-dc-refetch, #admin-dc-start, #admin-dc-cancel, .admin-dialog-close");
             if (!button || button.disabled) return;
             const root = button.closest(".admin-view");
             if (!root) return;
-            if (button.matches(".admin-dc-refetch")) refetch(panel, root, button);
+            if (button.matches(".admin-dialog-close")) button.closest("mdui-dialog").open = false;
+            else if (button.matches(".admin-dc-detail")) detail(root, button);
+            else if (button.matches(".admin-dc-refetch")) refetch(panel, root, button);
             else if (button.id === "admin-dc-start") start(panel, root, button);
             else cancel(panel, root, button);
         });

@@ -400,6 +400,18 @@ public class AdminTabsFragmentController {
         });
     }
 
+    /** Everything the DTDD caches keep about one entry, the body of the entries' dialog. */
+    @GetMapping("/dtdd-caches/{kind}/entry")
+    String dtddCacheEntry(Model model, HttpServletResponse response, @PathVariable String kind,
+                          @RequestParam String key) {
+        return guarded(model, response, () -> {
+            model.addAttribute("kind", kind);
+            model.addAttribute("key", key);
+            model.addAttribute("entry", apiService.adminDtddCacheEntry(kind, key));
+            return "pages/admin-tab/dtdd-caches :: entry";
+        });
+    }
+
     @GetMapping("/groups")
     String groups(Model model, HttpServletResponse response) {
         return guarded(model, response, () -> {

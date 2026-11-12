@@ -176,7 +176,93 @@
 
         <div data-admin-value="pagination"><th:block th:replace="~{pages/admin-tab/common :: pagination(${entries})}"></th:block></div>
     </div>
+    <!--/* An entry in full: its body comes from /spa/admin/dtdd-caches/{kind}/entry (admin-dtdd-caches.js) */-->
+    <mdui-dialog id="admin-dc-dialog" class="admin-dialog" close-on-overlay-click>
+        <div class="admin-dialog-body"></div>
+        <mdui-button slot="action" variant="text" class="admin-dialog-close" th:text="#{admin.close}">Close</mdui-button>
+    </mdui-dialog>
 </div>
+
+<!--/* A list of topics as chips, "—" when empty. */-->
+<div th:fragment="topicList(label, topics)" class="admin-dc-topic-list">
+    <h4 th:text="${label}">Yes</h4>
+    <p class="admin-cell-muted" th:if="${topics == null or topics.isEmpty()}">—</p>
+    <div class="admin-dc-chips" th:unless="${topics == null or topics.isEmpty()}">
+        <mdui-chip th:each="t : ${topics}" th:text="${t}">topic</mdui-chip>
+    </div>
+</div>
+
+<!--/*
+  Everything cached about an entry. A title: its record, its topics in full and the searches that found it; a search:
+  itself and the titles it found.
+*/-->
+<div th:fragment="entry" class="admin-detail admin-dc-detail-body">
+    <p class="admin-placeholder" th:if="${entry == null}" th:text="#{admin.dtdd-caches.detail.not_found}">not cached</p>
+    <th:block th:if="${entry != null and entry.dtddId() != null}" th:with="game=${entry.game()},topics=${entry.topics()}">
+        <h3 th:text="${game != null ? game.name() : (topics != null and topics.name() != null ? topics.name() : #messages.msg('admin.dtdd-caches.detail.title', entry.dtddId()))}">Title</h3>
+        <dl class="admin-fields">
+            <dt th:text="#{admin.dtdd-caches.column.id}">ID</dt>
+            <dd><a th:href="|https://www.doesthedogdie.com/media/${entry.dtddId()}|" target="_blank" rel="noopener noreferrer"
+                   th:text="${entry.dtddId()}">1</a></dd>
+            <th:block th:if="${game != null}">
+                <dt th:text="#{admin.dtdd-caches.column.type}">Type</dt>
+                <dd th:text="${game.mediaType() ?: '—'}">type</dd>
+                <dt th:text="#{admin.dtdd-caches.detail.poster}">Poster</dt>
+                <dd th:if="${game.posterUrl() == null}">—</dd>
+                <dd th:if="${game.posterUrl() != null}"><img class="admin-dc-poster" th:src="${game.posterUrl()}" alt="" loading="lazy"></dd>
+                <dt th:text="#{admin.dtdd-caches.detail.game_fetched}">Record fetched</dt>
+                <dd><th:block th:replace="~{:: when(${game.fetchedAt()}, ${game.stale()})}"></th:block></dd>
+            </th:block>
+            <th:block th:if="${game == null}">
+                <dt th:text="#{admin.dtdd-caches.detail.game_fetched}">Record fetched</dt>
+                <dd class="admin-cell-muted" th:text="#{admin.dtdd-caches.detail.not_cached}">not cached</dd>
+            </th:block>
+        </dl>
+
+        <h4 class="admin-dc-detail-section" th:text="#{admin.dtdd-caches.kind.topics}">Topics</h4>
+        <p class="admin-cell-muted" th:if="${topics == null}" th:text="#{admin.dtdd-caches.detail.not_cached}">not cached</p>
+        <th:block th:if="${topics != null}">
+            <p><th:block th:replace="~{:: when(${topics.fetchedAt()}, ${topics.stale()})}"></th:block></p>
+            <div class="admin-dc-topic-lists">
+                <th:block th:replace="~{:: topicList(#{admin.dtdd-caches.column.yes}, ${topics.yesTopics()})}"></th:block>
+                <th:block th:replace="~{:: topicList(#{admin.dtdd-caches.column.no}, ${topics.noTopics()})}"></th:block>
+                <th:block th:replace="~{:: topicList(#{admin.dtdd-caches.column.mostly}, ${topics.mostlyTopics()})}"></th:block>
+            </div>
+        </th:block>
+
+        <h4 class="admin-dc-detail-section" th:text="#{admin.dtdd-caches.detail.found_by}">Found by</h4>
+        <p class="admin-cell-muted" th:if="${entry.searches().isEmpty()}" th:text="#{admin.dtdd-caches.detail.no_search}">none</p>
+        <ul th:unless="${entry.searches().isEmpty()}">
+            <li th:each="s : ${entry.searches()}"><strong th:text="${s.query()}">query</strong> ·
+                <th:block th:replace="~{:: when(${s.searchedAt()}, ${s.stale()})}"></th:block></li>
+        </ul>
+    </th:block>
+
+    <th:block th:if="${entry != null and entry.query() != null}" th:with="search=${entry.searches().get(0)}">
+        <h3 th:text="${entry.query()}">query</h3>
+        <dl class="admin-fields">
+            <dt th:text="#{admin.dtdd-caches.detail.searched}">Searched</dt>
+            <dd><th:block th:replace="~{:: when(${search.searchedAt()}, ${search.stale()})}"></th:block></dd>
+        </dl>
+        <h4 class="admin-dc-detail-section" th:text="#{admin.dtdd-caches.column.found}">Titles found</h4>
+        <p class="admin-cell-muted" th:if="${entry.titles().isEmpty()}" th:text="#{admin.dtdd-caches.detail.nothing_found}">nothing</p>
+        <ul th:unless="${entry.titles().isEmpty()}">
+            <li th:each="t : ${entry.titles()}">
+                <a th:href="|https://www.doesthedogdie.com/media/${t.dtddId()}|" target="_blank" rel="noopener noreferrer"
+                   th:text="${t.dtddId()}">1</a> ·
+                <span th:text="${t.name() ?: #messages.msg('admin.dtdd-caches.detail.not_cached')}">name</span>
+                <span class="admin-cell-muted"
+                      th:text="${t.topicsCached()} ? | · #{admin.dtdd-caches.detail.topics_cached}| : | · #{admin.dtdd-caches.detail.topics_not_cached}|">topics</span>
+            </li>
+        </ul>
+    </th:block>
+</div>
+
+<!--/* A date, "stale" past its cache's lifetime. */-->
+<th:block th:fragment="when(at, stale)">
+    <span th:text="${at == null ? '—' : #temporals.format(at, #messages.msg('format.datetime'))}">when</span>
+    <mdui-chip th:if="${stale}" icon="schedule" class="admin-dc-stale" th:text="#{admin.dtdd-caches.stale}">Stale</mdui-chip>
+</th:block>
 
 <!--/* When an entry was fetched, "stale" past its cache's lifetime. */-->
 <span th:fragment="fetched(at, stale)" class="admin-cell admin-dc-fetched" th:attr="data-label=#{admin.dtdd-caches.column.fetched}">
@@ -184,8 +270,10 @@
     <mdui-chip th:if="${stale}" icon="schedule" class="admin-dc-stale" th:text="#{admin.dtdd-caches.stale}">Stale</mdui-chip>
 </span>
 
-<!--/* An entry fetched again, by its key: the title's ID or the search's query. */-->
+<!--/* An entry seen in full or fetched again, by its key: the title's ID or the search's query. */-->
 <span th:fragment="refetch(key)" class="admin-row-actions">
+    <mdui-button-icon icon="visibility" class="admin-dc-detail"
+                      th:attr="data-key=${key},aria-label=#{admin.dtdd-caches.detail}" th:title="#{admin.dtdd-caches.detail}"></mdui-button-icon>
     <mdui-button-icon icon="refresh" class="admin-dc-refetch"
                       th:attr="data-key=${key},aria-label=#{admin.dtdd-caches.refetch}" th:title="#{admin.dtdd-caches.refetch}"></mdui-button-icon>
 </span>

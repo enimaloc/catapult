@@ -2380,6 +2380,14 @@ mdui-snackbar.broadcast-warning { --mdui-color-inverse-surface: var(--mdui-color
 .admin-dc-quota-row, .admin-table:has(> .admin-dc-quota-row) { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1.2fr) 10rem; }
 .admin-dc-topics { min-width: 0; overflow-wrap: anywhere; }
 .admin-dc-fetched { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.admin-dc-detail-section { margin: 16px 0 4px; }
+.admin-dc-topic-lists { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.admin-dc-topic-list h4 { margin: 0 0 4px; }
+.admin-dc-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.admin-dc-poster { max-width: 120px; border-radius: 8px; }
+@media (max-width: 650px) {
+    .admin-dc-topic-lists { grid-template-columns: minmax(0, 1fr); }
+}
 @media (max-width: 650px) {
     .admin-gm-row, .admin-table:has(> .admin-gm-row),
     .admin-gm-missing-row, .admin-table:has(> .admin-gm-missing-row) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }

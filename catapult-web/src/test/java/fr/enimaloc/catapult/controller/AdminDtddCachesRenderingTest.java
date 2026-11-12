@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
+import fr.enimaloc.catapult.common.dto.admin.DtddCacheEntryDetailDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddCachesSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddGameCacheEntryDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddKeyQuotaDto;
@@ -133,5 +134,57 @@ class AdminDtddCachesRenderingTest {
     void anUnavailableApi_offersARetry() throws Exception {
         assertThat(render("/spa/admin/dtdd-caches", Locale.ENGLISH)).contains("data-admin-retry");
         assertThat(render("/spa/admin/dtdd-caches/topics", Locale.ENGLISH)).contains("data-admin-retry");
+    }
+
+    @Test
+    void aTitleInFull_showsItsRecordItsTopicsAndTheSearchesThatFoundIt() throws Exception {
+        when(apiService.adminDtddCacheEntry("topics", "16758")).thenReturn(new DtddCacheEntryDetailDto(16758L, null,
+                new DtddGameCacheEntryDto(16758, "Halo Infinite", "Video Game", "https://poster.test/h.jpg", AT, false),
+                new DtddTopicsCacheEntryDto(16758, "Halo Infinite", List.of("a dog dies", "gore"), List.of(),
+                        List.of("jump scares"), AT, true),
+                List.of(new DtddSearchCacheEntryDto("halo", List.of(16758L), AT, false)), List.of()));
+
+        String html = render("/spa/admin/dtdd-caches/topics/entry?key=16758", Locale.ENGLISH);
+
+        assertThat(html).contains("Halo Infinite", "https://www.doesthedogdie.com/media/16758", "Video Game",
+                "https://poster.test/h.jpg", ">a dog dies<", ">gore<", ">jump scares<", ">halo<", "admin-dc-stale");
+        // An empty list of topics reads as such
+        assertThat(html).contains(">—<");
+    }
+
+    @Test
+    void aTitleWithoutTopics_saysSo() throws Exception {
+        when(apiService.adminDtddCacheEntry("games", "9")).thenReturn(new DtddCacheEntryDetailDto(9L, null,
+                new DtddGameCacheEntryDto(9, "Portal", null, null, AT, false), null, List.of(), List.of()));
+
+        assertThat(render("/spa/admin/dtdd-caches/games/entry?key=9", Locale.FRENCH))
+                .contains("Portal", "pas en cache", "Aucune recherche en cache ne l&#39;a trouvé.");
+    }
+
+    @Test
+    void aSearchInFull_showsTheTitlesItFound() throws Exception {
+        when(apiService.adminDtddCacheEntry("searches", "halo")).thenReturn(new DtddCacheEntryDetailDto(null, "halo",
+                null, null, List.of(new DtddSearchCacheEntryDto("halo", List.of(16758L, 1L), AT, false)),
+                List.of(new DtddCacheEntryDetailDto.FoundTitle(16758L, "Halo Infinite", true),
+                        new DtddCacheEntryDetailDto.FoundTitle(1L, null, false))));
+
+        assertThat(render("/spa/admin/dtdd-caches/searches/entry?key=halo", Locale.ENGLISH))
+                .contains("Halo Infinite", "topics cached", "not cached", "topics not cached",
+                        "https://www.doesthedogdie.com/media/1");
+    }
+
+    @Test
+    void anEntryGone_saysSo() throws Exception {
+        assertThat(render("/spa/admin/dtdd-caches/topics/entry?key=7", Locale.ENGLISH))
+                .contains("This entry is no longer in the cache.");
+    }
+
+    @Test
+    void eachEntry_canBeSeenInFull() throws Exception {
+        when(apiService.adminDtddGamesCache(any(), anyInt())).thenReturn(new AdminPage<>(List.of(
+                new DtddGameCacheEntryDto(16758, "Halo Infinite", "Video Game", null, AT, false)), 0, 1, 1));
+
+        assertThat(render("/spa/admin/dtdd-caches/games", Locale.ENGLISH))
+                .contains("class=\"admin-dc-detail\"", "id=\"admin-dc-dialog\"");
     }
 }

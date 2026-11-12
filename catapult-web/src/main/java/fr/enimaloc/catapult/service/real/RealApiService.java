@@ -49,6 +49,7 @@ import fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
 import fr.enimaloc.catapult.common.dto.admin.DetectedGameDto;
+import fr.enimaloc.catapult.common.dto.admin.DtddCacheEntryDetailDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddCachesSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddGameCacheEntryDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddRefetchJobDto;
@@ -1023,6 +1024,12 @@ public class RealApiService implements ApiService {
     public int adminRefetchDtddCache(String kind, String key) {
         return client.call(HttpMethod.POST, "/api/internal/admin/dtdd-caches/{kind}/refetch?key={key}", null,
                 Void.class, kind, key).status();
+    }
+
+    @Override
+    public DtddCacheEntryDetailDto adminDtddCacheEntry(String kind, String key) {
+        return client.get("/api/internal/admin/dtdd-caches/{kind}/entry?key={key}", DtddCacheEntryDetailDto.class,
+                kind, key);
     }
 
     @Override

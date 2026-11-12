@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.service.mock;
 
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
+import fr.enimaloc.catapult.common.dto.admin.DtddCacheEntryDetailDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddCachesSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddGameCacheEntryDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddKeyQuotaDto;
@@ -91,6 +92,39 @@ class MockDtddCachesStore {
         return page(searches, s -> s.query().contains(needle), DtddSearchCacheEntryDto::searchedAt, page,
                 s -> new DtddSearchCacheEntryDto(s.query(), s.dtddIds(), s.searchedAt(),
                         isStale(s.searchedAt(), SEARCHES_TTL_HOURS)));
+    }
+
+    /** Everything cached about an entry, as catapult-api gives it; null when it isn't cached. */
+    synchronized DtddCacheEntryDetailDto detail(String kind, String key) {
+        String trimmed = key == null ? "" : key.trim();
+        if (kind.equals("searches")) {
+            String query = trimmed.toLowerCase(Locale.ROOT);
+            return searches(query, 0).content().stream().filter(s -> s.query().equals(query)).findFirst()
+                    .map(s -> new DtddCacheEntryDetailDto(null, query, null, null, List.of(s), s.dtddIds().stream()
+                            .map(id -> new DtddCacheEntryDetailDto.FoundTitle(id,
+                                    games.stream().filter(g -> g.dtddId() == id).map(DtddGameCacheEntryDto::name)
+                                            .findFirst().orElse(null),
+                                    topics.stream().anyMatch(t -> t.dtddId() == id)))
+                            .toList()))
+                    .orElse(null);
+        }
+        long id;
+        try {
+            id = Long.parseLong(trimmed);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+        DtddTopicsCacheEntryDto topic = topics(String.valueOf(id), 0).content().stream()
+                .filter(t -> t.dtddId() == id).findFirst().orElse(null);
+        DtddGameCacheEntryDto game = games(String.valueOf(id), 0).content().stream()
+                .filter(g -> g.dtddId() == id).findFirst().orElse(null);
+        if (kind.equals("topics") ? topic == null : game == null) return null;
+        return new DtddCacheEntryDetailDto(id, null, game, topic,
+                searches.stream().filter(s -> s.dtddIds().contains(id))
+                        .map(s -> new DtddSearchCacheEntryDto(s.query(), s.dtddIds(), s.searchedAt(),
+                                isStale(s.searchedAt(), SEARCHES_TTL_HOURS)))
+                        .toList(),
+                List.of());
     }
 
     /** The entry as fetched just now: 200, 404 when it isn't cached, 400 for an unknown cache or a title key not an ID. */

@@ -35,6 +35,7 @@ import fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
 import fr.enimaloc.catapult.common.dto.admin.DetectedGameDto;
+import fr.enimaloc.catapult.common.dto.admin.DtddCacheEntryDetailDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddCachesSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddGameCacheEntryDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddRefetchJobDto;
@@ -364,6 +365,11 @@ public interface ApiService {
      * off), 502 when unreachable.
      */
     int adminRefetchDtddCache(String kind, String key);
+    /**
+     * Everything the DTDD caches keep about an entry ({@code kind}: topics, games, searches; {@code key}: the title's
+     * ID or the search's query); null when it isn't cached or catapult-api fails.
+     */
+    DtddCacheEntryDetailDto adminDtddCacheEntry(String kind, String key);
     /** catapult-api's status (202; 409 one runs already; 503 DTDD off) and the refetch, 502 when unreachable. */
     ApiClient.Result<DtddRefetchJobDto> adminStartDtddRefetch();
     /** catapult-api's status (200) and the refetch asked to stop, 502 when unreachable. */

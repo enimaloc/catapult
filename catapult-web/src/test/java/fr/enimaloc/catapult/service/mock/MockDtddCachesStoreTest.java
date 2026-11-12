@@ -58,4 +58,21 @@ class MockDtddCachesStoreTest {
         assertThat(job.done()).isEqualTo(job.total());
         assertThat(job.failed()).isEqualTo(1);
     }
+
+    @Test
+    void detail_givesWhatIsCachedAboutAnEntry() {
+        var title = store.detail("topics", "16758");
+        assertThat(title.game().name()).isEqualTo("Halo Infinite");
+        assertThat(title.topics().yesTopics()).containsExactly("a dog dies");
+        assertThat(title.searches()).singleElement().satisfies(s -> assertThat(s.query()).isEqualTo("halo"));
+
+        var search = store.detail("searches", "Halo");
+        assertThat(search.titles()).singleElement().satisfies(t -> {
+            assertThat(t.name()).isEqualTo("Halo Infinite");
+            assertThat(t.topicsCached()).isTrue();
+        });
+
+        assertThat(store.detail("topics", "999")).isNull();
+        assertThat(store.detail("games", "18842")).isNull();
+    }
 }

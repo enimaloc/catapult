@@ -819,6 +819,12 @@ public class MockApiService implements ApiService {
     }
 
     @Override
+    public fr.enimaloc.catapult.common.dto.admin.DtddCacheEntryDetailDto adminDtddCacheEntry(String kind, String key) {
+        log.trace("adminDtddCacheEntry({}, {})", kind, key);
+        return dtddCaches.detail(kind, key);
+    }
+
+    @Override
     public ApiClient.Result<fr.enimaloc.catapult.common.dto.admin.DtddRefetchJobDto> adminStartDtddRefetch() {
         log.trace("adminStartDtddRefetch()");
         return dtddCaches.start();

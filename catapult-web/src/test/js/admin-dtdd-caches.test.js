@@ -34,9 +34,11 @@ function entries(kind, key) {
             <div class="admin-view admin-dtdd-cache-entries" data-kind="${kind}" data-refetched="Fetched again.">
                 <div data-admin-results>
                     <div class="admin-row" data-admin-key="${key}">
+                        <button class="admin-dc-detail" data-key="${key}"></button>
                         <button class="admin-dc-refetch" data-key="${key}"></button>
                     </div>
                 </div>
+                <mdui-dialog id="admin-dc-dialog"><div class="admin-dialog-body"></div><button class="admin-dialog-close"></button></mdui-dialog>
             </div>
         </mdui-tab-panel>`);
     document.getElementById("admin-tabs").value = "dtdd-caches";
@@ -88,6 +90,31 @@ describe("admin-dtdd-caches", () => {
         expect(tabs.patch).toHaveBeenCalledWith(panel());
         expect(snackbars()).toContain("Fetched again.");
         expect(button.disabled).toBe(false);
+    });
+
+    it("opens an entry in full in the dialog, and closes it", async () => {
+        entries("searches", "halo infinite");
+        window.fetch = vi.fn(async () => ({ ok: true, status: 200, text: async () => "<p class='full'>Halo</p>" }));
+        await click(".admin-dc-detail");
+
+        expect(window.fetch).toHaveBeenCalledWith("/spa/admin/dtdd-caches/searches/entry?key=halo+infinite");
+        expect(document.querySelector("#admin-dc-dialog .full").textContent).toBe("Halo");
+        expect(document.getElementById("admin-dc-dialog").open).toBe(true);
+
+        await click(".admin-dialog-close");
+        expect(document.getElementById("admin-dc-dialog").open).toBe(false);
+    });
+
+    it("tells why an entry can't be opened", async () => {
+        entries("topics", "7");
+        window.fetch = vi.fn(async () => ({ ok: false, status: 404, text: async () => "" }));
+        tabs.refusal = vi.fn(() => "Gone");
+        window.CatapultChannel = { ...window.CatapultChannel, showError: vi.fn() };
+        await click(".admin-dc-detail");
+
+        expect(tabs.refusal).toHaveBeenCalledWith(expect.anything(), 404);
+        expect(window.CatapultChannel.showError).toHaveBeenCalledWith("Gone");
+        expect(document.getElementById("admin-dc-dialog").open).not.toBe(true);
     });
 
     it("patches the results when the entry is gone, and nothing else on another refusal", async () => {
