@@ -105,6 +105,13 @@ public class SpaFragmentController {
                 apiService.dtddMappingStatus(username)));
     }
 
+    /** Why the caller's binding has its TWs, the body of its TW panel's details dialog. */
+    @GetMapping("/channel/bindings/{bindingId}/tw-details")
+    String twDetails(Model model, @PathVariable String bindingId) {
+        model.addAttribute("details", apiService.twDetails(bindingId));
+        return "pages/channel-tab/tw-details :: details";
+    }
+
     @GetMapping("/channel/{username}/dock")
     String dock(Model model, @PathVariable String username, HttpServletResponse response) {
         int refused = filler.channelDock(model, username);

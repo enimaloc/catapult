@@ -276,6 +276,14 @@ public class RealApiService implements ApiService {
     }
 
     @Override
+    public fr.enimaloc.catapult.common.dto.channel.TwDetailsDto twDetails(String bindingId) {
+        UUID me = me();
+        if (me == null) return null;
+        return client.get("/api/internal/users/{userId}/bindings/{bindingId}/tws/details",
+                fr.enimaloc.catapult.common.dto.channel.TwDetailsDto.class, me, bindingId);
+    }
+
+    @Override
     public int resetBinding(String bindingId) {
         UUID me = me();
         if (me == null) return HttpStatus.UNAUTHORIZED.value();

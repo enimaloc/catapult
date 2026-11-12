@@ -390,6 +390,36 @@ public class MockApiService implements ApiService {
         return NO_CONTENT;
     }
 
+    /**
+     * The mock's TWs explained: each one the binding has detected by a sample source (the first by Steam and a DTDD
+     * topic over its threshold), and jump scares kept off by a DTDD topic under its own.
+     */
+    @Override
+    public fr.enimaloc.catapult.common.dto.channel.TwDetailsDto twDetails(String bindingId) {
+        log.trace("twDetails({})", bindingId);
+        BindingDto binding = currentData().bindingById(bindingId);
+        if (binding == null) return null;
+        Map<String, String> labels = new HashMap<>();
+        MockPresets.AVAILABLE_TWS.forEach(t -> labels.put(t.id(), t.label()));
+        List<fr.enimaloc.catapult.common.dto.channel.TwDetailsDto.Tw> tws = new ArrayList<>();
+        for (String id : binding.tws()) {
+            String label = labels.getOrDefault(id, id);
+            List<fr.enimaloc.catapult.common.dto.channel.TwDetailsDto.Source> sources = tws.isEmpty()
+                    ? List.of(new fr.enimaloc.catapult.common.dto.channel.TwDetailsDto.Source(id, label, "STEAM_CONTENT", "2", null),
+                            new fr.enimaloc.catapult.common.dto.channel.TwDetailsDto.Source(id, label, "DTDD_TOPIC",
+                                    "there's blood/gore", new fr.enimaloc.catapult.common.dto.channel.TwDetailsDto.Severity(
+                                            "VOTES", "Depicted", "Excessive", 12, 83)))
+                    : List.of(new fr.enimaloc.catapult.common.dto.channel.TwDetailsDto.Source(id, label, "STEAM_KEYWORD", id, null));
+            tws.add(new fr.enimaloc.catapult.common.dto.channel.TwDetailsDto.Tw(id, label, true,
+                    binding.twOverride() ? "STREAMER" : "DETECTED", binding.twOverride() ? List.of() : sources));
+        }
+        return new fr.enimaloc.catapult.common.dto.channel.TwDetailsDto(binding.twOverride(), tws, List.of(
+                new fr.enimaloc.catapult.common.dto.channel.TwDetailsDto.Source("jumpscares",
+                        labels.getOrDefault("jumpscares", "Jump scares"), "DTDD_TOPIC", "there are jump scares",
+                        new fr.enimaloc.catapult.common.dto.channel.TwDetailsDto.Severity("BELOW_VOTES", "Startling", "Mild",
+                                9, 22))));
+    }
+
     @Override
     public int resetTws(String bindingId) {
         log.trace("resetTws({})", bindingId);
