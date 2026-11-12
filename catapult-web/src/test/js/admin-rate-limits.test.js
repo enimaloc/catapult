@@ -93,6 +93,15 @@ describe("admin-rate-limits", () => {
         expect(tabs.post.mock.calls[0][3]).toEqual({ limitCalls: null, limitWindowSeconds: null, resumeSeconds: 30, scope: "ROUTE" });
     });
 
+    it("gives a route's scope back to the learning when none was chosen", async () => {
+        list();
+        document.querySelector('[data-id^="GET"]').dataset.scopePinned = "false";
+        await click("#edit-route");
+        expect(field("scope").value).toBe("LEARNED");
+        await click(".admin-rl-save");
+        expect(tabs.post.mock.calls[0][3].scope).toBe("LEARNED");
+    });
+
     it("keeps the dialog open when the correction is refused, and closes it on demand", async () => {
         list();
         await click("#edit-host");

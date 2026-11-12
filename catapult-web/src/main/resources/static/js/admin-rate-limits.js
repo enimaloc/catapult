@@ -27,11 +27,11 @@ window.CatapultAdminRateLimits = (function () {
         dialog.querySelector('[name="resume"]').value = row.dataset.resume ?? "";
         const scope = dialog.querySelector('[name="scope"]');
         scope.hidden = row.dataset.host === "true";
-        scope.value = row.dataset.scopePinned === "true" ? row.dataset.scope : "";
+        scope.value = row.dataset.scopePinned === "true" ? row.dataset.scope : "LEARNED";
         dialog.open = true;
     }
 
-    /** The correction the dialog holds: a limit only with its calls, a scope only for a route. */
+    /** The correction the dialog holds: a limit only with its calls, a scope only for a route (LEARNED: unpinned). */
     function correctionOf(dialog) {
         const calls = numberOf(dialog.querySelector('[name="calls"]'));
         const scope = dialog.querySelector('[name="scope"]');

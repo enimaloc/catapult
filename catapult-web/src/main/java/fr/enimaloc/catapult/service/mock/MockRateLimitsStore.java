@@ -45,13 +45,15 @@ class MockRateLimitsStore {
             return 400;
         }
         LearnedRateLimitDto d = limits.get(i);
-        String scope = c.scope() == null || c.scope().isBlank() || d.hostScope() ? d.scope()
-                : c.scope().trim().toUpperCase(Locale.ROOT);
+        String named = c.scope() == null ? "" : c.scope().trim().toUpperCase(Locale.ROOT);
+        boolean unpin = named.equals("LEARNED");
+        String scope = named.isEmpty() || unpin || d.hostScope() ? d.scope() : named;
         if (scope != null && !scope.equals("HOST") && !scope.equals("ROUTE")) return 400;
+        boolean pinned = !d.hostScope() && !unpin && (d.scopePinned() || !named.isEmpty());
         boolean limitSet = c.limitCalls() != null;
         boolean resumeSet = c.resumeSeconds() != null;
         limits.set(i, new LearnedRateLimitDto(d.id(), d.host(), d.method(), d.path(), scope,
-                d.scopePinned() || !d.hostScope() && c.scope() != null && !c.scope().isBlank(),
+                pinned,
                 limitSet ? c.limitCalls() : d.limitCalls(), limitSet ? c.limitWindowSeconds() : d.limitWindowSeconds(),
                 limitSet, resumeSet ? c.resumeSeconds() * 1000L : d.resumeMs(), resumeSet, d.rateLimitedCount(),
                 d.lastRateLimitedAt(), d.usedCalls(), d.blockedUntil()));

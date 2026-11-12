@@ -36,6 +36,9 @@ class MockRateLimitsStoreTest {
         assertThat(row(PAGE).scopePinned()).isTrue();
         assertThat(row(PAGE).limitCorrected()).isFalse();
 
+        assertThat(store.correct(PAGE, new LearnedRateLimitCorrectionDto(null, null, null, "LEARNED"))).isEqualTo(200);
+        assertThat(row(PAGE).scopePinned()).isFalse();
+
         assertThat(store.reset(PAGE)).isEqualTo(200);
         assertThat(row(PAGE).scopePinned()).isFalse();
         assertThat(row(PAGE).limitCalls()).isNull();
