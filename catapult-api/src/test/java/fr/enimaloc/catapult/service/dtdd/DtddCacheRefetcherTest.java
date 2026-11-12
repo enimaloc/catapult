@@ -103,4 +103,19 @@ class DtddCacheRefetcherTest {
         assertThatThrownBy(() -> refetcher.refetch(client, DtddCacheKind.TOPICS, "halo"))
                 .isInstanceOf(ResponseStatusException.class).hasMessageContaining("400");
     }
+
+    @Test
+    void topics_keepTheirSeverities() {
+        when(client.fetchTopics(7L)).thenReturn(Optional.of(new DtddTopics(List.of("a dog dies"), List.of(), List.of(),
+                java.util.Map.of("a dog dies", new DtddApiClient.DtddSeverity(List.of("Implied", "Depicted"),
+                        List.of(1, 4), List.of(20, 80), 5, 2)))));
+
+        refetcher.refetch(client, DtddCacheKind.TOPICS, "7");
+
+        ArgumentCaptor<DtddTopicsCache> saved = ArgumentCaptor.forClass(DtddTopicsCache.class);
+        verify(topics).save(saved.capture());
+        assertThat(saved.getValue().getSeverities()).containsOnlyKeys("a dog dies");
+        assertThat(saved.getValue().getSeverities().get("a dog dies").verified()).isEqualTo(2);
+        assertThat(saved.getValue().getSeverities().get("a dog dies").percents()).containsExactly(20, 80);
+    }
 }

@@ -5,10 +5,12 @@ import fr.enimaloc.catapult.common.dto.admin.DtddCachesSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddGameCacheEntryDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddKeyQuotaDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddSearchCacheEntryDto;
+import fr.enimaloc.catapult.common.dto.admin.DtddTopicSeverityDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddTopicsCacheEntryDto;
 import fr.enimaloc.catapult.domain.dtdd.DtddApiKeyEntry;
 import fr.enimaloc.catapult.domain.dtdd.DtddGameCache;
 import fr.enimaloc.catapult.domain.dtdd.DtddSearchCache;
+import fr.enimaloc.catapult.domain.dtdd.DtddTopicSeverity;
 import fr.enimaloc.catapult.domain.dtdd.DtddTopicsCache;
 import fr.enimaloc.catapult.getter.dtdd.DtddApiClient;
 import fr.enimaloc.catapult.getter.dtdd.DtddApiKeyRotator;
@@ -33,6 +35,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -192,8 +195,18 @@ public class DtddCacheAdminService {
     }
 
     private DtddTopicsCacheEntryDto topic(DtddTopicsCache t, Map<Long, String> names) {
+        Map<String, DtddTopicSeverityDto> severities = null;
+        if (t.getSeverities() != null) {
+            severities = new LinkedHashMap<>();
+            for (Map.Entry<String, DtddTopicSeverity> e : t.getSeverities().entrySet()) {
+                DtddTopicSeverity s = e.getValue();
+                severities.put(e.getKey(), new DtddTopicSeverityDto(s.levels(), s.counts(), s.percents(), s.total(),
+                        s.verified()));
+            }
+        }
         return new DtddTopicsCacheEntryDto(t.getDtddId(), names.get(t.getDtddId()), t.getYesTopics(),
-                t.getNoTopics(), t.getMostlyTopics(), t.getFetchedAt(), stale(DtddCacheKind.TOPICS, t.getFetchedAt()));
+                t.getNoTopics(), t.getMostlyTopics(), t.getFetchedAt(), stale(DtddCacheKind.TOPICS, t.getFetchedAt()),
+                severities);
     }
 
     private DtddGameCacheEntryDto game(DtddGameCache g) {

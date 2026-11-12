@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.getter.dtdd;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 public interface DtddApiClient {
@@ -29,7 +30,15 @@ public interface DtddApiClient {
 
     record DtddSearchResult(long dtddId, String name, String slug, String mediaType, String posterUrl) {}
 
-    record DtddTopics(List<String> yesTopics, List<String> noTopics, List<String> mostlyTopics) {}
+    /** A title's topics by its votes, and each one's severity by its name (a topic without levels absent). */
+    record DtddTopics(List<String> yesTopics, List<String> noTopics, List<String> mostlyTopics,
+                      Map<String, DtddSeverity> severities) {
+
+        /** Topics without their severities. */
+        public DtddTopics(List<String> yesTopics, List<String> noTopics, List<String> mostlyTopics) {
+            this(yesTopics, noTopics, mostlyTopics, Map.of());
+        }
+    }
 
     record DtddItem(long id, String name, String[] genres, long releaseYear, long itemTypeId, String itemTypeName,
                     long tmdbId, String imdbId, String backgroundImage, String posterImage, String overview,

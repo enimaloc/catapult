@@ -195,4 +195,24 @@ class RealDtddApiClientTest {
         assertThat(server.getRequestCount()).isZero();
         verify(rotator, never()).nextKey();
     }
+
+    @Test
+    void fetchTopics_keepsEachTopicsSeverity_byItsName() {
+        when(rotator.nextKey()).thenReturn(Optional.of("KEY_A"));
+        server.enqueue(new MockResponse()
+            .setHeader("Content-Type", "application/json")
+            .setBody("""
+                { "id": 7, "topicItemStats": [
+                    { "topicName": "a dog dies", "yesSum": 5, "noSum": 1,
+                      "severity": { "levels": ["Implied", "Depicted"], "counts": [1, 4], "percents": [20, 80],
+                                    "total": 5, "verified": 2 } },
+                    { "topicName": "a cat dies", "yesSum": 0, "noSum": 3, "severity": null }
+                ] }
+                """));
+
+        DtddApiClient.DtddTopics topics = client.fetchTopics(7L).orElseThrow();
+
+        assertThat(topics.severities()).containsOnlyKeys("a dog dies");
+        assertThat(topics.severities().get("a dog dies").verifiedLevel()).contains("Depicted");
+    }
 }

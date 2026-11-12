@@ -65,7 +65,7 @@ public class DtddService {
 
     private void persist(long dtddId, DtddTopics t) {
         topicsRepo.save(new DtddTopicsCache(
-            dtddId, t.yesTopics(), t.noTopics(), t.mostlyTopics(), Instant.now()));
+            dtddId, t.yesTopics(), t.noTopics(), t.mostlyTopics(), Instant.now(), DtddCacheRefetcher.severities(t)));
     }
 
     private boolean isFresh(Instant ts) {

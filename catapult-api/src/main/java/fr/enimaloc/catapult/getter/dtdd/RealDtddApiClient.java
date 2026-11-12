@@ -18,7 +18,9 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -85,12 +87,16 @@ public class RealDtddApiClient implements DtddApiClient {
         return apiObservations.observe("dtdd", "fetch_topics", () ->
             item(dtddId).map(item -> {
                 List<String> yes = new ArrayList<>(), no = new ArrayList<>(), mostly = new ArrayList<>();
+                Map<String, DtddSeverity> severities = new LinkedHashMap<>();
                 for (DtddTopicItemStat topicItemStat : item.topicItemStats()) {
                     if (topicItemStat.yesSum() > topicItemStat.noSum()) yes.add(topicItemStat.topicName());
                     else if (topicItemStat.yesSum() < topicItemStat.noSum()) no.add(topicItemStat.topicName());
                     else mostly.add(topicItemStat.topicName());
+                    if (topicItemStat.severity() != null && topicItemStat.topicName() != null) {
+                        severities.put(topicItemStat.topicName(), topicItemStat.severity());
+                    }
                 }
-                return new DtddTopics(yes, no, mostly);
+                return new DtddTopics(yes, no, mostly, severities);
             })
         );
     }

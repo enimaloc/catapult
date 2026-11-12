@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.service.dtdd;
 
 import fr.enimaloc.catapult.domain.dtdd.DtddGameCache;
 import fr.enimaloc.catapult.domain.dtdd.DtddSearchCache;
+import fr.enimaloc.catapult.domain.dtdd.DtddTopicSeverity;
 import fr.enimaloc.catapult.domain.dtdd.DtddTopicsCache;
 import fr.enimaloc.catapult.getter.dtdd.DtddApiClient;
 import fr.enimaloc.catapult.getter.dtdd.DtddApiClient.DtddSearchResult;
@@ -15,6 +16,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * Fetches one cached DTDD entry again and saves what DTDD answers, as the cache's own readers would have: a title's
@@ -53,7 +56,7 @@ public class DtddCacheRefetcher {
         return switch (kind) {
             case TOPICS -> client.fetchTopics(id(key)).map(topics -> {
                 topicsRepo.save(new DtddTopicsCache(id(key), topics.yesTopics(), topics.noTopics(),
-                        topics.mostlyTopics(), now));
+                        topics.mostlyTopics(), now, severities(topics)));
                 return true;
             }).orElse(false);
             case GAMES -> client.item(id(key)).map(item -> {
@@ -83,6 +86,15 @@ public class DtddCacheRefetcher {
                 return true;
             }).orElse(false);
         };
+    }
+
+    /** The topics' severities as the cache keeps them, by topic name. */
+    static Map<String, DtddTopicSeverity> severities(DtddApiClient.DtddTopics topics) {
+        Map<String, DtddTopicSeverity> kept = new LinkedHashMap<>();
+        if (topics.severities() == null) return kept;
+        topics.severities().forEach((topic, s) -> kept.put(topic,
+                new DtddTopicSeverity(s.levels(), s.counts(), s.percents(), s.total(), s.verified())));
+        return kept;
     }
 
     private static long id(String key) {

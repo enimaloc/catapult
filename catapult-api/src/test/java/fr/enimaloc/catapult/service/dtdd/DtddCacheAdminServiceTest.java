@@ -204,4 +204,20 @@ class DtddCacheAdminServiceTest {
         assertThatThrownBy(() -> service.detail(DtddCacheKind.SEARCHES, "nope"))
                 .isInstanceOf(ResponseStatusException.class).hasMessageContaining("404");
     }
+
+    @Test
+    void detail_givesEachTopicsSeverity_andNoneWhenTheyWereNotKept() {
+        when(topics.existsById(7L)).thenReturn(true);
+        when(topics.findById(7L)).thenReturn(Optional.of(new DtddTopicsCache(7L, List.of("a dog dies"), List.of(),
+                List.of(), NOW, Map.of("a dog dies", new fr.enimaloc.catapult.domain.dtdd.DtddTopicSeverity(
+                        List.of("Implied", "Depicted"), List.of(1, 4), List.of(20, 80), 5, 2)))));
+
+        var severity = service.detail(DtddCacheKind.TOPICS, "7").topics().severities().get("a dog dies");
+        assertThat(severity.verifiedLevel()).isEqualTo("Depicted");
+        assertThat(severity.level(1)).isEqualTo("Implied");
+
+        when(topics.findById(7L)).thenReturn(Optional.of(new DtddTopicsCache(7L, List.of("a dog dies"), List.of(),
+                List.of(), NOW)));
+        assertThat(service.detail(DtddCacheKind.TOPICS, "7").topics().severities()).isNull();
+    }
 }
