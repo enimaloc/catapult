@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.dtdd;
 
+import fr.enimaloc.catapult.common.dto.admin.DtddCacheEntryDetailDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddCachesSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddGameCacheEntryDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddKeyQuotaDto;
@@ -31,10 +32,12 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * The DTDD caches as the admin sees them: each one paged and searched, the oldest first, with what is past its own
@@ -131,6 +134,37 @@ public class DtddCacheAdminService {
             case GAMES -> game(gameRepo.findById(Long.parseLong(normalized)).orElseThrow());
             case SEARCHES -> search(searchRepo.findById(normalized).orElseThrow());
         };
+    }
+
+    /**
+     * Everything cached about the {@code kind} entry {@code key}: a title (from its topics or its record) with both
+     * and the searches that found it; a search with the titles it found.
+     *
+     * @throws ResponseStatusException 404 for an entry not cached, 400 for a title key that isn't an ID
+     */
+    public DtddCacheEntryDetailDto detail(DtddCacheKind kind, String key) {
+        String normalized = key == null ? "" : key.trim();
+        if (kind == DtddCacheKind.SEARCHES) normalized = normalized.toLowerCase(Locale.ROOT);
+        if (!cached(kind, normalized)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Not in the DTDD cache");
+        }
+        if (kind == DtddCacheKind.SEARCHES) {
+            DtddSearchCache found = searchRepo.findById(normalized).orElseThrow();
+            List<Long> ids = found.getDtddIds() == null ? List.of() : found.getDtddIds();
+            Map<Long, String> names = names(ids);
+            Set<Long> withTopics = new HashSet<>();
+            topicsRepo.findAllById(ids).forEach(t -> withTopics.add(t.getDtddId()));
+            return new DtddCacheEntryDetailDto(null, normalized, null, null, List.of(search(found)),
+                    ids.stream().map(id -> new DtddCacheEntryDetailDto.FoundTitle(id, names.get(id),
+                            withTopics.contains(id))).toList());
+        }
+        long id = Long.parseLong(normalized);
+        Map<Long, String> names = names(List.of(id));
+        return new DtddCacheEntryDetailDto(id, null,
+                gameRepo.findById(id).map(this::game).orElse(null),
+                topicsRepo.findById(id).map(t -> topic(t, names)).orElse(null),
+                searchRepo.findAllFinding(id).stream().map(this::search).toList(),
+                List.of());
     }
 
     private boolean cached(DtddCacheKind kind, String key) {

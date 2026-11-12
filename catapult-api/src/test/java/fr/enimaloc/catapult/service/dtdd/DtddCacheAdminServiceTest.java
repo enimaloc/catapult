@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.common.dto.admin.DtddRefetchJobDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddTopicsCacheEntryDto;
 import fr.enimaloc.catapult.domain.dtdd.DtddApiKeyEntry;
 import fr.enimaloc.catapult.domain.dtdd.DtddGameCache;
+import fr.enimaloc.catapult.domain.dtdd.DtddSearchCache;
 import fr.enimaloc.catapult.domain.dtdd.DtddTopicsCache;
 import fr.enimaloc.catapult.getter.dtdd.DtddApiClient;
 import fr.enimaloc.catapult.getter.dtdd.DtddApiKeyRotator;
@@ -145,5 +146,62 @@ class DtddCacheAdminServiceTest {
         assertThatThrownBy(() -> off.refetch(DtddCacheKind.TOPICS, "7"))
                 .isInstanceOf(ResponseStatusException.class).hasMessageContaining("503");
         assertThat(off.summary().quotas()).isEmpty();
+    }
+
+    @Test
+    void detail_ofATitle_givesItsRecordItsTopicsInFull_andTheSearchesThatFoundIt() {
+        when(topics.existsById(7L)).thenReturn(true);
+        when(topics.findById(7L)).thenReturn(Optional.of(new DtddTopicsCache(7L, List.of("a dog dies", "gore"),
+                List.of("a cat dies"), List.of("jump scares"), NOW)));
+        when(games.findById(7L)).thenReturn(Optional.of(
+                new DtddGameCache(7L, "Halo", "https://www.doesthedogdie.com/media/7", "Video Game", null, NOW)));
+        when(games.findAllById(List.of(7L))).thenReturn(List.of(new DtddGameCache(7L, "Halo", null, null, null, NOW)));
+        when(searches.findAllFinding(7L)).thenReturn(List.of(new DtddSearchCache("halo", List.of(7L, 8L), NOW)));
+
+        var detail = service.detail(DtddCacheKind.TOPICS, "7");
+
+        assertThat(detail.dtddId()).isEqualTo(7L);
+        assertThat(detail.topics().name()).isEqualTo("Halo");
+        assertThat(detail.topics().yesTopics()).containsExactly("a dog dies", "gore");
+        assertThat(detail.topics().noTopics()).containsExactly("a cat dies");
+        assertThat(detail.topics().mostlyTopics()).containsExactly("jump scares");
+        assertThat(detail.game().mediaType()).isEqualTo("Video Game");
+        assertThat(detail.searches()).singleElement().satisfies(s -> assertThat(s.query()).isEqualTo("halo"));
+        assertThat(detail.titles()).isEmpty();
+    }
+
+    @Test
+    void detail_ofATitleWithoutTopics_hasNoneButItsRecord() {
+        when(games.existsById(9L)).thenReturn(true);
+        when(games.findById(9L)).thenReturn(Optional.of(new DtddGameCache(9L, "Portal", null, null, null, NOW)));
+
+        var detail = service.detail(DtddCacheKind.GAMES, "9");
+
+        assertThat(detail.topics()).isNull();
+        assertThat(detail.game().name()).isEqualTo("Portal");
+        assertThat(detail.searches()).isEmpty();
+    }
+
+    @Test
+    void detail_ofASearch_givesTheTitlesItFound_asCached() {
+        when(searches.existsById("halo")).thenReturn(true);
+        when(searches.findById("halo")).thenReturn(Optional.of(new DtddSearchCache("halo", List.of(7L, 8L), NOW)));
+        when(games.findAllById(List.of(7L, 8L))).thenReturn(List.of(new DtddGameCache(7L, "Halo", null, null, null, NOW)));
+        when(topics.findAllById(List.of(7L, 8L))).thenReturn(List.of(
+                new DtddTopicsCache(8L, List.of(), List.of(), List.of(), NOW)));
+
+        var detail = service.detail(DtddCacheKind.SEARCHES, " HALO ");
+
+        assertThat(detail.query()).isEqualTo("halo");
+        assertThat(detail.searches()).singleElement().satisfies(s -> assertThat(s.dtddIds()).containsExactly(7L, 8L));
+        assertThat(detail.titles()).containsExactly(
+                new fr.enimaloc.catapult.common.dto.admin.DtddCacheEntryDetailDto.FoundTitle(7L, "Halo", false),
+                new fr.enimaloc.catapult.common.dto.admin.DtddCacheEntryDetailDto.FoundTitle(8L, null, true));
+    }
+
+    @Test
+    void detail_ofWhatIsNotCached_isNotFound() {
+        assertThatThrownBy(() -> service.detail(DtddCacheKind.SEARCHES, "nope"))
+                .isInstanceOf(ResponseStatusException.class).hasMessageContaining("404");
     }
 }

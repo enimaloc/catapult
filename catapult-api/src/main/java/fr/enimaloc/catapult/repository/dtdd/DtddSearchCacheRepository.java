@@ -18,6 +18,16 @@ public interface DtddSearchCacheRepository extends JpaRepository<DtddSearchCache
 
     long countBySearchedAtBefore(Instant before);
 
+    /** The cached searches that found the title {@code dtddId}, the latest first. */
+    @Query(value = "SELECT * FROM dtdd_search_cache WHERE dtdd_ids @> CAST(:ids AS jsonb) ORDER BY searched_at DESC",
+            nativeQuery = true)
+    List<DtddSearchCache> findAllFinding(@Param("ids") String jsonIds);
+
+    /** The cached searches that found the title {@code dtddId}, the latest first. */
+    default List<DtddSearchCache> findAllFinding(long dtddId) {
+        return findAllFinding("[" + dtddId + "]");
+    }
+
     /** Each query and when it was searched, the oldest first: what a bulk refetch goes through. */
     @Query("SELECT s.queryNormalized, s.searchedAt FROM DtddSearchCache s ORDER BY s.searchedAt")
     List<Object[]> findAllAges();

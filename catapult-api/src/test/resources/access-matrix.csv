@@ -222,6 +222,7 @@ GET,/api/internal/admin/dtdd-caches/refetch-all,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/dtdd-caches/refetch-all,,,401,PASS,403,403,403,PASS,401
 DELETE,/api/internal/admin/dtdd-caches/refetch-all,,,401,PASS,403,403,403,PASS,401
 GET,/api/internal/admin/dtdd-caches/{kind},kind=topics,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/dtdd-caches/{kind}/entry,kind=topics;?key=matrix,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/dtdd-caches/{kind}/refetch,kind=topics;?key=matrix,,401,PASS,403,403,403,PASS,401
 GET,/api/internal/admin/dtdd-mapping-proposals,,,401,PASS,403,403,403,PASS,401
 # handler reads the JWT itself: 401 without one

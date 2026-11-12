@@ -25,6 +25,8 @@ class ApiAdminDtddCachesControllerTest {
         assertThat(controller.list("searches", "halo", 2, 50)).isEmpty();
         controller.refetch("games", "7");
         verify(caches).refetch(DtddCacheKind.GAMES, "7");
+        controller.entry("topics", "7");
+        verify(caches).detail(DtddCacheKind.TOPICS, "7");
     }
 
     @Test
