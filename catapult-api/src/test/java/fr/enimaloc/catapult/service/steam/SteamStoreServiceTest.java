@@ -67,7 +67,7 @@ class SteamStoreServiceTest {
     void setUp() {
         LearnedRateLimitRepository limits = org.mockito.Mockito.mock(LearnedRateLimitRepository.class);
         doReturn(Optional.empty()).when(limits).findById(any());
-        rateLimiter = new LearnedRateLimiter(new LearnedRateLimitProperties(), limits, Optional.of(clock));
+        rateLimiter = new LearnedRateLimiter(new LearnedRateLimitProperties(), limits, Optional.of(clock), Optional.empty());
         RestClient.Builder builder = RestClient.builder().requestInterceptor(new LearnedRateLimitInterceptor(rateLimiter));
         steam = MockRestServiceServer.bindTo(builder).ignoreExpectOrder(true).build();
         ExternalApiObservations observations =
@@ -507,5 +507,37 @@ class SteamStoreServiceTest {
         assertThat(service.rateLimitedUntil()).contains(clock.now.plusSeconds(10));
         clock.now = clock.now.plusSeconds(11);
         assertThat(service.rateLimitedUntil()).isEmpty();
+    }
+
+    @Test
+    void cancelledBulkWork_neverStopsTheLiveCalls() {
+        assertThat(service.rateLimitedUntil()).isEmpty();
+        rateLimiter.correct("HOST store.steampowered.com", 1, 10, null, null);
+        givenAppDetails("100", success("100", "{\"type\": \"game\", \"name\": \"Some Game\"}"));
+        assertThat(service.fetchData("100", Locale.ENGLISH, false)).isPresent();
+        steam.reset();
+
+        assertThat(fr.enimaloc.catapult.ratelimit.RateLimitPriority.call(fr.enimaloc.catapult.ratelimit.RateLimitPriority.BULK,
+                () -> true, () -> service.fetchData("100", Locale.ENGLISH, false))).isEmpty();
+        assertThat(service.rateLimitedUntil()).isEmpty();
+    }
+
+    @Test
+    void withTheLearningOff_a429_stillLeavesTheStoreAlone() {
+        rateLimiter = null;
+        LearnedRateLimitRepository limits = org.mockito.Mockito.mock(LearnedRateLimitRepository.class);
+        LearnedRateLimitProperties off = new LearnedRateLimitProperties();
+        off.setEnabled(false);
+        LearnedRateLimiter disabled = new LearnedRateLimiter(off, limits, Optional.of(clock), Optional.empty());
+        RestClient.Builder builder = RestClient.builder().requestInterceptor(new LearnedRateLimitInterceptor(disabled));
+        steam = MockRestServiceServer.bindTo(builder).ignoreExpectOrder(true).build();
+        service = new SteamStoreServiceImpl(builder.build(),
+                new ExternalApiObservations(ObservationRegistry.create(), new SimpleMeterRegistry()),
+                steamAppParentRepository, redirectResolver, disabled);
+        service.setClock(clock);
+        given429("100", null);
+
+        assertThat(service.fetchTwSignals(List.of("100"))).isEmpty();
+        assertThat(service.rateLimitedUntil()).contains(clock.now.plusSeconds(60));
     }
 }
