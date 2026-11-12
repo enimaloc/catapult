@@ -8,6 +8,10 @@ import fr.enimaloc.catapult.service.steam.SteamStoreService.ResolvedParentApp;
 import fr.enimaloc.catapult.service.steam.SteamStoreService.SteamTwSignals;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.observation.ObservationRegistry;
+import fr.enimaloc.catapult.ratelimit.LearnedRateLimitInterceptor;
+import fr.enimaloc.catapult.ratelimit.LearnedRateLimitProperties;
+import fr.enimaloc.catapult.ratelimit.LearnedRateLimiter;
+import fr.enimaloc.catapult.repository.ratelimit.LearnedRateLimitRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -56,13 +60,21 @@ class SteamStoreServiceTest {
     private MockRestServiceServer steam;
     private SteamStoreServiceImpl service;
 
+    private final MovingClock clock = new MovingClock();
+    private LearnedRateLimiter rateLimiter;
+
     @BeforeEach
     void setUp() {
-        RestClient.Builder builder = RestClient.builder();
+        LearnedRateLimitRepository limits = org.mockito.Mockito.mock(LearnedRateLimitRepository.class);
+        doReturn(Optional.empty()).when(limits).findById(any());
+        rateLimiter = new LearnedRateLimiter(new LearnedRateLimitProperties(), limits, clock);
+        RestClient.Builder builder = RestClient.builder().requestInterceptor(new LearnedRateLimitInterceptor(rateLimiter));
         steam = MockRestServiceServer.bindTo(builder).ignoreExpectOrder(true).build();
         ExternalApiObservations observations =
                 new ExternalApiObservations(ObservationRegistry.create(), new SimpleMeterRegistry());
-        service = new SteamStoreServiceImpl(builder.build(), observations, steamAppParentRepository, redirectResolver);
+        service = new SteamStoreServiceImpl(builder.build(), observations, steamAppParentRepository, redirectResolver,
+                rateLimiter);
+        service.setClock(clock);
         doReturn(Optional.empty()).when(steamAppParentRepository).findById(any());
     }
 
@@ -466,14 +478,13 @@ class SteamStoreServiceTest {
 
     @Test
     void a429_leavesTheStoreAloneForItsRetryAfter_thenAsksAgain() {
-        MovingClock clock = new MovingClock();
-        service.setClock(clock);
         given429("100", "120");
 
         assertThat(service.fetchTwSignals(List.of("100"))).isEmpty();
         assertThat(service.rateLimitedUntil()).contains(clock.now.plusSeconds(120));
         // Not asked meanwhile (a second request would fail the mock)
         assertThat(service.fetchTwSignals(List.of("100"))).isEmpty();
+        assertThat(service.fetchIADisclosure("100", Locale.ENGLISH)).isEmpty();
         steam.verify();
 
         clock.now = clock.now.plusSeconds(121);
@@ -484,44 +495,17 @@ class SteamStoreServiceTest {
     }
 
     @Test
-    void a429_withoutRetryAfter_waits60s_doublingWhileTheyFollow_upTo10Minutes() {
-        MovingClock clock = new MovingClock();
-        service.setClock(clock);
-        long[] expected = {60, 120, 240, 480, 600, 600};
-        for (long seconds : expected) {
-            steam.reset();
-            given429("100", null);
-            service.fetchTwSignals(List.of("100"));
-            assertThat(service.rateLimitedUntil()).contains(clock.now.plusSeconds(seconds));
-            clock.now = clock.now.plusSeconds(seconds + 1);
-        }
-    }
-
-    @Test
-    void anAnswer_resetsTheWait() {
-        MovingClock clock = new MovingClock();
-        service.setClock(clock);
-        given429("100", null);
-        service.fetchTwSignals(List.of("100"));
-        clock.now = clock.now.plusSeconds(61);
-
-        steam.reset();
+    void aCallTheLearnedLimitRefuses_tellsUntilWhen() {
+        assertThat(service.rateLimitedUntil()).isEmpty();
+        rateLimiter.correct("HOST store.steampowered.com", 1, 10, null, null);
         givenAppDetails("100", success("100", "{\"type\": \"game\", \"name\": \"Some Game\"}"));
-        service.fetchTwSignals(List.of("100"));
+        assertThat(service.fetchData("100", Locale.ENGLISH, false)).isPresent();
         steam.reset();
-        given429("100", null);
-        service.fetchTwSignals(List.of("100"));
 
-        assertThat(service.rateLimitedUntil()).contains(clock.now.plusSeconds(60));
-    }
-
-    @Test
-    void retryAfter_readsSecondsOrAnHttpDate() {
-        Instant now = Instant.parse("2026-11-12T10:00:00Z");
-        assertThat(SteamStoreServiceImpl.retryAfter("30", now)).contains(java.time.Duration.ofSeconds(30));
-        assertThat(SteamStoreServiceImpl.retryAfter("Thu, 12 Nov 2026 10:05:00 GMT", now))
-                .contains(java.time.Duration.ofMinutes(5));
-        assertThat(SteamStoreServiceImpl.retryAfter("soon", now)).isEmpty();
-        assertThat(SteamStoreServiceImpl.retryAfter(null, now)).isEmpty();
+        // A call per 10 s: the next is refused without being sent
+        assertThat(service.fetchData("100", Locale.ENGLISH, false)).isEmpty();
+        assertThat(service.rateLimitedUntil()).contains(clock.now.plusSeconds(10));
+        clock.now = clock.now.plusSeconds(11);
+        assertThat(service.rateLimitedUntil()).isEmpty();
     }
 }
