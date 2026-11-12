@@ -57,7 +57,7 @@ dependencies {
     implementation("com.ibm.icu:icu4j:$icuVersion")
     implementation("io.micrometer:micrometer-registry-prometheus")
     // Sentry, only for the members in debug mode (see DebugSentryConfig)
-    implementation(platform("io.sentry:sentry-bom:8.60.0"))
+    implementation(platform("io.sentry:sentry-bom:8.62.0"))
     implementation("io.sentry:sentry-spring-boot-4-starter")
     implementation("io.sentry:sentry-logback")
     implementation("org.jsoup:jsoup:$jsoupVersion")
@@ -90,8 +90,8 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
     testImplementation("org.testcontainers:testcontainers-junit-jupiter")
     testImplementation("org.testcontainers:testcontainers-postgresql")
-    testImplementation("com.squareup.okhttp3:mockwebserver:5.4.0")
-    testImplementation("net.ttddyy:datasource-proxy:1.11.0")
+    testImplementation("com.squareup.okhttp3:mockwebserver:5.5.1")
+    testImplementation("net.ttddyy:datasource-proxy:1.11.1")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 

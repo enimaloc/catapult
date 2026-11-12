@@ -23,7 +23,7 @@ configurations {
 dependencies {
     implementation(project(":catapult-common"))
 
-    implementation("org.mvnpm:mdui:2.1.4")
+    implementation("org.mvnpm:mdui:2.1.5")
     // The version springdoc gives catapult-api; ApiDocsAssets.SWAGGER_UI_VERSION names it in the page's paths.
     implementation("org.webjars:swagger-ui:5.34.0")
     // The avatars' WebP encoder (AvatarImages): libwebp, bundled for glibc, hence the Debian-based image.
@@ -38,7 +38,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("io.micrometer:micrometer-registry-prometheus")
-    implementation(platform("io.sentry:sentry-bom:8.60.0"))
+    implementation(platform("io.sentry:sentry-bom:8.62.0"))
     implementation("io.sentry:sentry-spring-boot-4-starter")
     implementation("io.sentry:sentry-logback")
 
@@ -53,7 +53,7 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
     testImplementation("org.testcontainers:testcontainers-junit-jupiter")
-    testImplementation("com.squareup.okhttp3:mockwebserver:5.4.0")
+    testImplementation("com.squareup.okhttp3:mockwebserver:5.5.1")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
