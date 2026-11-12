@@ -70,7 +70,7 @@ class AdminTabsFragmentControllerTest {
         for (String url : List.of("/spa/admin/ccl", "/spa/admin/caches", "/spa/admin/caches/igdb-game-cache",
                 "/spa/admin/caches/igdb-game-cache/entry?key=1",
                 "/spa/admin/data", "/spa/admin/data/chat-command", "/spa/admin/data/chat-command/row?id=1",
-                "/spa/admin/members?q=a&page=1", "/spa/admin/members/search?q=a", "/spa/admin/meta", "/spa/admin/meta/file?id=1", "/spa/admin/links", "/spa/admin/notifications?page=1", "/spa/admin/broadcast", "/spa/admin/dtdd-mapping", "/spa/admin/game-mappings?page=1&missingPage=1", "/spa/admin/groups", "/spa/admin/whitelist", "/spa/admin/keys", "/spa/admin/tw", "/spa/admin/tw/gore",
+                "/spa/admin/members?q=a&page=1", "/spa/admin/members/search?q=a", "/spa/admin/meta", "/spa/admin/meta/file?id=1", "/spa/admin/links", "/spa/admin/notifications?page=1", "/spa/admin/broadcast", "/spa/admin/dtdd-mapping", "/spa/admin/game-mappings?page=1&missingPage=1", "/spa/admin/groups", "/spa/admin/whitelist", "/spa/admin/keys", "/spa/admin/tw", "/spa/admin/tw/gore", "/spa/admin/tw/gore/dtdd",
                 "/spa/admin/members", "/spa/admin/members/00000000-0000-0000-0000-000000000001",
                 "/spa/admin/experiments", "/spa/admin/experiments/00000000-0000-0000-0000-000000000001",
                 "/spa/admin/experiments/00000000-0000-0000-0000-000000000001/participants?variant=&q=x&page=1")) {
@@ -932,6 +932,27 @@ class AdminTabsFragmentControllerTest {
     }
 
     @Test
+    void eachKey_tellsItsUsage_andTheLearnedLimitsFollowTheKeys() throws Exception {
+        var steam = new fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto.Key("id-1", "abcd…wxyz", null, false, 0,
+                new fr.enimaloc.catapult.common.dto.admin.KeyUsageDto(2, 3, 5, null, "DAY", 1234, 100_000L, null));
+        var dtdd = new fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto.Key("id-2", "ddd_…mnop", null, false, 0,
+                new fr.enimaloc.catapult.common.dto.admin.KeyUsageDto(4, 30, 60, 26, "MONTH", 120, 5000L, 4880));
+        var bare = new fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto.Key("id-3", "efgh…ijkl", null, false, 0);
+        when(apiService.adminApiKeys(fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.STEAM)).thenReturn(keys(true, steam, bare));
+        when(apiService.adminApiKeys(fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.DTDD)).thenReturn(keys(true, dtdd));
+        when(apiService.adminRateLimits()).thenReturn(List.of(new fr.enimaloc.catapult.common.dto.admin.LearnedRateLimitDto(
+                "HOST store.steampowered.com", "store.steampowered.com", null, null, null, false, 190, 300, false,
+                60_000, false, 1, null, 3, null)));
+
+        String html = asAdmin("/spa/admin/keys");
+
+        assertThat(html).contains("2 / 3 in 5 s", "1,234 / 100,000 today", "4 / 30 in 60 s", "(26 left)",
+                "120 / 5,000 this month", "(4,880 left)", "admin-rate-limits", "data-admin-list=\"limits\"",
+                "190 per 5 min");
+        assertThat(html.indexOf("admin-rate-limits")).isGreaterThan(html.indexOf("id=\"admin-minecraft\""));
+    }
+
+    @Test
     void unreachableApi_showsThePlaceholder() throws Exception {
         when(apiService.adminApiKeys(org.mockito.ArgumentMatchers.any())).thenReturn(null);
 
@@ -993,6 +1014,54 @@ class AdminTabsFragmentControllerTest {
                 "data-rebuild=\"untouched\"", "data-rebuild=\"non-overridden\"", "data-rebuild=\"force-pinned\"",
                 "This will OVERWRITE the TW choices");
         assertThat(html.split("admin-tw-danger", -1)).hasSize(2);
+    }
+
+    @Test
+    void twFragment_showsTheRecalculation_itsProgress_andItsStop() throws Exception {
+        when(apiService.adminTws()).thenReturn(List.of());
+        when(apiService.adminTwRebuildStatus()).thenReturn(new fr.enimaloc.catapult.common.dto.admin.TwRebuildStatusDto(
+                "RUNNING", "NON_OVERRIDDEN", 40, 10, 3, 1, java.time.Instant.now(), null,
+                java.time.Instant.parse("2026-11-12T10:05:00Z")));
+
+        String html = asAdmin("/spa/admin/tw");
+
+        assertThat(html).contains("data-state=\"RUNNING\"", "value=\"14\"", "max=\"40\"",
+                "14 / 40 games · 10 recalculated, 3 skipped, 1 failed", "Steam is rate limiting: going on at",
+                "admin-tw-rebuild-cancel", "games their streamer didn&#39;t change");
+    }
+
+    @Test
+    void twFragment_beforeAnyRecalculation_showsNoProgress() throws Exception {
+        when(apiService.adminTws()).thenReturn(List.of());
+        when(apiService.adminTwRebuildStatus()).thenReturn(fr.enimaloc.catapult.common.dto.admin.TwRebuildStatusDto.IDLE);
+
+        assertThat(asAdmin("/spa/admin/tw")).contains("data-state=\"IDLE\"").doesNotContain("admin-tw-rebuild-cancel",
+                "mdui-linear-progress");
+    }
+
+    @Test
+    void twDtddFragment_offersTheKnownLevels_andKeepsASavedOneNoTitleGives() throws Exception {
+        when(apiService.adminTw("gore")).thenReturn(
+                new fr.enimaloc.catapult.common.dto.admin.TwDefinitionDto("gore", "Gore", null, true, 10));
+        when(apiService.adminTwDtddTopics("gore")).thenReturn(List.of(
+                new fr.enimaloc.catapult.common.dto.admin.TwDtddTopicDto("there's blood/gore", "Depicted",
+                        List.of("Minor", "Depicted", "Excessive")),
+                new fr.enimaloc.catapult.common.dto.admin.TwDtddTopicDto("there's excessive gore", "Graphic", List.of())));
+
+        String html = asAdmin("/spa/admin/tw/gore/dtdd");
+
+        assertThat(html).contains("data-tw-id=\"gore\"", "data-topic=\"there&#39;s blood/gore\"", "value=\"Depicted\"",
+                ">Minor<", ">Excessive<", "value=\"Graphic\"", "admin-tw-dtdd-add");
+        when(apiService.adminTws()).thenReturn(List.of(
+                new fr.enimaloc.catapult.common.dto.admin.TwDefinitionDto("gore", "Gore", null, true, 10)));
+        assertThat(asAdmin("/spa/admin/tw")).contains("data-admin-open=\"gore/dtdd\"");
+    }
+
+    @Test
+    void twDtddFragment_ofAnUnknownTw_isTheMissingOne() throws Exception {
+        when(apiService.isAdmin()).thenReturn(true);
+        mvc.perform(get("/spa/admin/tw/nope/dtdd").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+                .andExpect(status().isNotFound());
     }
 
     @Test

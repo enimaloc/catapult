@@ -88,7 +88,7 @@ class AdminGameMappingServiceTest {
         chain = spy(new CategoryChain(activations, streamStateService, userSettingsRepository,
                 raidRestoreHold, gameStateService, mock(UserAccountRepository.class), new CategoryApplier(twitchService, streamStateService), mock(RaidRestoreGateService.class), mock(GameBindingLookup.class), mock(ExtensionLayoutApplier.class)));
         bindingService = spy(new BindingService(bindingRepo, igdbService, igdbGameDetailsService, twitchService,
-                twResolverService, mappingRepo, new GameBindingLookup(bindingRepo), chain, mock(ExtensionLayoutApplier.class)));
+                twResolverService, mappingRepo, new GameBindingLookup(bindingRepo), chain, mock(ExtensionLayoutApplier.class), org.mockito.Mockito.mock(org.springframework.context.ApplicationEventPublisher.class)));
         service = new AdminGameMappingService(mappingRepo, bindingRepo, userRepo, bindingService, gameStateService,
                 streamStateService, channelEventPublisher, chain, transactionManager);
 
@@ -547,5 +547,168 @@ class AdminGameMappingServiceTest {
         assertThat(result.liveChannelsFailed()).isZero();
         verify(twitchService, never()).updateChannelReporting(any(), any());
         verify(streamStateService, never()).storePending(any(), any());
+    }
+
+    // ---- Ignored by default
+
+    private static GameMappingRequest ignoring(String sourceId, String twitchId, boolean applyLive) {
+        return new GameMappingRequest("STEAM", sourceId, twitchId, twitchId == null ? null : "Category " + twitchId,
+                null, null, applyLive, true);
+    }
+
+    @Test
+    void ignoredByDefault_withoutCategory_ignoresTheBindings_andLeavesTheirCategoryToIgdb() {
+        GameBinding auto = binding(user("a"), "730", Status.AUTO);
+        GameBinding incomplete = binding(user("b"), "730", Status.INCOMPLETE);
+        bindingsOfTheGame(auto, incomplete);
+
+        GameMappingResult result = service.create(ignoring("730", null, false), admin);
+
+        assertThat(result.bindingsUpdated()).isEqualTo(2);
+        assertThat(List.of(auto, incomplete)).allSatisfy(b -> assertThat(b.isIgnored()).isTrue());
+        assertThat(auto.getStatus()).isEqualTo(Status.AUTO);
+        assertThat(auto.getTwitchGameId()).isEqualTo("old");
+        assertThat(incomplete.getStatus()).isEqualTo(Status.INCOMPLETE);
+        assertThat(result.mapping().ignoredByDefault()).isTrue();
+        assertThat(result.mapping().twitchGameId()).isNull();
+        // Nothing to ask IGDB for a mapping that sets no category
+        verifyNoInteractions(igdbService);
+    }
+
+    @Test
+    void ignoredByDefault_withACategory_mapsAndIgnores() {
+        GameBinding auto = binding(user("a"), "730", Status.AUTO);
+        bindingsOfTheGame(auto);
+
+        GameMappingResult result = service.create(ignoring("730", "32399", false), admin);
+
+        assertThat(result.bindingsUpdated()).isEqualTo(1);
+        assertThat(auto.getStatus()).isEqualTo(Status.MAPPED);
+        assertThat(auto.getTwitchGameId()).isEqualTo("32399");
+        assertThat(auto.isIgnored()).isTrue();
+    }
+
+    @Test
+    void ignoredByDefault_leavesManualBindingsAndTheStreamersChoiceAlone() {
+        GameBinding manual = binding(user("a"), "730", Status.MANUAL);
+        GameBinding chosen = binding(user("b"), "730", Status.AUTO);
+        chosen.setIgnoredOverride(true);
+        bindingsOfTheGame(manual, chosen);
+
+        GameMappingResult result = service.create(ignoring("730", null, false), admin);
+
+        assertThat(result.bindingsUpdated()).isZero();
+        assertThat(manual.isIgnored()).isFalse();
+        assertThat(chosen.isIgnored()).isFalse();
+        verify(bindingRepo, never()).save(any(GameBinding.class));
+    }
+
+    @Test
+    void withoutCategory_isRefused_unlessIgnoredByDefault() {
+        assertThatThrownBy(() -> service.create(
+                new GameMappingRequest("STEAM", "730", " ", null, null, null, false, false), admin))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Missing Twitch category");
+        // Half a category is refused all the same
+        assertThatThrownBy(() -> service.create(
+                new GameMappingRequest("STEAM", "730", "32399", " ", null, null, false, true), admin))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Missing Twitch category");
+    }
+
+    @Test
+    void turningTheIgnoreOff_stopsIgnoringOnlyWhatItIgnored() {
+        GameMappingResult created = service.create(ignoring("730", null, false), admin);
+        GameBinding byTheMapping = binding(user("a"), "730", Status.AUTO);
+        byTheMapping.setIgnored(true);
+        GameBinding byTheStreamer = binding(user("b"), "730", Status.AUTO);
+        byTheStreamer.setIgnored(true);
+        byTheStreamer.setIgnoredOverride(true);
+        bindingsOfTheGame(byTheMapping, byTheStreamer);
+
+        GameMappingResult result = service.update(created.mapping().id(), request("730", "32399", false), admin);
+
+        assertThat(byTheMapping.isIgnored()).isFalse();
+        assertThat(byTheMapping.getStatus()).isEqualTo(Status.MAPPED);
+        assertThat(byTheStreamer.isIgnored()).isTrue();
+        // Mapped, but still ignored by its streamer
+        assertThat(byTheStreamer.getStatus()).isEqualTo(Status.MAPPED);
+        assertThat(result.bindingsUpdated()).isEqualTo(2);
+        assertThat(result.mapping().ignoredByDefault()).isFalse();
+    }
+
+    @Test
+    void anUpdateKeepingTheIgnore_doesNotIgnoreAgainWhatTheStreamerStoppedIgnoring() {
+        GameMappingResult created = service.create(ignoring("730", null, false), admin);
+        // Ignored by the mapping, then not by its streamer
+        GameBinding unignored = binding(user("a"), "730", Status.AUTO);
+        unignored.setIgnoredOverride(true);
+        bindingsOfTheGame(unignored);
+
+        service.update(created.mapping().id(), ignoring("730", "32399", false), admin);
+
+        assertThat(unignored.isIgnored()).isFalse();
+    }
+
+    @Test
+    void anUpdateDroppingTheCategory_sendsTheMappedBindingsBackToIgdb() {
+        GameMappingResult created = service.create(request("730", "32399", false), admin);
+        GameBinding mapped = binding(user("a"), "730", Status.MAPPED);
+        bindingsOfTheGame(mapped);
+
+        service.update(created.mapping().id(), ignoring("730", null, false), admin);
+
+        verify(bindingService).resolveWithoutMapping(mapped);
+        // IGDB finds nothing here: incomplete again, and ignored
+        assertThat(mapped.getStatus()).isEqualTo(Status.INCOMPLETE);
+        assertThat(mapped.isIgnored()).isTrue();
+    }
+
+    @Test
+    void deletingAnIgnoringMapping_stopsIgnoringItsBindings() {
+        GameMappingResult created = service.create(ignoring("730", null, false), admin);
+        GameBinding ignored = binding(user("a"), "730", Status.AUTO);
+        ignored.setIgnored(true);
+        bindingsOfTheGame(ignored);
+
+        GameMappingResult result = service.delete(created.mapping().id(), false);
+
+        assertThat(ignored.isIgnored()).isFalse();
+        assertThat(result.bindingsUpdated()).isEqualTo(1);
+    }
+
+    @Test
+    void movingAnIgnoringMapping_stopsIgnoringTheOldGame() {
+        GameMappingResult created = service.create(ignoring("730", null, false), admin);
+        GameBinding oldGame = binding(user("a"), "730", Status.AUTO);
+        oldGame.setIgnored(true);
+        GameBinding newGame = binding(user("b"), "570", Status.AUTO);
+        bindingsOfTheGame(oldGame);
+        when(bindingRepo.lockAllBySourceTypeAndSourceIdAndStatusIn(eq(SourceType.STEAM), eq("570"), anyCollection()))
+                .thenReturn(new ArrayList<>(List.of(newGame)));
+
+        service.update(created.mapping().id(), ignoring("570", null, false), admin);
+
+        assertThat(oldGame.isIgnored()).isFalse();
+        assertThat(newGame.isIgnored()).isTrue();
+    }
+
+    /** A binding it just ignored goes to the no-game fallback live, unlike one ignored already. */
+    @Test
+    void applyLive_pushesTheBindingsItJustIgnored() {
+        UserAccount onIt = user("on-it");
+        UserAccount alreadyIgnored = user("already");
+        GameBinding justIgnored = binding(onIt, "730", Status.AUTO);
+        GameBinding stillIgnored = binding(alreadyIgnored, "730", Status.AUTO);
+        stillIgnored.setIgnored(true);
+        stillIgnored.setIgnoredOverride(true);
+        bindingsOfTheGame(justIgnored, stillIgnored);
+        liveOn(onIt, "730");
+        liveOn(alreadyIgnored, "730");
+
+        service.create(ignoring("730", "32399", true), admin);
+
+        verify(chain).apply(eq(onIt), any(MappingChanged.class));
+        verify(chain, never()).apply(eq(alreadyIgnored), any());
     }
 }

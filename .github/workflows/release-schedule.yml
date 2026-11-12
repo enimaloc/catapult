@@ -18,6 +18,7 @@ jobs:
       github.event.sender.login == github.repository_owner &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       (
+        (github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref == 'dev') ||
         (github.event.pull_request.base.ref == 'beta' && github.event.pull_request.head.ref == 'dev') ||
         (github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref == 'beta')
       )
@@ -98,5 +99,5 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
           SOURCE: ${{ matrix.source }}
-          TARGET: ${{ matrix.source == 'dev' && 'beta' || 'main' }}
-        run: node .github/release/schedule.mjs --run --source "$SOURCE" --target "$TARGET"
+        # The target is the source's next branch in lib/flow.mjs (dev -> main while beta is skipped)
+        run: node .github/release/schedule.mjs --run --source "$SOURCE"

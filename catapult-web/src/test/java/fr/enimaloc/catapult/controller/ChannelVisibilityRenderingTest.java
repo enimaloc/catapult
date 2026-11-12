@@ -391,6 +391,45 @@ class ChannelVisibilityRenderingTest {
                         "incomplete-fallback-title-input");
     }
 
+    /** The title fields' helper names the conditions and the drops only while their experiments offer them. */
+    @Test
+    void streamTitle_helperNamesConditionsAndDrops_onlyWhenOffered() throws Exception {
+        BindingDto binding = new BindingDto("binding-1", "AUTO", "STEAM", "Game A", "123", "Game A",
+                false, true, Set.of(), true, false, Set.of(), null, List.of(), null);
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(new ChannelPageData(
+                new ChannelUserDto("id-1", "twitch-1", "enimaloc", "https://example.test/avatar.png"),
+                "enimaloc", false, true, true, null,
+                new PagedBindings(0, 1, 1, List.of(binding)),
+                List.of(), Set.of(), List.of(), Set.of(),
+                null, null, null, null, null, null, null, null));
+
+        when(apiService.channelSettings(any())).thenReturn(titleSettings(true, true));
+        String both = mvc.perform(get("/spa/channel/enimaloc")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        when(apiService.channelSettings(any())).thenReturn(titleSettings(true, false));
+        String conditions = mvc.perform(get("/spa/channel/enimaloc")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        when(apiService.channelSettings(any())).thenReturn(titleSettings(null, null));
+        String neither = mvc.perform(get("/spa/channel/enimaloc")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        for (String id : List.of("title-template-input", "no-game-title-input", "incomplete-fallback-title-input")) {
+            assertThat(openingTagForId(both, id)).as(id).contains("{{ORIGINAL_TITLE}}", "IS_NO_GAME", "{{DROP_NAME}}");
+            assertThat(openingTagForId(conditions, id)).as(id).contains("IS_NO_GAME").doesNotContain("DROP_NAME");
+            assertThat(openingTagForId(neither, id)).as(id).contains("{{ORIGINAL_TITLE}}")
+                    .doesNotContain("IS_NO_GAME", "DROP_NAME", "null");
+        }
+        assertThat(both).contains("IS_INCOMPLETE, HAS_TW");
+        assertThat(neither).doesNotContain("IS_INCOMPLETE, HAS_TW", "{{DROP_END}}");
+    }
+
+    private static UserSettingsDto titleSettings(Boolean conditions, Boolean drops) {
+        return new UserSettingsDto(
+                false, Set.of(), null, null, Set.of(), false, false, false,
+                null, null, Set.of(), List.of(), false, Set.of(), List.of(), null, false, List.of(), List.of(),
+                true, "Playing {{GAME}}", true, null, null, false, conditions, drops);
+    }
+
     private ChannelPageData pageWithDrops(java.util.Map<String, fr.enimaloc.catapult.common.dto.channel.DropDto> drops) {
         BindingDto delta = new BindingDto("binding-1", "AUTO", "STEAM", "Delta Force", "1282866981", "Delta Force",
                 false, true, Set.of(), true, false, Set.of());

@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.service.minecraft.MinecraftGateService;
+import fr.enimaloc.catapult.service.title.TitleHelpSections;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,6 +27,7 @@ class ApiHelpControllerTest {
 
     @Mock private MessageSource messageSource;
     @Mock private MinecraftGateService gateService;
+    @Mock private TitleHelpSections titleHelpSections;
     @Mock private Jwt jwt;
 
     @InjectMocks private ApiHelpController controller;
@@ -45,6 +47,12 @@ class ApiHelpControllerTest {
                 .thenReturn("<p>minecraft</p>");
         when(messageSource.getMessage(eq("help.connections.body.xbox"), any(), any(), eq(locale)))
                 .thenReturn("<p>xbox</p>");
+        when(messageSource.getMessage(eq("help.title-settings.body"), any(), any(), eq(locale)))
+                .thenReturn("<p>titre</p>");
+        when(messageSource.getMessage(eq("help.title-settings.body.conditions"), any(), any(), eq(locale)))
+                .thenReturn("<p>conditions</p>");
+        when(messageSource.getMessage(eq("help.title-settings.body.drops"), any(), any(), eq(locale)))
+                .thenReturn("<p>drops</p>");
     }
 
     @Test
@@ -119,5 +127,40 @@ class ApiHelpControllerTest {
         var content = controller.help("connections", locale, jwt);
 
         assertThat(content.body()).isEqualTo("<p>corps</p>");
+    }
+
+    @Test
+    void titleSettings_conditionsAndDrops_appendsBothSections() {
+        when(titleHelpSections.forAccount(userId)).thenReturn(new TitleHelpSections.Offered(true, true));
+
+        var content = controller.help("title-settings", locale, jwt);
+
+        assertThat(content.body()).isEqualTo("<p>titre</p><p>conditions</p><p>drops</p>");
+    }
+
+    @Test
+    void titleSettings_conditionsWithoutDrops_appendsConditionsOnly() {
+        when(titleHelpSections.forAccount(userId)).thenReturn(new TitleHelpSections.Offered(true, false));
+
+        var content = controller.help("title-settings", locale, jwt);
+
+        assertThat(content.body()).isEqualTo("<p>titre</p><p>conditions</p>");
+    }
+
+    @Test
+    void titleSettings_noneOffered_omitsBoth() {
+        when(titleHelpSections.forAccount(userId)).thenReturn(TitleHelpSections.Offered.NONE);
+
+        var content = controller.help("title-settings", locale, jwt);
+
+        assertThat(content.body()).isEqualTo("<p>titre</p>");
+    }
+
+    @Test
+    void titleSettings_anonymous_omitsBoth() {
+        var content = controller.help("title-settings", locale, null);
+
+        assertThat(content.body()).isEqualTo("<p>titre</p>");
+        org.mockito.Mockito.verifyNoInteractions(titleHelpSections);
     }
 }

@@ -214,7 +214,8 @@ public class TwitchServiceImpl implements TwitchService {
             if (e.getStatusCode() == HttpStatus.TOO_MANY_REQUESTS) {
                 log.warn("Twitch rate limit hit for user {} — will retry next cycle", user.getId());
             } else {
-                log.error("Twitch API error for user {}: {} {}", user.getId(), e.getStatusCode(), e.getMessage());
+                log.error("Twitch API error for user {} (game_id={}): {} {}",
+                    user.getId(), binding.getTwitchGameId(), e.getStatusCode(), e.getMessage());
             }
             throw refused[0] = e;
         } catch (RuntimeException e) {

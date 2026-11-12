@@ -1,8 +1,11 @@
 package fr.enimaloc.catapult.service.mock;
 
 import fr.enimaloc.catapult.common.dto.admin.TwDefinitionDto;
+import fr.enimaloc.catapult.common.dto.admin.TwRebuildStatusDto;
+import fr.enimaloc.catapult.common.dto.admin.TwDtddTopicDto;
 import fr.enimaloc.catapult.common.dto.admin.TwKeywordTestDto;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -28,12 +31,43 @@ class MockTwStore {
 
     private final List<TwDefinitionDto> definitions = new ArrayList<>();
     private final Map<String, TreeSet<String>> keywords = new java.util.HashMap<>();
+    /** Each definition's DTDD topics with their least severe level, as catapult-api keeps them. */
+    private final Map<String, Map<String, String>> dtddTopics = new java.util.HashMap<>();
+    /** The levels the mock's cached titles give: blood/gore and jump scares only. */
+    private static final Map<String, List<String>> KNOWN_LEVELS = Map.of(
+            "there's blood/gore", List.of("Minor", "Depicted", "Excessive"),
+            "there are jump scares", List.of("Mild", "Startling", "Jarring"));
 
     MockTwStore() {
         definitions.add(new TwDefinitionDto("violence", "Violence", null, true, 10));
         definitions.add(new TwDefinitionDto("jumpscares", "Jump scares", null, true, 20));
         definitions.add(new TwDefinitionDto("flashing_lights", "Flashing lights", null, false, 30));
         keywords.put("violence", new TreeSet<>(List.of("blood", "gore")));
+        Map<String, String> violence = new java.util.TreeMap<>();
+        violence.put("there's blood/gore", "Depicted");
+        violence.put("someone is stabbed", null);
+        dtddTopics.put("violence", violence);
+        Map<String, String> jumps = new java.util.TreeMap<>();
+        jumps.put("there are jump scares", null);
+        dtddTopics.put("jumpscares", jumps);
+    }
+
+    /** A definition's DTDD topics with their threshold and known levels, by name; null when it is unknown. */
+    synchronized List<TwDtddTopicDto> dtddTopics(String id) {
+        if (find(id).isEmpty()) return null;
+        return dtddTopics.getOrDefault(id, Map.of()).entrySet().stream()
+                .map(e -> new TwDtddTopicDto(e.getKey(), e.getValue(),
+                        KNOWN_LEVELS.getOrDefault(e.getKey().toLowerCase(Locale.ROOT), List.of())))
+                .toList();
+    }
+
+    /** Replaces them all: 204, 404 for an unknown definition. */
+    synchronized int setDtddTopics(String id, Map<String, String> minByTopic) {
+        if (find(id).isEmpty()) return 404;
+        Map<String, String> kept = new java.util.TreeMap<>();
+        minByTopic.forEach((topic, min) -> kept.put(topic.trim(), min == null || min.isBlank() ? null : min.trim()));
+        dtddTopics.put(id, kept);
+        return 204;
     }
 
     synchronized List<TwDefinitionDto> list() {
@@ -54,9 +88,46 @@ class MockTwStore {
         return 201;
     }
 
-    /** The rebuild runs in the background in catapult-api: accepted, nothing to change here. */
-    int rebuild() {
+    /** How many bindings the mock's recalculation goes through, three more each time it is read. */
+    static final int REBUILD_TOTAL = 12;
+    private static final int REBUILD_STEP = 3;
+    private TwRebuildStatusDto rebuild = TwRebuildStatusDto.IDLE;
+
+    /** Runs "in the background" as catapult-api does: 202, 409 while one runs already. */
+    synchronized int rebuild(String mode) {
+        if ("RUNNING".equals(rebuild.state())) return 409;
+        rebuild = new TwRebuildStatusDto("RUNNING", mode, REBUILD_TOTAL, 0, 0, 0, Instant.now(), null, null);
         return 202;
+    }
+
+    /**
+     * The recalculation, three bindings further each time it is read; halfway, it waits a minute for the Steam
+     * store's rate limit once, as catapult-api would show it.
+     */
+    synchronized TwRebuildStatusDto rebuildStatus() {
+        if (!"RUNNING".equals(rebuild.state())) return rebuild;
+        TwRebuildStatusDto r = rebuild;
+        if (r.done() == REBUILD_TOTAL / 2 && r.waitingUntil() == null) {
+            rebuild = new TwRebuildStatusDto("RUNNING", r.mode(), r.total(), r.processed(), r.skipped(), r.failed(),
+                    r.startedAt(), null, Instant.now().plusSeconds(60));
+            return rebuild;
+        }
+        int processed = r.processed() + REBUILD_STEP - 1;
+        int skipped = r.skipped() + 1;
+        boolean done = processed + skipped >= REBUILD_TOTAL;
+        rebuild = new TwRebuildStatusDto(done ? "DONE" : "RUNNING", r.mode(), r.total(),
+                Math.min(processed, REBUILD_TOTAL - skipped), skipped, r.failed(), r.startedAt(),
+                done ? Instant.now() : null, null);
+        return rebuild;
+    }
+
+    synchronized int cancelRebuild() {
+        if ("RUNNING".equals(rebuild.state())) {
+            TwRebuildStatusDto r = rebuild;
+            rebuild = new TwRebuildStatusDto("CANCELLED", r.mode(), r.total(), r.processed(), r.skipped(), r.failed(),
+                    r.startedAt(), Instant.now(), null);
+        }
+        return 200;
     }
 
     /** A definition's keywords, sorted; null when the definition is unknown. */

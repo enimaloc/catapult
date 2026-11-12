@@ -34,7 +34,7 @@ public class DtddKeyPoolService {
         this.events = events;
     }
 
-    private static String mask(String key) {
+    static String mask(String key) {
         return key.length() > 8
                 ? key.substring(0, 4) + "…" + key.substring(key.length() - 4)
                 : "…";
@@ -53,7 +53,8 @@ public class DtddKeyPoolService {
             long until = blockedUntil.getOrDefault(key, 0L);
             boolean blocked = until > now;
             long remainingSec = blocked ? TimeUnit.MILLISECONDS.toSeconds(until - now) : 0L;
-            keys.add(new KeyStatus(ApiKeyHasher.id(key), masked, owner, blocked, remainingSec));
+            keys.add(new KeyStatus(ApiKeyHasher.id(key), masked, owner, blocked, remainingSec,
+                    rotator.map(r -> r.usage(key)).orElse(null)));
         }
         return new DtddKeysPageData(keys, rotator.isPresent());
     }

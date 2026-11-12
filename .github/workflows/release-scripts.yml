@@ -1,10 +1,13 @@
 name: Release scripts
 
+# Pull requests only, no `push`: a branch push with an open PR would run the same job twice.
 on:
   pull_request:
-  # Branches only: a version tag push runs release.yml, not the checks again
-  push:
-    branches: ['**']
+
+# A new push to a pull request cancels its previous run; a dispatched run is never cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # Not `test`: ready.mjs requires the check named `test` (Tests workflow) before merging a release.

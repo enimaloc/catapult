@@ -29,8 +29,19 @@ class MockTwStoreTest {
     }
 
     @Test
-    void rebuild_isAccepted() {
-        assertThat(store.rebuild()).isEqualTo(202);
+    void rebuild_isAccepted_onceAtATime_andMovesOnEachTimeItIsRead() {
+        assertThat(store.rebuildStatus().state()).isEqualTo("IDLE");
+        assertThat(store.rebuild("NON_OVERRIDDEN")).isEqualTo(202);
+        assertThat(store.rebuild("UNTOUCHED")).isEqualTo(409);
+
+        var status = store.rebuildStatus();
+        for (int i = 0; i < 20 && "RUNNING".equals(status.state()); i++) status = store.rebuildStatus();
+        assertThat(status.state()).isEqualTo("DONE");
+        assertThat(status.done()).isEqualTo(MockTwStore.REBUILD_TOTAL);
+
+        store.rebuild("FORCE_PINNED");
+        assertThat(store.cancelRebuild()).isEqualTo(200);
+        assertThat(store.rebuildStatus().state()).isEqualTo("CANCELLED");
     }
 
     @Test
@@ -64,5 +75,23 @@ class MockTwStoreTest {
         assertThat(store.test("violence", "730", "").draftKeywordMatch()).isNull();
         assertThat(store.test("violence", "999", null).matchedKeywords()).isEmpty();
         assertThat(store.test("nope", "730", null)).isNull();
+    }
+
+    @Test
+    void dtddTopics_comeWithTheirLevel_andAreReplacedWhole() {
+        assertThat(store.dtddTopics("violence")).extracting(
+                fr.enimaloc.catapult.common.dto.admin.TwDtddTopicDto::topic,
+                fr.enimaloc.catapult.common.dto.admin.TwDtddTopicDto::minSeverity)
+            .contains(org.assertj.core.api.Assertions.tuple("there's blood/gore", "Depicted"));
+        assertThat(store.dtddTopics("nope")).isNull();
+
+        java.util.Map<String, String> topics = new java.util.LinkedHashMap<>();
+        topics.put("there are jump scares", "Startling");
+        assertThat(store.setDtddTopics("jumpscares", topics)).isEqualTo(204);
+        assertThat(store.dtddTopics("jumpscares")).singleElement().satisfies(t -> {
+            assertThat(t.minSeverity()).isEqualTo("Startling");
+            assertThat(t.knownLevels()).containsExactly("Mild", "Startling", "Jarring");
+        });
+        assertThat(store.setDtddTopics("nope", topics)).isEqualTo(404);
     }
 }

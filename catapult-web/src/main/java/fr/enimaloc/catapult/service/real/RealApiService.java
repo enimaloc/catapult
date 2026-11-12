@@ -8,6 +8,8 @@ import fr.enimaloc.catapult.common.dto.channel.BindingDto;
 import fr.enimaloc.catapult.common.dto.premium.PremiumStatusDto;
 import fr.enimaloc.catapult.common.dto.channel.DeleteAccountRequest;
 import fr.enimaloc.catapult.common.dto.TokenResponse;
+import fr.enimaloc.catapult.common.dto.admin.LearnedRateLimitCorrectionDto;
+import fr.enimaloc.catapult.common.dto.admin.LearnedRateLimitDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminCclPage;
@@ -49,6 +51,12 @@ import fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
 import fr.enimaloc.catapult.common.dto.admin.DetectedGameDto;
+import fr.enimaloc.catapult.common.dto.admin.DtddCacheEntryDetailDto;
+import fr.enimaloc.catapult.common.dto.admin.DtddCachesSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.DtddGameCacheEntryDto;
+import fr.enimaloc.catapult.common.dto.admin.DtddRefetchJobDto;
+import fr.enimaloc.catapult.common.dto.admin.DtddSearchCacheEntryDto;
+import fr.enimaloc.catapult.common.dto.admin.DtddTopicsCacheEntryDto;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingDto;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingRequest;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingResult;
@@ -157,6 +165,9 @@ public class RealApiService implements ApiService {
     private static final ParameterizedTypeReference<AdminPage<fr.enimaloc.catapult.common.dto.admin.DebugExchangeSummaryDto>> DEBUG_EXCHANGES = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<String>> DEBUG_SERVICES = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<AdminPage<GameMappingDto>> GAME_MAPPINGS = new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<AdminPage<DtddTopicsCacheEntryDto>> DTDD_TOPICS = new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<AdminPage<DtddGameCacheEntryDto>> DTDD_GAMES = new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<AdminPage<DtddSearchCacheEntryDto>> DTDD_SEARCHES = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<AdminPage<DetectedGameDto>> MISSING_GAMES = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<DetectedGameDto>> DETECTED_GAMES = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<TwitchCategoryDto>> CATEGORIES = new ParameterizedTypeReference<>() {};
@@ -164,6 +175,7 @@ public class RealApiService implements ApiService {
     private static final ParameterizedTypeReference<List<TwDefinitionDto>> TWS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<fr.enimaloc.catapult.common.dto.chatcommand.EnabledChatCommandDto>> ENABLED_COMMANDS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<GroupSummaryDto>> GROUPS = new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<List<LearnedRateLimitDto>> RATE_LIMITS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<ExperimentSummaryDto>> EXPERIMENTS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<FlagKeyDto>> FLAG_KEYS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<AdminPage<AdminNotificationDto>> ADMIN_NOTIFICATIONS = new ParameterizedTypeReference<>() {};
@@ -264,6 +276,14 @@ public class RealApiService implements ApiService {
         UUID me = me();
         if (me == null) return HttpStatus.UNAUTHORIZED.value();
         return client.delete("/api/internal/users/{userId}/bindings/{bindingId}/tws", me, bindingId);
+    }
+
+    @Override
+    public fr.enimaloc.catapult.common.dto.channel.TwDetailsDto twDetails(String bindingId) {
+        UUID me = me();
+        if (me == null) return null;
+        return client.get("/api/internal/users/{userId}/bindings/{bindingId}/tws/details",
+                fr.enimaloc.catapult.common.dto.channel.TwDetailsDto.class, me, bindingId);
     }
 
     @Override
@@ -990,6 +1010,69 @@ public class RealApiService implements ApiService {
     }
 
     @Override
+    public DtddCachesSummaryDto adminDtddCaches() {
+        return client.get("/api/internal/admin/dtdd-caches", DtddCachesSummaryDto.class);
+    }
+
+    @Override
+    public AdminPage<DtddTopicsCacheEntryDto> adminDtddTopicsCache(String q, int page) {
+        return client.get("/api/internal/admin/dtdd-caches/{kind}?q={q}&page={page}&size=20", DTDD_TOPICS, "topics",
+                q == null ? "" : q, page);
+    }
+
+    @Override
+    public AdminPage<DtddGameCacheEntryDto> adminDtddGamesCache(String q, int page) {
+        return client.get("/api/internal/admin/dtdd-caches/{kind}?q={q}&page={page}&size=20", DTDD_GAMES, "games",
+                q == null ? "" : q, page);
+    }
+
+    @Override
+    public AdminPage<DtddSearchCacheEntryDto> adminDtddSearchesCache(String q, int page) {
+        return client.get("/api/internal/admin/dtdd-caches/{kind}?q={q}&page={page}&size=20", DTDD_SEARCHES, "searches",
+                q == null ? "" : q, page);
+    }
+
+    @Override
+    public int adminRefetchDtddCache(String kind, String key) {
+        return client.call(HttpMethod.POST, "/api/internal/admin/dtdd-caches/{kind}/refetch?key={key}", null,
+                Void.class, kind, key).status();
+    }
+
+    @Override
+    public DtddCacheEntryDetailDto adminDtddCacheEntry(String kind, String key) {
+        return client.get("/api/internal/admin/dtdd-caches/{kind}/entry?key={key}", DtddCacheEntryDetailDto.class,
+                kind, key);
+    }
+
+    @Override
+    public ApiClient.Result<DtddRefetchJobDto> adminStartDtddRefetch() {
+        return client.call(HttpMethod.POST, "/api/internal/admin/dtdd-caches/refetch-all", null, DtddRefetchJobDto.class);
+    }
+
+    @Override
+    public ApiClient.Result<DtddRefetchJobDto> adminCancelDtddRefetch() {
+        return client.call(HttpMethod.DELETE, "/api/internal/admin/dtdd-caches/refetch-all", null,
+                DtddRefetchJobDto.class);
+    }
+
+    @Override
+    public List<LearnedRateLimitDto> adminRateLimits() {
+        return client.get("/api/internal/admin/rate-limits", RATE_LIMITS);
+    }
+
+    @Override
+    public int adminCorrectRateLimit(String id, LearnedRateLimitCorrectionDto correction) {
+        return client.call(HttpMethod.PUT, "/api/internal/admin/rate-limits/entry?id={id}", correction,
+                LearnedRateLimitDto.class, id).status();
+    }
+
+    @Override
+    public int adminResetRateLimit(String id) {
+        return client.call(HttpMethod.DELETE, "/api/internal/admin/rate-limits/entry?id={id}", null,
+                LearnedRateLimitDto.class, id).status();
+    }
+
+    @Override
     public List<GroupSummaryDto> adminGroups() {
         return client.get("/api/internal/admin/groups", GROUPS);
     }
@@ -1331,6 +1414,16 @@ public class RealApiService implements ApiService {
     }
 
     @Override
+    public fr.enimaloc.catapult.common.dto.admin.TwRebuildStatusDto adminTwRebuildStatus() {
+        return client.get("/api/internal/admin/tws/rebuild/status", fr.enimaloc.catapult.common.dto.admin.TwRebuildStatusDto.class);
+    }
+
+    @Override
+    public int adminCancelTwRebuild() {
+        return client.call(HttpMethod.POST, "/api/internal/admin/tws/rebuild/cancel", null, Void.class).status();
+    }
+
+    @Override
     public int adminRebuildTws(TwRebuild mode) {
         ApiClient.Result<Void> result = switch (mode) {
             case NON_OVERRIDDEN -> client.call(HttpMethod.POST, "/api/internal/admin/tws/rebuild", null, Void.class);
@@ -1343,6 +1436,23 @@ public class RealApiService implements ApiService {
     @Override
     public List<String> adminTwKeywords(String id) {
         return client.get("/api/internal/admin/tws/{id}/steam-keywords", new ParameterizedTypeReference<List<String>>() {}, id);
+    }
+
+    @Override
+    public List<fr.enimaloc.catapult.common.dto.admin.TwDtddTopicDto> adminTwDtddTopics(String id) {
+        return client.get("/api/internal/admin/tws/{id}/dtdd-topics",
+                new ParameterizedTypeReference<List<fr.enimaloc.catapult.common.dto.admin.TwDtddTopicDto>>() {}, id);
+    }
+
+    @Override
+    public int adminSetTwDtddTopics(String id, Map<String, String> minByTopic) {
+        Map<String, String> thresholds = new java.util.LinkedHashMap<>();
+        minByTopic.forEach((topic, min) -> {
+            if (min != null && !min.isBlank()) thresholds.put(topic, min);
+        });
+        return client.call(HttpMethod.PUT, "/api/internal/admin/tws/{id}/dtdd-topics",
+                new fr.enimaloc.catapult.common.dto.admin.DtddTopicsBody(minByTopic.keySet(), thresholds), Void.class,
+                id).status();
     }
 
     @Override

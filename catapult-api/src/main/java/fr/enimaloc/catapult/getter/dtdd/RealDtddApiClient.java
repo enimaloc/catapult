@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.getter.dtdd;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
 import lombok.extern.slf4j.Slf4j;
@@ -9,26 +10,35 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 @Slf4j
 @Component
 @ConditionalOnBooleanProperty("dtdd.enabled")
 public class RealDtddApiClient implements DtddApiClient {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    // DTDD adds fields to its answers (severity, 2026-11): one we don't know must not fail the whole call
+    private static final ObjectMapper MAPPER = new ObjectMapper()
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     private final RestClient client;
     private final DtddApiKeyRotator rotator;
     private final ExternalApiObservations apiObservations;
+    /** The key each call takes: any usable one, or (a {@link #reserving} view) only those above a reserve. */
+    private final Supplier<Optional<String>> keys;
 
     @Autowired
     public RealDtddApiClient(@Value("${dtdd.api-base-url}") String baseUrl,
@@ -42,9 +52,20 @@ public class RealDtddApiClient implements DtddApiClient {
 
     // visible for tests
     RealDtddApiClient(RestClient client, DtddApiKeyRotator rotator, ExternalApiObservations apiObservations) {
+        this(client, rotator, apiObservations, rotator::nextKey);
+    }
+
+    private RealDtddApiClient(RestClient client, DtddApiKeyRotator rotator, ExternalApiObservations apiObservations,
+                              Supplier<Optional<String>> keys) {
         this.client = client;
         this.rotator = rotator;
         this.apiObservations = apiObservations;
+        this.keys = keys;
+    }
+
+    @Override
+    public DtddApiClient reserving(int monthlyReserve) {
+        return new RealDtddApiClient(client, rotator, apiObservations, () -> rotator.nextKeyAbove(monthlyReserve));
     }
 
     @Override
@@ -54,7 +75,7 @@ public class RealDtddApiClient implements DtddApiClient {
                     .uri("/v3/items?q={q}", query)
                     .header("X-API-KEY", key)
                     .retrieve()
-                    .body(String.class), this::parseSearch)
+                    .toEntity(String.class), this::parseSearch)
                     .map(list -> list.stream()
                             .filter(result -> mediaType == null || mediaType.equals(result.mediaType()))
                             .toList())
@@ -66,12 +87,16 @@ public class RealDtddApiClient implements DtddApiClient {
         return apiObservations.observe("dtdd", "fetch_topics", () ->
             item(dtddId).map(item -> {
                 List<String> yes = new ArrayList<>(), no = new ArrayList<>(), mostly = new ArrayList<>();
+                Map<String, DtddSeverity> severities = new LinkedHashMap<>();
                 for (DtddTopicItemStat topicItemStat : item.topicItemStats()) {
                     if (topicItemStat.yesSum() > topicItemStat.noSum()) yes.add(topicItemStat.topicName());
                     else if (topicItemStat.yesSum() < topicItemStat.noSum()) no.add(topicItemStat.topicName());
                     else mostly.add(topicItemStat.topicName());
+                    if (topicItemStat.severity() != null && topicItemStat.topicName() != null) {
+                        severities.put(topicItemStat.topicName(), topicItemStat.severity());
+                    }
                 }
-                return new DtddTopics(yes, no, mostly);
+                return new DtddTopics(yes, no, mostly, severities);
             })
         );
     }
@@ -83,18 +108,23 @@ public class RealDtddApiClient implements DtddApiClient {
                     .uri("/v3/items/{id}", dtddId)
                     .header("X-API-KEY", key)
                     .retrieve()
-                    .body(String.class), this::parseItem)
+                    .toEntity(String.class), this::parseItem)
         );
     }
 
-    private <T> Optional<T> callWithRetry(Function<String, String> call, Function<String, T> parser) {
+    private <T> Optional<T> callWithRetry(Function<String, ResponseEntity<String>> call, Function<String, T> parser) {
         for (int attempt = 0; attempt < 2; attempt++) {
-            Optional<String> keyOpt = rotator.nextKey();
+            Optional<String> keyOpt = keys.get();
             if (keyOpt.isEmpty()) return Optional.empty();
             String key = keyOpt.get();
             try {
-                String body = call.apply(key);
-                return Optional.ofNullable(parser.apply(body));
+                rotator.onCall(key);
+                ResponseEntity<String> response = call.apply(key);
+                rotator.onQuota(key, header(response.getHeaders(), "X-RateLimit-Remaining-Minute"),
+                        header(response.getHeaders(), "X-RateLimit-Remaining-Month"),
+                        header(response.getHeaders(), "X-RateLimit-Limit-Minute"),
+                        header(response.getHeaders(), "X-RateLimit-Limit-Month"));
+                return Optional.ofNullable(parser.apply(response.getBody()));
             } catch (RestClientResponseException e) {
                 HttpStatusCode status = e.getStatusCode();
                 if (status.value() == 404) return Optional.empty();
@@ -113,6 +143,17 @@ public class RealDtddApiClient implements DtddApiClient {
             }
         }
         return Optional.empty();
+    }
+
+    /** A quota header's number, null when DTDD didn't send it (or sent something else). */
+    private static Integer header(HttpHeaders headers, String name) {
+        String value = headers.getFirst(name);
+        if (value == null || value.isBlank()) return null;
+        try {
+            return Integer.parseInt(value.trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     private int parseRetryAfter(String header) {

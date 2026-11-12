@@ -99,6 +99,7 @@ public class AdminMigrationService {
                         tgt.setSourceName(src.getSourceName());
                         tgt.setStatus(src.getStatus());
                         tgt.setIgnored(src.isIgnored());
+                        tgt.setIgnoredOverride(src.isIgnoredOverride());
                         tgt.setCclEnabled(src.isCclEnabled());
                         tgt.setCcls(new HashSet<>(src.getCcls()));
                         tgt.setExtensionSlots(new HashSet<>(src.getExtensionSlots()));
@@ -115,6 +116,7 @@ public class AdminMigrationService {
                         tgt.setTwitchGameName(src.getTwitchGameName());
                         tgt.setStatus(src.getStatus());
                         tgt.setIgnored(src.isIgnored());
+                        tgt.setIgnoredOverride(src.isIgnoredOverride());
                         tgt.setCclEnabled(src.isCclEnabled());
                         tgt.setCcls(new HashSet<>(src.getCcls()));
                         tgt.setExtensionSlots(new HashSet<>(src.getExtensionSlots()));

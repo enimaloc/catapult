@@ -2,12 +2,20 @@ package fr.enimaloc.catapult.getter.dtdd;
 
 import fr.enimaloc.catapult.domain.dtdd.DtddApiKeyEntry;
 import fr.enimaloc.catapult.repository.dtdd.DtddApiKeyRepository;
+import fr.enimaloc.catapult.common.dto.admin.KeyUsageDto;
+import fr.enimaloc.catapult.getter.KeyCallCounter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.time.YearMonth;
+import java.time.ZoneOffset;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -23,8 +31,14 @@ public class DtddApiKeyRotator {
     private final DtddApiKeyRepository repository;
     private final MeterRegistry meterRegistry;
     private final Map<String, Long> keyBlockedUntil = new ConcurrentHashMap<>();
+    private final Map<String, Quota> quotas = new ConcurrentHashMap<>();
     private final AtomicInteger counter = new AtomicInteger(0);
     private volatile List<String> keys = List.of();
+    private final KeyCallCounter calls =
+            new KeyCallCounter(Duration.ofMinutes(1), at -> YearMonth.from(at.atZone(ZoneOffset.UTC)));
+    /** A key's limits when DTDD doesn't tell them ({@code X-RateLimit-Limit-*}): its free tier's. */
+    @Setter @Value("${dtdd.rate-limit.per-minute:30}") private int defaultPerMinute = 30;
+    @Setter @Value("${dtdd.rate-limit.per-month:5000}") private long defaultPerMonth = 5000;
 
     public DtddApiKeyRotator(DtddApiKeyRepository repository, MeterRegistry meterRegistry) {
         this.repository = repository;
@@ -86,6 +100,98 @@ public class DtddApiKeyRotator {
         if (snapshot.isEmpty()) return false;
         long now = System.currentTimeMillis();
         return snapshot.stream().allMatch(k -> keyBlockedUntil.getOrDefault(k, 0L) > now);
+    }
+
+    /**
+     * What DTDD said was left of a key's quota with its last answer ({@code X-RateLimit-Remaining-*}), and its limits
+     * ({@code X-RateLimit-Limit-*}), null when it didn't say; {@code at} when it said it (epoch ms).
+     */
+    public record Quota(Integer remainingMinute, Integer remainingMonth, long at, Integer limitMinute,
+                        Integer limitMonth) {
+
+        /** What was left, without the limits. */
+        public Quota(Integer remainingMinute, Integer remainingMonth, long at) {
+            this(remainingMinute, remainingMonth, at, null, null);
+        }
+    }
+
+    /**
+     * Remembers what DTDD said was left of {@code key}'s quota. Nothing left this minute: the key rests until the
+     * next one instead of asking for a 429.
+     */
+    public void onQuota(String key, Integer remainingMinute, Integer remainingMonth) {
+        onQuota(key, remainingMinute, remainingMonth, null, null);
+    }
+
+    /** As {@link #onQuota(String, Integer, Integer)}, with the limits DTDD told (null: not told). */
+    public void onQuota(String key, Integer remainingMinute, Integer remainingMonth, Integer limitMinute,
+                        Integer limitMonth) {
+        if (remainingMinute == null && remainingMonth == null) return;
+        long now = System.currentTimeMillis();
+        quotas.put(key, new Quota(remainingMinute, remainingMonth, now, limitMinute, limitMonth));
+        if (remainingMinute != null && remainingMinute <= 0) {
+            keyBlockedUntil.merge(key, now + 60_000L, Math::max);
+        }
+    }
+
+    /** A call about to be sent with {@code key}: counted for the admin Keys tab. */
+    public void onCall(String key) {
+        calls.record(key, Instant.now());
+    }
+
+    /**
+     * What {@code key} was used for on this instance: its calls of the last minute and of the month (UTC), each out
+     * of the limit DTDD told (else the free tier's), with what DTDD said was left (the minute's only while fresh).
+     */
+    public KeyUsageDto usage(String key) {
+        Instant now = Instant.now();
+        Quota q = quotas.get(key);
+        boolean fresh = q != null && now.toEpochMilli() - q.at() < 60_000L;
+        Integer limitMinute = q != null && q.limitMinute() != null ? q.limitMinute() : defaultPerMinute;
+        Long limitMonth = q != null && q.limitMonth() != null ? (long) q.limitMonth() : defaultPerMonth;
+        return new KeyUsageDto(calls.inWindow(key, now), limitMinute, 60, fresh ? q.remainingMinute() : null,
+                "MONTH", calls.inPeriod(key, now), limitMonth, q == null ? null : q.remainingMonth());
+    }
+
+    /** Each key's last known quota (keys DTDD never answered for are absent). */
+    public Map<String, Quota> getQuotas() {
+        return Map.copyOf(quotas);
+    }
+
+    /**
+     * A key usable now that keeps more than {@code monthlyReserve} requests of its month (one whose month is unknown
+     * counts as keeping them), round robin; empty when none is — for bulk work, which must leave the reserve to the
+     * detection. Unlike {@link #nextKey}, never a blocked one.
+     */
+    public Optional<String> nextKeyAbove(int monthlyReserve) {
+        long now = System.currentTimeMillis();
+        List<String> available = keys.stream()
+            .filter(k -> aboveReserve(k, monthlyReserve))
+            .filter(k -> keyBlockedUntil.getOrDefault(k, 0L) <= now)
+            .toList();
+        if (available.isEmpty()) return Optional.empty();
+        return Optional.of(available.get(Math.floorMod(counter.getAndIncrement(), available.size())));
+    }
+
+    /**
+     * When a key that keeps more than {@code monthlyReserve} requests of its month is usable (epoch ms, now or
+     * earlier when one already is); empty when no key keeps them: the month is spent down to the reserve.
+     */
+    public Optional<Long> nextUsableAt(int monthlyReserve) {
+        return keys.stream()
+            .filter(k -> aboveReserve(k, monthlyReserve))
+            .map(k -> keyBlockedUntil.getOrDefault(k, 0L))
+            .min(Long::compare);
+    }
+
+    /** How many keys keep more than {@code monthlyReserve} requests of their month, blocked or not. */
+    public int keysAbove(int monthlyReserve) {
+        return (int) keys.stream().filter(k -> aboveReserve(k, monthlyReserve)).count();
+    }
+
+    private boolean aboveReserve(String key, int monthlyReserve) {
+        Quota quota = quotas.get(key);
+        return quota == null || quota.remainingMonth() == null || quota.remainingMonth() > monthlyReserve;
     }
 
     public void onKeyRateLimited(String key, int retryAfterSeconds) {

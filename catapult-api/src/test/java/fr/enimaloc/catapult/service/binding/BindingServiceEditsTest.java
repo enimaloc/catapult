@@ -55,7 +55,7 @@ class BindingServiceEditsTest {
     private final BindingService service = new BindingService(bindings, igdb, igdbDetails, twitch, twResolver, mappings,
             new GameBindingLookup(bindings), new CategoryChain(mock(CustomBindingActivations.class),
                     streamState, mock(UserSettingsRepository.class), new RaidRestoreHold(),
-                    gameState, mock(UserAccountRepository.class), new CategoryApplier(twitch, streamState), mock(RaidRestoreGateService.class), mock(GameBindingLookup.class), mock(ExtensionLayoutApplier.class)), layouts);
+                    gameState, mock(UserAccountRepository.class), new CategoryApplier(twitch, streamState), mock(RaidRestoreGateService.class), mock(GameBindingLookup.class), mock(ExtensionLayoutApplier.class)), layouts, org.mockito.Mockito.mock(org.springframework.context.ApplicationEventPublisher.class));
 
     private UserAccount user;
     private GameBinding binding;

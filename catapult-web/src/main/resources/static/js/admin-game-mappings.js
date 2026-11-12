@@ -8,7 +8,7 @@
  * changes one (from its row). Its game field suggests the platform's detected games as the ID or name is typed
  * ("name — ID · Streamers: n"; picking one fills the ID, any ID typed is kept as is); its category field searches
  * Twitch through GameSearch. The CCLs and TWs stay IGDB's (null) unless their switch replaces them with the boxes
- * checked (even none). After a save the form shows what changed and turns into the saved mapping's edit form.
+ * checked (even none). Its "ignored by default" switch makes the category optional. After a save the form shows what changed and turns into the saved mapping's edit form.
  * A deletion asks first, in its own dialog. A refusal is told by its status, never by catapult-api's message
  * (catapult-web relays none): 400 invalid, 404 gone, 409 already mapped, anything else unavailable.
  * Text from data only ever reaches the page through textContent. Listeners are delegated to the panel.
@@ -125,6 +125,7 @@ window.CatapultAdminGameMappings = (function () {
             gameName: el.querySelector(".admin-gm-game-name"),
             suggestions: el.querySelector(".admin-gm-suggestions"),
             category: el.querySelector('[name="category"]'),
+            ignored: el.querySelector('[name="ignoredByDefault"]'),
             applyLive: el.querySelector('[name="applyLive"]'),
             error: el.querySelector(".admin-gm-error"),
             result: el.querySelector(".admin-gm-result"),
@@ -240,7 +241,10 @@ window.CatapultAdminGameMappings = (function () {
         return [...checked, ...form.kept[key]];
     }
 
-    /** Fills the form with `mapping` (`{ id?, sourceType, sourceId, sourceName, twitchGameId, twitchGameName, ccls, tws }`) and opens it. */
+    /**
+     * Fills the form with `mapping` (`{ id?, sourceType, sourceId, sourceName, twitchGameId, twitchGameName, ccls, tws,
+     * ignoredByDefault? }`) and opens it.
+     */
     function open(form, mapping) {
         form.id = mapping.id ?? null;
         form.title.textContent = form.root.dataset[form.id ? "labelEditTitle" : "labelCreateTitle"];
@@ -252,6 +256,7 @@ window.CatapultAdminGameMappings = (function () {
         form.search.select(mapping.twitchGameId ? { id: mapping.twitchGameId, name: mapping.twitchGameName } : null);
         setOverride(form, "ccls", mapping.ccls ?? null);
         setOverride(form, "tws", mapping.tws ?? null);
+        form.ignored.checked = mapping.ignoredByDefault === true;
         form.applyLive.checked = false;
         hideMessages(form);
         form.dialog.open = true;
@@ -269,7 +274,8 @@ window.CatapultAdminGameMappings = (function () {
             twitchGameId: row.dataset.twitchGameId,
             twitchGameName: row.dataset.twitchGameName,
             ccls: list("ccls"),
-            tws: list("tws")
+            tws: list("tws"),
+            ignoredByDefault: row.hasAttribute("data-ignored-by-default")
         };
     }
 
@@ -277,16 +283,19 @@ window.CatapultAdminGameMappings = (function () {
         hideMessages(form);
         const sourceId = form.sourceId.value.trim();
         const category = form.search.selected();
+        const ignoredByDefault = form.ignored.checked;
         if (sourceId === "") return tell(form.error, form.root.dataset.labelErrorId);
-        if (!category) return tell(form.error, form.root.dataset.labelErrorCategory);
+        // A game ignored by default needs no category: its bindings keep IGDB's
+        if (!category && !ignoredByDefault) return tell(form.error, form.root.dataset.labelErrorCategory);
         const body = {
             sourceType: form.platform.value,
             sourceId,
-            twitchGameId: category.id,
-            twitchGameName: category.name,
+            twitchGameId: category?.id ?? null,
+            twitchGameName: category?.name ?? null,
             ccls: overrideOf(form, "ccls"),
             tws: overrideOf(form, "tws"),
-            applyLive: form.applyLive.checked
+            applyLive: form.applyLive.checked,
+            ignoredByDefault
         };
         form.save.disabled = true;
         const { status, body: result } = form.id

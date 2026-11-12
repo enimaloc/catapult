@@ -16,5 +16,9 @@ public interface TwDtddTopicMappingRepository extends JpaRepository<TwDtddTopicM
            "WHERE LOWER(m.dtddTopicName) IN :lowered")
     Set<String> findTwIdsByDtddTopicNameInIgnoreCase(@Param("lowered") Set<String> lowered);
 
+    /** The mappings of these DTDD topics (lower-cased names), each one with its TW and its least severe level. */
+    @Query("SELECT m FROM TwDtddTopicMapping m WHERE LOWER(m.dtddTopicName) IN :lowered")
+    List<TwDtddTopicMapping> findAllByDtddTopicNameInIgnoreCase(@Param("lowered") Set<String> lowered);
+
     void deleteAllByTwId(String twId);
 }

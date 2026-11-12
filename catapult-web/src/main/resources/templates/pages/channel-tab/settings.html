@@ -1,7 +1,7 @@
 <!--/*@thymesVar id="channelPage" type="fr.enimaloc.catapult.common.dto.channel.ChannelPageData"*/-->
 <!--/*@thymesVar id="channelSettings" type="fr.enimaloc.catapult.common.dto.channel.UserSettingsDto"*/-->
 <!--/* The channel's owner and its moderators alike: catapult-api lets both change these. */-->
-<mdui-tab-panel slot="panel" value="settings" th:with="settings=${channelSettings}" th:fragment="panel" xmlns:spa="urn:fr.enimaloc.catapult:spa">
+<mdui-tab-panel slot="panel" value="settings" th:with="settings=${channelSettings},titleHelperExtra=${(channelSettings?.titleConditionsAvailable() == true ? ' ' + #messages.msg('channel.title.helper_conditions') : '') + (channelSettings?.titleDropsAvailable() == true ? ' ' + #messages.msg('channel.title.helper_drops') : '')}" th:fragment="panel" xmlns:spa="urn:fr.enimaloc.catapult:spa">
 <!--/* Built only once the tab is picked (lazy.js): the page carries it, the browser builds nothing of it till then. */-->
 <template data-lazy>
     <div class="section-header">
@@ -51,7 +51,7 @@
         <!--/* Only while the channel is offered titles: without the field, a save leaves it as it is. */-->
         <mdui-text-field th:if="${settings.titleAvailable() == true}" id="no-game-title-input" variant="outlined"
                          maxlength="140" counter data-title-highlight th:value="${settings.noGameTitle()}"
-                         th:attr="label=#{channel.settings.fallback_title},helper=#{channel.settings.fallback_title_helper}"></mdui-text-field>
+                         th:attr="label=#{channel.settings.fallback_title},helper=|#{channel.settings.fallback_title_helper}${titleHelperExtra}|"></mdui-text-field>
         <p class="title-preview" data-title-preview th:if="${settings.titlePreviewAvailable() == true and settings.titleAvailable() == true}" data-preview-kind="NO_GAME"
            th:attr="data-none=#{channel.settings.stream_title.preview_none}"><span
                 th:text="#{channel.settings.stream_title.preview}">Aperçu :</span> <span class="title-preview-text"></span></p>
@@ -82,7 +82,7 @@
         <mdui-text-field th:if="${settings.titleAvailable() == true}" id="incomplete-fallback-title-input"
                          variant="outlined" maxlength="140" counter data-title-highlight
                          th:value="${settings.incompleteFallbackTitle()}"
-                         th:attr="label=#{channel.settings.fallback_title},helper=#{channel.settings.fallback_title_helper}"></mdui-text-field>
+                         th:attr="label=#{channel.settings.fallback_title},helper=|#{channel.settings.fallback_title_helper}${titleHelperExtra}|"></mdui-text-field>
         <p class="title-preview" data-title-preview th:if="${settings.titlePreviewAvailable() == true and settings.titleAvailable() == true}" data-preview-kind="INCOMPLETE"
            th:attr="data-none=#{channel.settings.stream_title.preview_none}"><span
                 th:text="#{channel.settings.stream_title.preview}">Aperçu :</span> <span class="title-preview-text"></span></p>
@@ -105,7 +105,7 @@
         <mdui-text-field id="title-template-input" variant="outlined" maxlength="140" counter data-title-highlight
                          th:value="${settings.titleTemplate()}"
                          th:disabled="${settings.titleFeatureEnabled() != true}"
-                         th:attr="label=#{channel.settings.stream_title.template},helper=#{channel.settings.stream_title.template_helper}"></mdui-text-field>
+                         th:attr="label=#{channel.settings.stream_title.template},helper=|#{channel.settings.stream_title.template_helper}${titleHelperExtra}|"></mdui-text-field>
         <p class="title-preview" data-title-preview th:if="${settings.titlePreviewAvailable() == true}" data-preview-kind="TEMPLATE"
            th:attr="data-none=#{channel.settings.stream_title.preview_none}"><span
                 th:text="#{channel.settings.stream_title.preview}">Aperçu :</span> <span class="title-preview-text"></span></p>

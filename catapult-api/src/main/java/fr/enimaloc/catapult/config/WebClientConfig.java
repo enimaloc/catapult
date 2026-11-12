@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import fr.enimaloc.catapult.ratelimit.LearnedRateLimitInterceptor;
 import org.springframework.boot.restclient.RestClientCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -24,16 +25,18 @@ public class WebClientConfig {
      * Spring Boot hands out. Wraps the request factory in a
      * {@link BufferingClientHttpRequestFactory} so the interceptor can read
      * the response body without exhausting the underlying stream for the
-     * actual caller.
+     * actual caller. The learned rate limits apply to every call too.
      */
     @Bean
-    public RestClientCustomizer traceLoggingCustomizer(HttpTraceLoggingInterceptor interceptor) {
+    public RestClientCustomizer traceLoggingCustomizer(HttpTraceLoggingInterceptor interceptor,
+                                                       LearnedRateLimitInterceptor rateLimits) {
         JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(
                 HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).build());
         requestFactory.setReadTimeout(READ_TIMEOUT);
         return builder -> builder
                 .requestFactory(new BufferingClientHttpRequestFactory(requestFactory))
-                .requestInterceptor(interceptor);
+                .requestInterceptor(interceptor)
+                .requestInterceptor(rateLimits);
     }
 
     /**

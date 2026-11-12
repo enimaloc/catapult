@@ -2,14 +2,21 @@ package fr.enimaloc.catapult.service.steam;
 
 import fr.enimaloc.catapult.domain.steam.SteamAppParentEntry;
 import fr.enimaloc.catapult.getter.steam.SteamPlaytestRedirectResolver;
+import fr.enimaloc.catapult.ratelimit.LearnedRateLimiter;
+import fr.enimaloc.catapult.ratelimit.RateLimitPriority;
 import fr.enimaloc.catapult.repository.steam.SteamAppParentRepository;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
+import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.*;
 
@@ -18,7 +25,9 @@ import java.util.*;
 @RequiredArgsConstructor
 public class SteamStoreServiceImpl implements SteamStoreService {
 
-    private static final String APP_DETAILS_URL = "https://store.steampowered.com/api/appdetails";
+    private static final String STORE_HOST = "store.steampowered.com";
+    private static final String APP_DETAILS_PATH = "/api/appdetails";
+    private static final String APP_DETAILS_URL = "https://" + STORE_HOST + APP_DETAILS_PATH;
 
     private static final Map<String, Set<String>> KEYWORDS = Map.of(
         "ViolentGraphic",    Set.of("blood", "gore", "violence", "violent", "killing", "combat", "death", "injury"),
@@ -32,8 +41,50 @@ public class SteamStoreServiceImpl implements SteamStoreService {
     private final ExternalApiObservations apiObservations;
     private final SteamAppParentRepository steamAppParentRepository;
     private final SteamPlaytestRedirectResolver redirectResolver;
+    private final LearnedRateLimiter rateLimiter;
 
     private static final java.time.Duration PARENT_CACHE_TTL = java.time.Duration.ofDays(30);
+
+    @Setter(AccessLevel.PACKAGE)
+    private Clock clock = Clock.systemUTC();
+    /** Until when the learned rate limit refused the store's calls without sending them (live calls don't wait). */
+    private volatile Instant refusedUntil;
+    /** How long a 429 nothing learned from (the learning off) leaves the store alone without a Retry-After. */
+    private static final java.time.Duration UNBLOCKED_429_WAIT = java.time.Duration.ofMinutes(1);
+
+    /**
+     * Until when the store's {@code appdetails} isn't called: its learned rate limit blocks it after a 429, or
+     * refused a live call without sending it.
+     */
+    @Override
+    public Optional<Instant> rateLimitedUntil() {
+        Instant now = clock.instant();
+        Instant refused = refusedUntil;
+        Optional<Instant> blocked = rateLimiter.blockedUntil(STORE_HOST, APP_DETAILS_PATH);
+        if (refused == null || !refused.isAfter(now)) return blocked;
+        return blocked.filter(b -> b.isAfter(refused)).or(() -> Optional.of(refused));
+    }
+
+    /**
+     * A 429 on {@code appdetails} ({@code appDetails}; another route's never stops it): a live call the learned rate
+     * limit refused (no call sent) tells until when, bulk work it gave up on (cancelled) doesn't. A real one is
+     * already learned; while nothing blocks the route (the learning off), it is left alone for its Retry-After, else
+     * a minute, so the TWs resolved meanwhile know Steam's signals were missed.
+     */
+    private void onRateLimited(HttpClientErrorException.TooManyRequests e, boolean appDetails) {
+        HttpHeaders headers = e.getResponseHeaders();
+        boolean local = headers != null && headers.containsHeader(LearnedRateLimiter.LOCAL_REFUSAL_HEADER);
+        if (!local) log.warn("Steam store rate limited (429): left alone until {}", rateLimitedUntil().orElse(null));
+        if (!appDetails) return;
+        if (local && RateLimitPriority.current() != RateLimitPriority.LIVE) return;
+        if (!local && rateLimiter.blockedUntil(STORE_HOST, APP_DETAILS_PATH).isPresent()) return;
+        Instant now = clock.instant();
+        java.time.Duration wait = LearnedRateLimiter.retryAfter(headers == null ? null
+                : headers.getFirst(HttpHeaders.RETRY_AFTER), now).orElse(UNBLOCKED_429_WAIT);
+        Instant until = now.plus(wait);
+        Instant refused = refusedUntil;
+        if (refused == null || until.isAfter(refused)) refusedUntil = until;
+    }
 
     /** One app's entry in an {@code appdetails} response, keyed by appId. */
     record AppDetailsEntry(boolean success, SteamStorePage data) {}
@@ -207,14 +258,21 @@ public class SteamStoreServiceImpl implements SteamStoreService {
                     .map(ResolvedParentApp::appId)
                     .orElse(appId) : appId;
             SteamLanguage lang = SteamLanguage.fromLocale(locale);
+            if (rateLimitedUntil().isPresent()) {
+                log.debug("Steam store left alone (rate limited): no appdetails for appId={}", appId);
+                return Optional.empty();
+            }
             try {
                 Map<String, AppDetailsEntry> response = restClient.get()
-                        .uri(APP_DETAILS_URL + "?appids=" + effectiveAppId + "&l=" + lang)
+                        .uri(APP_DETAILS_URL + "?appids={appId}&l={lang}", effectiveAppId, lang)
                         .retrieve()
                         .body(new ParameterizedTypeReference<>() {});
                 AppDetailsEntry entry = response == null ? null : response.get(effectiveAppId);
                 if (entry == null || !entry.success()) return Optional.empty();
                 return Optional.ofNullable(entry.data());
+            } catch (HttpClientErrorException.TooManyRequests e) {
+                onRateLimited(e, true);
+                return Optional.empty();
             } catch (Exception e) {
                 log.warn("Steam fetchData failed for appId={}: {}", appId, e.getMessage(), e);
                 return Optional.empty();
@@ -229,13 +287,17 @@ public class SteamStoreServiceImpl implements SteamStoreService {
                     .map(ResolvedParentApp::appId)
                     .orElse(appId);
             SteamLanguage lang = SteamLanguage.fromLocale(locale);
+            if (rateLimitedUntil().isPresent()) return Optional.empty();
             try {
                 String response = restClient.get()
-                        .uri("https://store.steampowered.com/app/" + effectiveAppId + "?l=" + lang)
+                        .uri("https://" + STORE_HOST + "/app/{appId}?l={lang}", effectiveAppId, lang)
                         .retrieve()
                         .body(String.class);
                 if (response == null || response.isBlank()) return Optional.empty();
                 return Optional.of(response);
+            } catch (HttpClientErrorException.TooManyRequests e) {
+                onRateLimited(e, false);
+                return Optional.empty();
             } catch (Exception e) {
                 log.warn("Steam fetchIADisclosure failed for appId={}: {}", appId, e.getMessage(), e);
                 return Optional.empty();

@@ -51,7 +51,7 @@ class BindingServiceMappingTest {
             new BindingService(bindings, igdb, igdbDetails, twitch, twResolver, mappings,
                     new GameBindingLookup(bindings), new CategoryChain(mock(CustomBindingActivations.class),
                     mock(StreamStateService.class), mock(UserSettingsRepository.class), new RaidRestoreHold(),
-                    gameState, mock(UserAccountRepository.class), new CategoryApplier(twitch, mock(StreamStateService.class)), mock(RaidRestoreGateService.class), mock(GameBindingLookup.class), mock(ExtensionLayoutApplier.class)), mock(ExtensionLayoutApplier.class));
+                    gameState, mock(UserAccountRepository.class), new CategoryApplier(twitch, mock(StreamStateService.class)), mock(RaidRestoreGateService.class), mock(GameBindingLookup.class), mock(ExtensionLayoutApplier.class)), mock(ExtensionLayoutApplier.class), org.mockito.Mockito.mock(org.springframework.context.ApplicationEventPublisher.class));
 
     private final DetectedGame cs2 = new DetectedGame("730", GameBinding.SourceType.STEAM, "Counter-Strike 2");
     private UserAccount user;
@@ -298,5 +298,77 @@ class BindingServiceMappingTest {
         GameBinding lost = binding(GameBinding.Status.MAPPED);
 
         assertThat(service.resolveWithoutMapping(lost).getStatus()).isEqualTo(GameBinding.Status.INCOMPLETE);
+    }
+
+    @Test
+    void newDetection_ofAGameIgnoredByDefault_comesInIgnored_withIgdbsCategoryWithoutOne() {
+        mapping.setIgnoredByDefault(true);
+        mapping.setTwitchGameId(null);
+        mapping.setTwitchGameName(null);
+        when(bindings.findByUserAndSourceIdAndSourceType(user, "730", GameBinding.SourceType.STEAM))
+                .thenReturn(Optional.empty());
+
+        GameBinding created = service.resolveOrCreate(user, cs2);
+
+        assertThat(created.isIgnored()).isTrue();
+        assertThat(created.isIgnoredOverride()).isFalse();
+        assertThat(created.getStatus()).isEqualTo(GameBinding.Status.AUTO);
+        assertThat(created.getTwitchGameId()).isEqualTo("igdb-twitch");
+    }
+
+    @Test
+    void applyMapping_ofAnIgnoreOnlyMapping_changesNothing() {
+        mapping.setTwitchGameId(null);
+        mapping.setTwitchGameName(null);
+        GameBinding binding = binding(GameBinding.Status.AUTO);
+
+        assertThat(service.applyMapping(binding, mapping, BindingService.MappingSuggestions.NONE)).isFalse();
+        assertThat(binding.getStatus()).isEqualTo(GameBinding.Status.AUTO);
+        assertThat(binding.getTwitchGameId()).isEqualTo("old");
+    }
+
+    @Test
+    void toggleIgnored_isTheStreamersChoice() {
+        GameBinding binding = binding(GameBinding.Status.MAPPED);
+
+        service.toggleIgnored(user, binding.getId(), true);
+
+        assertThat(binding.isIgnored()).isTrue();
+        assertThat(binding.isIgnoredOverride()).isTrue();
+        // An admin mapping no longer changes it
+        assertThat(service.applyMappingIgnore(binding, false)).isFalse();
+        assertThat(binding.isIgnored()).isTrue();
+    }
+
+    @Test
+    void updateBinding_marksTheStreamersChoice_onlyWhenTheIgnoreChanges() {
+        GameBinding kept = binding(GameBinding.Status.AUTO);
+        GameBinding switched = binding(GameBinding.Status.AUTO);
+
+        service.updateBinding(user, kept.getId(), "1", "One", Set.of(), false);
+        service.updateBinding(user, switched.getId(), "1", "One", Set.of(), true);
+
+        assertThat(kept.isIgnoredOverride()).isFalse();
+        assertThat(switched.isIgnoredOverride()).isTrue();
+    }
+
+    @Test
+    void applyMappingIgnore_leavesManualBindingsAlone() {
+        GameBinding manual = binding(GameBinding.Status.MANUAL);
+
+        assertThat(service.applyMappingIgnore(manual, true)).isFalse();
+        assertThat(manual.isIgnored()).isFalse();
+    }
+
+    @Test
+    void resetToDefaults_followsTheMappingsIgnore_andForgetsTheStreamersChoice() {
+        mapping.setIgnoredByDefault(true);
+        GameBinding binding = binding(GameBinding.Status.MAPPED);
+        binding.setIgnoredOverride(true);
+
+        service.resetToDefaults(user, binding.getId());
+
+        assertThat(binding.isIgnored()).isTrue();
+        assertThat(binding.isIgnoredOverride()).isFalse();
     }
 }

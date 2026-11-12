@@ -35,6 +35,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
@@ -371,6 +372,46 @@ public class AdminTabsFragmentController {
         });
     }
 
+    /** The DTDD caches' summary: their sizes and stale entries, the keys' quotas and the bulk refetch. */
+    @GetMapping("/dtdd-caches")
+    String dtddCaches(Model model, HttpServletResponse response) {
+        return guarded(model, response, () -> {
+            model.addAttribute("summary", apiService.adminDtddCaches());
+            return "pages/admin-tab/dtdd-caches :: list";
+        });
+    }
+
+    /** One DTDD cache's entries ({@code kind}: topics, games, searches), searched and paged, the oldest first. */
+    @GetMapping("/dtdd-caches/{kind}")
+    String dtddCacheEntries(Model model, HttpServletResponse response, @PathVariable String kind,
+                            @RequestParam(required = false) String q, @RequestParam(defaultValue = "0") int page) {
+        return guarded(model, response, () -> {
+            int shown = Math.max(0, page);
+            Object entries = switch (kind) {
+                case "topics" -> apiService.adminDtddTopicsCache(q, shown);
+                case "games" -> apiService.adminDtddGamesCache(q, shown);
+                case "searches" -> apiService.adminDtddSearchesCache(q, shown);
+                default -> throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+            };
+            model.addAttribute("kind", kind);
+            model.addAttribute("q", q == null ? "" : q);
+            model.addAttribute("entries", entries);
+            return "pages/admin-tab/dtdd-caches :: entries";
+        });
+    }
+
+    /** Everything the DTDD caches keep about one entry, the body of the entries' dialog. */
+    @GetMapping("/dtdd-caches/{kind}/entry")
+    String dtddCacheEntry(Model model, HttpServletResponse response, @PathVariable String kind,
+                          @RequestParam String key) {
+        return guarded(model, response, () -> {
+            model.addAttribute("kind", kind);
+            model.addAttribute("key", key);
+            model.addAttribute("entry", apiService.adminDtddCacheEntry(kind, key));
+            return "pages/admin-tab/dtdd-caches :: entry";
+        });
+    }
+
     @GetMapping("/groups")
     String groups(Model model, HttpServletResponse response) {
         return guarded(model, response, () -> {
@@ -392,6 +433,7 @@ public class AdminTabsFragmentController {
     String tw(Model model, HttpServletResponse response) {
         return guarded(model, response, () -> {
             model.addAttribute("definitions", apiService.adminTws());
+            model.addAttribute("rebuild", apiService.adminTwRebuildStatus());
             return "pages/admin-tab/tw :: content";
         });
     }
@@ -411,6 +453,21 @@ public class AdminTabsFragmentController {
         });
     }
 
+    /** One definition's DTDD topics with their least severe level; the missing fragment (404) when it is unknown. */
+    @GetMapping("/tw/{id}/dtdd")
+    String twDtddTopics(Model model, HttpServletResponse response, @PathVariable String id) {
+        return guarded(model, response, () -> {
+            TwDefinitionDto definition = apiService.adminTw(id);
+            if (definition == null) {
+                response.setStatus(HttpStatus.NOT_FOUND.value());
+                return "pages/admin-tab/tw :: missing";
+            }
+            model.addAttribute("definition", definition);
+            model.addAttribute("topics", apiService.adminTwDtddTopics(id));
+            return "pages/admin-tab/tw :: dtdd";
+        });
+    }
+
     /** Steam and DTDD keys cards, then the Minecraft service accounts card. */
     @GetMapping("/keys")
     String keys(Model model, HttpServletResponse response) {
@@ -418,6 +475,8 @@ public class AdminTabsFragmentController {
             model.addAttribute("steam", apiService.adminApiKeys(ApiKeyProvider.STEAM));
             model.addAttribute("dtdd", apiService.adminApiKeys(ApiKeyProvider.DTDD));
             model.addAttribute("minecraft", apiService.adminMinecraftAccounts());
+            // The rate limits learned from the platforms' 429s: each host, then its routes
+            model.addAttribute("limits", apiService.adminRateLimits());
             return "pages/admin-tab/keys :: content";
         });
     }

@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.domain.binding.ExtensionSlotSetting;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.binding.GameMapping;
 import fr.enimaloc.catapult.domain.igdb.IgdbGameDetails;
+import fr.enimaloc.catapult.event.TwsMissedSteamEvent;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
 import fr.enimaloc.catapult.repository.binding.GameMappingRepository;
@@ -18,6 +19,7 @@ import fr.enimaloc.catapult.service.tw.TwResolverService;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,6 +46,8 @@ public class BindingService {
     private final GameBindingLookup gameBindingLookup;
     private final CategoryChain categoryChain;
     private final ExtensionLayoutApplier extensionLayoutApplier;
+    /** Tells a binding whose Steam signals were missed (the store rate limited). */
+    private final ApplicationEventPublisher events;
 
     /**
      * Applies {@code change} to the user's binding (if it exists), saves it, and applies it when it is the game
@@ -62,10 +66,13 @@ public class BindingService {
 
     /** The TWs suggested for a game from its IGDB descriptors, Steam signals (Steam games only) and name. */
     private Set<String> suggestTws(String igdbId, DetectedGame game) {
+        return twResolverService.suggest(twInput(igdbId, game));
+    }
+
+    private TwResolverService.SuggestInput twInput(String igdbId, DetectedGame game) {
         Set<Long> descriptorIds = igdbService.fetchDescriptorIds(igdbId);
         String steamAppId = game.getSourceType() == GameBinding.SourceType.STEAM ? game.getSourceId() : null;
-        return twResolverService.suggest(new TwResolverService.SuggestInput(
-                igdbId, descriptorIds, steamAppId, game.getSourceName()));
+        return new TwResolverService.SuggestInput(igdbId, descriptorIds, steamAppId, game.getSourceName());
     }
 
     private static DetectedGame detectedOf(GameBinding binding) {
@@ -125,26 +132,79 @@ public class BindingService {
         binding.setSourceType(detectedGame.getSourceType());
         binding.setSourceName(detectedGame.getSourceName());
 
+        // A game an admin mapping ignores by default comes in ignored
+        binding.setIgnored(mappingOf(detectedGame).map(GameMapping::isIgnoredByDefault).orElse(false));
+
         log.info("Creating binding for user {}  — game '{}'", user.getId(), detectedGame.getSourceName());
         return updateWithIgdbResolution(user, detectedGame, binding);
     }
 
-    /**
-     * Resolves the binding's category and saves it: from the admin game mapping of its game when there is one
-     * (MAPPED), else from IGDB (AUTO, or INCOMPLETE when IGDB finds no Twitch category).
-     */
-    private GameBinding updateWithIgdbResolution(UserAccount user, DetectedGame detectedGame, GameBinding binding) {
-        Optional<GameMapping> mapping = detectedGame.getSourceId() != null
+    /** The admin game mapping of a detected game, if any (none without a source ID). */
+    private Optional<GameMapping> mappingOf(DetectedGame detectedGame) {
+        return detectedGame.getSourceId() != null
                 ? gameMappingRepository.findBySourceTypeAndSourceId(
                         detectedGame.getSourceType(), detectedGame.getSourceId())
                 : Optional.empty();
+    }
+
+    /**
+     * Resolves the binding's category and saves it: from the admin game mapping of its game when it sets one
+     * (MAPPED), else from IGDB (AUTO, or INCOMPLETE when IGDB finds no Twitch category).
+     */
+    private GameBinding updateWithIgdbResolution(UserAccount user, DetectedGame detectedGame, GameBinding binding) {
+        Optional<GameMapping> mapping = mappingOf(detectedGame).filter(GameMapping::hasCategory);
         if (mapping.isPresent()) {
             applyMapping(binding, mapping.get());
             log.info("Binding updated as MAPPED for user {} — game '{}' mapped by an admin to '{}' (twitchId={})",
                     user.getId(), detectedGame.getSourceName(), binding.getTwitchGameName(), binding.getTwitchGameId());
-            return gameBindingRepository.save(binding);
+            return missedSteam(gameBindingRepository.save(binding), mapping.get().isTwsOverridden());
         }
-        return updateWithoutMapping(user, detectedGame, binding);
+        return missedSteam(updateWithoutMapping(user, detectedGame, binding), false);
+    }
+
+    /**
+     * A Steam game's binding just resolved while the Steam store is rate limited: its TWs (when the detection chose
+     * them: not the streamer's, nor an admin's) miss Steam's signals, and are resolved again once it may be called.
+     */
+    private GameBinding missedSteam(GameBinding saved, boolean adminTws) {
+        if (adminTws || saved.isTwOverride()
+                || saved.getSourceType() != GameBinding.SourceType.STEAM || saved.getId() == null) {
+            return saved;
+        }
+        twResolverService.steamRateLimitedUntil()
+                .ifPresent(until -> events.publishEvent(new TwsMissedSteamEvent(saved.getId(), until)));
+        return saved;
+    }
+
+    /**
+     * Resolves again the TWs of a binding whose Steam signals were missed (the store rate limited), when the detection
+     * still chooses them; saved when they changed. Still limited, it is told again for later.
+     *
+     * @return the binding when its TWs changed, to push to its dashboard
+     */
+    @Transactional
+    public Optional<GameBinding> retryTwsAfterSteamLimit(UUID bindingId) {
+        Optional<GameBinding> found = gameBindingRepository.findById(bindingId);
+        if (found.isEmpty()) return Optional.empty();
+        GameBinding binding = found.get();
+        boolean adminTws = binding.getStatus() == GameBinding.Status.MAPPED && binding.getSourceId() != null
+                && gameMappingRepository.findBySourceTypeAndSourceId(binding.getSourceType(), binding.getSourceId())
+                        .map(GameMapping::isTwsOverridden).orElse(false);
+        if (binding.isTwOverride() || adminTws || binding.getStatus() == GameBinding.Status.MANUAL) {
+            return Optional.empty();
+        }
+        Optional<String> igdbId = igdbService.resolveIgdbIdForBinding(binding);
+        if (igdbId.isEmpty()) return Optional.empty();
+        TwResolverService.Suggestion suggestion = twResolverService.suggestReporting(twInput(igdbId.get(), detectedOf(binding)));
+        if (suggestion.steamLimitedUntil().isPresent()) {
+            events.publishEvent(new TwsMissedSteamEvent(bindingId, suggestion.steamLimitedUntil().get()));
+            return Optional.empty();
+        }
+        if (binding.getTws().equals(suggestion.tws())) return Optional.empty();
+        binding.getTws().clear();
+        binding.getTws().addAll(suggestion.tws());
+        log.info("[TW] binding {} resolved again after the Steam store's rate limit: {}", bindingId, suggestion.tws());
+        return Optional.of(gameBindingRepository.save(binding));
     }
 
     /**
@@ -191,7 +251,7 @@ public class BindingService {
      * @return whether the binding changed; always false for a MANUAL binding, which is never touched.
      */
     public boolean applyMapping(GameBinding binding, GameMapping mapping, MappingSuggestions suggestions) {
-        if (binding.getStatus() == GameBinding.Status.MANUAL) return false;
+        if (binding.getStatus() == GameBinding.Status.MANUAL || !mapping.hasCategory()) return false;
 
         Set<String> ccls = mapping.isCclsOverridden() ? Set.copyOf(mapping.getCcls()) : suggestions.ccls();
         Set<String> tws = binding.isTwOverride() ? Set.copyOf(binding.getTws())
@@ -214,6 +274,19 @@ public class BindingService {
         return changed;
     }
 
+    /**
+     * Sets whether the binding is ignored as an admin mapping says, without saving it — unless it is MANUAL or its
+     * streamer chose ({@code ignoredOverride}).
+     *
+     * @return whether the binding changed
+     */
+    public boolean applyMappingIgnore(GameBinding binding, boolean ignored) {
+        if (binding.getStatus() == GameBinding.Status.MANUAL || binding.isIgnoredOverride()
+                || binding.isIgnored() == ignored) return false;
+        binding.setIgnored(ignored);
+        return true;
+    }
+
     /** Resolves and saves the binding from IGDB alone, its game's mapping ignored — for a deleted mapping. */
     @Transactional
     public GameBinding resolveWithoutMapping(GameBinding binding) {
@@ -229,7 +302,8 @@ public class BindingService {
             String twitchId = igdbGameDetailsService.getDetails(igdbId)
                     .map(IgdbGameDetails::getWebsites)
                     .map(websites -> websites.get("twitch"))
-                    .filter(id -> !id.isBlank())
+                    // A category id (external_games' uid), not a Twitch website's URL kept under the same key
+                    .filter(BindingService::isTwitchCategoryId)
                     .or(() -> igdbService.findTwitchGameId(igdbId))
                     .or(() -> twitchService.findCategoryIdByName(user, gameName))
                     .orElse(null);
@@ -264,6 +338,11 @@ public class BindingService {
         return gameBindingRepository.save(binding);
     }
 
+    /** Twitch's category ids are numeric; anything else (a website URL) is refused as the PATCH's game_id. */
+    static boolean isTwitchCategoryId(String id) {
+        return !id.isEmpty() && id.chars().allMatch(c -> c >= '0' && c <= '9');
+    }
+
     private Optional<IgdbService.IgdbGame> resolveViaIgdb(DetectedGame detectedGame) {
         return detectedGame.getSourceId() != null
                 ? igdbService.findByExternalAppId(detectedGame.getSourceType(), detectedGame.getSourceId())
@@ -290,6 +369,7 @@ public class BindingService {
             binding.getTws().clear();
             binding.getTws().addAll(tws);
             binding.setTwOverride(true);
+            if (binding.isIgnored() != ignored) binding.setIgnoredOverride(true);
             binding.setIgnored(ignored);
             if (twitchGameId != null && !twitchGameId.isBlank()) {
                 binding.setStatus(GameBinding.Status.MANUAL);
@@ -336,15 +416,17 @@ public class BindingService {
     }
 
     /**
-     * Puts the binding back as first detected: resolved anew (category, CCLs, TWs), its toggles on, not ignored, its
-     * extension layout emptied (pushed to Twitch when it is the configuration in place).
+     * Puts the binding back as first detected: resolved anew (category, CCLs, TWs), its toggles on, ignored only when
+     * its game's admin mapping ignores it by default, its extension layout emptied (pushed to Twitch when it is the
+     * configuration in place).
      * @throws ResponseStatusException 404 when the binding isn't the user's
      */
     @Transactional
     public void resetToDefaults(UserAccount user, UUID bindingId) {
         GameBinding binding = gameBindingRepository.findByIdAndUser(bindingId, user)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown binding"));
-        binding.setIgnored(false);
+        binding.setIgnoredOverride(false);
+        binding.setIgnored(mappingOf(detectedOf(binding)).map(GameMapping::isIgnoredByDefault).orElse(false));
         binding.setCclEnabled(true);
         binding.setTwEnabled(true);
         binding.setTitle(null);
@@ -387,6 +469,17 @@ public class BindingService {
         });
     }
 
+    /** A binding and why each TW is suggested for its game now (nothing when IGDB doesn't know the game). */
+    public record TwExplanation(GameBinding binding, TwResolverService.Explanation explanation) {}
+
+    /** As {@link #previewTws}, with the binding and each suggestion's sources; empty when it isn't the user's. */
+    public Optional<TwExplanation> explainTws(UserAccount user, UUID bindingId) {
+        return gameBindingRepository.findByIdAndUser(bindingId, user).map(binding -> new TwExplanation(binding,
+                igdbService.resolveIgdbIdForBinding(binding)
+                        .map(igdbId -> twResolverService.explain(twInput(igdbId, detectedOf(binding))))
+                        .orElseGet(() -> new TwResolverService.Explanation(List.of()))));
+    }
+
     public Set<String> previewTws(UserAccount user, UUID bindingId) {
         return gameBindingRepository.findByIdAndUser(bindingId, user)
                 .flatMap(binding -> igdbService.resolveIgdbIdForBinding(binding)
@@ -402,7 +495,11 @@ public class BindingService {
 
     @Transactional
     public void toggleIgnored(UserAccount user, UUID bindingId, boolean ignored) {
-        editBinding(user, bindingId, binding -> binding.setIgnored(ignored));
+        editBinding(user, bindingId, binding -> {
+            binding.setIgnored(ignored);
+            // The streamer's choice: an admin mapping no longer changes it
+            binding.setIgnoredOverride(true);
+        });
     }
 
     @Transactional

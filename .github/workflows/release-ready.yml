@@ -2,7 +2,8 @@ name: Release ready
 
 # `pull_request` rather than `pull_request_target`: `main` holds no workflow until the first stable
 # release, so a target-based trigger would never fire for beta -> main. The job only runs for the
-# owner on this repository's release branches, and it runs dev's scripts.
+# owner on this repository's release branches, and it runs dev's scripts. Beta is skipped for now
+# (.github/release/lib/flow.mjs): the promotion is dev -> main; the beta pairs stay accepted.
 on:
   pull_request:
     types: [ready_for_review]
@@ -21,6 +22,7 @@ jobs:
       github.event.sender.login == github.repository_owner &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       (
+        (github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref == 'dev') ||
         (github.event.pull_request.base.ref == 'beta' && github.event.pull_request.head.ref == 'dev') ||
         (github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref == 'beta') ||
         (github.event.pull_request.base.ref == 'main' && startsWith(github.event.pull_request.head.ref, 'hotfix/'))

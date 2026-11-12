@@ -251,6 +251,20 @@ test("stablePromotion_bumpsToTheStableVersion", async () => {
   assert.match(file.text, /version = "1\.0\.0"\n/);
 });
 
+test("devToMainPromotion_bumpsDevToTheStableVersion", async () => {
+  const gh = fakeGitHub({
+    base: "main",
+    head: "dev",
+    title: "chore(release): v1.2.0",
+    tags: ["v1.1.0-BETA.1", "v1.1.0"],
+    ahead: [commit("a", "feat(web): one")],
+  });
+  assert.equal(await run(gh), "auto-merge");
+  const [[, file]] = named(gh, "commitFile");
+  assert.equal(file.branch, "dev");
+  assert.match(file.text, /version = "1\.2\.0"\n/);
+});
+
 test("hotfixWithoutVersionTitle_getsTheNextPatch", async () => {
   const tags = ["v0.0.0", "v1.0.0"];
   const gh = fakeGitHub({ base: "main", head: "hotfix/login", title: "fix: login", marker: null, tags });
@@ -279,7 +293,7 @@ test("otherSender_isIgnored", async () => {
 });
 
 test("unrelatedPr_isIgnored", async () => {
-  for (const [base, head] of [["dev", "feat/x"], ["main", "dev"], ["beta", "hotfix/x"], ["main", "feat/x"]]) {
+  for (const [base, head] of [["dev", "feat/x"], ["dev", "main"], ["beta", "hotfix/x"], ["main", "feat/x"]]) {
     const gh = fakeGitHub({ base, head });
     assert.equal(await run(gh), "ignored");
     assert.deepEqual(gh.calls, [["getPull", 7]]);

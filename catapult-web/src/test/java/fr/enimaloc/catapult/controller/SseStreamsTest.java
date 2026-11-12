@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
@@ -109,8 +110,13 @@ class SseStreamsTest {
         assertThat(sse.openCount()).isZero();
     }
 
+    /*
+     * Not completed after an IOException: the container reports the error itself (onError), and Tomcat refuses
+     * an application thread completing the stream after that (an IllegalStateException out of the writing
+     * thread, seen in production).
+     */
     @Test
-    void aStreamThatFails_isClosedAndForgotten_once() throws IOException {
+    void aStreamThatFails_isClosedAndForgotten_once_withoutBeingCompleted() throws IOException {
         SseStreams sse = SseStreams.direct(metrics);
         SseEmitter emitter = mock(SseEmitter.class);
         sse.open(emitter, closed::incrementAndGet);
@@ -119,9 +125,60 @@ class SseStreamsTest {
         sse.send(emitter, "A", "1");
         sse.send(emitter, "B", "2");
 
+        verify(emitter, never()).complete();
+        assertThat(closed).hasValue(1);
+        assertThat(sse.openCount()).isZero();
+    }
+
+    /*
+     * Completed once the container has failed it, the emitter refuses: still closed, and nothing thrown out of
+     * the writing task (its own thread in production, where the exception was only logged as uncaught).
+     */
+    @Test
+    void aStreamCompletedAfterTheContainersError_isClosedQuietly() {
+        List<Runnable> tasks = new ArrayList<>();
+        SseStreams sse = new SseStreams(metrics, InstanceBus.local(), tasks::add);
+        SseEmitter emitter = mock(SseEmitter.class);
+        sse.open(emitter, closed::incrementAndGet);
+        doThrow(new IllegalStateException("AsyncContext used after an error")).when(emitter).complete();
+        sse.close(emitter);
+
+        assertThatCode(() -> tasks.getFirst().run()).doesNotThrowAnyException();
+
         verify(emitter).complete();
         assertThat(closed).hasValue(1);
         assertThat(sse.openCount()).isZero();
+    }
+
+    @Test
+    void aStreamThatFailsOtherwise_isCompletedQuietly() throws IOException {
+        List<Runnable> tasks = new ArrayList<>();
+        SseStreams sse = new SseStreams(metrics, InstanceBus.local(), tasks::add);
+        SseEmitter emitter = mock(SseEmitter.class);
+        sse.open(emitter, closed::incrementAndGet);
+        doThrow(new IllegalStateException("completed")).when(emitter).send(any(SseEmitter.SseEventBuilder.class));
+        doThrow(new IllegalStateException("AsyncContext used after an error")).when(emitter).complete();
+        sse.send(emitter, "A", "1");
+
+        assertThatCode(() -> tasks.getFirst().run()).doesNotThrowAnyException();
+
+        verify(emitter).complete();
+        assertThat(closed).hasValue(1);
+    }
+
+    @Test
+    void aStreamThatDoesNotKeepUp_isClosedQuietly_evenWhenItsCompletionIsRefused() {
+        List<Runnable> never = new ArrayList<>();
+        SseStreams sse = new SseStreams(metrics, InstanceBus.local(), never::add);
+        SseEmitter emitter = mock(SseEmitter.class);
+        sse.open(emitter, closed::incrementAndGet);
+        doThrow(new IllegalStateException("AsyncContext used after an error")).when(emitter).complete();
+
+        assertThatCode(() -> {
+            for (int i = 0; i <= SseStreams.MAX_PENDING; i++) sse.send(emitter, "A", i);
+        }).doesNotThrowAnyException();
+
+        assertThat(closed).hasValue(1);
     }
 
     @Test

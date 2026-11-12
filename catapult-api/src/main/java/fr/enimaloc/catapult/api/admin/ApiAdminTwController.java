@@ -3,11 +3,15 @@ package fr.enimaloc.catapult.api.admin;
 import fr.enimaloc.catapult.api.ApiPaths;
 import fr.enimaloc.catapult.common.dto.admin.AdminTwCreateBody;
 import fr.enimaloc.catapult.common.dto.admin.DtddTopicsBody;
+import fr.enimaloc.catapult.common.dto.admin.TwDtddTopicDto;
+import fr.enimaloc.catapult.domain.tw.TwDtddTopicMapping;
+import fr.enimaloc.catapult.service.tw.TwDtddTopicLevels;
 import fr.enimaloc.catapult.common.dto.admin.IgdbDescriptorsBody;
 import fr.enimaloc.catapult.common.dto.admin.SteamIdsBody;
 import fr.enimaloc.catapult.common.dto.admin.SteamKeywordBody;
 import fr.enimaloc.catapult.common.dto.admin.SteamKeywordsBody;
 import fr.enimaloc.catapult.common.dto.admin.SteamSignalTestBody;
+import fr.enimaloc.catapult.common.dto.admin.TwRebuildStatusDto;
 import fr.enimaloc.catapult.common.dto.admin.UpdateBody;
 import fr.enimaloc.catapult.domain.tw.TwDefinition;
 import fr.enimaloc.catapult.service.notification.AdminEventPublisher;
@@ -31,6 +35,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 @RestController
@@ -46,6 +51,8 @@ public class ApiAdminTwController {
     private final Optional<TwBackfillService> backfillService;
 
     private final AdminEventPublisher events;
+
+    private final TwDtddTopicLevels topicLevels;
 
     @GetMapping
     public List<TwDefinition> list() {
@@ -82,9 +89,20 @@ public class ApiAdminTwController {
         return ResponseEntity.noContent().build();
     }
 
+    /** The TW's DTDD topics with their least severe level, and the levels the cached titles give each. */
+    @GetMapping("/{id}/dtdd-topics")
+    public List<TwDtddTopicDto> listDtdd(@PathVariable String id) {
+        if (service.get(id).isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown TW " + id);
+        List<TwDtddTopicMapping> topics = service.listDtddTopics(id);
+        Map<String, List<String>> levels = topicLevels.of(topics.stream().map(TwDtddTopicMapping::getDtddTopicName).toList());
+        return topics.stream().map(m -> new TwDtddTopicDto(m.getDtddTopicName(), m.getMinSeverity(),
+                levels.getOrDefault(m.getDtddTopicName().toLowerCase(Locale.ROOT), List.of()))).toList();
+    }
+
     @PutMapping("/{id}/dtdd-topics")
     public ResponseEntity<Void> setDtdd(@PathVariable String id, @RequestBody DtddTopicsBody b) {
-        service.replaceDtddTopics(id, b.topics() == null ? Set.of() : b.topics());
+        service.replaceDtddTopics(id, b.topics() == null ? Set.of() : b.topics(),
+                b.minSeverities() == null ? Map.of() : b.minSeverities());
         return ResponseEntity.noContent().build();
     }
 
@@ -129,32 +147,39 @@ public class ApiAdminTwController {
     }
 
     @PostMapping("/rebuild")
-    public ResponseEntity<Void> rebuildNonOverriddenMappings() {
-        return backfillService
-                .map(backfill -> {
-                    backfill.rebuildAllNonOverridden();
-                    return ResponseEntity.accepted().<Void>build();
-                })
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "The TW backfill is not available"));
+    public ResponseEntity<TwRebuildStatusDto> rebuildNonOverriddenMappings() {
+        return start(TwBackfillService.Mode.NON_OVERRIDDEN);
     }
 
     @PostMapping("/rebuild/force")
-    public ResponseEntity<Void> rebuildMappings() {
-        return backfillService
-                .map(backfill -> {
-                    backfill.rebuildAll();
-                    return ResponseEntity.accepted().<Void>build();
-                })
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "The TW backfill is not available"));
+    public ResponseEntity<TwRebuildStatusDto> rebuildMappings() {
+        return start(TwBackfillService.Mode.UNTOUCHED);
     }
 
     @PostMapping("/rebuild/force-pinned")
-    public ResponseEntity<Void> rebuildMappingsIncludingPinned() {
-        return backfillService
-                .map(backfill -> {
-                    backfill.forceRebuildAllIncludingPinned();
-                    return ResponseEntity.accepted().<Void>build();
-                })
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "The TW backfill is not available"));
+    public ResponseEntity<TwRebuildStatusDto> rebuildMappingsIncludingPinned() {
+        return start(TwBackfillService.Mode.FORCE_PINNED);
+    }
+
+    /** The TWs' recalculation running or last run (IDLE without the backfill: none ever). */
+    @GetMapping("/rebuild/status")
+    public TwRebuildStatusDto rebuildStatus() {
+        return backfillService.map(TwBackfillService::status).orElse(TwRebuildStatusDto.IDLE);
+    }
+
+    /** Asks the running recalculation to stop after its current binding. */
+    @PostMapping("/rebuild/cancel")
+    public TwRebuildStatusDto cancelRebuild() {
+        return backfill().cancel();
+    }
+
+    /** 202 with the recalculation started; 409 while one runs already, 503 without the backfill. */
+    private ResponseEntity<TwRebuildStatusDto> start(TwBackfillService.Mode mode) {
+        return ResponseEntity.accepted().body(backfill().start(mode));
+    }
+
+    private TwBackfillService backfill() {
+        return backfillService.orElseThrow(
+                () -> new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "The TW backfill is not available"));
     }
 }

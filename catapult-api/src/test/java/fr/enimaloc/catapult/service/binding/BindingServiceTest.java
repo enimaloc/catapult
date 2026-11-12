@@ -60,7 +60,7 @@ class BindingServiceTest {
         bindingService = new BindingService(gameBindingRepository, igdbService, igdbGameDetailsService, twitchService, twResolverService, gameMappingRepository, new GameBindingLookup(gameBindingRepository),
                 new CategoryChain(mock(CustomBindingActivations.class), streamState,
                         mock(UserSettingsRepository.class), new RaidRestoreHold(), gameStateService,
-                        mock(UserAccountRepository.class), new CategoryApplier(twitchService, streamState), mock(RaidRestoreGateService.class), mock(GameBindingLookup.class), mock(ExtensionLayoutApplier.class)), mock(ExtensionLayoutApplier.class));
+                        mock(UserAccountRepository.class), new CategoryApplier(twitchService, streamState), mock(RaidRestoreGateService.class), mock(GameBindingLookup.class), mock(ExtensionLayoutApplier.class)), mock(ExtensionLayoutApplier.class), org.mockito.Mockito.mock(org.springframework.context.ApplicationEventPublisher.class));
 
         user = new UserAccount();
         bindingId = UUID.randomUUID();
@@ -259,6 +259,34 @@ class BindingServiceTest {
         assertThat(result.getStatus()).isEqualTo(GameBinding.Status.AUTO);
         assertThat(result.getTwitchGameId()).isEqualTo("493959");
         verifyNoInteractions(twitchService);
+    }
+
+    /*
+     * A game without a Twitch external_game but with a Twitch website keeps that website's URL under "twitch"
+     * (IgdbWebsiteKeys#links): sent as the game_id, Twitch refused every update ("The ID in game_id is not valid").
+     */
+    @Test
+    void resolveOrCreate_ignoresATwitchWebsiteUrl_forTheCategoryId() {
+        DetectedGame game = new DetectedGame("steam-123", GameBinding.SourceType.STEAM, "Portal");
+        when(gameBindingRepository.findByUserAndSourceIdAndSourceType(user, "steam-123", GameBinding.SourceType.STEAM))
+            .thenReturn(Optional.empty());
+        IgdbService.IgdbGame igdbGame = new IgdbService.IgdbGame("1234", "Portal");
+        when(igdbService.findByExternalAppId(GameBinding.SourceType.STEAM, "steam-123")).thenReturn(Optional.of(igdbGame));
+
+        IgdbGameDetails details = new IgdbGameDetails();
+        details.setIgdbId("1234");
+        details.setWebsites(Map.of("twitch", "https://www.twitch.tv/valve"));
+        when(igdbGameDetailsService.getDetails("1234")).thenReturn(Optional.of(details));
+        when(igdbService.findTwitchGameId("1234")).thenReturn(Optional.empty());
+        when(twitchService.findCategoryIdByName(user, "Portal")).thenReturn(Optional.of("6187"));
+
+        when(igdbService.suggestCcls("1234")).thenReturn(Set.of());
+        when(gameBindingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        GameBinding result = bindingService.resolveOrCreate(user, game);
+
+        assertThat(result.getStatus()).isEqualTo(GameBinding.Status.AUTO);
+        assertThat(result.getTwitchGameId()).isEqualTo("6187");
     }
 
     @Test
