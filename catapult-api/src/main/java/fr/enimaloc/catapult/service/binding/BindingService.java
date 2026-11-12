@@ -62,10 +62,13 @@ public class BindingService {
 
     /** The TWs suggested for a game from its IGDB descriptors, Steam signals (Steam games only) and name. */
     private Set<String> suggestTws(String igdbId, DetectedGame game) {
+        return twResolverService.suggest(twInput(igdbId, game));
+    }
+
+    private TwResolverService.SuggestInput twInput(String igdbId, DetectedGame game) {
         Set<Long> descriptorIds = igdbService.fetchDescriptorIds(igdbId);
         String steamAppId = game.getSourceType() == GameBinding.SourceType.STEAM ? game.getSourceId() : null;
-        return twResolverService.suggest(new TwResolverService.SuggestInput(
-                igdbId, descriptorIds, steamAppId, game.getSourceName()));
+        return new TwResolverService.SuggestInput(igdbId, descriptorIds, steamAppId, game.getSourceName());
     }
 
     private static DetectedGame detectedOf(GameBinding binding) {
@@ -385,6 +388,17 @@ public class BindingService {
             binding.getTws().addAll(tws);
             binding.setTwOverride(true);
         });
+    }
+
+    /** A binding and why each TW is suggested for its game now (nothing when IGDB doesn't know the game). */
+    public record TwExplanation(GameBinding binding, TwResolverService.Explanation explanation) {}
+
+    /** As {@link #previewTws}, with the binding and each suggestion's sources; empty when it isn't the user's. */
+    public Optional<TwExplanation> explainTws(UserAccount user, UUID bindingId) {
+        return gameBindingRepository.findByIdAndUser(bindingId, user).map(binding -> new TwExplanation(binding,
+                igdbService.resolveIgdbIdForBinding(binding)
+                        .map(igdbId -> twResolverService.explain(twInput(igdbId, detectedOf(binding))))
+                        .orElseGet(() -> new TwResolverService.Explanation(List.of()))));
     }
 
     public Set<String> previewTws(UserAccount user, UUID bindingId) {

@@ -46,6 +46,7 @@ PUT,/api/internal/users/{userId}/bindings/{bindingId}/tws,userId=self,,401,401,P
 DELETE,/api/internal/users/{userId}/bindings/{bindingId}/tws,userId=self,,401,401,PASS,PASS,PASS,PASS,401
 POST,/api/internal/users/{userId}/bindings/{bindingId}/reset,userId=self,,401,401,PASS,PASS,PASS,PASS,401
 GET,/api/internal/users/{userId}/bindings/{bindingId}/tws/suggestions,userId=self,,401,401,PASS,PASS,PASS,PASS,401
+GET,/api/internal/users/{userId}/bindings/{bindingId}/tws/details,userId=self,,401,401,PASS,PASS,PASS,PASS,401
 GET,/api/internal/dtdd-mappings/{igdbId},igdbId=1,,401,PASS,PASS,PASS,PASS,PASS,401
 POST,/api/internal/dtdd-mappings/{igdbId}/proposals,igdbId=1,,401,401,PASS,PASS,PASS,PASS,401
 GET,/api/internal/dtdd-games,?q=matrix,,401,PASS,PASS,PASS,PASS,PASS,401
@@ -120,6 +121,7 @@ GET,/api/internal/users/{userId}/obs,unmapped,,401,401,403,403,PASS,403,401
 GET,/api/internal/users/{userId}/chat-command-settings,unmapped,,401,401,403,403,GATED,403,401
 PUT,/api/internal/users/{userId}/chat-command-settings/{key},unmapped,,401,401,403,403,GATED,403,401
 GET,/api/internal/users/{userId}/bindings/{bindingId}/tws/suggestions,unmapped,,401,401,403,403,PASS,403,401
+GET,/api/internal/users/{userId}/bindings/{bindingId}/tws/details,unmapped,,401,401,403,403,PASS,403,401
 PUT,/api/internal/users/{userId}/bindings/{bindingId}/tws,unmapped,,401,401,403,403,PASS,403,401
 GET,/api/internal/users/{userId}/api-token,unmapped,,401,401,403,403,PASS,403,401
 DELETE,/api/internal/users/{userId}/api-token,unmapped,,401,401,403,403,PASS,403,401

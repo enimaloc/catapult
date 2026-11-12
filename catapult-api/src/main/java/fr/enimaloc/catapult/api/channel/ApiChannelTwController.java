@@ -1,5 +1,10 @@
 package fr.enimaloc.catapult.api.channel;
 
+import fr.enimaloc.catapult.common.dto.channel.TwDetailsDto;
+import fr.enimaloc.catapult.service.binding.TwDetailsService;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+
 import fr.enimaloc.catapult.api.ApiPaths;
 import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.common.dto.channel.SaveBody;
@@ -43,6 +48,7 @@ public class ApiChannelTwController {
     private final ApiUserResolver userResolver;
     private final ChannelDashboardActions dashboardActions;
     private final BindingService bindingService;
+    private final TwDetailsService twDetailsService;
 
     @PreAuthorize("@authz.isSelf(#userId)")
     @PutMapping("/tws")
@@ -85,6 +91,17 @@ public class ApiChannelTwController {
         UserAccount user = userResolver.viewerByTwitchId(jwt);
         dashboardActions.toggleTwEnabled(user, bindingId, body.enabled());
         return ResponseEntity.noContent().build();
+    }
+
+    /** Why the binding has its TWs, as the detection tells it now; 404 when it isn't the caller's. */
+    @PreAuthorize("@authz.isSelf(#userId)")
+    @GetMapping("/tws/details")
+    public TwDetailsDto twDetails(@PathVariable UUID userId,
+                                  @PathVariable UUID bindingId,
+                                  @AuthenticationPrincipal Jwt jwt) {
+        UserAccount user = userResolver.viewerByTwitchId(jwt);
+        return twDetailsService.details(user, bindingId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown binding"));
     }
 
     @PreAuthorize("@authz.isSelf(#userId)")

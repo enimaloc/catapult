@@ -45,6 +45,7 @@ class ApiChannelTwControllerTest {
     @Autowired ObjectMapper om;
     @Autowired UserAccountRepository userAccountRepository;
     @MockitoBean BindingService bindingService;
+    @MockitoBean fr.enimaloc.catapult.service.binding.TwDetailsService twDetailsService;
     @MockitoBean TwitchLoginSuccessHandler twitchLoginSuccessHandler;
 
     private UserAccount seededUser() {
@@ -151,5 +152,28 @@ class ApiChannelTwControllerTest {
                 .andExpect(status().isForbidden());
 
         verifyNoInteractions(bindingService);
+    }
+
+    @Test
+    void twDetails_areTheOwners_andAnotherOnesBindingIs404() throws Exception {
+        MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).apply(springSecurity()).build();
+        UserAccount user = seededUser();
+        UUID bindingId = UUID.randomUUID();
+        when(twDetailsService.details(any(UserAccount.class), eq(bindingId))).thenReturn(java.util.Optional.of(
+                new fr.enimaloc.catapult.common.dto.channel.TwDetailsDto(false, java.util.List.of(
+                        new fr.enimaloc.catapult.common.dto.channel.TwDetailsDto.Tw("gore", "Gore", true, "DETECTED",
+                                java.util.List.of())), java.util.List.of())));
+
+        mvc.perform(get("/api/internal/users/{userId}/bindings/{bindingId}/tws/details", user.getId(), bindingId)
+                        .with(jwt().jwt(j -> j.subject(user.getId().toString()).claim("twitchId", user.getTwitchId()))))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.tws[0].origin")
+                        .value("DETECTED"));
+
+        UUID other = UUID.randomUUID();
+        when(twDetailsService.details(any(UserAccount.class), eq(other))).thenReturn(java.util.Optional.empty());
+        mvc.perform(get("/api/internal/users/{userId}/bindings/{bindingId}/tws/details", user.getId(), other)
+                        .with(jwt().jwt(j -> j.subject(user.getId().toString()).claim("twitchId", user.getTwitchId()))))
+                .andExpect(status().isNotFound());
     }
 }
