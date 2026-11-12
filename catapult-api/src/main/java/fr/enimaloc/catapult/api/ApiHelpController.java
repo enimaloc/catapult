@@ -1,11 +1,8 @@
 package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.common.dto.HelpContent;
-import fr.enimaloc.catapult.domain.account.UserAccount;
-import fr.enimaloc.catapult.repository.account.UserAccountRepository;
-import fr.enimaloc.catapult.service.drops.DropsGate;
 import fr.enimaloc.catapult.service.minecraft.MinecraftGateService;
-import fr.enimaloc.catapult.service.title.StreamTitleService;
+import fr.enimaloc.catapult.service.title.TitleHelpSections;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
@@ -17,7 +14,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Locale;
-import java.util.Optional;
 import java.util.UUID;
 
 @RestController
@@ -27,9 +23,7 @@ public class ApiHelpController {
 
     private final MessageSource messageSource;
     private final MinecraftGateService gateService;
-    private final StreamTitleService streamTitleService;
-    private final DropsGate dropsGate;
-    private final UserAccountRepository userAccountRepository;
+    private final TitleHelpSections titleHelpSections;
 
     @Value("${app.account.deletion-delay-days:7}")
     private int accountDeletionDelayDays;
@@ -58,24 +52,23 @@ public class ApiHelpController {
             }
         }
         if ("title-settings".equals(cardId)) {
-            // Read-only, as the title fields offered them (the settings page enrols): the drops need the conditions
-            Optional<UserAccount> account = account(jwt);
-            if (account.map(streamTitleService::conditionsAvailableReadOnly).orElse(false)) {
+            TitleHelpSections.Offered offered = titleSections(jwt);
+            if (offered.conditions()) {
                 body += messageSource.getMessage("help.title-settings.body.conditions", args, "", locale);
-                if (dropsGate.isAvailableReadOnly(account.get())) {
-                    body += messageSource.getMessage("help.title-settings.body.drops", args, "", locale);
-                }
+            }
+            if (offered.drops()) {
+                body += messageSource.getMessage("help.title-settings.body.drops", args, "", locale);
             }
         }
         return new HelpContent(title, body);
     }
 
-    private Optional<UserAccount> account(Jwt jwt) {
-        if (jwt == null) return Optional.empty();
+    private TitleHelpSections.Offered titleSections(Jwt jwt) {
+        if (jwt == null) return TitleHelpSections.Offered.NONE;
         try {
-            return userAccountRepository.findById(UUID.fromString(jwt.getSubject()));
+            return titleHelpSections.forAccount(UUID.fromString(jwt.getSubject()));
         } catch (IllegalArgumentException e) {
-            return Optional.empty();
+            return TitleHelpSections.Offered.NONE;
         }
     }
 

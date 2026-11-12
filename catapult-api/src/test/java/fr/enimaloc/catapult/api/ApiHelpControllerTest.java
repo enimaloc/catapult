@@ -1,10 +1,7 @@
 package fr.enimaloc.catapult.api;
 
-import fr.enimaloc.catapult.domain.account.UserAccount;
-import fr.enimaloc.catapult.repository.account.UserAccountRepository;
-import fr.enimaloc.catapult.service.drops.DropsGate;
 import fr.enimaloc.catapult.service.minecraft.MinecraftGateService;
-import fr.enimaloc.catapult.service.title.StreamTitleService;
+import fr.enimaloc.catapult.service.title.TitleHelpSections;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -17,7 +14,6 @@ import org.springframework.context.MessageSource;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 import java.util.Locale;
-import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -31,9 +27,7 @@ class ApiHelpControllerTest {
 
     @Mock private MessageSource messageSource;
     @Mock private MinecraftGateService gateService;
-    @Mock private StreamTitleService streamTitleService;
-    @Mock private DropsGate dropsGate;
-    @Mock private UserAccountRepository userAccountRepository;
+    @Mock private TitleHelpSections titleHelpSections;
     @Mock private Jwt jwt;
 
     @InjectMocks private ApiHelpController controller;
@@ -137,10 +131,7 @@ class ApiHelpControllerTest {
 
     @Test
     void titleSettings_conditionsAndDrops_appendsBothSections() {
-        UserAccount user = new UserAccount();
-        when(userAccountRepository.findById(userId)).thenReturn(Optional.of(user));
-        when(streamTitleService.conditionsAvailableReadOnly(user)).thenReturn(true);
-        when(dropsGate.isAvailableReadOnly(user)).thenReturn(true);
+        when(titleHelpSections.forAccount(userId)).thenReturn(new TitleHelpSections.Offered(true, true));
 
         var content = controller.help("title-settings", locale, jwt);
 
@@ -149,10 +140,7 @@ class ApiHelpControllerTest {
 
     @Test
     void titleSettings_conditionsWithoutDrops_appendsConditionsOnly() {
-        UserAccount user = new UserAccount();
-        when(userAccountRepository.findById(userId)).thenReturn(Optional.of(user));
-        when(streamTitleService.conditionsAvailableReadOnly(user)).thenReturn(true);
-        when(dropsGate.isAvailableReadOnly(user)).thenReturn(false);
+        when(titleHelpSections.forAccount(userId)).thenReturn(new TitleHelpSections.Offered(true, false));
 
         var content = controller.help("title-settings", locale, jwt);
 
@@ -160,11 +148,8 @@ class ApiHelpControllerTest {
     }
 
     @Test
-    void titleSettings_dropsWithoutConditions_omitsBoth() {
-        UserAccount user = new UserAccount();
-        when(userAccountRepository.findById(userId)).thenReturn(Optional.of(user));
-        when(streamTitleService.conditionsAvailableReadOnly(user)).thenReturn(false);
-        when(dropsGate.isAvailableReadOnly(user)).thenReturn(true);
+    void titleSettings_noneOffered_omitsBoth() {
+        when(titleHelpSections.forAccount(userId)).thenReturn(TitleHelpSections.Offered.NONE);
 
         var content = controller.help("title-settings", locale, jwt);
 
@@ -176,5 +161,6 @@ class ApiHelpControllerTest {
         var content = controller.help("title-settings", locale, null);
 
         assertThat(content.body()).isEqualTo("<p>titre</p>");
+        org.mockito.Mockito.verifyNoInteractions(titleHelpSections);
     }
 }
