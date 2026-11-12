@@ -35,6 +35,12 @@ import fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
 import fr.enimaloc.catapult.common.dto.admin.DetectedGameDto;
+import fr.enimaloc.catapult.common.dto.admin.DtddCacheEntryDetailDto;
+import fr.enimaloc.catapult.common.dto.admin.DtddCachesSummaryDto;
+import fr.enimaloc.catapult.common.dto.admin.DtddGameCacheEntryDto;
+import fr.enimaloc.catapult.common.dto.admin.DtddRefetchJobDto;
+import fr.enimaloc.catapult.common.dto.admin.DtddSearchCacheEntryDto;
+import fr.enimaloc.catapult.common.dto.admin.DtddTopicsCacheEntryDto;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingDto;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingRequest;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingResult;
@@ -344,6 +350,30 @@ public interface ApiService {
     ApiClient.Result<GameMappingResult> adminUpdateGameMapping(UUID id, GameMappingRequest request);
     /** catapult-api's status (200; 404 unknown) and result (no mapping), 502 when unreachable. */
     ApiClient.Result<GameMappingResult> adminDeleteGameMapping(UUID id, boolean applyLive);
+
+    /** The DTDD caches' sizes and stale entries, the keys' quotas and the bulk refetch; null when catapult-api fails. */
+    DtddCachesSummaryDto adminDtddCaches();
+    /** One page of the cached DTDD topics matching {@code q}, the oldest first; null when catapult-api fails. */
+    AdminPage<DtddTopicsCacheEntryDto> adminDtddTopicsCache(String q, int page);
+    /** One page of the cached DTDD titles matching {@code q}, the oldest first; null when catapult-api fails. */
+    AdminPage<DtddGameCacheEntryDto> adminDtddGamesCache(String q, int page);
+    /** One page of the cached DTDD searches matching {@code q}, the oldest first; null when catapult-api fails. */
+    AdminPage<DtddSearchCacheEntryDto> adminDtddSearchesCache(String q, int page);
+    /**
+     * Fetches a cached DTDD entry again ({@code kind}: topics, games, searches; {@code key}: the title's ID or the
+     * search's query): catapult-api's status (200; 400 not an ID; 404 not cached; 502 DTDD gave nothing; 503 DTDD
+     * off), 502 when unreachable.
+     */
+    int adminRefetchDtddCache(String kind, String key);
+    /**
+     * Everything the DTDD caches keep about an entry ({@code kind}: topics, games, searches; {@code key}: the title's
+     * ID or the search's query); null when it isn't cached or catapult-api fails.
+     */
+    DtddCacheEntryDetailDto adminDtddCacheEntry(String kind, String key);
+    /** catapult-api's status (202; 409 one runs already; 503 DTDD off) and the refetch, 502 when unreachable. */
+    ApiClient.Result<DtddRefetchJobDto> adminStartDtddRefetch();
+    /** catapult-api's status (200) and the refetch asked to stop, 502 when unreachable. */
+    ApiClient.Result<DtddRefetchJobDto> adminCancelDtddRefetch();
 
     /** The member groups, with their member counts; null when catapult-api fails. */
     List<GroupSummaryDto> adminGroups();

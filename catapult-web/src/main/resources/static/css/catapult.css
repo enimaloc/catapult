@@ -2097,10 +2097,10 @@ span.box-art {
  * The tables below are one grid each, every row (header included) a subgrid of it: as separate grids,
  * the rows sized their action column to their own buttons, so no cell sat under its header.
  */
-.admin-table:has(> :is(.admin-dtdd-row, .admin-groups-row, .admin-whitelist-invite-row, .admin-whitelist-row, .admin-keys-row, .admin-minecraft-row, .admin-tw-row, .admin-meta-tag-row, .admin-social-link-row, .invite-row, .admin-gm-row, .admin-gm-missing-row)) { display: grid; column-gap: 12px; }
-.admin-table:has(> :is(.admin-dtdd-row, .admin-groups-row, .admin-whitelist-invite-row, .admin-whitelist-row, .admin-keys-row, .admin-minecraft-row, .admin-tw-row, .admin-meta-tag-row, .admin-social-link-row, .invite-row, .admin-gm-row, .admin-gm-missing-row)) > * { grid-column: 1 / -1; }
-.admin-table > :is(.admin-dtdd-row, .admin-groups-row, .admin-whitelist-invite-row, .admin-whitelist-row, .admin-keys-row, .admin-minecraft-row, .admin-tw-row, .admin-meta-tag-row, .admin-social-link-row, .invite-row, .admin-gm-row, .admin-gm-missing-row) { grid-template-columns: subgrid; }
-.admin-table > :is(.admin-dtdd-row, .admin-groups-row, .admin-whitelist-invite-row, .admin-whitelist-row, .admin-keys-row, .admin-minecraft-row, .admin-tw-row, .admin-meta-tag-row, .admin-social-link-row, .invite-row, .admin-gm-row, .admin-gm-missing-row) > .admin-row-actions { justify-content: flex-end; }
+.admin-table:has(> :is(.admin-dtdd-row, .admin-groups-row, .admin-whitelist-invite-row, .admin-whitelist-row, .admin-keys-row, .admin-minecraft-row, .admin-tw-row, .admin-meta-tag-row, .admin-social-link-row, .invite-row, .admin-gm-row, .admin-gm-missing-row, .admin-dc-topics-row, .admin-dc-games-row, .admin-dc-searches-row, .admin-dc-quota-row)) { display: grid; column-gap: 12px; }
+.admin-table:has(> :is(.admin-dtdd-row, .admin-groups-row, .admin-whitelist-invite-row, .admin-whitelist-row, .admin-keys-row, .admin-minecraft-row, .admin-tw-row, .admin-meta-tag-row, .admin-social-link-row, .invite-row, .admin-gm-row, .admin-gm-missing-row, .admin-dc-topics-row, .admin-dc-games-row, .admin-dc-searches-row, .admin-dc-quota-row)) > * { grid-column: 1 / -1; }
+.admin-table > :is(.admin-dtdd-row, .admin-groups-row, .admin-whitelist-invite-row, .admin-whitelist-row, .admin-keys-row, .admin-minecraft-row, .admin-tw-row, .admin-meta-tag-row, .admin-social-link-row, .invite-row, .admin-gm-row, .admin-gm-missing-row, .admin-dc-topics-row, .admin-dc-games-row, .admin-dc-searches-row, .admin-dc-quota-row) { grid-template-columns: subgrid; }
+.admin-table > :is(.admin-dtdd-row, .admin-groups-row, .admin-whitelist-invite-row, .admin-whitelist-row, .admin-keys-row, .admin-minecraft-row, .admin-tw-row, .admin-meta-tag-row, .admin-social-link-row, .invite-row, .admin-gm-row, .admin-gm-missing-row, .admin-dc-topics-row, .admin-dc-games-row, .admin-dc-searches-row, .admin-dc-quota-row) > .admin-row-actions { justify-content: flex-end; }
 
 .admin-pagination {
     display: flex;
@@ -2370,12 +2370,47 @@ mdui-snackbar.broadcast-warning { --mdui-color-inverse-surface: var(--mdui-color
 .admin-gm-choices { display: flex; flex-wrap: wrap; gap: 0 16px; }
 .admin-gm-error { margin: 0; color: rgb(var(--mdui-color-error)); }
 .admin-gm-result { margin: 0; color: var(--catapult-text-secondary); }
+.admin-dc-hint { margin: 0 0 16px; }
+.admin-dc-job { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.admin-dc-job h3, .admin-dc-job p { margin: 0; }
+.admin-dc-job-state { display: flex; flex-direction: column; gap: 6px; }
+.admin-dc-stop { color: rgb(var(--mdui-color-error)); }
+.admin-dc-quotas-header { margin-top: 24px; }
+.admin-dc-topics-row, .admin-table:has(> .admin-dc-topics-row) { grid-template-columns: 6rem minmax(0, 1.2fr) minmax(0, 1.5fr) minmax(0, 1.5fr) minmax(0, 1fr) 10rem auto; }
+.admin-dc-games-row, .admin-table:has(> .admin-dc-games-row) { grid-template-columns: 6rem minmax(0, 2fr) minmax(0, 1fr) 10rem auto; }
+.admin-dc-searches-row, .admin-table:has(> .admin-dc-searches-row) { grid-template-columns: minmax(0, 2fr) minmax(0, 1.5fr) 10rem auto; }
+.admin-dc-quota-row, .admin-table:has(> .admin-dc-quota-row) { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1.2fr) 10rem; }
+.admin-dc-topics { min-width: 0; overflow-wrap: anywhere; }
+.admin-dc-fetched { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.admin-dc-detail-section { margin: 16px 0 4px; }
+.admin-dc-topic-lists { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.admin-dc-topic-list h4 { margin: 0 0 4px; }
+/* Wider than the other admin dialogs: three lists of topics, each with its severity, side by side */
+.admin-dc-dialog { --mdui-comp-dialog-max-width: min(1100px, 100vw - 32px); }
+.admin-dc-detail-body { width: min(1040px, 100vw - 96px); max-width: 100%; }
+.admin-dc-topic-items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.admin-dc-topic-items > li { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.admin-dc-topic-name { font-weight: 500; overflow-wrap: anywhere; }
+.admin-dc-levels { display: flex; flex-wrap: wrap; gap: 2px 10px; font-size: 0.875rem; color: var(--catapult-text-secondary); }
+.admin-dc-level-verified { color: var(--catapult-text); font-weight: 600; }
+.admin-dc-poster { max-width: 120px; border-radius: 8px; }
+@media (max-width: 650px) {
+    .admin-dc-topic-lists { grid-template-columns: minmax(0, 1fr); }
+}
 @media (max-width: 650px) {
     .admin-gm-row, .admin-table:has(> .admin-gm-row),
     .admin-gm-missing-row, .admin-table:has(> .admin-gm-missing-row) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
     .admin-gm-row > [data-label]::before, .admin-gm-missing-row > [data-label]::before { content: attr(data-label) " : "; color: var(--catapult-text-muted); }
     .admin-gm-row > .admin-row-actions, .admin-gm-missing-row > .admin-row-actions { grid-column: 1 / -1; }
     .admin-gm-row > .admin-cell, .admin-gm-missing-row > .admin-cell { white-space: normal; }
+}
+@media (max-width: 650px) {
+    .admin-dc-topics-row, .admin-table:has(> .admin-dc-topics-row),
+    .admin-dc-games-row, .admin-table:has(> .admin-dc-games-row),
+    .admin-dc-searches-row, .admin-table:has(> .admin-dc-searches-row),
+    .admin-dc-quota-row, .admin-table:has(> .admin-dc-quota-row) { grid-template-columns: minmax(0, 1fr); }
+    :is(.admin-dc-topics-row, .admin-dc-games-row, .admin-dc-searches-row, .admin-dc-quota-row) > [data-label]::before { content: attr(data-label) " : "; color: var(--catapult-text-muted); }
+    :is(.admin-dc-topics-row, .admin-dc-games-row, .admin-dc-searches-row, .admin-dc-quota-row) > .admin-cell { white-space: normal; }
 }
 
 /* The admin Groups tab. */

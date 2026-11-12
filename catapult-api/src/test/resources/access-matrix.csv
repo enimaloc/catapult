@@ -217,6 +217,13 @@ GET,/api/internal/admin/dtdd-keys,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/dtdd-keys,,"{""apiKey"":""matrix""}",401,PASS,403,403,403,PASS,401
 DELETE,/api/internal/admin/dtdd-keys/{keyId},keyId=matrix,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/dtdd-keys/refresh,,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/dtdd-caches,,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/dtdd-caches/refetch-all,,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/dtdd-caches/refetch-all,,,401,PASS,403,403,403,PASS,401
+DELETE,/api/internal/admin/dtdd-caches/refetch-all,,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/dtdd-caches/{kind},kind=topics,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/dtdd-caches/{kind}/entry,kind=topics;?key=matrix,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/dtdd-caches/{kind}/refetch,kind=topics;?key=matrix,,401,PASS,403,403,403,PASS,401
 GET,/api/internal/admin/dtdd-mapping-proposals,,,401,PASS,403,403,403,PASS,401
 # handler reads the JWT itself: 401 without one
 POST,/api/internal/admin/dtdd-mapping-proposals/{id}/approve,,,401,401,403,403,403,PASS,401

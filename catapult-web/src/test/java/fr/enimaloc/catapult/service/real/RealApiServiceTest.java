@@ -1062,6 +1062,49 @@ class RealApiServiceTest {
     }
 
     @Test
+    void adminDtddCaches_readTheSummaryAndEachCachePage() {
+        respond(HttpMethod.GET, "/api/internal/admin/dtdd-caches",
+                "{\"topics\":4,\"topicsStale\":1,\"games\":3,\"gamesStale\":0,\"searches\":2,\"searchesStale\":2,"
+                        + "\"topicsTtlHours\":168,\"gamesTtlHours\":4320,\"searchesTtlHours\":720,\"quotas\":[],"
+                        + "\"monthlyReserve\":500,\"job\":{\"state\":\"IDLE\",\"total\":0,\"done\":0,\"failed\":0}}");
+        respond(HttpMethod.GET, "/api/internal/admin/dtdd-caches/topics?q=halo&page=1&size=20",
+                "{\"content\":[{\"dtddId\":7,\"name\":\"Halo\",\"yesTopics\":[\"gore\"],\"noTopics\":[],"
+                        + "\"mostlyTopics\":[],\"stale\":true}],\"number\":1,\"totalPages\":2,\"totalElements\":21}");
+        respond(HttpMethod.GET, "/api/internal/admin/dtdd-caches/games?q=&page=0&size=20",
+                "{\"content\":[{\"dtddId\":7,\"name\":\"Halo\",\"mediaType\":\"Video Game\",\"stale\":false}],"
+                        + "\"number\":0,\"totalPages\":1,\"totalElements\":1}");
+        respond(HttpMethod.GET, "/api/internal/admin/dtdd-caches/searches?q=&page=0&size=20",
+                "{\"content\":[{\"query\":\"halo\",\"dtddIds\":[7],\"stale\":false}],"
+                        + "\"number\":0,\"totalPages\":1,\"totalElements\":1}");
+
+        assertThat(service.adminDtddCaches().topicsStale()).isEqualTo(1L);
+        assertThat(service.adminDtddTopicsCache("halo", 1).content().getFirst().yesTopics()).containsExactly("gore");
+        assertThat(service.adminDtddGamesCache(null, 0).content().getFirst().mediaType()).isEqualTo("Video Game");
+        assertThat(service.adminDtddSearchesCache(null, 0).content().getFirst().dtddIds()).containsExactly(7L);
+    }
+
+    @Test
+    void adminDtddCaches_refetchAnEntry_andStartOrStopTheFullRefetch() {
+        expect(HttpMethod.POST, "/api/internal/admin/dtdd-caches/searches/refetch?key=halo%20infinite")
+                .andRespond(withStatus(HttpStatus.OK));
+        expect(HttpMethod.POST, "/api/internal/admin/dtdd-caches/refetch-all")
+                .andRespond(withStatus(HttpStatus.ACCEPTED).contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"state\":\"RUNNING\",\"total\":9,\"done\":0,\"failed\":0}"));
+        expect(HttpMethod.DELETE, "/api/internal/admin/dtdd-caches/refetch-all")
+                .andRespond(withSuccess("{\"state\":\"CANCELLED\",\"total\":9,\"done\":2,\"failed\":0}",
+                        MediaType.APPLICATION_JSON));
+        respond(HttpMethod.GET, "/api/internal/admin/dtdd-caches/topics/entry?key=7",
+                "{\"dtddId\":7,\"searches\":[],\"titles\":[]}");
+
+        assertThat(service.adminRefetchDtddCache("searches", "halo infinite")).isEqualTo(200);
+        var started = service.adminStartDtddRefetch();
+        assertThat(started.status()).isEqualTo(202);
+        assertThat(started.body().total()).isEqualTo(9);
+        assertThat(service.adminCancelDtddRefetch().body().state()).isEqualTo("CANCELLED");
+        assertThat(service.adminDtddCacheEntry("topics", "7").dtddId()).isEqualTo(7L);
+    }
+
+    @Test
     void adminDeleteCacheEntry_relaysTheStatus() {
         expect(HttpMethod.DELETE, "/api/internal/admin/caches/igdb-game-cache?key=1001").andRespond(withNoContent());
         expect(HttpMethod.DELETE, "/api/internal/admin/caches/tw-known-paths?key=x").andRespond(withStatus(HttpStatus.BAD_REQUEST));

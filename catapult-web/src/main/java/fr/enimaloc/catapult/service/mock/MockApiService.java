@@ -176,6 +176,7 @@ public class MockApiService implements ApiService {
     private final MockDtddProposalsStore dtddProposals = new MockDtddProposalsStore();
     /** Application-wide: the game mappings an admin edits are the same for every mock session. */
     private final MockGameMappingsStore gameMappings = new MockGameMappingsStore();
+    private final MockDtddCachesStore dtddCaches = new MockDtddCachesStore();
     /** Application-wide: the groups an admin creates are the same for every mock session. */
     private final MockGroupsStore groups = new MockGroupsStore();
     /** Application-wide: the experiments an admin edits are the same for every mock session. */
@@ -785,6 +786,54 @@ public class MockApiService implements ApiService {
     public ApiClient.Result<GameMappingResult> adminDeleteGameMapping(UUID id, boolean applyLive) {
         log.trace("adminDeleteGameMapping({}, {})", id, applyLive);
         return gameMappings.delete(id, applyLive);
+    }
+
+    @Override
+    public fr.enimaloc.catapult.common.dto.admin.DtddCachesSummaryDto adminDtddCaches() {
+        log.trace("adminDtddCaches()");
+        return dtddCaches.summary();
+    }
+
+    @Override
+    public AdminPage<fr.enimaloc.catapult.common.dto.admin.DtddTopicsCacheEntryDto> adminDtddTopicsCache(String q, int page) {
+        log.trace("adminDtddTopicsCache({}, {})", q, page);
+        return dtddCaches.topics(q, page);
+    }
+
+    @Override
+    public AdminPage<fr.enimaloc.catapult.common.dto.admin.DtddGameCacheEntryDto> adminDtddGamesCache(String q, int page) {
+        log.trace("adminDtddGamesCache({}, {})", q, page);
+        return dtddCaches.games(q, page);
+    }
+
+    @Override
+    public AdminPage<fr.enimaloc.catapult.common.dto.admin.DtddSearchCacheEntryDto> adminDtddSearchesCache(String q, int page) {
+        log.trace("adminDtddSearchesCache({}, {})", q, page);
+        return dtddCaches.searches(q, page);
+    }
+
+    @Override
+    public int adminRefetchDtddCache(String kind, String key) {
+        log.trace("adminRefetchDtddCache({}, {})", kind, key);
+        return dtddCaches.refetch(kind, key);
+    }
+
+    @Override
+    public fr.enimaloc.catapult.common.dto.admin.DtddCacheEntryDetailDto adminDtddCacheEntry(String kind, String key) {
+        log.trace("adminDtddCacheEntry({}, {})", kind, key);
+        return dtddCaches.detail(kind, key);
+    }
+
+    @Override
+    public ApiClient.Result<fr.enimaloc.catapult.common.dto.admin.DtddRefetchJobDto> adminStartDtddRefetch() {
+        log.trace("adminStartDtddRefetch()");
+        return dtddCaches.start();
+    }
+
+    @Override
+    public ApiClient.Result<fr.enimaloc.catapult.common.dto.admin.DtddRefetchJobDto> adminCancelDtddRefetch() {
+        log.trace("adminCancelDtddRefetch()");
+        return dtddCaches.cancel();
     }
 
     @Override

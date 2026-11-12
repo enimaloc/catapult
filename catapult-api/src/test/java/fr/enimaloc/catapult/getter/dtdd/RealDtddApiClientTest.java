@@ -172,4 +172,47 @@ class RealDtddApiClientTest {
         assertThat(new DtddApiClient.DtddSeverity(levels, List.of(), List.of(), 0, 4).verifiedLevel()).isEmpty();
         assertThat(new DtddApiClient.DtddSeverity(levels, List.of(), List.of(), 0, 1).verifiedLevel()).contains("Mild");
     }
+
+    @Test
+    void everyAnswer_tellsTheRotatorWhatIsLeftOfTheKey() {
+        when(rotator.nextKey()).thenReturn(Optional.of("KEY_A"));
+        server.enqueue(new MockResponse()
+            .setHeader("Content-Type", "application/json")
+            .setHeader("X-RateLimit-Remaining-Minute", "28")
+            .setHeader("X-RateLimit-Remaining-Month", "4321")
+            .setBody("[]"));
+
+        client.search("x", null);
+
+        verify(rotator).onQuota("KEY_A", 28, 4321);
+    }
+
+    @Test
+    void aReservingView_takesOnlyKeysAboveTheReserve_andAnswersEmptyWithoutOne() {
+        when(rotator.nextKeyAbove(500)).thenReturn(Optional.empty());
+
+        assertThat(client.reserving(500).item(1L)).isEmpty();
+        assertThat(server.getRequestCount()).isZero();
+        verify(rotator, never()).nextKey();
+    }
+
+    @Test
+    void fetchTopics_keepsEachTopicsSeverity_byItsName() {
+        when(rotator.nextKey()).thenReturn(Optional.of("KEY_A"));
+        server.enqueue(new MockResponse()
+            .setHeader("Content-Type", "application/json")
+            .setBody("""
+                { "id": 7, "topicItemStats": [
+                    { "topicName": "a dog dies", "yesSum": 5, "noSum": 1,
+                      "severity": { "levels": ["Implied", "Depicted"], "counts": [1, 4], "percents": [20, 80],
+                                    "total": 5, "verified": 2 } },
+                    { "topicName": "a cat dies", "yesSum": 0, "noSum": 3, "severity": null }
+                ] }
+                """));
+
+        DtddApiClient.DtddTopics topics = client.fetchTopics(7L).orElseThrow();
+
+        assertThat(topics.severities()).containsOnlyKeys("a dog dies");
+        assertThat(topics.severities().get("a dog dies").verifiedLevel()).contains("Depicted");
+    }
 }
