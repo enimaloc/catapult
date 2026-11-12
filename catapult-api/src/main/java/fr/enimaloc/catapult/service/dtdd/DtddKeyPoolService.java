@@ -34,7 +34,7 @@ public class DtddKeyPoolService {
         this.events = events;
     }
 
-    private static String mask(String key) {
+    static String mask(String key) {
         return key.length() > 8
                 ? key.substring(0, 4) + "…" + key.substring(key.length() - 4)
                 : "…";
