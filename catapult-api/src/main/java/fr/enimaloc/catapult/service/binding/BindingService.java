@@ -302,7 +302,8 @@ public class BindingService {
             String twitchId = igdbGameDetailsService.getDetails(igdbId)
                     .map(IgdbGameDetails::getWebsites)
                     .map(websites -> websites.get("twitch"))
-                    .filter(id -> !id.isBlank())
+                    // A category id (external_games' uid), not a Twitch website's URL kept under the same key
+                    .filter(BindingService::isTwitchCategoryId)
                     .or(() -> igdbService.findTwitchGameId(igdbId))
                     .or(() -> twitchService.findCategoryIdByName(user, gameName))
                     .orElse(null);
@@ -335,6 +336,11 @@ public class BindingService {
         }
 
         return gameBindingRepository.save(binding);
+    }
+
+    /** Twitch's category ids are numeric; anything else (a website URL) is refused as the PATCH's game_id. */
+    static boolean isTwitchCategoryId(String id) {
+        return !id.isEmpty() && id.chars().allMatch(c -> c >= '0' && c <= '9');
     }
 
     private Optional<IgdbService.IgdbGame> resolveViaIgdb(DetectedGame detectedGame) {
