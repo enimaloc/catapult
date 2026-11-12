@@ -49,6 +49,8 @@ class MockGameMappingsStore {
         mappings.add(new GameMappingDto(UUID.randomUUID(), "XBOX", "1942", "Halo Infinite", "506416",
                 "Halo Infinite", java.util.Set.of("violent-graphic"), java.util.Set.of("violence"), 6,
                 now.minus(1, ChronoUnit.DAYS), "enimaloc"));
+        mappings.add(new GameMappingDto(UUID.randomUUID(), "STEAM", "431960", "Wallpaper Engine", null, null,
+                null, null, 0, now.minus(3, ChronoUnit.DAYS), "enimaloc", true));
     }
 
     synchronized AdminPage<GameMappingDto> list(int page) {
@@ -73,7 +75,8 @@ class MockGameMappingsStore {
     }
 
     synchronized ApiClient.Result<GameMappingResult> create(GameMappingRequest request, String updatedBy) {
-        if (request == null || invalid(request.sourceType(), request.sourceId(), request.twitchGameId())) {
+        if (request == null || invalid(request.sourceType(), request.sourceId(), request.twitchGameId(),
+                request.ignoredByDefault())) {
             return new ApiClient.Result<>(400, null);
         }
         String sourceId = request.sourceId().trim();
@@ -83,7 +86,8 @@ class MockGameMappingsStore {
                 .findFirst().orElse(null);
         GameMappingDto mapping = new GameMappingDto(UUID.randomUUID(), request.sourceType(), sourceId,
                 game == null ? null : game.sourceName(), request.twitchGameId(), request.twitchGameName(),
-                request.ccls(), request.tws(), game == null ? 0 : game.streamerCount(), clock.instant(), updatedBy);
+                request.ccls(), request.tws(), game == null ? 0 : game.streamerCount(), clock.instant(), updatedBy,
+                request.ignoredByDefault());
         mappings.add(mapping);
         return new ApiClient.Result<>(201, result(mapping, request.applyLive()));
     }
@@ -93,12 +97,12 @@ class MockGameMappingsStore {
         int index = indexOf(id);
         if (index < 0) return new ApiClient.Result<>(404, null);
         GameMappingDto current = mappings.get(index);
-        if (request == null || request.twitchGameId() == null || request.twitchGameId().isBlank()) {
+        if (request == null || blank(request.twitchGameId()) && !request.ignoredByDefault()) {
             return new ApiClient.Result<>(400, null);
         }
         GameMappingDto changed = new GameMappingDto(id, current.sourceType(), current.sourceId(), current.sourceName(),
                 request.twitchGameId(), request.twitchGameName(), request.ccls(), request.tws(),
-                current.bindingCount(), clock.instant(), updatedBy);
+                current.bindingCount(), clock.instant(), updatedBy, request.ignoredByDefault());
         mappings.set(index, changed);
         return new ApiClient.Result<>(200, result(changed, request.applyLive()));
     }
@@ -116,9 +120,14 @@ class MockGameMappingsStore {
         return new AdminPage<>(all.subList(from, to), Math.max(page, 0), (all.size() + pageSize - 1) / pageSize, all.size());
     }
 
-    private static boolean invalid(String sourceType, String sourceId, String twitchGameId) {
-        return sourceType == null || sourceType.isBlank() || "MANUAL".equalsIgnoreCase(sourceType)
-                || sourceId == null || sourceId.isBlank() || twitchGameId == null || twitchGameId.isBlank();
+    /** No category is only valid for a game ignored by default, as catapult-api checks it. */
+    private static boolean invalid(String sourceType, String sourceId, String twitchGameId, boolean ignoredByDefault) {
+        return blank(sourceType) || "MANUAL".equalsIgnoreCase(sourceType)
+                || blank(sourceId) || blank(twitchGameId) && !ignoredByDefault;
+    }
+
+    private static boolean blank(String s) {
+        return s == null || s.isBlank();
     }
 
     private static GameMappingResult result(GameMappingDto mapping, boolean applyLive) {

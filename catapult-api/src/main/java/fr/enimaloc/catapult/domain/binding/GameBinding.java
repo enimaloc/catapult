@@ -61,6 +61,10 @@ public class GameBinding {
     @Column(nullable = false)
     private boolean ignored = false;
 
+    /** true: the streamer chose {@link #ignored} by hand, an admin mapping's ignore no longer changes it. */
+    @Column(name = "ignored_override", nullable = false)
+    private boolean ignoredOverride = false;
+
     @Column(name = "ccl_enabled", nullable = false)
     private boolean cclEnabled = true;
 

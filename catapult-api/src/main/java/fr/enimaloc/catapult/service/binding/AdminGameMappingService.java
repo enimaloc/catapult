@@ -33,8 +33,10 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -48,6 +50,9 @@ import java.util.stream.Collectors;
  * The admin game mappings: an admin sets the Twitch category of a detected game (platform + its ID) for every
  * streamer. Saving one applies it to the game's AUTO, INCOMPLETE and MAPPED bindings (never to a streamer's MANUAL
  * choice), deleting one sends its MAPPED bindings back to IGDB, in the same transaction as the mapping itself.
+ * A mapping can also ignore its game by default (a background app such as Wallpaper Engine), its category then
+ * optional: turning that on ignores the bindings, turning it off (or deleting the mapping) stops ignoring them — but
+ * those whose streamer chose ({@code ignoredOverride}).
  * After the commit, each changed binding is pushed to its streamer's dashboard and, when asked, the channels live
  * on that game get it on Twitch through the detection's own path
  * ({@link CategoryChain}, {@link MappingChanged}); a Twitch failure there is logged and counted, the mapping stays.
@@ -96,10 +101,34 @@ public class AdminGameMappingService {
         }
     }
 
-    /** What a write did in its transaction: the mapping (null once deleted), the bindings changed, the live ones. */
-    private record Written(GameMappingDto mapping, List<GameBinding> changed, List<GameBinding> live) {}
+    /**
+     * What a write did in its transaction: the mapping (null once deleted), the bindings changed, those whose ignore
+     * it switched, the live ones.
+     */
+    private record Written(GameMappingDto mapping, List<GameBinding> changed, Set<GameBinding> ignoreSwitched,
+                           List<GameBinding> live) {}
 
-    /** A validated request: the platform, the trimmed ID and category. */
+    /** The bindings a write changed, each once, and those whose ignore it switched. */
+    private static final class Changes {
+        private final Set<GameBinding> seen = Collections.newSetFromMap(new IdentityHashMap<>());
+        private final List<GameBinding> changed = new ArrayList<>();
+        private final Set<GameBinding> ignoreSwitched = Collections.newSetFromMap(new IdentityHashMap<>());
+
+        void add(GameBinding binding) {
+            if (seen.add(binding)) changed.add(binding);
+        }
+
+        void addAll(Collection<GameBinding> bindings) {
+            bindings.forEach(this::add);
+        }
+
+        void ignoreSwitched(GameBinding binding) {
+            add(binding);
+            ignoreSwitched.add(binding);
+        }
+    }
+
+    /** A validated request: the platform, the trimmed ID and category (both null: none, an ignore-only mapping). */
     private record Target(SourceType sourceType, String sourceId, String twitchGameId, String twitchGameName) {}
 
     // ---- Listings
@@ -144,11 +173,16 @@ public class AdminGameMappingService {
             GameMapping mapping = new GameMapping();
             fill(mapping, target, request, admin);
             GameMapping saved = save(mapping);
-            List<GameBinding> changed = applyToBindings(saved, suggestions);
-            log.info("Game mapping {} {} created by {} — '{}' (twitchId={}), {} binding(s) updated",
+            Changes changes = new Changes();
+            changes.addAll(applyToBindings(saved, suggestions));
+            if (saved.isIgnoredByDefault()) {
+                applyIgnore(saved.getSourceType(), saved.getSourceId(), true, changes);
+            }
+            log.info("Game mapping {} {} created by {} — '{}' (twitchId={}, ignored={}), {} binding(s) updated",
                     saved.getSourceType(), saved.getSourceId(), admin == null ? null : admin.getId(),
-                    saved.getTwitchGameName(), saved.getTwitchGameId(), changed.size());
-            return new Written(toDto(saved, admin), changed, List.of());
+                    saved.getTwitchGameName(), saved.getTwitchGameId(), saved.isIgnoredByDefault(),
+                    changes.changed.size());
+            return written(toDto(saved, admin), changes);
         });
     }
 
@@ -159,21 +193,32 @@ public class AdminGameMappingService {
             GameMapping mapping = existing(id);
             boolean moved = mapping.getSourceType() != target.sourceType()
                     || !mapping.getSourceId().equals(target.sourceId());
-            List<GameBinding> changed = new ArrayList<>();
+            // What the game's bindings were told before: on another game, nothing
+            boolean wasIgnored = !moved && mapping.isIgnoredByDefault();
+            Changes changes = new Changes();
             if (moved) {
                 if (mappingRepository.findBySourceTypeAndSourceId(target.sourceType(), target.sourceId()).isPresent()) {
                     throw duplicate();
                 }
-                // Now about another game: the old one's bindings go back to IGDB.
-                changed.addAll(backToIgdb(mapping.getSourceType(), mapping.getSourceId()));
+                // Now about another game: the old one's bindings go back to IGDB, and are no longer ignored by it.
+                changes.addAll(backToIgdb(mapping.getSourceType(), mapping.getSourceId()));
+                if (mapping.isIgnoredByDefault()) {
+                    applyIgnore(mapping.getSourceType(), mapping.getSourceId(), false, changes);
+                }
             }
             fill(mapping, target, request, admin);
             GameMapping saved = save(mapping);
-            changed.addAll(applyToBindings(saved, suggestions));
-            log.info("Game mapping {} {} updated by {} — '{}' (twitchId={}), {} binding(s) updated",
+            // No category any more: the bindings that followed it go back to IGDB
+            if (!saved.hasCategory()) changes.addAll(backToIgdb(saved.getSourceType(), saved.getSourceId()));
+            changes.addAll(applyToBindings(saved, suggestions));
+            if (saved.isIgnoredByDefault() != wasIgnored) {
+                applyIgnore(saved.getSourceType(), saved.getSourceId(), saved.isIgnoredByDefault(), changes);
+            }
+            log.info("Game mapping {} {} updated by {} — '{}' (twitchId={}, ignored={}), {} binding(s) updated",
                     saved.getSourceType(), saved.getSourceId(), admin == null ? null : admin.getId(),
-                    saved.getTwitchGameName(), saved.getTwitchGameId(), changed.size());
-            return new Written(toDto(saved, admin), changed, List.of());
+                    saved.getTwitchGameName(), saved.getTwitchGameId(), saved.isIgnoredByDefault(),
+                    changes.changed.size());
+            return written(toDto(saved, admin), changes);
         });
     }
 
@@ -181,10 +226,14 @@ public class AdminGameMappingService {
         return write(applyLive, () -> {
             GameMapping mapping = existing(id);
             mappingRepository.delete(mapping);
-            List<GameBinding> changed = backToIgdb(mapping.getSourceType(), mapping.getSourceId());
-            log.info("Game mapping {} {} deleted — {} binding(s) back to IGDB",
-                    mapping.getSourceType(), mapping.getSourceId(), changed.size());
-            return new Written(null, changed, List.of());
+            Changes changes = new Changes();
+            changes.addAll(backToIgdb(mapping.getSourceType(), mapping.getSourceId()));
+            if (mapping.isIgnoredByDefault()) {
+                applyIgnore(mapping.getSourceType(), mapping.getSourceId(), false, changes);
+            }
+            log.info("Game mapping {} {} deleted — {} binding(s) back to IGDB or no longer ignored",
+                    mapping.getSourceType(), mapping.getSourceId(), changes.changed.size());
+            return written(null, changes);
         });
     }
 
@@ -195,7 +244,8 @@ public class AdminGameMappingService {
     private GameMappingResult write(boolean applyLive, Supplier<Written> work) {
         Written written = transactions.execute(status -> {
             Written w = work.get();
-            return new Written(w.mapping(), w.changed(), applyLive ? liveOnTheirGame(w.changed()) : List.of());
+            return new Written(w.mapping(), w.changed(), w.ignoreSwitched(),
+                    applyLive ? liveOnTheirGame(w.changed(), w.ignoreSwitched()) : List.of());
         });
         Objects.requireNonNull(written);
 
@@ -244,13 +294,20 @@ public class AdminGameMappingService {
         return new GameMappingResult(written.mapping(), written.changed().size(), updated, failed);
     }
 
-    /** The changed bindings whose streamer is live and plays their game now (not ignored ones: no-game fallback). */
-    private List<GameBinding> liveOnTheirGame(List<GameBinding> changed) {
+    private static Written written(GameMappingDto mapping, Changes changes) {
+        return new Written(mapping, changes.changed, changes.ignoreSwitched, List.of());
+    }
+
+    /**
+     * The changed bindings whose streamer is live and plays their game now: not the ignored ones (no-game fallback
+     * whatever their category), but those the write just ignored, which go to it.
+     */
+    private List<GameBinding> liveOnTheirGame(List<GameBinding> changed, Set<GameBinding> ignoreSwitched) {
         if (changed.isEmpty()) return List.of();
         Map<UUID, DetectedGame> playing = gameStateService.lastKnownGames();
         List<GameBinding> live = new ArrayList<>();
         for (GameBinding binding : changed) {
-            if (binding.isIgnored()) continue;
+            if (binding.isIgnored() && !ignoreSwitched.contains(binding)) continue;
             DetectedGame game = playing.get(binding.getUser().getId());
             if (game == null || game.getSourceType() != binding.getSourceType()
                     || !Objects.equals(game.getSourceId(), binding.getSourceId())) continue;
@@ -267,7 +324,10 @@ public class AdminGameMappingService {
      * name) for the CCLs / TWs the mapping keeps from IGDB, so no IGDB call happens while its bindings are locked.
      */
     private BindingService.MappingSuggestions igdbSuggestions(Target target, GameMappingRequest request) {
-        if (request.ccls() != null && request.tws() != null) return BindingService.MappingSuggestions.NONE;
+        // An ignore-only mapping leaves the bindings to IGDB; one that replaces both needs none of its suggestions
+        if (target.twitchGameId() == null || request.ccls() != null && request.tws() != null) {
+            return BindingService.MappingSuggestions.NONE;
+        }
         GameKey game = GameKey.of(target.sourceType(), target.sourceId());
         String name = mostFrequentNames(List.of(game)).get(game);
         return bindingService.igdbSuggestions(new DetectedGame(target.sourceId(), target.sourceType(), name),
@@ -305,6 +365,20 @@ public class AdminGameMappingService {
         return changed;
     }
 
+    /**
+     * Ignores the game's bindings (or stops ignoring them) as its mapping says, but MANUAL ones and those whose
+     * streamer chose; they are saved. The rows are locked first, as in {@link #applyToBindings}.
+     */
+    private void applyIgnore(SourceType sourceType, String sourceId, boolean ignored, Changes changes) {
+        for (GameBinding binding : bindingRepository.lockAllBySourceTypeAndSourceIdAndStatusIn(
+                sourceType, sourceId, MAPPABLE)) {
+            if (bindingService.applyMappingIgnore(binding, ignored)) {
+                bindingRepository.save(binding);
+                changes.ignoreSwitched(binding);
+            }
+        }
+    }
+
     private GameMapping save(GameMapping mapping) {
         try {
             return mappingRepository.saveAndFlush(mapping);
@@ -325,6 +399,7 @@ public class AdminGameMappingService {
         mapping.setTwsOverridden(request.tws() != null);
         mapping.getTws().clear();
         if (request.tws() != null) mapping.getTws().addAll(request.tws());
+        mapping.setIgnoredByDefault(request.ignoredByDefault());
         mapping.setUpdatedBy(admin == null ? null : admin.getId());
     }
 
@@ -344,6 +419,10 @@ public class AdminGameMappingService {
         if (sourceId.isEmpty()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing game ID");
         String twitchGameId = request.twitchGameId() == null ? "" : request.twitchGameId().trim();
         String twitchGameName = request.twitchGameName() == null ? "" : request.twitchGameName().trim();
+        if (twitchGameId.isEmpty() && twitchGameName.isEmpty() && request.ignoredByDefault()) {
+            // Ignored by default, the game needs no category: its bindings keep IGDB's
+            return new Target(platform, sourceId, null, null);
+        }
         if (twitchGameId.isEmpty() || twitchGameName.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing Twitch category");
         }
@@ -395,7 +474,7 @@ public class AdminGameMappingService {
                     m.isCclsOverridden() ? Set.copyOf(m.getCcls()) : null,
                     m.isTwsOverridden() ? Set.copyOf(m.getTws()) : null,
                     followers.getOrDefault(key, 0L), m.getUpdatedAt(),
-                    m.getUpdatedBy() == null ? null : logins.get(m.getUpdatedBy()));
+                    m.getUpdatedBy() == null ? null : logins.get(m.getUpdatedBy()), m.isIgnoredByDefault());
         }).toList();
     }
 
