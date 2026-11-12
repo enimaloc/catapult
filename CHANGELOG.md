@@ -4,6 +4,85 @@ Toutes les versions publiées de Catapult, la plus récente en premier.
 
 Ce fichier est régénéré par le bot à chaque release à partir des notes des [GitHub Releases](https://github.com/enimaloc/catapult/releases) : pour corriger une entrée, modifie les notes de la release (ou le changelog de la PR de release avant sa publication), pas ce fichier.
 
+## [v1.2.0](https://github.com/enimaloc/catapult/releases/tag/v1.2.0) - 2026-11-12
+
+### Features
+- **api:** tell the settings whether the title's conditions and drops are offered (b1f56be)
+- **api:** let an admin game mapping ignore its game by default (939704b)
+- **web:** ignore a game by default from the admin game mappings (aac9d6e)
+- **api:** expose each DTDD topic's severity in the public game detail (5f54d94)
+- **api:** track each DTDD key's remaining quota and let bulk work keep a monthly reserve (0b11316)
+- **api:** list the DTDD caches for the admins and refetch them under the rate limit (8ed75a3)
+- **web:** add an admin tab for the DTDD caches with a refetch per entry and a full one (6f7012c)
+- **api:** give the admins everything the DTDD caches keep about one entry (458d771)
+- **web:** open a DTDD cache entry in full from the admin tab (525ecd0)
+- **api:** keep each cached DTDD topic's severity and show it to the admins (67508d9)
+- **web:** show each DTDD topic's severity in a wider entry dialog (0bb16dc)
+- **api:** let a DTDD topic's severity keep its TW off below the mapping's least severe level (2092d4c)
+- **api:** let the admins read and set each DTDD topic's least severe level on a TW (a3656a7)
+- **web:** edit a TW's DTDD topics and their least severe level from the admin tab (9c099d8)
+- **api:** tell a streamer why each of a binding's TWs is on (6e8c455)
+- **web:** show a streamer why each of a binding's TWs is on, in a details dialog (2c1e5d9)
+- **api:** run one TW recalculation at a time, follow and cancel it, waiting out Steam's rate limit (1ae844a)
+- **web:** show the TW recalculation's progress in the admin tab, and let it be stopped (9f3102f)
+- let an admin game mapping ignore its game by default (4dab0bc)
+- an admin tab for the DTDD caches, with each topic's severity (4f681f3)
+- let a DTDD topic's severity decide its TW, and tell streamers why each TW is on (45ffb48)
+- follow the TW recalculation and respect Steam's rate limit (3a9d91d)
+- **ratelimit:** add route keys and caller priority (cc3231d)
+- **ratelimit:** learn limits and resume delays from 429s (cd059a6)
+- **ratelimit:** persist learned rate limits (a62732a)
+- **ratelimit:** throttle routes by learned limits with live priority (4465212)
+- **ratelimit:** apply learned limits to outbound HTTP calls (6694be6)
+- **ratelimit:** bound the routes per host and learn only from windows counted whole (e4227c5)
+- **tw:** run the TW recalculation as bulk traffic under the learned rate limits (ca73b99)
+- **admin:** expose the learned rate limits in the admin API (1f3f8db)
+- **admin:** a tab to see, correct and reset the learned rate limits (e55fe64)
+- merge learned rate limits into dev (47477c9)
+- **keys:** count each shared key's calls against its window and daily or monthly limit (d37dd81)
+- **admin:** merge the rate limits into the Keys tab, with each key's usage, updated live (d511999)
+- merge the keys and rate limits tab into dev (831cad3)
+
+### Fixes
+- **api:** explain each title condition and the drops in the help, only when offered (d85167e)
+- **web:** name the title's conditions and drop variables under its fields when offered (b5ad1b1)
+- **api:** read DTDD's new topic severity instead of failing every item call (8478f18)
+- **api:** leave the Steam store alone after a 429, for its Retry-After or a doubling wait (4bbbc96)
+- **api:** resolve a Steam game's TWs again once the store's rate limit ends (d7170cb)
+- **api:** decide the title help's parts in a service, not in the controller (859daae)
+- show the title's conditions and drop variables in its help when offered (11e0f6e)
+- **api:** read DTDD's new topic severity instead of failing every item call (63a3ae7)
+- **web:** write the DTDD caches' API paths in their calls (025d804)
+- **web:** stop completing an SSE stream the container already failed (434b489)
+- **api:** leave the query string out of the http.client.requests uri tag (9029240)
+- **api:** never take a Twitch website URL for a binding's category id (3a1bc1c)
+- merge fix/1.1.1 into dev (142d52d)
+- **xbox:** use a URI template for the store's product calls (8f4041a)
+- **ratelimit:** fall back to the system clock in profiles without a Clock bean (4a7cd42)
+- **ratelimit:** keep admin changes across instances and learn no tiny first limit (3add1c0)
+- **steam:** let only live appdetails refusals stop the store, back off when nothing learned (1f6de35)
+- **admin:** give a route's rate limit scope back to the learning (e83f87b)
+
+### Refactoring
+- **api:** inject the binding service's event publisher through its constructor (e13f736)
+- **steam:** rely on learned rate limits for the store (da95d94)
+- **ratelimit:** name the host row check hostScope so JSON keeps the host field (48cac62)
+
+### Other
+- merge dev into feat/dtdd-cache-admin (375f54a)
+- merge dev into feat/tw-dtdd-severity (9ee1eef)
+- **web:** cover the DTDD caches calls of the real and mock API services (bc3ce92)
+- merge feat/dtdd-cache-admin into feat/tw-dtdd-severity (62bf3a7)
+- **web:** cover the TW details and DTDD topics calls of the real and mock API services (6cf1834)
+- merge dev into feat/dtdd-cache-admin (e6a9391)
+- merge feat/dtdd-cache-admin into feat/tw-dtdd-severity (939f5f2)
+- merge feat/tw-dtdd-severity into feat/tw-rebuild-progress (bc730cc)
+- **common:** cover the admin DTOs' shorter constructors and older payloads (e9b65e8)
+- **release:** promote dev straight to main, skipping beta (8ff3dc2)
+- **release:** auto-merge the backports that bring a release back to dev (353eaaf)
+- run the checks on pull requests only and cancel superseded runs (89bb860)
+- merge ci-skip-beta into dev (0e7496d)
+
 ## [v1.1.0](https://github.com/enimaloc/catapult/releases/tag/v1.1.0) - 2026-11-10
 
 ### Features
