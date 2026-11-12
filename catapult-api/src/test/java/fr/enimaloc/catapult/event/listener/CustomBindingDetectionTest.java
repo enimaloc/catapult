@@ -302,7 +302,7 @@ class CustomBindingDetectionTest {
         BindingService realBindings = new BindingService(gameBindings, mock(IgdbService.class),
                 mock(IgdbGameDetailsService.class), twitchService, mock(TwResolverService.class),
                 mock(GameMappingRepository.class), new GameBindingLookup(gameBindings), realChain,
-                mock(ExtensionLayoutApplier.class));
+                mock(ExtensionLayoutApplier.class), org.mockito.Mockito.mock(org.springframework.context.ApplicationEventPublisher.class));
 
         realBindings.setTwitchGame(user, gameBinding.getId(), "1234", "Other");
 

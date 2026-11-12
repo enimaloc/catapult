@@ -50,14 +50,13 @@ class BindingServiceSteamLimitTest {
             mock(StreamStateService.class), mock(UserSettingsRepository.class), new RaidRestoreHold(),
             mock(GameStateService.class), mock(UserAccountRepository.class),
             new CategoryApplier(twitch, mock(StreamStateService.class)), mock(RaidRestoreGateService.class),
-            mock(GameBindingLookup.class), mock(ExtensionLayoutApplier.class)), mock(ExtensionLayoutApplier.class));
+            mock(GameBindingLookup.class), mock(ExtensionLayoutApplier.class)), mock(ExtensionLayoutApplier.class), events);
 
     private final UserAccount user = new UserAccount();
     private final DetectedGame steamGame = new DetectedGame("730", GameBinding.SourceType.STEAM, "Counter-Strike 2");
 
     @BeforeEach
     void setUp() {
-        service.setEvents(events);
         user.setId(UUID.randomUUID());
         when(bindings.save(any())).thenAnswer(call -> {
             GameBinding b = call.getArgument(0);

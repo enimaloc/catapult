@@ -18,9 +18,7 @@ import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.tw.TwResolverService;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
 import lombok.RequiredArgsConstructor;
-import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -48,9 +46,8 @@ public class BindingService {
     private final GameBindingLookup gameBindingLookup;
     private final CategoryChain categoryChain;
     private final ExtensionLayoutApplier extensionLayoutApplier;
-    /** Tells a binding whose Steam signals were missed (the store rate limited); null outside Spring. */
-    @Setter(onMethod_ = @Autowired)
-    private ApplicationEventPublisher events;
+    /** Tells a binding whose Steam signals were missed (the store rate limited). */
+    private final ApplicationEventPublisher events;
 
     /**
      * Applies {@code change} to the user's binding (if it exists), saves it, and applies it when it is the game
@@ -162,7 +159,7 @@ public class BindingService {
      * them: not the streamer's, nor an admin's) miss Steam's signals, and are resolved again once it may be called.
      */
     private GameBinding missedSteam(GameBinding saved, boolean adminTws) {
-        if (events == null || adminTws || saved.isTwOverride()
+        if (adminTws || saved.isTwOverride()
                 || saved.getSourceType() != GameBinding.SourceType.STEAM || saved.getId() == null) {
             return saved;
         }
@@ -192,9 +189,7 @@ public class BindingService {
         if (igdbId.isEmpty()) return Optional.empty();
         TwResolverService.Suggestion suggestion = twResolverService.suggestReporting(twInput(igdbId.get(), detectedOf(binding)));
         if (suggestion.steamLimitedUntil().isPresent()) {
-            if (events != null) {
-                events.publishEvent(new TwsMissedSteamEvent(bindingId, suggestion.steamLimitedUntil().get()));
-            }
+            events.publishEvent(new TwsMissedSteamEvent(bindingId, suggestion.steamLimitedUntil().get()));
             return Optional.empty();
         }
         if (binding.getTws().equals(suggestion.tws())) return Optional.empty();
