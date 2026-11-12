@@ -16,6 +16,8 @@ public record RouteKey(String host, String method, String path) {
     /** The request attribute {@code RestClient} keeps the URI template in. */
     static final String URI_TEMPLATE_ATTRIBUTE = "org.springframework.web.client.DefaultRestClient.uriTemplate";
 
+    /** The longest path kept (the rest cut): what is stored stays bounded. */
+    static final int MAX_PATH = 300;
     private static final Pattern ID_SEGMENT = Pattern.compile("\\d+|[A-Za-z0-9_-]{16,}|.*\\(.*\\).*");
 
     public static RouteKey of(HttpRequest request) {
@@ -53,6 +55,7 @@ public record RouteKey(String host, String method, String path) {
             out.append('/').append(ID_SEGMENT.matcher(segment).matches() ? "{id}" : segment);
         }
         if (rawPath.endsWith("/") && !out.isEmpty()) out.append('/');
+        if (out.length() > MAX_PATH) return out.substring(0, MAX_PATH) + "…";
         return out.isEmpty() ? "/" : out.toString();
     }
 }

@@ -20,6 +20,8 @@ final class LimitEstimator {
             Duration.ofMinutes(5), Duration.ofHours(1));
     private static final Duration KEPT = WINDOWS.getLast();
     private static final int MAX_KEPT = 10_000;
+    /** The fewest calls a first limit is learned from: a 429 after fewer tells too little (other instances' calls). */
+    static final int MIN_FIRST_LIMIT = 5;
 
     /** A limit: at most {@code calls} in any {@code window}. */
     record Estimate(int calls, Duration window) {}
@@ -67,7 +69,7 @@ final class LimitEstimator {
      * ({@code resumeHint}), the limit the calls sent in it before the refused one. Never loosened by a 429, and at
      * most halved by one in the same window: a 429 after few calls tells more of a longer window than of a tiny limit.
      * Nothing is learned when the window wasn't counted whole (just started, or a wait ended within it): the calls
-     * the platform counted aren't all known.
+     * the platform counted aren't all known; nor a first limit from fewer than {@link #MIN_FIRST_LIMIT} calls.
      */
     void on429(Instant now, Duration resumeHint) {
         last429 = now;
@@ -77,7 +79,7 @@ final class LimitEstimator {
         if (estimate != null && estimate.window().equals(window)) {
             int halved = (estimate.calls() + 1) / 2;
             estimate = new Estimate(Math.min(estimate.calls(), Math.max(limit, halved)), window);
-        } else {
+        } else if (limit >= MIN_FIRST_LIMIT) {
             estimate = new Estimate(limit, window);
         }
     }

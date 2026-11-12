@@ -53,7 +53,7 @@ class LearnedRateLimiterTest {
             stored.put(e.getId(), e);
             return e;
         });
-        limiter = new LearnedRateLimiter(props, repository, Optional.of(clock));
+        limiter = new LearnedRateLimiter(props, repository, Optional.of(clock), Optional.empty());
         limiter.setSleeper(ms -> {
             slept.addAndGet((int) ms);
             clock.advance(Duration.ofMillis(ms));
@@ -255,8 +255,33 @@ class LearnedRateLimiterTest {
         tooMany(APPDETAILS, null);
         assertThat(row(APPDETAILS.id()).scope()).isEqualTo("HOST");
 
+        limiter.correct(APPDETAILS.id(), null, null, null, "learned");
+        assertThat(row(APPDETAILS.id()).scopePinned()).isFalse();
+        assertThat(row(APPDETAILS.id()).scope()).isEqualTo("HOST");
+
+        limiter.correct(APPDETAILS.id(), null, null, null, "ROUTE");
         limiter.reset(APPDETAILS.id());
         assertThat(row(APPDETAILS.id()).scopePinned()).isFalse();
+    }
+
+    @Test
+    void anAdminsCorrectionOrReset_onAnotherInstance_isNeverWrittenOver() {
+        known();
+        calls(APPDETAILS, 10);
+        LearnedRateLimiter other = new LearnedRateLimiter(props, repository, Optional.of(clock), Optional.empty());
+        other.correct("HOST " + STORE, 50, 60, null, null);
+
+        // This instance learns before syncing: it takes the correction rather than writing over it
+        tooMany(APPDETAILS, null);
+        assertThat(stored.get("HOST " + STORE).getOverrideCalls()).isEqualTo(50);
+        assertThat(row("HOST " + STORE).limitCalls()).isEqualTo(50);
+
+        clock.advance(Duration.ofMinutes(5));
+        other.reset("HOST " + STORE);
+        calls(APPDETAILS, 1);
+        clock.advance(Duration.ofHours(2));
+        tooMany(APPDETAILS, null);
+        assertThat(stored.get("HOST " + STORE).getOverrideCalls()).isNull();
     }
 
     @Test
@@ -277,7 +302,8 @@ class LearnedRateLimiterTest {
         known();
         calls(APPDETAILS, 10);
         tooMany(APPDETAILS, null);
-        LearnedRateLimiter other = new LearnedRateLimiter(props, repository, Optional.of(clock));
+        LearnedRateLimiter other = new LearnedRateLimiter(props, repository, Optional.of(clock),
+                Optional.of(mock(org.springframework.transaction.PlatformTransactionManager.class)));
 
         assertThat(other.blockedUntil(STORE, "/api/appdetails")).isEmpty();
         assertThat(other.list()).extracting(LearnedRateLimitDto::id)
@@ -308,13 +334,12 @@ class LearnedRateLimiterTest {
     @Test
     void longNearTheLimit_raisesIt() {
         known();
-        limiter.acquire(APPDETAILS);
+        calls(APPDETAILS, 6);
         tooMany(APPDETAILS, null);
-        assertThat(row("HOST " + STORE).limitCalls()).isEqualTo(1);
+        assertThat(row("HOST " + STORE).limitCalls()).isEqualTo(6);
         clock.advance(Duration.ofHours(2));
-        calls(APPDETAILS, 1);
-        calls(APPDETAILS, 1);
-        assertThat(row("HOST " + STORE).limitCalls()).isEqualTo(2);
+        calls(APPDETAILS, 6);
+        assertThat(row("HOST " + STORE).limitCalls()).isEqualTo(7);
         verify(repository, atLeast(3)).save(any());
     }
 

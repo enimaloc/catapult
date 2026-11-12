@@ -1,6 +1,7 @@
 -- What Catapult learned of the rate limits platforms don't document, from their 429s: one row per host (its shared
 -- budget, method and path NULL) and one per route seen (scope HOST: counted in its host's budget; ROUTE: its own).
--- override_*: an admin's correction, kept until reset; the learning leaves it alone.
+-- override_*: an admin's correction, kept until reset; the learning leaves it alone. admin_changed_at: the last
+-- correction or reset, which an instance that hasn't taken it yet must not write over.
 CREATE TABLE learned_rate_limits (
     id                      VARCHAR(800) PRIMARY KEY,
     host                    VARCHAR(255) NOT NULL,
@@ -19,5 +20,6 @@ CREATE TABLE learned_rate_limits (
     override_calls          INTEGER,
     override_window_seconds INTEGER,
     override_resume_ms      BIGINT,
+    admin_changed_at        TIMESTAMPTZ,
     updated_at              TIMESTAMPTZ  NOT NULL
 );

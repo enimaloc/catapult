@@ -36,6 +36,8 @@ final class RateLimitScope {
     private boolean learningResume;
     private int rateLimitedCount;
     private Instant lastRateLimitedAt;
+    /** The last admin correction or reset taken: a newer one stored is taken before writing over it. */
+    private Instant adminSeenAt;
     /** A host's: when each of its routes was last answered (no 429), by route ID. */
     private final Map<String, Instant> lastAnswerByRoute = new ConcurrentHashMap<>();
 
@@ -163,18 +165,31 @@ final class RateLimitScope {
         return true;
     }
 
-    /** An admin's correction: null values leave that part to the learning. */
-    synchronized void correct(Estimate limit, Duration resumeDelay, Kind pinnedKind) {
+    /**
+     * An admin's correction: null values leave that part to the learning; a route's scope chosen ({@code pinnedKind}),
+     * or given back to the learning ({@code unpin}), else left as it is.
+     */
+    synchronized void correct(Estimate limit, Duration resumeDelay, Kind pinnedKind, boolean unpin, Instant now) {
         overrideLimit = limit;
         overrideResume = resumeDelay;
-        if (pinnedKind != null && route != null) {
+        if (route != null && pinnedKind != null) {
             kind = pinnedKind;
             kindPinned = true;
+        } else if (route != null && unpin) {
+            kindPinned = false;
         }
+        adminSeenAt = now;
+    }
+
+    /** Whether {@code stored} carries an admin's correction or reset this scope hasn't taken yet. */
+    synchronized boolean behind(LearnedRateLimit stored) {
+        Instant changed = stored.getAdminChangedAt();
+        return changed != null && (adminSeenAt == null || changed.isAfter(adminSeenAt));
     }
 
     /** Forgets everything learned and corrected: the scope starts again without a known limit. */
-    synchronized void reset() {
+    synchronized void reset(Instant now) {
+        adminSeenAt = now;
         estimator.reset();
         resume.reset();
         overrideLimit = null;
@@ -210,6 +225,7 @@ final class RateLimitScope {
                 .overrideCalls(overrideLimit == null ? null : overrideLimit.calls())
                 .overrideWindowSeconds(overrideLimit == null ? null : (int) overrideLimit.window().toSeconds())
                 .overrideResumeMs(overrideResume == null ? null : overrideResume.toMillis())
+                .adminChangedAt(adminSeenAt)
                 .updatedAt(now)
                 .build();
     }
@@ -228,6 +244,7 @@ final class RateLimitScope {
         lastRateLimitedAt = e.getLastRateLimitedAt();
         if (route != null && e.getScope() != null) kind = Kind.valueOf(e.getScope());
         kindPinned = e.isScopePinned();
+        adminSeenAt = e.getAdminChangedAt();
     }
 
     synchronized LearnedRateLimitDto toDto(Instant now) {

@@ -13,6 +13,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -40,6 +43,8 @@ public class LearnedRateLimiter {
     public static final String LOCAL_REFUSAL_HEADER = "X-Catapult-Local-Limit";
     private static final long SLICE_MS = 1_000L;
     static final String OTHER_PATH = "/{other}";
+    /** The scope an admin gives a route back to the learning with. */
+    static final String LEARNED_SCOPE = "LEARNED";
 
     interface Sleeper {
         void sleep(long millis) throws InterruptedException;
@@ -48,17 +53,24 @@ public class LearnedRateLimiter {
     private final LearnedRateLimitProperties props;
     private final LearnedRateLimitRepository repository;
     private final Clock clock;
+    /** Its own transaction for each write: never part of (nor failing) the caller's. */
+    private final TransactionTemplate writes;
     private final Map<String, RateLimitScope> scopes = new ConcurrentHashMap<>();
 
     @Setter(AccessLevel.PACKAGE)
     private Sleeper sleeper = Thread::sleep;
 
-    /** {@code clock}: the application's when there is one (not every profile defines it), else the system's. */
+    /**
+     * {@code clock}: the application's when there is one (not every profile defines it), else the system's;
+     * {@code transactions}: each write's own transaction (without one, the repository's).
+     */
     public LearnedRateLimiter(LearnedRateLimitProperties props, LearnedRateLimitRepository repository,
-                              Optional<Clock> clock) {
+                              Optional<Clock> clock, Optional<PlatformTransactionManager> transactions) {
         this.props = props;
         this.repository = repository;
         this.clock = clock.orElseGet(Clock::systemUTC);
+        this.writes = transactions.map(TransactionTemplate::new).orElse(null);
+        if (writes != null) writes.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
     /** Whether calls to {@code host} are learned from (not one of the hosts left to their documented limits). */
@@ -174,7 +186,8 @@ public class LearnedRateLimiter {
 
     /**
      * An admin's correction of a scope (404 if unknown): the limit ({@code calls} per {@code windowSeconds}, both or
-     * neither), the resume delay, a route's scope; null leaves that part to the learning.
+     * neither), the resume delay, a route's scope (HOST, ROUTE, or LEARNED: given back to the learning); null leaves
+     * that part to the learning.
      */
     public LearnedRateLimitDto correct(String id, Integer calls, Integer windowSeconds, Integer resumeSeconds,
                                        String scope) {
@@ -183,23 +196,25 @@ public class LearnedRateLimiter {
                 || (resumeSeconds != null && resumeSeconds < 1)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid correction");
         }
+        String named = scope == null ? "" : scope.trim().toUpperCase(Locale.ROOT);
+        boolean unpin = named.equals(LEARNED_SCOPE);
         Kind kind;
         try {
-            kind = scope == null || scope.isBlank() ? null : Kind.valueOf(scope.trim().toUpperCase(Locale.ROOT));
+            kind = named.isEmpty() || unpin ? null : Kind.valueOf(named);
         } catch (IllegalArgumentException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown scope " + scope);
         }
         s.correct(calls == null ? null : new Estimate(calls, Duration.ofSeconds(windowSeconds)),
-                resumeSeconds == null ? null : Duration.ofSeconds(resumeSeconds), kind);
-        save(s);
+                resumeSeconds == null ? null : Duration.ofSeconds(resumeSeconds), kind, unpin, clock.instant());
+        store(s);
         return s.toDto(clock.instant());
     }
 
     /** Forgets what was learned and corrected of a scope (404 if unknown). */
     public LearnedRateLimitDto reset(String id) {
         RateLimitScope s = known(id);
-        s.reset();
-        save(s);
+        s.reset(clock.instant());
+        store(s);
         return s.toDto(clock.instant());
     }
 
@@ -267,9 +282,30 @@ public class LearnedRateLimiter {
         return s;
     }
 
+    /**
+     * Stores what the learning changed, unless an admin corrected or reset the scope meanwhile (on another instance):
+     * then the scope takes that instead, rather than writing over it.
+     */
     private void save(RateLimitScope scope) {
-        try {
+        write(scope, () -> {
+            Optional<LearnedRateLimit> stored = repository.findById(scope.id());
+            if (stored.isPresent() && scope.behind(stored.get())) {
+                scope.apply(stored.get());
+                return;
+            }
             repository.save(scope.toEntity(clock.instant()));
+        });
+    }
+
+    /** Stores an admin's correction or reset as it is. */
+    private void store(RateLimitScope scope) {
+        write(scope, () -> repository.save(scope.toEntity(clock.instant())));
+    }
+
+    private void write(RateLimitScope scope, Runnable body) {
+        try {
+            if (writes == null) body.run();
+            else writes.executeWithoutResult(status -> body.run());
         } catch (RuntimeException ex) {
             log.warn("Learned rate limits: {} could not be stored: {}", scope.id(), ex.getMessage());
         }

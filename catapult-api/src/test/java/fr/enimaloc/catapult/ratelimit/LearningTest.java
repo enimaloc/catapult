@@ -64,11 +64,15 @@ class LearningTest {
     }
 
     @Test
-    void theLimit_isNeverUnderOneCall() {
+    void aFirstLimit_needsEnoughCalls() {
         LimitEstimator e = new LimitEstimator(Duration.ofHours(1), T0.minus(Duration.ofHours(1)));
         e.on429(T0, Duration.ofSeconds(1));
-        assertThat(e.estimate()).contains(new Estimate(1, Duration.ofSeconds(10)));
+        assertThat(e.estimate()).isEmpty();
         assertThat(e.oldestWithin(Duration.ofSeconds(10), T0)).isEmpty();
+
+        for (int i = 0; i < 6; i++) e.record(T0.plusSeconds(1));
+        e.on429(T0.plusSeconds(2), Duration.ofSeconds(1));
+        assertThat(e.estimate()).contains(new Estimate(5, Duration.ofSeconds(10)));
     }
 
     @Test

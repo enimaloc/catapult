@@ -70,6 +70,10 @@ public class LearnedRateLimit {
     @Column(name = "override_resume_ms")
     private Long overrideResumeMs;
 
+    /** The last admin correction or reset: an instance that hasn't taken it yet doesn't write over it. */
+    @Column(name = "admin_changed_at")
+    private Instant adminChangedAt;
+
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 }
