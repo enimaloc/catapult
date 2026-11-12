@@ -170,6 +170,17 @@ class AdminTwControllerTest {
     }
 
     @Test
+    void cancelRebuild_relaysTheStatus_andIsNoMode() throws Exception {
+        when(apiService.isAdmin()).thenReturn(true);
+        when(apiService.adminCancelTwRebuild()).thenReturn(200);
+
+        mvc.perform(admin(post(BASE + "/rebuild/cancel"), "{}")).andExpect(status().isOk());
+
+        org.mockito.Mockito.verify(apiService).adminCancelTwRebuild();
+        org.mockito.Mockito.verify(apiService, org.mockito.Mockito.never()).adminRebuildTws(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
     void dtddTopics_areSentInOrder_onceEach_withTheirLevel() throws Exception {
         when(apiService.isAdmin()).thenReturn(true);
         when(apiService.adminSetTwDtddTopics(org.mockito.ArgumentMatchers.eq("gore"), org.mockito.ArgumentMatchers.any()))

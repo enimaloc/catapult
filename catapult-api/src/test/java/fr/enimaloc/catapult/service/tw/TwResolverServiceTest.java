@@ -129,4 +129,25 @@ class TwResolverServiceTest {
             steam);
         assertThat(none.suggest(new TwResolverService.SuggestInput("x", Set.of(), null, "x"))).isEmpty();
     }
+
+    @Test
+    void steamSignalsMissedWhileRateLimited_areReported_andOtherwiseNot() {
+        SteamStoreService steam = mock(SteamStoreService.class);
+        TwResolverService svc = new TwResolverService(
+            mock(TwIgdbDescriptorMappingRepository.class), mock(TwSteamContentIdMappingRepository.class),
+            mock(TwSteamKeywordRepository.class), mock(TwDtddTopicMappingRepository.class), Optional.empty(), steam);
+        java.time.Instant until = java.time.Instant.parse("2026-11-12T10:05:00Z");
+        when(steam.fetchTwSignals(List.of("app42"))).thenReturn(Map.of());
+        when(steam.rateLimitedUntil()).thenReturn(Optional.of(until));
+
+        assertThat(svc.suggestReporting(new TwResolverService.SuggestInput("x", Set.of(), "app42", "x"))
+            .steamLimitedUntil()).contains(until);
+        // Not a Steam game: nothing asked of Steam, nothing missed
+        assertThat(svc.suggestReporting(new TwResolverService.SuggestInput("x", Set.of(), null, "x"))
+            .steamLimitedUntil()).isEmpty();
+        // Steam answered
+        when(steam.fetchTwSignals(List.of("app42"))).thenReturn(Map.of("app42", SteamTwSignals.empty()));
+        assertThat(svc.suggestReporting(new TwResolverService.SuggestInput("x", Set.of(), "app42", "x"))
+            .steamLimitedUntil()).isEmpty();
+    }
 }

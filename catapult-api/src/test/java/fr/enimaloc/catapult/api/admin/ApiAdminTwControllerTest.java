@@ -53,7 +53,7 @@ class ApiAdminTwControllerTest {
         MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
         mvc.perform(post("/api/internal/admin/tws/rebuild/force-pinned").with(csrf()))
                 .andExpect(status().isAccepted());
-        verify(twBackfillService).forceRebuildAllIncludingPinned();
+        verify(twBackfillService).start(TwBackfillService.Mode.FORCE_PINNED);
     }
 
     @Test
@@ -130,6 +130,22 @@ class ApiAdminTwControllerTest {
                 .andExpect(jsonPath("$.matchedKeywords[0]").value("blood"))
                 .andExpect(jsonPath("$.draftKeywordMatch").value(true))
                 .andExpect(jsonPath("$.matchedContentDescriptorIds[0]").value(2));
+    }
+
+    @Test
+    void theRebuild_isFollowedAndCancelled() throws Exception {
+        MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
+        var running = new fr.enimaloc.catapult.common.dto.admin.TwRebuildStatusDto("RUNNING", "NON_OVERRIDDEN", 10, 3, 1,
+                0, null, null, null);
+        when(twBackfillService.status()).thenReturn(running);
+        when(twBackfillService.cancel()).thenReturn(running);
+
+        mvc.perform(get("/api/internal/admin/tws/rebuild/status"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.state").value("RUNNING"))
+                .andExpect(jsonPath("$.total").value(10));
+        mvc.perform(post("/api/internal/admin/tws/rebuild/cancel").with(csrf())).andExpect(status().isOk());
+        verify(twBackfillService).cancel();
     }
 
     @Test

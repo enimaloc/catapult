@@ -19,6 +19,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -60,9 +61,17 @@ public class TwResolverService {
 
     /**
      * Every signal found for a game: those that turn their TW on, and the DTDD topics kept off by their severity
-     * ({@link #dropped}). {@link #twIds} is what {@link #suggest} gives.
+     * ({@link #dropped}). {@link #twIds} is what {@link #suggest} gives. {@code steamLimitedUntil}: until when the
+     * Steam store was rate limited when a Steam game's signals were asked for (empty: they came, or weren't needed);
+     * without them, the TWs miss what Steam would have added.
      */
-    public record Explanation(List<Signal> signals) {
+    public record Explanation(List<Signal> signals, Optional<Instant> steamLimitedUntil) {
+
+        /** Signals Steam didn't fail to give. */
+        public Explanation(List<Signal> signals) {
+            this(signals, Optional.empty());
+        }
+
         public Set<String> twIds() {
             return signals.stream().filter(Signal::triggers).map(Signal::twId).collect(Collectors.toSet());
         }
@@ -70,6 +79,20 @@ public class TwResolverService {
         public List<Signal> dropped() {
             return signals.stream().filter(s -> !s.triggers()).toList();
         }
+    }
+
+    /** The TWs suggested, and until when the Steam store was rate limited when its signals were missed. */
+    public record Suggestion(Set<String> tws, Optional<Instant> steamLimitedUntil) {}
+
+    /** Until when the Steam store is rate limited (a Steam game's TWs resolved meanwhile miss its signals). */
+    public Optional<Instant> steamRateLimitedUntil() {
+        return steamStoreService.rateLimitedUntil();
+    }
+
+    /** As {@link #suggest}, telling when the Steam signals were missed because the store was rate limited. */
+    public Suggestion suggestReporting(SuggestInput in) {
+        Explanation explanation = explain(in);
+        return new Suggestion(explanation.twIds(), explanation.steamLimitedUntil());
     }
 
     /** Computes the set of TW slugs that should be pre-activated for this binding input. */
@@ -80,6 +103,7 @@ public class TwResolverService {
     /** As {@link #suggest}, telling which source turned each TW on, and which DTDD topics their severity kept off. */
     public Explanation explain(SuggestInput in) {
         List<Signal> out = new ArrayList<>();
+        Optional<Instant> steamLimitedUntil = Optional.empty();
 
         if (in.igdbDescriptorIds() != null && !in.igdbDescriptorIds().isEmpty()) {
             for (TwIgdbDescriptorMapping m : igdbRepo.findAllByDescriptorIdIn(in.igdbDescriptorIds())) {
@@ -88,8 +112,9 @@ public class TwResolverService {
         }
 
         if (in.steamAppId() != null) {
-            SteamTwSignals s = steamStoreService.fetchTwSignals(List.of(in.steamAppId()))
-                .getOrDefault(in.steamAppId(), SteamTwSignals.empty());
+            Map<String, SteamTwSignals> fetched = steamStoreService.fetchTwSignals(List.of(in.steamAppId()));
+            if (!fetched.containsKey(in.steamAppId())) steamLimitedUntil = steamStoreService.rateLimitedUntil();
+            SteamTwSignals s = fetched.getOrDefault(in.steamAppId(), SteamTwSignals.empty());
             if (!s.contentDescriptorIds().isEmpty()) {
                 for (TwSteamContentIdMapping m : steamIdRepo.findAllBySteamContentIdIn(s.contentDescriptorIds())) {
                     out.add(new Signal(m.getTwId(), SourceType.STEAM_CONTENT, String.valueOf(m.getSteamContentId()), null));
@@ -119,6 +144,6 @@ public class TwResolverService {
             }
         });
 
-        return new Explanation(out);
+        return new Explanation(out, steamLimitedUntil);
     }
 }

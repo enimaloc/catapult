@@ -100,6 +100,13 @@ public class AdminTwController {
         return result == null ? ResponseEntity.status(502).build() : ResponseEntity.ok(result);
     }
 
+    /** Asks the running recalculation to stop after its current binding. */
+    @PostMapping("/rebuild/cancel")
+    public ResponseEntity<Void> cancelRebuild() {
+        AdminAccess.require(filler);
+        return ResponseEntity.status(apiService.adminCancelTwRebuild()).build();
+    }
+
     /** A DTDD topic and the least severe level of it that turns the TW on (null or blank: any). */
     public record DtddTopicBody(String topic, String minSeverity) {}
 

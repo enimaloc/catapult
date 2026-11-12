@@ -445,4 +445,83 @@ class SteamStoreServiceTest {
 
         assertThat(service.fetchIADisclosure("100", Locale.ENGLISH)).isEmpty();
     }
+
+    // --- rate limit (429) ---------------------------------------------------------------------
+
+    /** A clock the test moves on. */
+    private static final class MovingClock extends java.time.Clock {
+        Instant now = Instant.parse("2026-11-12T10:00:00Z");
+
+        @Override public java.time.ZoneId getZone() { return java.time.ZoneOffset.UTC; }
+        @Override public java.time.Clock withZone(java.time.ZoneId zone) { return this; }
+        @Override public Instant instant() { return now; }
+    }
+
+    private void given429(String appId, String retryAfter) {
+        var response = withStatus(HttpStatus.TOO_MANY_REQUESTS);
+        if (retryAfter != null) response = response.header("Retry-After", retryAfter);
+        steam.expect(org.springframework.test.web.client.ExpectedCount.once(),
+                requestTo(APP_DETAILS + "?appids=" + appId + "&l=english")).andRespond(response);
+    }
+
+    @Test
+    void a429_leavesTheStoreAloneForItsRetryAfter_thenAsksAgain() {
+        MovingClock clock = new MovingClock();
+        service.setClock(clock);
+        given429("100", "120");
+
+        assertThat(service.fetchTwSignals(List.of("100"))).isEmpty();
+        assertThat(service.rateLimitedUntil()).contains(clock.now.plusSeconds(120));
+        // Not asked meanwhile (a second request would fail the mock)
+        assertThat(service.fetchTwSignals(List.of("100"))).isEmpty();
+        steam.verify();
+
+        clock.now = clock.now.plusSeconds(121);
+        assertThat(service.rateLimitedUntil()).isEmpty();
+        steam.reset();
+        givenAppDetails("100", success("100", "{\"type\": \"game\", \"name\": \"Some Game\"}"));
+        assertThat(service.fetchTwSignals(List.of("100"))).containsKey("100");
+    }
+
+    @Test
+    void a429_withoutRetryAfter_waits60s_doublingWhileTheyFollow_upTo10Minutes() {
+        MovingClock clock = new MovingClock();
+        service.setClock(clock);
+        long[] expected = {60, 120, 240, 480, 600, 600};
+        for (long seconds : expected) {
+            steam.reset();
+            given429("100", null);
+            service.fetchTwSignals(List.of("100"));
+            assertThat(service.rateLimitedUntil()).contains(clock.now.plusSeconds(seconds));
+            clock.now = clock.now.plusSeconds(seconds + 1);
+        }
+    }
+
+    @Test
+    void anAnswer_resetsTheWait() {
+        MovingClock clock = new MovingClock();
+        service.setClock(clock);
+        given429("100", null);
+        service.fetchTwSignals(List.of("100"));
+        clock.now = clock.now.plusSeconds(61);
+
+        steam.reset();
+        givenAppDetails("100", success("100", "{\"type\": \"game\", \"name\": \"Some Game\"}"));
+        service.fetchTwSignals(List.of("100"));
+        steam.reset();
+        given429("100", null);
+        service.fetchTwSignals(List.of("100"));
+
+        assertThat(service.rateLimitedUntil()).contains(clock.now.plusSeconds(60));
+    }
+
+    @Test
+    void retryAfter_readsSecondsOrAnHttpDate() {
+        Instant now = Instant.parse("2026-11-12T10:00:00Z");
+        assertThat(SteamStoreServiceImpl.retryAfter("30", now)).contains(java.time.Duration.ofSeconds(30));
+        assertThat(SteamStoreServiceImpl.retryAfter("Thu, 12 Nov 2026 10:05:00 GMT", now))
+                .contains(java.time.Duration.ofMinutes(5));
+        assertThat(SteamStoreServiceImpl.retryAfter("soon", now)).isEmpty();
+        assertThat(SteamStoreServiceImpl.retryAfter(null, now)).isEmpty();
+    }
 }

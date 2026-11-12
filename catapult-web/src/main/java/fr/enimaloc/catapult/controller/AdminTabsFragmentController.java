@@ -433,6 +433,7 @@ public class AdminTabsFragmentController {
     String tw(Model model, HttpServletResponse response) {
         return guarded(model, response, () -> {
             model.addAttribute("definitions", apiService.adminTws());
+            model.addAttribute("rebuild", apiService.adminTwRebuildStatus());
             return "pages/admin-tab/tw :: content";
         });
     }

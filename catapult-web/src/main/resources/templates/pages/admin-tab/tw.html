@@ -1,4 +1,5 @@
 <!--/*@thymesVar id="definitions" type="java.util.List<fr.enimaloc.catapult.common.dto.admin.TwDefinitionDto>"*/-->
+<!--/*@thymesVar id="rebuild" type="fr.enimaloc.catapult.common.dto.admin.TwRebuildStatusDto"*/-->
 <!--/*
   The trigger warnings: the three rebuilds in the header (each confirmed with its own text, the force-pinned one
   in the danger style), a card adding a definition (id, label, order), then the list with, per definition, a link
@@ -8,7 +9,8 @@
      th:attr="data-confirm-text=#{admin.confirm},data-cancel-text=#{admin.cancel},
               data-label-invalid=#{admin.tw.invalid},data-label-conflict=#{admin.tw.conflict},
               data-label-disabled=#{admin.tw.disabled},data-label-unavailable=#{admin.tw.unavailable},
-              data-label-created=#{admin.tw.created},data-label-rebuild-started=#{admin.tw.rebuild-started}">
+              data-label-created=#{admin.tw.created},data-label-rebuild-started=#{admin.tw.rebuild-started},
+              data-label-rebuild-running=#{admin.tw.rebuild.running}">
     <div class="section-header admin-tw-head">
         <h2 th:text="#{admin.tab.tw}">Trigger warnings</h2>
         <div class="admin-tw-rebuilds">
@@ -21,6 +23,32 @@
                              th:text="#{|admin.tw.rebuild.${mode}.button|}">Rebuild</mdui-button>
             </mdui-tooltip>
         </div>
+    </div>
+
+    <!--/*
+      The recalculation running or last run: patched every few seconds while it runs (admin-tw.js follows data-state);
+      nothing shown before the first one.
+    */-->
+    <div data-admin-value="tw-rebuild" class="admin-tw-rebuild-progress"
+         th:attr="data-state=${rebuild == null ? 'UNKNOWN' : rebuild.state()}">
+        <mdui-card class="settings-card" variant="outlined"
+                   th:if="${rebuild != null and rebuild.state() != 'IDLE'}" th:with="r=${rebuild}">
+            <h3>
+                <span th:text="#{|admin.tw.rebuild.state.${r.state()}|}">Running</span>
+                <span class="admin-cell-muted" th:if="${r.mode() != null}"
+                      th:text="${'· ' + #messages.msg('admin.tw.rebuild.mode.' + r.mode())}">mode</span>
+            </h3>
+            <mdui-linear-progress th:if="${r.total() > 0}" th:attr="value=${r.done()},max=${r.total()}"></mdui-linear-progress>
+            <p th:text="#{admin.tw.rebuild.progress(${r.done()}, ${r.total()}, ${r.processed()}, ${r.skipped()}, ${r.failed()})}">0 / 0</p>
+            <p class="admin-cell-muted" th:if="${r.waitingUntil() != null}"
+               th:text="#{admin.tw.rebuild.waiting(${#temporals.format(r.waitingUntil(), 'HH:mm:ss')})}">waiting for Steam</p>
+            <p class="admin-cell-muted" th:if="${r.finishedAt() != null}"
+               th:text="#{admin.tw.rebuild.finished(${#temporals.format(r.finishedAt(), #messages.msg('format.datetime'))})}">finished</p>
+            <div class="admin-data-actions" th:if="${r.state() == 'RUNNING'}">
+                <mdui-button variant="text" icon="stop" class="admin-tw-rebuild-cancel"
+                             th:text="#{admin.tw.rebuild.cancel}">Stop</mdui-button>
+            </div>
+        </mdui-card>
     </div>
 
     <mdui-card class="admin-tw-create" variant="outlined">

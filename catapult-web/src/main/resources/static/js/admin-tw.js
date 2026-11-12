@@ -6,6 +6,9 @@
  * by its status, never by catapult-api's message: 400 (invalid), 409 (id taken), 503 (trigger warnings
  * disabled), else unavailable. "Manage keywords" is a plain data-admin-open link handled by admin-tabs.js.
  *
+ * A recalculation started (or one already running: 409) shows its progress: the tab's card is patched every few
+ * seconds (admin-tabs.js) while it reads RUNNING and the tab is the one shown, and it can be asked to stop.
+ *
  * The keywords sub-view (#tw/{id}) adds and removes (confirmed) Steam keywords of 2 to 50 characters, the
  * keyword travelling in the JSON body, and tests the saved keywords plus the one being typed on a Steam app:
  * the answer is built with textContent only (the notes are data). Adding or removing one patches the list
@@ -76,16 +79,53 @@ window.CatapultAdminTw = (function () {
         }
     }
 
-    async function rebuild(root, button) {
+    async function rebuild(panel, root, button) {
         button.disabled = true; // before the confirmation: a second click must not open another
         try {
             if (!await CatapultAdminTabs.confirmed(root, button.dataset.confirm)) return;
             const status = await post(button, `/admin/tw/rebuild/${button.dataset.rebuild}`, {});
             if (ok(status)) window.mdui?.snackbar?.({ message: root.dataset.labelRebuildStarted });
-            else CatapultChannel.showError(refusal(root, status));
+            else CatapultChannel.showError(status === 409 ? root.dataset.labelRebuildRunning : refusal(root, status));
+            // started, or one runs already: its progress is shown
+            if (ok(status) || status === 409) {
+                await CatapultAdminTabs.patch(panel);
+                follow(panel);
+            }
         } finally {
             button.disabled = false;
         }
+    }
+
+    async function cancelRebuild(panel, root, button) {
+        const status = await post(button, "/admin/tw/rebuild/cancel", {});
+        if (!ok(status)) {
+            CatapultChannel.showError(refusal(root, status));
+            return;
+        }
+        await CatapultAdminTabs.patch(panel);
+    }
+
+    // --- following a recalculation -------------------------------------------------------------
+
+    const FOLLOW_MS = 3000;
+    let followTimer = null;
+
+    /** Whether the list shown reads a running recalculation, in the tab shown. */
+    function following(panel) {
+        const progress = panel.querySelector('.admin-tw [data-admin-value="tw-rebuild"]');
+        return progress?.dataset.state === "RUNNING" && document.getElementById("admin-tabs")?.value === "tw";
+    }
+
+    /** Patches the list every FOLLOW_MS while it reads a running recalculation; stops by itself otherwise. */
+    function follow(panel) {
+        clearTimeout(followTimer);
+        followTimer = null;
+        if (!following(panel)) return;
+        followTimer = setTimeout(async () => {
+            if (!panel.isConnected || !following(panel)) return;
+            await CatapultAdminTabs.patch(panel);
+            follow(panel);
+        }, FOLLOW_MS);
     }
 
     // --- the keywords sub-view ---------------------------------------------------------------
@@ -180,7 +220,7 @@ window.CatapultAdminTw = (function () {
         if (!panel) return;
 
         panel.addEventListener("click", event => {
-            const target = event.target.closest?.(".admin-tw-add-save, .admin-tw-rebuild,"
+            const target = event.target.closest?.(".admin-tw-add-save, .admin-tw-rebuild, .admin-tw-rebuild-cancel,"
                 + " .admin-tw-keyword-add, .admin-tw-keyword-remove, .admin-tw-test-run");
             if (!target || !panel.contains(target) || target.disabled) return;
             const keywordsRoot = target.closest(".admin-tw-kw");
@@ -193,12 +233,21 @@ window.CatapultAdminTw = (function () {
             const root = panel.querySelector(".admin-tw");
             if (!root) return;
             if (target.matches(".admin-tw-add-save")) addDefinition(panel, root, target);
-            else rebuild(root, target);
+            else if (target.matches(".admin-tw-rebuild-cancel")) cancelRebuild(panel, root, target);
+            else rebuild(panel, root, target);
         });
         panel.addEventListener("input", event => event.target.removeAttribute?.("invalid"));
+        // Back on the tab: a recalculation running is followed again (left, it stopped being)
+        document.getElementById("admin-tabs")?.addEventListener("change", event => {
+            if (event.target.id === "admin-tabs") follow(panel);
+        });
     }
 
     document.addEventListener("catapult:render", attach);
+    // The list shown (the tab, back from a sub-view): a recalculation running is followed
+    document.addEventListener("catapult:admin-panel", event => {
+        if (event.detail?.tab === "tw") follow(event.detail.panel);
+    });
 
     return { attach };
 })();

@@ -996,6 +996,29 @@ class AdminTabsFragmentControllerTest {
     }
 
     @Test
+    void twFragment_showsTheRecalculation_itsProgress_andItsStop() throws Exception {
+        when(apiService.adminTws()).thenReturn(List.of());
+        when(apiService.adminTwRebuildStatus()).thenReturn(new fr.enimaloc.catapult.common.dto.admin.TwRebuildStatusDto(
+                "RUNNING", "NON_OVERRIDDEN", 40, 10, 3, 1, java.time.Instant.now(), null,
+                java.time.Instant.parse("2026-11-12T10:05:00Z")));
+
+        String html = asAdmin("/spa/admin/tw");
+
+        assertThat(html).contains("data-state=\"RUNNING\"", "value=\"14\"", "max=\"40\"",
+                "14 / 40 games · 10 recalculated, 3 skipped, 1 failed", "Steam is rate limiting: going on at",
+                "admin-tw-rebuild-cancel", "games their streamer didn&#39;t change");
+    }
+
+    @Test
+    void twFragment_beforeAnyRecalculation_showsNoProgress() throws Exception {
+        when(apiService.adminTws()).thenReturn(List.of());
+        when(apiService.adminTwRebuildStatus()).thenReturn(fr.enimaloc.catapult.common.dto.admin.TwRebuildStatusDto.IDLE);
+
+        assertThat(asAdmin("/spa/admin/tw")).contains("data-state=\"IDLE\"").doesNotContain("admin-tw-rebuild-cancel",
+                "mdui-linear-progress");
+    }
+
+    @Test
     void twDtddFragment_offersTheKnownLevels_andKeepsASavedOneNoTitleGives() throws Exception {
         when(apiService.adminTw("gore")).thenReturn(
                 new fr.enimaloc.catapult.common.dto.admin.TwDefinitionDto("gore", "Gore", null, true, 10));

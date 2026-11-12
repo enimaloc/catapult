@@ -16,7 +16,11 @@ function page() {
         <mdui-tab-panel value="tw">
             <div class="admin-view admin-tw" data-confirm-text="OK" data-cancel-text="No"
                  data-label-invalid="Invalid" data-label-conflict="Taken" data-label-disabled="Off"
-                 data-label-unavailable="Down" data-label-created="Created" data-label-rebuild-started="Started">
+                 data-label-unavailable="Down" data-label-created="Created" data-label-rebuild-started="Started"
+                 data-label-rebuild-running="Already running">
+                <div data-admin-value="tw-rebuild" data-state="IDLE">
+                    <button class="admin-tw-rebuild-cancel"></button>
+                </div>
                 <button class="admin-tw-rebuild" data-rebuild="untouched" data-confirm="Update never-analyzed?"></button>
                 <button class="admin-tw-rebuild" data-rebuild="non-overridden" data-confirm="Rebuild non-pinned?"></button>
                 <button class="admin-tw-rebuild" data-rebuild="force-pinned" data-confirm="OVERWRITE pinned?"></button>
@@ -45,6 +49,7 @@ beforeEach(async () => {
     window.CatapultCsrf = { postJson: posted };
     window.mdui = { confirm: vi.fn(() => (confirmAnswer ? Promise.resolve() : Promise.reject())), snackbar: vi.fn() };
     await load("admin-tabs", "admin-tw");
+    document.getElementById("admin-tabs")?.remove();
     window.CatapultChannel = { showError: vi.fn() };
     window.CatapultAdminTabs.patch = vi.fn(async () => {});
     page();
@@ -65,7 +70,55 @@ describe("admin-tw", () => {
             expect(rebuildButton(mode).disabled).toBe(false);
         }
         expect(posted).toHaveBeenCalledTimes(3);
-        expect(CatapultAdminTabs.patch).not.toHaveBeenCalled();
+        // each one's progress shown
+        expect(CatapultAdminTabs.patch).toHaveBeenCalledTimes(3);
+    });
+
+    it("tells a recalculation already running, and shows it", async () => {
+        posted.mockResolvedValueOnce(response(409));
+        await click('[data-rebuild="untouched"]');
+
+        expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Already running");
+        expect(CatapultAdminTabs.patch).toHaveBeenCalledTimes(1);
+        expect(window.mdui.snackbar).not.toHaveBeenCalled();
+    });
+
+    it("follows a running recalculation while its tab is shown, and stops once it ends", async () => {
+        vi.useFakeTimers();
+        try {
+            const tabs = document.createElement("div");
+            tabs.id = "admin-tabs";
+            tabs.value = "tw";
+            document.body.prepend(tabs);
+            const progress = document.querySelector('[data-admin-value="tw-rebuild"]');
+            let reads = 0;
+            CatapultAdminTabs.patch = vi.fn(async () => {
+                reads++;
+                progress.dataset.state = reads < 3 ? "RUNNING" : "DONE";
+            });
+
+            document.querySelector('[data-rebuild="untouched"]').click();
+            await vi.advanceTimersByTimeAsync(0);
+            expect(CatapultAdminTabs.patch).toHaveBeenCalledTimes(1);
+
+            await vi.advanceTimersByTimeAsync(3000);
+            expect(CatapultAdminTabs.patch).toHaveBeenCalledTimes(2);
+            await vi.advanceTimersByTimeAsync(3000);
+            expect(CatapultAdminTabs.patch).toHaveBeenCalledTimes(3);
+            // Done: no more
+            await vi.advanceTimersByTimeAsync(9000);
+            expect(CatapultAdminTabs.patch).toHaveBeenCalledTimes(3);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("asks a running recalculation to stop, then shows it", async () => {
+        posted.mockResolvedValueOnce(response(200));
+        await click(".admin-tw-rebuild-cancel");
+
+        expect(posted).toHaveBeenLastCalledWith("/admin/tw/rebuild/cancel", {});
+        expect(CatapultAdminTabs.patch).toHaveBeenCalledTimes(1);
     });
 
     it("does not rebuild when the confirmation is declined", async () => {

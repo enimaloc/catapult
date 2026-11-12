@@ -232,7 +232,7 @@ public class ChannelFixture {
                 new CategoryApplier(twitch, streamStateService), new RaidRestoreGateService(experimentService), lookup, mock(ExtensionLayoutApplier.class));
         bindingService = new BindingService(bindingRepository, igdbService, mock(IgdbGameDetailsService.class),
                 twitch, mock(TwResolverService.class), mappingRepository, lookup, categoryChain,
-                mock(ExtensionLayoutApplier.class));
+                mock(ExtensionLayoutApplier.class), org.mockito.Mockito.mock(org.springframework.context.ApplicationEventPublisher.class));
         raidRestoreGameService = new RaidRestoreGameService(categoryChain, new CategoryApplier(twitch, streamStateService),
                 raidRestoreHold);
         listener = new GameEventListener(bindingService, streamStateService, publisher,
