@@ -23,10 +23,15 @@ class MockGameMappingsStoreTest {
     }
 
     @Test
-    void seeded_hasTwoMappings_newestFirst() {
+    void seeded_hasThreeMappings_newestFirst_oneIgnoredByDefault() {
         assertThat(store.list(0).content()).hasSize(2);
-        assertThat(store.list(0).totalElements()).isEqualTo(2);
+        assertThat(store.list(0).totalElements()).isEqualTo(3);
         assertThat(store.list(0).content()).extracting(GameMappingDto::updatedAt).isSortedAccordingTo(java.util.Comparator.reverseOrder());
+        // The oldest, on the second page: a wallpaper app ignored without a category
+        assertThat(store.list(1).content()).singleElement().satisfies(m -> {
+            assertThat(m.ignoredByDefault()).isTrue();
+            assertThat(m.twitchGameId()).isNull();
+        });
     }
 
     @Test
@@ -99,7 +104,7 @@ class MockGameMappingsStoreTest {
 
         assertThat(deleted.status()).isEqualTo(200);
         assertThat(deleted.body().mapping()).isNull();
-        assertThat(store.list(0).totalElements()).isEqualTo(1);
+        assertThat(store.list(0).totalElements()).isEqualTo(2);
         assertThat(store.delete(existing.id(), false).status()).isEqualTo(404);
     }
 
@@ -110,5 +115,16 @@ class MockGameMappingsStoreTest {
         assertThat(store.detected("STEAM", first.sourceName().substring(0, 3).toUpperCase())).contains(first);
         assertThat(store.detected("STEAM", "zzzz-none")).isEmpty();
         assertThat(store.detected(null, "")).isEmpty();
+    }
+
+    @Test
+    void create_withoutCategory_onlyWhenIgnoredByDefault() {
+        assertThat(store.create(new GameMappingRequest("STEAM", "413150", null, null, null, null, false), "me")
+                .status()).isEqualTo(400);
+
+        var created = store.create(new GameMappingRequest("STEAM", "413150", null, null, null, null, false, true), "me");
+
+        assertThat(created.status()).isEqualTo(201);
+        assertThat(created.body().mapping().ignoredByDefault()).isTrue();
     }
 }

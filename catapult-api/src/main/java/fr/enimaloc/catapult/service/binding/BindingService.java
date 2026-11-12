@@ -125,19 +125,27 @@ public class BindingService {
         binding.setSourceType(detectedGame.getSourceType());
         binding.setSourceName(detectedGame.getSourceName());
 
+        // A game an admin mapping ignores by default comes in ignored
+        binding.setIgnored(mappingOf(detectedGame).map(GameMapping::isIgnoredByDefault).orElse(false));
+
         log.info("Creating binding for user {}  — game '{}'", user.getId(), detectedGame.getSourceName());
         return updateWithIgdbResolution(user, detectedGame, binding);
     }
 
-    /**
-     * Resolves the binding's category and saves it: from the admin game mapping of its game when there is one
-     * (MAPPED), else from IGDB (AUTO, or INCOMPLETE when IGDB finds no Twitch category).
-     */
-    private GameBinding updateWithIgdbResolution(UserAccount user, DetectedGame detectedGame, GameBinding binding) {
-        Optional<GameMapping> mapping = detectedGame.getSourceId() != null
+    /** The admin game mapping of a detected game, if any (none without a source ID). */
+    private Optional<GameMapping> mappingOf(DetectedGame detectedGame) {
+        return detectedGame.getSourceId() != null
                 ? gameMappingRepository.findBySourceTypeAndSourceId(
                         detectedGame.getSourceType(), detectedGame.getSourceId())
                 : Optional.empty();
+    }
+
+    /**
+     * Resolves the binding's category and saves it: from the admin game mapping of its game when it sets one
+     * (MAPPED), else from IGDB (AUTO, or INCOMPLETE when IGDB finds no Twitch category).
+     */
+    private GameBinding updateWithIgdbResolution(UserAccount user, DetectedGame detectedGame, GameBinding binding) {
+        Optional<GameMapping> mapping = mappingOf(detectedGame).filter(GameMapping::hasCategory);
         if (mapping.isPresent()) {
             applyMapping(binding, mapping.get());
             log.info("Binding updated as MAPPED for user {} — game '{}' mapped by an admin to '{}' (twitchId={})",
@@ -191,7 +199,7 @@ public class BindingService {
      * @return whether the binding changed; always false for a MANUAL binding, which is never touched.
      */
     public boolean applyMapping(GameBinding binding, GameMapping mapping, MappingSuggestions suggestions) {
-        if (binding.getStatus() == GameBinding.Status.MANUAL) return false;
+        if (binding.getStatus() == GameBinding.Status.MANUAL || !mapping.hasCategory()) return false;
 
         Set<String> ccls = mapping.isCclsOverridden() ? Set.copyOf(mapping.getCcls()) : suggestions.ccls();
         Set<String> tws = binding.isTwOverride() ? Set.copyOf(binding.getTws())
@@ -212,6 +220,19 @@ public class BindingService {
         binding.getTws().clear();
         binding.getTws().addAll(tws);
         return changed;
+    }
+
+    /**
+     * Sets whether the binding is ignored as an admin mapping says, without saving it — unless it is MANUAL or its
+     * streamer chose ({@code ignoredOverride}).
+     *
+     * @return whether the binding changed
+     */
+    public boolean applyMappingIgnore(GameBinding binding, boolean ignored) {
+        if (binding.getStatus() == GameBinding.Status.MANUAL || binding.isIgnoredOverride()
+                || binding.isIgnored() == ignored) return false;
+        binding.setIgnored(ignored);
+        return true;
     }
 
     /** Resolves and saves the binding from IGDB alone, its game's mapping ignored — for a deleted mapping. */
@@ -290,6 +311,7 @@ public class BindingService {
             binding.getTws().clear();
             binding.getTws().addAll(tws);
             binding.setTwOverride(true);
+            if (binding.isIgnored() != ignored) binding.setIgnoredOverride(true);
             binding.setIgnored(ignored);
             if (twitchGameId != null && !twitchGameId.isBlank()) {
                 binding.setStatus(GameBinding.Status.MANUAL);
@@ -336,15 +358,17 @@ public class BindingService {
     }
 
     /**
-     * Puts the binding back as first detected: resolved anew (category, CCLs, TWs), its toggles on, not ignored, its
-     * extension layout emptied (pushed to Twitch when it is the configuration in place).
+     * Puts the binding back as first detected: resolved anew (category, CCLs, TWs), its toggles on, ignored only when
+     * its game's admin mapping ignores it by default, its extension layout emptied (pushed to Twitch when it is the
+     * configuration in place).
      * @throws ResponseStatusException 404 when the binding isn't the user's
      */
     @Transactional
     public void resetToDefaults(UserAccount user, UUID bindingId) {
         GameBinding binding = gameBindingRepository.findByIdAndUser(bindingId, user)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown binding"));
-        binding.setIgnored(false);
+        binding.setIgnoredOverride(false);
+        binding.setIgnored(mappingOf(detectedOf(binding)).map(GameMapping::isIgnoredByDefault).orElse(false));
         binding.setCclEnabled(true);
         binding.setTwEnabled(true);
         binding.setTitle(null);
@@ -402,7 +426,11 @@ public class BindingService {
 
     @Transactional
     public void toggleIgnored(UserAccount user, UUID bindingId, boolean ignored) {
-        editBinding(user, bindingId, binding -> binding.setIgnored(ignored));
+        editBinding(user, bindingId, binding -> {
+            binding.setIgnored(ignored);
+            // The streamer's choice: an admin mapping no longer changes it
+            binding.setIgnoredOverride(true);
+        });
     }
 
     @Transactional
