@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.getter.dtdd;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
 import lombok.extern.slf4j.Slf4j;
@@ -24,7 +25,9 @@ import java.util.function.Function;
 @ConditionalOnBooleanProperty("dtdd.enabled")
 public class RealDtddApiClient implements DtddApiClient {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    // DTDD adds fields to its answers (severity, 2026-11): one we don't know must not fail the whole call
+    private static final ObjectMapper MAPPER = new ObjectMapper()
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     private final RestClient client;
     private final DtddApiKeyRotator rotator;
