@@ -93,6 +93,13 @@ public class AdminTwController {
         return result == null ? ResponseEntity.status(502).build() : ResponseEntity.ok(result);
     }
 
+    /** Asks the running recalculation to stop after its current binding. */
+    @PostMapping("/rebuild/cancel")
+    public ResponseEntity<Void> cancelRebuild() {
+        AdminAccess.require(filler);
+        return ResponseEntity.status(apiService.adminCancelTwRebuild()).build();
+    }
+
     @PostMapping("/rebuild/{mode}")
     public ResponseEntity<Void> rebuild(@PathVariable String mode) {
         AdminAccess.require(filler);

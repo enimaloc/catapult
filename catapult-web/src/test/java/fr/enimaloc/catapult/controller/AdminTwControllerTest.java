@@ -168,4 +168,15 @@ class AdminTwControllerTest {
         }
         verify(apiService, org.mockito.Mockito.times(2)).adminTestTwKeyword(any(), any(), any());
     }
+
+    @Test
+    void cancelRebuild_relaysTheStatus_andIsNoMode() throws Exception {
+        when(apiService.isAdmin()).thenReturn(true);
+        when(apiService.adminCancelTwRebuild()).thenReturn(200);
+
+        mvc.perform(admin(post(BASE + "/rebuild/cancel"), "{}")).andExpect(status().isOk());
+
+        org.mockito.Mockito.verify(apiService).adminCancelTwRebuild();
+        org.mockito.Mockito.verify(apiService, org.mockito.Mockito.never()).adminRebuildTws(org.mockito.ArgumentMatchers.any());
+    }
 }

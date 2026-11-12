@@ -480,6 +480,10 @@ public interface ApiService {
     int adminCreateTw(String id, String label, int sortOrder);
     /** Starts a background rebuild of the mappings; catapult-api's status (202; 503 when trigger warnings are off), 502 when unreachable. */
     int adminRebuildTws(TwRebuild mode);
+    /** The TWs' recalculation running or last run; null when catapult-api fails. */
+    fr.enimaloc.catapult.common.dto.admin.TwRebuildStatusDto adminTwRebuildStatus();
+    /** Asks the running recalculation to stop: catapult-api's status (200; 503 TWs disabled), 502 when unreachable. */
+    int adminCancelTwRebuild();
     /** A definition's Steam keywords, sorted; null when unknown or when catapult-api fails. */
     List<String> adminTwKeywords(String id);
     /** Adds a keyword (already there changes nothing); catapult-api's status (204), 502 when unreachable. */

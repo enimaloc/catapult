@@ -1,8 +1,10 @@
 package fr.enimaloc.catapult.service.mock;
 
 import fr.enimaloc.catapult.common.dto.admin.TwDefinitionDto;
+import fr.enimaloc.catapult.common.dto.admin.TwRebuildStatusDto;
 import fr.enimaloc.catapult.common.dto.admin.TwKeywordTestDto;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -54,9 +56,46 @@ class MockTwStore {
         return 201;
     }
 
-    /** The rebuild runs in the background in catapult-api: accepted, nothing to change here. */
-    int rebuild() {
+    /** How many bindings the mock's recalculation goes through, three more each time it is read. */
+    static final int REBUILD_TOTAL = 12;
+    private static final int REBUILD_STEP = 3;
+    private TwRebuildStatusDto rebuild = TwRebuildStatusDto.IDLE;
+
+    /** Runs "in the background" as catapult-api does: 202, 409 while one runs already. */
+    synchronized int rebuild(String mode) {
+        if ("RUNNING".equals(rebuild.state())) return 409;
+        rebuild = new TwRebuildStatusDto("RUNNING", mode, REBUILD_TOTAL, 0, 0, 0, Instant.now(), null, null);
         return 202;
+    }
+
+    /**
+     * The recalculation, three bindings further each time it is read; halfway, it waits a minute for the Steam
+     * store's rate limit once, as catapult-api would show it.
+     */
+    synchronized TwRebuildStatusDto rebuildStatus() {
+        if (!"RUNNING".equals(rebuild.state())) return rebuild;
+        TwRebuildStatusDto r = rebuild;
+        if (r.done() == REBUILD_TOTAL / 2 && r.waitingUntil() == null) {
+            rebuild = new TwRebuildStatusDto("RUNNING", r.mode(), r.total(), r.processed(), r.skipped(), r.failed(),
+                    r.startedAt(), null, Instant.now().plusSeconds(60));
+            return rebuild;
+        }
+        int processed = r.processed() + REBUILD_STEP - 1;
+        int skipped = r.skipped() + 1;
+        boolean done = processed + skipped >= REBUILD_TOTAL;
+        rebuild = new TwRebuildStatusDto(done ? "DONE" : "RUNNING", r.mode(), r.total(),
+                Math.min(processed, REBUILD_TOTAL - skipped), skipped, r.failed(), r.startedAt(),
+                done ? Instant.now() : null, null);
+        return rebuild;
+    }
+
+    synchronized int cancelRebuild() {
+        if ("RUNNING".equals(rebuild.state())) {
+            TwRebuildStatusDto r = rebuild;
+            rebuild = new TwRebuildStatusDto("CANCELLED", r.mode(), r.total(), r.processed(), r.skipped(), r.failed(),
+                    r.startedAt(), Instant.now(), null);
+        }
+        return 200;
     }
 
     /** A definition's keywords, sorted; null when the definition is unknown. */

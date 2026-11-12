@@ -29,8 +29,19 @@ class MockTwStoreTest {
     }
 
     @Test
-    void rebuild_isAccepted() {
-        assertThat(store.rebuild()).isEqualTo(202);
+    void rebuild_isAccepted_onceAtATime_andMovesOnEachTimeItIsRead() {
+        assertThat(store.rebuildStatus().state()).isEqualTo("IDLE");
+        assertThat(store.rebuild("NON_OVERRIDDEN")).isEqualTo(202);
+        assertThat(store.rebuild("UNTOUCHED")).isEqualTo(409);
+
+        var status = store.rebuildStatus();
+        for (int i = 0; i < 20 && "RUNNING".equals(status.state()); i++) status = store.rebuildStatus();
+        assertThat(status.state()).isEqualTo("DONE");
+        assertThat(status.done()).isEqualTo(MockTwStore.REBUILD_TOTAL);
+
+        store.rebuild("FORCE_PINNED");
+        assertThat(store.cancelRebuild()).isEqualTo(200);
+        assertThat(store.rebuildStatus().state()).isEqualTo("CANCELLED");
     }
 
     @Test

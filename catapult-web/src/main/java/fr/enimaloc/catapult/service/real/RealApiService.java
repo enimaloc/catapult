@@ -1331,6 +1331,16 @@ public class RealApiService implements ApiService {
     }
 
     @Override
+    public fr.enimaloc.catapult.common.dto.admin.TwRebuildStatusDto adminTwRebuildStatus() {
+        return client.get("/api/internal/admin/tws/rebuild/status", fr.enimaloc.catapult.common.dto.admin.TwRebuildStatusDto.class);
+    }
+
+    @Override
+    public int adminCancelTwRebuild() {
+        return client.call(HttpMethod.POST, "/api/internal/admin/tws/rebuild/cancel", null, Void.class).status();
+    }
+
+    @Override
     public int adminRebuildTws(TwRebuild mode) {
         ApiClient.Result<Void> result = switch (mode) {
             case NON_OVERRIDDEN -> client.call(HttpMethod.POST, "/api/internal/admin/tws/rebuild", null, Void.class);

@@ -1688,7 +1688,19 @@ public class MockApiService implements ApiService {
     @Override
     public int adminRebuildTws(TwRebuild mode) {
         log.trace("adminRebuildTws({})", mode);
-        return tws.rebuild();
+        return tws.rebuild(mode.name());
+    }
+
+    @Override
+    public fr.enimaloc.catapult.common.dto.admin.TwRebuildStatusDto adminTwRebuildStatus() {
+        log.trace("adminTwRebuildStatus()");
+        return tws.rebuildStatus();
+    }
+
+    @Override
+    public int adminCancelTwRebuild() {
+        log.trace("adminCancelTwRebuild()");
+        return tws.cancelRebuild();
     }
 
     @Override
