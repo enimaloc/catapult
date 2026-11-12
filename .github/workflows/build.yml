@@ -1,17 +1,17 @@
 name: Build
 
+# Pull requests (into any branch, stacked ones included) rather than `push`: a push to a branch with
+# an open PR ran the same job twice. dev's head is checked by its dev -> main promotion PR, main's by
+# the backport main -> dev, and a version tag push runs release.yml.
 on:
-  # Branches only: a version tag push runs release.yml, not the checks again
-  push:
-    branches: ['**']
   # Lets renovate-merge.yml run it on dev after a checkbox merge, which GITHUB_TOKEN pushes cannot trigger
   workflow_dispatch:
   pull_request:
-    branches:
-      - master # until it is renamed dev
-      - dev
-      - beta
-      - main
+
+# A new push to a pull request cancels its previous run; a dispatched run is never cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
