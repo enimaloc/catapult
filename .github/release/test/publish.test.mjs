@@ -182,6 +182,25 @@ test("stableMerge_reusesAnOpenBackportToDev", async () => {
   assert.deepEqual(named(gh, "createPull"), []);
 });
 
+test("backport_isOpenedWithAutoMergePinnedToItsHead", async () => {
+  const gh = fakeGitHub({ compare: { "dev...beta": [commit("r", "chore(release): v1.0.0")] } });
+  const [number] = (await run(gh, mergedPull({ base: "main", head: "beta", title: "chore(release): v1.0.0" }))).backports;
+  assert.deepEqual(named(gh, "enableAutoMerge"), [
+    ["enableAutoMerge", number, { expectedHeadOid: sha("h"), commitHeadline: "chore(release): backport v1.0.0 to dev" }],
+  ]);
+  assert.match(named(gh, "createPull")[0][1].body, /auto-merge est activé/);
+  assert.deepEqual(named(gh, "updatePull"), []);
+});
+
+test("backportWhoseAutoMergeFails_isLeftToTheOwner", async () => {
+  const gh = fakeGitHub({ compare: { "dev...main": [commit("r", "fix: r")] }, autoMergeFails: true });
+  const result = await run(gh, mergedPull({ base: "main", head: "dev", title: "chore(release): v1.2.0" }), false);
+  assert.equal(result.backports.length, 1, "the backport stays open");
+  const [[, number, { body }]] = named(gh, "updatePull");
+  assert.equal(number, result.backports[0]);
+  assert.match(body, /Fusionne cette PR par commit de merge/);
+});
+
 // Beta skipped (lib/flow.mjs): dev -> main is a stable, brought back to dev straight from main.
 test("devToMainMerge_tagsTheStable_andOpensTheBackportOfMainToDev", async () => {
   const gh = fakeGitHub({ compare: { "dev...main": [commit("r", "chore(release): v1.2.0")] } });
@@ -191,6 +210,7 @@ test("devToMainMerge_tagsTheStable_andOpensTheBackportOfMainToDev", async () => 
     ["createTag", { tag: "v1.2.0", sha: sha("m"), message: "chore(release): v1.2.0" }],
   ]);
   assert.deepEqual(opened(gh), [backport("dev", "main", "v1.2.0")]);
+  assert.equal(named(gh, "enableAutoMerge").length, 1);
 });
 
 test("hotfixWithoutBeta_opensTheBackportOfMainToDev", async () => {

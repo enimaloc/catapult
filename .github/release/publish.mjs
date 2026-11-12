@@ -1,5 +1,5 @@
 // A promotion (or hotfix) PR was merged: tag its merge commit, and after a stable or a hotfix open
-// the backport PRs that bring it back to dev (main -> dev while beta is skipped, else
+// the backport PRs that bring it back to dev, with auto-merge (main -> dev while beta is skipped, else
 // main -> beta, then beta -> dev once that one is merged). The tag is pushed with the App token, so its push event runs
 // release.yml, the single publication path (it reads the PR's notes itself). After a beta, the beta -> main
 // promotion is retitled by publish.yml's own job, in the promote-beta concurrency group, not here.
@@ -34,31 +34,49 @@ function isBackportToBeta(pr, repository) {
   return pr.headRepo === repository && pr.head === "main" && pr.base === "beta" && pr.labels?.includes("backport");
 }
 
-function backportBody(tag, pr, from, to) {
+function backportBody(tag, pr, from, to, autoMerge) {
   return (
     `Report de \`${tag}\` (#${pr.number}) de \`${from}\` vers \`${to}\`.\n\n` +
-    `Fusionne cette PR par commit de merge pour ramener la release sur \`${to}\` ; tant qu'elle est ` +
-    `ouverte, la promotion depuis et vers \`${to}\` est refusée.\n`
+    (autoMerge
+      ? `L'auto-merge est activé : la PR se fusionne d'elle-même (commit de merge) dès que les checks passent`
+      : `Fusionne cette PR par commit de merge pour ramener la release sur \`${to}\``) +
+    ` ; tant qu'elle est ouverte, la promotion depuis et vers \`${to}\` est refusée.\n`
   );
 }
 
+/** Auto-merge (merge commit) pinned to the backport's head; a failure leaves the merge to the owner. */
+async function autoMergeBackport(gh, created, title) {
+  try {
+    await gh.enableAutoMerge(created, { expectedHeadOid: created.headSha, commitHeadline: title });
+    return true;
+  } catch (error) {
+    console.warn(`::warning::#${created.number}: could not enable auto-merge: ${error.message}`);
+    return false;
+  }
+}
+
 /**
- * Opens the backport PR `from` -> `to` unless one is open (it is reused) or there is nothing to bring.
+ * Opens the backport PR `from` -> `to`, with auto-merge, unless one is open (it is reused) or there is
+ * nothing to bring.
  * -> {number} when opened, {pending: true} when one is already open, null when there is nothing to bring.
  */
 async function openBackport(gh, tag, pr, from, to) {
   const [open, commits] = await Promise.all([gh.listPulls({ base: to, head: from }), gh.compareCommits(to, from)]);
   if (open.length) return { pending: true };
   if (commits.length === 0) return null;
+  const title = `chore(release): backport ${tag} to ${to}`;
   const created = await gh.createPull({
-    title: `chore(release): backport ${tag} to ${to}`,
+    title,
     base: to,
     head: from,
     draft: false,
     labels: ["backport"],
-    body: backportBody(tag, pr, from, to),
+    body: backportBody(tag, pr, from, to, true),
   });
   console.log(`opened the backport #${created.number} ${from} -> ${to}`);
+  if (!(await autoMergeBackport(gh, created, title))) {
+    await gh.updatePull(created.number, { body: backportBody(tag, pr, from, to, false) });
+  }
   return { number: created.number };
 }
 
