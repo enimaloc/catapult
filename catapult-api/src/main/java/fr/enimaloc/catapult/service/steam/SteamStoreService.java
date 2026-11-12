@@ -28,6 +28,14 @@ public interface SteamStoreService {
     Map<String, SteamTwSignals> fetchTwSignals(Collection<String> appIds);
 
     /**
+     * Until when the Steam store asked to be left alone (a 429): it isn't called meanwhile, an app it would have
+     * answered for answering nothing. Empty while it may be called.
+     */
+    default Optional<java.time.Instant> rateLimitedUntil() {
+        return Optional.empty();
+    }
+
+    /**
      * Store-page short description for the given app, in the given locale (mapped to Steam's
      * own language names internally — Steam does not accept ISO codes). Empty when Steam has
      * none in that language or the app doesn't resolve (unknown appId, API failure).

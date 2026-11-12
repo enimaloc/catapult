@@ -4,13 +4,22 @@ import fr.enimaloc.catapult.domain.steam.SteamAppParentEntry;
 import fr.enimaloc.catapult.getter.steam.SteamPlaytestRedirectResolver;
 import fr.enimaloc.catapult.repository.steam.SteamAppParentRepository;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
+import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 
 @Slf4j
@@ -34,6 +43,52 @@ public class SteamStoreServiceImpl implements SteamStoreService {
     private final SteamPlaytestRedirectResolver redirectResolver;
 
     private static final java.time.Duration PARENT_CACHE_TTL = java.time.Duration.ofDays(30);
+
+    /** Without a Retry-After, the first wait after a 429; it doubles while they follow each other, up to the max. */
+    private static final Duration RATE_LIMIT_FIRST = Duration.ofSeconds(60);
+    private static final Duration RATE_LIMIT_MAX = Duration.ofMinutes(10);
+
+    @Setter(AccessLevel.PACKAGE)
+    private Clock clock = Clock.systemUTC();
+    /** Until when the store asked to be left alone; null: it may be called. */
+    private volatile Instant rateLimitedUntil;
+    /** The wait the next 429 without a Retry-After gets: doubled by each, reset by an answer. */
+    private volatile Duration nextWait = RATE_LIMIT_FIRST;
+
+    @Override
+    public Optional<Instant> rateLimitedUntil() {
+        Instant until = rateLimitedUntil;
+        return until != null && until.isAfter(clock.instant()) ? Optional.of(until) : Optional.empty();
+    }
+
+    /** The store answered 429: left alone for its Retry-After (seconds or an HTTP date), else the next wait. */
+    private void onRateLimited(HttpHeaders headers) {
+        Instant now = clock.instant();
+        Duration wait = retryAfter(headers == null ? null : headers.getFirst("Retry-After"), now)
+                .orElse(nextWait);
+        if (wait.compareTo(RATE_LIMIT_MAX) > 0) wait = RATE_LIMIT_MAX;
+        Instant until = now.plus(wait);
+        if (rateLimitedUntil == null || until.isAfter(rateLimitedUntil)) rateLimitedUntil = until;
+        Duration doubled = nextWait.multipliedBy(2);
+        nextWait = doubled.compareTo(RATE_LIMIT_MAX) > 0 ? RATE_LIMIT_MAX : doubled;
+        log.warn("Steam store rate limited (429): left alone until {}", rateLimitedUntil);
+    }
+
+    static Optional<Duration> retryAfter(String header, Instant now) {
+        if (header == null || header.isBlank()) return Optional.empty();
+        String value = header.trim();
+        try {
+            return Optional.of(Duration.ofSeconds(Math.max(1, Long.parseLong(value))));
+        } catch (NumberFormatException notSeconds) {
+            try {
+                Instant at = ZonedDateTime.parse(value,
+                        DateTimeFormatter.RFC_1123_DATE_TIME).toInstant();
+                return Optional.of(at.isAfter(now) ? Duration.between(now, at) : Duration.ofSeconds(1));
+            } catch (DateTimeParseException notADate) {
+                return Optional.empty();
+            }
+        }
+    }
 
     /** One app's entry in an {@code appdetails} response, keyed by appId. */
     record AppDetailsEntry(boolean success, SteamStorePage data) {}
@@ -207,14 +262,22 @@ public class SteamStoreServiceImpl implements SteamStoreService {
                     .map(ResolvedParentApp::appId)
                     .orElse(appId) : appId;
             SteamLanguage lang = SteamLanguage.fromLocale(locale);
+            if (rateLimitedUntil().isPresent()) {
+                log.debug("Steam store left alone (rate limited): no appdetails for appId={}", appId);
+                return Optional.empty();
+            }
             try {
                 Map<String, AppDetailsEntry> response = restClient.get()
                         .uri(APP_DETAILS_URL + "?appids=" + effectiveAppId + "&l=" + lang)
                         .retrieve()
                         .body(new ParameterizedTypeReference<>() {});
+                nextWait = RATE_LIMIT_FIRST;
                 AppDetailsEntry entry = response == null ? null : response.get(effectiveAppId);
                 if (entry == null || !entry.success()) return Optional.empty();
                 return Optional.ofNullable(entry.data());
+            } catch (HttpClientErrorException.TooManyRequests e) {
+                onRateLimited(e.getResponseHeaders());
+                return Optional.empty();
             } catch (Exception e) {
                 log.warn("Steam fetchData failed for appId={}: {}", appId, e.getMessage(), e);
                 return Optional.empty();
@@ -229,6 +292,7 @@ public class SteamStoreServiceImpl implements SteamStoreService {
                     .map(ResolvedParentApp::appId)
                     .orElse(appId);
             SteamLanguage lang = SteamLanguage.fromLocale(locale);
+            if (rateLimitedUntil().isPresent()) return Optional.empty();
             try {
                 String response = restClient.get()
                         .uri("https://store.steampowered.com/app/" + effectiveAppId + "?l=" + lang)
@@ -236,6 +300,9 @@ public class SteamStoreServiceImpl implements SteamStoreService {
                         .body(String.class);
                 if (response == null || response.isBlank()) return Optional.empty();
                 return Optional.of(response);
+            } catch (HttpClientErrorException.TooManyRequests e) {
+                onRateLimited(e.getResponseHeaders());
+                return Optional.empty();
             } catch (Exception e) {
                 log.warn("Steam fetchIADisclosure failed for appId={}: {}", appId, e.getMessage(), e);
                 return Optional.empty();

@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -36,17 +37,30 @@ public class TwResolverService {
         String sourceName
     ) {}
 
+    /**
+     * The TWs suggested, and until when the Steam store was rate limited when a Steam game's signals were asked for
+     * (empty: they came, or weren't needed): without them, the TWs miss what Steam would have added.
+     */
+    public record Suggestion(Set<String> tws, Optional<Instant> steamLimitedUntil) {}
+
     /** Computes the set of TW slugs that should be pre-activated for this binding input. */
     public Set<String> suggest(SuggestInput in) {
+        return suggestReporting(in).tws();
+    }
+
+    /** As {@link #suggest}, telling when the Steam signals were missed because the store was rate limited. */
+    public Suggestion suggestReporting(SuggestInput in) {
         Set<String> out = new HashSet<>();
+        Optional<Instant> steamLimitedUntil = Optional.empty();
 
         if (in.igdbDescriptorIds() != null && !in.igdbDescriptorIds().isEmpty()) {
             out.addAll(igdbRepo.findTwIdsByDescriptorIds(in.igdbDescriptorIds()));
         }
 
         if (in.steamAppId() != null) {
-            SteamTwSignals s = steamStoreService.fetchTwSignals(List.of(in.steamAppId()))
-                .getOrDefault(in.steamAppId(), SteamTwSignals.empty());
+            Map<String, SteamTwSignals> signals = steamStoreService.fetchTwSignals(List.of(in.steamAppId()));
+            if (!signals.containsKey(in.steamAppId())) steamLimitedUntil = steamStoreService.rateLimitedUntil();
+            SteamTwSignals s = signals.getOrDefault(in.steamAppId(), SteamTwSignals.empty());
             if (!s.contentDescriptorIds().isEmpty()) {
                 out.addAll(steamIdRepo.findTwIdsBySteamContentIdIn(s.contentDescriptorIds()));
             }
@@ -68,6 +82,6 @@ public class TwResolverService {
             }
         });
 
-        return out;
+        return new Suggestion(out, steamLimitedUntil);
     }
 }
