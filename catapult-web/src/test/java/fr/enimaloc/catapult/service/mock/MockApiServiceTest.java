@@ -1285,6 +1285,15 @@ class MockApiServiceTest {
     }
 
     @Test
+    void rateLimits_areTheMocksStore() {
+        var host = "HOST store.steampowered.com";
+        assertThat(service.adminRateLimits()).hasSize(4);
+        assertThat(service.adminCorrectRateLimit(host,
+                new fr.enimaloc.catapult.common.dto.admin.LearnedRateLimitCorrectionDto(25, 60, 30, null))).isEqualTo(200);
+        assertThat(service.adminResetRateLimit(host)).isEqualTo(200);
+    }
+
+    @Test
     void twDetailsAndDtddTopics_areTheMocks() {
         String bindingId = service.channelPage("enimaloc", 0, null, null).bindings().content().getFirst().id();
         assertThat(service.twDetails(bindingId)).isNotNull();

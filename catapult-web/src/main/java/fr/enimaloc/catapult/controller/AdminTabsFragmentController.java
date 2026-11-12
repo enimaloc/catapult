@@ -412,6 +412,15 @@ public class AdminTabsFragmentController {
         });
     }
 
+    /** The rate limits learned from the platforms' 429s: each host, then its routes. */
+    @GetMapping("/rate-limits")
+    String rateLimits(Model model, HttpServletResponse response) {
+        return guarded(model, response, () -> {
+            model.addAttribute("limits", apiService.adminRateLimits());
+            return "pages/admin-tab/rate-limits :: list";
+        });
+    }
+
     @GetMapping("/groups")
     String groups(Model model, HttpServletResponse response) {
         return guarded(model, response, () -> {

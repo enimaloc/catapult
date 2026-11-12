@@ -1136,6 +1136,27 @@ class RealApiServiceTest {
     }
 
     @Test
+    void adminRateLimits_areListedCorrectedAndReset() {
+        respond(HttpMethod.GET, "/api/internal/admin/rate-limits",
+                "[{\"id\":\"HOST store.steampowered.com\",\"host\":\"store.steampowered.com\",\"scopePinned\":false,"
+                        + "\"limitCalls\":20,\"limitWindowSeconds\":60,\"limitCorrected\":false,\"resumeMs\":60000,"
+                        + "\"resumeCorrected\":false,\"rateLimitedCount\":1,\"usedCalls\":3}]");
+        expect(HttpMethod.PUT, "/api/internal/admin/rate-limits/entry?id=HOST%20store.steampowered.com")
+                .andRespond(withSuccess("{\"id\":\"HOST store.steampowered.com\",\"host\":\"store.steampowered.com\"}",
+                        MediaType.APPLICATION_JSON));
+        expect(HttpMethod.DELETE, "/api/internal/admin/rate-limits/entry?id=HOST%20store.steampowered.com")
+                .andRespond(withStatus(HttpStatus.NOT_FOUND));
+
+        var limits = service.adminRateLimits();
+        assertThat(limits).hasSize(1);
+        assertThat(limits.getFirst().limitCalls()).isEqualTo(20);
+        assertThat(limits.getFirst().hostScope()).isTrue();
+        assertThat(service.adminCorrectRateLimit("HOST store.steampowered.com",
+                new fr.enimaloc.catapult.common.dto.admin.LearnedRateLimitCorrectionDto(20, 60, null, null))).isEqualTo(200);
+        assertThat(service.adminResetRateLimit("HOST store.steampowered.com")).isEqualTo(404);
+    }
+
+    @Test
     void adminDeleteCacheEntry_relaysTheStatus() {
         expect(HttpMethod.DELETE, "/api/internal/admin/caches/igdb-game-cache?key=1001").andRespond(withNoContent());
         expect(HttpMethod.DELETE, "/api/internal/admin/caches/tw-known-paths?key=x").andRespond(withStatus(HttpStatus.BAD_REQUEST));

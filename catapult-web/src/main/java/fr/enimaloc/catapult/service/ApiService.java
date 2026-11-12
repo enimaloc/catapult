@@ -8,6 +8,8 @@ import java.util.UUID;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import fr.enimaloc.catapult.service.http.ApiError;
 import fr.enimaloc.catapult.common.dto.*;
+import fr.enimaloc.catapult.common.dto.admin.LearnedRateLimitCorrectionDto;
+import fr.enimaloc.catapult.common.dto.admin.LearnedRateLimitDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminCclPage;
@@ -376,6 +378,16 @@ public interface ApiService {
     ApiClient.Result<DtddRefetchJobDto> adminStartDtddRefetch();
     /** catapult-api's status (200) and the refetch asked to stop, 502 when unreachable. */
     ApiClient.Result<DtddRefetchJobDto> adminCancelDtddRefetch();
+
+    /** The rate limits catapult-api learned from the platforms' 429s, hosts then their routes; null when it fails. */
+    List<LearnedRateLimitDto> adminRateLimits();
+    /**
+     * Corrects a learned rate limit ({@code id}: the scope's): catapult-api's status (200; 400 an invalid correction;
+     * 404 unknown), 502 when unreachable.
+     */
+    int adminCorrectRateLimit(String id, LearnedRateLimitCorrectionDto correction);
+    /** Forgets what was learned and corrected of a rate limit: catapult-api's status (200; 404 unknown), 502 when unreachable. */
+    int adminResetRateLimit(String id);
 
     /** The member groups, with their member counts; null when catapult-api fails. */
     List<GroupSummaryDto> adminGroups();
