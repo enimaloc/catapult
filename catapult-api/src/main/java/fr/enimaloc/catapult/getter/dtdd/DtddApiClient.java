@@ -19,6 +19,14 @@ public interface DtddApiClient {
 
     Optional<DtddItem> item(long dtddId);
 
+    /**
+     * The same calls, made only with keys that keep more than {@code monthlyReserve} requests of their month (none
+     * left: they answer empty) — for bulk work, which must leave the reserve to the detection.
+     */
+    default DtddApiClient reserving(int monthlyReserve) {
+        return this;
+    }
+
     record DtddSearchResult(long dtddId, String name, String slug, String mediaType, String posterUrl) {}
 
     record DtddTopics(List<String> yesTopics, List<String> noTopics, List<String> mostlyTopics) {}

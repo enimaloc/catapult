@@ -172,4 +172,27 @@ class RealDtddApiClientTest {
         assertThat(new DtddApiClient.DtddSeverity(levels, List.of(), List.of(), 0, 4).verifiedLevel()).isEmpty();
         assertThat(new DtddApiClient.DtddSeverity(levels, List.of(), List.of(), 0, 1).verifiedLevel()).contains("Mild");
     }
+
+    @Test
+    void everyAnswer_tellsTheRotatorWhatIsLeftOfTheKey() {
+        when(rotator.nextKey()).thenReturn(Optional.of("KEY_A"));
+        server.enqueue(new MockResponse()
+            .setHeader("Content-Type", "application/json")
+            .setHeader("X-RateLimit-Remaining-Minute", "28")
+            .setHeader("X-RateLimit-Remaining-Month", "4321")
+            .setBody("[]"));
+
+        client.search("x", null);
+
+        verify(rotator).onQuota("KEY_A", 28, 4321);
+    }
+
+    @Test
+    void aReservingView_takesOnlyKeysAboveTheReserve_andAnswersEmptyWithoutOne() {
+        when(rotator.nextKeyAbove(500)).thenReturn(Optional.empty());
+
+        assertThat(client.reserving(500).item(1L)).isEmpty();
+        assertThat(server.getRequestCount()).isZero();
+        verify(rotator, never()).nextKey();
+    }
 }
