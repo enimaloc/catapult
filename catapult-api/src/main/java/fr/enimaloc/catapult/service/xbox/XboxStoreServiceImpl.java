@@ -35,8 +35,8 @@ public class XboxStoreServiceImpl implements XboxStoreService {
                         ? "en-US" : locale.toLanguageTag();
                 String market = locale != null && !locale.getCountry().isBlank() ? locale.getCountry() : "US";
                 DisplayCatalogResponse response = restClient.get()
-                        .uri(DISPLAY_CATALOG_URL + productId + "?market=" + market
-                                + "&languages=" + languageTag + "&fieldsTemplate=Details")
+                        .uri(DISPLAY_CATALOG_URL + "{productId}?market={market}&languages={languages}"
+                                + "&fieldsTemplate=Details", productId, market, languageTag)
                         .retrieve()
                         .body(DisplayCatalogResponse.class);
                 if (response == null || response.product() == null) {
