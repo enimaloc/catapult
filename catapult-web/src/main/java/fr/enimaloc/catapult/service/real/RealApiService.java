@@ -1005,20 +1005,21 @@ public class RealApiService implements ApiService {
 
     @Override
     public AdminPage<DtddTopicsCacheEntryDto> adminDtddTopicsCache(String q, int page) {
-        return client.get(DTDD_CACHE_PAGE, DTDD_TOPICS, "topics", q == null ? "" : q, page);
+        return client.get("/api/internal/admin/dtdd-caches/{kind}?q={q}&page={page}&size=20", DTDD_TOPICS, "topics",
+                q == null ? "" : q, page);
     }
 
     @Override
     public AdminPage<DtddGameCacheEntryDto> adminDtddGamesCache(String q, int page) {
-        return client.get(DTDD_CACHE_PAGE, DTDD_GAMES, "games", q == null ? "" : q, page);
+        return client.get("/api/internal/admin/dtdd-caches/{kind}?q={q}&page={page}&size=20", DTDD_GAMES, "games",
+                q == null ? "" : q, page);
     }
 
     @Override
     public AdminPage<DtddSearchCacheEntryDto> adminDtddSearchesCache(String q, int page) {
-        return client.get(DTDD_CACHE_PAGE, DTDD_SEARCHES, "searches", q == null ? "" : q, page);
+        return client.get("/api/internal/admin/dtdd-caches/{kind}?q={q}&page={page}&size=20", DTDD_SEARCHES, "searches",
+                q == null ? "" : q, page);
     }
-
-    private static final String DTDD_CACHE_PAGE = "/api/internal/admin/dtdd-caches/{kind}?q={q}&page={page}&size=20";
 
     @Override
     public int adminRefetchDtddCache(String kind, String key) {
