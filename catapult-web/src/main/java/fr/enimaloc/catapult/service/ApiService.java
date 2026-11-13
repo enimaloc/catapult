@@ -518,10 +518,10 @@ public interface ApiService {
     /** A device-code start: the code when {@code status} is 200, else null and catapult-api's problem (may be null). */
     record MinecraftDeviceCodeStart(int status, MinecraftDeviceCodeDto code, ApiError error) {}
     /**
-     * Polls the device code to enrol a new account ({@code label} null: catapult-api's default):
+     * Polls the device code to enrol a new account:
      * 202 while it isn't confirmed yet, 200 with the account once it is, else the error; 502 when unreachable.
      */
-    ApiClient.Result<Map<String, Object>> adminCreateMinecraftAccount(String deviceCode, String label);
+    ApiClient.Result<Map<String, Object>> adminCreateMinecraftAccount(String deviceCode);
     /** Polls the device code to re-authenticate the account, answered like {@link #adminCreateMinecraftAccount}. */
     ApiClient.Result<Map<String, Object>> adminReauthMinecraftAccount(UUID id, String deviceCode);
 
@@ -531,12 +531,12 @@ public interface ApiService {
      * Stores a bot account and starts its first login: catapult-api's status (202; 400 refused), 502 when unreachable.
      * The credentials travel in the request body only.
      */
-    int adminCreateBattleNetAccount(String label, String email, String password);
+    int adminCreateBattleNetAccount(String email, String password);
     /** Submits the 2FA code of a login waiting for one: 202; 409 when none is waiting; 404 unknown; 502 when unreachable. */
     int adminSubmitBattleNetCode(UUID id, String code);
     /** Re-runs the account's login: 202; 409 while a login is running; 404 unknown; 502 when unreachable. */
     int adminReauthBattleNetAccount(UUID id);
-    /** PATCHes a bot ({@code label}, {@code fillOrder}, {@code enabled}, {@code password}, {@code friendLimitReached}): 200; 409; 404; 502. */
+    /** PATCHes a bot ({@code fillOrder}, {@code enabled}, {@code password}, {@code friendLimitReached}): 200; 409; 404; 502. */
     int adminPatchBattleNetAccount(UUID id, Map<String, Object> patch);
     /** Deletes a bot account: 204; 404 unknown; 502 when unreachable. */
     int adminDeleteBattleNetAccount(UUID id);

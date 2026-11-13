@@ -18,9 +18,6 @@ public class MinecraftServiceAccount {
     private UUID id;
 
     @Column(nullable = false)
-    private String label;
-
-    @Column(nullable = false)
     private String minecraftUsername;
 
     /** MSA refresh token, encrypted through TokenEncryptionService. */

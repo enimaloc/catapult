@@ -52,7 +52,6 @@ class BattleNetServiceAccountAdminTest {
     @BeforeEach
     void setUp() {
         account.setId(UUID.randomUUID());
-        account.setLabel("bot-1");
         account.setEmail("bot-mailbox@example.com");
         account.setPasswordEnc("enc:old");
         account.setStorageStateEnc("enc:state");
@@ -75,13 +74,44 @@ class BattleNetServiceAccountAdminTest {
             return saved;
         });
 
-        AccountDto dto = admin.create("bot-2", "mail@example.com", "s3cret");
+        AccountDto dto = admin.create("mail@example.com", "s3cret");
 
         verify(accounts).save(org.mockito.ArgumentMatchers.argThat(saved ->
                 saved.getPasswordEnc().equals("enc:s3cret") && saved.getEmail().equals("mail@example.com")
                         && saved.getAuthState() == AuthState.NEW));
         verify(coordinator).startInteractive(account.getId());
         assertThat(dto.authState()).isEqualTo("NEW");
+        // no BattleTag before the first login: the masked e-mail stands in
+        assertThat(dto.displayName()).isEqualTo("m***@example.com");
+        assertThat(dto.battleTag()).isNull();
+    }
+
+    @Test
+    void createNeedsAnEmailAndAPassword() {
+        assertThatThrownBy(() -> admin.create(" ", "s3cret"))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
+        assertThatThrownBy(() -> admin.create("mail@example.com", null))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
+    }
+
+    @Test
+    void displayNamePrefersTheBattleTag() {
+        assertThat(admin.list()).singleElement().satisfies(dto -> assertThat(dto.displayName()).isEqualTo("Bot#1234"));
+        assertThat(BattleNetServiceAccountAdmin.displayName("Bot#1234", "bot@example.com")).isEqualTo("Bot#1234");
+        assertThat(BattleNetServiceAccountAdmin.displayName(null, "bot@example.com")).isEqualTo("b***@example.com");
+        assertThat(BattleNetServiceAccountAdmin.displayName(" ", "bot@example.com")).isEqualTo("b***@example.com");
+        assertThat(BattleNetServiceAccountAdmin.displayName(null, null)).isNull();
+    }
+
+    @Test
+    void maskEmailKeepsTheFirstCharacterAndTheDomain() {
+        assertThat(BattleNetServiceAccountAdmin.maskEmail("bot-mailbox@example.com")).isEqualTo("b***@example.com");
+        assertThat(BattleNetServiceAccountAdmin.maskEmail("b@example.com")).isEqualTo("b***@example.com");
+        assertThat(BattleNetServiceAccountAdmin.maskEmail(null)).isNull();
+        assertThat(BattleNetServiceAccountAdmin.maskEmail("")).isNull();
+        assertThat(BattleNetServiceAccountAdmin.maskEmail("   ")).isNull();
     }
 
     @Test
@@ -212,11 +242,12 @@ class BattleNetServiceAccountAdminTest {
 
     @Test
     void updateEditsPlainFieldsWithoutLoggingIn() {
-        admin.update(account.getId(),
+        // a legacy label is ignored, like any unknown field
+        AccountDto dto = admin.update(account.getId(),
                 Map.of("label", "renamed", "fillOrder", 4, "friendLimitReached", false, "enabled", true));
 
-        assertThat(account.getLabel()).isEqualTo("renamed");
         assertThat(account.getFillOrder()).isEqualTo(4);
+        assertThat(dto.displayName()).isEqualTo("Bot#1234");
         verify(coordinator, never()).startInteractive(any());
     }
 
@@ -235,17 +266,17 @@ class BattleNetServiceAccountAdminTest {
             return inv.getArgument(0);
         });
 
-        AccountDto dto = admin.update(account.getId(), Map.of("label", "renamed"));
+        AccountDto dto = admin.update(account.getId(), Map.of("fillOrder", 7));
 
         assertThat(saves.get()).isEqualTo(2);
-        assertThat(dto.label()).isEqualTo("renamed");
+        assertThat(dto.fillOrder()).isEqualTo(7);
     }
 
     @Test
     void updateThatKeepsConflictingIsA409() {
         when(accounts.save(any())).thenThrow(conflict());
 
-        assertThatThrownBy(() -> admin.update(account.getId(), Map.of("label", "renamed")))
+        assertThatThrownBy(() -> admin.update(account.getId(), Map.of("fillOrder", 7)))
                 .isInstanceOfSatisfying(ResponseStatusException.class,
                         e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
     }
@@ -282,7 +313,7 @@ class BattleNetServiceAccountAdminTest {
         when(coordinator.startInteractive(any())).thenReturn(
                 CompletableFuture.failedFuture(new IllegalStateException("executor shut down")));
 
-        AccountDto dto = admin.create("bot-2", "mail@example.com", "s3cret");
+        AccountDto dto = admin.create("mail@example.com", "s3cret");
 
         assertThat(dto.authState()).isEqualTo("AUTH_FAILED");
         verify(accounts, org.mockito.Mockito.times(2)).save(any());

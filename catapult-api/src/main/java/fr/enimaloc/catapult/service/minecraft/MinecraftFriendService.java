@@ -92,7 +92,7 @@ public class MinecraftFriendService {
                 }
             } else {
                 log.warn("No token for {} — re-enrolling without removeFriend on the API side",
-                        existing.getServiceAccount().getLabel());
+                        existing.getServiceAccount().getMinecraftUsername());
             }
         }
 
@@ -107,7 +107,7 @@ public class MinecraftFriendService {
             } catch (HttpClientErrorException e) {
                 if (isInviteRejected(e)) {
                     log.info("Minecraft invite rejected by the player (privacy) for {} via {}",
-                            profile.name(), account.getLabel());
+                            profile.name(), account.getMinecraftUsername());
                     MinecraftFriendLink link = existing != null ? existing : new MinecraftFriendLink();
                     link.setUser(user);
                     link.setServiceAccount(account);
@@ -121,7 +121,7 @@ public class MinecraftFriendService {
                 }
                 // The limit error code is undocumented: any 4xx (other than INVITE_REJECTED) on the
                 // add is treated as the limit being reached, and the body is logged to refine this.
-                log.warn("addFriend refused for {} ({}): {}", account.getLabel(),
+                log.warn("addFriend refused for {} ({}): {}", account.getMinecraftUsername(),
                         e.getStatusCode(), e.getResponseBodyAsString());
                 limitMarker.markFull(account);
                 continue;
@@ -241,7 +241,7 @@ public class MinecraftFriendService {
                 friendsList = debug.batch(FRIENDS_OPERATION, membersOf(links), BatchDebugFilter::minecraftFriends,
                         () -> minecraftService.getFriends(accessToken));
             } catch (Exception e) {
-                log.warn("getFriends failed for {}: {}", account.getLabel(), e.getMessage());
+                log.warn("getFriends failed for {}: {}", account.getMinecraftUsername(), e.getMessage());
                 continue;
             }
 
@@ -268,18 +268,18 @@ public class MinecraftFriendService {
                 if (friend != null && link.getStatus() == MinecraftFriendLink.Status.PENDING) {
                     link.setStatus(MinecraftFriendLink.Status.ACCEPTED);
                     link.setAcceptedAt(Instant.now());
-                    log.info("Minecraft link accepted: {} via {}", link.getMinecraftName(), account.getLabel());
+                    log.info("Minecraft link accepted: {} via {}", link.getMinecraftName(), account.getMinecraftUsername());
                     changed = true;
                 } else if (friend == null && link.getStatus() == MinecraftFriendLink.Status.ACCEPTED) {
                     link.setStatus(MinecraftFriendLink.Status.REMOVED);
-                    log.info("Minecraft link removed by the player: {} via {}", link.getMinecraftName(), account.getLabel());
+                    log.info("Minecraft link removed by the player: {} via {}", link.getMinecraftName(), account.getMinecraftUsername());
                     changed = true;
                 } else if (link.getStatus() == MinecraftFriendLink.Status.INVITE_REJECTED) {
                     if (friend != null) {
                         link.setStatus(MinecraftFriendLink.Status.ACCEPTED);
                         link.setAcceptedAt(Instant.now());
                         log.info("Minecraft link accepted (after an initial rejection): {} via {}",
-                                link.getMinecraftName(), account.getLabel());
+                                link.getMinecraftName(), account.getMinecraftUsername());
                         changed = true;
                     } else {
                         MinecraftService.FriendsList.Friend incoming =
@@ -291,11 +291,11 @@ public class MinecraftFriendService {
                                 link.setStatus(MinecraftFriendLink.Status.ACCEPTED);
                                 link.setAcceptedAt(Instant.now());
                                 log.info("Minecraft link accepted (retry after a manual invite): {} via {}",
-                                        link.getMinecraftName(), account.getLabel());
+                                        link.getMinecraftName(), account.getMinecraftUsername());
                                 changed = true;
                             } catch (Exception retryFailure) {
                                 log.info("addFriend retry still refused for {} via {}: {}",
-                                        link.getMinecraftName(), account.getLabel(), retryFailure.getMessage());
+                                        link.getMinecraftName(), account.getMinecraftUsername(), retryFailure.getMessage());
                             }
                         }
                     }
@@ -345,7 +345,7 @@ public class MinecraftFriendService {
             }
         } else {
             log.warn("No token for {} — link {} deleted without removeFriend on the API side",
-                    link.getServiceAccount().getLabel(), link.getMinecraftProfileId());
+                    link.getServiceAccount().getMinecraftUsername(), link.getMinecraftProfileId());
         }
         linkRepository.delete(link);
     }

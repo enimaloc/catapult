@@ -30,14 +30,15 @@ class MockMinecraftAccountsStoreTest {
         assertThat(code.verificationUri()).startsWith("https://");
         int before = store.list().size();
 
-        assertThat(store.create(code.deviceCode(), "Bot9").status()).isEqualTo(202);
-        var done = store.create(code.deviceCode(), "Bot9");
+        assertThat(store.create(code.deviceCode()).status()).isEqualTo(202);
+        var done = store.create(code.deviceCode());
 
         assertThat(done.status()).isEqualTo(200);
-        assertThat(done.body()).containsEntry("label", "Bot9").containsKey("minecraftUsername");
-        assertThat(store.list()).hasSize(before + 1).anyMatch(a -> a.label().equals("Bot9") && a.enabled());
-        assertThat(store.create(code.deviceCode(), "Bot9").status()).isEqualTo(400); // a used code is gone
-        assertThat(store.create("never-issued", "x").status()).isEqualTo(400);
+        String name = (String) done.body().get("minecraftUsername");
+        assertThat(done.body()).containsEntry("displayName", name);
+        assertThat(store.list()).hasSize(before + 1).anyMatch(a -> a.displayName().equals(name) && a.enabled());
+        assertThat(store.create(code.deviceCode()).status()).isEqualTo(400); // a used code is gone
+        assertThat(store.create("never-issued").status()).isEqualTo(400);
     }
 
     @Test

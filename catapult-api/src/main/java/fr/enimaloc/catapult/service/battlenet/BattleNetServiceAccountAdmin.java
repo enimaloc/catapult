@@ -39,10 +39,11 @@ import java.util.function.Supplier;
 public class BattleNetServiceAccountAdmin {
 
     /**
-     * What the admin UI sees of a bot account: never the e-mail, the password or the browser state.
-     * {@code waitingForCode}: an admin login waits for its 2FA code, so {@link #submitCode} can take one.
+     * What the admin UI sees of a bot account: never the e-mail (only masked, see {@link #displayName}), the
+     * password or the browser state. {@code waitingForCode}: an admin login waits for its 2FA code, so
+     * {@link #submitCode} can take one.
      */
-    public record AccountDto(UUID id, String label, String battleTag, String authState, String sessionState,
+    public record AccountDto(UUID id, String displayName, String battleTag, String authState, String sessionState,
                              int fillOrder, boolean friendLimitReached, boolean enabled, long friendCount,
                              boolean waitingForCode) {}
 
@@ -59,19 +60,17 @@ public class BattleNetServiceAccountAdmin {
     }
 
     /** Stores the account with encrypted credentials and starts its interactive login in the background. */
-    public AccountDto create(String label, String email, String password) {
-        requireText(label, "label");
+    public AccountDto create(String email, String password) {
         requireText(email, "email");
         requireText(password, "password");
         BattleNetServiceAccount account = new BattleNetServiceAccount();
-        account.setLabel(label);
         account.setEmail(email);
         account.setPasswordEnc(encryption.encrypt(password));
         account.setAuthState(AuthState.NEW);
         account.setFillOrder((int) accountRepository.count());
         account.setUpdatedAt(Instant.now());
         BattleNetServiceAccount saved = accountRepository.save(account);
-        log.info("Battle.net service account created: {}", saved.getLabel());
+        log.info("Battle.net service account created: {}", saved.getId());
         if (!startLogin(saved.getId())) {
             // the account is stored: the admin can re-authenticate it, so a refused start is not a failed create
             saved.setAuthState(AuthState.AUTH_FAILED);
@@ -110,9 +109,6 @@ public class BattleNetServiceAccountAdmin {
         BattleNetServiceAccount saved = withRetry(() -> {
             BattleNetServiceAccount account = findOrThrow(id);
             enabledChanged[0] = false;
-            if (body.containsKey("label")) {
-                account.setLabel(requireText(field(body, "label", String.class), "label"));
-            }
             if (body.containsKey("enabled")) {
                 boolean enabled = field(body, "enabled", Boolean.class);
                 enabledChanged[0] = enabled != account.isEnabled();
@@ -169,7 +165,7 @@ public class BattleNetServiceAccountAdmin {
             accountRepository.delete(account);
             return account;
         });
-        log.info("Battle.net service account deleted: {} ({} link(s) dropped)", deleted.getLabel(), owners.size());
+        log.info("Battle.net service account deleted: {} ({} link(s) dropped)", deleted.getId(), owners.size());
         owners.forEach(owner -> channelEventPublisher.battleNetLinkChanged(owner, "NONE", null, null));
     }
 
@@ -233,10 +229,25 @@ public class BattleNetServiceAccountAdmin {
 
     /** The friend count is the ACCEPTED links in the database, so it needs no live session. */
     private AccountDto toDto(BattleNetServiceAccount account) {
-        return new AccountDto(account.getId(), account.getLabel(), account.getBattleTag(),
+        return new AccountDto(account.getId(), displayName(account.getBattleTag(), account.getEmail()),
+                account.getBattleTag(),
                 account.getAuthState().name(), sessionManager.sessionState(account.getId()),
                 account.getFillOrder(), account.isFriendLimitReached(), account.isEnabled(),
                 linkRepository.countByServiceAccountAndStatus(account, BattleNetFriendLink.Status.ACCEPTED),
                 loginCoordinator.waitingForCode(account.getId()));
+    }
+
+    /** The BattleTag once known; before the first login the masked e-mail; null without either. */
+    static String displayName(String battleTag, String email) {
+        return battleTag != null && !battleTag.isBlank() ? battleTag : maskEmail(email);
+    }
+
+    /** {@code bot@example.com} → {@code b***@example.com}: enough to tell the bots apart, never the whole address. */
+    static String maskEmail(String email) {
+        if (email == null || email.isBlank()) return null;
+        String trimmed = email.trim();
+        int at = trimmed.lastIndexOf('@');
+        String first = trimmed.substring(0, 1);
+        return at <= 0 ? first + "***" : first + "***" + trimmed.substring(at);
     }
 }

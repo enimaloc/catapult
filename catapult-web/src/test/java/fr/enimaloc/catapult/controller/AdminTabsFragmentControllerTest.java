@@ -959,10 +959,10 @@ class AdminTabsFragmentControllerTest {
         assertThat(asAdmin("/spa/admin/keys")).contains("admin-placeholder").doesNotContain("admin-keys-add-save");
     }
 
-    private static fr.enimaloc.catapult.common.dto.admin.AccountDto account(String id, String label, long links,
+    private static fr.enimaloc.catapult.common.dto.admin.AccountDto account(String id, String name, long links,
             boolean enabled, boolean full) {
-        return new fr.enimaloc.catapult.common.dto.admin.AccountDto(java.util.UUID.fromString(id), label,
-                label + "_mc", 0, full, enabled, (int) links);
+        return new fr.enimaloc.catapult.common.dto.admin.AccountDto(java.util.UUID.fromString(id), name + "_mc",
+                name + "_mc", 0, full, enabled, (int) links);
     }
 
     @Test
@@ -975,8 +975,11 @@ class AdminTabsFragmentControllerTest {
 
         String html = asAdmin("/spa/admin/keys").replaceAll("\\s+", " ");
 
-        assertThat(html).contains("id=\"admin-minecraft\"", "Act&lt;ive&gt;", "Off_mc", "admin-minecraft-add",
+        assertThat(html).contains("id=\"admin-minecraft\"", "Act&lt;ive&gt;_mc", "Off_mc", "admin-minecraft-add",
                 "Minecraft service accounts");
+        // shown by its Minecraft username alone: no label column nor label field
+        String card = html.substring(html.indexOf("id=\"admin-minecraft\""), html.indexOf("id=\"admin-battlenet\""));
+        assertThat(card).doesNotContain("name=\"label\"", ">Label<");
         // the state chips themselves: enabled ×2, disabled ×1, full ×1 (not the seeded "Full" label)
         assertThat(html.split("<mdui-chip icon=\"check_circle\">Enabled</mdui-chip>", -1)).hasSize(3);
         assertThat(html.split("<mdui-chip icon=\"block\">Disabled</mdui-chip>", -1)).hasSize(2);
@@ -991,14 +994,14 @@ class AdminTabsFragmentControllerTest {
         assertThat(html.split("admin-minecraft-delete\"", -1)).hasSize(4);
     }
 
-    private static fr.enimaloc.catapult.common.dto.admin.BattleNetAccountDto bot(String id, String label, String tag,
+    private static fr.enimaloc.catapult.common.dto.admin.BattleNetAccountDto bot(String id, String displayName, String tag,
             String auth, String session, boolean enabled, boolean full) {
-        return bot(id, label, tag, auth, session, enabled, full, "CODE_REQUIRED".equals(auth));
+        return bot(id, displayName, tag, auth, session, enabled, full, "CODE_REQUIRED".equals(auth));
     }
 
-    private static fr.enimaloc.catapult.common.dto.admin.BattleNetAccountDto bot(String id, String label, String tag,
+    private static fr.enimaloc.catapult.common.dto.admin.BattleNetAccountDto bot(String id, String displayName, String tag,
             String auth, String session, boolean enabled, boolean full, boolean waitingForCode) {
-        return new fr.enimaloc.catapult.common.dto.admin.BattleNetAccountDto(java.util.UUID.fromString(id), label, tag, auth,
+        return new fr.enimaloc.catapult.common.dto.admin.BattleNetAccountDto(java.util.UUID.fromString(id), displayName, tag, auth,
                 session, 0, full, enabled, 4, waitingForCode);
     }
 
@@ -1007,11 +1010,13 @@ class AdminTabsFragmentControllerTest {
         when(apiService.adminApiKeys(org.mockito.ArgumentMatchers.any())).thenReturn(keys(true));
         when(apiService.adminBattleNetAccounts()).thenReturn(List.of(
                 bot("00000000-0000-0000-0000-00000000000a", "Ready<b>", "Tag#1", "READY", "READY", true, true),
-                bot("00000000-0000-0000-0000-00000000000b", "Waiting", null, "CODE_REQUIRED", "STOPPED_CODE_REQUIRED", false, false)));
+                bot("00000000-0000-0000-0000-00000000000b", "w***@example.com", null, "CODE_REQUIRED", "STOPPED_CODE_REQUIRED", false, false)));
 
         String html = asAdmin("/spa/admin/keys").replaceAll("\\s+", " ");
 
-        assertThat(html).contains("id=\"admin-battlenet\"", "Battle.net bots", "Ready&lt;b&gt;", "Tag#1", "Add a bot",
+        // each bot shown by its display name (its BattleTag, else its masked e-mail): no label to type or show
+        assertThat(html.substring(html.indexOf("id=\"admin-battlenet\""))).doesNotContain("name=\"label\"", ">Label<");
+        assertThat(html).contains("id=\"admin-battlenet\"", "Battle.net bots", "Ready&lt;b&gt;", "w***@example.com", "Add a bot",
                 "data-auth-state=\"CODE_REQUIRED\"", "2FA code required", "Admin action needed", "account.battle.net");
         // the code field only for the bot waiting for one; the full flag lifts only the full one
         assertThat(html.split("admin-battlenet-code-submit\"", -1)).hasSize(2);

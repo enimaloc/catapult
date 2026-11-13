@@ -1764,9 +1764,9 @@ public class MockApiService implements ApiService {
     }
 
     @Override
-    public int adminCreateBattleNetAccount(String label, String email, String password) {
-        log.trace("adminCreateBattleNetAccount({})", label);
-        return battleNetAccounts.create(label);
+    public int adminCreateBattleNetAccount(String email, String password) {
+        log.trace("adminCreateBattleNetAccount()");
+        return battleNetAccounts.create(email);
     }
 
     @Override
@@ -1818,9 +1818,9 @@ public class MockApiService implements ApiService {
     }
 
     @Override
-    public ApiClient.Result<Map<String, Object>> adminCreateMinecraftAccount(String deviceCode, String label) {
-        log.trace("adminCreateMinecraftAccount({})", label);
-        return minecraftAccounts.create(deviceCode, label);
+    public ApiClient.Result<Map<String, Object>> adminCreateMinecraftAccount(String deviceCode) {
+        log.trace("adminCreateMinecraftAccount()");
+        return minecraftAccounts.create(deviceCode);
     }
 
     @Override

@@ -281,18 +281,18 @@ public class BattleNetSessionManager implements SmartLifecycle {
         }
         Session session = new Session(account);
         sessions.put(account.getId(), session);
-        log.info("Opening the BGS session of Battle.net service account {}", account.getLabel());
+        log.info("Opening the BGS session of Battle.net service account {}", account.getId());
         try {
             starter.execute(session::start);
         } catch (RejectedExecutionException e) {
-            log.warn("Could not start the BGS session of {}: the executor is shut down", account.getLabel());
+            log.warn("Could not start the BGS session of {}: the executor is shut down", account.getId());
         }
     }
 
     private void close(UUID accountId) {
         Session session = sessions.remove(accountId);
         if (session != null) {
-            log.info("Closing the BGS session of Battle.net service account {}", session.label);
+            log.info("Closing the BGS session of Battle.net service account {}", accountId);
             session.stop();
         }
     }
@@ -309,7 +309,7 @@ public class BattleNetSessionManager implements SmartLifecycle {
         }
     }
 
-    private void storeIdentity(UUID accountId, String label, long bnetAccountId, String battleTag) {
+    private void storeIdentity(UUID accountId, long bnetAccountId, String battleTag) {
         try {
             transactions.executeWithoutResult(status -> repository.findById(accountId).ifPresent(account -> {
                 if (Objects.equals(account.getBnetAccountId(), bnetAccountId)
@@ -321,7 +321,7 @@ public class BattleNetSessionManager implements SmartLifecycle {
                 repository.save(account);
             }));
         } catch (RuntimeException e) {
-            log.warn("Could not store the BattleTag of Battle.net service account {}: {}", label, e.toString());
+            log.warn("Could not store the BattleTag of Battle.net service account {}: {}", accountId, e.toString());
         }
     }
 
@@ -329,7 +329,6 @@ public class BattleNetSessionManager implements SmartLifecycle {
     private final class Session implements BgsListener {
 
         private final UUID accountId;
-        private final String label;
         private final BgsClient client;
         private final BgsConnection connection;
         /** Friends whose game this session reported, forgotten when it ends. */
@@ -338,7 +337,6 @@ public class BattleNetSessionManager implements SmartLifecycle {
 
         Session(BattleNetServiceAccount account) {
             this.accountId = account.getId();
-            this.label = account.getLabel();
             this.client = new BgsClient(new BgsClientConfig(host, BGS_PORT, account.getEmail(), LOCALE),
                     coordinator.ticketProviderFor(accountId), this, mintExecutor);
             this.connection = new BgsConnection(client, channels, scheduler, MIN_BACKOFF, MAX_BACKOFF);
@@ -369,8 +367,8 @@ public class BattleNetSessionManager implements SmartLifecycle {
 
         @Override
         public void onReady(long bnetAccountId, String battleTag) {
-            log.info("BGS session of Battle.net service account {} is ready as {}", label, battleTag);
-            handOff("the BattleTag of " + label, () -> storeIdentity(accountId, label, bnetAccountId, battleTag));
+            log.info("BGS session of Battle.net service account {} is ready as {}", accountId, battleTag);
+            handOff("the BattleTag of " + accountId, () -> storeIdentity(accountId, bnetAccountId, battleTag));
         }
 
         @Override
@@ -388,7 +386,7 @@ public class BattleNetSessionManager implements SmartLifecycle {
 
         @Override
         public void onFriend(FriendEvent event) {
-            handOff("a friend event of " + label,
+            handOff("a friend event of " + accountId,
                     () -> events.publishEvent(new BattleNetFriendEventReceived(accountId, event)));
         }
 
@@ -401,15 +399,15 @@ public class BattleNetSessionManager implements SmartLifecycle {
             switch (reason) {
                 case SESSION_REPLACED -> {
                     log.error("BGS session of Battle.net service account {} was replaced by another login on the "
-                            + "same account: not reconnecting", label);
-                    registry.counter(REPLACED_COUNTER, "account", label).increment();
+                            + "same account: not reconnecting", accountId);
+                    registry.counter(REPLACED_COUNTER, "account", accountId.toString()).increment();
                 }
                 case CODE_REQUIRED -> {
                     log.warn("BGS session of Battle.net service account {} stopped: the login needs an admin "
-                            + "(2FA code, rejected login or repeated timeouts)", label);
-                    registry.counter(ADMIN_ACTION_COUNTER, "account", label).increment();
+                            + "(2FA code, rejected login or repeated timeouts)", accountId);
+                    registry.counter(ADMIN_ACTION_COUNTER, "account", accountId.toString()).increment();
                 }
-                default -> log.debug("BGS session of Battle.net service account {} closed: {}", label, reason);
+                default -> log.debug("BGS session of Battle.net service account {} closed: {}", accountId, reason);
             }
         }
     }

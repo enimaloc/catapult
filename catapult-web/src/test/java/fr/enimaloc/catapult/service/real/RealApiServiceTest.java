@@ -1843,12 +1843,12 @@ class RealApiServiceTest {
     @Test
     void adminMinecraftAccounts_readCatapultApisAccountDto() {
         respond(HttpMethod.GET, "/api/internal/admin/minecraft-accounts", "[{\"id\":\"00000000-0000-0000-0000-00000000000a\","
-                + "\"label\":\"Bot1\",\"minecraftUsername\":\"CatapultBot1\",\"fillOrder\":2,\"friendLimitReached\":true,"
+                + "\"displayName\":\"CatapultBot1\",\"minecraftUsername\":\"CatapultBot1\",\"fillOrder\":2,\"friendLimitReached\":true,"
                 + "\"enabled\":false,\"linkCount\":7}]");
 
         assertThat(service.adminMinecraftAccounts()).singleElement().satisfies(a -> {
             assertThat(a.id()).isEqualTo(UUID.fromString("00000000-0000-0000-0000-00000000000a"));
-            assertThat(a.label()).isEqualTo("Bot1");
+            assertThat(a.displayName()).isEqualTo("CatapultBot1");
             assertThat(a.minecraftUsername()).isEqualTo("CatapultBot1");
             assertThat(a.fillOrder()).isEqualTo(2);
             assertThat(a.linkCount()).isEqualTo(7);
@@ -1880,9 +1880,10 @@ class RealApiServiceTest {
     @Test
     void adminBattleNetAccounts_readCatapultApisDto() {
         respond(HttpMethod.GET, "/api/internal/admin/battlenet-accounts", "[{\"id\":\"00000000-0000-0000-0000-00000000000a\","
-                + "\"label\":\"Bot1\",\"battleTag\":\"Bot#1\",\"authState\":\"CODE_REQUIRED\",\"sessionState\":\"STOPPED_CODE_REQUIRED\","
+                + "\"displayName\":\"Bot#1\",\"battleTag\":\"Bot#1\",\"authState\":\"CODE_REQUIRED\",\"sessionState\":\"STOPPED_CODE_REQUIRED\","
                 + "\"fillOrder\":2,\"friendLimitReached\":true,\"enabled\":false,\"friendCount\":7,\"waitingForCode\":true}]");
         assertThat(service.adminBattleNetAccounts()).singleElement().satisfies(a -> {
+            assertThat(a.displayName()).isEqualTo("Bot#1");
             assertThat(a.battleTag()).isEqualTo("Bot#1");
             assertThat(a.authState()).isEqualTo("CODE_REQUIRED");
             assertThat(a.sessionState()).isEqualTo("STOPPED_CODE_REQUIRED");
@@ -1903,7 +1904,7 @@ class RealApiServiceTest {
     void battleNetAccountActions_sendTheirShapes_andReturnTheStatus() {
         UUID id = UUID.fromString("00000000-0000-0000-0000-00000000000a");
         expect(HttpMethod.POST, "/api/internal/admin/battlenet-accounts")
-                .andExpect(content().json("{\"label\":\"Bot\",\"email\":\"b@x.y\",\"password\":\"pw\"}",
+                .andExpect(content().json("{\"email\":\"b@x.y\",\"password\":\"pw\"}",
                         org.springframework.test.json.JsonCompareMode.STRICT))
                 .andRespond(withStatus(HttpStatus.ACCEPTED).contentType(MediaType.APPLICATION_JSON).body("{}"));
         expect(HttpMethod.POST, "/api/internal/admin/battlenet-accounts/" + id + "/code")
@@ -1916,7 +1917,7 @@ class RealApiServiceTest {
                 .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
         expect(HttpMethod.DELETE, "/api/internal/admin/battlenet-accounts/" + id).andRespond(withNoContent());
 
-        assertThat(service.adminCreateBattleNetAccount("Bot", "b@x.y", "pw")).isEqualTo(202);
+        assertThat(service.adminCreateBattleNetAccount("b@x.y", "pw")).isEqualTo(202);
         assertThat(service.adminSubmitBattleNetCode(id, "123456")).isEqualTo(202);
         assertThat(service.adminReauthBattleNetAccount(id)).isEqualTo(409);
         assertThat(service.adminPatchBattleNetAccount(id, Map.of("friendLimitReached", false))).isEqualTo(200);
@@ -1950,17 +1951,17 @@ class RealApiServiceTest {
     void createAndReauth_postTheDeviceCode_andKeepTheStatusAndBody() {
         UUID id = UUID.fromString("00000000-0000-0000-0000-00000000000a");
         expect(HttpMethod.POST, "/api/internal/admin/minecraft-accounts")
-                .andExpect(content().json("{\"deviceCode\":\"dc-1\",\"label\":\"Bot1\"}", org.springframework.test.json.JsonCompareMode.STRICT))
+                .andExpect(content().json("{\"deviceCode\":\"dc-1\"}", org.springframework.test.json.JsonCompareMode.STRICT))
                 .andRespond(withStatus(HttpStatus.ACCEPTED).contentType(MediaType.APPLICATION_JSON).body("{\"status\":\"PENDING\"}"));
         expect(HttpMethod.POST, "/api/internal/admin/minecraft-accounts")
                 .andExpect(content().json("{\"deviceCode\":\"dc-1\"}", org.springframework.test.json.JsonCompareMode.STRICT))
-                .andRespond(withSuccess("{\"label\":\"Compte Minecraft\",\"minecraftUsername\":\"CatapultBot1\"}", MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess("{\"displayName\":\"CatapultBot1\",\"minecraftUsername\":\"CatapultBot1\"}", MediaType.APPLICATION_JSON));
         expect(HttpMethod.POST, "/api/internal/admin/minecraft-accounts/" + id + "/reauth")
                 .andExpect(content().json("{\"deviceCode\":\"dc-2\"}", org.springframework.test.json.JsonCompareMode.STRICT))
                 .andRespond(withStatus(HttpStatus.BAD_GATEWAY).contentType(MediaType.APPLICATION_JSON).body("{\"message\":\"chain failed\"}"));
 
-        assertThat(service.adminCreateMinecraftAccount("dc-1", "Bot1").status()).isEqualTo(202);
-        var created = service.adminCreateMinecraftAccount("dc-1", null);
+        assertThat(service.adminCreateMinecraftAccount("dc-1").status()).isEqualTo(202);
+        var created = service.adminCreateMinecraftAccount("dc-1");
         assertThat(created.status()).isEqualTo(200);
         assertThat(created.body()).containsEntry("minecraftUsername", "CatapultBot1");
         var failed = service.adminReauthMinecraftAccount(id, "dc-2");

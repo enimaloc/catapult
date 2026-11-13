@@ -53,7 +53,7 @@ class MinecraftPresenceGetterTest {
         user = new UserAccount();
         bot1 = new MinecraftServiceAccount();
         bot1.setId(UUID.randomUUID());
-        bot1.setLabel("CatapultBot1");
+        bot1.setMinecraftUsername("CatapultBot1");
         bot1.setEnabled(true);
 
         link = new MinecraftFriendLink();

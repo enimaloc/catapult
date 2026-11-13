@@ -1375,9 +1375,9 @@ public class RealApiService implements ApiService {
     }
 
     @Override
-    public int adminCreateBattleNetAccount(String label, String email, String password) {
+    public int adminCreateBattleNetAccount(String email, String password) {
         return client.call(HttpMethod.POST, "/api/internal/admin/battlenet-accounts",
-                Map.of("label", label, "email", email, "password", password), Void.class).status();
+                Map.of("email", email, "password", password), Void.class).status();
     }
 
     @Override
@@ -1439,9 +1439,8 @@ public class RealApiService implements ApiService {
     }
 
     @Override
-    public ApiClient.Result<Map<String, Object>> adminCreateMinecraftAccount(String deviceCode, String label) {
-        Map<String, String> body = label == null ? Map.of("deviceCode", deviceCode) : Map.of("deviceCode", deviceCode, "label", label);
-        return mapResult(client.call(HttpMethod.POST, "/api/internal/admin/minecraft-accounts", body, Map.class));
+    public ApiClient.Result<Map<String, Object>> adminCreateMinecraftAccount(String deviceCode) {
+        return mapResult(client.call(HttpMethod.POST, "/api/internal/admin/minecraft-accounts", Map.of("deviceCode", deviceCode), Map.class));
     }
 
     @Override

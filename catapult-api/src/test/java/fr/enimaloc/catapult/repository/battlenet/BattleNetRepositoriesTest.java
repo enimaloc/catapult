@@ -24,13 +24,12 @@ class BattleNetRepositoriesTest {
     @Autowired BattleNetFriendLinkRepository links;
     @Autowired TestEntityManager em;
 
-    private BattleNetServiceAccount account(String label, long bnetAccountId) {
+    private BattleNetServiceAccount account(String name, long bnetAccountId) {
         BattleNetServiceAccount a = new BattleNetServiceAccount();
-        a.setLabel(label);
-        a.setEmail(label + "@example.test");
+        a.setEmail(name + "@example.test");
         a.setPasswordEnc("enc-password");
         a.setBnetAccountId(bnetAccountId);
-        a.setBattleTag(label + "#1234");
+        a.setBattleTag(name + "#1234");
         return em.persist(a);
     }
 
@@ -72,7 +71,7 @@ class BattleNetRepositoriesTest {
         em.flush();
 
         assertThat(accounts.findByEnabledTrueAndAuthStateOrderByFillOrderAsc(BattleNetServiceAccount.AuthState.READY))
-                .extracting(BattleNetServiceAccount::getLabel).containsExactly("first", "second");
+                .extracting(BattleNetServiceAccount::getBattleTag).containsExactly("first#1234", "second#1234");
         assertThat(accounts.countByEnabledTrue()).isEqualTo(3);
         assertThat(accounts.countByEnabledTrueAndFriendLimitReachedFalse()).isEqualTo(2);
     }
@@ -80,7 +79,6 @@ class BattleNetRepositoriesTest {
     @Test
     void accountToStringHidesSecrets() {
         BattleNetServiceAccount a = new BattleNetServiceAccount();
-        a.setLabel("bot");
         a.setEmail("secret@example.test");
         a.setPasswordEnc("enc-password-blob");
         a.setStorageStateEnc("enc-storage-blob");

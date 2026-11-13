@@ -153,10 +153,10 @@ class BattleNetFriendServiceTest {
         when(client.removeFriend(anyLong())).thenReturn(CompletableFuture.completedFuture(null));
     }
 
-    private static BattleNetServiceAccount bot(String label, int fillOrder, String battleTag) {
+    private static BattleNetServiceAccount bot(String email, int fillOrder, String battleTag) {
         BattleNetServiceAccount bot = new BattleNetServiceAccount();
         bot.setId(UUID.randomUUID());
-        bot.setLabel(label);
+        bot.setEmail(email);
         bot.setFillOrder(fillOrder);
         bot.setBattleTag(battleTag);
         bot.setAuthState(AuthState.READY);
