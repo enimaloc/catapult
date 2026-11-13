@@ -48,6 +48,7 @@ import fr.enimaloc.catapult.common.dto.admin.DtddTopicsCacheEntryDto;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingDto;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingRequest;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingResult;
+import fr.enimaloc.catapult.common.dto.admin.IgdbGameOption;
 import fr.enimaloc.catapult.common.dto.admin.TwitchCategoryDto;
 import fr.enimaloc.catapult.common.dto.notification.AdminNotificationDto;
 import fr.enimaloc.catapult.common.dto.notification.BroadcastRequestDto;
@@ -354,6 +355,8 @@ public interface ApiService {
     List<DetectedGameDto> adminDetectedGames(String sourceType, String q);
     /** The Twitch categories matching {@code q}, with the box art as catapult-api returns it; null when catapult-api fails. */
     List<TwitchCategoryDto> adminSearchCategories(String q);
+    /** The IGDB games matching {@code q} (name, release year, cover), for the mapping form's IGDB picker; null when catapult-api fails. */
+    List<IgdbGameOption> adminSearchIgdbGames(String q);
     /** catapult-api's status (201; 400 MANUAL platform, missing ID or category; 409 already mapped) and result, 502 when unreachable. */
     ApiClient.Result<GameMappingResult> adminCreateGameMapping(GameMappingRequest request);
     /** catapult-api's status (200; 400 as for a creation; 404 unknown) and result, 502 when unreachable. */

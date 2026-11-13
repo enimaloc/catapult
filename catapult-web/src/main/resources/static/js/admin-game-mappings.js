@@ -7,7 +7,9 @@
  * The form (a dialog) creates a mapping (new, or from a missing game's row: its platform and ID filled in) or
  * changes one (from its row). Its game field suggests the platform's detected games as the ID or name is typed
  * ("name — ID · Streamers: n"; picking one fills the ID, any ID typed is kept as is); its category field searches
- * Twitch through GameSearch. The CCLs and TWs stay IGDB's (null) unless their switch replaces them with the boxes
+ * Twitch through GameSearch. Its IGDB game field searches IGDB the same way ("name (year)"; a clear button
+ * empties it): picking, changing or clearing the IGDB game empties the category, which catapult-api then deduces
+ * from the game, so a category is only required when neither it nor an IGDB game is set. The CCLs and TWs stay IGDB's (null) unless their switch replaces them with the boxes
  * checked (even none). Its "ignored by default" switch makes the category optional. After a save the form shows what changed and turns into the saved mapping's edit form.
  * A deletion asks first, in its own dialog. A refusal is told by its status, never by catapult-api's message
  * (catapult-web relays none): 400 invalid, 404 gone, 409 already mapped, anything else unavailable.
@@ -140,6 +142,14 @@ window.CatapultAdminGameMappings = (function () {
         };
         form.search = GameSearch.attach(form.category, el.querySelector(".admin-gm-category-results"),
             `${BASE}/categories`, () => hideMessages(form), { initial: null });
+        form.igdbInput = el.querySelector('[name="igdbGame"]');
+        // The category follows the IGDB game: whatever was picked for the old one no longer applies
+        form.igdb = GameSearch.attach(form.igdbInput, el.querySelector(".admin-gm-igdb-results"),
+            `${BASE}/igdb-games`, () => { form.search.select(null); hideMessages(form); },
+            { initial: null, label: game => game.releaseYear == null ? game.name : `${game.name} (${game.releaseYear})` });
+        form.igdbInput.addEventListener("input", () => {
+            if (form.igdbInput.value.trim() === "") form.search.select(null);
+        });
         wireSuggestions(form);
         form.platform.addEventListener("change", () => {
             showFormat(form);
@@ -242,7 +252,7 @@ window.CatapultAdminGameMappings = (function () {
     }
 
     /**
-     * Fills the form with `mapping` (`{ id?, sourceType, sourceId, sourceName, twitchGameId, twitchGameName, ccls, tws,
+     * Fills the form with `mapping` (`{ id?, sourceType, sourceId, sourceName, twitchGameId, twitchGameName, igdbId, igdbGameName, ccls, tws,
      * ignoredByDefault? }`) and opens it.
      */
     function open(form, mapping) {
@@ -254,6 +264,7 @@ window.CatapultAdminGameMappings = (function () {
         form.gameName.textContent = mapping.sourceName ?? "";
         form.dropSuggestions();
         form.search.select(mapping.twitchGameId ? { id: mapping.twitchGameId, name: mapping.twitchGameName } : null);
+        form.igdb.select(mapping.igdbId ? { id: mapping.igdbId, name: mapping.igdbGameName || mapping.igdbId } : null);
         setOverride(form, "ccls", mapping.ccls ?? null);
         setOverride(form, "tws", mapping.tws ?? null);
         form.ignored.checked = mapping.ignoredByDefault === true;
@@ -273,6 +284,8 @@ window.CatapultAdminGameMappings = (function () {
             sourceName: row.dataset.sourceName,
             twitchGameId: row.dataset.twitchGameId,
             twitchGameName: row.dataset.twitchGameName,
+            igdbId: row.dataset.igdbId,
+            igdbGameName: row.dataset.igdbGameName,
             ccls: list("ccls"),
             tws: list("tws"),
             ignoredByDefault: row.hasAttribute("data-ignored-by-default")
@@ -283,15 +296,17 @@ window.CatapultAdminGameMappings = (function () {
         hideMessages(form);
         const sourceId = form.sourceId.value.trim();
         const category = form.search.selected();
+        const igdb = form.igdb.selected();
         const ignoredByDefault = form.ignored.checked;
         if (sourceId === "") return tell(form.error, form.root.dataset.labelErrorId);
-        // A game ignored by default needs no category: its bindings keep IGDB's
-        if (!category && !ignoredByDefault) return tell(form.error, form.root.dataset.labelErrorCategory);
+        // A game ignored by default needs no category: its bindings keep IGDB's; one pinned to an IGDB game has its deduced
+        if (!category && !igdb && !ignoredByDefault) return tell(form.error, form.root.dataset.labelErrorCategory);
         const body = {
             sourceType: form.platform.value,
             sourceId,
             twitchGameId: category?.id ?? null,
             twitchGameName: category?.name ?? null,
+            igdbId: igdb?.id ?? null,
             ccls: overrideOf(form, "ccls"),
             tws: overrideOf(form, "tws"),
             applyLive: form.applyLive.checked,
@@ -357,7 +372,7 @@ window.CatapultAdminGameMappings = (function () {
         panel.addEventListener("click", event => {
             const target = event.target.closest?.(
                 "[data-gm-page], [data-gm-missing-page], [data-gm-edit], [data-gm-delete], [data-gm-create], #admin-gm-new, "
-                + ".admin-gm-save, .admin-gm-confirm-delete, .admin-gm-close");
+                + ".admin-gm-igdb-clear, .admin-gm-save, .admin-gm-confirm-delete, .admin-gm-close");
             if (!target || !panel.contains(target) || target.disabled) return;
             if (target.matches("[data-gm-page]")) {
                 reload(panel, Number(target.dataset.gmPage), undefined);
@@ -374,6 +389,10 @@ window.CatapultAdminGameMappings = (function () {
                 });
             } else if (target.matches("#admin-gm-new")) {
                 open(formOf(panel), { sourceType: "STEAM", ccls: null, tws: null });
+            } else if (target.matches(".admin-gm-igdb-clear")) {
+                const form = formOf(panel);
+                form.igdb.select(null);
+                form.search.select(null);
             } else if (target.matches(".admin-gm-save")) {
                 save(panel, formOf(panel));
             } else if (target.matches(".admin-gm-confirm-delete")) {

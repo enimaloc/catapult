@@ -18,6 +18,7 @@ import fr.enimaloc.catapult.common.dto.admin.DetectedGameDto;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingDto;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingRequest;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingResult;
+import fr.enimaloc.catapult.common.dto.admin.IgdbGameOption;
 import fr.enimaloc.catapult.common.dto.admin.TwitchCategoryDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
@@ -819,6 +820,12 @@ public class MockApiService implements ApiService {
                 .filter(c -> c.name().toLowerCase().contains(q.trim().toLowerCase()))
                 .limit(10)
                 .toList();
+    }
+
+    @Override
+    public List<IgdbGameOption> adminSearchIgdbGames(String q) {
+        log.trace("adminSearchIgdbGames({})", q);
+        return gameMappings.igdbGames(q);
     }
 
     @Override

@@ -23,15 +23,22 @@ class MockGameMappingsStoreTest {
     }
 
     @Test
-    void seeded_hasThreeMappings_newestFirst_oneIgnoredByDefault() {
+    void seeded_hasTheBlizzardTitles_newestFirst_oneIgnoredByDefault() {
         assertThat(store.list(0).content()).hasSize(2);
-        assertThat(store.list(0).totalElements()).isEqualTo(3);
+        assertThat(store.list(0).totalElements()).isEqualTo(12);
         assertThat(store.list(0).content()).extracting(GameMappingDto::updatedAt).isSortedAccordingTo(java.util.Comparator.reverseOrder());
-        // The oldest, on the second page: a wallpaper app ignored without a category
-        assertThat(store.list(1).content()).singleElement().satisfies(m -> {
-            assertThat(m.ignoredByDefault()).isTrue();
-            assertThat(m.twitchGameId()).isNull();
-        });
+        var all = new java.util.ArrayList<GameMappingDto>();
+        for (int page = 0; page < 6; page++) all.addAll(store.list(page).content());
+        // A wallpaper app ignored without a category
+        assertThat(all).filteredOn(GameMappingDto::ignoredByDefault).singleElement()
+                .satisfies(m -> assertThat(m.twitchGameId()).isNull());
+        // The nine Blizzard titles, each pinned to its IGDB game (the IGDB name differs from the title's for two)
+        assertThat(all).filteredOn(m -> m.sourceType().equals("BATTLENET")).hasSize(9)
+                .allSatisfy(m -> assertThat(m.twitchGameId()).isNotNull())
+                .extracting(GameMappingDto::sourceId, GameMappingDto::igdbId, GameMappingDto::igdbGameName)
+                .contains(org.assertj.core.groups.Tuple.tuple("WoW", "123", "World of Warcraft"),
+                        org.assertj.core.groups.Tuple.tuple("S2", "239", "StarCraft II: Wings of Liberty"),
+                        org.assertj.core.groups.Tuple.tuple("W3", "111650", "Warcraft III: Reforged"));
     }
 
     @Test
@@ -104,7 +111,7 @@ class MockGameMappingsStoreTest {
 
         assertThat(deleted.status()).isEqualTo(200);
         assertThat(deleted.body().mapping()).isNull();
-        assertThat(store.list(0).totalElements()).isEqualTo(2);
+        assertThat(store.list(0).totalElements()).isEqualTo(11);
         assertThat(store.delete(existing.id(), false).status()).isEqualTo(404);
     }
 
@@ -115,6 +122,36 @@ class MockGameMappingsStoreTest {
         assertThat(store.detected("STEAM", first.sourceName().substring(0, 3).toUpperCase())).contains(first);
         assertThat(store.detected("STEAM", "zzzz-none")).isEmpty();
         assertThat(store.detected(null, "")).isEmpty();
+    }
+
+    @Test
+    void igdbGames_searchesTheFixedListByName_andIsEmptyWithoutAQuery() {
+        assertThat(store.igdbGames("warcraft")).extracting(o -> o.name())
+                .contains("World of Warcraft", "Warcraft III: Reforged");
+        assertThat(store.igdbGames("WORLD OF").getFirst().releaseYear()).isEqualTo(2004);
+        assertThat(store.igdbGames("zzzz-none")).isEmpty();
+        assertThat(store.igdbGames("  ")).isEmpty();
+        assertThat(store.igdbGames(null)).isEmpty();
+    }
+
+    @Test
+    void create_withAnIgdbGame_deducesTheCategory_orRefusesWhenThereIsNone() {
+        var deduced = store.create(new GameMappingRequest("STEAM", "413150", null, null, null, null, false, false, "125165"), "me");
+
+        assertThat(deduced.status()).isEqualTo(201);
+        assertThat(deduced.body().mapping()).satisfies(m -> {
+            assertThat(m.igdbId()).isEqualTo("125165");
+            assertThat(m.igdbGameName()).isEqualTo("Diablo IV");
+            assertThat(m.twitchGameId()).isEqualTo("515024");
+        });
+        // An explicit category wins over the deduced one
+        var explicit = store.create(new GameMappingRequest("STEAM", "99", "1", "One", null, null, false, false, "125165"), "me");
+        assertThat(explicit.body().mapping().twitchGameId()).isEqualTo("1");
+        // An IGDB game with no Twitch category, or an unknown one: nothing to deduce
+        assertThat(store.create(new GameMappingRequest("STEAM", "98", null, null, null, null, false, false, "9999"), "me")
+                .status()).isEqualTo(400);
+        assertThat(store.create(new GameMappingRequest("STEAM", "97", null, null, null, null, false, false, "nope"), "me")
+                .status()).isEqualTo(400);
     }
 
     @Test
