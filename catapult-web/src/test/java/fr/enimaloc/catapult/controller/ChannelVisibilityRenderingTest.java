@@ -755,6 +755,13 @@ class ChannelVisibilityRenderingTest {
     }
 
     @Test
+    void aHostileBattleTag_isRenderedEscaped() throws Exception {
+        String html = battleNetPage(new BattleNetData("ACCEPTED", "<b>x</b>", "<i>y</i>"));
+
+        assertThat(html).contains("&lt;b&gt;x&lt;/b&gt;").doesNotContain("<b>x</b>").doesNotContain("<i>y</i>");
+    }
+
+    @Test
     void noVerifyButton() throws Exception {
         String html = battleNetPage(new BattleNetData("PENDING", "Me#1", "CatapultBot#4242"));
 
