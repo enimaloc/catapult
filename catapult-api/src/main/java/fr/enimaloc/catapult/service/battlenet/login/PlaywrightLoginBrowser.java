@@ -6,6 +6,8 @@ import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.PlaywrightException;
+import com.microsoft.playwright.options.WaitForSelectorState;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
@@ -13,6 +15,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProp
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -37,14 +42,37 @@ public class PlaywrightLoginBrowser implements BattleNetLoginBrowser {
     private static final String SUBMIT = "#submit";
     /** A visible error element on the login form after a submit: Battle.net's explicit rejection. */
     private static final String LOGIN_ERROR = ".alert-error:visible, .form-error:visible, [role=alert]:visible";
-    // UNVERIFIED: the real 2FA page's markup was never captured. These generic selectors were validated only by
-    // the spike: any visible input besides the account name and password is taken for the code field.
-    private static final String CODE_INPUT = "input:visible:not(#accountName):not(#password):not([type=hidden])";
-    private static final String CODE_SUBMIT = "button[type=submit]:visible, #submit:visible, input[type=submit]:visible";
+    // Verified against the live site on 2026-11-14: after the password, a fresh context lands on a "Security
+    // Check" page (/challenge/<uuid>/choose, a method <select> and #submit), then on the code page
+    // (/challenge/<uuid>) whose one-time-code input submits the form by itself once filled.
+    private static final String CODE_INPUT = "input[autocomplete=one-time-code]:visible";
+    private static final String SUBMIT_VISIBLE = "#submit:visible";
+    /** Fill target when the code input lacks its autocomplete hint; never used to recognise a page. */
+    private static final String CODE_INPUT_FALLBACK =
+            "input:visible:not(#accountName):not(#password):not([type=hidden])";
+    /** Visible controls and alerts, without any value, for the diagnostic of an unrecognised page. */
+    private static final String VISIBLE_ELEMENTS_SCRIPT = """
+            () => Array.from(document.querySelectorAll('input, select, textarea, button, [role=alert]'))
+                .filter(e => e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden')
+                .filter(e => !(e.tagName === 'INPUT' && e.type === 'hidden'))
+                .slice(0, 40)
+                .map(e => ({
+                    tag: e.tagName.toLowerCase(),
+                    id: e.id || null,
+                    name: e.getAttribute('name'),
+                    type: e.getAttribute('type'),
+                    role: e.getAttribute('role'),
+                    text: (e.tagName === 'BUTTON' || e.getAttribute('role') === 'alert')
+                        ? (e.innerText || '').slice(0, 2000) : null
+                }))
+            """;
 
     private static final Pattern TICKET = Pattern.compile("[?&]ST=(EU-[0-9a-fA-F]{32}-\\d+)");
     private static final double ACTION_TIMEOUT_MS = 15_000;
     private static final long POLL_MS = 250;
+    private static final double QUICK_CLICK_TIMEOUT_MS = 3_000;
+    private static final long CODE_AUTO_SUBMIT_MS = 1_000;
+    private static final double CODE_SUBMITTED_TIMEOUT_MS = 10_000;
 
     private @Nullable Playwright playwright;
     private @Nullable Browser browser;
@@ -104,6 +132,8 @@ public class PlaywrightLoginBrowser implements BattleNetLoginBrowser {
         private final BrowserContext context;
         private final Page page;
         private final AtomicReference<String> ticket;
+        /** Path of the security check page already submitted, so it is clicked only once. */
+        private @Nullable String chooseSubmittedFor;
 
         PlaywrightLoginPage(BrowserContext context, Page page, AtomicReference<String> ticket) {
             this.context = context;
@@ -132,24 +162,102 @@ public class PlaywrightLoginBrowser implements BattleNetLoginBrowser {
             do {
                 String t = ticket.get();
                 if (t != null) return new Outcome.Ticket(t);
-                if (page.locator(CODE_INPUT).count() > 0 && page.locator(PASSWORD).count() == 0
-                        && page.locator(ACCOUNT_NAME).count() == 0) {
-                    return new Outcome.CodeRequired();
-                }
-                if (page.locator(LOGIN_ERROR).count() > 0) {
+                String url = page.url();
+                LoginPageInspection.Step step = LoginPageInspection.classify(url);
+                if (step == LoginPageInspection.Step.CHALLENGE_CHOOSE) {
+                    // Keep the default method (e-mail) and ask for the code, once per challenge.
+                    String path = LoginPageInspection.withoutQuery(url);
+                    // Recorded only once the click is sent: the URL changes before the button is rendered.
+                    if (!path.equals(chooseSubmittedFor) && clickIfVisible(SUBMIT_VISIBLE)) {
+                        chooseSubmittedFor = path;
+                        log.debug("Battle.net security check: requested a code with the default method");
+                    }
+                } else if (step == LoginPageInspection.Step.CHALLENGE_CODE || page.locator(CODE_INPUT).count() > 0) {
+                    // A code already typed and not rejected is still being submitted: keep waiting for the ticket.
+                    if (awaitsCode()) return new Outcome.CodeRequired();
+                } else if (page.locator(LOGIN_ERROR).count() > 0) {
                     // Fixed text: the page's own message could echo the account e-mail.
                     return new Outcome.Failed("login rejected");
                 }
                 page.waitForTimeout(POLL_MS);
             } while (System.nanoTime() < deadline);
             String t = ticket.get();
-            return t != null ? new Outcome.Ticket(t) : new Outcome.TimedOut();
+            if (t != null) return new Outcome.Ticket(t);
+            logUnrecognisedPage();
+            return new Outcome.TimedOut();
         }
 
         @Override
         public void submitCode(String code) {
-            page.locator(CODE_INPUT).first().fill(code);
-            page.locator(CODE_SUBMIT).first().click();
+            Locator otp = page.locator(CODE_INPUT);
+            Locator input = (otp.count() > 0 ? otp : page.locator(CODE_INPUT_FALLBACK)).first();
+            input.fill(code);
+            // The code input submits the form by itself: #submit is often already gone.
+            page.waitForTimeout(CODE_AUTO_SUBMIT_MS);
+            clickIfVisible(SUBMIT_VISIBLE);
+            // Leave the code page before awaitOutcome, or it would ask for a code again straight away.
+            try {
+                input.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.HIDDEN)
+                        .setTimeout(CODE_SUBMITTED_TIMEOUT_MS));
+            } catch (PlaywrightException e) {
+                log.debug("The Battle.net code page is still shown after submitting the code");
+            }
+        }
+
+        /** True when the code input is shown empty, or with an alert (a rejected code). */
+        private boolean awaitsCode() {
+            Locator input = page.locator(CODE_INPUT);
+            if (input.count() == 0) return false;
+            if (page.locator(LOGIN_ERROR).count() > 0) return true;
+            try {
+                return input.first().inputValue(new Locator.InputValueOptions().setTimeout(QUICK_CLICK_TIMEOUT_MS))
+                        .isBlank();
+            } catch (PlaywrightException e) {
+                // Detached by a navigation: the next poll looks at the new page.
+                return false;
+            }
+        }
+
+        /**
+         * Clicks the first match if visible; a race with a navigation is not an error.
+         *
+         * @return whether the click was sent
+         */
+        private boolean clickIfVisible(String selector) {
+            Locator target = page.locator(selector);
+            if (target.count() == 0) return false;
+            try {
+                target.first().click(new Locator.ClickOptions().setTimeout(QUICK_CLICK_TIMEOUT_MS));
+                return true;
+            } catch (PlaywrightException e) {
+                log.debug("Click on a Battle.net login button failed ({})", e.getClass().getSimpleName());
+                return false;
+            }
+        }
+
+        /** Logs what the page shows when nothing was recognised, so a new Blizzard page shows up in the logs. */
+        private void logUnrecognisedPage() {
+            try {
+                List<LoginPageInspection.PageElement> elements = new ArrayList<>();
+                if (page.evaluate(VISIBLE_ELEMENTS_SCRIPT) instanceof List<?> raw) {
+                    for (Object o : raw) {
+                        if (o instanceof Map<?, ?> m) {
+                            elements.add(new LoginPageInspection.PageElement(String.valueOf(m.get("tag")),
+                                    str(m.get("id")), str(m.get("name")), str(m.get("type")), str(m.get("role")),
+                                    str(m.get("text"))));
+                        }
+                    }
+                }
+                log.warn("Battle.net login page not recognised before the timeout: {}",
+                        LoginPageInspection.describe(page.url(), page.title(), elements));
+            } catch (RuntimeException e) {
+                log.warn("Battle.net login page not recognised before the timeout (diagnostic failed: {})",
+                        e.getClass().getSimpleName());
+            }
+        }
+
+        private static @Nullable String str(@Nullable Object o) {
+            return o == null ? null : o.toString();
         }
 
         @Override
