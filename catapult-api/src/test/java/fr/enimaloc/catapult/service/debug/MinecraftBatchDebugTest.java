@@ -87,7 +87,7 @@ class MinecraftBatchDebugTest {
     @BeforeEach
     void setUp() {
         account.setId(UUID.randomUUID());
-        account.setLabel("svc-1");
+        account.setMinecraftUsername("svc-1");
         when(registry.modeOf(any())).thenReturn(Optional.empty());
         RestClient.Builder builder = RestClient.builder()
                 .requestInterceptor(new HttpTraceLoggingInterceptor(registry, recorder));

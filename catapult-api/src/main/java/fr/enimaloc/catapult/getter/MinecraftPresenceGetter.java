@@ -87,7 +87,7 @@ public class MinecraftPresenceGetter implements GameGetter {
                             cache.put(MinecraftService.normalizeProfileId(presence.profileId()), presence.status());
                         }
                     } catch (Exception e) {
-                        log.warn("Minecraft presence failed for {}: {}", account.getLabel(), e.getMessage());
+                        log.warn("Minecraft presence failed for {}: {}", account.getMinecraftUsername(), e.getMessage());
                     }
                 });
             }
@@ -110,7 +110,7 @@ public class MinecraftPresenceGetter implements GameGetter {
                     .toList();
         } catch (RuntimeException e) {
             // the presence call goes on, unrecorded
-            log.warn("Could not list the members of {} for the debug recording: {}", account.getLabel(), e.toString());
+            log.warn("Could not list the members of {} for the debug recording: {}", account.getMinecraftUsername(), e.toString());
             return List.of();
         }
     }

@@ -6,7 +6,6 @@ import fr.enimaloc.catapult.service.http.ApiClient;
 import fr.enimaloc.catapult.service.http.ApiError;
 import fr.enimaloc.catapult.service.http.ApiErrorText;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -26,7 +25,7 @@ import java.util.function.Supplier;
  * delete (409 while users are linked to it), each answered with catapult-api's status (502 when
  * unreachable); and the Microsoft device-code flow catapult-api runs, which this only relays: the
  * device code (else catapult-api's status and the refusal's {@code message}, 502 when unreachable), then each create / reauth poll with catapult-api's status
- * (202 not confirmed yet, 200 done with the account's {@code minecraftUsername} and {@code label}, else the status alone).
+ * (202 not confirmed yet, 200 done with the account's {@code minecraftUsername} and {@code displayName}, else the status alone).
  */
 @RestController
 @RequestMapping("/admin/minecraft-accounts")
@@ -35,10 +34,9 @@ public class AdminMinecraftController {
     private final ApiService apiService;
     private final ModelFiller filler;
     private final ApiErrorText errorText;
-    private final MessageSource messageSource;
 
     public record EnabledBody(Boolean enabled) {}
-    public record CreateBody(String deviceCode, String label) {}
+    public record CreateBody(String deviceCode) {}
     public record ReauthBody(String deviceCode) {}
 
     @PostMapping("/{id}/enabled")
@@ -74,13 +72,10 @@ public class AdminMinecraftController {
     }
 
     @PostMapping("/create")
-    public ResponseEntity<Map<String, Object>> create(@RequestBody CreateBody body, Locale locale) {
+    public ResponseEntity<Map<String, Object>> create(@RequestBody CreateBody body) {
         AdminAccess.require(filler);
         if (blank(body.deviceCode())) return ResponseEntity.badRequest().build();
-        String label = blank(body.label())
-                ? messageSource.getMessage("admin.minecraft.default-label", null, locale)
-                : body.label().trim();
-        return poll(() -> apiService.adminCreateMinecraftAccount(body.deviceCode(), label));
+        return poll(() -> apiService.adminCreateMinecraftAccount(body.deviceCode()));
     }
 
     @PostMapping("/{id}/reauth")
@@ -101,7 +96,7 @@ public class AdminMinecraftController {
         Map<String, Object> shown = new HashMap<>();
         if (result.status() == 200) {
             shown.put("minecraftUsername", answer.get("minecraftUsername"));
-            shown.put("label", answer.get("label"));
+            shown.put("displayName", answer.get("displayName"));
         }
         return ResponseEntity.status(result.status()).body(shown);
     }

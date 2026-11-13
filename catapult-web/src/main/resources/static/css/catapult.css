@@ -2509,7 +2509,7 @@ mdui-snackbar.broadcast-warning { --mdui-color-inverse-surface: var(--mdui-color
     .admin-keys-row > .admin-row-actions { grid-column: 1 / -1; }
     .admin-keys-row > .admin-cell { white-space: normal; }
 }
-.admin-minecraft-row, .admin-table:has(> .admin-minecraft-row) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 6rem 4rem 12rem auto; }
+.admin-minecraft-row, .admin-table:has(> .admin-minecraft-row) { grid-template-columns: minmax(0, 1fr) 6rem 4rem 12rem auto; }
 .admin-minecraft-states { display: flex; flex-wrap: wrap; gap: 4px; }
 .admin-minecraft-full { color: rgb(var(--mdui-color-error)); }
 .admin-minecraft-row > .admin-minecraft-flow { grid-column: 1 / -1; }

@@ -959,10 +959,10 @@ class AdminTabsFragmentControllerTest {
         assertThat(asAdmin("/spa/admin/keys")).contains("admin-placeholder").doesNotContain("admin-keys-add-save");
     }
 
-    private static fr.enimaloc.catapult.common.dto.admin.AccountDto account(String id, String label, long links,
+    private static fr.enimaloc.catapult.common.dto.admin.AccountDto account(String id, String name, long links,
             boolean enabled, boolean full) {
-        return new fr.enimaloc.catapult.common.dto.admin.AccountDto(java.util.UUID.fromString(id), label,
-                label + "_mc", 0, full, enabled, (int) links);
+        return new fr.enimaloc.catapult.common.dto.admin.AccountDto(java.util.UUID.fromString(id), name + "_mc",
+                name + "_mc", 0, full, enabled, (int) links);
     }
 
     @Test
@@ -975,8 +975,11 @@ class AdminTabsFragmentControllerTest {
 
         String html = asAdmin("/spa/admin/keys").replaceAll("\\s+", " ");
 
-        assertThat(html).contains("id=\"admin-minecraft\"", "Act&lt;ive&gt;", "Off_mc", "admin-minecraft-add",
+        assertThat(html).contains("id=\"admin-minecraft\"", "Act&lt;ive&gt;_mc", "Off_mc", "admin-minecraft-add",
                 "Minecraft service accounts");
+        // shown by its Minecraft username alone: no label column nor label field
+        String card = html.substring(html.indexOf("id=\"admin-minecraft\""), html.indexOf("id=\"admin-battlenet\""));
+        assertThat(card).doesNotContain("name=\"label\"", ">Label<");
         // the state chips themselves: enabled ×2, disabled ×1, full ×1 (not the seeded "Full" label)
         assertThat(html.split("<mdui-chip icon=\"check_circle\">Enabled</mdui-chip>", -1)).hasSize(3);
         assertThat(html.split("<mdui-chip icon=\"block\">Disabled</mdui-chip>", -1)).hasSize(2);

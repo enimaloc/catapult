@@ -1818,9 +1818,9 @@ public class MockApiService implements ApiService {
     }
 
     @Override
-    public ApiClient.Result<Map<String, Object>> adminCreateMinecraftAccount(String deviceCode, String label) {
-        log.trace("adminCreateMinecraftAccount({})", label);
-        return minecraftAccounts.create(deviceCode, label);
+    public ApiClient.Result<Map<String, Object>> adminCreateMinecraftAccount(String deviceCode) {
+        log.trace("adminCreateMinecraftAccount()");
+        return minecraftAccounts.create(deviceCode);
     }
 
     @Override

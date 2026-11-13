@@ -111,7 +111,7 @@ public class MinecraftTokenService {
             Optional<ValidatedChain> chain = validateChain(account.getMsaRefreshToken());
             if (chain.isEmpty()) {
                 tokenState.put(account.getId(), 0);
-                log.warn("Minecraft auth chain failed for account {}", account.getLabel());
+                log.warn("Minecraft auth chain failed for account {}", account.getMinecraftUsername());
                 return Optional.empty();
             }
 

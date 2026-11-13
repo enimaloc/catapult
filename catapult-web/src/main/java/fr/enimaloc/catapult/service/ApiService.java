@@ -518,10 +518,10 @@ public interface ApiService {
     /** A device-code start: the code when {@code status} is 200, else null and catapult-api's problem (may be null). */
     record MinecraftDeviceCodeStart(int status, MinecraftDeviceCodeDto code, ApiError error) {}
     /**
-     * Polls the device code to enrol a new account ({@code label} null: catapult-api's default):
+     * Polls the device code to enrol a new account:
      * 202 while it isn't confirmed yet, 200 with the account once it is, else the error; 502 when unreachable.
      */
-    ApiClient.Result<Map<String, Object>> adminCreateMinecraftAccount(String deviceCode, String label);
+    ApiClient.Result<Map<String, Object>> adminCreateMinecraftAccount(String deviceCode);
     /** Polls the device code to re-authenticate the account, answered like {@link #adminCreateMinecraftAccount}. */
     ApiClient.Result<Map<String, Object>> adminReauthMinecraftAccount(UUID id, String deviceCode);
 

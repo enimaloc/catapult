@@ -42,8 +42,6 @@ class AdminMinecraftControllerTest {
         @Bean
         StaticMessageSource messageSource() {
             StaticMessageSource messages = new StaticMessageSource();
-            messages.addMessage("admin.minecraft.default-label", Locale.FRENCH, "Compte Minecraft");
-            messages.addMessage("admin.minecraft.default-label", Locale.ENGLISH, "Minecraft account");
             messages.addMessage("api.error.minecraft_device_code_refused", Locale.FRENCH, "Device-code Microsoft refusé: {0}");
             messages.addMessage("api.error.minecraft_device_code_refused", Locale.ENGLISH, "Microsoft refused the device code: {0}");
             return messages;
@@ -134,43 +132,31 @@ class AdminMinecraftControllerTest {
     }
 
     @Test
-    void create_relays202Then200() throws Exception {
+    void create_relays202Then200_withTheAccountsDisplayName() throws Exception {
         when(apiService.isAdmin()).thenReturn(true);
-        when(apiService.adminCreateMinecraftAccount("dc-1", "Bot1"))
+        when(apiService.adminCreateMinecraftAccount("dc-1"))
                 .thenReturn(new ApiClient.Result<>(202, Map.of("status", "PENDING")))
-                .thenReturn(new ApiClient.Result<>(200, Map.of("id", ID.toString(), "label", "Bot1",
+                .thenReturn(new ApiClient.Result<>(200, Map.of("id", ID.toString(), "displayName", "CatapultBot1",
                         "minecraftUsername", "CatapultBot1", "linkCount", 0)));
 
-        mvc.perform(admin(post(BASE + "/create"), "{\"deviceCode\":\"dc-1\",\"label\":\" Bot1 \"}"))
+        mvc.perform(admin(post(BASE + "/create"), "{\"deviceCode\":\"dc-1\"}"))
                 .andExpect(status().isAccepted());
+        // a legacy label is ignored, like any unknown field
         mvc.perform(admin(post(BASE + "/create"), "{\"deviceCode\":\"dc-1\",\"label\":\"Bot1\"}"))
                 .andExpect(status().isOk())
-                .andExpect(content().json("{\"minecraftUsername\":\"CatapultBot1\",\"label\":\"Bot1\"}",
+                .andExpect(content().json("{\"minecraftUsername\":\"CatapultBot1\",\"displayName\":\"CatapultBot1\"}",
                         org.springframework.test.json.JsonCompareMode.STRICT));
     }
 
     @Test
-    void create_anErrorIsRelayedAsItsStatusAlone_andABlankLabelIsFilledWithTheBundlesDefault() throws Exception {
+    void create_anErrorIsRelayedAsItsStatusAlone() throws Exception {
         when(apiService.isAdmin()).thenReturn(true);
-        when(apiService.adminCreateMinecraftAccount("dc-1", "Minecraft account"))
+        when(apiService.adminCreateMinecraftAccount("dc-1"))
                 .thenReturn(new ApiClient.Result<>(502, Map.of("message", "Xbox chain failed", "trace", "x")));
 
-        mvc.perform(admin(post(BASE + "/create"), "{\"deviceCode\":\"dc-1\",\"label\":\"  \"}"))
+        mvc.perform(admin(post(BASE + "/create"), "{\"deviceCode\":\"dc-1\"}"))
                 .andExpect(status().isBadGateway())
                 .andExpect(content().json("{}", org.springframework.test.json.JsonCompareMode.STRICT));
-    }
-
-    @Test
-    void create_withoutALabel_sendsTheDefaultInTheAdminsLanguage() throws Exception {
-        when(apiService.isAdmin()).thenReturn(true);
-        when(apiService.adminCreateMinecraftAccount(any(), any())).thenReturn(new ApiClient.Result<>(202, null));
-
-        mvc.perform(admin(post(BASE + "/create"), "{\"deviceCode\":\"c\",\"label\":\"  \"}").locale(Locale.FRENCH))
-                .andExpect(status().isAccepted());
-        mvc.perform(admin(post(BASE + "/create"), "{\"deviceCode\":\"c\",\"label\":\"  \"}").locale(Locale.ENGLISH))
-                .andExpect(status().isAccepted());
-        verify(apiService).adminCreateMinecraftAccount("c", "Compte Minecraft");
-        verify(apiService).adminCreateMinecraftAccount("c", "Minecraft account");
     }
 
     @Test
@@ -178,12 +164,12 @@ class AdminMinecraftControllerTest {
         when(apiService.isAdmin()).thenReturn(true);
         when(apiService.adminReauthMinecraftAccount(ID, "dc-2"))
                 .thenReturn(new ApiClient.Result<>(202, null))
-                .thenReturn(new ApiClient.Result<>(200, Map.of("label", "Bot1", "minecraftUsername", "CatapultBot1")))
+                .thenReturn(new ApiClient.Result<>(200, Map.of("displayName", "CatapultBot1", "minecraftUsername", "CatapultBot1")))
                 .thenReturn(new ApiClient.Result<>(404, null));
 
         mvc.perform(admin(post(BASE + "/" + ID + "/reauth"), "{\"deviceCode\":\"dc-2\"}")).andExpect(status().isAccepted());
         mvc.perform(admin(post(BASE + "/" + ID + "/reauth"), "{\"deviceCode\":\"dc-2\"}")).andExpect(status().isOk())
-                .andExpect(content().json("{\"minecraftUsername\":\"CatapultBot1\",\"label\":\"Bot1\"}"));
+                .andExpect(content().json("{\"minecraftUsername\":\"CatapultBot1\",\"displayName\":\"CatapultBot1\"}"));
         mvc.perform(admin(post(BASE + "/" + ID + "/reauth"), "{\"deviceCode\":\"dc-2\"}")).andExpect(status().isNotFound())
                 .andExpect(content().json("{}", org.springframework.test.json.JsonCompareMode.STRICT));
     }
@@ -192,9 +178,9 @@ class AdminMinecraftControllerTest {
     void aBlankDeviceCode_is400_withoutCallingTheApi() throws Exception {
         when(apiService.isAdmin()).thenReturn(true);
 
-        mvc.perform(admin(post(BASE + "/create"), "{\"label\":\"Bot1\"}")).andExpect(status().isBadRequest());
+        mvc.perform(admin(post(BASE + "/create"), "{}")).andExpect(status().isBadRequest());
         mvc.perform(admin(post(BASE + "/" + ID + "/reauth"), "{\"deviceCode\":\" \"}")).andExpect(status().isBadRequest());
-        verify(apiService, never()).adminCreateMinecraftAccount(any(), any());
+        verify(apiService, never()).adminCreateMinecraftAccount(any());
         verify(apiService, never()).adminReauthMinecraftAccount(any(), any());
     }
 
@@ -208,7 +194,7 @@ class AdminMinecraftControllerTest {
         mvc.perform(admin(post(BASE + "/" + ID + "/delete"), "{}")).andExpect(status().isForbidden());
         mvc.perform(admin(post(BASE + "/" + ID + "/enabled"), "{\"enabled\":true}")).andExpect(status().isForbidden());
         verify(apiService, never()).adminMinecraftDeviceCode();
-        verify(apiService, never()).adminCreateMinecraftAccount(any(), any());
+        verify(apiService, never()).adminCreateMinecraftAccount(any());
         verify(apiService, never()).adminDeleteMinecraftAccount(any());
         verify(apiService, never()).adminPatchMinecraftAccount(any(), any());
     }

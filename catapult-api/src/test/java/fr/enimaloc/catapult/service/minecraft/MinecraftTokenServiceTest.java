@@ -39,7 +39,7 @@ class MinecraftTokenServiceTest {
 
         account = new MinecraftServiceAccount();
         account.setId(UUID.randomUUID());
-        account.setLabel("CatapultBot1");
+        account.setMinecraftUsername("CatapultBot1");
         account.setMsaRefreshToken("enc-refresh");
 
         when(encryption.decrypt(anyString())).thenAnswer(inv -> {
@@ -106,7 +106,7 @@ class MinecraftTokenServiceTest {
     void getToken_transientAccountWithoutId_validatesWithoutPersistingOrCaching() {
         // account not persisted yet (enrolment validation): a null id must neither NPE nor write to the database
         var transientAccount = new MinecraftServiceAccount();
-        transientAccount.setLabel("Nouveau");
+        transientAccount.setMinecraftUsername("Nouveau");
         transientAccount.setMsaRefreshToken("enc-refresh");
 
         assertThat(service.getToken(transientAccount)).contains("mc-token");

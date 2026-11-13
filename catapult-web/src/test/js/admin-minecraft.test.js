@@ -30,7 +30,6 @@ function page() {
                                 <div class="admin-minecraft-flow"></div>
                             </div>
                             <div class="admin-minecraft-enroll">
-                                <input name="label">
                                 <button class="admin-minecraft-add"></button>
                                 <div class="admin-minecraft-flow"></div>
                             </div>
@@ -81,8 +80,7 @@ afterEach(() => {
 
 describe("admin-minecraft device-code flow", () => {
     it("shows the user code and an https link, then polls every max(3, interval) s until 200 and patches", async () => {
-        routes["/admin/minecraft-accounts/create"] = [response(202, {}), response(200, { minecraftUsername: "Bot_mc", label: "Bot1" })];
-        document.querySelector('[name="label"]').value = " Bot1 ";
+        routes["/admin/minecraft-accounts/create"] = [response(202, {}), response(200, { minecraftUsername: "Bot_mc", displayName: "Bot_mc" })];
 
         await click(".admin-minecraft-add");
 
@@ -98,7 +96,7 @@ describe("admin-minecraft device-code flow", () => {
         expect(polls()).toHaveLength(0);
         await vi.advanceTimersByTimeAsync(1);
         expect(polls()).toHaveLength(1);
-        expect(posted).toHaveBeenLastCalledWith("/admin/minecraft-accounts/create", { deviceCode: "dc-1", label: "Bot1" });
+        expect(posted).toHaveBeenLastCalledWith("/admin/minecraft-accounts/create", { deviceCode: "dc-1" });
         expect(CatapultAdminTabs.patch).not.toHaveBeenCalled();
 
         await vi.advanceTimersByTimeAsync(3000);
@@ -106,7 +104,6 @@ describe("admin-minecraft device-code flow", () => {
         expect(window.mdui.snackbar).toHaveBeenLastCalledWith({ message: "Created" });
         expect(CatapultAdminTabs.patch).toHaveBeenCalledWith(panel());
         expect(addFlow().children).toHaveLength(0); // the code shown is of no more use
-        expect(document.querySelector('[name="label"]').value).toBe("");
 
         await vi.advanceTimersByTimeAsync(30000);
         expect(polls()).toHaveLength(2);
@@ -236,7 +233,7 @@ describe("admin-minecraft device-code flow", () => {
         expect(polls()).toHaveLength(1);
 
         panel().innerHTML = "<p>another view</p>";
-        answer(response(200, { minecraftUsername: "Bot_mc", label: "Bot1" }));
+        answer(response(200, { minecraftUsername: "Bot_mc", displayName: "Bot_mc" }));
         await vi.advanceTimersByTimeAsync(30000);
 
         expect(polls()).toHaveLength(1);
