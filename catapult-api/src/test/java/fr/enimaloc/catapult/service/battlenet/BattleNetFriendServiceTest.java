@@ -14,6 +14,7 @@ import fr.enimaloc.catapult.repository.battlenet.BattleNetServiceAccountReposito
 import fr.enimaloc.catapult.repository.binding.GetterConfigRepository;
 import fr.enimaloc.catapult.service.battlenet.BattleNetFriendService.BattleNetEnrollmentException;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,6 +23,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.transaction.TransactionException;
+import org.springframework.transaction.support.SimpleTransactionStatus;
+import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionOperations;
 
 import java.time.Instant;
@@ -43,6 +47,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -66,11 +71,43 @@ class BattleNetFriendServiceTest {
     private BattleNetServiceAccount bot2;
     /** The links in "the database", queried by the repository stubs. */
     private final List<BattleNetFriendLink> links = new ArrayList<>();
+    private final RecordingTransactions transactions = new RecordingTransactions();
+    /** BGS actions run while a transaction was open: must stay empty. */
+    private final List<String> callsInsideTransaction = new ArrayList<>();
+    /** The bot each BGS action ran on, in order. */
+    private final List<UUID> callsOn = new ArrayList<>();
+
+    /** Runs callbacks directly and records whether one is running. */
+    private static final class RecordingTransactions implements TransactionOperations {
+        boolean inside;
+        int count;
+
+        @Override
+        public <T> T execute(TransactionCallback<T> action) throws TransactionException {
+            inside = true;
+            count++;
+            try {
+                return action.doInTransaction(new SimpleTransactionStatus());
+            } finally {
+                inside = false;
+            }
+        }
+    }
+
+    private <T> CompletableFuture<T> recorded(String what, CompletableFuture<T> result) {
+        if (transactions.inside) callsInsideTransaction.add(what);
+        return result;
+    }
+
+    @AfterEach
+    void noBgsCallInsideATransaction() {
+        assertThat(callsInsideTransaction).isEmpty();
+    }
 
     @BeforeEach
     void setUp() {
         service = new BattleNetFriendService(accountRepository, linkRepository, getterConfigRepository, publisher,
-                sessionManager, TransactionOperations.withoutTransaction(), Runnable::run);
+                sessionManager, transactions, Runnable::run);
         user = new UserAccount();
         user.setId(UUID.randomUUID());
         bot1 = bot("bot1", 1, "CatapultBot#1111");
@@ -82,11 +119,14 @@ class BattleNetFriendServiceTest {
         when(accountRepository.findById(bot2.getId())).thenReturn(Optional.of(bot2));
         when(linkRepository.save(any())).thenAnswer(inv -> {
             BattleNetFriendLink link = inv.getArgument(0);
+            if (link.getId() == null) link.setId(UUID.randomUUID());
             if (!links.contains(link)) links.add(link);
             return link;
         });
         when(linkRepository.findWithServiceAccountByUser(any())).thenAnswer(inv -> links.stream()
                 .filter(link -> link.getUser() == inv.getArgument(0)).findFirst());
+        when(linkRepository.findById(any())).thenAnswer(inv -> links.stream()
+                .filter(link -> inv.getArgument(0).equals(link.getId())).findFirst());
         doAnswer(inv -> links.remove((BattleNetFriendLink) inv.getArgument(0)))
                 .when(linkRepository).delete(any());
         when(linkRepository.findByServiceAccountAndBnetAccountId(any(), anyLong())).thenAnswer(inv -> links.stream()
@@ -103,7 +143,8 @@ class BattleNetFriendServiceTest {
 
         when(sessionManager.withClient(any(), any())).thenAnswer(inv -> {
             Function<BgsClient, CompletableFuture<Void>> action = inv.getArgument(1);
-            return action.apply(client);
+            callsOn.add(inv.getArgument(0));
+            return recorded("withClient", action.apply(client));
         });
         when(client.sendInvitation(anyString())).thenReturn(CompletableFuture.completedFuture(null));
         when(client.acceptInvitation(anyLong())).thenReturn(CompletableFuture.completedFuture(null));
@@ -124,6 +165,7 @@ class BattleNetFriendServiceTest {
 
     private BattleNetFriendLink link(BattleNetServiceAccount bot, Status status, Long invitationId) {
         BattleNetFriendLink link = new BattleNetFriendLink();
+        link.setId(UUID.randomUUID());
         link.setUser(user);
         link.setServiceAccount(bot);
         link.setBnetAccountId(STREAMER_ID);
@@ -189,25 +231,54 @@ class BattleNetFriendServiceTest {
     }
 
     @Test
-    void enrollMarksTheBotFullWhenItsFriendsListIsFull() {
+    void fullBotIsMarkedAndTheLinkMovesToTheNextBotWhichInvites() {
+        when(client.sendInvitation(anyString()))
+                .thenReturn(CompletableFuture.failedFuture(
+                        new BgsRpcException(BattleNetFriendService.STATUS_INVITER_AT_MAX_FRIENDS)))
+                .thenReturn(CompletableFuture.completedFuture(null));
+
+        BattleNetFriendLink link = service.enroll(user, STREAMER_ID, STREAMER_TAG);
+
+        assertThat(bot1.isFriendLimitReached()).isTrue();
+        verify(accountRepository).save(bot1);
+        assertThat(links).containsExactly(link);
+        assertThat(link.getServiceAccount()).isSameAs(bot2);
+        assertThat(link.getStatus()).isEqualTo(Status.PENDING);
+        assertThat(callsOn).containsExactly(bot1.getId(), bot2.getId());
+        verify(client, times(2)).sendInvitation(STREAMER_TAG);
+        var order = inOrder(publisher);
+        order.verify(publisher).battleNetLinkChanged(user.getId(), "PENDING", STREAMER_TAG, "CatapultBot#1111");
+        order.verify(publisher).battleNetLinkChanged(user.getId(), "PENDING", STREAMER_TAG, "CatapultBot#2222");
+    }
+
+    @Test
+    void anyFailureAtTheFriendCapMovesTheLink() {
+        when(client.sendInvitation(anyString()))
+                .thenReturn(CompletableFuture.failedFuture(new BgsRpcException(7)))
+                .thenReturn(CompletableFuture.completedFuture(null));
+        when(linkRepository.countByServiceAccountAndStatus(bot1, Status.ACCEPTED))
+                .thenReturn((long) BattleNetFriendService.FRIEND_CAP);
+
+        BattleNetFriendLink link = service.enroll(user, STREAMER_ID, STREAMER_TAG);
+
+        assertThat(bot1.isFriendLimitReached()).isTrue();
+        assertThat(link.getServiceAccount()).isSameAs(bot2);
+    }
+
+    @Test
+    void fullBotWithNoOtherBotDeletesTheLink() {
+        bot2.setFriendLimitReached(true);
         when(client.sendInvitation(anyString())).thenReturn(CompletableFuture.failedFuture(
                 new BgsRpcException(BattleNetFriendService.STATUS_INVITER_AT_MAX_FRIENDS)));
 
         service.enroll(user, STREAMER_ID, STREAMER_TAG);
 
         assertThat(bot1.isFriendLimitReached()).isTrue();
-        verify(accountRepository).save(bot1);
-    }
-
-    @Test
-    void enrollMarksTheBotFullOnAnyFailureAtTheFriendCap() {
-        when(client.sendInvitation(anyString())).thenReturn(CompletableFuture.failedFuture(new BgsRpcException(7)));
-        when(linkRepository.countByServiceAccountAndStatus(bot1, Status.ACCEPTED))
-                .thenReturn((long) BattleNetFriendService.FRIEND_CAP);
-
-        service.enroll(user, STREAMER_ID, STREAMER_TAG);
-
-        assertThat(bot1.isFriendLimitReached()).isTrue();
+        assertThat(links).isEmpty();
+        assertThat(callsOn).containsExactly(bot1.getId());
+        var order = inOrder(publisher);
+        order.verify(publisher).battleNetLinkChanged(user.getId(), "PENDING", STREAMER_TAG, "CatapultBot#1111");
+        order.verify(publisher).battleNetLinkChanged(eq(user.getId()), eq("NONE"), isNull(), isNull());
     }
 
     @Test
@@ -361,12 +432,37 @@ class BattleNetFriendServiceTest {
     }
 
     @Test
-    void rejectedThenFriendAddedIsAccepted() {
-        BattleNetFriendLink link = link(bot1, Status.INVITE_REJECTED, 55L);
+    void rejectedThenStreamerAddsTheBotIsAccepted() {
+        BattleNetFriendLink link = link(bot1, Status.PENDING, 55L);
 
+        receive(bot1, new FriendEvent.InvitationSentRemoved(55L, STREAMER_TAG, 3));
+        assertThat(link.getStatus()).isEqualTo(Status.INVITE_REJECTED);
+        receive(bot1, new FriendEvent.InvitationReceived(90L, STREAMER_ID, STREAMER_TAG));
+        verify(client).acceptInvitation(90L);
+        verify(client, never()).declineInvitation(anyLong());
         receive(bot1, new FriendEvent.FriendAdded(STREAMER_ID, STREAMER_TAG));
 
         assertThat(link.getStatus()).isEqualTo(Status.ACCEPTED);
+    }
+
+    @Test
+    void noBgsCallRunsInsideATransaction() {
+        // every client action records whether a transaction was open (checked after each test too)
+        service.enroll(user, STREAMER_ID, STREAMER_TAG);
+        receive(bot1, new FriendEvent.InvitationReceived(90L, STREAMER_ID, STREAMER_TAG));
+        receive(bot1, new FriendEvent.InvitationReceived(91L, 999L, "Stranger#1"));
+        receive(bot1, new FriendEvent.InvitationSent(55L, STREAMER_TAG));
+        service.unenroll(user);
+        link(bot1, Status.ACCEPTED, null);
+        service.unenroll(user);
+
+        verify(client).sendInvitation(STREAMER_TAG);
+        verify(client).acceptInvitation(90L);
+        verify(client).declineInvitation(91L);
+        verify(client).revokeInvitation(55L);
+        verify(client).removeFriend(STREAMER_ID);
+        assertThat(transactions.count).isPositive();
+        assertThat(callsInsideTransaction).isEmpty();
     }
 
     @Test

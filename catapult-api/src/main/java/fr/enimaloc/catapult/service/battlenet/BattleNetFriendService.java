@@ -45,9 +45,11 @@ import java.util.function.Function;
  * {@link #enroll} writes a {@code PENDING} link on the first ready bot with room and has it send a friend invitation;
  * the link then moves with the bot's friend events: {@code FriendAdded} accepts it, a sent invitation removed with a
  * non-zero reason rejects it, {@code FriendRemoved} removes it. A received invitation is accepted only when it is the
- * one a {@code PENDING} link waits for on that bot. Every change of a link is announced to its channel.
+ * one a link of that bot waits for ({@code PENDING} or {@code INVITE_REJECTED}). Every change of a link is announced
+ * to its channel.
  * <p>
- * Database writes run in short transactions of their own: the BGS calls are asynchronous and never hold one.
+ * Database writes run in short transactions of their own; every BGS call is made outside them, once they are
+ * committed.
  */
 @Slf4j
 @Service
@@ -105,8 +107,9 @@ public class BattleNetFriendService {
 
     /**
      * Links {@code user} to the first enabled, {@code READY} bot with room (by fill order), replacing any existing
-     * link, then has the bot invite {@code battleTag}. A failed invitation keeps the link: the streamer can still add
-     * the bot himself. Without a bot to take the link, the existing one is left untouched.
+     * link, then has the bot invite {@code battleTag}. A failed invitation keeps the link (the streamer can still add
+     * the bot himself), unless it shows the bot is full: the link then moves to the next bot with room, or is deleted
+     * when none is left. Without a bot to take the link, the existing one is left untouched.
      */
     public BattleNetFriendLink enroll(UserAccount user, long bnetAccountId, String battleTag) {
         List<BattleNetServiceAccount> ready = accountRepository.findByEnabledTrueAndAuthStateOrderByFillOrderAsc(
@@ -135,13 +138,18 @@ public class BattleNetFriendService {
         log.info("Battle.net link requested for user {} via {}", user.getId(), bot.getLabel());
         channelEventPublisher.battleNetLinkChanged(user.getId(), Status.PENDING.name(), battleTag, bot.getBattleTag());
 
+        invite(bot, link.getId(), user.getId(), battleTag);
+        return link;
+    }
+
+    /** Has {@code bot} invite {@code battleTag} for the link {@code linkId}; the outcome is handled off the session. */
+    private void invite(BattleNetServiceAccount bot, UUID linkId, UUID ownerId, String battleTag) {
         call(bot.getId(), client -> client.sendInvitation(battleTag))
                 .whenCompleteAsync((ignored, failure) -> {
                     if (failure != null) {
-                        invitationFailed(bot, unwrap(failure));
+                        invitationFailed(bot, linkId, ownerId, battleTag, unwrap(failure));
                     }
                 }, followUps);
-        return link;
     }
 
     /**
@@ -190,19 +198,22 @@ public class BattleNetFriendService {
     @EventListener
     public void onFriendEvent(BattleNetFriendEventReceived received) {
         try {
+            // The BGS calls decided inside the transaction run once it is committed: an answer sent to the server
+            // cannot be taken back by a rollback
+            List<Runnable> afterCommit = new ArrayList<>();
             List<Change> changes = transactions.execute(status -> apply(received.serviceAccountId(),
-                    received.event()));
+                    received.event(), afterCommit));
             if (changes != null) {
-                changes.forEach(change -> channelEventPublisher.battleNetLinkChanged(change.ownerId(),
-                        change.status().name(), change.battleTag(), change.serviceAccountBattleTag()));
+                changes.forEach(this::publish);
             }
+            afterCommit.forEach(Runnable::run);
         } catch (RuntimeException e) {
             log.warn("Could not apply the Battle.net friend event {} of service account {}: {}",
                     received.event().getClass().getSimpleName(), received.serviceAccountId(), e.toString());
         }
     }
 
-    private List<Change> apply(UUID botId, FriendEvent event) {
+    private List<Change> apply(UUID botId, FriendEvent event, List<Runnable> afterCommit) {
         BattleNetServiceAccount bot = accountRepository.findById(botId).orElse(null);
         if (bot == null) {
             log.debug("Battle.net friend event for an unknown service account {}: ignored", botId);
@@ -270,7 +281,7 @@ public class BattleNetFriendService {
                             sentRemoved.reason(), link.getUser().getId());
                 }
             }
-            case InvitationReceived invitation -> answer(bot, invitation);
+            case InvitationReceived invitation -> afterCommit.add(answer(bot, invitation));
             case InvitationRemoved ignored -> {
                 // the outcome shows up as a FriendAdded, or not at all
             }
@@ -278,42 +289,94 @@ public class BattleNetFriendService {
         return changes;
     }
 
-    /** Accepts the invitation a PENDING link of this bot waits for (same account id); declines any other. */
-    private void answer(BattleNetServiceAccount bot, InvitationReceived invitation) {
+    /**
+     * Decides the answer to a received invitation, to send after the commit: accepted when a link of this bot with the
+     * sender's account id waits for it ({@code PENDING}, or {@code INVITE_REJECTED}: the streamer declined the bot's
+     * invitation and adds the bot himself), declined otherwise.
+     */
+    private Runnable answer(BattleNetServiceAccount bot, InvitationReceived invitation) {
         boolean expected = linkRepository.findByServiceAccountAndBnetAccountId(bot, invitation.accountId()).stream()
-                .anyMatch(link -> link.getStatus() == Status.PENDING);
+                .anyMatch(link -> link.getStatus() == Status.PENDING || link.getStatus() == Status.INVITE_REJECTED);
         long invitationId = invitation.invitationId();
+        UUID botId = bot.getId();
+        String label = bot.getLabel();
         if (expected) {
-            log.info("Accepting the Battle.net invitation of an enrolled streamer on {}", bot.getLabel());
-            call(bot.getId(), client -> client.acceptInvitation(invitationId)).whenComplete((ignored, failure) -> {
-                if (failure != null) {
-                    log.warn("acceptInvitation failed on {}: {}", bot.getLabel(), unwrap(failure).toString());
-                }
-            });
-        } else {
-            log.info("Declining a Battle.net invitation no link waits for on {}", bot.getLabel());
-            call(bot.getId(), client -> client.declineInvitation(invitationId)).whenComplete((ignored, failure) -> {
-                if (failure != null) {
-                    log.warn("declineInvitation failed on {}: {}", bot.getLabel(), unwrap(failure).toString());
-                }
-            });
+            log.info("Accepting the Battle.net invitation of an enrolled streamer on {}", label);
+            return () -> call(botId, client -> client.acceptInvitation(invitationId))
+                    .whenComplete((ignored, failure) -> {
+                        if (failure != null) {
+                            log.warn("acceptInvitation failed on {}: {}", label, unwrap(failure).toString());
+                        }
+                    });
         }
+        log.info("Declining a Battle.net invitation no link waits for on {}", label);
+        return () -> call(botId, client -> client.declineInvitation(invitationId)).whenComplete((ignored, failure) -> {
+            if (failure != null) {
+                log.warn("declineInvitation failed on {}: {}", label, unwrap(failure).toString());
+            }
+        });
     }
 
     // --- internals ---
 
-    /** Marks the bot full when the failure says so (or when it already holds a full friends list). */
-    private void invitationFailed(BattleNetServiceAccount bot, Throwable failure) {
-        log.warn("The Battle.net invitation sent by {} failed, the link stays pending: {}", bot.getLabel(),
-                failure.toString());
-        boolean full = failure instanceof BgsRpcException rpc && rpc.status() == STATUS_INVITER_AT_MAX_FRIENDS;
+    /**
+     * A failed invitation keeps its link, unless it shows the bot is full (the failure says so, or the bot already
+     * holds a full friends list): the bot is then marked full and the link moved to the next bot with room, which
+     * invites in turn, or deleted when none is left.
+     */
+    private void invitationFailed(BattleNetServiceAccount bot, UUID linkId, UUID ownerId, String battleTag,
+                                  Throwable failure) {
         try {
-            if (full || linkRepository.countByServiceAccountAndStatus(bot, Status.ACCEPTED) >= FRIEND_CAP) {
-                markFull(bot.getId());
+            boolean full = failure instanceof BgsRpcException rpc && rpc.status() == STATUS_INVITER_AT_MAX_FRIENDS
+                    || linkRepository.countByServiceAccountAndStatus(bot, Status.ACCEPTED) >= FRIEND_CAP;
+            if (!full) {
+                log.warn("The Battle.net invitation sent by {} failed, the link stays pending: {}", bot.getLabel(),
+                        failure.toString());
+                return;
             }
+            log.warn("The Battle.net invitation sent by {} shows its friends list is full: {}", bot.getLabel(),
+                    failure.toString());
+            markFull(bot.getId());
+            relocate(bot.getId(), linkId, ownerId, battleTag);
         } catch (RuntimeException e) {
-            log.warn("Could not check whether {} reached its friend cap: {}", bot.getLabel(), e.toString());
+            log.warn("Could not handle the failed invitation of {}: {}", bot.getLabel(), e.toString());
         }
+    }
+
+    /** Moves the pending link off the full bot {@code fullBotId} to the next bot with room, or deletes it. */
+    private void relocate(UUID fullBotId, UUID linkId, UUID ownerId, String battleTag) {
+        BattleNetServiceAccount[] next = new BattleNetServiceAccount[1];
+        Boolean moved = transactions.execute(status -> {
+            BattleNetFriendLink link = linkId == null ? null : linkRepository.findById(linkId).orElse(null);
+            // The link was replaced, removed or answered meanwhile: it is no longer this invitation's
+            if (link == null || link.getStatus() != Status.PENDING
+                    || !fullBotId.equals(link.getServiceAccount().getId())) {
+                return null;
+            }
+            next[0] = accountRepository.findByEnabledTrueAndAuthStateOrderByFillOrderAsc(AuthState.READY).stream()
+                    .filter(account -> !account.isFriendLimitReached() && !fullBotId.equals(account.getId()))
+                    .findFirst().orElse(null);
+            if (next[0] == null) {
+                linkRepository.delete(link);
+                return false;
+            }
+            link.setServiceAccount(next[0]);
+            link.setInvitationId(null);
+            link.setRequestedAt(Instant.now());
+            linkRepository.save(link);
+            return true;
+        });
+        if (moved == null) {
+            return;
+        }
+        if (!moved) {
+            log.warn("No Battle.net service account has room left: the link of user {} is deleted", ownerId);
+            channelEventPublisher.battleNetLinkChanged(ownerId, "NONE", null, null);
+            return;
+        }
+        log.info("Battle.net link of user {} moved to {}", ownerId, next[0].getLabel());
+        channelEventPublisher.battleNetLinkChanged(ownerId, Status.PENDING.name(), battleTag, next[0].getBattleTag());
+        invite(next[0], linkId, ownerId, battleTag);
     }
 
     /** Persists {@code friendLimitReached} on a fresh copy of the bot (an admin edit may have moved its version). */
@@ -348,6 +411,11 @@ public class BattleNetFriendService {
     private Change save(BattleNetFriendLink link, BattleNetServiceAccount bot) {
         linkRepository.save(link);
         return new Change(link.getUser().getId(), link.getStatus(), link.getBattleTag(), bot.getBattleTag());
+    }
+
+    private void publish(Change change) {
+        channelEventPublisher.battleNetLinkChanged(change.ownerId(), change.status().name(), change.battleTag(),
+                change.serviceAccountBattleTag());
     }
 
     private CompletableFuture<Void> call(UUID botId, Function<BgsClient, CompletableFuture<Void>> action) {
