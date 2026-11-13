@@ -32,6 +32,7 @@ val springCloudContextVersion = "5.0.4"
 
 dependencies {
     implementation(project(":catapult-common"))
+    implementation(project(":catapult-bgs"))
 
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
