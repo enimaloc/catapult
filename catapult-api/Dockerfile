@@ -26,7 +26,7 @@ FROM eclipse-temurin:25-jre-noble
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends curl jq && rm -rf /var/lib/apt/lists/*
-RUN groupadd --system catapult && useradd --system --gid catapult catapult
+RUN groupadd --system catapult && useradd --system --create-home --home-dir /home/catapult --gid catapult catapult
 
 COPY --from=builder /app/catapult-api/build/libs/*.jar app.jar
 
