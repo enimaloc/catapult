@@ -223,6 +223,14 @@
                             <mdui-button variant="filled" icon="send" class="admin-battlenet-code-submit"
                                          th:attr="data-id=${a.id()}" th:text="#{admin.battlenet.code.submit}">Send the code</mdui-button>
                         </div>
+                        <div class="admin-battlenet-details">
+                            <mdui-text-field name="label" variant="outlined" maxlength="80" autocomplete="off"
+                                             th:attr="label=#{admin.battlenet.details.label},value=${a.label()}"></mdui-text-field>
+                            <mdui-text-field name="fillOrder" type="number" min="0" variant="outlined" autocomplete="off"
+                                             th:attr="label=#{admin.battlenet.details.order},value=${a.fillOrder()}"></mdui-text-field>
+                            <mdui-button variant="text" icon="save" class="admin-battlenet-details-submit"
+                                         th:attr="data-id=${a.id()}" th:text="#{admin.battlenet.details.submit}">Save</mdui-button>
+                        </div>
                         <div class="admin-battlenet-password">
                             <mdui-text-field name="password" type="password" variant="outlined" autocomplete="new-password"
                                              toggle-password th:attr="label=#{admin.battlenet.password.label}"></mdui-text-field>

@@ -94,6 +94,17 @@ class AdminBattleNetControllerTest {
     }
 
     @Test
+    void detailsForwardsLabelAndFillOrder_andValidates() throws Exception {
+        when(apiService.isAdmin()).thenReturn(true);
+        when(apiService.adminPatchBattleNetAccount(ID, Map.of("label", "Bot2", "fillOrder", 3))).thenReturn(200);
+
+        mvc.perform(admin(post(BASE + "/" + ID + "/details"), "{\"label\":\" Bot2 \",\"fillOrder\":3}")).andExpect(status().isOk());
+        mvc.perform(admin(post(BASE + "/" + ID + "/details"), "{\"label\":\" \",\"fillOrder\":3}")).andExpect(status().isBadRequest());
+        mvc.perform(admin(post(BASE + "/" + ID + "/details"), "{\"label\":\"a\",\"fillOrder\":-1}")).andExpect(status().isBadRequest());
+        mvc.perform(admin(post(BASE + "/" + ID + "/details"), "{\"label\":\"a\"}")).andExpect(status().isBadRequest());
+    }
+
+    @Test
     void deleteRelaysTheStatus() throws Exception {
         when(apiService.isAdmin()).thenReturn(true);
         when(apiService.adminDeleteBattleNetAccount(ID)).thenReturn(204);

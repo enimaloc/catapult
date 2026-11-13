@@ -17,6 +17,7 @@ function row(state) {
             <button class="admin-battlenet-reset" data-id="${ID}"></button>
             <button class="admin-battlenet-delete" data-id="${ID}" data-confirm="Delete Bot?"></button>
             <div class="admin-battlenet-code"><input name="code"><button class="admin-battlenet-code-submit" data-id="${ID}"></button></div>
+            <div class="admin-battlenet-details"><input name="label" value="Bot"><input name="fillOrder" value="2"><button class="admin-battlenet-details-submit" data-id="${ID}"></button></div>
             <div class="admin-battlenet-password"><input name="password"><button class="admin-battlenet-password-submit" data-id="${ID}"></button></div>
         </div>`;
 }
@@ -147,6 +148,22 @@ describe("admin-battlenet actions", () => {
     });
 });
 
+describe("admin-battlenet details", () => {
+    it("sends the label and the fill order, refusing a blank label or a negative order", async () => {
+        await click(".admin-battlenet-details-submit");
+        expect(posted).toHaveBeenLastCalledWith(`/admin/battlenet-accounts/${ID}/details`, { label: "Bot", fillOrder: 2 });
+
+        posted.mockClear();
+        document.querySelector('.admin-battlenet-details [name="fillOrder"]').value = "-1";
+        await click(".admin-battlenet-details-submit");
+        document.querySelector('.admin-battlenet-details [name="fillOrder"]').value = "1";
+        document.querySelector('.admin-battlenet-details [name="label"]').value = " ";
+        await click(".admin-battlenet-details-submit");
+        expect(posted).not.toHaveBeenCalled();
+        expect(message().textContent).toBe("Invalid");
+    });
+});
+
 describe("admin-battlenet polling", () => {
     it("patches the tab every 3 s while a bot waits for its code, and stops once none does", async () => {
         page("CODE_REQUIRED");
@@ -181,5 +198,25 @@ describe("admin-battlenet polling", () => {
         const calls = CatapultAdminTabs.patch.mock.calls.length;
         await vi.advanceTimersByTimeAsync(30000);
         expect(CatapultAdminTabs.patch).toHaveBeenCalledTimes(calls);
+    });
+
+    it("does not restart when a not-yet-visited tab is opened, nor after a tick in flight at leave time", async () => {
+        page("CODE_REQUIRED");
+        let finish;
+        CatapultAdminTabs.patch = vi.fn(() => new Promise(resolve => { finish = resolve; }));
+        await vi.advanceTimersByTimeAsync(3000); // a tick is in flight
+        const tabs = document.getElementById("admin-tabs");
+        tabs.value = "broadcast";
+        tabs.dispatchEvent(new Event("change"));
+        document.dispatchEvent(new CustomEvent("catapult:admin-panel", { detail: { tab: "broadcast" } }));
+        finish();
+        await vi.advanceTimersByTimeAsync(0);
+        await vi.advanceTimersByTimeAsync(30000);
+        expect(CatapultAdminTabs.patch).toHaveBeenCalledTimes(1);
+
+        tabs.value = "keys"; // back on Keys: it resumes
+        tabs.dispatchEvent(new Event("change"));
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(CatapultAdminTabs.patch).toHaveBeenCalledTimes(2);
     });
 });

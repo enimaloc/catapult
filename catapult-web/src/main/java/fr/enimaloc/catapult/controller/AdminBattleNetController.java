@@ -14,7 +14,7 @@ import java.util.UUID;
 
 /**
  * The admin Keys tab's Battle.net bot pool: add a bot, submit its 2FA code, re-authenticate, enable /
- * disable, lift "full", change its password and delete, each answered with catapult-api's status
+ * disable, rename and reorder, lift "full", change its password and delete, each answered with catapult-api's status
  * (409 while a login is running or none waits for a code, 404 unknown, 502 when unreachable). The
  * credentials and the code only travel in the JSON bodies, and are never logged nor sent back.
  */
@@ -41,6 +41,8 @@ public class AdminBattleNetController {
     }
 
     public record EnabledBody(Boolean enabled) {}
+
+    public record DetailsBody(String label, Integer fillOrder) {}
 
     public record PasswordBody(String password) {
         @Override
@@ -81,6 +83,14 @@ public class AdminBattleNetController {
     public ResponseEntity<Void> resetLimit(@PathVariable UUID id) {
         AdminAccess.require(filler);
         return ResponseEntity.status(apiService.adminPatchBattleNetAccount(id, Map.of("friendLimitReached", false))).build();
+    }
+
+    @PostMapping("/{id}/details")
+    public ResponseEntity<Void> details(@PathVariable UUID id, @RequestBody DetailsBody body) {
+        AdminAccess.require(filler);
+        if (blank(body.label()) || body.fillOrder() == null || body.fillOrder() < 0) return ResponseEntity.badRequest().build();
+        return ResponseEntity.status(apiService.adminPatchBattleNetAccount(id,
+                Map.of("label", body.label().trim(), "fillOrder", body.fillOrder()))).build();
     }
 
     @PostMapping("/{id}/password")

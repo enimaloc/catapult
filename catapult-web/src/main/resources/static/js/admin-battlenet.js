@@ -102,6 +102,21 @@ window.CatapultAdminBattleNet = (function () {
             card.dataset.labelUpdated, [field]);
     }
 
+    /** Whether the Keys tab is the one shown (an unmounted tabs element counts as shown: nothing to compare). */
+    function keysShown() {
+        const tabs = document.getElementById("admin-tabs");
+        return !tabs || (tabs.value ?? tabs.getAttribute("value")) === "keys";
+    }
+
+    function saveDetails(panel, card, button) {
+        const box = button.closest(".admin-battlenet-details");
+        const label = (box?.querySelector('[name="label"]')?.value ?? "").trim();
+        const order = Number(box?.querySelector('[name="fillOrder"]')?.value);
+        if (!label || !Number.isInteger(order) || order < 0) return show(card, card.dataset.labelInvalid, true);
+        return act(panel, card, button, `${BASE}/${encodeURIComponent(button.dataset.id)}/details`,
+            { label, fillOrder: order }, card.dataset.labelUpdated);
+    }
+
     function stopPolling() {
         clearTimeout(timer);
         timer = null;
@@ -110,15 +125,15 @@ window.CatapultAdminBattleNet = (function () {
     /** Patches the tab again in 3 s while a bot is NEW or CODE_REQUIRED; no second timer, none otherwise. */
     function schedule() {
         const panel = panelOf();
-        if (timer !== null || !panel || !panel.querySelector(PENDING)) return;
+        if (timer !== null || !panel || !keysShown() || !panel.querySelector(PENDING)) return;
         timer = setTimeout(async () => {
             timer = null;
             const current = panelOf();
-            if (!current || !current.querySelector(PENDING)) return;
+            if (!current || !keysShown() || !current.querySelector(PENDING)) return;
             try {
                 await CatapultAdminTabs.patch(current);
             } finally {
-                schedule();
+                schedule(); // a no-op once the tab was left meanwhile
             }
         }, POLL_MS);
     }
@@ -130,7 +145,7 @@ window.CatapultAdminBattleNet = (function () {
             panel.dataset.battlenetBound = "true";
             panel.addEventListener("click", event => {
                 const target = event.target.closest?.(
-                    ".admin-battlenet-add, .admin-battlenet-code-submit, .admin-battlenet-password-submit, "
+                    ".admin-battlenet-add, .admin-battlenet-code-submit, .admin-battlenet-password-submit, .admin-battlenet-details-submit, "
                     + ".admin-battlenet-reauth, .admin-battlenet-toggle, .admin-battlenet-reset, .admin-battlenet-delete");
                 if (!target || !panel.contains(target) || target.disabled) return;
                 const card = target.closest(".admin-battlenet");
@@ -139,6 +154,7 @@ window.CatapultAdminBattleNet = (function () {
                 if (target.matches(".admin-battlenet-add")) add(panel, card, target);
                 else if (target.matches(".admin-battlenet-code-submit")) sendCode(panel, card, target);
                 else if (target.matches(".admin-battlenet-password-submit")) changePassword(panel, card, target);
+                else if (target.matches(".admin-battlenet-details-submit")) saveDetails(panel, card, target);
                 else if (target.matches(".admin-battlenet-reauth")) act(panel, card, target, `${BASE}/${id}/reauth`, {}, card.dataset.labelReauthed);
                 else if (target.matches(".admin-battlenet-toggle")) act(panel, card, target, `${BASE}/${id}/enabled`,
                     { enabled: target.dataset.enabled === "true" }, card.dataset.labelUpdated);

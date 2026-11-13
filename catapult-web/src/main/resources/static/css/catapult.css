@@ -2519,7 +2519,7 @@ mdui-snackbar.broadcast-warning { --mdui-color-inverse-surface: var(--mdui-color
 .admin-battlenet-row, .admin-table:has(> .admin-battlenet-row) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 7rem 10rem 4rem 12rem auto; }
 .admin-battlenet-states { display: flex; flex-wrap: wrap; gap: 4px; }
 .admin-battlenet-full { color: rgb(var(--mdui-color-error)); }
-.admin-battlenet-row > .admin-battlenet-code, .admin-battlenet-row > .admin-battlenet-password { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.admin-battlenet-row > .admin-battlenet-code, .admin-battlenet-row > .admin-battlenet-password, .admin-battlenet-row > .admin-battlenet-details { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .admin-battlenet-message { overflow-wrap: anywhere; }
 .admin-battlenet-message.admin-battlenet-error { color: rgb(var(--mdui-color-error)); }
 .admin-battlenet-prereq { margin-top: 12px; color: var(--catapult-text-muted); }
