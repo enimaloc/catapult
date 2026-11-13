@@ -128,7 +128,7 @@ public final class BgsClient {
 
     /**
      * Completes with the reason the current session ended: once per session, along with
-     * {@link BgsListener#onClosed}. A local {@link #close()} reports {@link CloseReason#IO}.
+     * {@link BgsListener#onClosed}. A local {@link #close()} reports {@link CloseReason#LOCAL}.
      *
      * @throws IllegalStateException before the first {@link #start}
      */
@@ -174,11 +174,15 @@ public final class BgsClient {
         return Map.copyOf(friends);
     }
 
-    /** Closes the current session, if any; its close reason is {@link CloseReason#IO}. */
+    /** Closes the current session, if any; its close reason is {@link CloseReason#LOCAL}. */
     public void close() {
         Session session = current;
         if (session != null) {
-            session.channel.close();
+            try {
+                session.channel.loop().execute(session::closeLocally);
+            } catch (RejectedExecutionException e) {
+                // The loop is already shut down: the session is closed
+            }
         }
     }
 
@@ -448,6 +452,12 @@ public final class BgsClient {
             channel.close();
         }
 
+        void closeLocally() {
+            if (!closed.isDone()) {
+                fail(CloseReason.LOCAL, new IOException("BGS session closed by the client"));
+            }
+        }
+
         void onChannelClosed(Throwable cause) {
             ready = false;
             CloseReason reason = closeReason != null ? closeReason : CloseReason.IO;
@@ -549,9 +559,9 @@ public final class BgsClient {
                     GetSentInvitationsResponse::getContinuation, new ArrayList<>(), 0, list -> {
                         Map<Long, String> now = new LinkedHashMap<>();
                         list.forEach(i -> now.put(i.getId(), i.getTargetName()));
-                        // The real reason of an offline removal is unknown: reported as 0
+                        // The outcome of an offline removal is unknown: not to be read as accepted (reason 0)
                         sentInvitations.keySet().stream().filter(id -> !now.containsKey(id)).sorted().toList()
-                                .forEach(id -> sentInvitationRemoved(id, 0));
+                                .forEach(id -> sentInvitationRemoved(id, FriendEvent.REASON_GONE_WHILE_OFFLINE));
                         now.forEach(this::sentInvitationAdded);
                     });
         }

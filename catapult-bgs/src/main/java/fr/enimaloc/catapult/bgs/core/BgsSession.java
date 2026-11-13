@@ -9,8 +9,8 @@ import fr.enimaloc.catapult.bgs.proto.ServiceMethod;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.lang.reflect.AccessFlag;
 import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -285,7 +285,7 @@ public final class BgsSession implements BgsChannel {
     private static Map<Long, ServiceMethod<?, ?>> knownMethods() {
         Map<Long, ServiceMethod<?, ?>> map = new HashMap<>();
         for (Field f : BgsServices.class.getFields()) {
-            if (Modifier.isStatic(f.getModifiers()) && ServiceMethod.class.isAssignableFrom(f.getType())) {
+            if (f.accessFlags().contains(AccessFlag.STATIC) && ServiceMethod.class.isAssignableFrom(f.getType())) {
                 try {
                     ServiceMethod<?, ?> m = (ServiceMethod<?, ?>) f.get(null);
                     map.put(key(m.serviceHash(), m.methodId()), m);

@@ -98,7 +98,36 @@ class FriendsSyncTest {
         h.session.reply(FRIENDS_GET_SENT_INVITATIONS, GetSentInvitationsResponse.getDefaultInstance());
 
         assertThat(h.friendEvents).containsExactly(new InvitationRemoved(70, 5, "e#5", 0),
-                new InvitationSentRemoved(80, "t#8", 0));
+                new InvitationSentRemoved(80, "t#8", FriendEvent.REASON_GONE_WHILE_OFFLINE));
+    }
+
+    @Test
+    void invitationAcceptedOfflineIsGoneWithAFriendAddedInTheSameResync() {
+        ClientHarness h = new ClientHarness().ready();
+        h.session.reply(FRIENDS_GET_FRIENDS, friends(0));
+        h.session.reply(FRIENDS_GET_RECEIVED_INVITATIONS, GetReceivedInvitationsResponse.getDefaultInstance());
+        h.session.reply(FRIENDS_GET_SENT_INVITATIONS, GetSentInvitationsResponse.newBuilder()
+                .addInvitations(SentInvitation.newBuilder().setId(80).setTargetName("t#8")).build());
+        h.session.drop(new IOException("reset"));
+        h.friendEvents.clear();
+
+        h.restart().connect().logon().accountState().select();
+        h.sync(friends(0, 8L, "t#8"));
+
+        assertThat(h.friendEvents).containsExactly(new FriendAdded(8, "t#8"),
+                new InvitationSentRemoved(80, "t#8", FriendEvent.REASON_GONE_WHILE_OFFLINE));
+    }
+
+    @Test
+    void livePushKeepsTheServerReason() {
+        ClientHarness h = new ClientHarness().ready().sync(friends(0));
+        h.session.push(FRIENDS_LISTENER_ON_SENT_INVITATION_ADDED, SentInvitationAddedNotification.newBuilder()
+                .addInvitations(SentInvitation.newBuilder().setId(60).setTargetName("t#6")).build());
+        h.session.push(FRIENDS_LISTENER_ON_SENT_INVITATION_REMOVED, SentInvitationRemovedNotification.newBuilder()
+                .addAssignments(RemovedInvitationAssignment.newBuilder().setInvitationId(60).setReason(3)).build());
+
+        assertThat(h.friendEvents).containsExactly(new InvitationSent(60, "t#6"),
+                new InvitationSentRemoved(60, "t#6", 3));
     }
 
     @Test

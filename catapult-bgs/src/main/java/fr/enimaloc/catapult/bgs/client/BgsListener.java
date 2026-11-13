@@ -17,8 +17,10 @@ public interface BgsListener {
     void onClosed(CloseReason reason);
 
     enum CloseReason {
-        /** Transport error, end of stream, local close, or a failure before the session was ready. */
+        /** Transport error, end of stream, or a failure before the session was ready. */
         IO,
+        /** Closed by the client itself ({@link BgsClient#close()}). */
+        LOCAL,
         /** ForceDisconnect pushed by the server with an error code other than 60. */
         FORCE_DISCONNECT,
         /** ForceDisconnect 60: another session opened the same account; reconnecting would evict it in a loop. */

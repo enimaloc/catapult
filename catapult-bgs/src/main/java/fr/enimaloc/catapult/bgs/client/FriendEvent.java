@@ -6,6 +6,13 @@ package fr.enimaloc.catapult.bgs.client;
  */
 public sealed interface FriendEvent {
 
+    /**
+     * Reason of an {@link InvitationSentRemoved} found by the resync diff: the invitation vanished while offline and
+     * its outcome is unknown. Accepted offline, it shows up as a {@link FriendAdded} in the same resync; declined or
+     * revoked, it does not.
+     */
+    int REASON_GONE_WHILE_OFFLINE = -1;
+
     record FriendAdded(long accountId, String battleTag) implements FriendEvent {
     }
 
@@ -24,8 +31,9 @@ public sealed interface FriendEvent {
     }
 
     /**
-     * A sent invitation is gone: {@code reason} 0 means accepted (a {@link FriendAdded} follows), any other value
-     * means declined or revoked. A removal found by the resync diff carries 0, the real reason being unknown.
+     * A sent invitation is gone. From a push, {@code reason} is the server's: 0 means accepted (a {@link FriendAdded}
+     * follows), any other value means declined or revoked. From the resync diff it is
+     * {@link FriendEvent#REASON_GONE_WHILE_OFFLINE}.
      */
     record InvitationSentRemoved(long invitationId, String targetName, int reason) implements FriendEvent {
     }

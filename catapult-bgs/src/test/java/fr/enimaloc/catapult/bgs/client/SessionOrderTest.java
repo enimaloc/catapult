@@ -251,6 +251,26 @@ class SessionOrderTest {
     }
 
     @Test
+    void localCloseReportsLocal() {
+        ClientHarness h = new ClientHarness().ready();
+        h.client.close();
+
+        assertThat(h.session.closed).isTrue();
+        assertThat(h.client.ready()).isFalse();
+        assertThat(h.client.closed()).isCompletedWithValue(CloseReason.LOCAL);
+        assertThat(h.closes).containsExactly(CloseReason.LOCAL);
+    }
+
+    @Test
+    void localCloseBeforeReadyFailsTheStart() {
+        ClientHarness h = new ClientHarness().start().connect();
+        h.client.close();
+
+        assertThat(h.started).isCompletedExceptionally();
+        assertThat(h.client.closed()).isCompletedWithValue(CloseReason.LOCAL);
+    }
+
+    @Test
     void configToStringMasksTheEmail() {
         assertThat(CONFIG.toString()).doesNotContain("bot@example.test").contains("bgs.test");
     }
