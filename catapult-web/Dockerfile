@@ -7,6 +7,7 @@ RUN apk add --no-cache git
 COPY gradlew settings.gradle.kts build.gradle.kts gradle.properties ./
 COPY gradle ./gradle
 COPY catapult-common/build.gradle.kts ./catapult-common/
+COPY catapult-bgs/build.gradle.kts ./catapult-bgs/
 COPY catapult-api/build.gradle.kts ./catapult-api/
 COPY catapult-web/build.gradle.kts ./catapult-web/
 RUN ./gradlew :catapult-web:dependencies --no-daemon -q
