@@ -1,6 +1,6 @@
 /*
  * The admin Keys tab's Battle.net bot pool card: the actions and their inline refusals, the 2FA code and
- * password fields (sent once, then emptied), and the 3 s refresh while a bot is NEW or CODE_REQUIRED.
+ * password fields (sent once, then emptied), and the 3 s refresh while a bot is NEW or waits for its code.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { load, render, response } from "./helpers.js";
@@ -9,9 +9,9 @@ const ID = "00000000-0000-0000-0000-00000000000b";
 let routes;
 let posted;
 
-function row(state) {
+function row(state, waitingForCode) {
     return `
-        <div class="admin-battlenet-row" data-auth-state="${state}">
+        <div class="admin-battlenet-row" data-auth-state="${state}" data-waiting-code="${waitingForCode}">
             <button class="admin-battlenet-reauth" data-id="${ID}"></button>
             <button class="admin-battlenet-toggle" data-id="${ID}" data-enabled="false"></button>
             <button class="admin-battlenet-reset" data-id="${ID}"></button>
@@ -22,7 +22,7 @@ function row(state) {
         </div>`;
 }
 
-function page(state = "READY") {
+function page(state = "READY", waitingForCode = state === "CODE_REQUIRED") {
     document.body.innerHTML = `
         <mdui-tabs id="admin-tabs" value="keys">
             <mdui-tab-panel value="keys">
@@ -32,7 +32,7 @@ function page(state = "READY") {
                              data-label-unavailable="Down" data-label-updated="Updated" data-label-deleted="Deleted"
                              data-label-created="Created" data-label-code-sent="Code sent" data-label-reauthed="Reauthed"
                              data-label-invalid="Invalid">
-                            ${row(state)}
+                            ${row(state, waitingForCode)}
                             <div class="admin-battlenet-enroll">
                                 <input name="label"><input name="email"><input name="password" type="password">
                                 <button class="admin-battlenet-add"></button>
@@ -179,6 +179,12 @@ describe("admin-battlenet polling", () => {
         const calls = CatapultAdminTabs.patch.mock.calls.length;
         await vi.advanceTimersByTimeAsync(30000);
         expect(CatapultAdminTabs.patch).toHaveBeenCalledTimes(calls);
+    });
+
+    it("does not poll a CODE_REQUIRED bot no login waits for", async () => {
+        page("CODE_REQUIRED", false);
+        await vi.advanceTimersByTimeAsync(30000);
+        expect(CatapultAdminTabs.patch).not.toHaveBeenCalled();
     });
 
     it("does not poll when every bot is settled", async () => {

@@ -993,8 +993,13 @@ class AdminTabsFragmentControllerTest {
 
     private static fr.enimaloc.catapult.common.dto.admin.BattleNetAccountDto bot(String id, String label, String tag,
             String auth, String session, boolean enabled, boolean full) {
+        return bot(id, label, tag, auth, session, enabled, full, "CODE_REQUIRED".equals(auth));
+    }
+
+    private static fr.enimaloc.catapult.common.dto.admin.BattleNetAccountDto bot(String id, String label, String tag,
+            String auth, String session, boolean enabled, boolean full, boolean waitingForCode) {
         return new fr.enimaloc.catapult.common.dto.admin.BattleNetAccountDto(java.util.UUID.fromString(id), label, tag, auth,
-                session, 0, full, enabled, 4);
+                session, 0, full, enabled, 4, waitingForCode);
     }
 
     @Test
@@ -1015,6 +1020,19 @@ class AdminTabsFragmentControllerTest {
         assertThat(html.split("admin-battlenet-toggle\"", -1)).hasSize(3);
         assertThat(html.split("admin-battlenet-delete\"", -1)).hasSize(3);
         assertThat(html).doesNotContain("Ready<b>");
+    }
+
+    @Test
+    void aBotNoLoginWaitsForGetsTheReauthHintInsteadOfTheCodeField() throws Exception {
+        when(apiService.adminApiKeys(org.mockito.ArgumentMatchers.any())).thenReturn(keys(true));
+        when(apiService.adminBattleNetAccounts()).thenReturn(List.of(
+                bot("00000000-0000-0000-0000-00000000000b", "Stuck", null, "CODE_REQUIRED", "STOPPED_CODE_REQUIRED",
+                        true, false, false)));
+
+        String html = asAdmin("/spa/admin/keys").replaceAll("\\s+", " ");
+
+        assertThat(html).contains("data-waiting-code=\"false\"", "admin-battlenet-code-hint", "No login waits for a code any more")
+                .doesNotContain("admin-battlenet-code-submit");
     }
 
     @Test

@@ -9,14 +9,15 @@
  * ever puts them in a URL or the page. Labels and BattleTags come from the server-rendered rows, never
  * from innerHTML.
  *
- * While a bot is NEW or CODE_REQUIRED (its row's data-auth-state) the tab is patched every 3 s, so its
- * login progress shows without a reload; the polling stops once none is, once the card has left the page
- * and when another admin tab is shown. Listeners are delegated to the panel: its content comes and goes.
+ * While a bot is NEW, or CODE_REQUIRED with a login waiting for its code (its row's data-auth-state and
+ * data-waiting-code), the tab is patched every 3 s, so its login progress shows without a reload; the
+ * polling stops once none is, once the card has left the page and when another admin tab is shown. Listeners are delegated to the panel: its content comes and goes.
  */
 window.CatapultAdminBattleNet = (function () {
     const BASE = "/admin/battlenet-accounts";
     const POLL_MS = 3000;
-    const PENDING = '.admin-battlenet-row[data-auth-state="NEW"], .admin-battlenet-row[data-auth-state="CODE_REQUIRED"]';
+    const PENDING = '.admin-battlenet-row[data-auth-state="NEW"], '
+        + '.admin-battlenet-row[data-auth-state="CODE_REQUIRED"][data-waiting-code="true"]';
     const ok = status => status >= 200 && status < 300;
 
     let timer = null;
@@ -122,7 +123,7 @@ window.CatapultAdminBattleNet = (function () {
         timer = null;
     }
 
-    /** Patches the tab again in 3 s while a bot is NEW or CODE_REQUIRED; no second timer, none otherwise. */
+    /** Patches the tab again in 3 s while a bot is NEW or waits for its code; no second timer, none otherwise. */
     function schedule() {
         const panel = panelOf();
         if (timer !== null || !panel || !keysShown() || !panel.querySelector(PENDING)) return;

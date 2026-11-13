@@ -160,8 +160,10 @@
 
     <!--/*
       The Battle.net bot pool: each bot's auth and session states, its friends, then "Add a bot". A bot waiting for its
-      2FA code (CODE_REQUIRED) shows a code field. The e-mail and passwords are only ever typed here: nothing renders
-      them back. admin-battlenet.js refreshes the tab every 3 s while a bot is NEW or CODE_REQUIRED.
+      2FA code (CODE_REQUIRED with a login waiting for it) shows a code field; one left CODE_REQUIRED by an automatic
+      login has none waiting, so it points to "Re-authenticate" instead. The e-mail and passwords are only ever typed
+      here: nothing renders them back. admin-battlenet.js refreshes the tab every 3 s while a bot is NEW or waits for
+      its code.
     */-->
     <div id="admin-battlenet">
         <mdui-card class="admin-keys-card admin-battlenet" variant="outlined"
@@ -191,7 +193,7 @@
                         <span></span>
                     </div>
                     <div class="admin-row admin-battlenet-row" th:each="a : ${battlenet}"
-                         th:attr="data-admin-key=${a.id()},data-auth-state=${a.authState()}">
+                         th:attr="data-admin-key=${a.id()},data-auth-state=${a.authState()},data-waiting-code=${a.waitingForCode()}">
                         <span class="admin-cell" th:attr="data-label=#{admin.battlenet.col.label}" th:text="${a.label()}">Bot1</span>
                         <span class="admin-cell" th:attr="data-label=#{admin.battlenet.col.battletag}" th:text="${a.battleTag()}">Bot#1234</span>
                         <span class="admin-cell" th:attr="data-label=#{admin.battlenet.col.auth}"
@@ -217,7 +219,10 @@
                                               th:attr="data-id=${a.id()},aria-label=#{admin.battlenet.action.delete},
                                               data-confirm=#{admin.battlenet.action.delete-confirm(${a.label()})}"></mdui-button-icon>
                         </span>
-                        <div class="admin-battlenet-code" th:if="${a.authState() == 'CODE_REQUIRED'}">
+                        <p class="admin-cell-muted admin-battlenet-code-hint"
+                           th:if="${a.authState() == 'CODE_REQUIRED' and !a.waitingForCode()}"
+                           th:text="#{admin.battlenet.code.reauth-hint}">Re-authenticate to enter a code.</p>
+                        <div class="admin-battlenet-code" th:if="${a.authState() == 'CODE_REQUIRED' and a.waitingForCode()}">
                             <mdui-text-field name="code" variant="outlined" maxlength="16" autocomplete="one-time-code"
                                              th:attr="label=#{admin.battlenet.code.label}"></mdui-text-field>
                             <mdui-button variant="filled" icon="send" class="admin-battlenet-code-submit"

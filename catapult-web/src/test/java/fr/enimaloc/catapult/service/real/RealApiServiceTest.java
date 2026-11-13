@@ -1881,13 +1881,14 @@ class RealApiServiceTest {
     void adminBattleNetAccounts_readCatapultApisDto() {
         respond(HttpMethod.GET, "/api/internal/admin/battlenet-accounts", "[{\"id\":\"00000000-0000-0000-0000-00000000000a\","
                 + "\"label\":\"Bot1\",\"battleTag\":\"Bot#1\",\"authState\":\"CODE_REQUIRED\",\"sessionState\":\"STOPPED_CODE_REQUIRED\","
-                + "\"fillOrder\":2,\"friendLimitReached\":true,\"enabled\":false,\"friendCount\":7}]");
+                + "\"fillOrder\":2,\"friendLimitReached\":true,\"enabled\":false,\"friendCount\":7,\"waitingForCode\":true}]");
         assertThat(service.adminBattleNetAccounts()).singleElement().satisfies(a -> {
             assertThat(a.battleTag()).isEqualTo("Bot#1");
             assertThat(a.authState()).isEqualTo("CODE_REQUIRED");
             assertThat(a.sessionState()).isEqualTo("STOPPED_CODE_REQUIRED");
             assertThat(a.friendCount()).isEqualTo(7);
             assertThat(a.friendLimitReached()).isTrue();
+            assertThat(a.waitingForCode()).isTrue();
         });
     }
 

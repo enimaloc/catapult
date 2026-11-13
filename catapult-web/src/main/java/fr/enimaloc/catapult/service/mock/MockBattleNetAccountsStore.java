@@ -19,8 +19,9 @@ class MockBattleNetAccountsStore {
     private record Account(UUID id, String label, String battleTag, String authState, String sessionState,
                            int fillOrder, boolean friendLimitReached, boolean enabled, long friendCount) {
         BattleNetAccountDto dto() {
+            // the mock's CODE_REQUIRED bots always have a login waiting for the code
             return new BattleNetAccountDto(id, label, battleTag, authState, sessionState, fillOrder,
-                    friendLimitReached, enabled, friendCount);
+                    friendLimitReached, enabled, friendCount, "CODE_REQUIRED".equals(authState));
         }
 
         Account with(String authState, String sessionState, boolean friendLimitReached, boolean enabled) {

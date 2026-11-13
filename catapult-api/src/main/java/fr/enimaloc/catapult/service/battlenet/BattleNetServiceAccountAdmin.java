@@ -33,9 +33,13 @@ import java.util.function.Supplier;
 @ConditionalOnBooleanProperty("battlenet.enabled")
 public class BattleNetServiceAccountAdmin {
 
-    /** What the admin UI sees of a bot account: never the e-mail, the password or the browser state. */
+    /**
+     * What the admin UI sees of a bot account: never the e-mail, the password or the browser state.
+     * {@code waitingForCode}: an admin login waits for its 2FA code, so {@link #submitCode} can take one.
+     */
     public record AccountDto(UUID id, String label, String battleTag, String authState, String sessionState,
-                             int fillOrder, boolean friendLimitReached, boolean enabled, long friendCount) {}
+                             int fillOrder, boolean friendLimitReached, boolean enabled, long friendCount,
+                             boolean waitingForCode) {}
 
     private final BattleNetServiceAccountRepository accountRepository;
     private final BattleNetFriendLinkRepository linkRepository;
@@ -209,6 +213,7 @@ public class BattleNetServiceAccountAdmin {
         return new AccountDto(account.getId(), account.getLabel(), account.getBattleTag(),
                 account.getAuthState().name(), sessionManager.sessionState(account.getId()),
                 account.getFillOrder(), account.isFriendLimitReached(), account.isEnabled(),
-                linkRepository.countByServiceAccountAndStatus(account, BattleNetFriendLink.Status.ACCEPTED));
+                linkRepository.countByServiceAccountAndStatus(account, BattleNetFriendLink.Status.ACCEPTED),
+                loginCoordinator.waitingForCode(account.getId()));
     }
 }

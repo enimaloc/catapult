@@ -126,6 +126,15 @@ class BattleNetServiceAccountAdminTest {
     }
 
     @Test
+    void waitingForCodeTellsWhetherALoginWaitsForTheCode() {
+        account.setAuthState(AuthState.CODE_REQUIRED);
+
+        assertThat(admin.list()).singleElement().extracting(AccountDto::waitingForCode).isEqualTo(false);
+        when(coordinator.waitingForCode(account.getId())).thenReturn(true);
+        assertThat(admin.list()).singleElement().extracting(AccountDto::waitingForCode).isEqualTo(true);
+    }
+
+    @Test
     void codeIsForwardedToTheCoordinator() {
         admin.submitCode(account.getId(), "123456");
 
