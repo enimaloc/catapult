@@ -25,7 +25,7 @@ import java.io.IOException;
 
 /**
  * Saves the refresh token after a successful OAuth2 login or secondary link
- * (Twitch = login, Xbox = secondary link on an already-authenticated user).
+ * (Twitch = login, Xbox and Battle.net = secondary links on an already-authenticated user).
  * Spring's OAuth2UserService only exposes the access token; the refresh token
  * is only available via OAuth2AuthorizedClientRepository once the client is saved,
  * which happens before this handler is called.
@@ -80,6 +80,13 @@ public class TwitchLoginSuccessHandler implements AuthenticationSuccessHandler {
                     response.sendRedirect(callback.encode().build().toUriString());
                     return;
                 }
+            } else if ("battlenet".equals(registrationId)) {
+                // Battle.net is a secondary link that keeps no token (the bot befriends the account): nothing to
+                // save, only send the user back to their channel's integrations tab.
+                if (webUrl != null && !webUrl.isBlank()) {
+                    response.sendRedirect(channelIntegrationsUrl(catUser));
+                    return;
+                }
             } else if ("xbox".equals(registrationId)) {
                 // Xbox is a secondary link: the user is already authenticated via Twitch.
                 // Only the refresh token needs saving — no login event, no JWT re-issuance.
@@ -89,18 +96,21 @@ public class TwitchLoginSuccessHandler implements AuthenticationSuccessHandler {
                 // they started, not the /dashboard default meant for the primary Twitch login on
                 // catapult-api itself.
                 if (webUrl != null && !webUrl.isBlank()) {
-                    String channelUrl = UriComponentsBuilder.fromUriString(webUrl)
-                            .path("/channel/{username}")
-                            .fragment("integrations")
-                            .buildAndExpand(catUser.getUserAccount().getTwitchUsername())
-                            .toUriString();
-                    response.sendRedirect(channelUrl);
+                    response.sendRedirect(channelIntegrationsUrl(catUser));
                     return;
                 }
             }
         }
 
         delegate.onAuthenticationSuccess(request, response, authentication);
+    }
+
+    private String channelIntegrationsUrl(CatapultOAuth2User catUser) {
+        return UriComponentsBuilder.fromUriString(webUrl)
+                .path("/channel/{username}")
+                .fragment("integrations")
+                .buildAndExpand(catUser.getUserAccount().getTwitchUsername())
+                .toUriString();
     }
 
     /**

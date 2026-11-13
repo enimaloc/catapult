@@ -40,6 +40,13 @@ import fr.enimaloc.catapult.service.binding.StreamStateService;
 import fr.enimaloc.catapult.service.connections.SteamProfileDiagnostics;
 import fr.enimaloc.catapult.service.igdb.AdminCclService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
+import fr.enimaloc.catapult.service.battlenet.BattleNetGateService;
+import fr.enimaloc.catapult.service.battlenet.BattleNetLinkStateService;
+import fr.enimaloc.catapult.repository.battlenet.BattleNetFriendLinkRepository;
+import fr.enimaloc.catapult.repository.battlenet.BattleNetServiceAccountRepository;
+import fr.enimaloc.catapult.domain.battlenet.BattleNetFriendLink;
+import fr.enimaloc.catapult.domain.battlenet.BattleNetServiceAccount;
+import fr.enimaloc.catapult.common.dto.channel.BattleNetData;
 import fr.enimaloc.catapult.service.minecraft.MinecraftFriendService;
 import fr.enimaloc.catapult.service.minecraft.MinecraftGateService;
 import fr.enimaloc.catapult.service.minecraft.MinecraftLinkStateService;
@@ -90,6 +97,11 @@ class ChannelDashboardAssemblerTest {
     private final MinecraftFriendService minecraft = mock(MinecraftFriendService.class);
     private final MinecraftGateService minecraftGate = mock(MinecraftGateService.class);
     private final MinecraftServiceAccountRepository minecraftAccounts = mock(MinecraftServiceAccountRepository.class);
+    private final BattleNetGateService battleNetGate = mock(BattleNetGateService.class);
+    private final BattleNetFriendLinkRepository battleNetLinks = mock(BattleNetFriendLinkRepository.class);
+    private final BattleNetServiceAccountRepository battleNetAccounts = mock(BattleNetServiceAccountRepository.class);
+    private final BattleNetLinkStateService battleNetStates =
+            new BattleNetLinkStateService(battleNetGate, battleNetLinks, battleNetAccounts);
     private final MinecraftLinkStateService minecraftStates =
             new MinecraftLinkStateService(minecraft, minecraftGate, minecraftAccounts);
     private final TwitchatWidgetSettingsService twitchat = mock(TwitchatWidgetSettingsService.class);
@@ -109,11 +121,12 @@ class ChannelDashboardAssemblerTest {
 
     private ChannelDashboardAssembler assembler(Optional<SteamApiClient> steamClient,
                                                 Optional<MinecraftLinkStateService> minecraftService,
+                                                Optional<BattleNetLinkStateService> battleNetService,
                                                 boolean xboxEnabled) {
         SteamProfileDiagnostics diagnostics = new SteamProfileDiagnostics(steamClient, Optional.of(keyRotator), encryption);
         ChannelDashboardAssembler assembler = new ChannelDashboardAssembler(bindings, settingsRepository, streamState,
                 gameState, ccls, tws, encryption, steamClient, diagnostics, igdb, dtddMappings, dtddCache,
-                dtddProposals, oauthTokens, minecraftService, twitchat, raidRestoreGate,
+                dtddProposals, oauthTokens, minecraftService, battleNetService, twitchat, raidRestoreGate,
                 new fr.enimaloc.catapult.api.CustomBindingViews(customBindings,
                         org.mockito.Mockito.mock(fr.enimaloc.catapult.service.premium.PremiumUiGate.class),
                         org.mockito.Mockito.mock(fr.enimaloc.catapult.service.binding.schedule.CustomBindingScheduleService.class),
@@ -125,7 +138,7 @@ class ChannelDashboardAssemblerTest {
     }
 
     private ChannelDashboardAssembler assembler() {
-        return assembler(Optional.of(steam), Optional.of(minecraftStates), true);
+        return assembler(Optional.of(steam), Optional.of(minecraftStates), Optional.of(battleNetStates), true);
     }
 
     private static UserAccount account(String username) {
@@ -391,7 +404,7 @@ class ChannelDashboardAssemblerTest {
 
         @Test
         void unavailableProvidersAreNull() {
-            ChannelPageData page = assembler(Optional.empty(), Optional.empty(), false)
+            ChannelPageData page = assembler(Optional.empty(), Optional.empty(), Optional.empty(), false)
                     .page(owner, owner, "streamer", 0, null, null);
 
             assertThat(page.steam()).isNull();
@@ -442,6 +455,32 @@ class ChannelDashboardAssemblerTest {
 
             assertThat(assembler().page(owner, owner, "streamer", 0, null, null).minecraft())
                     .isEqualTo(new MinecraftData("FULL", null, null));
+        }
+
+        @Test
+        void dashboardCarriesBattleNetDataForTheOwnerOnly() {
+            BattleNetServiceAccount bot = new BattleNetServiceAccount();
+            bot.setBattleTag("Bot#1111");
+            BattleNetFriendLink link = new BattleNetFriendLink();
+            link.setStatus(BattleNetFriendLink.Status.ACCEPTED);
+            link.setBattleTag("Name#1234");
+            link.setServiceAccount(bot);
+            when(battleNetGate.isAvailableFor(owner)).thenReturn(true);
+            when(battleNetAccounts.countByEnabledTrueAndAuthState(BattleNetServiceAccount.AuthState.READY))
+                    .thenReturn(1L);
+            when(battleNetLinks.findWithServiceAccountByUser(owner)).thenReturn(Optional.of(link));
+            when(bindings.findByUser(eq(owner), any())).thenReturn(new PageImpl<>(List.of()));
+
+            assertThat(assembler().page(owner, owner, "streamer", 0, null, null).battleNet())
+                    .isEqualTo(new BattleNetData("ACCEPTED", "Name#1234", "Bot#1111"));
+            assertThat(assembler().page(moderator, owner, "streamer", 0, null, null).battleNet()).isNull();
+        }
+
+        @Test
+        void battleNetClosedToTheChannelIsNull() {
+            when(battleNetGate.isAvailableFor(owner)).thenReturn(false);
+
+            assertThat(assembler().page(owner, owner, "streamer", 0, null, null).battleNet()).isNull();
         }
 
         @Test
@@ -810,7 +849,7 @@ class ChannelDashboardAssemblerTest {
         @Test
         void nothingToDoWithoutSteam() {
             assembler().refreshSteamProfileCache(owner);
-            assembler(Optional.empty(), Optional.empty(), false).refreshSteamProfileCache(owner);
+            assembler(Optional.empty(), Optional.empty(), Optional.empty(), false).refreshSteamProfileCache(owner);
 
             verify(steam, never()).invalidateProfileCache(any(), any());
         }

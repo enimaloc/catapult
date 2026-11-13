@@ -36,7 +36,7 @@ public class Oauth2LoginFailureHandler implements AuthenticationFailureHandler {
     private static final int RETRY_COOKIE_MAX_AGE_SECONDS = 60;
     private static final Set<String> BUSINESS_ERROR_CODES = Set.of(
             "not_whitelisted", "invalid_invite", "alpha_full",
-            "system_account_login_forbidden", "unauthorized");
+            "system_account_login_forbidden", "unauthorized", "battlenet_unavailable", "battlenet_full");
 
     @Value("${app.web-url:http://localhost:8080}")
     private String webUrl;

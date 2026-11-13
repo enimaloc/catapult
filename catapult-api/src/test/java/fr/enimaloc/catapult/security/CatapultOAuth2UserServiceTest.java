@@ -11,6 +11,8 @@ import fr.enimaloc.catapult.repository.binding.GetterConfigRepository;
 import fr.enimaloc.catapult.service.access.InviteService;
 import fr.enimaloc.catapult.service.access.WhitelistService;
 import fr.enimaloc.catapult.service.account.AdminMigrationService;
+import fr.enimaloc.catapult.service.battlenet.BattleNetFriendService;
+import fr.enimaloc.catapult.service.battlenet.BattleNetGateService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,7 +23,13 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -34,6 +42,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
@@ -50,6 +59,11 @@ class CatapultOAuth2UserServiceTest {
     @Mock private WhitelistService whitelistService;
     @Mock private AdminMigrationService adminMigrationService;
     @Mock private InviteService inviteService;
+    @Mock private BattleNetGateService battleNetGate;
+    @Mock private BattleNetFriendService battleNetFriends;
+    @Mock private ObjectProvider<BattleNetFriendService> battleNetFriendsProvider;
+    @Mock private DefaultOAuth2UserService battleNetUserInfo;
+    @Mock private PlatformTransactionManager transactionManager;
 
     @Mock private RestClient.RequestHeadersUriSpec getSpec;
     @Mock private RestClient.RequestHeadersSpec headersSpec;
@@ -62,7 +76,8 @@ class CatapultOAuth2UserServiceTest {
         service = new CatapultOAuth2UserService(
             userAccountRepository, oAuthTokenRepository, userSettingsRepository,
             getterConfigRepository, tokenEncryptionService, eventPublisher, restClient, whitelistService,
-            adminMigrationService, inviteService
+            adminMigrationService, inviteService, battleNetGate, battleNetFriendsProvider,
+            new TransactionTemplate(transactionManager)
         );
         ReflectionTestUtils.setField(service, "ownerId", "");
         ReflectionTestUtils.setField(service, "defaultNoGameName", "");
@@ -248,5 +263,118 @@ class CatapultOAuth2UserServiceTest {
         org.junit.jupiter.api.Assertions.assertThrows(
             org.springframework.security.oauth2.core.OAuth2AuthenticationException.class,
             () -> ReflectionTestUtils.invokeMethod(service, "handleSecondaryLink", buildRequest(), OAuthToken.Provider.XBOX));
+    }
+
+    private OAuth2UserRequest battleNetRequest() {
+        ClientRegistration reg = ClientRegistration.withRegistrationId("battlenet")
+            .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+            .clientId("client-id")
+            .redirectUri("http://localhost/callback")
+            .authorizationUri("https://oauth.battle.net/authorize")
+            .tokenUri("https://oauth.battle.net/token")
+            .userInfoUri("https://oauth.battle.net/userinfo")
+            .userNameAttributeName("sub")
+            .build();
+        OAuth2AccessToken token = new OAuth2AccessToken(
+            OAuth2AccessToken.TokenType.BEARER, "bnet-token", Instant.now(), Instant.now().plusSeconds(3600));
+        return new OAuth2UserRequest(reg, token);
+    }
+
+    private CatapultOAuth2User signedInStreamer(UserAccount account) {
+        CatapultOAuth2User principal = new CatapultOAuth2User(null, account, false);
+        SecurityContextHolder.getContext().setAuthentication(new TestingAuthenticationToken(principal, null));
+        return principal;
+    }
+
+    private void battleNetUserInfoIs(Map<String, Object> attributes) {
+        ReflectionTestUtils.setField(service, "delegate", battleNetUserInfo);
+        when(battleNetUserInfo.loadUser(any())).thenReturn(
+            new DefaultOAuth2User(List.of(), attributes, "sub"));
+    }
+
+    @Test
+    void battlenetLinkEnrollsWithUserInfoIdAndTag() {
+        UserAccount account = new UserAccount();
+        account.setId(UUID.randomUUID());
+        CatapultOAuth2User principal = signedInStreamer(account);
+        when(battleNetFriendsProvider.getIfAvailable()).thenReturn(battleNetFriends);
+        when(battleNetGate.isAvailableFor(account)).thenReturn(true);
+        battleNetUserInfoIs(Map.of("sub", "1234567890", "id", 1234567890L, "battletag", "Name#1234"));
+
+        var user = service.loadUser(battleNetRequest());
+
+        verify(battleNetFriends).enroll(account, 1234567890L, "Name#1234");
+        assertThat(user).isSameAs(principal);
+    }
+
+    @Test
+    void battlenetLinkFallsBackToTheSubWhenTheIdIsMissing() {
+        UserAccount account = new UserAccount();
+        account.setId(UUID.randomUUID());
+        signedInStreamer(account);
+        when(battleNetFriendsProvider.getIfAvailable()).thenReturn(battleNetFriends);
+        when(battleNetGate.isAvailableFor(account)).thenReturn(true);
+        battleNetUserInfoIs(Map.of("sub", "42", "battletag", "Name#1234"));
+
+        service.loadUser(battleNetRequest());
+
+        verify(battleNetFriends).enroll(account, 42L, "Name#1234");
+    }
+
+    @Test
+    void battlenetLinkWithoutTwitchSessionIsUnauthorized() {
+        assertThatThrownBy(() -> service.loadUser(battleNetRequest()))
+            .isInstanceOf(OAuth2AuthenticationException.class)
+            .extracting(e -> ((OAuth2AuthenticationException) e).getError().getErrorCode())
+            .isEqualTo("unauthorized");
+        verifyNoInteractions(battleNetFriends);
+    }
+
+    @Test
+    void battlenetLinkWithClosedGateFails() {
+        UserAccount account = new UserAccount();
+        account.setId(UUID.randomUUID());
+        signedInStreamer(account);
+        when(battleNetFriendsProvider.getIfAvailable()).thenReturn(battleNetFriends);
+        when(battleNetGate.isAvailableFor(account)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.loadUser(battleNetRequest()))
+            .isInstanceOf(OAuth2AuthenticationException.class)
+            .extracting(e -> ((OAuth2AuthenticationException) e).getError().getErrorCode())
+            .isEqualTo("battlenet_unavailable");
+        verifyNoInteractions(battleNetFriends);
+    }
+
+    @Test
+    void battlenetLinkWithNoRoomFails() {
+        UserAccount account = new UserAccount();
+        account.setId(UUID.randomUUID());
+        signedInStreamer(account);
+        when(battleNetFriendsProvider.getIfAvailable()).thenReturn(battleNetFriends);
+        when(battleNetGate.isAvailableFor(account)).thenReturn(true);
+        battleNetUserInfoIs(Map.of("sub", "1", "id", 1L, "battletag", "Name#1234"));
+        when(battleNetFriends.enroll(account, 1L, "Name#1234")).thenThrow(
+            new BattleNetFriendService.BattleNetEnrollmentException(
+                BattleNetFriendService.BattleNetEnrollmentException.Reason.NO_CAPACITY, "full"));
+
+        assertThatThrownBy(() -> service.loadUser(battleNetRequest()))
+            .isInstanceOf(OAuth2AuthenticationException.class)
+            .extracting(e -> ((OAuth2AuthenticationException) e).getError().getErrorCode())
+            .isEqualTo("battlenet_full");
+    }
+
+    @Test
+    void battlenetTokenIsNotSaved() {
+        UserAccount account = new UserAccount();
+        account.setId(UUID.randomUUID());
+        signedInStreamer(account);
+        when(battleNetFriendsProvider.getIfAvailable()).thenReturn(battleNetFriends);
+        when(battleNetGate.isAvailableFor(account)).thenReturn(true);
+        battleNetUserInfoIs(Map.of("sub", "1", "id", 1L, "battletag", "Name#1234"));
+
+        service.loadUser(battleNetRequest());
+
+        verifyNoInteractions(oAuthTokenRepository);
+        verifyNoInteractions(transactionManager);
     }
 }
