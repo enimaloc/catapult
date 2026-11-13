@@ -90,6 +90,24 @@ class BattleNetLoginCoordinatorTest {
     }
 
     @Test
+    void anAdminEditRacingTheLoginIsRetriedOnceOnAFreshCopy() throws Exception {
+        browser.script(new Outcome.Ticket(TICKET));
+        java.util.concurrent.atomic.AtomicInteger saves = new java.util.concurrent.atomic.AtomicInteger();
+        when(repository.save(any())).thenAnswer(inv -> {
+            if (saves.incrementAndGet() == 1) {
+                throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
+                        BattleNetServiceAccount.class, account.getId());
+            }
+            return inv.getArgument(0);
+        });
+
+        coordinator.startInteractive(account.getId()).get(5, TimeUnit.SECONDS);
+
+        assertThat(saves.get()).isEqualTo(2);
+        assertThat(account.getAuthState()).isEqualTo(AuthState.READY);
+    }
+
+    @Test
     void automaticReMintReturnsTheTicket() throws Exception {
         browser.script(new Outcome.Ticket(TICKET));
 

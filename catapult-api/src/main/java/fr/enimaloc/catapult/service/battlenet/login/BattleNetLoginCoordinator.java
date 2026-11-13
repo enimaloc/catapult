@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.service.battlenet.login;
 
 import fr.enimaloc.catapult.bgs.client.TicketException;
 import fr.enimaloc.catapult.bgs.client.TicketProvider;
+import fr.enimaloc.catapult.domain.battlenet.BattleNetServiceAccount;
 import fr.enimaloc.catapult.domain.battlenet.BattleNetServiceAccount.AuthState;
 import fr.enimaloc.catapult.repository.battlenet.BattleNetServiceAccountRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
@@ -13,6 +14,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionOperations;
 
@@ -28,6 +30,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Consumer;
 
 /**
  * Runs the Battle.net logins of the service accounts (spec §9, §9.1) one at a time on a dedicated thread,
@@ -250,18 +253,32 @@ public class BattleNetLoginCoordinator {
 
     private void saveSuccess(UUID accountId, @Nullable String storageState) {
         @Nullable String encrypted = storageState == null ? null : encryption.encrypt(storageState);
-        transactions.executeWithoutResult(status -> repository.findById(accountId).ifPresent(account -> {
+        update(accountId, account -> {
             if (encrypted != null) account.setStorageStateEnc(encrypted);
             account.setAuthState(AuthState.READY);
-            repository.save(account);
-        }));
+        });
     }
 
     private void setAuthState(UUID accountId, AuthState state) {
-        transactions.executeWithoutResult(status -> repository.findById(accountId).ifPresent(account -> {
-            account.setAuthState(state);
-            repository.save(account);
-        }));
+        update(accountId, account -> account.setAuthState(state));
+    }
+
+    /**
+     * Reloads and saves the account; an admin edit that slipped in between (optimistic lock) is picked up
+     * by one retry on a fresh copy, so the login's fields never overwrite the edit.
+     */
+    private void update(UUID accountId, Consumer<BattleNetServiceAccount> change) {
+        for (int attempt = 1; ; attempt++) {
+            try {
+                transactions.executeWithoutResult(status -> repository.findById(accountId).ifPresent(account -> {
+                    change.accept(account);
+                    repository.save(account);
+                }));
+                return;
+            } catch (ObjectOptimisticLockingFailureException e) {
+                if (attempt >= 2) throw e;
+            }
+        }
     }
 
     @PreDestroy

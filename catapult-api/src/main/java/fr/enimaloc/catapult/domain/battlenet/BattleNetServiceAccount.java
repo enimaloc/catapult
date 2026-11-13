@@ -66,6 +66,10 @@ public class BattleNetServiceAccount {
     @Column(nullable = false)
     private Instant updatedAt = Instant.now();
 
+    /** Optimistic lock: admin edits and in-flight logins both write the account. */
+    @Version
+    private long version;
+
     @PreUpdate
     void onUpdate() {
         this.updatedAt = Instant.now();
