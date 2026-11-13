@@ -52,9 +52,9 @@ class BattleNetRepositoriesTest {
         em.persistAndFlush(link);
         em.clear();
 
-        assertThat(links.findByServiceAccountAndBnetAccountId(bot, 100000002L)).isPresent()
-                .get().extracting(BattleNetFriendLink::getStatus).isEqualTo(BattleNetFriendLink.Status.PENDING);
-        assertThat(links.findByServiceAccountAndBattleTagIgnoreCase(bot, "streamer#2928")).isPresent();
+        assertThat(links.findByServiceAccountAndBnetAccountId(bot, 100000002L))
+                .singleElement().extracting(BattleNetFriendLink::getStatus).isEqualTo(BattleNetFriendLink.Status.PENDING);
+        assertThat(links.findByServiceAccountAndBattleTagIgnoreCase(bot, "streamer#2928")).hasSize(1);
         assertThat(links.findByServiceAccountAndBnetAccountId(bot, 7L)).isEmpty();
         assertThat(accounts.findByBnetAccountId(42L)).isPresent();
     }

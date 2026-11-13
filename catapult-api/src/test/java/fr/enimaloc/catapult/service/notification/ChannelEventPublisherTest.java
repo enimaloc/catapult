@@ -157,6 +157,15 @@ class ChannelEventPublisherTest {
     }
 
     @Test
+    void battleNetLinkChanged_publishesTheLinkState() {
+        publisher.battleNetLinkChanged(ownerId, "PENDING", "Streamer#2928", "CatapultBot#1234");
+
+        assertThat(published(ChannelEvents.BATTLENET_LINK_CHANGED)).isEqualTo(
+                new ChannelEvents.BattleNetLinkChanged(ownerId.toString(), "streamername", "PENDING",
+                        "Streamer#2928", "CatapultBot#1234"));
+    }
+
+    @Test
     void customBindingChanged_publishesTheActiveOne() {
         UUID active = UUID.randomUUID();
         publisher.customBindingChanged(ownerId, active);

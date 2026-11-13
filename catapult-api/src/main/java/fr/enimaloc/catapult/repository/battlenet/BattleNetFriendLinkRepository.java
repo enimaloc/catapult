@@ -24,10 +24,20 @@ public interface BattleNetFriendLinkRepository extends JpaRepository<BattleNetFr
     long countByServiceAccountAndStatus(BattleNetServiceAccount serviceAccount, BattleNetFriendLink.Status status);
     boolean existsByServiceAccountAndStatus(BattleNetServiceAccount serviceAccount, BattleNetFriendLink.Status status);
 
-    Optional<BattleNetFriendLink> findByServiceAccountAndBnetAccountId(BattleNetServiceAccount serviceAccount,
-                                                                       long bnetAccountId);
+    /**
+     * Several links can match (nothing makes {@code bnetAccountId} unique per bot: two Catapult users may link the
+     * same Battle.net account), hence a list.
+     */
+    List<BattleNetFriendLink> findByServiceAccountAndBnetAccountId(BattleNetServiceAccount serviceAccount,
+                                                                   long bnetAccountId);
 
-    /** Attaches InvitationSent events, which carry account_id 0: matched by BattleTag instead. */
-    Optional<BattleNetFriendLink> findByServiceAccountAndBattleTagIgnoreCase(BattleNetServiceAccount serviceAccount,
-                                                                             String battleTag);
+    /**
+     * Attaches InvitationSent events, which carry account_id 0: matched by BattleTag instead. Several links can
+     * match (no unique constraint), hence a list.
+     */
+    List<BattleNetFriendLink> findByServiceAccountAndBattleTagIgnoreCase(BattleNetServiceAccount serviceAccount,
+                                                                         String battleTag);
+
+    List<BattleNetFriendLink> findByServiceAccountAndInvitationId(BattleNetServiceAccount serviceAccount,
+                                                                  long invitationId);
 }
