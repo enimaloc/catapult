@@ -238,6 +238,16 @@ public class BindingService {
     }
 
     /**
+     * {@link #igdbSuggestions(DetectedGame, boolean, boolean)} with the game's stored mapping left aside
+     * ({@link IgdbService#resolveUnmapped}): for a write whose mapping names no IGDB game while its stored row, not
+     * updated yet, may still name the old one. None for Battle.net.
+     */
+    public MappingSuggestions igdbSuggestionsUnmapped(DetectedGame game, boolean ccls, boolean tws) {
+        if (!ccls && !tws) return MappingSuggestions.NONE;
+        return igdbSuggestions(resolveUnmappedViaIgdb(game).map(IgdbService.IgdbGame::id), game, ccls, tws);
+    }
+
+    /**
      * {@link #igdbSuggestions(DetectedGame, boolean, boolean)} for the IGDB game the mapping itself names, not the
      * one already saved (a write resolves its suggestions before the mapping is stored).
      */
@@ -301,8 +311,22 @@ public class BindingService {
         return updateWithoutMapping(binding.getUser(), detectedOf(binding), binding);
     }
 
+    /**
+     * {@link #resolveWithoutMapping} without the IGDB game of the stored mapping either
+     * ({@link IgdbService#resolveUnmapped}): for the bindings of a game its mapping is no longer about.
+     */
+    @Transactional
+    public GameBinding resolveUnmapped(GameBinding binding) {
+        DetectedGame detectedGame = detectedOf(binding);
+        return updateFromIgdb(binding.getUser(), detectedGame, binding, resolveUnmappedViaIgdb(detectedGame));
+    }
+
     private GameBinding updateWithoutMapping(UserAccount user, DetectedGame detectedGame, GameBinding binding) {
-        Optional<IgdbService.IgdbGame> igdbGame = resolveViaIgdb(detectedGame);
+        return updateFromIgdb(user, detectedGame, binding, resolveViaIgdb(detectedGame));
+    }
+
+    private GameBinding updateFromIgdb(UserAccount user, DetectedGame detectedGame, GameBinding binding,
+                                       Optional<IgdbService.IgdbGame> igdbGame) {
 
         if (igdbGame.isPresent()) {
             String igdbId = igdbGame.get().id();
@@ -368,6 +392,14 @@ public class BindingService {
     private Optional<IgdbService.IgdbGame> resolveViaIgdb(DetectedGame detectedGame) {
         return detectedGame.getSourceId() != null
                 ? igdbService.resolveDetected(detectedGame.getSourceType(), detectedGame.getSourceId(),
+                        detectedGame.getSourceName())
+                : Optional.empty();
+    }
+
+    /** {@link #resolveViaIgdb} with the stored mapping left aside ({@link IgdbService#resolveUnmapped}). */
+    private Optional<IgdbService.IgdbGame> resolveUnmappedViaIgdb(DetectedGame detectedGame) {
+        return detectedGame.getSourceId() != null
+                ? igdbService.resolveUnmapped(detectedGame.getSourceType(), detectedGame.getSourceId(),
                         detectedGame.getSourceName())
                 : Optional.empty();
     }

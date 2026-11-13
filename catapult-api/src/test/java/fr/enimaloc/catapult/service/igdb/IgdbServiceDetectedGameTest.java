@@ -136,6 +136,21 @@ class IgdbServiceDetectedGameTest {
     }
 
     @Test
+    void resolveUnmappedLeavesTheMappingsIgdbGameAside() {
+        mapped(GameBinding.SourceType.STEAM, "570", "123");
+        mapped(GameBinding.SourceType.BATTLENET, "Pro", "456");
+        when(igdb.findExternalGameByUid("570", STEAM, "token")).thenReturn(List.of(ExternalGame.newBuilder()
+                .setGame(Game.newBuilder().setId(7).setName("Dota 2")).build()));
+
+        assertThat(service.resolveUnmapped(GameBinding.SourceType.STEAM, "570", "Dota 2"))
+                .contains(new IgdbService.IgdbGame("7", "Dota 2"));
+        assertThat(service.resolveUnmapped(GameBinding.SourceType.BATTLENET, "Pro", "Overwatch")).isEmpty();
+
+        verify(mappings, never()).findBySourceTypeAndSourceId(any(), anyString());
+        verify(service, never()).findByName(anyString());
+    }
+
+    @Test
     void resolveIgdbIdForBindingUsesTheMapping() {
         mapped(GameBinding.SourceType.BATTLENET, "Pro", "456");
         knownName("456", "Overwatch 2");

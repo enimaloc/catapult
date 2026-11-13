@@ -216,7 +216,8 @@ public class AdminGameMappingService {
                     throw duplicate();
                 }
                 // Now about another game: the old one's bindings go back to IGDB, and are no longer ignored by it.
-                changes.addAll(backToIgdb(mapping.getSourceType(), mapping.getSourceId()));
+                // Its stored row still names the old game: resolved without its IGDB game
+                changes.addAll(backToIgdb(mapping.getSourceType(), mapping.getSourceId(), true));
                 if (mapping.isIgnoredByDefault()) {
                     applyIgnore(mapping.getSourceType(), mapping.getSourceId(), false, changes);
                 }
@@ -346,10 +347,11 @@ public class AdminGameMappingService {
         GameKey game = GameKey.of(target.sourceType(), target.sourceId());
         String name = mostFrequentNames(List.of(game)).get(game);
         DetectedGame detected = new DetectedGame(target.sourceId(), target.sourceType(), name);
-        // The request's IGDB game, not the saved mapping's (none yet on a create, the old one on an update)
+        // The request's IGDB game, not the saved mapping's (none yet on a create, the old one on an update): without
+        // one, the stored row's is left aside too
         return target.igdbId() != null
                 ? bindingService.igdbSuggestions(target.igdbId(), detected, request.ccls() == null, request.tws() == null)
-                : bindingService.igdbSuggestions(detected, request.ccls() == null, request.tws() == null);
+                : bindingService.igdbSuggestionsUnmapped(detected, request.ccls() == null, request.tws() == null);
     }
 
     /**
@@ -374,11 +376,20 @@ public class AdminGameMappingService {
      * are locked first and their status checked again, as in {@link #applyToBindings}.
      */
     private List<GameBinding> backToIgdb(SourceType sourceType, String sourceId) {
+        return backToIgdb(sourceType, sourceId, false);
+    }
+
+    /**
+     * {@link #backToIgdb(SourceType, String)}; {@code withoutMapping} also leaves aside the IGDB game of the
+     * mapping stored for that game (one moved to another game, its row not updated yet).
+     */
+    private List<GameBinding> backToIgdb(SourceType sourceType, String sourceId, boolean withoutMapping) {
         List<GameBinding> changed = new ArrayList<>();
         for (GameBinding binding : bindingRepository.lockAllBySourceTypeAndSourceIdAndStatusIn(
                 sourceType, sourceId, List.of(Status.MAPPED))) {
             if (binding.getStatus() != Status.MAPPED) continue;
-            changed.add(bindingService.resolveWithoutMapping(binding));
+            changed.add(withoutMapping ? bindingService.resolveUnmapped(binding)
+                    : bindingService.resolveWithoutMapping(binding));
         }
         return changed;
     }

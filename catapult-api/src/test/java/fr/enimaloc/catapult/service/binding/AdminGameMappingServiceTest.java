@@ -516,7 +516,7 @@ class AdminGameMappingServiceTest {
         bindingsOfTheGame(auto);
         when(bindingRepo.countSourceNames(anyCollection(), anyCollection())).thenReturn(List.<Object[]>of(
                 new Object[]{SourceType.STEAM, "730", "Counter-Strike 2", 1L}));
-        when(igdbService.resolveDetected(eq(SourceType.STEAM), eq("730"), any()))
+        when(igdbService.resolveUnmapped(eq(SourceType.STEAM), eq("730"), any()))
                 .thenReturn(Optional.of(new IgdbService.IgdbGame("42", "Counter-Strike 2")));
         when(igdbService.suggestCcls("42")).thenReturn(Set.of("ViolentGraphic"));
 
@@ -853,5 +853,89 @@ class AdminGameMappingServiceTest {
         assertThat(mapped.getCcls()).containsExactly("ViolentGraphic");
         assertThat(old.getIgdbId()).isEqualTo("42");
         verify(igdbService, never()).suggestCcls("41");
+    }
+
+    private GameMapping storedMapping(SourceType sourceType, String sourceId, String igdbId) {
+        GameMapping m = new GameMapping();
+        m.setId(UUID.randomUUID());
+        m.setSourceType(sourceType);
+        m.setSourceId(sourceId);
+        m.setTwitchGameId("488552");
+        m.setTwitchGameName("Overwatch 2");
+        m.setIgdbId(igdbId);
+        mappings.put(m.getId(), m);
+        return m;
+    }
+
+    private static GameBinding battlenetBinding(UserAccount owner, Status status) {
+        GameBinding b = binding(owner, "Pro", status);
+        b.setSourceType(SourceType.BATTLENET);
+        b.setSourceName("Overwatch");
+        return b;
+    }
+
+    private void battlenetBindings(GameBinding... bindings) {
+        when(bindingRepo.lockAllBySourceTypeAndSourceIdAndStatusIn(eq(SourceType.BATTLENET), eq("Pro"),
+                anyCollection())).thenAnswer(inv -> new ArrayList<>(List.of(bindings)));
+    }
+
+    /** What the not-yet-updated mapping row says: the old IGDB game, through the mapping-aware resolution. */
+    private void storedRowResolvesTo(String igdbId) {
+        when(igdbService.resolveDetected(any(), any(), any()))
+                .thenReturn(Optional.of(new IgdbService.IgdbGame(igdbId, "Old game")));
+        when(igdbService.suggestCcls(igdbId)).thenReturn(Set.of("Old"));
+        when(igdbService.findTwitchGameId(igdbId)).thenReturn(Optional.of("488552"));
+    }
+
+    @Test
+    void updateClearingTheIgdbIdTakesNoSuggestionsFromTheOldOne() {
+        GameMapping old = storedMapping(SourceType.BATTLENET, "Pro", "123");
+        GameBinding mapped = battlenetBinding(user("a"), Status.MAPPED);
+        mapped.getCcls().add("Old");
+        battlenetBindings(mapped);
+        storedRowResolvesTo("123");
+
+        service.update(old.getId(), new GameMappingRequest("BATTLENET", "Pro", "488552", "Overwatch 2", null, null,
+                false, false, null), admin);
+
+        assertThat(old.getIgdbId()).isNull();
+        // Battle.net without an IGDB game: no IGDB data at all (spec 3.4)
+        assertThat(mapped.getCcls()).isEmpty();
+        assertThat(mapped.getTws()).isEmpty();
+        verify(igdbService, never()).suggestCcls("123");
+        verify(igdbService, never()).fetchDescriptorIds("123");
+    }
+
+    @Test
+    void updateClearingTheIgdbIdTakesSteamSuggestionsFromThePlatformId() {
+        GameMapping old = storedMapping(SourceType.STEAM, "730", "41");
+        GameBinding mapped = binding(user("a"), "730", Status.MAPPED);
+        bindingsOfTheGame(mapped);
+        storedRowResolvesTo("41");
+        when(igdbService.resolveUnmapped(eq(SourceType.STEAM), eq("730"), any()))
+                .thenReturn(Optional.of(new IgdbService.IgdbGame("42", "Counter-Strike 2")));
+        when(igdbService.suggestCcls("42")).thenReturn(Set.of("ViolentGraphic"));
+
+        service.update(old.getId(),
+                new GameMappingRequest("STEAM", "730", "32399", "CS", null, Set.of(), false, false, " "), admin);
+
+        assertThat(old.getIgdbId()).isNull();
+        assertThat(mapped.getCcls()).containsExactly("ViolentGraphic");
+        verify(igdbService, never()).suggestCcls("41");
+    }
+
+    @Test
+    void movingAMappingResolvesTheOldGameWithoutItsIgdbGame() {
+        GameMapping old = storedMapping(SourceType.BATTLENET, "Pro", "123");
+        GameBinding oldGame = battlenetBinding(user("a"), Status.MAPPED);
+        battlenetBindings(oldGame);
+        storedRowResolvesTo("123");
+
+        service.update(old.getId(), request("730", "32399", false), admin);
+
+        assertThat(old.getSourceType()).isEqualTo(SourceType.STEAM);
+        // No longer about Battle.net "Pro": its bindings get no IGDB game, hence incomplete
+        assertThat(oldGame.getStatus()).isEqualTo(Status.INCOMPLETE);
+        verify(igdbService, never()).suggestCcls("123");
     }
 }
