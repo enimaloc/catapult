@@ -350,11 +350,9 @@ public class ChannelDashboardAssembler {
         return new DtddMappingStatusDto(current, pending, canValidate, id, viewerIsAdmin);
     }
 
-    /** IGDB entry of a detected game: by app id for Steam games, by name otherwise. */
+    /** IGDB entry of a detected game, as {@link IgdbService#resolveDetected} resolves it. */
     private Optional<IgdbService.IgdbGame> igdbGame(DetectedGame game) {
-        return game.getSourceType() == GameBinding.SourceType.STEAM
-                ? igdbService.findBySteamAppId(game.getSourceId())
-                : igdbService.findByName(game.getSourceName());
+        return igdbService.resolveDetected(game.getSourceType(), game.getSourceId(), game.getSourceName());
     }
 
     private String dtddName(Long dtddId) {

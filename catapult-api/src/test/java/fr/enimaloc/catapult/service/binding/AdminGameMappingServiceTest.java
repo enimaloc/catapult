@@ -516,7 +516,7 @@ class AdminGameMappingServiceTest {
         bindingsOfTheGame(auto);
         when(bindingRepo.countSourceNames(anyCollection(), anyCollection())).thenReturn(List.<Object[]>of(
                 new Object[]{SourceType.STEAM, "730", "Counter-Strike 2", 1L}));
-        when(igdbService.findByExternalAppId(SourceType.STEAM, "730"))
+        when(igdbService.resolveDetected(eq(SourceType.STEAM), eq("730"), any()))
                 .thenReturn(Optional.of(new IgdbService.IgdbGame("42", "Counter-Strike 2")));
         when(igdbService.suggestCcls("42")).thenReturn(Set.of("ViolentGraphic"));
 

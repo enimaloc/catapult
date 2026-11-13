@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.perf;
 
+import fr.enimaloc.catapult.domain.binding.GameBinding;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -196,7 +197,7 @@ class RouteBudgetTest {
 
     /** IGDB knows the owner's game, the Steam store and the Microsoft Store have a page for it. */
     private void stubLookups() throws JacksonException {
-        when(igdbService.findBySteamAppId(BudgetFixtures.STEAM_APP_ID))
+        when(igdbService.resolveDetected(eq(GameBinding.SourceType.STEAM), eq(BudgetFixtures.STEAM_APP_ID), any()))
                 .thenReturn(Optional.of(new IgdbService.IgdbGame(BudgetFixtures.IGDB_ID, "Budget game 0")));
         SteamStoreService.SteamStorePage page = JsonMapper.builder().build().readValue(
                 "{\"type\":\"game\",\"name\":\"Budget game 0\",\"required_age\":0,\"is_free\":false,"

@@ -234,11 +234,7 @@ public class BindingService {
      */
     public MappingSuggestions igdbSuggestions(DetectedGame game, boolean ccls, boolean tws) {
         if (!ccls && !tws) return MappingSuggestions.NONE;
-        Optional<String> igdbId = (game.getSourceName() != null ? resolveViaIgdb(game)
-                : game.getSourceId() != null
-                        ? igdbService.findByExternalAppId(game.getSourceType(), game.getSourceId())
-                        : Optional.<IgdbService.IgdbGame>empty())
-                .map(IgdbService.IgdbGame::id);
+        Optional<String> igdbId = resolveViaIgdb(game).map(IgdbService.IgdbGame::id);
         return new MappingSuggestions(
                 ccls ? igdbId.map(igdbService::suggestCcls).orElse(Set.of()) : Set.of(),
                 tws ? igdbId.map(id -> suggestTws(id, game)).orElse(Set.of()) : Set.of());
@@ -298,6 +294,7 @@ public class BindingService {
 
         if (igdbGame.isPresent()) {
             String igdbId = igdbGame.get().id();
+            // Null when the game comes from a mapping whose IGDB name is not known yet (IGDB unreachable)
             String gameName = igdbGame.get().name();
             String twitchId = igdbGameDetailsService.getDetails(igdbId)
                     .map(IgdbGameDetails::getWebsites)
@@ -305,7 +302,7 @@ public class BindingService {
                     // A category id (external_games' uid), not a Twitch website's URL kept under the same key
                     .filter(BindingService::isTwitchCategoryId)
                     .or(() -> igdbService.findTwitchGameId(igdbId))
-                    .or(() -> twitchService.findCategoryIdByName(user, gameName))
+                    .or(() -> gameName == null ? Optional.empty() : twitchService.findCategoryIdByName(user, gameName))
                     .orElse(null);
             binding.setTwitchGameId(twitchId);
             binding.setTwitchGameName(gameName);
@@ -343,10 +340,11 @@ public class BindingService {
         return !id.isEmpty() && id.chars().allMatch(c -> c >= '0' && c <= '9');
     }
 
+    /** The detected game's IGDB game ({@link IgdbService#resolveDetected}); none without a platform id. */
     private Optional<IgdbService.IgdbGame> resolveViaIgdb(DetectedGame detectedGame) {
         return detectedGame.getSourceId() != null
-                ? igdbService.findByExternalAppId(detectedGame.getSourceType(), detectedGame.getSourceId())
-                    .or(() -> igdbService.findByName(detectedGame.getSourceName()))
+                ? igdbService.resolveDetected(detectedGame.getSourceType(), detectedGame.getSourceId(),
+                        detectedGame.getSourceName())
                 : Optional.empty();
     }
 

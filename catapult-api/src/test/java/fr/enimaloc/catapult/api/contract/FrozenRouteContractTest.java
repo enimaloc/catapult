@@ -204,7 +204,7 @@ class FrozenRouteContractTest extends FullContextTestBase {
     @BeforeEach
     void thirdParties() throws Exception {
         when(twitchService.updateChannelReporting(any(), any())).thenReturn(ChannelUpdateOutcome.APPLIED);
-        when(igdbService.findByName(any())).thenReturn(Optional.of(new IgdbService.IgdbGame(IGDB_ID, "Frozen Game")));
+        when(igdbService.resolveDetected(any(), any(), any())).thenReturn(Optional.of(new IgdbService.IgdbGame(IGDB_ID, "Frozen Game")));
         SteamStoreService.SteamStorePage page = JsonMapper.builder()
                 .build()
                 .readValue(

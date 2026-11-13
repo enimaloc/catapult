@@ -1,7 +1,6 @@
 package fr.enimaloc.catapult.service.dtdd;
 
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingCurrentDto;
-import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.dtdd.DtddGameCache;
 import fr.enimaloc.catapult.domain.dtdd.DtddMappingProposal;
 import fr.enimaloc.catapult.getter.DetectedGame;
@@ -84,11 +83,9 @@ public class DtddMappingEvents {
                 mapping.getConfidence(), mapping.isVerified())).orElse(null);
     }
 
-    /** The IGDB game of a detected game: by app id for Steam games, by name otherwise. */
+    /** The IGDB game of a detected game, as {@link IgdbService#resolveDetected} resolves it. */
     private Optional<String> igdbGameId(DetectedGame game) {
-        return (game.getSourceType() == GameBinding.SourceType.STEAM
-                ? igdbService.findBySteamAppId(game.getSourceId())
-                : igdbService.findByName(game.getSourceName()))
+        return igdbService.resolveDetected(game.getSourceType(), game.getSourceId(), game.getSourceName())
                 .map(IgdbService.IgdbGame::id);
     }
 }

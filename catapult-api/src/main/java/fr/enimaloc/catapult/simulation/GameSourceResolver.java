@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component;
  *   <li>Steam: the game's Steam app id on IGDB;</li>
  *   <li>Xbox: its Microsoft Store product id on IGDB, which the Xbox getter reports once it has resolved the title;</li>
  *   <li>Minecraft: {@code minecraft} / {@code Minecraft}, all the Minecraft getter ever reports;</li>
- *   <li>Battle.net: the name, as there is no id to report (Catapult resolves it by name).</li>
+ *   <li>Battle.net: the name, as there is no id to report (Catapult resolves it through its game mapping only).</li>
  * </ul>
  */
 @Component

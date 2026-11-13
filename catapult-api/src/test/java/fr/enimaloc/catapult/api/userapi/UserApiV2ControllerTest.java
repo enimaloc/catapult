@@ -51,6 +51,7 @@ import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
@@ -142,7 +143,7 @@ class UserApiV2ControllerTest {
         @Test
         void steamGame_isAggregatedFromEveryPlatform() throws Exception {
             playing(GameBinding.SourceType.STEAM, "892970", "Valheim");
-            when(igdbService.findByExternalAppId(GameBinding.SourceType.STEAM, "892970"))
+            when(igdbService.resolveDetected(eq(GameBinding.SourceType.STEAM), eq("892970"), any()))
                     .thenReturn(Optional.of(new IgdbService.IgdbGame("42", "Valheim")));
             IgdbGameDetails details = new IgdbGameDetails();
             details.setSlug("valheim");
@@ -201,7 +202,7 @@ class UserApiV2ControllerTest {
         @Test
         void igdbFallsBackToTheName_andDtddIsResolvedWhenEnabled() throws Exception {
             playing(GameBinding.SourceType.MINECRAFT, null, "Minecraft");
-            when(igdbService.findByName("Minecraft")).thenReturn(Optional.of(new IgdbService.IgdbGame("7", "Minecraft")));
+            when(igdbService.resolveDetected(any(), any(), eq("Minecraft"))).thenReturn(Optional.of(new IgdbService.IgdbGame("7", "Minecraft")));
             DtddGameMapping mapping = new DtddGameMapping();
             mapping.setDtddId(99L);
             when(dtddMappingService.resolve("7", "Minecraft")).thenReturn(mapping);
@@ -219,7 +220,7 @@ class UserApiV2ControllerTest {
         @Test
         void unmappedDtdd_isNull() throws Exception {
             playing(GameBinding.SourceType.MINECRAFT, null, "Minecraft");
-            when(igdbService.findByName("Minecraft")).thenReturn(Optional.of(new IgdbService.IgdbGame("7", "Minecraft")));
+            when(igdbService.resolveDetected(any(), any(), eq("Minecraft"))).thenReturn(Optional.of(new IgdbService.IgdbGame("7", "Minecraft")));
             when(dtddMappingService.resolve("7", "Minecraft")).thenReturn(new DtddGameMapping());
 
             mvc.perform(get("/api/user/game/{uuid}", token)).andExpect(jsonPath("$.dtdd").value(nullValue()));
@@ -271,7 +272,7 @@ class UserApiV2ControllerTest {
         playing(GameBinding.SourceType.STEAM, "892970", "Valheim");
         when(steamStoreService.fetchData(any(), any())).thenReturn(Optional.of(VALHEIM));
         when(steamStoreService.fetchIADisclosure(any(), any())).thenReturn(Optional.empty());
-        when(igdbService.findByExternalAppId(GameBinding.SourceType.STEAM, "892970"))
+        when(igdbService.resolveDetected(eq(GameBinding.SourceType.STEAM), eq("892970"), any()))
                 .thenReturn(Optional.of(new IgdbService.IgdbGame("42", "Valheim")));
         IgdbGameDetails details = new IgdbGameDetails();
         details.setSlug("valheim");
@@ -449,7 +450,7 @@ class UserApiV2ControllerTest {
         /** A Steam game IGDB knows as 42, with the given IGDB details. */
         private void steamGameWithIgdb(IgdbGameDetails details) {
             playing(GameBinding.SourceType.STEAM, "892970", "Valheim");
-            when(igdbService.findByExternalAppId(GameBinding.SourceType.STEAM, "892970"))
+            when(igdbService.resolveDetected(eq(GameBinding.SourceType.STEAM), eq("892970"), any()))
                     .thenReturn(Optional.of(new IgdbService.IgdbGame("42", "Valheim")));
             when(igdbGameDetailsService.getDetails("42")).thenReturn(Optional.of(details));
             when(steamStoreService.fetchData(any(), any())).thenReturn(Optional.of(VALHEIM));
@@ -461,7 +462,7 @@ class UserApiV2ControllerTest {
             // A null summary makes the summary's description lookup throw (findFirst on a null): out of this task.
             details.setSummary("Viking survival.");
             playing(GameBinding.SourceType.MANUAL, "m1", "Valheim");
-            when(igdbService.findByName("Valheim")).thenReturn(Optional.of(new IgdbService.IgdbGame("42", "Valheim")));
+            when(igdbService.resolveDetected(any(), any(), eq("Valheim"))).thenReturn(Optional.of(new IgdbService.IgdbGame("42", "Valheim")));
             when(igdbGameDetailsService.getDetails("42")).thenReturn(Optional.of(details));
         }
 
@@ -525,7 +526,7 @@ class UserApiV2ControllerTest {
         @Test
         void dtddObjectLinksItsMediaPageAndDetailRoute() throws Exception {
             playing(GameBinding.SourceType.MINECRAFT, null, "Minecraft");
-            when(igdbService.findByName("Minecraft")).thenReturn(Optional.of(new IgdbService.IgdbGame("7", "Minecraft")));
+            when(igdbService.resolveDetected(any(), any(), eq("Minecraft"))).thenReturn(Optional.of(new IgdbService.IgdbGame("7", "Minecraft")));
             DtddGameMapping mapping = new DtddGameMapping();
             mapping.setDtddId(99L);
             when(dtddMappingService.resolve("7", "Minecraft")).thenReturn(mapping);
@@ -692,7 +693,7 @@ class UserApiV2ControllerTest {
         @Test
         void summaryOfAnIgdbOnlyGameWithoutSummaryIsNotAnError() throws Exception {
             playing(GameBinding.SourceType.MANUAL, "m1", "Valheim");
-            when(igdbService.findByName("Valheim")).thenReturn(Optional.of(new IgdbService.IgdbGame("42", "Valheim")));
+            when(igdbService.resolveDetected(any(), any(), eq("Valheim"))).thenReturn(Optional.of(new IgdbService.IgdbGame("42", "Valheim")));
             when(igdbGameDetailsService.getDetails("42")).thenReturn(Optional.of(details("valheim")));
 
             mvc.perform(get("/api/user/summary/{uuid}", token))
