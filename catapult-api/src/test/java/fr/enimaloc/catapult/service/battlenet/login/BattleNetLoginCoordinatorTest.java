@@ -156,6 +156,35 @@ class BattleNetLoginCoordinatorTest {
     }
 
     @Test
+    void automaticReMintRejectedByBattleNetMarksAuthFailedAndStops() {
+        browser.script(new Outcome.Failed("wrong password"));
+
+        assertThatThrownBy(() -> coordinator.ticketProviderFor(account.getId()).mint())
+                .isInstanceOfSatisfying(TicketException.class, e -> assertThat(e.codeRequired()).isTrue());
+        assertThat(account.getAuthState()).isEqualTo(AuthState.AUTH_FAILED);
+    }
+
+    @Test
+    void automaticReMintTimeoutLeavesTheStateAndStaysRetryable() {
+        account.setAuthState(AuthState.READY);
+        browser.script(new Outcome.TimedOut());
+
+        assertThatThrownBy(() -> coordinator.ticketProviderFor(account.getId()).mint())
+                .isInstanceOfSatisfying(TicketException.class, e -> assertThat(e.codeRequired()).isFalse());
+        assertThat(account.getAuthState()).isEqualTo(AuthState.READY);
+    }
+
+    @Test
+    void automaticReMintWithoutABrowserStaysRetryable() {
+        account.setAuthState(AuthState.READY);
+        when(browserProvider.getIfAvailable()).thenReturn(null);
+
+        assertThatThrownBy(() -> coordinator.ticketProviderFor(account.getId()).mint())
+                .isInstanceOfSatisfying(TicketException.class, e -> assertThat(e.codeRequired()).isFalse());
+        assertThat(account.getAuthState()).isEqualTo(AuthState.READY);
+    }
+
+    @Test
     void reMintWhileAnInteractiveFlowWaitsForACodeFailsFast() throws Exception {
         browser.script(new Outcome.CodeRequired(), new Outcome.Ticket(TICKET));
         CompletableFuture<Void> login = coordinator.startInteractive(account.getId());

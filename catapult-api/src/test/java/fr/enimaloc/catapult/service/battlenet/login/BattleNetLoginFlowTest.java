@@ -81,12 +81,21 @@ class BattleNetLoginFlowTest {
     }
 
     @Test
-    void failedOutcomeIsReturned() {
-        browser.script(new Outcome.Failed("timeout"));
+    void failedOutcomeIsARejection() {
+        browser.script(new Outcome.Failed("wrong password"));
 
-        Result result = flow(true, Duration.ofMinutes(10)).run(browser.open(null), "e", "p");
+        Result result = flow(false, Duration.ofMinutes(10)).run(browser.open(null), "e", "p");
 
-        assertThat(result).isEqualTo(new Result.Failed("timeout"));
+        assertThat(result).isEqualTo(new Result.Rejected("wrong password"));
+    }
+
+    @Test
+    void timeoutIsARetryableFailure() {
+        browser.script(new Outcome.TimedOut());
+
+        Result result = flow(false, Duration.ofMinutes(10)).run(browser.open(null), "e", "p");
+
+        assertThat(result).isInstanceOf(Result.Failed.class);
     }
 
     @Test

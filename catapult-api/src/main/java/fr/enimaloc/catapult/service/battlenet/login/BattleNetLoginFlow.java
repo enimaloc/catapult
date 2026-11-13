@@ -30,6 +30,11 @@ public final class BattleNetLoginFlow {
         record CodeRequired() implements Result {
         }
 
+        /** Battle.net turned the login down: an admin must fix the account before any retry. */
+        record Rejected(String reason) implements Result {
+        }
+
+        /** Timeout or technical failure: a later retry may succeed. */
         record Failed(String reason) implements Result {
         }
     }
@@ -76,7 +81,10 @@ public final class BattleNetLoginFlow {
                         return new Result.Success(ticket.value(), storageStateOf(page));
                     }
                     case Outcome.Failed failed -> {
-                        return new Result.Failed(failed.reason());
+                        return new Result.Rejected(failed.reason());
+                    }
+                    case Outcome.TimedOut ignored -> {
+                        return new Result.Failed("No answer from the login page in time");
                     }
                     case Outcome.CodeRequired ignored -> {
                         if (!interactive) return new Result.CodeRequired();

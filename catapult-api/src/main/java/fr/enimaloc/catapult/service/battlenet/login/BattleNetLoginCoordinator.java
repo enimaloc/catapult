@@ -112,7 +112,14 @@ public class BattleNetLoginCoordinator {
         return flow != null && flow.waitingForCode();
     }
 
-    /** Automatic re-mint for the account's BGS session: blocking, never waits for a code. */
+    /**
+     * Automatic re-mint for the account's BGS session: blocking, never waits for a code. Failures that need an
+     * admin throw {@link TicketException} with {@code codeRequired=true}, so the connection stops instead of
+     * retrying: a code request ({@code CODE_REQUIRED}) and a login turned down by Battle.net, such as a wrong
+     * password or a locked account ({@code AUTH_FAILED}; repeated failed logins could get the bot locked).
+     * Timeouts and technical failures (browser crash, navigation error, no browser bean, unreadable stored
+     * credentials) leave the auth state unchanged and throw with {@code codeRequired=false}: retryable.
+     */
     public TicketProvider ticketProviderFor(UUID accountId) {
         return () -> mint(accountId);
     }
@@ -161,12 +168,14 @@ public class BattleNetLoginCoordinator {
                     .orElse(null));
         } catch (RuntimeException e) {
             return fail(accountId, flow, "Could not read the stored credentials (" + e.getClass().getSimpleName() + ")",
-                    true);
+                    flow.interactive());
         }
         if (credentials == null) throw new TicketException("Unknown Battle.net service account", false);
 
         BattleNetLoginBrowser browser = browsers.getIfAvailable();
-        if (browser == null) return fail(accountId, flow, "No Battle.net login browser is available", true);
+        if (browser == null) {
+            return fail(accountId, flow, "No Battle.net login browser is available", flow.interactive());
+        }
 
         Result result = attempt(browser, flow, credentials);
         return switch (result) {
@@ -179,6 +188,13 @@ public class BattleNetLoginCoordinator {
                 setAuthState(accountId, AuthState.CODE_REQUIRED);
                 log.warn("Battle.net service account {} asks for a 2FA code: an admin must log it in", accountId);
                 throw new TicketException("The Battle.net login asks for a 2FA code", true);
+            }
+            case Result.Rejected rejected -> {
+                setAuthState(accountId, AuthState.AUTH_FAILED);
+                log.warn("Battle.net turned down the login of service account {} ({} login): {}", accountId,
+                        flow.interactive() ? "admin" : "automatic", rejected.reason());
+                // codeRequired: an admin must act; retrying the same credentials may get the account locked.
+                throw new TicketException("Battle.net rejected the login: " + rejected.reason(), true);
             }
             case Result.Failed failed -> fail(accountId, flow, failed.reason(), flow.interactive());
         };

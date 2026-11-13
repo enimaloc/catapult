@@ -17,7 +17,10 @@ public interface BattleNetLoginBrowser {
 
         void submitCredentials(String email, String password);
 
-        /** Blocks until the ticket redirect, the code page or a failure, at most {@code timeout}. */
+        /**
+         * Blocks until the ticket redirect, the code page or a rejection, at most {@code timeout}
+         * ({@link Outcome.TimedOut} then). Technical failures (crash, navigation error) are thrown.
+         */
         Outcome awaitOutcome(Duration timeout);
 
         /** Fills the 2FA code page and submits it; follow with {@link #awaitOutcome}. */
@@ -42,8 +45,16 @@ public interface BattleNetLoginBrowser {
         record CodeRequired() implements Outcome {
         }
 
-        /** {@code reason} is shown to the admin and logged: it never carries a credential or a ticket. */
+        /**
+         * The page answered with something that is neither a ticket nor a code request (wrong password, locked
+         * account...): retrying the same credentials is pointless. {@code reason} is shown to the admin and
+         * logged: it never carries a credential or a ticket.
+         */
         record Failed(String reason) implements Outcome {
+        }
+
+        /** No answer within the timeout: worth retrying later. */
+        record TimedOut() implements Outcome {
         }
     }
 }
