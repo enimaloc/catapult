@@ -72,7 +72,7 @@ class BattleNetLoginCoordinatorTest {
 
     private BattleNetLoginCoordinator coordinator(Duration codeTimeout) {
         return new BattleNetLoginCoordinator(repository, encryption, browserProvider,
-                TransactionOperations.withoutTransaction(), Duration.ofSeconds(60), codeTimeout);
+                TransactionOperations.withoutTransaction(), Duration.ofSeconds(60), codeTimeout, 3);
     }
 
     @Test
@@ -171,6 +171,38 @@ class BattleNetLoginCoordinatorTest {
 
         assertThatThrownBy(() -> coordinator.ticketProviderFor(account.getId()).mint())
                 .isInstanceOfSatisfying(TicketException.class, e -> assertThat(e.codeRequired()).isFalse());
+        assertThat(account.getAuthState()).isEqualTo(AuthState.READY);
+    }
+
+    @Test
+    void thirdConsecutiveTimeoutMarksAuthFailedAndStops() {
+        account.setAuthState(AuthState.READY);
+        browser.script(new Outcome.TimedOut(), new Outcome.TimedOut(), new Outcome.TimedOut());
+        var provider = coordinator.ticketProviderFor(account.getId());
+
+        for (int i = 0; i < 2; i++) {
+            assertThatThrownBy(provider::mint)
+                    .isInstanceOfSatisfying(TicketException.class, e -> assertThat(e.codeRequired()).isFalse());
+            assertThat(account.getAuthState()).isEqualTo(AuthState.READY);
+        }
+        assertThatThrownBy(provider::mint)
+                .isInstanceOfSatisfying(TicketException.class, e -> assertThat(e.codeRequired()).isTrue());
+        assertThat(account.getAuthState()).isEqualTo(AuthState.AUTH_FAILED);
+    }
+
+    @Test
+    void aTicketBetweenTimeoutsResetsTheCount() throws Exception {
+        account.setAuthState(AuthState.READY);
+        browser.script(new Outcome.TimedOut(), new Outcome.TimedOut(), new Outcome.Ticket(TICKET),
+                new Outcome.TimedOut(), new Outcome.TimedOut());
+        var provider = coordinator.ticketProviderFor(account.getId());
+
+        for (int i = 0; i < 2; i++) assertThatThrownBy(provider::mint).isInstanceOf(TicketException.class);
+        assertThat(provider.mint()).isEqualTo(TICKET);
+        for (int i = 0; i < 2; i++) {
+            assertThatThrownBy(provider::mint)
+                    .isInstanceOfSatisfying(TicketException.class, e -> assertThat(e.codeRequired()).isFalse());
+        }
         assertThat(account.getAuthState()).isEqualTo(AuthState.READY);
     }
 

@@ -49,19 +49,25 @@ public class BattleNetLoginCoordinator {
             Thread.ofPlatform().name("battlenet-login").daemon().factory());
     /** Admin logins from submission to completion, per service account. */
     private final Map<UUID, BattleNetLoginFlow> interactiveFlows = new ConcurrentHashMap<>();
+    private final int maxConsecutiveTimeouts;
+    /** Consecutive automatic re-mints that ended in a timeout, per service account (in memory). */
+    private final Map<UUID, Integer> timeouts = new ConcurrentHashMap<>();
 
     public BattleNetLoginCoordinator(BattleNetServiceAccountRepository repository,
                                      TokenEncryptionService encryption,
                                      ObjectProvider<BattleNetLoginBrowser> browsers,
                                      TransactionOperations transactions,
                                      @Value("${battlenet.login.ticket-timeout:60s}") Duration ticketTimeout,
-                                     @Value("${battlenet.login.code-timeout:10m}") Duration codeTimeout) {
+                                     @Value("${battlenet.login.code-timeout:10m}") Duration codeTimeout,
+                                     @Value("${battlenet.login.max-consecutive-timeouts:3}")
+                                     int maxConsecutiveTimeouts) {
         this.repository = repository;
         this.encryption = encryption;
         this.browsers = browsers;
         this.transactions = transactions;
         this.ticketTimeout = ticketTimeout;
         this.codeTimeout = codeTimeout;
+        this.maxConsecutiveTimeouts = maxConsecutiveTimeouts;
     }
 
     /**
@@ -70,6 +76,7 @@ public class BattleNetLoginCoordinator {
      * and {@link #submitCode} resumes it.
      */
     public CompletableFuture<Void> startInteractive(UUID accountId) {
+        timeouts.remove(accountId);
         BattleNetLoginFlow flow = new BattleNetLoginFlow(true, ticketTimeout, codeTimeout,
                 () -> {
                     setAuthState(accountId, AuthState.CODE_REQUIRED);
@@ -118,7 +125,11 @@ public class BattleNetLoginCoordinator {
      * retrying: a code request ({@code CODE_REQUIRED}) and a login turned down by Battle.net, such as a wrong
      * password or a locked account ({@code AUTH_FAILED}; repeated failed logins could get the bot locked).
      * Timeouts and technical failures (browser crash, navigation error, no browser bean, unreadable stored
-     * credentials) leave the auth state unchanged and throw with {@code codeRequired=false}: retryable.
+     * credentials) leave the auth state unchanged and throw with {@code codeRequired=false}: retryable. Except
+     * that a login page which never answers may be an undetected rejection: after
+     * {@code maxConsecutiveTimeouts} (default 3) automatic re-mints in a row ended in a timeout, the account
+     * becomes {@code AUTH_FAILED} and the exception has {@code codeRequired=true}. A ticket or an admin login
+     * resets the count; technical failures do not count.
      */
     public TicketProvider ticketProviderFor(UUID accountId) {
         return () -> mint(accountId);
@@ -180,6 +191,7 @@ public class BattleNetLoginCoordinator {
         Result result = attempt(browser, flow, credentials);
         return switch (result) {
             case Result.Success success -> {
+                timeouts.remove(accountId);
                 saveSuccess(accountId, success.storageState());
                 log.info("Battle.net service account {} logged in", accountId);
                 yield success.ticket();
@@ -196,7 +208,17 @@ public class BattleNetLoginCoordinator {
                 // codeRequired: an admin must act; retrying the same credentials may get the account locked.
                 throw new TicketException("Battle.net rejected the login: " + rejected.reason(), true);
             }
-            case Result.Failed failed -> fail(accountId, flow, failed.reason(), flow.interactive());
+            case Result.Failed failed -> {
+                if (!flow.interactive() && BattleNetLoginFlow.TIMEOUT_REASON.equals(failed.reason())
+                        && timeouts.merge(accountId, 1, Integer::sum) >= maxConsecutiveTimeouts) {
+                    timeouts.remove(accountId);
+                    setAuthState(accountId, AuthState.AUTH_FAILED);
+                    log.warn("Battle.net service account {}: {} automatic logins in a row timed out, "
+                            + "an admin must log it in", accountId, maxConsecutiveTimeouts);
+                    throw new TicketException("Battle.net login timed out repeatedly", true);
+                }
+                yield fail(accountId, flow, failed.reason(), flow.interactive());
+            }
         };
     }
 

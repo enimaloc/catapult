@@ -39,6 +39,9 @@ public final class BattleNetLoginFlow {
         }
     }
 
+    /** Reason of the {@link Result.Failed} returned when the login page never answered. */
+    static final String TIMEOUT_REASON = "No answer from the login page in time";
+
     private final boolean interactive;
     private final Duration ticketTimeout;
     private final Duration codeTimeout;
@@ -84,7 +87,7 @@ public final class BattleNetLoginFlow {
                         return new Result.Rejected(failed.reason());
                     }
                     case Outcome.TimedOut ignored -> {
-                        return new Result.Failed("No answer from the login page in time");
+                        return new Result.Failed(TIMEOUT_REASON);
                     }
                     case Outcome.CodeRequired ignored -> {
                         if (!interactive) return new Result.CodeRequired();
