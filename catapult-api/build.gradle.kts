@@ -133,7 +133,7 @@ val englishConventions = tasks.register<Test>("englishConventions") {
     testClassesDirs = testSourceSet.output.classesDirs
     classpath = testSourceSet.runtimeClasspath
     filter.includeTestsMatching("*EnglishConventionsTest")
-    listOf("catapult-common", "catapult-web").forEach { module ->
+    listOf("catapult-common", "catapult-bgs", "catapult-web").forEach { module ->
         inputs.dir(rootProject.file("$module/src"))
             .withPropertyName("${module}Sources")
             .withPathSensitivity(PathSensitivity.RELATIVE)

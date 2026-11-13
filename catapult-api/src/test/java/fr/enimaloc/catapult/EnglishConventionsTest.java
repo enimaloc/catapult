@@ -25,8 +25,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
- * Code, comments, logs and test names are written in English, read from the sources of catapult-api, catapult-common
- * and catapult-web as text. The texts the API stores or sends to viewers and streamers stay as they are: they are
+ * Code, comments, logs and test names are written in English, read from the sources of catapult-api, catapult-common,
+ * catapult-bgs and catapult-web as text. The texts the API stores or sends to viewers and streamers stay as they are: they are
  * listed in {@link #KEPT} with the reason.
  */
 class EnglishConventionsTest {
@@ -129,11 +129,12 @@ class EnglishConventionsTest {
 
     private static final Path ROOT = Path.of("..");
     private static final String SELF = "catapult-api/src/test/java/fr/enimaloc/catapult/EnglishConventionsTest.java";
-    private static final List<String> MODULES = List.of("catapult-api", "catapult-common", "catapult-web");
+    private static final List<String> MODULES = List.of("catapult-api", "catapult-common", "catapult-bgs", "catapult-web");
     /** Fewer files than this under a prefix means a tree went missing, not that it got English. */
     private static final Map<String, Integer> MIN_FILES = Map.of(
             "catapult-api/", 900,
             "catapult-common/", 150,
+            "catapult-bgs/", 6,
             "catapult-web/", 400,
             "catapult-web/src/main/resources/static/js/", 40,
             "catapult-web/src/test/js/", 40,

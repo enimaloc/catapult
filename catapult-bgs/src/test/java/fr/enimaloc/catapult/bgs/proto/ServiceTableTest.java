@@ -2,8 +2,8 @@ package fr.enimaloc.catapult.bgs.proto;
 
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.AccessFlag;
 import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -80,7 +80,7 @@ class ServiceTableTest {
     private static List<ServiceMethod<?, ?>> constants() throws IllegalAccessException {
         List<ServiceMethod<?, ?>> result = new ArrayList<>();
         for (Field f : BgsServices.class.getDeclaredFields()) {
-            if (Modifier.isStatic(f.getModifiers()) && ServiceMethod.class.isAssignableFrom(f.getType())) {
+            if (f.accessFlags().contains(AccessFlag.STATIC) && ServiceMethod.class.isAssignableFrom(f.getType())) {
                 result.add((ServiceMethod<?, ?>) f.get(null));
             }
         }
