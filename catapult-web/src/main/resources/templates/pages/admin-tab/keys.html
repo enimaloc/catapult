@@ -158,5 +158,118 @@
         </mdui-card>
     </div>
 
+    <!--/*
+      The Battle.net bot pool: each bot's auth and session states, its friends, then "Add a bot". A bot waiting for its
+      2FA code (CODE_REQUIRED with a login waiting for it) shows a code field; one left CODE_REQUIRED by an automatic
+      login has none waiting, so it points to "Re-authenticate" instead. The e-mail and passwords are only ever typed
+      here: nothing renders them back. admin-battlenet.js refreshes the tab every 3 s while a bot is NEW or waits for
+      its code.
+    */-->
+    <div id="admin-battlenet">
+        <mdui-card class="admin-keys-card admin-battlenet" variant="outlined"
+                   th:attr="data-label-conflict=#{admin.battlenet.error.conflict},data-label-unknown=#{admin.battlenet.unknown},
+                            data-label-unavailable=#{admin.battlenet.unavailable-action},data-label-updated=#{admin.battlenet.updated},
+                            data-label-deleted=#{admin.battlenet.deleted},data-label-created=#{admin.battlenet.created},
+                            data-label-code-sent=#{admin.battlenet.code-sent},data-label-reauthed=#{admin.battlenet.reauthed},
+                            data-label-invalid=#{admin.battlenet.error.invalid}">
+            <div class="admin-keys-head">
+                <h3 th:text="#{admin.battlenet.title}">Battle.net bots</h3>
+            </div>
+
+            <p class="admin-cell-muted admin-battlenet-unavailable" th:if="${battlenet == null}"
+               th:text="#{admin.battlenet.unavailable}">Unavailable.</p>
+
+            <th:block th:if="${battlenet != null}">
+                <p class="admin-cell-muted" data-admin-value="battlenet-empty" th:hidden="${!battlenet.isEmpty()}"
+                   th:text="#{admin.battlenet.empty}">None.</p>
+                <div class="admin-table" data-admin-list="battlenet" th:hidden="${battlenet.isEmpty()}">
+                    <div class="admin-row admin-battlenet-row admin-row-head" aria-hidden="true">
+                        <span th:text="#{admin.battlenet.col.label}">Label</span>
+                        <span th:text="#{admin.battlenet.col.battletag}">BattleTag</span>
+                        <span th:text="#{admin.battlenet.col.auth}">Login</span>
+                        <span th:text="#{admin.battlenet.col.session}">Session</span>
+                        <span th:text="#{admin.battlenet.col.friends}">Friends</span>
+                        <span th:text="#{admin.battlenet.col.state}">State</span>
+                        <span></span>
+                    </div>
+                    <div class="admin-row admin-battlenet-row" th:each="a : ${battlenet}"
+                         th:attr="data-admin-key=${a.id()},data-auth-state=${a.authState()},data-waiting-code=${a.waitingForCode()}">
+                        <span class="admin-cell" th:attr="data-label=#{admin.battlenet.col.label}" th:text="${a.label()}">Bot1</span>
+                        <span class="admin-cell" th:attr="data-label=#{admin.battlenet.col.battletag}" th:text="${a.battleTag()}">Bot#1234</span>
+                        <span class="admin-cell" th:attr="data-label=#{admin.battlenet.col.auth}"
+                              th:text="#{'admin.battlenet.auth.' + ${a.authState()}}">READY</span>
+                        <span class="admin-cell" th:attr="data-label=#{admin.battlenet.col.session}"
+                              th:text="#{'admin.battlenet.session.' + ${a.sessionState()}}">READY</span>
+                        <span class="admin-cell" th:attr="data-label=#{admin.battlenet.col.friends}" th:text="${a.friendCount()}">0</span>
+                        <span class="admin-cell admin-battlenet-states" th:attr="data-label=#{admin.battlenet.col.state}">
+                            <mdui-chip th:if="${a.enabled()}" icon="check_circle" th:text="#{admin.battlenet.state.enabled}">Enabled</mdui-chip>
+                            <mdui-chip th:unless="${a.enabled()}" icon="block" th:text="#{admin.battlenet.state.disabled}">Disabled</mdui-chip>
+                            <mdui-chip th:if="${a.friendLimitReached()}" icon="group_off" class="admin-battlenet-full"
+                                       th:text="#{admin.battlenet.state.full}">Full</mdui-chip>
+                        </span>
+                        <span class="admin-row-actions">
+                            <mdui-button variant="tonal" icon="key" class="admin-battlenet-reauth"
+                                         th:attr="data-id=${a.id()}" th:text="#{admin.battlenet.action.reauth}">Re-authenticate</mdui-button>
+                            <mdui-button variant="text" class="admin-battlenet-toggle"
+                                         th:attr="data-id=${a.id()},data-enabled=${!a.enabled()}"
+                                         th:text="${a.enabled()} ? #{admin.battlenet.action.disable} : #{admin.battlenet.action.enable}">Disable</mdui-button>
+                            <mdui-button th:if="${a.friendLimitReached()}" variant="text" icon="restart_alt" class="admin-battlenet-reset"
+                                         th:attr="data-id=${a.id()}" th:text="#{admin.battlenet.action.lift_full}">Lift full</mdui-button>
+                            <mdui-button-icon icon="delete" class="admin-battlenet-delete"
+                                              th:attr="data-id=${a.id()},aria-label=#{admin.battlenet.action.delete},
+                                              data-confirm=#{admin.battlenet.action.delete-confirm(${a.label()})}"></mdui-button-icon>
+                        </span>
+                        <p class="admin-cell-muted admin-battlenet-code-hint"
+                           th:if="${a.authState() == 'CODE_REQUIRED' and !a.waitingForCode()}"
+                           th:text="#{admin.battlenet.code.reauth-hint}">Re-authenticate to enter a code.</p>
+                        <div class="admin-battlenet-code" th:if="${a.authState() == 'CODE_REQUIRED' and a.waitingForCode()}">
+                            <mdui-text-field name="code" variant="outlined" maxlength="16" autocomplete="one-time-code"
+                                             th:attr="label=#{admin.battlenet.code.label}"></mdui-text-field>
+                            <mdui-button variant="filled" icon="send" class="admin-battlenet-code-submit"
+                                         th:attr="data-id=${a.id()}" th:text="#{admin.battlenet.code.submit}">Send the code</mdui-button>
+                        </div>
+                        <div class="admin-battlenet-details">
+                            <mdui-text-field name="label" variant="outlined" maxlength="80" autocomplete="off"
+                                             th:attr="label=#{admin.battlenet.details.label},value=${a.label()}"></mdui-text-field>
+                            <mdui-text-field name="fillOrder" type="number" min="0" variant="outlined" autocomplete="off"
+                                             th:attr="label=#{admin.battlenet.details.order},value=${a.fillOrder()}"></mdui-text-field>
+                            <mdui-button variant="text" icon="save" class="admin-battlenet-details-submit"
+                                         th:attr="data-id=${a.id()}" th:text="#{admin.battlenet.details.submit}">Save</mdui-button>
+                        </div>
+                        <div class="admin-battlenet-password">
+                            <mdui-text-field name="password" type="password" variant="outlined" autocomplete="new-password"
+                                             toggle-password th:attr="label=#{admin.battlenet.password.label}"></mdui-text-field>
+                            <mdui-button variant="text" icon="password" class="admin-battlenet-password-submit"
+                                         th:attr="data-id=${a.id()}" th:text="#{admin.battlenet.password.submit}">Change password</mdui-button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="admin-battlenet-enroll">
+                    <div class="admin-keys-add">
+                        <mdui-text-field name="label" variant="outlined" maxlength="80" autocomplete="off"
+                                         th:attr="label=#{admin.battlenet.enroll.label}"></mdui-text-field>
+                        <mdui-text-field name="email" type="email" variant="outlined" autocomplete="off"
+                                         th:attr="label=#{admin.battlenet.enroll.email}"></mdui-text-field>
+                        <mdui-text-field name="password" type="password" variant="outlined" autocomplete="new-password"
+                                         toggle-password th:attr="label=#{admin.battlenet.enroll.password}"></mdui-text-field>
+                        <mdui-button variant="filled" icon="add" class="admin-battlenet-add"
+                                     th:text="#{admin.battlenet.enroll.start}">Add a bot</mdui-button>
+                    </div>
+                </div>
+                <p class="admin-battlenet-message admin-cell-muted" aria-live="polite" hidden></p>
+
+                <div class="admin-battlenet-prereq">
+                    <strong th:text="#{admin.battlenet.prereq.title}">Before adding a bot</strong>
+                    <ul>
+                        <li th:text="#{admin.battlenet.prereq.name}">First and last name set on account.battle.net</li>
+                        <li th:text="#{admin.battlenet.prereq.secret}">A secret question set on account.battle.net</li>
+                        <li th:text="#{admin.battlenet.prereq.delay}">Changes can take up to 3 hours to propagate</li>
+                    </ul>
+                </div>
+            </th:block>
+        </mdui-card>
+    </div>
+
     <th:block th:replace="~{pages/admin-tab/rate-limits :: list}"></th:block>
 </div>

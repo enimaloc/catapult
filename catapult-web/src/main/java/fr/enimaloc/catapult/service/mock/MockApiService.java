@@ -35,6 +35,7 @@ import fr.enimaloc.catapult.common.dto.admin.TwDefinitionDto;
 import fr.enimaloc.catapult.common.dto.admin.TwKeywordTestDto;
 import fr.enimaloc.catapult.common.dto.admin.TwRebuild;
 import fr.enimaloc.catapult.common.dto.admin.AccountDto;
+import fr.enimaloc.catapult.common.dto.admin.BattleNetAccountDto;
 import fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
@@ -65,6 +66,7 @@ import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
 import fr.enimaloc.catapult.common.dto.channel.GameDto;
 import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
 import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
+import fr.enimaloc.catapult.common.dto.connect.BattleNetLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatDispatch;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
@@ -85,6 +87,7 @@ import fr.enimaloc.catapult.event.binding.BindingTitleEvent;
 import fr.enimaloc.catapult.event.binding.BindingUpdatedEvent;
 import fr.enimaloc.catapult.event.binding.CclStateEvent;
 import fr.enimaloc.catapult.event.binding.GameChangedEvent;
+import fr.enimaloc.catapult.event.battlenet.BattleNetLinkEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftDisconnectedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftEnrollEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftSyncEvent;
@@ -190,6 +193,7 @@ public class MockApiService implements ApiService {
     private final MockTwStore tws = new MockTwStore();
     /** Application-wide: the Minecraft service accounts are the same for every mock session. */
     private final MockMinecraftAccountsStore minecraftAccounts = new MockMinecraftAccountsStore();
+    private final MockBattleNetAccountsStore battleNetAccounts = new MockBattleNetAccountsStore();
     /** Application-wide, as catapult-api's: every mock account that logged in is a member any admin session lists. */
     private final MockMembers members = new MockMembers();
     /** Application-wide too: a member's custom flags are the same for every mock session. */
@@ -510,6 +514,22 @@ public class MockApiService implements ApiService {
         log.trace("minecraftDisconnect({})", username);
         currentData().minecraftDisconnect();
         eventPublisher.publishEvent(new MinecraftDisconnectedEvent(username));
+        return NO_CONTENT;
+    }
+
+    @Override
+    public BattleNetLinkStateResponse battleNetStatus(String username) {
+        log.trace("battleNetStatus({})", username);
+        return currentData().getBattleNetLink();
+    }
+
+    @Override
+    public int battleNetDisconnect(String username) {
+        log.trace("battleNetDisconnect({})", username);
+        MockData data = currentData();
+        data.battleNetDisconnect();
+        BattleNetLinkStateResponse link = data.getBattleNetLink();
+        eventPublisher.publishEvent(new BattleNetLinkEvent(username, link.status(), null, null));
         return NO_CONTENT;
     }
 
@@ -1728,6 +1748,42 @@ public class MockApiService implements ApiService {
     public int adminRefreshApiKeys(ApiKeyProvider provider) {
         log.trace("adminRefreshApiKeys({})", provider);
         return apiKeys.refresh();
+    }
+
+    @Override
+    public List<BattleNetAccountDto> adminBattleNetAccounts() {
+        log.trace("adminBattleNetAccounts()");
+        return battleNetAccounts.list();
+    }
+
+    @Override
+    public int adminCreateBattleNetAccount(String label, String email, String password) {
+        log.trace("adminCreateBattleNetAccount({})", label);
+        return battleNetAccounts.create(label);
+    }
+
+    @Override
+    public int adminSubmitBattleNetCode(UUID id, String code) {
+        log.trace("adminSubmitBattleNetCode({})", id);
+        return battleNetAccounts.submitCode(id, code);
+    }
+
+    @Override
+    public int adminReauthBattleNetAccount(UUID id) {
+        log.trace("adminReauthBattleNetAccount({})", id);
+        return battleNetAccounts.reauth(id);
+    }
+
+    @Override
+    public int adminPatchBattleNetAccount(UUID id, Map<String, Object> patch) {
+        log.trace("adminPatchBattleNetAccount({}, {})", id, patch.keySet()); // never the password
+        return battleNetAccounts.patch(id, patch);
+    }
+
+    @Override
+    public int adminDeleteBattleNetAccount(UUID id) {
+        log.trace("adminDeleteBattleNetAccount({})", id);
+        return battleNetAccounts.delete(id);
     }
 
     @Override

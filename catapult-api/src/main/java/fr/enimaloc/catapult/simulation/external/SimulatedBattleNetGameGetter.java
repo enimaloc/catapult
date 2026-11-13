@@ -18,7 +18,8 @@ import java.util.Optional;
 
 /**
  * The Battle.net presence in the account's {@code battlenet.presence} mode: the simulated data's game, or nothing on
- * a failure. A subclass only because the detection chain asks for the concrete getter.
+ * a failure. A subclass only because the detection chain asks for the concrete getter: the superclass's state is
+ * never used.
  */
 @Primary
 @Component
@@ -31,6 +32,7 @@ public class SimulatedBattleNetGameGetter extends BattleNetGameGetter {
 
     public SimulatedBattleNetGameGetter(@Qualifier("battleNetGameGetter") ObjectProvider<BattleNetGameGetter> real,
                                         SimulatedCallRunner runner, SimulationRegistry registry) {
+        super(null, null, null, null);
         this.real = real;
         this.runner = runner;
         this.registry = registry;

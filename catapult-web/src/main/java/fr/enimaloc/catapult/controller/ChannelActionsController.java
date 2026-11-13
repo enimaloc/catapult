@@ -22,6 +22,7 @@ import fr.enimaloc.catapult.common.dto.channel.TwEnabledBody;
 import fr.enimaloc.catapult.common.dto.channel.TwSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.UpdateBindingRequest;
 import fr.enimaloc.catapult.common.dto.channel.ValidateRequest;
+import fr.enimaloc.catapult.common.dto.connect.BattleNetLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatSettingsResponse;
 import fr.enimaloc.catapult.service.ApiService;
@@ -181,6 +182,20 @@ public class ChannelActionsController {
     public ResponseEntity<Void> minecraftDisconnect(@PathVariable String username) {
         if (!ownChannel(username)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         return ApiStatus.answer(apiService.minecraftDisconnect(username));
+    }
+
+    // Like Minecraft's, the member's own link. Linking is catapult-api's OAuth flow, not a call from here.
+
+    @GetMapping("/channel/{username}/battlenet")
+    public ResponseEntity<BattleNetLinkStateResponse> battleNetStatus(@PathVariable String username) {
+        if (!ownChannel(username)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        return ResponseEntity.ok(apiService.battleNetStatus(username));
+    }
+
+    @PostMapping("/channel/{username}/battlenet/disconnect")
+    public ResponseEntity<Void> battleNetDisconnect(@PathVariable String username) {
+        if (!ownChannel(username)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        return ApiStatus.answer(apiService.battleNetDisconnect(username));
     }
 
     @PostMapping("/channel/{username}/xbox/disconnect")

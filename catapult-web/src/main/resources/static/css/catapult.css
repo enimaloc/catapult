@@ -1825,6 +1825,18 @@ mdui-select::part(menu) {
     max-width: none;
 }
 
+/* The Battle.net card's sentences: static text around BattleTags the live event replaces in place. */
+.battlenet-sentence {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25em;
+}
+
+.battlenet-sentence .battlenet-bot-tag,
+.battlenet-sentence .battlenet-tag {
+    font-weight: 600;
+}
+
 /* Actions sit right-aligned under the details. A segmented group lays out its own
  * segments; a plain div (OBS) holds separate buttons. Either way, no separator:
  * outranks the `.connection-card > div` rules above. */
@@ -2097,10 +2109,10 @@ span.box-art {
  * The tables below are one grid each, every row (header included) a subgrid of it: as separate grids,
  * the rows sized their action column to their own buttons, so no cell sat under its header.
  */
-.admin-table:has(> :is(.admin-dtdd-row, .admin-groups-row, .admin-whitelist-invite-row, .admin-whitelist-row, .admin-keys-row, .admin-minecraft-row, .admin-tw-row, .admin-meta-tag-row, .admin-social-link-row, .invite-row, .admin-gm-row, .admin-gm-missing-row, .admin-dc-topics-row, .admin-dc-games-row, .admin-dc-searches-row, .admin-dc-quota-row, .admin-rl-row)) { display: grid; column-gap: 12px; }
-.admin-table:has(> :is(.admin-dtdd-row, .admin-groups-row, .admin-whitelist-invite-row, .admin-whitelist-row, .admin-keys-row, .admin-minecraft-row, .admin-tw-row, .admin-meta-tag-row, .admin-social-link-row, .invite-row, .admin-gm-row, .admin-gm-missing-row, .admin-dc-topics-row, .admin-dc-games-row, .admin-dc-searches-row, .admin-dc-quota-row, .admin-rl-row)) > * { grid-column: 1 / -1; }
-.admin-table > :is(.admin-dtdd-row, .admin-groups-row, .admin-whitelist-invite-row, .admin-whitelist-row, .admin-keys-row, .admin-minecraft-row, .admin-tw-row, .admin-meta-tag-row, .admin-social-link-row, .invite-row, .admin-gm-row, .admin-gm-missing-row, .admin-dc-topics-row, .admin-dc-games-row, .admin-dc-searches-row, .admin-dc-quota-row, .admin-rl-row) { grid-template-columns: subgrid; }
-.admin-table > :is(.admin-dtdd-row, .admin-groups-row, .admin-whitelist-invite-row, .admin-whitelist-row, .admin-keys-row, .admin-minecraft-row, .admin-tw-row, .admin-meta-tag-row, .admin-social-link-row, .invite-row, .admin-gm-row, .admin-gm-missing-row, .admin-dc-topics-row, .admin-dc-games-row, .admin-dc-searches-row, .admin-dc-quota-row, .admin-rl-row) > .admin-row-actions { justify-content: flex-end; }
+.admin-table:has(> :is(.admin-dtdd-row, .admin-groups-row, .admin-whitelist-invite-row, .admin-whitelist-row, .admin-keys-row, .admin-minecraft-row, .admin-battlenet-row, .admin-tw-row, .admin-meta-tag-row, .admin-social-link-row, .invite-row, .admin-gm-row, .admin-gm-missing-row, .admin-dc-topics-row, .admin-dc-games-row, .admin-dc-searches-row, .admin-dc-quota-row, .admin-rl-row)) { display: grid; column-gap: 12px; }
+.admin-table:has(> :is(.admin-dtdd-row, .admin-groups-row, .admin-whitelist-invite-row, .admin-whitelist-row, .admin-keys-row, .admin-minecraft-row, .admin-battlenet-row, .admin-tw-row, .admin-meta-tag-row, .admin-social-link-row, .invite-row, .admin-gm-row, .admin-gm-missing-row, .admin-dc-topics-row, .admin-dc-games-row, .admin-dc-searches-row, .admin-dc-quota-row, .admin-rl-row)) > * { grid-column: 1 / -1; }
+.admin-table > :is(.admin-dtdd-row, .admin-groups-row, .admin-whitelist-invite-row, .admin-whitelist-row, .admin-keys-row, .admin-minecraft-row, .admin-battlenet-row, .admin-tw-row, .admin-meta-tag-row, .admin-social-link-row, .invite-row, .admin-gm-row, .admin-gm-missing-row, .admin-dc-topics-row, .admin-dc-games-row, .admin-dc-searches-row, .admin-dc-quota-row, .admin-rl-row) { grid-template-columns: subgrid; }
+.admin-table > :is(.admin-dtdd-row, .admin-groups-row, .admin-whitelist-invite-row, .admin-whitelist-row, .admin-keys-row, .admin-minecraft-row, .admin-battlenet-row, .admin-tw-row, .admin-meta-tag-row, .admin-social-link-row, .invite-row, .admin-gm-row, .admin-gm-missing-row, .admin-dc-topics-row, .admin-dc-games-row, .admin-dc-searches-row, .admin-dc-quota-row, .admin-rl-row) > .admin-row-actions { justify-content: flex-end; }
 
 .admin-pagination {
     display: flex;
@@ -2504,6 +2516,19 @@ mdui-snackbar.broadcast-warning { --mdui-color-inverse-surface: var(--mdui-color
 .admin-minecraft-code { margin: 4px 0; }
 .admin-minecraft-user-code { font-family: monospace; font-size: 1.15em; letter-spacing: .05em; }
 .admin-minecraft-error { color: rgb(var(--mdui-color-error)); }
+.admin-battlenet-row, .admin-table:has(> .admin-battlenet-row) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 7rem 10rem 4rem 12rem auto; }
+.admin-battlenet-states { display: flex; flex-wrap: wrap; gap: 4px; }
+.admin-battlenet-full { color: rgb(var(--mdui-color-error)); }
+.admin-battlenet-row > .admin-battlenet-code, .admin-battlenet-row > .admin-battlenet-password, .admin-battlenet-row > .admin-battlenet-details { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.admin-battlenet-message { overflow-wrap: anywhere; }
+.admin-battlenet-message.admin-battlenet-error { color: rgb(var(--mdui-color-error)); }
+.admin-battlenet-prereq { margin-top: 12px; color: var(--catapult-text-muted); }
+@media (max-width: 800px) {
+    .admin-battlenet-row, .admin-table:has(> .admin-battlenet-row) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .admin-battlenet-row > [data-label]::before { content: attr(data-label) " : "; color: var(--catapult-text-muted); }
+    .admin-battlenet-row > .admin-row-actions { grid-column: 1 / -1; flex-wrap: wrap; }
+    .admin-battlenet-row > .admin-cell { white-space: normal; }
+}
 @media (max-width: 600px) {
     .admin-minecraft-row, .admin-table:has(> .admin-minecraft-row) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
     .admin-minecraft-row > [data-label]::before { content: attr(data-label) " : "; color: var(--catapult-text-muted); }

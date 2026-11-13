@@ -39,12 +39,14 @@ import fr.enimaloc.catapult.common.dto.admin.TwDefinitionDto;
 import fr.enimaloc.catapult.common.dto.admin.TwKeywordTestDto;
 import fr.enimaloc.catapult.common.dto.admin.TwRebuild;
 import fr.enimaloc.catapult.common.dto.admin.AccountDto;
+import fr.enimaloc.catapult.common.dto.admin.BattleNetAccountDto;
 import fr.enimaloc.catapult.common.dto.admin.MetaTagDto;
 import fr.enimaloc.catapult.common.dto.admin.MetaTagRequest;
 import fr.enimaloc.catapult.common.dto.admin.SocialLinkDto;
 import fr.enimaloc.catapult.common.dto.admin.SocialLinkOrderRequest;
 import fr.enimaloc.catapult.common.dto.admin.SocialLinkRequest;
 import fr.enimaloc.catapult.common.dto.admin.MinecraftDeviceCodeDto;
+import fr.enimaloc.catapult.common.dto.connect.BattleNetLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.admin.DtddKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.SteamKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto;
@@ -351,6 +353,20 @@ public class RealApiService implements ApiService {
         UUID me = me();
         if (me == null) return HttpStatus.UNAUTHORIZED.value();
         return client.delete("/api/internal/users/{userId}/links/minecraft", me);
+    }
+
+    @Override
+    public BattleNetLinkStateResponse battleNetStatus(String username) {
+        UUID me = me();
+        if (me == null) return null;
+        return client.get("/api/internal/users/{userId}/links/battlenet", BattleNetLinkStateResponse.class, me);
+    }
+
+    @Override
+    public int battleNetDisconnect(String username) {
+        UUID me = me();
+        if (me == null) return HttpStatus.UNAUTHORIZED.value();
+        return client.delete("/api/internal/users/{userId}/links/battlenet", me);
     }
 
     @Override
@@ -1342,6 +1358,39 @@ public class RealApiService implements ApiService {
             case DTDD -> client.call(HttpMethod.POST, "/api/internal/admin/dtdd-keys/refresh", null, Void.class);
         };
         return result.status();
+    }
+
+    @Override
+    public List<BattleNetAccountDto> adminBattleNetAccounts() {
+        // a 404 (Battle.net disabled in catapult-api) is null, like any failed read
+        BattleNetAccountDto[] accounts = client.get("/api/internal/admin/battlenet-accounts", BattleNetAccountDto[].class);
+        return accounts == null ? null : List.of(accounts);
+    }
+
+    @Override
+    public int adminCreateBattleNetAccount(String label, String email, String password) {
+        return client.call(HttpMethod.POST, "/api/internal/admin/battlenet-accounts",
+                Map.of("label", label, "email", email, "password", password), Void.class).status();
+    }
+
+    @Override
+    public int adminSubmitBattleNetCode(UUID id, String code) {
+        return client.call(HttpMethod.POST, "/api/internal/admin/battlenet-accounts/{id}/code", Map.of("code", code), Void.class, id).status();
+    }
+
+    @Override
+    public int adminReauthBattleNetAccount(UUID id) {
+        return client.call(HttpMethod.POST, "/api/internal/admin/battlenet-accounts/{id}/reauth", null, Void.class, id).status();
+    }
+
+    @Override
+    public int adminPatchBattleNetAccount(UUID id, Map<String, Object> patch) {
+        return client.call(HttpMethod.PATCH, "/api/internal/admin/battlenet-accounts/{id}", patch, Void.class, id).status();
+    }
+
+    @Override
+    public int adminDeleteBattleNetAccount(UUID id) {
+        return client.call(HttpMethod.DELETE, "/api/internal/admin/battlenet-accounts/{id}", null, Void.class, id).status();
     }
 
     @Override

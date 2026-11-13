@@ -120,6 +120,17 @@ public class ChannelEventPublisher {
                 (id, login) -> new ChannelEvents.MinecraftLinkChanged(id, login, status, minecraftName));
     }
 
+    /**
+     * The channel's Battle.net link is now {@code status} ({@code NONE} once gone), for {@code battleTag}, with the
+     * bot {@code serviceAccountBattleTag}.
+     */
+    public void battleNetLinkChanged(UUID channelOwnerId, String status, String battleTag,
+                                     String serviceAccountBattleTag) {
+        publish(channelOwnerId, ChannelEvents.BATTLENET_LINK_CHANGED,
+                (id, login) -> new ChannelEvents.BattleNetLinkChanged(id, login, status, battleTag,
+                        serviceAccountBattleTag));
+    }
+
     /** The channel's active custom binding is now {@code activeId}; null once deactivated. */
     public void customBindingChanged(UUID channelOwnerId, UUID activeId) {
         String active = activeId == null ? null : activeId.toString();

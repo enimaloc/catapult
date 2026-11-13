@@ -12,9 +12,12 @@ import fr.enimaloc.catapult.repository.binding.GetterConfigRepository;
 import fr.enimaloc.catapult.service.access.InviteService;
 import fr.enimaloc.catapult.service.access.WhitelistService;
 import fr.enimaloc.catapult.service.account.AdminMigrationService;
+import fr.enimaloc.catapult.service.battlenet.BattleNetFriendService;
+import fr.enimaloc.catapult.service.battlenet.BattleNetGateService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.logging.log4j.util.Strings;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.core.Authentication;
@@ -28,7 +31,7 @@ import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.client.RestClient;
 
 import java.util.List;
@@ -50,6 +53,10 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
     private final WhitelistService whitelistService;
     private final AdminMigrationService adminMigrationService;
     private final InviteService inviteService;
+    private final BattleNetGateService battleNetGate;
+    // Only present when battlenet.enabled.
+    private final ObjectProvider<BattleNetFriendService> battleNetFriends;
+    private final TransactionTemplate transactions;
 
     @Value("${app.owner-id:}")
     private String ownerId;
@@ -69,16 +76,22 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
 
     private final DefaultOAuth2UserService delegate = new DefaultOAuth2UserService();
 
+    /**
+     * Not {@code @Transactional}: the Battle.net link calls services that run their own short transactions and must
+     * commit them before the invitation and the published events, so the other providers open theirs explicitly.
+     */
     @Override
-    @Transactional
     public OAuth2User loadUser(OAuth2UserRequest userRequest) throws OAuth2AuthenticationException {
         String registrationId = userRequest.getClientRegistration().getRegistrationId();
         try {
             return switch (registrationId) {
-                case "twitch" -> handleTwitchLogin(userRequest, fetchTwitchUser(userRequest));
-                case "steam" -> handleSecondaryLink(userRequest, OAuthToken.Provider.STEAM);
-                case "xbox" -> handleSecondaryLink(userRequest, OAuthToken.Provider.XBOX);
-//                case "battlenet" -> handleSecondaryLink(userRequest, OAuthToken.Provider.BATTLENET);
+                case "twitch" -> transactions.execute(status ->
+                    handleTwitchLogin(userRequest, fetchTwitchUser(userRequest)));
+                case "steam" -> transactions.execute(status ->
+                    handleSecondaryLink(userRequest, OAuthToken.Provider.STEAM));
+                case "xbox" -> transactions.execute(status ->
+                    handleSecondaryLink(userRequest, OAuthToken.Provider.XBOX));
+                case "battlenet" -> handleBattleNetLink(userRequest);
                 default -> delegate.loadUser(userRequest);
             };
         } catch (OAuth2AuthenticationException e) {
@@ -94,7 +107,7 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
     }
 
     /**
-     * Steam/Xbox/BattleNet are secondary providers (game detection), not login
+     * Steam/Xbox are secondary providers (game detection), not login
      * providers. When a user links one, they are already authenticated via
      * Twitch. We save the token for their account and return their existing
      * principal.
@@ -112,6 +125,54 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
         }
         log.info("{} linked for user {}", provider, existingUser.getUserAccount().getId());
         return existingUser;
+    }
+
+    /**
+     * Battle.net is a secondary link too, but it saves no token: the userinfo only tells which account to befriend
+     * (its {@code id} is the BGS account id) and the bot does the rest. Not transactional, see {@link #loadUser}.
+     */
+    private OAuth2User handleBattleNetLink(OAuth2UserRequest userRequest) {
+        Authentication currentAuth = SecurityContextHolder.getContext().getAuthentication();
+        if (currentAuth == null || !(currentAuth.getPrincipal() instanceof CatapultOAuth2User existingUser)) {
+            log.error("BATTLENET link attempted without an authenticated Twitch session");
+            throw new OAuth2AuthenticationException(new OAuth2Error("unauthorized"));
+        }
+        UserAccount user = existingUser.getUserAccount();
+        BattleNetFriendService friends = battleNetFriends.getIfAvailable();
+        if (friends == null || !battleNetGate.isAvailableFor(user)) {
+            throw new OAuth2AuthenticationException(new OAuth2Error("battlenet_unavailable"));
+        }
+
+        OAuth2User info = delegate.loadUser(userRequest);
+        Long accountId = accountId(info);
+        String battleTag = info.getAttribute("battletag");
+        if (accountId == null || battleTag == null || battleTag.isBlank()) {
+            throw new OAuth2AuthenticationException(new OAuth2Error("invalid_user_info_response"));
+        }
+        try {
+            friends.enroll(user, accountId, battleTag);
+        } catch (BattleNetFriendService.BattleNetEnrollmentException e) {
+            log.warn("Battle.net link refused for user {}: {}", user.getId(), e.getReason());
+            throw new OAuth2AuthenticationException(new OAuth2Error("battlenet_full"), e);
+        }
+        log.info("BATTLENET linked for user {}", user.getId());
+        return existingUser;
+    }
+
+    /** The Battle.net account id: userinfo's {@code id}, or its {@code sub} (the same value, as a string). */
+    private static Long accountId(OAuth2User info) {
+        Object id = info.getAttribute("id");
+        if (id == null) {
+            id = info.getAttribute("sub");
+        }
+        if (id instanceof Number number) {
+            return number.longValue();
+        }
+        try {
+            return id == null ? null : Long.valueOf(id.toString());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     /**

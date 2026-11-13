@@ -8,6 +8,7 @@ import fr.enimaloc.catapult.common.dto.channel.DtddMappingCurrentDto;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingProposalDto;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
 import fr.enimaloc.catapult.common.dto.channel.GameDto;
+import fr.enimaloc.catapult.common.dto.channel.BattleNetData;
 import fr.enimaloc.catapult.common.dto.channel.MinecraftData;
 import fr.enimaloc.catapult.common.dto.channel.ObsData;
 import fr.enimaloc.catapult.common.dto.channel.TwitchatData;
@@ -51,6 +52,7 @@ import fr.enimaloc.catapult.service.connections.SteamProfileDto;
 import fr.enimaloc.catapult.service.igdb.AdminCclService;
 import fr.enimaloc.catapult.api.CustomBindingViews;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
+import fr.enimaloc.catapult.service.battlenet.BattleNetLinkStateService;
 import fr.enimaloc.catapult.service.minecraft.MinecraftLinkStateService;
 import fr.enimaloc.catapult.service.notification.TwitchatWidgetSettingsService;
 import lombok.RequiredArgsConstructor;
@@ -92,6 +94,8 @@ public class ChannelDashboardAssembler {
     private final OAuthTokenRepository oAuthTokenRepository;
     // Only present when minecraft.enabled (the service is @ConditionalOnBooleanProperty).
     private final Optional<MinecraftLinkStateService> minecraftLinkStates;
+    // Only present when battlenet.enabled.
+    private final Optional<BattleNetLinkStateService> battleNetLinkStates;
     private final TwitchatWidgetSettingsService twitchatWidgetSettingsService;
     private final RaidRestoreGateService raidRestoreGate;
     private final CustomBindingViews customBindingViews;
@@ -147,6 +151,7 @@ public class ChannelDashboardAssembler {
                 steamData(channel, owner),
                 xboxEnabled ? new XboxData(hasXboxToken(channel)) : null,
                 owner ? minecraftData(channel) : null,
+                owner ? battleNetData(channel) : null,
                 owner ? obsData(widget) : null,
                 owner ? TwitchatData.of(widget.getTwitchatBranch()) : null,
                 custom,
@@ -246,6 +251,15 @@ public class ChannelDashboardAssembler {
                 .map(service -> service.state(channel))
                 .filter(state -> !MinecraftLinkStateService.UNAVAILABLE.equals(state.status()))
                 .map(state -> new MinecraftData(state.status(), state.minecraftName(), state.serviceAccountUsername()))
+                .orElse(null);
+    }
+
+    /** The Battle.net link as the connect endpoint states it, null without Battle.net or when it's unavailable. */
+    private BattleNetData battleNetData(UserAccount channel) {
+        return battleNetLinkStates
+                .map(service -> service.state(channel))
+                .filter(state -> !BattleNetLinkStateService.UNAVAILABLE.equals(state.status()))
+                .map(state -> new BattleNetData(state.status(), state.battleTag(), state.serviceAccountBattleTag()))
                 .orElse(null);
     }
 

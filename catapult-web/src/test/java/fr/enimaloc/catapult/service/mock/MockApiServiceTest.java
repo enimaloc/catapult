@@ -434,6 +434,18 @@ class MockApiServiceTest {
     }
 
     @Test
+    void battleNetDisconnect_unlinksAndTellsThePage() {
+        data.battleNetDisconnect();
+        events.clear();
+
+        service.battleNetDisconnect(username);
+
+        assertThat(data.getBattleNetLink().status()).isEqualTo("NONE");
+        assertThat(events).containsExactly(
+                new fr.enimaloc.catapult.event.battlenet.BattleNetLinkEvent(username, "NONE", null, null));
+    }
+
+    @Test
     void minecraftLink() {
         service.minecraftEnroll(username, "Steve");
         service.minecraftSync(username);

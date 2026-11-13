@@ -106,7 +106,12 @@ class FictitiousAccountServiceTest {
 
         CatapultOAuth2UserService members = new CatapultOAuth2UserService(accounts, tokens, settings, getters,
                 mock(TokenEncryptionService.class), events, mock(RestClient.class), mock(WhitelistService.class),
-                mock(AdminMigrationService.class), mock(InviteService.class));
+                mock(AdminMigrationService.class), mock(InviteService.class),
+                mock(fr.enimaloc.catapult.service.battlenet.BattleNetGateService.class),
+                new org.springframework.beans.factory.support.StaticListableBeanFactory()
+                        .getBeanProvider(fr.enimaloc.catapult.service.battlenet.BattleNetFriendService.class),
+                new org.springframework.transaction.support.TransactionTemplate(
+                        mock(org.springframework.transaction.PlatformTransactionManager.class)));
         SimulationProperties properties = new SimulationProperties();
         properties.setStateFile(dir.resolve("simulation.json").toString());
         registry = new SimulationRegistry(properties, accounts, tokens, mock(MinecraftFriendLinkRepository.class),

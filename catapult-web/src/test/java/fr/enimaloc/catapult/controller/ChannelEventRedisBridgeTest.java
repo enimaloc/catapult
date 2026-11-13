@@ -17,6 +17,7 @@ import fr.enimaloc.catapult.event.binding.CclStateEvent;
 import fr.enimaloc.catapult.event.binding.CustomBindingChangedEvent;
 import fr.enimaloc.catapult.event.binding.CustomBindingsUpdatedEvent;
 import fr.enimaloc.catapult.event.binding.GameChangedEvent;
+import fr.enimaloc.catapult.event.battlenet.BattleNetLinkEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftDisconnectedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftSyncEvent;
 import fr.enimaloc.catapult.event.steam.SteamConnectionStateEvent;
@@ -230,6 +231,16 @@ class ChannelEventRedisBridgeTest {
         assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.MINECRAFT_LINK_CHANGED,
                 new ChannelEvents.MinecraftLinkChanged(owner.toString(), "streamer", "NONE", null))))
                 .containsExactly(new MinecraftDisconnectedEvent("streamer"));
+    }
+
+    @Test
+    void bridgeRelaysBattleNetLinkChanged() {
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.BATTLENET_LINK_CHANGED,
+                new ChannelEvents.BattleNetLinkChanged(owner.toString(), "streamer", "ACCEPTED", "Me#1", "Bot#2"))))
+                .containsExactly(new BattleNetLinkEvent("streamer", "ACCEPTED", "Me#1", "Bot#2"));
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.BATTLENET_LINK_CHANGED,
+                new ChannelEvents.BattleNetLinkChanged(owner.toString(), "streamer", "NONE", null, null))))
+                .containsExactly(new BattleNetLinkEvent("streamer", "NONE", null, null));
     }
 
     @Test

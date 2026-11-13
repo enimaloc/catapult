@@ -219,6 +219,21 @@ class TwitchLoginSuccessHandlerTest {
     }
 
     @Test
+    void battleNetLink_forgetsTheBlizzardTokenAndRedirectsToTheChannel() throws Exception {
+        ReflectionTestUtils.setField(handler, "webUrl", "https://web.example.com");
+        userAccount.setTwitchUsername("jeb_");
+        var authToken = mock(OAuth2AuthenticationToken.class);
+        when(authToken.getAuthorizedClientRegistrationId()).thenReturn("battlenet");
+        when(authToken.getPrincipal()).thenReturn(catapultUser);
+
+        handler.onAuthenticationSuccess(request, response, authToken);
+
+        verify(authorizedClientRepository).removeAuthorizedClient("battlenet", authToken, request, response);
+        verify(oAuthTokenRepository, never()).save(any());
+        assertThat(response.getRedirectedUrl()).isEqualTo("https://web.example.com/channel/jeb_#integrations");
+    }
+
+    @Test
     void twitchToken_withWebUrl_sendsCatapultWebsStateBackAndForgetsIt() throws Exception {
         ReflectionTestUtils.setField(handler, "webUrl", "https://web.example.com");
         MockHttpSession session = new MockHttpSession();

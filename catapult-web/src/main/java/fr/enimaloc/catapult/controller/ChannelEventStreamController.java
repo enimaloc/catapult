@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.event.ChannelUpdatedEvent;
+import fr.enimaloc.catapult.event.battlenet.BattleNetLinkEvent;
 import fr.enimaloc.catapult.event.binding.CustomBindingsUpdatedEvent;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
@@ -89,15 +90,18 @@ public class ChannelEventStreamController {
         String name = event.getClass().getSimpleName();
         ChannelUpdatedEvent forModerators = forModerators(event);
         for (SseEmitter emitter : emittersByUsername.getOrDefault(key(event.username()), List.of())) {
-            sse.send(emitter, name, ownerEmitters.contains(emitter) ? event : forModerators);
+            ChannelUpdatedEvent payload = ownerEmitters.contains(emitter) ? event : forModerators;
+            if (payload != null) sse.send(emitter, name, payload);
         }
     }
 
     /**
      * {@code event} as a moderator's stream gets it: without the custom bindings, which catapult-api shows the
-     * owner alone (their page has no list to update).
+     * owner alone (their page has no list to update). Null when they get nothing at all: the Battle.net link, whose
+     * tags and card are the owner's alone.
      */
     static ChannelUpdatedEvent forModerators(ChannelUpdatedEvent event) {
+        if (event instanceof BattleNetLinkEvent) return null;
         return event instanceof CustomBindingsUpdatedEvent updated ? new CustomBindingsUpdatedEvent(updated.username())
                 : event;
     }
