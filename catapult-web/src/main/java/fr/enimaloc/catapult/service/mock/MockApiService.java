@@ -65,6 +65,7 @@ import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
 import fr.enimaloc.catapult.common.dto.channel.GameDto;
 import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
 import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
+import fr.enimaloc.catapult.common.dto.connect.BattleNetLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatDispatch;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
@@ -85,6 +86,7 @@ import fr.enimaloc.catapult.event.binding.BindingTitleEvent;
 import fr.enimaloc.catapult.event.binding.BindingUpdatedEvent;
 import fr.enimaloc.catapult.event.binding.CclStateEvent;
 import fr.enimaloc.catapult.event.binding.GameChangedEvent;
+import fr.enimaloc.catapult.event.battlenet.BattleNetLinkEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftDisconnectedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftEnrollEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftSyncEvent;
@@ -510,6 +512,22 @@ public class MockApiService implements ApiService {
         log.trace("minecraftDisconnect({})", username);
         currentData().minecraftDisconnect();
         eventPublisher.publishEvent(new MinecraftDisconnectedEvent(username));
+        return NO_CONTENT;
+    }
+
+    @Override
+    public BattleNetLinkStateResponse battleNetStatus(String username) {
+        log.trace("battleNetStatus({})", username);
+        return currentData().getBattleNetLink();
+    }
+
+    @Override
+    public int battleNetDisconnect(String username) {
+        log.trace("battleNetDisconnect({})", username);
+        MockData data = currentData();
+        data.battleNetDisconnect();
+        BattleNetLinkStateResponse link = data.getBattleNetLink();
+        eventPublisher.publishEvent(new BattleNetLinkEvent(username, link.status(), null, null));
         return NO_CONTENT;
     }
 

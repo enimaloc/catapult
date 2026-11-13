@@ -1825,6 +1825,18 @@ mdui-select::part(menu) {
     max-width: none;
 }
 
+/* The Battle.net card's sentences: static text around BattleTags the live event replaces in place. */
+.battlenet-sentence {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25em;
+}
+
+.battlenet-sentence .battlenet-bot-tag,
+.battlenet-sentence .battlenet-tag {
+    font-weight: 600;
+}
+
 /* Actions sit right-aligned under the details. A segmented group lays out its own
  * segments; a plain div (OBS) holds separate buttons. Either way, no separator:
  * outranks the `.connection-card > div` rules above. */

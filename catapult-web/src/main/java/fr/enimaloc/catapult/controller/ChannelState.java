@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.common.dto.channel.BindingDto;
 import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
 import fr.enimaloc.catapult.common.dto.channel.GameDto;
+import fr.enimaloc.catapult.common.dto.channel.BattleNetData;
 import fr.enimaloc.catapult.common.dto.channel.MinecraftData;
 import fr.enimaloc.catapult.common.dto.channel.SteamData;
 import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
@@ -17,6 +18,7 @@ import fr.enimaloc.catapult.event.ChannelUpdatedEvent;
 import fr.enimaloc.catapult.event.DtddMappingChangedEvent;
 import fr.enimaloc.catapult.event.binding.CustomBindingsUpdatedEvent;
 import fr.enimaloc.catapult.event.binding.GameChangedEvent;
+import fr.enimaloc.catapult.event.battlenet.BattleNetLinkEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftDisconnectedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftSyncEvent;
 import fr.enimaloc.catapult.event.steam.SteamConnectionStateEvent;
@@ -70,6 +72,11 @@ public final class ChannelState {
         }
         if (ch.minecraft() != null) {
             events.add(minecraft(login, ch.minecraft()));
+        }
+        if (ch.battleNet() != null) {
+            BattleNetData link = ch.battleNet();
+            events.add(new BattleNetLinkEvent(login, link.status() == null ? "NONE" : link.status(), link.battleTag(),
+                    link.serviceAccountBattleTag()));
         }
         CustomBindingsStateDto custom = ch.customBindings();
         if (custom != null) {

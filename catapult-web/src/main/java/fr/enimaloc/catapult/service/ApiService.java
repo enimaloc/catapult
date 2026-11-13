@@ -33,6 +33,7 @@ import fr.enimaloc.catapult.common.dto.admin.TwKeywordTestDto;
 import fr.enimaloc.catapult.common.dto.admin.TwRebuild;
 import fr.enimaloc.catapult.common.dto.admin.AccountDto;
 import fr.enimaloc.catapult.common.dto.admin.MinecraftDeviceCodeDto;
+import fr.enimaloc.catapult.common.dto.connect.BattleNetLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
@@ -103,6 +104,10 @@ public interface ApiService {
     int minecraftEnroll(String username, String name);
     int minecraftSync(String username);
     int minecraftDisconnect(String username);
+    /** The logged-in member's own Battle.net link; null when logged out or catapult-api fails. */
+    BattleNetLinkStateResponse battleNetStatus(String username);
+    /** Unlinks the member's Battle.net account; catapult-api's status (204), 401 when logged out, 502 when unreachable. */
+    int battleNetDisconnect(String username);
     /** Unlinks the channel's Xbox account; catapult-api's status (204; 403 not the owner), 502 when unreachable. */
     int xboxDisconnect(String username);
     /** The logged-in user's OBS connection; null when logged out or OBS isn't enabled. */

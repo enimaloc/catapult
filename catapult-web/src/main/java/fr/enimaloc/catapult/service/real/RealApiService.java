@@ -45,6 +45,7 @@ import fr.enimaloc.catapult.common.dto.admin.SocialLinkDto;
 import fr.enimaloc.catapult.common.dto.admin.SocialLinkOrderRequest;
 import fr.enimaloc.catapult.common.dto.admin.SocialLinkRequest;
 import fr.enimaloc.catapult.common.dto.admin.MinecraftDeviceCodeDto;
+import fr.enimaloc.catapult.common.dto.connect.BattleNetLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.admin.DtddKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.SteamKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto;
@@ -351,6 +352,20 @@ public class RealApiService implements ApiService {
         UUID me = me();
         if (me == null) return HttpStatus.UNAUTHORIZED.value();
         return client.delete("/api/internal/users/{userId}/links/minecraft", me);
+    }
+
+    @Override
+    public BattleNetLinkStateResponse battleNetStatus(String username) {
+        UUID me = me();
+        if (me == null) return null;
+        return client.get("/api/internal/users/{userId}/links/battlenet", BattleNetLinkStateResponse.class, me);
+    }
+
+    @Override
+    public int battleNetDisconnect(String username) {
+        UUID me = me();
+        if (me == null) return HttpStatus.UNAUTHORIZED.value();
+        return client.delete("/api/internal/users/{userId}/links/battlenet", me);
     }
 
     @Override

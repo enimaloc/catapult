@@ -16,6 +16,7 @@ import fr.enimaloc.catapult.event.binding.CclStateEvent;
 import fr.enimaloc.catapult.event.binding.CustomBindingChangedEvent;
 import fr.enimaloc.catapult.event.binding.CustomBindingsUpdatedEvent;
 import fr.enimaloc.catapult.event.binding.GameChangedEvent;
+import fr.enimaloc.catapult.event.battlenet.BattleNetLinkEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftDisconnectedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftSyncEvent;
 import fr.enimaloc.catapult.event.steam.SteamConnectionStateEvent;
@@ -142,6 +143,11 @@ public class ChannelEventRedisBridge {
                 var link = read(data, ChannelEvents.MinecraftLinkChanged.class);
                 yield "NONE".equals(link.status()) ? List.of(new MinecraftDisconnectedEvent(login))
                         : List.of(new MinecraftSyncEvent(login, link.status(), link.minecraftName()));
+            }
+            case ChannelEvents.BATTLENET_LINK_CHANGED -> {
+                var link = read(data, ChannelEvents.BattleNetLinkChanged.class);
+                yield List.of(new BattleNetLinkEvent(login, link.status(), link.battleTag(),
+                        link.serviceAccountBattleTag()));
             }
             default -> List.of();
         };

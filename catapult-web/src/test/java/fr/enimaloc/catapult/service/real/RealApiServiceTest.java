@@ -746,6 +746,17 @@ class RealApiServiceTest {
     }
 
     @Test
+    void battleNetStatusAndDisconnect() {
+        respond(HttpMethod.GET, OWN + "/links/battlenet",
+                "{\"status\":\"PENDING\",\"battleTag\":\"Me#1\",\"serviceAccountBattleTag\":\"Bot#2\"}");
+        expect(HttpMethod.DELETE, OWN + "/links/battlenet").andRespond(withNoContent());
+
+        assertThat(service.battleNetStatus("enimaloc")).isEqualTo(
+                new fr.enimaloc.catapult.common.dto.connect.BattleNetLinkStateResponse("PENDING", "Me#1", "Bot#2"));
+        assertThat(service.battleNetDisconnect("enimaloc")).isEqualTo(204);
+    }
+
+    @Test
     void minecraftDisconnect() {
         expect(HttpMethod.DELETE, OWN + "/links/minecraft").andRespond(withNoContent());
         service.minecraftDisconnect("enimaloc");

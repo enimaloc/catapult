@@ -64,6 +64,17 @@ class ChannelStateTest {
     }
 
     @Test
+    void battleNetLink_asItsEvent() {
+        ChannelPageData ch = new ChannelPageData(new ChannelUserDto("1", "2", "enimaloc", "img"), "enimaloc", true, true,
+                false, null, new PagedBindings(0, 0, 0, List.of()), List.of(), Set.of(), List.of(), Set.of(), null,
+                null, null, null, null, new fr.enimaloc.catapult.common.dto.channel.BattleNetData("PENDING", "Me#1",
+                "Bot#2"), null, null, null, null);
+
+        assertThat(events(ChannelState.of(ch, SETTINGS, null)))
+                .contains(new fr.enimaloc.catapult.event.battlenet.BattleNetLinkEvent("enimaloc", "PENDING", "Me#1", "Bot#2"));
+    }
+
+    @Test
     void everythingThePageShows_asItsEvents() {
         UUID active = UUID.randomUUID();
         CustomBindingDto art = new CustomBindingDto(active, "Art", "509660", "Art", List.of(), List.of(), false);

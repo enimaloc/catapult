@@ -8,6 +8,7 @@ import fr.enimaloc.catapult.common.dto.channel.ChannelUserDto;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
 import fr.enimaloc.catapult.common.dto.channel.ExtensionSlotDto;
 import fr.enimaloc.catapult.common.dto.channel.GameDto;
+import fr.enimaloc.catapult.common.dto.channel.BattleNetData;
 import fr.enimaloc.catapult.common.dto.channel.MinecraftData;
 import fr.enimaloc.catapult.common.dto.channel.ObsData;
 import fr.enimaloc.catapult.common.dto.channel.PagedBindings;
@@ -555,6 +556,22 @@ class ChannelVisibilityRenderingTest {
                 null, null, null, null, minecraft, null, null, null);
     }
 
+    private ChannelPageData channelPageData(BattleNetData battleNet) {
+        return new ChannelPageData(
+                new ChannelUserDto("id-1", "twitch-1", "enimaloc", "https://example.test/avatar.png"),
+                "enimaloc", true, true, true, null,
+                new PagedBindings(0, 1, 0, List.of()),
+                List.of(), Set.of(), List.of(), Set.of(),
+                null, null, null, null, null, battleNet, null, null, null, null);
+    }
+
+    private String battleNetPage(BattleNetData battleNet) throws Exception {
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(channelPageData(battleNet));
+        return mvc.perform(get("/spa/channel/enimaloc").locale(java.util.Locale.ENGLISH))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+    }
+
     /** Extracts the opening tag text for the first element with the given id. */
     private static String openingTagForId(String html, String id) {
         java.util.regex.Matcher m = java.util.regex.Pattern
@@ -686,6 +703,69 @@ class ChannelVisibilityRenderingTest {
         assertThat(openingTagForId(html, "minecraft-enroll-btn")).contains("hidden");
         assertThat(openingTagForId(html, "minecraft-check-btn")).contains("hidden");
         assertThat(openingTagForId(html, "minecraft-disconnect-btn")).contains("hidden");
+    }
+
+    @Test
+    void battleNetCardRendersOneCasePerStatus() throws Exception {
+        String html = battleNetPage(new BattleNetData("NONE", null, null));
+
+        for (String flag : List.of("caseNone", "casePending", "caseRejected", "caseAccepted", "caseRemoved", "caseFull")) {
+            assertThat(countOccurrences(html, "data-if=\"" + flag + "\"")).as(flag).isEqualTo(1);
+        }
+        assertThat(html).contains("data-conn=\"battlenet\"");
+        assertThat(html).contains("data-on=\"caseNone:BattleNetLinkEvent.status=NONE\"");
+        assertThat(html).contains("data-on=\"caseAccepted:BattleNetLinkEvent.status=ACCEPTED\"");
+        String noneCase = html.substring(html.lastIndexOf('<', html.indexOf("data-if=\"caseNone\"")));
+        assertThat(noneCase.substring(0, noneCase.indexOf('>'))).doesNotContain("hidden");
+        String acceptedCase = html.substring(html.lastIndexOf('<', html.indexOf("data-if=\"caseAccepted\"")));
+        assertThat(acceptedCase.substring(0, acceptedCase.indexOf('>'))).contains("hidden");
+        assertThat(openingTagForId(html, "battlenet-connect-btn")).doesNotContain("hidden");
+        assertThat(openingTagForId(html, "battlenet-disconnect-btn")).contains("hidden");
+    }
+
+    @Test
+    void pendingCaseShowsTheBotTag() throws Exception {
+        String html = battleNetPage(new BattleNetData("PENDING", "Me#1", "CatapultBot#4242"));
+
+        String pendingCase = html.substring(html.lastIndexOf('<', html.indexOf("data-if=\"casePending\"")));
+        assertThat(pendingCase.substring(0, pendingCase.indexOf('>'))).doesNotContain("hidden");
+        assertThat(html).contains("CatapultBot#4242")
+                .contains("data-value=\"textContent:BattleNetLinkEvent.serviceAccountBattleTag\"");
+        assertThat(openingTagForId(html, "battlenet-connect-btn")).contains("hidden");
+        assertThat(openingTagForId(html, "battlenet-disconnect-btn")).contains("hidden");
+    }
+
+    @Test
+    void acceptedCaseShowsTheStreamerTagAndTheDisconnectButton() throws Exception {
+        String html = battleNetPage(new BattleNetData("ACCEPTED", "Me#1", "CatapultBot#4242"));
+
+        assertThat(html).contains("Connected as").contains("Me#1");
+        assertThat(openingTagForId(html, "battlenet-disconnect-btn")).doesNotContain("hidden")
+                .contains("data-on=\"showDisconnect:BattleNetLinkEvent.status=ACCEPTED\"");
+        assertThat(openingTagForId(html, "battlenet-connect-btn")).contains("hidden");
+    }
+
+    @Test
+    void rejectedAndRemovedOfferTheConnectButtonAgain() throws Exception {
+        for (String status : List.of("INVITE_REJECTED", "REMOVED")) {
+            String html = battleNetPage(new BattleNetData(status, "Me#1", "CatapultBot#4242"));
+            assertThat(openingTagForId(html, "battlenet-connect-btn")).as(status).doesNotContain("hidden");
+            assertThat(openingTagForId(html, "battlenet-disconnect-btn")).as(status).contains("hidden");
+        }
+    }
+
+    @Test
+    void noVerifyButton() throws Exception {
+        String html = battleNetPage(new BattleNetData("PENDING", "Me#1", "CatapultBot#4242"));
+
+        assertThat(html).doesNotContain("battlenet-check-btn").doesNotContain("battlenet-sync-btn");
+    }
+
+    @Test
+    void battleNetUnavailable_hasNoCard() throws Exception {
+        String html = battleNetPage(null);
+
+        assertThat(html).doesNotContain("data-conn=\"battlenet\"").doesNotContain("battlenet-status-body");
     }
 
     /** Minecraft unavailable to the channel (catapult-api's null): no card at all. */

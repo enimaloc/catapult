@@ -20,6 +20,8 @@ import fr.enimaloc.catapult.common.dto.channel.PagedBindings;
 import fr.enimaloc.catapult.common.dto.channel.SteamData;
 import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
 import fr.enimaloc.catapult.common.dto.channel.XboxData;
+import fr.enimaloc.catapult.common.dto.channel.BattleNetData;
+import fr.enimaloc.catapult.common.dto.connect.BattleNetLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEvents;
@@ -60,6 +62,9 @@ public class MockData {
     };
     private static final ObsData DEFAULT_OBS = new ObsData(false, "127.0.0.1", 4455, true);
     private static final LinkStateResponse MINECRAFT_UNLINKED = new LinkStateResponse("NONE", null, null);
+    private static final BattleNetLinkStateResponse BATTLENET_UNLINKED = new BattleNetLinkStateResponse("NONE", null, null);
+    private static final String MOCK_BATTLE_TAG = "MockStreamer#1234";
+    private static final String MOCK_BOT_BATTLE_TAG = "CatapultBot#4242";
 
     /** A session's initial Steam state. */
     record SteamState(boolean connected, boolean personalToken, boolean tokenShared,
@@ -101,6 +106,8 @@ public class MockData {
     @Getter
     private boolean hasMinecraftProvider;
     private LinkStateResponse minecraftLink;
+    /** Battle.net is offered to every mock session; the quick-launch presets differ by their link. */
+    private BattleNetLinkStateResponse battleNetLink = BATTLENET_UNLINKED;
     private ObsData obsData;
     private String obsPassword;
     private String twitchatBranch = TwitchatData.AUTO;
@@ -193,13 +200,20 @@ public class MockData {
         int id = Integer.parseInt(jwt);
         List<ChannelDto> channels = MockPresets.CHANNELS;
         List<BindingDto> bindings = MockPresets.BINDINGS;
-        return new MockData(
+        MockData data = new MockData(
                 channels.get(Math.min(id, channels.size() - 1)),
                 List.of(bindings.get(Math.min(id, bindings.size() - 1))),
                 MockPresets.DEFAULT_SETTINGS,
                 id == 0 ? channels : List.of(),
                 new SteamState(true, true, false, false, false, false),
                 false, false, MINECRAFT_UNLINKED, DEFAULT_OBS);
+        // The first preset is linked, the second one waits for its friend invitation, the others have no link.
+        data.battleNetLink = switch (id) {
+            case 0 -> new BattleNetLinkStateResponse("ACCEPTED", MOCK_BATTLE_TAG, MOCK_BOT_BATTLE_TAG);
+            case 1 -> new BattleNetLinkStateResponse("PENDING", MOCK_BATTLE_TAG, MOCK_BOT_BATTLE_TAG);
+            default -> BATTLENET_UNLINKED;
+        };
+        return data;
     }
 
     private static MockData fromConfig(MockConfig config) {
@@ -325,7 +339,7 @@ public class MockData {
                 shown.live(), botEnabled, gameDto,
                 new PagedBindings(0, bindings.isEmpty() ? 0 : 1, bindings.size(), bindings),
                 AVAILABLE_CCLS, userSettingsDto.blockedCcls(), AVAILABLE_TWS, userSettingsDto.blockedTws(),
-                status, source, steamData(), hasXboxProvider ? new XboxData(hasXbox) : null, minecraftData(), obsData,
+                status, source, steamData(), hasXboxProvider ? new XboxData(hasXbox) : null, minecraftData(), battleNetData(), obsData,
                 obsData == null ? null : TwitchatData.of(twitchatBranch),
                 username.equals(channelDto.twitchUsername()) ? customBindings.state() : null,
                 // drops: the mock has no experiments, they are offered
@@ -351,6 +365,11 @@ public class MockData {
                 minecraftLink.serviceAccountUsername());
     }
 
+    private BattleNetData battleNetData() {
+        return new BattleNetData(battleNetLink.status(), battleNetLink.battleTag(),
+                battleNetLink.serviceAccountBattleTag());
+    }
+
     public ChannelUserDto getChannelUser() {
         return userOf(channelDto);
     }
@@ -366,6 +385,14 @@ public class MockData {
 
     public LinkStateResponse getMinecraftLink() {
         return minecraftLink;
+    }
+
+    public BattleNetLinkStateResponse getBattleNetLink() {
+        return battleNetLink;
+    }
+
+    public void battleNetDisconnect() {
+        battleNetLink = BATTLENET_UNLINKED;
     }
 
     // --- binding mutations ---------------------------------------------------------------------
