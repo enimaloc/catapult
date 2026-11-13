@@ -938,4 +938,32 @@ class AdminGameMappingServiceTest {
         assertThat(oldGame.getStatus()).isEqualTo(Status.INCOMPLETE);
         verify(igdbService, never()).suggestCcls("123");
     }
+
+    @Test
+    void aNonNumericIgdbIdIsA400ForAnActiveMapping() {
+        assertThatThrownBy(() -> service.create(withIgdb("32399", "Typed", false, "abc"), admin))
+                .isInstanceOfSatisfying(ResponseStatusException.class, e -> {
+                    assertThat(e.getStatusCode().value()).isEqualTo(400);
+                    assertThat(e.getReason()).isEqualTo("IGDB game id must be numeric");
+                });
+        assertThat(mappings).isEmpty();
+        verify(mappingRepo, never()).saveAndFlush(any());
+        verifyNoInteractions(igdbService);
+    }
+
+    @Test
+    void aNonNumericIgdbIdIsA400ForAnIgnoredMapping() {
+        GameMapping old = storedMapping(SourceType.STEAM, "730", "41");
+
+        assertThatThrownBy(() -> service.update(old.getId(), withIgdb(null, null, true, "12a"), admin))
+                .isInstanceOfSatisfying(ResponseStatusException.class, e -> {
+                    assertThat(e.getStatusCode().value()).isEqualTo(400);
+                    assertThat(e.getReason()).isEqualTo("IGDB game id must be numeric");
+                });
+        assertThatThrownBy(() -> service.create(withIgdb(null, null, true, "-1"), admin))
+                .isInstanceOf(ResponseStatusException.class);
+        assertThat(old.getIgdbId()).isEqualTo("41");
+        assertThat(mappings).hasSize(1);
+        verify(mappingRepo, never()).saveAndFlush(any());
+    }
 }

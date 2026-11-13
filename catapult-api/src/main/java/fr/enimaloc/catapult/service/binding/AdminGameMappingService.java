@@ -448,6 +448,10 @@ public class AdminGameMappingService {
         String sourceId = request.sourceId() == null ? "" : request.sourceId().trim();
         if (sourceId.isEmpty()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing game ID");
         String igdbId = request.igdbId() == null || request.igdbId().isBlank() ? null : request.igdbId().trim();
+        // IGDB's ids are numbers: anything else would fail every IGDB call made with it
+        if (igdbId != null && !igdbId.chars().allMatch(c -> c >= '0' && c <= '9')) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "IGDB game id must be numeric");
+        }
         String twitchGameId = request.twitchGameId() == null ? "" : request.twitchGameId().trim();
         String twitchGameName = request.twitchGameName() == null ? "" : request.twitchGameName().trim();
         if (twitchGameId.isEmpty() && twitchGameName.isEmpty()) {
