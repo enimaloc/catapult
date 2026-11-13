@@ -474,7 +474,8 @@ public class AdminGameMappingService {
                     m.isCclsOverridden() ? Set.copyOf(m.getCcls()) : null,
                     m.isTwsOverridden() ? Set.copyOf(m.getTws()) : null,
                     followers.getOrDefault(key, 0L), m.getUpdatedAt(),
-                    m.getUpdatedBy() == null ? null : logins.get(m.getUpdatedBy()), m.isIgnoredByDefault());
+                    m.getUpdatedBy() == null ? null : logins.get(m.getUpdatedBy()), m.isIgnoredByDefault(),
+                    m.getIgdbId(), null);
         }).toList();
     }
 

@@ -11,21 +11,23 @@ import java.util.UUID;
  * {@code bindingCount} the number of bindings that follow it (MAPPED); {@code updatedBy} the admin's Twitch login.
  * {@code ignoredByDefault}: the game's bindings are ignored, but those whose streamer chose; its category
  * ({@code twitchGameId}, {@code twitchGameName}) is then null when it sets none.
+ * {@code igdbId}: the IGDB game the source is pinned to, null for none; {@code igdbGameName} its name when known.
  */
 public record GameMappingDto(UUID id, String sourceType, String sourceId, String sourceName, String twitchGameId,
                              String twitchGameName, Set<String> ccls, Set<String> tws, long bindingCount,
-                             Instant updatedAt, String updatedBy, Boolean ignoredByDefault) {
+                             Instant updatedAt, String updatedBy, Boolean ignoredByDefault,
+                             String igdbId, String igdbGameName) {
 
     /** Boxed so a catapult-api that predates it still reads (Jackson refuses a missing primitive): absent, false. */
     public GameMappingDto {
         ignoredByDefault = Boolean.TRUE.equals(ignoredByDefault);
     }
 
-    /** A mapping that doesn't ignore its game. */
+    /** A mapping that doesn't ignore its game and pins no IGDB game. */
     public GameMappingDto(UUID id, String sourceType, String sourceId, String sourceName, String twitchGameId,
                           String twitchGameName, Set<String> ccls, Set<String> tws, long bindingCount,
                           Instant updatedAt, String updatedBy) {
         this(id, sourceType, sourceId, sourceName, twitchGameId, twitchGameName, ccls, tws, bindingCount, updatedAt,
-                updatedBy, false);
+                updatedBy, false, null, null);
     }
 }

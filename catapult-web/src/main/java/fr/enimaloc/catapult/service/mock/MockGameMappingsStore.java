@@ -50,7 +50,7 @@ class MockGameMappingsStore {
                 "Halo Infinite", java.util.Set.of("violent-graphic"), java.util.Set.of("violence"), 6,
                 now.minus(1, ChronoUnit.DAYS), "enimaloc"));
         mappings.add(new GameMappingDto(UUID.randomUUID(), "STEAM", "431960", "Wallpaper Engine", null, null,
-                null, null, 0, now.minus(3, ChronoUnit.DAYS), "enimaloc", true));
+                null, null, 0, now.minus(3, ChronoUnit.DAYS), "enimaloc", true, null, null));
     }
 
     synchronized AdminPage<GameMappingDto> list(int page) {
@@ -87,7 +87,7 @@ class MockGameMappingsStore {
         GameMappingDto mapping = new GameMappingDto(UUID.randomUUID(), request.sourceType(), sourceId,
                 game == null ? null : game.sourceName(), request.twitchGameId(), request.twitchGameName(),
                 request.ccls(), request.tws(), game == null ? 0 : game.streamerCount(), clock.instant(), updatedBy,
-                request.ignoredByDefault());
+                request.ignoredByDefault(), request.igdbId(), null);
         mappings.add(mapping);
         return new ApiClient.Result<>(201, result(mapping, request.applyLive()));
     }
@@ -102,7 +102,8 @@ class MockGameMappingsStore {
         }
         GameMappingDto changed = new GameMappingDto(id, current.sourceType(), current.sourceId(), current.sourceName(),
                 request.twitchGameId(), request.twitchGameName(), request.ccls(), request.tws(),
-                current.bindingCount(), clock.instant(), updatedBy, request.ignoredByDefault());
+                current.bindingCount(), clock.instant(), updatedBy, request.ignoredByDefault(),
+                request.igdbId(), null);
         mappings.set(index, changed);
         return new ApiClient.Result<>(200, result(changed, request.applyLive()));
     }

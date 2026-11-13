@@ -553,7 +553,7 @@ class AdminGameMappingServiceTest {
 
     private static GameMappingRequest ignoring(String sourceId, String twitchId, boolean applyLive) {
         return new GameMappingRequest("STEAM", sourceId, twitchId, twitchId == null ? null : "Category " + twitchId,
-                null, null, applyLive, true);
+                null, null, applyLive, true, null);
     }
 
     @Test
@@ -606,12 +606,12 @@ class AdminGameMappingServiceTest {
     @Test
     void withoutCategory_isRefused_unlessIgnoredByDefault() {
         assertThatThrownBy(() -> service.create(
-                new GameMappingRequest("STEAM", "730", " ", null, null, null, false, false), admin))
+                new GameMappingRequest("STEAM", "730", " ", null, null, null, false, false, null), admin))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("Missing Twitch category");
         // Half a category is refused all the same
         assertThatThrownBy(() -> service.create(
-                new GameMappingRequest("STEAM", "730", "32399", " ", null, null, false, true), admin))
+                new GameMappingRequest("STEAM", "730", "32399", " ", null, null, false, true, null), admin))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("Missing Twitch category");
     }

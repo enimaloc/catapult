@@ -43,6 +43,10 @@ public class GameMapping {
     @Column(name = "ignored_by_default", nullable = false)
     private boolean ignoredByDefault = false;
 
+    /** The IGDB game this source is pinned to; null: resolved as without a mapping. */
+    @Column(name = "igdb_id")
+    private String igdbId;
+
     /** false: the bindings keep IGDB's CCLs; true: they get {@link #ccls}, even when empty. */
     @Column(name = "ccls_overridden", nullable = false)
     private boolean cclsOverridden = false;

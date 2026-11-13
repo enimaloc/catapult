@@ -122,7 +122,7 @@ class MockGameMappingsStoreTest {
         assertThat(store.create(new GameMappingRequest("STEAM", "413150", null, null, null, null, false), "me")
                 .status()).isEqualTo(400);
 
-        var created = store.create(new GameMappingRequest("STEAM", "413150", null, null, null, null, false, true), "me");
+        var created = store.create(new GameMappingRequest("STEAM", "413150", null, null, null, null, false, true, null), "me");
 
         assertThat(created.status()).isEqualTo(201);
         assertThat(created.body().mapping().ignoredByDefault()).isTrue();

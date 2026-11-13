@@ -51,7 +51,7 @@ class AdminDtosTest {
     void aGameMapping_withoutItsIgnore_doesNotIgnoreTheGame() {
         GameMappingRequest request = new GameMappingRequest("STEAM", "730", "1", "CS", null, null, false);
         assertThat(request.ignoredByDefault()).isFalse();
-        assertThat(new GameMappingRequest("STEAM", "730", null, null, null, null, false, null).ignoredByDefault())
+        assertThat(new GameMappingRequest("STEAM", "730", null, null, null, null, false, null, null).ignoredByDefault())
                 .isFalse();
         assertThat(json.readValue("{\"sourceType\":\"STEAM\",\"sourceId\":\"730\",\"applyLive\":true}",
                 GameMappingRequest.class).ignoredByDefault()).isFalse();
@@ -61,6 +61,16 @@ class AdminDtosTest {
         assertThat(mapping.ignoredByDefault()).isFalse();
         assertThat(json.readValue("{\"sourceType\":\"STEAM\",\"sourceId\":\"730\",\"bindingCount\":0}",
                 GameMappingDto.class).ignoredByDefault()).isFalse();
+    }
+
+    @Test
+    void aGameMapping_withoutItsIgdbGame_pinsNone() {
+        assertThat(json.readValue("{\"sourceType\":\"STEAM\",\"sourceId\":\"730\",\"applyLive\":true}",
+                GameMappingRequest.class).igdbId()).isNull();
+        GameMappingDto dto = json.readValue("{\"sourceType\":\"STEAM\",\"sourceId\":\"730\",\"bindingCount\":0}",
+                GameMappingDto.class);
+        assertThat(dto.igdbId()).isNull();
+        assertThat(dto.igdbGameName()).isNull();
     }
 
     @Test
