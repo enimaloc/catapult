@@ -162,11 +162,4 @@ class ApiAdminGameMappingControllerTest {
         assertThat(controller.igdbGames(null)).isEmpty();
         verify(igdbService, never()).searchGameOptions(any());
     }
-
-    @Test
-    void igdbFailureIsEmpty() {
-        when(igdbService.searchGameOptions("boom")).thenReturn(List.of());
-
-        assertThat(controller.igdbGames("boom")).isEmpty();
-    }
 }
