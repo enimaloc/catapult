@@ -17,5 +17,9 @@ public interface BattleNetServiceAccountRepository extends JpaRepository<BattleN
 
     long countByEnabledTrueAndFriendLimitReachedFalse();
 
+    long countByEnabledTrueAndAuthState(BattleNetServiceAccount.AuthState authState);
+
+    long countByEnabledTrueAndAuthStateAndFriendLimitReachedFalse(BattleNetServiceAccount.AuthState authState);
+
     Optional<BattleNetServiceAccount> findByBnetAccountId(long bnetAccountId);
 }
