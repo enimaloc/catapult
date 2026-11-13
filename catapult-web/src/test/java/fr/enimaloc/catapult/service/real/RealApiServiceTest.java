@@ -1878,6 +1878,51 @@ class RealApiServiceTest {
     }
 
     @Test
+    void adminBattleNetAccounts_readCatapultApisDto() {
+        respond(HttpMethod.GET, "/api/internal/admin/battlenet-accounts", "[{\"id\":\"00000000-0000-0000-0000-00000000000a\","
+                + "\"label\":\"Bot1\",\"battleTag\":\"Bot#1\",\"authState\":\"CODE_REQUIRED\",\"sessionState\":\"STOPPED_CODE_REQUIRED\","
+                + "\"fillOrder\":2,\"friendLimitReached\":true,\"enabled\":false,\"friendCount\":7}]");
+        assertThat(service.adminBattleNetAccounts()).singleElement().satisfies(a -> {
+            assertThat(a.battleTag()).isEqualTo("Bot#1");
+            assertThat(a.authState()).isEqualTo("CODE_REQUIRED");
+            assertThat(a.sessionState()).isEqualTo("STOPPED_CODE_REQUIRED");
+            assertThat(a.friendCount()).isEqualTo(7);
+            assertThat(a.friendLimitReached()).isTrue();
+        });
+    }
+
+    @Test
+    void adminBattleNetAccounts_isNullWhenTheApiFails() {
+        expect(HttpMethod.GET, "/api/internal/admin/battlenet-accounts").andRespond(withStatus(HttpStatus.NOT_FOUND));
+
+        assertThat(service.adminBattleNetAccounts()).isNull();
+    }
+
+    @Test
+    void battleNetAccountActions_sendTheirShapes_andReturnTheStatus() {
+        UUID id = UUID.fromString("00000000-0000-0000-0000-00000000000a");
+        expect(HttpMethod.POST, "/api/internal/admin/battlenet-accounts")
+                .andExpect(content().json("{\"label\":\"Bot\",\"email\":\"b@x.y\",\"password\":\"pw\"}",
+                        org.springframework.test.json.JsonCompareMode.STRICT))
+                .andRespond(withStatus(HttpStatus.ACCEPTED).contentType(MediaType.APPLICATION_JSON).body("{}"));
+        expect(HttpMethod.POST, "/api/internal/admin/battlenet-accounts/" + id + "/code")
+                .andExpect(content().json("{\"code\":\"123456\"}", org.springframework.test.json.JsonCompareMode.STRICT))
+                .andRespond(withStatus(HttpStatus.ACCEPTED));
+        expect(HttpMethod.POST, "/api/internal/admin/battlenet-accounts/" + id + "/reauth")
+                .andRespond(withStatus(HttpStatus.CONFLICT));
+        expect(HttpMethod.PATCH, "/api/internal/admin/battlenet-accounts/" + id)
+                .andExpect(content().json("{\"friendLimitReached\":false}", org.springframework.test.json.JsonCompareMode.STRICT))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+        expect(HttpMethod.DELETE, "/api/internal/admin/battlenet-accounts/" + id).andRespond(withNoContent());
+
+        assertThat(service.adminCreateBattleNetAccount("Bot", "b@x.y", "pw")).isEqualTo(202);
+        assertThat(service.adminSubmitBattleNetCode(id, "123456")).isEqualTo(202);
+        assertThat(service.adminReauthBattleNetAccount(id)).isEqualTo(409);
+        assertThat(service.adminPatchBattleNetAccount(id, Map.of("friendLimitReached", false))).isEqualTo(200);
+        assertThat(service.adminDeleteBattleNetAccount(id)).isEqualTo(204);
+    }
+
+    @Test
     void adminMinecraftDeviceCode_readsTheSnakeCaseAnswer_andKeepsARefusalsStatusAndProblem() {
         expect(HttpMethod.POST, "/api/internal/admin/minecraft-accounts/device-code").andRespond(withSuccess(
                 "{\"device_code\":\"dc-1\",\"user_code\":\"ABCD-1234\",\"verification_uri\":\"https://www.microsoft.com/link\","

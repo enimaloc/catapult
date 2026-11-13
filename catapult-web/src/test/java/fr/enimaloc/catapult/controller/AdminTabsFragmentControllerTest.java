@@ -991,6 +991,59 @@ class AdminTabsFragmentControllerTest {
         assertThat(html.split("admin-minecraft-delete\"", -1)).hasSize(4);
     }
 
+    private static fr.enimaloc.catapult.common.dto.admin.BattleNetAccountDto bot(String id, String label, String tag,
+            String auth, String session, boolean enabled, boolean full) {
+        return new fr.enimaloc.catapult.common.dto.admin.BattleNetAccountDto(java.util.UUID.fromString(id), label, tag, auth,
+                session, 0, full, enabled, 4);
+    }
+
+    @Test
+    void keysTabRendersTheBattleNetSection() throws Exception {
+        when(apiService.adminApiKeys(org.mockito.ArgumentMatchers.any())).thenReturn(keys(true));
+        when(apiService.adminBattleNetAccounts()).thenReturn(List.of(
+                bot("00000000-0000-0000-0000-00000000000a", "Ready<b>", "Tag#1", "READY", "READY", true, true),
+                bot("00000000-0000-0000-0000-00000000000b", "Waiting", null, "CODE_REQUIRED", "STOPPED_CODE_REQUIRED", false, false)));
+
+        String html = asAdmin("/spa/admin/keys").replaceAll("\\s+", " ");
+
+        assertThat(html).contains("id=\"admin-battlenet\"", "Battle.net bots", "Ready&lt;b&gt;", "Tag#1", "Add a bot",
+                "data-auth-state=\"CODE_REQUIRED\"", "2FA code required", "Admin action needed", "account.battle.net");
+        // the code field only for the bot waiting for one; the full flag lifts only the full one
+        assertThat(html.split("admin-battlenet-code-submit\"", -1)).hasSize(2);
+        assertThat(html).contains("admin-battlenet-code-submit\" data-id=\"00000000-0000-0000-0000-00000000000b\"");
+        assertThat(html.split("admin-battlenet-reset\"", -1)).hasSize(2);
+        assertThat(html.split("admin-battlenet-toggle\"", -1)).hasSize(3);
+        assertThat(html.split("admin-battlenet-delete\"", -1)).hasSize(3);
+        assertThat(html).doesNotContain("Ready<b>");
+    }
+
+    @Test
+    void passwordNeverRenderedBack() throws Exception {
+        when(apiService.adminApiKeys(org.mockito.ArgumentMatchers.any())).thenReturn(keys(true));
+        when(apiService.adminBattleNetAccounts()).thenReturn(List.of(
+                bot("00000000-0000-0000-0000-00000000000a", "Bot", "Tag#1", "READY", "READY", true, false)));
+
+        String html = asAdmin("/spa/admin/keys").replaceAll("\\s+", " ");
+
+        // every password field is a password input, autofill-proof, with no value of any kind
+        java.util.regex.Matcher fields = java.util.regex.Pattern
+                .compile("<mdui-text-field[^>]*name=\"password\"[^>]*>").matcher(html);
+        int count = 0;
+        while (fields.find()) {
+            count++;
+            assertThat(fields.group()).contains("type=\"password\"", "autocomplete=\"new-password\"").doesNotContain("value=");
+        }
+        assertThat(count).isEqualTo(2); // the bot's "change password" and the add form
+    }
+
+    @Test
+    void battleNetSection_unavailableWhenTheApiFails() throws Exception {
+        when(apiService.adminApiKeys(org.mockito.ArgumentMatchers.any())).thenReturn(keys(true));
+        when(apiService.adminBattleNetAccounts()).thenReturn(null);
+
+        assertThat(asAdmin("/spa/admin/keys")).contains("admin-battlenet-unavailable").doesNotContain("admin-battlenet-add");
+    }
+
     @Test
     void accountsCard_emptyAndUnavailable() throws Exception {
         when(apiService.adminApiKeys(org.mockito.ArgumentMatchers.any())).thenReturn(keys(true));

@@ -468,13 +468,14 @@ public class AdminTabsFragmentController {
         });
     }
 
-    /** Steam and DTDD keys cards, then the Minecraft service accounts card. */
+    /** Steam and DTDD keys cards, then the Minecraft and Battle.net service accounts cards. */
     @GetMapping("/keys")
     String keys(Model model, HttpServletResponse response) {
         return guarded(model, response, () -> {
             model.addAttribute("steam", apiService.adminApiKeys(ApiKeyProvider.STEAM));
             model.addAttribute("dtdd", apiService.adminApiKeys(ApiKeyProvider.DTDD));
             model.addAttribute("minecraft", apiService.adminMinecraftAccounts());
+            model.addAttribute("battlenet", apiService.adminBattleNetAccounts());
             // The rate limits learned from the platforms' 429s: each host, then its routes
             model.addAttribute("limits", apiService.adminRateLimits());
             return "pages/admin-tab/keys :: content";

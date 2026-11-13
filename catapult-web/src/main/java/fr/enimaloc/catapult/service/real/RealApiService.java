@@ -39,6 +39,7 @@ import fr.enimaloc.catapult.common.dto.admin.TwDefinitionDto;
 import fr.enimaloc.catapult.common.dto.admin.TwKeywordTestDto;
 import fr.enimaloc.catapult.common.dto.admin.TwRebuild;
 import fr.enimaloc.catapult.common.dto.admin.AccountDto;
+import fr.enimaloc.catapult.common.dto.admin.BattleNetAccountDto;
 import fr.enimaloc.catapult.common.dto.admin.MetaTagDto;
 import fr.enimaloc.catapult.common.dto.admin.MetaTagRequest;
 import fr.enimaloc.catapult.common.dto.admin.SocialLinkDto;
@@ -1357,6 +1358,41 @@ public class RealApiService implements ApiService {
             case DTDD -> client.call(HttpMethod.POST, "/api/internal/admin/dtdd-keys/refresh", null, Void.class);
         };
         return result.status();
+    }
+
+    private static final String BATTLENET_ACCOUNTS = "/api/internal/admin/battlenet-accounts";
+
+    @Override
+    public List<BattleNetAccountDto> adminBattleNetAccounts() {
+        // a 404 (Battle.net disabled in catapult-api) is null, like any failed read
+        BattleNetAccountDto[] accounts = client.get(BATTLENET_ACCOUNTS, BattleNetAccountDto[].class);
+        return accounts == null ? null : List.of(accounts);
+    }
+
+    @Override
+    public int adminCreateBattleNetAccount(String label, String email, String password) {
+        return client.call(HttpMethod.POST, BATTLENET_ACCOUNTS,
+                Map.of("label", label, "email", email, "password", password), Void.class).status();
+    }
+
+    @Override
+    public int adminSubmitBattleNetCode(UUID id, String code) {
+        return client.call(HttpMethod.POST, BATTLENET_ACCOUNTS + "/{id}/code", Map.of("code", code), Void.class, id).status();
+    }
+
+    @Override
+    public int adminReauthBattleNetAccount(UUID id) {
+        return client.call(HttpMethod.POST, BATTLENET_ACCOUNTS + "/{id}/reauth", null, Void.class, id).status();
+    }
+
+    @Override
+    public int adminPatchBattleNetAccount(UUID id, Map<String, Object> patch) {
+        return client.call(HttpMethod.PATCH, BATTLENET_ACCOUNTS + "/{id}", patch, Void.class, id).status();
+    }
+
+    @Override
+    public int adminDeleteBattleNetAccount(UUID id) {
+        return client.call(HttpMethod.DELETE, BATTLENET_ACCOUNTS + "/{id}", null, Void.class, id).status();
     }
 
     @Override
