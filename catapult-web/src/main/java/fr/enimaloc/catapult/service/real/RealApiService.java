@@ -1360,39 +1360,37 @@ public class RealApiService implements ApiService {
         return result.status();
     }
 
-    private static final String BATTLENET_ACCOUNTS = "/api/internal/admin/battlenet-accounts";
-
     @Override
     public List<BattleNetAccountDto> adminBattleNetAccounts() {
         // a 404 (Battle.net disabled in catapult-api) is null, like any failed read
-        BattleNetAccountDto[] accounts = client.get(BATTLENET_ACCOUNTS, BattleNetAccountDto[].class);
+        BattleNetAccountDto[] accounts = client.get("/api/internal/admin/battlenet-accounts", BattleNetAccountDto[].class);
         return accounts == null ? null : List.of(accounts);
     }
 
     @Override
     public int adminCreateBattleNetAccount(String label, String email, String password) {
-        return client.call(HttpMethod.POST, BATTLENET_ACCOUNTS,
+        return client.call(HttpMethod.POST, "/api/internal/admin/battlenet-accounts",
                 Map.of("label", label, "email", email, "password", password), Void.class).status();
     }
 
     @Override
     public int adminSubmitBattleNetCode(UUID id, String code) {
-        return client.call(HttpMethod.POST, BATTLENET_ACCOUNTS + "/{id}/code", Map.of("code", code), Void.class, id).status();
+        return client.call(HttpMethod.POST, "/api/internal/admin/battlenet-accounts/{id}/code", Map.of("code", code), Void.class, id).status();
     }
 
     @Override
     public int adminReauthBattleNetAccount(UUID id) {
-        return client.call(HttpMethod.POST, BATTLENET_ACCOUNTS + "/{id}/reauth", null, Void.class, id).status();
+        return client.call(HttpMethod.POST, "/api/internal/admin/battlenet-accounts/{id}/reauth", null, Void.class, id).status();
     }
 
     @Override
     public int adminPatchBattleNetAccount(UUID id, Map<String, Object> patch) {
-        return client.call(HttpMethod.PATCH, BATTLENET_ACCOUNTS + "/{id}", patch, Void.class, id).status();
+        return client.call(HttpMethod.PATCH, "/api/internal/admin/battlenet-accounts/{id}", patch, Void.class, id).status();
     }
 
     @Override
     public int adminDeleteBattleNetAccount(UUID id) {
-        return client.call(HttpMethod.DELETE, BATTLENET_ACCOUNTS + "/{id}", null, Void.class, id).status();
+        return client.call(HttpMethod.DELETE, "/api/internal/admin/battlenet-accounts/{id}", null, Void.class, id).status();
     }
 
     @Override

@@ -121,7 +121,11 @@ import tools.jackson.databind.json.JsonMapper;
             "xbox.client-secret=full-context-test",
             "minecraft.enabled=true",
             "minecraft.msa-client-id=full-context-test",
-            "dtdd.enabled=true"
+            "dtdd.enabled=true",
+            "battlenet.enabled=true",
+            "battlenet.client-id=full-context-test",
+            "battlenet.client-secret=full-context-test",
+            "battlenet.sessions.enabled=false"
         })
 @Import(FullContextContainers.class)
 @AutoConfigureMockMvc
