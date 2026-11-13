@@ -4,6 +4,72 @@ Toutes les versions publiées de Catapult, la plus récente en premier.
 
 Ce fichier est régénéré par le bot à chaque release à partir des notes des [GitHub Releases](https://github.com/enimaloc/catapult/releases) : pour corriger une entrée, modifie les notes de la release (ou le changelog de la PR de release avant sa publication), pas ce fichier.
 
+## [v1.3.0](https://github.com/enimaloc/catapult/releases/tag/v1.3.0) - 2026-11-13
+
+### Features
+- **bgs:** add the catapult-bgs module with the Battle.net service table (0118885)
+- **bgs:** add the BGS frame codec and RPC session (72913f6)
+- **bgs:** merge presence deltas into per-friend game changes (a5c7987)
+- **bgs:** add the BGS client session, friends list and presence watch (e89cd29)
+- **bgs:** reconnect BGS sessions with backoff and stop on replaced sessions (f8de5ff)
+- **battlenet:** add the service account and friend link tables (d680857)
+- **battlenet:** gate the integration and expose the link state (1345097)
+- **battlenet:** mint BGS tickets through a headless login with an admin-entered code (bd47147)
+- **battlenet:** drive the Battle.net login page with headless Chromium (cb5685b)
+- **battlenet:** keep one BGS session per bot on the active site and detect games (31c4c6a)
+- **battlenet:** manage the bot pool from the admin API (1ba9db2)
+- **battlenet:** track friend links from BGS friend events (d1df994)
+- **battlenet:** link a streamer's Battle.net account through Blizzard OAuth (cdba7e0)
+- **web:** add the Battle.net connection card (4486e5a)
+- **web:** manage Battle.net bots from the admin Keys tab (fb9983e)
+- merge Battle.net presence detection into dev (3c775c5)
+- **mappings:** store an IGDB game on game mappings and seed Blizzard titles (1ef74de)
+- **igdb:** resolve detected games through their mapping's IGDB game (2a68225)
+- **mappings:** pick an IGDB game and deduce its Twitch category (4292c9c)
+- **web:** pick an IGDB game for a game mapping (dce5d3f)
+- merge IGDB games on game mappings into dev (1bdbc94)
+
+### Fixes
+- **bgs:** notify late close listeners and log swallowed session errors (2797536)
+- **bgs:** flag invitations gone while offline and local closes (f77c3b6)
+- **bgs:** abort BGS session starts that never complete (c61d642)
+- **battlenet:** stop re-minting tickets after a rejected login (d4f37da)
+- **battlenet:** stop re-minting after repeated login timeouts (d2db4bd)
+- **docker:** keep Playwright from downloading browsers at runtime (36de5ed)
+- **battlenet:** guard bot accounts against lost updates (f7f2d81)
+- **battlenet:** handle concurrent bot edits and in-flight logins in the admin API (e6fa264)
+- **battlenet:** answer invitations after commit and recover rejected or full links (95148c2)
+- **web:** keep Battle.net tags out of moderators' channel streams (4b1b6b4)
+- **web:** stop Battle.net polling off the Keys tab and edit bot labels (6538ae8)
+- **docker:** copy the catapult-bgs build file into the web image builder (550093a)
+- **battlenet:** run at most one ticket mint per bot and drop abandoned ones (8f08de4)
+- **bgs:** bound the TLS handshake so a silent server cannot hang a session (70b20ce)
+- **docker:** give the catapult user a home directory for Chromium (5763fa0)
+- **battlenet:** forget the Blizzard token once the account is linked (c3d6ffd)
+- **battlenet:** only offer the code field while a login waits for it (d171bd7)
+- **battlenet:** notify streamers when their bot is deleted (c8a67dc)
+- **battlenet:** resolve the caller through ApiUserResolver in the link controller (aa1549b)
+- **battlenet:** declare the battlenet.integration experiment (c78e520)
+- **battlenet:** link through plain OAuth2 so the Catapult user service runs (bd146c9)
+- **web:** style the Battle.net connect button like the other account links (cd9643c)
+- **api:** show a bindings page whose bindings have no Twitch category (05d822e)
+- merge the uncategorised bindings page fix into dev (a792ead)
+- **mappings:** stop applying a cleared IGDB game's suggestions (0583773)
+- **mappings:** reject a non-numeric IGDB game id (c4e972b)
+- **web:** explain the IGDB category deduction in mapping errors (cbd48bd)
+
+### Refactoring
+- **minecraft:** drop the service account label (b24b1a8)
+- **battlenet:** drop the service account label (d91fdb9)
+- merge the service account label removal into dev (7507c4e)
+
+### Other
+- **conventions:** check the catapult-bgs sources are written in English (483d06c)
+- **docker:** run catapult-api on a glibc base so Chromium can start (b9e9619)
+- **battlenet:** cover the Battle.net routes in the route and access checks (140ad64)
+- **mappings:** cover the IGDB game search and its admin route (72eb335)
+- **perf:** budget the game routes with their resolved IGDB and DTDD data (5ebb8db)
+
 ## [v1.2.0](https://github.com/enimaloc/catapult/releases/tag/v1.2.0) - 2026-11-12
 
 ### Features
