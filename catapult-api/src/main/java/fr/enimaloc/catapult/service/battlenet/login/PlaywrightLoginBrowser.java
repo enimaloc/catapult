@@ -47,7 +47,7 @@ public class PlaywrightLoginBrowser implements BattleNetLoginBrowser {
     // (/challenge/<uuid>) whose one-time-code input submits the form by itself once filled.
     private static final String CODE_INPUT = "input[autocomplete=one-time-code]:visible";
     private static final String SUBMIT_VISIBLE = "#submit:visible";
-    /** Last resort when the code input lacks its autocomplete hint: any other visible field. */
+    /** Fill target when the code input lacks its autocomplete hint; never used to recognise a page. */
     private static final String CODE_INPUT_FALLBACK =
             "input:visible:not(#accountName):not(#password):not([type=hidden])";
     /** Visible controls and alerts, without any value, for the diagnostic of an unrecognised page. */
@@ -63,7 +63,7 @@ public class PlaywrightLoginBrowser implements BattleNetLoginBrowser {
                     type: e.getAttribute('type'),
                     role: e.getAttribute('role'),
                     text: (e.tagName === 'BUTTON' || e.getAttribute('role') === 'alert')
-                        ? (e.innerText || '').slice(0, 200) : null
+                        ? (e.innerText || '').slice(0, 2000) : null
                 }))
             """;
 
@@ -167,15 +167,14 @@ public class PlaywrightLoginBrowser implements BattleNetLoginBrowser {
                 if (step == LoginPageInspection.Step.CHALLENGE_CHOOSE) {
                     // Keep the default method (e-mail) and ask for the code, once per challenge.
                     String path = LoginPageInspection.withoutQuery(url);
-                    if (!path.equals(chooseSubmittedFor)) {
+                    // Recorded only once the click is sent: the URL changes before the button is rendered.
+                    if (!path.equals(chooseSubmittedFor) && clickIfVisible(SUBMIT_VISIBLE)) {
                         chooseSubmittedFor = path;
-                        log.debug("Battle.net security check: requesting a code with the default method");
-                        clickIfVisible(SUBMIT_VISIBLE);
+                        log.debug("Battle.net security check: requested a code with the default method");
                     }
-                } else if (step == LoginPageInspection.Step.CHALLENGE_CODE || page.locator(CODE_INPUT).count() > 0
-                        || (page.locator(CODE_INPUT_FALLBACK).count() > 0 && page.locator(PASSWORD).count() == 0
-                        && page.locator(ACCOUNT_NAME).count() == 0)) {
-                    return new Outcome.CodeRequired();
+                } else if (step == LoginPageInspection.Step.CHALLENGE_CODE || page.locator(CODE_INPUT).count() > 0) {
+                    // A code already typed and not rejected is still being submitted: keep waiting for the ticket.
+                    if (awaitsCode()) return new Outcome.CodeRequired();
                 } else if (page.locator(LOGIN_ERROR).count() > 0) {
                     // Fixed text: the page's own message could echo the account e-mail.
                     return new Outcome.Failed("login rejected");
@@ -205,14 +204,34 @@ public class PlaywrightLoginBrowser implements BattleNetLoginBrowser {
             }
         }
 
-        /** Clicks the first match if visible; a race with a navigation is not an error. */
-        private void clickIfVisible(String selector) {
+        /** True when the code input is shown empty, or with an alert (a rejected code). */
+        private boolean awaitsCode() {
+            Locator input = page.locator(CODE_INPUT);
+            if (input.count() == 0) return false;
+            if (page.locator(LOGIN_ERROR).count() > 0) return true;
+            try {
+                return input.first().inputValue(new Locator.InputValueOptions().setTimeout(QUICK_CLICK_TIMEOUT_MS))
+                        .isBlank();
+            } catch (PlaywrightException e) {
+                // Detached by a navigation: the next poll looks at the new page.
+                return false;
+            }
+        }
+
+        /**
+         * Clicks the first match if visible; a race with a navigation is not an error.
+         *
+         * @return whether the click was sent
+         */
+        private boolean clickIfVisible(String selector) {
             Locator target = page.locator(selector);
-            if (target.count() == 0) return;
+            if (target.count() == 0) return false;
             try {
                 target.first().click(new Locator.ClickOptions().setTimeout(QUICK_CLICK_TIMEOUT_MS));
+                return true;
             } catch (PlaywrightException e) {
                 log.debug("Click on a Battle.net login button failed ({})", e.getClass().getSimpleName());
+                return false;
             }
         }
 
