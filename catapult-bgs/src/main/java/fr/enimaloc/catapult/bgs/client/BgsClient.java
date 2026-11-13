@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.bgs.client;
 
+import bgs.protocol.RpcProto.NoData;
 import bgs.protocol.account.v1.AccountServiceOuterClass.AccountStateNotification;
 import bgs.protocol.account.v1.AccountTypes.GameAccountList;
 import bgs.protocol.account.v2.GameAccountHandleOuterClass.GameAccountHandle;
@@ -172,6 +173,23 @@ public final class BgsClient {
     /** A copy of the friends list: account id to BattleTag. */
     public Map<Long, String> friends() {
         return Map.copyOf(friends);
+    }
+
+    /** Sends a KeepAlive (no reply expected) on the current session when it is ready; a no-op otherwise. */
+    public void keepAlive() {
+        Session session = current;
+        if (session == null || !session.ready || session.closed.isDone()) {
+            return;
+        }
+        try {
+            session.channel.loop().execute(() -> {
+                if (session.live() && session.ready) {
+                    session.channel.callNoReply(CONNECTION_KEEP_ALIVE, NoData.getDefaultInstance());
+                }
+            });
+        } catch (RejectedExecutionException e) {
+            // The loop is already shut down: the session is closed
+        }
     }
 
     /** Closes the current session, if any; its close reason is {@link CloseReason#LOCAL}. */
