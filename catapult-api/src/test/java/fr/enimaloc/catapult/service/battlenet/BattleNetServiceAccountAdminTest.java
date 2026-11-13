@@ -1,14 +1,18 @@
 package fr.enimaloc.catapult.service.battlenet;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.battlenet.BattleNetFriendLink;
 import fr.enimaloc.catapult.domain.battlenet.BattleNetServiceAccount;
 import fr.enimaloc.catapult.domain.battlenet.BattleNetServiceAccount.AuthState;
+import fr.enimaloc.catapult.domain.binding.GetterConfig;
 import fr.enimaloc.catapult.repository.battlenet.BattleNetFriendLinkRepository;
 import fr.enimaloc.catapult.repository.battlenet.BattleNetServiceAccountRepository;
+import fr.enimaloc.catapult.repository.binding.GetterConfigRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.battlenet.BattleNetServiceAccountAdmin.AccountDto;
 import fr.enimaloc.catapult.service.battlenet.login.BattleNetLoginCoordinator;
+import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
@@ -38,8 +42,10 @@ class BattleNetServiceAccountAdminTest {
     private final TokenEncryptionService encryption = mock(TokenEncryptionService.class);
     private final BattleNetLoginCoordinator coordinator = mock(BattleNetLoginCoordinator.class);
     private final BattleNetSessionManager sessions = mock(BattleNetSessionManager.class);
-    private final BattleNetServiceAccountAdmin admin =
-            new BattleNetServiceAccountAdmin(accounts, links, encryption, coordinator, sessions);
+    private final GetterConfigRepository getterConfigs = mock(GetterConfigRepository.class);
+    private final ChannelEventPublisher channelEvents = mock(ChannelEventPublisher.class);
+    private final BattleNetServiceAccountAdmin admin = new BattleNetServiceAccountAdmin(accounts, links, encryption,
+            coordinator, sessions, getterConfigs, channelEvents);
     private final BattleNetServiceAccount account = new BattleNetServiceAccount();
     private CompletableFuture<Void> login;
 
@@ -160,6 +166,7 @@ class BattleNetServiceAccountAdminTest {
     @Test
     void deleteStopsTheSessionFirst() {
         BattleNetFriendLink link = new BattleNetFriendLink();
+        link.setUser(new UserAccount());
         when(links.findByServiceAccount(account)).thenReturn(List.of(link));
 
         admin.delete(account.getId());
@@ -168,6 +175,28 @@ class BattleNetServiceAccountAdminTest {
         order.verify(sessions).stop(account.getId());
         order.verify(links).deleteAll(List.of(link));
         order.verify(accounts).delete(account);
+    }
+
+    @Test
+    void deleteUnlinksEveryStreamerOfTheBotAndTellsThemAfterwards() {
+        UserAccount streamer = new UserAccount();
+        streamer.setId(UUID.randomUUID());
+        BattleNetFriendLink link = new BattleNetFriendLink();
+        link.setUser(streamer);
+        link.setServiceAccount(account);
+        GetterConfig getter = new GetterConfig();
+        getter.setEnabled(true);
+        when(links.findByServiceAccount(account)).thenReturn(List.of(link));
+        when(getterConfigs.findByUserAndProvider(streamer, GetterConfig.Provider.BATTLENET))
+                .thenReturn(Optional.of(getter));
+
+        admin.delete(account.getId());
+
+        assertThat(getter.isEnabled()).isFalse();
+        InOrder order = inOrder(getterConfigs, accounts, channelEvents);
+        order.verify(getterConfigs).save(getter);
+        order.verify(accounts).delete(account);
+        order.verify(channelEvents).battleNetLinkChanged(streamer.getId(), "NONE", null, null);
     }
 
     @Test

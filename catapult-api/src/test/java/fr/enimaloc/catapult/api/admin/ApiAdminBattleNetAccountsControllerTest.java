@@ -4,10 +4,12 @@ import fr.enimaloc.catapult.api.error.ProblemAdvice;
 import fr.enimaloc.catapult.domain.battlenet.BattleNetServiceAccount;
 import fr.enimaloc.catapult.repository.battlenet.BattleNetFriendLinkRepository;
 import fr.enimaloc.catapult.repository.battlenet.BattleNetServiceAccountRepository;
+import fr.enimaloc.catapult.repository.binding.GetterConfigRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.battlenet.BattleNetServiceAccountAdmin;
 import fr.enimaloc.catapult.service.battlenet.BattleNetSessionManager;
 import fr.enimaloc.catapult.service.battlenet.login.BattleNetLoginCoordinator;
+import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -58,7 +60,8 @@ class ApiAdminBattleNetAccountsControllerTest {
         when(coordinator.startInteractive(any())).thenReturn(new CompletableFuture<>());
         when(sessions.sessionState(any())).thenReturn("DISABLED");
         mvc = MockMvcBuilders.standaloneSetup(new ApiAdminBattleNetAccountsController(
-                        new BattleNetServiceAccountAdmin(accounts, links, encryption, coordinator, sessions)))
+                        new BattleNetServiceAccountAdmin(accounts, links, encryption, coordinator, sessions,
+                                mock(GetterConfigRepository.class), mock(ChannelEventPublisher.class))))
                 .setControllerAdvice(new ProblemAdvice()).build();
     }
 

@@ -1,12 +1,16 @@
 package fr.enimaloc.catapult.service.battlenet;
 
+import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.battlenet.BattleNetFriendLink;
 import fr.enimaloc.catapult.domain.battlenet.BattleNetServiceAccount;
 import fr.enimaloc.catapult.domain.battlenet.BattleNetServiceAccount.AuthState;
+import fr.enimaloc.catapult.domain.binding.GetterConfig;
 import fr.enimaloc.catapult.repository.battlenet.BattleNetFriendLinkRepository;
 import fr.enimaloc.catapult.repository.battlenet.BattleNetServiceAccountRepository;
+import fr.enimaloc.catapult.repository.binding.GetterConfigRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.battlenet.login.BattleNetLoginCoordinator;
+import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
@@ -16,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -46,6 +51,8 @@ public class BattleNetServiceAccountAdmin {
     private final TokenEncryptionService encryption;
     private final BattleNetLoginCoordinator loginCoordinator;
     private final BattleNetSessionManager sessionManager;
+    private final GetterConfigRepository getterConfigRepository;
+    private final ChannelEventPublisher channelEventPublisher;
 
     public List<AccountDto> list() {
         return accountRepository.findAll().stream().map(this::toDto).toList();
@@ -137,17 +144,33 @@ public class BattleNetServiceAccountAdmin {
         return toDto(saved);
     }
 
-    /** Stops the session first, then drops the links and the account. */
+    /**
+     * Stops the session first, then drops the links and the account. Each streamer who was linked through the bot
+     * is unlinked as by unenrolling: their Battle.net getter is disabled and, once deleted, their dashboards told.
+     */
     public void delete(UUID id) {
         findOrThrow(id);
         sessionManager.stop(id);
+        List<UUID> owners = new ArrayList<>();
         BattleNetServiceAccount deleted = withRetry(() -> {
+            owners.clear();
             BattleNetServiceAccount account = findOrThrow(id);
-            linkRepository.deleteAll(linkRepository.findByServiceAccount(account));
+            List<BattleNetFriendLink> links = linkRepository.findByServiceAccount(account);
+            linkRepository.deleteAll(links);
+            for (BattleNetFriendLink link : links) {
+                UserAccount owner = link.getUser();
+                owners.add(owner.getId());
+                getterConfigRepository.findByUserAndProvider(owner, GetterConfig.Provider.BATTLENET)
+                        .ifPresent(config -> {
+                            config.setEnabled(false);
+                            getterConfigRepository.save(config);
+                        });
+            }
             accountRepository.delete(account);
             return account;
         });
-        log.info("Battle.net service account deleted: {}", deleted.getLabel());
+        log.info("Battle.net service account deleted: {} ({} link(s) dropped)", deleted.getLabel(), owners.size());
+        owners.forEach(owner -> channelEventPublisher.battleNetLinkChanged(owner, "NONE", null, null));
     }
 
     /**
