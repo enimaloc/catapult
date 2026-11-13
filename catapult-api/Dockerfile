@@ -38,6 +38,9 @@ RUN java -Dloader.main=com.microsoft.playwright.CLI -cp app.jar \
     && rm -rf /var/lib/apt/lists/* \
     && chown -R catapult:catapult /ms-playwright app.jar
 
+# Only Chromium is baked in: Playwright.create() must not try to download the other browsers at runtime
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+
 USER catapult
 
 # 8081: catapult-api, reached by catapult-web only; 8091: the management port (actuator, Prometheus, the compose
