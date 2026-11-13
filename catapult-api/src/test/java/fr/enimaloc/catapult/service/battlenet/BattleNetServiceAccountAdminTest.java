@@ -188,4 +188,70 @@ class BattleNetServiceAccountAdminTest {
                 .isInstanceOfSatisfying(ResponseStatusException.class,
                         e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
     }
+
+    @Test
+    void updateRetriesOnceWhenALoginCommittedInBetween() {
+        java.util.concurrent.atomic.AtomicInteger saves = new java.util.concurrent.atomic.AtomicInteger();
+        when(accounts.save(any())).thenAnswer(inv -> {
+            if (saves.incrementAndGet() == 1) throw conflict();
+            return inv.getArgument(0);
+        });
+
+        AccountDto dto = admin.update(account.getId(), Map.of("label", "renamed"));
+
+        assertThat(saves.get()).isEqualTo(2);
+        assertThat(dto.label()).isEqualTo("renamed");
+    }
+
+    @Test
+    void updateThatKeepsConflictingIsA409() {
+        when(accounts.save(any())).thenThrow(conflict());
+
+        assertThatThrownBy(() -> admin.update(account.getId(), Map.of("label", "renamed")))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
+    }
+
+    @Test
+    void deleteRetriesOnceOnAConflict() {
+        org.mockito.Mockito.doThrow(conflict()).doNothing().when(accounts).delete(account);
+
+        admin.delete(account.getId());
+
+        verify(accounts, org.mockito.Mockito.times(2)).delete(account);
+    }
+
+    @Test
+    void passwordChangeWhileALoginRunsIsRefusedWithoutChanges() {
+        when(coordinator.loginInProgress(account.getId())).thenReturn(true);
+
+        assertThatThrownBy(() -> admin.update(account.getId(), Map.of("password", "n3w")))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
+        assertThat(account.getPasswordEnc()).isEqualTo("enc:old");
+        assertThat(account.getAuthState()).isEqualTo(AuthState.READY);
+        verify(accounts, never()).save(any());
+        verify(sessions, never()).stop(any(UUID.class));
+    }
+
+    @Test
+    void createWhoseLoginCannotStartStillSucceedsAsAuthFailed() {
+        when(accounts.save(any())).thenAnswer(inv -> {
+            BattleNetServiceAccount saved = inv.getArgument(0);
+            saved.setId(account.getId());
+            return saved;
+        });
+        when(coordinator.startInteractive(any())).thenReturn(
+                CompletableFuture.failedFuture(new IllegalStateException("executor shut down")));
+
+        AccountDto dto = admin.create("bot-2", "mail@example.com", "s3cret");
+
+        assertThat(dto.authState()).isEqualTo("AUTH_FAILED");
+        verify(accounts, org.mockito.Mockito.times(2)).save(any());
+    }
+
+    private static org.springframework.orm.ObjectOptimisticLockingFailureException conflict() {
+        return new org.springframework.orm.ObjectOptimisticLockingFailureException(
+                BattleNetServiceAccount.class, "id");
+    }
 }

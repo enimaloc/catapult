@@ -117,6 +117,11 @@ public class BattleNetLoginCoordinator {
         flow.submitCode(code);
     }
 
+    /** Whether an admin login of the account is running, waiting for a code or not. */
+    public boolean loginInProgress(UUID accountId) {
+        return interactiveFlows.containsKey(accountId);
+    }
+
     public boolean waitingForCode(UUID accountId) {
         BattleNetLoginFlow flow = interactiveFlows.get(accountId);
         return flow != null && flow.waitingForCode();

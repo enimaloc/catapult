@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.http.HttpStatus;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -19,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
 
 /**
  * An admin's pool of Battle.net bot accounts (spec §10.3): enrolment through the login coordinator, 2FA code,
@@ -59,7 +61,11 @@ public class BattleNetServiceAccountAdmin {
         account.setUpdatedAt(Instant.now());
         BattleNetServiceAccount saved = accountRepository.save(account);
         log.info("Battle.net service account created: {}", saved.getLabel());
-        startLogin(saved.getId());
+        if (!startLogin(saved.getId())) {
+            // the account is stored: the admin can re-authenticate it, so a refused start is not a failed create
+            saved.setAuthState(AuthState.AUTH_FAILED);
+            saved = accountRepository.save(saved);
+        }
         return toDto(saved);
     }
 
@@ -77,40 +83,51 @@ public class BattleNetServiceAccountAdmin {
     /** Runs the interactive login again, for an account whose session needs an admin. */
     public AccountDto reauth(UUID id) {
         BattleNetServiceAccount account = findOrThrow(id);
-        startLogin(id);
+        if (!startLogin(id)) throw loginInProgress();
         return toDto(account);
     }
 
-    /** 404 for an unknown account before 400 for a field of the wrong type. */
+    /**
+     * 404 for an unknown account before 400 for a field of the wrong type. A password change while a login runs
+     * is refused (409) before anything is saved.
+     */
     public AccountDto update(UUID id, Map<String, Object> body) {
-        BattleNetServiceAccount account = findOrThrow(id);
-        boolean enabledChanged = false;
-        if (body.containsKey("label")) {
-            account.setLabel(requireText(field(body, "label", String.class), "label"));
-        }
-        if (body.containsKey("enabled")) {
-            boolean enabled = field(body, "enabled", Boolean.class);
-            enabledChanged = enabled != account.isEnabled();
-            account.setEnabled(enabled);
-        }
-        if (body.containsKey("friendLimitReached")) {
-            account.setFriendLimitReached(field(body, "friendLimitReached", Boolean.class));
-        }
-        if (body.containsKey("fillOrder")) {
-            account.setFillOrder(field(body, "fillOrder", Number.class).intValue());
-        }
+        findOrThrow(id);
         boolean passwordChanged = body.containsKey("password");
-        if (passwordChanged) {
-            account.setPasswordEnc(encryption.encrypt(requireText(field(body, "password", String.class), "password")));
-            account.setAuthState(AuthState.NEW);
-        }
-        account.setUpdatedAt(Instant.now());
-        BattleNetServiceAccount saved = accountRepository.save(account);
+        if (passwordChanged && loginCoordinator.loginInProgress(id)) throw loginInProgress();
+        boolean[] enabledChanged = new boolean[1];
+        BattleNetServiceAccount saved = withRetry(() -> {
+            BattleNetServiceAccount account = findOrThrow(id);
+            enabledChanged[0] = false;
+            if (body.containsKey("label")) {
+                account.setLabel(requireText(field(body, "label", String.class), "label"));
+            }
+            if (body.containsKey("enabled")) {
+                boolean enabled = field(body, "enabled", Boolean.class);
+                enabledChanged[0] = enabled != account.isEnabled();
+                account.setEnabled(enabled);
+            }
+            if (body.containsKey("friendLimitReached")) {
+                account.setFriendLimitReached(field(body, "friendLimitReached", Boolean.class));
+            }
+            if (body.containsKey("fillOrder")) {
+                account.setFillOrder(field(body, "fillOrder", Number.class).intValue());
+            }
+            if (passwordChanged) {
+                account.setPasswordEnc(
+                        encryption.encrypt(requireText(field(body, "password", String.class), "password")));
+                account.setAuthState(AuthState.NEW);
+            }
+            account.setUpdatedAt(Instant.now());
+            return accountRepository.save(account);
+        });
         if (passwordChanged) {
             // the bot must authenticate again with the new password
             sessionManager.stop(id);
-            startLogin(id);
-        } else if (enabledChanged) {
+            if (!startLogin(id)) {
+                log.warn("Battle.net service account {}: the login after a password change could not start", id);
+            }
+        } else if (enabledChanged[0]) {
             sessionManager.restart(id);
         }
         return toDto(saved);
@@ -118,18 +135,42 @@ public class BattleNetServiceAccountAdmin {
 
     /** Stops the session first, then drops the links and the account. */
     public void delete(UUID id) {
-        BattleNetServiceAccount account = findOrThrow(id);
+        findOrThrow(id);
         sessionManager.stop(id);
-        linkRepository.deleteAll(linkRepository.findByServiceAccount(account));
-        accountRepository.delete(account);
-        log.info("Battle.net service account deleted: {}", account.getLabel());
+        BattleNetServiceAccount deleted = withRetry(() -> {
+            BattleNetServiceAccount account = findOrThrow(id);
+            linkRepository.deleteAll(linkRepository.findByServiceAccount(account));
+            accountRepository.delete(account);
+            return account;
+        });
+        log.info("Battle.net service account deleted: {}", deleted.getLabel());
     }
 
-    private void startLogin(UUID id) {
+    /**
+     * Runs a read-modify-write of the account again once when a login committed in between (optimistic lock),
+     * 409 when it still conflicts.
+     */
+    private <T> T withRetry(Supplier<T> write) {
+        try {
+            return write.get();
+        } catch (ObjectOptimisticLockingFailureException first) {
+            try {
+                return write.get();
+            } catch (ObjectOptimisticLockingFailureException second) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "The account was modified concurrently");
+            }
+        }
+    }
+
+    private static ResponseStatusException loginInProgress() {
+        return new ResponseStatusException(HttpStatus.CONFLICT, "A login is already in progress");
+    }
+
+    /** False when the login could not start (one is already in progress); true once it runs in the background. */
+    private boolean startLogin(UUID id) {
         CompletableFuture<Void> login = loginCoordinator.startInteractive(id);
         if (login.isCompletedExceptionally()) {
-            // a failure already there is a login refused to start (one is in progress), not a failed login
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "A login is already in progress");
+            return false;
         }
         login.whenComplete((ignored, failure) -> {
             if (failure == null) {
@@ -139,6 +180,7 @@ public class BattleNetServiceAccountAdmin {
                         failure.getClass().getSimpleName());
             }
         });
+        return true;
     }
 
     private BattleNetServiceAccount findOrThrow(UUID id) {
