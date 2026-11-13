@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.controller;
 import fr.enimaloc.catapult.common.dto.admin.DetectedGameDto;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingRequest;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingResult;
+import fr.enimaloc.catapult.common.dto.admin.IgdbGameOption;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import fr.enimaloc.catapult.common.dto.admin.TwitchCategoryDto;
@@ -66,6 +67,13 @@ public class AdminGameMappingsController {
     public ResponseEntity<List<TwitchCategoryDto>> categories(@RequestParam(defaultValue = "") String q) {
         AdminAccess.require(filler);
         return answer(apiService.adminSearchCategories(q));
+    }
+
+    /** The IGDB games matching {@code q}, as {@code [{id, name, releaseYear, coverUrl}]}. */
+    @GetMapping("/igdb-games")
+    public ResponseEntity<List<IgdbGameOption>> igdbGames(@RequestParam(defaultValue = "") String q) {
+        AdminAccess.require(filler);
+        return answer(apiService.adminSearchIgdbGames(q));
     }
 
     private static <T> ResponseEntity<T> answer(ApiClient.Result<T> result) {

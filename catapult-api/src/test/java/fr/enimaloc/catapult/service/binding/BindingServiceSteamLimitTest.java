@@ -26,6 +26,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -64,7 +65,7 @@ class BindingServiceSteamLimitTest {
             return b;
         });
         when(mappings.findBySourceTypeAndSourceId(any(), any())).thenReturn(Optional.empty());
-        when(igdb.findByExternalAppId(GameBinding.SourceType.STEAM, "730"))
+        when(igdb.resolveDetected(eq(GameBinding.SourceType.STEAM), eq("730"), any()))
                 .thenReturn(Optional.of(new IgdbService.IgdbGame("igdb-1", "Counter-Strike 2")));
         when(igdbDetails.getDetails(anyString())).thenReturn(Optional.empty());
         when(igdb.findTwitchGameId("igdb-1")).thenReturn(Optional.of("32399"));
@@ -103,7 +104,7 @@ class BindingServiceSteamLimitTest {
         service.resolveOrCreate(user, steamGame);
 
         when(twResolver.steamRateLimitedUntil()).thenReturn(Optional.of(UNTIL));
-        when(igdb.findByExternalAppId(GameBinding.SourceType.XBOX, "x1"))
+        when(igdb.resolveDetected(eq(GameBinding.SourceType.XBOX), eq("x1"), any()))
                 .thenReturn(Optional.of(new IgdbService.IgdbGame("igdb-2", "Halo")));
         service.resolveOrCreate(user, new DetectedGame("x1", GameBinding.SourceType.XBOX, "Halo"));
 

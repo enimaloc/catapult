@@ -2366,16 +2366,18 @@ mdui-snackbar.broadcast-warning { --mdui-color-inverse-surface: var(--mdui-color
 /* The admin game mappings tab. */
 .admin-gm-hint { margin: 0 0 16px; }
 .admin-gm-missing-header { margin-top: 24px; }
-.admin-gm-row, .admin-table:has(> .admin-gm-row) { grid-template-columns: 7.5rem minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr) 5.5rem 9rem auto; }
+.admin-gm-row, .admin-table:has(> .admin-gm-row) { grid-template-columns: 7.5rem minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1.5fr) minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr) 5.5rem 9rem auto; }
 .admin-gm-missing-row, .admin-table:has(> .admin-gm-missing-row) { grid-template-columns: 7.5rem minmax(0, 1fr) minmax(0, 2fr) 6rem auto; }
 .admin-gm-labels { min-width: 0; overflow-wrap: anywhere; }
+.admin-gm-igdb-field { display: flex; align-items: center; gap: 4px; }
+.admin-gm-igdb-field > mdui-text-field { flex: 1; }
 .admin-gm-category { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
 .admin-gm-ignored-helper { margin: -8px 0 0; }
 .admin-gm-row > .admin-member-id { display: flex; flex-direction: column; }
 .admin-gm-form { display: flex; flex-direction: column; gap: 12px; min-width: min(560px, 100%); }
 .admin-gm-form [hidden] { display: none; }
 .admin-gm-search { display: flex; flex-direction: column; gap: 4px; }
-.admin-gm-suggestions, .admin-gm-category-results { max-height: 220px; overflow-y: auto; padding: 0; }
+.admin-gm-suggestions, .admin-gm-category-results, .admin-gm-igdb-results { max-height: 220px; overflow-y: auto; padding: 0; }
 .admin-gm-override { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 8px 12px 12px; border: 1px solid var(--catapult-border); border-radius: 12px; }
 .admin-gm-override legend { padding: 0 4px; color: var(--catapult-text-muted); }
 .admin-gm-switch { display: flex; align-items: center; gap: 12px; }

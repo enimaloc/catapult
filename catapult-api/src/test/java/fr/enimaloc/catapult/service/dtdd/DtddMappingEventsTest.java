@@ -48,9 +48,9 @@ class DtddMappingEventsTest {
                 steamPlayer, new DetectedGame("413150", GameBinding.SourceType.STEAM, "Stardew Valley"),
                 namedPlayer, new DetectedGame(null, GameBinding.SourceType.MANUAL, "Stardew Valley"),
                 otherPlayer, new DetectedGame("620", GameBinding.SourceType.STEAM, "Portal 2")));
-        when(igdb.findBySteamAppId("413150")).thenReturn(Optional.of(new IgdbService.IgdbGame("100", "Stardew Valley")));
-        when(igdb.findByName("Stardew Valley")).thenReturn(Optional.of(new IgdbService.IgdbGame("100", "Stardew Valley")));
-        when(igdb.findBySteamAppId("620")).thenReturn(Optional.of(new IgdbService.IgdbGame("200", "Portal 2")));
+        when(igdb.resolveDetected(eq(GameBinding.SourceType.STEAM), eq("413150"), any())).thenReturn(Optional.of(new IgdbService.IgdbGame("100", "Stardew Valley")));
+        when(igdb.resolveDetected(any(), any(), eq("Stardew Valley"))).thenReturn(Optional.of(new IgdbService.IgdbGame("100", "Stardew Valley")));
+        when(igdb.resolveDetected(eq(GameBinding.SourceType.STEAM), eq("620"), any())).thenReturn(Optional.of(new IgdbService.IgdbGame("200", "Portal 2")));
     }
 
     @Test
@@ -112,7 +112,7 @@ class DtddMappingEventsTest {
     void aGameIgdbCantResolve_isSkipped() {
         when(gameState.lastKnownGames()).thenReturn(Map.of(steamPlayer,
                 new DetectedGame("1", GameBinding.SourceType.STEAM, "Unknown")));
-        when(igdb.findBySteamAppId("1")).thenThrow(new IllegalStateException("IGDB down"));
+        when(igdb.resolveDetected(eq(GameBinding.SourceType.STEAM), eq("1"), any())).thenThrow(new IllegalStateException("IGDB down"));
 
         events.mappingChanged("100");
         events.mappingChanged(null);

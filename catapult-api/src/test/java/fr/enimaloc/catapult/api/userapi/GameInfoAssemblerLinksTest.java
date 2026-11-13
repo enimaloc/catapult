@@ -25,6 +25,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -67,7 +68,7 @@ class GameInfoAssemblerLinksTest {
 
         DetectedGame detected = new DetectedGame("620", GameBinding.SourceType.STEAM, "Portal 2");
         when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(detected));
-        when(igdbService.findByExternalAppId(GameBinding.SourceType.STEAM, "620"))
+        when(igdbService.resolveDetected(eq(GameBinding.SourceType.STEAM), eq("620"), any()))
                 .thenReturn(Optional.of(new IgdbService.IgdbGame("72", "Portal 2")));
         IgdbGameDetails details = new IgdbGameDetails();
         details.setIgdbId("72");

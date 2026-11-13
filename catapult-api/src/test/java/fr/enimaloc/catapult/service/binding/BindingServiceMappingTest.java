@@ -30,6 +30,7 @@ import fr.enimaloc.catapult.domain.binding.ExtensionSlotSetting;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -74,7 +75,7 @@ class BindingServiceMappingTest {
         when(mappings.findBySourceTypeAndSourceId(GameBinding.SourceType.STEAM, "730")).thenReturn(Optional.of(mapping));
 
         // IGDB knows the game: its suggestions are what a mapping that replaces nothing keeps.
-        when(igdb.findByExternalAppId(GameBinding.SourceType.STEAM, "730"))
+        when(igdb.resolveDetected(eq(GameBinding.SourceType.STEAM), eq("730"), any()))
                 .thenReturn(Optional.of(new IgdbService.IgdbGame("igdb-1", "Counter-Strike 2")));
         when(igdb.suggestCcls("igdb-1")).thenReturn(Set.of("ViolentGraphic"));
         when(twResolver.suggest(any())).thenReturn(Set.of("tw-igdb"));

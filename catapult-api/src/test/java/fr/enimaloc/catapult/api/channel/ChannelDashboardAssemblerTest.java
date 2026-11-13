@@ -757,13 +757,13 @@ class ChannelDashboardAssemblerTest {
             playing(GameBinding.SourceType.XBOX, "1", "Halo");
 
             assertThat(assembler().dtddMapping(moderator, owner, true)).isEqualTo(NONE);
-            verify(igdb).findByName("Halo");
+            verify(igdb).resolveDetected(any(), any(), eq("Halo"));
         }
 
         @Test
         void unverifiedMappingWithoutProposals_canBeValidated() {
             playing(GameBinding.SourceType.STEAM, "892970", "Valheim");
-            when(igdb.findBySteamAppId("892970")).thenReturn(Optional.of(new IgdbService.IgdbGame("42", "Valheim")));
+            when(igdb.resolveDetected(eq(GameBinding.SourceType.STEAM), eq("892970"), any())).thenReturn(Optional.of(new IgdbService.IgdbGame("42", "Valheim")));
             DtddGameMapping mapping = new DtddGameMapping();
             mapping.setIgdbId("42");
             mapping.setDtddId(7L);
@@ -788,7 +788,7 @@ class ChannelDashboardAssemblerTest {
         @Test
         void dtddMapping_memberCannotValidateDirectly() {
             playing(GameBinding.SourceType.STEAM, "892970", "Valheim");
-            when(igdb.findBySteamAppId("892970")).thenReturn(Optional.of(new IgdbService.IgdbGame("42", "Valheim")));
+            when(igdb.resolveDetected(eq(GameBinding.SourceType.STEAM), eq("892970"), any())).thenReturn(Optional.of(new IgdbService.IgdbGame("42", "Valheim")));
             DtddGameMapping mapping = new DtddGameMapping();
             mapping.setIgdbId("42");
             mapping.setDtddId(7L);
@@ -804,7 +804,7 @@ class ChannelDashboardAssemblerTest {
         @Test
         void dtddMapping_adminCanValidateDirectly() {
             playing(GameBinding.SourceType.STEAM, "892970", "Valheim");
-            when(igdb.findBySteamAppId("892970")).thenReturn(Optional.of(new IgdbService.IgdbGame("42", "Valheim")));
+            when(igdb.resolveDetected(eq(GameBinding.SourceType.STEAM), eq("892970"), any())).thenReturn(Optional.of(new IgdbService.IgdbGame("42", "Valheim")));
             DtddGameMapping mapping = new DtddGameMapping();
             mapping.setIgdbId("42");
             mapping.setDtddId(7L);
@@ -816,7 +816,7 @@ class ChannelDashboardAssemblerTest {
         @Test
         void pendingProposalsOrVerifiedMappings_cantBeValidated() {
             playing(GameBinding.SourceType.STEAM, "892970", "Valheim");
-            when(igdb.findBySteamAppId("892970")).thenReturn(Optional.of(new IgdbService.IgdbGame("42", "Valheim")));
+            when(igdb.resolveDetected(eq(GameBinding.SourceType.STEAM), eq("892970"), any())).thenReturn(Optional.of(new IgdbService.IgdbGame("42", "Valheim")));
             DtddGameMapping mapping = new DtddGameMapping();
             when(dtddMappings.findById("42")).thenReturn(Optional.of(mapping));
             when(dtddProposals.countByIgdbIdAndStatus("42", DtddMappingProposal.Status.PENDING)).thenReturn(1L);
@@ -839,7 +839,7 @@ class ChannelDashboardAssemblerTest {
         @Test
         void unmappedGame() {
             playing(GameBinding.SourceType.STEAM, "1", "New");
-            when(igdb.findBySteamAppId("1")).thenReturn(Optional.of(new IgdbService.IgdbGame("5", "New")));
+            when(igdb.resolveDetected(eq(GameBinding.SourceType.STEAM), eq("1"), any())).thenReturn(Optional.of(new IgdbService.IgdbGame("5", "New")));
 
             DtddMappingStatusDto status = assembler().dtddMapping(moderator, owner, true);
 

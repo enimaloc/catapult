@@ -260,6 +260,7 @@ GET,/api/internal/admin/game-mappings,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/game-mappings,,"{""applyLive"":false}",401,401,403,403,403,PASS,401
 GET,/api/internal/admin/game-mappings/categories,,,401,PASS,403,403,403,PASS,401
 GET,/api/internal/admin/game-mappings/detected,,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/game-mappings/igdb-games,,,401,PASS,403,403,403,PASS,401
 GET,/api/internal/admin/game-mappings/missing,,,401,PASS,403,403,403,PASS,401
 DELETE,/api/internal/admin/game-mappings/{id},,,401,PASS,403,403,403,PASS,401
 # handler reads the JWT itself: 401 without one

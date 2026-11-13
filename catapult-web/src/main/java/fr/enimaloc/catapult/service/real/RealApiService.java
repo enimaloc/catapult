@@ -62,6 +62,7 @@ import fr.enimaloc.catapult.common.dto.admin.DtddTopicsCacheEntryDto;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingDto;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingRequest;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingResult;
+import fr.enimaloc.catapult.common.dto.admin.IgdbGameOption;
 import fr.enimaloc.catapult.common.dto.admin.TwitchCategoryDto;
 import fr.enimaloc.catapult.common.dto.notification.AdminNotificationDto;
 import fr.enimaloc.catapult.common.dto.notification.BroadcastRequestDto;
@@ -173,6 +174,7 @@ public class RealApiService implements ApiService {
     private static final ParameterizedTypeReference<AdminPage<DetectedGameDto>> MISSING_GAMES = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<DetectedGameDto>> DETECTED_GAMES = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<TwitchCategoryDto>> CATEGORIES = new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<List<IgdbGameOption>> IGDB_GAMES = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<DtddProposalDto>> DTDD_PROPOSALS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<TwDefinitionDto>> TWS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<fr.enimaloc.catapult.common.dto.chatcommand.EnabledChatCommandDto>> ENABLED_COMMANDS = new ParameterizedTypeReference<>() {};
@@ -1007,6 +1009,11 @@ public class RealApiService implements ApiService {
     @Override
     public List<TwitchCategoryDto> adminSearchCategories(String q) {
         return client.get("/api/internal/admin/game-mappings/categories?q={q}", CATEGORIES, q == null ? "" : q);
+    }
+
+    @Override
+    public List<IgdbGameOption> adminSearchIgdbGames(String q) {
+        return client.get("/api/internal/admin/game-mappings/igdb-games?q={q}", IGDB_GAMES, q == null ? "" : q);
     }
 
     @Override

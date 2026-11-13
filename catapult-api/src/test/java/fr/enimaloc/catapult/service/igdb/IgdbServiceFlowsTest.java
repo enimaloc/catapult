@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.igdb;
 
+import fr.enimaloc.catapult.repository.binding.GameMappingRepository;
 import com.api.igdb.exceptions.RequestException;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.igdb.IgdbGameCacheEntry;
@@ -63,7 +64,7 @@ class IgdbServiceFlowsTest {
     private final SteamStoreService steamStore = mock(SteamStoreService.class);
     private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
     private final IgdbService service = new IgdbService(igdb, cache, externalIds, ccls, cclDefinitions, steamStore,
-            mock(RestClient.class), meters, SimulationGates.none());
+            mock(RestClient.class), meters, SimulationGates.none(), mock(GameMappingRepository.class));
 
     @BeforeEach
     void setUp() {

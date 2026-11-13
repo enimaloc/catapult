@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.common.dto.admin.DetectedGameDto;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingDto;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingRequest;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingResult;
+import fr.enimaloc.catapult.common.dto.admin.IgdbGameOption;
 import fr.enimaloc.catapult.service.binding.AdminGameMappingService;
 import fr.enimaloc.catapult.service.notification.AdminEventPublisher;
 import fr.enimaloc.catapult.service.twitch.TwitchCategory;
@@ -85,5 +86,12 @@ public class ApiAdminGameMappingController {
     public List<TwitchCategory> categories(@RequestParam(required = false) String q) {
         if (q == null || q.isBlank()) return List.of();
         return categoryService.searchCategories(q.trim());
+    }
+
+    /** The IGDB game search of the form (at most 10); empty for a blank query or when IGDB is unavailable. */
+    @GetMapping("/igdb-games")
+    public List<IgdbGameOption> igdbGames(@RequestParam(required = false) String q) {
+        if (q == null || q.isBlank()) return List.of();
+        return service.searchIgdbGames(q.trim());
     }
 }

@@ -2,11 +2,14 @@ package fr.enimaloc.catapult.service.igdb;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import fr.enimaloc.catapult.common.dto.admin.IgdbGameOption;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
+import fr.enimaloc.catapult.domain.binding.GameMapping;
 import fr.enimaloc.catapult.domain.igdb.IgdbGameCacheEntry;
 import fr.enimaloc.catapult.domain.igdb.IgdbGameCcl;
 import fr.enimaloc.catapult.domain.igdb.IgdbGameExternalId;
 import fr.enimaloc.catapult.domain.twitch.TwitchCclDefinition;
+import fr.enimaloc.catapult.repository.binding.GameMappingRepository;
 import fr.enimaloc.catapult.repository.igdb.IgdbGameCacheRepository;
 import fr.enimaloc.catapult.repository.igdb.IgdbGameCclRepository;
 import fr.enimaloc.catapult.repository.igdb.IgdbGameExternalIdRepository;
@@ -26,6 +29,7 @@ import org.springframework.web.client.RestClient;
 import proto.*;
 
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.*;
 import java.util.Collection;
 import java.util.concurrent.ConcurrentHashMap;
@@ -38,11 +42,14 @@ import java.util.stream.Collectors;
 public class IgdbService {
 
     private static final String TWITCH_TOKEN_URL = "https://id.twitch.tv/oauth2/token";
+    /** IGDB's cover image CDN path (small cover size); the image id and ".jpg" follow. */
+    private static final String COVER_URL_PREFIX = "https://images.igdb.com/igdb/image/upload/t_cover_small/";
     /** The DB cache key prefix of a game looked up by its Steam app id. */
     public static final String KEY_STEAM_PREFIX = "steam:";
     private static final String KEY_NAME_PREFIX  = "name:";
     private static final String KEY_EXE_PREFIX   = "exe:";
     private static final String KEY_XBOX_PREFIX  = "xbox:";
+    private static final String KEY_ID_PREFIX    = "id:";
     private static final int IGDB_BATCH_SIZE = 500;
 
     private final IgdbClient igdbClient;
@@ -54,6 +61,7 @@ public class IgdbService {
     private final RestClient restClient;
     private final MeterRegistry meterRegistry;
     private final ObjectProvider<SimulationGate> simulationGate;
+    private final GameMappingRepository gameMappingRepository;
 
     @Value("${app.igdb.client-id:}")
     private String clientId;
@@ -315,6 +323,46 @@ public class IgdbService {
     }
 
     /**
+     * The form's IGDB game search: up to 10 games with their release year (UTC) and cover. Their names are
+     * remembered (id → name) so a mapping that picks one shows it. Empty for a blank query or when IGDB or its
+     * token is unavailable.
+     */
+    public List<IgdbGameOption> searchGameOptions(String query) {
+        String trimmed = query == null ? "" : query.strip();
+        if (clientId.isBlank() || trimmed.isEmpty()) return List.of();
+        try {
+            String token = getOrRefreshAppToken();
+            if (token.isBlank()) return List.of();
+            List<IgdbGameOption> options = igdbClient.searchByName(trimmed, token).stream()
+                .filter(g -> !g.getName().isBlank())
+                .map(IgdbService::toOption)
+                .limit(10)
+                .toList();
+            options.forEach(o -> igdbGameCache.put(o.id(), o.name()));
+            return options;
+        } catch (RuntimeException e) {
+            log.warn("IGDB game search failed: {}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    private static IgdbGameOption toOption(Game game) {
+        Integer year = game.hasFirstReleaseDate() && game.getFirstReleaseDate().getSeconds() > 0
+            ? Instant.ofEpochSecond(game.getFirstReleaseDate().getSeconds()).atZone(ZoneOffset.UTC).getYear()
+            : null;
+        String imageId = game.hasCover() ? game.getCover().getImageId() : "";
+        String cover = imageId.isBlank() ? null : COVER_URL_PREFIX + imageId + ".jpg";
+        return new IgdbGameOption(String.valueOf(game.getId()), game.getName(), year, cover);
+    }
+
+    /**
+     * Resolves a game by its IGDB id (memory, DB cache, then IGDB); the name is null while none of them knows it.
+     */
+    public IgdbGame findById(String igdbId) {
+        return mappedGame(igdbId);
+    }
+
+    /**
      * Warms the CCL cache for every already-known game (igdb_game_cache) that is
      * not yet in igdb_game_ccl_cache. Uses IGDB batch calls (max 500 per request).
      */
@@ -498,16 +546,78 @@ public class IgdbService {
     }
 
     /**
-     * Re-applies the same IGDB resolution logic as BindingService: for STEAM bindings with a
-     * non-null sourceId, try Steam appId lookup first and fall back to name search.
+     * The IGDB game of a binding, resolved as {@link #resolveDetected} does.
      * Returns the resolved {@link IgdbGame#id()} or empty if none found.
      */
     public Optional<String> resolveIgdbIdForBinding(GameBinding b) {
-        if (b.getSourceType() == GameBinding.SourceType.STEAM && b.getSourceId() != null) {
-            Optional<IgdbGame> byApp = findBySteamAppId(b.getSourceId());
-            if (byApp.isPresent()) return byApp.map(IgdbGame::id);
+        return resolveDetected(b.getSourceType(), b.getSourceId(), b.getSourceName()).map(IgdbGame::id);
+    }
+
+    /**
+     * The IGDB game of a game detected on a platform: the admin mapping's IGDB game when the game's
+     * {@code (sourceType, sourceId)} mapping has one; else nothing for Battle.net, never looked up by name (its
+     * names are too ambiguous); else the platform id ({@link #findByExternalAppId}), then the name.
+     *
+     * @param sourceId   the platform's id for the game, may be null (then no mapping nor platform lookup)
+     * @param sourceName the name the platform reports, may be null (then no name lookup)
+     */
+    public Optional<IgdbGame> resolveDetected(GameBinding.SourceType sourceType, String sourceId, String sourceName) {
+        if (sourceId != null) {
+            Optional<String> mappedIgdbId = gameMappingRepository.findBySourceTypeAndSourceId(sourceType, sourceId)
+                .map(GameMapping::getIgdbId)
+                .filter(id -> !id.isBlank());
+            if (mappedIgdbId.isPresent()) return Optional.of(mappedGame(mappedIgdbId.get()));
         }
-        return findByName(b.getSourceName()).map(IgdbGame::id);
+        return resolveUnmapped(sourceType, sourceId, sourceName);
+    }
+
+    /**
+     * {@link #resolveDetected} with the game's mapping left aside: nothing for Battle.net, else the platform id
+     * ({@link #findByExternalAppId}), then the name. For a write whose mapping no longer names an IGDB game (or is
+     * no longer about this game) while its stored row still does.
+     *
+     * @param sourceId   the platform's id for the game, may be null (then no platform lookup)
+     * @param sourceName the name the platform reports, may be null (then no name lookup)
+     */
+    public Optional<IgdbGame> resolveUnmapped(GameBinding.SourceType sourceType, String sourceId, String sourceName) {
+        if (sourceType == GameBinding.SourceType.BATTLENET) return Optional.empty();
+        Optional<IgdbGame> byPlatformId = sourceId != null ? findByExternalAppId(sourceType, sourceId) : Optional.empty();
+        if (byPlatformId.isPresent() || sourceName == null || sourceName.isBlank()) return byPlatformId;
+        return findByName(sourceName);
+    }
+
+    /**
+     * The mapped IGDB game {@code igdbId} with its name: from memory, else the DB cache, else IGDB (then remembered).
+     * The name is null while neither knows it (IGDB unavailable or unknown id).
+     */
+    private IgdbGame mappedGame(String igdbId) {
+        String known = igdbGameCache.get(igdbId);
+        if (known != null) return new IgdbGame(igdbId, known);
+
+        String key = KEY_ID_PREFIX + igdbId;
+        Optional<IgdbGame> fromDb = lookupInDb(key);
+        if (fromDb.isPresent()) {
+            countLookup("id", "db_hit");
+            igdbGameCache.put(igdbId, fromDb.get().name());
+            return fromDb.get();
+        }
+
+        String token = clientId.isBlank() ? "" : getOrRefreshAppToken();
+        if (token.isBlank()) return new IgdbGame(igdbId, null);
+        List<Game> results;
+        try {
+            results = igdbClient.fetchGameById(igdbId, "name", token);
+        } catch (RuntimeException e) {
+            log.warn("Cannot fetch the name of mapped IGDB game {}: {}", igdbId, e.getMessage());
+            return new IgdbGame(igdbId, null);
+        }
+        countLookup("id", "miss");
+        if (results.isEmpty() || results.getFirst().getName().isBlank()) return new IgdbGame(igdbId, null);
+
+        IgdbGame resolved = new IgdbGame(igdbId, results.getFirst().getName());
+        remember(resolved);
+        saveToDb(key, resolved);
+        return resolved;
     }
 
     private Set<String> extractCcls(Game game) {
