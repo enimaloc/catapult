@@ -204,6 +204,18 @@ public final class BgsClient {
         }
     }
 
+    /** Closes the current session as a lost connection ({@link CloseReason#IO}), so a supervisor retries. */
+    public void abort() {
+        Session session = current;
+        if (session != null) {
+            try {
+                session.channel.loop().execute(session::abort);
+            } catch (RejectedExecutionException e) {
+                // The loop is already shut down: the session is closed
+            }
+        }
+    }
+
     /**
      * Fails at once, without queueing, when no session is ready. The reply never changes the local state: the push
      * that follows (often before the reply) does.
@@ -319,15 +331,23 @@ public final class BgsClient {
 
         /** Mints off the loop, then continues on it; a mint failure ends the session. */
         private void mintThen(Consumer<String> next) {
-            CompletableFuture.supplyAsync(() -> {
-                try {
-                    return tickets.mint();
-                } catch (TicketException e) {
-                    throw new CompletionException(e);
-                } catch (RuntimeException e) {
-                    throw new CompletionException(new TicketException("Ticket minting failed", false, e));
-                }
-            }, mintExecutor).whenCompleteAsync((ticket, error) -> {
+            CompletableFuture<String> minted;
+            try {
+                minted = CompletableFuture.supplyAsync(() -> {
+                    try {
+                        return tickets.mint();
+                    } catch (TicketException e) {
+                        throw new CompletionException(e);
+                    } catch (RuntimeException e) {
+                        throw new CompletionException(new TicketException("Ticket minting failed", false, e));
+                    }
+                }, mintExecutor);
+            } catch (RuntimeException e) {
+                LOG.log(Level.WARNING, "BGS ticket minting could not be scheduled: " + describe(e));
+                fail(CloseReason.IO, e);
+                return;
+            }
+            minted.whenCompleteAsync((ticket, error) -> {
                 if (!live()) {
                     return;
                 }
@@ -366,6 +386,9 @@ public final class BgsClient {
             channel.call(ACCOUNT_SUBSCRIBE, BgsRequests.accountSubscribe(accountId)).whenComplete((r, error) -> {
                 if (error != null) {
                     LOG.log(Level.WARNING, "BGS account subscribe failed: " + describe(unwrap(error)));
+                    if (live()) {
+                        fail(CloseReason.IO, unwrap(error));
+                    }
                 }
             });
         }
@@ -468,6 +491,12 @@ public final class BgsClient {
             }
             started.completeExceptionally(cause);
             channel.close();
+        }
+
+        void abort() {
+            if (!closed.isDone()) {
+                fail(CloseReason.IO, new IOException("BGS session aborted: it did not become ready in time"));
+            }
         }
 
         void closeLocally() {

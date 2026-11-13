@@ -26,6 +26,8 @@ public final class BgsConnection {
 
     static final Duration KEEP_ALIVE_INTERVAL = Duration.ofSeconds(30);
 
+    static final Duration DEFAULT_START_TIMEOUT = Duration.ofMinutes(2);
+
     private static final System.Logger LOG = System.getLogger(BgsConnection.class.getName());
 
     private final BgsClient client;
@@ -33,6 +35,7 @@ public final class BgsConnection {
     private final ScheduledExecutorService scheduler;
     private final Duration minBackoff;
     private final Duration maxBackoff;
+    private final Duration startTimeout;
     private final Object lock = new Object();
 
     private volatile State state = State.STOPPED;
@@ -41,9 +44,20 @@ public final class BgsConnection {
     private Duration nextBackoff;
     private ScheduledFuture<?> retry;
     private ScheduledFuture<?> keepAlive;
+    private ScheduledFuture<?> watchdog;
 
     public BgsConnection(BgsClient client, Supplier<BgsChannel> sessionFactory, ScheduledExecutorService scheduler,
                          Duration minBackoff, Duration maxBackoff) {
+        this(client, sessionFactory, scheduler, minBackoff, maxBackoff, DEFAULT_START_TIMEOUT);
+    }
+
+    /**
+     * @param startTimeout how long an attempt may stay CONNECTING before it is aborted and retried; it must cover
+     *                     the ticket minting and a logon queue
+     */
+    public BgsConnection(BgsClient client, Supplier<BgsChannel> sessionFactory, ScheduledExecutorService scheduler,
+                         Duration minBackoff, Duration maxBackoff, Duration startTimeout) {
+        this.startTimeout = startTimeout;
         this.client = client;
         this.sessionFactory = sessionFactory;
         this.scheduler = scheduler;
@@ -97,8 +111,19 @@ public final class BgsConnection {
             backoff();
             return;
         }
+        watchdog = scheduler.schedule(() -> onStartTimeout(id), startTimeout.toMillis(), TimeUnit.MILLISECONDS);
         ready.whenComplete((v, error) -> onStarted(id, error));
         closed.thenAccept(reason -> onClosed(id, reason));
+    }
+
+    private void onStartTimeout(long id) {
+        synchronized (lock) {
+            if (id != attempt || state != State.CONNECTING) {
+                return;
+            }
+            LOG.log(Level.WARNING, "BGS session did not become ready within " + startTimeout.toSeconds() + " s");
+        }
+        client.abort();
     }
 
     private void onStarted(long id, Throwable error) {
@@ -106,6 +131,7 @@ public final class BgsConnection {
             if (id != attempt || state != State.CONNECTING) {
                 return;
             }
+            cancelWatchdog();
             if (error == null) {
                 nextBackoff = minBackoff;
                 transition(State.READY);
@@ -160,7 +186,15 @@ public final class BgsConnection {
         }, delay.toMillis(), TimeUnit.MILLISECONDS);
     }
 
+    private void cancelWatchdog() {
+        if (watchdog != null) {
+            watchdog.cancel(false);
+            watchdog = null;
+        }
+    }
+
     private void cancelTimers() {
+        cancelWatchdog();
         if (retry != null) {
             retry.cancel(false);
             retry = null;

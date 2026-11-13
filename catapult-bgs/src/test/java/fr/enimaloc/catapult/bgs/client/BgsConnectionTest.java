@@ -8,7 +8,9 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.RejectedExecutionException;
 
+import static fr.enimaloc.catapult.bgs.proto.BgsServices.ACCOUNT_SUBSCRIBE;
 import static fr.enimaloc.catapult.bgs.proto.BgsServices.CONNECTION_FORCE_DISCONNECT;
 import static fr.enimaloc.catapult.bgs.proto.BgsServices.CONNECTION_KEEP_ALIVE;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -149,6 +151,61 @@ class BgsConnectionTest {
         assertThat(connection.state()).isEqualTo(State.STOPPED);
         assertThat(scheduler.pending()).isZero();
         scheduler.advance(10 * 60_000);
+        assertThat(sessions).hasSize(1);
+    }
+
+    @Test
+    void startThatNeverGetsTheAccountStateIsAbortedAndRetried() {
+        connection.start();
+        h.connect().logon();
+        scheduler.advance(120_000 - 1);
+        assertThat(connection.state()).isEqualTo(State.CONNECTING);
+        FakeSession stuck = h.session;
+        scheduler.advance(1);
+
+        assertThat(stuck.closed).isTrue();
+        assertThat(connection.state()).isEqualTo(State.BACKOFF);
+        scheduler.advance(5_000);
+        assertThat(sessions).hasSize(2);
+        assertThat(connection.state()).isEqualTo(State.CONNECTING);
+    }
+
+    @Test
+    void accountSubscribeFailureClosesTheSessionAndBacksOff() {
+        connection.start();
+        h.connect().logon();
+        h.session.fail(ACCOUNT_SUBSCRIBE, 5);
+
+        assertThat(h.session.closed).isTrue();
+        assertThat(h.client.closed()).isCompletedWithValue(BgsListener.CloseReason.IO);
+        assertThat(connection.state()).isEqualTo(State.BACKOFF);
+    }
+
+    @Test
+    void rejectedMintExecutorClosesTheSessionAndBacksOff() {
+        BgsClient rejecting = new BgsClient(ClientHarness.CONFIG, () -> "unused", h, r -> {
+            throw new RejectedExecutionException("full");
+        });
+        BgsConnection c = new BgsConnection(rejecting, () -> {
+            h.session = new FakeSession();
+            return h.session;
+        }, scheduler, Duration.ofSeconds(5), Duration.ofSeconds(120));
+        c.start();
+        h.connect();
+
+        assertThat(h.session.closed).isTrue();
+        assertThat(rejecting.closed()).isCompletedWithValue(BgsListener.CloseReason.IO);
+        assertThat(c.state()).isEqualTo(State.BACKOFF);
+    }
+
+    @Test
+    void watchdogDoesNotFireAfterReady() {
+        connection.start();
+        readySession();
+        scheduler.advance(10 * 60_000);
+
+        assertThat(connection.state()).isEqualTo(State.READY);
+        assertThat(h.session.closed).isFalse();
         assertThat(sessions).hasSize(1);
     }
 }
