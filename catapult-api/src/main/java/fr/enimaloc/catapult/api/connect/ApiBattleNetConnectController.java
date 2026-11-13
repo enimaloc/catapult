@@ -6,7 +6,6 @@ import fr.enimaloc.catapult.api.error.ApiProblem;
 import fr.enimaloc.catapult.common.dto.connect.BattleNetLinkStateResponse;
 import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.domain.account.UserAccount;
-import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.battlenet.BattleNetFriendService;
 import fr.enimaloc.catapult.service.battlenet.BattleNetGateService;
 import fr.enimaloc.catapult.service.battlenet.BattleNetLinkStateService;
@@ -17,7 +16,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.UUID;
 
@@ -35,28 +33,22 @@ public class ApiBattleNetConnectController {
     private final BattleNetFriendService friendService;
     private final BattleNetLinkStateService linkStates;
     private final BattleNetGateService gateService;
-    private final UserAccountRepository userAccountRepository;
+    private final ApiUserResolver userResolver;
 
     @PreAuthorize("@authz.isSelf(#userId)")
     @GetMapping
     public BattleNetLinkStateResponse status(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt) {
-        return linkStates.state(currentUser(jwt));
+        return linkStates.state(userResolver.viewer(jwt));
     }
 
     @PreAuthorize("@authz.isSelf(#userId)")
     @DeleteMapping
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void unenroll(@PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt) {
-        UserAccount user = currentUser(jwt);
+        UserAccount user = userResolver.viewer(jwt);
         if (!gateService.isAvailableFor(user)) {
             throw new ApiProblem(ErrorCode.FEATURE_DISABLED, "Battle.net is not available for this account");
         }
         friendService.unenroll(user);
-    }
-
-    private UserAccount currentUser(Jwt jwt) {
-        UUID caller = UUID.fromString(ApiUserResolver.requireJwt(jwt).getSubject());
-        return userAccountRepository.findById(caller)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unknown user"));
     }
 }

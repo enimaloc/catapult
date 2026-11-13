@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.connect;
 
+import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.api.error.ApiProblem;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.battlenet.BattleNetFriendLink;
@@ -46,7 +47,7 @@ class ApiBattleNetConnectControllerTest {
     void setup() {
         controller = new ApiBattleNetConnectController(friendService,
                 new BattleNetLinkStateService(gateService, linkRepository, accountRepository),
-                gateService, userAccountRepository);
+                gateService, new ApiUserResolver(userAccountRepository));
         user = new UserAccount();
         UUID userId = UUID.randomUUID();
         when(jwt.getSubject()).thenReturn(userId.toString());
