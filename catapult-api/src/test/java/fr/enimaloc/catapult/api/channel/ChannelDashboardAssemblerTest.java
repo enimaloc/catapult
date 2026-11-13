@@ -357,6 +357,17 @@ class ChannelDashboardAssemblerTest {
         }
 
         @Test
+        void aPageWhoseBindingsHaveNoTwitchCategory_buildsWithoutBoxArt() {
+            GameBinding incomplete = binding(owner, "1", "Incomplete");
+            incomplete.setTwitchGameId(null);
+            when(bindings.findByUser(eq(owner), any())).thenReturn(new PageImpl<>(List.of(incomplete)));
+
+            var content = assembler().page(owner, owner, "streamer", 0, null, null).bindings().content();
+
+            assertThat(content).extracting(BindingDto::boxArtUrl).containsExactly((String) null);
+        }
+
+        @Test
         void filtersByStatusFirst_thenBySource_caseInsensitive() {
             when(bindings.findByUserAndStatusIn(eq(owner), eq(Set.of(GameBinding.Status.MANUAL)), any()))
                     .thenReturn(new PageImpl<>(List.of()));
@@ -503,6 +514,18 @@ class ChannelDashboardAssemblerTest {
 
             assertThat(assembler().currentBinding(owner)).get()
                     .extracting(BindingDto::id).isEqualTo(valheim.getId().toString());
+        }
+
+        @Test
+        void hasNoBoxArt_whenTheBindingHasNoTwitchCategory() {
+            GameBinding incomplete = binding(owner, "1", "Incomplete");
+            incomplete.setTwitchGameId(null);
+            when(gameState.getLastKnownGame(owner))
+                    .thenReturn(Optional.of(new DetectedGame("1", GameBinding.SourceType.STEAM, "Incomplete")));
+            when(bindings.findByUserAndSourceIdAndSourceType(owner, "1", GameBinding.SourceType.STEAM))
+                    .thenReturn(Optional.of(incomplete));
+
+            assertThat(assembler().currentBinding(owner)).get().extracting(BindingDto::boxArtUrl).isNull();
         }
 
         @Test

@@ -204,7 +204,7 @@ public class ChannelDashboardAssembler {
         }
         Map<String, String> boxArts = boxArts(bindings.getContent());
         List<BindingDto> content = bindings.getContent().stream()
-                .map(binding -> toBindingDto(binding, boxArts.get(binding.getTwitchGameId())))
+                .map(binding -> toBindingDto(binding, boxArt(boxArts, binding.getTwitchGameId())))
                 .toList();
         return new PagedBindings(bindings.getNumber(), bindings.getTotalPages(), bindings.getTotalElements(), content);
     }
@@ -217,6 +217,11 @@ public class ChannelDashboardAssembler {
         return twitchCategoryCache.findAllById(ids).stream()
                 .filter(category -> category.getBoxArtUrl() != null && !category.getBoxArtUrl().isBlank())
                 .collect(Collectors.toMap(TwitchCategoryCache::getId, TwitchCategoryCache::getBoxArtUrl));
+    }
+
+    /** A category's box art, absent for a binding with no Twitch category (an immutable map rejects a null key). */
+    private static String boxArt(Map<String, String> boxArts, String twitchGameId) {
+        return twitchGameId == null ? null : boxArts.get(twitchGameId);
     }
 
     private static BindingDto toBindingDto(GameBinding binding, String boxArtUrl) {
@@ -383,7 +388,7 @@ public class ChannelDashboardAssembler {
         return gameStateService.getLastKnownGame(channel)
                 .flatMap(game -> gameBindingRepository
                         .findByUserAndSourceIdAndSourceType(channel, game.getSourceId(), game.getSourceType()))
-                .map(binding -> toBindingDto(binding, boxArts(List.of(binding)).get(binding.getTwitchGameId())));
+                .map(binding -> toBindingDto(binding, boxArt(boxArts(List.of(binding)), binding.getTwitchGameId())));
     }
 
     /** The detected game, with the id of the channel's binding for it when there is one. */
