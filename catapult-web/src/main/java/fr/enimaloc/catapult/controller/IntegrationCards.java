@@ -225,16 +225,17 @@ public final class IntegrationCards {
                         battleNetCase("caseFull", status, List.of("FULL"),
                                 new Text(Attrs.NONE, false, key(PREFIX + "battlenet.full"))))),
 
+                // An OAuth login, so it looks like the Xbox card's actions: filled connect, text disconnect.
                 // Each button needs its own flag name, as the Minecraft card's do.
                 new Container(Attrs.id("battlenet-status-actions").withClass("card-actions"),
-                        Container.Kind.SEGMENTED_GROUP, List.of(
-                        segmented(Attrs.id("battlenet-connect-btn")
+                        Container.Kind.DIV, List.of(
+                        new Button(Attrs.id("battlenet-connect-btn")
                                         .withState(battleNetState("showConnect", status,
                                                 List.of("NONE", "INVITE_REJECTED", "REMOVED"))),
-                                key(PREFIX + "battlenet.connect")),
-                        segmented(Attrs.id("battlenet-disconnect-btn")
+                                Button.Kind.FILLED, key(PREFIX + "battlenet.connect")),
+                        new Button(Attrs.id("battlenet-disconnect-btn")
                                         .withState(battleNetState("showDisconnect", status, List.of("ACCEPTED"))),
-                                key(PREFIX + "battlenet.disconnect")))));
+                                Button.Kind.TEXT, key(PREFIX + "battlenet.disconnect")))));
     }
 
     private static Text battleNetTag(String className, String field, String tag) {

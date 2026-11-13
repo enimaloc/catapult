@@ -721,6 +721,11 @@ class ChannelVisibilityRenderingTest {
         assertThat(acceptedCase.substring(0, acceptedCase.indexOf('>'))).contains("hidden");
         assertThat(openingTagForId(html, "battlenet-connect-btn")).doesNotContain("hidden");
         assertThat(openingTagForId(html, "battlenet-disconnect-btn")).contains("hidden");
+        // Same look as the Xbox account link: a plain button, not a segmented one.
+        assertThat(openingTagForId(html, "battlenet-connect-btn")).startsWith("<mdui-button ")
+                .doesNotContain("variant=");
+        assertThat(openingTagForId(html, "battlenet-disconnect-btn")).startsWith("<mdui-button ")
+                .contains("variant=\"text\"");
     }
 
     @Test
