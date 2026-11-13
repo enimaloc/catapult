@@ -50,7 +50,6 @@ class ApiAdminBattleNetAccountsControllerTest {
     @BeforeEach
     void setUp() {
         account.setId(UUID.randomUUID());
-        account.setLabel("bot-1");
         account.setEmail("bot-mailbox@example.com");
         account.setPasswordEnc("enc:pw");
         when(accounts.findById(account.getId())).thenReturn(Optional.of(account));
@@ -69,7 +68,8 @@ class ApiAdminBattleNetAccountsControllerTest {
     void listReturnsTheAccountsWithoutSecrets() throws Exception {
         mvc.perform(get("/api/internal/admin/battlenet-accounts"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].label").value("bot-1"))
+                .andExpect(jsonPath("$[0].displayName").value("b***@example.com"))
+                .andExpect(jsonPath("$[0].label").doesNotExist())
                 .andExpect(jsonPath("$[0].email").doesNotExist())
                 .andExpect(jsonPath("$[0].passwordEnc").doesNotExist());
     }
@@ -77,15 +77,16 @@ class ApiAdminBattleNetAccountsControllerTest {
     @Test
     void createReturns202() throws Exception {
         mvc.perform(post("/api/internal/admin/battlenet-accounts").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"label\":\"bot-2\",\"email\":\"a@b.c\",\"password\":\"pw\"}"))
+                        .content("{\"email\":\"a@b.c\",\"password\":\"pw\"}"))
                 .andExpect(status().isAccepted())
-                .andExpect(jsonPath("$.authState").value("NEW"));
+                .andExpect(jsonPath("$.authState").value("NEW"))
+                .andExpect(jsonPath("$.displayName").value("a***@b.c"));
     }
 
     @Test
     void createWithoutPasswordIs400() throws Exception {
         mvc.perform(post("/api/internal/admin/battlenet-accounts").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"label\":\"bot-2\",\"email\":\"a@b.c\"}"))
+                        .content("{\"email\":\"a@b.c\"}"))
                 .andExpect(status().isBadRequest());
     }
 
@@ -123,9 +124,11 @@ class ApiAdminBattleNetAccountsControllerTest {
     @Test
     void patchUpdatesAndDeleteReturns204() throws Exception {
         mvc.perform(patch("/api/internal/admin/battlenet-accounts/{id}", account.getId())
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"label\":\"renamed\"}"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"label\":\"renamed\",\"fillOrder\":3}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.label").value("renamed"));
+                .andExpect(jsonPath("$.fillOrder").value(3))
+                .andExpect(jsonPath("$.displayName").value("b***@example.com")) // the legacy label is ignored
+                .andExpect(jsonPath("$.label").doesNotExist());
         mvc.perform(delete("/api/internal/admin/battlenet-accounts/{id}", account.getId()))
                 .andExpect(status().isNoContent());
     }

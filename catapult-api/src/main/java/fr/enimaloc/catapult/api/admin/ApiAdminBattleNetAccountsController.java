@@ -28,8 +28,7 @@ public class ApiAdminBattleNetAccountsController {
     /** 202: the account is stored and its login runs in the background (poll the list for its auth state). */
     @PostMapping
     public ResponseEntity<AccountDto> create(@RequestBody Map<String, String> body) {
-        return ResponseEntity.accepted().body(
-                accounts.create(body.get("label"), body.get("email"), body.get("password")));
+        return ResponseEntity.accepted().body(accounts.create(body.get("email"), body.get("password")));
     }
 
     /** The 2FA code of a login waiting for one; 409 when none is. */

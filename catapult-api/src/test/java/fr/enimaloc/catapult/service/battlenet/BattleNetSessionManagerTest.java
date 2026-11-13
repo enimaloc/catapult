@@ -73,11 +73,10 @@ class BattleNetSessionManagerTest {
         scheduler.shutdownNow();
     }
 
-    private static BattleNetServiceAccount account(String label) {
+    private static BattleNetServiceAccount account(String name) {
         BattleNetServiceAccount account = new BattleNetServiceAccount();
         account.setId(UUID.randomUUID());
-        account.setLabel(label);
-        account.setEmail(label.toLowerCase() + "@example.test");
+        account.setEmail(name.toLowerCase() + "@example.test");
         account.setAuthState(AuthState.READY);
         account.setEnabled(true);
         return account;
@@ -234,9 +233,12 @@ class BattleNetSessionManagerTest {
                 DisconnectNotification.newBuilder().setErrorCode(60).build());
 
         assertThat(manager.sessionState(bot1.getId())).isEqualTo("STOPPED_REPLACED");
-        assertThat(registry.counter(BattleNetSessionManager.REPLACED_COUNTER, "account", "Bot1").count())
+        assertThat(registry.counter(BattleNetSessionManager.REPLACED_COUNTER, "account", bot1.getId().toString()).count())
                 .isEqualTo(1.0);
         assertThat(channels).hasSize(2); // no new channel for Bot1
+        // tagged by the account id, never its e-mail
+        assertThat(registry.find(BattleNetSessionManager.REPLACED_COUNTER).tag("account", bot1.getEmail()).counter())
+                .isNull();
     }
 
     @Test
@@ -248,7 +250,7 @@ class BattleNetSessionManagerTest {
         connect(channels.getFirst());
 
         assertThat(manager.sessionState(bot1.getId())).isEqualTo("STOPPED_CODE_REQUIRED");
-        assertThat(registry.counter(BattleNetSessionManager.ADMIN_ACTION_COUNTER, "account", "Bot1").count())
+        assertThat(registry.counter(BattleNetSessionManager.ADMIN_ACTION_COUNTER, "account", bot1.getId().toString()).count())
                 .isEqualTo(1.0);
         assertThat(bot1.getAuthState()).isEqualTo(AuthState.CODE_REQUIRED);
         verify(repository, never()).save(any());

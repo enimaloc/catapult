@@ -17,7 +17,7 @@ function row(state, waitingForCode) {
             <button class="admin-battlenet-reset" data-id="${ID}"></button>
             <button class="admin-battlenet-delete" data-id="${ID}" data-confirm="Delete Bot?"></button>
             <div class="admin-battlenet-code"><input name="code"><button class="admin-battlenet-code-submit" data-id="${ID}"></button></div>
-            <div class="admin-battlenet-details"><input name="label" value="Bot"><input name="fillOrder" value="2"><button class="admin-battlenet-details-submit" data-id="${ID}"></button></div>
+            <div class="admin-battlenet-details"><input name="fillOrder" value="2"><button class="admin-battlenet-details-submit" data-id="${ID}"></button></div>
             <div class="admin-battlenet-password"><input name="password"><button class="admin-battlenet-password-submit" data-id="${ID}"></button></div>
         </div>`;
 }
@@ -34,7 +34,7 @@ function page(state = "READY", waitingForCode = state === "CODE_REQUIRED") {
                              data-label-invalid="Invalid">
                             ${row(state, waitingForCode)}
                             <div class="admin-battlenet-enroll">
-                                <input name="label"><input name="email"><input name="password" type="password">
+                                <input name="email"><input name="password" type="password">
                                 <button class="admin-battlenet-add"></button>
                             </div>
                             <p class="admin-battlenet-message" hidden></p>
@@ -75,20 +75,19 @@ afterEach(() => {
 describe("admin-battlenet actions", () => {
     it("adds a bot with the typed credentials in the body, then empties the fields and patches", async () => {
         routes["/admin/battlenet-accounts"] = response(202, {});
-        document.querySelector('.admin-battlenet-enroll [name="label"]').value = " Bot1 ";
-        document.querySelector('.admin-battlenet-enroll [name="email"]').value = "bot@example.com";
+        document.querySelector('.admin-battlenet-enroll [name="email"]').value = " bot@example.com ";
         document.querySelector('.admin-battlenet-enroll [name="password"]').value = "s3cret";
 
         await click(".admin-battlenet-add");
 
-        expect(posted).toHaveBeenCalledWith("/admin/battlenet-accounts", { label: "Bot1", email: "bot@example.com", password: "s3cret" });
+        expect(posted).toHaveBeenCalledWith("/admin/battlenet-accounts", { email: "bot@example.com", password: "s3cret" });
         expect(window.mdui.snackbar).toHaveBeenCalledWith({ message: "Created" });
         expect(document.querySelector('.admin-battlenet-enroll [name="password"]').value).toBe("");
         expect(CatapultAdminTabs.patch).toHaveBeenCalledWith(document.querySelector('mdui-tab-panel[value="keys"]'));
     });
 
     it("refuses an incomplete add form without calling the server", async () => {
-        document.querySelector('.admin-battlenet-enroll [name="label"]').value = "Bot1";
+        document.querySelector('.admin-battlenet-enroll [name="email"]').value = "bot@example.com";
 
         await click(".admin-battlenet-add");
 
@@ -149,15 +148,14 @@ describe("admin-battlenet actions", () => {
 });
 
 describe("admin-battlenet details", () => {
-    it("sends the label and the fill order, refusing a blank label or a negative order", async () => {
+    it("sends the fill order alone, refusing a negative or fractional one", async () => {
         await click(".admin-battlenet-details-submit");
-        expect(posted).toHaveBeenLastCalledWith(`/admin/battlenet-accounts/${ID}/details`, { label: "Bot", fillOrder: 2 });
+        expect(posted).toHaveBeenLastCalledWith(`/admin/battlenet-accounts/${ID}/details`, { fillOrder: 2 });
 
         posted.mockClear();
         document.querySelector('.admin-battlenet-details [name="fillOrder"]').value = "-1";
         await click(".admin-battlenet-details-submit");
-        document.querySelector('.admin-battlenet-details [name="fillOrder"]').value = "1";
-        document.querySelector('.admin-battlenet-details [name="label"]').value = " ";
+        document.querySelector('.admin-battlenet-details [name="fillOrder"]').value = "1.5";
         await click(".admin-battlenet-details-submit");
         expect(posted).not.toHaveBeenCalled();
         expect(message().textContent).toBe("Invalid");

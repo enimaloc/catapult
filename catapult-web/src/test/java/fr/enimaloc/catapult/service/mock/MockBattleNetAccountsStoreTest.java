@@ -32,6 +32,7 @@ class MockBattleNetAccountsStoreTest {
         assertThat(store.list()).filteredOn(a -> a.id().equals(id)).singleElement().satisfies(a -> {
             assertThat(a.authState()).isEqualTo("READY");
             assertThat(a.battleTag()).isNotNull();
+            assertThat(a.displayName()).isEqualTo(a.battleTag());
         });
         assertThat(store.submitCode(id, MockBattleNetAccountsStore.CODE)).isEqualTo(409); // nothing waits any more
         assertThat(store.submitCode(UUID.randomUUID(), "1")).isEqualTo(404);
@@ -39,9 +40,12 @@ class MockBattleNetAccountsStoreTest {
 
     @Test
     void createWaitsForACode_reauthPatchAndDelete() {
-        assertThat(store.create("Bot9")).isEqualTo(202);
-        BattleNetAccountDto created = store.list().stream().filter(a -> a.label().equals("Bot9")).findFirst().orElseThrow();
+        assertThat(store.create("bot9@example.com")).isEqualTo(202);
+        // no BattleTag before the first login: the masked e-mail stands in
+        BattleNetAccountDto created = store.list().stream().filter(a -> a.displayName().equals("b***@example.com"))
+                .findFirst().orElseThrow();
         assertThat(created.authState()).isEqualTo("CODE_REQUIRED");
+        assertThat(created.battleTag()).isNull();
 
         UUID ready = find("READY").id();
         assertThat(store.reauth(ready)).isEqualTo(202);

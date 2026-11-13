@@ -1,13 +1,13 @@
 /**
- * The admin Keys tab's Battle.net bot pool card. Add a bot (label, e-mail, password), send the 2FA code of
+ * The admin Keys tab's Battle.net bot pool card. Add a bot (e-mail, password), send the 2FA code of
  * a bot waiting for one, re-authenticate, enable / disable, lift "full", change the password and delete
  * (after a confirmation) all post to AdminBattleNetController, the button disabled until the list is
  * patched (admin-tabs.js). A refusal is told inline under the card's form by its status: 409 (a login is
  * already running, or none waits for a code), 404 (gone: patched away), 400 (invalid), else unavailable.
  *
  * Passwords are typed in password fields, only sent in the POST body and emptied once sent; nothing
- * ever puts them in a URL or the page. Labels and BattleTags come from the server-rendered rows, never
- * from innerHTML.
+ * ever puts them in a URL or the page. Display names (BattleTag, else masked e-mail) come from the
+ * server-rendered rows, never from innerHTML.
  *
  * While a bot is NEW, or CODE_REQUIRED with a login waiting for its code (its row's data-auth-state and
  * data-waiting-code), the tab is patched every 3 s, so its login progress shows without a reload; the
@@ -80,11 +80,12 @@ window.CatapultAdminBattleNet = (function () {
 
     function add(panel, card, button) {
         const enroll = card.querySelector(".admin-battlenet-enroll");
-        const fields = ["label", "email", "password"].map(name => enroll.querySelector(`[name="${name}"]`));
-        const [label, email, password] = fields.map(field => (field?.value ?? "").trim());
-        if (!label || !email || !(fields[2]?.value ?? "")) return show(card, card.dataset.labelInvalid, true);
+        const fields = ["email", "password"].map(name => enroll.querySelector(`[name="${name}"]`));
+        const email = (fields[0]?.value ?? "").trim();
+        const password = fields[1]?.value ?? "";
+        if (!email || !password) return show(card, card.dataset.labelInvalid, true);
         // the password is sent as typed (not trimmed)
-        return act(panel, card, button, BASE, { label, email, password: fields[2].value }, card.dataset.labelCreated, fields);
+        return act(panel, card, button, BASE, { email, password }, card.dataset.labelCreated, fields);
     }
 
     function sendCode(panel, card, button) {
@@ -111,11 +112,10 @@ window.CatapultAdminBattleNet = (function () {
 
     function saveDetails(panel, card, button) {
         const box = button.closest(".admin-battlenet-details");
-        const label = (box?.querySelector('[name="label"]')?.value ?? "").trim();
         const order = Number(box?.querySelector('[name="fillOrder"]')?.value);
-        if (!label || !Number.isInteger(order) || order < 0) return show(card, card.dataset.labelInvalid, true);
+        if (!Number.isInteger(order) || order < 0) return show(card, card.dataset.labelInvalid, true);
         return act(panel, card, button, `${BASE}/${encodeURIComponent(button.dataset.id)}/details`,
-            { label, fillOrder: order }, card.dataset.labelUpdated);
+            { fillOrder: order }, card.dataset.labelUpdated);
     }
 
     function stopPolling() {

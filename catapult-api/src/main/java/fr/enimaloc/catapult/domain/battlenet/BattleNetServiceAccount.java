@@ -23,9 +23,6 @@ public class BattleNetServiceAccount {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(nullable = false)
-    private String label;
-
     @ToString.Exclude
     @Column(nullable = false)
     private String email;

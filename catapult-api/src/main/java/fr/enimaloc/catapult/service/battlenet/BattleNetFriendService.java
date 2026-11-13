@@ -135,7 +135,7 @@ public class BattleNetFriendService {
             created.setRequestedAt(Instant.now());
             return linkRepository.save(created);
         });
-        log.info("Battle.net link requested for user {} via {}", user.getId(), bot.getLabel());
+        log.info("Battle.net link requested for user {} via {}", user.getId(), bot.getId());
         channelEventPublisher.battleNetLinkChanged(user.getId(), Status.PENDING.name(), battleTag, bot.getBattleTag());
 
         invite(bot, link.getId(), user.getId(), battleTag);
@@ -231,10 +231,10 @@ public class BattleNetFriendService {
                     link.setAcceptedAt(Instant.now());
                     enableGetter(link.getUser());
                     changes.add(save(link, bot));
-                    log.info("Battle.net link accepted for user {} via {}", link.getUser().getId(), bot.getLabel());
+                    log.info("Battle.net link accepted for user {} via {}", link.getUser().getId(), bot.getId());
                 }
                 if (changes.isEmpty()) {
-                    log.debug("Battle.net friend added on {} without a link to accept", bot.getLabel());
+                    log.debug("Battle.net friend added on {} without a link to accept", bot.getId());
                 }
             }
             case FriendRemoved removed -> {
@@ -245,11 +245,11 @@ public class BattleNetFriendService {
                         link.setStatus(Status.REMOVED);
                         changes.add(save(link, bot));
                         log.info("Battle.net link removed by the streamer: user {} via {}", link.getUser().getId(),
-                                bot.getLabel());
+                                bot.getId());
                     }
                 }
                 if (changes.isEmpty()) {
-                    log.debug("Battle.net friend removed on {} without an accepted link", bot.getLabel());
+                    log.debug("Battle.net friend removed on {} without an accepted link", bot.getId());
                 }
             }
             case InvitationSent sent -> {
@@ -261,7 +261,7 @@ public class BattleNetFriendService {
                 pending.ifPresentOrElse(link -> {
                     link.setInvitationId(sent.invitationId());
                     linkRepository.save(link);
-                }, () -> log.debug("Battle.net invitation sent by {} matches no pending link", bot.getLabel()));
+                }, () -> log.debug("Battle.net invitation sent by {} matches no pending link", bot.getId()));
             }
             case InvitationSentRemoved sentRemoved -> {
                 if (sentRemoved.reason() == 0) {
@@ -277,7 +277,7 @@ public class BattleNetFriendService {
                     }
                     link.setStatus(Status.INVITE_REJECTED);
                     changes.add(save(link, bot));
-                    log.info("Battle.net invitation of {} not accepted (reason {}) for user {}", bot.getLabel(),
+                    log.info("Battle.net invitation of {} not accepted (reason {}) for user {}", bot.getId(),
                             sentRemoved.reason(), link.getUser().getId());
                 }
             }
@@ -299,20 +299,19 @@ public class BattleNetFriendService {
                 .anyMatch(link -> link.getStatus() == Status.PENDING || link.getStatus() == Status.INVITE_REJECTED);
         long invitationId = invitation.invitationId();
         UUID botId = bot.getId();
-        String label = bot.getLabel();
         if (expected) {
-            log.info("Accepting the Battle.net invitation of an enrolled streamer on {}", label);
+            log.info("Accepting the Battle.net invitation of an enrolled streamer on {}", botId);
             return () -> call(botId, client -> client.acceptInvitation(invitationId))
                     .whenComplete((ignored, failure) -> {
                         if (failure != null) {
-                            log.warn("acceptInvitation failed on {}: {}", label, unwrap(failure).toString());
+                            log.warn("acceptInvitation failed on {}: {}", botId, unwrap(failure).toString());
                         }
                     });
         }
-        log.info("Declining a Battle.net invitation no link waits for on {}", label);
+        log.info("Declining a Battle.net invitation no link waits for on {}", botId);
         return () -> call(botId, client -> client.declineInvitation(invitationId)).whenComplete((ignored, failure) -> {
             if (failure != null) {
-                log.warn("declineInvitation failed on {}: {}", label, unwrap(failure).toString());
+                log.warn("declineInvitation failed on {}: {}", botId, unwrap(failure).toString());
             }
         });
     }
@@ -330,16 +329,16 @@ public class BattleNetFriendService {
             boolean full = failure instanceof BgsRpcException rpc && rpc.status() == STATUS_INVITER_AT_MAX_FRIENDS
                     || linkRepository.countByServiceAccountAndStatus(bot, Status.ACCEPTED) >= FRIEND_CAP;
             if (!full) {
-                log.warn("The Battle.net invitation sent by {} failed, the link stays pending: {}", bot.getLabel(),
+                log.warn("The Battle.net invitation sent by {} failed, the link stays pending: {}", bot.getId(),
                         failure.toString());
                 return;
             }
-            log.warn("The Battle.net invitation sent by {} shows its friends list is full: {}", bot.getLabel(),
+            log.warn("The Battle.net invitation sent by {} shows its friends list is full: {}", bot.getId(),
                     failure.toString());
             markFull(bot.getId());
             relocate(bot.getId(), linkId, ownerId, battleTag);
         } catch (RuntimeException e) {
-            log.warn("Could not handle the failed invitation of {}: {}", bot.getLabel(), e.toString());
+            log.warn("Could not handle the failed invitation of {}: {}", bot.getId(), e.toString());
         }
     }
 
@@ -374,7 +373,7 @@ public class BattleNetFriendService {
             channelEventPublisher.battleNetLinkChanged(ownerId, "NONE", null, null);
             return;
         }
-        log.info("Battle.net link of user {} moved to {}", ownerId, next[0].getLabel());
+        log.info("Battle.net link of user {} moved to {}", ownerId, next[0].getId());
         channelEventPublisher.battleNetLinkChanged(ownerId, Status.PENDING.name(), battleTag, next[0].getBattleTag());
         invite(next[0], linkId, ownerId, battleTag);
     }
@@ -387,7 +386,7 @@ public class BattleNetFriendService {
             }
             account.setFriendLimitReached(true);
             accountRepository.save(account);
-            log.warn("Battle.net service account {} marked full", account.getLabel());
+            log.warn("Battle.net service account {} marked full", account.getId());
         }));
     }
 

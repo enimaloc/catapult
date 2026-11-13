@@ -1375,9 +1375,9 @@ public class RealApiService implements ApiService {
     }
 
     @Override
-    public int adminCreateBattleNetAccount(String label, String email, String password) {
+    public int adminCreateBattleNetAccount(String email, String password) {
         return client.call(HttpMethod.POST, "/api/internal/admin/battlenet-accounts",
-                Map.of("label", label, "email", email, "password", password), Void.class).status();
+                Map.of("email", email, "password", password), Void.class).status();
     }
 
     @Override

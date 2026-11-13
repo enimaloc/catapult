@@ -531,12 +531,12 @@ public interface ApiService {
      * Stores a bot account and starts its first login: catapult-api's status (202; 400 refused), 502 when unreachable.
      * The credentials travel in the request body only.
      */
-    int adminCreateBattleNetAccount(String label, String email, String password);
+    int adminCreateBattleNetAccount(String email, String password);
     /** Submits the 2FA code of a login waiting for one: 202; 409 when none is waiting; 404 unknown; 502 when unreachable. */
     int adminSubmitBattleNetCode(UUID id, String code);
     /** Re-runs the account's login: 202; 409 while a login is running; 404 unknown; 502 when unreachable. */
     int adminReauthBattleNetAccount(UUID id);
-    /** PATCHes a bot ({@code label}, {@code fillOrder}, {@code enabled}, {@code password}, {@code friendLimitReached}): 200; 409; 404; 502. */
+    /** PATCHes a bot ({@code fillOrder}, {@code enabled}, {@code password}, {@code friendLimitReached}): 200; 409; 404; 502. */
     int adminPatchBattleNetAccount(UUID id, Map<String, Object> patch);
     /** Deletes a bot account: 204; 404 unknown; 502 when unreachable. */
     int adminDeleteBattleNetAccount(UUID id);

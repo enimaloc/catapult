@@ -54,7 +54,6 @@ class BattleNetLoginCoordinatorTest {
     @BeforeEach
     void setUp() {
         account.setId(UUID.randomUUID());
-        account.setLabel("bot-1");
         account.setEmail(EMAIL);
         account.setPasswordEnc(encryption.encrypt(PASSWORD));
         account.setStorageStateEnc(encryption.encrypt(OLD_STATE));
@@ -294,7 +293,6 @@ class BattleNetLoginCoordinatorTest {
     private CompletableFuture<Void> blockTheLoginThread() throws InterruptedException {
         other = new BattleNetServiceAccount();
         other.setId(UUID.randomUUID());
-        other.setLabel("bot-2");
         other.setEmail("other-mailbox@example.com");
         other.setPasswordEnc(encryption.encrypt(PASSWORD));
         when(repository.findById(other.getId())).thenReturn(Optional.of(other));

@@ -994,14 +994,14 @@ class AdminTabsFragmentControllerTest {
         assertThat(html.split("admin-minecraft-delete\"", -1)).hasSize(4);
     }
 
-    private static fr.enimaloc.catapult.common.dto.admin.BattleNetAccountDto bot(String id, String label, String tag,
+    private static fr.enimaloc.catapult.common.dto.admin.BattleNetAccountDto bot(String id, String displayName, String tag,
             String auth, String session, boolean enabled, boolean full) {
-        return bot(id, label, tag, auth, session, enabled, full, "CODE_REQUIRED".equals(auth));
+        return bot(id, displayName, tag, auth, session, enabled, full, "CODE_REQUIRED".equals(auth));
     }
 
-    private static fr.enimaloc.catapult.common.dto.admin.BattleNetAccountDto bot(String id, String label, String tag,
+    private static fr.enimaloc.catapult.common.dto.admin.BattleNetAccountDto bot(String id, String displayName, String tag,
             String auth, String session, boolean enabled, boolean full, boolean waitingForCode) {
-        return new fr.enimaloc.catapult.common.dto.admin.BattleNetAccountDto(java.util.UUID.fromString(id), label, tag, auth,
+        return new fr.enimaloc.catapult.common.dto.admin.BattleNetAccountDto(java.util.UUID.fromString(id), displayName, tag, auth,
                 session, 0, full, enabled, 4, waitingForCode);
     }
 
@@ -1010,11 +1010,13 @@ class AdminTabsFragmentControllerTest {
         when(apiService.adminApiKeys(org.mockito.ArgumentMatchers.any())).thenReturn(keys(true));
         when(apiService.adminBattleNetAccounts()).thenReturn(List.of(
                 bot("00000000-0000-0000-0000-00000000000a", "Ready<b>", "Tag#1", "READY", "READY", true, true),
-                bot("00000000-0000-0000-0000-00000000000b", "Waiting", null, "CODE_REQUIRED", "STOPPED_CODE_REQUIRED", false, false)));
+                bot("00000000-0000-0000-0000-00000000000b", "w***@example.com", null, "CODE_REQUIRED", "STOPPED_CODE_REQUIRED", false, false)));
 
         String html = asAdmin("/spa/admin/keys").replaceAll("\\s+", " ");
 
-        assertThat(html).contains("id=\"admin-battlenet\"", "Battle.net bots", "Ready&lt;b&gt;", "Tag#1", "Add a bot",
+        // each bot shown by its display name (its BattleTag, else its masked e-mail): no label to type or show
+        assertThat(html.substring(html.indexOf("id=\"admin-battlenet\""))).doesNotContain("name=\"label\"", ">Label<");
+        assertThat(html).contains("id=\"admin-battlenet\"", "Battle.net bots", "Ready&lt;b&gt;", "w***@example.com", "Add a bot",
                 "data-auth-state=\"CODE_REQUIRED\"", "2FA code required", "Admin action needed", "account.battle.net");
         // the code field only for the bot waiting for one; the full flag lifts only the full one
         assertThat(html.split("admin-battlenet-code-submit\"", -1)).hasSize(2);

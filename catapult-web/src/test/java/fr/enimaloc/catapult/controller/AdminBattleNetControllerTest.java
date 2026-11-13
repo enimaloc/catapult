@@ -41,22 +41,25 @@ class AdminBattleNetControllerTest {
     @Test
     void createForwardsCredentialsAndReturns202() throws Exception {
         when(apiService.isAdmin()).thenReturn(true);
-        when(apiService.adminCreateBattleNetAccount("Bot1", "bot@example.com", " s3cret ")).thenReturn(202);
+        when(apiService.adminCreateBattleNetAccount("bot@example.com", " s3cret ")).thenReturn(202);
 
-        mvc.perform(admin(post(BASE), "{\"label\":\" Bot1 \",\"email\":\"bot@example.com \",\"password\":\" s3cret \"}"))
+        mvc.perform(admin(post(BASE), "{\"email\":\"bot@example.com \",\"password\":\" s3cret \"}"))
                 .andExpect(status().isAccepted())
                 .andExpect(content().string(""));
-        verify(apiService).adminCreateBattleNetAccount("Bot1", "bot@example.com", " s3cret ");
+        // a legacy label is ignored, like any unknown field
+        mvc.perform(admin(post(BASE), "{\"label\":\"Bot1\",\"email\":\"bot@example.com\",\"password\":\" s3cret \"}"))
+                .andExpect(status().isAccepted());
+        verify(apiService, org.mockito.Mockito.times(2)).adminCreateBattleNetAccount("bot@example.com", " s3cret ");
     }
 
     @Test
     void createWithAMissingFieldIs400AndNeverCallsTheApi() throws Exception {
         when(apiService.isAdmin()).thenReturn(true);
 
-        mvc.perform(admin(post(BASE), "{\"label\":\"Bot1\",\"email\":\"\",\"password\":\"x\"}")).andExpect(status().isBadRequest());
-        mvc.perform(admin(post(BASE), "{\"label\":\"Bot1\",\"email\":\"a@b.c\"}")).andExpect(status().isBadRequest());
+        mvc.perform(admin(post(BASE), "{\"email\":\"\",\"password\":\"x\"}")).andExpect(status().isBadRequest());
+        mvc.perform(admin(post(BASE), "{\"email\":\"a@b.c\"}")).andExpect(status().isBadRequest());
         verify(apiService, never()).adminCreateBattleNetAccount(org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+                org.mockito.ArgumentMatchers.any());
     }
 
     @Test
@@ -94,14 +97,16 @@ class AdminBattleNetControllerTest {
     }
 
     @Test
-    void detailsForwardsLabelAndFillOrder_andValidates() throws Exception {
+    void detailsForwardsTheFillOrderAlone_andValidates() throws Exception {
         when(apiService.isAdmin()).thenReturn(true);
-        when(apiService.adminPatchBattleNetAccount(ID, Map.of("label", "Bot2", "fillOrder", 3))).thenReturn(200);
+        when(apiService.adminPatchBattleNetAccount(ID, Map.of("fillOrder", 3))).thenReturn(200);
 
-        mvc.perform(admin(post(BASE + "/" + ID + "/details"), "{\"label\":\" Bot2 \",\"fillOrder\":3}")).andExpect(status().isOk());
-        mvc.perform(admin(post(BASE + "/" + ID + "/details"), "{\"label\":\" \",\"fillOrder\":3}")).andExpect(status().isBadRequest());
-        mvc.perform(admin(post(BASE + "/" + ID + "/details"), "{\"label\":\"a\",\"fillOrder\":-1}")).andExpect(status().isBadRequest());
-        mvc.perform(admin(post(BASE + "/" + ID + "/details"), "{\"label\":\"a\"}")).andExpect(status().isBadRequest());
+        mvc.perform(admin(post(BASE + "/" + ID + "/details"), "{\"fillOrder\":3}")).andExpect(status().isOk());
+        // a legacy label is ignored, never forwarded
+        mvc.perform(admin(post(BASE + "/" + ID + "/details"), "{\"label\":\"Bot2\",\"fillOrder\":3}")).andExpect(status().isOk());
+        verify(apiService, org.mockito.Mockito.times(2)).adminPatchBattleNetAccount(ID, Map.of("fillOrder", 3));
+        mvc.perform(admin(post(BASE + "/" + ID + "/details"), "{\"fillOrder\":-1}")).andExpect(status().isBadRequest());
+        mvc.perform(admin(post(BASE + "/" + ID + "/details"), "{}")).andExpect(status().isBadRequest());
     }
 
     @Test
@@ -116,8 +121,8 @@ class AdminBattleNetControllerTest {
     void nonAdminIsRefusedBeforeTheApiIsCalled() throws Exception {
         when(apiService.isAdmin()).thenReturn(false);
 
-        mvc.perform(admin(post(BASE), "{\"label\":\"a\",\"email\":\"b\",\"password\":\"c\"}")).andExpect(status().is4xxClientError());
+        mvc.perform(admin(post(BASE), "{\"email\":\"b\",\"password\":\"c\"}")).andExpect(status().is4xxClientError());
         verify(apiService, never()).adminCreateBattleNetAccount(org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+                org.mockito.ArgumentMatchers.any());
     }
 }

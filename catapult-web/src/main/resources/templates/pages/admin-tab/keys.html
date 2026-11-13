@@ -180,8 +180,7 @@
                    th:text="#{admin.battlenet.empty}">None.</p>
                 <div class="admin-table" data-admin-list="battlenet" th:hidden="${battlenet.isEmpty()}">
                     <div class="admin-row admin-battlenet-row admin-row-head" aria-hidden="true">
-                        <span th:text="#{admin.battlenet.col.label}">Label</span>
-                        <span th:text="#{admin.battlenet.col.battletag}">BattleTag</span>
+                        <span th:text="#{admin.battlenet.col.account}">Account</span>
                         <span th:text="#{admin.battlenet.col.auth}">Login</span>
                         <span th:text="#{admin.battlenet.col.session}">Session</span>
                         <span th:text="#{admin.battlenet.col.friends}">Friends</span>
@@ -190,8 +189,7 @@
                     </div>
                     <div class="admin-row admin-battlenet-row" th:each="a : ${battlenet}"
                          th:attr="data-admin-key=${a.id()},data-auth-state=${a.authState()},data-waiting-code=${a.waitingForCode()}">
-                        <span class="admin-cell" th:attr="data-label=#{admin.battlenet.col.label}" th:text="${a.label()}">Bot1</span>
-                        <span class="admin-cell" th:attr="data-label=#{admin.battlenet.col.battletag}" th:text="${a.battleTag()}">Bot#1234</span>
+                        <span class="admin-cell" th:attr="data-label=#{admin.battlenet.col.account}" th:text="${a.displayName()}">Bot#1234</span>
                         <span class="admin-cell" th:attr="data-label=#{admin.battlenet.col.auth}"
                               th:text="#{'admin.battlenet.auth.' + ${a.authState()}}">READY</span>
                         <span class="admin-cell" th:attr="data-label=#{admin.battlenet.col.session}"
@@ -213,7 +211,7 @@
                                          th:attr="data-id=${a.id()}" th:text="#{admin.battlenet.action.lift_full}">Lift full</mdui-button>
                             <mdui-button-icon icon="delete" class="admin-battlenet-delete"
                                               th:attr="data-id=${a.id()},aria-label=#{admin.battlenet.action.delete},
-                                              data-confirm=#{admin.battlenet.action.delete-confirm(${a.label()})}"></mdui-button-icon>
+                                              data-confirm=#{admin.battlenet.action.delete-confirm(${a.displayName()})}"></mdui-button-icon>
                         </span>
                         <p class="admin-cell-muted admin-battlenet-code-hint"
                            th:if="${a.authState() == 'CODE_REQUIRED' and !a.waitingForCode()}"
@@ -225,8 +223,6 @@
                                          th:attr="data-id=${a.id()}" th:text="#{admin.battlenet.code.submit}">Send the code</mdui-button>
                         </div>
                         <div class="admin-battlenet-details">
-                            <mdui-text-field name="label" variant="outlined" maxlength="80" autocomplete="off"
-                                             th:attr="label=#{admin.battlenet.details.label},value=${a.label()}"></mdui-text-field>
                             <mdui-text-field name="fillOrder" type="number" min="0" variant="outlined" autocomplete="off"
                                              th:attr="label=#{admin.battlenet.details.order},value=${a.fillOrder()}"></mdui-text-field>
                             <mdui-button variant="text" icon="save" class="admin-battlenet-details-submit"
@@ -243,8 +239,6 @@
 
                 <div class="admin-battlenet-enroll">
                     <div class="admin-keys-add">
-                        <mdui-text-field name="label" variant="outlined" maxlength="80" autocomplete="off"
-                                         th:attr="label=#{admin.battlenet.enroll.label}"></mdui-text-field>
                         <mdui-text-field name="email" type="email" variant="outlined" autocomplete="off"
                                          th:attr="label=#{admin.battlenet.enroll.email}"></mdui-text-field>
                         <mdui-text-field name="password" type="password" variant="outlined" autocomplete="new-password"

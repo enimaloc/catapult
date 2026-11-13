@@ -1764,9 +1764,9 @@ public class MockApiService implements ApiService {
     }
 
     @Override
-    public int adminCreateBattleNetAccount(String label, String email, String password) {
-        log.trace("adminCreateBattleNetAccount({})", label);
-        return battleNetAccounts.create(label);
+    public int adminCreateBattleNetAccount(String email, String password) {
+        log.trace("adminCreateBattleNetAccount()");
+        return battleNetAccounts.create(email);
     }
 
     @Override
