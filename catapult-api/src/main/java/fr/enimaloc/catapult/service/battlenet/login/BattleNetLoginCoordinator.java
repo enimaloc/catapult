@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionOperations;
 
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -26,10 +27,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
 /**
@@ -55,6 +56,8 @@ public class BattleNetLoginCoordinator {
     private final int maxConsecutiveTimeouts;
     /** Consecutive automatic re-mints that ended in a timeout, per service account (in memory). */
     private final Map<UUID, Integer> timeouts = new ConcurrentHashMap<>();
+    /** The automatic re-mint queued or running, per service account; guarded by itself. */
+    private final Map<UUID, Remint> remints = new HashMap<>();
 
     public BattleNetLoginCoordinator(BattleNetServiceAccountRepository repository,
                                      TokenEncryptionService encryption,
@@ -94,7 +97,7 @@ public class BattleNetLoginCoordinator {
             executor.execute(() -> {
                 Throwable failure = null;
                 try {
-                    login(accountId, flow);
+                    login(accountId, flow, () -> true);
                 } catch (TicketException | RuntimeException e) {
                     failure = e;
                 } finally {
@@ -143,6 +146,11 @@ public class BattleNetLoginCoordinator {
         return () -> mint(accountId);
     }
 
+    /**
+     * At most one automatic login per account: a caller asking while one is queued or running waits for that one.
+     * A caller that stops waiting (timeout, interrupt) withdraws; when none is left before the login reaches the
+     * browser, the login is dropped without opening Chromium.
+     */
     private String mint(UUID accountId) throws TicketException {
         BattleNetLoginFlow running = interactiveFlows.get(accountId);
         if (running != null) {
@@ -151,33 +159,92 @@ public class BattleNetLoginCoordinator {
             throw new TicketException(codeRequired ? "An admin login waits for a 2FA code"
                     : "An admin login is in progress", codeRequired);
         }
-        BattleNetLoginFlow flow = new BattleNetLoginFlow(false, ticketTimeout, codeTimeout, () -> { });
-        Future<String> ticket;
-        try {
-            ticket = executor.submit(() -> login(accountId, flow));
-        } catch (RejectedExecutionException e) {
-            throw new TicketException("The Battle.net login executor is shut down", false);
+        Remint remint;
+        boolean queue;
+        synchronized (remints) {
+            remint = remints.get(accountId);
+            queue = remint == null;
+            if (queue) {
+                remint = new Remint();
+                remints.put(accountId, remint);
+            }
+            remint.waiters++;
+        }
+        if (queue) {
+            queueRemint(accountId, remint);
         }
         // Another account's admin login may hold the executor while it waits for its code.
         Duration maxWait = codeTimeout.plus(ticketTimeout.multipliedBy(3));
         try {
-            return ticket.get(maxWait.toNanos(), TimeUnit.NANOSECONDS);
+            return remint.ticket.get(maxWait.toNanos(), TimeUnit.NANOSECONDS);
         } catch (ExecutionException e) {
             if (e.getCause() instanceof TicketException te) throw te;
             throw new TicketException("Battle.net login failed (" + e.getCause().getClass().getSimpleName() + ")",
                     false);
         } catch (TimeoutException e) {
-            ticket.cancel(true);
+            withdraw(remint);
             throw new TicketException("Timed out waiting for the Battle.net login", false);
         } catch (InterruptedException e) {
-            ticket.cancel(true);
+            withdraw(remint);
             Thread.currentThread().interrupt();
             throw new TicketException("Interrupted while waiting for the Battle.net login", false);
         }
     }
 
+    private void queueRemint(UUID accountId, Remint remint) {
+        BattleNetLoginFlow flow = new BattleNetLoginFlow(false, ticketTimeout, codeTimeout, () -> { });
+        try {
+            executor.execute(() -> {
+                String ticket = null;
+                Throwable failure = null;
+                try {
+                    ticket = login(accountId, flow, () -> stillWanted(accountId, remint));
+                } catch (TicketException | RuntimeException e) {
+                    failure = e;
+                }
+                // Removed before completing: a caller arriving now queues a new login rather than reuse this ticket
+                forget(accountId, remint);
+                if (failure == null) remint.ticket.complete(ticket);
+                else remint.ticket.completeExceptionally(failure);
+            });
+        } catch (RejectedExecutionException e) {
+            forget(accountId, remint);
+            remint.ticket.completeExceptionally(
+                    new TicketException("The Battle.net login executor is shut down", false));
+        }
+    }
+
+    /** How many callers wait for the account's automatic re-mint (0 when none is queued or running). */
+    int remintWaiters(UUID accountId) {
+        synchronized (remints) {
+            Remint remint = remints.get(accountId);
+            return remint == null ? 0 : remint.waiters;
+        }
+    }
+
+    private void withdraw(Remint remint) {
+        synchronized (remints) {
+            remint.waiters--;
+        }
+    }
+
+    /** On the login thread, just before the browser: false (and the re-mint is dropped) once every caller left. */
+    private boolean stillWanted(UUID accountId, Remint remint) {
+        synchronized (remints) {
+            if (remint.waiters > 0) return true;
+            remints.remove(accountId, remint);
+            return false;
+        }
+    }
+
+    private void forget(UUID accountId, Remint remint) {
+        synchronized (remints) {
+            remints.remove(accountId, remint);
+        }
+    }
+
     /** Runs on the login thread: one attempt, then the resulting auth state is persisted. */
-    private String login(UUID accountId, BattleNetLoginFlow flow) throws TicketException {
+    private String login(UUID accountId, BattleNetLoginFlow flow, BooleanSupplier wanted) throws TicketException {
         Credentials credentials;
         try {
             credentials = transactions.execute(status -> repository.findById(accountId)
@@ -196,6 +263,11 @@ public class BattleNetLoginCoordinator {
             return fail(accountId, flow, "No Battle.net login browser is available", flow.interactive());
         }
 
+        if (!wanted.getAsBoolean()) {
+            log.info("Battle.net automatic login of service account {} dropped: nobody waits for it any more",
+                    accountId);
+            throw new TicketException("Nobody waits for this Battle.net login any more", false);
+        }
         Result result = attempt(browser, flow, credentials);
         return switch (result) {
             case Result.Success success -> {
@@ -289,6 +361,12 @@ public class BattleNetLoginCoordinator {
     @PreDestroy
     public void shutdown() {
         executor.shutdownNow();
+    }
+
+    /** One automatic re-mint and the callers waiting for it ({@code waiters} is guarded by {@code remints}). */
+    private static final class Remint {
+        final CompletableFuture<String> ticket = new CompletableFuture<>();
+        int waiters;
     }
 
     private record Credentials(String email, String password, @Nullable String storageState) {

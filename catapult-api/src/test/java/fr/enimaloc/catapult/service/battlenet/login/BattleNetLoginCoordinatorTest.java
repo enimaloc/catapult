@@ -48,6 +48,8 @@ class BattleNetLoginCoordinatorTest {
     private final Logger logger = (Logger) LoggerFactory.getLogger(BattleNetLoginCoordinator.class.getPackageName());
     private final ListAppender<ILoggingEvent> logs = new ListAppender<>();
     private BattleNetLoginCoordinator coordinator;
+    /** The account whose admin login keeps the login thread busy, in the re-mint queueing tests. */
+    private BattleNetServiceAccount other;
 
     @BeforeEach
     void setUp() {
@@ -246,6 +248,80 @@ class BattleNetLoginCoordinatorTest {
 
         coordinator.submitCode(account.getId(), "123456");
         login.get(5, TimeUnit.SECONDS);
+    }
+
+    @Test
+    void concurrentReMintsOfOneAccountShareOneBrowserLogin() throws Exception {
+        CompletableFuture<Void> blocking = blockTheLoginThread();
+        CompletableFuture<String> first = CompletableFuture.supplyAsync(this::mintQuietly);
+        CompletableFuture<String> second = CompletableFuture.supplyAsync(this::mintQuietly);
+        awaitWaiters(2);
+
+        coordinator.submitCode(other.getId(), "123456");
+        blocking.get(5, TimeUnit.SECONDS);
+
+        assertThat(first.get(5, TimeUnit.SECONDS)).isEqualTo(TICKET);
+        assertThat(second.get(5, TimeUnit.SECONDS)).isEqualTo(TICKET);
+        assertThat(browser.pages).filteredOn(page -> OLD_STATE.equals(page.openedWith)).hasSize(1);
+    }
+
+    @Test
+    void aReMintWhoseCallerGaveUpBeforeItsTurnNeverOpensTheBrowser() throws Exception {
+        CompletableFuture<Void> blocking = blockTheLoginThread();
+        CompletableFuture<Throwable> failure = new CompletableFuture<>();
+        Thread caller = Thread.ofVirtual().start(() -> {
+            try {
+                coordinator.ticketProviderFor(account.getId()).mint();
+                failure.complete(null);
+            } catch (TicketException e) {
+                failure.complete(e);
+            }
+        });
+        awaitWaiters(1);
+        caller.interrupt();
+        assertThat(failure.get(5, TimeUnit.SECONDS)).isInstanceOf(TicketException.class);
+
+        coordinator.submitCode(other.getId(), "123456");
+        blocking.get(5, TimeUnit.SECONDS);
+        // the login thread runs in order: once this one is done, the dropped re-mint has had its turn
+        coordinator.startInteractive(other.getId()).get(5, TimeUnit.SECONDS);
+
+        assertThat(browser.pages).filteredOn(page -> OLD_STATE.equals(page.openedWith)).isEmpty();
+        assertThat(account.getAuthState()).isNotEqualTo(AuthState.AUTH_FAILED);
+    }
+
+    /** Another account's admin login waiting for its code: the login thread is busy until the code comes. */
+    private CompletableFuture<Void> blockTheLoginThread() throws InterruptedException {
+        other = new BattleNetServiceAccount();
+        other.setId(UUID.randomUUID());
+        other.setLabel("bot-2");
+        other.setEmail("other-mailbox@example.com");
+        other.setPasswordEnc(encryption.encrypt(PASSWORD));
+        when(repository.findById(other.getId())).thenReturn(Optional.of(other));
+        browser.script(new Outcome.CodeRequired(), new Outcome.Ticket(TICKET), new Outcome.Ticket(TICKET));
+        CompletableFuture<Void> login = coordinator.startInteractive(other.getId());
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (!coordinator.waitingForCode(other.getId())) {
+            if (System.nanoTime() > deadline) throw new AssertionError("the blocking login never waited");
+            Thread.sleep(5);
+        }
+        return login;
+    }
+
+    private String mintQuietly() {
+        try {
+            return coordinator.ticketProviderFor(account.getId()).mint();
+        } catch (TicketException e) {
+            throw new java.util.concurrent.CompletionException(e);
+        }
+    }
+
+    private void awaitWaiters(int count) throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (coordinator.remintWaiters(account.getId()) < count) {
+            if (System.nanoTime() > deadline) throw new AssertionError("the re-mint callers never queued");
+            Thread.sleep(5);
+        }
     }
 
     @Test

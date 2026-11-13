@@ -44,6 +44,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.LongFunction;
@@ -329,17 +330,31 @@ public final class BgsClient {
                     }));
         }
 
-        /** Mints off the loop, then continues on it; a mint failure ends the session. */
+        /**
+         * Mints off the loop, then continues on it; a mint failure ends the session. A session that ends while
+         * the mint runs interrupts it, so the provider knows nobody waits for that ticket any more.
+         */
         private void mintThen(Consumer<String> next) {
             CompletableFuture<String> minted;
+            AtomicReference<Thread> minter = new AtomicReference<>();
             try {
                 minted = CompletableFuture.supplyAsync(() -> {
+                    Thread self = Thread.currentThread();
+                    minter.set(self);
                     try {
+                        if (closed.isDone()) {
+                            throw new TicketException("The BGS session ended before minting", false);
+                        }
                         return tickets.mint();
                     } catch (TicketException e) {
                         throw new CompletionException(e);
                     } catch (RuntimeException e) {
                         throw new CompletionException(new TicketException("Ticket minting failed", false, e));
+                    } finally {
+                        if (!minter.compareAndSet(self, null)) {
+                            // the session ended just as the mint returned: drop its interrupt, the thread lives on
+                            Thread.interrupted();
+                        }
                     }
                 }, mintExecutor);
             } catch (RuntimeException e) {
@@ -347,6 +362,12 @@ public final class BgsClient {
                 fail(CloseReason.IO, e);
                 return;
             }
+            closed.whenComplete((reason, error) -> {
+                Thread running = minter.getAndSet(null);
+                if (running != null) {
+                    running.interrupt();
+                }
+            });
             minted.whenCompleteAsync((ticket, error) -> {
                 if (!live()) {
                     return;

@@ -8,6 +8,7 @@ import bgs.protocol.account.v1.AccountTypes.SubscriberReference;
 import bgs.protocol.account.v2.GameAccountHandleOuterClass.GameAccountHandle;
 import bgs.protocol.authentication.v2.client.AuthenticationListenerOuterClass.LogonCompleteNotification;
 import bgs.protocol.authentication.v2.client.AuthenticationServiceOuterClass.LogonRequest;
+import bgs.protocol.connection.v1.ConnectionServiceProto.ConnectResponse;
 import bgs.protocol.connection.v1.ConnectionServiceProto.DisconnectNotification;
 import bgs.protocol.presence.v2.client.PresenceServiceOuterClass.BatchSubscribeRequest;
 import com.google.protobuf.CodedInputStream;
@@ -18,8 +19,13 @@ import fr.enimaloc.catapult.bgs.proto.Fourcc;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import static fr.enimaloc.catapult.bgs.client.ClientHarness.*;
 import static fr.enimaloc.catapult.bgs.proto.BgsServices.*;
@@ -189,6 +195,33 @@ class SessionOrderTest {
 
         assertThat(h.started.exceptionNow()).isSameAs(h.mintFailure);
         assertThat(h.client.closed()).isCompletedWithValue(CloseReason.IO);
+    }
+
+    @Test
+    void anAbortedSessionInterruptsItsPendingMint() throws Exception {
+        CountDownLatch minting = new CountDownLatch(1);
+        CompletableFuture<Boolean> interrupted = new CompletableFuture<>();
+        ClientHarness listener = new ClientHarness();
+        BgsClient client = new BgsClient(CONFIG, () -> {
+            minting.countDown();
+            try {
+                Thread.sleep(Duration.ofSeconds(30));
+                interrupted.complete(false);
+            } catch (InterruptedException e) {
+                interrupted.complete(true);
+            }
+            throw new TicketException("Nobody waits for this ticket", false);
+        }, listener, Executors.newVirtualThreadPerTaskExecutor());
+        FakeSession session = new FakeSession();
+        client.start(session);
+        session.reply(CONNECTION_CONNECT,
+                ConnectResponse.newBuilder().setCiid(CIID).setConnectedRegion(2).buildPartial());
+        assertThat(minting.await(5, TimeUnit.SECONDS)).isTrue();
+
+        client.abort();
+
+        assertThat(interrupted.get(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(client.closed()).isCompletedWithValue(CloseReason.IO);
     }
 
     @Test
