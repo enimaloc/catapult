@@ -81,8 +81,10 @@ public class TwitchLoginSuccessHandler implements AuthenticationSuccessHandler {
                     return;
                 }
             } else if ("battlenet".equals(registrationId)) {
-                // Battle.net is a secondary link that keeps no token (the bot befriends the account): nothing to
-                // save, only send the user back to their channel's integrations tab.
+                // Battle.net is a secondary link that keeps no token (the bot befriends the account): the access
+                // token Spring just stored is forgotten at once (spec §10.2), then the user goes back to their
+                // channel's integrations tab.
+                authorizedClientRepository.removeAuthorizedClient("battlenet", authentication, request, response);
                 if (webUrl != null && !webUrl.isBlank()) {
                     response.sendRedirect(channelIntegrationsUrl(catUser));
                     return;
