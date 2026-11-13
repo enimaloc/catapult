@@ -21,6 +21,24 @@ beforeEach(async () => {
 });
 
 describe("GameSearch.attach", () => {
+    it("words each result with `label` as text, never as markup, and picks the plain name", async () => {
+        fetchMock.mockResolvedValue(response(200, [{ id: "5", name: "<b>x</b>", releaseYear: 2004 }]));
+        const onSelect = vi.fn();
+        const search = GameSearch.attach(input, results, "/search", onSelect,
+            { initial: null, label: game => `${game.name} (${game.releaseYear})` });
+
+        type("wo");
+        await vi.advanceTimersByTimeAsync(300);
+
+        expect(results.children).toHaveLength(1);
+        expect(results.children[0].textContent).toBe("<b>x</b> (2004)");
+        expect(results.querySelector("b")).toBeNull();
+        results.children[0].click();
+        expect(input.value).toBe("<b>x</b>");
+        expect(search.selected()).toEqual({ id: "5", name: "<b>x</b>" });
+        expect(onSelect).toHaveBeenCalledOnce();
+    });
+
     it("clears the results without searching below two characters", async () => {
         GameSearch.attach(input, results, "/search", vi.fn());
 

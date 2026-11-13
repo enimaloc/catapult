@@ -64,7 +64,7 @@ class IgdbClientTest {
         gamesReturn(List.of(DOOM));
 
         assertThat(client.searchByName("doom", "token")).containsExactly(DOOM);
-        assertThat(lastQuery.get()).contains("search \"doom\"").contains("f id,name").contains("l 5");
+        assertThat(lastQuery.get()).contains("search \"doom\"").contains("f id,name,first_release_date,cover.image_id").contains("l 10");
     }
 
     @Test

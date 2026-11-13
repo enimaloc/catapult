@@ -9,4 +9,4 @@ pluginManagement {
 }
 
 rootProject.name = "catapult"
-include("catapult-common", "catapult-api", "catapult-web")
+include("catapult-common", "catapult-bgs", "catapult-api", "catapult-web")

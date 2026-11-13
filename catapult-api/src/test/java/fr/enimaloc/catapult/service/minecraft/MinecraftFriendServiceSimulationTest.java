@@ -49,7 +49,7 @@ class MinecraftFriendServiceSimulationTest {
     @BeforeEach
     void setUp() {
         bot.setId(UUID.randomUUID());
-        bot.setLabel("CatapultBot1");
+        bot.setMinecraftUsername("CatapultBot1");
         member.setId(UUID.randomUUID());
         link.setUser(member);
         link.setServiceAccount(bot);

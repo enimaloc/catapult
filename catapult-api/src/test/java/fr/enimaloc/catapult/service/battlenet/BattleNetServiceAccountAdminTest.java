@@ -1,0 +1,326 @@
+package fr.enimaloc.catapult.service.battlenet;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.battlenet.BattleNetFriendLink;
+import fr.enimaloc.catapult.domain.battlenet.BattleNetServiceAccount;
+import fr.enimaloc.catapult.domain.battlenet.BattleNetServiceAccount.AuthState;
+import fr.enimaloc.catapult.domain.binding.GetterConfig;
+import fr.enimaloc.catapult.repository.battlenet.BattleNetFriendLinkRepository;
+import fr.enimaloc.catapult.repository.battlenet.BattleNetServiceAccountRepository;
+import fr.enimaloc.catapult.repository.binding.GetterConfigRepository;
+import fr.enimaloc.catapult.security.TokenEncryptionService;
+import fr.enimaloc.catapult.service.battlenet.BattleNetServiceAccountAdmin.AccountDto;
+import fr.enimaloc.catapult.service.battlenet.login.BattleNetLoginCoordinator;
+import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+class BattleNetServiceAccountAdminTest {
+
+    private final BattleNetServiceAccountRepository accounts = mock(BattleNetServiceAccountRepository.class);
+    private final BattleNetFriendLinkRepository links = mock(BattleNetFriendLinkRepository.class);
+    private final TokenEncryptionService encryption = mock(TokenEncryptionService.class);
+    private final BattleNetLoginCoordinator coordinator = mock(BattleNetLoginCoordinator.class);
+    private final BattleNetSessionManager sessions = mock(BattleNetSessionManager.class);
+    private final GetterConfigRepository getterConfigs = mock(GetterConfigRepository.class);
+    private final ChannelEventPublisher channelEvents = mock(ChannelEventPublisher.class);
+    private final BattleNetServiceAccountAdmin admin = new BattleNetServiceAccountAdmin(accounts, links, encryption,
+            coordinator, sessions, getterConfigs, channelEvents);
+    private final BattleNetServiceAccount account = new BattleNetServiceAccount();
+    private CompletableFuture<Void> login;
+
+    @BeforeEach
+    void setUp() {
+        account.setId(UUID.randomUUID());
+        account.setEmail("bot-mailbox@example.com");
+        account.setPasswordEnc("enc:old");
+        account.setStorageStateEnc("enc:state");
+        account.setBattleTag("Bot#1234");
+        account.setAuthState(AuthState.READY);
+        login = new CompletableFuture<>();
+                when(accounts.findAll()).thenReturn(List.of(account));
+        when(accounts.findById(account.getId())).thenReturn(Optional.of(account));
+        when(accounts.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(encryption.encrypt(anyString())).thenAnswer(inv -> "enc:" + inv.getArgument(0));
+        when(coordinator.startInteractive(any())).thenReturn(login);
+        when(sessions.sessionState(any())).thenReturn("READY");
+    }
+
+    @Test
+    void createEncryptsPasswordAndStartsLogin() {
+        when(accounts.save(any())).thenAnswer(inv -> {
+            BattleNetServiceAccount saved = inv.getArgument(0);
+            saved.setId(account.getId());
+            return saved;
+        });
+
+        AccountDto dto = admin.create("mail@example.com", "s3cret");
+
+        verify(accounts).save(org.mockito.ArgumentMatchers.argThat(saved ->
+                saved.getPasswordEnc().equals("enc:s3cret") && saved.getEmail().equals("mail@example.com")
+                        && saved.getAuthState() == AuthState.NEW));
+        verify(coordinator).startInteractive(account.getId());
+        assertThat(dto.authState()).isEqualTo("NEW");
+        // no BattleTag before the first login: the masked e-mail stands in
+        assertThat(dto.displayName()).isEqualTo("m***@example.com");
+        assertThat(dto.battleTag()).isNull();
+    }
+
+    @Test
+    void createNeedsAnEmailAndAPassword() {
+        assertThatThrownBy(() -> admin.create(" ", "s3cret"))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
+        assertThatThrownBy(() -> admin.create("mail@example.com", null))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
+    }
+
+    @Test
+    void displayNamePrefersTheBattleTag() {
+        assertThat(admin.list()).singleElement().satisfies(dto -> assertThat(dto.displayName()).isEqualTo("Bot#1234"));
+        assertThat(BattleNetServiceAccountAdmin.displayName("Bot#1234", "bot@example.com")).isEqualTo("Bot#1234");
+        assertThat(BattleNetServiceAccountAdmin.displayName(null, "bot@example.com")).isEqualTo("b***@example.com");
+        assertThat(BattleNetServiceAccountAdmin.displayName(" ", "bot@example.com")).isEqualTo("b***@example.com");
+        assertThat(BattleNetServiceAccountAdmin.displayName(null, null)).isNull();
+    }
+
+    @Test
+    void maskEmailKeepsTheFirstCharacterAndTheDomain() {
+        assertThat(BattleNetServiceAccountAdmin.maskEmail("bot-mailbox@example.com")).isEqualTo("b***@example.com");
+        assertThat(BattleNetServiceAccountAdmin.maskEmail("b@example.com")).isEqualTo("b***@example.com");
+        assertThat(BattleNetServiceAccountAdmin.maskEmail(null)).isNull();
+        assertThat(BattleNetServiceAccountAdmin.maskEmail("")).isNull();
+        assertThat(BattleNetServiceAccountAdmin.maskEmail("   ")).isNull();
+    }
+
+    @Test
+    void sessionIsRestartedOnceTheLoginIsReady() {
+        admin.reauth(account.getId());
+        verify(sessions, never()).restart(any());
+
+        login.complete(null);
+
+        verify(sessions).restart(account.getId());
+    }
+
+    @Test
+    void sessionIsNotRestartedWhenTheLoginFails() {
+        admin.reauth(account.getId());
+
+        login.completeExceptionally(new IllegalStateException("rejected"));
+
+        verify(sessions, never()).restart(any());
+    }
+
+    @Test
+    void reauthWhileALoginRunsIsAConflict() {
+        when(coordinator.startInteractive(any())).thenReturn(
+                CompletableFuture.failedFuture(new IllegalStateException("A login is already in progress")));
+
+        assertThatThrownBy(() -> admin.reauth(account.getId()))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
+    }
+
+    @Test
+    void dtoNeverCarriesSecrets() throws Exception {
+        account.setPasswordEnc("enc:hunter2");
+
+        String json = new ObjectMapper().writeValueAsString(admin.list());
+
+        assertThat(json).contains("Bot#1234").contains("\"sessionState\":\"READY\"")
+                .doesNotContain("email", "password", "storageState", "hunter2", "bot-mailbox", "enc:state");
+    }
+
+    @Test
+    void friendCountIsTheAcceptedLinks() {
+        when(links.countByServiceAccountAndStatus(account, BattleNetFriendLink.Status.ACCEPTED)).thenReturn(3L);
+        when(accounts.findAll()).thenReturn(List.of(account));
+
+        assertThat(admin.list()).singleElement().extracting(AccountDto::friendCount).isEqualTo(3L);
+    }
+
+    @Test
+    void waitingForCodeTellsWhetherALoginWaitsForTheCode() {
+        account.setAuthState(AuthState.CODE_REQUIRED);
+
+        assertThat(admin.list()).singleElement().extracting(AccountDto::waitingForCode).isEqualTo(false);
+        when(coordinator.waitingForCode(account.getId())).thenReturn(true);
+        assertThat(admin.list()).singleElement().extracting(AccountDto::waitingForCode).isEqualTo(true);
+    }
+
+    @Test
+    void codeIsForwardedToTheCoordinator() {
+        admin.submitCode(account.getId(), "123456");
+
+        verify(coordinator).submitCode(account.getId(), "123456");
+    }
+
+    @Test
+    void codeWithNoFlowWaitingIsAConflict() {
+        org.mockito.Mockito.doThrow(new IllegalStateException("none")).when(coordinator).submitCode(any(), any());
+
+        assertThatThrownBy(() -> admin.submitCode(account.getId(), "123456"))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
+    }
+
+    @Test
+    void unknownAccountIsNotFound() {
+        assertThatThrownBy(() -> admin.submitCode(UUID.randomUUID(), "1"))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
+    }
+
+    @Test
+    void deleteStopsTheSessionFirst() {
+        BattleNetFriendLink link = new BattleNetFriendLink();
+        link.setUser(new UserAccount());
+        when(links.findByServiceAccount(account)).thenReturn(List.of(link));
+
+        admin.delete(account.getId());
+
+        InOrder order = inOrder(sessions, links, accounts);
+        order.verify(sessions).stop(account.getId());
+        order.verify(links).deleteAll(List.of(link));
+        order.verify(accounts).delete(account);
+    }
+
+    @Test
+    void deleteUnlinksEveryStreamerOfTheBotAndTellsThemAfterwards() {
+        UserAccount streamer = new UserAccount();
+        streamer.setId(UUID.randomUUID());
+        BattleNetFriendLink link = new BattleNetFriendLink();
+        link.setUser(streamer);
+        link.setServiceAccount(account);
+        GetterConfig getter = new GetterConfig();
+        getter.setEnabled(true);
+        when(links.findByServiceAccount(account)).thenReturn(List.of(link));
+        when(getterConfigs.findByUserAndProvider(streamer, GetterConfig.Provider.BATTLENET))
+                .thenReturn(Optional.of(getter));
+
+        admin.delete(account.getId());
+
+        assertThat(getter.isEnabled()).isFalse();
+        InOrder order = inOrder(getterConfigs, accounts, channelEvents);
+        order.verify(getterConfigs).save(getter);
+        order.verify(accounts).delete(account);
+        order.verify(channelEvents).battleNetLinkChanged(streamer.getId(), "NONE", null, null);
+    }
+
+    @Test
+    void updatePasswordReEncrypts() {
+        AccountDto dto = admin.update(account.getId(), Map.of("password", "n3w"));
+
+        assertThat(account.getPasswordEnc()).isEqualTo("enc:n3w");
+        assertThat(account.getAuthState()).isEqualTo(AuthState.NEW);
+        verify(sessions).stop(account.getId());
+        verify(coordinator).startInteractive(account.getId());
+        assertThat(dto.authState()).isEqualTo("NEW");
+    }
+
+    @Test
+    void updateEditsPlainFieldsWithoutLoggingIn() {
+        // a legacy label is ignored, like any unknown field
+        AccountDto dto = admin.update(account.getId(),
+                Map.of("label", "renamed", "fillOrder", 4, "friendLimitReached", false, "enabled", true));
+
+        assertThat(account.getFillOrder()).isEqualTo(4);
+        assertThat(dto.displayName()).isEqualTo("Bot#1234");
+        verify(coordinator, never()).startInteractive(any());
+    }
+
+    @Test
+    void updateWithAWrongTypeIsABadRequest() {
+        assertThatThrownBy(() -> admin.update(account.getId(), Map.of("enabled", "yes")))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
+    }
+
+    @Test
+    void updateRetriesOnceWhenALoginCommittedInBetween() {
+        java.util.concurrent.atomic.AtomicInteger saves = new java.util.concurrent.atomic.AtomicInteger();
+        when(accounts.save(any())).thenAnswer(inv -> {
+            if (saves.incrementAndGet() == 1) throw conflict();
+            return inv.getArgument(0);
+        });
+
+        AccountDto dto = admin.update(account.getId(), Map.of("fillOrder", 7));
+
+        assertThat(saves.get()).isEqualTo(2);
+        assertThat(dto.fillOrder()).isEqualTo(7);
+    }
+
+    @Test
+    void updateThatKeepsConflictingIsA409() {
+        when(accounts.save(any())).thenThrow(conflict());
+
+        assertThatThrownBy(() -> admin.update(account.getId(), Map.of("fillOrder", 7)))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
+    }
+
+    @Test
+    void deleteRetriesOnceOnAConflict() {
+        org.mockito.Mockito.doThrow(conflict()).doNothing().when(accounts).delete(account);
+
+        admin.delete(account.getId());
+
+        verify(accounts, org.mockito.Mockito.times(2)).delete(account);
+    }
+
+    @Test
+    void passwordChangeWhileALoginRunsIsRefusedWithoutChanges() {
+        when(coordinator.loginInProgress(account.getId())).thenReturn(true);
+
+        assertThatThrownBy(() -> admin.update(account.getId(), Map.of("password", "n3w")))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
+        assertThat(account.getPasswordEnc()).isEqualTo("enc:old");
+        assertThat(account.getAuthState()).isEqualTo(AuthState.READY);
+        verify(accounts, never()).save(any());
+        verify(sessions, never()).stop(any(UUID.class));
+    }
+
+    @Test
+    void createWhoseLoginCannotStartStillSucceedsAsAuthFailed() {
+        when(accounts.save(any())).thenAnswer(inv -> {
+            BattleNetServiceAccount saved = inv.getArgument(0);
+            saved.setId(account.getId());
+            return saved;
+        });
+        when(coordinator.startInteractive(any())).thenReturn(
+                CompletableFuture.failedFuture(new IllegalStateException("executor shut down")));
+
+        AccountDto dto = admin.create("mail@example.com", "s3cret");
+
+        assertThat(dto.authState()).isEqualTo("AUTH_FAILED");
+        verify(accounts, org.mockito.Mockito.times(2)).save(any());
+    }
+
+    private static org.springframework.orm.ObjectOptimisticLockingFailureException conflict() {
+        return new org.springframework.orm.ObjectOptimisticLockingFailureException(
+                BattleNetServiceAccount.class, "id");
+    }
+}

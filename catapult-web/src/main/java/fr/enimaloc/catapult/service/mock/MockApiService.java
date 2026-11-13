@@ -18,6 +18,7 @@ import fr.enimaloc.catapult.common.dto.admin.DetectedGameDto;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingDto;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingRequest;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingResult;
+import fr.enimaloc.catapult.common.dto.admin.IgdbGameOption;
 import fr.enimaloc.catapult.common.dto.admin.TwitchCategoryDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
@@ -35,6 +36,7 @@ import fr.enimaloc.catapult.common.dto.admin.TwDefinitionDto;
 import fr.enimaloc.catapult.common.dto.admin.TwKeywordTestDto;
 import fr.enimaloc.catapult.common.dto.admin.TwRebuild;
 import fr.enimaloc.catapult.common.dto.admin.AccountDto;
+import fr.enimaloc.catapult.common.dto.admin.BattleNetAccountDto;
 import fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
@@ -65,6 +67,7 @@ import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
 import fr.enimaloc.catapult.common.dto.channel.GameDto;
 import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
 import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
+import fr.enimaloc.catapult.common.dto.connect.BattleNetLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatDispatch;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
@@ -85,6 +88,7 @@ import fr.enimaloc.catapult.event.binding.BindingTitleEvent;
 import fr.enimaloc.catapult.event.binding.BindingUpdatedEvent;
 import fr.enimaloc.catapult.event.binding.CclStateEvent;
 import fr.enimaloc.catapult.event.binding.GameChangedEvent;
+import fr.enimaloc.catapult.event.battlenet.BattleNetLinkEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftDisconnectedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftEnrollEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftSyncEvent;
@@ -190,6 +194,7 @@ public class MockApiService implements ApiService {
     private final MockTwStore tws = new MockTwStore();
     /** Application-wide: the Minecraft service accounts are the same for every mock session. */
     private final MockMinecraftAccountsStore minecraftAccounts = new MockMinecraftAccountsStore();
+    private final MockBattleNetAccountsStore battleNetAccounts = new MockBattleNetAccountsStore();
     /** Application-wide, as catapult-api's: every mock account that logged in is a member any admin session lists. */
     private final MockMembers members = new MockMembers();
     /** Application-wide too: a member's custom flags are the same for every mock session. */
@@ -514,6 +519,22 @@ public class MockApiService implements ApiService {
     }
 
     @Override
+    public BattleNetLinkStateResponse battleNetStatus(String username) {
+        log.trace("battleNetStatus({})", username);
+        return currentData().getBattleNetLink();
+    }
+
+    @Override
+    public int battleNetDisconnect(String username) {
+        log.trace("battleNetDisconnect({})", username);
+        MockData data = currentData();
+        data.battleNetDisconnect();
+        BattleNetLinkStateResponse link = data.getBattleNetLink();
+        eventPublisher.publishEvent(new BattleNetLinkEvent(username, link.status(), null, null));
+        return NO_CONTENT;
+    }
+
+    @Override
     public int xboxDisconnect(String username) {
         log.trace("xboxDisconnect({})", username);
         currentData().xboxDisconnect();
@@ -799,6 +820,12 @@ public class MockApiService implements ApiService {
                 .filter(c -> c.name().toLowerCase().contains(q.trim().toLowerCase()))
                 .limit(10)
                 .toList();
+    }
+
+    @Override
+    public List<IgdbGameOption> adminSearchIgdbGames(String q) {
+        log.trace("adminSearchIgdbGames({})", q);
+        return gameMappings.igdbGames(q);
     }
 
     @Override
@@ -1731,6 +1758,42 @@ public class MockApiService implements ApiService {
     }
 
     @Override
+    public List<BattleNetAccountDto> adminBattleNetAccounts() {
+        log.trace("adminBattleNetAccounts()");
+        return battleNetAccounts.list();
+    }
+
+    @Override
+    public int adminCreateBattleNetAccount(String email, String password) {
+        log.trace("adminCreateBattleNetAccount()");
+        return battleNetAccounts.create(email);
+    }
+
+    @Override
+    public int adminSubmitBattleNetCode(UUID id, String code) {
+        log.trace("adminSubmitBattleNetCode({})", id);
+        return battleNetAccounts.submitCode(id, code);
+    }
+
+    @Override
+    public int adminReauthBattleNetAccount(UUID id) {
+        log.trace("adminReauthBattleNetAccount({})", id);
+        return battleNetAccounts.reauth(id);
+    }
+
+    @Override
+    public int adminPatchBattleNetAccount(UUID id, Map<String, Object> patch) {
+        log.trace("adminPatchBattleNetAccount({}, {})", id, patch.keySet()); // never the password
+        return battleNetAccounts.patch(id, patch);
+    }
+
+    @Override
+    public int adminDeleteBattleNetAccount(UUID id) {
+        log.trace("adminDeleteBattleNetAccount({})", id);
+        return battleNetAccounts.delete(id);
+    }
+
+    @Override
     public List<AccountDto> adminMinecraftAccounts() {
         log.trace("adminMinecraftAccounts()");
         return minecraftAccounts.list();
@@ -1755,9 +1818,9 @@ public class MockApiService implements ApiService {
     }
 
     @Override
-    public ApiClient.Result<Map<String, Object>> adminCreateMinecraftAccount(String deviceCode, String label) {
-        log.trace("adminCreateMinecraftAccount({})", label);
-        return minecraftAccounts.create(deviceCode, label);
+    public ApiClient.Result<Map<String, Object>> adminCreateMinecraftAccount(String deviceCode) {
+        log.trace("adminCreateMinecraftAccount()");
+        return minecraftAccounts.create(deviceCode);
     }
 
     @Override

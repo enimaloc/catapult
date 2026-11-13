@@ -53,14 +53,13 @@ public class MinecraftServiceAccountAdmin {
     }
 
     /** Empty while the admin hasn't validated the code on microsoft.com/link; the created account afterwards. */
-    public Optional<AccountDto> create(String deviceCode, String label) {
+    public Optional<AccountDto> create(String deviceCode) {
         requireDeviceCode(deviceCode);
-        return msaAuthClient.pollDeviceCode(deviceCode).map(tokens -> finalizeAccount(tokens, label));
+        return msaAuthClient.pollDeviceCode(deviceCode).map(this::finalizeAccount);
     }
 
-    private AccountDto finalizeAccount(MsaAuthClient.MsaTokens tokens, String label) {
+    private AccountDto finalizeAccount(MsaAuthClient.MsaTokens tokens) {
         MinecraftServiceAccount account = new MinecraftServiceAccount();
-        account.setLabel(label);
         account.setFillOrder((int) accountRepository.count());
         account.setMinecraftUsername("(pending)");
 
@@ -69,7 +68,7 @@ public class MinecraftServiceAccountAdmin {
         account.setMinecraftUsername(profile.minecraftUsername());
         account.setUpdatedAt(Instant.now());
         MinecraftServiceAccount saved = accountRepository.save(account);
-        log.info("Minecraft service account enrolled: {} ({})", saved.getLabel(), profile.minecraftUsername());
+        log.info("Minecraft service account enrolled: {} ({})", profile.minecraftUsername(), saved.getId());
         return toDto(saved, 0);
     }
 
@@ -96,7 +95,7 @@ public class MinecraftServiceAccountAdmin {
         // on the new chain rather than fall back on the old "failing" state
         tokenService.evict(account.getId());
         MinecraftServiceAccount saved = accountRepository.save(account);
-        log.info("Minecraft service account re-authenticated: {} ({})", saved.getLabel(), profile.minecraftUsername());
+        log.info("Minecraft service account re-authenticated: {} ({})", profile.minecraftUsername(), saved.getId());
         return toDto(saved);
     }
 
@@ -176,7 +175,7 @@ public class MinecraftServiceAccountAdmin {
     }
 
     private static AccountDto toDto(MinecraftServiceAccount account, int linkCount) {
-        return new AccountDto(account.getId(), account.getLabel(), account.getMinecraftUsername(),
+        return new AccountDto(account.getId(), account.getMinecraftUsername(), account.getMinecraftUsername(),
                 account.getFillOrder(), account.isFriendLimitReached(), account.isEnabled(), linkCount);
     }
 }

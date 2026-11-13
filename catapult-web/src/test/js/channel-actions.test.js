@@ -283,6 +283,8 @@ describe("channel-connections", () => {
               <button id="minecraft-enroll-btn"></button>
               <button id="minecraft-check-btn"></button>
               <button id="minecraft-disconnect-btn"></button>
+              <button id="battlenet-connect-btn"></button>
+              <button id="battlenet-disconnect-btn"></button>
               <input id="obs-host" value="10.0.0.2">
               <input id="obs-port" value="4456">
               <input id="obs-password" value="">
@@ -350,6 +352,12 @@ describe("channel-connections", () => {
             ["/channel/enimaloc/minecraft/sync", {}],
             ["/channel/enimaloc/minecraft/disconnect", {}],
         ]);
+    });
+
+    it("unlinks Battle.net with a post", async () => {
+        await click("#battlenet-disconnect-btn");
+
+        expect(posts()).toEqual([["/channel/enimaloc/battlenet/disconnect", {}]]);
     });
 
     it("saves the OBS settings, keeping the stored password when the field is empty", async () => {

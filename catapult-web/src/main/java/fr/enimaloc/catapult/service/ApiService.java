@@ -32,7 +32,9 @@ import fr.enimaloc.catapult.common.dto.admin.TwDefinitionDto;
 import fr.enimaloc.catapult.common.dto.admin.TwKeywordTestDto;
 import fr.enimaloc.catapult.common.dto.admin.TwRebuild;
 import fr.enimaloc.catapult.common.dto.admin.AccountDto;
+import fr.enimaloc.catapult.common.dto.admin.BattleNetAccountDto;
 import fr.enimaloc.catapult.common.dto.admin.MinecraftDeviceCodeDto;
+import fr.enimaloc.catapult.common.dto.connect.BattleNetLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
@@ -46,6 +48,7 @@ import fr.enimaloc.catapult.common.dto.admin.DtddTopicsCacheEntryDto;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingDto;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingRequest;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingResult;
+import fr.enimaloc.catapult.common.dto.admin.IgdbGameOption;
 import fr.enimaloc.catapult.common.dto.admin.TwitchCategoryDto;
 import fr.enimaloc.catapult.common.dto.notification.AdminNotificationDto;
 import fr.enimaloc.catapult.common.dto.notification.BroadcastRequestDto;
@@ -103,6 +106,10 @@ public interface ApiService {
     int minecraftEnroll(String username, String name);
     int minecraftSync(String username);
     int minecraftDisconnect(String username);
+    /** The logged-in member's own Battle.net link; null when logged out or catapult-api fails. */
+    BattleNetLinkStateResponse battleNetStatus(String username);
+    /** Unlinks the member's Battle.net account; catapult-api's status (204), 401 when logged out, 502 when unreachable. */
+    int battleNetDisconnect(String username);
     /** Unlinks the channel's Xbox account; catapult-api's status (204; 403 not the owner), 502 when unreachable. */
     int xboxDisconnect(String username);
     /** The logged-in user's OBS connection; null when logged out or OBS isn't enabled. */
@@ -348,6 +355,8 @@ public interface ApiService {
     List<DetectedGameDto> adminDetectedGames(String sourceType, String q);
     /** The Twitch categories matching {@code q}, with the box art as catapult-api returns it; null when catapult-api fails. */
     List<TwitchCategoryDto> adminSearchCategories(String q);
+    /** The IGDB games matching {@code q} (name, release year, cover), for the mapping form's IGDB picker; null when catapult-api fails. */
+    List<IgdbGameOption> adminSearchIgdbGames(String q);
     /** catapult-api's status (201; 400 MANUAL platform, missing ID or category; 409 already mapped) and result, 502 when unreachable. */
     ApiClient.Result<GameMappingResult> adminCreateGameMapping(GameMappingRequest request);
     /** catapult-api's status (200; 400 as for a creation; 404 unknown) and result, 502 when unreachable. */
@@ -509,12 +518,28 @@ public interface ApiService {
     /** A device-code start: the code when {@code status} is 200, else null and catapult-api's problem (may be null). */
     record MinecraftDeviceCodeStart(int status, MinecraftDeviceCodeDto code, ApiError error) {}
     /**
-     * Polls the device code to enrol a new account ({@code label} null: catapult-api's default):
+     * Polls the device code to enrol a new account:
      * 202 while it isn't confirmed yet, 200 with the account once it is, else the error; 502 when unreachable.
      */
-    ApiClient.Result<Map<String, Object>> adminCreateMinecraftAccount(String deviceCode, String label);
+    ApiClient.Result<Map<String, Object>> adminCreateMinecraftAccount(String deviceCode);
     /** Polls the device code to re-authenticate the account, answered like {@link #adminCreateMinecraftAccount}. */
     ApiClient.Result<Map<String, Object>> adminReauthMinecraftAccount(UUID id, String deviceCode);
+
+    /** The Battle.net bot accounts; null when catapult-api fails (Battle.net disabled included). */
+    List<BattleNetAccountDto> adminBattleNetAccounts();
+    /**
+     * Stores a bot account and starts its first login: catapult-api's status (202; 400 refused), 502 when unreachable.
+     * The credentials travel in the request body only.
+     */
+    int adminCreateBattleNetAccount(String email, String password);
+    /** Submits the 2FA code of a login waiting for one: 202; 409 when none is waiting; 404 unknown; 502 when unreachable. */
+    int adminSubmitBattleNetCode(UUID id, String code);
+    /** Re-runs the account's login: 202; 409 while a login is running; 404 unknown; 502 when unreachable. */
+    int adminReauthBattleNetAccount(UUID id);
+    /** PATCHes a bot ({@code fillOrder}, {@code enabled}, {@code password}, {@code friendLimitReached}): 200; 409; 404; 502. */
+    int adminPatchBattleNetAccount(UUID id, Map<String, Object> patch);
+    /** Deletes a bot account: 204; 404 unknown; 502 when unreachable. */
+    int adminDeleteBattleNetAccount(UUID id);
 
     /** The trigger warning definitions, by sort order; null when catapult-api fails. */
     List<TwDefinitionDto> adminTws();

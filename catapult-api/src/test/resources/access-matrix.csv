@@ -66,6 +66,8 @@ POST,/api/internal/users/{userId}/chat-commands/presets/{presetKey},userId=self,
 DELETE,/api/internal/users/{userId}/chat-commands/{id},userId=self,,401,401,GATED,GATED,GATED,GATED,401
 PUT,/api/internal/users/{userId}/chat-commands/{id},userId=self,"{""name"":""!matrix"",""template"":""matrix"",""permission"":""VIEWERS"",""enabled"":false}",401,401,GATED,GATED,GATED,GATED,401
 POST,/api/internal/users/{userId}/chat-commands/{id}/test,userId=self,,401,401,GATED,GATED,GATED,GATED,401
+DELETE,/api/internal/users/{userId}/links/battlenet,userId=self,,401,401,GATED,GATED,GATED,GATED,401
+GET,/api/internal/users/{userId}/links/battlenet,userId=self,,401,401,PASS,PASS,PASS,PASS,401
 DELETE,/api/internal/users/{userId}/links/minecraft,userId=self,,401,401,GATED,GATED,GATED,GATED,401
 GET,/api/internal/users/{userId}/links/minecraft,userId=self,,401,401,PASS,PASS,PASS,PASS,401
 PUT,/api/internal/users/{userId}/links/minecraft,userId=self,,401,401,GATED,GATED,GATED,GATED,401
@@ -110,6 +112,8 @@ GET,/api/internal/users/{userId}/seen-features,unmapped,,401,401,403,403,PASS,40
 PUT,/api/internal/users/{userId}/seen-features/{key},unmapped,,401,401,403,403,PASS,403,401
 GET,/api/internal/users/{userId}/feedback,unmapped,,401,401,403,403,PASS,403,401
 DELETE,/api/internal/users/{userId}/feedback/{id}/subscription,unmapped,,401,401,403,403,PASS,403,401
+DELETE,/api/internal/users/{userId}/links/battlenet,unmapped,,401,401,403,403,GATED,403,401
+GET,/api/internal/users/{userId}/links/battlenet,unmapped,,401,401,403,403,PASS,403,401
 GET,/api/internal/users/{userId}/links/minecraft,unmapped,,401,401,403,403,PASS,403,401
 PUT,/api/internal/users/{userId}/links/minecraft,unmapped,,401,401,403,403,GATED,403,401
 POST,/api/internal/users/{userId}/experiment-feedback,unmapped,"{""experimentId"":""00000000-0000-0000-0000-00000000dead"",""npsScore"":5}",401,401,403,403,PASS,403,401
@@ -256,6 +260,7 @@ GET,/api/internal/admin/game-mappings,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/game-mappings,,"{""applyLive"":false}",401,401,403,403,403,PASS,401
 GET,/api/internal/admin/game-mappings/categories,,,401,PASS,403,403,403,PASS,401
 GET,/api/internal/admin/game-mappings/detected,,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/game-mappings/igdb-games,,,401,PASS,403,403,403,PASS,401
 GET,/api/internal/admin/game-mappings/missing,,,401,PASS,403,403,403,PASS,401
 DELETE,/api/internal/admin/game-mappings/{id},,,401,PASS,403,403,403,PASS,401
 # handler reads the JWT itself: 401 without one
@@ -305,6 +310,12 @@ POST,/api/internal/admin/social-links,,"{""platform"":""DISCORD"",""url"":""http
 PUT,/api/internal/admin/social-links/order,,,401,PASS,403,403,403,PASS,401
 DELETE,/api/internal/admin/social-links/{id},id=1,,401,PASS,403,403,403,PASS,401
 PUT,/api/internal/admin/social-links/{id},id=1,"{""platform"":""DISCORD"",""url"":""https://matrix.example"",""visible"":true}",401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/battlenet-accounts,,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/battlenet-accounts,,,401,PASS,403,403,403,PASS,401
+DELETE,/api/internal/admin/battlenet-accounts/{id},,,401,PASS,403,403,403,PASS,401
+PATCH,/api/internal/admin/battlenet-accounts/{id},,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/battlenet-accounts/{id}/code,,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/battlenet-accounts/{id}/reauth,,,401,PASS,403,403,403,PASS,401
 GET,/api/internal/admin/minecraft-accounts,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/minecraft-accounts,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/minecraft-accounts/device-code,,,401,PASS,403,403,403,PASS,401

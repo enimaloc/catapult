@@ -17,17 +17,17 @@ import java.util.UUID;
  * Deleting an account users are linked to is a 409; an unknown account is a 404.
  */
 class MockMinecraftAccountsStore {
-    private record Account(UUID id, String label, String minecraftUsername, int fillOrder, int linkCount,
+    private record Account(UUID id, String minecraftUsername, int fillOrder, int linkCount,
                            boolean enabled, boolean friendLimitReached) {
         AccountDto dto() {
-            return new AccountDto(id, label, minecraftUsername, fillOrder, friendLimitReached, enabled, linkCount);
+            return new AccountDto(id, minecraftUsername, minecraftUsername, fillOrder, friendLimitReached, enabled, linkCount);
         }
     }
 
     private final List<Account> accounts = new ArrayList<>(List.of(
-            new Account(UUID.fromString("6d2f0c1e-0000-4000-8000-000000000001"), "Bot1", "CatapultBot1", 0, 12, true, false),
-            new Account(UUID.fromString("6d2f0c1e-0000-4000-8000-000000000002"), "Bot2", "CatapultBot2", 1, 0, false, false),
-            new Account(UUID.fromString("6d2f0c1e-0000-4000-8000-000000000003"), "Bot3", "CatapultBot3", 2, 30, true, true)));
+            new Account(UUID.fromString("6d2f0c1e-0000-4000-8000-000000000001"), "CatapultBot1", 0, 12, true, false),
+            new Account(UUID.fromString("6d2f0c1e-0000-4000-8000-000000000002"), "CatapultBot2", 1, 0, false, false),
+            new Account(UUID.fromString("6d2f0c1e-0000-4000-8000-000000000003"), "CatapultBot3", 2, 30, true, true)));
     /** Issued device codes → how many times each was polled. */
     private final Map<String, Integer> polls = new HashMap<>();
 
@@ -41,11 +41,10 @@ class MockMinecraftAccountsStore {
         return new MinecraftDeviceCodeDto(code, "MOCK-" + code.substring(0, 4).toUpperCase(), "https://www.microsoft.com/link", 5, 900);
     }
 
-    synchronized ApiClient.Result<Map<String, Object>> create(String deviceCode, String label) {
+    synchronized ApiClient.Result<Map<String, Object>> create(String deviceCode) {
         ApiClient.Result<Map<String, Object>> pending = poll(deviceCode);
         if (pending != null) return pending;
-        String name = label == null || label.isBlank() ? "Minecraft account" : label;
-        Account account = new Account(UUID.randomUUID(), name, "CatapultBot" + (accounts.size() + 1), accounts.size(), 0, true, false);
+        Account account = new Account(UUID.randomUUID(), "CatapultBot" + (accounts.size() + 1), accounts.size(), 0, true, false);
         accounts.add(account);
         return done(account);
     }
@@ -56,7 +55,7 @@ class MockMinecraftAccountsStore {
         ApiClient.Result<Map<String, Object>> pending = poll(deviceCode);
         if (pending != null) return pending;
         Account a = accounts.get(index);
-        Account renewed = new Account(a.id(), a.label(), a.minecraftUsername(), a.fillOrder(), a.linkCount(), true, a.friendLimitReached());
+        Account renewed = new Account(a.id(), a.minecraftUsername(), a.fillOrder(), a.linkCount(), true, a.friendLimitReached());
         accounts.set(index, renewed);
         return done(renewed);
     }
@@ -67,7 +66,7 @@ class MockMinecraftAccountsStore {
         Account a = accounts.get(index);
         boolean enabled = patch.get("enabled") instanceof Boolean b ? b : a.enabled();
         boolean full = patch.get("friendLimitReached") instanceof Boolean b ? b : a.friendLimitReached();
-        accounts.set(index, new Account(a.id(), a.label(), a.minecraftUsername(), a.fillOrder(), a.linkCount(), enabled, full));
+        accounts.set(index, new Account(a.id(), a.minecraftUsername(), a.fillOrder(), a.linkCount(), enabled, full));
         return 200;
     }
 
@@ -92,7 +91,7 @@ class MockMinecraftAccountsStore {
     }
 
     private static ApiClient.Result<Map<String, Object>> done(Account account) {
-        return new ApiClient.Result<>(200, Map.of("id", account.id().toString(), "label", account.label(),
+        return new ApiClient.Result<>(200, Map.of("id", account.id().toString(), "displayName", account.minecraftUsername(),
                 "minecraftUsername", account.minecraftUsername()));
     }
 

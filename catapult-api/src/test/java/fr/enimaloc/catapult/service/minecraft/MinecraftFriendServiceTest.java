@@ -72,10 +72,10 @@ class MinecraftFriendServiceTest {
         ReflectionTestUtils.setField(service, "objectMapper", new ObjectMapper());
     }
 
-    private MinecraftServiceAccount account(String label, int order) {
+    private MinecraftServiceAccount account(String username, int order) {
         var a = new MinecraftServiceAccount();
         a.setId(UUID.randomUUID());
-        a.setLabel(label);
+        a.setMinecraftUsername(username);
         a.setFillOrder(order);
         a.setEnabled(true);
         return a;

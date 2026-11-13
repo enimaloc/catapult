@@ -382,10 +382,7 @@ public class GameInfoAssembler {
     }
 
     private Optional<String> resolveIgdbId(DetectedGame detected) {
-        return (detected.getSourceId() != null
-                ? igdbService.findByExternalAppId(detected.getSourceType(), detected.getSourceId())
-                .or(() -> igdbService.findByName(detected.getSourceName()))
-                : igdbService.findByName(detected.getSourceName()))
+        return igdbService.resolveDetected(detected.getSourceType(), detected.getSourceId(), detected.getSourceName())
                 .map(IgdbService.IgdbGame::id);
     }
 }

@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
+import fr.enimaloc.catapult.common.dto.channel.BattleNetData;
 import fr.enimaloc.catapult.common.dto.channel.MinecraftData;
 import fr.enimaloc.catapult.common.dto.channel.ObsData;
 import fr.enimaloc.catapult.common.dto.channel.SteamData;
@@ -56,6 +57,9 @@ public final class IntegrationCards {
         }
         if (ch.minecraft() != null) {
             cards.add(minecraft(ch.minecraft()));
+        }
+        if (ch.battleNet() != null) {
+            cards.add(battleNet(ch.battleNet()));
         }
         if (ch.obs() != null) {
             cards.add(obs(ch.obs()));
@@ -190,6 +194,61 @@ public final class IntegrationCards {
                 "MinecraftEnrollEvent.status=" + values,
                 "MinecraftSyncEvent.status=" + values,
                 (showsNone ? "" : "!") + "MinecraftDisconnectedEvent");
+    }
+
+    // Battle.net: one sub-view and button per status, driven by the status field of BattleNetLinkEvent,
+    // which carries NONE too. Linking goes through Blizzard's login (catapult-api's
+    // /oauth2/authorization/battlenet), so a rejected or removed link offers the same button as none at all.
+    // The tags are sentence parts of their own so that the event can replace them in place.
+
+    private static IntegrationDto battleNet(BattleNetData battleNet) {
+        String status = battleNet.status() == null ? "NONE" : battleNet.status();
+        return card("battlenet",
+                new Container(Attrs.id("battlenet-status-body"), Container.Kind.DIV, List.of(
+                        battleNetCase("caseNone", status, List.of("NONE"),
+                                new Text(Attrs.NONE, false, key(PREFIX + "battlenet.none"))),
+                        battleNetCase("casePending", status, List.of("PENDING"),
+                                new Container(Attrs.cls("battlenet-sentence"), Container.Kind.DIV, List.of(
+                                        new Text(Attrs.NONE, false, key(PREFIX + "battlenet.pending.before")),
+                                        battleNetTag("battlenet-bot-tag", "serviceAccountBattleTag",
+                                                battleNet.serviceAccountBattleTag()),
+                                        new Text(Attrs.NONE, false, key(PREFIX + "battlenet.pending.after"))))),
+                        battleNetCase("caseRejected", status, List.of("INVITE_REJECTED"),
+                                new Text(Attrs.NONE, false, key(PREFIX + "battlenet.rejected"))),
+                        battleNetCase("caseAccepted", status, List.of("ACCEPTED"),
+                                new Container(Attrs.cls("battlenet-sentence"), Container.Kind.DIV, List.of(
+                                        new Text(Attrs.NONE, false, key(PREFIX + "battlenet.accepted")),
+                                        battleNetTag("battlenet-tag", "battleTag", battleNet.battleTag())))),
+                        battleNetCase("caseRemoved", status, List.of("REMOVED"),
+                                new Text(Attrs.NONE, false, key(PREFIX + "battlenet.removed"))),
+                        // No service account with room for one: nothing to do but wait.
+                        battleNetCase("caseFull", status, List.of("FULL"),
+                                new Text(Attrs.NONE, false, key(PREFIX + "battlenet.full"))))),
+
+                // An OAuth login, so it looks like the Xbox card's actions: filled connect, text disconnect.
+                // Each button needs its own flag name, as the Minecraft card's do.
+                new Container(Attrs.id("battlenet-status-actions").withClass("card-actions"),
+                        Container.Kind.DIV, List.of(
+                        new Button(Attrs.id("battlenet-connect-btn")
+                                        .withState(battleNetState("showConnect", status,
+                                                List.of("NONE", "INVITE_REJECTED", "REMOVED"))),
+                                Button.Kind.FILLED, key(PREFIX + "battlenet.connect")),
+                        new Button(Attrs.id("battlenet-disconnect-btn")
+                                        .withState(battleNetState("showDisconnect", status, List.of("ACCEPTED"))),
+                                Button.Kind.TEXT, key(PREFIX + "battlenet.disconnect")))));
+    }
+
+    private static Text battleNetTag(String className, String field, String tag) {
+        return new Text(Attrs.cls(className).withState(SpaState.sync("textContent", "BattleNetLinkEvent." + field)),
+                false, Message.literal(tag));
+    }
+
+    private static Container battleNetCase(String flag, String status, List<String> statuses, IntegrationNode content) {
+        return new Container(Attrs.state(battleNetState(flag, status, statuses)), Container.Kind.DIV, List.of(content));
+    }
+
+    private static SpaState battleNetState(String flag, String status, List<String> statuses) {
+        return SpaState.flag(flag, statuses.contains(status), "BattleNetLinkEvent.status=" + String.join("/", statuses));
     }
 
     // OBS: no SSE event either, channel-connections.js refreshes the page after saving.

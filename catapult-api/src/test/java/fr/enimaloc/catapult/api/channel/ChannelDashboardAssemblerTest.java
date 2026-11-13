@@ -40,6 +40,13 @@ import fr.enimaloc.catapult.service.binding.StreamStateService;
 import fr.enimaloc.catapult.service.connections.SteamProfileDiagnostics;
 import fr.enimaloc.catapult.service.igdb.AdminCclService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
+import fr.enimaloc.catapult.service.battlenet.BattleNetGateService;
+import fr.enimaloc.catapult.service.battlenet.BattleNetLinkStateService;
+import fr.enimaloc.catapult.repository.battlenet.BattleNetFriendLinkRepository;
+import fr.enimaloc.catapult.repository.battlenet.BattleNetServiceAccountRepository;
+import fr.enimaloc.catapult.domain.battlenet.BattleNetFriendLink;
+import fr.enimaloc.catapult.domain.battlenet.BattleNetServiceAccount;
+import fr.enimaloc.catapult.common.dto.channel.BattleNetData;
 import fr.enimaloc.catapult.service.minecraft.MinecraftFriendService;
 import fr.enimaloc.catapult.service.minecraft.MinecraftGateService;
 import fr.enimaloc.catapult.service.minecraft.MinecraftLinkStateService;
@@ -90,6 +97,11 @@ class ChannelDashboardAssemblerTest {
     private final MinecraftFriendService minecraft = mock(MinecraftFriendService.class);
     private final MinecraftGateService minecraftGate = mock(MinecraftGateService.class);
     private final MinecraftServiceAccountRepository minecraftAccounts = mock(MinecraftServiceAccountRepository.class);
+    private final BattleNetGateService battleNetGate = mock(BattleNetGateService.class);
+    private final BattleNetFriendLinkRepository battleNetLinks = mock(BattleNetFriendLinkRepository.class);
+    private final BattleNetServiceAccountRepository battleNetAccounts = mock(BattleNetServiceAccountRepository.class);
+    private final BattleNetLinkStateService battleNetStates =
+            new BattleNetLinkStateService(battleNetGate, battleNetLinks, battleNetAccounts);
     private final MinecraftLinkStateService minecraftStates =
             new MinecraftLinkStateService(minecraft, minecraftGate, minecraftAccounts);
     private final TwitchatWidgetSettingsService twitchat = mock(TwitchatWidgetSettingsService.class);
@@ -109,11 +121,12 @@ class ChannelDashboardAssemblerTest {
 
     private ChannelDashboardAssembler assembler(Optional<SteamApiClient> steamClient,
                                                 Optional<MinecraftLinkStateService> minecraftService,
+                                                Optional<BattleNetLinkStateService> battleNetService,
                                                 boolean xboxEnabled) {
         SteamProfileDiagnostics diagnostics = new SteamProfileDiagnostics(steamClient, Optional.of(keyRotator), encryption);
         ChannelDashboardAssembler assembler = new ChannelDashboardAssembler(bindings, settingsRepository, streamState,
                 gameState, ccls, tws, encryption, steamClient, diagnostics, igdb, dtddMappings, dtddCache,
-                dtddProposals, oauthTokens, minecraftService, twitchat, raidRestoreGate,
+                dtddProposals, oauthTokens, minecraftService, battleNetService, twitchat, raidRestoreGate,
                 new fr.enimaloc.catapult.api.CustomBindingViews(customBindings,
                         org.mockito.Mockito.mock(fr.enimaloc.catapult.service.premium.PremiumUiGate.class),
                         org.mockito.Mockito.mock(fr.enimaloc.catapult.service.binding.schedule.CustomBindingScheduleService.class),
@@ -125,7 +138,7 @@ class ChannelDashboardAssemblerTest {
     }
 
     private ChannelDashboardAssembler assembler() {
-        return assembler(Optional.of(steam), Optional.of(minecraftStates), true);
+        return assembler(Optional.of(steam), Optional.of(minecraftStates), Optional.of(battleNetStates), true);
     }
 
     private static UserAccount account(String username) {
@@ -344,6 +357,17 @@ class ChannelDashboardAssemblerTest {
         }
 
         @Test
+        void aPageWhoseBindingsHaveNoTwitchCategory_buildsWithoutBoxArt() {
+            GameBinding incomplete = binding(owner, "1", "Incomplete");
+            incomplete.setTwitchGameId(null);
+            when(bindings.findByUser(eq(owner), any())).thenReturn(new PageImpl<>(List.of(incomplete)));
+
+            var content = assembler().page(owner, owner, "streamer", 0, null, null).bindings().content();
+
+            assertThat(content).extracting(BindingDto::boxArtUrl).containsExactly((String) null);
+        }
+
+        @Test
         void filtersByStatusFirst_thenBySource_caseInsensitive() {
             when(bindings.findByUserAndStatusIn(eq(owner), eq(Set.of(GameBinding.Status.MANUAL)), any()))
                     .thenReturn(new PageImpl<>(List.of()));
@@ -391,7 +415,7 @@ class ChannelDashboardAssemblerTest {
 
         @Test
         void unavailableProvidersAreNull() {
-            ChannelPageData page = assembler(Optional.empty(), Optional.empty(), false)
+            ChannelPageData page = assembler(Optional.empty(), Optional.empty(), Optional.empty(), false)
                     .page(owner, owner, "streamer", 0, null, null);
 
             assertThat(page.steam()).isNull();
@@ -445,6 +469,32 @@ class ChannelDashboardAssemblerTest {
         }
 
         @Test
+        void dashboardCarriesBattleNetDataForTheOwnerOnly() {
+            BattleNetServiceAccount bot = new BattleNetServiceAccount();
+            bot.setBattleTag("Bot#1111");
+            BattleNetFriendLink link = new BattleNetFriendLink();
+            link.setStatus(BattleNetFriendLink.Status.ACCEPTED);
+            link.setBattleTag("Name#1234");
+            link.setServiceAccount(bot);
+            when(battleNetGate.isAvailableFor(owner)).thenReturn(true);
+            when(battleNetAccounts.countByEnabledTrueAndAuthState(BattleNetServiceAccount.AuthState.READY))
+                    .thenReturn(1L);
+            when(battleNetLinks.findWithServiceAccountByUser(owner)).thenReturn(Optional.of(link));
+            when(bindings.findByUser(eq(owner), any())).thenReturn(new PageImpl<>(List.of()));
+
+            assertThat(assembler().page(owner, owner, "streamer", 0, null, null).battleNet())
+                    .isEqualTo(new BattleNetData("ACCEPTED", "Name#1234", "Bot#1111"));
+            assertThat(assembler().page(moderator, owner, "streamer", 0, null, null).battleNet()).isNull();
+        }
+
+        @Test
+        void battleNetClosedToTheChannelIsNull() {
+            when(battleNetGate.isAvailableFor(owner)).thenReturn(false);
+
+            assertThat(assembler().page(owner, owner, "streamer", 0, null, null).battleNet()).isNull();
+        }
+
+        @Test
         void obsReportsAStoredPasswordWithoutSendingIt() {
             twitchat.getOrCreate(owner).setObsPasswordEncrypted("encrypted");
 
@@ -464,6 +514,18 @@ class ChannelDashboardAssemblerTest {
 
             assertThat(assembler().currentBinding(owner)).get()
                     .extracting(BindingDto::id).isEqualTo(valheim.getId().toString());
+        }
+
+        @Test
+        void hasNoBoxArt_whenTheBindingHasNoTwitchCategory() {
+            GameBinding incomplete = binding(owner, "1", "Incomplete");
+            incomplete.setTwitchGameId(null);
+            when(gameState.getLastKnownGame(owner))
+                    .thenReturn(Optional.of(new DetectedGame("1", GameBinding.SourceType.STEAM, "Incomplete")));
+            when(bindings.findByUserAndSourceIdAndSourceType(owner, "1", GameBinding.SourceType.STEAM))
+                    .thenReturn(Optional.of(incomplete));
+
+            assertThat(assembler().currentBinding(owner)).get().extracting(BindingDto::boxArtUrl).isNull();
         }
 
         @Test
@@ -695,13 +757,13 @@ class ChannelDashboardAssemblerTest {
             playing(GameBinding.SourceType.XBOX, "1", "Halo");
 
             assertThat(assembler().dtddMapping(moderator, owner, true)).isEqualTo(NONE);
-            verify(igdb).findByName("Halo");
+            verify(igdb).resolveDetected(any(), any(), eq("Halo"));
         }
 
         @Test
         void unverifiedMappingWithoutProposals_canBeValidated() {
             playing(GameBinding.SourceType.STEAM, "892970", "Valheim");
-            when(igdb.findBySteamAppId("892970")).thenReturn(Optional.of(new IgdbService.IgdbGame("42", "Valheim")));
+            when(igdb.resolveDetected(eq(GameBinding.SourceType.STEAM), eq("892970"), any())).thenReturn(Optional.of(new IgdbService.IgdbGame("42", "Valheim")));
             DtddGameMapping mapping = new DtddGameMapping();
             mapping.setIgdbId("42");
             mapping.setDtddId(7L);
@@ -726,7 +788,7 @@ class ChannelDashboardAssemblerTest {
         @Test
         void dtddMapping_memberCannotValidateDirectly() {
             playing(GameBinding.SourceType.STEAM, "892970", "Valheim");
-            when(igdb.findBySteamAppId("892970")).thenReturn(Optional.of(new IgdbService.IgdbGame("42", "Valheim")));
+            when(igdb.resolveDetected(eq(GameBinding.SourceType.STEAM), eq("892970"), any())).thenReturn(Optional.of(new IgdbService.IgdbGame("42", "Valheim")));
             DtddGameMapping mapping = new DtddGameMapping();
             mapping.setIgdbId("42");
             mapping.setDtddId(7L);
@@ -742,7 +804,7 @@ class ChannelDashboardAssemblerTest {
         @Test
         void dtddMapping_adminCanValidateDirectly() {
             playing(GameBinding.SourceType.STEAM, "892970", "Valheim");
-            when(igdb.findBySteamAppId("892970")).thenReturn(Optional.of(new IgdbService.IgdbGame("42", "Valheim")));
+            when(igdb.resolveDetected(eq(GameBinding.SourceType.STEAM), eq("892970"), any())).thenReturn(Optional.of(new IgdbService.IgdbGame("42", "Valheim")));
             DtddGameMapping mapping = new DtddGameMapping();
             mapping.setIgdbId("42");
             mapping.setDtddId(7L);
@@ -754,7 +816,7 @@ class ChannelDashboardAssemblerTest {
         @Test
         void pendingProposalsOrVerifiedMappings_cantBeValidated() {
             playing(GameBinding.SourceType.STEAM, "892970", "Valheim");
-            when(igdb.findBySteamAppId("892970")).thenReturn(Optional.of(new IgdbService.IgdbGame("42", "Valheim")));
+            when(igdb.resolveDetected(eq(GameBinding.SourceType.STEAM), eq("892970"), any())).thenReturn(Optional.of(new IgdbService.IgdbGame("42", "Valheim")));
             DtddGameMapping mapping = new DtddGameMapping();
             when(dtddMappings.findById("42")).thenReturn(Optional.of(mapping));
             when(dtddProposals.countByIgdbIdAndStatus("42", DtddMappingProposal.Status.PENDING)).thenReturn(1L);
@@ -777,7 +839,7 @@ class ChannelDashboardAssemblerTest {
         @Test
         void unmappedGame() {
             playing(GameBinding.SourceType.STEAM, "1", "New");
-            when(igdb.findBySteamAppId("1")).thenReturn(Optional.of(new IgdbService.IgdbGame("5", "New")));
+            when(igdb.resolveDetected(eq(GameBinding.SourceType.STEAM), eq("1"), any())).thenReturn(Optional.of(new IgdbService.IgdbGame("5", "New")));
 
             DtddMappingStatusDto status = assembler().dtddMapping(moderator, owner, true);
 
@@ -810,7 +872,7 @@ class ChannelDashboardAssemblerTest {
         @Test
         void nothingToDoWithoutSteam() {
             assembler().refreshSteamProfileCache(owner);
-            assembler(Optional.empty(), Optional.empty(), false).refreshSteamProfileCache(owner);
+            assembler(Optional.empty(), Optional.empty(), Optional.empty(), false).refreshSteamProfileCache(owner);
 
             verify(steam, never()).invalidateProfileCache(any(), any());
         }

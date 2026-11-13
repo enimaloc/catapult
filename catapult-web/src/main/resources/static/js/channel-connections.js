@@ -1,5 +1,5 @@
 /**
- * Handlers for the Steam/Minecraft/Xbox/OBS connection cards. The Steam/Minecraft cards' elements are all
+ * Handlers for the Steam/Minecraft/Battle.net/Xbox/OBS connection cards. The Steam/Minecraft cards' elements are all
  * pre-rendered and only toggled via the `hidden` class (spa:if/spa:switch, see
  * channel.html) instead of being created/destroyed per SSE event, so handlers only
  * need attaching once, at render — no refresh() either: the SSE echo updates the cards.
@@ -77,6 +77,10 @@ window.CatapultConnections = (function () {
             postJson(`${baseUrl}/minecraft/enroll`, { name: value("minecraft-name-input") }));
         on("minecraft-check-btn", "click", () => postJson(`${baseUrl}/minecraft/sync`, {}));
         on("minecraft-disconnect-btn", "click", () => postJson(`${baseUrl}/minecraft/disconnect`, {}));
+
+        // Battle.net. Linking leaves for Blizzard's login, which sends the member back to this tab.
+        on("battlenet-connect-btn", "click", () => location.assign("/oauth2/authorization/battlenet"));
+        on("battlenet-disconnect-btn", "click", () => postJson(`${baseUrl}/battlenet/disconnect`, {}));
 
         // OBS: connecting and disconnecting both save the whole form, only `enabled` differs.
         // An empty password field means "keep the stored one" (it's never sent back to the page),

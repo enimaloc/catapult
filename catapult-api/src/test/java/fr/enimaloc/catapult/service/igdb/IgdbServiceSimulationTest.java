@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.igdb;
 
+import fr.enimaloc.catapult.repository.binding.GameMappingRepository;
 import fr.enimaloc.catapult.repository.igdb.IgdbGameCacheRepository;
 import fr.enimaloc.catapult.repository.igdb.IgdbGameCclRepository;
 import fr.enimaloc.catapult.repository.igdb.IgdbGameExternalIdRepository;
@@ -30,7 +31,7 @@ class IgdbServiceSimulationTest {
         IgdbService service = new IgdbService(mock(IgdbClient.class), mock(IgdbGameCacheRepository.class),
                 mock(IgdbGameExternalIdRepository.class), mock(IgdbGameCclRepository.class),
                 mock(TwitchCclDefinitionRepository.class), mock(SteamStoreService.class), restClient,
-                new SimpleMeterRegistry(), provider);
+                new SimpleMeterRegistry(), provider, mock(GameMappingRepository.class));
         ReflectionTestUtils.setField(service, "clientId", "client");
         ReflectionTestUtils.setField(service, "clientSecret", "secret");
         return service;

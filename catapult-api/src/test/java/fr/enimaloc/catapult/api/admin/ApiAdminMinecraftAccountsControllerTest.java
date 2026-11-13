@@ -55,7 +55,7 @@ class ApiAdminMinecraftAccountsControllerTest {
     void create_pendingDeviceCode_returns202() {
         when(msaAuthClient.pollDeviceCode("device-1")).thenReturn(Optional.empty());
 
-        ResponseEntity<?> response = controller.create(Map.of("deviceCode", "device-1", "label", "Bot1"));
+        ResponseEntity<?> response = controller.create(Map.of("deviceCode", "device-1"));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
     }
@@ -68,13 +68,12 @@ class ApiAdminMinecraftAccountsControllerTest {
                 new MinecraftTokenService.ValidatedChain("mc-token", "enc:refresh-rotated", 86400)));
         when(minecraftService.getMinecraftProfileName("mc-token")).thenReturn("CatapultBot1");
 
-        ResponseEntity<?> response = controller.create(Map.of("deviceCode", "device-1", "label", "Bot1"));
+        ResponseEntity<?> response = controller.create(Map.of("deviceCode", "device-1"));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         verify(accountRepository).save(org.mockito.ArgumentMatchers.argThat(account ->
                 account.getMsaRefreshToken().equals("enc:refresh-rotated")
-                        && account.getMinecraftUsername().equals("CatapultBot1")
-                        && account.getLabel().equals("Bot1")));
+                        && account.getMinecraftUsername().equals("CatapultBot1")));
     }
 
     @Test

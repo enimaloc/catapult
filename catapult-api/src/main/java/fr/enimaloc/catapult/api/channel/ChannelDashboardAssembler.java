@@ -8,6 +8,7 @@ import fr.enimaloc.catapult.common.dto.channel.DtddMappingCurrentDto;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingProposalDto;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
 import fr.enimaloc.catapult.common.dto.channel.GameDto;
+import fr.enimaloc.catapult.common.dto.channel.BattleNetData;
 import fr.enimaloc.catapult.common.dto.channel.MinecraftData;
 import fr.enimaloc.catapult.common.dto.channel.ObsData;
 import fr.enimaloc.catapult.common.dto.channel.TwitchatData;
@@ -51,6 +52,7 @@ import fr.enimaloc.catapult.service.connections.SteamProfileDto;
 import fr.enimaloc.catapult.service.igdb.AdminCclService;
 import fr.enimaloc.catapult.api.CustomBindingViews;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
+import fr.enimaloc.catapult.service.battlenet.BattleNetLinkStateService;
 import fr.enimaloc.catapult.service.minecraft.MinecraftLinkStateService;
 import fr.enimaloc.catapult.service.notification.TwitchatWidgetSettingsService;
 import lombok.RequiredArgsConstructor;
@@ -92,6 +94,8 @@ public class ChannelDashboardAssembler {
     private final OAuthTokenRepository oAuthTokenRepository;
     // Only present when minecraft.enabled (the service is @ConditionalOnBooleanProperty).
     private final Optional<MinecraftLinkStateService> minecraftLinkStates;
+    // Only present when battlenet.enabled.
+    private final Optional<BattleNetLinkStateService> battleNetLinkStates;
     private final TwitchatWidgetSettingsService twitchatWidgetSettingsService;
     private final RaidRestoreGateService raidRestoreGate;
     private final CustomBindingViews customBindingViews;
@@ -147,6 +151,7 @@ public class ChannelDashboardAssembler {
                 steamData(channel, owner),
                 xboxEnabled ? new XboxData(hasXboxToken(channel)) : null,
                 owner ? minecraftData(channel) : null,
+                owner ? battleNetData(channel) : null,
                 owner ? obsData(widget) : null,
                 owner ? TwitchatData.of(widget.getTwitchatBranch()) : null,
                 custom,
@@ -199,7 +204,7 @@ public class ChannelDashboardAssembler {
         }
         Map<String, String> boxArts = boxArts(bindings.getContent());
         List<BindingDto> content = bindings.getContent().stream()
-                .map(binding -> toBindingDto(binding, boxArts.get(binding.getTwitchGameId())))
+                .map(binding -> toBindingDto(binding, boxArt(boxArts, binding.getTwitchGameId())))
                 .toList();
         return new PagedBindings(bindings.getNumber(), bindings.getTotalPages(), bindings.getTotalElements(), content);
     }
@@ -212,6 +217,11 @@ public class ChannelDashboardAssembler {
         return twitchCategoryCache.findAllById(ids).stream()
                 .filter(category -> category.getBoxArtUrl() != null && !category.getBoxArtUrl().isBlank())
                 .collect(Collectors.toMap(TwitchCategoryCache::getId, TwitchCategoryCache::getBoxArtUrl));
+    }
+
+    /** A category's box art, absent for a binding with no Twitch category (an immutable map rejects a null key). */
+    private static String boxArt(Map<String, String> boxArts, String twitchGameId) {
+        return twitchGameId == null ? null : boxArts.get(twitchGameId);
     }
 
     private static BindingDto toBindingDto(GameBinding binding, String boxArtUrl) {
@@ -246,6 +256,15 @@ public class ChannelDashboardAssembler {
                 .map(service -> service.state(channel))
                 .filter(state -> !MinecraftLinkStateService.UNAVAILABLE.equals(state.status()))
                 .map(state -> new MinecraftData(state.status(), state.minecraftName(), state.serviceAccountUsername()))
+                .orElse(null);
+    }
+
+    /** The Battle.net link as the connect endpoint states it, null without Battle.net or when it's unavailable. */
+    private BattleNetData battleNetData(UserAccount channel) {
+        return battleNetLinkStates
+                .map(service -> service.state(channel))
+                .filter(state -> !BattleNetLinkStateService.UNAVAILABLE.equals(state.status()))
+                .map(state -> new BattleNetData(state.status(), state.battleTag(), state.serviceAccountBattleTag()))
                 .orElse(null);
     }
 
@@ -331,11 +350,9 @@ public class ChannelDashboardAssembler {
         return new DtddMappingStatusDto(current, pending, canValidate, id, viewerIsAdmin);
     }
 
-    /** IGDB entry of a detected game: by app id for Steam games, by name otherwise. */
+    /** IGDB entry of a detected game, as {@link IgdbService#resolveDetected} resolves it. */
     private Optional<IgdbService.IgdbGame> igdbGame(DetectedGame game) {
-        return game.getSourceType() == GameBinding.SourceType.STEAM
-                ? igdbService.findBySteamAppId(game.getSourceId())
-                : igdbService.findByName(game.getSourceName());
+        return igdbService.resolveDetected(game.getSourceType(), game.getSourceId(), game.getSourceName());
     }
 
     private String dtddName(Long dtddId) {
@@ -369,7 +386,7 @@ public class ChannelDashboardAssembler {
         return gameStateService.getLastKnownGame(channel)
                 .flatMap(game -> gameBindingRepository
                         .findByUserAndSourceIdAndSourceType(channel, game.getSourceId(), game.getSourceType()))
-                .map(binding -> toBindingDto(binding, boxArts(List.of(binding)).get(binding.getTwitchGameId())));
+                .map(binding -> toBindingDto(binding, boxArt(boxArts(List.of(binding)), binding.getTwitchGameId())));
     }
 
     /** The detected game, with the id of the channel's binding for it when there is one. */

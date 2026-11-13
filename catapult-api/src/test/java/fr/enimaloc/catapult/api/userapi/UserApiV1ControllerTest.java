@@ -32,6 +32,8 @@ import java.util.UUID;
 
 import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.nullValue;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -114,7 +116,7 @@ class UserApiV1ControllerTest {
         when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(detected));
         when(gameBindingRepository.findByUserAndSourceIdAndSourceType(user, "440", GameBinding.SourceType.STEAM))
                 .thenReturn(Optional.of(binding));
-        when(igdbService.findByExternalAppId(GameBinding.SourceType.STEAM, "440"))
+        when(igdbService.resolveDetected(eq(GameBinding.SourceType.STEAM), eq("440"), any()))
                 .thenReturn(Optional.of(new IgdbService.IgdbGame("1234", "Team Fortress 2")));
         when(igdbGameDetailsService.getDetails("1234")).thenReturn(Optional.of(details));
         when(twLabelService.resolve("violence", Locale.ENGLISH)).thenReturn("Violence");
@@ -157,7 +159,7 @@ class UserApiV1ControllerTest {
         when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(detected));
         when(gameBindingRepository.findByUserAndSourceIdAndSourceType(user, "440", GameBinding.SourceType.STEAM))
                 .thenReturn(Optional.empty());
-        when(igdbService.findByExternalAppId(GameBinding.SourceType.STEAM, "440"))
+        when(igdbService.resolveDetected(eq(GameBinding.SourceType.STEAM), eq("440"), any()))
                 .thenReturn(Optional.of(new IgdbService.IgdbGame("1234", "Team Fortress 2")));
         when(igdbGameDetailsService.getDetails("1234")).thenReturn(Optional.of(details));
         when(steamStoreService.fetchDescription("440", Locale.FRENCH))
@@ -183,7 +185,7 @@ class UserApiV1ControllerTest {
         when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(detected));
         when(gameBindingRepository.findByUserAndSourceIdAndSourceType(user, "440", GameBinding.SourceType.STEAM))
                 .thenReturn(Optional.empty());
-        when(igdbService.findByExternalAppId(GameBinding.SourceType.STEAM, "440"))
+        when(igdbService.resolveDetected(eq(GameBinding.SourceType.STEAM), eq("440"), any()))
                 .thenReturn(Optional.of(new IgdbService.IgdbGame("1234", "Team Fortress 2")));
         when(igdbGameDetailsService.getDetails("1234")).thenReturn(Optional.of(details));
         when(steamStoreService.fetchDescription("440", Locale.ENGLISH)).thenReturn(Optional.empty());
@@ -204,7 +206,7 @@ class UserApiV1ControllerTest {
         when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(detected));
         when(gameBindingRepository.findByUserAndSourceIdAndSourceType(user, null, GameBinding.SourceType.MANUAL))
                 .thenReturn(Optional.empty());
-        when(igdbService.findByName("Some Unlisted Game")).thenReturn(Optional.empty());
+        when(igdbService.resolveDetected(any(), any(), eq("Some Unlisted Game"))).thenReturn(Optional.empty());
 
         mvc.perform(get("/api/game/{uuid}", token))
                 .andExpect(status().isOk())
@@ -237,7 +239,7 @@ class UserApiV1ControllerTest {
         when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(detected));
         when(gameBindingRepository.findByUserAndSourceIdAndSourceType(user, null, GameBinding.SourceType.MANUAL))
                 .thenReturn(Optional.empty());
-        when(igdbService.findByName("Some Unlisted Game")).thenReturn(Optional.empty());
+        when(igdbService.resolveDetected(any(), any(), eq("Some Unlisted Game"))).thenReturn(Optional.empty());
 
         mvc.perform(get("/api/game/{uuid}?lang=fr", token))
                 .andExpect(status().isOk())
@@ -255,7 +257,7 @@ class UserApiV1ControllerTest {
         when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(detected));
         when(gameBindingRepository.findByUserAndSourceIdAndSourceType(user, null, GameBinding.SourceType.MANUAL))
                 .thenReturn(Optional.empty());
-        when(igdbService.findByName("Some Unlisted Game")).thenReturn(Optional.empty());
+        when(igdbService.resolveDetected(any(), any(), eq("Some Unlisted Game"))).thenReturn(Optional.empty());
 
         mvc.perform(get("/api/game/{uuid}", token))
                 .andExpect(status().isOk())
@@ -274,7 +276,7 @@ class UserApiV1ControllerTest {
         when(widgetTokenService.resolve(token)).thenReturn(Optional.of(user));
         when(gameStateService.getLastKnownGame(user))
                 .thenReturn(Optional.of(new DetectedGame("440", GameBinding.SourceType.STEAM, "Team Fortress 2")));
-        when(igdbService.findByExternalAppId(GameBinding.SourceType.STEAM, "440"))
+        when(igdbService.resolveDetected(eq(GameBinding.SourceType.STEAM), eq("440"), any()))
                 .thenReturn(Optional.of(new IgdbService.IgdbGame("1234", "Team Fortress 2")));
         when(igdbGameDetailsService.getDetails("1234")).thenReturn(Optional.of(details));
 

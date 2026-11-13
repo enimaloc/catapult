@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.common.dto.admin.DetectedGameDto;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingDto;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingRequest;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingResult;
+import fr.enimaloc.catapult.common.dto.admin.IgdbGameOption;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
@@ -123,15 +124,31 @@ class AdminGameMappingsControllerTest {
     }
 
     @Test
+    void igdbGames_areProxied_andAnUnreachableApiIs502() throws Exception {
+        when(apiService.isAdmin()).thenReturn(true);
+        when(apiService.adminSearchIgdbGames("warc")).thenReturn(List.of(
+                new IgdbGameOption("123", "World of Warcraft", 2004, "https://images.igdb.com/igdb/image/upload/t_cover_big/x.jpg")));
+        when(apiService.adminSearchIgdbGames("down")).thenReturn(null);
+
+        mvc.perform(get(BASE + "/igdb-games?q=warc").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].id").value("123"))
+                .andExpect(jsonPath("$[0].name").value("World of Warcraft"))
+                .andExpect(jsonPath("$[0].releaseYear").value(2004));
+        mvc.perform(get(BASE + "/igdb-games?q=down").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+                .andExpect(status().isBadGateway());
+    }
+
+    @Test
     void everyRoute_refusesVisitorsAndMembers_andActionsNeedCsrf() throws Exception {
         List<MockHttpServletRequestBuilder> routes = List.of(post(BASE), put(BASE + "/" + ID),
-                delete(BASE + "/" + ID), get(BASE + "/detected?sourceType=STEAM"), get(BASE + "/categories?q=a"));
+                delete(BASE + "/" + ID), get(BASE + "/detected?sourceType=STEAM"), get(BASE + "/categories?q=a"),
+                get(BASE + "/igdb-games?q=a"));
         for (MockHttpServletRequestBuilder route : routes) {
             mvc.perform(route.with(csrf()).contentType(MediaType.APPLICATION_JSON).content(BODY))
                     .andExpect(status().isUnauthorized());
         }
         for (MockHttpServletRequestBuilder route : List.of(post(BASE), put(BASE + "/" + ID), delete(BASE + "/" + ID),
-                get(BASE + "/detected?sourceType=STEAM"), get(BASE + "/categories?q=a"))) {
+                get(BASE + "/detected?sourceType=STEAM"), get(BASE + "/categories?q=a"), get(BASE + "/igdb-games?q=a"))) {
             mvc.perform(route.with(csrf()).sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt")
                     .contentType(MediaType.APPLICATION_JSON).content(BODY)).andExpect(status().isForbidden());
         }
@@ -143,5 +160,6 @@ class AdminGameMappingsControllerTest {
         verify(apiService, never()).adminDeleteGameMapping(any(), anyBoolean());
         verify(apiService, never()).adminDetectedGames(anyString(), anyString());
         verify(apiService, never()).adminSearchCategories(anyString());
+        verify(apiService, never()).adminSearchIgdbGames(anyString());
     }
 }

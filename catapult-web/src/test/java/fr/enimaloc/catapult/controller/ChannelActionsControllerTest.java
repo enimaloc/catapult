@@ -304,6 +304,17 @@ class ChannelActionsControllerTest {
     }
 
     @Test
+    void disconnectCallsTheApi() throws Exception {
+        mvc.perform(post("/channel/enimaloc/battlenet/disconnect").with(csrf()).session(as("enimaloc")))
+                .andExpect(status().isNoContent());
+        mvc.perform(post("/channel/someone/battlenet/disconnect").with(csrf()).session(as("enimaloc")))
+                .andExpect(status().isForbidden());
+
+        verify(apiService).battleNetDisconnect("enimaloc");
+        org.mockito.Mockito.verify(apiService, org.mockito.Mockito.never()).battleNetDisconnect("someone");
+    }
+
+    @Test
     void minecraftDisconnect_callsApiService() throws Exception {
         mvc.perform(post("/channel/enimaloc/minecraft/disconnect").with(csrf()).session(as("enimaloc")))
                 .andExpect(status().isNoContent());

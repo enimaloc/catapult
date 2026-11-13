@@ -167,10 +167,8 @@ public class GameContextService {
     }
 
     private Optional<String> resolveIgdbId(DetectedGame detected) {
-        if (detected.getSourceType() == GameBinding.SourceType.STEAM) {
-            return igdbService.findBySteamAppId(detected.getSourceId()).map(IgdbService.IgdbGame::id);
-        }
-        return igdbService.findByName(detected.getSourceName()).map(IgdbService.IgdbGame::id);
+        return igdbService.resolveDetected(detected.getSourceType(), detected.getSourceId(), detected.getSourceName())
+            .map(IgdbService.IgdbGame::id);
     }
 
     private Locale resolveLocale(UserAccount user) {

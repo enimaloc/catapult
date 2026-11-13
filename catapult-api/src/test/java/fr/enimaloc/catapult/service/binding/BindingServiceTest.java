@@ -223,7 +223,7 @@ class BindingServiceTest {
         when(gameBindingRepository.findByUserAndSourceIdAndSourceType(user, "steam-123", GameBinding.SourceType.STEAM))
             .thenReturn(Optional.empty());
         IgdbService.IgdbGame igdbGame = new IgdbService.IgdbGame("1234", "Portal");
-        when(igdbService.findByExternalAppId(GameBinding.SourceType.STEAM, "steam-123")).thenReturn(Optional.of(igdbGame));
+        when(igdbService.resolveDetected(eq(GameBinding.SourceType.STEAM), eq("steam-123"), any())).thenReturn(Optional.of(igdbGame));
         when(igdbService.findTwitchGameId("1234")).thenReturn(Optional.of("twitch-123"));
         when(igdbService.suggestCcls("1234")).thenReturn(Set.of());
         when(gameBindingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -244,7 +244,7 @@ class BindingServiceTest {
         when(gameBindingRepository.findByUserAndSourceIdAndSourceType(user, "steam-123", GameBinding.SourceType.STEAM))
             .thenReturn(Optional.empty());
         IgdbService.IgdbGame igdbGame = new IgdbService.IgdbGame("25076", "Red Dead Redemption 2");
-        when(igdbService.findByExternalAppId(GameBinding.SourceType.STEAM, "steam-123")).thenReturn(Optional.of(igdbGame));
+        when(igdbService.resolveDetected(eq(GameBinding.SourceType.STEAM), eq("steam-123"), any())).thenReturn(Optional.of(igdbGame));
 
         IgdbGameDetails details = new IgdbGameDetails();
         details.setIgdbId("25076");
@@ -271,7 +271,7 @@ class BindingServiceTest {
         when(gameBindingRepository.findByUserAndSourceIdAndSourceType(user, "steam-123", GameBinding.SourceType.STEAM))
             .thenReturn(Optional.empty());
         IgdbService.IgdbGame igdbGame = new IgdbService.IgdbGame("1234", "Portal");
-        when(igdbService.findByExternalAppId(GameBinding.SourceType.STEAM, "steam-123")).thenReturn(Optional.of(igdbGame));
+        when(igdbService.resolveDetected(eq(GameBinding.SourceType.STEAM), eq("steam-123"), any())).thenReturn(Optional.of(igdbGame));
 
         IgdbGameDetails details = new IgdbGameDetails();
         details.setIgdbId("1234");
@@ -294,7 +294,7 @@ class BindingServiceTest {
         DetectedGame game = new DetectedGame(null, GameBinding.SourceType.MANUAL, "Unknown Game");
         when(gameBindingRepository.findByUserAndSourceIdAndSourceType(user, null, GameBinding.SourceType.MANUAL))
             .thenReturn(Optional.empty());
-        when(igdbService.findByName("Unknown Game")).thenReturn(Optional.empty());
+        when(igdbService.resolveDetected(any(), any(), eq("Unknown Game"))).thenReturn(Optional.empty());
         when(gameBindingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         GameBinding result = bindingService.resolveOrCreate(user, game);
@@ -303,12 +303,31 @@ class BindingServiceTest {
     }
 
     @Test
+    void resolveOrCreate_battleNetWithoutMapping_createsIncompleteBinding_withoutAnyNameSearch() {
+        DetectedGame game = new DetectedGame("Pro", GameBinding.SourceType.BATTLENET, "Overwatch");
+        when(gameBindingRepository.findByUserAndSourceIdAndSourceType(user, "Pro", GameBinding.SourceType.BATTLENET))
+            .thenReturn(Optional.empty());
+        when(gameMappingRepository.findBySourceTypeAndSourceId(GameBinding.SourceType.BATTLENET, "Pro"))
+            .thenReturn(Optional.empty());
+        when(igdbService.resolveDetected(GameBinding.SourceType.BATTLENET, "Pro", "Overwatch")).thenReturn(Optional.empty());
+        when(gameBindingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        GameBinding result = bindingService.resolveOrCreate(user, game);
+
+        assertThat(result.getStatus()).isEqualTo(GameBinding.Status.INCOMPLETE);
+        verify(igdbService).resolveDetected(GameBinding.SourceType.BATTLENET, "Pro", "Overwatch");
+        verify(igdbService, never()).findByName(any());
+        verify(igdbService, never()).findByExternalAppId(any(), any());
+        verify(igdbService, never()).suggestCcls(any());
+    }
+
+    @Test
     void resolveOrCreate_noExisting_igdbFoundButNoTwitchId_createsIncompleteBinding() {
         DetectedGame game = new DetectedGame("steam-123", GameBinding.SourceType.STEAM, "Portal");
         when(gameBindingRepository.findByUserAndSourceIdAndSourceType(user, "steam-123", GameBinding.SourceType.STEAM))
             .thenReturn(Optional.empty());
         IgdbService.IgdbGame igdbGame = new IgdbService.IgdbGame("1234", "Portal");
-        when(igdbService.findByExternalAppId(GameBinding.SourceType.STEAM, "steam-123")).thenReturn(Optional.of(igdbGame));
+        when(igdbService.resolveDetected(eq(GameBinding.SourceType.STEAM), eq("steam-123"), any())).thenReturn(Optional.of(igdbGame));
         when(igdbService.findTwitchGameId("1234")).thenReturn(Optional.empty());
         when(twitchService.findCategoryIdByName(user, "Portal")).thenReturn(Optional.empty());
         when(igdbService.suggestCcls("1234")).thenReturn(Set.of());
@@ -329,7 +348,7 @@ class BindingServiceTest {
         when(gameBindingRepository.findByUserAndSourceIdAndSourceType(user, "steam-123", GameBinding.SourceType.STEAM))
             .thenReturn(Optional.of(incompleteBinding));
         IgdbService.IgdbGame igdbGame = new IgdbService.IgdbGame("1234", "Portal");
-        when(igdbService.findByExternalAppId(GameBinding.SourceType.STEAM, "steam-123")).thenReturn(Optional.of(igdbGame));
+        when(igdbService.resolveDetected(eq(GameBinding.SourceType.STEAM), eq("steam-123"), any())).thenReturn(Optional.of(igdbGame));
         when(igdbService.findTwitchGameId("1234")).thenReturn(Optional.empty());
         when(twitchService.findCategoryIdByName(user, "Portal")).thenReturn(Optional.of("twitch-456"));
         when(igdbService.suggestCcls("1234")).thenReturn(Set.of());
@@ -364,7 +383,7 @@ class BindingServiceTest {
         when(gameBindingRepository.findAllByStatusAndIgnoredFalse(GameBinding.Status.INCOMPLETE))
             .thenReturn(List.of(incomplete));
         IgdbService.IgdbGame igdbGame = new IgdbService.IgdbGame("42", "Half-Life 3");
-        when(igdbService.findByExternalAppId(GameBinding.SourceType.STEAM, "steam-999")).thenReturn(Optional.of(igdbGame));
+        when(igdbService.resolveDetected(eq(GameBinding.SourceType.STEAM), eq("steam-999"), any())).thenReturn(Optional.of(igdbGame));
         when(igdbService.findTwitchGameId("42")).thenReturn(Optional.of("twitch-42"));
         when(igdbService.suggestCcls("42")).thenReturn(Set.of());
         when(gameBindingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -406,7 +425,7 @@ class BindingServiceTest {
 
         when(gameBindingRepository.findAllByStatusAndIgnoredFalse(GameBinding.Status.INCOMPLETE))
             .thenReturn(List.of(incomplete));
-        when(igdbService.findByName("Unknown Indie Game")).thenReturn(Optional.empty());
+        when(igdbService.resolveDetected(any(), any(), eq("Unknown Indie Game"))).thenReturn(Optional.empty());
         when(gameBindingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         bindingService.refreshIncompleteBindings();
@@ -420,7 +439,7 @@ class BindingServiceTest {
         when(gameBindingRepository.findByUserAndSourceIdAndSourceType(user, "steam-123", GameBinding.SourceType.STEAM))
             .thenReturn(Optional.empty());
         IgdbService.IgdbGame igdbGame = new IgdbService.IgdbGame("1234", "Portal");
-        when(igdbService.findByExternalAppId(GameBinding.SourceType.STEAM, "steam-123")).thenReturn(Optional.of(igdbGame));
+        when(igdbService.resolveDetected(eq(GameBinding.SourceType.STEAM), eq("steam-123"), any())).thenReturn(Optional.of(igdbGame));
         when(igdbService.findTwitchGameId("1234")).thenReturn(Optional.of("twitch-123"));
         when(igdbService.suggestCcls("1234")).thenReturn(Set.of());
         when(igdbService.fetchDescriptorIds("1234")).thenReturn(Set.of(10L, 11L));
@@ -447,7 +466,7 @@ class BindingServiceTest {
         when(gameBindingRepository.findAllByStatusAndIgnoredFalse(GameBinding.Status.INCOMPLETE))
             .thenReturn(List.of(overridden));
         IgdbService.IgdbGame igdbGame = new IgdbService.IgdbGame("777", "Half-Life");
-        when(igdbService.findByExternalAppId(GameBinding.SourceType.STEAM, "steam-555")).thenReturn(Optional.of(igdbGame));
+        when(igdbService.resolveDetected(eq(GameBinding.SourceType.STEAM), eq("steam-555"), any())).thenReturn(Optional.of(igdbGame));
         when(igdbService.findTwitchGameId("777")).thenReturn(Optional.of("twitch-777"));
         when(igdbService.suggestCcls("777")).thenReturn(Set.of());
         when(gameBindingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));

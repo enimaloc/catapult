@@ -7,7 +7,7 @@
  * "Add an account" and "Re-authenticate" run catapult-api's Microsoft device-code flow: get a device
  * code, show its user code, its verification link and the time left before it expires (counted down
  * by time.js), then poll the create / reauth route every max(3, interval) s: 202 → poll again, 200 →
- * done (the list patched, the enroll form emptied), anything else → the error, stop. The countdown only shows the time left:
+ * done (the list patched), anything else → the error, stop. The countdown only shows the time left:
  * once the code has expired, catapult-api refuses the next poll (400) and the flow ends with the
  * expired label, so a poll answered as the code runs out still counts.
  * A refusal (of the device code or of a poll) shows its localized label then catapult-api's message.
@@ -182,8 +182,6 @@ window.CatapultAdminMinecraft = (function () {
                 button.disabled = true; // until the list is patched
                 window.mdui?.snackbar?.({ message: doneLabel });
                 flowEl.replaceChildren(); // done: the code shown is of no more use
-                const enroll = flowEl.closest(".admin-minecraft-enroll");
-                if (enroll) CatapultAdminTabs.reset(enroll);
                 try {
                     await CatapultAdminTabs.patch(panel);
                 } finally {
@@ -198,11 +196,9 @@ window.CatapultAdminMinecraft = (function () {
     }
 
     function add(panel, card, button) {
-        const field = card.querySelector('.admin-minecraft-enroll [name="label"]');
         const flowEl = card.querySelector(".admin-minecraft-enroll .admin-minecraft-flow");
         if (!flowEl) return;
-        const label = (field?.value ?? "").trim();
-        return runFlow(panel, card, button, flowEl, `${BASE}/create`, label ? { label } : {}, card.dataset.labelCreated);
+        return runFlow(panel, card, button, flowEl, `${BASE}/create`, {}, card.dataset.labelCreated);
     }
 
     function reauth(panel, card, button) {

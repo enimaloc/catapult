@@ -45,7 +45,7 @@ class MinecraftPresenceGetterSimulationTest {
     @BeforeEach
     void setUp() {
         bot.setId(UUID.randomUUID());
-        bot.setLabel("CatapultBot1");
+        bot.setMinecraftUsername("CatapultBot1");
         member.setId(UUID.randomUUID());
         MinecraftFriendLink link = new MinecraftFriendLink();
         link.setUser(member);

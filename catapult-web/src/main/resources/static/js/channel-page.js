@@ -137,7 +137,8 @@ window.CatapultChannel = (function () {
     // owner, and the Minecraft card every status sub-view (NONE/PENDING/INVITE_REJECTED/
     // ACCEPTED/REMOVED), all toggled generically by each element's own spa:on/spa:
     // switch/spa:value (see channel.html) instead of being created/destroyed per event.
-    // No handler is needed here for any Steam or Minecraft event.
+    // The Battle.net card is the same, switching on BattleNetLinkEvent's status.
+    // No handler is needed here for any Steam, Minecraft or Battle.net event.
 
     return {
         username, baseUrl, refresh, postJson, postSwitch, showError, actionFailed, unreachable,

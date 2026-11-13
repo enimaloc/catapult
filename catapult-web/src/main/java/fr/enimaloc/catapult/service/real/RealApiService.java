@@ -39,12 +39,14 @@ import fr.enimaloc.catapult.common.dto.admin.TwDefinitionDto;
 import fr.enimaloc.catapult.common.dto.admin.TwKeywordTestDto;
 import fr.enimaloc.catapult.common.dto.admin.TwRebuild;
 import fr.enimaloc.catapult.common.dto.admin.AccountDto;
+import fr.enimaloc.catapult.common.dto.admin.BattleNetAccountDto;
 import fr.enimaloc.catapult.common.dto.admin.MetaTagDto;
 import fr.enimaloc.catapult.common.dto.admin.MetaTagRequest;
 import fr.enimaloc.catapult.common.dto.admin.SocialLinkDto;
 import fr.enimaloc.catapult.common.dto.admin.SocialLinkOrderRequest;
 import fr.enimaloc.catapult.common.dto.admin.SocialLinkRequest;
 import fr.enimaloc.catapult.common.dto.admin.MinecraftDeviceCodeDto;
+import fr.enimaloc.catapult.common.dto.connect.BattleNetLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.admin.DtddKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.SteamKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto;
@@ -60,6 +62,7 @@ import fr.enimaloc.catapult.common.dto.admin.DtddTopicsCacheEntryDto;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingDto;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingRequest;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingResult;
+import fr.enimaloc.catapult.common.dto.admin.IgdbGameOption;
 import fr.enimaloc.catapult.common.dto.admin.TwitchCategoryDto;
 import fr.enimaloc.catapult.common.dto.notification.AdminNotificationDto;
 import fr.enimaloc.catapult.common.dto.notification.BroadcastRequestDto;
@@ -171,6 +174,7 @@ public class RealApiService implements ApiService {
     private static final ParameterizedTypeReference<AdminPage<DetectedGameDto>> MISSING_GAMES = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<DetectedGameDto>> DETECTED_GAMES = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<TwitchCategoryDto>> CATEGORIES = new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<List<IgdbGameOption>> IGDB_GAMES = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<DtddProposalDto>> DTDD_PROPOSALS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<TwDefinitionDto>> TWS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<fr.enimaloc.catapult.common.dto.chatcommand.EnabledChatCommandDto>> ENABLED_COMMANDS = new ParameterizedTypeReference<>() {};
@@ -351,6 +355,20 @@ public class RealApiService implements ApiService {
         UUID me = me();
         if (me == null) return HttpStatus.UNAUTHORIZED.value();
         return client.delete("/api/internal/users/{userId}/links/minecraft", me);
+    }
+
+    @Override
+    public BattleNetLinkStateResponse battleNetStatus(String username) {
+        UUID me = me();
+        if (me == null) return null;
+        return client.get("/api/internal/users/{userId}/links/battlenet", BattleNetLinkStateResponse.class, me);
+    }
+
+    @Override
+    public int battleNetDisconnect(String username) {
+        UUID me = me();
+        if (me == null) return HttpStatus.UNAUTHORIZED.value();
+        return client.delete("/api/internal/users/{userId}/links/battlenet", me);
     }
 
     @Override
@@ -994,6 +1012,11 @@ public class RealApiService implements ApiService {
     }
 
     @Override
+    public List<IgdbGameOption> adminSearchIgdbGames(String q) {
+        return client.get("/api/internal/admin/game-mappings/igdb-games?q={q}", IGDB_GAMES, q == null ? "" : q);
+    }
+
+    @Override
     public ApiClient.Result<GameMappingResult> adminCreateGameMapping(GameMappingRequest request) {
         return client.call(HttpMethod.POST, "/api/internal/admin/game-mappings", request, GameMappingResult.class);
     }
@@ -1345,6 +1368,39 @@ public class RealApiService implements ApiService {
     }
 
     @Override
+    public List<BattleNetAccountDto> adminBattleNetAccounts() {
+        // a 404 (Battle.net disabled in catapult-api) is null, like any failed read
+        BattleNetAccountDto[] accounts = client.get("/api/internal/admin/battlenet-accounts", BattleNetAccountDto[].class);
+        return accounts == null ? null : List.of(accounts);
+    }
+
+    @Override
+    public int adminCreateBattleNetAccount(String email, String password) {
+        return client.call(HttpMethod.POST, "/api/internal/admin/battlenet-accounts",
+                Map.of("email", email, "password", password), Void.class).status();
+    }
+
+    @Override
+    public int adminSubmitBattleNetCode(UUID id, String code) {
+        return client.call(HttpMethod.POST, "/api/internal/admin/battlenet-accounts/{id}/code", Map.of("code", code), Void.class, id).status();
+    }
+
+    @Override
+    public int adminReauthBattleNetAccount(UUID id) {
+        return client.call(HttpMethod.POST, "/api/internal/admin/battlenet-accounts/{id}/reauth", null, Void.class, id).status();
+    }
+
+    @Override
+    public int adminPatchBattleNetAccount(UUID id, Map<String, Object> patch) {
+        return client.call(HttpMethod.PATCH, "/api/internal/admin/battlenet-accounts/{id}", patch, Void.class, id).status();
+    }
+
+    @Override
+    public int adminDeleteBattleNetAccount(UUID id) {
+        return client.call(HttpMethod.DELETE, "/api/internal/admin/battlenet-accounts/{id}", null, Void.class, id).status();
+    }
+
+    @Override
     public List<AccountDto> adminMinecraftAccounts() {
         // a 404 (Minecraft disabled in catapult-api) is null, like any failed read
         AccountDto[] accounts = client.get("/api/internal/admin/minecraft-accounts", AccountDto[].class);
@@ -1383,9 +1439,8 @@ public class RealApiService implements ApiService {
     }
 
     @Override
-    public ApiClient.Result<Map<String, Object>> adminCreateMinecraftAccount(String deviceCode, String label) {
-        Map<String, String> body = label == null ? Map.of("deviceCode", deviceCode) : Map.of("deviceCode", deviceCode, "label", label);
-        return mapResult(client.call(HttpMethod.POST, "/api/internal/admin/minecraft-accounts", body, Map.class));
+    public ApiClient.Result<Map<String, Object>> adminCreateMinecraftAccount(String deviceCode) {
+        return mapResult(client.call(HttpMethod.POST, "/api/internal/admin/minecraft-accounts", Map.of("deviceCode", deviceCode), Map.class));
     }
 
     @Override

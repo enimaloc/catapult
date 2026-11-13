@@ -62,7 +62,6 @@ class ApiAdminMinecraftAccountsFlowsTest {
     void setUp() {
         account = new MinecraftServiceAccount();
         account.setId(UUID.randomUUID());
-        account.setLabel("Pool #1");
         account.setMinecraftUsername("Steve");
         account.setEnabled(false);
         when(accounts.findById(any())).thenReturn(Optional.empty());
@@ -111,7 +110,7 @@ class ApiAdminMinecraftAccountsFlowsTest {
         when(accounts.findAll()).thenReturn(List.of(account));
 
         assertThat(controller.list()).containsExactly(
-                new AccountDto(account.getId(), "Pool #1", "Steve", 0, false, false, 3));
+                new AccountDto(account.getId(), "Steve", "Steve", 0, false, false, 3));
     }
 
     @Test
@@ -178,15 +177,16 @@ class ApiAdminMinecraftAccountsFlowsTest {
     }
 
     @Test
-    void create_usesTheDefaultLabel_andFailsWhenTheChainDoesNot() {
+    void create_isShownByItsMinecraftUsername_andFailsWhenTheChainDoesNot() {
         when(msa.pollDeviceCode("dc")).thenReturn(Optional.of(msaTokens()));
         when(accounts.count()).thenReturn(2L);
         chainValidates("Alex");
 
-        ResponseEntity<?> created = controller.create(Map.of("deviceCode", "dc"));
+        // a legacy label in the body is ignored, like any unknown field
+        ResponseEntity<?> created = controller.create(Map.of("deviceCode", "dc", "label", "Pool #2"));
 
         assertThat(created.getBody()).isInstanceOfSatisfying(AccountDto.class, dto -> {
-            assertThat(dto.label()).isEqualTo("Minecraft account");
+            assertThat(dto.displayName()).isEqualTo("Alex");
             assertThat(dto.minecraftUsername()).isEqualTo("Alex");
             assertThat(dto.fillOrder()).isEqualTo(2);
             assertThat(dto.linkCount()).isZero();
@@ -208,6 +208,7 @@ class ApiAdminMinecraftAccountsFlowsTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(account.getMsaRefreshToken()).isEqualTo("rotated");
         assertThat(account.getMinecraftUsername()).isEqualTo("Steve2");
+        assertThat(((AccountDto) response.getBody()).displayName()).isEqualTo("Steve2");
         assertThat(account.isEnabled()).isTrue();
         verify(tokens).evict(account.getId());
         assertThat(((AccountDto) response.getBody()).linkCount()).isEqualTo(3);
@@ -233,7 +234,7 @@ class ApiAdminMinecraftAccountsFlowsTest {
     void update_appliesTheGivenFields() {
         AccountDto dto = controller.update(account.getId(), Map.of("enabled", true, "friendLimitReached", true, "fillOrder", 4));
 
-        assertThat(dto).isEqualTo(new AccountDto(account.getId(), "Pool #1", "Steve", 4, true, true, 3));
+        assertThat(dto).isEqualTo(new AccountDto(account.getId(), "Steve", "Steve", 4, true, true, 3));
         assertThat(account.getUpdatedAt()).isNotNull();
 
         controller.update(account.getId(), Map.of());

@@ -73,7 +73,12 @@ class CatapultOAuth2UserServiceLoginTest {
         RestClient.Builder builder = RestClient.builder();
         twitch = MockRestServiceServer.bindTo(builder).build();
         service = new CatapultOAuth2UserService(accounts, tokens, settings, getters, encryption, events,
-                builder.build(), whitelist, migrations, invites);
+                builder.build(), whitelist, migrations, invites,
+                mock(fr.enimaloc.catapult.service.battlenet.BattleNetGateService.class),
+                new org.springframework.beans.factory.support.StaticListableBeanFactory()
+                        .getBeanProvider(fr.enimaloc.catapult.service.battlenet.BattleNetFriendService.class),
+                new org.springframework.transaction.support.TransactionTemplate(
+                        mock(org.springframework.transaction.PlatformTransactionManager.class)));
         ReflectionTestUtils.setField(service, "ownerId", "owner-1");
         ReflectionTestUtils.setField(service, "defaultNoGameName", "Just Chatting");
         ReflectionTestUtils.setField(service, "defaultNoGameId", "509658");

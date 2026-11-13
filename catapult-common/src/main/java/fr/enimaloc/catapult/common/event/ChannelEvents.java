@@ -35,6 +35,7 @@ public final class ChannelEvents {
     public static final String CONNECTION_CHANGED = "connection.changed";
     public static final String DTDD_MAPPING_CHANGED = "dtdd.mapping.changed";
     public static final String MINECRAFT_LINK_CHANGED = "minecraft.link.changed";
+    public static final String BATTLENET_LINK_CHANGED = "battlenet.link.changed";
     public static final String CUSTOM_BINDING_CHANGED = "custom.binding.changed";
     public static final String CUSTOM_BINDINGS_UPDATED = "custom.bindings.updated";
 
@@ -90,6 +91,13 @@ public final class ChannelEvents {
 
     /** The channel's Minecraft link changed: its status ({@code NONE} once gone) and player name. */
     public record MinecraftLinkChanged(String channelId, String channelLogin, String status, String minecraftName) {}
+
+    /**
+     * The channel's Battle.net link changed: its status ({@code NONE} once gone), the streamer's BattleTag and the
+     * BattleTag of the bot it is linked to (both null once gone).
+     */
+    public record BattleNetLinkChanged(String channelId, String channelLogin, String status, String battleTag,
+                                       String serviceAccountBattleTag) {}
 
     /**
      * New notifications wait to be sent to these members' Twitchat: whichever catapult-web instance holds one

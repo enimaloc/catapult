@@ -28,8 +28,8 @@ GET,/api/internal/admin/experiments/{id}/assignments,?page=0,admin,6,
 # personal API token
 GET,/api/me/custom-bindings,,ptoken,12,
 GET,/api/me/drops,,ptoken,11,fixed:the token and the drops gate then the current game's binding; the campaigns are Catapult's copy of ttvdrops
-GET,/api/me/game,,ptoken,8,fixed:the one game the channel plays
-GET,/api/me/game/summary,,ptoken,8,fixed:the one game the channel plays
+GET,/api/me/game,,ptoken,13,fixed:the one game the channel plays and resolved with its IGDB and DTDD data
+GET,/api/me/game/summary,,ptoken,13,fixed:the one game the channel plays and resolved with its IGDB and DTDD data
 GET,/api/me/bindings/{bindingId},,ptoken,5,fixed:one binding
 # public, but GET /api/connect/steam/callback: it only redirects (no SQL) and every row must answer 2xx
 GET,/api/internal/changelog,,anon,0,fixed:read from a file
@@ -51,11 +51,11 @@ GET,/api/v3/api-docs,,anon,0,fixed:the API description
 GET,/api/v3/api-docs/swagger-config,,anon,0,fixed:the API description
 # legacy public routes, open to the owner (api.legacy-routes experiment): the gate reads the experiment, and
 # for a widget token its assignment, on top of the route itself
-GET,/api/game/{uuid},,anon,11,fixed:the one game the channel plays
+GET,/api/game/{uuid},,anon,12,fixed:the one game the channel plays and resolved with its IGDB and DTDD data
 GET,/api/user/catapult/{bindingId},,anon,3,fixed:one binding
 GET,/api/user/dtdd/{dtddId},dtddId=1,anon,2,fixed:one DTDD title
-GET,/api/user/game/{uuid},,anon,11,fixed:the one game the channel plays
+GET,/api/user/game/{uuid},,anon,16,fixed:the one game the channel plays and resolved with its IGDB and DTDD data
 GET,/api/user/igdb/{igdbId},igdbId=1,anon,2,fixed:one IGDB game
 GET,/api/user/steam/{appId},appId=990000,anon,1,fixed:one Steam app
-GET,/api/user/summary/{uuid},,anon,11,fixed:the one game the channel plays
+GET,/api/user/summary/{uuid},,anon,16,fixed:the one game the channel plays and resolved with its IGDB and DTDD data
 GET,/api/user/xbox/{productId},productId=9NBLGGH4R315,anon,1,fixed:one Microsoft Store product

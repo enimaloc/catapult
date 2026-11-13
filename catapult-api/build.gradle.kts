@@ -32,6 +32,7 @@ val springCloudContextVersion = "5.0.4"
 
 dependencies {
     implementation(project(":catapult-common"))
+    implementation(project(":catapult-bgs"))
 
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
@@ -61,6 +62,7 @@ dependencies {
     implementation("io.sentry:sentry-spring-boot-4-starter")
     implementation("io.sentry:sentry-logback")
     implementation("org.jsoup:jsoup:$jsoupVersion")
+    implementation("com.microsoft.playwright:playwright:1.64.0")
     implementation("org.commonmark:commonmark:$commonmarkVersion")
     implementation("org.springframework.cloud:spring-cloud-context:$springCloudContextVersion")
 
@@ -133,7 +135,7 @@ val englishConventions = tasks.register<Test>("englishConventions") {
     testClassesDirs = testSourceSet.output.classesDirs
     classpath = testSourceSet.runtimeClasspath
     filter.includeTestsMatching("*EnglishConventionsTest")
-    listOf("catapult-common", "catapult-web").forEach { module ->
+    listOf("catapult-common", "catapult-bgs", "catapult-web").forEach { module ->
         inputs.dir(rootProject.file("$module/src"))
             .withPropertyName("${module}Sources")
             .withPathSensitivity(PathSensitivity.RELATIVE)

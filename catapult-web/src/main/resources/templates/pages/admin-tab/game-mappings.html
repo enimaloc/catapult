@@ -40,6 +40,7 @@
                 <span th:text="#{admin.game-mappings.column.id}">ID</span>
                 <span th:text="#{admin.game-mappings.column.name}">Detected name</span>
                 <span th:text="#{admin.game-mappings.column.category}">Twitch category</span>
+                <span th:text="#{admin.game-mappings.column.igdb-game}">IGDB game</span>
                 <span th:text="#{admin.game-mappings.column.ccls}">CCL</span>
                 <span th:text="#{admin.game-mappings.column.tws}">TW</span>
                 <span th:text="#{admin.game-mappings.column.bindings}">Bindings</span>
@@ -49,7 +50,8 @@
             <div class="admin-row admin-gm-row" th:each="m : ${mappings.content()}"
                  th:attr="data-id=${m.id()},data-admin-key=${m.id()},data-source-type=${m.sourceType()},data-source-id=${m.sourceId()},
                           data-source-name=${m.sourceName()},data-twitch-game-id=${m.twitchGameId()},
-                          data-twitch-game-name=${m.twitchGameName()},data-ignored-by-default=${m.ignoredByDefault() ? 'true' : null},
+                          data-twitch-game-name=${m.twitchGameName()},data-igdb-id=${m.igdbId()},data-igdb-game-name=${m.igdbGameName()},
+                          data-ignored-by-default=${m.ignoredByDefault() ? 'true' : null},
                           data-ccls-override=${m.ccls() == null ? null : 'true'},data-ccls=${m.ccls() == null ? null : #strings.setJoin(m.ccls(), ',')},
                           data-tws-override=${m.tws() == null ? null : 'true'},data-tws=${m.tws() == null ? null : #strings.setJoin(m.tws(), ',')}">
                 <span class="admin-cell" th:attr="data-label=#{admin.game-mappings.column.platform}"
@@ -62,6 +64,8 @@
                     <mdui-chip th:if="${m.ignoredByDefault()}" icon="visibility_off" class="admin-gm-ignored"
                                th:text="#{admin.game-mappings.ignored}">Ignored by default</mdui-chip>
                 </span>
+                <span class="admin-cell admin-gm-igdb" th:attr="data-label=#{admin.game-mappings.column.igdb-game}"
+                      th:text="${m.igdbId() == null ? '' : (m.igdbGameName() == null ? m.igdbId() : m.igdbGameName() + ' (' + m.igdbId() + ')')}">igdb</span>
                 <span class="admin-gm-labels" th:attr="data-label=#{admin.game-mappings.column.ccls}">
                     <span th:if="${m.ccls() == null}" class="admin-cell-muted" th:text="#{admin.game-mappings.igdb}">IGDB</span>
                     <span th:if="${m.ccls() != null and m.ccls().isEmpty()}" th:text="#{admin.game-mappings.none}">None</span>
@@ -144,8 +148,17 @@
             </label>
             <p class="admin-cell-muted admin-gm-ignored-helper" th:text="#{admin.game-mappings.form.ignored-helper}">helper</p>
             <div class="admin-gm-search">
+                <div class="admin-gm-igdb-field">
+                    <mdui-text-field name="igdbGame" variant="outlined" autocomplete="off" icon="search"
+                                     th:attr="label=#{admin.game-mappings.form.igdb-game}"></mdui-text-field>
+                    <mdui-button-icon class="admin-gm-igdb-clear" icon="clear"
+                                      th:attr="aria-label=#{admin.game-mappings.form.igdb-clear}"></mdui-button-icon>
+                </div>
+                <mdui-list class="admin-gm-igdb-results"></mdui-list>
+            </div>
+            <div class="admin-gm-search">
                 <mdui-text-field name="category" variant="outlined" autocomplete="off" icon="search"
-                                 th:attr="label=#{admin.game-mappings.form.category}"></mdui-text-field>
+                                 th:attr="label=#{admin.game-mappings.form.category},helper=#{admin.game-mappings.form.category-helper}"></mdui-text-field>
                 <mdui-list class="admin-gm-category-results"></mdui-list>
             </div>
 

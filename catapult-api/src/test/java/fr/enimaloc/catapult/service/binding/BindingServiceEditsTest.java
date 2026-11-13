@@ -32,6 +32,7 @@ import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -187,7 +188,7 @@ class BindingServiceEditsTest {
     void resetTws_reResolvesTheSuggestion_andPushesTheNewCategory() {
         binding.setTwOverride(true);
         playing(GameBinding.SourceType.STEAM, "620");
-        when(igdb.findByExternalAppId(GameBinding.SourceType.STEAM, "620"))
+        when(igdb.resolveDetected(eq(GameBinding.SourceType.STEAM), eq("620"), any()))
                 .thenReturn(Optional.of(new IgdbService.IgdbGame("72", "Portal 2")));
         when(igdbDetails.getDetails("72")).thenReturn(Optional.empty());
         when(igdb.findTwitchGameId("72")).thenReturn(Optional.of("tw-72"));
@@ -212,7 +213,7 @@ class BindingServiceEditsTest {
         binding.setTwitchGameId("tw-72");
         binding.setStatus(GameBinding.Status.MANUAL);
         playing(GameBinding.SourceType.STEAM, "620");
-        when(igdb.findByExternalAppId(GameBinding.SourceType.STEAM, "620"))
+        when(igdb.resolveDetected(eq(GameBinding.SourceType.STEAM), eq("620"), any()))
                 .thenReturn(Optional.of(new IgdbService.IgdbGame("72", "Portal 2")));
         when(igdbDetails.getDetails("72")).thenReturn(Optional.empty());
         when(igdb.findTwitchGameId("72")).thenReturn(Optional.of("tw-72"));
@@ -229,7 +230,7 @@ class BindingServiceEditsTest {
         binding.setStatus(GameBinding.Status.INCOMPLETE);
         playing(GameBinding.SourceType.STEAM, "620");
         when(bindings.findAllByStatusAndIgnoredFalse(GameBinding.Status.INCOMPLETE)).thenReturn(List.of(binding));
-        when(igdb.findByExternalAppId(GameBinding.SourceType.STEAM, "620"))
+        when(igdb.resolveDetected(eq(GameBinding.SourceType.STEAM), eq("620"), any()))
                 .thenReturn(Optional.of(new IgdbService.IgdbGame("72", "Portal 2")));
         when(igdbDetails.getDetails("72")).thenReturn(Optional.empty());
         when(igdb.findTwitchGameId("72")).thenReturn(Optional.of("tw-72"));
@@ -254,7 +255,7 @@ class BindingServiceEditsTest {
         playing(GameBinding.SourceType.STEAM, "620");
         when(bindings.findAllByStatusAndIgnoredFalse(GameBinding.Status.INCOMPLETE))
                 .thenReturn(List.of(binding, other));
-        when(igdb.findByExternalAppId(any(), anyString()))
+        when(igdb.resolveDetected(any(), anyString(), any()))
                 .thenReturn(Optional.of(new IgdbService.IgdbGame("72", "Portal 2")));
         when(igdbDetails.getDetails("72")).thenReturn(Optional.empty());
         when(igdb.findTwitchGameId("72")).thenReturn(Optional.of("tw-72"));
@@ -279,7 +280,7 @@ class BindingServiceEditsTest {
         binding.setStatus(GameBinding.Status.INCOMPLETE);
         when(bindings.findAllByStatusAndIgnoredFalse(GameBinding.Status.INCOMPLETE))
                 .thenReturn(List.of(binding, other));
-        when(igdb.findByExternalAppId(any(), anyString()))
+        when(igdb.resolveDetected(any(), anyString(), any()))
                 .thenReturn(Optional.of(new IgdbService.IgdbGame("72", "Portal 2")));
         when(igdbDetails.getDetails("72")).thenReturn(Optional.empty());
         when(igdb.findTwitchGameId("72")).thenReturn(Optional.of("tw-72"));
@@ -323,8 +324,8 @@ class BindingServiceEditsTest {
     @Test
     void refreshingIncompleteBindings_countsTheResolvedOnes() {
         when(bindings.findAllByStatusAndIgnoredFalse(GameBinding.Status.INCOMPLETE)).thenReturn(List.of(binding));
-        when(igdb.findByExternalAppId(any(), anyString())).thenReturn(Optional.empty());
-        when(igdb.findByName("Portal 2")).thenReturn(Optional.empty());
+        when(igdb.resolveDetected(any(), anyString(), any())).thenReturn(Optional.empty());
+        when(igdb.resolveDetected(any(), any(), eq("Portal 2"))).thenReturn(Optional.empty());
 
         service.refreshIncompleteBindings();
 

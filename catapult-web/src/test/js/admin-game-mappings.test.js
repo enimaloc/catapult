@@ -30,6 +30,8 @@ function page() {
                         <span class="admin-gm-game-name"></span>
                         <div class="admin-gm-suggestions"></div>
                         <input type="checkbox" name="ignoredByDefault">
+                        <input name="igdbGame"><button class="admin-gm-igdb-clear"></button>
+                        <div class="admin-gm-igdb-results"></div>
                         <input name="category">
                         <div class="admin-gm-category-results"></div>
                         <fieldset data-gm-override="ccls"><input type="checkbox" class="admin-gm-override-switch"><div class="admin-gm-choices"></div></fieldset>
@@ -149,6 +151,8 @@ function fullPage(rows = ROW) {
                         <input name="sourceId"><span class="admin-gm-game-name"></span>
                         <div class="admin-gm-suggestions"></div>
                         <input type="checkbox" name="ignoredByDefault">
+                        <input name="igdbGame"><button class="admin-gm-igdb-clear"></button>
+                        <div class="admin-gm-igdb-results"></div>
                         <input name="category"><div class="admin-gm-category-results"></div>
                         <fieldset data-gm-override="ccls"><input type="checkbox" class="admin-gm-override-switch">
                             <div class="admin-gm-choices"><mdui-checkbox value="a"></mdui-checkbox><mdui-checkbox value="c"></mdui-checkbox></div></fieldset>
@@ -179,11 +183,24 @@ const LISTS = "/spa/admin/game-mappings?page=1&missingPage=0";
 const panel = () => q('mdui-tab-panel[value="game-mappings"]');
 const fragment = rows => `<div class="admin-game-mappings" data-page="1" data-missing-page="0"><div data-gm-lists>${rows}</div></div>`;
 let selected;
+let selectedIgdb;
+let igdbAttach;
 
 describe("admin-game-mappings form and lists", () => {
     beforeEach(() => {
         selected = null;
-        window.GameSearch = { attach: () => ({ select: s => { selected = s; }, selected: () => selected }) };
+        selectedIgdb = null;
+        igdbAttach = null;
+        // One search per picker field: the category's and the IGDB game's
+        window.GameSearch = {
+            attach: (input, results, url, onSelect, options) => {
+                if (input.name === "igdbGame") {
+                    igdbAttach = { url, onSelect, options };
+                    return { select: s => { selectedIgdb = s; }, selected: () => selectedIgdb };
+                }
+                return { select: s => { selected = s; }, selected: () => selected };
+            }
+        };
         window.mdui.snackbar = vi.fn();
     });
 
@@ -268,7 +285,7 @@ describe("admin-game-mappings form and lists", () => {
         expect([url, init.method]).toEqual(["/admin/game-mappings", "POST"]);
         expect(JSON.parse(init.body)).toEqual({
             sourceType: "STEAM", sourceId: "s1", twitchGameId: "9", twitchGameName: "Portal TW",
-            ccls: ["a"], tws: null, applyLive: false, ignoredByDefault: false
+            ccls: ["a"], tws: null, applyLive: false, ignoredByDefault: false, igdbId: null
         });
         expect(result().textContent).toBe("B 2 L 1 F 0");
         expect(q(".admin-gm-form-title").textContent).toBe("Edit");
@@ -285,6 +302,76 @@ describe("admin-game-mappings form and lists", () => {
         expect(fetched.mock.calls[1][1].method).toBe("PUT");
     });
 
+    it("searches IGDB like the category, wording a result with its year when it has one", () => {
+        fullPage();
+        click("#admin-gm-new");
+
+        expect(igdbAttach.url).toBe("/admin/game-mappings/igdb-games");
+        const { label } = igdbAttach.options;
+        expect(label({ name: "World of Warcraft", releaseYear: 2004 })).toBe("World of Warcraft (2004)");
+        expect(label({ name: "Unreleased", releaseYear: null })).toBe("Unreleased");
+    });
+
+    it("saves with the IGDB game picked and no category, which catapult-api deduces", async () => {
+        fullPage();
+        click("#admin-gm-new");
+        sourceId().value = "WoW";
+        selectedIgdb = { id: "123", name: "World of Warcraft" };
+        fetched.mockResolvedValueOnce(response(200, { mapping: { id: "90" } }));
+
+        click(".admin-gm-save");
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(error().hidden).toBe(true);
+        expect(JSON.parse(fetched.mock.calls[0][1].body)).toEqual({
+            sourceType: "STEAM", sourceId: "WoW", twitchGameId: null, twitchGameName: null,
+            ccls: null, tws: null, applyLive: false, ignoredByDefault: false, igdbId: "123"
+        });
+    });
+
+    it("empties the category when an IGDB game is picked, and when the field is emptied by hand", () => {
+        fullPage();
+        click("#admin-gm-new");
+        selected = { id: "9", name: "Portal TW" };
+
+        igdbAttach.onSelect({ id: "123", name: "World of Warcraft" });
+        expect(selected).toBeNull();
+
+        selected = { id: "9", name: "Portal TW" };
+        const input = q('[name="igdbGame"]');
+        input.value = "wor";
+        input.dispatchEvent(new Event("input"));
+        expect(selected).toEqual({ id: "9", name: "Portal TW" });
+        input.value = "  ";
+        input.dispatchEvent(new Event("input"));
+        expect(selected).toBeNull();
+    });
+
+    it("clears the IGDB game and the category with the clear button", () => {
+        fullPage();
+        click("#admin-gm-new");
+        selectedIgdb = { id: "123", name: "World of Warcraft" };
+        selected = { id: "9", name: "Portal TW" };
+
+        click(".admin-gm-igdb-clear");
+
+        expect(selectedIgdb).toBeNull();
+        expect(selected).toBeNull();
+    });
+
+    it("opens a row's form with its IGDB game, the id standing in for an unknown name", () => {
+        fullPage(ROW.replace('data-id="7"', 'data-id="7" data-igdb-id="123" data-igdb-game-name="World of Warcraft"'));
+        click("[data-gm-edit]");
+        expect(selectedIgdb).toEqual({ id: "123", name: "World of Warcraft" });
+
+        fullPage(ROW.replace('data-id="7"', 'data-id="7" data-igdb-id="456"'));
+        click("[data-gm-edit]");
+        expect(selectedIgdb).toEqual({ id: "456", name: "456" });
+
+        click("#admin-gm-new");
+        expect(selectedIgdb).toBeNull();
+    });
+
     it("saves a game ignored by default without a category", async () => {
         fullPage();
         click("#admin-gm-new");
@@ -298,7 +385,7 @@ describe("admin-game-mappings form and lists", () => {
         expect(error().hidden).toBe(true);
         expect(JSON.parse(fetched.mock.calls[0][1].body)).toEqual({
             sourceType: "STEAM", sourceId: "431960", twitchGameId: null, twitchGameName: null,
-            ccls: null, tws: null, applyLive: false, ignoredByDefault: true
+            ccls: null, tws: null, applyLive: false, ignoredByDefault: true, igdbId: null
         });
     });
 

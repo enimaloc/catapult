@@ -70,8 +70,8 @@ public class OAuth2ClientConfig {
         }
 
         if (configured(battleNetClientId, battleNetClientSecret)) {
+            // No "openid": it would switch Spring to the OIDC flow and bypass CatapultOAuth2UserService; Blizzard's userinfo needs no scope.
             registrations.add(authorizationCode("battlenet", battleNetClientId, battleNetClientSecret)
-                .scope("openid")
                 .authorizationUri("https://oauth.battle.net/authorize")
                 .tokenUri("https://oauth.battle.net/token")
                 .userInfoUri("https://oauth.battle.net/userinfo")

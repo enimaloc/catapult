@@ -52,7 +52,11 @@ class OAuth2ClientConfigTest {
 
         assertThat(repository.findByRegistrationId("xbox")).isNull();
         ClientRegistration battlenet = repository.findByRegistrationId("battlenet");
-        assertThat(battlenet.getScopes()).containsExactly("openid");
+        // "openid" would switch Spring to the OIDC flow and bypass CatapultOAuth2UserService.
+        assertThat(battlenet.getScopes()).doesNotContain("openid");
+        assertThat(battlenet.getProviderDetails().getAuthorizationUri()).isEqualTo("https://oauth.battle.net/authorize");
+        assertThat(battlenet.getProviderDetails().getTokenUri()).isEqualTo("https://oauth.battle.net/token");
+        assertThat(battlenet.getProviderDetails().getUserInfoEndpoint().getUri()).isEqualTo("https://oauth.battle.net/userinfo");
         assertThat(battlenet.getProviderDetails().getUserInfoEndpoint().getUserNameAttributeName()).isEqualTo("sub");
     }
 

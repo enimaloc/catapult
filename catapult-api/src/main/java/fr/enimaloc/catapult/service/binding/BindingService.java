@@ -234,11 +234,29 @@ public class BindingService {
      */
     public MappingSuggestions igdbSuggestions(DetectedGame game, boolean ccls, boolean tws) {
         if (!ccls && !tws) return MappingSuggestions.NONE;
-        Optional<String> igdbId = (game.getSourceName() != null ? resolveViaIgdb(game)
-                : game.getSourceId() != null
-                        ? igdbService.findByExternalAppId(game.getSourceType(), game.getSourceId())
-                        : Optional.<IgdbService.IgdbGame>empty())
-                .map(IgdbService.IgdbGame::id);
+        return igdbSuggestions(resolveViaIgdb(game).map(IgdbService.IgdbGame::id), game, ccls, tws);
+    }
+
+    /**
+     * {@link #igdbSuggestions(DetectedGame, boolean, boolean)} with the game's stored mapping left aside
+     * ({@link IgdbService#resolveUnmapped}): for a write whose mapping names no IGDB game while its stored row, not
+     * updated yet, may still name the old one. None for Battle.net.
+     */
+    public MappingSuggestions igdbSuggestionsUnmapped(DetectedGame game, boolean ccls, boolean tws) {
+        if (!ccls && !tws) return MappingSuggestions.NONE;
+        return igdbSuggestions(resolveUnmappedViaIgdb(game).map(IgdbService.IgdbGame::id), game, ccls, tws);
+    }
+
+    /**
+     * {@link #igdbSuggestions(DetectedGame, boolean, boolean)} for the IGDB game the mapping itself names, not the
+     * one already saved (a write resolves its suggestions before the mapping is stored).
+     */
+    public MappingSuggestions igdbSuggestions(String igdbGameId, DetectedGame game, boolean ccls, boolean tws) {
+        if (!ccls && !tws) return MappingSuggestions.NONE;
+        return igdbSuggestions(Optional.of(igdbGameId), game, ccls, tws);
+    }
+
+    private MappingSuggestions igdbSuggestions(Optional<String> igdbId, DetectedGame game, boolean ccls, boolean tws) {
         return new MappingSuggestions(
                 ccls ? igdbId.map(igdbService::suggestCcls).orElse(Set.of()) : Set.of(),
                 tws ? igdbId.map(id -> suggestTws(id, game)).orElse(Set.of()) : Set.of());
@@ -293,20 +311,28 @@ public class BindingService {
         return updateWithoutMapping(binding.getUser(), detectedOf(binding), binding);
     }
 
+    /**
+     * {@link #resolveWithoutMapping} without the IGDB game of the stored mapping either
+     * ({@link IgdbService#resolveUnmapped}): for the bindings of a game its mapping is no longer about.
+     */
+    @Transactional
+    public GameBinding resolveUnmapped(GameBinding binding) {
+        DetectedGame detectedGame = detectedOf(binding);
+        return updateFromIgdb(binding.getUser(), detectedGame, binding, resolveUnmappedViaIgdb(detectedGame));
+    }
+
     private GameBinding updateWithoutMapping(UserAccount user, DetectedGame detectedGame, GameBinding binding) {
-        Optional<IgdbService.IgdbGame> igdbGame = resolveViaIgdb(detectedGame);
+        return updateFromIgdb(user, detectedGame, binding, resolveViaIgdb(detectedGame));
+    }
+
+    private GameBinding updateFromIgdb(UserAccount user, DetectedGame detectedGame, GameBinding binding,
+                                       Optional<IgdbService.IgdbGame> igdbGame) {
 
         if (igdbGame.isPresent()) {
             String igdbId = igdbGame.get().id();
+            // Null when the game comes from a mapping whose IGDB name is not known yet (IGDB unreachable)
             String gameName = igdbGame.get().name();
-            String twitchId = igdbGameDetailsService.getDetails(igdbId)
-                    .map(IgdbGameDetails::getWebsites)
-                    .map(websites -> websites.get("twitch"))
-                    // A category id (external_games' uid), not a Twitch website's URL kept under the same key
-                    .filter(BindingService::isTwitchCategoryId)
-                    .or(() -> igdbService.findTwitchGameId(igdbId))
-                    .or(() -> twitchService.findCategoryIdByName(user, gameName))
-                    .orElse(null);
+            String twitchId = twitchCategoryFor(igdbId, gameName, user).map(TwitchCategoryRef::id).orElse(null);
             binding.setTwitchGameId(twitchId);
             binding.setTwitchGameName(gameName);
             binding.setStatus(GameBinding.Status.AUTO);
@@ -338,15 +364,43 @@ public class BindingService {
         return gameBindingRepository.save(binding);
     }
 
+    /** A Twitch category: its id and the name it is kept under (the IGDB game's). */
+    public record TwitchCategoryRef(String id, String name) {}
+
+    /**
+     * The Twitch category of an IGDB game: the Twitch id of its details' website (numeric ones only), else its
+     * external Twitch game, else a Twitch category search by {@code gameName} (skipped when null). The name is the
+     * IGDB game's, as the bindings keep it.
+     */
+    public Optional<TwitchCategoryRef> twitchCategoryFor(String igdbId, String gameName, UserAccount actingUser) {
+        return igdbGameDetailsService.getDetails(igdbId)
+                .map(IgdbGameDetails::getWebsites)
+                .map(websites -> websites.get("twitch"))
+                // A category id (external_games' uid), not a Twitch website's URL kept under the same key
+                .filter(BindingService::isTwitchCategoryId)
+                .or(() -> igdbService.findTwitchGameId(igdbId))
+                .or(() -> gameName == null ? Optional.empty() : twitchService.findCategoryIdByName(actingUser, gameName))
+                .map(id -> new TwitchCategoryRef(id, gameName));
+    }
+
     /** Twitch's category ids are numeric; anything else (a website URL) is refused as the PATCH's game_id. */
     static boolean isTwitchCategoryId(String id) {
         return !id.isEmpty() && id.chars().allMatch(c -> c >= '0' && c <= '9');
     }
 
+    /** The detected game's IGDB game ({@link IgdbService#resolveDetected}); none without a platform id. */
     private Optional<IgdbService.IgdbGame> resolveViaIgdb(DetectedGame detectedGame) {
         return detectedGame.getSourceId() != null
-                ? igdbService.findByExternalAppId(detectedGame.getSourceType(), detectedGame.getSourceId())
-                    .or(() -> igdbService.findByName(detectedGame.getSourceName()))
+                ? igdbService.resolveDetected(detectedGame.getSourceType(), detectedGame.getSourceId(),
+                        detectedGame.getSourceName())
+                : Optional.empty();
+    }
+
+    /** {@link #resolveViaIgdb} with the stored mapping left aside ({@link IgdbService#resolveUnmapped}). */
+    private Optional<IgdbService.IgdbGame> resolveUnmappedViaIgdb(DetectedGame detectedGame) {
+        return detectedGame.getSourceId() != null
+                ? igdbService.resolveUnmapped(detectedGame.getSourceType(), detectedGame.getSourceId(),
+                        detectedGame.getSourceName())
                 : Optional.empty();
     }
 

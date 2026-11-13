@@ -9,6 +9,7 @@ import fr.enimaloc.catapult.event.binding.GameChangedEvent;
 import fr.enimaloc.catapult.monitoring.InteractionMetrics;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
 import fr.enimaloc.catapult.service.ApiService;
+import fr.enimaloc.catapult.event.battlenet.BattleNetLinkEvent;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -108,6 +109,20 @@ class ChannelEventStreamControllerTest {
                 .contains("event:CustomBindingsUpdatedEvent\ndata:{\"username\":\"enimaloc\",\"bindings\":null,"
                         + "\"activeId\":null,\"ts\":null}")
                 .doesNotContain("Art");
+    }
+
+    @Test
+    void theBattleNetLinkGoesToTheOwnersStreams_aModeratorsGetNothing() throws Exception {
+        MvcResult owner = subscribe("enimaloc", member("EnimaLoc"));
+        MvcResult moderator = subscribe("enimaloc", member("a-moderator"));
+        BattleNetLinkEvent link = new BattleNetLinkEvent("enimaloc", "ACCEPTED", "Me#1", "Bot#2");
+
+        controller.onChannelUpdated(link);
+
+        assertThat(owner.getResponse().getContentAsString()).contains("event:BattleNetLinkEvent", "Me#1", "Bot#2");
+        assertThat(moderator.getResponse().getContentAsString()).doesNotContain("BattleNetLinkEvent")
+                .doesNotContain("Me#1").doesNotContain("Bot#2");
+        assertThat(ChannelEventStreamController.forModerators(link)).isNull();
     }
 
     @Test

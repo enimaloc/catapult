@@ -86,6 +86,42 @@ class AdminGameMappingsRenderingTest {
     }
 
     @Test
+    void igdbColumn_showsNameAndId_theIdAlone_orNothing_andEscapesIgdbText() throws Exception {
+        UUID named = UUID.fromString("00000000-0000-0000-0000-000000000011");
+        UUID idOnly = UUID.fromString("00000000-0000-0000-0000-000000000012");
+        UUID none = UUID.fromString("00000000-0000-0000-0000-000000000013");
+        UUID hostile = UUID.fromString("00000000-0000-0000-0000-000000000014");
+        Instant at = Instant.parse("2026-10-22T10:00:00Z");
+        when(apiService.adminGameMappings(0)).thenReturn(new AdminPage<>(List.of(
+                new GameMappingDto(named, "BATTLENET", "WoW", null, "18122", "World of Warcraft", null, null, 0, at,
+                        "a", false, "123", "World of Warcraft"),
+                new GameMappingDto(idOnly, "BATTLENET", "Hero", null, "32959", "Heroes of the Storm", null, null, 0, at,
+                        "a", false, "7313", null),
+                new GameMappingDto(none, "STEAM", "730", null, "32399", "Counter-Strike", null, null, 0, at, "a"),
+                new GameMappingDto(hostile, "STEAM", "9", null, "1", "One", null, null, 0, at,
+                        "a", false, "5", "<b>x</b>")), 0, 1, 4));
+
+        String html = render(Locale.ENGLISH);
+
+        assertThat(html).contains("IGDB game", ">World of Warcraft (123)<", ">7313<", "data-igdb-id=\"123\"",
+                "data-igdb-game-name=\"World of Warcraft\"");
+        String noneRow = html.substring(html.indexOf("data-id=\"" + none + "\""), html.indexOf("data-id=\"" + hostile + "\""));
+        assertThat(noneRow).doesNotContain("data-igdb-id").contains("admin-gm-igdb\" data-label=\"IGDB game\"></span>");
+        // IGDB's text only ever reaches the page escaped
+        assertThat(html).doesNotContain("<b>x</b>").contains("&lt;b&gt;x&lt;/b&gt; (5)");
+    }
+
+    @Test
+    void form_hasTheIgdbPicker_andTheCategoryHint() throws Exception {
+        String en = render(Locale.ENGLISH);
+        String fr = render(Locale.FRENCH);
+
+        assertThat(en).contains("name=\"igdbGame\"", "admin-gm-igdb-results", "admin-gm-igdb-clear",
+                "Deduced from IGDB when empty", "Clear the IGDB game");
+        assertThat(fr).doesNotContain("??").contains("Jeu IGDB", "Déduite d&#39;IGDB si vide", "Retirer le jeu IGDB");
+    }
+
+    @Test
     void missingList_isPagedWithCreateButtons() throws Exception {
         String html = render(Locale.ENGLISH);
 

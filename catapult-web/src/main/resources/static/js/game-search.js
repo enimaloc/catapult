@@ -15,6 +15,8 @@
  * field is left it shows the selection back, and a save never pairs a typed name with another
  * game's id. select() sets the selection from elsewhere (a save made in another tab).
  *
+ * `label` (default: the result's name) words a result's list item; the field shows the name picked either way.
+ *
  * A result with a Twitch `boxArtUrl` shows its box art, through catapult-web's proxy (the browser
  * never asks Twitch's CDN); one without (DTDD's, the mock's) shows its name alone.
  */
@@ -39,7 +41,7 @@ window.GameSearch = (function () {
         channel.showError(status ? channel.actionFailed(status) : channel.unreachable());
     }
 
-    function attach(inputEl, resultsEl, searchUrl, onSelect, { pick = data => data, initial } = {}) {
+    function attach(inputEl, resultsEl, searchUrl, onSelect, { pick = data => data, initial, label = game => game.name } = {}) {
         let debounceTimer;
         let latest = 0;
         let selected = initial?.id ? { id: initial.id, name: initial.name ?? "" } : null;
@@ -66,7 +68,7 @@ window.GameSearch = (function () {
             if (query !== latest) return;
             resultsEl.replaceChildren(...(Array.isArray(games) ? games : []).map(game => {
                 const item = document.createElement("mdui-list-item");
-                item.textContent = game.name;
+                item.textContent = label(game);
                 const art = boxArt(game.boxArtUrl);
                 if (art) {
                     const img = document.createElement("img");
