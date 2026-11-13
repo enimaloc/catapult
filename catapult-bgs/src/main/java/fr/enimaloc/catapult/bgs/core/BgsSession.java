@@ -30,6 +30,8 @@ import java.util.function.Consumer;
  */
 public final class BgsSession implements BgsChannel {
 
+    private static final System.Logger LOG = System.getLogger(BgsSession.class.getName());
+
     private static final int REPLY = 0xFE;
 
     /** Known server-to-client methods, to know whether an unregistered incoming call expects an ack. */
@@ -47,8 +49,8 @@ public final class BgsSession implements BgsChannel {
     private final List<Consumer<Throwable>> closeListeners = new ArrayList<>();
     private volatile String ciid = "";
     private int nextToken;
-    private boolean closed;
-    private Throwable closeCause;
+    private volatile boolean closed;
+    private volatile Throwable closeCause;
 
     private BgsSession(BgsTransport transport) {
         this.transport = transport;
@@ -112,8 +114,10 @@ public final class BgsSession implements BgsChannel {
         handlers.put(key(method.serviceHash(), method.methodId()), new Handler(method, body -> {
             try {
                 handler.accept(method.requestParser().parseFrom(body));
-            } catch (InvalidProtocolBufferException ignored) {
+            } catch (InvalidProtocolBufferException e) {
                 // an undecodable notification is dropped; the ack is already sent
+                LOG.log(System.Logger.Level.WARNING, "Undecodable BGS notification " + describe(method.serviceHash(),
+                        method.methodId()), e);
             }
         }));
     }
@@ -130,13 +134,23 @@ public final class BgsSession implements BgsChannel {
 
     @Override
     public void onClose(Consumer<Throwable> listener) {
-        post(() -> {
-            if (closed) {
-                runQuietly(() -> listener.accept(closeCause));
-            } else {
-                closeListeners.add(listener);
-            }
-        }, null);
+        // Once the loop is shut down nothing can be posted: notify the late listener directly
+        Runnable notifyNow = () -> runQuietly("close listener", () -> listener.accept(closeCause));
+        if (closed) {
+            notifyNow.run();
+            return;
+        }
+        try {
+            loop.execute(() -> {
+                if (closed) {
+                    notifyNow.run();
+                } else {
+                    closeListeners.add(listener);
+                }
+            });
+        } catch (RejectedExecutionException e) {
+            notifyNow.run();
+        }
     }
 
     @Override
@@ -202,7 +216,7 @@ public final class BgsSession implements BgsChannel {
             write(Header.newBuilder().setServiceId(REPLY).setToken(h.getToken()).build(), ByteString.EMPTY);
         }
         if (handler != null) {
-            runQuietly(() -> handler.body().accept(frame.body()));
+            runQuietly("handler " + describe(h.getServiceHash(), h.getMethodId()), () -> handler.body().accept(frame.body()));
         }
     }
 
@@ -210,13 +224,13 @@ public final class BgsSession implements BgsChannel {
         if (closed) {
             return;
         }
-        closed = true;
         closeCause = cause;
-        runQuietly(transport::close);
+        closed = true;
+        runQuietly("transport close", transport::close);
         Throwable failure = cause != null ? cause : new IOException("Session closed");
         pending.values().forEach(f -> f.completeExceptionally(failure));
         pending.clear();
-        closeListeners.forEach(l -> runQuietly(() -> l.accept(cause)));
+        closeListeners.forEach(l -> runQuietly("close listener", () -> l.accept(cause)));
         closeListeners.clear();
         loop.shutdown();
     }
@@ -239,7 +253,7 @@ public final class BgsSession implements BgsChannel {
 
     private void post(Runnable task, CompletableFuture<?> onRejected) {
         try {
-            loop.execute(() -> runQuietly(task::run));
+            loop.execute(() -> runQuietly("session task", task::run));
         } catch (RejectedExecutionException e) {
             if (onRejected != null) {
                 onRejected.completeExceptionally(new IOException("Session closed"));
@@ -251,12 +265,17 @@ public final class BgsSession implements BgsChannel {
         void run() throws Exception;
     }
 
-    private static void runQuietly(Action action) {
+    /** A failing callback must not take the session down: it is logged (never with the body) and dropped. */
+    private static void runQuietly(String what, Action action) {
         try {
             action.run();
-        } catch (Exception ignored) {
-            // a failing callback must not take the session down
+        } catch (Exception e) {
+            LOG.log(System.Logger.Level.WARNING, "BGS session " + what + " failed", e);
         }
+    }
+
+    private static String describe(int serviceHash, int methodId) {
+        return "0x" + Integer.toHexString(serviceHash).toUpperCase() + "." + methodId;
     }
 
     private static long key(int serviceHash, int methodId) {

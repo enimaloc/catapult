@@ -229,4 +229,30 @@ class BgsSessionTest {
         assertThat(await(closed)).isNull();
         assertThatThrownBy(() -> await(future)).isInstanceOf(ExecutionException.class);
     }
+
+    @Test
+    void closeListenerRegisteredAfterCloseIsStillNotified() throws Exception {
+        session.close();
+        var first = new CompletableFuture<Throwable>();
+        session.onClose(first::complete);
+        // the loop is shut down by then: a second late registration must also be notified
+        var second = new CompletableFuture<Throwable>();
+        session.onClose(second::complete);
+
+        assertThat(await(first)).isNull();
+        assertThat(await(second)).isNull();
+    }
+
+    @Test
+    void closeListenerRegisteredAfterEofGetsTheCause() throws Exception {
+        var closed = new CompletableFuture<Throwable>();
+        session.onClose(closed::complete);
+        serverOut.close();
+        await(closed);
+
+        var late = new CompletableFuture<Throwable>();
+        session.onClose(late::complete);
+
+        assertThat(await(late)).isNotNull();
+    }
 }
