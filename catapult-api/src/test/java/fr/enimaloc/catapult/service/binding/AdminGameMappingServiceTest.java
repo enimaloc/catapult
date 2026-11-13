@@ -89,7 +89,7 @@ class AdminGameMappingServiceTest {
                 raidRestoreHold, gameStateService, mock(UserAccountRepository.class), new CategoryApplier(twitchService, streamStateService), mock(RaidRestoreGateService.class), mock(GameBindingLookup.class), mock(ExtensionLayoutApplier.class)));
         bindingService = spy(new BindingService(bindingRepo, igdbService, igdbGameDetailsService, twitchService,
                 twResolverService, mappingRepo, new GameBindingLookup(bindingRepo), chain, mock(ExtensionLayoutApplier.class), org.mockito.Mockito.mock(org.springframework.context.ApplicationEventPublisher.class)));
-        service = new AdminGameMappingService(mappingRepo, bindingRepo, userRepo, bindingService, gameStateService,
+        service = new AdminGameMappingService(mappingRepo, bindingRepo, userRepo, bindingService, igdbService, gameStateService,
                 streamStateService, channelEventPublisher, chain, transactionManager);
 
         admin = user("admin");
@@ -710,5 +710,148 @@ class AdminGameMappingServiceTest {
 
         verify(chain).apply(eq(onIt), any(MappingChanged.class));
         verify(chain, never()).apply(eq(alreadyIgnored), any());
+    }
+
+    // ---- IGDB game on a mapping
+
+    private static GameMappingRequest withIgdb(String twitchId, String twitchName, boolean ignored, String igdbId) {
+        return new GameMappingRequest("STEAM", "730", twitchId, twitchName, null, null, false, ignored, igdbId);
+    }
+
+    private void igdbKnows(String igdbId, String name) {
+        when(igdbService.findById(igdbId)).thenReturn(new IgdbService.IgdbGame(igdbId, name));
+    }
+
+    @Test
+    void typedCategoryWinsOverIgdb() {
+        igdbKnows("42", "Counter-Strike 2");
+        when(igdbService.findTwitchGameId("42")).thenReturn(Optional.of("999"));
+
+        GameMappingResult result = service.create(withIgdb("32399", "Typed", false, "42"), admin);
+
+        assertThat(result.mapping().twitchGameId()).isEqualTo("32399");
+        assertThat(result.mapping().twitchGameName()).isEqualTo("Typed");
+        assertThat(result.mapping().igdbId()).isEqualTo("42");
+        verify(bindingService, never()).twitchCategoryFor(any(), any(), any());
+    }
+
+    @Test
+    void emptyCategoryIsDeducedFromIgdb() {
+        igdbKnows("42", "Counter-Strike 2");
+        when(igdbService.findTwitchGameId("42")).thenReturn(Optional.of("32399"));
+
+        GameMappingResult result = service.create(withIgdb(" ", null, false, "42"), admin);
+
+        assertThat(result.mapping().twitchGameId()).isEqualTo("32399");
+        assertThat(result.mapping().twitchGameName()).isEqualTo("Counter-Strike 2");
+        GameMapping stored = mappings.values().iterator().next();
+        assertThat(stored.getTwitchGameId()).isEqualTo("32399");
+        assertThat(stored.getTwitchGameName()).isEqualTo("Counter-Strike 2");
+        assertThat(stored.getIgdbId()).isEqualTo("42");
+    }
+
+    @Test
+    void deductionFailureIsA400ForAnActiveMapping() {
+        igdbKnows("42", "Counter-Strike 2");
+        when(igdbService.findTwitchGameId("42")).thenReturn(Optional.empty());
+        when(twitchService.findCategoryIdByName(any(), any())).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.create(withIgdb(null, null, false, "42"), admin))
+                .isInstanceOfSatisfying(ResponseStatusException.class, e -> {
+                    assertThat(e.getStatusCode().value()).isEqualTo(400);
+                    assertThat(e.getReason()).isEqualTo("No Twitch category found for this IGDB game: enter one");
+                });
+        assertThat(mappings).isEmpty();
+    }
+
+    @Test
+    void deductionFailureIsAcceptedForAnIgnoredMapping() {
+        igdbKnows("42", "Counter-Strike 2");
+        when(igdbService.findTwitchGameId("42")).thenReturn(Optional.empty());
+        when(twitchService.findCategoryIdByName(any(), any())).thenReturn(Optional.empty());
+
+        GameMappingResult result = service.create(withIgdb(null, null, true, "42"), admin);
+
+        assertThat(result.mapping().twitchGameId()).isNull();
+        assertThat(result.mapping().igdbId()).isEqualTo("42");
+        assertThat(result.mapping().ignoredByDefault()).isTrue();
+    }
+
+    @Test
+    void igdbUnavailableIsA400NotA500() {
+        // The name cannot be resolved (token blank): no deduction
+        igdbKnows("42", null);
+        assertThatThrownBy(() -> service.create(withIgdb(null, null, false, "42"), admin))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode().value()).isEqualTo(400));
+
+        // The client throws
+        when(igdbService.findById("43")).thenThrow(new IllegalStateException("igdb down"));
+        assertThatThrownBy(() -> service.create(withIgdb(null, null, false, "43"), admin))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode().value()).isEqualTo(400));
+    }
+
+    @Test
+    void listShowsTheCachedIgdbNameOrNull() {
+        GameMapping known = new GameMapping();
+        known.setId(UUID.randomUUID());
+        known.setSourceType(SourceType.BATTLENET);
+        known.setSourceId("Pro");
+        known.setIgdbId("42");
+        GameMapping unknown = new GameMapping();
+        unknown.setId(UUID.randomUUID());
+        unknown.setSourceType(SourceType.BATTLENET);
+        unknown.setSourceId("Zeus");
+        unknown.setIgdbId("43");
+        when(mappingRepo.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(known, unknown)));
+        when(igdbService.getGameCache()).thenReturn(Map.of("42", "Overwatch 2"));
+
+        var rows = service.list(0, 25).getContent();
+
+        assertThat(rows.get(0).igdbGameName()).isEqualTo("Overwatch 2");
+        assertThat(rows.get(1).igdbGameName()).isNull();
+        verify(igdbService, never()).findById(any());
+    }
+
+    @Test
+    void createWithAnIgdbIdTakesItsSuggestionsFromThatId() {
+        GameBinding auto = binding(user("a"), "730", Status.AUTO);
+        bindingsOfTheGame(auto);
+        // No mapping is stored yet: resolveDetected knows nothing, only the request's id leads to the game
+        when(igdbService.resolveDetected(any(), any(), any())).thenReturn(Optional.empty());
+        when(igdbService.suggestCcls("42")).thenReturn(Set.of("ViolentGraphic"));
+
+        service.create(new GameMappingRequest("STEAM", "730", "32399", "CS", null, Set.of(), false, false, "42"),
+                admin);
+
+        assertThat(auto.getCcls()).containsExactly("ViolentGraphic");
+        verify(igdbService).suggestCcls("42");
+    }
+
+    @Test
+    void updateChangingTheIgdbIdTakesItsSuggestionsFromTheNewId() {
+        GameMapping old = new GameMapping();
+        old.setId(UUID.randomUUID());
+        old.setSourceType(SourceType.STEAM);
+        old.setSourceId("730");
+        old.setTwitchGameId("old");
+        old.setTwitchGameName("Old");
+        old.setIgdbId("41");
+        mappings.put(old.getId(), old);
+        GameBinding mapped = binding(user("a"), "730", Status.MAPPED);
+        bindingsOfTheGame(mapped);
+        // What is persisted still says 41: the new id must win
+        when(igdbService.resolveDetected(any(), any(), any()))
+                .thenReturn(Optional.of(new IgdbService.IgdbGame("41", "Old game")));
+        when(igdbService.suggestCcls("41")).thenReturn(Set.of("Old"));
+        when(igdbService.suggestCcls("42")).thenReturn(Set.of("ViolentGraphic"));
+
+        service.update(old.getId(),
+                new GameMappingRequest("STEAM", "730", "32399", "CS", null, Set.of(), false, false, "42"), admin);
+
+        assertThat(mapped.getCcls()).containsExactly("ViolentGraphic");
+        assertThat(old.getIgdbId()).isEqualTo("42");
+        verify(igdbService, never()).suggestCcls("41");
     }
 }

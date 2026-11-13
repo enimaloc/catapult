@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.service.igdb;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import fr.enimaloc.catapult.common.dto.admin.IgdbGameOption;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.binding.GameMapping;
 import fr.enimaloc.catapult.domain.igdb.IgdbGameCacheEntry;
@@ -28,6 +29,7 @@ import org.springframework.web.client.RestClient;
 import proto.*;
 
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.*;
 import java.util.Collection;
 import java.util.concurrent.ConcurrentHashMap;
@@ -41,6 +43,8 @@ public class IgdbService {
 
     private static final String TWITCH_TOKEN_URL = "https://id.twitch.tv/oauth2/token";
     /** The DB cache key prefix of a game looked up by its Steam app id. */
+    /** IGDB's cover image CDN path (small cover size); the image id and ".jpg" follow. */
+    private static final String COVER_URL_PREFIX = "https://images.igdb.com/igdb/image/upload/t_cover_small/";
     public static final String KEY_STEAM_PREFIX = "steam:";
     private static final String KEY_NAME_PREFIX  = "name:";
     private static final String KEY_EXE_PREFIX   = "exe:";
@@ -316,6 +320,46 @@ public class IgdbService {
         return igdbClient.searchByName(trimmed, token).stream()
             .map(IgdbService::toIgdbGame)
             .toList();
+    }
+
+    /**
+     * The form's IGDB game search: up to 10 games with their release year (UTC) and cover. Their names are
+     * remembered (id → name) so a mapping that picks one shows it. Empty for a blank query or when IGDB or its
+     * token is unavailable.
+     */
+    public List<IgdbGameOption> searchGameOptions(String query) {
+        String trimmed = query == null ? "" : query.strip();
+        if (clientId.isBlank() || trimmed.isEmpty()) return List.of();
+        try {
+            String token = getOrRefreshAppToken();
+            if (token.isBlank()) return List.of();
+            List<IgdbGameOption> options = igdbClient.searchByName(trimmed, token).stream()
+                .filter(g -> !g.getName().isBlank())
+                .map(IgdbService::toOption)
+                .limit(10)
+                .toList();
+            options.forEach(o -> igdbGameCache.put(o.id(), o.name()));
+            return options;
+        } catch (RuntimeException e) {
+            log.warn("IGDB game search failed: {}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    private static IgdbGameOption toOption(Game game) {
+        Integer year = game.hasFirstReleaseDate() && game.getFirstReleaseDate().getSeconds() > 0
+            ? Instant.ofEpochSecond(game.getFirstReleaseDate().getSeconds()).atZone(ZoneOffset.UTC).getYear()
+            : null;
+        String imageId = game.hasCover() ? game.getCover().getImageId() : "";
+        String cover = imageId.isBlank() ? null : COVER_URL_PREFIX + imageId + ".jpg";
+        return new IgdbGameOption(String.valueOf(game.getId()), game.getName(), year, cover);
+    }
+
+    /**
+     * Resolves a game by its IGDB id (memory, DB cache, then IGDB); the name is null while none of them knows it.
+     */
+    public IgdbGame findById(String igdbId) {
+        return mappedGame(igdbId);
     }
 
     /**

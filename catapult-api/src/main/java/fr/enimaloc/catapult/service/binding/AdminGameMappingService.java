@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.common.dto.admin.DetectedGameDto;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingDto;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingRequest;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingResult;
+import fr.enimaloc.catapult.common.dto.admin.IgdbGameOption;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.binding.GameBinding.SourceType;
@@ -13,6 +14,7 @@ import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.binding.GameBindingRepository;
 import fr.enimaloc.catapult.repository.binding.GameMappingRepository;
+import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import fr.enimaloc.catapult.service.category.CategoryChain;
 import fr.enimaloc.catapult.service.category.CategoryOutcome;
@@ -41,6 +43,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Supplier;
@@ -72,6 +75,7 @@ public class AdminGameMappingService {
     private final GameBindingRepository bindingRepository;
     private final UserAccountRepository userAccountRepository;
     private final BindingService bindingService;
+    private final IgdbService igdbService;
     private final GameStateService gameStateService;
     private final StreamStateService streamStateService;
     private final ChannelEventPublisher channelEventPublisher;
@@ -80,6 +84,7 @@ public class AdminGameMappingService {
 
     public AdminGameMappingService(GameMappingRepository mappingRepository, GameBindingRepository bindingRepository,
                                    UserAccountRepository userAccountRepository, BindingService bindingService,
+                                   IgdbService igdbService,
                                    GameStateService gameStateService, StreamStateService streamStateService,
                                    ChannelEventPublisher channelEventPublisher, CategoryChain categoryChain,
                                    PlatformTransactionManager transactionManager) {
@@ -87,6 +92,7 @@ public class AdminGameMappingService {
         this.bindingRepository = bindingRepository;
         this.userAccountRepository = userAccountRepository;
         this.bindingService = bindingService;
+        this.igdbService = igdbService;
         this.gameStateService = gameStateService;
         this.streamStateService = streamStateService;
         this.channelEventPublisher = channelEventPublisher;
@@ -128,8 +134,12 @@ public class AdminGameMappingService {
         }
     }
 
-    /** A validated request: the platform, the trimmed ID and category (both null: none, an ignore-only mapping). */
-    private record Target(SourceType sourceType, String sourceId, String twitchGameId, String twitchGameName) {}
+    /**
+     * A validated request: the platform, the trimmed ID, the category (both null: none, an ignore-only mapping) and
+     * the IGDB game (null: none).
+     */
+    private record Target(SourceType sourceType, String sourceId, String twitchGameId, String twitchGameName,
+                          String igdbId) {}
 
     // ---- Listings
 
@@ -161,10 +171,15 @@ public class AdminGameMappingService {
         return rows.stream().map(r -> detectedGame(r, names)).toList();
     }
 
+    /** The form's IGDB game search (see {@link IgdbService#searchGameOptions}); empty when IGDB is unavailable. */
+    public List<IgdbGameOption> searchIgdbGames(String q) {
+        return igdbService.searchGameOptions(q);
+    }
+
     // ---- Writes
 
     public GameMappingResult create(GameMappingRequest request, UserAccount admin) {
-        Target target = validate(request);
+        Target target = validate(request, admin);
         BindingService.MappingSuggestions suggestions = igdbSuggestions(target, request);
         return write(request.applyLive(), () -> {
             if (mappingRepository.findBySourceTypeAndSourceId(target.sourceType(), target.sourceId()).isPresent()) {
@@ -187,7 +202,7 @@ public class AdminGameMappingService {
     }
 
     public GameMappingResult update(UUID id, GameMappingRequest request, UserAccount admin) {
-        Target target = validate(request);
+        Target target = validate(request, admin);
         BindingService.MappingSuggestions suggestions = igdbSuggestions(target, request);
         return write(request.applyLive(), () -> {
             GameMapping mapping = existing(id);
@@ -330,8 +345,11 @@ public class AdminGameMappingService {
         }
         GameKey game = GameKey.of(target.sourceType(), target.sourceId());
         String name = mostFrequentNames(List.of(game)).get(game);
-        return bindingService.igdbSuggestions(new DetectedGame(target.sourceId(), target.sourceType(), name),
-                request.ccls() == null, request.tws() == null);
+        DetectedGame detected = new DetectedGame(target.sourceId(), target.sourceType(), name);
+        // The request's IGDB game, not the saved mapping's (none yet on a create, the old one on an update)
+        return target.igdbId() != null
+                ? bindingService.igdbSuggestions(target.igdbId(), detected, request.ccls() == null, request.tws() == null)
+                : bindingService.igdbSuggestions(detected, request.ccls() == null, request.tws() == null);
     }
 
     /**
@@ -400,6 +418,7 @@ public class AdminGameMappingService {
         mapping.getTws().clear();
         if (request.tws() != null) mapping.getTws().addAll(request.tws());
         mapping.setIgnoredByDefault(request.ignoredByDefault());
+        mapping.setIgdbId(target.igdbId());
         mapping.setUpdatedBy(admin == null ? null : admin.getId());
     }
 
@@ -412,21 +431,47 @@ public class AdminGameMappingService {
         return new ResponseStatusException(HttpStatus.CONFLICT, "This game already has a mapping");
     }
 
-    private static Target validate(GameMappingRequest request) {
+    private Target validate(GameMappingRequest request, UserAccount admin) {
         if (request == null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing body");
         SourceType platform = platform(request.sourceType());
         String sourceId = request.sourceId() == null ? "" : request.sourceId().trim();
         if (sourceId.isEmpty()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing game ID");
+        String igdbId = request.igdbId() == null || request.igdbId().isBlank() ? null : request.igdbId().trim();
         String twitchGameId = request.twitchGameId() == null ? "" : request.twitchGameId().trim();
         String twitchGameName = request.twitchGameName() == null ? "" : request.twitchGameName().trim();
-        if (twitchGameId.isEmpty() && twitchGameName.isEmpty() && request.ignoredByDefault()) {
-            // Ignored by default, the game needs no category: its bindings keep IGDB's
-            return new Target(platform, sourceId, null, null);
+        if (twitchGameId.isEmpty() && twitchGameName.isEmpty()) {
+            if (igdbId != null) {
+                // No category typed: IGDB's game gives it (one typed always wins, nothing is deduced then)
+                Optional<BindingService.TwitchCategoryRef> deduced = deduceCategory(igdbId, admin);
+                if (deduced.isPresent()) {
+                    return new Target(platform, sourceId, deduced.get().id(), deduced.get().name(), igdbId);
+                }
+                if (!request.ignoredByDefault()) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                            "No Twitch category found for this IGDB game: enter one");
+                }
+            }
+            if (request.ignoredByDefault()) {
+                // Ignored by default, the game needs no category: its bindings keep IGDB's
+                return new Target(platform, sourceId, null, null, igdbId);
+            }
         }
         if (twitchGameId.isEmpty() || twitchGameName.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing Twitch category");
         }
-        return new Target(platform, sourceId, twitchGameId, twitchGameName);
+        return new Target(platform, sourceId, twitchGameId, twitchGameName, igdbId);
+    }
+
+    /** The Twitch category of the IGDB game; none when it has none, or when IGDB or Twitch cannot be reached. */
+    private Optional<BindingService.TwitchCategoryRef> deduceCategory(String igdbId, UserAccount admin) {
+        try {
+            IgdbService.IgdbGame game = igdbService.findById(igdbId);
+            if (game == null || game.name() == null || game.name().isBlank()) return Optional.empty();
+            return bindingService.twitchCategoryFor(igdbId, game.name(), admin);
+        } catch (RuntimeException e) {
+            log.warn("Twitch category of IGDB game {} not deduced: {}", igdbId, e.getMessage());
+            return Optional.empty();
+        }
     }
 
     /** A detected game's platform; MANUAL is not one (its ID is an IGDB ID set by the chat command). */
@@ -475,8 +520,13 @@ public class AdminGameMappingService {
                     m.isTwsOverridden() ? Set.copyOf(m.getTws()) : null,
                     followers.getOrDefault(key, 0L), m.getUpdatedAt(),
                     m.getUpdatedBy() == null ? null : logins.get(m.getUpdatedBy()), m.isIgnoredByDefault(),
-                    m.getIgdbId(), null);
+                    m.getIgdbId(), igdbName(m.getIgdbId()));
         }).toList();
+    }
+
+    /** The IGDB game's name from the in-memory cache; null when it is not there (IGDB is not called to list). */
+    private String igdbName(String igdbId) {
+        return igdbId == null ? null : igdbService.getGameCache().get(igdbId);
     }
 
     private static DetectedGameDto detectedGame(Object[] row, Map<GameKey, String> names) {

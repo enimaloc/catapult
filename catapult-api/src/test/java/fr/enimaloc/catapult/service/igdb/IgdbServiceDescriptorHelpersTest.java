@@ -37,6 +37,7 @@ import static org.mockito.Mockito.when;
 @MockitoSettings(strictness = Strictness.LENIENT)
 class IgdbServiceDescriptorHelpersTest {
 
+    @Mock fr.enimaloc.catapult.repository.binding.GameMappingRepository gameMappingRepository;
     @Mock IgdbClient igdbClient;
     @Mock IgdbGameCacheRepository cacheRepository;
     @Mock IgdbGameExternalIdRepository externalIdRepository;
@@ -85,6 +86,7 @@ class IgdbServiceDescriptorHelpersTest {
         IgdbService.IgdbGame steamHit = new IgdbService.IgdbGame("igdb_steam_100", "Stardew Valley");
         doReturn(Optional.of(steamHit)).when(igdbService).findBySteamAppId("100");
 
+        when(gameMappingRepository.findBySourceTypeAndSourceId(any(), any())).thenReturn(Optional.empty());
         GameBinding b = new GameBinding();
         b.setSourceType(GameBinding.SourceType.STEAM);
         b.setSourceId("100");

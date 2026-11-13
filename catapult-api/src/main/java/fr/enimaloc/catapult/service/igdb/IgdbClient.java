@@ -112,11 +112,11 @@ public class IgdbClient {
     }
 
     /**
-     * Full-text search of a game by name.
+     * Full-text search of a game by name (at most 10): its id and name, release date and cover image.
      */
     public List<Game> searchByName(String name, String token) {
         return apiObservations.observe("igdb", "search_by_name", () -> {
-            APICalypse query = new APICalypse().search(name).fields("id,name").limit(5);
+            APICalypse query = new APICalypse().search(name).fields("id,name,first_release_date,cover.image_id").limit(10);
             return fetchOrEmpty(token, "/games", "search '" + name + "'", query, IgdbClient::games);
         });
     }

@@ -49,6 +49,7 @@ class ApiAdminGameMappingControllerTest {
     @Mock GameBindingRepository bindingRepo;
     @Mock UserAccountRepository userRepo;
     @Mock BindingService bindingService;
+    @Mock fr.enimaloc.catapult.service.igdb.IgdbService igdbService;
     @Mock GameStateService gameStateService;
     @Mock StreamStateService streamStateService;
     @Mock ChannelEventPublisher channelEventPublisher;
@@ -65,7 +66,7 @@ class ApiAdminGameMappingControllerTest {
     @BeforeEach
     void setUp() {
         AdminGameMappingService service = new AdminGameMappingService(mappingRepo, bindingRepo, userRepo,
-                bindingService, gameStateService, streamStateService, channelEventPublisher, categoryChain,
+                bindingService, igdbService, gameStateService, streamStateService, channelEventPublisher, categoryChain,
                 transactionManager);
         controller = new ApiAdminGameMappingController(service, categories, userResolver, events);
         admin = new UserAccount();
@@ -145,5 +146,27 @@ class ApiAdminGameMappingControllerTest {
         assertThat(controller.categories("  ")).isEmpty();
         assertThat(controller.categories(null)).isEmpty();
         verifyNoInteractions(categories);
+    }
+
+    @Test
+    void igdbGamesSearchesByName() {
+        var option = new fr.enimaloc.catapult.common.dto.admin.IgdbGameOption("42", "Overwatch 2", 2022, "https://c/42.jpg");
+        when(igdbService.searchGameOptions("overwatch")).thenReturn(List.of(option));
+
+        assertThat(controller.igdbGames(" overwatch ")).containsExactly(option);
+    }
+
+    @Test
+    void blankQueryIsEmpty() {
+        assertThat(controller.igdbGames(" ")).isEmpty();
+        assertThat(controller.igdbGames(null)).isEmpty();
+        verify(igdbService, never()).searchGameOptions(any());
+    }
+
+    @Test
+    void igdbFailureIsEmpty() {
+        when(igdbService.searchGameOptions("boom")).thenReturn(List.of());
+
+        assertThat(controller.igdbGames("boom")).isEmpty();
     }
 }
