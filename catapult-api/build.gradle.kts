@@ -62,6 +62,7 @@ dependencies {
     implementation("io.sentry:sentry-spring-boot-4-starter")
     implementation("io.sentry:sentry-logback")
     implementation("org.jsoup:jsoup:$jsoupVersion")
+    implementation("com.microsoft.playwright:playwright:1.64.0")
     implementation("org.commonmark:commonmark:$commonmarkVersion")
     implementation("org.springframework.cloud:spring-cloud-context:$springCloudContextVersion")
 
