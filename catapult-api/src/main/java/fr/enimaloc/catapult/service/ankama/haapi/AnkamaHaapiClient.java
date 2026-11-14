@@ -106,14 +106,23 @@ public class AnkamaHaapiClient {
     /**
      * Asks for a chat token; {@code certificate} (nullable) is the Shield certificate, {@code hm1} the
      * per-account secret it was issued for (needed for the certificate proof, ignored without a certificate).
+     *
+     * @throws AnkamaShieldException when Ankama wants a certificate or the given one is unusable
      */
     public String chatToken(String key, Certificate certificate, String hm1) {
         Reply reply;
         if (certificate == null) {
             reply = get(haapiUrl + "Account/CreateToken?game=99", key, Map.of());
         } else {
+            String hash;
+            try {
+                hash = certificateHash(hm1, certificate);
+            } catch (IllegalArgumentException e) {
+                // A corrupt or mismatched certificate never gets better: a new Shield code is the way out
+                throw new AnkamaShieldException("the stored Shield certificate is unusable");
+            }
             reply = get(haapiUrl + "Account/CreateToken?game=99&certificate_id={id}&certificate_hash={hash}", key,
-                    Map.of("id", String.valueOf(certificate.id()), "hash", certificateHash(hm1, certificate)));
+                    Map.of("id", String.valueOf(certificate.id()), "hash", hash));
         }
         int status = reply.status();
         if (status >= 400 && status < 500) {

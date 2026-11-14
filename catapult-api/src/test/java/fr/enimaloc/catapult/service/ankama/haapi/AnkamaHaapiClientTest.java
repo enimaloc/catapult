@@ -120,6 +120,14 @@ class AnkamaHaapiClientTest {
     }
 
     @Test
+    void chatToken_anUnusableCertificate_isAnAnkamaShieldException_withoutCallingAnkama() {
+        AnkamaHaapiClient.Certificate corrupt = new AnkamaHaapiClient.Certificate(7, "not-a-certificate");
+
+        assertThatThrownBy(() -> client.chatToken("K", corrupt, HM1)).isInstanceOf(AnkamaShieldException.class);
+        server.verify();
+    }
+
+    @Test
     void chatToken_aShieldRefusal_isAnAnkamaShieldException() {
         server.expect(requestTo(HAAPI + "Account/CreateToken?game=99")).andRespond(withStatus(HttpStatus.FORBIDDEN)
                 .contentType(json()).body("{\"message\":\"Shield certificate required\"}"));
