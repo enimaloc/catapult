@@ -551,7 +551,9 @@ public class AnkamaSessionManager implements SmartLifecycle {
                 }
                 return;
             } catch (RuntimeException e) {
-                log.warn("Could not get a chat token for Ankama service account {}: {}", accountId, e.toString());
+                // The class name only: a transport error message carries the URI with the certificate proof
+                log.warn("Could not get a chat token for Ankama service account {}: {}", accountId,
+                        e.getClass().getName());
                 retryLater();
                 return;
             }
