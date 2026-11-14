@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.simulation.external;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.binding.GetterConfig;
+import fr.enimaloc.catapult.getter.AnkamaGameGetter;
 import fr.enimaloc.catapult.getter.BattleNetGameGetter;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.getter.MinecraftPresenceGetter;
@@ -36,9 +37,11 @@ class SimulatedPresenceGettersTest {
     XboxGameGetter realXbox = mock(XboxGameGetter.class);
     MinecraftPresenceGetter realMinecraft = mock(MinecraftPresenceGetter.class);
     BattleNetGameGetter realBattleNet = mock(BattleNetGameGetter.class);
+    AnkamaGameGetter realAnkama = mock(AnkamaGameGetter.class);
     SimulatedXboxGameGetter xbox;
     SimulatedMinecraftPresenceGetter minecraft;
     SimulatedBattleNetGameGetter battleNet;
+    SimulatedAnkamaGameGetter ankama;
 
     @BeforeEach
     void setUp() {
@@ -48,6 +51,7 @@ class SimulatedPresenceGettersTest {
                 fx.registry);
         battleNet = new SimulatedBattleNetGameGetter(SimulationFixture.providerOf(realBattleNet), fx.runner,
                 fx.registry);
+        ankama = new SimulatedAnkamaGameGetter(SimulationFixture.providerOf(realAnkama), fx.runner, fx.registry);
     }
 
     private void playing(GetterConfig.Provider provider, String sourceId, String name) {
@@ -119,5 +123,14 @@ class SimulatedPresenceGettersTest {
         assertThat(battleNet.getCurrentGame(fx.fictitious))
                 .contains(new DetectedGame("wow", GameBinding.SourceType.BATTLENET, "World of Warcraft"));
         verifyNoInteractions(realBattleNet);
+    }
+
+    @Test
+    void simulatedGetter_answersFromTheSimulation() {
+        playing(GetterConfig.Provider.ANKAMA, "3", "Wakfu");
+
+        assertThat(ankama.getCurrentGame(fx.fictitious))
+                .contains(new DetectedGame("3", GameBinding.SourceType.ANKAMA, "Wakfu"));
+        verifyNoInteractions(realAnkama);
     }
 }

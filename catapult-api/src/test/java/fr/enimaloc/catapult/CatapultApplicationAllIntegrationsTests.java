@@ -23,6 +23,8 @@ import org.springframework.test.context.TestPropertySource;
             "minecraft.msa-client-id=full-context-test",
             "dtdd.enabled=true",
             "battlenet.enabled=true",
+            "ankama.enabled=true",
+            "ankama.sessions.enabled=false",
             "battlenet.client-id=full-context-test",
             "battlenet.client-secret=full-context-test",
             "app.chat.provider=irc"

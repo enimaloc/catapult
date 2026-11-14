@@ -39,6 +39,8 @@ import fr.enimaloc.catapult.common.dto.admin.TwDefinitionDto;
 import fr.enimaloc.catapult.common.dto.admin.TwKeywordTestDto;
 import fr.enimaloc.catapult.common.dto.admin.TwRebuild;
 import fr.enimaloc.catapult.common.dto.admin.AccountDto;
+import fr.enimaloc.catapult.common.dto.admin.AnkamaAccountDto;
+import fr.enimaloc.catapult.common.dto.admin.AnkamaLoginStartDto;
 import fr.enimaloc.catapult.common.dto.admin.BattleNetAccountDto;
 import fr.enimaloc.catapult.common.dto.admin.MetaTagDto;
 import fr.enimaloc.catapult.common.dto.admin.MetaTagRequest;
@@ -46,6 +48,7 @@ import fr.enimaloc.catapult.common.dto.admin.SocialLinkDto;
 import fr.enimaloc.catapult.common.dto.admin.SocialLinkOrderRequest;
 import fr.enimaloc.catapult.common.dto.admin.SocialLinkRequest;
 import fr.enimaloc.catapult.common.dto.admin.MinecraftDeviceCodeDto;
+import fr.enimaloc.catapult.common.dto.connect.AnkamaLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.connect.BattleNetLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.admin.DtddKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.SteamKeysPageData;
@@ -362,6 +365,35 @@ public class RealApiService implements ApiService {
         UUID me = me();
         if (me == null) return null;
         return client.get("/api/internal/users/{userId}/links/battlenet", BattleNetLinkStateResponse.class, me);
+    }
+
+    @Override
+    public AnkamaLinkStateResponse ankamaStatus(String username) {
+        UUID me = me();
+        if (me == null) return null;
+        return client.get("/api/internal/users/{userId}/links/ankama", AnkamaLinkStateResponse.class, me);
+    }
+
+    @Override
+    public ApiClient.Result<AnkamaLinkStateResponse> ankamaEnroll(String username, String nameTag) {
+        UUID me = me();
+        if (me == null) return new ApiClient.Result<>(HttpStatus.UNAUTHORIZED.value(), null);
+        return client.call(HttpMethod.PUT, "/api/internal/users/{userId}/links/ankama", Map.of("nameTag", nameTag),
+                AnkamaLinkStateResponse.class, me);
+    }
+
+    @Override
+    public int ankamaResend(String username) {
+        UUID me = me();
+        if (me == null) return HttpStatus.UNAUTHORIZED.value();
+        return client.postVoid("/api/internal/users/{userId}/links/ankama/resend", null, me);
+    }
+
+    @Override
+    public int ankamaDisconnect(String username) {
+        UUID me = me();
+        if (me == null) return HttpStatus.UNAUTHORIZED.value();
+        return client.delete("/api/internal/users/{userId}/links/ankama", me);
     }
 
     @Override
@@ -1398,6 +1430,65 @@ public class RealApiService implements ApiService {
     @Override
     public int adminDeleteBattleNetAccount(UUID id) {
         return client.call(HttpMethod.DELETE, "/api/internal/admin/battlenet-accounts/{id}", null, Void.class, id).status();
+    }
+
+    @Override
+    public List<AnkamaAccountDto> adminAnkamaAccounts() {
+        // a 404 (Ankama disabled in catapult-api) is null, like any failed read
+        AnkamaAccountDto[] accounts = client.get("/api/internal/admin/ankama-accounts", AnkamaAccountDto[].class);
+        return accounts == null ? null : List.of(accounts);
+    }
+
+    @Override
+    public AdminCall<AnkamaLoginStartDto> adminStartAnkamaLogin(UUID accountId) {
+        Map<String, Object> body = accountId == null ? Map.of() : Map.of("accountId", accountId.toString());
+        return ankamaAnswer(client.call(HttpMethod.POST, "/api/internal/admin/ankama-accounts/login", body, JsonNode.class),
+                AnkamaLoginStartDto.class);
+    }
+
+    @Override
+    public AdminCall<AnkamaAccountDto> adminCompleteAnkamaLogin(UUID loginId, String redirectUrl) {
+        // the URL holds a one-time code: it only travels in the body
+        return ankamaAnswer(client.call(HttpMethod.POST, "/api/internal/admin/ankama-accounts/login/{loginId}/complete",
+                Map.of("redirectUrl", redirectUrl), JsonNode.class, loginId), AnkamaAccountDto.class);
+    }
+
+    @Override
+    public AdminCall<Void> adminSubmitAnkamaCode(UUID id, String code) {
+        return ankamaAnswer(client.call(HttpMethod.POST, "/api/internal/admin/ankama-accounts/{id}/code",
+                Map.of("code", code), JsonNode.class, id), Void.class);
+    }
+
+    @Override
+    public int adminResendAnkamaCode(UUID id) {
+        return client.call(HttpMethod.POST, "/api/internal/admin/ankama-accounts/{id}/code/resend", null, Void.class, id).status();
+    }
+
+    @Override
+    public AdminCall<AnkamaAccountDto> adminPatchAnkamaAccount(UUID id, Map<String, Object> patch) {
+        return ankamaAnswer(client.call(HttpMethod.PATCH, "/api/internal/admin/ankama-accounts/{id}", patch, JsonNode.class, id),
+                AnkamaAccountDto.class);
+    }
+
+    @Override
+    public int adminDeleteAnkamaAccount(UUID id) {
+        return client.call(HttpMethod.DELETE, "/api/internal/admin/ankama-accounts/{id}", null, Void.class, id).status();
+    }
+
+    /** An Ankama admin call's status, its body read as {@code type} on a 2xx, and the {@code error} text of a refusal. */
+    private static <T> AdminCall<T> ankamaAnswer(ApiClient.Result<JsonNode> result, Class<T> type) {
+        JsonNode node = result.body();
+        if (!result.ok()) {
+            JsonNode error = node == null ? null : node.get("error");
+            return new AdminCall<>(result.status(), null, error != null && error.isString() ? error.stringValue() : null);
+        }
+        if (node == null || type == Void.class) return new AdminCall<>(result.status(), null, null);
+        try {
+            return new AdminCall<>(result.status(), SAVE_JSON.treeToValue(node, type), null);
+        } catch (RuntimeException e) {
+            // an answer that is no {@code type}: the status still counts
+            return new AdminCall<>(result.status(), null, null);
+        }
     }
 
     @Override

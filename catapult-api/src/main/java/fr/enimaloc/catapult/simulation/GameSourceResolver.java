@@ -40,7 +40,7 @@ public class GameSourceResolver {
     public Resolution resolve(GetterConfig.Provider provider, String name) {
         return switch (provider) {
             case MINECRAFT -> new Resolution("minecraft", "Minecraft", null);
-            case BATTLENET -> new Resolution(name, name, null);
+            case BATTLENET, ANKAMA -> new Resolution(name, name, null);
             case STEAM -> store(GameBinding.SourceType.STEAM, "Steam app id", name);
             case XBOX -> store(GameBinding.SourceType.XBOX, "Microsoft Store product id", name);
         };

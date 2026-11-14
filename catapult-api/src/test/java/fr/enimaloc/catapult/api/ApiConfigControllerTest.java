@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.getter.GameGetter;
 import fr.enimaloc.catapult.getter.steam.SteamApiKeyRotator;
+import fr.enimaloc.catapult.service.ankama.AnkamaGateService;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -16,7 +17,7 @@ import static org.mockito.Mockito.when;
 class ApiConfigControllerTest {
 
     private static ApiConfigController controller(Optional<SteamApiKeyRotator> rotator, String configuredKey) {
-        ApiConfigController controller = new ApiConfigController(List.of(), rotator);
+        ApiConfigController controller = new ApiConfigController(List.of(), rotator, mock(AnkamaGateService.class));
         ReflectionTestUtils.setField(controller, "steamEnabled", true);
         ReflectionTestUtils.setField(controller, "steamApiKey", configuredKey);
         return controller;
@@ -27,7 +28,7 @@ class ApiConfigControllerTest {
         // under the simulation a getter and its simulated subclass are both GameGetter beans
         ApiConfigController controller = new ApiConfigController(
                 List.of(getter("Steam"), getter("Xbox"), getter("Minecraft"), getter("Xbox"), getter("Minecraft")),
-                Optional.empty());
+                Optional.empty(), mock(AnkamaGateService.class));
 
         assertThat(controller.appConfig().gettersName()).containsExactly("Steam", "Xbox", "Minecraft");
     }
@@ -52,5 +53,15 @@ class ApiConfigControllerTest {
 
         assertThat(controller.providers().steam()).isTrue();
         assertThat(controller.providers().steam()).isFalse();
+    }
+
+    @Test
+    void providers_ankamaFollowsTheGate() {
+        AnkamaGateService gate = mock(AnkamaGateService.class);
+        when(gate.isConfigured()).thenReturn(true, false);
+        ApiConfigController controller = new ApiConfigController(List.of(), Optional.empty(), gate);
+
+        assertThat(controller.providers().ankama()).isTrue();
+        assertThat(controller.providers().ankama()).isFalse();
     }
 }

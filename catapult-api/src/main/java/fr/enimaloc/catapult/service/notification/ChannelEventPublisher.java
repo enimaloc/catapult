@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.service.notification;
 
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingDto;
+import fr.enimaloc.catapult.common.dto.connect.AnkamaLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto;
 import fr.enimaloc.catapult.common.dto.channel.BindingDto;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingCurrentDto;
@@ -129,6 +130,13 @@ public class ChannelEventPublisher {
         publish(channelOwnerId, ChannelEvents.BATTLENET_LINK_CHANGED,
                 (id, login) -> new ChannelEvents.BattleNetLinkChanged(id, login, status, battleTag,
                         serviceAccountBattleTag));
+    }
+
+    /** The channel's Ankama link is now {@code state} ({@code NONE} once gone). */
+    public void publishAnkamaLinkChanged(UUID channelOwnerId, AnkamaLinkStateResponse state) {
+        publish(channelOwnerId, ChannelEvents.ANKAMA_LINK_CHANGED,
+                (id, login) -> new ChannelEvents.AnkamaLinkChanged(id, login, state.status(), state.nameTag(),
+                        state.serviceAccountTag()));
     }
 
     /** The channel's active custom binding is now {@code activeId}; null once deactivated. */

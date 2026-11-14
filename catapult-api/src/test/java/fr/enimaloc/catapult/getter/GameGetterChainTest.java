@@ -33,7 +33,7 @@ class GameGetterChainTest {
     @BeforeEach
     void setUp() {
         registry = new SimpleMeterRegistry();
-        chain = new GameGetterChain(getterConfigRepository, Optional.of(steamGameGetter), Optional.empty(), Optional.empty(), Optional.empty(), registry);
+        chain = new GameGetterChain(getterConfigRepository, Optional.of(steamGameGetter), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), registry);
     }
 
     @Test
