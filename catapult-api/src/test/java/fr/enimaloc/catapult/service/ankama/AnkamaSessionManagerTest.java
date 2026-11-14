@@ -33,6 +33,10 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -106,6 +110,10 @@ class AnkamaSessionManagerTest {
     }
 
     private AnkamaSessionManager manager(boolean sessionsEnabled) {
+        return manager(sessionsEnabled, Runnable::run);
+    }
+
+    private AnkamaSessionManager manager(boolean sessionsEnabled, Executor starter) {
         return new AnkamaSessionManager(repository, haapi, encryption, siteRole, events, registry,
                 TransactionOperations.withoutTransaction(), sessionsEnabled,
                 () -> {
@@ -113,7 +121,7 @@ class AnkamaSessionManagerTest {
                     clients.add(client);
                     return client;
                 },
-                scheduler, Runnable::run, Runnable::run, clock, Duration.ofMillis(1));
+                scheduler, starter, Runnable::run, clock, Duration.ofMillis(1));
     }
 
     private AnkamaSessionManager started() {
@@ -387,5 +395,114 @@ class AnkamaSessionManagerTest {
         manager.onSiteRoleChanged(new SiteRoleChangedEvent(this, true));
         assertThat(clients).hasSize(4);
         assertThat(manager.sessionState(bot1.getId())).isEqualTo("READY");
+    }
+
+    @Test
+    void threeMoreRefusals_afterASuccessfulRefresh_setReauthRequired() {
+        when(repository.findByEnabledTrueAndAuthStateOrderByFillOrderAsc(AuthState.READY))
+                .thenReturn(List.of(bot1));
+        for (int i = 0; i < 6; i++) {
+            prepared.add(FakeChatClient.refusing());
+        }
+        when(haapi.refresh("key-Bot1", "refresh-Bot1")).thenReturn("new-refresh");
+        AnkamaSessionManager manager = started();
+
+        eventually(() -> assertThat(bot1.getAuthState()).isEqualTo(AuthState.REAUTH_REQUIRED));
+        eventually(() -> assertThat(manager.sessionState(bot1.getId())).isEqualTo(AnkamaSessionManager.DISABLED));
+        assertThat(clients).hasSize(6);
+        verify(haapi, times(1)).refresh(anyString(), anyString());
+        assertThat(encryption.decrypt(bot1.getRefreshTokenEnc())).isEqualTo("new-refresh");
+        assertThat(adminActions()).isEqualTo(1.0);
+    }
+
+    /** Bot1's first chat token call blocks until released, then fails with {@code failure}. */
+    private final class BlockedChatToken {
+        final CountDownLatch entered = new CountDownLatch(1);
+        final CountDownLatch release = new CountDownLatch(1);
+        final ExecutorService starter = Executors.newSingleThreadExecutor();
+
+        BlockedChatToken(RuntimeException failure) {
+            when(repository.findByEnabledTrueAndAuthStateOrderByFillOrderAsc(AuthState.READY))
+                    .thenReturn(List.of(bot1));
+            when(haapi.chatToken(eq("key-Bot1"), any(), anyString())).thenAnswer(invocation -> {
+                entered.countDown();
+                release.await(5, TimeUnit.SECONDS);
+                throw failure;
+            }).thenReturn("chat-token");
+        }
+
+        AnkamaSessionManager start() throws InterruptedException {
+            AnkamaSessionManager manager = manager(true, starter);
+            manager.start();
+            assertThat(entered.await(5, TimeUnit.SECONDS)).isTrue();
+            return manager;
+        }
+
+        /** Lets the blocked call fail and waits for every queued attempt. */
+        void finish() throws InterruptedException {
+            release.countDown();
+            starter.shutdown();
+            assertThat(starter.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
+    @Test
+    void attemptStoppedDuringTheChatTokenCall_neitherRefreshesNorTouchesTheAccount() throws Exception {
+        BlockedChatToken refused = new BlockedChatToken(new AnkamaAuthException("refused"));
+        AnkamaSessionManager manager = refused.start();
+
+        manager.stop(bot1.getId());
+        refused.finish();
+
+        verify(haapi, never()).refresh(anyString(), anyString());
+        verify(repository, never()).save(any());
+        assertThat(bot1.getAuthState()).isEqualTo(AuthState.READY);
+        assertThat(clients).isEmpty();
+        assertThat(adminActions()).isZero();
+    }
+
+    @Test
+    void attemptStoppedDuringTheChatTokenCall_sendsNoShieldCode() throws Exception {
+        BlockedChatToken shield = new BlockedChatToken(new AnkamaShieldException("certificate"));
+        AnkamaSessionManager manager = shield.start();
+
+        manager.stop(bot1.getId());
+        shield.finish();
+
+        verify(haapi, never()).sendShieldCode(anyString());
+        verify(repository, never()).save(any());
+        assertThat(bot1.getAuthState()).isEqualTo(AuthState.READY);
+        assertThat(adminActions()).isZero();
+    }
+
+    @Test
+    void standbyDuringTheChatTokenCall_refreshesNothing() throws Exception {
+        BlockedChatToken refused = new BlockedChatToken(new AnkamaAuthException("refused"));
+        AnkamaSessionManager manager = refused.start();
+
+        when(siteRole.isActive()).thenReturn(false);
+        manager.onSiteRoleChanged(new SiteRoleChangedEvent(this, false));
+        refused.finish();
+
+        verify(haapi, never()).refresh(anyString(), anyString());
+        assertThat(bot1.getAuthState()).isEqualTo(AuthState.READY);
+        assertThat(manager.sessionState(bot1.getId())).isEqualTo(AnkamaSessionManager.DISABLED);
+    }
+
+    @Test
+    void restartDuringARefusedChatTokenCall_keepsTheNewSession() throws Exception {
+        BlockedChatToken refused = new BlockedChatToken(new AnkamaAuthException("refused"));
+        AnkamaSessionManager manager = refused.start();
+
+        manager.restart(bot1.getId());
+        refused.finish();
+
+        verify(haapi, never()).refresh(anyString(), anyString());
+        verify(repository, never()).save(any());
+        assertThat(bot1.getAuthState()).isEqualTo(AuthState.READY);
+        assertThat(manager.sessionState(bot1.getId())).isEqualTo("READY");
+        assertThat(clients).hasSize(1);
+        assertThat(clients.getFirst().closed).isFalse();
+        assertThat(adminActions()).isZero();
     }
 }

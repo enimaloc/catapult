@@ -416,7 +416,7 @@ public class AnkamaSessionManager implements SmartLifecycle {
         }
     }
 
-    /** Marks the account, counts it and stops its session until the admin acts. */
+    /** Marks the account, counts it and stops whatever session it has until the admin acts. */
     private void requireAdmin(UUID accountId, AuthState state) {
         setAuthState(accountId, state);
         registry.counter(ADMIN_ACTION_COUNTER, "account", accountId.toString()).increment();
@@ -479,12 +479,38 @@ public class AnkamaSessionManager implements SmartLifecycle {
             return sessions.get(accountId) == this;
         }
 
+        /**
+         * Whether this session still owns the account: neither stopped nor replaced. An attempt blocked in an HTTP
+         * call may outlive its session, and must then neither refresh the key nor touch the account.
+         */
+        private boolean owned() {
+            return !stopped && current();
+        }
+
         /** Leaves the session for good, from the session itself. */
         private void end() {
             synchronized (lock) {
                 if (current()) {
                     close(accountId);
                 }
+            }
+        }
+
+        /**
+         * Marks the account, counts it and ends this session until the admin acts; does nothing when the session no
+         * longer owns the account (a newer one may run on a fresh login).
+         *
+         * @return whether the account was marked
+         */
+        private boolean stopForAdmin(AuthState state) {
+            synchronized (lock) {
+                if (!owned()) {
+                    return false;
+                }
+                setAuthState(accountId, state);
+                registry.counter(ADMIN_ACTION_COUNTER, "account", accountId.toString()).increment();
+                close(accountId);
+                return true;
             }
         }
 
@@ -512,17 +538,17 @@ public class AnkamaSessionManager implements SmartLifecycle {
                 key = encryption.decrypt(account.getApiKeyEnc());
                 token = chatToken(account, key);
             } catch (AnkamaShieldException e) {
-                log.warn("Ankama wants a Shield code for service account {}: sending one, the session waits for "
-                        + "the admin", accountId);
-                setAuthState(accountId, AuthState.CODE_REQUIRED);
-                sendShieldCode(key);
-                registry.counter(ADMIN_ACTION_COUNTER, "account", accountId.toString()).increment();
-                end();
+                if (stopForAdmin(AuthState.CODE_REQUIRED)) {
+                    log.warn("Ankama wants a Shield code for service account {}: sending one, the session waits "
+                            + "for the admin", accountId);
+                    sendShieldCode(key);
+                }
                 return;
             } catch (AnkamaAuthException e) {
-                log.warn("Ankama refused the key of service account {} even after a refresh: it needs a new login",
-                        accountId);
-                requireAdmin(accountId, AuthState.REAUTH_REQUIRED);
+                if (stopForAdmin(AuthState.REAUTH_REQUIRED)) {
+                    log.warn("Ankama refused the key of service account {} even after a refresh: it needs a new "
+                            + "login", accountId);
+                }
                 return;
             } catch (RuntimeException e) {
                 log.warn("Could not get a chat token for Ankama service account {}: {}", accountId, e.toString());
@@ -575,6 +601,9 @@ public class AnkamaSessionManager implements SmartLifecycle {
             try {
                 return haapi.chatToken(key, certificate, account.getHm1());
             } catch (AnkamaAuthException e) {
+                if (!owned()) {
+                    throw e;
+                }
                 log.info("Ankama refused the chat token of service account {}: refreshing its key once", accountId);
                 refresh(accountId);
                 return haapi.chatToken(key, certificate, account.getHm1());
@@ -591,6 +620,9 @@ public class AnkamaSessionManager implements SmartLifecycle {
 
         /** {@link #MAX_CHAT_AUTH_FAILURES} refusals in a row: refresh the key once, then ask the admin. */
         private void chatAuthRefused() {
+            if (!owned()) {
+                return;
+            }
             if (++chatAuthFailures < MAX_CHAT_AUTH_FAILURES) {
                 log.warn("The chat refused the token of Ankama service account {} ({} in a row)", accountId,
                         chatAuthFailures);
@@ -599,17 +631,23 @@ public class AnkamaSessionManager implements SmartLifecycle {
             }
             chatAuthFailures = 0;
             if (refreshedForChat) {
-                log.warn("The chat still refuses Ankama service account {} after a key refresh: it needs a new "
-                        + "login", accountId);
-                requireAdmin(accountId, AuthState.REAUTH_REQUIRED);
+                if (stopForAdmin(AuthState.REAUTH_REQUIRED)) {
+                    log.warn("The chat still refuses Ankama service account {} after a key refresh: it needs a new "
+                            + "login", accountId);
+                }
                 return;
             }
             refreshedForChat = true;
+            if (!owned()) {
+                return;
+            }
             try {
                 refresh(accountId);
             } catch (AnkamaAuthException e) {
-                log.warn("Ankama refused to refresh the key of service account {}: it needs a new login", accountId);
-                requireAdmin(accountId, AuthState.REAUTH_REQUIRED);
+                if (stopForAdmin(AuthState.REAUTH_REQUIRED)) {
+                    log.warn("Ankama refused to refresh the key of service account {}: it needs a new login",
+                            accountId);
+                }
                 return;
             } catch (RuntimeException e) {
                 log.warn("Could not refresh the key of Ankama service account {}: {}", accountId, e.toString());
