@@ -9,6 +9,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpHeaders;
@@ -46,9 +47,12 @@ public class LinkSessionRestoreFilter extends OncePerRequestFilter {
 
     static final String PATH_PREFIX = "/oauth2/authorization/";
     private static final String BEARER = "Bearer ";
+    /** Carried by the JWT an admin gets to act as a member ({@link ImpersonationService}). */
+    static final String IMPERSONATION_ROLE = "ROLE_PREVIOUS_ADMINISTRATOR";
 
-    private final JwtDecoder jwtDecoder;
-    private final UserAccountRepository users;
+    // Resolved on use: a servlet filter is picked up by every web test slice, which has neither
+    private final ObjectProvider<JwtDecoder> jwtDecoder;
+    private final ObjectProvider<UserAccountRepository> users;
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -79,18 +83,25 @@ public class LinkSessionRestoreFilter extends OncePerRequestFilter {
 
     private Optional<CatapultOAuth2User> bearerUser(HttpServletRequest request) {
         String header = request.getHeader(HttpHeaders.AUTHORIZATION);
-        if (header == null || !header.startsWith(BEARER)) return Optional.empty();
+        JwtDecoder decoder = jwtDecoder.getIfAvailable();
+        UserAccountRepository accounts = users.getIfAvailable();
+        if (header == null || !header.startsWith(BEARER) || decoder == null || accounts == null) return Optional.empty();
         Jwt jwt;
         UUID id;
         try {
-            jwt = jwtDecoder.decode(header.substring(BEARER.length()).trim());
+            jwt = decoder.decode(header.substring(BEARER.length()).trim());
             id = UUID.fromString(jwt.getSubject());
         } catch (JwtException | IllegalArgumentException | NullPointerException e) {
             log.info("Secondary link started with an unusable token ({})", e.getClass().getSimpleName());
             return Optional.empty();
         }
         List<String> roles = Optional.ofNullable(jwt.getClaimAsStringList("roles")).orElse(List.of());
-        return users.findById(id)
+        if (roles.contains(IMPERSONATION_ROLE)) {
+            // An admin acting as a member: their own provider account must never be linked to the member's
+            log.info("Secondary link started while impersonating: no session restored");
+            return Optional.empty();
+        }
+        return accounts.findById(id)
                 .filter(account -> account.getStatus() == UserAccount.Status.ACTIVE)
                 .map(account -> new CatapultOAuth2User(null, account, roles.contains("ROLE_ADMIN")));
     }

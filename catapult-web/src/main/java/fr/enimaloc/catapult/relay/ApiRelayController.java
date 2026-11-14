@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.relay;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+import fr.enimaloc.catapult.controller.ImpersonationController;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -162,11 +163,13 @@ public class ApiRelayController {
     /**
      * The logged-in user's JWT when a secondary link (Steam, Xbox, Battle.net) starts: catapult-api's session, which
      * its callback reads the user from, may have been lost (restart, other replica), so catapult-api restores it
-     * from this token (its LinkSessionRestoreFilter). Null for any other request.
+     * from this token (its LinkSessionRestoreFilter). Null for any other request, and while an admin impersonates a
+     * member: the admin's own account must never be linked to the member's.
      */
     private static String linkJwt(HttpServletRequest request) {
         String uri = request.getRequestURI();
         if (!uri.startsWith(LINK_PREFIX) || uri.equals(LINK_PREFIX + "twitch")) return null;
+        if (ImpersonationController.impersonating(request)) return null;
         HttpSession session = request.getSession(false);
         return session != null && session.getAttribute(ApiClient.SESSION_JWT_KEY) instanceof String jwt
                 && !jwt.isBlank() ? jwt : null;

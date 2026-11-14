@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockHttpSession;
@@ -32,7 +33,14 @@ class LinkSessionRestoreFilterTest {
 
     private final JwtDecoder decoder = mock(JwtDecoder.class);
     private final UserAccountRepository users = mock(UserAccountRepository.class);
-    private final LinkSessionRestoreFilter filter = new LinkSessionRestoreFilter(decoder, users);
+    private final LinkSessionRestoreFilter filter = new LinkSessionRestoreFilter(provider(decoder), provider(users));
+
+    @SuppressWarnings("unchecked")
+    private static <T> ObjectProvider<T> provider(T bean) {
+        ObjectProvider<T> provider = mock(ObjectProvider.class);
+        when(provider.getIfAvailable()).thenReturn(bean);
+        return provider;
+    }
 
     private static UserAccount account(UUID id, UserAccount.Status status) {
         UserAccount account = new UserAccount();
@@ -141,6 +149,19 @@ class LinkSessionRestoreFilterTest {
             assertThat(request.getSession(false)).as(String.valueOf(token)).isNull();
             verify(chain).doFilter(request, response);
         }
+    }
+
+    @Test
+    void anImpersonationToken_restoresNothing() throws Exception {
+        UUID member = UUID.randomUUID();
+        when(decoder.decode("impersonation")).thenReturn(
+                jwt(member, List.of("ROLE_USER", LinkSessionRestoreFilter.IMPERSONATION_ROLE)));
+        when(users.findById(member)).thenReturn(Optional.of(account(member, UserAccount.Status.ACTIVE)));
+        MockHttpServletRequest request = linkStart("battlenet", "impersonation");
+
+        filter.doFilter(request, new MockHttpServletResponse(), mock(FilterChain.class));
+
+        assertThat(request.getSession(false)).isNull();
     }
 
     @Test

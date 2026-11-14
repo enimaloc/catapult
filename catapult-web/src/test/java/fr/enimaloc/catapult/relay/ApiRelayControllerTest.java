@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.relay;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
+import fr.enimaloc.catapult.controller.ImpersonationController;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -145,6 +146,17 @@ class ApiRelayControllerTest {
                     .andExpect(status().isOk());
             assertThat(RECEIVED.get().header("Authorization")).as(provider).isEqualTo("Bearer session-jwt");
         }
+    }
+
+    @Test
+    void anImpersonatingAdmin_neverSendsTheMembersJwt() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute(ApiClient.SESSION_JWT_KEY, "member-jwt");
+        session.setAttribute(ImpersonationController.ORIGINAL_JWT_KEY, "admin-jwt");
+
+        mvc.perform(get("/oauth2/authorization/battlenet").session(session)).andExpect(status().isOk());
+
+        assertThat(RECEIVED.get().header("Authorization")).isNull();
     }
 
     @Test
