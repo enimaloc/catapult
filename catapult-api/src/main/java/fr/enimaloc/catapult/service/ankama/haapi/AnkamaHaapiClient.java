@@ -92,7 +92,10 @@ public class AnkamaHaapiClient {
         form.add("lang", "fr");
         Reply reply = client.post().uri(haapiUrl + "Api/RefreshApiKey").header("APIKEY", key)
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED).body(form).exchange(this::read);
-        return text(ok(reply), "refresh_token");
+        String newRefreshToken = text(ok(reply), "refresh_token");
+        // Ankama answered without a new token: keep the old one rather than storing an empty token
+        if (newRefreshToken.isBlank()) throw new RestClientException("Ankama returned no refresh token");
+        return newRefreshToken;
     }
 
     /** Asks for a chat token without a Shield certificate. */

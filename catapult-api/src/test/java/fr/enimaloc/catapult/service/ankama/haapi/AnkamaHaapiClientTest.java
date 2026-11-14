@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 
 import javax.crypto.Cipher;
 import javax.crypto.spec.SecretKeySpec;
@@ -89,6 +90,14 @@ class AnkamaHaapiClientTest {
                 .andRespond(withSuccess("{\"key\":\"K\",\"refresh_token\":\"new\"}", json()));
 
         assertThat(client.refresh("K", "old")).isEqualTo("new");
+    }
+
+    @Test
+    void refresh_withoutARefreshToken_isAFailure() {
+        server.expect(requestTo(HAAPI + "Api/RefreshApiKey"))
+                .andRespond(withSuccess("{\"key\":\"K\"}", json()));
+
+        assertThatThrownBy(() -> client.refresh("K", "old")).isInstanceOf(RestClientException.class);
     }
 
     @Test
