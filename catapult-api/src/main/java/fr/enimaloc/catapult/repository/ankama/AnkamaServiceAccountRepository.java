@@ -12,4 +12,6 @@ public interface AnkamaServiceAccountRepository extends JpaRepository<AnkamaServ
 
     List<AnkamaServiceAccount> findByEnabledTrueAndAuthStateOrderByFillOrderAsc(
             AnkamaServiceAccount.AuthState authState);
+
+    List<AnkamaServiceAccount> findByAuthState(AnkamaServiceAccount.AuthState authState);
 }
