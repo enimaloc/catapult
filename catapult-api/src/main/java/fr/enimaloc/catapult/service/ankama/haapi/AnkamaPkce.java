@@ -12,27 +12,27 @@ import java.util.Base64;
 /** PKCE helpers for the launcher-style Ankama login (public client 102, loopback redirect). */
 public final class AnkamaPkce {
 
-    public record Pair(String verifier, String challenge) {
+    public record Pair(String proofKey, String challenge) {
     }
 
     private static final String ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
-    private static final int VERIFIER_LENGTH = 64;
+    private static final int PROOF_KEY_LENGTH = 64;
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private AnkamaPkce() {
     }
 
     public static Pair generate() {
-        StringBuilder verifier = new StringBuilder(VERIFIER_LENGTH);
-        for (int i = 0; i < VERIFIER_LENGTH; i++) {
-            verifier.append(ALPHABET.charAt(RANDOM.nextInt(ALPHABET.length())));
+        StringBuilder proofKey = new StringBuilder(PROOF_KEY_LENGTH);
+        for (int i = 0; i < PROOF_KEY_LENGTH; i++) {
+            proofKey.append(ALPHABET.charAt(RANDOM.nextInt(ALPHABET.length())));
         }
-        return new Pair(verifier.toString(), challengeOf(verifier.toString()));
+        return new Pair(proofKey.toString(), challengeOf(proofKey.toString()));
     }
 
-    static String challengeOf(String verifier) {
+    static String challengeOf(String proofKey) {
         try {
-            byte[] digest = MessageDigest.getInstance("SHA-256").digest(verifier.getBytes(StandardCharsets.US_ASCII));
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(proofKey.getBytes(StandardCharsets.US_ASCII));
             return Base64.getUrlEncoder().withoutPadding().encodeToString(digest);
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);

@@ -64,13 +64,13 @@ public class AnkamaHaapiClient {
         this.authUrl = authUrl;
     }
 
-    public Tokens exchangeCode(String code, String verifier) {
+    public Tokens exchangeCode(String code, String proofKey) {
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("grant_type", "authorization_code");
         form.add("code", code);
         form.add("redirect_uri", REDIRECT_URI);
         form.add("client_id", CLIENT_ID);
-        form.add("code_verifier", verifier);
+        form.add("code_verifier", proofKey);
         JsonNode body = ok(post(authUrl + "token", form));
         return new Tokens(text(body, "access_token"), text(body, "refresh_token"));
     }

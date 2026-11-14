@@ -54,8 +54,8 @@ public class AnkamaServiceAccountAdmin {
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final List<AnkamaFriendLink.Status> ACCEPTED = List.of(AnkamaFriendLink.Status.ACCEPTED);
 
-    /** A started login: the PKCE verifier never leaves the server. */
-    private record PendingLogin(String verifier, UUID reauthAccountId, Instant expiresAt) {}
+    /** A started login: the PKCE proof key never leaves the server. */
+    private record PendingLogin(String proofKey, UUID reauthAccountId, Instant expiresAt) {}
 
     private final AnkamaServiceAccountRepository accountRepository;
     private final AnkamaFriendLinkRepository linkRepository;
@@ -107,7 +107,7 @@ public class AnkamaServiceAccountAdmin {
         pendingLogins.values().removeIf(pending -> pending.expiresAt().isBefore(now));
         AnkamaPkce.Pair pkce = AnkamaPkce.generate();
         UUID loginId = UUID.randomUUID();
-        pendingLogins.put(loginId, new PendingLogin(pkce.verifier(), reauthAccountId, now.plus(LOGIN_TTL)));
+        pendingLogins.put(loginId, new PendingLogin(pkce.proofKey(), reauthAccountId, now.plus(LOGIN_TTL)));
         return new AnkamaLoginStartDto(loginId, AnkamaPkce.authorizeUrl(pkce.challenge()));
     }
 
@@ -124,7 +124,7 @@ public class AnkamaServiceAccountAdmin {
         Tokens tokens;
         Account ankama;
         try {
-            tokens = haapi.exchangeCode(code, pending.verifier());
+            tokens = haapi.exchangeCode(code, pending.proofKey());
             ankama = haapi.account(tokens.key());
         } catch (AnkamaAuthException e) {
             log.warn("Ankama refused the login code: {}", e.toString());

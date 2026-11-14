@@ -12,13 +12,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class AnkamaPkceTest {
 
     @Test
-    void challenge_isTheBase64UrlSha256OfTheVerifier() throws Exception {
+    void challenge_isTheBase64UrlSha256OfTheProofKey() throws Exception {
         AnkamaPkce.Pair pair = AnkamaPkce.generate();
 
-        byte[] digest = MessageDigest.getInstance("SHA-256").digest(pair.verifier().getBytes(StandardCharsets.US_ASCII));
-        assertThat(pair.verifier()).hasSize(64).matches("[A-Za-z0-9\\-._~]+");
+        byte[] digest = MessageDigest.getInstance("SHA-256").digest(pair.proofKey().getBytes(StandardCharsets.US_ASCII));
+        assertThat(pair.proofKey()).hasSize(64).matches("[A-Za-z0-9\\-._~]+");
         assertThat(pair.challenge()).isEqualTo(Base64.getUrlEncoder().withoutPadding().encodeToString(digest));
-        assertThat(AnkamaPkce.generate().verifier()).isNotEqualTo(pair.verifier());
+        assertThat(AnkamaPkce.generate().proofKey()).isNotEqualTo(pair.proofKey());
     }
 
     @Test
