@@ -757,6 +757,40 @@ class RealApiServiceTest {
     }
 
     @Test
+    void ankamaStatusEnrollResendAndDisconnect() {
+        respond(HttpMethod.GET, OWN + "/links/ankama",
+                "{\"status\":\"PENDING\",\"nameTag\":\"Me#1\",\"serviceAccountTag\":\"Bot#2\"}");
+        expect(HttpMethod.PUT, OWN + "/links/ankama")
+                .andExpect(content().json("{\"nameTag\":\"Me#1\"}", org.springframework.test.json.JsonCompareMode.STRICT))
+                .andRespond(org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess(
+                        "{\"status\":\"PENDING\",\"nameTag\":\"Me#1\",\"serviceAccountTag\":\"Bot#2\"}",
+                        org.springframework.http.MediaType.APPLICATION_JSON));
+        respond(HttpMethod.POST, OWN + "/links/ankama/resend", "{\"status\":\"PENDING\"}");
+        expect(HttpMethod.DELETE, OWN + "/links/ankama").andRespond(withNoContent());
+
+        assertThat(service.ankamaStatus("enimaloc")).isEqualTo(
+                new fr.enimaloc.catapult.common.dto.connect.AnkamaLinkStateResponse("PENDING", "Me#1", "Bot#2"));
+        var enrolled = service.ankamaEnroll("enimaloc", "Me#1");
+        assertThat(enrolled.status()).isEqualTo(200);
+        assertThat(enrolled.body().serviceAccountTag()).isEqualTo("Bot#2");
+        assertThat(service.ankamaResend("enimaloc")).isEqualTo(200);
+        assertThat(service.ankamaDisconnect("enimaloc")).isEqualTo(204);
+    }
+
+    @Test
+    void ankamaEnroll_aConflictKeepsItsReason() {
+        expect(HttpMethod.PUT, OWN + "/links/ankama")
+                .andRespond(org.springframework.test.web.client.response.MockRestResponseCreators.withStatus(HttpStatus.CONFLICT)
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .body("{\"status\":409,\"code\":\"conflict\",\"detail\":\"x\",\"reason\":\"FULL\"}"));
+
+        var result = service.ankamaEnroll("enimaloc", "Me#1");
+
+        assertThat(result.status()).isEqualTo(409);
+        assertThat(result.error().property("reason", String.class)).isEqualTo("FULL");
+    }
+
+    @Test
     void minecraftDisconnect() {
         expect(HttpMethod.DELETE, OWN + "/links/minecraft").andRespond(withNoContent());
         service.minecraftDisconnect("enimaloc");

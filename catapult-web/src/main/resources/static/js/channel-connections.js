@@ -1,5 +1,5 @@
 /**
- * Handlers for the Steam/Minecraft/Battle.net/Xbox/OBS connection cards. The Steam/Minecraft cards' elements are all
+ * Handlers for the Steam/Minecraft/Battle.net/Ankama/Xbox/OBS connection cards. The Steam/Minecraft cards' elements are all
  * pre-rendered and only toggled via the `hidden` class (spa:if/spa:switch, see
  * channel.html) instead of being created/destroyed per SSE event, so handlers only
  * need attaching once, at render — no refresh() either: the SSE echo updates the cards.
@@ -32,6 +32,46 @@ window.CatapultConnections = (function () {
         toggle(".xbox-not-connected-chip", connected);
         toggle("#xbox-connect-btn", connected);
         toggle("#xbox-disconnect-btn", !connected);
+    }
+
+    // Same pattern as the API's (AnkamaFriendService.NAME_TAG): Pseudo#tag, a tag of one to eight digits.
+    const ANKAMA_NAME_TAG = /^\s*([^#\s][^#]*?)\s*#\s*(\d{1,8})\s*$/;
+
+    // What the Ankama card tells, in the page's language (index.html's body carries it).
+    function ankamaLabel(name, fallback) {
+        return document.body.dataset[name] ?? fallback;
+    }
+
+    // Links the member to the Ankama account typed in `input`. The card then follows from AnkamaLinkEvent. Unlike
+    // CatapultChannel.postJson, a refusal says why: a bad format, an account of another channel, or no bot with room.
+    async function enrollAnkama(input) {
+        const { showError, actionFailed, unreachable } = CatapultChannel;
+        const format = () => ankamaLabel("labelAnkamaFormat", "Enter your Ankama name as Pseudo#1234");
+        const nameTag = input.value.trim();
+        if (!ANKAMA_NAME_TAG.test(nameTag)) {
+            showError(format());
+            return;
+        }
+        let response;
+        try {
+            response = await CatapultCsrf.postJson(`${CatapultChannel.baseUrl()}/ankama/enroll`, { nameTag });
+        } catch {
+            showError(unreachable());
+            return;
+        }
+        if (response.ok) return;
+        if (response.status === 400) {
+            showError(format());
+        } else if (response.status === 409) {
+            const reason = (await response.json().catch(() => null))?.reason;
+            showError(reason === "ALREADY_LINKED"
+                ? ankamaLabel("labelAnkamaAlreadyLinked",
+                    "This Ankama account is already linked to another Catapult channel")
+                : ankamaLabel("labelAnkamaFull",
+                    "Every Catapult Ankama account is full for now: linking will be possible again soon."));
+        } else {
+            showError(actionFailed(response.status));
+        }
     }
 
     // The Integrations tab is built only once picked (lazy.js): its cards are bound then, as with the page otherwise.
@@ -81,6 +121,11 @@ window.CatapultConnections = (function () {
         // Battle.net. Linking leaves for Blizzard's login, which sends the member back to this tab.
         on("battlenet-connect-btn", "click", () => location.assign("/oauth2/authorization/battlenet"));
         on("battlenet-disconnect-btn", "click", () => postJson(`${baseUrl}/battlenet/disconnect`, {}));
+
+        // Ankama: the streamer types their Pseudo#tag, whose invitation the bot sends.
+        on("ankama-connect-btn", "click", () => enrollAnkama(document.getElementById("ankama-name-input")));
+        on("ankama-resend-btn", "click", () => postJson(`${baseUrl}/ankama/resend`, {}));
+        on("ankama-disconnect-btn", "click", () => postJson(`${baseUrl}/ankama/disconnect`, {}));
 
         // OBS: connecting and disconnecting both save the whole form, only `enabled` differs.
         // An empty password field means "keep the stored one" (it's never sent back to the page),

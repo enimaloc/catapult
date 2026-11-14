@@ -49,7 +49,7 @@
 
 <!--/* The words of a failed action's snackbar, for every page's scripts (CatapultChannel.postJson). */-->
 <!--/* An OBS dock (ObsDock) is the channel page alone: no app bar, no footer, a compact layout. */-->
-<body th:classappend="${dock} ? 'obs-dock-mode'" th:attr="data-label-action-failed=#{action.error.failed('{0}')},data-label-action-unreachable=#{action.error.unreachable}">
+<body th:classappend="${dock} ? 'obs-dock-mode'" th:attr="data-label-action-failed=#{action.error.failed('{0}')},data-label-action-unreachable=#{action.error.unreachable},data-label-ankama-format=#{channel.connections.ankama.error.format},data-label-ankama-already-linked=#{channel.connections.ankama.error.already_linked},data-label-ankama-full=#{channel.connections.ankama.full}">
 <mdui-layout>
     <!-- Navigation -->
     <mdui-top-app-bar class="app-bar" th:unless="${dock}">

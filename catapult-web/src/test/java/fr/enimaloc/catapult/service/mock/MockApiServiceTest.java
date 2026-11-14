@@ -446,6 +446,25 @@ class MockApiServiceTest {
     }
 
     @Test
+    void ankamaLink_enrollsResendsAndUnlinks_tellingThePage() {
+        var enrolled = service.ankamaEnroll(username, " Me#1234 ");
+
+        assertThat(enrolled.status()).isEqualTo(200);
+        assertThat(data.getAnkamaLink().status()).isEqualTo("PENDING");
+        assertThat(data.getAnkamaLink().nameTag()).isEqualTo("Me#1234");
+        assertThat(data.getAnkamaLink().serviceAccountTag()).isNotBlank();
+
+        service.ankamaResend(username);
+        service.ankamaDisconnect(username);
+
+        assertThat(data.getAnkamaLink().status()).isEqualTo("NONE");
+        assertThat(events).hasSize(3).allSatisfy(event ->
+                assertThat(event).isInstanceOf(fr.enimaloc.catapult.event.ankama.AnkamaLinkEvent.class));
+        assertThat(events.getLast()).isEqualTo(
+                new fr.enimaloc.catapult.event.ankama.AnkamaLinkEvent(username, "NONE", null, null));
+    }
+
+    @Test
     void minecraftLink() {
         service.minecraftEnroll(username, "Steve");
         service.minecraftSync(username);

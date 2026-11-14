@@ -773,6 +773,95 @@ class ChannelVisibilityRenderingTest {
         assertThat(html).doesNotContain("battlenet-check-btn").doesNotContain("battlenet-sync-btn");
     }
 
+    private String ankamaPage(fr.enimaloc.catapult.common.dto.channel.AnkamaData ankama) throws Exception {
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(new ChannelPageData(
+                new ChannelUserDto("id-1", "twitch-1", "enimaloc", "https://example.test/avatar.png"),
+                "enimaloc", true, true, true, null, new PagedBindings(0, 1, 0, List.of()),
+                List.of(), Set.of(), List.of(), Set.of(), null, null, null, null, null, null, null, null, null, null,
+                ankama));
+        return mvc.perform(get("/spa/channel/enimaloc").locale(java.util.Locale.ENGLISH))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+    }
+
+    private static fr.enimaloc.catapult.common.dto.channel.AnkamaData ankama(String status) {
+        return new fr.enimaloc.catapult.common.dto.channel.AnkamaData(status, "Me#1", "CatapultBot#4242");
+    }
+
+    @Test
+    void ankamaCardRendersOneCasePerStatus() throws Exception {
+        String html = ankamaPage(new fr.enimaloc.catapult.common.dto.channel.AnkamaData("NONE", null, null));
+
+        for (String flag : List.of("caseNone", "casePending", "caseRejected", "caseAccepted", "caseRemoved", "caseFull")) {
+            assertThat(countOccurrences(html, "data-if=\"" + flag + "\"")).as(flag).isEqualTo(1);
+        }
+        assertThat(html).contains("data-conn=\"ankama\"");
+        assertThat(html).contains("data-on=\"caseNone:AnkamaLinkEvent.status=NONE\"");
+        assertThat(html).contains("data-on=\"caseAccepted:AnkamaLinkEvent.status=ACCEPTED\"");
+        assertThat(html).contains("placeholder=\"Pseudo#1234\"");
+        assertThat(openingTagForId(html, "ankama-name-input")).doesNotContain("hidden");
+        assertThat(openingTagForId(html, "ankama-connect-btn")).doesNotContain("hidden");
+        assertThat(openingTagForId(html, "ankama-resend-btn")).contains("hidden");
+        assertThat(openingTagForId(html, "ankama-disconnect-btn")).contains("hidden");
+    }
+
+    @Test
+    void ankamaPendingCase_showsTheBotAndTheResendButton() throws Exception {
+        String html = ankamaPage(ankama("PENDING"));
+
+        String pendingCase = html.substring(html.lastIndexOf('<', html.indexOf("data-if=\"casePending\"")));
+        assertThat(pendingCase.substring(0, pendingCase.indexOf('>'))).doesNotContain("hidden");
+        assertThat(html).contains("Accept the invitation from").contains("CatapultBot#4242")
+                .contains("data-value=\"textContent:AnkamaLinkEvent.serviceAccountTag\"");
+        assertThat(openingTagForId(html, "ankama-resend-btn")).doesNotContain("hidden");
+        assertThat(openingTagForId(html, "ankama-connect-btn")).contains("hidden");
+        assertThat(openingTagForId(html, "ankama-name-input")).contains("hidden");
+        assertThat(openingTagForId(html, "ankama-disconnect-btn")).contains("hidden");
+    }
+
+    @Test
+    void ankamaAcceptedCase_showsTheNameTagAndTheDisconnectButton() throws Exception {
+        String html = ankamaPage(ankama("ACCEPTED"));
+
+        assertThat(html).contains("Connected as").contains("Me#1");
+        assertThat(openingTagForId(html, "ankama-disconnect-btn")).doesNotContain("hidden");
+        assertThat(openingTagForId(html, "ankama-connect-btn")).contains("hidden");
+        assertThat(openingTagForId(html, "ankama-resend-btn")).contains("hidden");
+    }
+
+    @Test
+    void ankamaRejectedAndRemoved_offerTheFormAgain() throws Exception {
+        for (String status : List.of("INVITE_REJECTED", "REMOVED")) {
+            String html = ankamaPage(ankama(status));
+            assertThat(openingTagForId(html, "ankama-connect-btn")).as(status).doesNotContain("hidden");
+            assertThat(openingTagForId(html, "ankama-name-input")).as(status).doesNotContain("hidden");
+            assertThat(openingTagForId(html, "ankama-disconnect-btn")).as(status).contains("hidden");
+        }
+    }
+
+    @Test
+    void ankamaFull_hidesTheForm() throws Exception {
+        String html = ankamaPage(ankama("FULL"));
+
+        assertThat(html).contains("Every Catapult Ankama account is full for now");
+        assertThat(openingTagForId(html, "ankama-connect-btn")).contains("hidden");
+        assertThat(openingTagForId(html, "ankama-name-input")).contains("hidden");
+    }
+
+    @Test
+    void aHostileAnkamaTag_isRenderedEscaped() throws Exception {
+        String html = ankamaPage(new fr.enimaloc.catapult.common.dto.channel.AnkamaData("ACCEPTED", "<b>x</b>", "<i>y</i>"));
+
+        assertThat(html).contains("&lt;b&gt;x&lt;/b&gt;").doesNotContain("<b>x</b>").doesNotContain("<i>y</i>");
+    }
+
+    @Test
+    void ankamaUnavailable_hasNoCard() throws Exception {
+        String html = ankamaPage(null);
+
+        assertThat(html).doesNotContain("data-conn=\"ankama\"").doesNotContain("ankama-status-body");
+    }
+
     @Test
     void battleNetUnavailable_hasNoCard() throws Exception {
         String html = battleNetPage(null);

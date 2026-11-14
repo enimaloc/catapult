@@ -285,6 +285,10 @@ describe("channel-connections", () => {
               <button id="minecraft-disconnect-btn"></button>
               <button id="battlenet-connect-btn"></button>
               <button id="battlenet-disconnect-btn"></button>
+              <input id="ankama-name-input" value="Me#1234">
+              <button id="ankama-connect-btn"></button>
+              <button id="ankama-resend-btn"></button>
+              <button id="ankama-disconnect-btn"></button>
               <input id="obs-host" value="10.0.0.2">
               <input id="obs-port" value="4456">
               <input id="obs-password" value="">
@@ -358,6 +362,84 @@ describe("channel-connections", () => {
         await click("#battlenet-disconnect-btn");
 
         expect(posts()).toEqual([["/channel/enimaloc/battlenet/disconnect", {}]]);
+    });
+
+    describe("the Ankama link", () => {
+        const snackbars = () => Array.from(document.querySelectorAll("mdui-snackbar"), s => s.textContent);
+        const typed = text => { document.getElementById("ankama-name-input").value = text; };
+
+        it("sends the Pseudo#tag, trimmed", async () => {
+            typed("  Me # 1234 ");
+            await click("#ankama-connect-btn");
+
+            expect(posts()).toEqual([["/channel/enimaloc/ankama/enroll", { nameTag: "Me # 1234" }]]);
+            expect(snackbars()).toEqual([]);
+        });
+
+        it.each(["", "Me", "Me#", "#1234", "Me#abc", "Me#123456789", "A#1#2"])(
+            "refuses %j before sending anything", async text => {
+                typed(text);
+                await click("#ankama-connect-btn");
+
+                expect(posts()).toEqual([]);
+                expect(snackbars()).toEqual(["Enter your Ankama name as Pseudo#1234"]);
+            });
+
+        it("accepts the forms the API accepts", async () => {
+            for (const text of ["Me#1", "Some Name#12345678", " Me#007 "]) {
+                typed(text);
+                await click("#ankama-connect-btn");
+            }
+
+            expect(posts().map(([, body]) => body.nameTag)).toEqual(["Me#1", "Some Name#12345678", "Me#007"]);
+        });
+
+        it("tells a bad format refused by the API", async () => {
+            posted.mockResolvedValueOnce(response(400, { reason: null }));
+            await click("#ankama-connect-btn");
+
+            expect(snackbars()).toEqual(["Enter your Ankama name as Pseudo#1234"]);
+        });
+
+        it("tells an account already linked to another channel from a full bot", async () => {
+            posted.mockResolvedValueOnce(response(409, { reason: "ALREADY_LINKED" }));
+            await click("#ankama-connect-btn");
+            posted.mockResolvedValueOnce(response(409, { reason: "FULL" }));
+            await click("#ankama-connect-btn");
+
+            expect(snackbars()).toEqual([
+                "This Ankama account is already linked to another Catapult channel",
+                "Every Catapult Ankama account is full for now: linking will be possible again soon.",
+            ]);
+        });
+
+        it("speaks the page's language", async () => {
+            document.body.dataset.labelAnkamaAlreadyLinked = "Deja lie";
+            posted.mockResolvedValueOnce(response(409, { reason: "ALREADY_LINKED" }));
+            await click("#ankama-connect-btn");
+
+            expect(snackbars()).toEqual(["Deja lie"]);
+            delete document.body.dataset.labelAnkamaAlreadyLinked;
+        });
+
+        it("tells any other failure, and an unreachable server", async () => {
+            posted.mockResolvedValueOnce(response(502));
+            await click("#ankama-connect-btn");
+            posted.mockRejectedValueOnce(new TypeError("offline"));
+            await click("#ankama-connect-btn");
+
+            expect(snackbars()).toEqual(["Action failed (502)", "Catapult could not be reached"]);
+        });
+
+        it("resends the invitation and unlinks with posts", async () => {
+            await click("#ankama-resend-btn");
+            await click("#ankama-disconnect-btn");
+
+            expect(posts()).toEqual([
+                ["/channel/enimaloc/ankama/resend", {}],
+                ["/channel/enimaloc/ankama/disconnect", {}],
+            ]);
+        });
     });
 
     it("saves the OBS settings, keeping the stored password when the field is empty", async () => {

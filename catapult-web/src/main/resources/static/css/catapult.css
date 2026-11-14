@@ -1837,6 +1837,18 @@ mdui-select::part(menu) {
     font-weight: 600;
 }
 
+/* The Ankama card's sentences, as the Battle.net card's. */
+.ankama-sentence {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25em;
+}
+
+.ankama-sentence .ankama-bot-tag,
+.ankama-sentence .ankama-tag {
+    font-weight: 600;
+}
+
 /* Actions sit right-aligned under the details. A segmented group lays out its own
  * segments; a plain div (OBS) holds separate buttons. Either way, no separator:
  * outranks the `.connection-card > div` rules above. */

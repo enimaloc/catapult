@@ -46,6 +46,7 @@ import fr.enimaloc.catapult.common.dto.admin.SocialLinkDto;
 import fr.enimaloc.catapult.common.dto.admin.SocialLinkOrderRequest;
 import fr.enimaloc.catapult.common.dto.admin.SocialLinkRequest;
 import fr.enimaloc.catapult.common.dto.admin.MinecraftDeviceCodeDto;
+import fr.enimaloc.catapult.common.dto.connect.AnkamaLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.connect.BattleNetLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.admin.DtddKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.SteamKeysPageData;
@@ -362,6 +363,35 @@ public class RealApiService implements ApiService {
         UUID me = me();
         if (me == null) return null;
         return client.get("/api/internal/users/{userId}/links/battlenet", BattleNetLinkStateResponse.class, me);
+    }
+
+    @Override
+    public AnkamaLinkStateResponse ankamaStatus(String username) {
+        UUID me = me();
+        if (me == null) return null;
+        return client.get("/api/internal/users/{userId}/links/ankama", AnkamaLinkStateResponse.class, me);
+    }
+
+    @Override
+    public ApiClient.Result<AnkamaLinkStateResponse> ankamaEnroll(String username, String nameTag) {
+        UUID me = me();
+        if (me == null) return new ApiClient.Result<>(HttpStatus.UNAUTHORIZED.value(), null);
+        return client.call(HttpMethod.PUT, "/api/internal/users/{userId}/links/ankama", Map.of("nameTag", nameTag),
+                AnkamaLinkStateResponse.class, me);
+    }
+
+    @Override
+    public int ankamaResend(String username) {
+        UUID me = me();
+        if (me == null) return HttpStatus.UNAUTHORIZED.value();
+        return client.postVoid("/api/internal/users/{userId}/links/ankama/resend", null, me);
+    }
+
+    @Override
+    public int ankamaDisconnect(String username) {
+        UUID me = me();
+        if (me == null) return HttpStatus.UNAUTHORIZED.value();
+        return client.delete("/api/internal/users/{userId}/links/ankama", me);
     }
 
     @Override

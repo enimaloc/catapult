@@ -67,6 +67,7 @@ import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
 import fr.enimaloc.catapult.common.dto.channel.GameDto;
 import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
 import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
+import fr.enimaloc.catapult.common.dto.connect.AnkamaLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.connect.BattleNetLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatDispatch;
@@ -88,6 +89,7 @@ import fr.enimaloc.catapult.event.binding.BindingTitleEvent;
 import fr.enimaloc.catapult.event.binding.BindingUpdatedEvent;
 import fr.enimaloc.catapult.event.binding.CclStateEvent;
 import fr.enimaloc.catapult.event.binding.GameChangedEvent;
+import fr.enimaloc.catapult.event.ankama.AnkamaLinkEvent;
 import fr.enimaloc.catapult.event.battlenet.BattleNetLinkEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftDisconnectedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftEnrollEvent;
@@ -522,6 +524,39 @@ public class MockApiService implements ApiService {
     public BattleNetLinkStateResponse battleNetStatus(String username) {
         log.trace("battleNetStatus({})", username);
         return currentData().getBattleNetLink();
+    }
+
+    @Override
+    public AnkamaLinkStateResponse ankamaStatus(String username) {
+        log.trace("ankamaStatus({})", username);
+        return currentData().getAnkamaLink();
+    }
+
+    @Override
+    public ApiClient.Result<AnkamaLinkStateResponse> ankamaEnroll(String username, String nameTag) {
+        log.trace("ankamaEnroll({}, {})", username, nameTag);
+        MockData data = currentData();
+        data.ankamaEnroll(nameTag.trim());
+        AnkamaLinkStateResponse link = data.getAnkamaLink();
+        eventPublisher.publishEvent(new AnkamaLinkEvent(username, link.status(), link.nameTag(), link.serviceAccountTag()));
+        return new ApiClient.Result<>(200, link);
+    }
+
+    @Override
+    public int ankamaResend(String username) {
+        log.trace("ankamaResend({})", username);
+        AnkamaLinkStateResponse link = currentData().getAnkamaLink();
+        eventPublisher.publishEvent(new AnkamaLinkEvent(username, link.status(), link.nameTag(), link.serviceAccountTag()));
+        return 200;
+    }
+
+    @Override
+    public int ankamaDisconnect(String username) {
+        log.trace("ankamaDisconnect({})", username);
+        MockData data = currentData();
+        data.ankamaDisconnect();
+        eventPublisher.publishEvent(new AnkamaLinkEvent(username, data.getAnkamaLink().status(), null, null));
+        return NO_CONTENT;
     }
 
     @Override
