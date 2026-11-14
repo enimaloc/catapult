@@ -28,9 +28,9 @@ function row(state) {
 
 function page(state = "READY") {
     document.body.innerHTML = `
-        <mdui-tabs id="admin-tabs" value="ankama">
-            <mdui-tab-panel value="ankama">
-                <div class="admin-view admin-ankama-view" data-confirm-text="OK" data-cancel-text="No">
+        <mdui-tabs id="admin-tabs" value="keys">
+            <mdui-tab-panel value="keys">
+                <div class="admin-view admin-keys" data-confirm-text="OK" data-cancel-text="No">
                     <div class="admin-keys-card admin-ankama" data-label-conflict="Busy" data-label-unknown="Gone"
                          data-label-unavailable="Down" data-label-updated="Updated" data-label-deleted="Deleted"
                          data-label-invalid="Invalid" data-label-code-sent="Code sent" data-label-code-resent="Code resent"
@@ -113,7 +113,7 @@ describe("admin-ankama login flow", () => {
         expect(document.querySelector('[name="redirectUrl"]').value).toBe("");
         expect(loginBox().hidden).toBe(true);
         expect(window.mdui.snackbar).toHaveBeenCalledWith({ message: "Bot logged in" });
-        expect(CatapultAdminTabs.patch).toHaveBeenCalledWith(document.querySelector('mdui-tab-panel[value="ankama"]'));
+        expect(CatapultAdminTabs.patch).toHaveBeenCalledWith(document.querySelector('mdui-tab-panel[value="keys"]'));
     });
 
     it("shows the API's 400 message as text, and drops the login the API has used up", async () => {

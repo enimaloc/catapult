@@ -70,7 +70,7 @@ class AdminTabsFragmentControllerTest {
         for (String url : List.of("/spa/admin/ccl", "/spa/admin/caches", "/spa/admin/caches/igdb-game-cache",
                 "/spa/admin/caches/igdb-game-cache/entry?key=1",
                 "/spa/admin/data", "/spa/admin/data/chat-command", "/spa/admin/data/chat-command/row?id=1",
-                "/spa/admin/members?q=a&page=1", "/spa/admin/members/search?q=a", "/spa/admin/meta", "/spa/admin/meta/file?id=1", "/spa/admin/links", "/spa/admin/notifications?page=1", "/spa/admin/broadcast", "/spa/admin/dtdd-mapping", "/spa/admin/game-mappings?page=1&missingPage=1", "/spa/admin/groups", "/spa/admin/whitelist", "/spa/admin/keys", "/spa/admin/ankama", "/spa/admin/tw", "/spa/admin/tw/gore", "/spa/admin/tw/gore/dtdd",
+                "/spa/admin/members?q=a&page=1", "/spa/admin/members/search?q=a", "/spa/admin/meta", "/spa/admin/meta/file?id=1", "/spa/admin/links", "/spa/admin/notifications?page=1", "/spa/admin/broadcast", "/spa/admin/dtdd-mapping", "/spa/admin/game-mappings?page=1&missingPage=1", "/spa/admin/groups", "/spa/admin/whitelist", "/spa/admin/keys", "/spa/admin/tw", "/spa/admin/tw/gore", "/spa/admin/tw/gore/dtdd",
                 "/spa/admin/members", "/spa/admin/members/00000000-0000-0000-0000-000000000001",
                 "/spa/admin/experiments", "/spa/admin/experiments/00000000-0000-0000-0000-000000000001",
                 "/spa/admin/experiments/00000000-0000-0000-0000-000000000001/participants?variant=&q=x&page=1")) {
@@ -1075,13 +1075,13 @@ class AdminTabsFragmentControllerTest {
     }
 
     @Test
-    void ankamaTabRendersTheBotsWithTheirStateDependentControls() throws Exception {
+    void keysTab_rendersTheAnkamaBotsWithTheirStateDependentControls() throws Exception {
         when(apiService.adminAnkamaAccounts()).thenReturn(List.of(
                 ankamaBot("00000000-0000-0000-0000-00000000000a", "Ready<b>#0001", "READY", true, true, null),
                 ankamaBot("00000000-0000-0000-0000-00000000000b", "Reauth#0002", "REAUTH_REQUIRED", false, false, null),
                 ankamaBot("00000000-0000-0000-0000-00000000000c", "Shield#0003", "CODE_REQUIRED", true, false, "example.com")));
 
-        String html = asAdmin("/spa/admin/ankama").replaceAll("\\s+", " ");
+        String html = asAdmin("/spa/admin/keys").replaceAll("\\s+", " ");
 
         assertThat(html).contains("admin-ankama", "Ready&lt;b&gt;#0001", "Reauth#0002", "Add a bot",
                 "data-auth-state=\"REAUTH_REQUIRED\"", "Login to redo", "private window", "that is expected",
@@ -1100,10 +1100,13 @@ class AdminTabsFragmentControllerTest {
     }
 
     @Test
-    void ankamaTab_unavailableWhenTheApiFails() throws Exception {
+    void keysTab_ankamaCardUnavailableWhenTheApiFails() throws Exception {
         when(apiService.adminAnkamaAccounts()).thenReturn(null);
 
-        assertThat(asAdmin("/spa/admin/ankama")).contains("admin-ankama-unavailable").doesNotContain("admin-ankama-add");
+        assertThat(asAdmin("/spa/admin/keys")).contains("admin-ankama-unavailable").doesNotContain("admin-ankama-add");
+        // no tab of its own any more: its old address answers 404
+        mvc.perform(get("/spa/admin/ankama").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+                .andExpect(status().isNotFound());
     }
 
     @Test

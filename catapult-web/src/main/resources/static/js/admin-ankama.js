@@ -1,8 +1,8 @@
 /**
- * The admin Ankama tab's bot pool card. "Add a bot" (and "Re-authenticate", shown only on a REAUTH_REQUIRED bot) starts
- * a login: the authorize address is shown as a link opening in a new tab, and the admin pastes back the address of the
- * page that then fails to load, which finishes the login. A bot waiting for its Shield code has a code field and "Send
- * a new code". Enable / disable, lift "full", the fill order and delete (after a confirmation) all post to
+ * The Ankama bot pool card of the admin "Keys & limits" tab. "Add a bot" (and "Re-authenticate", shown only on a
+ * REAUTH_REQUIRED bot) starts a login: the authorize address is shown as a link opening in a new tab, and the admin pastes
+ * back the address of the page that then fails to load, which finishes the login. A bot waiting for its Shield code has a
+ * code field and "Send a new code". Enable / disable, lift "full", the fill order and delete (after a confirmation) all post to
  * AdminAnkamaController, the button disabled until the list is patched (admin-tabs.js).
  *
  * A refusal is told inline under the card: catapult-api's own message when it sent one (a wrong Shield code, a refused
@@ -34,7 +34,7 @@ window.CatapultAdminAnkama = (function () {
         }
     }
 
-    const panelOf = () => document.querySelector('mdui-tab-panel[value="ankama"]');
+    const panelOf = () => document.querySelector('mdui-tab-panel[value="keys"]');
 
     function refusal(card, { status, data }) {
         if (typeof data?.error === "string" && data.error) return data.error;
@@ -74,7 +74,7 @@ window.CatapultAdminAnkama = (function () {
     async function remove(panel, card, button) {
         button.disabled = true; // before the confirmation: a second click must not open another
         try {
-            const root = panel.querySelector(".admin-ankama-view") ?? card;
+            const root = card.closest(".admin-view") ?? card;
             if (!await CatapultAdminTabs.confirmed(root, button.dataset.confirm)) return;
             await act(panel, card, button, `${BASE}/${encodeURIComponent(button.dataset.id)}/delete`, {}, card.dataset.labelDeleted);
         } finally {
