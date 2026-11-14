@@ -1655,12 +1655,29 @@ a[data-link].active {
 
 /* Connections */
 
-#channel-connections,
 .channel-commands {
     display: flex;
     flex-direction: column;
     gap: 12px;
     margin-bottom: 56px;
+}
+
+/* The cards with at most two buttons at once side by side, as many as fit (one on a phone); the wide ones
+ * (IntegrationDto.wide: Steam, OBS, Twitchat) span the grid below them. A row's cards share its height,
+ * their content kept at the top. */
+#channel-connections {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+    gap: 12px;
+    margin-bottom: 56px;
+}
+
+#channel-connections > .connection-card {
+    align-content: start;
+}
+
+#channel-connections > .connection-card.wide {
+    grid-column: 1 / -1;
 }
 
 .connection-card > span:first-child {
