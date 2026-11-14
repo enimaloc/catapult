@@ -468,7 +468,10 @@ public class AdminTabsFragmentController {
         });
     }
 
-    /** Steam and DTDD keys cards, then the Minecraft and Battle.net service accounts cards. */
+    /**
+     * Steam and DTDD keys cards, then the Minecraft, Battle.net and Ankama service accounts cards; the Ankama list is
+     * null (its unavailable card) when catapult-api has Ankama off or is unreachable.
+     */
     @GetMapping("/keys")
     String keys(Model model, HttpServletResponse response) {
         return guarded(model, response, () -> {
@@ -476,18 +479,10 @@ public class AdminTabsFragmentController {
             model.addAttribute("dtdd", apiService.adminApiKeys(ApiKeyProvider.DTDD));
             model.addAttribute("minecraft", apiService.adminMinecraftAccounts());
             model.addAttribute("battlenet", apiService.adminBattleNetAccounts());
+            model.addAttribute("ankama", apiService.adminAnkamaAccounts());
             // The rate limits learned from the platforms' 429s: each host, then its routes
             model.addAttribute("limits", apiService.adminRateLimits());
             return "pages/admin-tab/keys :: content";
-        });
-    }
-
-    /** The Ankama bots card; its list is null (the unavailable card) when catapult-api has Ankama off or is unreachable. */
-    @GetMapping("/ankama")
-    String ankama(Model model, HttpServletResponse response) {
-        return guarded(model, response, () -> {
-            model.addAttribute("ankama", apiService.adminAnkamaAccounts());
-            return "pages/admin-tab/ankama :: content";
         });
     }
 
