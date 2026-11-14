@@ -1442,19 +1442,21 @@ public class RealApiService implements ApiService {
     @Override
     public AdminCall<AnkamaLoginStartDto> adminStartAnkamaLogin(UUID accountId) {
         Map<String, Object> body = accountId == null ? Map.of() : Map.of("accountId", accountId.toString());
-        return ankamaCall(HttpMethod.POST, "/api/internal/admin/ankama-accounts/login", body, AnkamaLoginStartDto.class);
+        return ankamaAnswer(client.call(HttpMethod.POST, "/api/internal/admin/ankama-accounts/login", body, JsonNode.class),
+                AnkamaLoginStartDto.class);
     }
 
     @Override
     public AdminCall<AnkamaAccountDto> adminCompleteAnkamaLogin(UUID loginId, String redirectUrl) {
         // the URL holds a one-time code: it only travels in the body
-        return ankamaCall(HttpMethod.POST, "/api/internal/admin/ankama-accounts/login/{loginId}/complete",
-                Map.of("redirectUrl", redirectUrl), AnkamaAccountDto.class, loginId);
+        return ankamaAnswer(client.call(HttpMethod.POST, "/api/internal/admin/ankama-accounts/login/{loginId}/complete",
+                Map.of("redirectUrl", redirectUrl), JsonNode.class, loginId), AnkamaAccountDto.class);
     }
 
     @Override
     public AdminCall<Void> adminSubmitAnkamaCode(UUID id, String code) {
-        return ankamaCall(HttpMethod.POST, "/api/internal/admin/ankama-accounts/{id}/code", Map.of("code", code), Void.class, id);
+        return ankamaAnswer(client.call(HttpMethod.POST, "/api/internal/admin/ankama-accounts/{id}/code",
+                Map.of("code", code), JsonNode.class, id), Void.class);
     }
 
     @Override
@@ -1464,7 +1466,8 @@ public class RealApiService implements ApiService {
 
     @Override
     public AdminCall<AnkamaAccountDto> adminPatchAnkamaAccount(UUID id, Map<String, Object> patch) {
-        return ankamaCall(HttpMethod.PATCH, "/api/internal/admin/ankama-accounts/{id}", patch, AnkamaAccountDto.class, id);
+        return ankamaAnswer(client.call(HttpMethod.PATCH, "/api/internal/admin/ankama-accounts/{id}", patch, JsonNode.class, id),
+                AnkamaAccountDto.class);
     }
 
     @Override
@@ -1472,9 +1475,8 @@ public class RealApiService implements ApiService {
         return client.call(HttpMethod.DELETE, "/api/internal/admin/ankama-accounts/{id}", null, Void.class, id).status();
     }
 
-    /** The call's status, its body read as {@code type} on a 2xx, and the {@code error} text of a refusal. */
-    private <T> AdminCall<T> ankamaCall(HttpMethod method, String path, Object body, Class<T> type, Object... uriVars) {
-        ApiClient.Result<JsonNode> result = client.call(method, path, body, JsonNode.class, uriVars);
+    /** An Ankama admin call's status, its body read as {@code type} on a 2xx, and the {@code error} text of a refusal. */
+    private static <T> AdminCall<T> ankamaAnswer(ApiClient.Result<JsonNode> result, Class<T> type) {
         JsonNode node = result.body();
         if (!result.ok()) {
             JsonNode error = node == null ? null : node.get("error");
