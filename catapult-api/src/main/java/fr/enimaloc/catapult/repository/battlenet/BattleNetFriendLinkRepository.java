@@ -21,6 +21,7 @@ public interface BattleNetFriendLinkRepository extends JpaRepository<BattleNetFr
     Optional<BattleNetFriendLink> findWithServiceAccountByUser(UserAccount user);
     List<BattleNetFriendLink> findByServiceAccount(BattleNetServiceAccount serviceAccount);
     long countByServiceAccount(BattleNetServiceAccount serviceAccount);
+    long countByStatus(BattleNetFriendLink.Status status);
     long countByServiceAccountAndStatus(BattleNetServiceAccount serviceAccount, BattleNetFriendLink.Status status);
     boolean existsByServiceAccountAndStatus(BattleNetServiceAccount serviceAccount, BattleNetFriendLink.Status status);
 
