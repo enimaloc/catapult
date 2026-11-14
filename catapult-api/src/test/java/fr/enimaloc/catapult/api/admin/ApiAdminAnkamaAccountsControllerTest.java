@@ -89,7 +89,7 @@ class ApiAdminAnkamaAccountsControllerTest {
         UUID loginId = UUID.randomUUID();
         when(admin.completeLogin(eq(loginId), eq("http://127.0.0.1:9001/authorized?code=c"))).thenReturn(dto);
 
-        mvc.perform(post(BASE + "/login/{loginId}", loginId).contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post(BASE + "/login/{loginId}/complete", loginId).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"redirectUrl\":\"http://127.0.0.1:9001/authorized?code=c\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.authState").value("CODE_REQUIRED"));
@@ -99,7 +99,7 @@ class ApiAdminAnkamaAccountsControllerTest {
     void completeLogin_refused_is400WithTheMessage() throws Exception {
         when(admin.completeLogin(any(), any())).thenThrow(new IllegalArgumentException("not the launcher redirect URL"));
 
-        mvc.perform(post(BASE + "/login/{loginId}", UUID.randomUUID()).contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post(BASE + "/login/{loginId}/complete", UUID.randomUUID()).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"redirectUrl\":\"nope\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("not the launcher redirect URL"));

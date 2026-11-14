@@ -40,7 +40,7 @@ public class ApiAdminAnkamaAccountsController {
     }
 
     /** Finishes a login with the redirect URL the admin pasted; 400 with {@code {"error": message}} when refused. */
-    @PostMapping("/login/{loginId}")
+    @PostMapping("/login/{loginId}/complete")
     public AnkamaAccountDto completeLogin(@PathVariable UUID loginId, @RequestBody Map<String, String> body) {
         return accounts.completeLogin(loginId, body.get("redirectUrl"));
     }

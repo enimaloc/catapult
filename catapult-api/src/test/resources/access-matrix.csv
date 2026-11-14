@@ -326,7 +326,7 @@ POST,/api/internal/admin/battlenet-accounts/{id}/code,,,401,PASS,403,403,403,PAS
 POST,/api/internal/admin/battlenet-accounts/{id}/reauth,,,401,PASS,403,403,403,PASS,401
 GET,/api/internal/admin/ankama-accounts,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/ankama-accounts/login,,,401,PASS,403,403,403,PASS,401
-POST,/api/internal/admin/ankama-accounts/login/{loginId},,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/ankama-accounts/login/{loginId}/complete,,,401,PASS,403,403,403,PASS,401
 DELETE,/api/internal/admin/ankama-accounts/{id},,,401,PASS,403,403,403,PASS,401
 PATCH,/api/internal/admin/ankama-accounts/{id},,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/ankama-accounts/{id}/code,,,401,PASS,403,403,403,PASS,401
