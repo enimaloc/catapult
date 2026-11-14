@@ -36,6 +36,7 @@ public final class ChannelEvents {
     public static final String DTDD_MAPPING_CHANGED = "dtdd.mapping.changed";
     public static final String MINECRAFT_LINK_CHANGED = "minecraft.link.changed";
     public static final String BATTLENET_LINK_CHANGED = "battlenet.link.changed";
+    public static final String ANKAMA_LINK_CHANGED = "ankama.link.changed";
     public static final String CUSTOM_BINDING_CHANGED = "custom.binding.changed";
     public static final String CUSTOM_BINDINGS_UPDATED = "custom.bindings.updated";
 
@@ -98,6 +99,13 @@ public final class ChannelEvents {
      */
     public record BattleNetLinkChanged(String channelId, String channelLogin, String status, String battleTag,
                                        String serviceAccountBattleTag) {}
+
+    /**
+     * The channel's Ankama link changed: its status ({@code NONE} once gone), the streamer's {@code name#tag} and the
+     * {@code name#tag} of the bot it is linked to (the latter only while the link waits for the streamer).
+     */
+    public record AnkamaLinkChanged(String channelId, String channelLogin, String status, String nameTag,
+                                    String serviceAccountTag) {}
 
     /**
      * New notifications wait to be sent to these members' Twitchat: whichever catapult-web instance holds one

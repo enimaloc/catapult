@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.common.dto.channel.BindingDto;
 import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
 import fr.enimaloc.catapult.common.dto.channel.GameDto;
+import fr.enimaloc.catapult.common.dto.channel.AnkamaData;
 import fr.enimaloc.catapult.common.dto.channel.BattleNetData;
 import fr.enimaloc.catapult.common.dto.channel.MinecraftData;
 import fr.enimaloc.catapult.common.dto.channel.SteamData;
@@ -18,6 +19,7 @@ import fr.enimaloc.catapult.event.ChannelUpdatedEvent;
 import fr.enimaloc.catapult.event.DtddMappingChangedEvent;
 import fr.enimaloc.catapult.event.binding.CustomBindingsUpdatedEvent;
 import fr.enimaloc.catapult.event.binding.GameChangedEvent;
+import fr.enimaloc.catapult.event.ankama.AnkamaLinkEvent;
 import fr.enimaloc.catapult.event.battlenet.BattleNetLinkEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftDisconnectedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftSyncEvent;
@@ -77,6 +79,11 @@ public final class ChannelState {
             BattleNetData link = ch.battleNet();
             events.add(new BattleNetLinkEvent(login, link.status() == null ? "NONE" : link.status(), link.battleTag(),
                     link.serviceAccountBattleTag()));
+        }
+        if (ch.ankama() != null) {
+            AnkamaData link = ch.ankama();
+            events.add(new AnkamaLinkEvent(login, link.status() == null ? "NONE" : link.status(), link.nameTag(),
+                    link.serviceAccountTag()));
         }
         CustomBindingsStateDto custom = ch.customBindings();
         if (custom != null) {

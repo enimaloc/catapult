@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
+import fr.enimaloc.catapult.common.dto.channel.AnkamaData;
 import fr.enimaloc.catapult.common.dto.channel.BattleNetData;
 import fr.enimaloc.catapult.common.dto.channel.MinecraftData;
 import fr.enimaloc.catapult.common.dto.channel.ObsData;
@@ -60,6 +61,9 @@ public final class IntegrationCards {
         }
         if (ch.battleNet() != null) {
             cards.add(battleNet(ch.battleNet()));
+        }
+        if (ch.ankama() != null) {
+            cards.add(ankama(ch.ankama()));
         }
         if (ch.obs() != null) {
             cards.add(obs(ch.obs()));
@@ -249,6 +253,66 @@ public final class IntegrationCards {
 
     private static SpaState battleNetState(String flag, String status, List<String> statuses) {
         return SpaState.flag(flag, statuses.contains(status), "BattleNetLinkEvent.status=" + String.join("/", statuses));
+    }
+
+    // Ankama: one sub-view and button per status, driven by the status field of AnkamaLinkEvent, which carries NONE
+    // too. Linking is a typed Pseudo#tag the streamer enters (channel-connections.js checks it and posts it), so a
+    // rejected or removed link shows the same form as none at all. No "check" button: the bot's chat tells the
+    // card by itself. The tags are sentence parts of their own so that the event can replace them in place.
+
+    private static IntegrationDto ankama(AnkamaData ankama) {
+        String status = ankama.status() == null ? "NONE" : ankama.status();
+        List<String> formStatuses = List.of("NONE", "INVITE_REJECTED", "REMOVED");
+        return card("ankama",
+                new Container(Attrs.id("ankama-status-body"), Container.Kind.DIV, List.of(
+                        ankamaCase("caseNone", status, List.of("NONE"),
+                                new Text(Attrs.NONE, false, key(PREFIX + "ankama.none"))),
+                        ankamaCase("casePending", status, List.of("PENDING"),
+                                new Container(Attrs.cls("ankama-sentence"), Container.Kind.DIV, List.of(
+                                        new Text(Attrs.NONE, false, key(PREFIX + "ankama.pending.before")),
+                                        ankamaTag("ankama-bot-tag", "serviceAccountTag", ankama.serviceAccountTag()),
+                                        new Text(Attrs.NONE, false, key(PREFIX + "ankama.pending.after"))))),
+                        ankamaCase("caseRejected", status, List.of("INVITE_REJECTED"),
+                                new Text(Attrs.NONE, false, key(PREFIX + "ankama.rejected"))),
+                        ankamaCase("caseAccepted", status, List.of("ACCEPTED"),
+                                new Container(Attrs.cls("ankama-sentence"), Container.Kind.DIV, List.of(
+                                        new Text(Attrs.NONE, false, key(PREFIX + "ankama.accepted")),
+                                        ankamaTag("ankama-tag", "nameTag", ankama.nameTag())))),
+                        ankamaCase("caseRemoved", status, List.of("REMOVED"),
+                                new Text(Attrs.NONE, false, key(PREFIX + "ankama.removed"))),
+                        // No service account with room for one: nothing to do but wait.
+                        ankamaCase("caseFull", status, List.of("FULL"),
+                                new Text(Attrs.NONE, false, key(PREFIX + "ankama.full"))),
+                        new Input(Attrs.id("ankama-name-input")
+                                        .withState(ankamaState("showInput", status, formStatuses)),
+                                "text", key(PREFIX + "ankama.name_placeholder"), key(PREFIX + "ankama.name_label"),
+                                null, null, null))),
+
+                // Each button needs its own flag name, as the Minecraft card's do.
+                new Container(Attrs.id("ankama-status-actions").withClass("card-actions"),
+                        Container.Kind.DIV, List.of(
+                        new Button(Attrs.id("ankama-connect-btn")
+                                        .withState(ankamaState("showConnect", status, formStatuses)),
+                                Button.Kind.FILLED, key(PREFIX + "ankama.connect")),
+                        new Button(Attrs.id("ankama-resend-btn")
+                                        .withState(ankamaState("showResend", status, List.of("PENDING"))),
+                                Button.Kind.TEXT, key(PREFIX + "ankama.resend")),
+                        new Button(Attrs.id("ankama-disconnect-btn")
+                                        .withState(ankamaState("showDisconnect", status, List.of("PENDING", "ACCEPTED"))),
+                                Button.Kind.TEXT, key(PREFIX + "ankama.disconnect")))));
+    }
+
+    private static Text ankamaTag(String className, String field, String tag) {
+        return new Text(Attrs.cls(className).withState(SpaState.sync("textContent", "AnkamaLinkEvent." + field)),
+                false, Message.literal(tag));
+    }
+
+    private static Container ankamaCase(String flag, String status, List<String> statuses, IntegrationNode content) {
+        return new Container(Attrs.state(ankamaState(flag, status, statuses)), Container.Kind.DIV, List.of(content));
+    }
+
+    private static SpaState ankamaState(String flag, String status, List<String> statuses) {
+        return SpaState.flag(flag, statuses.contains(status), "AnkamaLinkEvent.status=" + String.join("/", statuses));
     }
 
     // OBS: no SSE event either, channel-connections.js refreshes the page after saving.

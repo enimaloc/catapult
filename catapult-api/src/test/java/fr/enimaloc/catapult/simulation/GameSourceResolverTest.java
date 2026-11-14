@@ -48,6 +48,8 @@ class GameSourceResolverTest {
                 .isEqualTo(new Resolution("minecraft", "Minecraft", null));
         assertThat(resolver.resolve(GetterConfig.Provider.BATTLENET, "Overwatch 2"))
                 .isEqualTo(new Resolution("Overwatch 2", "Overwatch 2", null));
+        assertThat(resolver.resolve(GetterConfig.Provider.ANKAMA, "Wakfu"))
+                .isEqualTo(new Resolution("Wakfu", "Wakfu", null));
         verifyNoInteractions(igdb);
     }
 

@@ -22,6 +22,7 @@ import fr.enimaloc.catapult.common.dto.channel.TwEnabledBody;
 import fr.enimaloc.catapult.common.dto.channel.TwSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.UpdateBindingRequest;
 import fr.enimaloc.catapult.common.dto.channel.ValidateRequest;
+import fr.enimaloc.catapult.common.dto.connect.AnkamaLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.connect.BattleNetLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatSettingsResponse;
@@ -196,6 +197,45 @@ public class ChannelActionsController {
     public ResponseEntity<Void> battleNetDisconnect(@PathVariable String username) {
         if (!ownChannel(username)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         return ApiStatus.answer(apiService.battleNetDisconnect(username));
+    }
+
+    // The Ankama link is the member's own too; linking is a typed Pseudo#tag, relayed like Minecraft's name.
+
+    @GetMapping("/channel/{username}/ankama")
+    public ResponseEntity<AnkamaLinkStateResponse> ankamaStatus(@PathVariable String username) {
+        if (!ownChannel(username)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        return ResponseEntity.ok(apiService.ankamaStatus(username));
+    }
+
+    /**
+     * Answers 204 once linked, else catapult-api's refusal; a 409 carries its reason ({@code FULL} or
+     * {@code ALREADY_LINKED}) as {@code {"reason": ...}}, for the card to tell them apart.
+     */
+    @PostMapping("/channel/{username}/ankama/enroll")
+    public ResponseEntity<java.util.Map<String, String>> ankamaEnroll(@PathVariable String username,
+                                                                       @RequestBody java.util.Map<String, String> body) {
+        if (!ownChannel(username)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        String nameTag = body == null ? null : body.get("nameTag");
+        if (nameTag == null || nameTag.isBlank()) return ResponseEntity.badRequest().build();
+        ApiClient.Result<AnkamaLinkStateResponse> result = apiService.ankamaEnroll(username, nameTag.trim());
+        if (result.status() == HttpStatus.CONFLICT.value() && result.error() != null) {
+            String reason = result.error().property("reason", String.class);
+            if (reason != null) return ResponseEntity.status(HttpStatus.CONFLICT).body(java.util.Map.of("reason", reason));
+        }
+        ResponseEntity<Void> answer = ApiStatus.answer(result.status());
+        return ResponseEntity.status(answer.getStatusCode()).build();
+    }
+
+    @PostMapping("/channel/{username}/ankama/resend")
+    public ResponseEntity<Void> ankamaResend(@PathVariable String username) {
+        if (!ownChannel(username)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        return ApiStatus.answer(apiService.ankamaResend(username));
+    }
+
+    @PostMapping("/channel/{username}/ankama/disconnect")
+    public ResponseEntity<Void> ankamaDisconnect(@PathVariable String username) {
+        if (!ownChannel(username)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        return ApiStatus.answer(apiService.ankamaDisconnect(username));
     }
 
     @PostMapping("/channel/{username}/xbox/disconnect")

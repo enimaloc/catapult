@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.notification;
 
+import fr.enimaloc.catapult.common.dto.connect.AnkamaLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingDto;
 import fr.enimaloc.catapult.common.dto.channel.BindingDto;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingCurrentDto;
@@ -163,6 +164,15 @@ class ChannelEventPublisherTest {
         assertThat(published(ChannelEvents.BATTLENET_LINK_CHANGED)).isEqualTo(
                 new ChannelEvents.BattleNetLinkChanged(ownerId.toString(), "streamername", "PENDING",
                         "Streamer#2928", "CatapultBot#1234"));
+    }
+
+    @Test
+    void ankamaLinkChanged_publishesTheLinkState() {
+        publisher.publishAnkamaLinkChanged(ownerId, new AnkamaLinkStateResponse("PENDING", "Enimaloc#6094", "Bot#1"));
+
+        assertThat(published(ChannelEvents.ANKAMA_LINK_CHANGED)).isEqualTo(
+                new ChannelEvents.AnkamaLinkChanged(ownerId.toString(), "streamername", "PENDING", "Enimaloc#6094",
+                        "Bot#1"));
     }
 
     @Test

@@ -757,6 +757,40 @@ class RealApiServiceTest {
     }
 
     @Test
+    void ankamaStatusEnrollResendAndDisconnect() {
+        respond(HttpMethod.GET, OWN + "/links/ankama",
+                "{\"status\":\"PENDING\",\"nameTag\":\"Me#1\",\"serviceAccountTag\":\"Bot#2\"}");
+        expect(HttpMethod.PUT, OWN + "/links/ankama")
+                .andExpect(content().json("{\"nameTag\":\"Me#1\"}", org.springframework.test.json.JsonCompareMode.STRICT))
+                .andRespond(org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess(
+                        "{\"status\":\"PENDING\",\"nameTag\":\"Me#1\",\"serviceAccountTag\":\"Bot#2\"}",
+                        org.springframework.http.MediaType.APPLICATION_JSON));
+        respond(HttpMethod.POST, OWN + "/links/ankama/resend", "{\"status\":\"PENDING\"}");
+        expect(HttpMethod.DELETE, OWN + "/links/ankama").andRespond(withNoContent());
+
+        assertThat(service.ankamaStatus("enimaloc")).isEqualTo(
+                new fr.enimaloc.catapult.common.dto.connect.AnkamaLinkStateResponse("PENDING", "Me#1", "Bot#2"));
+        var enrolled = service.ankamaEnroll("enimaloc", "Me#1");
+        assertThat(enrolled.status()).isEqualTo(200);
+        assertThat(enrolled.body().serviceAccountTag()).isEqualTo("Bot#2");
+        assertThat(service.ankamaResend("enimaloc")).isEqualTo(200);
+        assertThat(service.ankamaDisconnect("enimaloc")).isEqualTo(204);
+    }
+
+    @Test
+    void ankamaEnroll_aConflictKeepsItsReason() {
+        expect(HttpMethod.PUT, OWN + "/links/ankama")
+                .andRespond(org.springframework.test.web.client.response.MockRestResponseCreators.withStatus(HttpStatus.CONFLICT)
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .body("{\"status\":409,\"code\":\"conflict\",\"detail\":\"x\",\"reason\":\"FULL\"}"));
+
+        var result = service.ankamaEnroll("enimaloc", "Me#1");
+
+        assertThat(result.status()).isEqualTo(409);
+        assertThat(result.error().property("reason", String.class)).isEqualTo("FULL");
+    }
+
+    @Test
     void minecraftDisconnect() {
         expect(HttpMethod.DELETE, OWN + "/links/minecraft").andRespond(withNoContent());
         service.minecraftDisconnect("enimaloc");
@@ -1922,6 +1956,85 @@ class RealApiServiceTest {
         assertThat(service.adminReauthBattleNetAccount(id)).isEqualTo(409);
         assertThat(service.adminPatchBattleNetAccount(id, Map.of("friendLimitReached", false))).isEqualTo(200);
         assertThat(service.adminDeleteBattleNetAccount(id)).isEqualTo(204);
+    }
+
+    @Test
+    void adminAnkamaAccounts_readCatapultApisDto() {
+        respond(HttpMethod.GET, "/api/internal/admin/ankama-accounts", "[{\"id\":\"00000000-0000-0000-0000-00000000000a\","
+                + "\"displayTag\":\"Bot#1\",\"authState\":\"CODE_REQUIRED\",\"sessionState\":\"STOPPED\",\"fillOrder\":2,"
+                + "\"friendLimitReached\":true,\"enabled\":false,\"friendCount\":7,\"shieldCodeDomain\":\"example.com\"}]");
+        assertThat(service.adminAnkamaAccounts()).singleElement().satisfies(a -> {
+            assertThat(a.displayTag()).isEqualTo("Bot#1");
+            assertThat(a.shieldCodeDomain()).isEqualTo("example.com");
+            assertThat(a.friendCount()).isEqualTo(7);
+        });
+    }
+
+    @Test
+    void adminAnkamaAccounts_isNullWhenTheApiFails() {
+        expect(HttpMethod.GET, "/api/internal/admin/ankama-accounts").andRespond(withStatus(HttpStatus.NOT_FOUND));
+
+        assertThat(service.adminAnkamaAccounts()).isNull();
+    }
+
+    @Test
+    void ankamaLogin_sendsItsShapes_keepsTheAnswerAndTheApisMessage() {
+        UUID id = UUID.fromString("00000000-0000-0000-0000-00000000000a");
+        UUID login = UUID.fromString("00000000-0000-0000-0000-0000000000b1");
+        expect(HttpMethod.POST, "/api/internal/admin/ankama-accounts/login")
+                .andExpect(content().json("{}", org.springframework.test.json.JsonCompareMode.STRICT))
+                .andRespond(withSuccess("{\"loginId\":\"" + login + "\",\"authorizeUrl\":\"https://auth.ankama.com/x\"}",
+                        MediaType.APPLICATION_JSON));
+        expect(HttpMethod.POST, "/api/internal/admin/ankama-accounts/login")
+                .andExpect(content().json("{\"accountId\":\"" + id + "\"}", org.springframework.test.json.JsonCompareMode.STRICT))
+                .andRespond(withStatus(HttpStatus.NOT_FOUND));
+        expect(HttpMethod.POST, "/api/internal/admin/ankama-accounts/login/" + login + "/complete")
+                .andExpect(content().json("{\"redirectUrl\":\"http://127.0.0.1:9001/a?code=1\"}",
+                        org.springframework.test.json.JsonCompareMode.STRICT))
+                .andRespond(withSuccess("{\"id\":\"" + id + "\",\"displayTag\":\"Bot#1\",\"authState\":\"CODE_REQUIRED\","
+                        + "\"sessionState\":\"DISABLED\",\"fillOrder\":0,\"friendLimitReached\":false,\"enabled\":true,"
+                        + "\"friendCount\":0,\"shieldCodeDomain\":\"example.com\"}", MediaType.APPLICATION_JSON));
+        expect(HttpMethod.POST, "/api/internal/admin/ankama-accounts/login/" + login + "/complete")
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST).contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"error\":\"Ankama refused the login\"}"));
+
+        var started = service.adminStartAnkamaLogin(null);
+        assertThat(started.status()).isEqualTo(200);
+        assertThat(started.body().loginId()).isEqualTo(login);
+        assertThat(started.body().authorizeUrl()).isEqualTo("https://auth.ankama.com/x");
+        assertThat(service.adminStartAnkamaLogin(id).status()).isEqualTo(404);
+        var done = service.adminCompleteAnkamaLogin(login, "http://127.0.0.1:9001/a?code=1");
+        assertThat(done.body().shieldCodeDomain()).isEqualTo("example.com");
+        var refused = service.adminCompleteAnkamaLogin(login, "http://127.0.0.1:9001/a?code=1");
+        assertThat(refused.status()).isEqualTo(400);
+        assertThat(refused.body()).isNull();
+        assertThat(refused.error()).isEqualTo("Ankama refused the login");
+    }
+
+    @Test
+    void ankamaAccountActions_sendTheirShapes_andReturnTheStatus() {
+        UUID id = UUID.fromString("00000000-0000-0000-0000-00000000000a");
+        expect(HttpMethod.POST, "/api/internal/admin/ankama-accounts/" + id + "/code")
+                .andExpect(content().json("{\"code\":\"257146\"}", org.springframework.test.json.JsonCompareMode.STRICT))
+                .andRespond(withStatus(HttpStatus.ACCEPTED));
+        expect(HttpMethod.POST, "/api/internal/admin/ankama-accounts/" + id + "/code")
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST).contentType(MediaType.APPLICATION_JSON).body("{\"error\":\"Wrong code\"}"));
+        expect(HttpMethod.POST, "/api/internal/admin/ankama-accounts/" + id + "/code/resend")
+                .andRespond(withStatus(HttpStatus.ACCEPTED));
+        expect(HttpMethod.PATCH, "/api/internal/admin/ankama-accounts/" + id)
+                .andExpect(content().json("{\"friendLimitReached\":false}", org.springframework.test.json.JsonCompareMode.STRICT))
+                .andRespond(withSuccess("{\"id\":\"" + id + "\",\"displayTag\":\"Bot#1\",\"authState\":\"READY\","
+                        + "\"sessionState\":\"READY\",\"fillOrder\":0,\"friendLimitReached\":false,\"enabled\":true,"
+                        + "\"friendCount\":0}", MediaType.APPLICATION_JSON));
+        expect(HttpMethod.DELETE, "/api/internal/admin/ankama-accounts/" + id).andRespond(withNoContent());
+
+        assertThat(service.adminSubmitAnkamaCode(id, "257146").status()).isEqualTo(202);
+        var wrong = service.adminSubmitAnkamaCode(id, "1");
+        assertThat(wrong.status()).isEqualTo(400);
+        assertThat(wrong.error()).isEqualTo("Wrong code");
+        assertThat(service.adminResendAnkamaCode(id)).isEqualTo(202);
+        assertThat(service.adminPatchAnkamaAccount(id, Map.of("friendLimitReached", false)).status()).isEqualTo(200);
+        assertThat(service.adminDeleteAnkamaAccount(id)).isEqualTo(204);
     }
 
     @Test

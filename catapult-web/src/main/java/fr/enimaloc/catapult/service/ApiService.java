@@ -32,8 +32,11 @@ import fr.enimaloc.catapult.common.dto.admin.TwDefinitionDto;
 import fr.enimaloc.catapult.common.dto.admin.TwKeywordTestDto;
 import fr.enimaloc.catapult.common.dto.admin.TwRebuild;
 import fr.enimaloc.catapult.common.dto.admin.AccountDto;
+import fr.enimaloc.catapult.common.dto.admin.AnkamaAccountDto;
+import fr.enimaloc.catapult.common.dto.admin.AnkamaLoginStartDto;
 import fr.enimaloc.catapult.common.dto.admin.BattleNetAccountDto;
 import fr.enimaloc.catapult.common.dto.admin.MinecraftDeviceCodeDto;
+import fr.enimaloc.catapult.common.dto.connect.AnkamaLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.connect.BattleNetLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
@@ -108,6 +111,18 @@ public interface ApiService {
     int minecraftDisconnect(String username);
     /** The logged-in member's own Battle.net link; null when logged out or catapult-api fails. */
     BattleNetLinkStateResponse battleNetStatus(String username);
+    /** The logged-in member's own Ankama link; null when logged out or catapult-api fails. */
+    AnkamaLinkStateResponse ankamaStatus(String username);
+    /**
+     * Links the member to the Ankama account {@code nameTag} ({@code Pseudo#1234}): catapult-api's status and, on a
+     * refusal, its problem (a 409 carries the reason, {@code FULL} or {@code ALREADY_LINKED}); 401 when logged out,
+     * 502 when unreachable.
+     */
+    ApiClient.Result<AnkamaLinkStateResponse> ankamaEnroll(String username, String nameTag);
+    /** Has the Ankama bot send its invitation again; catapult-api's status, 401 when logged out, 502 when unreachable. */
+    int ankamaResend(String username);
+    /** Unlinks the member's Ankama account; catapult-api's status (204), 401 when logged out, 502 when unreachable. */
+    int ankamaDisconnect(String username);
     /** Unlinks the member's Battle.net account; catapult-api's status (204), 401 when logged out, 502 when unreachable. */
     int battleNetDisconnect(String username);
     /** Unlinks the channel's Xbox account; catapult-api's status (204; 403 not the owner), 502 when unreachable. */
@@ -540,6 +555,33 @@ public interface ApiService {
     int adminPatchBattleNetAccount(UUID id, Map<String, Object> patch);
     /** Deletes a bot account: 204; 404 unknown; 502 when unreachable. */
     int adminDeleteBattleNetAccount(UUID id);
+
+    /**
+     * An admin call's HTTP status, its body on a 2xx (null when it has none) and the {@code {"error": message}} text
+     * catapult-api answered a refusal with (null when it gave none).
+     */
+    record AdminCall<T>(int status, T body, String error) {
+        public boolean ok() {
+            return status >= 200 && status < 300;
+        }
+    }
+
+    /** The Ankama bot pool; null when it can't be read (Ankama disabled in catapult-api, or unreachable). */
+    List<AnkamaAccountDto> adminAnkamaAccounts();
+
+    /** Starts an Ankama login: a new bot, or {@code accountId}'s re-authentication; the URL the admin opens. */
+    AdminCall<AnkamaLoginStartDto> adminStartAnkamaLogin(UUID accountId);
+
+    /** Finishes the login {@code loginId} with the address the admin pasted (it holds a one-time code: never logged). */
+    AdminCall<AnkamaAccountDto> adminCompleteAnkamaLogin(UUID loginId, String redirectUrl);
+
+    AdminCall<Void> adminSubmitAnkamaCode(UUID id, String code);
+
+    int adminResendAnkamaCode(UUID id);
+
+    AdminCall<AnkamaAccountDto> adminPatchAnkamaAccount(UUID id, Map<String, Object> patch);
+
+    int adminDeleteAnkamaAccount(UUID id);
 
     /** The trigger warning definitions, by sort order; null when catapult-api fails. */
     List<TwDefinitionDto> adminTws();

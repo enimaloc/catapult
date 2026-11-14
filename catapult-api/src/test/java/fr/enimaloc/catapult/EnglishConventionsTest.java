@@ -78,6 +78,9 @@ class EnglishConventionsTest {
                     API + "experiment/BattleNetIntegrationExperiment.java LITERAL",
                     "experiment name, description and variants, seeded once into the DB"),
             Map.entry(
+                    API + "experiment/AnkamaIntegrationExperiment.java LITERAL",
+                    "experiment name, description and variants, seeded once into the DB"),
+            Map.entry(
                     API + "experiment/RaidRestoreGameExperiment.java LITERAL",
                     "experiment name, description and variants, seeded once into the DB"),
             Map.entry(

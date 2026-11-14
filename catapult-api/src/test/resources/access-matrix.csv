@@ -72,6 +72,10 @@ DELETE,/api/internal/users/{userId}/links/minecraft,userId=self,,401,401,GATED,G
 GET,/api/internal/users/{userId}/links/minecraft,userId=self,,401,401,PASS,PASS,PASS,PASS,401
 PUT,/api/internal/users/{userId}/links/minecraft,userId=self,,401,401,GATED,GATED,GATED,GATED,401
 POST,/api/internal/users/{userId}/links/minecraft/sync,userId=self,,401,401,GATED,GATED,GATED,GATED,401
+DELETE,/api/internal/users/{userId}/links/ankama,userId=self,,401,401,GATED,GATED,GATED,GATED,401
+GET,/api/internal/users/{userId}/links/ankama,userId=self,,401,401,PASS,PASS,PASS,PASS,401
+PUT,/api/internal/users/{userId}/links/ankama,userId=self,,401,401,GATED,GATED,GATED,GATED,401
+POST,/api/internal/users/{userId}/links/ankama/resend,userId=self,,401,401,GATED,GATED,GATED,GATED,401
 DELETE,/api/internal/users/{userId}/links/steam,userId=self,,401,401,PASS,PASS,PASS,PASS,401
 GET,/api/internal/users/{userId}/links/steam/start,userId=self,,401,401,PASS,PASS,PASS,PASS,401
 POST,/api/internal/users/{userId}/experiment-feedback,userId=self,"{""experimentId"":""00000000-0000-0000-0000-00000000dead"",""npsScore"":5}",401,401,PASS,PASS,PASS,PASS,401
@@ -116,6 +120,10 @@ DELETE,/api/internal/users/{userId}/links/battlenet,unmapped,,401,401,403,403,GA
 GET,/api/internal/users/{userId}/links/battlenet,unmapped,,401,401,403,403,PASS,403,401
 GET,/api/internal/users/{userId}/links/minecraft,unmapped,,401,401,403,403,PASS,403,401
 PUT,/api/internal/users/{userId}/links/minecraft,unmapped,,401,401,403,403,GATED,403,401
+DELETE,/api/internal/users/{userId}/links/ankama,unmapped,,401,401,403,403,GATED,403,401
+GET,/api/internal/users/{userId}/links/ankama,unmapped,,401,401,403,403,PASS,403,401
+PUT,/api/internal/users/{userId}/links/ankama,unmapped,,401,401,403,403,GATED,403,401
+POST,/api/internal/users/{userId}/links/ankama/resend,unmapped,,401,401,403,403,GATED,403,401
 POST,/api/internal/users/{userId}/experiment-feedback,unmapped,"{""experimentId"":""00000000-0000-0000-0000-00000000dead"",""npsScore"":5}",401,401,403,403,PASS,403,401
 DELETE,/api/internal/users/{userId}/links/steam,unmapped,,401,401,403,403,PASS,403,401
 GET,/api/internal/users/{userId}/links/steam/start,unmapped,,401,401,403,403,PASS,403,401
@@ -316,6 +324,13 @@ DELETE,/api/internal/admin/battlenet-accounts/{id},,,401,PASS,403,403,403,PASS,4
 PATCH,/api/internal/admin/battlenet-accounts/{id},,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/battlenet-accounts/{id}/code,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/battlenet-accounts/{id}/reauth,,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/ankama-accounts,,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/ankama-accounts/login,,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/ankama-accounts/login/{loginId}/complete,,,401,PASS,403,403,403,PASS,401
+DELETE,/api/internal/admin/ankama-accounts/{id},,,401,PASS,403,403,403,PASS,401
+PATCH,/api/internal/admin/ankama-accounts/{id},,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/ankama-accounts/{id}/code,,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/ankama-accounts/{id}/code/resend,,,401,PASS,403,403,403,PASS,401
 GET,/api/internal/admin/minecraft-accounts,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/minecraft-accounts,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/minecraft-accounts/device-code,,,401,PASS,403,403,403,PASS,401

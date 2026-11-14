@@ -20,7 +20,9 @@ import fr.enimaloc.catapult.common.dto.channel.PagedBindings;
 import fr.enimaloc.catapult.common.dto.channel.SteamData;
 import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
 import fr.enimaloc.catapult.common.dto.channel.XboxData;
+import fr.enimaloc.catapult.common.dto.channel.AnkamaData;
 import fr.enimaloc.catapult.common.dto.channel.BattleNetData;
+import fr.enimaloc.catapult.common.dto.connect.AnkamaLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.connect.BattleNetLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
@@ -63,6 +65,9 @@ public class MockData {
     private static final ObsData DEFAULT_OBS = new ObsData(false, "127.0.0.1", 4455, true);
     private static final LinkStateResponse MINECRAFT_UNLINKED = new LinkStateResponse("NONE", null, null);
     private static final BattleNetLinkStateResponse BATTLENET_UNLINKED = new BattleNetLinkStateResponse("NONE", null, null);
+    private static final AnkamaLinkStateResponse ANKAMA_UNLINKED = new AnkamaLinkStateResponse("NONE", null, null);
+    private static final String MOCK_ANKAMA_TAG = "MockStreamer#1234";
+    private static final String MOCK_BOT_ANKAMA_TAG = "CatapultBot#4242";
     private static final String MOCK_BATTLE_TAG = "MockStreamer#1234";
     private static final String MOCK_BOT_BATTLE_TAG = "CatapultBot#4242";
 
@@ -108,6 +113,8 @@ public class MockData {
     private LinkStateResponse minecraftLink;
     /** Battle.net is offered to every mock session; the quick-launch presets differ by their link. */
     private BattleNetLinkStateResponse battleNetLink = BATTLENET_UNLINKED;
+    /** Ankama is offered to every mock session too, with the same presets. */
+    private AnkamaLinkStateResponse ankamaLink = ANKAMA_UNLINKED;
     private ObsData obsData;
     private String obsPassword;
     private String twitchatBranch = TwitchatData.AUTO;
@@ -212,6 +219,11 @@ public class MockData {
             case 0 -> new BattleNetLinkStateResponse("ACCEPTED", MOCK_BATTLE_TAG, MOCK_BOT_BATTLE_TAG);
             case 1 -> new BattleNetLinkStateResponse("PENDING", MOCK_BATTLE_TAG, MOCK_BOT_BATTLE_TAG);
             default -> BATTLENET_UNLINKED;
+        };
+        data.ankamaLink = switch (id) {
+            case 0 -> new AnkamaLinkStateResponse("ACCEPTED", MOCK_ANKAMA_TAG, null);
+            case 1 -> new AnkamaLinkStateResponse("PENDING", MOCK_ANKAMA_TAG, MOCK_BOT_ANKAMA_TAG);
+            default -> ANKAMA_UNLINKED;
         };
         return data;
     }
@@ -343,7 +355,7 @@ public class MockData {
                 obsData == null ? null : TwitchatData.of(twitchatBranch),
                 username.equals(channelDto.twitchUsername()) ? customBindings.state() : null,
                 // drops: the mock has no experiments, they are offered
-                drops());
+                drops(), ankamaData());
     }
 
     /** The mock's one running drops campaign, on the first binding's category. */
@@ -363,6 +375,10 @@ public class MockData {
     private MinecraftData minecraftData() {
         return !hasMinecraftProvider ? null : new MinecraftData(minecraftLink.status(), minecraftLink.minecraftName(),
                 minecraftLink.serviceAccountUsername());
+    }
+
+    private AnkamaData ankamaData() {
+        return new AnkamaData(ankamaLink.status(), ankamaLink.nameTag(), ankamaLink.serviceAccountTag());
     }
 
     private BattleNetData battleNetData() {
@@ -389,6 +405,19 @@ public class MockData {
 
     public BattleNetLinkStateResponse getBattleNetLink() {
         return battleNetLink;
+    }
+
+    public AnkamaLinkStateResponse getAnkamaLink() {
+        return ankamaLink;
+    }
+
+    /** The streamer's {@code nameTag} is linked, its invitation sent: pending until they accept it. */
+    public void ankamaEnroll(String nameTag) {
+        ankamaLink = new AnkamaLinkStateResponse("PENDING", nameTag, MOCK_BOT_ANKAMA_TAG);
+    }
+
+    public void ankamaDisconnect() {
+        ankamaLink = ANKAMA_UNLINKED;
     }
 
     public void battleNetDisconnect() {

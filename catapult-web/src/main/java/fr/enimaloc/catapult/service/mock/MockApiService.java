@@ -36,6 +36,8 @@ import fr.enimaloc.catapult.common.dto.admin.TwDefinitionDto;
 import fr.enimaloc.catapult.common.dto.admin.TwKeywordTestDto;
 import fr.enimaloc.catapult.common.dto.admin.TwRebuild;
 import fr.enimaloc.catapult.common.dto.admin.AccountDto;
+import fr.enimaloc.catapult.common.dto.admin.AnkamaAccountDto;
+import fr.enimaloc.catapult.common.dto.admin.AnkamaLoginStartDto;
 import fr.enimaloc.catapult.common.dto.admin.BattleNetAccountDto;
 import fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
@@ -67,6 +69,7 @@ import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
 import fr.enimaloc.catapult.common.dto.channel.GameDto;
 import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
 import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
+import fr.enimaloc.catapult.common.dto.connect.AnkamaLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.connect.BattleNetLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatDispatch;
@@ -88,6 +91,7 @@ import fr.enimaloc.catapult.event.binding.BindingTitleEvent;
 import fr.enimaloc.catapult.event.binding.BindingUpdatedEvent;
 import fr.enimaloc.catapult.event.binding.CclStateEvent;
 import fr.enimaloc.catapult.event.binding.GameChangedEvent;
+import fr.enimaloc.catapult.event.ankama.AnkamaLinkEvent;
 import fr.enimaloc.catapult.event.battlenet.BattleNetLinkEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftDisconnectedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftEnrollEvent;
@@ -195,6 +199,7 @@ public class MockApiService implements ApiService {
     /** Application-wide: the Minecraft service accounts are the same for every mock session. */
     private final MockMinecraftAccountsStore minecraftAccounts = new MockMinecraftAccountsStore();
     private final MockBattleNetAccountsStore battleNetAccounts = new MockBattleNetAccountsStore();
+    private final MockAnkamaAccountsStore ankamaAccounts = new MockAnkamaAccountsStore();
     /** Application-wide, as catapult-api's: every mock account that logged in is a member any admin session lists. */
     private final MockMembers members = new MockMembers();
     /** Application-wide too: a member's custom flags are the same for every mock session. */
@@ -522,6 +527,39 @@ public class MockApiService implements ApiService {
     public BattleNetLinkStateResponse battleNetStatus(String username) {
         log.trace("battleNetStatus({})", username);
         return currentData().getBattleNetLink();
+    }
+
+    @Override
+    public AnkamaLinkStateResponse ankamaStatus(String username) {
+        log.trace("ankamaStatus({})", username);
+        return currentData().getAnkamaLink();
+    }
+
+    @Override
+    public ApiClient.Result<AnkamaLinkStateResponse> ankamaEnroll(String username, String nameTag) {
+        log.trace("ankamaEnroll({}, {})", username, nameTag);
+        MockData data = currentData();
+        data.ankamaEnroll(nameTag.trim());
+        AnkamaLinkStateResponse link = data.getAnkamaLink();
+        eventPublisher.publishEvent(new AnkamaLinkEvent(username, link.status(), link.nameTag(), link.serviceAccountTag()));
+        return new ApiClient.Result<>(200, link);
+    }
+
+    @Override
+    public int ankamaResend(String username) {
+        log.trace("ankamaResend({})", username);
+        AnkamaLinkStateResponse link = currentData().getAnkamaLink();
+        eventPublisher.publishEvent(new AnkamaLinkEvent(username, link.status(), link.nameTag(), link.serviceAccountTag()));
+        return 200;
+    }
+
+    @Override
+    public int ankamaDisconnect(String username) {
+        log.trace("ankamaDisconnect({})", username);
+        MockData data = currentData();
+        data.ankamaDisconnect();
+        eventPublisher.publishEvent(new AnkamaLinkEvent(username, data.getAnkamaLink().status(), null, null));
+        return NO_CONTENT;
     }
 
     @Override
@@ -1791,6 +1829,48 @@ public class MockApiService implements ApiService {
     public int adminDeleteBattleNetAccount(UUID id) {
         log.trace("adminDeleteBattleNetAccount({})", id);
         return battleNetAccounts.delete(id);
+    }
+
+    @Override
+    public List<AnkamaAccountDto> adminAnkamaAccounts() {
+        log.trace("adminAnkamaAccounts()");
+        return ankamaAccounts.list();
+    }
+
+    @Override
+    public AdminCall<AnkamaLoginStartDto> adminStartAnkamaLogin(UUID accountId) {
+        log.trace("adminStartAnkamaLogin({})", accountId);
+        return ankamaAccounts.startLogin(accountId);
+    }
+
+    @Override
+    public AdminCall<AnkamaAccountDto> adminCompleteAnkamaLogin(UUID loginId, String redirectUrl) {
+        log.trace("adminCompleteAnkamaLogin({})", loginId); // never the URL: it holds a one-time code
+        return ankamaAccounts.completeLogin(loginId, redirectUrl);
+    }
+
+    @Override
+    public AdminCall<Void> adminSubmitAnkamaCode(UUID id, String code) {
+        log.trace("adminSubmitAnkamaCode({})", id);
+        return ankamaAccounts.submitCode(id, code);
+    }
+
+    @Override
+    public int adminResendAnkamaCode(UUID id) {
+        log.trace("adminResendAnkamaCode({})", id);
+        return ankamaAccounts.resendCode(id);
+    }
+
+    @Override
+    public AdminCall<AnkamaAccountDto> adminPatchAnkamaAccount(UUID id, Map<String, Object> patch) {
+        log.trace("adminPatchAnkamaAccount({}, {})", id, patch.keySet());
+        return ankamaAccounts.patch(id, patch);
+    }
+
+    @Override
+    public int adminDeleteAnkamaAccount(UUID id) {
+        log.trace("adminDeleteAnkamaAccount({})", id);
+        return ankamaAccounts.delete(id);
     }
 
     @Override

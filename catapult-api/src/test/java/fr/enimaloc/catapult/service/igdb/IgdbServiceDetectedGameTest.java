@@ -102,6 +102,15 @@ class IgdbServiceDetectedGameTest {
     }
 
     @Test
+    void ankamaSource_isNeverSearchedByNameOnIgdb() {
+        assertThat(service.resolveDetected(GameBinding.SourceType.ANKAMA, "3", "Wakfu")).isEmpty();
+        assertThat(service.resolveUnmapped(GameBinding.SourceType.ANKAMA, "3", "Wakfu")).isEmpty();
+
+        verify(service, never()).findByName(anyString());
+        verifyNoInteractions(igdb);
+    }
+
+    @Test
     void battleNetMappingWithoutIgdbIdIsNotSearchedByName() {
         mapped(GameBinding.SourceType.BATTLENET, "Pro", null);
 
