@@ -2,6 +2,8 @@ package fr.enimaloc.catapult.relay;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
+import fr.enimaloc.catapult.service.http.ApiClient;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -52,6 +54,7 @@ public class ApiRelayController {
             "/api/me/custom-bindings", "/api/me/custom-bindings/**", "/api/me/drops", "/api/games/**",
             "/api/v3/api-docs", "/api/v3/api-docs/**",
     };
+    private static final String LINK_PREFIX = "/oauth2/authorization/";
     /** A relayed request's body is read whole: these endpoints only take small ones. */
     static final int MAX_BODY_BYTES = 2 * 1024 * 1024;
     static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
@@ -139,11 +142,14 @@ public class ApiRelayController {
                 .method(request.getMethod(), body.length == 0
                         ? HttpRequest.BodyPublishers.noBody()
                         : HttpRequest.BodyPublishers.ofByteArray(body));
+        String linkJwt = linkJwt(request);
         for (String name : Collections.list(request.getHeaderNames())) {
             String lower = name.toLowerCase(Locale.ROOT);
             if (NOT_RELAYED.contains(lower) || FORWARDING.contains(lower)) continue;
+            if (linkJwt != null && lower.equals("authorization")) continue;
             for (String value : Collections.list(request.getHeaders(name))) upstream.header(name, value);
         }
+        if (linkJwt != null) upstream.header("Authorization", "Bearer " + linkJwt);
         return upstream
                 .header("X-Forwarded-For", request.getRemoteAddr())
                 .header("X-Real-IP", request.getRemoteAddr())
@@ -151,6 +157,19 @@ public class ApiRelayController {
                 .header("X-Forwarded-Host", request.getServerName())
                 .header("X-Forwarded-Port", String.valueOf(request.getServerPort()))
                 .build();
+    }
+
+    /**
+     * The logged-in user's JWT when a secondary link (Steam, Xbox, Battle.net) starts: catapult-api's session, which
+     * its callback reads the user from, may have been lost (restart, other replica), so catapult-api restores it
+     * from this token (its LinkSessionRestoreFilter). Null for any other request.
+     */
+    private static String linkJwt(HttpServletRequest request) {
+        String uri = request.getRequestURI();
+        if (!uri.startsWith(LINK_PREFIX) || uri.equals(LINK_PREFIX + "twitch")) return null;
+        HttpSession session = request.getSession(false);
+        return session != null && session.getAttribute(ApiClient.SESSION_JWT_KEY) instanceof String jwt
+                && !jwt.isBlank() ? jwt : null;
     }
 
     private void unavailable(HttpServletResponse response) throws IOException {
