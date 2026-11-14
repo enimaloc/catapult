@@ -126,6 +126,21 @@ class ChannelEventStreamControllerTest {
     }
 
     @Test
+    void theAnkamaLinkGoesToTheOwnersStreams_aModeratorsGetNothing() throws Exception {
+        MvcResult owner = subscribe("enimaloc", member("EnimaLoc"));
+        MvcResult moderator = subscribe("enimaloc", member("a-moderator"));
+        fr.enimaloc.catapult.event.ankama.AnkamaLinkEvent link =
+                new fr.enimaloc.catapult.event.ankama.AnkamaLinkEvent("enimaloc", "ACCEPTED", "Me#1", "Bot#2");
+
+        controller.onChannelUpdated(link);
+
+        assertThat(owner.getResponse().getContentAsString()).contains("event:AnkamaLinkEvent", "Me#1", "Bot#2");
+        assertThat(moderator.getResponse().getContentAsString()).doesNotContain("AnkamaLinkEvent")
+                .doesNotContain("Me#1").doesNotContain("Bot#2");
+        assertThat(ChannelEventStreamController.forModerators(link)).isNull();
+    }
+
+    @Test
     void aChannelIsFollowedByItsLogin_whateverItsCase() throws Exception {
         MvcResult stream = subscribe("EnimaLoc");
 

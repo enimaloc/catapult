@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.experiment;
 
+import fr.enimaloc.catapult.service.ankama.AnkamaGateService;
 import fr.enimaloc.catapult.service.battlenet.BattleNetGateService;
 import fr.enimaloc.catapult.service.binding.RaidRestoreGateService;
 import fr.enimaloc.catapult.service.drops.DropsGate;
@@ -32,6 +33,7 @@ class GateExperimentDeclarationTest {
         List<String> gateKeys = List.of(
                 MinecraftGateService.EXPERIMENT_KEY,
                 BattleNetGateService.EXPERIMENT_KEY,
+                AnkamaGateService.EXPERIMENT_KEY,
                 StreamTitleService.EXPERIMENT_KEY,
                 RaidRestoreGateService.EXPERIMENT_KEY,
                 DropsGate.EXPERIMENT_KEY);

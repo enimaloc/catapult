@@ -12,10 +12,11 @@
     </div>
 
     <!--/* Cards are built by IntegrationCards: every state is pre-rendered and toggled with the
-         `hidden` class, by visibility.js (spa:state) or channel-connections.js. */-->
+         `hidden` class, by visibility.js (spa:state) or channel-connections.js. A grid: the cards
+         with at most two buttons at once side by side, the `wide` ones spanning it below them. */-->
     <div id="channel-connections">
         <mdui-card th:each="integration : ${integrations}" class="connection-card" variant="outlined"
-                   th:attr="data-conn=${integration.id()}">
+                   th:classappend="${integration.wide()} ? 'wide'" th:attr="data-conn=${integration.id()}">
             <span th:replace="~{pages/channel-tab/integrations :: message(${integration.name()})}">Twitch</span>
             <th:block th:each="node : ${integration.nodes()}"><th:block th:insert="~{pages/channel-tab/integrations :: node(${node})}"></th:block></th:block>
             <th:block th:if="${integration.id() == 'obs' and widgetUrl != null}" th:insert="~{pages/channel-tab/integrations :: obs-widget}"></th:block>

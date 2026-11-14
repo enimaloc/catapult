@@ -315,6 +315,95 @@ class ChannelActionsControllerTest {
     }
 
     @Test
+    void ankamaStatus_isTheMembersOwn() throws Exception {
+        when(apiService.ankamaStatus("enimaloc")).thenReturn(
+                new fr.enimaloc.catapult.common.dto.connect.AnkamaLinkStateResponse("PENDING", "Me#1", "Bot#2"));
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/channel/enimaloc/ankama")
+                        .session(as("enimaloc")))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.status").value("PENDING"));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/channel/someone/ankama")
+                .session(as("enimaloc"))).andExpect(status().isForbidden());
+    }
+
+    @Test
+    void ankamaEnroll_relaysTheTrimmedNameTag() throws Exception {
+        when(apiService.ankamaEnroll("enimaloc", "Me#1234")).thenReturn(new fr.enimaloc.catapult.service.http.ApiClient.Result<>(200,
+                new fr.enimaloc.catapult.common.dto.connect.AnkamaLinkStateResponse("PENDING", "Me#1234", "Bot#2")));
+
+        mvc.perform(post("/channel/enimaloc/ankama/enroll").with(csrf()).session(as("enimaloc"))
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"nameTag\":\" Me#1234 \"}"))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).ankamaEnroll("enimaloc", "Me#1234");
+    }
+
+    @Test
+    void ankamaEnroll_withoutANameTag_isABadRequest_notSentOn() throws Exception {
+        for (String body : new String[]{"{}", "{\"nameTag\":\"  \"}"}) {
+            mvc.perform(post("/channel/enimaloc/ankama/enroll").with(csrf()).session(as("enimaloc"))
+                            .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().isBadRequest());
+        }
+
+        org.mockito.Mockito.verify(apiService, org.mockito.Mockito.never())
+                .ankamaEnroll(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
+    /** A refusal carries its status, and for a 409 its reason, so that the card tells a full bot from a taken account. */
+    @Test
+    void ankamaEnroll_aConflict_relaysItsReason() throws Exception {
+        when(apiService.ankamaEnroll("enimaloc", "Me#1")).thenReturn(new fr.enimaloc.catapult.service.http.ApiClient.Result<>(
+                409, null, new fr.enimaloc.catapult.service.http.ApiError(null, null, tools.jackson.databind.json.JsonMapper.builder().build()
+                        .readTree("{\"code\":\"conflict\",\"reason\":\"ALREADY_LINKED\"}"))));
+
+        mvc.perform(post("/channel/enimaloc/ankama/enroll").with(csrf()).session(as("enimaloc"))
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"nameTag\":\"Me#1\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.reason")
+                        .value("ALREADY_LINKED"));
+    }
+
+    @Test
+    void ankamaEnroll_otherRefusals_keepTheirStatus() throws Exception {
+        when(apiService.ankamaEnroll("enimaloc", "Me#1")).thenReturn(
+                new fr.enimaloc.catapult.service.http.ApiClient.Result<>(400, null));
+
+        mvc.perform(post("/channel/enimaloc/ankama/enroll").with(csrf()).session(as("enimaloc"))
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"nameTag\":\"Me#1\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void ankamaResendAndDisconnect_callTheApi() throws Exception {
+        mvc.perform(post("/channel/enimaloc/ankama/resend").with(csrf()).session(as("enimaloc")))
+                .andExpect(status().isNoContent());
+        mvc.perform(post("/channel/enimaloc/ankama/disconnect").with(csrf()).session(as("enimaloc")))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).ankamaResend("enimaloc");
+        verify(apiService).ankamaDisconnect("enimaloc");
+    }
+
+    @Test
+    void ankama_onAnotherChannel_isForbidden() throws Exception {
+        mvc.perform(post("/channel/someone/ankama/enroll").with(csrf()).session(as("enimaloc"))
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content("{\"nameTag\":\"Me#1\"}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/channel/someone/ankama/resend").with(csrf()).session(as("enimaloc"))).andExpect(status().isForbidden());
+        mvc.perform(post("/channel/someone/ankama/disconnect").with(csrf()).session(as("enimaloc"))).andExpect(status().isForbidden());
+
+        org.mockito.Mockito.verify(apiService, org.mockito.Mockito.never())
+                .ankamaEnroll(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        org.mockito.Mockito.verify(apiService, org.mockito.Mockito.never()).ankamaResend(org.mockito.ArgumentMatchers.any());
+        org.mockito.Mockito.verify(apiService, org.mockito.Mockito.never()).ankamaDisconnect(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
     void minecraftDisconnect_callsApiService() throws Exception {
         mvc.perform(post("/channel/enimaloc/minecraft/disconnect").with(csrf()).session(as("enimaloc")))
                 .andExpect(status().isNoContent());

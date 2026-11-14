@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.perf;
 
 import fr.enimaloc.catapult.common.dto.AppConfigResponse;
+import fr.enimaloc.catapult.common.dto.LaunchedPlatformsResponse;
 import fr.enimaloc.catapult.common.dto.DegradedStatusDto;
 import fr.enimaloc.catapult.common.dto.InvitePageData;
 import fr.enimaloc.catapult.common.dto.InviteRedemptionDto;
@@ -118,6 +119,7 @@ public final class FakeApi extends Dispatcher {
         route("/api/internal/auth/validate", caller -> new UserInfoResponse(caller, twitchId(caller),
                 login(caller), avatar(caller), "ACTIVE", roles(caller), null));
         route("/api/internal/config/app", caller -> new AppConfigResponse("Catapult", 7, List.of("steam")));
+        route("/api/internal/config/launched-platforms", caller -> new LaunchedPlatformsResponse(List.of()));
         route("/api/internal/users/{id}/dashboard", caller -> channelPage(OWNER.equals(caller)));
         route("/api/internal/users/{id}/seen-features", caller -> List.of());
         route("/api/internal/users/{id}/debug", caller -> new MyDebugDto(false, 0));

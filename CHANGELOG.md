@@ -4,6 +4,13 @@ Toutes les versions publiées de Catapult, la plus récente en premier.
 
 Ce fichier est régénéré par le bot à chaque release à partir des notes des [GitHub Releases](https://github.com/enimaloc/catapult/releases) : pour corriger une entrée, modifie les notes de la release (ou le changelog de la PR de release avant sa publication), pas ce fichier.
 
+## [v1.3.1](https://github.com/enimaloc/catapult/releases/tag/v1.3.1) - 2026-11-13
+
+### Fixes
+- **battlenet:** get through Blizzard's security check when a bot logs in (9b8736f)
+- **battlenet:** only count a security check click once it is sent (3296f04)
+- merge the Battle.net login security check fix into dev (2ce2a2a)
+
 ## [v1.3.0](https://github.com/enimaloc/catapult/releases/tag/v1.3.0) - 2026-11-13
 
 ### Features

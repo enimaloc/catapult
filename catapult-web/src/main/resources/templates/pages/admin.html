@@ -10,7 +10,7 @@
 
         <!--/* data-hash-aliases: a former tab's hash, opening the tab it went into */-->
         <mdui-tabs id="admin-tabs" class="channel-tabs" value="members" placement="top" data-hash-tabs
-                   data-hash-aliases='{"rate-limits": "keys"}'>
+                   data-hash-aliases='{"rate-limits": "keys", "ankama": "keys"}'>
             <th:block th:each="tab : ${ {'members', 'ccl', 'caches', 'data', 'meta', 'links', 'notifications', 'dtdd-mapping', 'dtdd-caches', 'game-mappings', 'groups', 'experiments', 'whitelist', 'keys', 'tw', 'broadcast'} }">
                 <mdui-tab th:value="${tab}"><th:block th:text="#{|admin.tab.${tab}|}">admin.tab</th:block><th:block th:replace="~{fragments/new-feature :: dot(|admin.${tab}|)}"></th:block></mdui-tab>
             </th:block>

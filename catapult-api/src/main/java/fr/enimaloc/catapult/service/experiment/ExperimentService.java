@@ -138,6 +138,24 @@ public class ExperimentService {
             .orElse(false);
     }
 
+    /**
+     * Whether every member gets a non-control variant of {@code experimentKey}: ACTIVE, at a full rollout, its rules
+     * all RANDOM at 100 % (an experiment without rules assigns nobody), and no control variant with a weight. Per-member
+     * overrides are not considered. What the landing page waits for before listing a platform.
+     */
+    @Transactional(readOnly = true)
+    public boolean isFullyEnabled(String experimentKey) {
+        return experimentRepository.findByKey(experimentKey)
+                .filter(e -> e.getStatus() == Experiment.Status.ACTIVE)
+                .filter(e -> e.getRolloutPercentage() >= 100)
+                .filter(e -> !e.getRules().isEmpty() && e.getRules().stream().allMatch(rule ->
+                        rule.getRuleType() == ExperimentAssignmentRule.RuleType.RANDOM
+                                && rule.getPercentage() != null && rule.getPercentage() >= 100))
+                .map(e -> e.getVariants().stream().filter(v -> v.getWeight() > 0).toList())
+                .filter(weighted -> !weighted.isEmpty() && weighted.stream().noneMatch(ExperimentVariant::isControl))
+                .isPresent();
+    }
+
     public void markKnown(String key) {
         knownKeys.add(key);
     }

@@ -102,6 +102,8 @@ class ChannelDashboardAssemblerTest {
     private final BattleNetServiceAccountRepository battleNetAccounts = mock(BattleNetServiceAccountRepository.class);
     private final BattleNetLinkStateService battleNetStates =
             new BattleNetLinkStateService(battleNetGate, battleNetLinks, battleNetAccounts);
+    private final fr.enimaloc.catapult.service.ankama.AnkamaLinkStateService ankamaStates =
+            mock(fr.enimaloc.catapult.service.ankama.AnkamaLinkStateService.class);
     private final MinecraftLinkStateService minecraftStates =
             new MinecraftLinkStateService(minecraft, minecraftGate, minecraftAccounts);
     private final TwitchatWidgetSettingsService twitchat = mock(TwitchatWidgetSettingsService.class);
@@ -126,7 +128,7 @@ class ChannelDashboardAssemblerTest {
         SteamProfileDiagnostics diagnostics = new SteamProfileDiagnostics(steamClient, Optional.of(keyRotator), encryption);
         ChannelDashboardAssembler assembler = new ChannelDashboardAssembler(bindings, settingsRepository, streamState,
                 gameState, ccls, tws, encryption, steamClient, diagnostics, igdb, dtddMappings, dtddCache,
-                dtddProposals, oauthTokens, minecraftService, battleNetService, twitchat, raidRestoreGate,
+                dtddProposals, oauthTokens, minecraftService, battleNetService, Optional.of(ankamaStates), twitchat, raidRestoreGate,
                 new fr.enimaloc.catapult.api.CustomBindingViews(customBindings,
                         org.mockito.Mockito.mock(fr.enimaloc.catapult.service.premium.PremiumUiGate.class),
                         org.mockito.Mockito.mock(fr.enimaloc.catapult.service.binding.schedule.CustomBindingScheduleService.class),
@@ -485,6 +487,27 @@ class ChannelDashboardAssemblerTest {
             assertThat(assembler().page(owner, owner, "streamer", 0, null, null).battleNet())
                     .isEqualTo(new BattleNetData("ACCEPTED", "Name#1234", "Bot#1111"));
             assertThat(assembler().page(moderator, owner, "streamer", 0, null, null).battleNet()).isNull();
+        }
+
+        @Test
+        void dashboardCarriesAnkamaDataForTheOwnerOnly() {
+            when(ankamaStates.state(owner)).thenReturn(
+                    new fr.enimaloc.catapult.common.dto.connect.AnkamaLinkStateResponse("PENDING", "Name#1234", "Bot#1111"));
+            when(bindings.findByUser(eq(owner), any())).thenReturn(new PageImpl<>(List.of()));
+
+            assertThat(assembler().page(owner, owner, "streamer", 0, null, null).ankama())
+                    .isEqualTo(new fr.enimaloc.catapult.common.dto.channel.AnkamaData("PENDING", "Name#1234", "Bot#1111"));
+            assertThat(assembler().page(moderator, owner, "streamer", 0, null, null).ankama()).isNull();
+        }
+
+        @Test
+        void ankamaUnavailableToTheChannelIsNull() {
+            when(ankamaStates.state(owner)).thenReturn(
+                    fr.enimaloc.catapult.service.ankama.AnkamaLinkStateService.of(
+                            fr.enimaloc.catapult.service.ankama.AnkamaLinkStateService.UNAVAILABLE));
+            when(bindings.findByUser(eq(owner), any())).thenReturn(new PageImpl<>(List.of()));
+
+            assertThat(assembler().page(owner, owner, "streamer", 0, null, null).ankama()).isNull();
         }
 
         @Test

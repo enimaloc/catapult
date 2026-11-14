@@ -57,11 +57,8 @@ public class ModelFiller {
      */
     public record Seo(String title, String description, String canonicalUrl, boolean indexed) {}
 
-    /** Static, page-independent data every template can read as ${app.*}. */
+    /** Page-independent data every template can read as ${app.*}: the platforms add the launched gated ones. */
     public record AppModel(List<FeatureDto> features, List<PlatformDto> platforms, List<SpaPage> spa) {}
-
-    private static final AppModel APP_MODEL =
-            new AppModel(SiteCatalog.FEATURES, SiteCatalog.PLATFORMS, SiteCatalog.PAGES);
 
     private final Optional<BuildProperties> buildProperties;
     private final MessageSource messageSource;
@@ -71,9 +68,12 @@ public class ModelFiller {
     private final ObjectProvider<SiteSocialLinks> siteSocialLinks;
     private final ObjectProvider<DegradedState> degradedState;
     private final ObjectProvider<DegradedLabels> degradedLabels;
+    private final ObjectProvider<LaunchedPlatforms> launchedPlatforms;
 
     public void defaultAttr(Model model, String page) {
-        model.addAttribute("app", APP_MODEL);
+        LaunchedPlatforms launched = launchedPlatforms.getIfAvailable();
+        model.addAttribute("app", new AppModel(SiteCatalog.FEATURES,
+                SiteCatalog.platforms(launched == null ? List.of() : launched.ids()), SiteCatalog.PAGES));
         model.addAttribute("page", page == null ? "" : page);
     }
 
