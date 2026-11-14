@@ -702,7 +702,7 @@ public class AnkamaSessionManager implements SmartLifecycle {
                     log.warn("Could not list the friends and invites of Ankama service account {}: {}", accountId,
                             failure.toString());
                 } else if (!stopped) {
-                    replay.forEach(this::publish);
+                    replay.forEach(event -> publish(event, true));
                 }
             });
         }
@@ -715,8 +715,12 @@ public class AnkamaSessionManager implements SmartLifecycle {
         }
 
         private void publish(ChatMessages.Event event) {
+            publish(event, false);
+        }
+
+        private void publish(ChatMessages.Event event, boolean replayed) {
             handOff("a friend event of " + accountId,
-                    () -> events.publishEvent(new AnkamaFriendEventReceived(accountId, event)));
+                    () -> events.publishEvent(new AnkamaFriendEventReceived(accountId, event, replayed)));
         }
 
         private void updateGame(long userId) {

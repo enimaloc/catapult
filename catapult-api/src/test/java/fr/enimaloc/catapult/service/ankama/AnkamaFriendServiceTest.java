@@ -234,6 +234,10 @@ class AnkamaFriendServiceTest {
         service.onFriendEvent(new AnkamaFriendEventReceived(bot.getId(), event));
     }
 
+    private void replay(AnkamaServiceAccount bot, ChatMessages.Event event) {
+        service.onFriendEvent(new AnkamaFriendEventReceived(bot.getId(), event, true));
+    }
+
     private static ArgumentMatcher<ChatFrames.Payload> payloadOf(ChatMessages.Command command) {
         ChatFrames.Payload expected = command.toPayload();
         return actual -> actual.id() == expected.id() && Arrays.equals(actual.data(), expected.data());
@@ -463,6 +467,46 @@ class AnkamaFriendServiceTest {
 
         receive(bot1, new ChatMessages.FriendCreated(BOT_ID, STREAMER));
 
+        verify(publisher, never()).publishAnkamaLinkChanged(any(), any());
+        assertThat(getters).isEmpty();
+    }
+
+    @Test
+    void replayedStrayFriend_isDeleted_andChangesNoLink() {
+        // A leftover friendship: the link was deleted or removed while the bot was away, or lives on another bot
+        AnkamaFriendLink removed = link(bot1, Status.REMOVED, STREAMER_ID);
+        AnkamaFriendLink elsewhere = otherUsersLink(Status.ACCEPTED, "Enimaloc");
+        elsewhere.setServiceAccount(bot2);
+        elsewhere.setAnkamaUserId(STREAMER_ID);
+
+        replay(bot1, new ChatMessages.FriendCreated(BOT_ID, STREAMER));
+
+        verifyRequest(bot1, ChatMessages.deleteFriend(BOT_ID, STREAMER_ID));
+        assertThat(removed.getStatus()).isEqualTo(Status.REMOVED);
+        assertThat(elsewhere.getStatus()).isEqualTo(Status.ACCEPTED);
+        verify(publisher, never()).publishAnkamaLinkChanged(any(), any());
+        assertThat(getters).isEmpty();
+    }
+
+    @Test
+    void replayedClaimedFriend_isKept_andAcceptsTheLinkThatKnowsItsUserId() {
+        AnkamaFriendLink link = link(bot1, Status.PENDING, STREAMER_ID);
+
+        replay(bot1, new ChatMessages.FriendCreated(BOT_ID, STREAMER));
+
+        assertThat(link.getStatus()).isEqualTo(Status.ACCEPTED);
+        verifyNoRequest(ChatMessages.deleteFriend(BOT_ID, STREAMER_ID));
+    }
+
+    @Test
+    void replayedFriend_doesNotAcceptANewPendingLinkMatchedByNameTagOnly() {
+        // The friendship predates this link: only the streamer accepting the bot's invite consents to it
+        AnkamaFriendLink link = link(bot1, Status.PENDING, null);
+
+        replay(bot1, new ChatMessages.FriendCreated(BOT_ID, STREAMER));
+
+        assertThat(link.getStatus()).isEqualTo(Status.PENDING);
+        assertThat(link.getAnkamaUserId()).isNull();
         verify(publisher, never()).publishAnkamaLinkChanged(any(), any());
         assertThat(getters).isEmpty();
     }

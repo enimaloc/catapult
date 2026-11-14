@@ -271,6 +271,8 @@ class AnkamaSessionManagerTest {
                 new ChatMessages.InviteCreated(invite),
                 new ChatMessages.FriendCreated(1001L, friend),
                 new ChatMessages.FriendDeleted(1001L, 66L));
+        // Only the resync is flagged as a replay: the friend service treats its friends as possibly stale
+        assertThat(fromBot1).extracting(AnkamaFriendEventReceived::replayed).containsExactly(true, true, false);
         assertThat(manager.currentGame(66L)).isEqualTo(OptionalInt.of(1));
     }
 

@@ -39,8 +39,9 @@ import java.util.regex.Pattern;
  * {@code INVITE_REJECTED}, a friend deleted removes it. An invite received by the bot is accepted only when a link of
  * that bot waits for it. Every change of a link is announced to its channel.
  * <p>
- * The chat replays the friends and invites after each connection, so every handler is idempotent. Database writes run
- * in short transactions of their own; the chat requests are sent once they are committed.
+ * The chat replays the friends and invites after each connection, so every handler is idempotent; a replayed friend no
+ * link claims is removed. Database writes run in short transactions of their own; the chat requests are sent once
+ * they are committed.
  */
 @Slf4j
 @Service
@@ -221,7 +222,7 @@ public class AnkamaFriendService {
             List<Change> changes;
             try {
                 changes = transactions.execute(status -> apply(received.serviceAccountId(), received.event(),
-                        afterCommit, claimed));
+                        received.replayed(), afterCommit, claimed));
             } catch (RuntimeException e) {
                 answered.removeAll(claimed); // nothing was sent: the replay must be answered
                 throw e;
@@ -240,7 +241,7 @@ public class AnkamaFriendService {
         }
     }
 
-    private List<Change> apply(UUID botId, ChatMessages.Event event, List<Runnable> afterCommit,
+    private List<Change> apply(UUID botId, ChatMessages.Event event, boolean replayed, List<Runnable> afterCommit,
                               List<String> claimed) {
         AnkamaServiceAccount bot = accountRepository.findById(botId).orElse(null);
         if (bot == null) {
@@ -278,7 +279,16 @@ public class AnkamaFriendService {
             }
             case ChatMessages.FriendCreated created -> {
                 answered.remove(answeredKey(bot, created.friend() == null ? -1 : created.friend().userId()));
-                for (AnkamaFriendLink link : links(bot, created.friend())) {
+                List<AnkamaFriendLink> accepting = links(bot, created.friend());
+                if (replayed && created.friend() != null) {
+                    if (dropIfStray(bot, created.friend(), afterCommit)) {
+                        return changes;
+                    }
+                    // A replayed friendship may predate the link: only a link that learned the user id from the
+                    // bot's own invite (or the streamer's) is accepted by it, never one matched by name#tag alone
+                    accepting = accepting.stream().filter(link -> link.getAnkamaUserId() != null).toList();
+                }
+                for (AnkamaFriendLink link : accepting) {
                     if (link.getAnkamaUserId() == null) {
                         link.setAnkamaUserId(created.friend().userId());
                     }
@@ -311,6 +321,29 @@ public class AnkamaFriendService {
             }
         }
         return changes;
+    }
+
+    /**
+     * A friend of the bot that no live link of this bot claims (by user id, or by name#tag while the link does not
+     * know the user id) is a friendship left over from a link deleted while the bot was away: the bot removes it once
+     * the transaction is committed, so that it never accepts a later link without the streamer's consent.
+     *
+     * @return whether the friend was a stray
+     */
+    private boolean dropIfStray(AnkamaServiceAccount bot, ChatMessages.User friend, List<Runnable> afterCommit) {
+        boolean claimed = linkRepository.findByServiceAccountId(bot.getId()).stream()
+                .filter(link -> link.getStatus() != Status.REMOVED)
+                .anyMatch(link -> link.getAnkamaUserId() != null
+                        ? link.getAnkamaUserId() == friend.userId()
+                        : sameNameTag(link, friend));
+        if (claimed) {
+            return false;
+        }
+        UUID botId = bot.getId();
+        log.info("Removing a leftover Ankama friend no link claims on {}", botId);
+        afterCommit.add(() -> send(botId, ChatMessages.deleteFriend(bot.getAnkamaAccountId(), friend.userId()),
+                "deleteFriend", null));
+        return true;
     }
 
     /** The bot's own invite reached the streamer: keeps the streamer's user id on the link. */
@@ -404,8 +437,7 @@ public class AnkamaFriendService {
         List<AnkamaFriendLink> matching = linkRepository.findByServiceAccountId(bot.getId()).stream()
                 .filter(link -> link.getAnkamaUserId() != null
                         ? link.getAnkamaUserId() == user.userId()
-                        : user.name() != null && user.tag() != null && link.displayTag().toLowerCase(Locale.ROOT)
-                                .equals((user.name() + "#" + user.tag()).toLowerCase(Locale.ROOT)))
+                        : sameNameTag(link, user))
                 .toList();
         if (matching.size() > 1) {
             // Never bind a chat user to several channels: none of them is updated
@@ -414,6 +446,11 @@ public class AnkamaFriendService {
             return List.of();
         }
         return matching;
+    }
+
+    private static boolean sameNameTag(AnkamaFriendLink link, ChatMessages.User user) {
+        return user.name() != null && user.tag() != null && link.displayTag().toLowerCase(Locale.ROOT)
+                .equals((user.name() + "#" + user.tag()).toLowerCase(Locale.ROOT));
     }
 
     /**
