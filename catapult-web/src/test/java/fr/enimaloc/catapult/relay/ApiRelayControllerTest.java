@@ -3,6 +3,8 @@ package fr.enimaloc.catapult.relay;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
+import fr.enimaloc.catapult.controller.ImpersonationController;
+import fr.enimaloc.catapult.service.http.ApiClient;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -12,6 +14,7 @@ import org.springframework.context.annotation.Import;
 import jakarta.servlet.http.Cookie;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -129,6 +132,44 @@ class ApiRelayControllerTest {
         assertThat(received.header("X-Forwarded-Host")).isEqualTo("catapult.example");
         assertThat(received.header("X-Forwarded-Port")).isEqualTo("443");
         assertThat(received.header("Connection")).isNotEqualTo("keep-alive, X-Custom");
+    }
+
+    /** A secondary link's start carries the session's JWT: catapult-api restores its own session from it. */
+    @Test
+    void secondaryLinkStart_carriesTheSessionJwt_inPlaceOfTheVisitorsAuthorization() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute(ApiClient.SESSION_JWT_KEY, "session-jwt");
+
+        for (String provider : List.of("battlenet", "xbox", "steam")) {
+            mvc.perform(get("/oauth2/authorization/" + provider).session(session)
+                            .header("Authorization", "Bearer forged"))
+                    .andExpect(status().isOk());
+            assertThat(RECEIVED.get().header("Authorization")).as(provider).isEqualTo("Bearer session-jwt");
+        }
+    }
+
+    @Test
+    void anImpersonatingAdmin_neverSendsTheMembersJwt() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute(ApiClient.SESSION_JWT_KEY, "member-jwt");
+        session.setAttribute(ImpersonationController.ORIGINAL_JWT_KEY, "admin-jwt");
+
+        mvc.perform(get("/oauth2/authorization/battlenet").session(session)).andExpect(status().isOk());
+
+        assertThat(RECEIVED.get().header("Authorization")).isNull();
+    }
+
+    @Test
+    void theTwitchLogin_andOtherPaths_neverGetTheSessionJwt() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute(ApiClient.SESSION_JWT_KEY, "session-jwt");
+
+        mvc.perform(get("/oauth2/authorization/twitch").session(session)).andExpect(status().isOk());
+        assertThat(RECEIVED.get().header("Authorization")).isNull();
+        mvc.perform(get("/login/oauth2/code/battlenet").session(session)).andExpect(status().isOk());
+        assertThat(RECEIVED.get().header("Authorization")).isNull();
+        mvc.perform(get("/oauth2/authorization/battlenet")).andExpect(status().isOk());
+        assertThat(RECEIVED.get().header("Authorization")).isNull();
     }
 
     /** The login's redirect to Twitch, and the cookies it sets, must reach the browser untouched. */
