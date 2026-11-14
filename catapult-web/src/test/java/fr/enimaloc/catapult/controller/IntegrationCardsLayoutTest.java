@@ -61,6 +61,34 @@ class IntegrationCardsLayoutTest {
                 new IntegrationNode.Text(Attrs.NONE, false, null)).wide()).isTrue();
     }
 
+    /** Every grid card's linking button looks the same: a filled one. */
+    @Test
+    void linkingButtons_areFilled() {
+        assertThat(buttonKind(IntegrationCards.minecraft(new MinecraftData("NONE", null, null)).nodes(), "minecraft-enroll-btn"))
+                .isEqualTo(IntegrationNode.Button.Kind.FILLED);
+        assertThat(buttonKind(IntegrationCards.xbox(new XboxData(false)).nodes(), "xbox-connect-btn"))
+                .isEqualTo(IntegrationNode.Button.Kind.FILLED);
+        assertThat(buttonKind(IntegrationCards.battleNet(new BattleNetData("NONE", null, null)).nodes(), "battlenet-connect-btn"))
+                .isEqualTo(IntegrationNode.Button.Kind.FILLED);
+        assertThat(buttonKind(IntegrationCards.ankama(new AnkamaData("NONE", null, null)).nodes(), "ankama-connect-btn"))
+                .isEqualTo(IntegrationNode.Button.Kind.FILLED);
+    }
+
+    private static IntegrationNode.Button.Kind buttonKind(List<IntegrationNode> nodes, String id) {
+        for (IntegrationNode node : nodes) {
+            if (node instanceof IntegrationNode.Button button && id.equals(button.attrs().id())) {
+                return button.kind();
+            }
+            if (node instanceof IntegrationNode.Container container) {
+                IntegrationNode.Button.Kind kind = buttonKind(container.children(), id);
+                if (kind != null) {
+                    return kind;
+                }
+            }
+        }
+        return null;
+    }
+
     /** Buttons shown on first render: hidden ones, or ones inside a hidden container, don't count. */
     private static int visibleButtons(List<IntegrationNode> nodes) {
         int count = 0;

@@ -187,18 +187,19 @@ public final class IntegrationCards {
 
                 // Each button needs its own flag name even though they're all page-level:
                 // Visibility.apply looks elements up by data-if name alone, so buttons sharing
-                // one name would all move in lockstep.
+                // one name would all move in lockstep. Like the Battle.net and Ankama cards: a filled
+                // link button, text ones for the rest.
                 new Container(Attrs.id("minecraft-status-actions").withClass("card-actions"),
-                        Container.Kind.SEGMENTED_GROUP, List.of(
-                        segmented(Attrs.id("minecraft-enroll-btn")
+                        Container.Kind.DIV, List.of(
+                        new Button(Attrs.id("minecraft-enroll-btn")
                                         .withState(minecraftState("showEnroll", status, List.of("NONE"))),
-                                key(PREFIX + "minecraft.enroll")),
-                        segmented(Attrs.id("minecraft-check-btn")
+                                Button.Kind.FILLED, key(PREFIX + "minecraft.enroll")),
+                        new Button(Attrs.id("minecraft-check-btn")
                                         .withState(minecraftState("showCheck", status, List.of("PENDING", "REMOVED"))),
-                                key(PREFIX + "minecraft.check")),
-                        segmented(Attrs.id("minecraft-disconnect-btn")
+                                Button.Kind.TEXT, key(PREFIX + "minecraft.check")),
+                        new Button(Attrs.id("minecraft-disconnect-btn")
                                         .withState(minecraftState("showDisconnect", status, List.of("ACCEPTED"))),
-                                key(PREFIX + "minecraft.disconnect")))));
+                                Button.Kind.TEXT, key(PREFIX + "minecraft.disconnect")))));
     }
 
     private static Container minecraftCase(String flag, String status, List<String> statuses, IntegrationNode content) {
