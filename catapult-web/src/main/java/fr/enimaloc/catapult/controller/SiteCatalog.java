@@ -24,6 +24,19 @@ public final class SiteCatalog {
             new PlatformDto("sports_esports", "platforms.xbox")
     );
 
+    /** Listed once their experiment is fully enabled (LaunchedPlatforms), after the ones always shown. */
+    static final List<PlatformDto> GATED_PLATFORMS = List.of(
+            new PlatformDto("sports_esports", "platforms.battlenet"),
+            new PlatformDto("sports_esports", "platforms.ankama")
+    );
+
+    /** The landing page's platforms: the ones always shown, then the gated ones whose id is {@code launched}. */
+    public static List<PlatformDto> platforms(List<String> launched) {
+        if (launched.isEmpty()) return PLATFORMS;
+        return java.util.stream.Stream.concat(PLATFORMS.stream(),
+                GATED_PLATFORMS.stream().filter(platform -> launched.contains(platform.id()))).toList();
+    }
+
     /** The member's dashboards and the login and join pages have no description: they stay out of search engines. */
     public static final List<SpaPage> PAGES = List.of(
             new SpaPage("", "pages/landing", "landing", "/spa/landing", "page.title.landing", "page.description.landing"),

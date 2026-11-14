@@ -1458,6 +1458,13 @@ public class MockApiService implements ApiService {
     }
 
     @Override
+    public List<String> launchedPlatforms() {
+        log.trace("launchedPlatforms()");
+        // Like a fresh production: Battle.net and Ankama's experiments are created DRAFT
+        return List.of();
+    }
+
+    @Override
     public List<SocialLinkDto> socialLinks() {
         log.trace("socialLinks()");
         return socialLinks.list().stream().filter(SocialLinkDto::visible).toList();

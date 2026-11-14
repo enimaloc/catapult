@@ -291,6 +291,14 @@ public interface ApiService {
     /** catapult-api's status (204; 404), 502 when unreachable. */
     int adminDeleteMetaTag(long id);
 
+    // --- the gated platforms open to everyone: listed on the landing page ---
+
+    /**
+     * The gated platforms' ids ({@code battlenet}, {@code ankama}) whose experiment is fully enabled (read without the
+     * session); null when catapult-api fails.
+     */
+    List<String> launchedPlatforms();
+
     // --- social links: shown in the footer of every page, edited from the admin page ---
 
     /** The visible social links in order (read without the session, as every page shows them); null when catapult-api fails. */
