@@ -35,3 +35,9 @@ CREATE TABLE ankama_friend_link (
 CREATE INDEX idx_ankama_friend_link_service_account ON ankama_friend_link(service_account_id);
 CREATE INDEX idx_ankama_friend_link_status ON ankama_friend_link(status);
 CREATE INDEX idx_ankama_friend_link_ankama_user ON ankama_friend_link(ankama_user_id);
+
+-- One active link per Ankama identity: a chat user is never bound to two channels
+CREATE UNIQUE INDEX uq_ankama_friend_link_name_tag ON ankama_friend_link (lower(requested_name), requested_tag)
+    WHERE status <> 'REMOVED';
+CREATE UNIQUE INDEX uq_ankama_friend_link_ankama_user ON ankama_friend_link (ankama_user_id)
+    WHERE ankama_user_id IS NOT NULL AND status <> 'REMOVED';

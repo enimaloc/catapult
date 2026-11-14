@@ -102,6 +102,108 @@ class AnkamaFriendServiceTest {
             return config;
         });
         when(sessionManager.request(any(), any())).thenReturn(new CompletableFuture<>());
+        when(linkRepository.existsByUserIdNotAndStatusNotAndRequestedNameIgnoreCaseAndRequestedTag(any(), any(),
+                any(), any())).thenAnswer(inv -> links.stream().anyMatch(link ->
+                !link.getUser().getId().equals(inv.getArgument(0)) && link.getStatus() != inv.getArgument(1)
+                        && link.getRequestedName().equalsIgnoreCase(inv.getArgument(2))
+                        && link.getRequestedTag().equals(inv.getArgument(3))));
+        when(linkRepository.findByUserId(any())).thenAnswer(inv -> links.stream()
+                .filter(link -> link.getUser().getId().equals(inv.getArgument(0))).findFirst());
+    }
+
+    private AnkamaFriendLink otherUsersLink(Status status, String name) {
+        UserAccount other = new UserAccount();
+        other.setId(UUID.randomUUID());
+        AnkamaFriendLink link = new AnkamaFriendLink();
+        link.setId(UUID.randomUUID());
+        link.setUser(other);
+        link.setServiceAccount(bot1);
+        link.setRequestedName(name);
+        link.setRequestedTag("6094");
+        link.setStatus(status);
+        links.add(link);
+        return link;
+    }
+
+    @Test
+    void enroll_refusesAnIdentityAnotherUserHasLinked_whateverTheCase() {
+        otherUsersLink(Status.PENDING, "ENIMALOC");
+
+        assertThatThrownBy(() -> service.enroll(user, "enimaloc#6094"))
+                .isInstanceOfSatisfying(AnkamaEnrollmentException.class, e ->
+                        assertThat(e.getReason()).isEqualTo(AnkamaEnrollmentException.Reason.ALREADY_LINKED));
+        assertThat(links).hasSize(1);
+    }
+
+    @Test
+    void enroll_allowsAnIdentityWhoseOtherLinkIsRemoved() {
+        otherUsersLink(Status.REMOVED, "Enimaloc");
+
+        assertThat(service.enroll(user, "Enimaloc#6094").getStatus()).isEqualTo(Status.PENDING);
+    }
+
+    @Test
+    void enroll_sameUserAgainWithTheSameTag_isAllowed() {
+        link(bot1, Status.PENDING, null);
+
+        AnkamaFriendLink link = service.enroll(user, "Enimaloc#6094");
+
+        assertThat(links).containsExactly(link);
+    }
+
+    @Test
+    void enroll_refusesAKnownUserIdAnotherUserHasLinked() {
+        link(bot1, Status.PENDING, STREAMER_ID);
+        AnkamaFriendLink other = otherUsersLink(Status.ACCEPTED, "Else");
+        other.setAnkamaUserId(STREAMER_ID);
+        when(linkRepository.existsByUserIdNotAndStatusNotAndAnkamaUserId(user.getId(), Status.REMOVED, STREAMER_ID))
+                .thenReturn(true);
+
+        assertThatThrownBy(() -> service.enroll(user, "Enimaloc#6094"))
+                .isInstanceOfSatisfying(AnkamaEnrollmentException.class, e ->
+                        assertThat(e.getReason()).isEqualTo(AnkamaEnrollmentException.Reason.ALREADY_LINKED));
+    }
+
+    @Test
+    void ambiguousEvent_withTwoMatchingLinks_bindsAndUpdatesNone() {
+        AnkamaFriendLink first = link(bot1, Status.PENDING, null);
+        AnkamaFriendLink second = otherUsersLink(Status.PENDING, "enimaloc");
+
+        receive(bot1, new ChatMessages.FriendCreated(BOT_ID, STREAMER));
+        receive(bot1, new ChatMessages.InviteCreated(new ChatMessages.Invite(BOT_USER, STREAMER)));
+
+        assertThat(first.getStatus()).isEqualTo(Status.PENDING);
+        assertThat(second.getStatus()).isEqualTo(Status.PENDING);
+        assertThat(first.getAnkamaUserId()).isNull();
+        assertThat(second.getAnkamaUserId()).isNull();
+        verify(publisher, never()).publishAnkamaLinkChanged(any(), any());
+        assertThat(getters).isEmpty();
+    }
+
+    @Test
+    void lostAnswer_isGivenAgainWhenTheInviteIsReplayed() {
+        link(bot1, Status.PENDING, null);
+        when(sessionManager.request(any(), any())).thenReturn(
+                CompletableFuture.failedFuture(new IllegalStateException("connection dropped")));
+        ChatMessages.Event event = new ChatMessages.InviteCreated(new ChatMessages.Invite(STREAMER, BOT_USER));
+
+        receive(bot1, event);
+        receive(bot1, event);
+
+        verify(sessionManager, org.mockito.Mockito.times(2)).request(eq(bot1.getId()), any());
+    }
+
+    @Test
+    void failureAfterTheClaim_releasesTheKey() {
+        link(bot1, Status.PENDING, null);
+        org.mockito.Mockito.doThrow(new IllegalStateException("db down")).doAnswer(inv -> inv.getArgument(0))
+                .when(linkRepository).save(any());
+        ChatMessages.Event event = new ChatMessages.InviteCreated(new ChatMessages.Invite(STREAMER, BOT_USER));
+
+        receive(bot1, event);
+        receive(bot1, event);
+
+        verify(sessionManager).request(eq(bot1.getId()), any());
     }
 
     private static AnkamaServiceAccount bot(long ankamaId, int fillOrder, String nickname, String tag) {

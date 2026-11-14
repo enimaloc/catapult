@@ -102,6 +102,7 @@ public class AnkamaFriendService {
      */
     public AnkamaFriendLink enroll(UserAccount user, String rawNameTag) {
         NameTag nameTag = parse(rawNameTag);
+        requireNotLinkedByAnother(user, nameTag);
         List<AnkamaServiceAccount> ready = accountRepository.findByEnabledTrueAndAuthStateOrderByFillOrderAsc(
                 AuthState.READY);
         if (ready.isEmpty()) {
@@ -133,6 +134,25 @@ public class AnkamaFriendService {
         send(bot.getId(), ChatMessages.invite(bot.getAnkamaAccountId(), nameTag.name(), nameTag.tag()),
                 "invite", user.getId());
         return link;
+    }
+
+    /** One active link per Ankama identity: another user's link on the same name#tag (or user id) refuses. */
+    private void requireNotLinkedByAnother(UserAccount user, NameTag nameTag) {
+        boolean taken = linkRepository.existsByUserIdNotAndStatusNotAndRequestedNameIgnoreCaseAndRequestedTag(
+                user.getId(), Status.REMOVED, nameTag.name(), nameTag.tag());
+        if (!taken) {
+            // The user's own previous link on that identity knows its Ankama user id
+            Long knownId = linkRepository.findByUserId(user.getId())
+                    .filter(own -> own.getRequestedName().equalsIgnoreCase(nameTag.name())
+                            && own.getRequestedTag().equals(nameTag.tag()))
+                    .map(AnkamaFriendLink::getAnkamaUserId).orElse(null);
+            taken = knownId != null
+                    && linkRepository.existsByUserIdNotAndStatusNotAndAnkamaUserId(user.getId(), Status.REMOVED, knownId);
+        }
+        if (taken) {
+            throw new AnkamaEnrollmentException(AnkamaEnrollmentException.Reason.ALREADY_LINKED,
+                    "This Ankama account is already linked to another user");
+        }
     }
 
     /** Has the bot invite the streamer again; only for a link still waiting ({@code PENDING}/{@code INVITE_REJECTED}). */
@@ -197,19 +217,31 @@ public class AnkamaFriendService {
             // The answers decided inside the transaction are sent once it is committed: an answer sent to the server
             // cannot be taken back by a rollback
             List<Runnable> afterCommit = new ArrayList<>();
-            List<Change> changes = transactions.execute(status -> apply(received.serviceAccountId(),
-                    received.event(), afterCommit));
-            if (changes != null) {
-                changes.forEach(change -> publish(change.ownerId(), change.state()));
+            List<String> claimed = new ArrayList<>();
+            List<Change> changes;
+            try {
+                changes = transactions.execute(status -> apply(received.serviceAccountId(), received.event(),
+                        afterCommit, claimed));
+            } catch (RuntimeException e) {
+                answered.removeAll(claimed); // nothing was sent: the replay must be answered
+                throw e;
             }
-            afterCommit.forEach(Runnable::run);
+            if (changes == null) {
+                changes = List.of();
+            }
+            try {
+                changes.forEach(change -> publish(change.ownerId(), change.state()));
+            } finally {
+                afterCommit.forEach(Runnable::run);
+            }
         } catch (RuntimeException e) {
             log.warn("Could not apply the Ankama friend event {} of service account {}: {}",
                     received.event().getClass().getSimpleName(), received.serviceAccountId(), e.toString());
         }
     }
 
-    private List<Change> apply(UUID botId, ChatMessages.Event event, List<Runnable> afterCommit) {
+    private List<Change> apply(UUID botId, ChatMessages.Event event, List<Runnable> afterCommit,
+                              List<String> claimed) {
         AnkamaServiceAccount bot = accountRepository.findById(botId).orElse(null);
         if (bot == null) {
             log.debug("Ankama friend event for an unknown service account {}: ignored", botId);
@@ -225,7 +257,7 @@ public class AnkamaFriendService {
                 if (isBot(bot, invite.inviter())) {
                     learnRecipient(bot, invite.recipient());
                 } else if (isBot(bot, invite.recipient()) && invite.inviter() != null) {
-                    answer(bot, invite.inviter(), afterCommit);
+                    answer(bot, invite.inviter(), afterCommit, claimed);
                 }
             }
             case ChatMessages.InviteDeleted deleted -> {
@@ -300,7 +332,8 @@ public class AnkamaFriendService {
      * adds the bot himself), rejected when none does. A sender already accepted is left alone, and an invite is
      * answered once however often the resync replays it.
      */
-    private void answer(AnkamaServiceAccount bot, ChatMessages.User inviter, List<Runnable> afterCommit) {
+    private void answer(AnkamaServiceAccount bot, ChatMessages.User inviter, List<Runnable> afterCommit,
+                        List<String> claimed) {
         List<AnkamaFriendLink> candidates = links(bot, inviter);
         if (candidates.stream().anyMatch(link -> link.getStatus() == Status.ACCEPTED)) {
             return;
@@ -309,6 +342,7 @@ public class AnkamaFriendService {
         if (!answered.add(key)) {
             return;
         }
+        claimed.add(key);
         Optional<AnkamaFriendLink> expected = candidates.stream()
                 .filter(link -> link.getStatus() == Status.PENDING || link.getStatus() == Status.INVITE_REJECTED)
                 .findFirst();
@@ -329,24 +363,28 @@ public class AnkamaFriendService {
     // --- internals ---
 
     private void sendAnswer(UUID botId, String key, ChatMessages.Command command) {
-        if (!send(botId, command, "deleteInvite", null)) {
-            answered.remove(key);
-        }
+        // A lost answer must be given again when the resync replays the invite
+        send(botId, command, "deleteInvite", null, () -> answered.remove(key));
     }
 
-    /** Sends {@code command} through the bot's session; a failure is logged. @return whether it was handed off */
-    private boolean send(UUID botId, ChatMessages.Command command, String what, UUID userId) {
+    /** Sends {@code command} through the bot's session; a failure is logged. */
+    private void send(UUID botId, ChatMessages.Command command, String what, UUID userId) {
+        send(botId, command, what, userId, () -> { });
+    }
+
+    /** Sends {@code command} through the bot's session; a failure is logged and runs {@code onFailure}. */
+    private void send(UUID botId, ChatMessages.Command command, String what, UUID userId, Runnable onFailure) {
         try {
             sessionManager.request(botId, command.toPayload()).whenComplete((response, failure) -> {
                 if (failure != null) {
+                    onFailure.run();
                     log.warn("Ankama {} failed on {}{}: {}", what, botId, userId == null ? "" : " for user " + userId,
                             failure.toString());
                 }
             });
-            return true;
         } catch (RuntimeException e) {
             log.warn("Ankama {} could not be sent on {}: {}", what, botId, e.toString());
-            return false;
+            onFailure.run();
         }
     }
 
@@ -363,12 +401,19 @@ public class AnkamaFriendService {
         if (user == null) {
             return List.of();
         }
-        return linkRepository.findByServiceAccountId(bot.getId()).stream()
+        List<AnkamaFriendLink> matching = linkRepository.findByServiceAccountId(bot.getId()).stream()
                 .filter(link -> link.getAnkamaUserId() != null
                         ? link.getAnkamaUserId() == user.userId()
                         : user.name() != null && user.tag() != null && link.displayTag().toLowerCase(Locale.ROOT)
                                 .equals((user.name() + "#" + user.tag()).toLowerCase(Locale.ROOT)))
                 .toList();
+        if (matching.size() > 1) {
+            // Never bind a chat user to several channels: none of them is updated
+            log.warn("Ankama user {} matches {} links of service account {}: ignored", user.userId(),
+                    matching.size(), bot.getId());
+            return List.of();
+        }
+        return matching;
     }
 
     /**
@@ -403,7 +448,7 @@ public class AnkamaFriendService {
 
     @Getter
     public static class AnkamaEnrollmentException extends RuntimeException {
-        public enum Reason { NO_CAPACITY, NO_ACCOUNT_AVAILABLE }
+        public enum Reason { NO_CAPACITY, NO_ACCOUNT_AVAILABLE, ALREADY_LINKED }
 
         private final Reason reason;
 

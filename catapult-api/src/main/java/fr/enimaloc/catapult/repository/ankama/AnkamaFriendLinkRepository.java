@@ -28,5 +28,12 @@ public interface AnkamaFriendLinkRepository extends JpaRepository<AnkamaFriendLi
 
     long countByServiceAccountIdAndStatusIn(UUID serviceAccountId, Collection<AnkamaFriendLink.Status> statuses);
 
+    /** Another user's link on the same Ankama name#tag (case-insensitive), whatever status but {@code excluded}. */
+    boolean existsByUserIdNotAndStatusNotAndRequestedNameIgnoreCaseAndRequestedTag(
+            UUID userId, AnkamaFriendLink.Status excluded, String requestedName, String requestedTag);
+
+    boolean existsByUserIdNotAndStatusNotAndAnkamaUserId(UUID userId, AnkamaFriendLink.Status excluded,
+                                                         long ankamaUserId);
+
     List<AnkamaFriendLink> findByAnkamaUserIdAndStatus(long ankamaUserId, AnkamaFriendLink.Status status);
 }
