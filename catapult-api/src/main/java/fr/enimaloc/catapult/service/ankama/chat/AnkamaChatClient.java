@@ -36,6 +36,8 @@ public class AnkamaChatClient {
     private static final Duration HANDSHAKE_TIMEOUT = Duration.ofSeconds(10);
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(15);
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
+    /** Numbers the reader threads: the device id would put a stable identifier in every log line. */
+    private static final AtomicInteger READERS = new AtomicInteger();
 
     private final SocketFactory sockets;
     private final String host;
@@ -100,7 +102,7 @@ public class AnkamaChatClient {
             long millis = heartbeat.toMillis();
             heartbeatTask = scheduler.scheduleAtFixedRate(this::sendHeartbeat, millis, millis,
                     TimeUnit.MILLISECONDS);
-            Thread reader = new Thread(() -> readLoop(in), "ankama-chat-" + deviceId);
+            Thread reader = new Thread(() -> readLoop(in), "ankama-chat-" + READERS.incrementAndGet());
             reader.setDaemon(true);
             reader.start();
         } catch (IOException | RuntimeException e) {
