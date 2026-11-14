@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.repository.ankama;
 
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.ankama.AnkamaFriendLink;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Collection;
@@ -13,6 +14,10 @@ public interface AnkamaFriendLinkRepository extends JpaRepository<AnkamaFriendLi
     Optional<AnkamaFriendLink> findByUser(UserAccount user);
 
     Optional<AnkamaFriendLink> findByUserId(UUID userId);
+
+    /** With the service account loaded: open-in-view is disabled, readers outside a transaction need it. */
+    @EntityGraph(attributePaths = "serviceAccount")
+    Optional<AnkamaFriendLink> findWithServiceAccountByUser(UserAccount user);
 
     List<AnkamaFriendLink> findByServiceAccountId(UUID serviceAccountId);
 
