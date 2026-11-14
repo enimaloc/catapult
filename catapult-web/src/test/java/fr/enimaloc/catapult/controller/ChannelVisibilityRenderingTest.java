@@ -816,7 +816,9 @@ class ChannelVisibilityRenderingTest {
         assertThat(openingTagForId(html, "ankama-resend-btn")).doesNotContain("hidden");
         assertThat(openingTagForId(html, "ankama-connect-btn")).contains("hidden");
         assertThat(openingTagForId(html, "ankama-name-input")).contains("hidden");
-        assertThat(openingTagForId(html, "ankama-disconnect-btn")).contains("hidden");
+        // A mistyped Pseudo#tag can be cancelled while pending.
+        assertThat(openingTagForId(html, "ankama-disconnect-btn")).doesNotContain("hidden")
+                .contains("data-on=\"showDisconnect:AnkamaLinkEvent.status=PENDING/ACCEPTED\"");
     }
 
     @Test

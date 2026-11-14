@@ -298,7 +298,7 @@ public final class IntegrationCards {
                                         .withState(ankamaState("showResend", status, List.of("PENDING"))),
                                 Button.Kind.TEXT, key(PREFIX + "ankama.resend")),
                         new Button(Attrs.id("ankama-disconnect-btn")
-                                        .withState(ankamaState("showDisconnect", status, List.of("ACCEPTED"))),
+                                        .withState(ankamaState("showDisconnect", status, List.of("PENDING", "ACCEPTED"))),
                                 Button.Kind.TEXT, key(PREFIX + "ankama.disconnect")))));
     }
 
