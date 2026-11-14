@@ -273,6 +273,11 @@ public class AnkamaSessionManager implements SmartLifecycle {
         return session == null ? DISABLED : session.state.name();
     }
 
+    /** How many sessions are READY: the bots connected to the launcher chat right now (a gauge reads it). */
+    public long readySessionCount() {
+        return sessions.values().stream().filter(s -> s.state == State.READY).count();
+    }
+
     /** The application id of the Ankama game the user plays, as reported to the bot they are friends with. */
     public OptionalInt currentGame(long ankamaUserId) {
         Integer game = games.get(ankamaUserId);
