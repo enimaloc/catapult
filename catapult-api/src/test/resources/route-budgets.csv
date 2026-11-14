@@ -17,6 +17,7 @@ GET,/api/internal/users/{userId}/api-token/read,,owner,6,fixed:one token
 GET,/api/internal/users/{userId}/bindings/current,,owner,6,fixed:the binding of the one game the channel plays
 GET,/api/internal/auth/validate,,owner,1,fixed:the caller's own account
 GET,/api/internal/config/app,,owner,0,fixed:configuration only
+GET,/api/internal/config/launched-platforms,,owner,0,fixed:no query while the gated platforms are off
 # visitor
 GET,/api/internal/users/{userId}/dashboard,,visitor,19,
 # admin
@@ -34,6 +35,7 @@ GET,/api/me/bindings/{bindingId},,ptoken,5,fixed:one binding
 # public, but GET /api/connect/steam/callback: it only redirects (no SQL) and every row must answer 2xx
 GET,/api/internal/changelog,,anon,0,fixed:read from a file
 GET,/api/internal/config/app,,anon,0,fixed:configuration only
+GET,/api/internal/config/launched-platforms,,anon,0,fixed:no query while the gated platforms are off
 GET,/api/internal/config/providers,,anon,0,fixed:configuration only
 GET,/api/internal/health,,anon,0,fixed:no data
 GET,/api/internal/meta-tags,,anon,1,

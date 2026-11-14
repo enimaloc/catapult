@@ -47,6 +47,7 @@ import java.util.stream.Collectors;
  *   <li>{@code minecraft.friends}: an enabled Minecraft service account exists;</li>
  *   <li>other {@code minecraft} calls: a Minecraft friend link exists;</li>
  *   <li>{@code battlenet}: never (no per-account link is stored);</li>
+ *   <li>{@code ankama}: never (the link is a real one and the simulation does not read it);</li>
  *   <li>{@code twitch.app}: {@code twitch.client-id} and {@code twitch.client-secret} are set;</li>
  *   <li>{@code igdb}: {@code app.igdb.client-id} and {@code twitch.client-secret} are set;</li>
  *   <li>{@code dtdd}: {@code dtdd.enabled} is true and {@code dtdd.api-keys} is set;</li>

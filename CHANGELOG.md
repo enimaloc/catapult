@@ -4,6 +4,57 @@ Toutes les versions publiées de Catapult, la plus récente en premier.
 
 Ce fichier est régénéré par le bot à chaque release à partir des notes des [GitHub Releases](https://github.com/enimaloc/catapult/releases) : pour corriger une entrée, modifie les notes de la release (ou le changelog de la PR de release avant sa publication), pas ce fichier.
 
+## [v1.4.0](https://github.com/enimaloc/catapult/releases/tag/v1.4.0) - 2026-11-14
+
+### Features
+- **ankama:** add the launcher chat codec (f250db0)
+- **ankama:** add the presence rule (625961f)
+- **ankama:** add the HAAPI client and the PKCE login (bf22602)
+- **ankama:** add the bot and friend link schema (f2c4298)
+- **ankama:** add the launcher chat client (c260617)
+- **ankama:** run one chat session per bot (060fe62)
+- **ankama:** link streamers to Ankama bots (8ebf921)
+- **ankama:** detect the Ankama game a streamer plays (9471c43)
+- **ankama:** add the Ankama admin and link API (d4a2d11)
+- **ankama:** prefill the Ankama game mappings (28df5ae)
+- **ankama:** add the Ankama card to the channel page (ebf020c)
+- **ankama:** add the Ankama bots admin tab (2e87578)
+- merge Ankama presence detection into dev (147de23)
+- **web:** lay the connection cards out in a grid (e8bccfa)
+- list Battle.net and Ankama on the landing page once fully launched (180e475)
+- merge the connections grid and launched landing platforms into dev (1b26346)
+
+### Fixes
+- **ankama:** close the chat client's heartbeat and TLS gaps (d8cab3e)
+- **ankama:** keep a stopped chat attempt from acting on its bot (824acc3)
+- **ankama:** one Ankama account per link and retry lost invite answers (d6f7839)
+- **ankama:** wire the admin clock and map Ankama login failures (44f41e8)
+- **ankama:** make completing a bot login an action route (140d9a3)
+- **ankama:** let a pending Ankama link be cancelled from the card (51731fe)
+- **ankama:** call the Ankama admin API with literal paths (844d871)
+- **ankama:** post the PKCE code exchange to the auth token endpoint (5f860f4)
+- **ankama:** treat a key refresh without a refresh token as a failure (cb70dae)
+- **ankama:** ask for a new Shield code when the stored certificate is unusable (9c59985)
+- **ankama:** keep the certificate proof out of chat token failure logs (cc7a1d9)
+- **ankama:** name chat reader threads without the bot device id (12559c8)
+- **ankama:** expose the ankama.* settings in the admin config view (bbee59e)
+- **ankama:** label the Ankama store in the public game info (1f9274e)
+- **ankama:** offer Ankama in the game-mappings admin form (6b408e4)
+- **ankama:** keep the Ankama hosts out of admin config overrides (59063dc)
+- **ankama:** remove leftover bot friendships instead of accepting links with them (8029482)
+- **web:** pin the grid cards' buttons to their foot (fb3d51a)
+- **web:** give the Minecraft link button the filled look (10c50ed)
+- **web:** name every account card's buttons Connect and Disconnect (ddd48fe)
+
+### Refactoring
+- **ankama:** call the PKCE secret a proof key (b1fd380)
+- **web:** move the Ankama bots card into the Keys & limits admin tab (65f04a3)
+- merge the Ankama card move into the Keys & limits tab into dev (4ddbfaf)
+
+### Other
+- exempt the Ankama experiment seed from the English conventions check (72b1acf)
+- **ankama:** cover the mock Ankama admin and link calls (babcc70)
+
 ## [v1.3.1](https://github.com/enimaloc/catapult/releases/tag/v1.3.1) - 2026-11-13
 
 ### Fixes

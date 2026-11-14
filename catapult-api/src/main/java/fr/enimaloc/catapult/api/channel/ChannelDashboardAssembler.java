@@ -8,6 +8,7 @@ import fr.enimaloc.catapult.common.dto.channel.DtddMappingCurrentDto;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingProposalDto;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
 import fr.enimaloc.catapult.common.dto.channel.GameDto;
+import fr.enimaloc.catapult.common.dto.channel.AnkamaData;
 import fr.enimaloc.catapult.common.dto.channel.BattleNetData;
 import fr.enimaloc.catapult.common.dto.channel.MinecraftData;
 import fr.enimaloc.catapult.common.dto.channel.ObsData;
@@ -52,6 +53,7 @@ import fr.enimaloc.catapult.service.connections.SteamProfileDto;
 import fr.enimaloc.catapult.service.igdb.AdminCclService;
 import fr.enimaloc.catapult.api.CustomBindingViews;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
+import fr.enimaloc.catapult.service.ankama.AnkamaLinkStateService;
 import fr.enimaloc.catapult.service.battlenet.BattleNetLinkStateService;
 import fr.enimaloc.catapult.service.minecraft.MinecraftLinkStateService;
 import fr.enimaloc.catapult.service.notification.TwitchatWidgetSettingsService;
@@ -96,6 +98,8 @@ public class ChannelDashboardAssembler {
     private final Optional<MinecraftLinkStateService> minecraftLinkStates;
     // Only present when battlenet.enabled.
     private final Optional<BattleNetLinkStateService> battleNetLinkStates;
+    // Only present when ankama.enabled.
+    private final Optional<AnkamaLinkStateService> ankamaLinkStates;
     private final TwitchatWidgetSettingsService twitchatWidgetSettingsService;
     private final RaidRestoreGateService raidRestoreGate;
     private final CustomBindingViews customBindingViews;
@@ -155,7 +159,8 @@ public class ChannelDashboardAssembler {
                 owner ? obsData(widget) : null,
                 owner ? TwitchatData.of(widget.getTwitchatBranch()) : null,
                 custom,
-                drops ? drops(channel, shown, custom) : null);
+                drops ? drops(channel, shown, custom) : null,
+                owner ? ankamaData(channel) : null);
     }
 
     /** The source value of the "with drops" filter. */
@@ -265,6 +270,15 @@ public class ChannelDashboardAssembler {
                 .map(service -> service.state(channel))
                 .filter(state -> !BattleNetLinkStateService.UNAVAILABLE.equals(state.status()))
                 .map(state -> new BattleNetData(state.status(), state.battleTag(), state.serviceAccountBattleTag()))
+                .orElse(null);
+    }
+
+    /** The Ankama link as the connect endpoint states it, null without Ankama or when it's unavailable. */
+    private AnkamaData ankamaData(UserAccount channel) {
+        return ankamaLinkStates
+                .map(service -> service.state(channel))
+                .filter(state -> !AnkamaLinkStateService.UNAVAILABLE.equals(state.status()))
+                .map(state -> new AnkamaData(state.status(), state.nameTag(), state.serviceAccountTag()))
                 .orElse(null);
     }
 

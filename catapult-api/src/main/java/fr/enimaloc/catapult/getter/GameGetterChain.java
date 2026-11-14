@@ -31,6 +31,7 @@ public class GameGetterChain {
     private final Optional<XboxGameGetter> xboxGameGetter;
     private final Optional<BattleNetGameGetter> battleNetGameGetter;
     private final Optional<MinecraftPresenceGetter> minecraftPresenceGetter;
+    private final Optional<AnkamaGameGetter> ankamaGameGetter;
     private final MeterRegistry meterRegistry;
 
     public Optional<DetectedGame> resolve(UserAccount user) {
@@ -76,6 +77,7 @@ public class GameGetterChain {
         xboxGameGetter.ifPresent(g -> map.put(GetterConfig.Provider.XBOX, g));
         battleNetGameGetter.ifPresent(g -> map.put(GetterConfig.Provider.BATTLENET, g));
         minecraftPresenceGetter.ifPresent(g -> map.put(GetterConfig.Provider.MINECRAFT, g));
+        ankamaGameGetter.ifPresent(g -> map.put(GetterConfig.Provider.ANKAMA, g));
         return map;
     }
 }

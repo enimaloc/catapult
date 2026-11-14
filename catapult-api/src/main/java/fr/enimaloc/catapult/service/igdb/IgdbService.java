@@ -572,7 +572,7 @@ public class IgdbService {
     }
 
     /**
-     * {@link #resolveDetected} with the game's mapping left aside: nothing for Battle.net, else the platform id
+     * {@link #resolveDetected} with the game's mapping left aside: nothing for Battle.net and Ankama, else the platform id
      * ({@link #findByExternalAppId}), then the name. For a write whose mapping no longer names an IGDB game (or is
      * no longer about this game) while its stored row still does.
      *
@@ -580,7 +580,9 @@ public class IgdbService {
      * @param sourceName the name the platform reports, may be null (then no name lookup)
      */
     public Optional<IgdbGame> resolveUnmapped(GameBinding.SourceType sourceType, String sourceId, String sourceName) {
-        if (sourceType == GameBinding.SourceType.BATTLENET) return Optional.empty();
+        if (sourceType == GameBinding.SourceType.BATTLENET || sourceType == GameBinding.SourceType.ANKAMA) {
+            return Optional.empty();
+        }
         Optional<IgdbGame> byPlatformId = sourceId != null ? findByExternalAppId(sourceType, sourceId) : Optional.empty();
         if (byPlatformId.isPresent() || sourceName == null || sourceName.isBlank()) return byPlatformId;
         return findByName(sourceName);

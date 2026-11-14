@@ -132,7 +132,7 @@
         <div class="admin-gm-form">
             <h3 class="admin-gm-form-title" th:text="#{admin.game-mappings.form.create-title}">New game mapping</h3>
             <mdui-select name="sourceType" variant="outlined" value="STEAM" th:attr="label=#{admin.game-mappings.form.platform}">
-                <mdui-menu-item th:each="p : ${ {'STEAM', 'XBOX', 'BATTLENET', 'MINECRAFT'} }" th:value="${p}"
+                <mdui-menu-item th:each="p : ${ {'STEAM', 'XBOX', 'BATTLENET', 'MINECRAFT', 'ANKAMA'} }" th:value="${p}"
                                 th:attr="data-format=#{|admin.game-mappings.form.format.${#strings.toLowerCase(p)}|}"
                                 th:text="#{|admin.game-mappings.platform.${#strings.toLowerCase(p)}|}">Steam</mdui-menu-item>
             </mdui-select>

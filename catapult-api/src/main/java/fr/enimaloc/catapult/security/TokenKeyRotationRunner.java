@@ -30,7 +30,10 @@ public class TokenKeyRotationRunner implements ApplicationRunner {
             new Secret("oauth_token", "id", "refresh_token"),
             new Secret("user_account", "id", "steam_personal_token"),
             new Secret("twitchat_widget_settings", "user_id", "obs_password_encrypted"),
-            new Secret("minecraft_service_account", "id", "msa_refresh_token"));
+            new Secret("minecraft_service_account", "id", "msa_refresh_token"),
+            new Secret("ankama_service_account", "id", "api_key_enc"),
+            new Secret("ankama_service_account", "id", "refresh_token_enc"),
+            new Secret("ankama_service_account", "id", "certificate_enc"));
 
     record Secret(String table, String id, String column) {}
 

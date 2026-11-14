@@ -97,6 +97,7 @@ class AdminTabsFragmentControllerTest {
         verify(apiService, never()).adminApiKeys(org.mockito.ArgumentMatchers.any());
         verify(apiService, never()).adminTws();
         verify(apiService, never()).adminMinecraftAccounts();
+        verify(apiService, never()).adminAnkamaAccounts();
         verify(apiService, never()).adminMembers(anyString(), anyInt());
         verify(apiService, never()).adminMember(org.mockito.ArgumentMatchers.any());
         verify(apiService, never()).adminMemberTargeting(org.mockito.ArgumentMatchers.any());
@@ -1065,6 +1066,47 @@ class AdminTabsFragmentControllerTest {
         when(apiService.adminBattleNetAccounts()).thenReturn(null);
 
         assertThat(asAdmin("/spa/admin/keys")).contains("admin-battlenet-unavailable").doesNotContain("admin-battlenet-add");
+    }
+
+    private static fr.enimaloc.catapult.common.dto.admin.AnkamaAccountDto ankamaBot(String id, String tag, String auth,
+            boolean enabled, boolean full, String domain) {
+        return new fr.enimaloc.catapult.common.dto.admin.AnkamaAccountDto(java.util.UUID.fromString(id), tag, auth, "READY", 1,
+                full, enabled, 4, domain);
+    }
+
+    @Test
+    void keysTab_rendersTheAnkamaBotsWithTheirStateDependentControls() throws Exception {
+        when(apiService.adminAnkamaAccounts()).thenReturn(List.of(
+                ankamaBot("00000000-0000-0000-0000-00000000000a", "Ready<b>#0001", "READY", true, true, null),
+                ankamaBot("00000000-0000-0000-0000-00000000000b", "Reauth#0002", "REAUTH_REQUIRED", false, false, null),
+                ankamaBot("00000000-0000-0000-0000-00000000000c", "Shield#0003", "CODE_REQUIRED", true, false, "example.com")));
+
+        String html = asAdmin("/spa/admin/keys").replaceAll("\\s+", " ");
+
+        assertThat(html).contains("admin-ankama", "Ready&lt;b&gt;#0001", "Reauth#0002", "Add a bot",
+                "data-auth-state=\"REAUTH_REQUIRED\"", "Login to redo", "private window", "that is expected",
+                "rel=\"noopener noreferrer\"", "name=\"redirectUrl\"", "admin-ankama-login-submit");
+        assertThat(html).doesNotContain("Ready<b>");
+        // the re-auth button only for the bot whose login expired, the code field only for the one waiting for a code
+        assertThat(html.split("admin-ankama-reauth\"", -1)).hasSize(2);
+        assertThat(html).contains("admin-ankama-reauth\" data-id=\"00000000-0000-0000-0000-00000000000b\"");
+        assertThat(html.split("admin-ankama-code-submit\"", -1)).hasSize(2);
+        assertThat(html.split("admin-ankama-code-resend\"", -1)).hasSize(2);
+        assertThat(html).contains("An Ankama Shield code was sent to an address at example.com");
+        // the full flag lifts only the full bot; every bot can be switched and deleted
+        assertThat(html.split("admin-ankama-reset\"", -1)).hasSize(2);
+        assertThat(html.split("admin-ankama-toggle\"", -1)).hasSize(4);
+        assertThat(html.split("admin-ankama-delete\"", -1)).hasSize(4);
+    }
+
+    @Test
+    void keysTab_ankamaCardUnavailableWhenTheApiFails() throws Exception {
+        when(apiService.adminAnkamaAccounts()).thenReturn(null);
+
+        assertThat(asAdmin("/spa/admin/keys")).contains("admin-ankama-unavailable").doesNotContain("admin-ankama-add");
+        // no tab of its own any more: its old address answers 404
+        mvc.perform(get("/spa/admin/ankama").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+                .andExpect(status().isNotFound());
     }
 
     @Test

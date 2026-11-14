@@ -135,12 +135,16 @@ class AdminGameMappingsRenderingTest {
     }
 
     @Test
-    void form_hasTheFourPlatforms_notManual() throws Exception {
+    void form_hasTheFivePlatforms_notManual() throws Exception {
         String html = render(Locale.ENGLISH);
 
         assertThat(html).contains("id=\"admin-gm-dialog\"", "id=\"admin-gm-delete-dialog\"",
                 "<mdui-menu-item value=\"STEAM\"", "<mdui-menu-item value=\"XBOX\"",
-                "<mdui-menu-item value=\"BATTLENET\"", "<mdui-menu-item value=\"MINECRAFT\"");
+                "<mdui-menu-item value=\"BATTLENET\"", "<mdui-menu-item value=\"MINECRAFT\"",
+                "<mdui-menu-item value=\"ANKAMA\"");
+        // Ankama is named and its id format explained, in both languages
+        assertThat(html).contains("data-format=\"Ankama application id, e.g. 3 (Wakfu)\"", ">Ankama</mdui-menu-item>");
+        assertThat(render(Locale.FRENCH)).contains("data-format=\"ID d&#39;application Ankama, ex. 3 (Wakfu)\"");
         assertThat(html).doesNotContain("MANUAL");
         // The CCLs and the enabled TWs the streamers choose from, to replace IGDB's
         assertThat(html).contains("class=\"admin-gm-ccl\" value=\"gambling\"", "class=\"admin-gm-tw\" value=\"violence\"")
