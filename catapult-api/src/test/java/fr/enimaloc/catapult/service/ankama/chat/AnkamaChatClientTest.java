@@ -37,13 +37,14 @@ class AnkamaChatClientTest {
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
 
     private ServerSocket server;
-    private ScheduledExecutorService scheduler;
+    private java.util.concurrent.ScheduledThreadPoolExecutor scheduler;
     private AnkamaChatClient client;
 
     @BeforeEach
     void setUp() throws IOException {
         server = new ServerSocket(0, 1, java.net.InetAddress.getLoopbackAddress());
-        scheduler = Executors.newSingleThreadScheduledExecutor();
+        scheduler = new java.util.concurrent.ScheduledThreadPoolExecutor(1);
+        scheduler.setRemoveOnCancelPolicy(true);
         client = newClient(Duration.ofSeconds(30));
     }
 
@@ -220,5 +221,40 @@ class AnkamaChatClientTest {
         client.close();
 
         assertThat(listener.closed.poll(5, TimeUnit.SECONDS)).isEmpty();
+    }
+
+    @Test
+    void connectionDyingRightAfterTheHandshake_leavesNoHeartbeatScheduled() throws Exception {
+        RecordingListener listener = new RecordingListener();
+        Connected c = handshake(listener, "{\"success\": true}");
+        c.peer().socket.close();
+
+        assertThat(listener.closed.poll(5, TimeUnit.SECONDS)).isNotNull();
+        org.awaitility.Awaitility.await().atMost(5, TimeUnit.SECONDS)
+                .untilAsserted(() -> assertThat(scheduler.getQueue()).isEmpty());
+    }
+
+    @Test
+    void tlsSockets_verifyTheHostName() throws Exception {
+        javax.net.ssl.SSLSocket ssl = org.mockito.Mockito.mock(javax.net.ssl.SSLSocket.class);
+        org.mockito.Mockito.when(ssl.getSSLParameters()).thenReturn(new javax.net.ssl.SSLParameters());
+        org.mockito.Mockito.when(ssl.getInputStream()).thenReturn(InputStream.nullInputStream());
+        org.mockito.Mockito.when(ssl.getOutputStream()).thenReturn(OutputStream.nullOutputStream());
+        SocketFactory factory = new SocketFactory() {
+            @Override public Socket createSocket(String h, int p) { return ssl; }
+            @Override public Socket createSocket(String h, int p, java.net.InetAddress a, int lp) { return ssl; }
+            @Override public Socket createSocket(java.net.InetAddress a, int p) { return ssl; }
+            @Override public Socket createSocket(java.net.InetAddress a, int p, java.net.InetAddress la, int lp) {
+                return ssl;
+            }
+        };
+        AnkamaChatClient tls = new AnkamaChatClient(factory, "chat.example", 6337, Duration.ofSeconds(30), scheduler);
+
+        assertThatThrownBy(() -> tls.connect("t", "d", new RecordingListener())).isInstanceOf(IOException.class);
+
+        org.mockito.ArgumentCaptor<javax.net.ssl.SSLParameters> applied =
+                org.mockito.ArgumentCaptor.forClass(javax.net.ssl.SSLParameters.class);
+        org.mockito.Mockito.verify(ssl).setSSLParameters(applied.capture());
+        assertThat(applied.getValue().getEndpointIdentificationAlgorithm()).isEqualTo("HTTPS");
     }
 }

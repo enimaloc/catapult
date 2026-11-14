@@ -6,6 +6,8 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 import javax.net.SocketFactory;
+import javax.net.ssl.SSLParameters;
+import javax.net.ssl.SSLSocket;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -66,6 +68,12 @@ public class AnkamaChatClient {
         this.listener = listener;
         Socket s = sockets.createSocket(host, port);
         try {
+            if (s instanceof SSLSocket ssl) {
+                // The default parameters verify the chain but not the host name.
+                SSLParameters parameters = ssl.getSSLParameters();
+                parameters.setEndpointIdentificationAlgorithm("HTTPS");
+                ssl.setSSLParameters(parameters);
+            }
             s.setSoTimeout((int) HANDSHAKE_TIMEOUT.toMillis());
             InputStream in = s.getInputStream();
             OutputStream o = s.getOutputStream();
@@ -89,12 +97,12 @@ public class AnkamaChatClient {
             s.setSoTimeout(0);
             this.socket = s;
             this.out = o;
-            Thread reader = new Thread(() -> readLoop(in), "ankama-chat-" + deviceId);
-            reader.setDaemon(true);
-            reader.start();
             long millis = heartbeat.toMillis();
             heartbeatTask = scheduler.scheduleAtFixedRate(this::sendHeartbeat, millis, millis,
                     TimeUnit.MILLISECONDS);
+            Thread reader = new Thread(() -> readLoop(in), "ankama-chat-" + deviceId);
+            reader.setDaemon(true);
+            reader.start();
         } catch (IOException | RuntimeException e) {
             closeQuietly(s);
             throw e instanceof IOException io ? io : new IOException("Chat handshake failed", e);
@@ -134,6 +142,10 @@ public class AnkamaChatClient {
             write(ChatFrames.KIND_HEARTBEAT, new byte[0]);
         } catch (IOException e) {
             shutdown(e);
+            ScheduledFuture<?> task = heartbeatTask;
+            if (task != null) {
+                task.cancel(false);
+            }
         }
     }
 
