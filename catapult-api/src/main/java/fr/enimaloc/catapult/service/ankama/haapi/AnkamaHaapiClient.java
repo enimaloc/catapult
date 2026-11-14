@@ -71,7 +71,7 @@ public class AnkamaHaapiClient {
         form.add("redirect_uri", REDIRECT_URI);
         form.add("client_id", CLIENT_ID);
         form.add("code_verifier", verifier);
-        JsonNode body = ok(post(authUrl + "auth/token", form));
+        JsonNode body = ok(post(authUrl + "token", form));
         return new Tokens(text(body, "access_token"), text(body, "refresh_token"));
     }
 

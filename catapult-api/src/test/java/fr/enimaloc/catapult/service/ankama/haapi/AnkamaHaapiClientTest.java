@@ -46,7 +46,7 @@ class AnkamaHaapiClientTest {
 
     @Test
     void exchangeCode_postsThePkceForm_andMapsTheTokens() {
-        server.expect(requestTo(AUTH + "auth/token")).andExpect(method(HttpMethod.POST))
+        server.expect(requestTo(AUTH + "token")).andExpect(method(HttpMethod.POST))
                 .andExpect(header("User-Agent", "Zaap 3.15.15"))
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_FORM_URLENCODED))
                 .andExpect(content().string("grant_type=authorization_code&code=abc"
