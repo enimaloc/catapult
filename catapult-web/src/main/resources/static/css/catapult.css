@@ -1680,6 +1680,17 @@ a[data-link].active {
     grid-column: 1 / -1;
 }
 
+/* A grid card's buttons sit at its foot, whatever its row's height: its header, then its body, then a last row
+ * taking the room left, the actions at its bottom. */
+#channel-connections > .connection-card:not(.wide) {
+    grid-template-rows: auto auto 1fr;
+}
+
+#channel-connections > .connection-card:not(.wide) > .card-actions {
+    grid-row: 3;
+    align-self: end;
+}
+
 .connection-card > span:first-child {
     font-weight: 650;
 }
