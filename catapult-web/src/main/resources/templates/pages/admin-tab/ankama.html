@@ -1,0 +1,106 @@
+<!--/*@thymesVar id="ankama" type="java.util.List<fr.enimaloc.catapult.common.dto.admin.AnkamaAccountDto>"*/-->
+<!--/*
+  The Ankama bot pool: each bot's login and session states, its friends, then "Add a bot". A bot is added, or
+  re-authenticated (the button only shows on REAUTH_REQUIRED), by opening the authorize address in a private window and
+  pasting the address of the page that then fails to load: admin-ankama.js fills the login box (outside the list, so a
+  refresh of the tab keeps it). A bot waiting for its Shield code (CODE_REQUIRED) shows where it was sent and a code
+  field with "Send a new code". Nothing here renders a secret: Ankama's tokens never leave catapult-api.
+*/-->
+<div th:fragment="content" class="admin-view admin-ankama-view"
+     th:attr="data-confirm-text=#{admin.confirm},data-cancel-text=#{admin.cancel}">
+    <div class="section-header">
+        <h2 th:text="#{admin.tab.ankama}">Ankama</h2>
+    </div>
+
+    <mdui-card class="admin-keys-card admin-ankama" variant="outlined"
+               th:attr="data-label-conflict=#{admin.ankama.error.conflict},data-label-unknown=#{admin.ankama.unknown},
+                        data-label-unavailable=#{admin.ankama.unavailable-action},data-label-updated=#{admin.ankama.updated},
+                        data-label-deleted=#{admin.ankama.deleted},data-label-login-done=#{admin.ankama.login-done},
+                        data-label-code-sent=#{admin.ankama.code-sent},data-label-code-resent=#{admin.ankama.code-resent},
+                        data-label-invalid=#{admin.ankama.error.invalid}">
+        <div class="admin-keys-head">
+            <h3 th:text="#{admin.ankama.title}">Ankama bots</h3>
+        </div>
+
+        <p class="admin-cell-muted admin-ankama-unavailable" th:if="${ankama == null}"
+           th:text="#{admin.ankama.unavailable}">Unavailable.</p>
+
+        <th:block th:if="${ankama != null}">
+            <p class="admin-cell-muted" data-admin-value="ankama-empty" th:hidden="${!ankama.isEmpty()}"
+               th:text="#{admin.ankama.empty}">None.</p>
+            <div class="admin-table" data-admin-list="ankama" th:hidden="${ankama.isEmpty()}">
+                <div class="admin-row admin-ankama-row admin-row-head" aria-hidden="true">
+                    <span th:text="#{admin.ankama.col.account}">Account</span>
+                    <span th:text="#{admin.ankama.col.auth}">Login</span>
+                    <span th:text="#{admin.ankama.col.session}">Session</span>
+                    <span th:text="#{admin.ankama.col.friends}">Friends</span>
+                    <span th:text="#{admin.ankama.col.state}">State</span>
+                    <span></span>
+                </div>
+                <div class="admin-row admin-ankama-row" th:each="a : ${ankama}"
+                     th:attr="data-admin-key=${a.id()},data-auth-state=${a.authState()}">
+                    <span class="admin-cell" th:attr="data-label=#{admin.ankama.col.account}" th:text="${a.displayTag()}">Bot#1234</span>
+                    <span class="admin-cell" th:classappend="${a.authState() == 'REAUTH_REQUIRED'} ? 'admin-ankama-attention'"
+                          th:attr="data-label=#{admin.ankama.col.auth}"
+                          th:text="#{'admin.ankama.auth.' + ${a.authState()}}">READY</span>
+                    <span class="admin-cell" th:attr="data-label=#{admin.ankama.col.session}"
+                          th:text="#{'admin.ankama.session.' + ${a.sessionState()}}">READY</span>
+                    <span class="admin-cell" th:attr="data-label=#{admin.ankama.col.friends}" th:text="${a.friendCount()}">0</span>
+                    <span class="admin-cell admin-ankama-states" th:attr="data-label=#{admin.ankama.col.state}">
+                        <mdui-chip th:if="${a.enabled()}" icon="check_circle" th:text="#{admin.ankama.state.enabled}">Enabled</mdui-chip>
+                        <mdui-chip th:unless="${a.enabled()}" icon="block" th:text="#{admin.ankama.state.disabled}">Disabled</mdui-chip>
+                        <mdui-chip th:if="${a.friendLimitReached()}" icon="group_off" class="admin-ankama-full"
+                                   th:text="#{admin.ankama.state.full}">Full</mdui-chip>
+                    </span>
+                    <span class="admin-row-actions">
+                        <mdui-button th:if="${a.authState() == 'REAUTH_REQUIRED'}" variant="tonal" icon="key" class="admin-ankama-reauth"
+                                     th:attr="data-id=${a.id()}" th:text="#{admin.ankama.action.reauth}">Re-authenticate</mdui-button>
+                        <mdui-button variant="text" class="admin-ankama-toggle"
+                                     th:attr="data-id=${a.id()},data-enabled=${!a.enabled()}"
+                                     th:text="${a.enabled()} ? #{admin.ankama.action.disable} : #{admin.ankama.action.enable}">Disable</mdui-button>
+                        <mdui-button th:if="${a.friendLimitReached()}" variant="text" icon="restart_alt" class="admin-ankama-reset"
+                                     th:attr="data-id=${a.id()}" th:text="#{admin.ankama.action.lift_full}">Lift full</mdui-button>
+                        <mdui-button-icon icon="delete" class="admin-ankama-delete"
+                                          th:attr="data-id=${a.id()},aria-label=#{admin.ankama.action.delete},
+                                          data-confirm=#{admin.ankama.action.delete-confirm(${a.displayTag()})}"></mdui-button-icon>
+                    </span>
+                    <div class="admin-ankama-code" th:if="${a.authState() == 'CODE_REQUIRED'}">
+                        <p class="admin-cell-muted admin-ankama-code-hint"
+                           th:text="${a.shieldCodeDomain() != null} ? #{admin.ankama.code.sent(${a.shieldCodeDomain()})} : #{admin.ankama.code.sent-unknown}">Code sent.</p>
+                        <mdui-text-field name="code" variant="outlined" maxlength="16" autocomplete="one-time-code"
+                                         th:attr="label=#{admin.ankama.code.label}"></mdui-text-field>
+                        <mdui-button variant="filled" icon="send" class="admin-ankama-code-submit"
+                                     th:attr="data-id=${a.id()}" th:text="#{admin.ankama.code.submit}">Validate</mdui-button>
+                        <mdui-button variant="text" icon="refresh" class="admin-ankama-code-resend"
+                                     th:attr="data-id=${a.id()}" th:text="#{admin.ankama.code.resend}">Send a new code</mdui-button>
+                    </div>
+                    <div class="admin-ankama-details">
+                        <mdui-text-field name="fillOrder" type="number" min="0" variant="outlined" autocomplete="off"
+                                         th:attr="label=#{admin.ankama.details.order},value=${a.fillOrder()}"></mdui-text-field>
+                        <mdui-button variant="text" icon="save" class="admin-ankama-details-submit"
+                                     th:attr="data-id=${a.id()}" th:text="#{admin.ankama.details.submit}">Save</mdui-button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="admin-ankama-enroll">
+                <mdui-button variant="filled" icon="add" class="admin-ankama-add"
+                             th:text="#{admin.ankama.login.start}">Add a bot</mdui-button>
+            </div>
+
+            <!--/* Filled and shown by admin-ankama.js once a login is started: the authorize address (https only), then the pasted address. */-->
+            <div class="admin-ankama-login" hidden>
+                <p><span th:text="#{admin.ankama.login.open}">Open this address to log in:</span>
+                    <a class="admin-ankama-authorize" target="_blank" rel="noopener noreferrer"></a></p>
+                <p class="admin-cell-muted" th:text="#{admin.ankama.login.reminder}">Open it in a private window.</p>
+                <div class="admin-keys-add">
+                    <mdui-text-field name="redirectUrl" variant="outlined" autocomplete="off"
+                                     th:attr="label=#{admin.ankama.login.field}"></mdui-text-field>
+                    <mdui-button variant="filled" icon="check" class="admin-ankama-login-submit"
+                                 th:text="#{admin.ankama.login.submit}">Validate</mdui-button>
+                </div>
+            </div>
+            <p class="admin-ankama-message admin-cell-muted" aria-live="polite" hidden></p>
+        </th:block>
+    </mdui-card>
+</div>

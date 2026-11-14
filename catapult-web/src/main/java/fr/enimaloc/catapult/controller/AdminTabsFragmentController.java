@@ -482,6 +482,15 @@ public class AdminTabsFragmentController {
         });
     }
 
+    /** The Ankama bots card; its list is null (the unavailable card) when catapult-api has Ankama off or is unreachable. */
+    @GetMapping("/ankama")
+    String ankama(Model model, HttpServletResponse response) {
+        return guarded(model, response, () -> {
+            model.addAttribute("ankama", apiService.adminAnkamaAccounts());
+            return "pages/admin-tab/ankama :: content";
+        });
+    }
+
     @GetMapping("/broadcast")
     String broadcast(Model model, HttpServletResponse response) {
         return guarded(model, response, () -> {

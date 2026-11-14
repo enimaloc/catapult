@@ -36,6 +36,8 @@ import fr.enimaloc.catapult.common.dto.admin.TwDefinitionDto;
 import fr.enimaloc.catapult.common.dto.admin.TwKeywordTestDto;
 import fr.enimaloc.catapult.common.dto.admin.TwRebuild;
 import fr.enimaloc.catapult.common.dto.admin.AccountDto;
+import fr.enimaloc.catapult.common.dto.admin.AnkamaAccountDto;
+import fr.enimaloc.catapult.common.dto.admin.AnkamaLoginStartDto;
 import fr.enimaloc.catapult.common.dto.admin.BattleNetAccountDto;
 import fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
@@ -197,6 +199,7 @@ public class MockApiService implements ApiService {
     /** Application-wide: the Minecraft service accounts are the same for every mock session. */
     private final MockMinecraftAccountsStore minecraftAccounts = new MockMinecraftAccountsStore();
     private final MockBattleNetAccountsStore battleNetAccounts = new MockBattleNetAccountsStore();
+    private final MockAnkamaAccountsStore ankamaAccounts = new MockAnkamaAccountsStore();
     /** Application-wide, as catapult-api's: every mock account that logged in is a member any admin session lists. */
     private final MockMembers members = new MockMembers();
     /** Application-wide too: a member's custom flags are the same for every mock session. */
@@ -1826,6 +1829,48 @@ public class MockApiService implements ApiService {
     public int adminDeleteBattleNetAccount(UUID id) {
         log.trace("adminDeleteBattleNetAccount({})", id);
         return battleNetAccounts.delete(id);
+    }
+
+    @Override
+    public List<AnkamaAccountDto> adminAnkamaAccounts() {
+        log.trace("adminAnkamaAccounts()");
+        return ankamaAccounts.list();
+    }
+
+    @Override
+    public AdminCall<AnkamaLoginStartDto> adminStartAnkamaLogin(UUID accountId) {
+        log.trace("adminStartAnkamaLogin({})", accountId);
+        return ankamaAccounts.startLogin(accountId);
+    }
+
+    @Override
+    public AdminCall<AnkamaAccountDto> adminCompleteAnkamaLogin(UUID loginId, String redirectUrl) {
+        log.trace("adminCompleteAnkamaLogin({})", loginId); // never the URL: it holds a one-time code
+        return ankamaAccounts.completeLogin(loginId, redirectUrl);
+    }
+
+    @Override
+    public AdminCall<Void> adminSubmitAnkamaCode(UUID id, String code) {
+        log.trace("adminSubmitAnkamaCode({})", id);
+        return ankamaAccounts.submitCode(id, code);
+    }
+
+    @Override
+    public int adminResendAnkamaCode(UUID id) {
+        log.trace("adminResendAnkamaCode({})", id);
+        return ankamaAccounts.resendCode(id);
+    }
+
+    @Override
+    public AdminCall<AnkamaAccountDto> adminPatchAnkamaAccount(UUID id, Map<String, Object> patch) {
+        log.trace("adminPatchAnkamaAccount({}, {})", id, patch.keySet());
+        return ankamaAccounts.patch(id, patch);
+    }
+
+    @Override
+    public int adminDeleteAnkamaAccount(UUID id) {
+        log.trace("adminDeleteAnkamaAccount({})", id);
+        return ankamaAccounts.delete(id);
     }
 
     @Override
