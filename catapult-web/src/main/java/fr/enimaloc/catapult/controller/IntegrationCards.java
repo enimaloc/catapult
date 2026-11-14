@@ -24,6 +24,7 @@ import fr.enimaloc.catapult.dto.integration.Message;
 import fr.enimaloc.catapult.dto.integration.SpaState;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -49,7 +50,7 @@ public final class IntegrationCards {
     public static List<IntegrationDto> of(ChannelPageData ch, Map<String, List<TwitchatEventActionDto>> twitchatEvents,
                                           TwitchatEventForms forms) {
         List<IntegrationDto> cards = new ArrayList<>();
-        cards.add(card("twitch", new Chip(Attrs.NONE, CONNECTED)));
+        cards.add(twitch());
         if (ch.steam() != null) {
             cards.add(steam(ch.steam()));
         }
@@ -71,18 +72,31 @@ public final class IntegrationCards {
         if (ch.twitchat() != null) {
             cards.add(twitchat(ch.twitchat(), forms.eventsSection(twitchatEvents)));
         }
+        // The grid's cards first, the wide ones below them: the page reads in the order it shows (stable sort).
+        cards.sort(Comparator.comparing(IntegrationDto::wide));
         return cards;
     }
 
+    /** A card of the grid: it never shows more than two buttons at once. */
     private static IntegrationDto card(String id, IntegrationNode... nodes) {
-        return new IntegrationDto(id, key(PREFIX + id), List.of(nodes));
+        return new IntegrationDto(id, key(PREFIX + id), List.of(nodes), false);
+    }
+
+    /** A card spanning the grid, below the others: more buttons at once, or a form that needs the width. */
+    private static IntegrationDto wideCard(String id, IntegrationNode... nodes) {
+        return new IntegrationDto(id, key(PREFIX + id), List.of(nodes), true);
+    }
+
+    static IntegrationDto twitch() {
+        return card("twitch", new Chip(Attrs.NONE, CONNECTED));
     }
 
     // Steam
 
     private static final String STEAM_STATE = "SteamConnectionStateEvent";
 
-    private static IntegrationDto steam(SteamData steam) {
+    // Wide: once connected, its unlink, token and cache buttons all show.
+    static IntegrationDto steam(SteamData steam) {
         SpaState connected = SpaState.flag("connected", steam.connected(), STEAM_STATE + ".connected");
         SpaState notConnected = SpaState.flag("notConnected", !steam.connected(), STEAM_STATE + ".!connected");
         SpaState hasToken = SpaState.flag("hasToken", steam.hasPersonalToken(),
@@ -90,7 +104,7 @@ public final class IntegrationCards {
         SpaState noToken = SpaState.flag("noToken", !steam.hasPersonalToken(),
                 "SteamTokenDeletedEvent", "!SteamTokenSavedEvent");
 
-        return card("steam",
+        return wideCard("steam",
                 new Chip(Attrs.cls("steam-connected-chip").withState(connected), CONNECTED),
                 new Chip(Attrs.cls("steam-not-connected-chip").withState(notConnected), NOT_CONNECTED),
 
@@ -135,7 +149,7 @@ public final class IntegrationCards {
     // Linking goes through Microsoft's login (catapult-api's /oauth2/authorization/xbox), unlinking is
     // a post: both channel-connections.js's.
 
-    private static IntegrationDto xbox(XboxData xbox) {
+    static IntegrationDto xbox(XboxData xbox) {
         return card("xbox",
                 new Chip(Attrs.cls("xbox-connected-chip").hiddenIf(!xbox.connected()), CONNECTED),
                 new Chip(Attrs.cls("xbox-not-connected-chip").hiddenIf(xbox.connected()), NOT_CONNECTED),
@@ -150,7 +164,7 @@ public final class IntegrationCards {
     // MinecraftEnrollEvent/MinecraftSyncEvent. MinecraftDisconnectedEvent carries no field at
     // all, its mere occurrence always means NONE.
 
-    private static IntegrationDto minecraft(MinecraftData minecraft) {
+    static IntegrationDto minecraft(MinecraftData minecraft) {
         String status = minecraft.status();
         return card("minecraft",
                 new Container(Attrs.id("minecraft-status-body"), Container.Kind.DIV, List.of(
@@ -173,18 +187,19 @@ public final class IntegrationCards {
 
                 // Each button needs its own flag name even though they're all page-level:
                 // Visibility.apply looks elements up by data-if name alone, so buttons sharing
-                // one name would all move in lockstep.
+                // one name would all move in lockstep. Like the Battle.net and Ankama cards: a filled
+                // link button, text ones for the rest.
                 new Container(Attrs.id("minecraft-status-actions").withClass("card-actions"),
-                        Container.Kind.SEGMENTED_GROUP, List.of(
-                        segmented(Attrs.id("minecraft-enroll-btn")
+                        Container.Kind.DIV, List.of(
+                        new Button(Attrs.id("minecraft-enroll-btn")
                                         .withState(minecraftState("showEnroll", status, List.of("NONE"))),
-                                key(PREFIX + "minecraft.enroll")),
-                        segmented(Attrs.id("minecraft-check-btn")
+                                Button.Kind.FILLED, key(PREFIX + "minecraft.enroll")),
+                        new Button(Attrs.id("minecraft-check-btn")
                                         .withState(minecraftState("showCheck", status, List.of("PENDING", "REMOVED"))),
-                                key(PREFIX + "minecraft.check")),
-                        segmented(Attrs.id("minecraft-disconnect-btn")
+                                Button.Kind.TEXT, key(PREFIX + "minecraft.check")),
+                        new Button(Attrs.id("minecraft-disconnect-btn")
                                         .withState(minecraftState("showDisconnect", status, List.of("ACCEPTED"))),
-                                key(PREFIX + "minecraft.disconnect")))));
+                                Button.Kind.TEXT, key(PREFIX + "minecraft.disconnect")))));
     }
 
     private static Container minecraftCase(String flag, String status, List<String> statuses, IntegrationNode content) {
@@ -205,7 +220,7 @@ public final class IntegrationCards {
     // /oauth2/authorization/battlenet), so a rejected or removed link offers the same button as none at all.
     // The tags are sentence parts of their own so that the event can replace them in place.
 
-    private static IntegrationDto battleNet(BattleNetData battleNet) {
+    static IntegrationDto battleNet(BattleNetData battleNet) {
         String status = battleNet.status() == null ? "NONE" : battleNet.status();
         return card("battlenet",
                 new Container(Attrs.id("battlenet-status-body"), Container.Kind.DIV, List.of(
@@ -260,7 +275,7 @@ public final class IntegrationCards {
     // rejected or removed link shows the same form as none at all. No "check" button: the bot's chat tells the
     // card by itself. The tags are sentence parts of their own so that the event can replace them in place.
 
-    private static IntegrationDto ankama(AnkamaData ankama) {
+    static IntegrationDto ankama(AnkamaData ankama) {
         String status = ankama.status() == null ? "NONE" : ankama.status();
         List<String> formStatuses = List.of("NONE", "INVITE_REJECTED", "REMOVED");
         return card("ankama",
@@ -315,10 +330,11 @@ public final class IntegrationCards {
         return SpaState.flag(flag, statuses.contains(status), "AnkamaLinkEvent.status=" + String.join("/", statuses));
     }
 
-    // OBS: no SSE event either, channel-connections.js refreshes the page after saving.
+    // OBS: no SSE event either, channel-connections.js refreshes the page after saving. Wide: its three fields sit
+    // side by side.
 
-    private static IntegrationDto obs(ObsData obs) {
-        return card("obs",
+    static IntegrationDto obs(ObsData obs) {
+        return wideCard("obs",
                 new Chip(Attrs.cls("obs-connected-chip").hiddenIf(!obs.connected()), CONNECTED),
                 new Chip(Attrs.cls("obs-not-connected-chip").hiddenIf(obs.connected()), NOT_CONNECTED),
                 new Container(Attrs.id("obs-status-body"), Container.Kind.DIV, List.of(
@@ -339,15 +355,15 @@ public final class IntegrationCards {
     }
 
     // Twitchat: only the browser knows whether a Twitchat answers through OBS, so
-    // channel-connections.js toggles the chips.
+    // channel-connections.js toggles the chips. Wide: its events form needs the width.
 
-    private static IntegrationDto twitchat(TwitchatData twitchat, IntegrationNode events) {
+    static IntegrationDto twitchat(TwitchatData twitchat, IntegrationNode events) {
         List<Select.Option> branches = Stream.concat(
                 Stream.of(new Select.Option(TwitchatData.AUTO, key(PREFIX + "twitchat.auto"))),
                 twitchat.supportedBranches().stream().map(branch -> new Select.Option(branch, Message.literal(branch))))
                 .toList();
 
-        return card("twitchat",
+        return wideCard("twitchat",
                 new Chip(Attrs.cls("twitchat-connected-chip").hiddenIf(true), CONNECTED),
                 new Chip(Attrs.cls("twitchat-disconnected-chip"), key(PREFIX + "twitchat.disconnected")),
                 new Container(Attrs.id("twitchat-status-body"), Container.Kind.DIV, List.of(

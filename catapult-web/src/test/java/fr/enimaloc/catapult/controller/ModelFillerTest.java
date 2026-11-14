@@ -58,6 +58,7 @@ class ModelFillerTest {
     /** No DegradedLabels unless a test gives them (getIfAvailable answers null). */
     @SuppressWarnings("unchecked")
     private final ObjectProvider<DegradedLabels> degradedLabels = mock(ObjectProvider.class);
+    private final LaunchedPlatforms launchedPlatforms = mock(LaunchedPlatforms.class);
     private ExtendedModelMap model;
 
     private ModelFiller filler(Optional<BuildProperties> buildProperties) {
@@ -67,8 +68,11 @@ class ModelFillerTest {
         @SuppressWarnings("unchecked")
         ObjectProvider<SiteSocialLinks> socialLinksProvider = mock(ObjectProvider.class);
         when(socialLinksProvider.getIfAvailable()).thenReturn(siteSocialLinks);
+        @SuppressWarnings("unchecked")
+        ObjectProvider<LaunchedPlatforms> launchedProvider = mock(ObjectProvider.class);
+        when(launchedProvider.getIfAvailable()).thenReturn(launchedPlatforms);
         return new ModelFiller(buildProperties, messages, api, new TwitchatEventForms(TwitchatCatalog.load()), metaTags,
-                socialLinksProvider, degradedState, degradedLabels);
+                socialLinksProvider, degradedState, degradedLabels, launchedProvider);
     }
 
     private ModelFiller filler() {
@@ -93,6 +97,16 @@ class ModelFillerTest {
         assertThat(model.get("page")).isEqualTo("privacy");
         assertThat(model.get("app")).isEqualTo(
                 new ModelFiller.AppModel(SiteCatalog.FEATURES, SiteCatalog.PLATFORMS, SiteCatalog.PAGES));
+    }
+
+    @Test
+    void defaultAttr_listsTheLaunchedGatedPlatforms() {
+        when(launchedPlatforms.ids()).thenReturn(List.of("ankama"));
+
+        filler().defaultAttr(model, "");
+
+        assertThat(((ModelFiller.AppModel) model.get("app")).platforms()).extracting(p -> p.id())
+                .containsExactly("minecraft", "steam", "xbox", "ankama");
     }
 
     @Test

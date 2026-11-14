@@ -530,4 +530,66 @@ class ExperimentServiceTest {
 
         assertThat(experimentService.getVariant(user, "test-exp")).isEmpty();
     }
+
+    // isFullyEnabled: every member gets a non-control variant (what the landing page waits for to list a platform)
+
+    private Experiment launched() {
+        variantA.setControl(true);
+        variantA.setWeight(0);
+        variantB.setWeight(100);
+        ExperimentAssignmentRule everyone = new ExperimentAssignmentRule();
+        everyone.setRuleType(ExperimentAssignmentRule.RuleType.RANDOM);
+        everyone.setPercentage(100);
+        everyone.setExperiment(experiment);
+        experiment.setRules(new ArrayList<>(List.of(everyone)));
+        experiment.setRolloutPercentage(100);
+        when(experimentRepository.findByKey("test-exp")).thenReturn(Optional.of(experiment));
+        return experiment;
+    }
+
+    @Test
+    void isFullyEnabled_whenActive_atFullRollout_everyoneByRule_andNoControlWeight() {
+        launched();
+        assertThat(experimentService.isFullyEnabled("test-exp")).isTrue();
+    }
+
+    @Test
+    void isFullyEnabled_isFalse_forAMissingOrNotActiveExperiment() {
+        when(experimentRepository.findByKey("missing")).thenReturn(Optional.empty());
+        assertThat(experimentService.isFullyEnabled("missing")).isFalse();
+
+        launched().setStatus(Experiment.Status.DRAFT);
+        assertThat(experimentService.isFullyEnabled("test-exp")).isFalse();
+    }
+
+    @Test
+    void isFullyEnabled_isFalse_belowFullRollout() {
+        launched().setRolloutPercentage(99);
+        assertThat(experimentService.isFullyEnabled("test-exp")).isFalse();
+    }
+
+    @Test
+    void isFullyEnabled_isFalse_whileTheControlVariantStillWeighs() {
+        launched();
+        variantA.setWeight(1);
+        assertThat(experimentService.isFullyEnabled("test-exp")).isFalse();
+    }
+
+    @Test
+    void isFullyEnabled_isFalse_withoutRules_orWithATargetingOrPartialRule() {
+        launched().setRules(new ArrayList<>());
+        assertThat(experimentService.isFullyEnabled("test-exp")).isFalse();
+
+        ExperimentAssignmentRule half = new ExperimentAssignmentRule();
+        half.setRuleType(ExperimentAssignmentRule.RuleType.RANDOM);
+        half.setPercentage(50);
+        experiment.setRules(new ArrayList<>(List.of(half)));
+        assertThat(experimentService.isFullyEnabled("test-exp")).isFalse();
+
+        ExperimentAssignmentRule group = new ExperimentAssignmentRule();
+        group.setRuleType(ExperimentAssignmentRule.RuleType.GROUP);
+        group.setAttributeValue("beta");
+        experiment.setRules(new ArrayList<>(List.of(group)));
+        assertThat(experimentService.isFullyEnabled("test-exp")).isFalse();
+    }
 }

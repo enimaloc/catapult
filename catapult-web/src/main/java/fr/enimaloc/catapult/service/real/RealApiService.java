@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.common.dto.DegradedStatusDto;
 import fr.enimaloc.catapult.common.dto.InvitePageData;
 import fr.enimaloc.catapult.common.dto.UserInfoResponse;
 import fr.enimaloc.catapult.common.dto.AppConfigResponse;
+import fr.enimaloc.catapult.common.dto.LaunchedPlatformsResponse;
 import fr.enimaloc.catapult.common.dto.channel.BindingDto;
 import fr.enimaloc.catapult.common.dto.premium.PremiumStatusDto;
 import fr.enimaloc.catapult.common.dto.channel.DeleteAccountRequest;
@@ -844,6 +845,13 @@ public class RealApiService implements ApiService {
     @Override
     public int adminDeleteMetaTag(long id) {
         return client.call(HttpMethod.DELETE, "/api/internal/admin/meta-tags/{id}", null, Void.class, id).status();
+    }
+
+    @Override
+    public List<String> launchedPlatforms() {
+        ApiClient.Result<LaunchedPlatformsResponse> result =
+                client.getAnonymous("/api/internal/config/launched-platforms", LaunchedPlatformsResponse.class);
+        return result.status() == 200 && result.body() != null ? result.body().platforms() : null;
     }
 
     @Override

@@ -3,6 +3,7 @@ method,pattern,vars,body,anon,loop,member,mod,owner,admin,ptoken
 POST,/api/internal/auth/exchange,?code=matrix-spent-code,,PASS,PASS,PASS,PASS,PASS,PASS,401
 GET,/api/internal/changelog,,,PASS,PASS,PASS,PASS,PASS,PASS,401
 GET,/api/internal/config/app,,,PASS,PASS,PASS,PASS,PASS,PASS,401
+GET,/api/internal/config/launched-platforms,,,PASS,PASS,PASS,PASS,PASS,PASS,401
 GET,/api/internal/config/providers,,,PASS,PASS,PASS,PASS,PASS,PASS,401
 GET,/api/connect/steam/callback,,,PASS,PASS,PASS,PASS,PASS,PASS,401
 GET,/api/game/{uuid},,,PASS,PASS,PASS,PASS,PASS,PASS,401
