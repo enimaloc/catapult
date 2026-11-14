@@ -19,10 +19,13 @@ import fr.enimaloc.catapult.service.ankama.haapi.AnkamaPkce;
 import fr.enimaloc.catapult.service.ankama.haapi.AnkamaShieldException;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.security.SecureRandom;
@@ -68,11 +71,21 @@ public class AnkamaServiceAccountAdmin {
     /** Where the last Shield code of an account was sent (the e-mail domain), until the account is READY. */
     private final Map<UUID, String> shieldCodeDomains = new ConcurrentHashMap<>();
 
+    @Autowired
     public AnkamaServiceAccountAdmin(AnkamaServiceAccountRepository accountRepository,
                                      AnkamaFriendLinkRepository linkRepository, TokenEncryptionService encryption,
                                      AnkamaHaapiClient haapi, AnkamaSessionManager sessionManager,
                                      GetterConfigRepository getterConfigRepository,
-                                     ChannelEventPublisher channelEventPublisher, Clock clock) {
+                                     ChannelEventPublisher channelEventPublisher) {
+        this(accountRepository, linkRepository, encryption, haapi, sessionManager, getterConfigRepository,
+                channelEventPublisher, Clock.systemUTC());
+    }
+
+    AnkamaServiceAccountAdmin(AnkamaServiceAccountRepository accountRepository,
+                              AnkamaFriendLinkRepository linkRepository, TokenEncryptionService encryption,
+                              AnkamaHaapiClient haapi, AnkamaSessionManager sessionManager,
+                              GetterConfigRepository getterConfigRepository,
+                              ChannelEventPublisher channelEventPublisher, Clock clock) {
         this.accountRepository = accountRepository;
         this.linkRepository = linkRepository;
         this.encryption = encryption;
@@ -115,6 +128,11 @@ public class AnkamaServiceAccountAdmin {
             ankama = haapi.account(tokens.key());
         } catch (AnkamaAuthException e) {
             log.warn("Ankama refused the login code: {}", e.toString());
+            throw new IllegalArgumentException("Ankama refused the login, start it again");
+        } catch (RestClientException e) {
+            // an HTTP refusal (invalid_grant is a 400) is the admin's to retry; anything else is not their fault
+            log.warn("Ankama login failed: {}", e.getClass().getSimpleName());
+            if (isServerSide(e)) throw unreachable();
             throw new IllegalArgumentException("Ankama refused the login, start it again");
         }
 
@@ -164,6 +182,11 @@ public class AnkamaServiceAccountAdmin {
         } catch (AnkamaAuthException e) {
             log.warn("Ankama service account {}: the Shield code could not be checked: {}", id, e.toString());
             throw new IllegalArgumentException("Ankama refused the request, log in again");
+        } catch (RestClientException e) {
+            // never the exception itself: its message carries the request URI, hence the code and hm1
+            log.warn("Ankama service account {}: the Shield code could not be checked ({})", id,
+                    e.getClass().getSimpleName());
+            throw unreachable();
         }
         AnkamaServiceAccount saved = withRetry(() -> {
             AnkamaServiceAccount fresh = findOrThrow(id);
@@ -263,10 +286,21 @@ public class AnkamaServiceAccountAdmin {
             shieldCodeDomains.put(account.getId(), haapi.sendShieldCode(encryption.decrypt(account.getApiKeyEnc())));
             return true;
         } catch (RuntimeException e) {
-            log.warn("Ankama service account {}: the Shield code could not be sent: {}", account.getId(), e.toString());
+            log.warn("Ankama service account {}: the Shield code could not be sent ({})", account.getId(),
+                    e.getClass().getSimpleName());
             shieldCodeDomains.remove(account.getId());
             return false;
         }
+    }
+
+    /** A network failure or an Ankama 5xx: not a refusal of what the admin sent. */
+    private static boolean isServerSide(RestClientException e) {
+        String message = e.getMessage();
+        return e instanceof ResourceAccessException || (message != null && message.matches(".*HTTP 5\\d\\d.*"));
+    }
+
+    private static ResponseStatusException unreachable() {
+        return new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Ankama could not be reached, try again");
     }
 
     private static void requireCodeRequired(AnkamaServiceAccount account) {

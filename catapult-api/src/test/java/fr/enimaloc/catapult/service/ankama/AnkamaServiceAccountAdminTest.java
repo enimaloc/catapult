@@ -20,6 +20,8 @@ import fr.enimaloc.catapult.service.ankama.haapi.AnkamaShieldException;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -156,10 +158,39 @@ class AnkamaServiceAccountAdminTest {
 
     @Test
     void completeLogin_whenAnkamaRefusesTheCode_is400_andCreatesNothing() {
-        when(haapi.exchangeCode(anyString(), anyString())).thenThrow(new AnkamaAuthException("invalid_grant"));
+        when(haapi.exchangeCode(anyString(), anyString())).thenThrow(new RestClientException("Ankama answered HTTP 400"));
 
-        assertThatThrownBy(() -> login(null, LAUNCHER_URL)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> login(null, LAUNCHER_URL)).isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Ankama refused the login, start it again");
         assertThat(store).isEmpty();
+    }
+
+    @Test
+    void completeLogin_whenAnkamaIsUnreachable_is502() {
+        when(haapi.exchangeCode(anyString(), anyString()))
+                .thenThrow(new ResourceAccessException("I/O error on POST request"));
+
+        assertThatThrownBy(() -> login(null, LAUNCHER_URL)).isInstanceOfSatisfying(ResponseStatusException.class,
+                e -> assertThat(e.getStatusCode().value()).isEqualTo(502));
+        assertThat(store).isEmpty();
+    }
+
+    @Test
+    void submitShieldCode_whenTheRequestFails_is502WithoutTheCodeOrHm1() {
+        shieldAccount();
+        AnkamaAccountDto bot = login(null, LAUNCHER_URL);
+        String hm1 = store.get(bot.id()).getHm1();
+        when(haapi.validateShieldCode(anyString(), anyString(), anyString())).thenThrow(new ResourceAccessException(
+                "I/O error on GET request for \"https://haapi/Shield/ValidateCode?code=257146&hm1=" + hm1 + "\""));
+
+        assertThatThrownBy(() -> admin.submitShieldCode(bot.id(), "257146"))
+                .isInstanceOfSatisfying(ResponseStatusException.class, e -> {
+                    assertThat(e.getStatusCode().value()).isEqualTo(502);
+                    assertThat(String.valueOf(e.getReason())).doesNotContain("257146").doesNotContain(hm1);
+                    assertThat(e.getMessage()).doesNotContain("257146").doesNotContain(hm1);
+                    assertThat(e.getCause()).isNull();
+                });
+        assertThat(store.get(bot.id()).getAuthState()).isEqualTo(AuthState.CODE_REQUIRED);
     }
 
     @Test
