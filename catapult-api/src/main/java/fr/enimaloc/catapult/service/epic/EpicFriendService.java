@@ -41,6 +41,10 @@ import java.util.function.Function;
  * <p>
  * Every listing is a full snapshot, so the handler is idempotent. Database writes run in short transactions of their
  * own; the requests to Epic are sent once they are committed, and a failed one is logged, never thrown.
+ * <p>
+ * Requests to Epic are only sent where the bots' sessions may run ({@link EpicSessionManager#canOpenSessions()}):
+ * elsewhere (standby site, dev, restored dump) a bot's refresh token must never be rotated. There the links still
+ * change, without the request: a {@code PENDING} link waits for a resend from the active site.
  */
 @Slf4j
 @Service
@@ -55,6 +59,7 @@ public class EpicFriendService {
     private final ChannelEventPublisher channelEventPublisher;
     private final EpicTokenService tokenService;
     private final EpicFriendsClient friendsClient;
+    private final EpicSessionManager sessionManager;
     private final TransactionOperations transactions;
     private final int maxFriendsPerBot;
 
@@ -64,6 +69,7 @@ public class EpicFriendService {
                              ChannelEventPublisher channelEventPublisher,
                              EpicTokenService tokenService,
                              EpicFriendsClient friendsClient,
+                             EpicSessionManager sessionManager,
                              TransactionOperations transactions,
                              @Value("${epic.max-friends-per-bot:500}") int maxFriendsPerBot) {
         this.accountRepository = accountRepository;
@@ -72,6 +78,7 @@ public class EpicFriendService {
         this.channelEventPublisher = channelEventPublisher;
         this.tokenService = tokenService;
         this.friendsClient = friendsClient;
+        this.sessionManager = sessionManager;
         this.transactions = transactions;
         this.maxFriendsPerBot = maxFriendsPerBot;
     }
@@ -167,6 +174,11 @@ public class EpicFriendService {
      * @return the accepted link, empty when the request was sent or failed (the link stays {@code PENDING})
      */
     private Optional<EpicFriendLink> sendRequest(EpicFriendLink link, EpicServiceAccount bot) {
+        if (!sessionManager.canOpenSessions()) {
+            log.info("Epic friend request of user {} not sent: the Epic bots do not run on this instance",
+                    link.getUser().getId());
+            return Optional.empty();
+        }
         AddResult result;
         try {
             result = withToken(bot.getId(),
@@ -217,15 +229,7 @@ public class EpicFriendService {
         // Every status but REMOVED: a resent request of an INVITE_REJECTED link is live, and deleting what Epic no
         // longer has is harmless
         if (existing.getStatus() != Status.REMOVED) {
-            EpicServiceAccount bot = existing.getServiceAccount();
-            try {
-                withToken(bot.getId(), token -> {
-                    friendsClient.delete(token, bot.getEpicAccountId(), existing.getEpicAccountId());
-                    return null;
-                });
-            } catch (RuntimeException e) {
-                log.warn("Epic friend delete failed on {} for user {}: {}", bot.getId(), user.getId(), e.toString());
-            }
+            deleteFriend(existing);
         }
         transactions.executeWithoutResult(status -> {
             linkRepository.delete(existing);
@@ -236,6 +240,24 @@ public class EpicFriendService {
         });
         log.info("Epic link of user {} deleted ({})", user.getId(), existing.getStatus());
         publish(user.getId(), EpicLinkStateService.of(EpicLinkStateService.NONE));
+    }
+
+    /** Has the bot cancel the request or remove the friend; skipped where the bots do not run, logged on failure. */
+    private void deleteFriend(EpicFriendLink link) {
+        UUID userId = link.getUser().getId();
+        if (!sessionManager.canOpenSessions()) {
+            log.info("Epic friend cleanup of user {} skipped: the Epic bots do not run on this instance", userId);
+            return;
+        }
+        EpicServiceAccount bot = link.getServiceAccount();
+        try {
+            withToken(bot.getId(), token -> {
+                friendsClient.delete(token, bot.getEpicAccountId(), link.getEpicAccountId());
+                return null;
+            });
+        } catch (RuntimeException e) {
+            log.warn("Epic friend delete failed on {} for user {}: {}", bot.getId(), userId, e.toString());
+        }
     }
 
     public Optional<EpicFriendLink> getLink(UserAccount user) {

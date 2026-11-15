@@ -310,6 +310,14 @@ public class EpicSessionManager implements SmartLifecycle {
         return sessions.values().stream().map(Session::openToken).flatMap(Optional::stream).findFirst();
     }
 
+    /**
+     * Whether this instance may use the bots: sessions enabled and this site active. Anything that would call Epic
+     * with a bot's token, hence possibly rotate its refresh token, checks it first.
+     */
+    public boolean canOpenSessions() {
+        return canOpen();
+    }
+
     /** Lists the friends of every registered connection again; runs every {@link #RESYNC_PERIOD}. */
     void resyncAll() {
         if (!canOpen()) {

@@ -44,6 +44,7 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -59,6 +60,7 @@ class EpicFriendServiceTest {
     @Mock private ChannelEventPublisher publisher;
     @Mock private EpicTokenService tokenService;
     @Mock private EpicFriendsClient friendsClient;
+    @Mock private EpicSessionManager sessionManager;
 
     private EpicFriendService service;
     private UserAccount user;
@@ -70,7 +72,7 @@ class EpicFriendServiceTest {
     @BeforeEach
     void setUp() {
         service = new EpicFriendService(accountRepository, linkRepository, getterConfigRepository, publisher,
-                tokenService, friendsClient, TransactionOperations.withoutTransaction(), 2);
+                tokenService, friendsClient, sessionManager, TransactionOperations.withoutTransaction(), 2);
         user = user();
         bot1 = bot(1, BOT_EPIC_ID);
         bot2 = bot(2, "bot2-epic-id");
@@ -81,6 +83,7 @@ class EpicFriendServiceTest {
         when(accountRepository.findById(bot2.getId())).thenReturn(Optional.of(bot2));
         when(accountRepository.findByEpicAccountId(anyString())).thenReturn(Optional.empty());
         when(accountRepository.findByEpicAccountId(BOT_EPIC_ID)).thenReturn(Optional.of(bot1));
+        when(sessionManager.canOpenSessions()).thenReturn(true);
         when(tokenService.accessToken(any())).thenReturn("token");
         when(friendsClient.add(any(), any(), any())).thenReturn(AddResult.SENT);
 
@@ -328,6 +331,42 @@ class EpicFriendServiceTest {
         link.setStatus(Status.ACCEPTED);
         service.resendInvite(user);
         verify(friendsClient, times(1)).add(any(), any(), any());
+    }
+
+    // --- where the bots do not run ---
+
+    @Test
+    void enroll_whereTheBotsDoNotRun_savesThePendingLink_withoutCallingEpic() {
+        when(sessionManager.canOpenSessions()).thenReturn(false);
+
+        EpicFriendLink created = service.enroll(user, STREAMER_EPIC_ID, "Streamer");
+
+        assertThat(created.getStatus()).isEqualTo(Status.PENDING);
+        assertThat(links).containsExactly(created);
+        verifyNoInteractions(friendsClient, tokenService);
+    }
+
+    @Test
+    void resendInvite_whereTheBotsDoNotRun_leavesTheLinkPending_withoutCallingEpic() {
+        when(sessionManager.canOpenSessions()).thenReturn(false);
+        EpicFriendLink link = link(user, bot1, STREAMER_EPIC_ID, Status.PENDING);
+
+        service.resendInvite(user);
+
+        assertThat(link.getStatus()).isEqualTo(Status.PENDING);
+        verifyNoInteractions(friendsClient, tokenService);
+    }
+
+    @Test
+    void unenroll_whereTheBotsDoNotRun_dropsTheLink_withoutCallingEpic() {
+        when(sessionManager.canOpenSessions()).thenReturn(false);
+        link(user, bot1, STREAMER_EPIC_ID, Status.ACCEPTED);
+
+        service.unenroll(user);
+
+        assertThat(links).isEmpty();
+        verify(publisher).publishEpicLinkChanged(user.getId(), new EpicLinkStateResponse("NONE", null, null));
+        verifyNoInteractions(friendsClient, tokenService);
     }
 
     // --- sync ---

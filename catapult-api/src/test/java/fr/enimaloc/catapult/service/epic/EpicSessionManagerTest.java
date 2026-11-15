@@ -179,6 +179,19 @@ class EpicSessionManagerTest {
     }
 
     @Test
+    void canOpenSessions_onlyWhenEnabled_andActive() {
+        EpicSessionManager disabled = manager(false);
+        disabled.start();
+        assertThat(disabled.canOpenSessions()).isFalse();
+
+        EpicSessionManager active = started();
+        assertThat(active.canOpenSessions()).isTrue();
+
+        when(siteRole.isActive()).thenReturn(false);
+        assertThat(active.canOpenSessions()).isFalse();
+    }
+
+    @Test
     void sessionsDoNotOpen_whenDisabled_orStandby() {
         EpicSessionManager disabled = manager(false);
         disabled.start();
