@@ -33,6 +33,7 @@ import java.time.ZoneOffset;
 import java.util.*;
 import java.util.Collection;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -49,6 +50,12 @@ public class IgdbService {
     private static final String KEY_NAME_PREFIX  = "name:";
     private static final String KEY_EXE_PREFIX   = "exe:";
     private static final String KEY_XBOX_PREFIX  = "xbox:";
+    /** The DB cache key prefix of an Epic product id whose IGDB game the Epic catalog confirmed. */
+    private static final String KEY_EPIC_PREFIX  = "epic:";
+    /** The source id prefix of a game outside Epic Online Services, known only by its namespace. */
+    private static final String EPIC_NAMESPACE_PREFIX = "ns:";
+    /** An Epic Store offer id: 32 hex digits (IGDB's GUID-format uids are older ids the catalog does not know). */
+    private static final Pattern EPIC_OFFER_ID = Pattern.compile("[0-9a-fA-F]{32}");
     private static final String KEY_ID_PREFIX    = "id:";
     private static final int IGDB_BATCH_SIZE = 500;
 
@@ -62,6 +69,7 @@ public class IgdbService {
     private final MeterRegistry meterRegistry;
     private final ObjectProvider<SimulationGate> simulationGate;
     private final GameMappingRepository gameMappingRepository;
+    private final ObjectProvider<EpicCatalogClient> epicCatalogClient;
 
     @Value("${app.igdb.client-id:}")
     private String clientId;
@@ -117,12 +125,14 @@ public class IgdbService {
     private volatile long steamSourceId = -1;
     private volatile long xboxSourceId = -1;
     private volatile long twitchSourceId = -1;
+    private volatile long epicSourceId = -1;
 
     @PostConstruct
     public void init() {
         steamSourceId  = loadSourceId("Steam");
         xboxSourceId   = loadSourceId("Microsoft");
         twitchSourceId = loadSourceId("Twitch");
+        epicSourceId   = loadSourceId("Epic Games Store");
         warmInMemoryCacheFromDb();
     }
 
@@ -572,8 +582,9 @@ public class IgdbService {
     }
 
     /**
-     * {@link #resolveDetected} with the game's mapping left aside: nothing for Battle.net and Ankama, else the platform id
-     * ({@link #findByExternalAppId}), then the name. For a write whose mapping no longer names an IGDB game (or is
+     * {@link #resolveDetected} with the game's mapping left aside: nothing for Battle.net and Ankama, the
+     * catalog-verified match for Epic ({@link #resolveEpic}), else the platform id ({@link #findByExternalAppId}),
+     * then the name. For a write whose mapping no longer names an IGDB game (or is
      * no longer about this game) while its stored row still does.
      *
      * @param sourceId   the platform's id for the game, may be null (then no platform lookup)
@@ -583,9 +594,70 @@ public class IgdbService {
         if (sourceType == GameBinding.SourceType.BATTLENET || sourceType == GameBinding.SourceType.ANKAMA) {
             return Optional.empty();
         }
+        if (sourceType == GameBinding.SourceType.EPIC) return resolveEpic(sourceId, sourceName);
         Optional<IgdbGame> byPlatformId = sourceId != null ? findByExternalAppId(sourceType, sourceId) : Optional.empty();
         if (byPlatformId.isPresent() || sourceName == null || sourceName.isBlank()) return byPlatformId;
         return findByName(sourceName);
+    }
+
+    /**
+     * The IGDB game of an Epic product: the {@code epic:<productId>} DB cache, else the first IGDB name candidate
+     * owning an Epic Store offer whose catalog price tier starts with {@code <productId>_} (then cached), else the
+     * plain name match, not cached under {@code epic:} so the check is tried again later. A game outside Epic Online
+     * Services ({@code ns:<namespace>}) goes straight to the name match.
+     */
+    private Optional<IgdbGame> resolveEpic(String productId, String name) {
+        if (clientId.isBlank()) return Optional.empty();
+        if (productId == null || productId.startsWith(EPIC_NAMESPACE_PREFIX)) return nameMatch(name);
+
+        String key = KEY_EPIC_PREFIX + productId;
+        Optional<IgdbGame> fromDb = lookupInDb(key);
+        if (fromDb.isPresent()) {
+            countLookup("epic", "db_hit");
+            return fromDb;
+        }
+
+        Optional<IgdbGame> verified = verifiedEpicCandidate(productId, name);
+        countLookup("epic", verified.isPresent() ? "miss" : "unverified");
+        if (verified.isEmpty()) return nameMatch(name);
+
+        log.info("Epic product {} verified as IGDB game {} ({})", productId, verified.get().id(), verified.get().name());
+        remember(verified.get());
+        saveToDb(key, verified.get());
+        return verified;
+    }
+
+    /** The first IGDB name candidate whose Epic Store offer the catalog ties to {@code productId}, if any. */
+    private Optional<IgdbGame> verifiedEpicCandidate(String productId, String name) {
+        EpicCatalogClient catalog = epicCatalogClient.getIfAvailable();
+        if (catalog == null || epicSourceId < 0 || name == null || name.isBlank()) return Optional.empty();
+        String token = getOrRefreshAppToken();
+        if (token.isBlank()) return Optional.empty();
+
+        Map<IgdbGame, List<String>> offersByCandidate = new LinkedHashMap<>();
+        for (Game candidate : igdbClient.searchByNameWithExternalGames(name, token)) {
+            List<String> offers = candidate.getExternalGamesList().stream()
+                .filter(external -> external.getExternalGameSource().getId() == epicSourceId)
+                .map(ExternalGame::getUid)
+                .filter(uid -> EPIC_OFFER_ID.matcher(uid).matches())
+                .toList();
+            if (!offers.isEmpty()) offersByCandidate.putIfAbsent(toIgdbGame(candidate), offers);
+        }
+        if (offersByCandidate.isEmpty()) return Optional.empty();
+
+        List<String> offerIds = offersByCandidate.values().stream().flatMap(List::stream).distinct().toList();
+        Map<String, String> tiers = catalog.priceTiers(offerIds);
+        String tierPrefix = productId + "_";
+        return offersByCandidate.entrySet().stream()
+            .filter(entry -> entry.getValue().stream()
+                .map(tiers::get)
+                .anyMatch(tier -> tier != null && tier.startsWith(tierPrefix)))
+            .map(Map.Entry::getKey)
+            .findFirst();
+    }
+
+    private Optional<IgdbGame> nameMatch(String name) {
+        return name == null || name.isBlank() ? Optional.empty() : findByName(name);
     }
 
     /**

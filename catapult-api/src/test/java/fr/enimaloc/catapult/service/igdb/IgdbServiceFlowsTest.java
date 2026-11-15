@@ -19,6 +19,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestClient;
 import proto.AgeRating;
@@ -64,7 +65,8 @@ class IgdbServiceFlowsTest {
     private final SteamStoreService steamStore = mock(SteamStoreService.class);
     private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
     private final IgdbService service = new IgdbService(igdb, cache, externalIds, ccls, cclDefinitions, steamStore,
-            mock(RestClient.class), meters, SimulationGates.none(), mock(GameMappingRepository.class));
+            mock(RestClient.class), meters, SimulationGates.none(), mock(GameMappingRepository.class),
+            new StaticListableBeanFactory().getBeanProvider(EpicCatalogClient.class));
 
     @BeforeEach
     void setUp() {

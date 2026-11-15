@@ -11,6 +11,7 @@ import fr.enimaloc.catapult.simulation.SimulationGate;
 import fr.enimaloc.catapult.simulation.SimulationGates;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestClient;
@@ -31,7 +32,8 @@ class IgdbServiceSimulationTest {
         IgdbService service = new IgdbService(mock(IgdbClient.class), mock(IgdbGameCacheRepository.class),
                 mock(IgdbGameExternalIdRepository.class), mock(IgdbGameCclRepository.class),
                 mock(TwitchCclDefinitionRepository.class), mock(SteamStoreService.class), restClient,
-                new SimpleMeterRegistry(), provider, mock(GameMappingRepository.class));
+                new SimpleMeterRegistry(), provider, mock(GameMappingRepository.class),
+                new StaticListableBeanFactory().getBeanProvider(EpicCatalogClient.class));
         ReflectionTestUtils.setField(service, "clientId", "client");
         ReflectionTestUtils.setField(service, "clientSecret", "secret");
         return service;
