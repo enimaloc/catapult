@@ -103,17 +103,7 @@ class EpicRepositoriesTest {
         }).isInstanceOf(PersistenceException.class);
     }
 
-    @Test
-    void rejectsASecondLinkWithTheSameEpicAccountId() {
-        EpicServiceAccount bot = account("bot", "bot-epic-id");
-        link(user("first"), bot, "same-id");
-        em.flush();
-
-        assertThatThrownBy(() -> {
-            link(user("second"), bot, "same-id");
-            em.flush();
-        }).isInstanceOf(PersistenceException.class);
-    }
+    // Link epic_account_id uniqueness is a partial index (status <> 'REMOVED') in V116; H2 cannot model it.
 
     @Test
     void accountToStringHidesTheRefreshToken() {

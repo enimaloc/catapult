@@ -32,7 +32,7 @@ public class EpicFriendLink {
     private EpicServiceAccount serviceAccount;
 
     /** Epic account id of the streamer. */
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false)
     private String epicAccountId;
 
     @Column(nullable = false)

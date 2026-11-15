@@ -19,7 +19,7 @@ CREATE TABLE epic_friend_link (
     id                   UUID PRIMARY KEY,
     user_id              UUID        NOT NULL UNIQUE REFERENCES user_account(id) ON DELETE CASCADE,
     service_account_id   UUID        NOT NULL REFERENCES epic_service_account(id) ON DELETE CASCADE,
-    epic_account_id      TEXT        NOT NULL UNIQUE,
+    epic_account_id      TEXT        NOT NULL,
     display_name         TEXT        NOT NULL,
     status               TEXT        NOT NULL DEFAULT 'PENDING',
     requested_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -28,3 +28,7 @@ CREATE TABLE epic_friend_link (
 
 CREATE INDEX idx_epic_friend_link_service_account ON epic_friend_link(service_account_id);
 CREATE INDEX idx_epic_friend_link_status ON epic_friend_link(status);
+
+-- One active link per Epic account: a removed link must not reserve it forever
+CREATE UNIQUE INDEX uq_epic_friend_link_epic_account ON epic_friend_link (epic_account_id)
+    WHERE status <> 'REMOVED';
