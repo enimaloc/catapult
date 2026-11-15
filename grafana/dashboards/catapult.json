@@ -7293,6 +7293,44 @@
                   },
                   "refId": "D"
                 }
+              },
+              {
+                "kind": "PanelQuery",
+                "spec": {
+                  "hidden": false,
+                  "query": {
+                    "datasource": {
+                      "name": "${datasource}"
+                    },
+                    "group": "prometheus",
+                    "kind": "DataQuery",
+                    "spec": {
+                      "expr": "sum(increase(catapult_epic_session_dropped_total{application=~\"catapult(-api)?\"}[1h])) or vector(0)",
+                      "legendFormat": "Epic — session perdue"
+                    },
+                    "version": "v0"
+                  },
+                  "refId": "E"
+                }
+              },
+              {
+                "kind": "PanelQuery",
+                "spec": {
+                  "hidden": false,
+                  "query": {
+                    "datasource": {
+                      "name": "${datasource}"
+                    },
+                    "group": "prometheus",
+                    "kind": "DataQuery",
+                    "spec": {
+                      "expr": "sum(increase(catapult_epic_session_admin_action_required_total{application=~\"catapult(-api)?\"}[1h])) or vector(0)",
+                      "legendFormat": "Epic — action admin requise"
+                    },
+                    "version": "v0"
+                  },
+                  "refId": "F"
+                }
               }
             ],
             "queryOptions": {},
@@ -7967,7 +8005,7 @@
                 ]
               }
             },
-            "title": "Bots Battle.net / Ankama"
+            "title": "Bots Battle.net / Ankama / Epic"
           }
         },
         {
