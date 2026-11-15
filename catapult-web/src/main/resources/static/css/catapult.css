@@ -1877,6 +1877,18 @@ mdui-select::part(menu) {
     font-weight: 600;
 }
 
+/* The Epic card's sentences, as the Ankama card's. */
+.epic-sentence {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25em;
+}
+
+.epic-sentence .epic-bot-name,
+.epic-sentence .epic-name {
+    font-weight: 600;
+}
+
 /* Actions sit right-aligned under the details. A segmented group lays out its own
  * segments; a plain div (OBS) holds separate buttons. Either way, no separator:
  * outranks the `.connection-card > div` rules above. */

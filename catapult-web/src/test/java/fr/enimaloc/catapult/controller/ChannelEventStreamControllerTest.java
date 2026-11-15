@@ -126,6 +126,21 @@ class ChannelEventStreamControllerTest {
     }
 
     @Test
+    void theEpicLinkGoesToTheOwnersStreams_aModeratorsGetNothing() throws Exception {
+        MvcResult owner = subscribe("enimaloc", member("EnimaLoc"));
+        MvcResult moderator = subscribe("enimaloc", member("a-moderator"));
+        fr.enimaloc.catapult.event.epic.EpicLinkEvent link =
+                new fr.enimaloc.catapult.event.epic.EpicLinkEvent("enimaloc", "PENDING", "EpicMe", "EpicBot");
+
+        controller.onChannelUpdated(link);
+
+        assertThat(owner.getResponse().getContentAsString()).contains("event:EpicLinkEvent", "EpicMe", "EpicBot");
+        assertThat(moderator.getResponse().getContentAsString()).doesNotContain("EpicLinkEvent")
+                .doesNotContain("EpicMe").doesNotContain("EpicBot");
+        assertThat(ChannelEventStreamController.forModerators(link)).isNull();
+    }
+
+    @Test
     void theAnkamaLinkGoesToTheOwnersStreams_aModeratorsGetNothing() throws Exception {
         MvcResult owner = subscribe("enimaloc", member("EnimaLoc"));
         MvcResult moderator = subscribe("enimaloc", member("a-moderator"));

@@ -51,6 +51,7 @@ import fr.enimaloc.catapult.common.dto.admin.SocialLinkRequest;
 import fr.enimaloc.catapult.common.dto.admin.MinecraftDeviceCodeDto;
 import fr.enimaloc.catapult.common.dto.connect.AnkamaLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.connect.BattleNetLinkStateResponse;
+import fr.enimaloc.catapult.common.dto.connect.EpicLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.admin.DtddKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.SteamKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto;
@@ -395,6 +396,27 @@ public class RealApiService implements ApiService {
         UUID me = me();
         if (me == null) return HttpStatus.UNAUTHORIZED.value();
         return client.delete("/api/internal/users/{userId}/links/ankama", me);
+    }
+
+    @Override
+    public EpicLinkStateResponse epicStatus(String username) {
+        UUID me = me();
+        if (me == null) return null;
+        return client.get("/api/internal/users/{userId}/links/epic", EpicLinkStateResponse.class, me);
+    }
+
+    @Override
+    public int epicResend(String username) {
+        UUID me = me();
+        if (me == null) return HttpStatus.UNAUTHORIZED.value();
+        return client.postVoid("/api/internal/users/{userId}/links/epic/resend", null, me);
+    }
+
+    @Override
+    public int epicDisconnect(String username) {
+        UUID me = me();
+        if (me == null) return HttpStatus.UNAUTHORIZED.value();
+        return client.delete("/api/internal/users/{userId}/links/epic", me);
     }
 
     @Override

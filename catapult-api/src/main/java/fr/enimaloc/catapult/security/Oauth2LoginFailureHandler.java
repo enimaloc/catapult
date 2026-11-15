@@ -3,14 +3,18 @@ package fr.enimaloc.catapult.security;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.stereotype.Component;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -38,6 +42,12 @@ public class Oauth2LoginFailureHandler implements AuthenticationFailureHandler {
             "not_whitelisted", "invalid_invite", "alpha_full",
             "system_account_login_forbidden", "unauthorized", "battlenet_unavailable", "battlenet_full",
             "epic_unavailable", "epic_full", "epic_already_linked");
+    /**
+     * Refusals of a link the member started from their channel's integrations tab: they go back there, the code as
+     * {@code error}, for the card to tell why (TwitchLoginSuccessHandler sends a successful link to the same tab).
+     */
+    private static final Set<String> CHANNEL_LINK_ERROR_CODES = Set.of(
+            "epic_unavailable", "epic_full", "epic_already_linked");
 
     @Value("${app.web-url:http://localhost:8080}")
     private String webUrl;
@@ -63,7 +73,7 @@ public class Oauth2LoginFailureHandler implements AuthenticationFailureHandler {
             // The login is given up: catapult-web starts the next one with a state of its own
             InviteCodeRelayFilter.clearPendingWebState(request, response);
         }
-        response.sendRedirect(errorRedirectUrl(errorCode));
+        response.sendRedirect(errorRedirectUrl(errorCode, request));
     }
 
     private static String registrationIdOf(HttpServletRequest request) {
@@ -105,13 +115,40 @@ public class Oauth2LoginFailureHandler implements AuthenticationFailureHandler {
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
 
-    private String errorRedirectUrl(String errorCode) {
+    private String errorRedirectUrl(String errorCode, HttpServletRequest request) {
         if (errorCode == null) return webUrl + "/login?error";
+        if (CHANNEL_LINK_ERROR_CODES.contains(errorCode)) {
+            String login = sessionLogin(request.getSession(false));
+            if (login != null) {
+                return UriComponentsBuilder.fromUriString(webUrl)
+                        .path("/channel/{username}")
+                        .queryParam("error", errorCode)
+                        .fragment("integrations")
+                        .buildAndExpand(login)
+                        .toUriString();
+            }
+        }
         return switch (errorCode) {
             case "not_whitelisted" -> webUrl + "/login?error=not_whitelisted";
             case "invalid_invite" -> webUrl + "/join?error=invalid_invite";
             case "alpha_full" -> webUrl + "/join?error=alpha_full";
             default -> webUrl + "/login?error";
         };
+    }
+
+    /**
+     * The Twitch login of the member whose link failed: the session's, which the link ran on top of (the security
+     * context of the request itself is already cleared when a login fails).
+     */
+    private static String sessionLogin(HttpSession session) {
+        if (session != null
+                && session.getAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY)
+                        instanceof SecurityContext context
+                && context.getAuthentication() != null
+                && context.getAuthentication().getPrincipal() instanceof CatapultOAuth2User user
+                && user.getUserAccount() != null) {
+            return user.getUserAccount().getTwitchUsername();
+        }
+        return null;
     }
 }

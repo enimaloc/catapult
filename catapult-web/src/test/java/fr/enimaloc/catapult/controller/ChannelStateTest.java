@@ -75,6 +75,28 @@ class ChannelStateTest {
     }
 
     @Test
+    void epicLink_asItsEvent() {
+        ChannelPageData ch = new ChannelPageData(new ChannelUserDto("1", "2", "enimaloc", "img"), "enimaloc", true, true,
+                false, null, new PagedBindings(0, 0, 0, List.of()), List.of(), Set.of(), List.of(), Set.of(), null,
+                null, null, null, null, null, null, null, null, null, null,
+                new fr.enimaloc.catapult.common.dto.channel.EpicData("PENDING", "Me", "Bot"));
+
+        assertThat(events(ChannelState.of(ch, SETTINGS, null)))
+                .contains(new fr.enimaloc.catapult.event.epic.EpicLinkEvent("enimaloc", "PENDING", "Me", "Bot"));
+    }
+
+    @Test
+    void epicLink_withoutStatus_isNone() {
+        ChannelPageData ch = new ChannelPageData(new ChannelUserDto("1", "2", "enimaloc", "img"), "enimaloc", true, true,
+                false, null, new PagedBindings(0, 0, 0, List.of()), List.of(), Set.of(), List.of(), Set.of(), null,
+                null, null, null, null, null, null, null, null, null, null,
+                new fr.enimaloc.catapult.common.dto.channel.EpicData(null, null, null));
+
+        assertThat(events(ChannelState.of(ch, SETTINGS, null)))
+                .contains(new fr.enimaloc.catapult.event.epic.EpicLinkEvent("enimaloc", "NONE", null, null));
+    }
+
+    @Test
     void ankamaLink_asItsEvent() {
         ChannelPageData ch = new ChannelPageData(new ChannelUserDto("1", "2", "enimaloc", "img"), "enimaloc", true, true,
                 false, null, new PagedBindings(0, 0, 0, List.of()), List.of(), Set.of(), List.of(), Set.of(), null,

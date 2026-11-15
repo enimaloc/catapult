@@ -778,6 +778,19 @@ class RealApiServiceTest {
     }
 
     @Test
+    void epicStatusResendAndDisconnect() {
+        respond(HttpMethod.GET, OWN + "/links/epic",
+                "{\"status\":\"PENDING\",\"displayName\":\"Me\",\"serviceAccountName\":\"Bot\"}");
+        respond(HttpMethod.POST, OWN + "/links/epic/resend", "{\"status\":\"PENDING\"}");
+        expect(HttpMethod.DELETE, OWN + "/links/epic").andRespond(withNoContent());
+
+        assertThat(service.epicStatus("enimaloc")).isEqualTo(
+                new fr.enimaloc.catapult.common.dto.connect.EpicLinkStateResponse("PENDING", "Me", "Bot"));
+        assertThat(service.epicResend("enimaloc")).isEqualTo(200);
+        assertThat(service.epicDisconnect("enimaloc")).isEqualTo(204);
+    }
+
+    @Test
     void ankamaEnroll_aConflictKeepsItsReason() {
         expect(HttpMethod.PUT, OWN + "/links/ankama")
                 .andRespond(org.springframework.test.web.client.response.MockRestResponseCreators.withStatus(HttpStatus.CONFLICT)

@@ -11,6 +11,7 @@ import fr.enimaloc.catapult.common.dto.admin.KeyStatus;
 import fr.enimaloc.catapult.common.dto.admin.SteamKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
+import fr.enimaloc.catapult.common.dto.channel.EpicData;
 import fr.enimaloc.catapult.common.dto.channel.MinecraftData;
 import fr.enimaloc.catapult.common.dto.channel.PagedBindings;
 import fr.enimaloc.catapult.common.dto.channel.TwitchatData;
@@ -217,6 +218,13 @@ class DtoBehaviourTest {
     @Test
     void minecraftData_withoutStatus_isNotConnected() {
         assertThat(new MinecraftData(null, null, null).connected()).isFalse();
+    }
+
+    @ParameterizedTest
+    @CsvSource(value = {"ACCEPTED, true", "accepted, true", "PENDING, false", "NONE, false", "null, false"},
+            nullValues = "null")
+    void epicData_connectedOnlyOnceAccepted(String status, boolean connected) {
+        assertThat(new EpicData(status, null, null).connected()).isEqualTo(connected);
     }
 
     @Test

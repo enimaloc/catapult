@@ -465,6 +465,19 @@ class MockApiServiceTest {
     }
 
     @Test
+    void epicLink_resendsAndUnlinks_tellingThePage() {
+        service.epicResend(username);
+        service.epicDisconnect(username);
+
+        assertThat(data.getEpicLink().status()).isEqualTo("NONE");
+        assertThat(service.epicStatus(username)).isEqualTo(data.getEpicLink());
+        assertThat(events).hasSize(2).allSatisfy(event ->
+                assertThat(event).isInstanceOf(fr.enimaloc.catapult.event.epic.EpicLinkEvent.class));
+        assertThat(events.getLast()).isEqualTo(
+                new fr.enimaloc.catapult.event.epic.EpicLinkEvent(username, "NONE", null, null));
+    }
+
+    @Test
     void ankamaStatus_isTheMockLink() {
         assertThat(service.ankamaStatus(username)).isEqualTo(data.getAnkamaLink());
     }

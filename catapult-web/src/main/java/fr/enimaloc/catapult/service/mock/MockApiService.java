@@ -71,6 +71,7 @@ import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
 import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
 import fr.enimaloc.catapult.common.dto.connect.AnkamaLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.connect.BattleNetLinkStateResponse;
+import fr.enimaloc.catapult.common.dto.connect.EpicLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatDispatch;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
@@ -93,6 +94,7 @@ import fr.enimaloc.catapult.event.binding.CclStateEvent;
 import fr.enimaloc.catapult.event.binding.GameChangedEvent;
 import fr.enimaloc.catapult.event.ankama.AnkamaLinkEvent;
 import fr.enimaloc.catapult.event.battlenet.BattleNetLinkEvent;
+import fr.enimaloc.catapult.event.epic.EpicLinkEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftDisconnectedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftEnrollEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftSyncEvent;
@@ -559,6 +561,30 @@ public class MockApiService implements ApiService {
         MockData data = currentData();
         data.ankamaDisconnect();
         eventPublisher.publishEvent(new AnkamaLinkEvent(username, data.getAnkamaLink().status(), null, null));
+        return NO_CONTENT;
+    }
+
+    @Override
+    public EpicLinkStateResponse epicStatus(String username) {
+        log.trace("epicStatus({})", username);
+        return currentData().getEpicLink();
+    }
+
+    @Override
+    public int epicResend(String username) {
+        log.trace("epicResend({})", username);
+        EpicLinkStateResponse link = currentData().getEpicLink();
+        eventPublisher.publishEvent(new EpicLinkEvent(username, link.status(), link.displayName(),
+                link.serviceAccountName()));
+        return 200;
+    }
+
+    @Override
+    public int epicDisconnect(String username) {
+        log.trace("epicDisconnect({})", username);
+        MockData data = currentData();
+        data.epicDisconnect();
+        eventPublisher.publishEvent(new EpicLinkEvent(username, data.getEpicLink().status(), null, null));
         return NO_CONTENT;
     }
 

@@ -35,9 +35,23 @@ public record ChannelPageData(
          */
         Map<String, DropDto> drops,
         /** The owner's Ankama link; null for anyone else, or without Ankama for the channel. */
-        AnkamaData ankama
+        AnkamaData ankama,
+        /** The owner's Epic link; null for anyone else, or without Epic for the channel. */
+        EpicData epic
 ) {
-    /** A page without the Ankama link. */
+    /** A page without the Epic link. */
+    public ChannelPageData(ChannelUserDto channelUser, String channelUsername, boolean isOwner, boolean isLive,
+                           boolean botEnabled, GameDto currentGame, PagedBindings bindings, List<CclDto> availableCcls,
+                           Set<String> blockedCcls, List<TwDto> availableTws, Set<String> blockedTws,
+                           String filterStatus, String filterSource, SteamData steam, XboxData xbox,
+                           MinecraftData minecraft, BattleNetData battleNet, ObsData obs, TwitchatData twitchat,
+                           CustomBindingsStateDto customBindings, Map<String, DropDto> drops, AnkamaData ankama) {
+        this(channelUser, channelUsername, isOwner, isLive, botEnabled, currentGame, bindings, availableCcls,
+                blockedCcls, availableTws, blockedTws, filterStatus, filterSource, steam, xbox, minecraft, battleNet,
+                obs, twitchat, customBindings, drops, ankama, null);
+    }
+
+    /** A page without the Ankama nor the Epic link. */
     public ChannelPageData(ChannelUserDto channelUser, String channelUsername, boolean isOwner, boolean isLive,
                            boolean botEnabled, GameDto currentGame, PagedBindings bindings, List<CclDto> availableCcls,
                            Set<String> blockedCcls, List<TwDto> availableTws, Set<String> blockedTws,
@@ -46,7 +60,7 @@ public record ChannelPageData(
                            CustomBindingsStateDto customBindings, Map<String, DropDto> drops) {
         this(channelUser, channelUsername, isOwner, isLive, botEnabled, currentGame, bindings, availableCcls,
                 blockedCcls, availableTws, blockedTws, filterStatus, filterSource, steam, xbox, minecraft, battleNet,
-                obs, twitchat, customBindings, drops, null);
+                obs, twitchat, customBindings, drops, null, null);
     }
 
     /** A page without the Battle.net link. */
@@ -58,7 +72,7 @@ public record ChannelPageData(
                            CustomBindingsStateDto customBindings, Map<String, DropDto> drops) {
         this(channelUser, channelUsername, isOwner, isLive, botEnabled, currentGame, bindings, availableCcls,
                 blockedCcls, availableTws, blockedTws, filterStatus, filterSource, steam, xbox, minecraft, null, obs,
-                twitchat, customBindings, drops, null);
+                twitchat, customBindings, drops, null, null);
     }
 
     /** A page without the drops nor the Battle.net link. */
@@ -70,6 +84,6 @@ public record ChannelPageData(
                            CustomBindingsStateDto customBindings) {
         this(channelUser, channelUsername, isOwner, isLive, botEnabled, currentGame, bindings, availableCcls,
                 blockedCcls, availableTws, blockedTws, filterStatus, filterSource, steam, xbox, minecraft, null, obs,
-                twitchat, customBindings, null, null);
+                twitchat, customBindings, null, null, null);
     }
 }

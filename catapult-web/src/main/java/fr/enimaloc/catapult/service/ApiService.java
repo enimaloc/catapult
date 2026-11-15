@@ -38,6 +38,7 @@ import fr.enimaloc.catapult.common.dto.admin.BattleNetAccountDto;
 import fr.enimaloc.catapult.common.dto.admin.MinecraftDeviceCodeDto;
 import fr.enimaloc.catapult.common.dto.connect.AnkamaLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.connect.BattleNetLinkStateResponse;
+import fr.enimaloc.catapult.common.dto.connect.EpicLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
@@ -123,6 +124,15 @@ public interface ApiService {
     int ankamaResend(String username);
     /** Unlinks the member's Ankama account; catapult-api's status (204), 401 when logged out, 502 when unreachable. */
     int ankamaDisconnect(String username);
+    /** The logged-in member's own Epic link; null when logged out or catapult-api fails. */
+    EpicLinkStateResponse epicStatus(String username);
+    /**
+     * Has the Epic bot send its friend request again; catapult-api's status, 401 when logged out, 502 when
+     * unreachable.
+     */
+    int epicResend(String username);
+    /** Unlinks the member's Epic account; catapult-api's status (204), 401 when logged out, 502 when unreachable. */
+    int epicDisconnect(String username);
     /** Unlinks the member's Battle.net account; catapult-api's status (204), 401 when logged out, 502 when unreachable. */
     int battleNetDisconnect(String username);
     /** Unlinks the channel's Xbox account; catapult-api's status (204; 403 not the owner), 502 when unreachable. */
