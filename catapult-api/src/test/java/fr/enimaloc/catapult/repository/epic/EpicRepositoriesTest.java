@@ -67,8 +67,8 @@ class EpicRepositoriesTest {
         assertThat(links.findByUserId(streamer.getId())).get()
                 .extracting(EpicFriendLink::getStatus).isEqualTo(EpicFriendLink.Status.PENDING);
         assertThat(links.findByUser(streamer)).isPresent();
-        assertThat(links.findByEpicAccountId("streamer-epic-id")).isPresent();
-        assertThat(links.findByEpicAccountId("unknown")).isEmpty();
+        assertThat(links.findByEpicAccountIdAndStatusNot("streamer-epic-id", EpicFriendLink.Status.REMOVED)).hasSize(1);
+        assertThat(links.findByEpicAccountIdAndStatusNot("unknown", EpicFriendLink.Status.REMOVED)).isEmpty();
         assertThat(links.findByServiceAccountId(bot.getId())).hasSize(1);
         assertThat(links.findByServiceAccountIdAndStatusIn(bot.getId(), pending)).hasSize(1);
         assertThat(links.countByServiceAccountIdAndStatusIn(bot.getId(), pending)).isEqualTo(1);

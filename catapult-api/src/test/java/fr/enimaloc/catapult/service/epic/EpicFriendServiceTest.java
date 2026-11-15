@@ -23,6 +23,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.support.TransactionOperations;
 
 import java.util.ArrayList;
@@ -214,6 +215,40 @@ class EpicFriendServiceTest {
         EpicFriendLink created = service.enroll(user, STREAMER_EPIC_ID, "Streamer");
 
         assertThat(links).containsExactly(created).doesNotContain(stale);
+    }
+
+    @Test
+    void enroll_aSaveRejectedByTheUniqueIndex_isAlreadyLinked() {
+        doThrow(new DataIntegrityViolationException("uq_epic_friend_link")).when(linkRepository).save(any());
+
+        assertThatThrownBy(() -> service.enroll(user, STREAMER_EPIC_ID, "Streamer"))
+                .isInstanceOfSatisfying(EpicEnrollmentException.class,
+                        e -> assertThat(e.getReason()).isEqualTo(Reason.ALREADY_LINKED));
+    }
+
+    @Test
+    void enroll_theSameAccountAgain_keepsTheLink_andUpdatesTheName() {
+        EpicFriendLink existing = link(user, bot1, STREAMER_EPIC_ID, Status.ACCEPTED);
+
+        EpicFriendLink result = service.enroll(user, STREAMER_EPIC_ID, "Renamed");
+
+        assertThat(result).isSameAs(existing);
+        assertThat(result.getDisplayName()).isEqualTo("Renamed");
+        assertThat(links).containsExactly(existing);
+        verify(friendsClient, never()).delete(any(), any(), any());
+        verify(friendsClient, never()).add(any(), any(), any());
+        verify(publisher).publishEpicLinkChanged(user.getId(),
+                new EpicLinkStateResponse("ACCEPTED", "Renamed", null));
+    }
+
+    @Test
+    void enroll_deletingAStaleLinkOfAnotherMember_tellsThatMemberItIsGone() {
+        UserAccount other = user();
+        link(other, bot1, STREAMER_EPIC_ID, Status.REMOVED);
+
+        service.enroll(user, STREAMER_EPIC_ID, "Streamer");
+
+        verify(publisher).publishEpicLinkChanged(other.getId(), new EpicLinkStateResponse("NONE", null, null));
     }
 
     @Test
@@ -414,6 +449,26 @@ class EpicFriendServiceTest {
         assertThat(links).isEmpty();
         assertThat(getter.isEnabled()).isFalse();
         verify(publisher).publishEpicLinkChanged(user.getId(), new EpicLinkStateResponse("NONE", null, null));
+    }
+
+    @Test
+    void unenroll_cancelsTheRequestOfARejectedLinkToo() {
+        link(user, bot1, STREAMER_EPIC_ID, Status.INVITE_REJECTED);
+
+        service.unenroll(user);
+
+        verify(friendsClient).delete("token", BOT_EPIC_ID, STREAMER_EPIC_ID);
+        assertThat(links).isEmpty();
+    }
+
+    @Test
+    void unenroll_doesNotCallEpicForARemovedLink() {
+        link(user, bot1, STREAMER_EPIC_ID, Status.REMOVED);
+
+        service.unenroll(user);
+
+        verify(friendsClient, never()).delete(any(), any(), any());
+        assertThat(links).isEmpty();
     }
 
     @Test

@@ -20,6 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.context.event.EventListener;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionOperations;
 
@@ -86,6 +87,13 @@ public class EpicFriendService {
      */
     public EpicFriendLink enroll(UserAccount user, String epicAccountId, String displayName) {
         requireNotLinkedByAnother(user, epicAccountId);
+        EpicFriendLink same = linkRepository.findWithServiceAccountByUser(user)
+                .filter(own -> own.getEpicAccountId().equals(epicAccountId)
+                        && (own.getStatus() == Status.PENDING || own.getStatus() == Status.ACCEPTED))
+                .orElse(null);
+        if (same != null) {
+            return keep(same, displayName);
+        }
         List<EpicServiceAccount> ready = accountRepository.findByEnabledTrueAndAuthStateOrderByFillOrderAsc(
                 AuthState.READY);
         if (ready.isEmpty()) {
@@ -101,22 +109,45 @@ public class EpicFriendService {
                         "No Epic service account has room for a new friend"));
 
         unenroll(user);
-        EpicFriendLink link = transactions.execute(status -> {
-            // A REMOVED link of another member on this account is stale: the account belongs to this member now
-            linkRepository.deleteAll(linkRepository.findByEpicAccountIdAndStatus(epicAccountId, Status.REMOVED));
-            EpicFriendLink created = new EpicFriendLink();
-            created.setUser(user);
-            created.setServiceAccount(bot);
-            created.setEpicAccountId(epicAccountId);
-            created.setDisplayName(displayName);
-            created.setStatus(Status.PENDING);
-            created.setRequestedAt(Instant.now());
-            return linkRepository.save(created);
-        });
+        List<UUID> staleOwners = new ArrayList<>();
+        EpicFriendLink link;
+        try {
+            link = transactions.execute(status -> {
+                // A REMOVED link of another member on this account is stale: the account belongs to this member now
+                List<EpicFriendLink> stale = linkRepository.findByEpicAccountIdAndStatus(epicAccountId,
+                        Status.REMOVED);
+                stale.forEach(old -> staleOwners.add(old.getUser().getId()));
+                linkRepository.deleteAll(stale);
+                EpicFriendLink created = new EpicFriendLink();
+                created.setUser(user);
+                created.setServiceAccount(bot);
+                created.setEpicAccountId(epicAccountId);
+                created.setDisplayName(displayName);
+                created.setStatus(Status.PENDING);
+                created.setRequestedAt(Instant.now());
+                return linkRepository.save(created);
+            });
+        } catch (DataIntegrityViolationException e) {
+            // Another enrolment took the Epic account (or this member's link) between the check and the insert
+            throw new EpicEnrollmentException(Reason.ALREADY_LINKED,
+                    "This Epic account is already linked to another user");
+        }
+        staleOwners.stream().filter(owner -> !owner.equals(user.getId()))
+                .forEach(owner -> publish(owner, EpicLinkStateService.of(EpicLinkStateService.NONE)));
         log.info("Epic link requested for user {} via {}", user.getId(), bot.getId());
         publish(user.getId(), EpicLinkStateService.of(link));
 
         return sendRequest(link, bot).orElse(link);
+    }
+
+    /** The member links the Epic account they already have: the friendship or request stays, only the name moves. */
+    private EpicFriendLink keep(EpicFriendLink link, String displayName) {
+        if (displayName != null && !displayName.equals(link.getDisplayName())) {
+            link.setDisplayName(displayName);
+            transactions.executeWithoutResult(status -> linkRepository.save(link));
+        }
+        publish(link.getUser().getId(), EpicLinkStateService.of(link));
+        return link;
     }
 
     /** One active link per Epic account, and never a bot's own account. */
@@ -183,7 +214,9 @@ public class EpicFriendService {
         if (existing == null) {
             return;
         }
-        if (existing.getStatus() == Status.PENDING || existing.getStatus() == Status.ACCEPTED) {
+        // Every status but REMOVED: a resent request of an INVITE_REJECTED link is live, and deleting what Epic no
+        // longer has is harmless
+        if (existing.getStatus() != Status.REMOVED) {
             EpicServiceAccount bot = existing.getServiceAccount();
             try {
                 withToken(bot.getId(), token -> {

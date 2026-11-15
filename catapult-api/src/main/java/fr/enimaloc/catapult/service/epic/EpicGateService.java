@@ -29,10 +29,10 @@ public class EpicGateService {
     private final String clientSecret;
 
     public EpicGateService(ExperimentService experimentService,
-                                UserAccountRepository userAccountRepository,
-                                @Value("${epic.enabled:false}") boolean epicEnabled,
-                                @Value("${epic.client-id:}") String clientId,
-                                @Value("${epic.client-secret:}") String clientSecret) {
+                           UserAccountRepository userAccountRepository,
+                           @Value("${epic.enabled:false}") boolean epicEnabled,
+                           @Value("${epic.client-id:}") String clientId,
+                           @Value("${epic.client-secret:}") String clientSecret) {
         this.experimentService = experimentService;
         this.userAccountRepository = userAccountRepository;
         this.epicEnabled = epicEnabled;

@@ -24,8 +24,6 @@ public interface EpicFriendLinkRepository extends JpaRepository<EpicFriendLink, 
 
     List<EpicFriendLink> findByEpicAccountIdAndStatus(String epicAccountId, EpicFriendLink.Status status);
 
-    Optional<EpicFriendLink> findByEpicAccountId(String epicAccountId);
-
     List<EpicFriendLink> findByServiceAccountId(UUID serviceAccountId);
 
     List<EpicFriendLink> findByServiceAccountIdAndStatusIn(UUID serviceAccountId,
