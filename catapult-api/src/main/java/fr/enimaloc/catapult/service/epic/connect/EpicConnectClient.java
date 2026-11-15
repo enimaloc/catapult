@@ -17,6 +17,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * One WebSocket connection to Epic Connect (STOMP) for one bot account. A client is single-use: after
@@ -43,6 +44,11 @@ public class EpicConnectClient {
     private final Duration heartbeat;
     private final ScheduledExecutorService scheduler;
 
+    /**
+     * Orders deliveries: no listener callback follows {@code onClosed}. Reentrant, so a listener may call
+     * {@link #close()} from a callback; a close from another thread waits for the callback in flight.
+     */
+    private final ReentrantLock deliveryLock = new ReentrantLock();
     private final Object sendLock = new Object();
     private final AtomicBoolean started = new AtomicBoolean();
     private final AtomicBoolean closed = new AtomicBoolean();
@@ -81,13 +87,19 @@ public class EpicConnectClient {
         URI uri = URI.create((base.endsWith("/") ? base : base + "/") + "?auth-token="
                 + URLEncoder.encode(accessToken, StandardCharsets.UTF_8) + "&accept-language=en-US");
         WebSocket ws;
-        CompletableFuture<WebSocket> opening = connector.open(uri, new Reader());
+        CompletableFuture<WebSocket> opening = null;
         try {
+            opening = connector.open(uri, new Reader());
             // A copy, so that a timeout does not hide a socket that opens later.
             ws = opening.copy().orTimeout(OPEN_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS).join();
         } catch (RuntimeException e) {
-            closed.set(true);
-            opening.thenAccept(WebSocket::abort);
+            if (opening != null) {
+                opening.thenAccept(WebSocket::abort);
+            }
+            if (!closed.compareAndSet(false, true)) {
+                // Closed while the open was pending: onClosed was the report.
+                return;
+            }
             throw sanitize(e);
         }
         this.socket = ws;
@@ -180,15 +192,16 @@ public class EpicConnectClient {
     }
 
     private void dispatch(StompFrames.Frame frame) {
-        if (closed.get()) {
-            return;
-        }
         Optional<EpicConnectMessage> message = EpicConnectMessage.from(frame);
         if (message.isEmpty() || message.get().type().isEmpty()) {
             log.debug("Dropping an Epic Connect MESSAGE frame with an unknown type or an unparsable body");
             return;
         }
+        deliveryLock.lock();
         try {
+            if (closed.get()) {
+                return;
+            }
             if (CONNECTED_TYPE.equals(message.get().type())) {
                 listener.onConnected(message.get().connectionId());
             } else {
@@ -196,30 +209,37 @@ public class EpicConnectClient {
             }
         } catch (RuntimeException e) {
             log.warn("An Epic Connect listener failed on a {} message", message.get().type(), e);
+        } finally {
+            deliveryLock.unlock();
         }
     }
 
     /** Idempotent. A local {@link #close()} reports a null cause. */
     private void shutdown(Throwable cause) {
-        if (!closed.compareAndSet(false, true)) {
-            return;
-        }
-        cancelHeartbeat();
-        WebSocket ws = socket;
-        if (ws != null) {
-            if (cause == null) {
-                ws.sendClose(WebSocket.NORMAL_CLOSURE, "").exceptionally(t -> null);
-            } else {
-                ws.abort();
+        deliveryLock.lock();
+        try {
+            if (!closed.compareAndSet(false, true)) {
+                return;
             }
-        }
-        EpicConnectListener l = listener;
-        if (l != null) {
-            try {
-                l.onClosed(cause);
-            } catch (RuntimeException e) {
-                log.warn("An Epic Connect listener failed on close", e);
+            cancelHeartbeat();
+            WebSocket ws = socket;
+            if (ws != null) {
+                if (cause == null) {
+                    ws.sendClose(WebSocket.NORMAL_CLOSURE, "").exceptionally(t -> null);
+                } else {
+                    ws.abort();
+                }
             }
+            EpicConnectListener l = listener;
+            if (l != null) {
+                try {
+                    l.onClosed(cause);
+                } catch (RuntimeException e) {
+                    log.warn("An Epic Connect listener failed on close", e);
+                }
+            }
+        } finally {
+            deliveryLock.unlock();
         }
     }
 

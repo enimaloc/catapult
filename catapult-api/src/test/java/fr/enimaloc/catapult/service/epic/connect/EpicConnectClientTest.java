@@ -305,6 +305,78 @@ class EpicConnectClientTest {
     }
 
     @Test
+    void closeWaitsForAMessageInFlight_soNothingFollowsOnClosed() throws Exception {
+        java.util.concurrent.CountDownLatch entered = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
+        List<String> order = new CopyOnWriteArrayList<>();
+        EpicConnectListener listener = new EpicConnectListener() {
+            @Override
+            public void onConnected(String connectionId) {
+            }
+
+            @Override
+            public void onMessage(EpicConnectMessage message) {
+                entered.countDown();
+                try {
+                    release.await();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                order.add("message");
+            }
+
+            @Override
+            public void onClosed(Throwable cause) {
+                order.add("closed");
+            }
+        };
+        EpicConnectClient client = client(Duration.ofSeconds(30));
+        client.connect(TOKEN, BOT, listener);
+
+        Thread reader = new Thread(() -> wire.onText(socket,
+                message("{\"type\":\"presence.v1.UPDATE\",\"connectionId\":\"c\"}"), true));
+        reader.start();
+        assertThat(entered.await(3, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+        Thread closer = new Thread(client::close);
+        closer.start();
+        Thread.sleep(100);
+        assertThat(order).isEmpty();
+        release.countDown();
+        reader.join(3000);
+        closer.join(3000);
+        wire.onText(socket, message("{\"type\":\"presence.v1.UPDATE\",\"connectionId\":\"d\"}"), true);
+
+        assertThat(order).containsExactly("message", "closed");
+    }
+
+    @Test
+    void aConnectorThatThrows_isSanitized() {
+        EpicConnectClient throwing = new EpicConnectClient((uri, listener) -> {
+            throw new IllegalStateException("bad " + uri);
+        }, BASE, Duration.ofSeconds(30), scheduler);
+
+        assertThatThrownBy(() -> throwing.connect(TOKEN, BOT, new Recorder()))
+                .isInstanceOf(EpicConnectException.class)
+                .satisfies(e -> assertNoSecret(e));
+        assertThatThrownBy(() -> throwing.connect(TOKEN, BOT, new Recorder()))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void openFailingAfterAClose_doesNotThrow() {
+        Recorder recorder = new Recorder();
+        EpicConnectClient[] holder = new EpicConnectClient[1];
+        holder[0] = new EpicConnectClient((uri, listener) -> {
+            holder[0].close();
+            return CompletableFuture.failedFuture(new IOException("x"));
+        }, BASE, Duration.ofSeconds(30), scheduler);
+
+        holder[0].connect(TOKEN, BOT, recorder);
+
+        assertThat(recorder.closes).containsExactly((Throwable) null);
+    }
+
+    @Test
     void aClientIsSingleUse() {
         EpicConnectClient client = client(Duration.ofSeconds(30));
         client.connect(TOKEN, BOT, new Recorder());
