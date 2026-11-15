@@ -78,8 +78,8 @@ class ApiEpicConnectControllerTest {
     @Test
     void connect_routes_followTheAnkamaAccessRules() {
         // every route is the member's own, as for Ankama; linking goes through OAuth, so no PUT
-        for (Method method : ApiEpicConnectController.class.getDeclaredMethods()) {
-            if (!java.lang.reflect.Modifier.isPublic(method.getModifiers())) continue;
+        for (Method method : ApiEpicConnectController.class.getMethods()) {
+            if (method.getDeclaringClass() != ApiEpicConnectController.class) continue;
             assertThat(method.getAnnotation(PreAuthorize.class)).as(method.getName()).isNotNull()
                     .extracting(PreAuthorize::value).isEqualTo("@authz.isSelf(#userId)");
         }
