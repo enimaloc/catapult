@@ -105,20 +105,87 @@ class EpicTokenServiceTest {
     }
 
     @Test
-    void refresh_whoseSaveFails_handsOutNoAccessToken() {
-        when(accounts.refresh(anyString()))
-                .thenReturn(tokens("access-1", NOW.plus(Duration.ofHours(2)), "refresh-2"))
-                .thenReturn(tokens("access-2", NOW.plus(Duration.ofHours(2)), "refresh-3"));
+    void refresh_whoseSaveFails_handsOutNoAccessToken_andKeepsTheRotatedToken() {
+        when(accounts.refresh("refresh-1")).thenReturn(tokens("access-1", NOW.plus(Duration.ofHours(2)), "refresh-2"));
+        when(accounts.refresh("refresh-2")).thenReturn(tokens("access-2", NOW.plus(Duration.ofHours(4)), "refresh-3"));
         doThrow(new DataAccessResourceFailureException("database down"))
+                .doThrow(new DataAccessResourceFailureException("database still down"))
                 .doAnswer(invocation -> invocation.getArgument(0)).when(repository).save(any());
 
         assertThatThrownBy(() -> service.accessToken(bot.getId()))
                 .isInstanceOf(DataAccessResourceFailureException.class)
                 .hasMessageNotContaining("access-1");
 
-        // Nothing was cached: the next call refreshes again
+        // The consumed token is never sent again: the rotated one is stored first, still no access token without it
+        assertThatThrownBy(() -> service.accessToken(bot.getId()))
+                .isInstanceOf(DataAccessResourceFailureException.class);
+        verify(accounts, times(1)).refresh(anyString());
+
+        // Once stored, the access token of that same reply is handed out, without a new rotation
+        assertThat(service.accessToken(bot.getId())).isEqualTo("access-1");
+        assertThat(encryption.decrypt(bot.getRefreshTokenEnc())).isEqualTo("refresh-2");
+        verify(accounts, times(1)).refresh(anyString());
+
+        // The next refresh starts from the rotated token
+        clock.set(NOW.plus(Duration.ofMinutes(115)));
         assertThat(service.accessToken(bot.getId())).isEqualTo("access-2");
-        verify(accounts, times(2)).refresh(anyString());
+        verify(accounts).refresh("refresh-2");
+        verify(accounts, never()).refresh("refresh-3");
+        assertThat(encryption.decrypt(bot.getRefreshTokenEnc())).isEqualTo("refresh-3");
+    }
+
+    @Test
+    void install_storesALogin_replacesAPendingToken_andIsCached() {
+        when(accounts.refresh("refresh-1")).thenReturn(tokens("access-1", NOW.plus(Duration.ofHours(2)), "refresh-2"));
+        doThrow(new DataAccessResourceFailureException("database down"))
+                .doAnswer(invocation -> {
+                    assertThat(inOwnTransaction).as("saved in its own transaction").isTrue();
+                    return invocation.getArgument(0);
+                }).when(repository).save(any());
+        assertThatThrownBy(() -> service.accessToken(bot.getId()))
+                .isInstanceOf(DataAccessResourceFailureException.class);
+        bot.setAuthState(AuthState.REAUTH_REQUIRED);
+        clock.set(NOW.plus(Duration.ofMinutes(1)));
+
+        service.install(bot.getId(), new Tokens("access-login", NOW.plus(Duration.ofHours(2)), "refresh-login",
+                NOW.plus(Duration.ofDays(365)), bot.getEpicAccountId(), "Catapult-1"));
+
+        assertThat(encryption.decrypt(bot.getRefreshTokenEnc())).isEqualTo("refresh-login");
+        assertThat(bot.getAuthState()).isEqualTo(AuthState.READY);
+        assertThat(bot.getRefreshExpiresAt()).isEqualTo(NOW.plus(Duration.ofDays(365)));
+        assertThat(bot.getLastRefreshAt()).isEqualTo(NOW.plus(Duration.ofMinutes(1)));
+        // The pending rotated token of the old login is dropped, the login's access token is served from the cache
+        assertThat(service.accessToken(bot.getId())).isEqualTo("access-login");
+        assertThat(encryption.decrypt(bot.getRefreshTokenEnc())).isEqualTo("refresh-login");
+        verify(accounts, times(1)).refresh(anyString());
+    }
+
+    @Test
+    void install_waitsForARefreshInFlight() throws Exception {
+        CountDownLatch inRefresh = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        when(accounts.refresh("refresh-1")).thenAnswer(invocation -> {
+            inRefresh.countDown();
+            assertThat(release.await(5, TimeUnit.SECONDS)).isTrue();
+            return tokens("access-1", NOW.plus(Duration.ofHours(2)), "refresh-2");
+        });
+        ExecutorService threads = Executors.newFixedThreadPool(2);
+        try {
+            Future<String> refreshing = threads.submit(() -> service.accessToken(bot.getId()));
+            assertThat(inRefresh.await(5, TimeUnit.SECONDS)).isTrue();
+            Future<?> login = threads.submit(() -> service.install(bot.getId(), new Tokens("access-login",
+                    NOW.plus(Duration.ofHours(2)), "refresh-login", NOW.plus(Duration.ofDays(365)),
+                    bot.getEpicAccountId(), "Catapult-1")));
+            release.countDown();
+            assertThat(refreshing.get(5, TimeUnit.SECONDS)).isEqualTo("access-1");
+            login.get(5, TimeUnit.SECONDS);
+        } finally {
+            threads.shutdownNow();
+        }
+
+        // The login, stored after the refresh, wins
+        assertThat(encryption.decrypt(bot.getRefreshTokenEnc())).isEqualTo("refresh-login");
+        assertThat(service.accessToken(bot.getId())).isEqualTo("access-login");
     }
 
     @Test

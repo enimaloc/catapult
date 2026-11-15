@@ -54,6 +54,10 @@ class EpicSessionManagerTest {
     private static final String STREAMER = "51752b8577e341a6a96f95f6a95f38d5";
     private static final String FALL_GUYS_ID = "d42d7101bb7a41c09a810ee418b7d3d0";
     private static final EpicGame FALL_GUYS = new EpicGame(FALL_GUYS_ID, "Fall Guys", true);
+    private static final Duration STALE_GRACE = Duration.ofMillis(300);
+    /** An access token whose connection is renewed shortly after it opens. */
+    private static final AccessToken SOON_RENEWED =
+            new AccessToken("old", NOW.plus(EpicSessionManager.RENEW_BEFORE_EXPIRY).plusMillis(300));
 
     /** Spike 07:00:32: the streamer is in the launcher only. */
     private static final String LAUNCHER_ONLY = "{\"accountId\":\"" + STREAMER + "\",\"status\":\"online\","
@@ -130,7 +134,8 @@ class EpicSessionManagerTest {
                     clients.add(client);
                     return client;
                 },
-                scheduler, Runnable::run, Runnable::run, clock, Duration.ofMillis(1));
+                scheduler, Runnable::run, Runnable::run, clock,
+                new EpicSessionManager.Timing(Duration.ofMillis(1), Duration.ofMillis(1), STALE_GRACE));
     }
 
     private EpicSessionManager started() {
@@ -331,6 +336,75 @@ class EpicSessionManagerTest {
         assertThat(manager.anyOpenSessionToken()).contains("fresh");
         // A planned renewal is not a drop
         assertThat(counter(EpicSessionManager.DROPPED_COUNTER)).isZero();
+    }
+
+    /** Opens bot1 on a token renewed shortly after, reports Fall Guys on it, then waits for the renewal. */
+    private FakeEpicConnectClient renewedWhileInFallGuys(EpicSessionManager manager) {
+        FakeEpicConnectClient old = clientsOf(bot1).getFirst();
+        old.connected("conn-1");
+        old.push(EpicSessionManager.PRESENCE_UPDATE, IN_FALL_GUYS);
+        assertThat(manager.currentGame(STREAMER)).contains(FALL_GUYS);
+        eventually(() -> assertThat(old.closed).isTrue());
+        return old;
+    }
+
+    @Test
+    void plannedRenewal_keepsTheGames_untilTheNewConnectionReportsThem() throws InterruptedException {
+        when(tokens.token(bot1.getId())).thenReturn(SOON_RENEWED).thenReturn(token("fresh"));
+        EpicSessionManager manager = started();
+        FakeEpicConnectClient old = renewedWhileInFallGuys(manager);
+
+        eventually(() -> assertThat(clientsOf(bot1)).hasSize(2));
+        assertThat(manager.currentGame(STREAMER)).contains(FALL_GUYS);
+        assertThat(manager.sessionState(bot1.getId())).isEqualTo("CONNECTING");
+        FakeEpicConnectClient renewed = lastClientOf(bot1);
+        renewed.connected("conn-2");
+        renewed.push(EpicSessionManager.PRESENCE_UPDATE, IN_FALL_GUYS);
+
+        Thread.sleep(STALE_GRACE.multipliedBy(2).toMillis());
+        assertThat(manager.currentGame(STREAMER)).contains(FALL_GUYS);
+        // The replaced connection says nothing any more
+        old.push(EpicSessionManager.PRESENCE_UPDATE, LAUNCHER_ONLY);
+        assertThat(manager.currentGame(STREAMER)).contains(FALL_GUYS);
+        renewed.push(EpicSessionManager.PRESENCE_UPDATE, QUIT_FALL_GUYS);
+        assertThat(manager.currentGame(STREAMER)).isEmpty();
+    }
+
+    @Test
+    void plannedRenewal_forgetsTheGamesNotReportedAgain_afterTheGrace() {
+        when(tokens.token(bot1.getId())).thenReturn(SOON_RENEWED).thenReturn(token("fresh"));
+        EpicSessionManager manager = started();
+        renewedWhileInFallGuys(manager);
+
+        eventually(() -> assertThat(clientsOf(bot1)).hasSize(2));
+        lastClientOf(bot1).connected("conn-2");
+        assertThat(manager.currentGame(STREAMER)).contains(FALL_GUYS);
+
+        eventually(() -> assertThat(manager.currentGame(STREAMER)).isEmpty());
+    }
+
+    @Test
+    void plannedRenewal_whoseQuitIsReported_forgetsTheGameAtOnce() {
+        when(tokens.token(bot1.getId())).thenReturn(SOON_RENEWED).thenReturn(token("fresh"));
+        EpicSessionManager manager = started();
+        renewedWhileInFallGuys(manager);
+
+        eventually(() -> assertThat(clientsOf(bot1)).hasSize(2));
+        lastClientOf(bot1).connected("conn-2");
+        lastClientOf(bot1).push(EpicSessionManager.PRESENCE_UPDATE, LAUNCHER_ONLY);
+
+        assertThat(manager.currentGame(STREAMER)).isEmpty();
+    }
+
+    @Test
+    void plannedRenewal_thatFails_forgetsTheGamesAtOnce() {
+        when(tokens.token(bot1.getId())).thenReturn(SOON_RENEWED)
+                .thenThrow(new RestClientException("Epic account service answered HTTP 503"));
+        EpicSessionManager manager = started();
+        renewedWhileInFallGuys(manager);
+
+        eventually(() -> assertThat(manager.currentGame(STREAMER)).isEmpty());
+        assertThat(clientsOf(bot1)).hasSize(1);
     }
 
     @Test

@@ -59,7 +59,10 @@ import java.util.stream.Stream;
  * expires. A refused refresh token stops the session until the admin logs the bot in again; a rejected access token
  * is evicted and the connection retried with a fresh one, at once the first time, then with the usual backoff.
  *
- * <p>When a connection ends, every game it reported is forgotten: the next connection pushes the presences again.
+ * <p>When a connection drops, every game it reported is forgotten at once: the next connection pushes the presences
+ * again. A planned renewal keeps them, as stale, so that a streamer's game does not vanish while the new connection
+ * opens: they are forgotten if the new connection fails, and those it has not reported again
+ * {@link #STALE_GRACE} after it registered.
  */
 @Slf4j
 @Service
@@ -74,6 +77,13 @@ public class EpicSessionManager implements SmartLifecycle {
 
     static final Duration HEARTBEAT = Duration.ofSeconds(30);
     static final Duration MIN_BACKOFF = Duration.ofSeconds(5);
+    /** The shortest delay before a planned renewal, whatever the access token's lifetime. */
+    static final Duration RENEWAL_FLOOR = Duration.ofSeconds(60);
+    /**
+     * After a planned renewal, how long the games the previous connection reported stay known once the new connection
+     * is registered, waiting for it to report them again.
+     */
+    static final Duration STALE_GRACE = Duration.ofSeconds(30);
     static final Duration MAX_BACKOFF = Duration.ofSeconds(120);
     static final Duration RESYNC_PERIOD = Duration.ofMinutes(5);
     /** A connection is replaced this long before its access token expires (spec §4.4). */
@@ -98,7 +108,7 @@ public class EpicSessionManager implements SmartLifecycle {
     private final Executor starter;
     private final Executor handoff;
     private final Clock clock;
-    private final Duration minBackoff;
+    private final Timing timing;
     private final List<ExecutorService> owned;
 
     private final Object lock = new Object();
@@ -141,14 +151,14 @@ public class EpicSessionManager implements SmartLifecycle {
                 Executors.newVirtualThreadPerTaskExecutor(),
                 Executors.newSingleThreadExecutor(Thread.ofPlatform().name("epic-sessions").daemon().factory()),
                 Clock.systemUTC(),
-                MIN_BACKOFF);
+                Timing.DEFAULT);
     }
 
     /**
      * @param clients    builds the single-use Epic Connect client of each connection
      * @param starter    runs each connection attempt and REST call (blocking)
      * @param handoff    runs, in order, the friend events publication
-     * @param minBackoff first delay before a reconnection, doubled up to {@link #MAX_BACKOFF}
+     * @param timing     the backoff, renewal and stale-game delays
      */
     EpicSessionManager(EpicServiceAccountRepository repository,
                        EpicTokenService tokens,
@@ -163,7 +173,7 @@ public class EpicSessionManager implements SmartLifecycle {
                        Executor starter,
                        Executor handoff,
                        Clock clock,
-                       Duration minBackoff) {
+                       Timing timing) {
         this.repository = repository;
         this.tokens = tokens;
         this.friends = friends;
@@ -177,9 +187,18 @@ public class EpicSessionManager implements SmartLifecycle {
         this.starter = starter;
         this.handoff = handoff;
         this.clock = clock;
-        this.minBackoff = minBackoff;
+        this.timing = timing;
         this.owned = Stream.of(scheduler, starter, handoff)
                 .filter(ExecutorService.class::isInstance).map(ExecutorService.class::cast).toList();
+    }
+
+    /**
+     * @param minBackoff   first delay before a reconnection, doubled up to {@link #MAX_BACKOFF}
+     * @param renewalFloor shortest delay before a planned renewal
+     * @param staleGrace   how long the games of a renewed connection wait to be reported again
+     */
+    record Timing(Duration minBackoff, Duration renewalFloor, Duration staleGrace) {
+        static final Timing DEFAULT = new Timing(MIN_BACKOFF, RENEWAL_FLOOR, STALE_GRACE);
     }
 
     private static Supplier<EpicConnectClient> webSocketClients(URI connectUrl, ScheduledExecutorService scheduler) {
@@ -373,12 +392,17 @@ public class EpicSessionManager implements SmartLifecycle {
         private final Object resyncLock = new Object();
         /** Games by Epic account id, as this session's current connection reported them. Guarded by this. */
         private final Map<String, EpicGame> reported = new HashMap<>();
+        /**
+         * Games reported by the connection a planned renewal replaced: still in {@code games} until the new
+         * connection reports them again or {@link Timing#staleGrace} after it registered. Guarded by this.
+         */
+        private final Map<String, EpicGame> stale = new HashMap<>();
         private volatile State state = State.CONNECTING;
         private volatile boolean stopped;
         /** The connection in progress or open; null between two. Guarded by this. */
         private Link link;
         private ScheduledFuture<?> retry;
-        private Duration backoff = minBackoff;
+        private Duration backoff = timing.minBackoff();
         /** Access tokens rejected since the last settled connection. Guarded by this. */
         private int accessRejections;
 
@@ -505,8 +529,12 @@ public class EpicSessionManager implements SmartLifecycle {
             try {
                 candidate.client.connect(token.value(), candidate.botAccountId, candidate);
             } catch (RuntimeException e) {
-                // EpicConnectException carries no URL, hence no token
                 forget(candidate);
+                if (stopped) {
+                    // stop() closed the client while it was connecting
+                    return;
+                }
+                // EpicConnectException carries no URL, hence no token
                 log.warn("Could not connect Epic service account {} to Epic Connect: {}", accountId, e.toString());
                 retryLater();
                 return;
@@ -525,6 +553,8 @@ public class EpicSessionManager implements SmartLifecycle {
                 if (stopped) {
                     return;
                 }
+                // A renewal that could not connect: the games it kept are no longer known
+                forgetGames();
                 state = State.BACKOFF;
                 Duration delay = backoff;
                 Duration doubled = backoff.multipliedBy(2);
@@ -538,12 +568,26 @@ public class EpicSessionManager implements SmartLifecycle {
          * no longer this session's connection. Never called from a connection callback.
          */
         private void reconnect(Link from, boolean immediate) {
+            reconnect(from, immediate, false);
+        }
+
+        /**
+         * @param planned a renewal: the games {@code from} reported stay known, as stale, until the new connection
+         *                reports them again (see {@link #stale}); otherwise they are forgotten at once
+         */
+        private void reconnect(Link from, boolean immediate, boolean planned) {
             synchronized (this) {
                 if (link != from || stopped) {
                     return;
                 }
                 link = null;
-                forgetGames();
+                state = State.CONNECTING;
+                if (planned) {
+                    stale.putAll(reported);
+                    reported.clear();
+                } else {
+                    forgetGames();
+                }
             }
             from.end();
             if (immediate) {
@@ -556,7 +600,7 @@ public class EpicSessionManager implements SmartLifecycle {
         /** The connection registered and listed its friends once: the next failure starts the backoff afresh. */
         private synchronized void settle(Link from) {
             if (link == from) {
-                backoff = minBackoff;
+                backoff = timing.minBackoff();
                 accessRejections = 0;
             }
         }
@@ -599,6 +643,7 @@ public class EpicSessionManager implements SmartLifecycle {
                 state = State.READY;
             }
             log.info("Epic Connect session of Epic service account {} is ready", accountId);
+            schedule("the stale games of " + accountId, () -> dropStale(from), timing.staleGrace());
             resync(from, true);
         }
 
@@ -641,6 +686,7 @@ public class EpicSessionManager implements SmartLifecycle {
                 if (link != from || stopped || !current()) {
                     return;
                 }
+                EpicGame kept = stale.remove(epicAccountId);
                 if (game.isPresent()) {
                     reported.put(epicAccountId, game.get());
                     games.put(epicAccountId, game.get());
@@ -648,6 +694,9 @@ public class EpicSessionManager implements SmartLifecycle {
                     EpicGame previous = reported.remove(epicAccountId);
                     if (previous != null) {
                         games.remove(epicAccountId, previous);
+                    }
+                    if (kept != null) {
+                        games.remove(epicAccountId, kept);
                     }
                 }
             }
@@ -657,6 +706,20 @@ public class EpicSessionManager implements SmartLifecycle {
         private void forgetGames() {
             reported.forEach(games::remove);
             reported.clear();
+            forgetStale();
+        }
+
+        /** Called with this session's monitor held. */
+        private void forgetStale() {
+            stale.forEach(games::remove);
+            stale.clear();
+        }
+
+        /** The grace after {@code from} registered is over: what it has not reported again is no longer known. */
+        private synchronized void dropStale(Link from) {
+            if (link == from && !stopped) {
+                forgetStale();
+            }
         }
 
         /** One connection and its callbacks: those of a connection the session left are ignored. */
@@ -685,14 +748,16 @@ public class EpicSessionManager implements SmartLifecycle {
             /** Plans the replacement before the token expires, and a deadline for the registration. */
             void startTimers() {
                 Duration untilRenewal = Duration.between(clock.instant(), token.expiresAt().minus(RENEW_BEFORE_EXPIRY));
-                if (untilRenewal.compareTo(minBackoff) < 0) {
+                if (untilRenewal.compareTo(timing.renewalFloor()) < 0) {
+                    log.warn("The access token of Epic service account {} expires sooner than expected ({}): "
+                            + "renewing its connection in {}", accountId, token.expiresAt(), timing.renewalFloor());
                     // Never a tight loop of refreshes, whatever the token's lifetime
-                    untilRenewal = minBackoff;
+                    untilRenewal = timing.renewalFloor();
                 }
                 ScheduledFuture<?> renew = schedule("the renewal of " + accountId, () -> {
                     log.info("Renewing the Epic Connect connection of service account {} before its access token "
                             + "expires", accountId);
-                    reconnect(this, true);
+                    reconnect(this, true, true);
                 }, untilRenewal);
                 ScheduledFuture<?> timeout = schedule("the registration deadline of " + accountId, () -> {
                     boolean waiting;
