@@ -38,11 +38,15 @@ class EpicConnectClientTest {
         final List<String> sent = new CopyOnWriteArrayList<>();
         volatile boolean aborted;
         volatile java.util.function.Consumer<String> onSend = frame -> { };
+        volatile CompletableFuture<WebSocket> heartbeatResult;
 
         @Override
         public CompletableFuture<WebSocket> sendText(CharSequence data, boolean last) {
             sent.add(data.toString());
             onSend.accept(data.toString());
+            if (StompFrames.HEARTBEAT.contentEquals(data) && heartbeatResult != null) {
+                return heartbeatResult;
+            }
             return CompletableFuture.completedFuture(this);
         }
 
@@ -243,6 +247,61 @@ class EpicConnectClientTest {
         assertThat(recorder.closes).hasSize(1);
         assertThat(recorder.closes.get(0)).hasMessageContaining("nope");
         assertThat(socket.sent.stream().filter(StompFrames.HEARTBEAT::equals)).isEmpty();
+    }
+
+    @Test
+    void closeDuringTheOpen_abortsTheLateSocket_andClosesOnce() {
+        Recorder recorder = new Recorder();
+        EpicConnectClient[] holder = new EpicConnectClient[1];
+        holder[0] = new EpicConnectClient((uri, listener) -> {
+            wire = listener;
+            holder[0].close();
+            return CompletableFuture.completedFuture(socket);
+        }, BASE, Duration.ofSeconds(30), scheduler);
+
+        holder[0].connect(TOKEN, BOT, recorder);
+
+        assertThat(socket.aborted).isTrue();
+        assertThat(recorder.closes).containsExactly((Throwable) null);
+        assertThat(socket.sent).isEmpty();
+    }
+
+    @Test
+    void nothingIsDelivered_afterTheClose() {
+        Recorder recorder = new Recorder();
+        EpicConnectClient client = client(Duration.ofSeconds(30));
+        client.connect(TOKEN, BOT, recorder);
+        client.close();
+
+        wire.onText(socket, message("{\"type\":\"core.connect.v1.connected\",\"connectionId\":\"c\"}"), true);
+        wire.onText(socket, message("{\"type\":\"presence.v1.UPDATE\",\"connectionId\":\"c\"}"), true);
+
+        assertThat(recorder.connected).isEmpty();
+        assertThat(recorder.messages).isEmpty();
+    }
+
+    @Test
+    void aFailedHeartbeatSend_closesTheConnection() {
+        Recorder recorder = new Recorder();
+        socket.heartbeatResult = CompletableFuture.failedFuture(new IOException("wss://x?auth-token=secret"));
+        client(Duration.ofMillis(20)).connect(TOKEN, BOT, recorder);
+
+        await().atMost(Duration.ofSeconds(3)).until(() -> !recorder.closes.isEmpty());
+
+        assertThat(recorder.closes).hasSize(1);
+        assertThat(recorder.closes.get(0)).isInstanceOf(EpicConnectException.class);
+        assertNoSecret(recorder.closes.get(0));
+        assertThat(socket.aborted).isTrue();
+    }
+
+    @Test
+    void heartbeats_areSkippedWhileOneIsStillBeingSent() throws Exception {
+        socket.heartbeatResult = new CompletableFuture<>();
+        client(Duration.ofMillis(20)).connect(TOKEN, BOT, new Recorder());
+
+        Thread.sleep(300);
+
+        assertThat(socket.sent.stream().filter(StompFrames.HEARTBEAT::equals).count()).isEqualTo(1);
     }
 
     @Test

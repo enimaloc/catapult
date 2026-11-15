@@ -81,14 +81,21 @@ public class EpicConnectClient {
         URI uri = URI.create((base.endsWith("/") ? base : base + "/") + "?auth-token="
                 + URLEncoder.encode(accessToken, StandardCharsets.UTF_8) + "&accept-language=en-US");
         WebSocket ws;
+        CompletableFuture<WebSocket> opening = connector.open(uri, new Reader());
         try {
-            ws = connector.open(uri, new Reader())
-                    .orTimeout(OPEN_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS).join();
+            // A copy, so that a timeout does not hide a socket that opens later.
+            ws = opening.copy().orTimeout(OPEN_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS).join();
         } catch (RuntimeException e) {
             closed.set(true);
+            opening.thenAccept(WebSocket::abort);
             throw sanitize(e);
         }
         this.socket = ws;
+        if (closed.get()) {
+            // Closed (by close() or the server) before the socket was known to shutdown: nobody else will end it.
+            ws.abort();
+            return;
+        }
         try {
             send(StompFrames.connect());
             send(StompFrames.subscribe(botAccountId));
@@ -116,7 +123,8 @@ public class EpicConnectClient {
             throw new EpicConnectException("Epic Connect connection is closed");
         }
         CompletableFuture<WebSocket> sent;
-        // The JDK forbids overlapping sends: the heart-beat and the handshake take turns.
+        // The JDK forbids overlapping sends. The handshake sends are joined before the heart-beat starts and at most
+        // one heart-beat is in flight; the lock only guards the call itself.
         synchronized (sendLock) {
             sent = ws.sendText(frame, true);
         }
@@ -172,6 +180,9 @@ public class EpicConnectClient {
     }
 
     private void dispatch(StompFrames.Frame frame) {
+        if (closed.get()) {
+            return;
+        }
         Optional<EpicConnectMessage> message = EpicConnectMessage.from(frame);
         if (message.isEmpty() || message.get().type().isEmpty()) {
             log.debug("Dropping an Epic Connect MESSAGE frame with an unknown type or an unparsable body");
