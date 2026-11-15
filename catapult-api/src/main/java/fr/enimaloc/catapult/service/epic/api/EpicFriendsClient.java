@@ -7,9 +7,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.json.JsonMapper;
 
-import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -28,11 +26,7 @@ public class EpicFriendsClient {
         }
     }
 
-    private record Reply(int status, JsonNode body) {
-    }
-
     private final RestClient client;
-    private final JsonMapper mapper = JsonMapper.builder().build();
     private final String friendsUrl;
 
     public EpicFriendsClient(RestClient.Builder builder,
@@ -43,8 +37,8 @@ public class EpicFriendsClient {
     }
 
     public AddResult add(String token, String botId, String accountId) {
-        Reply reply = client.post().uri(friendsUrl + "/{bot}/friends/{id}", botId, accountId)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token).exchange(this::read);
+        EpicReplies.Reply reply = client.post().uri(friendsUrl + "/{bot}/friends/{id}", botId, accountId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token).exchange(EpicReplies::read);
         int status = reply.status();
         if (status >= 200 && status < 300) return AddResult.SENT;
         if (status == 409 && reply.body().path("errorCode").asString("").endsWith("duplicate_friendship")) {
@@ -54,16 +48,16 @@ public class EpicFriendsClient {
     }
 
     public void delete(String token, String botId, String accountId) {
-        Reply reply = client.delete().uri(friendsUrl + "/{bot}/friends/{id}", botId, accountId)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token).exchange(this::read);
+        EpicReplies.Reply reply = client.delete().uri(friendsUrl + "/{bot}/friends/{id}", botId, accountId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token).exchange(EpicReplies::read);
         int status = reply.status();
         if (status >= 200 && status < 300 || status == 404) return;
         throw failure(status);
     }
 
     public Summary summary(String token, String botId) {
-        Reply reply = client.get().uri(friendsUrl + "/{bot}/summary", botId)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token).exchange(this::read);
+        EpicReplies.Reply reply = client.get().uri(friendsUrl + "/{bot}/summary", botId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token).exchange(EpicReplies::read);
         int status = reply.status();
         if (status < 200 || status >= 300) throw failure(status);
         return toSummary(reply.body());
@@ -84,21 +78,8 @@ public class EpicFriendsClient {
         return ids;
     }
 
-    private Reply read(org.springframework.http.HttpRequest request,
-                       RestClient.RequestHeadersSpec.ConvertibleClientHttpResponse response) throws IOException {
-        int status = response.getStatusCode().value();
-        byte[] raw = response.getBody().readAllBytes();
-        JsonNode body;
-        try {
-            body = raw.length == 0 ? mapper.createObjectNode() : mapper.readTree(raw);
-        } catch (RuntimeException e) {
-            body = mapper.createObjectNode();
-        }
-        return new Reply(status, body);
-    }
-
     private static RuntimeException failure(int status) {
-        if (status == 401) return new EpicAuthException(EpicAuthException.Reason.REFRESH_REFUSED);
+        if (status == 401) return new EpicAuthException(EpicAuthException.Reason.ACCESS_REJECTED);
         return new RestClientException("Epic friends service answered HTTP " + status);
     }
 }

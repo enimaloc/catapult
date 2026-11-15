@@ -83,10 +83,12 @@ class EpicFriendsClientTest {
     }
 
     @Test
-    void unauthorized_isRefreshRefused() {
+    void unauthorized_isAccessRejected() {
         server.expect(requestTo(URL + "/bot/summary")).andRespond(withStatus(HttpStatus.UNAUTHORIZED));
 
         assertThatThrownBy(() -> client.summary("tok", "bot")).isInstanceOf(EpicAuthException.class)
+                .isInstanceOfSatisfying(EpicAuthException.class,
+                        e -> assertThat(e.reason()).isEqualTo(EpicAuthException.Reason.ACCESS_REJECTED))
                 .hasMessageNotContaining("tok");
     }
 }

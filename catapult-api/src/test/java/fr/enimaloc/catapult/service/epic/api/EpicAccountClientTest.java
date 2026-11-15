@@ -128,4 +128,23 @@ class EpicAccountClientTest {
                 .isInstanceOf(org.springframework.web.client.RestClientException.class)
                 .isNotInstanceOf(EpicAuthException.class);
     }
+
+    @Test
+    void unreadableSuccessReply_isNotBlankTokens() {
+        server.expect(requestTo(URL)).andRespond(withSuccess("<html>not json", MediaType.TEXT_HTML));
+
+        assertThatThrownBy(() -> client.refresh("old"))
+                .isInstanceOf(org.springframework.web.client.RestClientException.class)
+                .isNotInstanceOf(EpicAuthException.class);
+    }
+
+    @Test
+    void successReplyWithoutRefreshToken_isIncomplete() {
+        server.expect(requestTo(URL)).andRespond(withSuccess("{\"access_token\":\"at\",\"expires_in\":60,"
+                + "\"refresh_expires\":120,\"account_id\":\"a\"}", MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> client.refresh("old"))
+                .isInstanceOf(org.springframework.web.client.RestClientException.class)
+                .hasMessageContaining("incomplete token reply");
+    }
 }

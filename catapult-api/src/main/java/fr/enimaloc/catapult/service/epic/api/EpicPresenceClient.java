@@ -31,7 +31,7 @@ public class EpicPresenceClient {
                 .header("X-HTTP-Method-Override", "PATCH")
                 .contentType(MediaType.APPLICATION_JSON).body(ONLINE_BODY)
                 .exchange((request, response) -> response.getStatusCode().value());
-        if (status == 401) throw new EpicAuthException(EpicAuthException.Reason.REFRESH_REFUSED);
+        if (status == 401) throw new EpicAuthException(EpicAuthException.Reason.ACCESS_REJECTED);
         if (status < 200 || status >= 300) {
             throw new RestClientException("Epic presence service answered HTTP " + status);
         }

@@ -11,9 +11,7 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.json.JsonMapper;
 
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
@@ -31,11 +29,7 @@ public class EpicAccountClient {
                          String accountId, String displayName) {
     }
 
-    private record Reply(int status, JsonNode body) {
-    }
-
     private final RestClient client;
-    private final JsonMapper mapper = JsonMapper.builder().build();
     private final String tokenUrl;
     private final Clock clock;
 
@@ -70,32 +64,28 @@ public class EpicAccountClient {
         return tokens(post(form));
     }
 
-    private Reply post(MultiValueMap<String, String> form) {
+    private EpicReplies.Reply post(MultiValueMap<String, String> form) {
         return client.post().uri(tokenUrl).contentType(MediaType.APPLICATION_FORM_URLENCODED).body(form)
-                .exchange(this::read);
+                .exchange(EpicReplies::read);
     }
 
-    private Reply read(org.springframework.http.HttpRequest request,
-                       RestClient.RequestHeadersSpec.ConvertibleClientHttpResponse response) throws IOException {
-        int status = response.getStatusCode().value();
-        byte[] raw = response.getBody().readAllBytes();
-        JsonNode body;
-        try {
-            body = raw.length == 0 ? mapper.createObjectNode() : mapper.readTree(raw);
-        } catch (RuntimeException e) {
-            body = mapper.createObjectNode();
-        }
-        return new Reply(status, body);
-    }
-
-    private Tokens tokens(Reply reply) {
+    private Tokens tokens(EpicReplies.Reply reply) {
         int status = reply.status();
         JsonNode body = reply.body();
         if (status >= 200 && status < 300) {
+            String accessToken = text(body, "access_token");
+            String refreshToken = text(body, "refresh_token");
+            String accountId = text(body, "account_id");
+            long expiresIn = body.path("expires_in").asLong();
+            long refreshExpires = body.path("refresh_expires").asLong();
+            // A stored refresh token is replaced by this reply: never accept one that is partial
+            if (accessToken.isBlank() || refreshToken.isBlank() || accountId.isBlank() || expiresIn <= 0
+                    || refreshExpires <= 0) {
+                throw new RestClientException("Epic account service returned an incomplete token reply");
+            }
             Instant now = clock.instant();
-            return new Tokens(text(body, "access_token"), now.plusSeconds(body.path("expires_in").asLong()),
-                    text(body, "refresh_token"), now.plusSeconds(body.path("refresh_expires").asLong()),
-                    text(body, "account_id"), text(body, "displayName"));
+            return new Tokens(accessToken, now.plusSeconds(expiresIn), refreshToken,
+                    now.plusSeconds(refreshExpires), accountId, text(body, "displayName"));
         }
         String errorCode = text(body, "errorCode");
         if (status == 400 && errorCode.endsWith("authorization_code_not_found")) {

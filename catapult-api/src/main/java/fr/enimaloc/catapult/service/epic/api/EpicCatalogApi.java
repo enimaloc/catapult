@@ -43,7 +43,7 @@ public class EpicCatalogApi {
         JsonNode root = client.get().uri(uri).header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .exchange((request, response) -> {
                     int status = response.getStatusCode().value();
-                    if (status == 401) throw new EpicAuthException(EpicAuthException.Reason.REFRESH_REFUSED);
+                    if (status == 401) throw new EpicAuthException(EpicAuthException.Reason.ACCESS_REJECTED);
                     if (status < 200 || status >= 300) {
                         throw new RestClientException("Epic catalog service answered HTTP " + status);
                     }
