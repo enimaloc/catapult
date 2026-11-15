@@ -50,6 +50,8 @@ class GameSourceResolverTest {
                 .isEqualTo(new Resolution("Overwatch 2", "Overwatch 2", null));
         assertThat(resolver.resolve(GetterConfig.Provider.ANKAMA, "Wakfu"))
                 .isEqualTo(new Resolution("Wakfu", "Wakfu", null));
+        assertThat(resolver.resolve(GetterConfig.Provider.EPIC, "Fall Guys"))
+                .isEqualTo(new Resolution("Fall Guys", "Fall Guys", null));
         verifyNoInteractions(igdb);
     }
 

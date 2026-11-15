@@ -3,7 +3,7 @@ package fr.enimaloc.catapult.common.dto;
 import java.util.List;
 
 /**
- * The gated platforms open to every member, by id ({@code battlenet}, {@code ankama}): configured, and their experiment
+ * The gated platforms open to every member, by id ({@code battlenet}, {@code ankama}, {@code epic}): configured, and their experiment
  * fully enabled. The landing page lists them next to the ones it always shows.
  */
 public record LaunchedPlatformsResponse(List<String> platforms) {

@@ -371,6 +371,7 @@ public class GameInfoAssembler {
         return switch (sourceType) {
             case STEAM -> "steam";
             case BATTLENET -> "battlenet";
+            case EPIC -> "epicgames";
             default -> "";
         };
     }

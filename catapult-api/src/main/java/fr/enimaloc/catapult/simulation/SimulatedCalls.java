@@ -64,6 +64,7 @@ public final class SimulatedCalls {
     public static final CallKey MINECRAFT_FRIENDS = new CallKey("minecraft", "friends", ACCOUNT);
     public static final CallKey BATTLENET_PRESENCE = new CallKey("battlenet", "presence", ACCOUNT);
     public static final CallKey ANKAMA_PRESENCE = new CallKey("ankama", "presence", ACCOUNT);
+    public static final CallKey EPIC_PRESENCE = new CallKey("epic", "presence", ACCOUNT);
 
     public static final CallKey IGDB_SEARCH = new CallKey("igdb", "search", GLOBAL);
     public static final CallKey IGDB_GAME = new CallKey("igdb", "game", GLOBAL);
@@ -84,7 +85,7 @@ public final class SimulatedCalls {
             STEAM_PRESENCE, STEAM_PROFILE_STATUS, STEAM_OWNED_GAMES,
             STEAM_STORE_APP_DETAILS, STEAM_STORE_CCLS, STEAM_STORE_TW_SIGNALS, STEAM_STORE_LIBRARY,
             XBOX_PRESENCE, XBOX_STORE_PRODUCT, MINECRAFT_PRESENCE, MINECRAFT_FRIENDS, BATTLENET_PRESENCE,
-            ANKAMA_PRESENCE,
+            ANKAMA_PRESENCE, EPIC_PRESENCE,
             IGDB_SEARCH, IGDB_GAME, DTDD_SEARCH, DTDD_TOPICS, GITLAB_FEEDBACK);
 
     public static List<CallKey> all() {

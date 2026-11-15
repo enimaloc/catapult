@@ -193,16 +193,17 @@ class DtoBehaviourTest {
 
     @ParameterizedTest
     @CsvSource({
-            "false, false, false, false, false, false",
-            "true, false, false, false, false, true",
-            "false, true, false, false, false, true",
-            "false, false, true, false, false, true",
-            "false, false, false, true, false, true",
-            "false, false, false, false, true, true",
+            "false, false, false, false, false, false, false",
+            "true, false, false, false, false, false, true",
+            "false, true, false, false, false, false, true",
+            "false, false, true, false, false, false, true",
+            "false, false, false, true, false, false, true",
+            "false, false, false, false, true, false, true",
+            "false, false, false, false, false, true, true",
     })
     void providersResponse_hasAny(boolean minecraft, boolean steam, boolean xbox, boolean battlenet, boolean ankama,
-                                  boolean any) {
-        assertThat(new ProvidersResponse(minecraft, steam, xbox, battlenet, ankama).hasAny()).isEqualTo(any);
+                                  boolean epic, boolean any) {
+        assertThat(new ProvidersResponse(minecraft, steam, xbox, battlenet, ankama, epic).hasAny()).isEqualTo(any);
     }
 
     @ParameterizedTest
