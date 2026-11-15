@@ -2,10 +2,11 @@
 <!--/*@thymesVar id="dtdd" type="fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto"*/-->
 <!--/*@thymesVar id="minecraft" type="java.util.List<fr.enimaloc.catapult.common.dto.admin.AccountDto>"*/-->
 <!--/*@thymesVar id="ankama" type="java.util.List<fr.enimaloc.catapult.common.dto.admin.AnkamaAccountDto>"*/-->
+<!--/*@thymesVar id="epic" type="fr.enimaloc.catapult.common.dto.admin.EpicAccountsDto"*/-->
 <!--/*
   The shared API keys: one card for Steam and one for DTDD (a disabled provider shows only its note; an enabled one
   the add field, Refresh and the keys, masked only: the raw key is never rendered, each with what it was used for),
-  then the Minecraft, Battle.net and Ankama service accounts cards, then the rate limits learned from the platforms' 429s
+  then the Minecraft, Battle.net, Ankama and Epic service accounts cards, then the rate limits learned from the platforms' 429s
   (rate-limits.html).
   admin-rate-limits.js patches the tab every few seconds while it is shown, for the keys' usage and the limits. Driven by admin-keys.js (the provider is on each card's data-provider), admin-minecraft.js, admin-battlenet.js and admin-ankama.js.
   Each list and its empty state are both rendered, one hidden, so that admin-tabs.js patches them after an edit.
@@ -360,6 +361,104 @@
                     </div>
                 </div>
                 <p class="admin-ankama-message admin-cell-muted" aria-live="polite" hidden></p>
+            </th:block>
+        </mdui-card>
+    </div>
+
+    <!--/*
+      The Epic bot pool: each bot's login and session states, its friends, when its login expires (a warning once it is
+      close), then "Add a bot". A bot is added, or re-authenticated (the button only shows on REAUTH_REQUIRED), by opening
+      Epic's code page in a private window where the bot account is logged in, then pasting here what that page shows
+      (the whole text or just the code): admin-epic.js opens the login box (outside the list, so a refresh of the tab keeps
+      it). The code page's address is Epic's own and carries no secret; no token ever reaches this page.
+    */-->
+    <div id="admin-epic">
+        <mdui-card class="admin-keys-card admin-epic" variant="outlined"
+                   th:attr="data-label-conflict=#{admin.epic.error.conflict},data-label-unknown=#{admin.epic.unknown},
+                            data-label-unavailable=#{admin.epic.unavailable-action},data-label-updated=#{admin.epic.updated},
+                            data-label-deleted=#{admin.epic.deleted},data-label-login-done=#{admin.epic.login-done},
+                            data-label-invalid=#{admin.epic.error.invalid}">
+            <div class="admin-keys-head">
+                <h3 th:text="#{admin.epic.title}">Epic bots</h3>
+            </div>
+
+            <p class="admin-cell-muted admin-epic-unavailable" th:if="${epic == null}"
+               th:text="#{admin.epic.unavailable}">Unavailable.</p>
+
+            <th:block th:if="${epic != null}">
+                <p class="admin-cell-muted" data-admin-value="epic-empty" th:hidden="${!epic.accounts().isEmpty()}"
+                   th:text="#{admin.epic.empty}">None.</p>
+                <div class="admin-table" data-admin-list="epic" th:hidden="${epic.accounts().isEmpty()}">
+                    <div class="admin-row admin-epic-row admin-row-head" aria-hidden="true">
+                        <span th:text="#{admin.epic.col.account}">Account</span>
+                        <span th:text="#{admin.epic.col.auth}">Login</span>
+                        <span th:text="#{admin.epic.col.session}">Session</span>
+                        <span th:text="#{admin.epic.col.friends}">Friends</span>
+                        <span th:text="#{admin.epic.col.expires}">Login expires</span>
+                        <span th:text="#{admin.epic.col.state}">State</span>
+                        <span></span>
+                    </div>
+                    <div class="admin-row admin-epic-row" th:each="a : ${epic.accounts()}"
+                         th:attr="data-admin-key=${a.id()},data-auth-state=${a.authState()}">
+                        <span class="admin-cell" th:attr="data-label=#{admin.epic.col.account}" th:text="${a.displayName()}">Bot</span>
+                        <span class="admin-cell" th:classappend="${a.authState() == 'REAUTH_REQUIRED'} ? 'admin-epic-attention'"
+                              th:attr="data-label=#{admin.epic.col.auth}"
+                              th:text="#{'admin.epic.auth.' + ${a.authState()}}">READY</span>
+                        <span class="admin-cell" th:attr="data-label=#{admin.epic.col.session}"
+                              th:text="#{'admin.epic.session.' + ${a.sessionState()}}">READY</span>
+                        <span class="admin-cell" th:attr="data-label=#{admin.epic.col.friends}" th:text="${a.friendCount()}">0</span>
+                        <span class="admin-cell" th:classappend="${a.refreshExpiresSoon()} ? 'admin-epic-attention'"
+                              th:attr="data-label=#{admin.epic.col.expires}"
+                              th:text="${a.refreshExpiresAt() != null} ? ${#temporals.format(a.refreshExpiresAt(), #messages.msg('format.date'))} : '-'">-</span>
+                        <span class="admin-cell admin-epic-states" th:attr="data-label=#{admin.epic.col.state}">
+                            <mdui-chip th:if="${a.enabled()}" icon="check_circle" th:text="#{admin.epic.state.enabled}">Enabled</mdui-chip>
+                            <mdui-chip th:unless="${a.enabled()}" icon="block" th:text="#{admin.epic.state.disabled}">Disabled</mdui-chip>
+                            <mdui-chip th:if="${a.friendLimitReached()}" icon="group_off" class="admin-epic-full"
+                                       th:text="#{admin.epic.state.full}">Full</mdui-chip>
+                            <mdui-chip th:if="${a.refreshExpiresSoon()}" icon="schedule" class="admin-epic-expires-soon"
+                                       th:text="#{admin.epic.state.expires-soon}">Login expires soon</mdui-chip>
+                        </span>
+                        <span class="admin-row-actions">
+                            <mdui-button th:if="${a.authState() == 'REAUTH_REQUIRED'}" variant="tonal" icon="key" class="admin-epic-reauth"
+                                         th:attr="data-id=${a.id()}" th:text="#{admin.epic.action.reauth}">Re-authenticate</mdui-button>
+                            <mdui-button variant="text" class="admin-epic-toggle"
+                                         th:attr="data-id=${a.id()},data-enabled=${!a.enabled()}"
+                                         th:text="${a.enabled()} ? #{admin.epic.action.disable} : #{admin.epic.action.enable}">Disable</mdui-button>
+                            <mdui-button th:if="${a.friendLimitReached()}" variant="text" icon="restart_alt" class="admin-epic-reset"
+                                         th:attr="data-id=${a.id()}" th:text="#{admin.epic.action.lift_full}">Lift full</mdui-button>
+                            <mdui-button-icon icon="delete" class="admin-epic-delete"
+                                              th:attr="data-id=${a.id()},aria-label=#{admin.epic.action.delete},
+                                              data-confirm=#{admin.epic.action.delete-confirm(${a.displayName()})}"></mdui-button-icon>
+                        </span>
+                        <div class="admin-epic-details">
+                            <mdui-text-field name="fillOrder" type="number" min="0" variant="outlined" autocomplete="off"
+                                             th:attr="label=#{admin.epic.details.order},value=${a.fillOrder()}"></mdui-text-field>
+                            <mdui-button variant="text" icon="save" class="admin-epic-details-submit"
+                                         th:attr="data-id=${a.id()}" th:text="#{admin.epic.details.submit}">Save</mdui-button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="admin-epic-enroll">
+                    <mdui-button variant="filled" icon="add" class="admin-epic-add"
+                                 th:text="#{admin.epic.login.start}">Add a bot</mdui-button>
+                </div>
+
+                <!--/* Shown by admin-epic.js once "Add a bot" or "Re-authenticate" is clicked: Epic's code page (https only, new tab), then the pasted text. */-->
+                <div class="admin-epic-login" hidden>
+                    <p><span th:text="#{admin.epic.login.open}">Open this page to get the code:</span>
+                        <a class="admin-epic-code-link" target="_blank" rel="noopener noreferrer"
+                           th:if="${epic.codeUrl() != null and #strings.startsWith(epic.codeUrl(), 'https://')}"
+                           th:href="${epic.codeUrl()}" th:text="${epic.codeUrl()}"></a></p>
+                    <p class="admin-cell-muted" th:text="#{admin.epic.login.reminder}">Open it in a private window.</p>
+                    <div class="admin-keys-add">
+                        <mdui-text-field name="code" variant="outlined" autocomplete="off"
+                                         th:attr="label=#{admin.epic.login.field}"></mdui-text-field>
+                        <mdui-button variant="filled" icon="check" class="admin-epic-login-submit"
+                                     th:text="#{admin.epic.login.submit}">Validate</mdui-button>
+                    </div>
+                </div>
+                <p class="admin-epic-message admin-cell-muted" aria-live="polite" hidden></p>
             </th:block>
         </mdui-card>
     </div>

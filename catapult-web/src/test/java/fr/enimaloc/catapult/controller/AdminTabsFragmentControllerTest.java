@@ -98,6 +98,7 @@ class AdminTabsFragmentControllerTest {
         verify(apiService, never()).adminTws();
         verify(apiService, never()).adminMinecraftAccounts();
         verify(apiService, never()).adminAnkamaAccounts();
+        verify(apiService, never()).adminEpicAccounts();
         verify(apiService, never()).adminMembers(anyString(), anyInt());
         verify(apiService, never()).adminMember(org.mockito.ArgumentMatchers.any());
         verify(apiService, never()).adminMemberTargeting(org.mockito.ArgumentMatchers.any());
@@ -1107,6 +1108,60 @@ class AdminTabsFragmentControllerTest {
         // no tab of its own any more: its old address answers 404
         mvc.perform(get("/spa/admin/ankama").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
                 .andExpect(status().isNotFound());
+    }
+
+    private static fr.enimaloc.catapult.common.dto.admin.EpicAccountDto epicBot(String id, String name, String auth,
+            boolean enabled, boolean full, java.time.Instant expires, boolean soon) {
+        return new fr.enimaloc.catapult.common.dto.admin.EpicAccountDto(java.util.UUID.fromString(id), name, auth, "READY",
+                1, full, enabled, 4, expires, soon);
+    }
+
+    @Test
+    void keysTab_rendersTheEpicBotsWithTheirStateDependentControls() throws Exception {
+        String codeUrl = "https://www.epicgames.com/id/api/redirect?clientId=abc&responseType=code";
+        when(apiService.adminEpicAccounts()).thenReturn(new fr.enimaloc.catapult.common.dto.admin.EpicAccountsDto(List.of(
+                epicBot("00000000-0000-0000-0000-00000000000a", "Ready<b>Bot", "READY", true, true,
+                        java.time.Instant.parse("2027-01-15T00:00:00Z"), false),
+                epicBot("00000000-0000-0000-0000-00000000000b", "ReauthBot", "REAUTH_REQUIRED", false, false, null, false),
+                epicBot("00000000-0000-0000-0000-00000000000c", "SoonBot", "READY", true, false,
+                        java.time.Instant.parse("2026-12-01T00:00:00Z"), true)), codeUrl));
+
+        String html = asAdmin("/spa/admin/keys").replaceAll("\\s+", " ");
+
+        assertThat(html).contains("admin-epic", "Ready&lt;b&gt;Bot", "ReauthBot", "Add a bot",
+                "data-auth-state=\"REAUTH_REQUIRED\"", "Login to redo", "Login expires", "private window",
+                "the whole text or just the code", "name=\"code\"", "admin-epic-login-submit");
+        assertThat(html).doesNotContain("Ready<b>");
+        // Epic's code page opens in a new tab, without an opener
+        assertThat(html).contains("class=\"admin-epic-code-link\" target=\"_blank\" rel=\"noopener noreferrer\"",
+                "href=\"" + codeUrl.replace("&", "&amp;") + "\"");
+        // the re-auth button only for the bot whose login expired
+        assertThat(html.split("admin-epic-reauth\"", -1)).hasSize(2);
+        assertThat(html).contains("admin-epic-reauth\" data-id=\"00000000-0000-0000-0000-00000000000b\"");
+        // the expiry warning only for the bot whose login expires soon
+        assertThat(html.split("admin-epic-expires-soon\"", -1)).hasSize(2);
+        assertThat(html).contains("Login expires soon");
+        // the full flag lifts only the full bot; every bot can be switched and deleted
+        assertThat(html.split("admin-epic-reset\"", -1)).hasSize(2);
+        assertThat(html.split("admin-epic-toggle\"", -1)).hasSize(4);
+        assertThat(html.split("admin-epic-delete\"", -1)).hasSize(4);
+    }
+
+    @Test
+    void keysTab_noEpicCodeLinkWhenItsAddressIsNotHttps() throws Exception {
+        when(apiService.adminEpicAccounts()).thenReturn(new fr.enimaloc.catapult.common.dto.admin.EpicAccountsDto(
+                List.of(), "javascript:alert(1)"));
+
+        String html = asAdmin("/spa/admin/keys");
+
+        assertThat(html).contains("admin-epic-add").doesNotContain("javascript:alert(1)");
+    }
+
+    @Test
+    void keysTab_epicCardUnavailableWhenTheApiFails() throws Exception {
+        when(apiService.adminEpicAccounts()).thenReturn(null);
+
+        assertThat(asAdmin("/spa/admin/keys")).contains("admin-epic-unavailable").doesNotContain("admin-epic-add");
     }
 
     @Test

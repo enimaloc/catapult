@@ -469,8 +469,8 @@ public class AdminTabsFragmentController {
     }
 
     /**
-     * Steam and DTDD keys cards, then the Minecraft, Battle.net and Ankama service accounts cards; the Ankama list is
-     * null (its unavailable card) when catapult-api has Ankama off or is unreachable.
+     * Steam and DTDD keys cards, then the Minecraft, Battle.net, Ankama and Epic service accounts cards; the Ankama list
+     * and the Epic pool are null (their unavailable card) when catapult-api has them off or is unreachable.
      */
     @GetMapping("/keys")
     String keys(Model model, HttpServletResponse response) {
@@ -480,6 +480,7 @@ public class AdminTabsFragmentController {
             model.addAttribute("minecraft", apiService.adminMinecraftAccounts());
             model.addAttribute("battlenet", apiService.adminBattleNetAccounts());
             model.addAttribute("ankama", apiService.adminAnkamaAccounts());
+            model.addAttribute("epic", apiService.adminEpicAccounts());
             // The rate limits learned from the platforms' 429s: each host, then its routes
             model.addAttribute("limits", apiService.adminRateLimits());
             return "pages/admin-tab/keys :: content";

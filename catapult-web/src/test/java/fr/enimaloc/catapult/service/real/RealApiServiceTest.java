@@ -1991,6 +1991,60 @@ class RealApiServiceTest {
     }
 
     @Test
+    void adminEpicAccounts_readCatapultApisPoolAndCodeUrl() {
+        respond(HttpMethod.GET, "/api/internal/admin/epic-accounts", "{\"accounts\":[{\"id\":\"00000000-0000-0000-0000-00000000000a\","
+                + "\"displayName\":\"Bot\",\"authState\":\"REAUTH_REQUIRED\",\"sessionState\":\"DISABLED\",\"fillOrder\":2,"
+                + "\"friendLimitReached\":true,\"enabled\":false,\"friendCount\":7,"
+                + "\"refreshExpiresAt\":\"2027-01-15T00:00:00Z\",\"refreshExpiresSoon\":true}],\"codeUrl\":\"https://epic.example/code\"}");
+
+        var pool = service.adminEpicAccounts();
+
+        assertThat(pool.codeUrl()).isEqualTo("https://epic.example/code");
+        assertThat(pool.accounts()).singleElement().satisfies(a -> {
+            assertThat(a.displayName()).isEqualTo("Bot");
+            assertThat(a.friendCount()).isEqualTo(7);
+            assertThat(a.refreshExpiresAt()).isEqualTo(java.time.Instant.parse("2027-01-15T00:00:00Z"));
+            assertThat(a.refreshExpiresSoon()).isTrue();
+        });
+    }
+
+    @Test
+    void adminEpicAccounts_isNullWhenTheApiFails() {
+        expect(HttpMethod.GET, "/api/internal/admin/epic-accounts").andRespond(withStatus(HttpStatus.NOT_FOUND));
+
+        assertThat(service.adminEpicAccounts()).isNull();
+    }
+
+    @Test
+    void epicAccountActions_sendTheirShapes_keepTheAnswerAndTheApisMessage() {
+        UUID id = UUID.fromString("00000000-0000-0000-0000-00000000000a");
+        expect(HttpMethod.POST, "/api/internal/admin/epic-accounts")
+                .andExpect(content().json("{\"code\":\"abc\"}", org.springframework.test.json.JsonCompareMode.STRICT))
+                .andRespond(withSuccess("{\"id\":\"" + id + "\",\"displayName\":\"Bot\",\"authState\":\"READY\",\"sessionState\":\"READY\","
+                        + "\"fillOrder\":0,\"friendLimitReached\":false,\"enabled\":true,\"friendCount\":0,"
+                        + "\"refreshExpiresAt\":\"2027-01-15T00:00:00Z\",\"refreshExpiresSoon\":false}",
+                        MediaType.APPLICATION_JSON));
+        expect(HttpMethod.POST, "/api/internal/admin/epic-accounts")
+                .andExpect(content().json("{\"code\":\"abc\",\"accountId\":\"" + id + "\"}",
+                        org.springframework.test.json.JsonCompareMode.STRICT))
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST).contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"error\":\"this is not the same Epic account\"}"));
+        expect(HttpMethod.PATCH, "/api/internal/admin/epic-accounts/" + id)
+                .andExpect(content().json("{\"friendLimitReached\":false}", org.springframework.test.json.JsonCompareMode.STRICT))
+                .andRespond(withSuccess("{\"id\":\"" + id + "\"}", MediaType.APPLICATION_JSON));
+        expect(HttpMethod.DELETE, "/api/internal/admin/epic-accounts/" + id).andRespond(withNoContent());
+
+        var added = service.adminAddEpicAccount("abc", null);
+        assertThat(added.status()).isEqualTo(200);
+        assertThat(added.body().displayName()).isEqualTo("Bot");
+        var refused = service.adminAddEpicAccount("abc", id);
+        assertThat(refused.status()).isEqualTo(400);
+        assertThat(refused.error()).isEqualTo("this is not the same Epic account");
+        assertThat(service.adminPatchEpicAccount(id, Map.of("friendLimitReached", false)).status()).isEqualTo(200);
+        assertThat(service.adminDeleteEpicAccount(id)).isEqualTo(204);
+    }
+
+    @Test
     void ankamaLogin_sendsItsShapes_keepsTheAnswerAndTheApisMessage() {
         UUID id = UUID.fromString("00000000-0000-0000-0000-00000000000a");
         UUID login = UUID.fromString("00000000-0000-0000-0000-0000000000b1");

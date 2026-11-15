@@ -42,6 +42,8 @@ import fr.enimaloc.catapult.common.dto.admin.TwRebuild;
 import fr.enimaloc.catapult.common.dto.admin.AccountDto;
 import fr.enimaloc.catapult.common.dto.admin.AnkamaAccountDto;
 import fr.enimaloc.catapult.common.dto.admin.AnkamaLoginStartDto;
+import fr.enimaloc.catapult.common.dto.admin.EpicAccountDto;
+import fr.enimaloc.catapult.common.dto.admin.EpicAccountsDto;
 import fr.enimaloc.catapult.common.dto.admin.BattleNetAccountDto;
 import fr.enimaloc.catapult.common.dto.admin.MetaTagDto;
 import fr.enimaloc.catapult.common.dto.admin.MetaTagRequest;
@@ -1472,20 +1474,20 @@ public class RealApiService implements ApiService {
     @Override
     public AdminCall<AnkamaLoginStartDto> adminStartAnkamaLogin(UUID accountId) {
         Map<String, Object> body = accountId == null ? Map.of() : Map.of("accountId", accountId.toString());
-        return ankamaAnswer(client.call(HttpMethod.POST, "/api/internal/admin/ankama-accounts/login", body, JsonNode.class),
+        return adminAnswer(client.call(HttpMethod.POST, "/api/internal/admin/ankama-accounts/login", body, JsonNode.class),
                 AnkamaLoginStartDto.class);
     }
 
     @Override
     public AdminCall<AnkamaAccountDto> adminCompleteAnkamaLogin(UUID loginId, String redirectUrl) {
         // the URL holds a one-time code: it only travels in the body
-        return ankamaAnswer(client.call(HttpMethod.POST, "/api/internal/admin/ankama-accounts/login/{loginId}/complete",
+        return adminAnswer(client.call(HttpMethod.POST, "/api/internal/admin/ankama-accounts/login/{loginId}/complete",
                 Map.of("redirectUrl", redirectUrl), JsonNode.class, loginId), AnkamaAccountDto.class);
     }
 
     @Override
     public AdminCall<Void> adminSubmitAnkamaCode(UUID id, String code) {
-        return ankamaAnswer(client.call(HttpMethod.POST, "/api/internal/admin/ankama-accounts/{id}/code",
+        return adminAnswer(client.call(HttpMethod.POST, "/api/internal/admin/ankama-accounts/{id}/code",
                 Map.of("code", code), JsonNode.class, id), Void.class);
     }
 
@@ -1496,7 +1498,7 @@ public class RealApiService implements ApiService {
 
     @Override
     public AdminCall<AnkamaAccountDto> adminPatchAnkamaAccount(UUID id, Map<String, Object> patch) {
-        return ankamaAnswer(client.call(HttpMethod.PATCH, "/api/internal/admin/ankama-accounts/{id}", patch, JsonNode.class, id),
+        return adminAnswer(client.call(HttpMethod.PATCH, "/api/internal/admin/ankama-accounts/{id}", patch, JsonNode.class, id),
                 AnkamaAccountDto.class);
     }
 
@@ -1505,8 +1507,34 @@ public class RealApiService implements ApiService {
         return client.call(HttpMethod.DELETE, "/api/internal/admin/ankama-accounts/{id}", null, Void.class, id).status();
     }
 
-    /** An Ankama admin call's status, its body read as {@code type} on a 2xx, and the {@code error} text of a refusal. */
-    private static <T> AdminCall<T> ankamaAnswer(ApiClient.Result<JsonNode> result, Class<T> type) {
+    @Override
+    public EpicAccountsDto adminEpicAccounts() {
+        // a 404 (Epic disabled in catapult-api) is null, like any failed read
+        return client.get("/api/internal/admin/epic-accounts", EpicAccountsDto.class);
+    }
+
+    @Override
+    public AdminCall<EpicAccountDto> adminAddEpicAccount(String pasted, UUID accountId) {
+        // what was pasted holds a one-time code: it only travels in the body
+        Map<String, Object> body = accountId == null ? Map.of("code", pasted)
+                : Map.of("code", pasted, "accountId", accountId.toString());
+        return adminAnswer(client.call(HttpMethod.POST, "/api/internal/admin/epic-accounts", body, JsonNode.class),
+                EpicAccountDto.class);
+    }
+
+    @Override
+    public AdminCall<EpicAccountDto> adminPatchEpicAccount(UUID id, Map<String, Object> patch) {
+        return adminAnswer(client.call(HttpMethod.PATCH, "/api/internal/admin/epic-accounts/{id}", patch, JsonNode.class, id),
+                EpicAccountDto.class);
+    }
+
+    @Override
+    public int adminDeleteEpicAccount(UUID id) {
+        return client.call(HttpMethod.DELETE, "/api/internal/admin/epic-accounts/{id}", null, Void.class, id).status();
+    }
+
+    /** An Ankama or Epic admin call's status, its body read as {@code type} on a 2xx, and the {@code error} text of a refusal. */
+    private static <T> AdminCall<T> adminAnswer(ApiClient.Result<JsonNode> result, Class<T> type) {
         JsonNode node = result.body();
         if (!result.ok()) {
             JsonNode error = node == null ? null : node.get("error");

@@ -484,6 +484,19 @@ class MockApiServiceTest {
 
     /** The admin calls go through the mock store: a Shield login, its code, then the pool actions. */
     @Test
+    void adminEpicAccounts_addWithAPastedCode_thenPatchAndDelete() {
+        int before = service.adminEpicAccounts().accounts().size();
+
+        var bot = service.adminAddEpicAccount("0123456789abcdef0123456789abcdef", null).body();
+
+        assertThat(bot.authState()).isEqualTo("READY");
+        assertThat(service.adminEpicAccounts().accounts()).hasSize(before + 1);
+        assertThat(service.adminPatchEpicAccount(bot.id(), Map.of("enabled", false)).body().enabled()).isFalse();
+        assertThat(service.adminDeleteEpicAccount(bot.id())).isEqualTo(204);
+        assertThat(service.adminEpicAccounts().accounts()).hasSize(before);
+    }
+
+    @Test
     void adminAnkamaAccounts_logInWithAShieldCode_thenPatchAndDelete() {
         int before = service.adminAnkamaAccounts().size();
         UUID loginId = service.adminStartAnkamaLogin(null).body().loginId();
