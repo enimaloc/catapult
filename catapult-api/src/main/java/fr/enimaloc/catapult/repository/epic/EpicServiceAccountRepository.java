@@ -13,4 +13,6 @@ public interface EpicServiceAccountRepository extends JpaRepository<EpicServiceA
     List<EpicServiceAccount> findByEnabledTrueAndAuthStateOrderByFillOrderAsc(EpicServiceAccount.AuthState authState);
 
     long countByEnabledTrueAndAuthState(EpicServiceAccount.AuthState authState);
+
+    long countByEnabledTrueAndAuthStateAndFriendLimitReachedFalse(EpicServiceAccount.AuthState authState);
 }
