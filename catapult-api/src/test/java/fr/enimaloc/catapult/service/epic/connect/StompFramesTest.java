@@ -47,6 +47,17 @@ class StompFramesTest {
     }
 
     @Test
+    void endOfLinesAfterTheNul_areNotPartOfTheFrame() {
+        Frame frame = StompFrames.parse(messageFrame("m-1", "{\"a\":1}") + "\n").orElseThrow();
+        Frame crlf = StompFrames.parse(messageFrame("m-2", "{}") + "\r\n\n").orElseThrow();
+
+        assertThat(frame.command()).isEqualTo("MESSAGE");
+        assertThat(frame.body()).isEqualTo("{\"a\":1}");
+        assertThat(crlf.body()).isEqualTo("{}");
+        assertThat(StompFrames.parse("\0\n")).isEmpty();
+    }
+
+    @Test
     void headerValues_areUnescapedPerStomp12() {
         Frame frame = StompFrames.parse("ERROR\nmessage:a\\cb\\nc\\\\d\n\n\0").orElseThrow();
 

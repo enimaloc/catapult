@@ -28,11 +28,12 @@ public final class StompFrames {
     }
 
     /**
-     * Parses one received frame; empty for a heart-beat or a blank text. The first occurrence of a repeated header
-     * wins, as STOMP 1.2 specifies.
+     * Parses one received frame; empty for a heart-beat or a blank text. The frame ends at its NUL: the end-of-lines
+     * STOMP 1.2 allows after it are dropped. The first occurrence of a repeated header wins, as STOMP 1.2 specifies.
      */
     public static Optional<Frame> parse(String raw) {
-        String text = raw.endsWith("\0") ? raw.substring(0, raw.length() - 1) : raw;
+        int nul = raw.indexOf('\0');
+        String text = nul < 0 ? raw : raw.substring(0, nul);
         int start = 0;
         while (start < text.length() && (text.charAt(start) == '\n' || text.charAt(start) == '\r')) {
             start++;
