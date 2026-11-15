@@ -9,6 +9,9 @@ import java.util.Map;
  */
 public interface EpicCatalogClient {
 
+    /** Whether a check can be made now (an open bot session); when false, {@link #priceTiers} answers nothing. */
+    boolean canCheck();
+
     /** Maps each known offer id to its price tier; empty when nothing can be checked (no open session, failure). */
     Map<String, String> priceTiers(Collection<String> offerIds);
 }

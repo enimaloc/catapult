@@ -33,6 +33,11 @@ public class SessionEpicCatalogClient implements EpicCatalogClient {
     }
 
     @Override
+    public boolean canCheck() {
+        return sessions.anyOpenSessionToken().isPresent();
+    }
+
+    @Override
     public Map<String, String> priceTiers(Collection<String> offerIds) {
         if (offerIds.isEmpty()) return Map.of();
         Optional<String> token = sessions.anyOpenSessionToken();
@@ -42,14 +47,14 @@ public class SessionEpicCatalogClient implements EpicCatalogClient {
         }
         List<String> ids = List.copyOf(offerIds);
         Map<String, String> tiers = new HashMap<>();
-        try {
-            for (int i = 0; i < ids.size(); i += MAX_IDS_PER_REQUEST) {
-                tiers.putAll(catalog.priceTiers(token.get(), ids.subList(i, Math.min(i + MAX_IDS_PER_REQUEST, ids.size()))));
+        for (int i = 0; i < ids.size(); i += MAX_IDS_PER_REQUEST) {
+            List<String> chunk = ids.subList(i, Math.min(i + MAX_IDS_PER_REQUEST, ids.size()));
+            try {
+                tiers.putAll(catalog.priceTiers(token.get(), chunk));
+            } catch (RuntimeException e) {
+                log.warn("Epic catalog lookup of {} offers failed: {}: {}", chunk.size(), e.getClass().getSimpleName(),
+                        e.getMessage());
             }
-        } catch (RuntimeException e) {
-            log.warn("Epic catalog lookup of {} offers failed: {}: {}", ids.size(), e.getClass().getSimpleName(),
-                    e.getMessage());
-            return Map.of();
         }
         return tiers;
     }

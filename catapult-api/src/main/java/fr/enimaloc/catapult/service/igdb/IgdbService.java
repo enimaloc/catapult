@@ -28,6 +28,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import proto.*;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.*;
@@ -56,6 +58,8 @@ public class IgdbService {
     private static final String EPIC_NAMESPACE_PREFIX = "ns:";
     /** An Epic Store offer id: 32 hex digits (IGDB's GUID-format uids are older ids the catalog does not know). */
     private static final Pattern EPIC_OFFER_ID = Pattern.compile("[0-9a-fA-F]{32}");
+    /** How long a failed Epic verification is not retried: the name match answers meanwhile. */
+    private static final Duration EPIC_UNVERIFIED_TTL = Duration.ofHours(1);
     private static final String KEY_ID_PREFIX    = "id:";
     private static final int IGDB_BATCH_SIZE = 500;
 
@@ -105,6 +109,15 @@ public class IgdbService {
 
     // L1 index: lowercase exe name → IgdbGame (alternative_names lookup)
     private final Map<String, IgdbGame> exeNameIndex = new ConcurrentHashMap<>();
+
+    // L1 index: Epic productId → catalog-verified IgdbGame
+    private final Map<String, IgdbGame> epicIndex = new ConcurrentHashMap<>();
+
+    // Epic productId → instant until which a failed verification is not attempted again
+    private final Map<String, Instant> epicUnverifiedUntil = new ConcurrentHashMap<>();
+
+    // Time source of the failed Epic verification memo (replaced in tests)
+    private Clock clock = Clock.systemUTC();
 
     // CCL cache: igdbId → suggested CCLs (stable, no TTL needed)
     private final Map<String, Set<String>> cclCache = new ConcurrentHashMap<>();
@@ -601,38 +614,56 @@ public class IgdbService {
     }
 
     /**
-     * The IGDB game of an Epic product: the {@code epic:<productId>} DB cache, else the first IGDB name candidate
-     * owning an Epic Store offer whose catalog price tier starts with {@code <productId>_} (then cached), else the
-     * plain name match, not cached under {@code epic:} so the check is tried again later. A game outside Epic Online
-     * Services ({@code ns:<namespace>}) goes straight to the name match.
+     * The IGDB game of an Epic product: the in-memory then {@code epic:<productId>} DB cache, else the first IGDB
+     * name candidate owning an Epic Store offer whose catalog price tier starts with {@code <productId>_} (then
+     * cached), else the plain name match, not cached under {@code epic:} so the check is tried again later. A failed
+     * check is not retried for {@link #EPIC_UNVERIFIED_TTL}; none is attempted while the catalog cannot check (no open
+     * bot session). A game outside Epic Online Services ({@code ns:<namespace>}) goes straight to the name match.
      */
     private Optional<IgdbGame> resolveEpic(String productId, String name) {
         if (clientId.isBlank()) return Optional.empty();
         if (productId == null || productId.startsWith(EPIC_NAMESPACE_PREFIX)) return nameMatch(name);
 
+        IgdbGame known = epicIndex.get(productId);
+        if (known != null) {
+            countLookup("epic", "hit");
+            return Optional.of(known);
+        }
         String key = KEY_EPIC_PREFIX + productId;
         Optional<IgdbGame> fromDb = lookupInDb(key);
         if (fromDb.isPresent()) {
             countLookup("epic", "db_hit");
+            epicIndex.put(productId, fromDb.get());
             return fromDb;
         }
 
-        Optional<IgdbGame> verified = verifiedEpicCandidate(productId, name);
+        Instant retryAt = epicUnverifiedUntil.get(productId);
+        if (retryAt != null && clock.instant().isBefore(retryAt)) return nameMatch(name);
+        EpicCatalogClient catalog = epicCatalogClient.getIfAvailable();
+        if (catalog == null || !catalog.canCheck() || epicSourceId < 0 || name == null || name.isBlank()) {
+            return nameMatch(name);
+        }
+        String token = getOrRefreshAppToken();
+        if (token.isBlank()) return nameMatch(name);
+
+        Optional<IgdbGame> verified = verifiedEpicCandidate(catalog, productId, name, token);
         countLookup("epic", verified.isPresent() ? "miss" : "unverified");
-        if (verified.isEmpty()) return nameMatch(name);
+        if (verified.isEmpty()) {
+            epicUnverifiedUntil.put(productId, clock.instant().plus(EPIC_UNVERIFIED_TTL));
+            return nameMatch(name);
+        }
 
         log.info("Epic product {} verified as IGDB game {} ({})", productId, verified.get().id(), verified.get().name());
+        epicUnverifiedUntil.remove(productId);
+        epicIndex.put(productId, verified.get());
         remember(verified.get());
         saveToDb(key, verified.get());
         return verified;
     }
 
     /** The first IGDB name candidate whose Epic Store offer the catalog ties to {@code productId}, if any. */
-    private Optional<IgdbGame> verifiedEpicCandidate(String productId, String name) {
-        EpicCatalogClient catalog = epicCatalogClient.getIfAvailable();
-        if (catalog == null || epicSourceId < 0 || name == null || name.isBlank()) return Optional.empty();
-        String token = getOrRefreshAppToken();
-        if (token.isBlank()) return Optional.empty();
+    private Optional<IgdbGame> verifiedEpicCandidate(EpicCatalogClient catalog, String productId, String name,
+                                                     String token) {
 
         Map<IgdbGame, List<String>> offersByCandidate = new LinkedHashMap<>();
         for (Game candidate : igdbClient.searchByNameWithExternalGames(name, token)) {

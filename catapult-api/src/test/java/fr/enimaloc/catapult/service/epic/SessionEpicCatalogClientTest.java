@@ -75,4 +75,22 @@ class SessionEpicCatalogClientTest {
 
         assertThat(client.priceTiers(List.of("o1"))).isEmpty();
     }
+
+    @Test
+    void failedChunk_keepsTheTiersOfTheOthers() {
+        List<String> ids = IntStream.range(0, 60).mapToObj(i -> "o" + i).toList();
+        when(sessions.anyOpenSessionToken()).thenReturn(Optional.of("tok"));
+        when(api.priceTiers("tok", ids.subList(0, 50))).thenThrow(new RestClientException("HTTP 503"));
+        when(api.priceTiers("tok", ids.subList(50, 60))).thenReturn(Map.of("o55", "t55"));
+
+        assertThat(client.priceTiers(ids)).containsOnly(Map.entry("o55", "t55"));
+    }
+
+    @Test
+    void canCheck_onlyWithAnOpenSession() {
+        when(sessions.anyOpenSessionToken()).thenReturn(Optional.empty(), Optional.of("tok"));
+
+        assertThat(client.canCheck()).isFalse();
+        assertThat(client.canCheck()).isTrue();
+    }
 }

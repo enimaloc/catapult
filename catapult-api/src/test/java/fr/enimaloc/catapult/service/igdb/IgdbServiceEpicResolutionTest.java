@@ -21,7 +21,11 @@ import proto.ExternalGame;
 import proto.ExternalGameSource;
 import proto.Game;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -34,6 +38,7 @@ import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -53,6 +58,7 @@ class IgdbServiceEpicResolutionTest {
     private final IgdbGameCacheRepository cache = mock(IgdbGameCacheRepository.class);
     private final GameMappingRepository mappings = mock(GameMappingRepository.class);
     private final EpicCatalogClient catalog = mock(EpicCatalogClient.class);
+    private final MutableClock clock = new MutableClock(Instant.parse("2026-11-15T12:00:00Z"));
     private final StaticListableBeanFactory beans = new StaticListableBeanFactory();
     private final IgdbService service = spy(new IgdbService(igdb, cache, mock(IgdbGameExternalIdRepository.class),
             mock(IgdbGameCclRepository.class), mock(TwitchCclDefinitionRepository.class),
@@ -62,6 +68,8 @@ class IgdbServiceEpicResolutionTest {
     @BeforeEach
     void setUp() {
         beans.addBean("epicCatalogClient", catalog);
+        when(catalog.canCheck()).thenReturn(true);
+        ReflectionTestUtils.setField(service, "clock", clock);
         ReflectionTestUtils.setField(service, "clientId", "client");
         ReflectionTestUtils.setField(service, "clientSecret", "secret");
         ReflectionTestUtils.setField(service, "cacheTtlHours", 24);
@@ -126,12 +134,12 @@ class IgdbServiceEpicResolutionTest {
         assertThat(service.resolveUnmapped(GameBinding.SourceType.EPIC, FALL_GUYS, "Fall Guys"))
                 .contains(new IgdbService.IgdbGame("2", "Fall Guys"));
 
-        verifyNoInteractions(catalog);
+        verify(catalog, never()).priceTiers(anyCollection());
         verify(cache, never()).save(argThat(e -> e.getLookupKey().startsWith("epic:")));
     }
 
     @Test
-    void noOpenSession_fallsBackToTheNameMatch_withoutCaching() {
+    void emptyCatalogAnswer_fallsBackToTheNameMatch_withoutCaching() {
         candidates("Fall Guys", game(2, "Fall Guys", EPIC_STORE, FALL_GUYS_OFFER));
         when(catalog.priceTiers(anyCollection())).thenReturn(Map.of());
         nameMatch("Fall Guys", game(9, "Fall Guys Name Match"));
@@ -210,5 +218,85 @@ class IgdbServiceEpicResolutionTest {
 
         verify(service, never()).findByName(anyString());
         verifyNoInteractions(igdb, catalog);
+    }
+
+    @Test
+    void noOpenSession_skipsTheIgdbSearch_andIsNotMemoised() {
+        when(catalog.canCheck()).thenReturn(false);
+        nameMatch("Fall Guys", game(9, "Fall Guys Name Match"));
+
+        assertThat(service.resolveUnmapped(GameBinding.SourceType.EPIC, FALL_GUYS, "Fall Guys"))
+                .contains(new IgdbService.IgdbGame("9", "Fall Guys Name Match"));
+        verify(igdb, never()).searchByNameWithExternalGames(anyString(), anyString());
+        verify(catalog, never()).priceTiers(anyCollection());
+
+        when(catalog.canCheck()).thenReturn(true);
+        candidates("Fall Guys", game(2, "Fall Guys", EPIC_STORE, FALL_GUYS_OFFER));
+        when(catalog.priceTiers(List.of(FALL_GUYS_OFFER))).thenReturn(Map.of(FALL_GUYS_OFFER, FALL_GUYS_TIER));
+
+        assertThat(service.resolveUnmapped(GameBinding.SourceType.EPIC, FALL_GUYS, "Fall Guys"))
+                .contains(new IgdbService.IgdbGame("2", "Fall Guys"));
+    }
+
+    @Test
+    void failedVerification_isNotRetriedWithinTheHour_thenIsRetried() {
+        candidates("Fall Guys", game(2, "Fall Guys", EPIC_STORE, FALL_GUYS_OFFER));
+        when(catalog.priceTiers(anyCollection())).thenReturn(Map.of());
+        nameMatch("Fall Guys", game(9, "Fall Guys Name Match"));
+
+        service.resolveUnmapped(GameBinding.SourceType.EPIC, FALL_GUYS, "Fall Guys");
+        clock.advance(Duration.ofMinutes(59));
+        assertThat(service.resolveUnmapped(GameBinding.SourceType.EPIC, FALL_GUYS, "Fall Guys"))
+                .contains(new IgdbService.IgdbGame("9", "Fall Guys Name Match"));
+
+        verify(igdb, times(1)).searchByNameWithExternalGames("Fall Guys", "token");
+        verify(catalog, times(1)).priceTiers(anyCollection());
+
+        clock.advance(Duration.ofMinutes(2));
+        service.resolveUnmapped(GameBinding.SourceType.EPIC, FALL_GUYS, "Fall Guys");
+
+        verify(igdb, times(2)).searchByNameWithExternalGames("Fall Guys", "token");
+        verify(catalog, times(2)).priceTiers(anyCollection());
+    }
+
+    @Test
+    void verifiedGame_isAnsweredFromMemory_afterwards() {
+        candidates("Fall Guys", game(2, "Fall Guys", EPIC_STORE, FALL_GUYS_OFFER));
+        when(catalog.priceTiers(List.of(FALL_GUYS_OFFER))).thenReturn(Map.of(FALL_GUYS_OFFER, FALL_GUYS_TIER));
+
+        service.resolveUnmapped(GameBinding.SourceType.EPIC, FALL_GUYS, "Fall Guys");
+        assertThat(service.resolveUnmapped(GameBinding.SourceType.EPIC, FALL_GUYS, "Fall Guys"))
+                .contains(new IgdbService.IgdbGame("2", "Fall Guys"));
+
+        verify(cache, times(1)).findById("epic:" + FALL_GUYS);
+        verify(igdb, times(1)).searchByNameWithExternalGames("Fall Guys", "token");
+    }
+
+    /** A clock tests move forward by hand. */
+    private static final class MutableClock extends Clock {
+        private Instant now;
+
+        MutableClock(Instant now) {
+            this.now = now;
+        }
+
+        void advance(Duration duration) {
+            now = now.plus(duration);
+        }
+
+        @Override
+        public Instant instant() {
+            return now;
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return ZoneOffset.UTC;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return this;
+        }
     }
 }
