@@ -66,6 +66,18 @@ class Oauth2LoginFailureHandlerTest {
     }
 
     @Test
+    void epicErrors_areNotRetried() throws Exception {
+        // Even on the retrying (Twitch) callback: these are business errors, a fresh attempt changes nothing.
+        for (String code : new String[]{"epic_unavailable", "epic_full", "epic_already_linked"}) {
+            response = new MockHttpServletResponse();
+            handler.onAuthenticationFailure(request, response, new OAuth2AuthenticationException(new OAuth2Error(code)));
+
+            assertThat(response.getRedirectedUrl()).isEqualTo("http://localhost:8081/login?error");
+            assertThat(response.getCookie("catapult_oauth2_retry").getMaxAge()).isZero();
+        }
+    }
+
+    @Test
     void twitchRetry_keepsCatapultWebsState_butGivingUpForgetsIt() throws Exception {
         handler.onAuthenticationFailure(request, response,
                 new OAuth2AuthenticationException(new OAuth2Error("server_error")));

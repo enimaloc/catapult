@@ -21,7 +21,8 @@ class OAuth2ClientConfigTest {
         ReflectionTestUtils.setField(config, "twitchClientId", "tw-id");
         ReflectionTestUtils.setField(config, "twitchClientSecret", "tw-secret");
         ReflectionTestUtils.setField(config, "baseUrl", "https://api.test");
-        for (String field : new String[]{"xboxClientId", "xboxClientSecret", "battleNetClientId", "battleNetClientSecret"}) {
+        for (String field : new String[]{"xboxClientId", "xboxClientSecret", "battleNetClientId", "battleNetClientSecret",
+            "epicClientId", "epicClientSecret"}) {
             ReflectionTestUtils.setField(config, field, "");
         }
     }
@@ -58,6 +59,25 @@ class OAuth2ClientConfigTest {
         assertThat(battlenet.getProviderDetails().getTokenUri()).isEqualTo("https://oauth.battle.net/token");
         assertThat(battlenet.getProviderDetails().getUserInfoEndpoint().getUri()).isEqualTo("https://oauth.battle.net/userinfo");
         assertThat(battlenet.getProviderDetails().getUserInfoEndpoint().getUserNameAttributeName()).isEqualTo("sub");
+    }
+
+    @Test
+    void epicClient_isRegisteredOnlyWhenConfigured_withoutOpenid() {
+        ReflectionTestUtils.setField(config, "epicClientId", "ep-id");
+        assertThat(config.clientRegistrationRepository().findByRegistrationId("epic")).isNull();
+
+        ReflectionTestUtils.setField(config, "epicClientSecret", "ep-secret");
+        ClientRegistration epic = config.clientRegistrationRepository().findByRegistrationId("epic");
+
+        // "openid" would switch Spring to the OIDC flow and bypass CatapultOAuth2UserService.
+        assertThat(epic.getScopes()).containsExactly("basic_profile");
+        assertThat(epic.getClientAuthenticationMethod()).isEqualTo(ClientAuthenticationMethod.CLIENT_SECRET_BASIC);
+        assertThat(epic.getRedirectUri()).isEqualTo("https://api.test/login/oauth2/code/{registrationId}");
+        assertThat(epic.getProviderDetails().getAuthorizationUri()).isEqualTo("https://www.epicgames.com/id/authorize");
+        assertThat(epic.getProviderDetails().getTokenUri()).isEqualTo("https://api.epicgames.dev/epic/oauth/v2/token");
+        assertThat(epic.getProviderDetails().getUserInfoEndpoint().getUri())
+                .isEqualTo("https://api.epicgames.dev/epic/oauth/v2/userInfo");
+        assertThat(epic.getProviderDetails().getUserInfoEndpoint().getUserNameAttributeName()).isEqualTo("sub");
     }
 
     @Test

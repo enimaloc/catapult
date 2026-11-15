@@ -17,7 +17,7 @@ import java.time.Duration;
 import java.util.Set;
 
 /**
- * Only the primary Twitch login is retried here: xbox/steam/battlenet failures
+ * Only the primary Twitch login is retried here: xbox/steam/battlenet/epic failures
  * come from a "link a secondary provider" flow that runs on top of an already
  * authenticated Twitch session (see CatapultOAuth2UserService#handleSecondaryLink) —
  * invalidating the session to retry would just log that user out of their real session.
@@ -36,7 +36,8 @@ public class Oauth2LoginFailureHandler implements AuthenticationFailureHandler {
     private static final int RETRY_COOKIE_MAX_AGE_SECONDS = 60;
     private static final Set<String> BUSINESS_ERROR_CODES = Set.of(
             "not_whitelisted", "invalid_invite", "alpha_full",
-            "system_account_login_forbidden", "unauthorized", "battlenet_unavailable", "battlenet_full");
+            "system_account_login_forbidden", "unauthorized", "battlenet_unavailable", "battlenet_full",
+            "epic_unavailable", "epic_full", "epic_already_linked");
 
     @Value("${app.web-url:http://localhost:8080}")
     private String webUrl;

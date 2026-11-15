@@ -36,6 +36,12 @@ public class OAuth2ClientConfig {
     @Value("${battlenet.client-secret:}")
     private String battleNetClientSecret;
 
+    @Value("${epic.client-id:}")
+    private String epicClientId;
+
+    @Value("${epic.client-secret:}")
+    private String epicClientSecret;
+
     @Value("${app.base-url}")
     private String baseUrl;
 
@@ -75,6 +81,19 @@ public class OAuth2ClientConfig {
                 .authorizationUri("https://oauth.battle.net/authorize")
                 .tokenUri("https://oauth.battle.net/token")
                 .userInfoUri("https://oauth.battle.net/userinfo")
+                .userNameAttributeName("sub")
+                .build());
+        }
+
+        if (configured(epicClientId, epicClientSecret)) {
+            // No "openid": it would switch Spring to the OIDC flow and bypass CatapultOAuth2UserService; basic_profile
+            // is what EOS needs to answer userInfo with the account id and the display name.
+            registrations.add(authorizationCode("epic", epicClientId, epicClientSecret)
+                .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+                .scope("basic_profile")
+                .authorizationUri("https://www.epicgames.com/id/authorize")
+                .tokenUri("https://api.epicgames.dev/epic/oauth/v2/token")
+                .userInfoUri("https://api.epicgames.dev/epic/oauth/v2/userInfo")
                 .userNameAttributeName("sub")
                 .build());
         }
