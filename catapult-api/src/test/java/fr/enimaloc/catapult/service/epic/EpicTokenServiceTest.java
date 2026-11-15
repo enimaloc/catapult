@@ -161,6 +161,37 @@ class EpicTokenServiceTest {
     }
 
     @Test
+    void install_whoseWriteFails_keepsTheRotatedTokenWaiting() {
+        when(accounts.refresh("refresh-1")).thenReturn(tokens("access-1", NOW.plus(Duration.ofHours(2)), "refresh-2"));
+        doThrow(new DataAccessResourceFailureException("database down"))
+                .doThrow(new DataAccessResourceFailureException("database still down"))
+                .doAnswer(invocation -> invocation.getArgument(0)).when(repository).save(any());
+        assertThatThrownBy(() -> service.accessToken(bot.getId()))
+                .isInstanceOf(DataAccessResourceFailureException.class);
+
+        assertThatThrownBy(() -> service.install(bot.getId(), new Tokens("access-login", NOW.plus(Duration.ofHours(2)),
+                "refresh-login", NOW.plus(Duration.ofDays(365)), bot.getEpicAccountId(), "Catapult-1")))
+                .isInstanceOf(DataAccessResourceFailureException.class);
+
+        // The login was not stored: the rotated token still waits, and is stored before anything is handed out
+        assertThat(service.accessToken(bot.getId())).isEqualTo("access-1");
+        assertThat(encryption.decrypt(bot.getRefreshTokenEnc())).isEqualTo("refresh-2");
+        verify(accounts, times(1)).refresh(anyString());
+    }
+
+    @Test
+    void forget_dropsTheCachedAndTheWaitingTokens() {
+        when(accounts.refresh("refresh-1")).thenReturn(tokens("access-1", NOW.plus(Duration.ofHours(2)), "refresh-2"));
+        when(accounts.refresh("refresh-2")).thenReturn(tokens("access-2", NOW.plus(Duration.ofHours(2)), "refresh-3"));
+        assertThat(service.accessToken(bot.getId())).isEqualTo("access-1");
+
+        service.forget(bot.getId());
+
+        assertThat(service.accessToken(bot.getId())).isEqualTo("access-2");
+        verify(accounts, times(2)).refresh(anyString());
+    }
+
+    @Test
     void install_waitsForARefreshInFlight() throws Exception {
         CountDownLatch inRefresh = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);

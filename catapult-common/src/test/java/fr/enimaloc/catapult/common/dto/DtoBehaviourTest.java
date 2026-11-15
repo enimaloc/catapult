@@ -5,6 +5,8 @@ import fr.enimaloc.catapult.common.dto.admin.AdminIgdbDescriptorDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
 import fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddKeysPageData;
+import fr.enimaloc.catapult.common.dto.admin.EpicAccountDto;
+import fr.enimaloc.catapult.common.dto.admin.EpicAccountsDto;
 import fr.enimaloc.catapult.common.dto.admin.KeyStatus;
 import fr.enimaloc.catapult.common.dto.admin.SteamKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
@@ -264,6 +266,20 @@ class DtoBehaviourTest {
             assertThat(json.readValue("{\"channelId\":\"c\",\"channelLogin\":\"l\"}", ChannelEvents.CustomBindingsUpdated.class))
                     .isEqualTo(new ChannelEvents.CustomBindingsUpdated("c", "l", null, null));
         }
+    }
+
+    @Test
+    void epicAccounts_roundTripThroughJson_withTheirExpiry() {
+        JsonMapper json = JsonMapper.builder().build();
+        EpicAccountDto account = new EpicAccountDto(java.util.UUID.randomUUID(), "Catapult-1", "READY", "READY", 2,
+                false, true, 7, Instant.parse("2026-12-01T00:00:00Z"), true);
+        EpicAccountsDto page = new EpicAccountsDto(List.of(account), "https://www.epicgames.com/id/api/redirect");
+
+        String body = json.writeValueAsString(page);
+
+        assertThat(json.readValue(body, EpicAccountsDto.class)).isEqualTo(page);
+        assertThat(body).contains("\"refreshExpiresAt\":\"2026-12-01T00:00:00Z\"")
+                .contains("\"refreshExpiresSoon\":true");
     }
 
     private static java.util.Map.Entry<String, Object> entry(String key, Object value) {

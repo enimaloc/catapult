@@ -123,14 +123,13 @@ public class EpicTokenService {
      * Stores the tokens of a fresh login of an existing bot (authorization code exchange): the refresh token, its
      * expiry, {@code lastRefreshAt} and {@code READY}, in a transaction of its own. Taken under the bot's lock, so a
      * refresh in flight can neither overwrite the new login nor mark it {@code REAUTH_REQUIRED}; a rotated token still
-     * waiting to be stored is dropped, the login replaces it.
+     * waiting to be stored is dropped once the login is stored, the login replaces it.
      *
      * @throws IllegalStateException when the bot does not exist
-     * @throws RuntimeException      when the database fails; nothing is cached then
+     * @throws RuntimeException      when the database fails; nothing is cached and a waiting rotated token is kept
      */
     public void install(UUID botId, Tokens tokens) {
         synchronized (lockOf(botId)) {
-            pending.remove(botId);
             cache.remove(botId);
             String refreshTokenEnc = encryption.encrypt(tokens.refreshToken());
             Instant now = clock.instant();
@@ -140,8 +139,17 @@ public class EpicTokenService {
                 account.setLastRefreshAt(now);
                 account.setAuthState(AuthState.READY);
             });
+            pending.remove(botId);
             cache.put(botId, new AccessToken(tokens.accessToken(), tokens.accessExpiresAt()));
             log.info("Stored a new login of Epic service account {}", botId);
+        }
+    }
+
+    /** Drops everything held in memory for the bot (its access token, a rotated token waiting): it is being deleted. */
+    public void forget(UUID botId) {
+        synchronized (lockOf(botId)) {
+            cache.remove(botId);
+            pending.remove(botId);
         }
     }
 
