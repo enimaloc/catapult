@@ -43,13 +43,19 @@ public class EpicConnectClient {
     private final Duration heartbeat;
     private final ScheduledExecutorService scheduler;
 
+    private final Object sendLock = new Object();
+    private final AtomicBoolean started = new AtomicBoolean();
     private final AtomicBoolean closed = new AtomicBoolean();
+    private final AtomicBoolean heartbeatInFlight = new AtomicBoolean();
     private volatile WebSocket socket;
     private volatile EpicConnectListener listener;
     private volatile ScheduledFuture<?> heartbeatTask;
 
     public EpicConnectClient(Connector connector, URI baseUrl, Duration heartbeat,
                              ScheduledExecutorService scheduler) {
+        if (heartbeat.isZero() || heartbeat.isNegative()) {
+            throw new IllegalArgumentException("The heart-beat interval must be positive");
+        }
         this.connector = connector;
         this.baseUrl = baseUrl;
         this.heartbeat = heartbeat;
@@ -59,27 +65,43 @@ public class EpicConnectClient {
     /**
      * Opens the connection, sends CONNECT and SUBSCRIBE and starts the heart-beat.
      *
-     * @throws EpicConnectException when the connection cannot be opened or the handshake cannot be sent; the
-     *                              connection is closed and the listener is not called
+     * <p>Throws only when the socket could not be opened (the listener is not called then). Once it is open, every
+     * failure, including a failed handshake send, ends the connection through
+     * {@link EpicConnectListener#onClosed} exactly once and this method returns normally.
+     *
+     * @throws EpicConnectException  when the connection cannot be opened
+     * @throws IllegalStateException when this client was already used or closed
      */
     public void connect(String accessToken, String botAccountId, EpicConnectListener listener) {
+        if (closed.get() || !started.compareAndSet(false, true)) {
+            throw new IllegalStateException("An Epic Connect client is single-use");
+        }
         this.listener = listener;
         String base = baseUrl.toString();
         URI uri = URI.create((base.endsWith("/") ? base : base + "/") + "?auth-token="
                 + URLEncoder.encode(accessToken, StandardCharsets.UTF_8) + "&accept-language=en-US");
+        WebSocket ws;
         try {
-            WebSocket ws = connector.open(uri, new Reader())
+            ws = connector.open(uri, new Reader())
                     .orTimeout(OPEN_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS).join();
-            this.socket = ws;
+        } catch (RuntimeException e) {
+            closed.set(true);
+            throw sanitize(e);
+        }
+        this.socket = ws;
+        try {
             send(StompFrames.connect());
             send(StompFrames.subscribe(botAccountId));
             long millis = heartbeat.toMillis();
-            heartbeatTask = scheduler.scheduleAtFixedRate(this::sendHeartbeat, millis, millis,
+            ScheduledFuture<?> task = scheduler.scheduleAtFixedRate(this::sendHeartbeat, millis, millis,
                     TimeUnit.MILLISECONDS);
+            heartbeatTask = task;
+            if (closed.get()) {
+                // The connection ended while the handshake ran: shutdown may have missed the task.
+                task.cancel(false);
+            }
         } catch (RuntimeException e) {
-            closed.set(true);
-            abortQuietly();
-            throw sanitize(e);
+            shutdown(sanitize(e));
         }
     }
 
@@ -87,22 +109,51 @@ public class EpicConnectClient {
         shutdown(null);
     }
 
+    /** Blocking send for the handshake, which runs on the caller's thread. */
     private void send(String frame) {
         WebSocket ws = socket;
         if (ws == null || closed.get()) {
             throw new EpicConnectException("Epic Connect connection is closed");
         }
+        CompletableFuture<WebSocket> sent;
         // The JDK forbids overlapping sends: the heart-beat and the handshake take turns.
-        synchronized (this) {
-            ws.sendText(frame, true).orTimeout(SEND_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS).join();
+        synchronized (sendLock) {
+            sent = ws.sendText(frame, true);
+        }
+        sent.orTimeout(SEND_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS).join();
+    }
+
+    /** Never blocks the shared scheduler: a tick is skipped while the previous heart-beat is still being sent. */
+    private void sendHeartbeat() {
+        WebSocket ws = socket;
+        if (closed.get() || ws == null) {
+            cancelHeartbeat();
+            return;
+        }
+        if (!heartbeatInFlight.compareAndSet(false, true)) {
+            return;
+        }
+        try {
+            CompletableFuture<WebSocket> sent;
+            synchronized (sendLock) {
+                sent = ws.sendText(StompFrames.HEARTBEAT, true);
+            }
+            sent.orTimeout(SEND_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS).whenComplete((w, t) -> {
+                heartbeatInFlight.set(false);
+                if (t != null) {
+                    shutdown(sanitize(t));
+                }
+            });
+        } catch (RuntimeException e) {
+            heartbeatInFlight.set(false);
+            shutdown(sanitize(e));
         }
     }
 
-    private void sendHeartbeat() {
-        try {
-            send(StompFrames.HEARTBEAT);
-        } catch (RuntimeException e) {
-            shutdown(sanitize(e));
+    private void cancelHeartbeat() {
+        ScheduledFuture<?> task = heartbeatTask;
+        if (task != null) {
+            task.cancel(false);
         }
     }
 
@@ -142,10 +193,7 @@ public class EpicConnectClient {
         if (!closed.compareAndSet(false, true)) {
             return;
         }
-        ScheduledFuture<?> task = heartbeatTask;
-        if (task != null) {
-            task.cancel(false);
-        }
+        cancelHeartbeat();
         WebSocket ws = socket;
         if (ws != null) {
             if (cause == null) {
@@ -161,13 +209,6 @@ public class EpicConnectClient {
             } catch (RuntimeException e) {
                 log.warn("An Epic Connect listener failed on close", e);
             }
-        }
-    }
-
-    private void abortQuietly() {
-        WebSocket ws = socket;
-        if (ws != null) {
-            ws.abort();
         }
     }
 

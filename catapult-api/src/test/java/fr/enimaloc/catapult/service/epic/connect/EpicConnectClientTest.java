@@ -37,10 +37,12 @@ class EpicConnectClientTest {
     private static final class FakeSocket implements WebSocket {
         final List<String> sent = new CopyOnWriteArrayList<>();
         volatile boolean aborted;
+        volatile java.util.function.Consumer<String> onSend = frame -> { };
 
         @Override
         public CompletableFuture<WebSocket> sendText(CharSequence data, boolean last) {
             sent.add(data.toString());
+            onSend.accept(data.toString());
             return CompletableFuture.completedFuture(this);
         }
 
@@ -93,7 +95,6 @@ class EpicConnectClientTest {
         final List<String> connected = new CopyOnWriteArrayList<>();
         final List<EpicConnectMessage> messages = new CopyOnWriteArrayList<>();
         final List<Throwable> closes = new CopyOnWriteArrayList<>();
-        volatile boolean closedCalled;
 
         @Override
         public void onConnected(String connectionId) {
@@ -107,7 +108,6 @@ class EpicConnectClientTest {
 
         @Override
         public void onClosed(Throwable cause) {
-            closedCalled = true;
             closes.add(cause);
         }
     }
@@ -225,6 +225,33 @@ class EpicConnectClientTest {
 
         assertThat(recorder.closes).hasSize(1);
         assertThat(recorder.closes.get(0)).isInstanceOf(EpicConnectException.class);
+    }
+
+    @Test
+    void errorDuringTheHandshake_closesOnce_withoutThrowing_andStopsHeartbeats() throws Exception {
+        Recorder recorder = new Recorder();
+        EpicConnectClient client = client(Duration.ofMillis(20));
+        socket.onSend = frame -> {
+            if (frame.startsWith("SUBSCRIBE")) {
+                wire.onText(socket, "ERROR\nmessage:nope\n\n\0", true);
+            }
+        };
+
+        client.connect(TOKEN, BOT, recorder);
+        Thread.sleep(200);
+
+        assertThat(recorder.closes).hasSize(1);
+        assertThat(recorder.closes.get(0)).hasMessageContaining("nope");
+        assertThat(socket.sent.stream().filter(StompFrames.HEARTBEAT::equals)).isEmpty();
+    }
+
+    @Test
+    void aClientIsSingleUse() {
+        EpicConnectClient client = client(Duration.ofSeconds(30));
+        client.connect(TOKEN, BOT, new Recorder());
+
+        assertThatThrownBy(() -> client.connect(TOKEN, BOT, new Recorder()))
+                .isInstanceOf(IllegalStateException.class);
     }
 
     @Test
