@@ -33,7 +33,8 @@ public class TokenKeyRotationRunner implements ApplicationRunner {
             new Secret("minecraft_service_account", "id", "msa_refresh_token"),
             new Secret("ankama_service_account", "id", "api_key_enc"),
             new Secret("ankama_service_account", "id", "refresh_token_enc"),
-            new Secret("ankama_service_account", "id", "certificate_enc"));
+            new Secret("ankama_service_account", "id", "certificate_enc"),
+            new Secret("epic_service_account", "id", "refresh_token_enc"));
 
     record Secret(String table, String id, String column) {}
 
