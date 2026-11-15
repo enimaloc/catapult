@@ -2,11 +2,14 @@ package fr.enimaloc.catapult.service.epic.api;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 
 import java.util.Set;
 
@@ -80,6 +83,29 @@ class EpicFriendsClientTest {
         assertThat(summary.friends()).isEqualTo(Set.of("a", "b"));
         assertThat(summary.incoming()).isEqualTo(Set.of("c"));
         assertThat(summary.outgoing()).isEqualTo(Set.of("d"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "{}", "{\"friends\":{},\"incoming\":[],\"outgoing\":[]}",
+            "{\"friends\":[],\"incoming\":[]}", "{\"friends\":[],\"incoming\":null,\"outgoing\":[]}"})
+    void summary_incompleteListing_throws(String body) {
+        // Read as "no friends", such a listing would remove every accepted link of the bot for good
+        server.expect(requestTo(URL + "/bot/summary")).andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> client.summary("tok", "bot")).isInstanceOf(RestClientException.class)
+                .hasMessage("Epic returned an incomplete friends summary");
+    }
+
+    @Test
+    void summary_emptyLists_isAnEmptySummary() {
+        server.expect(requestTo(URL + "/bot/summary")).andRespond(withSuccess(
+                "{\"friends\":[],\"incoming\":[],\"outgoing\":[]}", MediaType.APPLICATION_JSON));
+
+        EpicFriendsClient.Summary summary = client.summary("tok", "bot");
+
+        assertThat(summary.friends()).isEmpty();
+        assertThat(summary.incoming()).isEmpty();
+        assertThat(summary.outgoing()).isEmpty();
     }
 
     @Test

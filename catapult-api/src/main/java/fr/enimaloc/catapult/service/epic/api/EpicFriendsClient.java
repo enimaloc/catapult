@@ -63,13 +63,19 @@ public class EpicFriendsClient {
         return toSummary(reply.body());
     }
 
-    /** The only place that knows the shape of the summary document (to be confirmed against the live service). */
+    /**
+     * The only place that knows the shape of the summary document (to be confirmed against the live service). The
+     * three lists are required: a listing missing one would read as "no friends" and remove every accepted link.
+     */
     private static Summary toSummary(JsonNode body) {
-        return new Summary(accountIds(body.path("friends")), accountIds(body.path("incoming")),
-                accountIds(body.path("outgoing")));
+        return new Summary(accountIds(body.get("friends")), accountIds(body.get("incoming")),
+                accountIds(body.get("outgoing")));
     }
 
     private static Set<String> accountIds(JsonNode list) {
+        if (list == null || !list.isArray()) {
+            throw new RestClientException("Epic returned an incomplete friends summary");
+        }
         Set<String> ids = new HashSet<>();
         list.forEach(entry -> {
             String id = entry.path("accountId").asString("");
