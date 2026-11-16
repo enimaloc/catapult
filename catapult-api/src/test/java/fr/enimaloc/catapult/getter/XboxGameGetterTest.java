@@ -32,7 +32,7 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
-@SuppressWarnings("rawtypes")
+@SuppressWarnings({"rawtypes", "unchecked"})
 class XboxGameGetterTest {
 
     @Mock private RestClient restClient;
@@ -158,6 +158,60 @@ class XboxGameGetterTest {
         assertThat(result).isPresent();
         assertThat(result.get().getSourceId()).isEqualTo("1234");
         assertThat(result.get().getSourceName()).isEqualTo("Halo Infinite");
+    }
+
+    private static Map<String, Object> titlehub(String type, String productId) {
+        return Map.of("titles", List.of(Map.of(
+            "type", type,
+            "detail", Map.of("availabilities", List.of(Map.of("AvailabilityId", productId))))));
+    }
+
+    private static Map<String, Object> presence(Map<String, Object>... titles) {
+        return Map.of("devices", List.of(Map.of("titles", List.of(titles))));
+    }
+
+    @Test
+    void getCurrentGame_titlehubTypeApp_isNotAGame() {
+        doReturn(presence(Map.of("id", "5678", "name", "Microsoft Store", "state", "Active")),
+            titlehub("App", "9QPQ53BM3J3T")).when(responseSpec).body(Map.class);
+
+        assertThat(getter.getCurrentGame(user)).isEmpty();
+    }
+
+    @Test
+    void getCurrentGame_appThenGame_returnsTheGame() {
+        doReturn(presence(
+                Map.of("id", "5678", "name", "Twitch", "state", "Active"),
+                Map.of("id", "1234", "name", "Halo Infinite", "state", "Active")),
+            titlehub("App", "9Q5CCV8BCC32"), titlehub("game", "9NP1P1WFS0LB")).when(responseSpec).body(Map.class);
+
+        Optional<DetectedGame> result = getter.getCurrentGame(user);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getSourceId()).isEqualTo("9NP1P1WFS0LB");
+        assertThat(result.get().getSourceName()).isEqualTo("Halo Infinite");
+    }
+
+    @Test
+    void getCurrentGame_titlehubTypeGame_returnsProductId() {
+        doReturn(presence(Map.of("id", "1234", "name", "Halo Infinite", "state", "Active")),
+            titlehub("Game", "9NP1P1WFS0LB")).when(responseSpec).body(Map.class);
+
+        Optional<DetectedGame> result = getter.getCurrentGame(user);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getSourceId()).isEqualTo("9NP1P1WFS0LB");
+    }
+
+    @Test
+    void getCurrentGame_titlehubFailure_fallsBackToTitleId() {
+        Map<String, Object> presence = presence(Map.of("id", "1234", "name", "Halo Infinite", "state", "Active"));
+        when(responseSpec.body(Map.class)).thenReturn(presence).thenThrow(new RuntimeException("400"));
+
+        Optional<DetectedGame> result = getter.getCurrentGame(user);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getSourceId()).isEqualTo("1234");
     }
 
     @Test
