@@ -122,6 +122,17 @@ public class IgdbClient {
     }
 
     /**
+     * Full-text search of a game by name (at most 10): its id and name with its external games' uid and source id.
+     */
+    public List<Game> searchByNameWithExternalGames(String name, String token) {
+        return apiObservations.observe("igdb", "search_by_name_with_external_games", () -> {
+            APICalypse query = new APICalypse().search(name)
+                    .fields("id,name,external_games.uid,external_games.external_game_source").limit(10);
+            return fetchOrEmpty(token, "/games", "search '" + name + "' with external games", query, IgdbClient::games);
+        });
+    }
+
+    /**
      * Fetches the details of several games by their IGDB ids in a single call (batch).
      */
     public List<Game> fetchGamesByIds(List<String> igdbIds, String fields, String token) {

@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.common.dto.ProvidersResponse;
 import fr.enimaloc.catapult.getter.GameGetter;
 import fr.enimaloc.catapult.getter.steam.SteamApiKeyRotator;
 import fr.enimaloc.catapult.service.ankama.AnkamaGateService;
+import fr.enimaloc.catapult.service.epic.EpicGateService;
 import fr.enimaloc.catapult.service.battlenet.BattleNetGateService;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import org.springframework.beans.factory.annotation.Value;
@@ -37,15 +38,17 @@ public class ApiConfigController {
     private final Optional<SteamApiKeyRotator> rotator;
 
     private final AnkamaGateService ankamaGate;
+    private final EpicGateService epicGate;
     private final BattleNetGateService battleNetGate;
     private final ExperimentService experiments;
 
     public ApiConfigController(List<GameGetter> availableGetters, Optional<SteamApiKeyRotator> rotator,
-                               AnkamaGateService ankamaGate, BattleNetGateService battleNetGate,
-                               ExperimentService experiments) {
+                               AnkamaGateService ankamaGate, EpicGateService epicGate,
+                               BattleNetGateService battleNetGate, ExperimentService experiments) {
         this.availableGetters = availableGetters;
         this.rotator = rotator;
         this.ankamaGate = ankamaGate;
+        this.epicGate = epicGate;
         this.battleNetGate = battleNetGate;
         this.experiments = experiments;
     }
@@ -54,7 +57,7 @@ public class ApiConfigController {
     public ProvidersResponse providers() {
         boolean showSteam = steamEnabled && steamKeyAvailable();
         return new ProvidersResponse(minecraftEnabled, showSteam, xboxEnabled, battlenetEnabled,
-                ankamaGate.isConfigured());
+                ankamaGate.isConfigured(), epicGate.isConfigured());
     }
 
     @GetMapping("/app")
@@ -79,6 +82,9 @@ public class ApiConfigController {
         }
         if (ankamaGate.isConfigured() && experiments.isFullyEnabled(AnkamaGateService.EXPERIMENT_KEY)) {
             platforms.add("ankama");
+        }
+        if (epicGate.isConfigured() && experiments.isFullyEnabled(EpicGateService.EXPERIMENT_KEY)) {
+            platforms.add("epic");
         }
         return new LaunchedPlatformsResponse(platforms);
     }

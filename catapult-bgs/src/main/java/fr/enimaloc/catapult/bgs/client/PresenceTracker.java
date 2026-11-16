@@ -23,6 +23,7 @@ import java.util.Optional;
 public final class PresenceTracker {
 
     private static final String LAUNCHER = "App";
+    private static final String MOBILE_APP = "BSAp";
     private static final PresenceKey ACTIVE_GAME_ACCOUNT = new PresenceKey(null, 1, 21);
 
     /** gaTitle is null unless group is 2 (game account level). */
@@ -90,7 +91,7 @@ public final class PresenceTracker {
         }
         try {
             String title = Fourcc.of(GameAccountHandle.parseFrom(blob).getTitleId());
-            return LAUNCHER.equals(title) ? null : title;
+            return LAUNCHER.equals(title) || MOBILE_APP.equals(title) ? null : title;
         } catch (InvalidProtocolBufferException e) {
             return null;
         }

@@ -14,7 +14,7 @@ import java.util.List;
  * The streamer's currently detected game — {@code sourceId} is the source-specific identifier
  * (e.g. the Steam appId when {@code sourceType == "STEAM"}, feeding {@code steam#getGame(id)}
  * directly), {@code sourceType} one of {@code GameBinding.SourceType}'s names ("STEAM", "XBOX",
- * "BATTLENET", "MANUAL", "MINECRAFT"), {@code sourceName} the display name.
+ * "BATTLENET", "MANUAL", "MINECRAFT", "ANKAMA", "EPIC"), {@code sourceName} the display name.
  */
 @Component
 @RequiredArgsConstructor

@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.event.ChannelUpdatedEvent;
 import fr.enimaloc.catapult.event.ankama.AnkamaLinkEvent;
 import fr.enimaloc.catapult.event.battlenet.BattleNetLinkEvent;
 import fr.enimaloc.catapult.event.binding.CustomBindingsUpdatedEvent;
+import fr.enimaloc.catapult.event.epic.EpicLinkEvent;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import jakarta.servlet.http.HttpServletRequest;
@@ -98,11 +99,13 @@ public class ChannelEventStreamController {
 
     /**
      * {@code event} as a moderator's stream gets it: without the custom bindings, which catapult-api shows the
-     * owner alone (their page has no list to update). Null when they get nothing at all: the Battle.net and Ankama links, whose
-     * tags and card are the owner's alone.
+     * owner alone (their page has no list to update). Null when they get nothing at
+     * all: the Battle.net, Ankama and Epic links, whose names and card are the owner's alone.
      */
     static ChannelUpdatedEvent forModerators(ChannelUpdatedEvent event) {
-        if (event instanceof BattleNetLinkEvent || event instanceof AnkamaLinkEvent) return null;
+        if (event instanceof BattleNetLinkEvent || event instanceof AnkamaLinkEvent || event instanceof EpicLinkEvent) {
+            return null;
+        }
         return event instanceof CustomBindingsUpdatedEvent updated ? new CustomBindingsUpdatedEvent(updated.username())
                 : event;
     }

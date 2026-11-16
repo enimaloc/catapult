@@ -21,6 +21,8 @@ public interface AnkamaFriendLinkRepository extends JpaRepository<AnkamaFriendLi
 
     List<AnkamaFriendLink> findByServiceAccountId(UUID serviceAccountId);
 
+    long countByStatus(AnkamaFriendLink.Status status);
+
     Optional<AnkamaFriendLink> findByServiceAccountIdAndAnkamaUserId(UUID serviceAccountId, long ankamaUserId);
 
     List<AnkamaFriendLink> findByServiceAccountIdAndStatusIn(UUID serviceAccountId,

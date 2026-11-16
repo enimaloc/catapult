@@ -24,6 +24,7 @@ import fr.enimaloc.catapult.common.dto.channel.UpdateBindingRequest;
 import fr.enimaloc.catapult.common.dto.channel.ValidateRequest;
 import fr.enimaloc.catapult.common.dto.connect.AnkamaLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.connect.BattleNetLinkStateResponse;
+import fr.enimaloc.catapult.common.dto.connect.EpicLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatSettingsResponse;
 import fr.enimaloc.catapult.service.ApiService;
@@ -236,6 +237,27 @@ public class ChannelActionsController {
     public ResponseEntity<Void> ankamaDisconnect(@PathVariable String username) {
         if (!ownChannel(username)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         return ApiStatus.answer(apiService.ankamaDisconnect(username));
+    }
+
+    // The Epic link is the member's own too. Linking is catapult-api's OAuth flow, like Battle.net's; the bot's
+    // request can be sent again, like Ankama's invitation.
+
+    @GetMapping("/channel/{username}/epic")
+    public ResponseEntity<EpicLinkStateResponse> epicStatus(@PathVariable String username) {
+        if (!ownChannel(username)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        return ResponseEntity.ok(apiService.epicStatus(username));
+    }
+
+    @PostMapping("/channel/{username}/epic/resend")
+    public ResponseEntity<Void> epicResend(@PathVariable String username) {
+        if (!ownChannel(username)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        return ApiStatus.answer(apiService.epicResend(username));
+    }
+
+    @PostMapping("/channel/{username}/epic/disconnect")
+    public ResponseEntity<Void> epicDisconnect(@PathVariable String username) {
+        if (!ownChannel(username)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        return ApiStatus.answer(apiService.epicDisconnect(username));
     }
 
     @PostMapping("/channel/{username}/xbox/disconnect")

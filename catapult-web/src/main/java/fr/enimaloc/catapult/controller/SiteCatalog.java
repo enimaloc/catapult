@@ -27,7 +27,8 @@ public final class SiteCatalog {
     /** Listed once their experiment is fully enabled (LaunchedPlatforms), after the ones always shown. */
     static final List<PlatformDto> GATED_PLATFORMS = List.of(
             new PlatformDto("sports_esports", "platforms.battlenet"),
-            new PlatformDto("sports_esports", "platforms.ankama")
+            new PlatformDto("sports_esports", "platforms.ankama"),
+            new PlatformDto("sports_esports", "platforms.epic")
     );
 
     /** The landing page's platforms: the ones always shown, then the gated ones whose id is {@code launched}. */

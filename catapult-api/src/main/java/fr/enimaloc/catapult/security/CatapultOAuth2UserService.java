@@ -14,6 +14,9 @@ import fr.enimaloc.catapult.service.access.WhitelistService;
 import fr.enimaloc.catapult.service.account.AdminMigrationService;
 import fr.enimaloc.catapult.service.battlenet.BattleNetFriendService;
 import fr.enimaloc.catapult.service.battlenet.BattleNetGateService;
+import fr.enimaloc.catapult.service.epic.EpicEnrollmentException;
+import fr.enimaloc.catapult.service.epic.EpicFriendService;
+import fr.enimaloc.catapult.service.epic.EpicGateService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.logging.log4j.util.Strings;
@@ -56,6 +59,9 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
     private final BattleNetGateService battleNetGate;
     // Only present when battlenet.enabled.
     private final ObjectProvider<BattleNetFriendService> battleNetFriends;
+    private final EpicGateService epicGate;
+    // Only present when epic.enabled.
+    private final ObjectProvider<EpicFriendService> epicFriends;
     private final TransactionTemplate transactions;
 
     @Value("${app.owner-id:}")
@@ -92,6 +98,7 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
                 case "xbox" -> transactions.execute(status ->
                     handleSecondaryLink(userRequest, OAuthToken.Provider.XBOX));
                 case "battlenet" -> handleBattleNetLink(userRequest);
+                case "epic" -> handleEpicLink(userRequest);
                 default -> delegate.loadUser(userRequest);
             };
         } catch (OAuth2AuthenticationException e) {
@@ -156,6 +163,43 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
             throw new OAuth2AuthenticationException(new OAuth2Error("battlenet_full"), e);
         }
         log.info("BATTLENET linked for user {}", user.getId());
+        return existingUser;
+    }
+
+    /**
+     * Epic is linked like Battle.net, with no token saved: the userinfo's {@code sub} is the Epic account id the bot
+     * befriends and {@code preferred_username} its display name. Not transactional, see {@link #loadUser}.
+     */
+    private OAuth2User handleEpicLink(OAuth2UserRequest userRequest) {
+        Authentication currentAuth = SecurityContextHolder.getContext().getAuthentication();
+        if (currentAuth == null || !(currentAuth.getPrincipal() instanceof CatapultOAuth2User existingUser)) {
+            log.error("EPIC link attempted without an authenticated Twitch session");
+            throw new OAuth2AuthenticationException(new OAuth2Error("unauthorized"));
+        }
+        UserAccount user = existingUser.getUserAccount();
+        EpicFriendService friends = epicFriends.getIfAvailable();
+        if (friends == null || !epicGate.isAvailableFor(user)) {
+            throw new OAuth2AuthenticationException(new OAuth2Error("epic_unavailable"));
+        }
+
+        OAuth2User info = delegate.loadUser(userRequest);
+        String accountId = info.getAttribute("sub");
+        if (accountId == null || accountId.isBlank()) {
+            throw new OAuth2AuthenticationException(new OAuth2Error("invalid_user_info_response"));
+        }
+        String displayName = info.getAttribute("preferred_username");
+        if (displayName == null || displayName.isBlank()) {
+            displayName = accountId;
+        }
+        try {
+            friends.enroll(user, accountId, displayName);
+        } catch (EpicEnrollmentException e) {
+            log.warn("Epic link refused for user {}: {}", user.getId(), e.getReason());
+            String code = e.getReason() == EpicEnrollmentException.Reason.ALREADY_LINKED
+                ? "epic_already_linked" : "epic_full";
+            throw new OAuth2AuthenticationException(new OAuth2Error(code), e);
+        }
+        log.info("EPIC linked for user {}", user.getId());
         return existingUser;
     }
 

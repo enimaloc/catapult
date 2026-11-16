@@ -38,6 +38,8 @@ import fr.enimaloc.catapult.common.dto.admin.TwRebuild;
 import fr.enimaloc.catapult.common.dto.admin.AccountDto;
 import fr.enimaloc.catapult.common.dto.admin.AnkamaAccountDto;
 import fr.enimaloc.catapult.common.dto.admin.AnkamaLoginStartDto;
+import fr.enimaloc.catapult.common.dto.admin.EpicAccountDto;
+import fr.enimaloc.catapult.common.dto.admin.EpicAccountsDto;
 import fr.enimaloc.catapult.common.dto.admin.BattleNetAccountDto;
 import fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
@@ -71,6 +73,7 @@ import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
 import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
 import fr.enimaloc.catapult.common.dto.connect.AnkamaLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.connect.BattleNetLinkStateResponse;
+import fr.enimaloc.catapult.common.dto.connect.EpicLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatDispatch;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
@@ -93,6 +96,7 @@ import fr.enimaloc.catapult.event.binding.CclStateEvent;
 import fr.enimaloc.catapult.event.binding.GameChangedEvent;
 import fr.enimaloc.catapult.event.ankama.AnkamaLinkEvent;
 import fr.enimaloc.catapult.event.battlenet.BattleNetLinkEvent;
+import fr.enimaloc.catapult.event.epic.EpicLinkEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftDisconnectedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftEnrollEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftSyncEvent;
@@ -200,6 +204,7 @@ public class MockApiService implements ApiService {
     private final MockMinecraftAccountsStore minecraftAccounts = new MockMinecraftAccountsStore();
     private final MockBattleNetAccountsStore battleNetAccounts = new MockBattleNetAccountsStore();
     private final MockAnkamaAccountsStore ankamaAccounts = new MockAnkamaAccountsStore();
+    private final MockEpicAccountsStore epicAccounts = new MockEpicAccountsStore();
     /** Application-wide, as catapult-api's: every mock account that logged in is a member any admin session lists. */
     private final MockMembers members = new MockMembers();
     /** Application-wide too: a member's custom flags are the same for every mock session. */
@@ -559,6 +564,30 @@ public class MockApiService implements ApiService {
         MockData data = currentData();
         data.ankamaDisconnect();
         eventPublisher.publishEvent(new AnkamaLinkEvent(username, data.getAnkamaLink().status(), null, null));
+        return NO_CONTENT;
+    }
+
+    @Override
+    public EpicLinkStateResponse epicStatus(String username) {
+        log.trace("epicStatus({})", username);
+        return currentData().getEpicLink();
+    }
+
+    @Override
+    public int epicResend(String username) {
+        log.trace("epicResend({})", username);
+        EpicLinkStateResponse link = currentData().getEpicLink();
+        eventPublisher.publishEvent(new EpicLinkEvent(username, link.status(), link.displayName(),
+                link.serviceAccountName()));
+        return 200;
+    }
+
+    @Override
+    public int epicDisconnect(String username) {
+        log.trace("epicDisconnect({})", username);
+        MockData data = currentData();
+        data.epicDisconnect();
+        eventPublisher.publishEvent(new EpicLinkEvent(username, data.getEpicLink().status(), null, null));
         return NO_CONTENT;
     }
 
@@ -1878,6 +1907,30 @@ public class MockApiService implements ApiService {
     public int adminDeleteAnkamaAccount(UUID id) {
         log.trace("adminDeleteAnkamaAccount({})", id);
         return ankamaAccounts.delete(id);
+    }
+
+    @Override
+    public EpicAccountsDto adminEpicAccounts() {
+        log.trace("adminEpicAccounts()");
+        return epicAccounts.list();
+    }
+
+    @Override
+    public AdminCall<EpicAccountDto> adminAddEpicAccount(String pasted, UUID accountId) {
+        log.trace("adminAddEpicAccount({})", accountId); // never what was pasted: it holds a one-time code
+        return epicAccounts.addOrReauth(pasted, accountId);
+    }
+
+    @Override
+    public AdminCall<EpicAccountDto> adminPatchEpicAccount(UUID id, Map<String, Object> patch) {
+        log.trace("adminPatchEpicAccount({}, {})", id, patch.keySet());
+        return epicAccounts.patch(id, patch);
+    }
+
+    @Override
+    public int adminDeleteEpicAccount(UUID id) {
+        log.trace("adminDeleteEpicAccount({})", id);
+        return epicAccounts.delete(id);
     }
 
     @Override

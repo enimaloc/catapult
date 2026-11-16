@@ -18,6 +18,7 @@ import fr.enimaloc.catapult.event.binding.CustomBindingsUpdatedEvent;
 import fr.enimaloc.catapult.event.binding.GameChangedEvent;
 import fr.enimaloc.catapult.event.ankama.AnkamaLinkEvent;
 import fr.enimaloc.catapult.event.battlenet.BattleNetLinkEvent;
+import fr.enimaloc.catapult.event.epic.EpicLinkEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftDisconnectedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftSyncEvent;
 import fr.enimaloc.catapult.event.steam.SteamConnectionStateEvent;
@@ -153,6 +154,10 @@ public class ChannelEventRedisBridge {
             case ChannelEvents.ANKAMA_LINK_CHANGED -> {
                 var link = read(data, ChannelEvents.AnkamaLinkChanged.class);
                 yield List.of(new AnkamaLinkEvent(login, link.status(), link.nameTag(), link.serviceAccountTag()));
+            }
+            case ChannelEvents.EPIC_LINK_CHANGED -> {
+                var link = read(data, ChannelEvents.EpicLinkChanged.class);
+                yield List.of(new EpicLinkEvent(login, link.status(), link.displayName(), link.serviceAccountName()));
             }
             default -> List.of();
         };

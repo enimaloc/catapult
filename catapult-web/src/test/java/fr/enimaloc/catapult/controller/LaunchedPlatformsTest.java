@@ -52,10 +52,10 @@ class LaunchedPlatformsTest {
 
     @Test
     void landingPlatforms_addTheLaunchedOnesAfterTheAlwaysShownOnes() {
-        when(api.launchedPlatforms()).thenReturn(List.of("ankama", "battlenet"));
+        when(api.launchedPlatforms()).thenReturn(List.of("epic", "ankama", "battlenet"));
 
         assertThat(SiteCatalog.platforms(launched.ids())).extracting(p -> p.id())
-                .containsExactly("minecraft", "steam", "xbox", "battlenet", "ankama");
+                .containsExactly("minecraft", "steam", "xbox", "battlenet", "ankama", "epic");
         assertThat(SiteCatalog.platforms(List.of())).extracting(p -> p.id())
                 .containsExactly("minecraft", "steam", "xbox");
     }

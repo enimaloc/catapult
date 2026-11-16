@@ -32,6 +32,7 @@ public class GameGetterChain {
     private final Optional<BattleNetGameGetter> battleNetGameGetter;
     private final Optional<MinecraftPresenceGetter> minecraftPresenceGetter;
     private final Optional<AnkamaGameGetter> ankamaGameGetter;
+    private final Optional<EpicGameGetter> epicGameGetter;
     private final MeterRegistry meterRegistry;
 
     public Optional<DetectedGame> resolve(UserAccount user) {
@@ -78,6 +79,7 @@ public class GameGetterChain {
         battleNetGameGetter.ifPresent(g -> map.put(GetterConfig.Provider.BATTLENET, g));
         minecraftPresenceGetter.ifPresent(g -> map.put(GetterConfig.Provider.MINECRAFT, g));
         ankamaGameGetter.ifPresent(g -> map.put(GetterConfig.Provider.ANKAMA, g));
+        epicGameGetter.ifPresent(g -> map.put(GetterConfig.Provider.EPIC, g));
         return map;
     }
 }

@@ -99,6 +99,22 @@ class IndexControllerTest {
                 .andExpect(model().attribute("page", "channel"));
     }
 
+    /** Why catapult-api refused an Epic login: channel-connections.js tells it from these, in the page's language. */
+    @Test
+    void channelFullPage_carriesTheEpicLinkErrors() throws Exception {
+        String html = mvc.perform(get("/channel/enimaloc").locale(java.util.Locale.ENGLISH))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html)
+                .contains("data-label-epic-full=\"Every Catapult Epic account is full for now: linking will be possible"
+                        + " again soon.\"")
+                .contains("data-label-epic-already-linked=\"This Epic account is already linked to another Catapult"
+                        + " account\"")
+                .contains("data-label-epic-unavailable=\"Epic Games linking is not available for now: try again"
+                        + " later.\"");
+    }
+
     /** catapult-api answers nothing for a visitor, an unknown channel or one the member may not see. */
     @Test
     void channelPage_withoutData_showsTheErrorPage_insteadOfFailing() throws Exception {

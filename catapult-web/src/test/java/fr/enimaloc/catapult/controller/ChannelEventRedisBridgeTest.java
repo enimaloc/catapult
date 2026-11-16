@@ -234,6 +234,16 @@ class ChannelEventRedisBridgeTest {
     }
 
     @Test
+    void bridgeRelaysEpicLinkChanged() {
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.EPIC_LINK_CHANGED,
+                new ChannelEvents.EpicLinkChanged(owner.toString(), "streamer", "PENDING", "Me", "Bot"))))
+                .containsExactly(new fr.enimaloc.catapult.event.epic.EpicLinkEvent("streamer", "PENDING", "Me", "Bot"));
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.EPIC_LINK_CHANGED,
+                new ChannelEvents.EpicLinkChanged(owner.toString(), "streamer", "NONE", null, null))))
+                .containsExactly(new fr.enimaloc.catapult.event.epic.EpicLinkEvent("streamer", "NONE", null, null));
+    }
+
+    @Test
     void bridgeRelaysAnkamaLinkChanged() {
         assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.ANKAMA_LINK_CHANGED,
                 new ChannelEvents.AnkamaLinkChanged(owner.toString(), "streamer", "PENDING", "Me#1", "Bot#2"))))

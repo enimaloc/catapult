@@ -12,9 +12,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
- * The gated platforms the landing page lists (see SiteCatalog#platforms): Battle.net and Ankama, once their experiment
- * is fully enabled. catapult-api's answer is kept 60 s, so a page doesn't reach it each time; one page at a time
- * loads it, the others meanwhile get the last answer, which also keeps showing when catapult-api fails, tried again
+ * The gated platforms the landing page lists (see SiteCatalog#platforms): Battle.net, Ankama and Epic, once their
+ * experiment is fully enabled. catapult-api's answer is kept 60 s, so a page doesn't reach it each time; one page at a
+ * time loads it, the others meanwhile get the last answer, which also keeps showing when catapult-api fails, tried again
  * 10 s later. Until an answer was ever obtained, none shows: a gated platform is never advertised by mistake.
  */
 @Component

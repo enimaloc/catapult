@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.service.notification;
 
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingDto;
 import fr.enimaloc.catapult.common.dto.connect.AnkamaLinkStateResponse;
+import fr.enimaloc.catapult.common.dto.connect.EpicLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto;
 import fr.enimaloc.catapult.common.dto.channel.BindingDto;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingCurrentDto;
@@ -137,6 +138,13 @@ public class ChannelEventPublisher {
         publish(channelOwnerId, ChannelEvents.ANKAMA_LINK_CHANGED,
                 (id, login) -> new ChannelEvents.AnkamaLinkChanged(id, login, state.status(), state.nameTag(),
                         state.serviceAccountTag()));
+    }
+
+    /** The channel's Epic link is now {@code state} ({@code NONE} once gone). */
+    public void publishEpicLinkChanged(UUID channelOwnerId, EpicLinkStateResponse state) {
+        publish(channelOwnerId, ChannelEvents.EPIC_LINK_CHANGED,
+                (id, login) -> new ChannelEvents.EpicLinkChanged(id, login, state.status(), state.displayName(),
+                        state.serviceAccountName()));
     }
 
     /** The channel's active custom binding is now {@code activeId}; null once deactivated. */

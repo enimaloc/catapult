@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.api;
 import fr.enimaloc.catapult.getter.GameGetter;
 import fr.enimaloc.catapult.getter.steam.SteamApiKeyRotator;
 import fr.enimaloc.catapult.service.ankama.AnkamaGateService;
+import fr.enimaloc.catapult.service.epic.EpicGateService;
 import fr.enimaloc.catapult.service.battlenet.BattleNetGateService;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
 import org.junit.jupiter.api.Test;
@@ -20,7 +21,7 @@ class ApiConfigControllerTest {
 
     private static ApiConfigController controller(Optional<SteamApiKeyRotator> rotator, String configuredKey) {
         ApiConfigController controller = new ApiConfigController(List.of(), rotator, mock(AnkamaGateService.class),
-                mock(BattleNetGateService.class), mock(ExperimentService.class));
+                mock(EpicGateService.class), mock(BattleNetGateService.class), mock(ExperimentService.class));
         ReflectionTestUtils.setField(controller, "steamEnabled", true);
         ReflectionTestUtils.setField(controller, "steamApiKey", configuredKey);
         return controller;
@@ -31,8 +32,8 @@ class ApiConfigControllerTest {
         // under the simulation a getter and its simulated subclass are both GameGetter beans
         ApiConfigController controller = new ApiConfigController(
                 List.of(getter("Steam"), getter("Xbox"), getter("Minecraft"), getter("Xbox"), getter("Minecraft")),
-                Optional.empty(), mock(AnkamaGateService.class), mock(BattleNetGateService.class),
-                mock(ExperimentService.class));
+                Optional.empty(), mock(AnkamaGateService.class), mock(EpicGateService.class),
+                mock(BattleNetGateService.class), mock(ExperimentService.class));
 
         assertThat(controller.appConfig().gettersName()).containsExactly("Steam", "Xbox", "Minecraft");
     }
@@ -64,10 +65,21 @@ class ApiConfigControllerTest {
         AnkamaGateService gate = mock(AnkamaGateService.class);
         when(gate.isConfigured()).thenReturn(true, false);
         ApiConfigController controller = new ApiConfigController(List.of(), Optional.empty(), gate,
-                mock(BattleNetGateService.class), mock(ExperimentService.class));
+                mock(EpicGateService.class), mock(BattleNetGateService.class), mock(ExperimentService.class));
 
         assertThat(controller.providers().ankama()).isTrue();
         assertThat(controller.providers().ankama()).isFalse();
+    }
+
+    @Test
+    void providers_epicFollowsTheGate() {
+        EpicGateService gate = mock(EpicGateService.class);
+        when(gate.isConfigured()).thenReturn(true, false);
+        ApiConfigController controller = new ApiConfigController(List.of(), Optional.empty(),
+                mock(AnkamaGateService.class), gate, mock(BattleNetGateService.class), mock(ExperimentService.class));
+
+        assertThat(controller.providers().epic()).isTrue();
+        assertThat(controller.providers().epic()).isFalse();
     }
 
     /** The landing page lists Battle.net and Ankama once they are configured and their experiment is fully enabled. */
@@ -76,14 +88,20 @@ class ApiConfigControllerTest {
         AnkamaGateService ankama = mock(AnkamaGateService.class);
         BattleNetGateService battleNet = mock(BattleNetGateService.class);
         ExperimentService experiments = mock(ExperimentService.class);
-        ApiConfigController controller = new ApiConfigController(List.of(), Optional.empty(), ankama, battleNet,
-                experiments);
+        EpicGateService epic = mock(EpicGateService.class);
+        ApiConfigController controller = new ApiConfigController(List.of(), Optional.empty(), ankama, epic,
+                battleNet, experiments);
 
         when(battleNet.isConfigured()).thenReturn(true);
         when(ankama.isConfigured()).thenReturn(true);
         when(experiments.isFullyEnabled(BattleNetGateService.EXPERIMENT_KEY)).thenReturn(true);
         when(experiments.isFullyEnabled(AnkamaGateService.EXPERIMENT_KEY)).thenReturn(true);
         assertThat(controller.launchedPlatforms().platforms()).containsExactly("battlenet", "ankama");
+
+        when(epic.isConfigured()).thenReturn(true);
+        when(experiments.isFullyEnabled(EpicGateService.EXPERIMENT_KEY)).thenReturn(true);
+        assertThat(controller.launchedPlatforms().platforms()).containsExactly("battlenet", "ankama", "epic");
+        when(epic.isConfigured()).thenReturn(false);
 
         when(experiments.isFullyEnabled(AnkamaGateService.EXPERIMENT_KEY)).thenReturn(false);
         assertThat(controller.launchedPlatforms().platforms()).containsExactly("battlenet");

@@ -12,6 +12,7 @@ import com.google.protobuf.Timestamp;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestClient;
 import proto.Cover;
@@ -33,7 +34,8 @@ class IgdbServiceGameSearchTest {
     private final IgdbService service = new IgdbService(igdb, mock(IgdbGameCacheRepository.class),
             mock(IgdbGameExternalIdRepository.class), mock(IgdbGameCclRepository.class),
             mock(TwitchCclDefinitionRepository.class), mock(SteamStoreService.class), mock(RestClient.class),
-            new SimpleMeterRegistry(), SimulationGates.none(), mock(GameMappingRepository.class));
+            new SimpleMeterRegistry(), SimulationGates.none(), mock(GameMappingRepository.class),
+            new StaticListableBeanFactory().getBeanProvider(EpicCatalogClient.class));
 
     @BeforeEach
     void setUp() {

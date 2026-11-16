@@ -104,6 +104,8 @@ class ChannelDashboardAssemblerTest {
             new BattleNetLinkStateService(battleNetGate, battleNetLinks, battleNetAccounts);
     private final fr.enimaloc.catapult.service.ankama.AnkamaLinkStateService ankamaStates =
             mock(fr.enimaloc.catapult.service.ankama.AnkamaLinkStateService.class);
+    private final fr.enimaloc.catapult.service.epic.EpicLinkStateService epicStates =
+            mock(fr.enimaloc.catapult.service.epic.EpicLinkStateService.class);
     private final MinecraftLinkStateService minecraftStates =
             new MinecraftLinkStateService(minecraft, minecraftGate, minecraftAccounts);
     private final TwitchatWidgetSettingsService twitchat = mock(TwitchatWidgetSettingsService.class);
@@ -128,7 +130,8 @@ class ChannelDashboardAssemblerTest {
         SteamProfileDiagnostics diagnostics = new SteamProfileDiagnostics(steamClient, Optional.of(keyRotator), encryption);
         ChannelDashboardAssembler assembler = new ChannelDashboardAssembler(bindings, settingsRepository, streamState,
                 gameState, ccls, tws, encryption, steamClient, diagnostics, igdb, dtddMappings, dtddCache,
-                dtddProposals, oauthTokens, minecraftService, battleNetService, Optional.of(ankamaStates), twitchat, raidRestoreGate,
+                dtddProposals, oauthTokens, minecraftService, battleNetService, Optional.of(ankamaStates),
+                Optional.of(epicStates), twitchat, raidRestoreGate,
                 new fr.enimaloc.catapult.api.CustomBindingViews(customBindings,
                         org.mockito.Mockito.mock(fr.enimaloc.catapult.service.premium.PremiumUiGate.class),
                         org.mockito.Mockito.mock(fr.enimaloc.catapult.service.binding.schedule.CustomBindingScheduleService.class),
@@ -508,6 +511,27 @@ class ChannelDashboardAssemblerTest {
             when(bindings.findByUser(eq(owner), any())).thenReturn(new PageImpl<>(List.of()));
 
             assertThat(assembler().page(owner, owner, "streamer", 0, null, null).ankama()).isNull();
+        }
+
+        @Test
+        void dashboardCarriesEpicDataForTheOwnerOnly() {
+            when(epicStates.state(owner)).thenReturn(
+                    new fr.enimaloc.catapult.common.dto.connect.EpicLinkStateResponse("PENDING", "Streamer", "CatapultBot"));
+            when(bindings.findByUser(eq(owner), any())).thenReturn(new PageImpl<>(List.of()));
+
+            assertThat(assembler().page(owner, owner, "streamer", 0, null, null).epic())
+                    .isEqualTo(new fr.enimaloc.catapult.common.dto.channel.EpicData("PENDING", "Streamer", "CatapultBot"));
+            assertThat(assembler().page(moderator, owner, "streamer", 0, null, null).epic()).isNull();
+        }
+
+        @Test
+        void epicUnavailableToTheChannelIsNull() {
+            when(epicStates.state(owner)).thenReturn(
+                    fr.enimaloc.catapult.service.epic.EpicLinkStateService.of(
+                            fr.enimaloc.catapult.service.epic.EpicLinkStateService.UNAVAILABLE));
+            when(bindings.findByUser(eq(owner), any())).thenReturn(new PageImpl<>(List.of()));
+
+            assertThat(assembler().page(owner, owner, "streamer", 0, null, null).epic()).isNull();
         }
 
         @Test

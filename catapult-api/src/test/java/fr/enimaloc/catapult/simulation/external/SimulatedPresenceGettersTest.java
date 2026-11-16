@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.domain.binding.GetterConfig;
 import fr.enimaloc.catapult.getter.AnkamaGameGetter;
 import fr.enimaloc.catapult.getter.BattleNetGameGetter;
 import fr.enimaloc.catapult.getter.DetectedGame;
+import fr.enimaloc.catapult.getter.EpicGameGetter;
 import fr.enimaloc.catapult.getter.MinecraftPresenceGetter;
 import fr.enimaloc.catapult.getter.XboxGameGetter;
 import fr.enimaloc.catapult.simulation.CallSetting;
@@ -38,10 +39,12 @@ class SimulatedPresenceGettersTest {
     MinecraftPresenceGetter realMinecraft = mock(MinecraftPresenceGetter.class);
     BattleNetGameGetter realBattleNet = mock(BattleNetGameGetter.class);
     AnkamaGameGetter realAnkama = mock(AnkamaGameGetter.class);
+    EpicGameGetter realEpic = mock(EpicGameGetter.class);
     SimulatedXboxGameGetter xbox;
     SimulatedMinecraftPresenceGetter minecraft;
     SimulatedBattleNetGameGetter battleNet;
     SimulatedAnkamaGameGetter ankama;
+    SimulatedEpicGameGetter epic;
 
     @BeforeEach
     void setUp() {
@@ -52,6 +55,7 @@ class SimulatedPresenceGettersTest {
         battleNet = new SimulatedBattleNetGameGetter(SimulationFixture.providerOf(realBattleNet), fx.runner,
                 fx.registry);
         ankama = new SimulatedAnkamaGameGetter(SimulationFixture.providerOf(realAnkama), fx.runner, fx.registry);
+        epic = new SimulatedEpicGameGetter(SimulationFixture.providerOf(realEpic), fx.runner, fx.registry);
     }
 
     private void playing(GetterConfig.Provider provider, String sourceId, String name) {
@@ -132,5 +136,15 @@ class SimulatedPresenceGettersTest {
         assertThat(ankama.getCurrentGame(fx.fictitious))
                 .contains(new DetectedGame("3", GameBinding.SourceType.ANKAMA, "Wakfu"));
         verifyNoInteractions(realAnkama);
+    }
+
+    @Test
+    void simulatedEpicGetter_answersFromTheSimulation() {
+        playing(GetterConfig.Provider.EPIC, "d42d7101", "Fall Guys");
+
+        assertThat(epic.getCurrentGame(fx.fictitious))
+                .contains(new DetectedGame("d42d7101", GameBinding.SourceType.EPIC, "Fall Guys"));
+        assertThat(epic.name()).isEqualTo("epic");
+        verifyNoInteractions(realEpic);
     }
 }

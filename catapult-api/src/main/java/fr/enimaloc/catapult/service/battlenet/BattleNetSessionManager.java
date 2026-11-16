@@ -231,6 +231,11 @@ public class BattleNetSessionManager implements SmartLifecycle {
         return session == null ? DISABLED : session.connection.state().name();
     }
 
+    /** How many sessions are READY: the bots logged in to BGS right now (a gauge reads it). */
+    public long readySessionCount() {
+        return sessions.values().stream().filter(s -> s.connection.state() == BgsConnection.State.READY).count();
+    }
+
     /** The fourcc of the game the BGS account plays, as reported to the bot it is friends with. */
     public Optional<String> currentGame(long bnetAccountId) {
         return Optional.ofNullable(games.get(bnetAccountId));

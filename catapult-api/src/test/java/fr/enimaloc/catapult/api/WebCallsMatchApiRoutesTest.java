@@ -45,6 +45,7 @@ import org.springframework.web.util.pattern.PathPatternParser;
             "dtdd.enabled=true",
             "battlenet.enabled=true",
             "ankama.enabled=true",
+            "epic.enabled=true",
             "ankama.sessions.enabled=false",
             "battlenet.client-id=full-context-test",
             "battlenet.client-secret=full-context-test",

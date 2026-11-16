@@ -5,10 +5,13 @@ import fr.enimaloc.catapult.common.dto.admin.AdminIgdbDescriptorDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
 import fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddKeysPageData;
+import fr.enimaloc.catapult.common.dto.admin.EpicAccountDto;
+import fr.enimaloc.catapult.common.dto.admin.EpicAccountsDto;
 import fr.enimaloc.catapult.common.dto.admin.KeyStatus;
 import fr.enimaloc.catapult.common.dto.admin.SteamKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
+import fr.enimaloc.catapult.common.dto.channel.EpicData;
 import fr.enimaloc.catapult.common.dto.channel.MinecraftData;
 import fr.enimaloc.catapult.common.dto.channel.PagedBindings;
 import fr.enimaloc.catapult.common.dto.channel.TwitchatData;
@@ -193,16 +196,17 @@ class DtoBehaviourTest {
 
     @ParameterizedTest
     @CsvSource({
-            "false, false, false, false, false, false",
-            "true, false, false, false, false, true",
-            "false, true, false, false, false, true",
-            "false, false, true, false, false, true",
-            "false, false, false, true, false, true",
-            "false, false, false, false, true, true",
+            "false, false, false, false, false, false, false",
+            "true, false, false, false, false, false, true",
+            "false, true, false, false, false, false, true",
+            "false, false, true, false, false, false, true",
+            "false, false, false, true, false, false, true",
+            "false, false, false, false, true, false, true",
+            "false, false, false, false, false, true, true",
     })
     void providersResponse_hasAny(boolean minecraft, boolean steam, boolean xbox, boolean battlenet, boolean ankama,
-                                  boolean any) {
-        assertThat(new ProvidersResponse(minecraft, steam, xbox, battlenet, ankama).hasAny()).isEqualTo(any);
+                                  boolean epic, boolean any) {
+        assertThat(new ProvidersResponse(minecraft, steam, xbox, battlenet, ankama, epic).hasAny()).isEqualTo(any);
     }
 
     @ParameterizedTest
@@ -214,6 +218,13 @@ class DtoBehaviourTest {
     @Test
     void minecraftData_withoutStatus_isNotConnected() {
         assertThat(new MinecraftData(null, null, null).connected()).isFalse();
+    }
+
+    @ParameterizedTest
+    @CsvSource(value = {"ACCEPTED, true", "accepted, true", "PENDING, false", "NONE, false", "null, false"},
+            nullValues = "null")
+    void epicData_connectedOnlyOnceAccepted(String status, boolean connected) {
+        assertThat(new EpicData(status, null, null).connected()).isEqualTo(connected);
     }
 
     @Test
@@ -263,6 +274,20 @@ class DtoBehaviourTest {
             assertThat(json.readValue("{\"channelId\":\"c\",\"channelLogin\":\"l\"}", ChannelEvents.CustomBindingsUpdated.class))
                     .isEqualTo(new ChannelEvents.CustomBindingsUpdated("c", "l", null, null));
         }
+    }
+
+    @Test
+    void epicAccounts_roundTripThroughJson_withTheirExpiry() {
+        JsonMapper json = JsonMapper.builder().build();
+        EpicAccountDto account = new EpicAccountDto(java.util.UUID.randomUUID(), "Catapult-1", "READY", "READY", 2,
+                false, true, 7, Instant.parse("2026-12-01T00:00:00Z"), true);
+        EpicAccountsDto page = new EpicAccountsDto(List.of(account), "https://www.epicgames.com/id/api/redirect");
+
+        String body = json.writeValueAsString(page);
+
+        assertThat(json.readValue(body, EpicAccountsDto.class)).isEqualTo(page);
+        assertThat(body).contains("\"refreshExpiresAt\":\"2026-12-01T00:00:00Z\"")
+                .contains("\"refreshExpiresSoon\":true");
     }
 
     private static java.util.Map.Entry<String, Object> entry(String key, Object value) {

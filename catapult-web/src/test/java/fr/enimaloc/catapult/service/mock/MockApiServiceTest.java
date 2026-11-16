@@ -465,11 +465,37 @@ class MockApiServiceTest {
     }
 
     @Test
+    void epicLink_resendsAndUnlinks_tellingThePage() {
+        service.epicResend(username);
+        service.epicDisconnect(username);
+
+        assertThat(data.getEpicLink().status()).isEqualTo("NONE");
+        assertThat(service.epicStatus(username)).isEqualTo(data.getEpicLink());
+        assertThat(events).hasSize(2).allSatisfy(event ->
+                assertThat(event).isInstanceOf(fr.enimaloc.catapult.event.epic.EpicLinkEvent.class));
+        assertThat(events.getLast()).isEqualTo(
+                new fr.enimaloc.catapult.event.epic.EpicLinkEvent(username, "NONE", null, null));
+    }
+
+    @Test
     void ankamaStatus_isTheMockLink() {
         assertThat(service.ankamaStatus(username)).isEqualTo(data.getAnkamaLink());
     }
 
     /** The admin calls go through the mock store: a Shield login, its code, then the pool actions. */
+    @Test
+    void adminEpicAccounts_addWithAPastedCode_thenPatchAndDelete() {
+        int before = service.adminEpicAccounts().accounts().size();
+
+        var bot = service.adminAddEpicAccount("0123456789abcdef0123456789abcdef", null).body();
+
+        assertThat(bot.authState()).isEqualTo("READY");
+        assertThat(service.adminEpicAccounts().accounts()).hasSize(before + 1);
+        assertThat(service.adminPatchEpicAccount(bot.id(), Map.of("enabled", false)).body().enabled()).isFalse();
+        assertThat(service.adminDeleteEpicAccount(bot.id())).isEqualTo(204);
+        assertThat(service.adminEpicAccounts().accounts()).hasSize(before);
+    }
+
     @Test
     void adminAnkamaAccounts_logInWithAShieldCode_thenPatchAndDelete() {
         int before = service.adminAnkamaAccounts().size();
