@@ -4,6 +4,13 @@ Toutes les versions publiées de Catapult, la plus récente en premier.
 
 Ce fichier est régénéré par le bot à chaque release à partir des notes des [GitHub Releases](https://github.com/enimaloc/catapult/releases) : pour corriger une entrée, modifie les notes de la release (ou le changelog de la PR de release avant sa publication), pas ce fichier.
 
+## [v1.5.1](https://github.com/enimaloc/catapult/releases/tag/v1.5.1) - 2026-11-16
+
+### Fixes
+- **epic:** send the EOS client secret unencoded in the Basic header (c734861)
+- **epic:** align the Epic Games copy with the other integrations (3c3dc64)
+- merge Epic Games OAuth link fixes into dev (80689e9)
+
 ## [v1.5.0](https://github.com/enimaloc/catapult/releases/tag/v1.5.0) - 2026-11-16
 
 ### Features
