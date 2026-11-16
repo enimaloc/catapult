@@ -390,6 +390,56 @@ class ChannelActionsControllerTest {
     }
 
     @Test
+    void epicStatus_isTheMembersOwn() throws Exception {
+        when(apiService.epicStatus("enimaloc")).thenReturn(
+                new fr.enimaloc.catapult.common.dto.connect.EpicLinkStateResponse("PENDING", "Me", "Bot"));
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/channel/enimaloc/epic")
+                        .session(as("enimaloc")))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.status").value("PENDING"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.serviceAccountName")
+                        .value("Bot"));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/channel/someone/epic")
+                .session(as("enimaloc"))).andExpect(status().isForbidden());
+    }
+
+    @Test
+    void epicResendAndDisconnect_callTheApi() throws Exception {
+        when(apiService.epicResend("enimaloc")).thenReturn(200);
+        when(apiService.epicDisconnect("enimaloc")).thenReturn(204);
+
+        mvc.perform(post("/channel/enimaloc/epic/resend").with(csrf()).session(as("enimaloc")))
+                .andExpect(status().isNoContent());
+        mvc.perform(post("/channel/enimaloc/epic/disconnect").with(csrf()).session(as("enimaloc")))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).epicResend("enimaloc");
+        verify(apiService).epicDisconnect("enimaloc");
+    }
+
+    @Test
+    void epic_refusalsKeepTheirStatus() throws Exception {
+        when(apiService.epicResend("enimaloc")).thenReturn(403);
+        when(apiService.epicDisconnect("enimaloc")).thenReturn(502);
+
+        mvc.perform(post("/channel/enimaloc/epic/resend").with(csrf()).session(as("enimaloc")))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/channel/enimaloc/epic/disconnect").with(csrf()).session(as("enimaloc")))
+                .andExpect(status().isBadGateway());
+    }
+
+    @Test
+    void epic_onAnotherChannel_isForbidden() throws Exception {
+        mvc.perform(post("/channel/someone/epic/resend").with(csrf()).session(as("enimaloc"))).andExpect(status().isForbidden());
+        mvc.perform(post("/channel/someone/epic/disconnect").with(csrf()).session(as("enimaloc")))
+                .andExpect(status().isForbidden());
+
+        org.mockito.Mockito.verify(apiService, org.mockito.Mockito.never()).epicResend(org.mockito.ArgumentMatchers.any());
+        org.mockito.Mockito.verify(apiService, org.mockito.Mockito.never()).epicDisconnect(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
     void ankama_onAnotherChannel_isForbidden() throws Exception {
         mvc.perform(post("/channel/someone/ankama/enroll").with(csrf()).session(as("enimaloc"))
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content("{\"nameTag\":\"Me#1\"}"))

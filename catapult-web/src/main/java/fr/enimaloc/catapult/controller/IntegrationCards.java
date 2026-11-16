@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.controller;
 import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.channel.AnkamaData;
 import fr.enimaloc.catapult.common.dto.channel.BattleNetData;
+import fr.enimaloc.catapult.common.dto.channel.EpicData;
 import fr.enimaloc.catapult.common.dto.channel.MinecraftData;
 import fr.enimaloc.catapult.common.dto.channel.ObsData;
 import fr.enimaloc.catapult.common.dto.channel.SteamData;
@@ -65,6 +66,9 @@ public final class IntegrationCards {
         }
         if (ch.ankama() != null) {
             cards.add(ankama(ch.ankama()));
+        }
+        if (ch.epic() != null) {
+            cards.add(epic(ch.epic()));
         }
         if (ch.obs() != null) {
             cards.add(obs(ch.obs()));
@@ -328,6 +332,66 @@ public final class IntegrationCards {
 
     private static SpaState ankamaState(String flag, String status, List<String> statuses) {
         return SpaState.flag(flag, statuses.contains(status), "AnkamaLinkEvent.status=" + String.join("/", statuses));
+    }
+
+    // Epic: one sub-view and button per status, driven by the status field of EpicLinkEvent, which carries NONE too.
+    // Linking goes through Epic's login (catapult-api's /oauth2/authorization/epic), like Battle.net's, so a rejected
+    // or removed link offers the same button as none at all; the bot's request can also be sent again while the link
+    // waits (a declined one included), and the bot's chat tells the card the rest by itself, like Ankama's. A refused
+    // login comes back to this tab with its reason, which channel-connections.js tells. The names are sentence parts
+    // of their own so that the event can replace them in place.
+
+    static IntegrationDto epic(EpicData epic) {
+        String status = epic.status() == null ? "NONE" : epic.status();
+        return card("epic",
+                new Container(Attrs.id("epic-status-body"), Container.Kind.DIV, List.of(
+                        epicCase("caseNone", status, List.of("NONE"),
+                                new Text(Attrs.NONE, false, key(PREFIX + "epic.none"))),
+                        epicCase("casePending", status, List.of("PENDING"),
+                                new Container(Attrs.cls("epic-sentence"), Container.Kind.DIV, List.of(
+                                        new Text(Attrs.NONE, false, key(PREFIX + "epic.pending.before")),
+                                        epicName("epic-bot-name", "serviceAccountName", epic.serviceAccountName()),
+                                        new Text(Attrs.NONE, false, key(PREFIX + "epic.pending.after"))))),
+                        epicCase("caseRejected", status, List.of("INVITE_REJECTED"),
+                                new Text(Attrs.NONE, false, key(PREFIX + "epic.rejected"))),
+                        epicCase("caseAccepted", status, List.of("ACCEPTED"),
+                                new Container(Attrs.cls("epic-sentence"), Container.Kind.DIV, List.of(
+                                        new Text(Attrs.NONE, false, key(PREFIX + "epic.accepted")),
+                                        epicName("epic-name", "displayName", epic.displayName())))),
+                        epicCase("caseRemoved", status, List.of("REMOVED"),
+                                new Text(Attrs.NONE, false, key(PREFIX + "epic.removed"))),
+                        // No service account with room for one: nothing to do but wait.
+                        epicCase("caseFull", status, List.of("FULL"),
+                                new Text(Attrs.NONE, false, key(PREFIX + "epic.full"))))),
+
+                // An OAuth login, so it looks like the Battle.net card's actions: filled connect, text for the rest.
+                // Each button needs its own flag name, as the Minecraft card's do.
+                new Container(Attrs.id("epic-status-actions").withClass("card-actions"),
+                        Container.Kind.DIV, List.of(
+                        new Button(Attrs.id("epic-connect-btn")
+                                        .withState(epicState("showConnect", status,
+                                                List.of("NONE", "INVITE_REJECTED", "REMOVED"))),
+                                Button.Kind.FILLED, key(PREFIX + "epic.connect")),
+                        new Button(Attrs.id("epic-resend-btn")
+                                        .withState(epicState("showResend", status,
+                                                List.of("PENDING", "INVITE_REJECTED"))),
+                                Button.Kind.TEXT, key(PREFIX + "epic.resend")),
+                        new Button(Attrs.id("epic-disconnect-btn")
+                                        .withState(epicState("showDisconnect", status, List.of("PENDING", "ACCEPTED"))),
+                                Button.Kind.TEXT, key(PREFIX + "epic.disconnect")))));
+    }
+
+    private static Text epicName(String className, String field, String name) {
+        return new Text(Attrs.cls(className).withState(SpaState.sync("textContent", "EpicLinkEvent." + field)),
+                false, Message.literal(name));
+    }
+
+    private static Container epicCase(String flag, String status, List<String> statuses, IntegrationNode content) {
+        return new Container(Attrs.state(epicState(flag, status, statuses)), Container.Kind.DIV, List.of(content));
+    }
+
+    private static SpaState epicState(String flag, String status, List<String> statuses) {
+        return SpaState.flag(flag, statuses.contains(status), "EpicLinkEvent.status=" + String.join("/", statuses));
     }
 
     // OBS: no SSE event either, channel-connections.js refreshes the page after saving. Wide: its three fields sit

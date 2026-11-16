@@ -110,6 +110,9 @@ class FictitiousAccountServiceTest {
                 mock(fr.enimaloc.catapult.service.battlenet.BattleNetGateService.class),
                 new org.springframework.beans.factory.support.StaticListableBeanFactory()
                         .getBeanProvider(fr.enimaloc.catapult.service.battlenet.BattleNetFriendService.class),
+                mock(fr.enimaloc.catapult.service.epic.EpicGateService.class),
+                new org.springframework.beans.factory.support.StaticListableBeanFactory()
+                        .getBeanProvider(fr.enimaloc.catapult.service.epic.EpicFriendService.class),
                 new org.springframework.transaction.support.TransactionTemplate(
                         mock(org.springframework.transaction.PlatformTransactionManager.class)));
         SimulationProperties properties = new SimulationProperties();

@@ -89,6 +89,13 @@ public class TwitchLoginSuccessHandler implements AuthenticationSuccessHandler {
                     response.sendRedirect(channelIntegrationsUrl(catUser));
                     return;
                 }
+            } else if ("epic".equals(registrationId)) {
+                // Like Battle.net: the bot befriends the account, so the EOS access token is forgotten at once.
+                authorizedClientRepository.removeAuthorizedClient("epic", authentication, request, response);
+                if (webUrl != null && !webUrl.isBlank()) {
+                    response.sendRedirect(channelIntegrationsUrl(catUser));
+                    return;
+                }
             } else if ("xbox".equals(registrationId)) {
                 // Xbox is a secondary link: the user is already authenticated via Twitch.
                 // Only the refresh token needs saving — no login event, no JWT re-issuance.

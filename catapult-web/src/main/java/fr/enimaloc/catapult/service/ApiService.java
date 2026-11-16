@@ -34,10 +34,13 @@ import fr.enimaloc.catapult.common.dto.admin.TwRebuild;
 import fr.enimaloc.catapult.common.dto.admin.AccountDto;
 import fr.enimaloc.catapult.common.dto.admin.AnkamaAccountDto;
 import fr.enimaloc.catapult.common.dto.admin.AnkamaLoginStartDto;
+import fr.enimaloc.catapult.common.dto.admin.EpicAccountDto;
+import fr.enimaloc.catapult.common.dto.admin.EpicAccountsDto;
 import fr.enimaloc.catapult.common.dto.admin.BattleNetAccountDto;
 import fr.enimaloc.catapult.common.dto.admin.MinecraftDeviceCodeDto;
 import fr.enimaloc.catapult.common.dto.connect.AnkamaLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.connect.BattleNetLinkStateResponse;
+import fr.enimaloc.catapult.common.dto.connect.EpicLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
@@ -123,6 +126,15 @@ public interface ApiService {
     int ankamaResend(String username);
     /** Unlinks the member's Ankama account; catapult-api's status (204), 401 when logged out, 502 when unreachable. */
     int ankamaDisconnect(String username);
+    /** The logged-in member's own Epic link; null when logged out or catapult-api fails. */
+    EpicLinkStateResponse epicStatus(String username);
+    /**
+     * Has the Epic bot send its friend request again; catapult-api's status, 401 when logged out, 502 when
+     * unreachable.
+     */
+    int epicResend(String username);
+    /** Unlinks the member's Epic account; catapult-api's status (204), 401 when logged out, 502 when unreachable. */
+    int epicDisconnect(String username);
     /** Unlinks the member's Battle.net account; catapult-api's status (204), 401 when logged out, 502 when unreachable. */
     int battleNetDisconnect(String username);
     /** Unlinks the channel's Xbox account; catapult-api's status (204; 403 not the owner), 502 when unreachable. */
@@ -590,6 +602,19 @@ public interface ApiService {
     AdminCall<AnkamaAccountDto> adminPatchAnkamaAccount(UUID id, Map<String, Object> patch);
 
     int adminDeleteAnkamaAccount(UUID id);
+
+    /** The Epic bot pool with the page that gives a bot's code; null when it can't be read (Epic disabled in catapult-api, or unreachable). */
+    EpicAccountsDto adminEpicAccounts();
+
+    /**
+     * Adds an Epic bot, or logs {@code accountId} in again, from what the admin pasted from Epic's code page (it holds a
+     * one-time authorization code: never logged). A refusal carries catapult-api's message.
+     */
+    AdminCall<EpicAccountDto> adminAddEpicAccount(String pasted, UUID accountId);
+
+    AdminCall<EpicAccountDto> adminPatchEpicAccount(UUID id, Map<String, Object> patch);
+
+    int adminDeleteEpicAccount(UUID id);
 
     /** The trigger warning definitions, by sort order; null when catapult-api fails. */
     List<TwDefinitionDto> adminTws();

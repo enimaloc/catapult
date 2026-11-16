@@ -864,6 +864,112 @@ class ChannelVisibilityRenderingTest {
         assertThat(html).doesNotContain("data-conn=\"ankama\"").doesNotContain("ankama-status-body");
     }
 
+    private String epicPage(fr.enimaloc.catapult.common.dto.channel.EpicData epic) throws Exception {
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(new ChannelPageData(
+                new ChannelUserDto("id-1", "twitch-1", "enimaloc", "https://example.test/avatar.png"),
+                "enimaloc", true, true, true, null, new PagedBindings(0, 1, 0, List.of()),
+                List.of(), Set.of(), List.of(), Set.of(), null, null, null, null, null, null, null, null, null, null,
+                null, epic));
+        return mvc.perform(get("/spa/channel/enimaloc").locale(java.util.Locale.ENGLISH))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+    }
+
+    private static fr.enimaloc.catapult.common.dto.channel.EpicData epic(String status) {
+        return new fr.enimaloc.catapult.common.dto.channel.EpicData(status, "MockStreamer", "CatapultBot");
+    }
+
+    @Test
+    void epicCardRendersOneCasePerStatus() throws Exception {
+        String html = epicPage(new fr.enimaloc.catapult.common.dto.channel.EpicData("NONE", null, null));
+
+        String card = html.substring(html.indexOf("data-conn=\"epic\""));
+        for (String flag : List.of("caseNone", "casePending", "caseRejected", "caseAccepted", "caseRemoved", "caseFull")) {
+            assertThat(countOccurrences(card, "data-if=\"" + flag + "\"")).as(flag).isEqualTo(1);
+        }
+        assertThat(html).contains("<span>Epic Games</span>").contains("Not linked: sign in with Epic");
+        assertThat(html).contains("data-on=\"caseNone:EpicLinkEvent.status=NONE\"");
+        assertThat(html).contains("data-on=\"caseAccepted:EpicLinkEvent.status=ACCEPTED\"");
+        assertThat(openingTagForId(html, "epic-connect-btn")).doesNotContain("hidden")
+                .contains("data-on=\"showConnect:EpicLinkEvent.status=NONE/INVITE_REJECTED/REMOVED\"");
+        assertThat(html).contains("Sign in with Epic");
+        assertThat(openingTagForId(html, "epic-resend-btn")).contains("hidden");
+        assertThat(openingTagForId(html, "epic-disconnect-btn")).contains("hidden");
+    }
+
+    @Test
+    void epicPendingCase_showsTheBotAndTheResendButton() throws Exception {
+        String html = epicPage(epic("PENDING"));
+
+        String card = html.substring(html.indexOf("data-conn=\"epic\""));
+        String pendingCase = card.substring(card.lastIndexOf('<', card.indexOf("data-if=\"casePending\"")));
+        assertThat(pendingCase.substring(0, pendingCase.indexOf('>'))).doesNotContain("hidden");
+        assertThat(html).contains("Accept the friend request from").contains("CatapultBot")
+                .contains("in your Epic launcher")
+                .contains("data-value=\"textContent:EpicLinkEvent.serviceAccountName\"");
+        assertThat(openingTagForId(html, "epic-resend-btn")).doesNotContain("hidden");
+        assertThat(html).contains("Resend the request");
+        assertThat(openingTagForId(html, "epic-connect-btn")).contains("hidden");
+        assertThat(openingTagForId(html, "epic-disconnect-btn")).doesNotContain("hidden")
+                .contains("data-on=\"showDisconnect:EpicLinkEvent.status=PENDING/ACCEPTED\"");
+    }
+
+    @Test
+    void epicAcceptedCase_showsTheDisplayNameAndTheDisconnectButton() throws Exception {
+        String html = epicPage(epic("ACCEPTED"));
+
+        assertThat(html).contains("Connected as").contains("MockStreamer")
+                .contains("data-value=\"textContent:EpicLinkEvent.displayName\"");
+        assertThat(openingTagForId(html, "epic-disconnect-btn")).doesNotContain("hidden");
+        assertThat(openingTagForId(html, "epic-connect-btn")).contains("hidden");
+        assertThat(openingTagForId(html, "epic-resend-btn")).contains("hidden");
+    }
+
+    @Test
+    void epicRejected_offersTheLoginAgainAndTheRequestAgain() throws Exception {
+        String html = epicPage(epic("INVITE_REJECTED"));
+
+        assertThat(html).contains("Friend request declined");
+        assertThat(openingTagForId(html, "epic-connect-btn")).doesNotContain("hidden");
+        assertThat(openingTagForId(html, "epic-resend-btn")).doesNotContain("hidden")
+                .contains("data-on=\"showResend:EpicLinkEvent.status=PENDING/INVITE_REJECTED\"");
+        assertThat(openingTagForId(html, "epic-disconnect-btn")).contains("hidden");
+    }
+
+    @Test
+    void epicRemoved_offersTheLoginAgain() throws Exception {
+        String html = epicPage(epic("REMOVED"));
+
+        assertThat(html).contains("Friend removed in the Epic launcher");
+        assertThat(openingTagForId(html, "epic-connect-btn")).doesNotContain("hidden");
+        assertThat(openingTagForId(html, "epic-resend-btn")).contains("hidden");
+        assertThat(openingTagForId(html, "epic-disconnect-btn")).contains("hidden");
+    }
+
+    @Test
+    void epicFull_hidesEveryButton() throws Exception {
+        String html = epicPage(epic("FULL"));
+
+        assertThat(html).contains("Every Catapult Epic account is full for now");
+        assertThat(openingTagForId(html, "epic-connect-btn")).contains("hidden");
+        assertThat(openingTagForId(html, "epic-resend-btn")).contains("hidden");
+        assertThat(openingTagForId(html, "epic-disconnect-btn")).contains("hidden");
+    }
+
+    @Test
+    void aHostileEpicName_isRenderedEscaped() throws Exception {
+        String html = epicPage(new fr.enimaloc.catapult.common.dto.channel.EpicData("PENDING", "<b>x</b>", "<i>y</i>"));
+
+        assertThat(html).contains("&lt;i&gt;y&lt;/i&gt;").doesNotContain("<b>x</b>").doesNotContain("<i>y</i>");
+    }
+
+    @Test
+    void epicUnavailable_hasNoCard() throws Exception {
+        String html = epicPage(null);
+
+        assertThat(html).doesNotContain("data-conn=\"epic\"").doesNotContain("epic-status-body");
+    }
+
     @Test
     void battleNetUnavailable_hasNoCard() throws Exception {
         String html = battleNetPage(null);

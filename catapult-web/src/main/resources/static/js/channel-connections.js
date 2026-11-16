@@ -1,5 +1,5 @@
 /**
- * Handlers for the Steam/Minecraft/Battle.net/Ankama/Xbox/OBS connection cards. The Steam/Minecraft cards' elements are all
+ * Handlers for the Steam/Minecraft/Battle.net/Ankama/Epic/Xbox/OBS connection cards. The Steam/Minecraft cards' elements are all
  * pre-rendered and only toggled via the `hidden` class (spa:if/spa:switch, see
  * channel.html) instead of being created/destroyed per SSE event, so handlers only
  * need attaching once, at render — no refresh() either: the SSE echo updates the cards.
@@ -37,8 +37,8 @@ window.CatapultConnections = (function () {
     // Same pattern as the API's (AnkamaFriendService.NAME_TAG): Pseudo#tag, a tag of one to eight digits.
     const ANKAMA_NAME_TAG = /^\s*([^#\s][^#]*?)\s*#\s*(\d{1,8})\s*$/;
 
-    // What the Ankama card tells, in the page's language (index.html's body carries it).
-    function ankamaLabel(name, fallback) {
+    // What the Ankama and Epic cards tell, in the page's language (index.html's body carries it).
+    function pageLabel(name, fallback) {
         return document.body.dataset[name] ?? fallback;
     }
 
@@ -46,7 +46,7 @@ window.CatapultConnections = (function () {
     // CatapultChannel.postJson, a refusal says why: a bad format, an account of another channel, or no bot with room.
     async function enrollAnkama(input) {
         const { showError, actionFailed, unreachable } = CatapultChannel;
-        const format = () => ankamaLabel("labelAnkamaFormat", "Enter your Ankama name as Pseudo#1234");
+        const format = () => pageLabel("labelAnkamaFormat", "Enter your Ankama name as Pseudo#1234");
         const nameTag = input.value.trim();
         if (!ANKAMA_NAME_TAG.test(nameTag)) {
             showError(format());
@@ -65,13 +65,30 @@ window.CatapultConnections = (function () {
         } else if (response.status === 409) {
             const reason = (await response.json().catch(() => null))?.reason;
             showError(reason === "ALREADY_LINKED"
-                ? ankamaLabel("labelAnkamaAlreadyLinked",
+                ? pageLabel("labelAnkamaAlreadyLinked",
                     "This Ankama account is already linked to another Catapult channel")
-                : ankamaLabel("labelAnkamaFull",
+                : pageLabel("labelAnkamaFull",
                     "Every Catapult Ankama account is full for now: linking will be possible again soon."));
         } else {
             showError(actionFailed(response.status));
         }
+    }
+
+    // Why catapult-api refused an Epic login, which it sends back to this tab as ?error=<code>.
+    const EPIC_LINK_ERRORS = {
+        epic_full: ["labelEpicFull", "Every Catapult Epic account is full for now: linking will be possible again soon."],
+        epic_already_linked: ["labelEpicAlreadyLinked", "This Epic account is already linked to another Catapult account"],
+        epic_unavailable: ["labelEpicUnavailable", "Epic Games linking is not available for now: try again later."],
+    };
+
+    // Tells a refused Epic login once: the code leaves the address, so neither a reload nor binding again repeats it.
+    function showEpicLinkError() {
+        const url = new URL(location.href);
+        const code = url.searchParams.get("error");
+        if (!Object.hasOwn(EPIC_LINK_ERRORS, code)) return;
+        url.searchParams.delete("error");
+        history.replaceState(history.state, "", url);
+        CatapultChannel.showError(pageLabel(...EPIC_LINK_ERRORS[code]));
     }
 
     // The Integrations tab is built only once picked (lazy.js): its cards are bound then, as with the page otherwise.
@@ -83,6 +100,7 @@ window.CatapultConnections = (function () {
     function bind() {
         if (!document.getElementById("channel-connections")) return;
         showTwitchatPresence();
+        showEpicLinkError();
 
         const { on, postJson, postSwitch } = CatapultChannel;
         const baseUrl = CatapultChannel.baseUrl();
@@ -126,6 +144,12 @@ window.CatapultConnections = (function () {
         on("ankama-connect-btn", "click", () => enrollAnkama(document.getElementById("ankama-name-input")));
         on("ankama-resend-btn", "click", () => postJson(`${baseUrl}/ankama/resend`, {}));
         on("ankama-disconnect-btn", "click", () => postJson(`${baseUrl}/ankama/disconnect`, {}));
+
+        // Epic. Linking leaves for Epic's login, which sends the member back to this tab; the bot's request can be
+        // sent again while the link waits.
+        on("epic-connect-btn", "click", () => location.assign("/oauth2/authorization/epic"));
+        on("epic-resend-btn", "click", () => postJson(`${baseUrl}/epic/resend`, {}));
+        on("epic-disconnect-btn", "click", () => postJson(`${baseUrl}/epic/disconnect`, {}));
 
         // OBS: connecting and disconnecting both save the whole form, only `enabled` differs.
         // An empty password field means "keep the stored one" (it's never sent back to the page),

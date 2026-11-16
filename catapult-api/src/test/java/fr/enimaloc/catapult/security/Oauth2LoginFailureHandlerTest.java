@@ -4,10 +4,15 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.mock.web.MockHttpSession;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextImpl;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import fr.enimaloc.catapult.domain.account.UserAccount;
 import jakarta.servlet.http.Cookie;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -63,6 +68,68 @@ class Oauth2LoginFailureHandlerTest {
                 new OAuth2AuthenticationException(new OAuth2Error("server_error")));
 
         assertThat(response.getRedirectedUrl()).isEqualTo("http://localhost:8081/login?error");
+    }
+
+    @Test
+    void epicErrors_areNotRetried() throws Exception {
+        // Even on the retrying (Twitch) callback: these are business errors, a fresh attempt changes nothing.
+        for (String code : new String[]{"epic_unavailable", "epic_full", "epic_already_linked"}) {
+            response = new MockHttpServletResponse();
+            handler.onAuthenticationFailure(request, response, new OAuth2AuthenticationException(new OAuth2Error(code)));
+
+            assertThat(response.getRedirectedUrl()).isEqualTo("http://localhost:8081/login?error");
+            assertThat(response.getCookie("catapult_oauth2_retry").getMaxAge()).isZero();
+        }
+    }
+
+    @Test
+    void epicLinkRefusals_goBackToTheChannelsIntegrationsTab_withTheirCode() throws Exception {
+        for (String code : new String[]{"epic_unavailable", "epic_full", "epic_already_linked"}) {
+            request = epicCallbackOf("jeb_");
+            response = new MockHttpServletResponse();
+
+            handler.onAuthenticationFailure(request, response,
+                    new OAuth2AuthenticationException(new OAuth2Error(code)));
+
+            assertThat(response.getRedirectedUrl())
+                    .isEqualTo("http://localhost:8081/channel/jeb_?error=" + code + "#integrations");
+        }
+    }
+
+    @Test
+    void epicLinkRefusal_withoutTheMembersSession_showsTheLoginError() throws Exception {
+        request = new MockHttpServletRequest("GET", "/login/oauth2/code/epic");
+
+        handler.onAuthenticationFailure(request, response,
+                new OAuth2AuthenticationException(new OAuth2Error("epic_full")));
+
+        assertThat(response.getRedirectedUrl()).isEqualTo("http://localhost:8081/login?error");
+    }
+
+    @Test
+    void otherLinkFailures_stillShowTheLoginError() throws Exception {
+        for (String code : new String[]{"battlenet_full", "battlenet_unavailable", "server_error"}) {
+            request = epicCallbackOf("jeb_");
+            response = new MockHttpServletResponse();
+
+            handler.onAuthenticationFailure(request, response,
+                    new OAuth2AuthenticationException(new OAuth2Error(code)));
+
+            assertThat(response.getRedirectedUrl()).isEqualTo("http://localhost:8081/login?error");
+        }
+    }
+
+    /** The Epic callback of a member logged in through Twitch as {@code login}, as the link's session holds them. */
+    private static MockHttpServletRequest epicCallbackOf(String login) {
+        UserAccount account = new UserAccount();
+        account.setTwitchUsername(login);
+        CatapultOAuth2User user = new CatapultOAuth2User(null, account, false);
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, new SecurityContextImpl(
+                UsernamePasswordAuthenticationToken.authenticated(user, null, user.getAuthorities())));
+        MockHttpServletRequest callback = new MockHttpServletRequest("GET", "/login/oauth2/code/epic");
+        callback.setSession(session);
+        return callback;
     }
 
     @Test

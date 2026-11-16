@@ -14,6 +14,7 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
+import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestClient;
 import proto.ExternalGame;
@@ -50,7 +51,8 @@ class IgdbServiceDetectedGameTest {
     private final GameMappingRepository mappings = mock(GameMappingRepository.class);
     private final IgdbService service = spy(new IgdbService(igdb, cache, externalIds,
             mock(IgdbGameCclRepository.class), mock(TwitchCclDefinitionRepository.class), steamStore,
-            mock(RestClient.class), new SimpleMeterRegistry(), SimulationGates.none(), mappings));
+            mock(RestClient.class), new SimpleMeterRegistry(), SimulationGates.none(), mappings,
+            new StaticListableBeanFactory().getBeanProvider(EpicCatalogClient.class)));
 
     @BeforeEach
     void setUp() {

@@ -37,6 +37,7 @@ public final class ChannelEvents {
     public static final String MINECRAFT_LINK_CHANGED = "minecraft.link.changed";
     public static final String BATTLENET_LINK_CHANGED = "battlenet.link.changed";
     public static final String ANKAMA_LINK_CHANGED = "ankama.link.changed";
+    public static final String EPIC_LINK_CHANGED = "epic.link.changed";
     public static final String CUSTOM_BINDING_CHANGED = "custom.binding.changed";
     public static final String CUSTOM_BINDINGS_UPDATED = "custom.bindings.updated";
 
@@ -106,6 +107,13 @@ public final class ChannelEvents {
      */
     public record AnkamaLinkChanged(String channelId, String channelLogin, String status, String nameTag,
                                     String serviceAccountTag) {}
+
+    /**
+     * The channel's Epic link changed: its status ({@code NONE} once gone), the streamer's display name and the
+     * display name of the bot it is linked to (the latter only while the link waits for the streamer).
+     */
+    public record EpicLinkChanged(String channelId, String channelLogin, String status, String displayName,
+                                  String serviceAccountName) {}
 
     /**
      * New notifications wait to be sent to these members' Twitchat: whichever catapult-web instance holds one

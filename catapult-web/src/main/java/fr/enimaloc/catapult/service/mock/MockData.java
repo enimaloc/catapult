@@ -22,8 +22,10 @@ import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
 import fr.enimaloc.catapult.common.dto.channel.XboxData;
 import fr.enimaloc.catapult.common.dto.channel.AnkamaData;
 import fr.enimaloc.catapult.common.dto.channel.BattleNetData;
+import fr.enimaloc.catapult.common.dto.channel.EpicData;
 import fr.enimaloc.catapult.common.dto.connect.AnkamaLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.connect.BattleNetLinkStateResponse;
+import fr.enimaloc.catapult.common.dto.connect.EpicLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEvents;
@@ -68,6 +70,9 @@ public class MockData {
     private static final AnkamaLinkStateResponse ANKAMA_UNLINKED = new AnkamaLinkStateResponse("NONE", null, null);
     private static final String MOCK_ANKAMA_TAG = "MockStreamer#1234";
     private static final String MOCK_BOT_ANKAMA_TAG = "CatapultBot#4242";
+    private static final EpicLinkStateResponse EPIC_UNLINKED = new EpicLinkStateResponse("NONE", null, null);
+    private static final String MOCK_EPIC_NAME = "MockStreamer";
+    private static final String MOCK_BOT_EPIC_NAME = "CatapultBot";
     private static final String MOCK_BATTLE_TAG = "MockStreamer#1234";
     private static final String MOCK_BOT_BATTLE_TAG = "CatapultBot#4242";
 
@@ -115,6 +120,8 @@ public class MockData {
     private BattleNetLinkStateResponse battleNetLink = BATTLENET_UNLINKED;
     /** Ankama is offered to every mock session too, with the same presets. */
     private AnkamaLinkStateResponse ankamaLink = ANKAMA_UNLINKED;
+    /** Epic is offered to every mock session too, with the same presets. */
+    private EpicLinkStateResponse epicLink = EPIC_UNLINKED;
     private ObsData obsData;
     private String obsPassword;
     private String twitchatBranch = TwitchatData.AUTO;
@@ -224,6 +231,11 @@ public class MockData {
             case 0 -> new AnkamaLinkStateResponse("ACCEPTED", MOCK_ANKAMA_TAG, null);
             case 1 -> new AnkamaLinkStateResponse("PENDING", MOCK_ANKAMA_TAG, MOCK_BOT_ANKAMA_TAG);
             default -> ANKAMA_UNLINKED;
+        };
+        data.epicLink = switch (id) {
+            case 0 -> new EpicLinkStateResponse("ACCEPTED", MOCK_EPIC_NAME, null);
+            case 1 -> new EpicLinkStateResponse("PENDING", MOCK_EPIC_NAME, MOCK_BOT_EPIC_NAME);
+            default -> EPIC_UNLINKED;
         };
         return data;
     }
@@ -355,7 +367,7 @@ public class MockData {
                 obsData == null ? null : TwitchatData.of(twitchatBranch),
                 username.equals(channelDto.twitchUsername()) ? customBindings.state() : null,
                 // drops: the mock has no experiments, they are offered
-                drops(), ankamaData());
+                drops(), ankamaData(), epicData());
     }
 
     /** The mock's one running drops campaign, on the first binding's category. */
@@ -379,6 +391,10 @@ public class MockData {
 
     private AnkamaData ankamaData() {
         return new AnkamaData(ankamaLink.status(), ankamaLink.nameTag(), ankamaLink.serviceAccountTag());
+    }
+
+    private EpicData epicData() {
+        return new EpicData(epicLink.status(), epicLink.displayName(), epicLink.serviceAccountName());
     }
 
     private BattleNetData battleNetData() {
@@ -418,6 +434,14 @@ public class MockData {
 
     public void ankamaDisconnect() {
         ankamaLink = ANKAMA_UNLINKED;
+    }
+
+    public EpicLinkStateResponse getEpicLink() {
+        return epicLink;
+    }
+
+    public void epicDisconnect() {
+        epicLink = EPIC_UNLINKED;
     }
 
     public void battleNetDisconnect() {

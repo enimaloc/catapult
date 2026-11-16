@@ -44,6 +44,7 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
             "dtdd.enabled=true",
             "battlenet.enabled=true",
             "ankama.enabled=true",
+            "epic.enabled=true",
             "ankama.sessions.enabled=false",
             "battlenet.client-id=full-context-test",
             "battlenet.client-secret=full-context-test",

@@ -13,6 +13,9 @@ import fr.enimaloc.catapult.service.access.WhitelistService;
 import fr.enimaloc.catapult.service.account.AdminMigrationService;
 import fr.enimaloc.catapult.service.battlenet.BattleNetFriendService;
 import fr.enimaloc.catapult.service.battlenet.BattleNetGateService;
+import fr.enimaloc.catapult.service.epic.EpicEnrollmentException;
+import fr.enimaloc.catapult.service.epic.EpicFriendService;
+import fr.enimaloc.catapult.service.epic.EpicGateService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,6 +46,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.mockito.Mockito.*;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
@@ -63,6 +67,9 @@ class CatapultOAuth2UserServiceTest {
     @Mock private BattleNetFriendService battleNetFriends;
     @Mock private ObjectProvider<BattleNetFriendService> battleNetFriendsProvider;
     @Mock private DefaultOAuth2UserService battleNetUserInfo;
+    @Mock private EpicGateService epicGate;
+    @Mock private EpicFriendService epicFriends;
+    @Mock private ObjectProvider<EpicFriendService> epicFriendsProvider;
     @Mock private PlatformTransactionManager transactionManager;
 
     @Mock private RestClient.RequestHeadersUriSpec getSpec;
@@ -77,7 +84,7 @@ class CatapultOAuth2UserServiceTest {
             userAccountRepository, oAuthTokenRepository, userSettingsRepository,
             getterConfigRepository, tokenEncryptionService, eventPublisher, restClient, whitelistService,
             adminMigrationService, inviteService, battleNetGate, battleNetFriendsProvider,
-            new TransactionTemplate(transactionManager)
+            epicGate, epicFriendsProvider, new TransactionTemplate(transactionManager)
         );
         ReflectionTestUtils.setField(service, "ownerId", "");
         ReflectionTestUtils.setField(service, "defaultNoGameName", "");
@@ -376,5 +383,94 @@ class CatapultOAuth2UserServiceTest {
 
         verifyNoInteractions(oAuthTokenRepository);
         verifyNoInteractions(transactionManager);
+    }
+
+    private OAuth2UserRequest epicRequest() {
+        ClientRegistration reg = ClientRegistration.withRegistrationId("epic")
+            .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+            .clientId("client-id")
+            .redirectUri("http://localhost/callback")
+            .authorizationUri("https://www.epicgames.com/id/authorize")
+            .tokenUri("https://api.epicgames.dev/epic/oauth/v2/token")
+            .userInfoUri("https://api.epicgames.dev/epic/oauth/v2/userInfo")
+            .userNameAttributeName("sub")
+            .build();
+        OAuth2AccessToken token = new OAuth2AccessToken(
+            OAuth2AccessToken.TokenType.BEARER, "eos-token", Instant.now(), Instant.now().plusSeconds(3600));
+        return new OAuth2UserRequest(reg, token);
+    }
+
+    private UserAccount epicStreamer(boolean gateOpen) {
+        UserAccount account = new UserAccount();
+        account.setId(UUID.randomUUID());
+        signedInStreamer(account);
+        when(epicFriendsProvider.getIfAvailable()).thenReturn(epicFriends);
+        when(epicGate.isAvailableFor(account)).thenReturn(gateOpen);
+        return account;
+    }
+
+    private String errorCodeOf(OAuth2UserRequest request) {
+        return ((OAuth2AuthenticationException) catchThrowable(() -> service.loadUser(request)))
+            .getError().getErrorCode();
+    }
+
+    @Test
+    void epicLink_enrollsTheSubAndPreferredUsername() {
+        UserAccount account = epicStreamer(true);
+        battleNetUserInfoIs(Map.of("sub", "abc123", "preferred_username", "Streamer"));
+
+        var user = service.loadUser(epicRequest());
+
+        verify(epicFriends).enroll(account, "abc123", "Streamer");
+        assertThat(user).isNotNull();
+        verifyNoInteractions(oAuthTokenRepository);
+    }
+
+    @Test
+    void epicLink_fallsBackToTheSubWhenThereIsNoDisplayName() {
+        UserAccount account = epicStreamer(true);
+        battleNetUserInfoIs(Map.of("sub", "abc123"));
+
+        service.loadUser(epicRequest());
+
+        verify(epicFriends).enroll(account, "abc123", "abc123");
+    }
+
+    @Test
+    void epicLink_withoutTwitchSession_isUnauthorized() {
+        assertThat(errorCodeOf(epicRequest())).isEqualTo("unauthorized");
+        verifyNoInteractions(epicFriends);
+    }
+
+    @Test
+    void epicLink_closedGate_isEpicUnavailable() {
+        epicStreamer(false);
+
+        assertThat(errorCodeOf(epicRequest())).isEqualTo("epic_unavailable");
+        verifyNoInteractions(epicFriends);
+    }
+
+    @Test
+    void epicLink_serviceAbsent_isEpicUnavailable() {
+        UserAccount account = new UserAccount();
+        account.setId(UUID.randomUUID());
+        signedInStreamer(account);
+        when(epicFriendsProvider.getIfAvailable()).thenReturn(null);
+
+        assertThat(errorCodeOf(epicRequest())).isEqualTo("epic_unavailable");
+    }
+
+    @Test
+    void epicLink_full_isEpicFull_alreadyLinked_isEpicAlreadyLinked() {
+        UserAccount account = epicStreamer(true);
+        battleNetUserInfoIs(Map.of("sub", "abc123", "preferred_username", "Streamer"));
+        when(epicFriends.enroll(account, "abc123", "Streamer"))
+            .thenThrow(new EpicEnrollmentException(EpicEnrollmentException.Reason.NO_CAPACITY, "full"))
+            .thenThrow(new EpicEnrollmentException(EpicEnrollmentException.Reason.NO_ACCOUNT_AVAILABLE, "none"))
+            .thenThrow(new EpicEnrollmentException(EpicEnrollmentException.Reason.ALREADY_LINKED, "linked"));
+
+        assertThat(errorCodeOf(epicRequest())).isEqualTo("epic_full");
+        assertThat(errorCodeOf(epicRequest())).isEqualTo("epic_full");
+        assertThat(errorCodeOf(epicRequest())).isEqualTo("epic_already_linked");
     }
 }

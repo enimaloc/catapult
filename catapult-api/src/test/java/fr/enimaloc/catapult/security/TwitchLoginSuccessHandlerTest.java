@@ -234,6 +234,21 @@ class TwitchLoginSuccessHandlerTest {
     }
 
     @Test
+    void epicAuthorizedClient_isRemovedAfterTheLink() throws Exception {
+        ReflectionTestUtils.setField(handler, "webUrl", "https://web.example.com");
+        userAccount.setTwitchUsername("jeb_");
+        var authToken = mock(OAuth2AuthenticationToken.class);
+        when(authToken.getAuthorizedClientRegistrationId()).thenReturn("epic");
+        when(authToken.getPrincipal()).thenReturn(catapultUser);
+
+        handler.onAuthenticationSuccess(request, response, authToken);
+
+        verify(authorizedClientRepository).removeAuthorizedClient("epic", authToken, request, response);
+        verify(oAuthTokenRepository, never()).save(any());
+        assertThat(response.getRedirectedUrl()).isEqualTo("https://web.example.com/channel/jeb_#integrations");
+    }
+
+    @Test
     void twitchToken_withWebUrl_sendsCatapultWebsStateBackAndForgetsIt() throws Exception {
         ReflectionTestUtils.setField(handler, "webUrl", "https://web.example.com");
         MockHttpSession session = new MockHttpSession();

@@ -4,12 +4,17 @@ import fr.enimaloc.catapult.domain.ankama.AnkamaFriendLink;
 import fr.enimaloc.catapult.domain.ankama.AnkamaServiceAccount;
 import fr.enimaloc.catapult.domain.battlenet.BattleNetFriendLink;
 import fr.enimaloc.catapult.domain.battlenet.BattleNetServiceAccount;
+import fr.enimaloc.catapult.domain.epic.EpicFriendLink;
+import fr.enimaloc.catapult.domain.epic.EpicServiceAccount;
 import fr.enimaloc.catapult.repository.ankama.AnkamaFriendLinkRepository;
 import fr.enimaloc.catapult.repository.ankama.AnkamaServiceAccountRepository;
 import fr.enimaloc.catapult.repository.battlenet.BattleNetFriendLinkRepository;
 import fr.enimaloc.catapult.repository.battlenet.BattleNetServiceAccountRepository;
+import fr.enimaloc.catapult.repository.epic.EpicFriendLinkRepository;
+import fr.enimaloc.catapult.repository.epic.EpicServiceAccountRepository;
 import fr.enimaloc.catapult.service.ankama.AnkamaSessionManager;
 import fr.enimaloc.catapult.service.battlenet.BattleNetSessionManager;
+import fr.enimaloc.catapult.service.epic.EpicSessionManager;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.binder.MeterBinder;
@@ -20,7 +25,7 @@ import org.springframework.stereotype.Component;
 import java.util.function.LongSupplier;
 
 /**
- * The Battle.net and Ankama bot pools, by {@code platform}: enabled bots by login state ({@code catapult.bots.accounts}),
+ * The Battle.net, Ankama and Epic bot pools, by {@code platform}: enabled bots by login state ({@code catapult.bots.accounts}),
  * sessions ready ({@code catapult.bots.sessions.ready}, 0 when the platform is off) and streamer links by status
  * ({@code catapult.bots.links}). Read on each scrape: a few count queries. Strong references: the count lambdas have
  * nothing else holding them, and a gauge only keeps its object weakly by default (it would read NaN once collected).
@@ -31,13 +36,17 @@ public class BotGauges implements MeterBinder {
 
     private static final String BATTLENET = "battlenet";
     private static final String ANKAMA = "ankama";
+    private static final String EPIC = "epic";
 
     private final BattleNetServiceAccountRepository battleNetAccounts;
     private final BattleNetFriendLinkRepository battleNetLinks;
     private final AnkamaServiceAccountRepository ankamaAccounts;
     private final AnkamaFriendLinkRepository ankamaLinks;
+    private final EpicServiceAccountRepository epicAccounts;
+    private final EpicFriendLinkRepository epicLinks;
     private final ObjectProvider<BattleNetSessionManager> battleNetSessions;
     private final ObjectProvider<AnkamaSessionManager> ankamaSessions;
+    private final ObjectProvider<EpicSessionManager> epicSessions;
 
     @Override
     public void bindTo(MeterRegistry registry) {
@@ -48,11 +57,17 @@ public class BotGauges implements MeterBinder {
         for (AnkamaServiceAccount.AuthState state : AnkamaServiceAccount.AuthState.values()) {
             accounts(registry, ANKAMA, state.name(), () -> ankamaAccounts.countByEnabledTrueAndAuthState(state));
         }
+        for (EpicServiceAccount.AuthState state : EpicServiceAccount.AuthState.values()) {
+            accounts(registry, EPIC, state.name(), () -> epicAccounts.countByEnabledTrueAndAuthState(state));
+        }
         for (BattleNetFriendLink.Status status : BattleNetFriendLink.Status.values()) {
             links(registry, BATTLENET, status.name(), () -> battleNetLinks.countByStatus(status));
         }
         for (AnkamaFriendLink.Status status : AnkamaFriendLink.Status.values()) {
             links(registry, ANKAMA, status.name(), () -> ankamaLinks.countByStatus(status));
+        }
+        for (EpicFriendLink.Status status : EpicFriendLink.Status.values()) {
+            links(registry, EPIC, status.name(), () -> epicLinks.countByStatus(status));
         }
         Gauge.builder("catapult.bots.sessions.ready", battleNetSessions,
                         p -> { BattleNetSessionManager m = p.getIfAvailable(); return m == null ? 0 : m.readySessionCount(); })
@@ -63,6 +78,12 @@ public class BotGauges implements MeterBinder {
         Gauge.builder("catapult.bots.sessions.ready", ankamaSessions,
                         p -> { AnkamaSessionManager m = p.getIfAvailable(); return m == null ? 0 : m.readySessionCount(); })
                 .tag("platform", ANKAMA)
+                .description("Bot sessions logged in right now")
+                .strongReference(true)
+                .register(registry);
+        Gauge.builder("catapult.bots.sessions.ready", epicSessions,
+                        p -> { EpicSessionManager m = p.getIfAvailable(); return m == null ? 0 : m.readySessionCount(); })
+                .tag("platform", EPIC)
                 .description("Bot sessions logged in right now")
                 .strongReference(true)
                 .register(registry);

@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.service.ankama.AnkamaGateService;
 import fr.enimaloc.catapult.service.battlenet.BattleNetGateService;
 import fr.enimaloc.catapult.service.binding.RaidRestoreGateService;
 import fr.enimaloc.catapult.service.drops.DropsGate;
+import fr.enimaloc.catapult.service.epic.EpicGateService;
 import fr.enimaloc.catapult.service.minecraft.MinecraftGateService;
 import fr.enimaloc.catapult.service.title.StreamTitleService;
 import org.junit.jupiter.api.Test;
@@ -34,6 +35,7 @@ class GateExperimentDeclarationTest {
                 MinecraftGateService.EXPERIMENT_KEY,
                 BattleNetGateService.EXPERIMENT_KEY,
                 AnkamaGateService.EXPERIMENT_KEY,
+                EpicGateService.EXPERIMENT_KEY,
                 StreamTitleService.EXPERIMENT_KEY,
                 RaidRestoreGateService.EXPERIMENT_KEY,
                 DropsGate.EXPERIMENT_KEY);

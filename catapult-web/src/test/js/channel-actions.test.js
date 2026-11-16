@@ -289,6 +289,8 @@ describe("channel-connections", () => {
               <button id="ankama-connect-btn"></button>
               <button id="ankama-resend-btn"></button>
               <button id="ankama-disconnect-btn"></button>
+              <button id="epic-resend-btn"></button>
+              <button id="epic-disconnect-btn"></button>
               <input id="obs-host" value="10.0.0.2">
               <input id="obs-port" value="4456">
               <input id="obs-password" value="">
@@ -439,6 +441,53 @@ describe("channel-connections", () => {
                 ["/channel/enimaloc/ankama/resend", {}],
                 ["/channel/enimaloc/ankama/disconnect", {}],
             ]);
+        });
+    });
+
+    describe("the Epic link", () => {
+        const snackbars = () => Array.from(document.querySelectorAll("mdui-snackbar"), s => s.textContent);
+
+        it("resends the friend request and unlinks with posts", async () => {
+            await click("#epic-resend-btn");
+            await click("#epic-disconnect-btn");
+
+            expect(posts()).toEqual([
+                ["/channel/enimaloc/epic/resend", {}],
+                ["/channel/enimaloc/epic/disconnect", {}],
+            ]);
+        });
+
+        it.each([
+            ["epic_full", "Every Catapult Epic account is full for now: linking will be possible again soon."],
+            ["epic_already_linked", "This Epic account is already linked to another Catapult account"],
+            ["epic_unavailable", "Epic Games linking is not available for now: try again later."],
+        ])("tells a login refused with %s once, and takes it off the address", (code, text) => {
+            history.replaceState(null, "", `/channel/enimaloc?page=2&error=${code}#integrations`);
+
+            render();
+            render();
+
+            expect(snackbars()).toEqual([text]);
+            expect(location.pathname + location.search + location.hash).toBe("/channel/enimaloc?page=2#integrations");
+        });
+
+        it("speaks the page's language", () => {
+            document.body.dataset.labelEpicAlreadyLinked = "Deja lie";
+            history.replaceState(null, "", "/channel/enimaloc?error=epic_already_linked#integrations");
+
+            render();
+
+            expect(snackbars()).toEqual(["Deja lie"]);
+            delete document.body.dataset.labelEpicAlreadyLinked;
+        });
+
+        it("leaves any other error alone", () => {
+            history.replaceState(null, "", "/channel/enimaloc?error=battlenet_full#integrations");
+
+            render();
+
+            expect(snackbars()).toEqual([]);
+            expect(location.search).toBe("?error=battlenet_full");
         });
     });
 
