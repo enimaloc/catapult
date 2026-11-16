@@ -3,8 +3,11 @@ package fr.enimaloc.catapult.config;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.oauth2.client.endpoint.DefaultOAuth2TokenRequestHeadersConverter;
 import org.springframework.security.oauth2.client.endpoint.OAuth2AccessTokenResponseClient;
+import org.springframework.security.oauth2.client.endpoint.OAuth2AuthorizationCodeGrantRequest;
 import org.springframework.security.oauth2.client.endpoint.OAuth2RefreshTokenGrantRequest;
+import org.springframework.security.oauth2.client.endpoint.RestClientAuthorizationCodeTokenResponseClient;
 import org.springframework.security.oauth2.client.endpoint.RestClientRefreshTokenTokenResponseClient;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
@@ -118,5 +121,25 @@ public class OAuth2ClientConfig {
     @Bean
     public OAuth2AccessTokenResponseClient<OAuth2RefreshTokenGrantRequest> refreshTokenResponseClient() {
         return new RestClientRefreshTokenTokenResponseClient();
+    }
+
+    /**
+     * Spring's authorization-code token client, except that Epic (EOS) gets its client credentials in the Basic
+     * header as-is: Spring URL-encodes them, EOS does not decode them and rejects a secret containing "/" or "+".
+     */
+    @Bean
+    public OAuth2AccessTokenResponseClient<OAuth2AuthorizationCodeGrantRequest> authorizationCodeTokenResponseClient() {
+        DefaultOAuth2TokenRequestHeadersConverter<OAuth2AuthorizationCodeGrantRequest> standard =
+            new DefaultOAuth2TokenRequestHeadersConverter<>();
+        DefaultOAuth2TokenRequestHeadersConverter<OAuth2AuthorizationCodeGrantRequest> unencoded =
+            new DefaultOAuth2TokenRequestHeadersConverter<>();
+        unencoded.setEncodeClientCredentials(false);
+
+        RestClientAuthorizationCodeTokenResponseClient client = new RestClientAuthorizationCodeTokenResponseClient();
+        client.setHeadersConverter(request ->
+            "epic".equals(request.getClientRegistration().getRegistrationId())
+                ? unencoded.convert(request)
+                : standard.convert(request));
+        return client;
     }
 }

@@ -887,12 +887,12 @@ class ChannelVisibilityRenderingTest {
         for (String flag : List.of("caseNone", "casePending", "caseRejected", "caseAccepted", "caseRemoved", "caseFull")) {
             assertThat(countOccurrences(card, "data-if=\"" + flag + "\"")).as(flag).isEqualTo(1);
         }
-        assertThat(html).contains("<span>Epic Games</span>").contains("Not linked: sign in with Epic");
+        assertThat(html).contains("<span>Epic Games</span>").contains("Not linked: link your Epic Games account");
         assertThat(html).contains("data-on=\"caseNone:EpicLinkEvent.status=NONE\"");
         assertThat(html).contains("data-on=\"caseAccepted:EpicLinkEvent.status=ACCEPTED\"");
         assertThat(openingTagForId(html, "epic-connect-btn")).doesNotContain("hidden")
                 .contains("data-on=\"showConnect:EpicLinkEvent.status=NONE/INVITE_REJECTED/REMOVED\"");
-        assertThat(html).contains("Sign in with Epic");
+        assertThat(html).contains("Connect");
         assertThat(openingTagForId(html, "epic-resend-btn")).contains("hidden");
         assertThat(openingTagForId(html, "epic-disconnect-btn")).contains("hidden");
     }
@@ -905,7 +905,7 @@ class ChannelVisibilityRenderingTest {
         String pendingCase = card.substring(card.lastIndexOf('<', card.indexOf("data-if=\"casePending\"")));
         assertThat(pendingCase.substring(0, pendingCase.indexOf('>'))).doesNotContain("hidden");
         assertThat(html).contains("Accept the friend request from").contains("CatapultBot")
-                .contains("in your Epic launcher")
+                .contains("in your Epic Games launcher")
                 .contains("data-value=\"textContent:EpicLinkEvent.serviceAccountName\"");
         assertThat(openingTagForId(html, "epic-resend-btn")).doesNotContain("hidden");
         assertThat(html).contains("Resend the request");
@@ -940,7 +940,7 @@ class ChannelVisibilityRenderingTest {
     void epicRemoved_offersTheLoginAgain() throws Exception {
         String html = epicPage(epic("REMOVED"));
 
-        assertThat(html).contains("Friend removed in the Epic launcher");
+        assertThat(html).contains("Friend removed in the Epic Games launcher");
         assertThat(openingTagForId(html, "epic-connect-btn")).doesNotContain("hidden");
         assertThat(openingTagForId(html, "epic-resend-btn")).contains("hidden");
         assertThat(openingTagForId(html, "epic-disconnect-btn")).contains("hidden");
@@ -950,7 +950,7 @@ class ChannelVisibilityRenderingTest {
     void epicFull_hidesEveryButton() throws Exception {
         String html = epicPage(epic("FULL"));
 
-        assertThat(html).contains("Every Catapult Epic account is full for now");
+        assertThat(html).contains("Every Catapult Epic Games account is full for now");
         assertThat(openingTagForId(html, "epic-connect-btn")).contains("hidden");
         assertThat(openingTagForId(html, "epic-resend-btn")).contains("hidden");
         assertThat(openingTagForId(html, "epic-disconnect-btn")).contains("hidden");

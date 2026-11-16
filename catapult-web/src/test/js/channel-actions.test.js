@@ -458,8 +458,8 @@ describe("channel-connections", () => {
         });
 
         it.each([
-            ["epic_full", "Every Catapult Epic account is full for now: linking will be possible again soon."],
-            ["epic_already_linked", "This Epic account is already linked to another Catapult account"],
+            ["epic_full", "Every Catapult Epic Games account is full for now: linking will be possible again soon."],
+            ["epic_already_linked", "This Epic Games account is already linked to another Catapult channel"],
             ["epic_unavailable", "Epic Games linking is not available for now: try again later."],
         ])("tells a login refused with %s once, and takes it off the address", (code, text) => {
             history.replaceState(null, "", `/channel/enimaloc?page=2&error=${code}#integrations`);

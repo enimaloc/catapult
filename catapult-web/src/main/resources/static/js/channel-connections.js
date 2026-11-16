@@ -76,8 +76,8 @@ window.CatapultConnections = (function () {
 
     // Why catapult-api refused an Epic login, which it sends back to this tab as ?error=<code>.
     const EPIC_LINK_ERRORS = {
-        epic_full: ["labelEpicFull", "Every Catapult Epic account is full for now: linking will be possible again soon."],
-        epic_already_linked: ["labelEpicAlreadyLinked", "This Epic account is already linked to another Catapult account"],
+        epic_full: ["labelEpicFull", "Every Catapult Epic Games account is full for now: linking will be possible again soon."],
+        epic_already_linked: ["labelEpicAlreadyLinked", "This Epic Games account is already linked to another Catapult channel"],
         epic_unavailable: ["labelEpicUnavailable", "Epic Games linking is not available for now: try again later."],
     };
 
