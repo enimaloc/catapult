@@ -107,10 +107,10 @@ class IndexControllerTest {
                 .andReturn().getResponse().getContentAsString();
 
         assertThat(html)
-                .contains("data-label-epic-full=\"Every Catapult Epic account is full for now: linking will be possible"
+                .contains("data-label-epic-full=\"Every Catapult Epic Games account is full for now: linking will be possible"
                         + " again soon.\"")
-                .contains("data-label-epic-already-linked=\"This Epic account is already linked to another Catapult"
-                        + " account\"")
+                .contains("data-label-epic-already-linked=\"This Epic Games account is already linked to another Catapult"
+                        + " channel\"")
                 .contains("data-label-epic-unavailable=\"Epic Games linking is not available for now: try again"
                         + " later.\"");
     }
