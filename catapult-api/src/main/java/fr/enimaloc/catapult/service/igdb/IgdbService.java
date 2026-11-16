@@ -54,9 +54,10 @@ public class IgdbService {
     private static final String KEY_XBOX_PREFIX  = "xbox:";
     /** The DB cache key prefix of an Epic product id whose IGDB game the Epic catalog confirmed. */
     private static final String KEY_EPIC_PREFIX  = "epic:";
-    /** The source id prefix of a game outside Epic Online Services, known only by its namespace. */
-    private static final String EPIC_NAMESPACE_PREFIX = "ns:";
-    /** An Epic Store offer id: 32 hex digits (IGDB's GUID-format uids are older ids the catalog does not know). */
+    /**
+     * An Epic Store offer id, or an EOS product id: 32 hex digits (IGDB's GUID-format uids are older ids the catalog
+     * does not know).
+     */
     private static final Pattern EPIC_OFFER_ID = Pattern.compile("[0-9a-fA-F]{32}");
     /** How long a failed Epic verification is not retried: the name match answers meanwhile. */
     private static final Duration EPIC_UNVERIFIED_TTL = Duration.ofHours(1);
@@ -618,11 +619,12 @@ public class IgdbService {
      * name candidate owning an Epic Store offer whose catalog price tier starts with {@code <productId>_} (then
      * cached), else the plain name match, not cached under {@code epic:} so the check is tried again later. A failed
      * check is not retried for {@link #EPIC_UNVERIFIED_TTL}; none is attempted while the catalog cannot check (no open
-     * bot session). A game outside Epic Online Services ({@code ns:<namespace>}) goes straight to the name match.
+     * bot session). Only a 32-hex EOS product id is verifiable: any other source id (a game outside Epic Online
+     * Services, {@code ns:<namespace>} or {@code app:<running app id>}) goes straight to the name match.
      */
     private Optional<IgdbGame> resolveEpic(String productId, String name) {
         if (clientId.isBlank()) return Optional.empty();
-        if (productId == null || productId.startsWith(EPIC_NAMESPACE_PREFIX)) return nameMatch(name);
+        if (productId == null || !EPIC_OFFER_ID.matcher(productId).matches()) return nameMatch(name);
 
         IgdbGame known = epicIndex.get(productId);
         if (known != null) {

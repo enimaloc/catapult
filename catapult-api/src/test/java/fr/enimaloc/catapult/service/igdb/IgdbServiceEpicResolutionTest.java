@@ -212,6 +212,18 @@ class IgdbServiceEpicResolutionTest {
     }
 
     @Test
+    void launcherApp_goesStraightToTheNameMatch() {
+        nameMatch("The Witness", game(6, "The Witness"));
+
+        assertThat(service.resolveUnmapped(GameBinding.SourceType.EPIC, "app:magnolia:a379f050:Magnolia",
+                "The Witness")).contains(new IgdbService.IgdbGame("6", "The Witness"));
+
+        verifyNoInteractions(catalog);
+        verify(cache, never()).findById("epic:app:magnolia:a379f050:Magnolia");
+        verify(igdb, never()).searchByNameWithExternalGames(anyString(), anyString());
+    }
+
+    @Test
     void battlenetAndAnkama_stillSkipNameSearch() {
         assertThat(service.resolveUnmapped(GameBinding.SourceType.BATTLENET, "Pro", "Overwatch")).isEmpty();
         assertThat(service.resolveUnmapped(GameBinding.SourceType.ANKAMA, "3", "Wakfu")).isEmpty();

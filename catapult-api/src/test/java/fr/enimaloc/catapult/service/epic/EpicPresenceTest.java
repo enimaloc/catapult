@@ -66,6 +66,47 @@ class EpicPresenceTest {
                 .contains(new EpicGame("ns:abc", "Some Game", false));
     }
 
+    private static final String RUNNING_APP_ID = "magnolia:a379f050fa3d47e4a0fa696b0ef744d5:Magnolia";
+
+    private static String launcherRunning(String props, boolean manual) {
+        return "{\"status\":\"online\",\"ns\":\"_\"" + (manual ? ",\"statusManual\":true" : "")
+                + ",\"conns\":[{\"id\":\"x\",\"props\":" + props + "}]}";
+    }
+
+    @Test
+    void launcherRunningApp_isAnAppGame() {
+        String launcher = launcherRunning("{\"running_app_id\":\"" + RUNNING_APP_ID
+                + "\",\"running_app_name\":\"The Witness\"}", false);
+        assertThat(EpicPresence.currentGame(payload("online", launcher)))
+                .contains(new EpicGame("app:" + RUNNING_APP_ID, "The Witness", false));
+    }
+
+    @Test
+    void launcherRunningAppWithoutName_isNamedByItsId() {
+        String launcher = launcherRunning("{\"running_app_id\":\"" + RUNNING_APP_ID + "\"}", false);
+        assertThat(EpicPresence.currentGame(payload("online", launcher)))
+                .contains(new EpicGame("app:" + RUNNING_APP_ID, RUNNING_APP_ID, false));
+    }
+
+    @Test
+    void launcherRunningApp_losesToAnEosGame() {
+        String launcher = launcherRunning("{\"running_app_id\":\"" + RUNNING_APP_ID + "\"}", false);
+        assertThat(EpicPresence.currentGame(payload("online", launcher, FALL_GUYS)))
+                .contains(new EpicGame("d42d7101bb7a41c09a810ee418b7d3d0", "Fall Guys", true));
+    }
+
+    @Test
+    void launcherRunningApp_withManualStatus_isNoGame() {
+        String launcher = launcherRunning("{\"running_app_id\":\"" + RUNNING_APP_ID + "\"}", true);
+        assertThat(EpicPresence.currentGame(payload("online", launcher))).isEmpty();
+    }
+
+    @Test
+    void launcherWithBlankRunningApp_isNoGame() {
+        assertThat(EpicPresence.currentGame(payload("online", launcherRunning("{\"running_app_id\":\" \"}", false))))
+                .isEmpty();
+    }
+
     @Test
     void manualStatus_isNoGame() {
         String game = "{\"productId\":\"p1\",\"ns\":\"abc\",\"statusManual\":true,\"status\":\"online\","
