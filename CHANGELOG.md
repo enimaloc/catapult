@@ -4,6 +4,53 @@ Toutes les versions publiées de Catapult, la plus récente en premier.
 
 Ce fichier est régénéré par le bot à chaque release à partir des notes des [GitHub Releases](https://github.com/enimaloc/catapult/releases) : pour corriger une entrée, modifie les notes de la release (ou le changelog de la PR de release avant sa publication), pas ce fichier.
 
+## [v1.5.0](https://github.com/enimaloc/catapult/releases/tag/v1.5.0) - 2026-11-16
+
+### Features
+- **api:** expose Battle.net and Ankama bot gauges (7e23c57)
+- **grafana:** add a Battle.net / Ankama bots row (3d05406)
+- merge Grafana bots metrics and panel fixes into dev (99e34a6)
+- **epic:** add the Epic Connect STOMP frames (9c06804)
+- **epic:** add the presence rule (a135340)
+- **epic:** add the Epic account, friends, presence and catalog clients (d376a80)
+- **epic:** add the bot and friend link schema (8c78ea0)
+- **epic:** add the Epic Connect client (7b9c3c3)
+- **epic:** run one Epic Connect session per bot (6d52db3)
+- **epic:** link streamers to Epic bots (819a742)
+- **epic:** link a streamer's Epic account through EOS OAuth (055054d)
+- **epic:** detect the Epic game a streamer plays (7991bad)
+- **epic:** verify IGDB matches against the Epic catalog (3a9a222)
+- **epic:** add the Epic admin and link API (98f1756)
+- **epic:** prefill the Fall Guys game mapping (c7d37b4)
+- **epic:** add the Epic card to the channel page (d002d9e)
+- **epic:** add the Epic bots admin tab (e7f8f24)
+- **epic:** detect games the launcher reports as running (5759483)
+- merge Epic Games presence into dev (6fe1967)
+
+### Fixes
+- **grafana:** repair panels showing no data (d37651e)
+- link Steam, Xbox and Battle.net after catapult-api restarts (f8e3b07)
+- never restore a link session while an admin impersonates a member (bd55b7c)
+- merge OAuth link session restore into dev (3ab8b8f)
+- **bgs:** ignore the Battle.net mobile app presence as a game (bcfd52a)
+- **bgs:** drop the bindings created for the Battle.net mobile app (53f4ac3)
+- merge Battle.net mobile app presence filter into dev (b8eb2b8)
+- **epic:** distinguish a rejected access token and refuse incomplete token replies (1741a4b)
+- **epic:** let a removed link free its Epic account (bfe3088)
+- **epic:** report an Epic Connect close once and keep heart-beats off the scheduler (c6d0a88)
+- **epic:** never leave an Epic Connect socket open after a close (e961d5f)
+- **epic:** never deliver an Epic Connect message after its close (d29f66a)
+- **epic:** keep games across a planned renewal and never drop a rotated refresh token (9752f06)
+- **epic:** cancel every pending request on unlink and keep a same-account relink (afd9c5d)
+- **epic:** stop re-searching IGDB for an Epic game that cannot be verified (3c6d66e)
+- **epic:** drop a French-looking identifier from the Epic connect controller test (74496e7)
+- **epic:** refuse an incomplete friends summary (62fbead)
+- **epic:** only call Epic for friends where bot sessions may run (9027b48)
+- **epic:** accept end-of-lines after a STOMP frame's NUL (2e15860)
+
+### Other
+- merge dev into fix/oauth-link-session (807e4a3)
+
 ## [v1.4.0](https://github.com/enimaloc/catapult/releases/tag/v1.4.0) - 2026-11-14
 
 ### Features
