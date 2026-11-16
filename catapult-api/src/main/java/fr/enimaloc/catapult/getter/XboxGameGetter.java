@@ -14,6 +14,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProp
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -79,16 +80,23 @@ public class XboxGameGetter implements GameGetter {
             return Optional.empty();
         }
 
-        return tokenService.getToken(user).flatMap(session -> fetchCurrentTitle(user, session)
-            .map(title -> {
-                String productId = resolveProductId(session, title.titleId()).orElse(title.titleId());
-                return new DetectedGame(productId, GameBinding.SourceType.XBOX, title.titleName());
-            })
-        );
+        return tokenService.getToken(user).flatMap(session -> {
+            for (TitlePresence title : fetchActiveTitles(user, session)) {
+                TitleDetail detail = resolveTitleDetail(session, title.titleId());
+                if (detail.isApp()) {
+                    log.debug("Skipping Xbox title {} ({}): Titlehub lists it as {}, not a game",
+                        title.titleId(), title.titleName(), detail.type());
+                    continue;
+                }
+                String productId = detail.productId().orElse(title.titleId());
+                return Optional.of(new DetectedGame(productId, GameBinding.SourceType.XBOX, title.titleName()));
+            }
+            return Optional.empty();
+        });
     }
 
     @SuppressWarnings("unchecked")
-    private Optional<TitlePresence> fetchCurrentTitle(UserAccount user, XboxUserTokenService.XstsSession session) {
+    private List<TitlePresence> fetchActiveTitles(UserAccount user, XboxUserTokenService.XstsSession session) {
         return apiObservations.observe("xbox", "get_presence", () -> {
             try {
                 Map<String, Object> response = restClient.get()
@@ -97,19 +105,20 @@ public class XboxGameGetter implements GameGetter {
                     .header("x-xbl-contract-version", "3")
                     .retrieve()
                     .body(Map.class);
-                return extractCurrentTitle(response);
+                return extractActiveTitles(response);
             } catch (Exception e) {
                 log.warn("Failed to fetch Xbox presence for user {}: {}", user.getId(), e.getMessage());
-                return Optional.empty();
+                return List.of();
             }
         });
     }
 
     @SuppressWarnings("unchecked")
-    private Optional<TitlePresence> extractCurrentTitle(Map<String, Object> response) {
-        if (response == null) return Optional.empty();
+    private List<TitlePresence> extractActiveTitles(Map<String, Object> response) {
+        List<TitlePresence> active = new ArrayList<>();
+        if (response == null) return active;
         List<Map<String, Object>> devices = (List<Map<String, Object>>) response.get("devices");
-        if (devices == null) return Optional.empty();
+        if (devices == null) return active;
 
         for (Map<String, Object> device : devices) {
             List<Map<String, Object>> titles = (List<Map<String, Object>>) device.get("titles");
@@ -121,15 +130,18 @@ public class XboxGameGetter implements GameGetter {
                 if (!"Active".equals(state)) continue;
                 String titleId = String.valueOf(title.get("id"));
                 if (titleIdBlacklist.contains(titleId)) continue;
-                return Optional.of(new TitlePresence(titleId, titleName));
+                active.add(new TitlePresence(titleId, titleName));
             }
         }
-        return Optional.empty();
+        return active;
     }
 
-    /** Resolves a titleId's Store Product ID (the format IGDB expects) through Titlehub; falls back to the titleId if the resolution fails. */
+    /**
+     * Fetches a title's Titlehub detail in one call: its type ("Game", "App"...) and its Store Product ID
+     * (the format IGDB expects). Falls back to an empty detail if the call fails.
+     */
     @SuppressWarnings("unchecked")
-    private Optional<String> resolveProductId(XboxUserTokenService.XstsSession session, String titleId) {
+    private TitleDetail resolveTitleDetail(XboxUserTokenService.XstsSession session, String titleId) {
         return apiObservations.observe("xbox", "get_title_detail", () -> {
             try {
                 Map<String, Object> response = restClient.get()
@@ -139,26 +151,43 @@ public class XboxGameGetter implements GameGetter {
                     .header("Accept-Language", "en-US") // Required by Titlehub (400 without a valid locale); determines no displayed content.
                     .retrieve()
                     .body(Map.class);
-                return extractProductId(response);
+                return extractTitleDetail(response);
             } catch (Exception e) {
                 log.warn("Failed to fetch Xbox title detail for titleId {}: {}", titleId, e.getMessage());
-                return Optional.empty();
+                return TitleDetail.EMPTY;
             }
         });
     }
 
     @SuppressWarnings("unchecked")
-    private Optional<String> extractProductId(Map<String, Object> response) {
-        if (response == null) return Optional.empty();
+    private TitleDetail extractTitleDetail(Map<String, Object> response) {
+        if (response == null) return TitleDetail.EMPTY;
         List<Map<String, Object>> titles = (List<Map<String, Object>>) response.get("titles");
-        if (titles == null || titles.isEmpty()) return Optional.empty();
-        Map<String, Object> detail = (Map<String, Object>) titles.getFirst().get("detail");
-        if (detail == null) return Optional.empty();
-        List<Map<String, Object>> availabilities = (List<Map<String, Object>>) detail.get("availabilities");
-        if (availabilities == null || availabilities.isEmpty()) return Optional.empty();
-        Object availabilityId = availabilities.getFirst().get("AvailabilityId");
-        return availabilityId == null ? Optional.empty() : Optional.of(String.valueOf(availabilityId));
+        if (titles == null || titles.isEmpty()) return TitleDetail.EMPTY;
+        Map<String, Object> first = titles.getFirst();
+        Object type = first.get("type");
+        String typeName = type == null ? null : String.valueOf(type);
+        Optional<String> productId = Optional.empty();
+        Map<String, Object> detail = (Map<String, Object>) first.get("detail");
+        if (detail != null) {
+            List<Map<String, Object>> availabilities = (List<Map<String, Object>>) detail.get("availabilities");
+            if (availabilities != null && !availabilities.isEmpty()) {
+                Object availabilityId = availabilities.getFirst().get("AvailabilityId");
+                if (availabilityId != null) productId = Optional.of(String.valueOf(availabilityId));
+            }
+        }
+        return new TitleDetail(typeName, productId);
     }
 
     private record TitlePresence(String titleId, String titleName) {}
+
+    /** Titlehub's view of a title; {@code type} is null when Titlehub did not answer or gave none. */
+    private record TitleDetail(String type, Optional<String> productId) {
+        static final TitleDetail EMPTY = new TitleDetail(null, Optional.empty());
+
+        /** A non-blank type that does not name a game ("Game", "DGame"...) is an app (Microsoft Store, Twitch...). */
+        boolean isApp() {
+            return type != null && !type.isBlank() && !type.toLowerCase(java.util.Locale.ROOT).contains("game");
+        }
+    }
 }
