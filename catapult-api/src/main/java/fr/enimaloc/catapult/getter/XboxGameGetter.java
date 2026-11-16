@@ -185,9 +185,9 @@ public class XboxGameGetter implements GameGetter {
     private record TitleDetail(String type, Optional<String> productId) {
         static final TitleDetail EMPTY = new TitleDetail(null, Optional.empty());
 
-        /** A non-blank type other than "Game" means a non-game app (Microsoft Store, Twitch, Netflix...). */
+        /** A non-blank type that does not name a game ("Game", "DGame"...) is an app (Microsoft Store, Twitch...). */
         boolean isApp() {
-            return type != null && !type.isBlank() && !"Game".equalsIgnoreCase(type.trim());
+            return type != null && !type.isBlank() && !type.toLowerCase(java.util.Locale.ROOT).contains("game");
         }
     }
 }

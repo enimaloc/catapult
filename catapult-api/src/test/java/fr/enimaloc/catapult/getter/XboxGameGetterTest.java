@@ -204,6 +204,17 @@ class XboxGameGetterTest {
     }
 
     @Test
+    void getCurrentGame_titlehubTypeDGame_isAGame() {
+        doReturn(presence(Map.of("id", "1234", "name", "Halo Infinite", "state", "Active")),
+            titlehub("DGame", "9NP1P1WFS0LB")).when(responseSpec).body(Map.class);
+
+        Optional<DetectedGame> result = getter.getCurrentGame(user);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getSourceId()).isEqualTo("9NP1P1WFS0LB");
+    }
+
+    @Test
     void getCurrentGame_titlehubFailure_fallsBackToTitleId() {
         Map<String, Object> presence = presence(Map.of("id", "1234", "name", "Halo Infinite", "state", "Active"));
         when(responseSpec.body(Map.class)).thenReturn(presence).thenThrow(new RuntimeException("400"));
