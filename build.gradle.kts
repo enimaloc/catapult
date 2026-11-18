@@ -4,7 +4,7 @@ plugins {
 
 allprojects {
     group = "fr.enimaloc"
-    version = "1.5.2"
+    version = "1.6.0"
 }
 
 subprojects {
