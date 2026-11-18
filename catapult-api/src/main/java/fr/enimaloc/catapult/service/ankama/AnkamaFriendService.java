@@ -10,10 +10,13 @@ import fr.enimaloc.catapult.domain.binding.GetterConfig;
 import fr.enimaloc.catapult.repository.ankama.AnkamaFriendLinkRepository;
 import fr.enimaloc.catapult.repository.ankama.AnkamaServiceAccountRepository;
 import fr.enimaloc.catapult.repository.binding.GetterConfigRepository;
+import fr.enimaloc.catapult.service.ankama.chat.ChatFrames;
 import fr.enimaloc.catapult.service.ankama.chat.ChatMessages;
+import fr.enimaloc.catapult.service.debug.SessionDebug;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.context.event.EventListener;
@@ -62,6 +65,7 @@ public class AnkamaFriendService {
     private final ChannelEventPublisher channelEventPublisher;
     private final AnkamaSessionManager sessionManager;
     private final TransactionOperations transactions;
+    private final SessionDebug debug;
     private final int maxFriendsPerBot;
     /**
      * Invites received by a bot ({@code botId:inviterUserId}) that were already answered: the resync replays them
@@ -75,6 +79,7 @@ public class AnkamaFriendService {
                                ChannelEventPublisher channelEventPublisher,
                                AnkamaSessionManager sessionManager,
                                TransactionOperations transactions,
+                               @Qualifier("ankamaSessionDebug") SessionDebug debug,
                                @Value("${ankama.max-friends-per-bot:200}") int maxFriendsPerBot) {
         this.accountRepository = accountRepository;
         this.linkRepository = linkRepository;
@@ -82,6 +87,7 @@ public class AnkamaFriendService {
         this.channelEventPublisher = channelEventPublisher;
         this.sessionManager = sessionManager;
         this.transactions = transactions;
+        this.debug = debug;
         this.maxFriendsPerBot = maxFriendsPerBot;
     }
 
@@ -384,20 +390,21 @@ public class AnkamaFriendService {
             expected.get().setAnkamaUserId(inviter.userId());
             linkRepository.save(expected.get());
             log.info("Accepting the Ankama invite of an enrolled streamer on {}", botId);
-            afterCommit.add(() -> sendAnswer(botId, key, ChatMessages.deleteInvite(inviter.userId(),
+            UUID streamer = expected.get().getUser().getId();
+            afterCommit.add(() -> sendAnswer(botId, streamer, key, ChatMessages.deleteInvite(inviter.userId(),
                     bot.getAnkamaAccountId(), ChatMessages.INVITE_ACCEPT)));
         } else {
             log.info("Rejecting an Ankama invite no link waits for on {}", botId);
-            afterCommit.add(() -> sendAnswer(botId, key, ChatMessages.deleteInvite(inviter.userId(),
+            afterCommit.add(() -> sendAnswer(botId, null, key, ChatMessages.deleteInvite(inviter.userId(),
                     bot.getAnkamaAccountId(), ChatMessages.INVITE_REJECT)));
         }
     }
 
     // --- internals ---
 
-    private void sendAnswer(UUID botId, String key, ChatMessages.Command command) {
+    private void sendAnswer(UUID botId, UUID userId, String key, ChatMessages.Command command) {
         // A lost answer must be given again when the resync replays the invite
-        send(botId, command, "deleteInvite", null, () -> answered.remove(key));
+        send(botId, command, "deleteInvite", userId, () -> answered.remove(key));
     }
 
     /** Sends {@code command} through the bot's session; a failure is logged. */
@@ -408,7 +415,8 @@ public class AnkamaFriendService {
     /** Sends {@code command} through the bot's session; a failure is logged and runs {@code onFailure}. */
     private void send(UUID botId, ChatMessages.Command command, String what, UUID userId, Runnable onFailure) {
         try {
-            sessionManager.request(botId, command.toPayload()).whenComplete((response, failure) -> {
+            debug.outbound(userId, "CHAT", "chat." + what, command::toString, AnkamaFriendService::describe,
+                    () -> sessionManager.request(botId, command.toPayload())).whenComplete((response, failure) -> {
                 if (failure != null) {
                     onFailure.run();
                     log.warn("Ankama {} failed on {}{}: {}", what, botId, userId == null ? "" : " for user " + userId,
@@ -419,6 +427,13 @@ public class AnkamaFriendService {
             log.warn("Ankama {} could not be sent on {}: {}", what, botId, e.toString());
             onFailure.run();
         }
+    }
+
+    /** The chat's answer to a command, for the debug recording. */
+    private static String describe(ChatFrames.Response response) {
+        ChatFrames.Payload payload = response.payload();
+        return "status " + response.status() + (payload == null ? ""
+                : ", payload " + payload.id() + " (" + payload.data().length + " bytes)");
     }
 
     private static boolean isBot(AnkamaServiceAccount bot, ChatMessages.User user) {

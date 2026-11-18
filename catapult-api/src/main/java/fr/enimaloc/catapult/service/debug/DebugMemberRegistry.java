@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -35,6 +36,11 @@ public class DebugMemberRegistry {
     /** Whether any member is in debug mode right now (lets a caller skip looking up who a grouped call is for). */
     public boolean hasAny() {
         return !modes.isEmpty();
+    }
+
+    /** The members in debug mode right now. */
+    public Set<UUID> members() {
+        return Set.copyOf(modes.keySet());
     }
 
     @EventListener(ApplicationReadyEvent.class)

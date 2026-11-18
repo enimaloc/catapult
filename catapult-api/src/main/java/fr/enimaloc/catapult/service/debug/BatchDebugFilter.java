@@ -71,6 +71,21 @@ public final class BatchDebugFilter {
         });
     }
 
+    /** Epic friends {@code /summary}: every list of entries cut down to this account id. */
+    public static RawExchange epicFriends(RawExchange raw, String accountId) {
+        return share(raw, accountId, query -> query, root -> {
+            if (!(root instanceof ObjectNode obj)) {
+                return false;
+            }
+            for (String list : List.copyOf(obj.propertyNames())) {
+                if (obj.get(list) instanceof ArrayNode) {
+                    keepIn(obj, list, e -> accountId.equals(text(e, "accountId")));
+                }
+            }
+            return true;
+        });
+    }
+
     // -------------------------------------------------------------------------------------------------------
 
     @FunctionalInterface

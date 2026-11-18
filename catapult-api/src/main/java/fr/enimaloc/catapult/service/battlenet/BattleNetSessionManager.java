@@ -12,12 +12,14 @@ import fr.enimaloc.catapult.domain.battlenet.BattleNetServiceAccount;
 import fr.enimaloc.catapult.domain.battlenet.BattleNetServiceAccount.AuthState;
 import fr.enimaloc.catapult.repository.battlenet.BattleNetServiceAccountRepository;
 import fr.enimaloc.catapult.service.battlenet.login.BattleNetLoginCoordinator;
+import fr.enimaloc.catapult.service.debug.SessionDebug;
 import fr.enimaloc.catapult.site.SiteRole;
 import fr.enimaloc.catapult.site.SiteRoleChangedEvent;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.context.ApplicationEventPublisher;
@@ -80,6 +82,7 @@ public class BattleNetSessionManager implements SmartLifecycle {
     private final ApplicationEventPublisher events;
     private final MeterRegistry registry;
     private final TransactionOperations transactions;
+    private final SessionDebug debug;
     private final boolean sessionsEnabled;
     private final String host;
     private final Supplier<BgsChannel> channels;
@@ -102,9 +105,10 @@ public class BattleNetSessionManager implements SmartLifecycle {
                                    ApplicationEventPublisher events,
                                    MeterRegistry registry,
                                    TransactionOperations transactions,
+                                   @Qualifier("battleNetSessionDebug") SessionDebug debug,
                                    @Value("${battlenet.sessions.enabled:false}") boolean sessionsEnabled,
                                    @Value("${battlenet.bgs-host:eu.actual.battle.net}") String host) {
-        this(repository, coordinator, siteRole, events, registry, transactions, sessionsEnabled, host,
+        this(repository, coordinator, siteRole, events, registry, transactions, debug, sessionsEnabled, host,
                 () -> connect(host),
                 // Two threads: a connect blocking one (TCP + TLS) does not hold the keep-alives back
                 Executors.newScheduledThreadPool(2, Thread.ofPlatform().name("battlenet-bgs-timers-", 0).daemon()
@@ -124,6 +128,7 @@ public class BattleNetSessionManager implements SmartLifecycle {
                             ApplicationEventPublisher events,
                             MeterRegistry registry,
                             TransactionOperations transactions,
+                            SessionDebug debug,
                             boolean sessionsEnabled,
                             String host,
                             Supplier<BgsChannel> channels,
@@ -137,6 +142,7 @@ public class BattleNetSessionManager implements SmartLifecycle {
         this.events = events;
         this.registry = registry;
         this.transactions = transactions;
+        this.debug = debug;
         this.sessionsEnabled = sessionsEnabled;
         this.host = host;
         this.channels = channels;
@@ -381,6 +387,10 @@ public class BattleNetSessionManager implements SmartLifecycle {
             if (!current()) {
                 return;
             }
+            if (debug.watches(accountId)) {
+                debug.inbound(accountId, BattleNetDebugKeys.account(event.accountId())::equals, "BGS",
+                        event::toString, () -> "bgs.presence");
+            }
             watched.add(event.accountId());
             if (event.game() == null) {
                 games.remove(event.accountId());
@@ -391,6 +401,10 @@ public class BattleNetSessionManager implements SmartLifecycle {
 
         @Override
         public void onFriend(FriendEvent event) {
+            if (debug.watches(accountId)) {
+                debug.inbound(accountId, BattleNetDebugKeys.of(event)::contains, "BGS", event::toString,
+                        () -> "bgs.friends." + event.getClass().getSimpleName());
+            }
             handOff("a friend event of " + accountId,
                     () -> events.publishEvent(new BattleNetFriendEventReceived(accountId, event)));
         }

@@ -40,6 +40,15 @@ public class ExternalServices {
         if (within(host, "xboxlive.com") || within(host, "xbox.com")) {
             return "xbox";
         }
+        if (within(host, "epicgames.com") || within(host, "epicgames.dev")) {
+            return "epic";
+        }
+        if (within(host, "battle.net") || within(host, "blizzard.com")) {
+            return "battlenet";
+        }
+        if (within(host, "ankama.com")) {
+            return "ankama";
+        }
         if (within(host, "doesthedogdie.com")) {
             return "dtdd";
         }

@@ -18,10 +18,12 @@ import fr.enimaloc.catapult.domain.binding.GetterConfig;
 import fr.enimaloc.catapult.repository.battlenet.BattleNetFriendLinkRepository;
 import fr.enimaloc.catapult.repository.battlenet.BattleNetServiceAccountRepository;
 import fr.enimaloc.catapult.repository.binding.GetterConfigRepository;
+import fr.enimaloc.catapult.service.debug.SessionDebug;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
@@ -72,6 +74,7 @@ public class BattleNetFriendService {
     private final ChannelEventPublisher channelEventPublisher;
     private final BattleNetSessionManager sessionManager;
     private final TransactionOperations transactions;
+    private final SessionDebug debug;
     private final Executor followUps;
 
     @Autowired
@@ -80,10 +83,11 @@ public class BattleNetFriendService {
                                   GetterConfigRepository getterConfigRepository,
                                   ChannelEventPublisher channelEventPublisher,
                                   BattleNetSessionManager sessionManager,
-                                  TransactionOperations transactions) {
+                                  TransactionOperations transactions,
+                                  @Qualifier("battleNetSessionDebug") SessionDebug debug) {
         // The outcome of an invitation completes on the BGS session loop: its database follow-up leaves that thread
         this(accountRepository, linkRepository, getterConfigRepository, channelEventPublisher, sessionManager,
-                transactions, task -> Thread.ofVirtual().name("battlenet-friends").start(task));
+                transactions, debug, task -> Thread.ofVirtual().name("battlenet-friends").start(task));
     }
 
     /** @param followUps runs what follows the outcome of an invitation sent at enrolment */
@@ -93,6 +97,7 @@ public class BattleNetFriendService {
                            ChannelEventPublisher channelEventPublisher,
                            BattleNetSessionManager sessionManager,
                            TransactionOperations transactions,
+                           SessionDebug debug,
                            Executor followUps) {
         this.accountRepository = accountRepository;
         this.linkRepository = linkRepository;
@@ -100,6 +105,7 @@ public class BattleNetFriendService {
         this.channelEventPublisher = channelEventPublisher;
         this.sessionManager = sessionManager;
         this.transactions = transactions;
+        this.debug = debug;
         this.followUps = followUps;
     }
 
@@ -144,7 +150,7 @@ public class BattleNetFriendService {
 
     /** Has {@code bot} invite {@code battleTag} for the link {@code linkId}; the outcome is handled off the session. */
     private void invite(BattleNetServiceAccount bot, UUID linkId, UUID ownerId, String battleTag) {
-        call(bot.getId(), client -> client.sendInvitation(battleTag))
+        call(bot.getId(), ownerId, "sendInvitation", battleTag, client -> client.sendInvitation(battleTag))
                 .whenCompleteAsync((ignored, failure) -> {
                     if (failure != null) {
                         invitationFailed(bot, linkId, ownerId, battleTag, unwrap(failure));
@@ -175,11 +181,12 @@ public class BattleNetFriendService {
         UUID botId = removed.getServiceAccount().getId();
         if (removed.getStatus() == Status.PENDING && removed.getInvitationId() != null) {
             long invitationId = removed.getInvitationId();
-            call(botId, client -> client.revokeInvitation(invitationId))
+            call(botId, user.getId(), "revokeInvitation", invitationId,
+                    client -> client.revokeInvitation(invitationId))
                     .whenComplete(logFailure("revokeInvitation", user.getId()));
         } else if (removed.getStatus() == Status.ACCEPTED) {
             long friendId = removed.getBnetAccountId();
-            call(botId, client -> client.removeFriend(friendId))
+            call(botId, user.getId(), "removeFriend", friendId, client -> client.removeFriend(friendId))
                     .whenComplete(logFailure("removeFriend", user.getId()));
         }
     }
@@ -295,13 +302,18 @@ public class BattleNetFriendService {
      * invitation and adds the bot himself), declined otherwise.
      */
     private Runnable answer(BattleNetServiceAccount bot, InvitationReceived invitation) {
-        boolean expected = linkRepository.findByServiceAccountAndBnetAccountId(bot, invitation.accountId()).stream()
-                .anyMatch(link -> link.getStatus() == Status.PENDING || link.getStatus() == Status.INVITE_REJECTED);
+        Optional<UUID> expected = linkRepository.findByServiceAccountAndBnetAccountId(bot, invitation.accountId())
+                .stream()
+                .filter(link -> link.getStatus() == Status.PENDING || link.getStatus() == Status.INVITE_REJECTED)
+                .map(link -> link.getUser().getId())
+                .findFirst();
         long invitationId = invitation.invitationId();
         UUID botId = bot.getId();
-        if (expected) {
+        if (expected.isPresent()) {
             log.info("Accepting the Battle.net invitation of an enrolled streamer on {}", botId);
-            return () -> call(botId, client -> client.acceptInvitation(invitationId))
+            UUID streamer = expected.get();
+            return () -> call(botId, streamer, "acceptInvitation", invitationId,
+                    client -> client.acceptInvitation(invitationId))
                     .whenComplete((ignored, failure) -> {
                         if (failure != null) {
                             log.warn("acceptInvitation failed on {}: {}", botId, unwrap(failure).toString());
@@ -309,7 +321,8 @@ public class BattleNetFriendService {
                     });
         }
         log.info("Declining a Battle.net invitation no link waits for on {}", botId);
-        return () -> call(botId, client -> client.declineInvitation(invitationId)).whenComplete((ignored, failure) -> {
+        return () -> call(botId, null, "declineInvitation", invitationId,
+                client -> client.declineInvitation(invitationId)).whenComplete((ignored, failure) -> {
             if (failure != null) {
                 log.warn("declineInvitation failed on {}: {}", botId, unwrap(failure).toString());
             }
@@ -417,9 +430,15 @@ public class BattleNetFriendService {
                 change.serviceAccountBattleTag());
     }
 
-    private CompletableFuture<Void> call(UUID botId, Function<BgsClient, CompletableFuture<Void>> action) {
+    /**
+     * Has the bot {@code botId} run {@code action}; recorded as {@code command(argument)} for {@code userId}, the
+     * member it is for (null for none), when that member is in debug mode.
+     */
+    private CompletableFuture<Void> call(UUID botId, UUID userId, String command, Object argument,
+                                         Function<BgsClient, CompletableFuture<Void>> action) {
         try {
-            return sessionManager.withClient(botId, action);
+            return debug.outbound(userId, "BGS", "bgs." + command, () -> command + "(" + argument + ")",
+                    ignored -> null, () -> sessionManager.withClient(botId, action));
         } catch (RuntimeException e) {
             return CompletableFuture.failedFuture(e);
         }

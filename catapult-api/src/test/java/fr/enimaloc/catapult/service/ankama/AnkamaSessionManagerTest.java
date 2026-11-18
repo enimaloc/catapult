@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.service.ankama;
 
 import fr.enimaloc.catapult.domain.ankama.AnkamaServiceAccount;
 import fr.enimaloc.catapult.domain.ankama.AnkamaServiceAccount.AuthState;
+import fr.enimaloc.catapult.domain.debug.DebugExchange.Direction;
 import fr.enimaloc.catapult.repository.ankama.AnkamaServiceAccountRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.ankama.chat.ChatMessages;
@@ -11,6 +12,8 @@ import fr.enimaloc.catapult.service.ankama.haapi.AnkamaAuthException;
 import fr.enimaloc.catapult.service.ankama.haapi.AnkamaHaapiClient;
 import fr.enimaloc.catapult.service.ankama.haapi.AnkamaHaapiClient.Certificate;
 import fr.enimaloc.catapult.service.ankama.haapi.AnkamaShieldException;
+import fr.enimaloc.catapult.service.debug.SessionDebug;
+import fr.enimaloc.catapult.service.debug.TestSessionDebug;
 import fr.enimaloc.catapult.site.SiteRole;
 import fr.enimaloc.catapult.site.SiteRoleChangedEvent;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -109,13 +112,15 @@ class AnkamaSessionManagerTest {
         return account;
     }
 
+    private SessionDebug debug = SessionDebug.OFF;
+
     private AnkamaSessionManager manager(boolean sessionsEnabled) {
         return manager(sessionsEnabled, Runnable::run);
     }
 
     private AnkamaSessionManager manager(boolean sessionsEnabled, Executor starter) {
         return new AnkamaSessionManager(repository, haapi, encryption, siteRole, events, registry,
-                TransactionOperations.withoutTransaction(), sessionsEnabled,
+                TransactionOperations.withoutTransaction(), debug, sessionsEnabled,
                 () -> {
                     FakeChatClient client = prepared.isEmpty() ? new FakeChatClient() : prepared.poll();
                     clients.add(client);
@@ -216,6 +221,19 @@ class AnkamaSessionManagerTest {
 
         client.push(new ChatMessages.EndpointsUpdated(42L, List.of(endpoint(102))));
         assertThat(manager.currentGame(42L)).isEmpty();
+    }
+
+    @Test
+    void chatEvent_recordedForTheMemberInDebugItNames() {
+        TestSessionDebug watched = new TestSessionDebug("ankama", bot1.getId(), AnkamaDebugKeys.user(42L));
+        debug = watched.debug;
+        started();
+        FakeChatClient client = clients.getFirst();
+
+        client.push(new ChatMessages.PresenceUpdated(42L, ChatMessages.PRESENCE_OFFLINE));
+        client.push(new ChatMessages.PresenceUpdated(43L, ChatMessages.PRESENCE_OFFLINE));
+
+        assertThat(watched.recorded(Direction.IN, "chat.PresenceUpdated")).contains("userId=42");
     }
 
     @Test

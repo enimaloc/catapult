@@ -13,6 +13,7 @@ import fr.enimaloc.catapult.repository.binding.GetterConfigRepository;
 import fr.enimaloc.catapult.service.ankama.AnkamaFriendService.AnkamaEnrollmentException;
 import fr.enimaloc.catapult.service.ankama.chat.ChatFrames;
 import fr.enimaloc.catapult.service.ankama.chat.ChatMessages;
+import fr.enimaloc.catapult.service.debug.SessionDebug;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -67,7 +68,7 @@ class AnkamaFriendServiceTest {
     @BeforeEach
     void setUp() {
         service = new AnkamaFriendService(accountRepository, linkRepository, getterConfigRepository, publisher,
-                sessionManager, TransactionOperations.withoutTransaction(), 2);
+                sessionManager, TransactionOperations.withoutTransaction(), SessionDebug.OFF, 2);
         user = new UserAccount();
         user.setId(UUID.randomUUID());
         bot1 = bot(BOT_ID, 1, "Bot", "1111");

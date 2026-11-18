@@ -81,4 +81,19 @@ class BatchDebugFilterTest {
         assertThat(body(share)).isEqualTo(
                 "{\"friends\":[],\"incomingRequests\":[],\"outgoingRequests\":[],\"empty\":true}");
     }
+
+    @Test
+    void epicFriends_everyListCutDownToTheMember_otherFieldsKept() {
+        RawExchange share = BatchDebugFilter.epicFriends(raw("https://friends.epicgames.com/friends/api/v1/bot/summary",
+                "{\"friends\":[{\"accountId\":\"a\"},{\"accountId\":\"b\"}],\"incoming\":[{\"accountId\":\"c\"}],"
+                        + "\"outgoing\":[{\"accountId\":\"b\"}],\"limitsReached\":{\"incoming\":false}}", null), "b");
+
+        assertThat(body(share)).isEqualTo("{\"friends\":[{\"accountId\":\"b\"}],\"incoming\":[],"
+                + "\"outgoing\":[{\"accountId\":\"b\"}],\"limitsReached\":{\"incoming\":false}}");
+    }
+
+    @Test
+    void epicFriends_notAnObject_noShare() {
+        assertThat(BatchDebugFilter.epicFriends(raw("https://friends.epicgames.com/x", "[]", null), "b")).isNull();
+    }
 }
