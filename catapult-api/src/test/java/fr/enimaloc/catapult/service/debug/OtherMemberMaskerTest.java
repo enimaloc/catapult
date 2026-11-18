@@ -3,6 +3,9 @@ package fr.enimaloc.catapult.service.debug;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.minecraft.MinecraftFriendLink;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.repository.ankama.AnkamaFriendLinkRepository;
+import fr.enimaloc.catapult.repository.battlenet.BattleNetFriendLinkRepository;
+import fr.enimaloc.catapult.repository.epic.EpicFriendLinkRepository;
 import fr.enimaloc.catapult.repository.minecraft.MinecraftFriendLinkRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,7 +44,8 @@ class OtherMemberMaskerTest {
         link.setMinecraftProfileId("069a79f4-44e9-4726-a5be-fca90e38aaf5");
         link.setMinecraftName("Notch");
         when(links.findAll()).thenReturn(List.of(link));
-        masker = new OtherMemberMasker(users, links);
+        masker = new OtherMemberMasker(users, links, mock(EpicFriendLinkRepository.class),
+                mock(BattleNetFriendLinkRepository.class), mock(AnkamaFriendLinkRepository.class));
         masker.reload();
     }
 
@@ -62,7 +66,9 @@ class OtherMemberMaskerTest {
     void shortIdentifiersAreIgnored() {
         UserAccountRepository users = mock(UserAccountRepository.class);
         when(users.findAll()).thenReturn(List.of(user(bId, "12", "abc", null)));
-        OtherMemberMasker m = new OtherMemberMasker(users, mock(MinecraftFriendLinkRepository.class));
+        OtherMemberMasker m = new OtherMemberMasker(users, mock(MinecraftFriendLinkRepository.class),
+                mock(EpicFriendLinkRepository.class), mock(BattleNetFriendLinkRepository.class),
+                mock(AnkamaFriendLinkRepository.class));
         m.reload();
         assertThat(m.mask("12 abc", aId)).isEqualTo("12 abc");
     }
@@ -90,7 +96,8 @@ class OtherMemberMaskerTest {
         link.setMinecraftProfileId("069a79f4-44e9-4726-a5be-fca90e38aaf5");
         link.setMinecraftName("Shared_Name");
         when(links.findAll()).thenReturn(List.of(link));
-        OtherMemberMasker m = new OtherMemberMasker(users, links);
+        OtherMemberMasker m = new OtherMemberMasker(users, links, mock(EpicFriendLinkRepository.class),
+                mock(BattleNetFriendLinkRepository.class), mock(AnkamaFriendLinkRepository.class));
         m.reload();
         assertThat(m.mask("shared_name", aId)).isEqualTo("[membre]");
     }

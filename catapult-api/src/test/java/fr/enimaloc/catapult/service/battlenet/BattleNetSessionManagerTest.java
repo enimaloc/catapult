@@ -6,9 +6,12 @@ import fr.enimaloc.catapult.bgs.client.FriendEvent;
 import fr.enimaloc.catapult.bgs.client.PresenceEvent;
 import fr.enimaloc.catapult.bgs.client.TicketException;
 import fr.enimaloc.catapult.domain.battlenet.BattleNetServiceAccount;
+import fr.enimaloc.catapult.domain.debug.DebugExchange.Direction;
 import fr.enimaloc.catapult.domain.battlenet.BattleNetServiceAccount.AuthState;
 import fr.enimaloc.catapult.repository.battlenet.BattleNetServiceAccountRepository;
 import fr.enimaloc.catapult.service.battlenet.login.BattleNetLoginCoordinator;
+import fr.enimaloc.catapult.service.debug.SessionDebug;
+import fr.enimaloc.catapult.service.debug.TestSessionDebug;
 import fr.enimaloc.catapult.site.SiteRole;
 import fr.enimaloc.catapult.site.SiteRoleChangedEvent;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -82,9 +85,11 @@ class BattleNetSessionManagerTest {
         return account;
     }
 
+    private SessionDebug debug = SessionDebug.OFF;
+
     private BattleNetSessionManager manager(boolean sessionsEnabled) {
         return new BattleNetSessionManager(repository, coordinator, siteRole, events, registry,
-                TransactionOperations.withoutTransaction(), sessionsEnabled, "bgs.test",
+                TransactionOperations.withoutTransaction(), debug, sessionsEnabled, "bgs.test",
                 () -> {
                     FakeBgsChannel channel = new FakeBgsChannel();
                     channels.add(channel);
@@ -191,6 +196,21 @@ class BattleNetSessionManagerTest {
         assertThat(channels.get(2).closed).isTrue();
         assertThat(manager.sessionState(bot1.getId())).isEqualTo(BattleNetSessionManager.DISABLED);
         assertThat(manager.sessionState(bot2.getId())).isEqualTo("CONNECTING");
+    }
+
+    @Test
+    void presenceAndFriendEvents_recordedForTheMemberInDebugTheyName() {
+        TestSessionDebug watched = new TestSessionDebug("battlenet", bot1.getId(), BattleNetDebugKeys.account(42L),
+                BattleNetDebugKeys.tag("Streamer#1234"));
+        debug = watched.debug;
+        BattleNetSessionManager manager = started();
+
+        manager.listenerOf(bot1.getId()).onPresence(new PresenceEvent(42L, "WTCG", 0x57544347, List.of()));
+        manager.listenerOf(bot1.getId()).onPresence(new PresenceEvent(43L, "Pro", 0x50726F, List.of()));
+        manager.listenerOf(bot1.getId()).onFriend(new FriendEvent.InvitationSent(7, "streamer#1234"));
+
+        assertThat(watched.recorded(Direction.IN, "bgs.presence")).contains("accountId=42").contains("WTCG");
+        assertThat(watched.recorded(Direction.IN, "bgs.friends.InvitationSent")).contains("streamer#1234");
     }
 
     @Test

@@ -1,8 +1,11 @@
 package fr.enimaloc.catapult.service.epic;
 
+import fr.enimaloc.catapult.domain.debug.DebugExchange.Direction;
 import fr.enimaloc.catapult.domain.epic.EpicServiceAccount;
 import fr.enimaloc.catapult.domain.epic.EpicServiceAccount.AuthState;
 import fr.enimaloc.catapult.repository.epic.EpicServiceAccountRepository;
+import fr.enimaloc.catapult.service.debug.SessionDebug;
+import fr.enimaloc.catapult.service.debug.TestSessionDebug;
 import fr.enimaloc.catapult.service.epic.EpicTokenService.AccessToken;
 import fr.enimaloc.catapult.service.epic.api.EpicAuthException;
 import fr.enimaloc.catapult.service.epic.api.EpicFriendsClient;
@@ -126,9 +129,11 @@ class EpicSessionManagerTest {
         return account;
     }
 
+    private SessionDebug debug = SessionDebug.OFF;
+
     private EpicSessionManager manager(boolean sessionsEnabled) {
         return new EpicSessionManager(repository, tokens, friends, presence, siteRole, events, registry,
-                sessionsEnabled,
+                debug, sessionsEnabled,
                 () -> {
                     FakeEpicConnectClient client = prepared.isEmpty() ? new FakeEpicConnectClient() : prepared.poll();
                     clients.add(client);
@@ -263,6 +268,20 @@ class EpicSessionManagerTest {
         order.verify(events).publishEvent(new EpicFriendEventReceived(bot1.getId(), summary));
         assertThat(manager.anyOpenSessionToken()).contains("access-1");
         verify(friends, never()).summary(eq("access-2"), anyString());
+    }
+
+    @Test
+    void connectMessage_recordedForTheMemberInDebugItNames() {
+        TestSessionDebug watched = new TestSessionDebug("epic", bot1.getId(), STREAMER);
+        debug = watched.debug;
+        started();
+        FakeEpicConnectClient client = lastClientOf(bot1);
+        client.connected("860311ff");
+
+        client.push(EpicSessionManager.PRESENCE_UPDATE, IN_FALL_GUYS);
+
+        assertThat(watched.recorded(Direction.IN, "connect." + EpicSessionManager.PRESENCE_UPDATE))
+                .contains("\"type\":\"" + EpicSessionManager.PRESENCE_UPDATE + "\"").contains("Fall Guys");
     }
 
     @Test

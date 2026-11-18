@@ -14,12 +14,14 @@ import fr.enimaloc.catapult.service.ankama.haapi.AnkamaAuthException;
 import fr.enimaloc.catapult.service.ankama.haapi.AnkamaHaapiClient;
 import fr.enimaloc.catapult.service.ankama.haapi.AnkamaHaapiClient.Certificate;
 import fr.enimaloc.catapult.service.ankama.haapi.AnkamaShieldException;
+import fr.enimaloc.catapult.service.debug.SessionDebug;
 import fr.enimaloc.catapult.site.SiteRole;
 import fr.enimaloc.catapult.site.SiteRoleChangedEvent;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.context.ApplicationEventPublisher;
@@ -97,6 +99,7 @@ public class AnkamaSessionManager implements SmartLifecycle {
     private final ApplicationEventPublisher events;
     private final MeterRegistry registry;
     private final TransactionOperations transactions;
+    private final SessionDebug debug;
     private final boolean sessionsEnabled;
     private final Supplier<AnkamaChatClient> clients;
     private final ScheduledExecutorService scheduler;
@@ -123,9 +126,11 @@ public class AnkamaSessionManager implements SmartLifecycle {
                                 ApplicationEventPublisher events,
                                 MeterRegistry registry,
                                 TransactionOperations transactions,
+                                @Qualifier("ankamaSessionDebug") SessionDebug debug,
                                 @Value("${ankama.sessions.enabled:false}") boolean sessionsEnabled,
                                 @Value("${ankama.chat-host:zaap-chat.ankama.com}") String chatHost) {
-        this(repository, haapi, encryption, siteRole, events, registry, transactions, sessionsEnabled, chatHost,
+        this(repository, haapi, encryption, siteRole, events, registry, transactions, debug, sessionsEnabled,
+                chatHost,
                 Executors.newScheduledThreadPool(2, Thread.ofPlatform().name("ankama-chat-timers-", 0).daemon()
                         .factory()));
     }
@@ -137,10 +142,11 @@ public class AnkamaSessionManager implements SmartLifecycle {
                                  ApplicationEventPublisher events,
                                  MeterRegistry registry,
                                  TransactionOperations transactions,
+                                 SessionDebug debug,
                                  boolean sessionsEnabled,
                                  String chatHost,
                                  ScheduledExecutorService scheduler) {
-        this(repository, haapi, encryption, siteRole, events, registry, transactions, sessionsEnabled,
+        this(repository, haapi, encryption, siteRole, events, registry, transactions, debug, sessionsEnabled,
                 () -> new AnkamaChatClient(SSLSocketFactory.getDefault(), chatHost, CHAT_PORT, HEARTBEAT, scheduler),
                 scheduler,
                 // Connecting blocks on HTTP, TCP and TLS: never on the timers
@@ -163,6 +169,7 @@ public class AnkamaSessionManager implements SmartLifecycle {
                          ApplicationEventPublisher events,
                          MeterRegistry registry,
                          TransactionOperations transactions,
+                         SessionDebug debug,
                          boolean sessionsEnabled,
                          Supplier<AnkamaChatClient> clients,
                          ScheduledExecutorService scheduler,
@@ -177,6 +184,7 @@ public class AnkamaSessionManager implements SmartLifecycle {
         this.events = events;
         this.registry = registry;
         this.transactions = transactions;
+        this.debug = debug;
         this.sessionsEnabled = sessionsEnabled;
         this.clients = clients;
         this.scheduler = scheduler;
@@ -707,7 +715,10 @@ public class AnkamaSessionManager implements SmartLifecycle {
                     log.warn("Could not list the friends and invites of Ankama service account {}: {}", accountId,
                             failure.toString());
                 } else if (!stopped) {
-                    replay.forEach(event -> publish(event, true));
+                    replay.forEach(event -> {
+                        record(event, true);
+                        publish(event, true);
+                    });
                 }
             });
         }
@@ -721,6 +732,15 @@ public class AnkamaSessionManager implements SmartLifecycle {
 
         private void publish(ChatMessages.Event event) {
             publish(event, false);
+        }
+
+        /** Records the event for the members in debug mode it names; {@code replayed} for the listing at connection. */
+        private void record(ChatMessages.Event event, boolean replayed) {
+            if (event instanceof ChatMessages.Unknown || !debug.watches(accountId)) {
+                return;
+            }
+            debug.inbound(accountId, AnkamaDebugKeys.of(event)::contains, "CHAT", event::toString,
+                    () -> "chat." + event.getClass().getSimpleName() + (replayed ? ".replay" : ""));
         }
 
         private void publish(ChatMessages.Event event, boolean replayed) {
@@ -771,6 +791,7 @@ public class AnkamaSessionManager implements SmartLifecycle {
                 if (!live()) {
                     return;
                 }
+                record(event, false);
                 switch (event) {
                     case ChatMessages.EndpointsUpdated e -> {
                         endpoints.put(e.userId(), e.properties());

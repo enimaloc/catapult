@@ -13,6 +13,8 @@ import java.util.UUID;
 public interface BattleNetFriendLinkRepository extends JpaRepository<BattleNetFriendLink, UUID> {
     Optional<BattleNetFriendLink> findByUser(UserAccount user);
 
+    Optional<BattleNetFriendLink> findByUserId(UUID userId);
+
     /**
      * Variant with the service account loaded (open-in-view is disabled: readers
      * outside a transaction, such as controllers, cannot initialize the LAZY proxy).
