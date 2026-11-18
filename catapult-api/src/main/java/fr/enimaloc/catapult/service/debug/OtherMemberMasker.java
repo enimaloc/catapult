@@ -1,9 +1,15 @@
 package fr.enimaloc.catapult.service.debug;
 
 import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.ankama.AnkamaFriendLink;
+import fr.enimaloc.catapult.domain.battlenet.BattleNetFriendLink;
+import fr.enimaloc.catapult.domain.epic.EpicFriendLink;
 import fr.enimaloc.catapult.domain.minecraft.MinecraftFriendLink;
 import fr.enimaloc.catapult.event.AccountCreatedEvent;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.repository.ankama.AnkamaFriendLinkRepository;
+import fr.enimaloc.catapult.repository.battlenet.BattleNetFriendLinkRepository;
+import fr.enimaloc.catapult.repository.epic.EpicFriendLinkRepository;
 import fr.enimaloc.catapult.repository.minecraft.MinecraftFriendLinkRepository;
 import fr.enimaloc.catapult.service.minecraft.MinecraftService;
 import lombok.extern.slf4j.Slf4j;
@@ -44,6 +50,9 @@ public class OtherMemberMasker {
 
     private final UserAccountRepository users;
     private final MinecraftFriendLinkRepository links;
+    private final EpicFriendLinkRepository epicLinks;
+    private final BattleNetFriendLinkRepository battleNetLinks;
+    private final AnkamaFriendLinkRepository ankamaLinks;
     private volatile Index index = Index.EMPTY;
     private final Executor reloader = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "debug-member-masker-reload");
@@ -51,9 +60,14 @@ public class OtherMemberMasker {
         return t;
     });
 
-    public OtherMemberMasker(UserAccountRepository users, MinecraftFriendLinkRepository links) {
+    public OtherMemberMasker(UserAccountRepository users, MinecraftFriendLinkRepository links,
+                             EpicFriendLinkRepository epicLinks, BattleNetFriendLinkRepository battleNetLinks,
+                             AnkamaFriendLinkRepository ankamaLinks) {
         this.users = users;
         this.links = links;
+        this.epicLinks = epicLinks;
+        this.battleNetLinks = battleNetLinks;
+        this.ankamaLinks = ankamaLinks;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -73,6 +87,24 @@ public class OtherMemberMasker {
                 add(owners, MinecraftService.normalizeProfileId(profile), owner);
                 add(owners, profile, owner);
                 add(owners, l.getMinecraftName(), owner);
+            }
+            for (EpicFriendLink l : epicLinks.findAll()) {
+                UUID owner = l.getUser().getId();
+                add(owners, l.getEpicAccountId(), owner);
+                add(owners, l.getDisplayName(), owner);
+            }
+            for (BattleNetFriendLink l : battleNetLinks.findAll()) {
+                UUID owner = l.getUser().getId();
+                add(owners, l.getBnetAccountId() == 0 ? null : String.valueOf(l.getBnetAccountId()), owner);
+                add(owners, l.getBattleTag(), owner);
+            }
+            for (AnkamaFriendLink l : ankamaLinks.findAll()) {
+                UUID owner = l.getUser().getId();
+                add(owners, l.getAnkamaUserId() == null ? null : String.valueOf(l.getAnkamaUserId()), owner);
+                add(owners, l.getRequestedName(), owner);
+                if (l.getRequestedName() != null && l.getRequestedTag() != null) {
+                    add(owners, l.getRequestedName() + "#" + l.getRequestedTag(), owner);
+                }
             }
             index = build(owners);
         } catch (RuntimeException e) {
