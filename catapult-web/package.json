@@ -10,7 +10,7 @@
     "generate:twitchat-protocol": "node scripts/generate-twitchat-protocol.mjs"
   },
   "devDependencies": {
-    "jsdom": "^26.1.0",
+    "jsdom": "^30.0.0",
     "vitest": "^4.1.11",
     "@vitest/coverage-v8": "^4.1.11"
   }
