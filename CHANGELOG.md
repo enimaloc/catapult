@@ -4,6 +4,13 @@ Toutes les versions publiées de Catapult, la plus récente en premier.
 
 Ce fichier est régénéré par le bot à chaque release à partir des notes des [GitHub Releases](https://github.com/enimaloc/catapult/releases) : pour corriger une entrée, modifie les notes de la release (ou le changelog de la PR de release avant sa publication), pas ce fichier.
 
+## [v1.6.0](https://github.com/enimaloc/catapult/releases/tag/v1.6.0) - 2026-11-18
+
+### Features
+- **debug:** mask the Epic, Battle.net and Ankama identifiers of other members (c798310)
+- **debug:** record the bot sessions' exchanges for members in debug mode (9b3af07)
+- merge debug recording of bot sessions into dev (4b3486d)
+
 ## [v1.5.2](https://github.com/enimaloc/catapult/releases/tag/v1.5.2) - 2026-11-16
 
 ### Fixes
