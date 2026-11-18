@@ -10,6 +10,7 @@ import fr.enimaloc.catapult.domain.epic.EpicServiceAccount.AuthState;
 import fr.enimaloc.catapult.repository.binding.GetterConfigRepository;
 import fr.enimaloc.catapult.repository.epic.EpicFriendLinkRepository;
 import fr.enimaloc.catapult.repository.epic.EpicServiceAccountRepository;
+import fr.enimaloc.catapult.service.debug.DebugContext;
 import fr.enimaloc.catapult.service.epic.EpicEnrollmentException.Reason;
 import fr.enimaloc.catapult.service.epic.api.EpicAuthException;
 import fr.enimaloc.catapult.service.epic.api.EpicFriendsClient;
@@ -181,8 +182,8 @@ public class EpicFriendService {
         }
         AddResult result;
         try {
-            result = withToken(bot.getId(),
-                    token -> friendsClient.add(token, bot.getEpicAccountId(), link.getEpicAccountId()));
+            result = withToken(bot.getId(), token -> DebugContext.callAs(link.getUser().getId(),
+                    () -> friendsClient.add(token, bot.getEpicAccountId(), link.getEpicAccountId())));
         } catch (RuntimeException e) {
             log.warn("Epic friend request failed on {} for user {}: {}", bot.getId(), link.getUser().getId(),
                     e.toString());
@@ -251,10 +252,10 @@ public class EpicFriendService {
         }
         EpicServiceAccount bot = link.getServiceAccount();
         try {
-            withToken(bot.getId(), token -> {
+            withToken(bot.getId(), token -> DebugContext.callAs(userId, () -> {
                 friendsClient.delete(token, bot.getEpicAccountId(), link.getEpicAccountId());
                 return null;
-            });
+            }));
         } catch (RuntimeException e) {
             log.warn("Epic friend delete failed on {} for user {}: {}", bot.getId(), userId, e.toString());
         }
@@ -345,13 +346,17 @@ public class EpicFriendService {
         if (candidates.stream().anyMatch(link -> link.getStatus() == Status.ACCEPTED)) {
             return;
         }
-        boolean expected = candidates.stream()
-                .anyMatch(link -> link.getStatus() == Status.PENDING || link.getStatus() == Status.INVITE_REJECTED);
+        Optional<UUID> expected = candidates.stream()
+                .filter(link -> link.getStatus() == Status.PENDING || link.getStatus() == Status.INVITE_REJECTED)
+                .map(link -> link.getUser().getId())
+                .findFirst();
         UUID botId = bot.getId();
         String botAccountId = bot.getEpicAccountId();
-        if (expected) {
+        if (expected.isPresent()) {
             log.info("Accepting the Epic request of an enrolled streamer on {}", botId);
-            afterCommit.add(() -> call(botId, "accept", token -> friendsClient.add(token, botAccountId, requester)));
+            UUID streamer = expected.get();
+            afterCommit.add(() -> call(botId, "accept", token -> DebugContext.callAs(streamer,
+                    () -> friendsClient.add(token, botAccountId, requester))));
         } else {
             log.info("Refusing an Epic request no link waits for on {}", botId);
             afterCommit.add(() -> call(botId, "refuse", token -> {

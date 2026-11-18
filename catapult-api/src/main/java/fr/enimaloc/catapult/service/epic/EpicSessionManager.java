@@ -3,6 +3,8 @@ package fr.enimaloc.catapult.service.epic;
 import fr.enimaloc.catapult.domain.epic.EpicServiceAccount;
 import fr.enimaloc.catapult.domain.epic.EpicServiceAccount.AuthState;
 import fr.enimaloc.catapult.repository.epic.EpicServiceAccountRepository;
+import fr.enimaloc.catapult.service.debug.BatchDebugFilter;
+import fr.enimaloc.catapult.service.debug.SessionDebug;
 import fr.enimaloc.catapult.service.epic.EpicTokenService.AccessToken;
 import fr.enimaloc.catapult.service.epic.api.EpicAuthException;
 import fr.enimaloc.catapult.service.epic.api.EpicFriendsClient;
@@ -16,6 +18,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.context.ApplicationEventPublisher;
@@ -23,6 +26,7 @@ import org.springframework.context.SmartLifecycle;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.JsonNodeFactory;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -92,6 +96,8 @@ public class EpicSessionManager implements SmartLifecycle {
     static final Duration REGISTER_TIMEOUT = Duration.ofSeconds(30);
     static final String PRESENCE_UPDATE = "presence.v1.UPDATE";
     static final String FRIENDS_PREFIX = "friends.v1.";
+    /** Names the friends listings in the debug recording. */
+    static final String FRIENDS_OPERATION = "epic.friends.summary";
     static final String ADMIN_ACTION_COUNTER = "catapult.epic.session.admin_action_required";
     static final String DROPPED_COUNTER = "catapult.epic.session.dropped";
 
@@ -102,6 +108,7 @@ public class EpicSessionManager implements SmartLifecycle {
     private final SiteRole siteRole;
     private final ApplicationEventPublisher events;
     private final MeterRegistry registry;
+    private final SessionDebug debug;
     private final boolean sessionsEnabled;
     private final Supplier<EpicConnectClient> clients;
     private final ScheduledExecutorService scheduler;
@@ -126,9 +133,10 @@ public class EpicSessionManager implements SmartLifecycle {
                               SiteRole siteRole,
                               ApplicationEventPublisher events,
                               MeterRegistry registry,
+                              @Qualifier("epicSessionDebug") SessionDebug debug,
                               @Value("${epic.sessions.enabled:false}") boolean sessionsEnabled,
                               @Value("${epic.connect-url:wss://connect.ol.epicgames.com}") String connectUrl) {
-        this(repository, tokens, friends, presence, siteRole, events, registry, sessionsEnabled,
+        this(repository, tokens, friends, presence, siteRole, events, registry, debug, sessionsEnabled,
                 URI.create(connectUrl),
                 Executors.newScheduledThreadPool(2, Thread.ofPlatform().name("epic-connect-timers-", 0).daemon()
                         .factory()));
@@ -141,10 +149,11 @@ public class EpicSessionManager implements SmartLifecycle {
                                SiteRole siteRole,
                                ApplicationEventPublisher events,
                                MeterRegistry registry,
+                               SessionDebug debug,
                                boolean sessionsEnabled,
                                URI connectUrl,
                                ScheduledExecutorService scheduler) {
-        this(repository, tokens, friends, presence, siteRole, events, registry, sessionsEnabled,
+        this(repository, tokens, friends, presence, siteRole, events, registry, debug, sessionsEnabled,
                 webSocketClients(connectUrl, scheduler),
                 scheduler,
                 // Connecting and the REST calls block on HTTP: never on the timers nor the WebSocket readers
@@ -167,6 +176,7 @@ public class EpicSessionManager implements SmartLifecycle {
                        SiteRole siteRole,
                        ApplicationEventPublisher events,
                        MeterRegistry registry,
+                       SessionDebug debug,
                        boolean sessionsEnabled,
                        Supplier<EpicConnectClient> clients,
                        ScheduledExecutorService scheduler,
@@ -181,6 +191,7 @@ public class EpicSessionManager implements SmartLifecycle {
         this.siteRole = siteRole;
         this.events = events;
         this.registry = registry;
+        this.debug = debug;
         this.sessionsEnabled = sessionsEnabled;
         this.clients = clients;
         this.scheduler = scheduler;
@@ -663,7 +674,8 @@ public class EpicSessionManager implements SmartLifecycle {
                 }
                 EpicFriendsClient.Summary summary;
                 try {
-                    summary = friends.summary(from.token.value(), from.botAccountId);
+                    summary = debug.batch(accountId, FRIENDS_OPERATION, BatchDebugFilter::epicFriends,
+                            () -> friends.summary(from.token.value(), from.botAccountId));
                 } catch (EpicAuthException e) {
                     accessRejected(from);
                     return;
@@ -818,6 +830,7 @@ public class EpicSessionManager implements SmartLifecycle {
                     return;
                 }
                 String type = message.type();
+                record(message);
                 if (PRESENCE_UPDATE.equals(type)) {
                     updateGame(this, message.payload());
                 } else if (type.startsWith(FRIENDS_PREFIX)) {
@@ -827,6 +840,16 @@ public class EpicSessionManager implements SmartLifecycle {
                 } else {
                     log.debug("Ignoring an Epic Connect {} message for service account {}", type, accountId);
                 }
+            }
+
+            /** Records the message for the members in debug mode it names. */
+            private void record(EpicConnectMessage message) {
+                if (!debug.watches(accountId)) {
+                    return;
+                }
+                String body = JsonNodeFactory.instance.objectNode().put("type", message.type())
+                        .set("payload", message.payload()).toString();
+                debug.inbound(accountId, body::contains, "WS", () -> body, () -> "connect." + message.type());
             }
 
             @Override

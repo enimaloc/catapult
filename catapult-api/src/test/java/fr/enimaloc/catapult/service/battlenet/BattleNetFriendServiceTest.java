@@ -13,6 +13,7 @@ import fr.enimaloc.catapult.repository.battlenet.BattleNetFriendLinkRepository;
 import fr.enimaloc.catapult.repository.battlenet.BattleNetServiceAccountRepository;
 import fr.enimaloc.catapult.repository.binding.GetterConfigRepository;
 import fr.enimaloc.catapult.service.battlenet.BattleNetFriendService.BattleNetEnrollmentException;
+import fr.enimaloc.catapult.service.debug.SessionDebug;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -107,7 +108,7 @@ class BattleNetFriendServiceTest {
     @BeforeEach
     void setUp() {
         service = new BattleNetFriendService(accountRepository, linkRepository, getterConfigRepository, publisher,
-                sessionManager, transactions, Runnable::run);
+                sessionManager, transactions, SessionDebug.OFF, Runnable::run);
         user = new UserAccount();
         user.setId(UUID.randomUUID());
         bot1 = bot("bot1", 1, "CatapultBot#1111");
