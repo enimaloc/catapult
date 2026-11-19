@@ -296,6 +296,47 @@ class EventSubTwitchChatServiceFlowsTest {
             verify(wsBuilder, times(1)).buildAsync(any(), any());
         }
 
+        private static final String WELCOME =
+                "{\"metadata\": {\"message_type\": \"session_welcome\"}, \"payload\": {\"session\": {\"id\": \"s-1\"}}}";
+
+        @Test
+        void welcome_on403_closesTheChatAndDoesNotReconnect() {
+            handshakesSucceed();
+            service.connect(user);
+            helix.expect(requestTo(SUBSCRIPTIONS_URL)).andRespond(withStatus(HttpStatus.FORBIDDEN));
+
+            service.handleMessage(user, token, WELCOME, false);
+
+            helix.verify();
+            assertThat(service.isConnected(user)).isFalse();
+            verify(wsBuilder, times(1)).buildAsync(any(), any());
+        }
+
+        @Test
+        void welcome_whenTheTokenCannotBeRead_closesTheChatAndDoesNotReconnect() {
+            handshakesSucceed();
+            service.connect(user);
+            when(tokenService.resolveAccessToken(token, user)).thenThrow(new IllegalStateException("Failed to decrypt token"));
+
+            service.handleMessage(user, token, WELCOME, false);
+
+            assertThat(service.isConnected(user)).isFalse();
+            verify(wsBuilder, times(1)).buildAsync(any(), any());
+        }
+
+        @Test
+        void welcome_on5xx_isTransient_theChatStaysOpen() {
+            handshakesSucceed();
+            service.connect(user);
+            helix.expect(requestTo(SUBSCRIPTIONS_URL)).andRespond(withServerError());
+            helix.expect(requestTo(SUBSCRIPTIONS_URL)).andRespond(withSuccess());
+
+            service.handleMessage(user, token, WELCOME, false);
+
+            helix.verify();
+            assertThat(service.isConnected(user)).isTrue();
+        }
+
         @Test
         void welcome_on401_retryFailuresAreSwallowed() {
             helix.expect(requestTo(SUBSCRIPTIONS_URL)).andRespond(withStatus(HttpStatus.UNAUTHORIZED));

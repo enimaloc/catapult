@@ -30,6 +30,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 
 import java.time.Instant;
 import java.util.List;
@@ -301,36 +302,52 @@ public class EventSubTwitchChatService implements TwitchChatService {
 
     private static final String CHAT_MESSAGE_TYPE = "channel.chat.message";
 
-    /** The chat subscription got a 401 and the token could not be refreshed: the token is dead or revoked. */
+    /**
+     * The chat subscription cannot succeed by retrying (token dead or revoked, missing scope, undecryptable token...):
+     * reopening the socket would only loop forever (welcome, refused, closed by Twitch).
+     */
     private static final class DeadToken extends RuntimeException {
-        DeadToken() {
-            super(null, null, false, false);
+        DeadToken(String reason) {
+            super(reason, null, false, false);
         }
     }
 
     private void subscribe(UserAccount user, OAuthToken token, String sessionId) {
-        String accessToken = twitchTokenService.resolveAccessToken(token, user);
         try {
+            String accessToken = twitchTokenService.resolveAccessToken(token, user);
             subscribeEvent(user, token, accessToken, sessionId, CHAT_MESSAGE_TYPE,
                 Map.of("broadcaster_user_id", user.getTwitchId(), "user_id", user.getTwitchId()));
             subscribeEvent(user, token, accessToken, sessionId,
                 "channel.channel_points_custom_reward_redemption.add",
                 Map.of("broadcaster_user_id", user.getTwitchId()));
             connections.onSubscribed(user);
-        } catch (DeadToken e) {
-            // Nothing to listen with, and reopening would loop forever (welcome, refused, closed by Twitch)
-            log.warn("[EventSub Chat] Twitch token of user {} is dead — closing the chat, no reconnection", user.getId());
-            connections.forbidReconnect(user);
-            connections.close(user, "token dead");
         } catch (HttpClientErrorException.TooManyRequests e) {
             log.warn("[EventSub Chat] Twitch refused a subscription for user {}, opening a new session: {}",
                 user.getId(), e.getMessage());
             connections.reopen(user, token);
+        } catch (DeadToken e) {
+            giveUp(user, e.getMessage());
+        } catch (RuntimeException e) {
+            // The token itself could not be read (decryption, refresh...): nothing to subscribe with
+            giveUp(user, e.getClass().getSimpleName() + ": " + e.getMessage());
         }
+    }
+
+    private void giveUp(UserAccount user, String reason) {
+        log.warn("[EventSub Chat] Cannot subscribe the chat of user {} ({}) — closing it, no reconnection",
+            user.getId(), reason);
+        connections.forbidReconnect(user);
+        connections.close(user, "subscription failed");
+    }
+
+    /** A refusal retrying cannot fix: a client error other than 429. Server errors and network faults are transient. */
+    private static boolean permanent(Exception e) {
+        return e instanceof HttpClientErrorException && !(e instanceof HttpClientErrorException.TooManyRequests);
     }
 
     private void subscribeEvent(UserAccount user, OAuthToken token, String accessToken, String sessionId,
                                 String type, Map<String, String> condition) {
+        boolean chat = CHAT_MESSAGE_TYPE.equals(type);
         try {
             postSubscription(accessToken, sessionId, type, condition);
             log.info("[EventSub Chat] Subscribed {} for user {} ({})",
@@ -343,7 +360,7 @@ public class EventSubTwitchChatService implements TwitchChatService {
             if (refreshed == null) {
                 log.warn("[EventSub Chat] Failed to subscribe to {} for user {}: token refresh failed",
                     type, user.getId());
-                if (CHAT_MESSAGE_TYPE.equals(type)) throw new DeadToken();
+                if (chat) throw new DeadToken("token refresh failed");
                 return;
             }
             try {
@@ -353,10 +370,16 @@ public class EventSubTwitchChatService implements TwitchChatService {
             } catch (Exception retryEx) {
                 log.warn("[EventSub Chat] Failed to subscribe to {} for user {} after refresh: {}",
                     type, user.getId(), retryEx.getMessage());
+                if (chat && (permanent(retryEx) || !(retryEx instanceof RestClientException))) {
+                    throw new DeadToken(retryEx.getMessage());
+                }
             }
         } catch (Exception e) {
             log.warn("[EventSub Chat] Failed to subscribe to {} for user {}: {}",
                 type, user.getId(), e.getMessage());
+            if (chat && (permanent(e) || !(e instanceof RestClientException))) {
+                throw new DeadToken(e.getMessage());
+            }
         }
     }
 
