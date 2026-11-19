@@ -62,6 +62,7 @@ class SystemMentionRepliesTest {
         UserAccount system = new UserAccount();
         system.setTwitchUsername("catapult_bot");
         when(users.findBySystemAccountTrue()).thenReturn(Optional.of(system));
+        when(emergency.isProviderUsed(any(), eq(GetterConfig.Provider.BATTLENET))).thenReturn(true);
         when(emergency.report(any(), eq(GetterConfig.Provider.BATTLENET), any(), any(), any(), any(), any()))
                 .thenReturn(new ReportOutcome(ReportOutcome.Kind.CHANNEL_STOP, 1, 3, Instant.now()));
 
@@ -72,8 +73,7 @@ class SystemMentionRepliesTest {
 
     @Test
     void notUsedReply_hasASingleApostrophe() {
-        when(emergency.report(any(), eq(GetterConfig.Provider.EPIC), any(), any(), any(), any(), any()))
-                .thenReturn(new ReportOutcome(ReportOutcome.Kind.PROVIDER_NOT_USED, 0, 3, null));
+        when(emergency.isProviderUsed(any(), eq(GetterConfig.Provider.EPIC))).thenReturn(false);
 
         assertThat(repliesTo(SenderRole.BROADCASTER, "b-1", new SystemMention("emergency", List.of("epic"))))
                 .containsExactly("Cette chaîne n'utilise pas Epic Games : rien à arrêter.");
