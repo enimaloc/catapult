@@ -267,15 +267,29 @@ public class EventSubTwitchChatService implements TwitchChatService {
         return ChatCommandEvent.SenderRole.VIEWERS;
     }
 
+    private static final String CHAT_MESSAGE_TYPE = "channel.chat.message";
+
+    /** The chat subscription got a 401 and the token could not be refreshed: the token is dead or revoked. */
+    private static final class DeadToken extends RuntimeException {
+        DeadToken() {
+            super(null, null, false, false);
+        }
+    }
+
     private void subscribe(UserAccount user, OAuthToken token, String sessionId) {
         String accessToken = twitchTokenService.resolveAccessToken(token, user);
         try {
-            subscribeEvent(user, token, accessToken, sessionId, "channel.chat.message",
+            subscribeEvent(user, token, accessToken, sessionId, CHAT_MESSAGE_TYPE,
                 Map.of("broadcaster_user_id", user.getTwitchId(), "user_id", user.getTwitchId()));
             subscribeEvent(user, token, accessToken, sessionId,
                 "channel.channel_points_custom_reward_redemption.add",
                 Map.of("broadcaster_user_id", user.getTwitchId()));
             connections.onSubscribed(user);
+        } catch (DeadToken e) {
+            // Nothing to listen with, and reopening would loop forever (welcome, refused, closed by Twitch)
+            log.warn("[EventSub Chat] Twitch token of user {} is dead — closing the chat, no reconnection", user.getId());
+            connections.forbidReconnect(user);
+            connections.close(user, "token dead");
         } catch (HttpClientErrorException.TooManyRequests e) {
             log.warn("[EventSub Chat] Twitch refused a subscription for user {}, opening a new session: {}",
                 user.getId(), e.getMessage());
@@ -297,6 +311,7 @@ public class EventSubTwitchChatService implements TwitchChatService {
             if (refreshed == null) {
                 log.warn("[EventSub Chat] Failed to subscribe to {} for user {}: token refresh failed",
                     type, user.getId());
+                if (CHAT_MESSAGE_TYPE.equals(type)) throw new DeadToken();
                 return;
             }
             try {

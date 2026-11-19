@@ -279,8 +279,11 @@ class EventSubTwitchChatServiceFlowsTest {
         }
 
         @Test
-        void welcome_on401_withoutARefreshedToken_givesUp() {
-            helix.expect(requestTo(SUBSCRIPTIONS_URL)).andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+        void welcome_on401_withoutARefreshedToken_closesTheChatAndDoesNotReconnect() {
+            handshakesSucceed();
+            service.connect(user);
+            assertThat(service.isConnected(user)).isTrue();
+            // Only the chat subscription is tried: with a dead token the rewards one is not attempted
             helix.expect(requestTo(SUBSCRIPTIONS_URL)).andRespond(withStatus(HttpStatus.UNAUTHORIZED));
             when(tokenService.refreshAccessToken(token, user)).thenReturn(null);
 
@@ -288,6 +291,9 @@ class EventSubTwitchChatServiceFlowsTest {
                     "{\"metadata\": {\"message_type\": \"session_welcome\"}, \"payload\": {\"session\": {\"id\": \"s-1\"}}}", false);
 
             helix.verify();
+            assertThat(service.isConnected(user)).isFalse();
+            // Reconnection is forbidden: a later drop of a socket must not reopen it
+            verify(wsBuilder, times(1)).buildAsync(any(), any());
         }
 
         @Test
