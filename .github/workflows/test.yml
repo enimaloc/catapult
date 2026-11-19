@@ -26,10 +26,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { key: api-1, tasks: ':catapult-api:test -PtestShard=0/4' }
-          - { key: api-2, tasks: ':catapult-api:test -PtestShard=1/4' }
-          - { key: api-3, tasks: ':catapult-api:test -PtestShard=2/4' }
-          - { key: api-4, tasks: ':catapult-api:test -PtestShard=3/4' }
+          - { key: api-1, tasks: ':catapult-api:test -PtestShard=0/5' }
+          - { key: api-2, tasks: ':catapult-api:test -PtestShard=1/5' }
+          - { key: api-3, tasks: ':catapult-api:test -PtestShard=2/5' }
+          - { key: api-4, tasks: ':catapult-api:test -PtestShard=3/5' }
+          - { key: api-5, tasks: ':catapult-api:test -PtestShard=4/5' }
           - { key: web-1, tasks: ':catapult-web:test -PtestShard=0/2' }
           - { key: web-2, tasks: ':catapult-web:test -PtestShard=1/2' }
           - { key: rest, tasks: ':catapult-common:test :catapult-bgs:test :catapult-api:englishConventions :catapult-web:jsTest' }
