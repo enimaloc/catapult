@@ -4,10 +4,13 @@ import fr.enimaloc.catapult.service.debug.DebugContext;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.event.GameDetectedEvent;
 import fr.enimaloc.catapult.event.NoGameDetectedEvent;
+import fr.enimaloc.catapult.domain.binding.GetterConfig;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.getter.DetectionTimeoutException;
 import fr.enimaloc.catapult.getter.GameGetterChain;
 import fr.enimaloc.catapult.getter.MinecraftPresenceGetter;
+import fr.enimaloc.catapult.getter.ProviderStoppedException;
+import fr.enimaloc.catapult.service.ActivityLogService;
 import fr.enimaloc.catapult.getter.steam.SteamGameGetter;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.simulation.SimulationGate;
@@ -30,6 +33,9 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -53,6 +59,10 @@ public class SchedulerService implements SchedulingConfigurer {
     private final ObjectProvider<SimulationGate> simulationGate;
     private final SiteRole siteRole;
     private final PollCadence pollCadence;
+    private final ActivityLogService activityLogService;
+
+    /** The stopped provider each chain was last told about, so the log gets one line per stop and chain. */
+    private final Map<UUID, GetterConfig.Provider> frozenChains = new ConcurrentHashMap<>();
 
     /**
      * Guards the prefetch→process→clear cycle so a manual {@link #triggerManualCheck}
@@ -183,11 +193,16 @@ public class SchedulerService implements SchedulingConfigurer {
         try {
             detected = gameGetterChain.resolve(user);
         } catch (DetectionTimeoutException e) {
+            if (e instanceof ProviderStoppedException stopped && frozenChains.put(user.getId(), stopped.getProvider()) != stopped.getProvider()) {
+                activityLogService.addEntry(user.getId(), "WARN", stopped.getProvider().name()
+                    + " is suspended by an emergency stop: detection is frozen until it is lifted");
+            }
             // Nothing learnt this cycle: the user keeps their state until a provider answers
             log.warn("Detection skipped for user {}: {}", user.getId(), e.getMessage());
             meterRegistry.counter("catapult.scheduler.detection.timeouts").increment();
             return;
         }
+        frozenChains.remove(user.getId());
         boolean firstSinceStart = gameStateService.markObserved(user);
 
         if (detected.isPresent()) {

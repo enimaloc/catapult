@@ -5,9 +5,12 @@ import fr.enimaloc.catapult.simulation.SimulationGate;
 import fr.enimaloc.catapult.simulation.SimulationGates;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.getter.DetectionTimeoutException;
+import fr.enimaloc.catapult.domain.binding.GetterConfig;
 import fr.enimaloc.catapult.getter.GameGetterChain;
+import fr.enimaloc.catapult.getter.ProviderStoppedException;
 import fr.enimaloc.catapult.getter.steam.SteamGameGetter;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
+import fr.enimaloc.catapult.service.ActivityLogService;
 import fr.enimaloc.catapult.service.premium.PremiumService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
@@ -47,6 +50,7 @@ class SchedulerServiceTest {
     @Mock GameStateService gameStateService;
     @Mock ApplicationEventPublisher eventPublisher;
     @Mock BindingService bindingService;
+    @Mock ActivityLogService activityLog;
 
     private SimpleMeterRegistry registry;
     private SchedulerService schedulerService;
@@ -56,7 +60,7 @@ class SchedulerServiceTest {
         registry = new SimpleMeterRegistry();
         schedulerService = new SchedulerService(
             userAccountRepository, gameGetterChain, gameStateService, eventPublisher, registry,
-            Optional.empty(), Optional.empty(), bindingService, SimulationGates.none(), SiteRoles.active(), PollCadences.always());
+            Optional.empty(), Optional.empty(), bindingService, SimulationGates.none(), SiteRoles.active(), PollCadences.always(), activityLog);
     }
 
     @Test
@@ -115,6 +119,44 @@ class SchedulerServiceTest {
     }
 
     @Test
+    void detect_providerStopped_keepsStateAndPublishesNothing() {
+        UserAccount u1 = new UserAccount(); u1.setId(UUID.randomUUID());
+        when(userAccountRepository.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE))
+            .thenReturn(List.of(u1));
+        when(gameGetterChain.resolve(any())).thenThrow(new ProviderStoppedException(GetterConfig.Provider.XBOX));
+
+        schedulerService.poll();
+        schedulerService.poll();
+
+        verify(gameStateService, never()).markObserved(any());
+        verify(gameStateService, never()).clearState(any());
+        verify(gameStateService, never()).updateState(any(), any());
+        verifyNoInteractions(eventPublisher);
+        // once per stop and chain, however many cycles it lasts
+        verify(activityLog, org.mockito.Mockito.times(1)).addEntry(
+            org.mockito.ArgumentMatchers.eq(u1.getId()), org.mockito.ArgumentMatchers.eq("WARN"), any());
+    }
+
+    @Test
+    void detect_providerStopLifted_logsAgainOnNextStop() {
+        UserAccount u1 = new UserAccount(); u1.setId(UUID.randomUUID());
+        when(userAccountRepository.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE))
+            .thenReturn(List.of(u1));
+        when(gameGetterChain.resolve(any()))
+            .thenThrow(new ProviderStoppedException(GetterConfig.Provider.XBOX))
+            .thenReturn(Optional.empty())
+            .thenThrow(new ProviderStoppedException(GetterConfig.Provider.XBOX));
+        when(gameStateService.getLastKnownGame(any())).thenReturn(Optional.empty());
+
+        schedulerService.poll();
+        schedulerService.poll();
+        schedulerService.poll();
+
+        verify(activityLog, org.mockito.Mockito.times(2)).addEntry(
+            org.mockito.ArgumentMatchers.eq(u1.getId()), org.mockito.ArgumentMatchers.eq("WARN"), any());
+    }
+
+    @Test
     void poll_withSteamGetter_callsPrefetchBatch() {
         SteamGameGetter steamGetter = mock(SteamGameGetter.class);
         when(steamGetter.prefetchBatch(any()))
@@ -124,7 +166,7 @@ class SchedulerServiceTest {
 
         SchedulerService service = new SchedulerService(
             userAccountRepository, gameGetterChain, gameStateService, eventPublisher, registry,
-            Optional.of(steamGetter), Optional.empty(), bindingService, SimulationGates.none(), SiteRoles.active(), PollCadences.always());
+            Optional.of(steamGetter), Optional.empty(), bindingService, SimulationGates.none(), SiteRoles.active(), PollCadences.always(), activityLog);
 
         service.poll();
 
@@ -156,7 +198,7 @@ class SchedulerServiceTest {
 
         SchedulerService service = new SchedulerService(
             userAccountRepository, gameGetterChain, gameStateService, eventPublisher, registry,
-            Optional.of(steamGetter), Optional.empty(), bindingService, SimulationGates.none(), SiteRoles.active(), PollCadences.always());
+            Optional.of(steamGetter), Optional.empty(), bindingService, SimulationGates.none(), SiteRoles.active(), PollCadences.always(), activityLog);
         when(gameGetterChain.resolve(user)).thenReturn(Optional.empty());
         when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.empty());
 
@@ -185,7 +227,7 @@ class SchedulerServiceTest {
         SchedulerService service = new SchedulerService(
             userAccountRepository, gameGetterChain, gameStateService, eventPublisher, registry,
             Optional.of(steamGetter), Optional.empty(), bindingService, SimulationGates.none(), SiteRoles.active(),
-            cadence);
+            cadence, activityLog);
 
         service.poll();
 
@@ -204,7 +246,7 @@ class SchedulerServiceTest {
         SchedulerService service = new SchedulerService(
             userAccountRepository, gameGetterChain, gameStateService, eventPublisher, registry,
             Optional.empty(), Optional.empty(), bindingService, SimulationGates.none(), SiteRoles.active(),
-            cadence);
+            cadence, activityLog);
 
         service.triggerManualCheck(user);
 
@@ -219,7 +261,7 @@ class SchedulerServiceTest {
         SchedulerService service = new SchedulerService(
             userAccountRepository, gameGetterChain, gameStateService, eventPublisher, registry,
             Optional.empty(), Optional.empty(), bindingService, SimulationGates.none(), SiteRoles.active(),
-            cadence);
+            cadence, activityLog);
         Instant t0 = Instant.parse("2026-11-04T12:00:00Z");
         SimpleTriggerContext context = new SimpleTriggerContext(Clock.fixed(t0, ZoneOffset.UTC));
         Trigger trigger = service.pollTrigger();
@@ -259,7 +301,7 @@ class SchedulerServiceTest {
         when(gameStateService.getLastKnownGame(any())).thenReturn(Optional.empty());
         SchedulerService service = new SchedulerService(
             userAccountRepository, gameGetterChain, gameStateService, eventPublisher, registry,
-            Optional.of(steamGetter), Optional.empty(), bindingService, SimulationGates.none(), SiteRoles.active(), PollCadences.always());
+            Optional.of(steamGetter), Optional.empty(), bindingService, SimulationGates.none(), SiteRoles.active(), PollCadences.always(), activityLog);
 
         service.poll();
 
@@ -277,7 +319,7 @@ class SchedulerServiceTest {
         when(gameStateService.getLastKnownGame(any())).thenReturn(Optional.empty());
         SchedulerService service = new SchedulerService(
             userAccountRepository, gameGetterChain, gameStateService, eventPublisher, registry,
-            Optional.empty(), Optional.empty(), bindingService, SimulationGates.of(mock(SimulationGate.class)), SiteRoles.active(), PollCadences.always());
+            Optional.empty(), Optional.empty(), bindingService, SimulationGates.of(mock(SimulationGate.class)), SiteRoles.active(), PollCadences.always(), activityLog);
 
         service.poll();
 
@@ -288,7 +330,7 @@ class SchedulerServiceTest {
     void poll_doesNothingOnStandby() {
         SchedulerService standby = new SchedulerService(
             userAccountRepository, gameGetterChain, gameStateService, eventPublisher, registry,
-            Optional.empty(), Optional.empty(), bindingService, SimulationGates.none(), SiteRoles.standby(), PollCadences.always());
+            Optional.empty(), Optional.empty(), bindingService, SimulationGates.none(), SiteRoles.standby(), PollCadences.always(), activityLog);
 
         standby.poll();
 
