@@ -50,11 +50,10 @@ class EmergencyVodResolverTest {
     @Test
     void vodUrl_rewindsTwoMinutes() {
         EmergencyReport r = report("2026-11-19T13:25:30Z");
-        when(twitch.archiveVideoId(channel, "s-1")).thenReturn(Optional.of("v-7"));
+        r.setVodId("v-7");
 
         assertThat(resolver.vodUrl(r)).contains("https://www.twitch.tv/videos/v-7?t=1h23m30s");
-        assertThat(r.getVodId()).isEqualTo("v-7");
-        verify(reports).save(r);
+        verify(twitch, never()).archiveVideoId(any(), any());
     }
 
     @Test
@@ -67,12 +66,11 @@ class EmergencyVodResolverTest {
     }
 
     @Test
-    void vodUrl_noArchive_isEmpty() {
+    void vodUrl_unresolvedVod_isEmptyAndAsksNothingOfTwitch() {
         EmergencyReport r = report("2026-11-19T13:00:00Z");
-        when(twitch.archiveVideoId(channel, "s-1")).thenReturn(Optional.empty());
 
         assertThat(resolver.vodUrl(r)).isEmpty();
-        assertThat(r.getVodId()).isNull();
+        verify(twitch, never()).archiveVideoId(any(), any());
     }
 
     @Test
@@ -87,12 +85,13 @@ class EmergencyVodResolverTest {
     @Test
     void resolvePending_resolvesAndPurges() {
         EmergencyReport r = report("2026-11-19T13:00:00Z");
-        when(reports.findByVodIdIsNullAndStreamIdIsNotNull()).thenReturn(List.of(r));
+        when(reports.findByVodIdIsNullAndStreamIdIsNotNullAndCreatedAtAfter(any())).thenReturn(List.of(r));
         when(twitch.archiveVideoId(channel, "s-1")).thenReturn(Optional.of("v-1"));
 
         resolver.resolvePending();
 
         assertThat(r.getVodId()).isEqualTo("v-1");
+        verify(reports).findByVodIdIsNullAndStreamIdIsNotNullAndCreatedAtAfter(NOW.minus(properties.getVodResolveMaxAge()));
         verify(reports).deleteByCreatedAtBefore(NOW.minus(properties.getReportRetention()));
     }
 

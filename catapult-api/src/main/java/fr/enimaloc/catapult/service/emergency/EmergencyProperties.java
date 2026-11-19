@@ -21,6 +21,8 @@ public class EmergencyProperties {
     private Duration stopDuration = Duration.ofHours(24);
     /** How far before the report the VOD link is rewound. */
     private Duration vodRewind = Duration.ofMinutes(2);
+    /** How long after a report its VOD is still looked for. */
+    private Duration vodResolveMaxAge = Duration.ofDays(14);
     /** How long reports are kept. */
     private Duration reportRetention = Duration.ofDays(90);
 }

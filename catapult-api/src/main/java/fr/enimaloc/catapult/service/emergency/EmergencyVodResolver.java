@@ -41,12 +41,14 @@ public class EmergencyVodResolver {
         this.clock = clock;
     }
 
-    /** The VOD link at the moment of the report, rewound a little; empty without a stream or a VOD. */
-    @Transactional
+    /**
+     * The VOD link at the moment of the report, rewound a little; empty without a stream or an already resolved VOD.
+     * Only reads: the VOD is looked up by {@link #resolvePending()}, never while a page is built.
+     */
     public Optional<String> vodUrl(EmergencyReport report) {
-        if (report.getStreamId() == null || report.getStreamStartedAt() == null) return Optional.empty();
-        if (report.getVodId() == null) resolve(report);
-        if (report.getVodId() == null) return Optional.empty();
+        if (report.getStreamId() == null || report.getStreamStartedAt() == null || report.getVodId() == null) {
+            return Optional.empty();
+        }
 
         Duration offset = Duration.between(report.getStreamStartedAt(), report.getCreatedAt())
                 .minus(properties.getVodRewind());
@@ -59,7 +61,8 @@ public class EmergencyVodResolver {
     @Transactional
     public void resolvePending() {
         if (!siteRole.isActive()) return;
-        for (EmergencyReport report : reports.findByVodIdIsNullAndStreamIdIsNotNull()) {
+        Instant resolveSince = clock.instant().minus(properties.getVodResolveMaxAge());
+        for (EmergencyReport report : reports.findByVodIdIsNullAndStreamIdIsNotNullAndCreatedAtAfter(resolveSince)) {
             try {
                 resolve(report);
             } catch (Exception e) {

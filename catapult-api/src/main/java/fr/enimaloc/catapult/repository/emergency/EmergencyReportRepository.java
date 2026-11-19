@@ -23,7 +23,8 @@ public interface EmergencyReportRepository extends JpaRepository<EmergencyReport
 
     Page<EmergencyReport> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
-    List<EmergencyReport> findByVodIdIsNullAndStreamIdIsNotNull();
+    /** Reports made during a stream whose VOD is still unknown, since the given instant. */
+    List<EmergencyReport> findByVodIdIsNullAndStreamIdIsNotNullAndCreatedAtAfter(Instant since);
 
     long deleteByCreatedAtBefore(Instant cutoff);
 

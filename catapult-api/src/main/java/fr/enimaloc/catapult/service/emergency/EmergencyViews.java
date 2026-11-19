@@ -52,8 +52,8 @@ public class EmergencyViews {
                 .toList();
     }
 
-    /** One page of reports, newest first. Resolving a VOD may write its id, hence the writable transaction. */
-    @Transactional
+    /** One page of reports, newest first; the VOD links are the ones already resolved, nothing is asked of Twitch. */
+    @Transactional(readOnly = true)
     public List<EmergencyReportDto> reports(int page) {
         return reports.findAllByOrderByCreatedAtDesc(PageRequest.of(Math.max(page, 0), PAGE_SIZE)).stream()
                 .map(this::toDto).toList();
