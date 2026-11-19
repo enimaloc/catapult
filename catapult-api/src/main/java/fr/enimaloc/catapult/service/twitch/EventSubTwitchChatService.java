@@ -237,7 +237,7 @@ public class EventSubTwitchChatService implements TwitchChatService {
 
             // A mention of the system account is answered even by a disabled bot, which only hears `on`
             Optional<SystemMention> mention = SystemMention.parse(event.path("message"),
-                    systemTwitchAccountService.getSystemTwitchId());
+                    systemTwitchAccountService::getSystemTwitchId);
             if (mention.isPresent()) {
                 if (!fromThisChannel(user, event)) {
                     // Shared chat relays messages of the other channels of the session: they cannot act here

@@ -22,7 +22,7 @@ class SystemMentionTest {
                   {"type": "mention", "text": "@bot", "mention": {"user_id": "sys-1"}},
                   {"type": "text", "text": " emergency steam"}]}""");
 
-        var mention = SystemMention.parse(message, SYSTEM_ID);
+        var mention = SystemMention.parse(message, () -> SYSTEM_ID);
 
         assertThat(mention).contains(new SystemMention("emergency", java.util.List.of("steam")));
     }
@@ -35,7 +35,7 @@ class SystemMentionTest {
                   {"type": "mention", "text": "@bot", "mention": {"user_id": "sys-1"}},
                   {"type": "text", "text": " off"}]}""");
 
-        assertThat(SystemMention.parse(message, SYSTEM_ID)).isEmpty();
+        assertThat(SystemMention.parse(message, () -> SYSTEM_ID)).isEmpty();
     }
 
     @Test
@@ -45,8 +45,8 @@ class SystemMentionTest {
                   {"type": "mention", "text": "@someone", "mention": {"user_id": "other"}},
                   {"type": "text", "text": " off"}]}""");
 
-        assertThat(SystemMention.parse(message, SYSTEM_ID)).isEmpty();
-        assertThat(SystemMention.parse(message, null)).isEmpty();
+        assertThat(SystemMention.parse(message, () -> SYSTEM_ID)).isEmpty();
+        assertThat(SystemMention.parse(message, () -> null)).isEmpty();
     }
 
     @Test
@@ -54,12 +54,12 @@ class SystemMentionTest {
         JsonNode message = message("""
                 {"fragments": [
                   {"type": "mention", "text": "@bot", "mention": {"user_id": "sys-1"}},
-                  {"type": "text", "text": "  OFF  Now "}]}""");
+                  {"type": "text", "text": "  EMERGENCY  Now "}]}""");
 
-        var mention = SystemMention.parse(message, SYSTEM_ID);
+        var mention = SystemMention.parse(message, () -> SYSTEM_ID);
 
         assertThat(mention).isPresent();
-        assertThat(mention.get().command()).isEqualTo("off");
+        assertThat(mention.get().command()).isEqualTo("emergency");
         assertThat(mention.get().args()).containsExactly("Now");
     }
 
@@ -68,6 +68,32 @@ class SystemMentionTest {
         JsonNode message = message("""
                 {"fragments": [{"type": "mention", "text": "@bot", "mention": {"user_id": "sys-1"}}]}""");
 
-        assertThat(SystemMention.parse(message, SYSTEM_ID)).isEmpty();
+        assertThat(SystemMention.parse(message, () -> SYSTEM_ID)).isEmpty();
+    }
+
+    private static JsonNode botSays(String text) throws Exception {
+        return message("{\"fragments\": [{\"type\": \"mention\", \"text\": \"@bot\", \"mention\": "
+                + "{\"user_id\": \"sys-1\"}}, {\"type\": \"text\", \"text\": \" " + text + "\"}]}");
+    }
+
+    @Test
+    void parse_onOrOffFollowedByWords_isIgnored() throws Exception {
+        assertThat(SystemMention.parse(botSays("on verra"), () -> SYSTEM_ID)).isEmpty();
+        assertThat(SystemMention.parse(botSays("off merci"), () -> SYSTEM_ID)).isEmpty();
+    }
+
+    @Test
+    void parse_onAlone_isACommand() throws Exception {
+        assertThat(SystemMention.parse(botSays("on"), () -> SYSTEM_ID))
+                .contains(new SystemMention("on", java.util.List.of()));
+    }
+
+    @Test
+    void parse_systemIdIsNotAskedForWhenTheMessageDoesNotStartWithAMention() throws Exception {
+        JsonNode plain = message("{\"fragments\": [{\"type\": \"text\", \"text\": \"hello\"}]}");
+
+        assertThat(SystemMention.parse(plain, () -> {
+            throw new AssertionError("asked");
+        })).isEmpty();
     }
 }

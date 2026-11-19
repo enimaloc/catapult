@@ -300,10 +300,11 @@ class EventSubTwitchChatServiceTest {
 
     @Test
     void bangCommand_stillPublishesNothingAnswered() {
-        when(systemTwitchAccountService.getSystemTwitchId()).thenReturn("sys-1");
-
         service.handleMessage(user, token, chatNotification(
             "[{\"type\": \"text\", \"text\": \"!debug\"}]", "!debug", ""), false);
+
+        // An ordinary message never costs a lookup of the system account
+        verify(systemTwitchAccountService, never()).getSystemTwitchId();
 
         // The retired command system still hears it as an event nobody consumes, and no mention is raised
         verify(eventPublisher).publishEvent(any(fr.enimaloc.catapult.chat.ChatCommandEvent.class));
