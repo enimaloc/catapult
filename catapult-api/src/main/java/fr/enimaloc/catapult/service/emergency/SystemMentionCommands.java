@@ -107,6 +107,11 @@ public class SystemMentionCommands {
                     args.isEmpty() ? null : args.getFirst());
             return;
         }
+        if (!emergencyStopService.isProviderUsed(channel, provider.get())) {
+            // Nothing will be recorded: no need to gather the context (a Twitch call) for it
+            reply(channel, "bot.mention.emergency.notUsed", displayName(provider.get().name()));
+            return;
+        }
         ReportOutcome outcome;
         try {
             ReportContext context = contextCollector.collect(channel);

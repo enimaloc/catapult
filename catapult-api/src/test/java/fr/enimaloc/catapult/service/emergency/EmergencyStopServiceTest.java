@@ -92,9 +92,11 @@ class EmergencyStopServiceTest {
         service = newService();
     }
 
+    private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
+
     private EmergencyStopService newService() {
         return new EmergencyStopService(reportRepository, stopRepository, getterConfigs, adminEvents,
-                new SimpleMeterRegistry(), new EmergencyProperties(), TransactionOperations.withoutTransaction(),
+                meters, new EmergencyProperties(), TransactionOperations.withoutTransaction(),
                 Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
@@ -179,6 +181,20 @@ class EmergencyStopServiceTest {
         assertThat(outcome.kind()).isEqualTo(ReportOutcome.Kind.GLOBAL_EXTENDED);
         assertThat(global.getExpiresAt()).isEqualTo(NOW.plus(Duration.ofHours(24)));
         assertThat(outcome.expiresAt()).isEqualTo(NOW.plus(Duration.ofHours(24)));
+    }
+
+    @Test
+    void stopsCounter_tellsAStopFromAnExtensionAndALifting() {
+        stop("XBOX", Scope.GLOBAL, null, Origin.THRESHOLD, NOW.plusSeconds(60));
+        report(channel(), "a");
+        report(channel(), "b");
+        report(channel(), "c");
+        service.ownerStop("steam", "owner");
+        service.ownerResume("steam", "owner");
+
+        assertThat(meters.get("catapult.emergency.stops").tag("action", "extended").counter().count()).isEqualTo(1);
+        assertThat(meters.get("catapult.emergency.stops").tag("action", "stopped").counter().count()).isEqualTo(1);
+        assertThat(meters.get("catapult.emergency.stops").tag("action", "lifted").counter().count()).isEqualTo(1);
     }
 
     @Test

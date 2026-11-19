@@ -64,6 +64,7 @@ class SystemMentionCommandsTest {
                 .thenAnswer(call -> call.getArgument(0, String.class)
                         + java.util.Arrays.toString(call.getArgument(1, Object[].class)));
         when(collector.collect(any())).thenReturn(new ReportContext("{}", null, null));
+        when(emergency.isProviderUsed(any(), any())).thenReturn(true);
     }
 
     private static MentionSender sender(String id, SenderRole role) {
@@ -224,13 +225,14 @@ class SystemMentionCommandsTest {
     }
 
     @Test
-    void emergency_providerNotUsed_explains() {
-        when(emergency.report(any(), eq(GetterConfig.Provider.EPIC), any(), any(), any(), any(), any()))
-                .thenReturn(new ReportOutcome(ReportOutcome.Kind.PROVIDER_NOT_USED, 0, 3, null));
+    void emergency_providerNotUsed_explainsWithoutGatheringTheContext() {
+        when(emergency.isProviderUsed(fresh, GetterConfig.Provider.EPIC)).thenReturn(false);
 
         commands.handle(channel, sender("b-1", SenderRole.BROADCASTER), mention("emergency", "EPIC"));
 
         repliedWith("bot.mention.emergency.notUsed");
+        verifyNoInteractions(collector);
+        verify(emergency, never()).report(any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test

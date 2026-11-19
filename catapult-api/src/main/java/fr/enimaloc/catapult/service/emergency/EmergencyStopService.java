@@ -88,6 +88,11 @@ public class EmergencyStopService {
         return cachedActive().stream().anyMatch(s -> covers(s, channel, provider));
     }
 
+    /** Whether the channel has the provider enabled: only then a report of it means anything. */
+    public boolean isProviderUsed(UserAccount channel, GetterConfig.Provider provider) {
+        return getterConfigs.findByUserAndProvider(channel, provider).map(GetterConfig::isEnabled).orElse(false);
+    }
+
     /**
      * Records a report. The vote counting and the global decision run under a per-provider lock,
      * outside the transaction that writes them, so a second report sees the first one committed.
@@ -102,9 +107,7 @@ public class EmergencyStopService {
                                 String reporterLogin, String contextJson, String streamId,
                                 Instant streamStartedAt) {
         int threshold = properties.getThreshold();
-        boolean used = getterConfigs.findByUserAndProvider(channel, provider)
-                .map(GetterConfig::isEnabled).orElse(false);
-        if (!used) {
+        if (!isProviderUsed(channel, provider)) {
             return new ReportOutcome(ReportOutcome.Kind.PROVIDER_NOT_USED, 0, threshold, null);
         }
         synchronized (locks.computeIfAbsent(provider, p -> new Object())) {
@@ -276,8 +279,10 @@ public class EmergencyStopService {
     private void announce(String action, ProviderEmergencyStop stop) {
         log.warn("Emergency stop {}: provider={} origin={} expiresAt={}",
                 action, stop.getProvider(), stop.getOrigin(), stop.getExpiresAt());
+        // "created" is counted as "stopped": the tag tells a new stop from an extension or a lifting
         meters.counter("catapult.emergency.stops", "provider", stop.getProvider(),
-                "origin", stop.getOrigin().name()).increment();
+                "origin", stop.getOrigin().name(), "action", "created".equals(action) ? "stopped" : action)
+                .increment();
         Map<String, Object> view = new HashMap<>();
         view.put("action", action);
         view.put("provider", stop.getProvider());
