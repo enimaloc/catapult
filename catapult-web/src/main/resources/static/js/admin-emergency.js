@@ -1,6 +1,6 @@
 /**
  * The admin emergency tab: a provider stopped for the whole instance from the stop form, or resumed from its active
- * stop's row, each once confirmed; the tab is then patched (admin-tabs.js). A refusal is told with the view's
+ * stop's row (the provider's every stop, its own confirmation text on the button), each once confirmed; the tab is then patched (admin-tabs.js). A refusal is told with the view's
  * data-error-{status}, else its data-error ({0}: the status). Listeners are delegated to the panel: its content comes
  * and goes. The texts are the view's data-* attributes.
  */
@@ -32,7 +32,7 @@ window.CatapultAdminEmergency = (function () {
             const root = button.closest(".admin-view");
             if (!root) return;
             if (button.matches(".admin-em-lift")) {
-                send(panel, root, button, "resume", button.dataset.provider, root.dataset.liftConfirm,
+                send(panel, root, button, "resume", button.dataset.provider, button.dataset.confirm,
                     root.dataset.liftDescription, root.dataset.lifted);
             } else {
                 const provider = button.closest(".admin-em-stop").querySelector('[name="provider"]').value;

@@ -13,9 +13,9 @@ function view() {
     html(`
         <mdui-tabs id="admin-tabs"></mdui-tabs>
         <mdui-tab-panel value="emergency">
-            <div class="admin-view admin-emergency" data-lift-confirm="Resume?" data-lift-description="Lifts"
+            <div class="admin-view admin-emergency" data-lift-description="Lifts"
                  data-stop-confirm="Stop?" data-stop-description="Until resumed" data-lifted="Resumed." data-stopped="Stopped.">
-                <button class="admin-em-lift" id="lift" data-provider="XBOX"></button>
+                <button class="admin-em-lift" id="lift" data-provider="XBOX" data-confirm="Resume?"></button>
                 <div class="admin-em-stop">
                     <mdui-select name="provider"></mdui-select>
                     <button class="admin-em-stop-button" id="stop"></button>

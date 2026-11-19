@@ -11,7 +11,7 @@
 <div th:fragment="content" class="admin-view admin-emergency"
      th:attr="data-confirm-text=#{admin.confirm},data-cancel-text=#{admin.cancel},data-error=#{admin.error.generic},
               data-error-400=#{admin.emergency.error.400},
-              data-lift-confirm=#{admin.emergency.lift.confirm},data-lift-description=#{admin.emergency.lift.description},
+              data-lift-description=#{admin.emergency.lift.description},
               data-stop-confirm=#{admin.emergency.stop.confirm},data-stop-description=#{admin.emergency.stop.description},
               data-lifted=#{admin.emergency.lifted},data-stopped=#{admin.emergency.stopped}">
     <div class="section-header">
@@ -47,8 +47,8 @@
                   th:text="${s.expiresAt() == null} ? #{admin.emergency.expires.never}
                       : ${#temporals.format(s.expiresAt(), #messages.msg('format.datetime'))}">date</span>
             <span class="admin-cell admin-row-actions">
-                <mdui-button variant="tonal" class="admin-em-lift" th:if="${s.scope() == 'GLOBAL'}"
-                             th:attr="data-provider=${s.provider()}" th:text="#{admin.emergency.lift}">Resume</mdui-button>
+                <mdui-button variant="tonal" class="admin-em-lift"
+                             th:attr="data-provider=${s.provider()},data-confirm=#{admin.emergency.lift.confirm(#{|emergency.provider.${s.provider()}|})}" th:text="#{admin.emergency.lift}">Resume</mdui-button>
             </span>
         </div>
     </mdui-card>

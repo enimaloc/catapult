@@ -132,6 +132,18 @@ class AdminEmergencyRenderingTest {
     }
 
     @Test
+    void aChannelStop_hasTheLiftButtonToo_whoseConfirmationNamesTheProviderWide() throws Exception {
+        when(apiService.adminEmergencyStops(true)).thenReturn(List.of(
+                new EmergencyStopDto(UUID.randomUUID(), "STEAM", "CHANNEL", "CHANNEL_REPORT", "streamer", AT,
+                        AT.plusSeconds(3600), null, null)));
+
+        String html = render("/spa/admin/emergency", Locale.FRENCH);
+
+        assertThat(html).contains("admin-em-lift", "data-provider=\"STEAM\"",
+                "Lever tous les arrêts Steam (global et chaînes) ?");
+    }
+
+    @Test
     void reports_arePaged_aFullPageOffersTheNext() throws Exception {
         when(apiService.adminEmergencyReports(1)).thenReturn(IntStream.range(0, 50)
                 .mapToObj(i -> report(null, OFFLINE, false)).toList());
