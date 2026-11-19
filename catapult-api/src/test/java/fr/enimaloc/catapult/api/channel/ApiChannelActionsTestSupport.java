@@ -83,6 +83,8 @@ abstract class ApiChannelActionsTestSupport {
     @MockitoBean ExtensionLayoutApplier extensionLayoutApplier;
     @MockitoBean fr.enimaloc.catapult.service.binding.GameBindingLookup gameBindingLookup;
     @MockitoBean fr.enimaloc.catapult.service.binding.CustomBindingActivations customBindingActivations;
+    @MockitoBean fr.enimaloc.catapult.service.emergency.EmergencyViews emergencyViews;
+    @MockitoBean fr.enimaloc.catapult.service.emergency.EmergencyStopService emergencyStopService;
 
     static RequestPostProcessor userJwt(UUID id) {
         return jwt().jwt(j -> j.subject(id.toString()).claim("twitchId", "123"))
