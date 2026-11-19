@@ -135,6 +135,9 @@ class SchedulerServiceTest {
         // once per stop and chain, however many cycles it lasts
         verify(activityLog, org.mockito.Mockito.times(1)).addEntry(
             org.mockito.ArgumentMatchers.eq(u1.getId()), org.mockito.ArgumentMatchers.eq("WARN"), any());
+        // a freeze is counted apart from the timeouts
+        assertThat(registry.get("catapult.scheduler.detection.frozen").counter().count()).isEqualTo(2.0);
+        assertThat(registry.find("catapult.scheduler.detection.timeouts").counter()).isNull();
     }
 
     @Test

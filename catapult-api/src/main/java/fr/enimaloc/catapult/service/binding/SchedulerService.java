@@ -193,11 +193,17 @@ public class SchedulerService implements SchedulingConfigurer {
         try {
             detected = gameGetterChain.resolve(user);
         } catch (DetectionTimeoutException e) {
-            if (e instanceof ProviderStoppedException stopped && frozenChains.put(user.getId(), stopped.getProvider()) != stopped.getProvider()) {
-                activityLogService.addEntry(user.getId(), "WARN", stopped.getProvider().name()
-                    + " is suspended by an emergency stop: detection is frozen until it is lifted");
-            }
             // Nothing learnt this cycle: the user keeps their state until a provider answers
+            if (e instanceof ProviderStoppedException stopped) {
+                // A freeze, not a failure: the activity log records it once, each cycle only counts it
+                if (frozenChains.put(user.getId(), stopped.getProvider()) != stopped.getProvider()) {
+                    activityLogService.addEntry(user.getId(), "WARN", stopped.getProvider().name()
+                        + " is suspended by an emergency stop: detection is frozen until it is lifted");
+                }
+                log.debug("Detection frozen for user {}: {}", user.getId(), e.getMessage());
+                meterRegistry.counter("catapult.scheduler.detection.frozen").increment();
+                return;
+            }
             log.warn("Detection skipped for user {}: {}", user.getId(), e.getMessage());
             meterRegistry.counter("catapult.scheduler.detection.timeouts").increment();
             return;
