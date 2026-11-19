@@ -42,6 +42,8 @@ public final class SimulatedCalls {
     public static final CallKey TWITCH_EVENTSUB_STREAM_OFFLINE = new CallKey(EVENTSUB, "stream-offline", ACCOUNT);
     public static final CallKey TWITCH_EVENTSUB_CHANNEL_UPDATE = new CallKey(EVENTSUB, "channel-update", ACCOUNT);
     public static final CallKey TWITCH_EVENTSUB_CHANNEL_RAID = new CallKey(EVENTSUB, "channel-raid", ACCOUNT);
+    /** A chat message the panel writes on the channel; the real chat is read by its own service. */
+    public static final CallKey TWITCH_EVENTSUB_CHAT_MESSAGE = new CallKey(EVENTSUB, "chat-message", ACCOUNT);
 
     public static final CallKey TWITCH_APP_CATEGORY_SEARCH = new CallKey(TWITCH_APP, "category-search", GLOBAL);
     public static final CallKey TWITCH_APP_APP_TOKEN = new CallKey(TWITCH_APP, "app-token", GLOBAL);
@@ -80,7 +82,7 @@ public final class SimulatedCalls {
             TWITCH_CHAT_CONNECT, TWITCH_CHAT_SEND_MESSAGE, TWITCH_CHAT_TIMEOUT, TWITCH_CHAT_BAN, TWITCH_CHAT_UNBAN,
             TWITCH_CHAT_STREAM_INFO, TWITCH_CHAT_USER_PROFILE, TWITCH_CHAT_FOLLOWED_AT, TWITCH_CHAT_SHOUTOUT,
             TWITCH_EVENTSUB_STREAM_ONLINE, TWITCH_EVENTSUB_STREAM_OFFLINE, TWITCH_EVENTSUB_CHANNEL_UPDATE,
-            TWITCH_EVENTSUB_CHANNEL_RAID,
+            TWITCH_EVENTSUB_CHANNEL_RAID, TWITCH_EVENTSUB_CHAT_MESSAGE,
             TWITCH_APP_CATEGORY_SEARCH, TWITCH_APP_APP_TOKEN, TWITCH_APP_BOT_REFRESH,
             STEAM_PRESENCE, STEAM_PROFILE_STATUS, STEAM_OWNED_GAMES,
             STEAM_STORE_APP_DETAILS, STEAM_STORE_CCLS, STEAM_STORE_TW_SIGNALS, STEAM_STORE_LIBRARY,

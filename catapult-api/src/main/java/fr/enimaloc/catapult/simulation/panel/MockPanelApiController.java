@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.simulation.panel;
 
 import fr.enimaloc.catapult.api.ApiPaths;
 import fr.enimaloc.catapult.api.error.ApiProblem;
+import fr.enimaloc.catapult.chat.ChatCommandEvent;
 import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GetterConfig;
@@ -24,6 +25,7 @@ import fr.enimaloc.catapult.simulation.account.TwitchUserLookup;
 import fr.enimaloc.catapult.simulation.panel.MockPanelDtos.AccountView;
 import fr.enimaloc.catapult.simulation.panel.MockPanelDtos.ApiCalls;
 import fr.enimaloc.catapult.simulation.panel.MockPanelDtos.BotRequest;
+import fr.enimaloc.catapult.simulation.panel.MockPanelDtos.ChatRequest;
 import fr.enimaloc.catapult.simulation.panel.MockPanelDtos.CallView;
 import fr.enimaloc.catapult.simulation.panel.MockPanelDtos.CreateAccount;
 import fr.enimaloc.catapult.simulation.panel.MockPanelDtos.DataUpdate;
@@ -62,8 +64,10 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -256,6 +260,28 @@ public class MockPanelApiController {
             throw new ApiProblem(ErrorCode.INVALID, "A category id and name are needed");
         }
         actions.manualCategoryChange(account, body.categoryId().trim(), body.categoryName().trim());
+    }
+
+    @PostMapping("/accounts/{id}/chat")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void chat(@PathVariable UUID id, @RequestBody ChatRequest body) {
+        UserAccount account = account(id);
+        if (blank(body.sender()) || blank(body.text())) {
+            throw new ApiProblem(ErrorCode.INVALID, "An author and a text are needed");
+        }
+        ChatCommandEvent.SenderRole role = null;
+        if (!blank(body.role())) {
+            try {
+                role = ChatCommandEvent.SenderRole.valueOf(body.role().trim().toUpperCase(Locale.ROOT));
+            } catch (IllegalArgumentException e) {
+                // left null: refused below
+            }
+        }
+        if (role == null) {
+            throw new ApiProblem(ErrorCode.INVALID, "The role must be one of "
+                    + Arrays.toString(ChatCommandEvent.SenderRole.values()));
+        }
+        actions.chatMessage(account, body.sender().trim(), role, body.owner(), body.text().trim());
     }
 
     @PostMapping("/accounts/{id}/raid-out")

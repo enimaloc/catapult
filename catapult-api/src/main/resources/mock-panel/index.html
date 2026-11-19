@@ -92,6 +92,24 @@
           <input id="raid-login" placeholder="Login of the raided channel" autocomplete="off">
           <button type="submit" class="btn">Raid out…</button>
         </form>
+        <form id="chat-form">
+          <div class="row">
+            <input id="chat-sender" value="viewer1" placeholder="Author's login" autocomplete="off">
+            <select id="chat-role">
+              <option value="VIEWERS">Viewer</option>
+              <option value="VIP">VIP</option>
+              <option value="MODERATOR">Moderator</option>
+              <option value="BROADCASTER">Broadcaster</option>
+            </select>
+            <label class="check"><input type="checkbox" id="chat-owner"> Instance owner</label>
+          </div>
+          <div class="row">
+            <input id="chat-text" placeholder="Message, e.g. @bot_login emergency xbox" autocomplete="off" size="40">
+            <button type="submit" class="btn">Send in chat</button>
+          </div>
+        </form>
+        <p class="muted">"Send in chat" writes a message in this channel: only one that starts by mentioning the
+          system account (<code>@bot off</code>, <code>on</code>, <code>emergency …</code>) does anything.</p>
       </section>
 
       <section class="card" id="identity-card">
