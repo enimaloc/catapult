@@ -658,6 +658,15 @@ public interface ApiService {
     List<fr.enimaloc.catapult.dto.changelog.ChangelogSection> changelog();
     /** Whether catapult-api runs degraded, with the properties it changes; null when it can't say. */
     DegradedStatusDto degradedStatus();
+
+    /** The active global emergency stops, for the banner; null when catapult-api can't say. */
+    fr.enimaloc.catapult.common.dto.emergency.EmergencyStatusDto emergencyStatus();
+
+    /** The channel's bot state, own stops and the global ones on its providers (owner only); null when refused or down. */
+    fr.enimaloc.catapult.common.dto.emergency.ChannelEmergencyDto channelEmergency(String username);
+
+    /** Lifts the channel's own emergency stops (owner only); catapult-api's status, 502 when unreachable. */
+    int resumeChannelEmergency(String username);
     /** Whether catapult-api answers and reports itself up (its health, asked without the session's bearer). */
     boolean apiAvailable();
 

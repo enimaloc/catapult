@@ -1710,6 +1710,25 @@ public class RealApiService implements ApiService {
     }
 
     @Override
+    public fr.enimaloc.catapult.common.dto.emergency.EmergencyStatusDto emergencyStatus() {
+        ApiClient.Result<fr.enimaloc.catapult.common.dto.emergency.EmergencyStatusDto> result = client.getAnonymous(
+                "/api/internal/emergency/status", fr.enimaloc.catapult.common.dto.emergency.EmergencyStatusDto.class);
+        return result.ok() ? result.body() : null;
+    }
+
+    @Override
+    public fr.enimaloc.catapult.common.dto.emergency.ChannelEmergencyDto channelEmergency(String username) {
+        return readChannel(username, id -> client.getResult("/api/internal/users/{userId}/emergency",
+                fr.enimaloc.catapult.common.dto.emergency.ChannelEmergencyDto.class, id));
+    }
+
+    @Override
+    public int resumeChannelEmergency(String username) {
+        return onChannel(username, id -> client.postVoid("/api/internal/users/{userId}/emergency/resume", null, id),
+                status -> status);
+    }
+
+    @Override
     @SuppressWarnings("rawtypes")
     public boolean apiAvailable() {
         ApiClient.Result<Map> health = client.getAnonymous("/api/internal/health", Map.class);

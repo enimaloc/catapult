@@ -46,6 +46,28 @@
             <label for="channel-bot-toggle" th:text="#{channel.status.bot_enabled}">Bot activé</label>
         </div>
 
+        <!--/* The owner's emergency view (ModelFiller): the bot off but still listening, the channel's own stops with a
+             button to resume, and the global stops on the providers it uses, read-only. Absent when catapult-api
+             gave none. channel-status.js posts the resume. */-->
+        <div id="channel-emergency" class="emergency-channel" th:if="${ch.isOwner() and channelEmergency != null}">
+            <p th:if="${!channelEmergency.botEnabled()}" th:text="#{emergency.channel.bot_listening}">emergency.channel.bot_listening</p>
+            <div class="emergency-channel-row" th:each="stop : ${channelEmergency.channelStops()}">
+                <mdui-icon name="warning"></mdui-icon>
+                <span th:text="${stop.expiresAt() == null}
+                        ? #{emergency.channel.stop_indefinite(#{'emergency.provider.' + ${stop.provider()}})}
+                        : #{emergency.channel.stop(#{'emergency.provider.' + ${stop.provider()}},
+                            ${#temporals.format(stop.expiresAt(), #messages.msg('format.date'))},
+                            ${#temporals.format(stop.expiresAt(), #messages.msg('format.time'))})}">emergency.channel.stop</span>
+                <mdui-button variant="tonal" class="channel-emergency-resume"
+                             th:attr="data-resume-url=@{/channel/{u}/emergency/resume(u=${ch.channelUsername()})}"
+                             th:text="#{emergency.channel.resume}">emergency.channel.resume</mdui-button>
+            </div>
+            <div class="emergency-channel-row" th:each="stop : ${channelEmergency.globalStopsOnUsedProviders()}">
+                <mdui-icon name="warning"></mdui-icon>
+                <span th:text="#{emergency.channel.global(#{'emergency.provider.' + ${stop.provider()}})}">emergency.channel.global</span>
+            </div>
+        </div>
+
         <!--/* The active custom binding (owner only, while the experiment is open), a link to its row below, which it
              opens: hidden while none is. channel-custom-bindings.js keeps it in step with the list. */-->
         <div id="channel-active-binding" class="status-binding-row"

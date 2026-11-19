@@ -59,6 +59,8 @@ class ModelFillerTest {
     @SuppressWarnings("unchecked")
     private final ObjectProvider<DegradedLabels> degradedLabels = mock(ObjectProvider.class);
     private final LaunchedPlatforms launchedPlatforms = mock(LaunchedPlatforms.class);
+    @SuppressWarnings("unchecked")
+    private final ObjectProvider<fr.enimaloc.catapult.service.emergency.EmergencyState> emergencyState = mock(ObjectProvider.class);
     private ExtendedModelMap model;
 
     private ModelFiller filler(Optional<BuildProperties> buildProperties) {
@@ -72,7 +74,7 @@ class ModelFillerTest {
         ObjectProvider<LaunchedPlatforms> launchedProvider = mock(ObjectProvider.class);
         when(launchedProvider.getIfAvailable()).thenReturn(launchedPlatforms);
         return new ModelFiller(buildProperties, messages, api, new TwitchatEventForms(TwitchatCatalog.load()), metaTags,
-                socialLinksProvider, degradedState, degradedLabels, launchedProvider);
+                socialLinksProvider, degradedState, degradedLabels, launchedProvider, emergencyState);
     }
 
     private ModelFiller filler() {
@@ -327,6 +329,17 @@ class ModelFillerTest {
         assertThat(model).containsEntry("username", "enimaloc").containsEntry("channelPage", page(true))
                 .containsEntry("channelSettings", settings).containsEntry("dtddMapping", dtdd)
                 .containsEntry("settingsUnavailable", false);
+    }
+
+    @Test
+    void channel_ownerGetsItsEmergencyView_aModeratorDoesNot() {
+        var emergency = new fr.enimaloc.catapult.common.dto.emergency.ChannelEmergencyDto(false, List.of(), List.of());
+        when(api.channelPage("enimaloc", 0, null, null)).thenReturn(page(true));
+        when(api.channelEmergency("enimaloc")).thenReturn(emergency);
+
+        filler().channel(model, "enimaloc", 0, null, null);
+
+        assertThat(model).containsEntry("channelEmergency", emergency);
     }
 
     @Test

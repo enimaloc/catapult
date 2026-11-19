@@ -2368,6 +2368,10 @@ span.box-art {
 .impersonation-banner-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .broadcast-banner-text { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; column-gap: 12px; row-gap: 2px; overflow-wrap: anywhere; }
 /* catapult-api's degraded mode (degraded.js): as the broadcast banner, folded by default; the summary is the toggle. */
+.emergency-banner { position: relative; z-index: 1; margin-top: 64px; margin-bottom: -64px; display: flex; align-items: center; gap: 12px; padding: 8px 16px; background: rgb(var(--mdui-color-error-container)); color: rgb(var(--mdui-color-on-error-container)); }
+.emergency-banner-stops { flex: 1; min-width: 0; margin: 0; padding: 0; list-style: none; overflow-wrap: anywhere; }
+.emergency-channel-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
+.emergency-channel-row span { flex: 1; min-width: 0; }
 .degraded-banner { position: relative; z-index: 1; margin-top: 64px; margin-bottom: -64px; display: flex; align-items: flex-start; gap: 12px; padding: 4px 8px 4px 16px; background: rgb(var(--mdui-color-secondary-container)); color: rgb(var(--mdui-color-on-secondary-container)); }
 .degraded-banner[hidden], .degraded-banner [hidden] { display: none; }
 .degraded-banner-details { flex: 1; min-width: 0; overflow-wrap: anywhere; }

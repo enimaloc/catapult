@@ -189,6 +189,7 @@ public class MockApiService implements ApiService {
     /** Application-wide: the game mappings an admin edits are the same for every mock session. */
     private final MockGameMappingsStore gameMappings = new MockGameMappingsStore();
     private final MockDtddCachesStore dtddCaches = new MockDtddCachesStore();
+    private final MockEmergencyStore emergency = new MockEmergencyStore(Clock.systemUTC());
     private final MockRateLimitsStore rateLimits = new MockRateLimitsStore(Clock.systemUTC());
     /** Application-wide: the groups an admin creates are the same for every mock session. */
     private final MockGroupsStore groups = new MockGroupsStore();
@@ -2097,6 +2098,25 @@ public class MockApiService implements ApiService {
                         new DegradedEffectDto("app.polling.free-interval-seconds", "90", "60"),
                         new DegradedEffectDto("minecraft.friends-sync-interval-ms", "900000", "300000")))
                 : new DegradedStatusDto(false, null);
+    }
+
+    @Override
+    public fr.enimaloc.catapult.common.dto.emergency.EmergencyStatusDto emergencyStatus() {
+        log.trace("emergencyStatus()");
+        return emergency.status();
+    }
+
+    @Override
+    public fr.enimaloc.catapult.common.dto.emergency.ChannelEmergencyDto channelEmergency(String username) {
+        log.trace("channelEmergency({})", username);
+        return emergency.channel(username, currentData().isBotEnabled());
+    }
+
+    @Override
+    public int resumeChannelEmergency(String username) {
+        log.trace("resumeChannelEmergency({})", username);
+        emergency.resume(username);
+        return NO_CONTENT;
     }
 
     /** The mock's catapult-api is always up. */

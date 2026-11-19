@@ -5,4 +5,11 @@ document.addEventListener("catapult:render", function () {
     // The game now detected comes back as a GameChangedEvent (see ChannelActionsController).
     CatapultChannel.on("channel-recheck-game", "click", event =>
         CatapultChannel.postJson(event.currentTarget.dataset.recheckUrl, {}));
+
+    // The channel's own emergency stops are lifted by catapult-api; the page is re-rendered to show it.
+    document.querySelectorAll(".channel-emergency-resume").forEach(button =>
+        button.addEventListener("click", async () => {
+            const response = await CatapultChannel.postJson(button.dataset.resumeUrl, {});
+            if (response.ok) CatapultChannel.refresh();
+        }));
 });

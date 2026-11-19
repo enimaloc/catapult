@@ -134,6 +134,35 @@ class ChannelVisibilityRenderingTest {
                 .doesNotContain("disabled=\"disabled\"");
     }
 
+    /** The owner sees the bot's listening state, its own stop with Resume and the global stops read-only. */
+    @Test
+    void emergency_inTheOwnersStatusCard_only() throws Exception {
+        var channelStop = new fr.enimaloc.catapult.common.dto.emergency.EmergencyStopDto(java.util.UUID.randomUUID(),
+                "STEAM", "CHANNEL", "CHANNEL_REPORT", "enimaloc", java.time.Instant.parse("2026-11-19T10:00:00Z"),
+                java.time.Instant.parse("2026-11-20T12:00:00Z"), null, null);
+        var globalStop = new fr.enimaloc.catapult.common.dto.emergency.EmergencyStopDto(java.util.UUID.randomUUID(),
+                "XBOX", "GLOBAL", "OWNER", null, java.time.Instant.parse("2026-11-19T10:00:00Z"), null, null, null);
+        when(apiService.channelEmergency(any())).thenReturn(
+                new fr.enimaloc.catapult.common.dto.emergency.ChannelEmergencyDto(false, List.of(channelStop),
+                        List.of(globalStop)));
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(channelPageData(true));
+
+        String owner = mvc.perform(get("/spa/channel/enimaloc")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(owner).contains("id=\"channel-emergency\"", "still listens to your chat",
+                "Detection of Steam suspended on this channel", "data-resume-url=\"/channel/enimaloc/emergency/resume\"",
+                "Detection of Xbox suspended for the whole instance");
+
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(new ChannelPageData(
+                new ChannelUserDto("id-1", "twitch-1", "enimaloc", "https://example.test/avatar.png"),
+                "enimaloc", false, true, true, null, new PagedBindings(0, 1, 0, List.of()),
+                List.of(), Set.of(), List.of(), Set.of(), null, null, null, null, null, null, null, null));
+        String other = mvc.perform(get("/spa/channel/enimaloc")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(other).doesNotContain("channel-emergency");
+    }
+
     /** The owner's account preference shows in their Settings tab too; a moderator doesn't get it. */
     @Test
     void notificationChannels_inTheOwnersSettingsTab_only() throws Exception {
