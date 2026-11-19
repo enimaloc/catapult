@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.repository.emergency;
 
+import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GetterConfig;
 import fr.enimaloc.catapult.domain.emergency.EmergencyReport;
 import org.springframework.data.domain.Page;
@@ -25,4 +26,7 @@ public interface EmergencyReportRepository extends JpaRepository<EmergencyReport
     List<EmergencyReport> findByVodIdIsNullAndStreamIdIsNotNull();
 
     long deleteByCreatedAtBefore(Instant cutoff);
+
+    /** Reports of a channel still standing (not withdrawn). */
+    List<EmergencyReport> findByChannelAndWithdrawnAtIsNull(UserAccount channel);
 }
