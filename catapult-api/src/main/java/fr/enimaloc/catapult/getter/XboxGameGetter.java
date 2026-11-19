@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestClient;
 
 import java.util.ArrayList;
@@ -106,6 +107,9 @@ public class XboxGameGetter implements GameGetter {
                     .retrieve()
                     .body(Map.class);
                 return extractActiveTitles(response);
+            } catch (HttpServerErrorException.ServiceUnavailable e) {
+                // An empty presence would read as "stopped playing": the whole detection is skipped instead
+                throw DetectionTimeoutException.unavailable(name(), e);
             } catch (Exception e) {
                 log.warn("Failed to fetch Xbox presence for user {}: {}", user.getId(), e.getMessage());
                 return List.of();
@@ -138,7 +142,7 @@ public class XboxGameGetter implements GameGetter {
 
     /**
      * Fetches a title's Titlehub detail in one call: its type ("Game", "App"...) and its Store Product ID
-     * (the format IGDB expects). Falls back to an empty detail if the call fails.
+     * (the format IGDB expects). Falls back to an empty detail if the call fails, except on a 503.
      */
     @SuppressWarnings("unchecked")
     private TitleDetail resolveTitleDetail(XboxUserTokenService.XstsSession session, String titleId) {
@@ -152,6 +156,9 @@ public class XboxGameGetter implements GameGetter {
                     .retrieve()
                     .body(Map.class);
                 return extractTitleDetail(response);
+            } catch (HttpServerErrorException.ServiceUnavailable e) {
+                // Falling back to the titleId would read as a game change: the whole detection is skipped instead
+                throw DetectionTimeoutException.unavailable(name(), e);
             } catch (Exception e) {
                 log.warn("Failed to fetch Xbox title detail for titleId {}: {}", titleId, e.getMessage());
                 return TitleDetail.EMPTY;

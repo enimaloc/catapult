@@ -15,7 +15,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestClient;
 
 import java.util.List;
@@ -24,6 +27,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doReturn;
@@ -261,8 +265,27 @@ class XboxGameGetterTest {
 
     @Test
     void getCurrentGame_apiFailure_returnsEmptyWithoutThrowing() {
-        doThrow(new RuntimeException("503")).when(responseSpec).body(Map.class);
+        doThrow(new RuntimeException("500")).when(responseSpec).body(Map.class);
 
         assertThat(getter.getCurrentGame(user)).isEmpty();
+    }
+
+    private static HttpServerErrorException serviceUnavailable() {
+        return HttpServerErrorException.create(HttpStatus.SERVICE_UNAVAILABLE, "Service Unavailable", HttpHeaders.EMPTY, null, null);
+    }
+
+    @Test
+    void getCurrentGame_presenceUnavailable_skipsTheDetection() {
+        doThrow(serviceUnavailable()).when(responseSpec).body(Map.class);
+
+        assertThatThrownBy(() -> getter.getCurrentGame(user)).isInstanceOf(DetectionTimeoutException.class);
+    }
+
+    @Test
+    void getCurrentGame_titlehubUnavailable_skipsTheDetection() {
+        Map<String, Object> presence = presence(Map.of("id", "1234", "name", "Halo Infinite", "state", "Active"));
+        when(responseSpec.body(Map.class)).thenReturn(presence).thenThrow(serviceUnavailable());
+
+        assertThatThrownBy(() -> getter.getCurrentGame(user)).isInstanceOf(DetectionTimeoutException.class);
     }
 }
