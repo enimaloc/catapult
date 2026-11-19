@@ -139,11 +139,23 @@ jobs:
           pattern: shard-*
           path: shards
 
-      # JaCoCo reads the very classes the shards tested, which also spares compiling them again
+      # A module added to settings.gradle.kts must get a shard: otherwise its tests would never run
+      - name: Check every module was tested
+        run: |
+          modules=$(grep -o 'include([^)]*)' settings.gradle.kts | grep -o '"[^"]*"' | tr -d '"')
+          for module in $modules; do
+            compgen -G "shards/*/$module/build/test-results/test/*.xml" > /dev/null \
+              || { echo "::error::No shard ran the tests of $module"; exit 1; }
+          done
+
+      # JaCoCo reads the very classes the shards tested, which also spares compiling them again. A
+      # module without coverage data would have its floor skipped, so its absence fails the job.
       - name: Restore the tested classes
         run: |
           for pair in catapult-common:rest catapult-api:api-1 catapult-web:web-1; do
             module="${pair%%:*}"
+            compgen -G "shards/*/coverage/$module/*.exec" > /dev/null \
+              || { echo "::error::No coverage data for $module"; exit 1; }
             mkdir -p "$module/build/classes/java"
             cp -r "shards/shard-${pair#*:}/$module/build/classes/java/main" "$module/build/classes/java/"
           done
@@ -159,11 +171,12 @@ jobs:
         run: |
           for module in catapult-common catapult-api catapult-web; do
             report="$module/build/reports/jacoco/test/jacocoTestReport.xml"
-            [ -f "$report" ] || { echo "$module: no coverage report" >> "$GITHUB_STEP_SUMMARY"; continue; }
+            [ -f "$report" ] || { echo "$module: no coverage report" >> "$GITHUB_STEP_SUMMARY"; failed=1; continue; }
             grep -o '<counter type="LINE"[^>]*>' "$report" | tail -1 | \
             awk -v m="$module" '{for(i=1;i<=NF;i++){if($i~/^missed=/){split($i,a,"\"");mi=a[2]} if($i~/^covered=/){split($i,a,"\"");c=a[2]}}}
                  END{printf "%s line coverage: %.1f%%\n", m, c/(mi+c)*100}' >> "$GITHUB_STEP_SUMMARY"
           done
+          exit "${failed:-0}"
 
       - name: Upload test results
         if: always()
