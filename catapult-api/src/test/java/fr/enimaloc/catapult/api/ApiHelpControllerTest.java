@@ -31,6 +31,8 @@ class ApiHelpControllerTest {
     @Mock private MinecraftGateService gateService;
     @Mock private TitleHelpSections titleHelpSections;
     @Mock private SystemTwitchAccountService systemAccount;
+    @org.mockito.Spy private fr.enimaloc.catapult.service.emergency.EmergencyProperties emergencyProperties =
+        new fr.enimaloc.catapult.service.emergency.EmergencyProperties();
     @Mock private Jwt jwt;
 
     @InjectMocks private ApiHelpController controller;
@@ -178,8 +180,9 @@ class ApiHelpControllerTest {
         assertThat(content.body()).isEqualTo("<p>status</p><h3>chat</h3>");
         var args = org.mockito.ArgumentCaptor.forClass(Object[].class);
         verify(messageSource).getMessage(eq("help.status.body.chat"), args.capture(), any(), eq(locale));
-        assertThat(args.getValue()).hasSize(4);
+        assertThat(args.getValue()).hasSize(5);
         assertThat(args.getValue()[3]).isEqualTo("catapult_bot");
+        assertThat(args.getValue()[4]).isEqualTo(24L);
     }
 
     @Test

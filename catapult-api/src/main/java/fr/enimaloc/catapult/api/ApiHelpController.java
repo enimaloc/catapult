@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.common.dto.HelpContent;
+import fr.enimaloc.catapult.service.emergency.EmergencyProperties;
 import fr.enimaloc.catapult.service.minecraft.MinecraftGateService;
 import fr.enimaloc.catapult.service.title.TitleHelpSections;
 import fr.enimaloc.catapult.service.twitch.SystemTwitchAccountService;
@@ -26,6 +27,7 @@ public class ApiHelpController {
     private final MinecraftGateService gateService;
     private final TitleHelpSections titleHelpSections;
     private final SystemTwitchAccountService systemAccount;
+    private final EmergencyProperties emergencyProperties;
 
     @Value("${app.account.deletion-delay-days:7}")
     private int accountDeletionDelayDays;
@@ -47,7 +49,9 @@ public class ApiHelpController {
         String body = messageSource.getMessage("help." + cardId + ".body", args, "", locale);
         if ("status".equals(cardId)) {
             // {3}: the bot's Twitch login, as streamers type it in chat (@login off / on / emergency).
-            Object[] chatArgs = {accountDeletionDelayDays, defaultNoGameName, appName, botLogin(locale)};
+            // {4}: how many hours an emergency stop lasts.
+            Object[] chatArgs = {accountDeletionDelayDays, defaultNoGameName, appName, botLogin(locale),
+                emergencyProperties.getStopDuration().toHours()};
             body += messageSource.getMessage("help.status.body.chat", chatArgs, "", locale);
         }
         if ("connections".equals(cardId)) {
