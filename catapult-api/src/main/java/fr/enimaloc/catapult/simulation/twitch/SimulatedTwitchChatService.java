@@ -59,6 +59,13 @@ public class SimulatedTwitchChatService implements TwitchChatService {
         }
     }
 
+    /** A state query, not a call: the transport knows whether a real socket is open. */
+    @Override
+    public boolean isConnected(UserAccount user) {
+        TwitchChatService transport = transport();
+        return transport != null && transport.isConnected(user);
+    }
+
     @Override
     public void disconnectAll(String reason) {
         TwitchChatService transport = transport();
@@ -127,6 +134,13 @@ public class SimulatedTwitchChatService implements TwitchChatService {
     public Optional<Instant> getFollowedAtById(UserAccount user, String targetTwitchId) {
         return lookup(user, SimulatedCalls.TWITCH_CHAT_FOLLOWED_AT, "GET /channels/followers id=" + targetTwitchId,
                 () -> real().getFollowedAtById(user, targetTwitchId), () -> Optional.of(SIMULATED_PAST));
+    }
+
+    /** Shares the stream-info setting: the VOD of a simulated stream does not exist. */
+    @Override
+    public Optional<String> archiveVideoId(UserAccount user, String streamId) {
+        return lookup(user, SimulatedCalls.TWITCH_CHAT_STREAM_INFO, "GET /videos stream=" + streamId,
+                () -> real().archiveVideoId(user, streamId), Optional::empty);
     }
 
     @Override
