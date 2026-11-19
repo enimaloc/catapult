@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.api;
 
 import fr.enimaloc.catapult.service.minecraft.MinecraftGateService;
 import fr.enimaloc.catapult.service.title.TitleHelpSections;
+import fr.enimaloc.catapult.service.twitch.SystemTwitchAccountService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,6 +20,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -28,6 +30,7 @@ class ApiHelpControllerTest {
     @Mock private MessageSource messageSource;
     @Mock private MinecraftGateService gateService;
     @Mock private TitleHelpSections titleHelpSections;
+    @Mock private SystemTwitchAccountService systemAccount;
     @Mock private Jwt jwt;
 
     @InjectMocks private ApiHelpController controller;
@@ -82,12 +85,12 @@ class ApiHelpControllerTest {
 
     @Test
     void otherCard_neverTouchesGate() {
-        when(messageSource.getMessage(eq("help.status.title"), any(), any(), eq(locale))).thenReturn("État");
-        when(messageSource.getMessage(eq("help.status.body"), any(), any(), eq(locale))).thenReturn("<p>status</p>");
+        when(messageSource.getMessage(eq("help.dtdd.title"), any(), any(), eq(locale))).thenReturn("État");
+        when(messageSource.getMessage(eq("help.dtdd.body"), any(), any(), eq(locale))).thenReturn("<p>dtdd</p>");
 
-        var content = controller.help("status", locale, jwt);
+        var content = controller.help("dtdd", locale, jwt);
 
-        assertThat(content.body()).isEqualTo("<p>status</p>");
+        assertThat(content.body()).isEqualTo("<p>dtdd</p>");
         org.mockito.Mockito.verifyNoInteractions(gateService);
     }
 
@@ -162,5 +165,41 @@ class ApiHelpControllerTest {
 
         assertThat(content.body()).isEqualTo("<p>titre</p>");
         org.mockito.Mockito.verifyNoInteractions(titleHelpSections);
+    }
+
+    @Test
+    void help_status_appendsChatCommandsWithSystemLogin() {
+        when(messageSource.getMessage(eq("help.status.body"), any(), any(), eq(locale))).thenReturn("<p>status</p>");
+        when(messageSource.getMessage(eq("help.status.body.chat"), any(), any(), eq(locale))).thenReturn("<h3>chat</h3>");
+        when(systemAccount.getSystemTwitchUsername()).thenReturn("catapult_bot");
+
+        var content = controller.help("status", locale, jwt);
+
+        assertThat(content.body()).isEqualTo("<p>status</p><h3>chat</h3>");
+        var args = org.mockito.ArgumentCaptor.forClass(Object[].class);
+        verify(messageSource).getMessage(eq("help.status.body.chat"), args.capture(), any(), eq(locale));
+        assertThat(args.getValue()).hasSize(4);
+        assertThat(args.getValue()[3]).isEqualTo("catapult_bot");
+    }
+
+    @Test
+    void help_status_noSystemAccount_usesFallback() {
+        when(messageSource.getMessage(eq("help.status.body.chat"), any(), any(), eq(locale))).thenReturn("<h3>chat</h3>");
+        when(messageSource.getMessage(eq("help.status.bot_fallback"), any(), any(), eq(locale))).thenReturn("le bot");
+        when(systemAccount.getSystemTwitchUsername()).thenReturn(null);
+
+        controller.help("status", locale, jwt);
+
+        var args = org.mockito.ArgumentCaptor.forClass(Object[].class);
+        verify(messageSource).getMessage(eq("help.status.body.chat"), args.capture(), any(), eq(locale));
+        assertThat(args.getValue()[3]).isEqualTo("le bot");
+    }
+
+    @Test
+    void help_otherCard_hasNoChatSection() {
+        var content = controller.help("connections", locale, jwt);
+
+        assertThat(content.body()).doesNotContain("chat");
+        org.mockito.Mockito.verifyNoInteractions(systemAccount);
     }
 }

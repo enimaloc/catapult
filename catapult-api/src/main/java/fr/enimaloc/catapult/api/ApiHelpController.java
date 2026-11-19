@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.api;
 import fr.enimaloc.catapult.common.dto.HelpContent;
 import fr.enimaloc.catapult.service.minecraft.MinecraftGateService;
 import fr.enimaloc.catapult.service.title.TitleHelpSections;
+import fr.enimaloc.catapult.service.twitch.SystemTwitchAccountService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
@@ -24,6 +25,7 @@ public class ApiHelpController {
     private final MessageSource messageSource;
     private final MinecraftGateService gateService;
     private final TitleHelpSections titleHelpSections;
+    private final SystemTwitchAccountService systemAccount;
 
     @Value("${app.account.deletion-delay-days:7}")
     private int accountDeletionDelayDays;
@@ -43,6 +45,11 @@ public class ApiHelpController {
         Object[] args = {accountDeletionDelayDays, defaultNoGameName, appName};
         String title = messageSource.getMessage("help." + cardId + ".title", null, cardId, locale);
         String body = messageSource.getMessage("help." + cardId + ".body", args, "", locale);
+        if ("status".equals(cardId)) {
+            // {3}: the bot's Twitch login, as streamers type it in chat (@login off / on / emergency).
+            Object[] chatArgs = {accountDeletionDelayDays, defaultNoGameName, appName, botLogin(locale)};
+            body += messageSource.getMessage("help.status.body.chat", chatArgs, "", locale);
+        }
         if ("connections".equals(cardId)) {
             if (xboxEnabled) {
                 body += messageSource.getMessage("help.connections.body.xbox", args, "", locale);
@@ -61,6 +68,12 @@ public class ApiHelpController {
             }
         }
         return new HelpContent(title, body);
+    }
+
+    private String botLogin(Locale locale) {
+        String login = systemAccount.getSystemTwitchUsername();
+        if (login != null && !login.isBlank()) return login;
+        return messageSource.getMessage("help.status.bot_fallback", null, "the bot", locale);
     }
 
     private TitleHelpSections.Offered titleSections(Jwt jwt) {

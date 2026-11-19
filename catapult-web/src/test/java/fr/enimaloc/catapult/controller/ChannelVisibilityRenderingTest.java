@@ -163,6 +163,35 @@ class ChannelVisibilityRenderingTest {
         assertThat(other).doesNotContain("channel-emergency");
     }
 
+    /** The one-time announcement sits in the owner's Status card while the key is unseen, never for a moderator. */
+    @Test
+    void emergencyNotice_inTheOwnersStatusCard_whileUnseen() throws Exception {
+        // The notice shows for a month after its release: the render check lapses with it.
+        org.junit.jupiter.api.Assumptions.assumeTrue(java.time.LocalDate.now(java.time.ZoneOffset.UTC)
+                .isBefore(java.time.LocalDate.of(2026, 12, 20)));
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(channelPageData(true));
+        when(apiService.seenFeatures()).thenReturn(List.of());
+        String jwtKey = fr.enimaloc.catapult.service.http.ApiClient.SESSION_JWT_KEY;
+
+        String unseen = mvc.perform(get("/spa/channel/enimaloc").sessionAttr(jwtKey, "jwt"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertThat(unseen).contains("id=\"emergency-notice\"", "data-new-feature=\"channel.emergency-notice\"");
+
+        when(apiService.seenFeatures()).thenReturn(List.of("channel.emergency-notice"));
+        String seen = mvc.perform(get("/spa/channel/enimaloc").sessionAttr(jwtKey, "jwt"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertThat(seen).doesNotContain("emergency-notice");
+
+        when(apiService.seenFeatures()).thenReturn(List.of());
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(new ChannelPageData(
+                new ChannelUserDto("id-1", "twitch-1", "enimaloc", "https://example.test/avatar.png"),
+                "enimaloc", false, true, true, null, new PagedBindings(0, 1, 0, List.of()),
+                List.of(), Set.of(), List.of(), Set.of(), null, null, null, null, null, null, null, null));
+        String moderator = mvc.perform(get("/spa/channel/enimaloc").sessionAttr(jwtKey, "jwt"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertThat(moderator).doesNotContain("emergency-notice");
+    }
+
     /** The owner's account preference shows in their Settings tab too; a moderator doesn't get it. */
     @Test
     void notificationChannels_inTheOwnersSettingsTab_only() throws Exception {

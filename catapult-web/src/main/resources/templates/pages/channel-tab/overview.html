@@ -68,6 +68,16 @@
             </div>
         </div>
 
+        <!--/* One-time announcement (NewFeatures "channel.emergency-notice"): the owner only, until they dismiss it
+             (channel-page.js tells catapult-web, as for a tab's dot) or a month after the release. */-->
+        <div id="emergency-notice" class="emergency-notice" data-new-feature="channel.emergency-notice"
+             th:if="${ch.isOwner() and newFeatures != null and newFeatures.contains('channel.emergency-notice')}">
+            <mdui-icon name="campaign"></mdui-icon>
+            <span th:text="#{channel.emergency_notice.text}">channel.emergency_notice.text</span>
+            <mdui-button variant="text" data-new-feature-dismiss
+                         th:text="#{channel.emergency_notice.dismiss}">channel.emergency_notice.dismiss</mdui-button>
+        </div>
+
         <!--/* The active custom binding (owner only, while the experiment is open), a link to its row below, which it
              opens: hidden while none is. channel-custom-bindings.js keeps it in step with the list. */-->
         <div id="channel-active-binding" class="status-binding-row"
