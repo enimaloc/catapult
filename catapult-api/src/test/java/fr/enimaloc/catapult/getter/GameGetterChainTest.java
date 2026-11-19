@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.binding.GetterConfig;
 import fr.enimaloc.catapult.getter.steam.SteamGameGetter;
 import fr.enimaloc.catapult.repository.binding.GetterConfigRepository;
+import fr.enimaloc.catapult.service.emergency.EmergencyStopService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,6 +20,7 @@ import java.util.concurrent.TimeoutException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -26,6 +28,8 @@ class GameGetterChainTest {
 
     @Mock GetterConfigRepository getterConfigRepository;
     @Mock SteamGameGetter steamGameGetter;
+    @Mock XboxGameGetter xboxGameGetter;
+    @Mock EmergencyStopService emergencyStops;
 
     GameGetterChain chain;
     SimpleMeterRegistry registry;
@@ -33,7 +37,7 @@ class GameGetterChainTest {
     @BeforeEach
     void setUp() {
         registry = new SimpleMeterRegistry();
-        chain = new GameGetterChain(getterConfigRepository, Optional.of(steamGameGetter), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), registry);
+        chain = new GameGetterChain(getterConfigRepository, Optional.of(steamGameGetter), Optional.of(xboxGameGetter), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), registry, emergencyStops);
     }
 
     @Test
@@ -74,5 +78,55 @@ class GameGetterChainTest {
         assertThatThrownBy(() -> chain.resolve(user)).isInstanceOf(DetectionTimeoutException.class);
         assertThat(registry.get("catapult.game.detection.duration")
                 .tag("resolved_by", "timeout").timer().count()).isEqualTo(1);
+    }
+
+    private GetterConfig config(GetterConfig.Provider provider, int priority) {
+        GetterConfig config = new GetterConfig();
+        config.setProvider(provider);
+        config.setEnabled(true);
+        config.setPriority(priority);
+        return config;
+    }
+
+    @Test
+    void resolve_stoppedProviderFirst_throwsProviderStopped() {
+        UserAccount user = new UserAccount();
+        user.setId(UUID.randomUUID());
+        when(getterConfigRepository.findByUserOrderByPriorityAsc(user))
+            .thenReturn(List.of(config(GetterConfig.Provider.XBOX, 1), config(GetterConfig.Provider.STEAM, 2)));
+        when(emergencyStops.isStopped(user, GetterConfig.Provider.XBOX)).thenReturn(true);
+
+        assertThatThrownBy(() -> chain.resolve(user))
+            .isInstanceOf(ProviderStoppedException.class)
+            .isInstanceOf(DetectionTimeoutException.class)
+            .hasMessage("XBOX is suspended by an emergency stop")
+            .extracting(e -> ((ProviderStoppedException) e).getProvider()).isEqualTo(GetterConfig.Provider.XBOX);
+        verifyNoInteractions(xboxGameGetter);
+    }
+
+    @Test
+    void resolve_higherPriorityFindsGame_beforeStoppedProvider_returnsIt() {
+        UserAccount user = new UserAccount();
+        user.setId(UUID.randomUUID());
+        DetectedGame game = new DetectedGame("123", GameBinding.SourceType.STEAM, "TestGame");
+        when(getterConfigRepository.findByUserOrderByPriorityAsc(user))
+            .thenReturn(List.of(config(GetterConfig.Provider.STEAM, 1), config(GetterConfig.Provider.XBOX, 2)));
+        when(emergencyStops.isStopped(user, GetterConfig.Provider.STEAM)).thenReturn(false);
+        when(steamGameGetter.getCurrentGame(user)).thenReturn(Optional.of(game));
+
+        assertThat(chain.resolve(user)).contains(game);
+        verifyNoInteractions(xboxGameGetter);
+    }
+
+    @Test
+    void resolve_stoppedProvider_doesNotCallLowerPriorityGetters() {
+        UserAccount user = new UserAccount();
+        user.setId(UUID.randomUUID());
+        when(getterConfigRepository.findByUserOrderByPriorityAsc(user))
+            .thenReturn(List.of(config(GetterConfig.Provider.XBOX, 1), config(GetterConfig.Provider.STEAM, 2)));
+        when(emergencyStops.isStopped(user, GetterConfig.Provider.XBOX)).thenReturn(true);
+
+        assertThatThrownBy(() -> chain.resolve(user)).isInstanceOf(ProviderStoppedException.class);
+        verifyNoInteractions(steamGameGetter);
     }
 }

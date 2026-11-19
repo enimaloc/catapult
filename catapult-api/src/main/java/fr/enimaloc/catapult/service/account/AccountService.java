@@ -64,6 +64,8 @@ public class AccountService {
         account.setStatus(UserAccount.Status.PENDING_DELETION);
         account.setDeletionRequestedAt(Instant.now());
         botToggleService.setBotEnabled(account, false);
+        // A disabled bot keeps listening to its chat; an account pending deletion must not
+        twitchChatService.disconnect(account);
         log.info("Account {} marked as PENDING_DELETION", account.getId());
     }
 
@@ -157,6 +159,8 @@ public class AccountService {
         account.setProfileImageUrl(null);
         account.setStatus(UserAccount.Status.INACTIVE);
         botToggleService.setBotEnabled(account, false);
+        // Its token is gone: no chat to keep listening to (a disabled bot otherwise keeps it open)
+        twitchChatService.disconnect(account);
         log.info("Admin unlinked Twitch for account {}", account.getId());
     }
 }

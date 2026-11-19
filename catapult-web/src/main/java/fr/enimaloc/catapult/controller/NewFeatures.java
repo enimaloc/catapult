@@ -11,7 +11,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * The tabs that get a "new" dot: each one by its key ({@code <page>.<tab value>}, as the templates
+ * The tabs (or cards) that get a "new" dot or notice: each one by its key ({@code <page>.<tab value>}, as the templates
  * test it in {@code newFeatures}) and the day it shipped. The dot shows for {@link #SHOWN_FOR}
  * after that day, until the member opens the tab (channel-page.js tells catapult-api, which keeps
  * it per account). Marking a tab is a line here; an expired one can stay or go.
@@ -19,7 +19,8 @@ import java.util.stream.Collectors;
 public final class NewFeatures {
 
     static final Map<String, LocalDate> RELEASES = Map.of(
-            "channel.commands", LocalDate.of(2026, 10, 21));
+            "channel.commands", LocalDate.of(2026, 10, 21),
+            "channel.emergency-notice", LocalDate.of(2026, 11, 20));
 
     static final Period SHOWN_FOR = Period.ofMonths(1);
 

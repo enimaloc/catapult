@@ -13,6 +13,7 @@ import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.degraded.DegradedLabels;
 import fr.enimaloc.catapult.service.degraded.DegradedState;
 import fr.enimaloc.catapult.service.degraded.DegradedView;
+import fr.enimaloc.catapult.service.emergency.EmergencyState;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.http.HttpServletRequest;
@@ -69,6 +70,7 @@ public class ModelFiller {
     private final ObjectProvider<DegradedState> degradedState;
     private final ObjectProvider<DegradedLabels> degradedLabels;
     private final ObjectProvider<LaunchedPlatforms> launchedPlatforms;
+    private final ObjectProvider<EmergencyState> emergencyState;
 
     public void defaultAttr(Model model, String page) {
         LaunchedPlatforms launched = launchedPlatforms.getIfAvailable();
@@ -99,6 +101,8 @@ public class ModelFiller {
         // For degraded.js, in data-* attributes: Thymeleaf forbids static calls there, and escapes the JSON
         model.addAttribute("degradedJson", JSON.writeValueAsString(degraded));
         model.addAttribute("degradedLabelsJson", JSON.writeValueAsString(effectLabels));
+        EmergencyState emergency = emergencyState.getIfAvailable();
+        model.addAttribute("emergency", emergency == null ? List.of() : emergency.globalStops());
         model.addAttribute("loggedIn", ApiClient.hasSession());
         model.addAttribute("admin", isAdmin());
         model.addAttribute("impersonatedLogin", impersonatedLogin());
@@ -266,6 +270,8 @@ public class ModelFiller {
         model.addAttribute("settingsUnavailable", settings == null);
         model.addAttribute("dtddMapping", apiService.dtddMappingStatus(username));
         if (channelPage.isOwner()) {
+            // Null when catapult-api fails to give it: the status card then shows no emergency, the rest still counts.
+            model.addAttribute("channelEmergency", apiService.channelEmergency(username));
             var twitchatEvents = channelPage.twitchat() == null ? Map.<String, List<TwitchatEventActionDto>>of()
                     : apiService.twitchatEvents(username);
             // Only when there is something to put the widget's token in: OBS.

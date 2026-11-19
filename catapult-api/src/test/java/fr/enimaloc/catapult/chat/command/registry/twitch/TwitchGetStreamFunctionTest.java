@@ -22,7 +22,7 @@ class TwitchGetStreamFunctionTest {
         UserAccount user = new UserAccount();
         Instant startedAt = Instant.now().minus(Duration.ofHours(2).plusMinutes(34));
         when(service.getStreamInfo(user)).thenReturn(
-            Optional.of(new TwitchStreamInfo("My Title", "Just Chatting", 42, startedAt)));
+            Optional.of(new TwitchStreamInfo("s1", "My Title", "Just Chatting", 42, startedAt)));
 
         TwitchGetStreamFunction fn = new TwitchGetStreamFunction(service);
         assertThat(fn.namespace()).isEqualTo("twitch");

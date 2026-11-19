@@ -137,14 +137,16 @@ class EventSubTwitchChatServiceFlowsTest {
     @Nested
     class Lifecycle {
         @Test
-        void init_connectsEveryActiveBotUser() {
+        void init_connectsDisabledActiveAccounts() {
             handshakesSucceed();
-            when(users.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE)).thenReturn(List.of(user));
+            user.setBotEnabled(false);
+            when(users.findByStatus(UserAccount.Status.ACTIVE)).thenReturn(List.of(user));
 
             service.init();
 
             verify(wsBuilder).buildAsync(eq(URI.create("wss://eventsub.wss.twitch.tv/ws")), any());
             assertThat(service.connectionCount()).isEqualTo(1);
+            assertThat(service.isConnected(user)).isTrue();
             assertThat(meters.find("catapult.chat.messages").tag("transport", "eventsub").counter()).isNotNull();
         }
 
@@ -277,8 +279,11 @@ class EventSubTwitchChatServiceFlowsTest {
         }
 
         @Test
-        void welcome_on401_withoutARefreshedToken_givesUp() {
-            helix.expect(requestTo(SUBSCRIPTIONS_URL)).andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+        void welcome_on401_withoutARefreshedToken_closesTheChatAndDoesNotReconnect() {
+            handshakesSucceed();
+            service.connect(user);
+            assertThat(service.isConnected(user)).isTrue();
+            // Only the chat subscription is tried: with a dead token the rewards one is not attempted
             helix.expect(requestTo(SUBSCRIPTIONS_URL)).andRespond(withStatus(HttpStatus.UNAUTHORIZED));
             when(tokenService.refreshAccessToken(token, user)).thenReturn(null);
 
@@ -286,6 +291,50 @@ class EventSubTwitchChatServiceFlowsTest {
                     "{\"metadata\": {\"message_type\": \"session_welcome\"}, \"payload\": {\"session\": {\"id\": \"s-1\"}}}", false);
 
             helix.verify();
+            assertThat(service.isConnected(user)).isFalse();
+            // Reconnection is forbidden: a later drop of a socket must not reopen it
+            verify(wsBuilder, times(1)).buildAsync(any(), any());
+        }
+
+        private static final String WELCOME =
+                "{\"metadata\": {\"message_type\": \"session_welcome\"}, \"payload\": {\"session\": {\"id\": \"s-1\"}}}";
+
+        @Test
+        void welcome_on403_closesTheChatAndDoesNotReconnect() {
+            handshakesSucceed();
+            service.connect(user);
+            helix.expect(requestTo(SUBSCRIPTIONS_URL)).andRespond(withStatus(HttpStatus.FORBIDDEN));
+
+            service.handleMessage(user, token, WELCOME, false);
+
+            helix.verify();
+            assertThat(service.isConnected(user)).isFalse();
+            verify(wsBuilder, times(1)).buildAsync(any(), any());
+        }
+
+        @Test
+        void welcome_whenTheTokenCannotBeRead_closesTheChatAndDoesNotReconnect() {
+            handshakesSucceed();
+            service.connect(user);
+            when(tokenService.resolveAccessToken(token, user)).thenThrow(new IllegalStateException("Failed to decrypt token"));
+
+            service.handleMessage(user, token, WELCOME, false);
+
+            assertThat(service.isConnected(user)).isFalse();
+            verify(wsBuilder, times(1)).buildAsync(any(), any());
+        }
+
+        @Test
+        void welcome_on5xx_isTransient_theChatStaysOpen() {
+            handshakesSucceed();
+            service.connect(user);
+            helix.expect(requestTo(SUBSCRIPTIONS_URL)).andRespond(withServerError());
+            helix.expect(requestTo(SUBSCRIPTIONS_URL)).andRespond(withSuccess());
+
+            service.handleMessage(user, token, WELCOME, false);
+
+            helix.verify();
+            assertThat(service.isConnected(user)).isTrue();
         }
 
         @Test

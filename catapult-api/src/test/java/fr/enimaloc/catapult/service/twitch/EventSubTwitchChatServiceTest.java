@@ -188,7 +188,7 @@ class EventSubTwitchChatServiceTest {
         java.time.Instant at = java.time.Instant.parse("2024-01-01T00:00:00Z");
         when(helix.followedAt(user, "fresh-token", "fan")).thenReturn(Optional.of(at));
         when(helix.followedAtById(user, "fresh-token", "42")).thenReturn(Optional.of(at));
-        TwitchStreamInfo live = new TwitchStreamInfo("t", "g", 1, at);
+        TwitchStreamInfo live = new TwitchStreamInfo("s", "t", "g", 1, at);
         when(helix.streamInfo(user, "fresh-token")).thenReturn(Optional.of(live));
         TwitchUserProfile profile = new TwitchUserProfile("Fan", at);
         when(helix.userProfile("fresh-token", "fan")).thenReturn(Optional.of(profile));
@@ -262,5 +262,116 @@ class EventSubTwitchChatServiceTest {
         verify(socket).sendClose(eq(WebSocket.NORMAL_CLOSURE), eq("standby"));
         assertThat(sockets).doesNotContainKey(user.getId());
         assertThat((java.util.Set<UUID>) connectionState("intentionallyDisconnected")).contains(user.getId());
+    }
+
+    private static String chatNotification(String fragmentsJson, String text, String badges) {
+        return chatNotification("broadcaster-123", fragmentsJson, text, badges);
+    }
+
+    private static String chatNotification(String broadcasterId, String fragmentsJson, String text, String badges) {
+        return """
+            {"metadata": {"message_type": "notification", "subscription_type": "channel.chat.message"},
+             "payload": {"event": {"broadcaster_user_id": "%s", "chatter_user_id": "c-9", "chatter_user_login": "chatter",
+               "message": {"text": "%s", "fragments": %s}, "badges": [%s]}}}
+            """.formatted(broadcasterId, text, fragmentsJson, badges);
+    }
+
+    private static final String MENTION_OFF = chatNotification("""
+        [{"type": "mention", "text": "@bot", "mention": {"user_id": "sys-1"}},
+         {"type": "text", "text": " off"}]""", "@bot off", "{\"set_id\": \"mod\"}");
+
+    @Test
+    void mentionMessage_goesToSystemMentionCommands() {
+        when(systemTwitchAccountService.getSystemTwitchId()).thenReturn("sys-1");
+
+        service.handleMessage(user, token, MENTION_OFF, false);
+
+        var captor = org.mockito.ArgumentCaptor.forClass(
+            fr.enimaloc.catapult.service.emergency.SystemMentionEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        var event = captor.getValue();
+        assertThat(event.channel()).isSameAs(user);
+        assertThat(event.mention().command()).isEqualTo("off");
+        assertThat(event.sender().twitchId()).isEqualTo("c-9");
+        assertThat(event.sender().login()).isEqualTo("chatter");
+        assertThat(event.sender().role()).isEqualTo(fr.enimaloc.catapult.chat.ChatCommandEvent.SenderRole.MODERATOR);
+        verify(eventPublisher, never()).publishEvent(any(fr.enimaloc.catapult.chat.ChatCommandEvent.class));
+    }
+
+    @Test
+    void bangCommand_stillPublishesNothingAnswered() {
+        service.handleMessage(user, token, chatNotification(
+            "[{\"type\": \"text\", \"text\": \"!debug\"}]", "!debug", ""), false);
+
+        // An ordinary message never costs a lookup of the system account
+        verify(systemTwitchAccountService, never()).getSystemTwitchId();
+
+        // The retired command system still hears it as an event nobody consumes, and no mention is raised
+        verify(eventPublisher).publishEvent(any(fr.enimaloc.catapult.chat.ChatCommandEvent.class));
+        verify(eventPublisher, never())
+            .publishEvent(any(fr.enimaloc.catapult.service.emergency.SystemMentionEvent.class));
+    }
+
+    @Test
+    void disabledBot_readFromDatabase_publishesNeitherBangNorRewardNorMention_butStillHearsAMention() {
+        when(systemTwitchAccountService.getSystemTwitchId()).thenReturn("sys-1");
+        UserAccount stored = new UserAccount();
+        stored.setId(user.getId());
+        stored.setBotEnabled(false);
+        when(userAccountRepository.findById(user.getId())).thenReturn(Optional.of(stored));
+
+        service.handleMessage(user, token, chatNotification(
+            "[{\"type\": \"text\", \"text\": \"!debug\"}]", "!debug", ""), false);
+        service.handleMessage(user, token, """
+            {"metadata": {"message_type": "notification",
+                          "subscription_type": "channel.channel_points_custom_reward_redemption.add"},
+             "payload": {"event": {"reward": {"title": "Hydrate"}}}}""", false);
+
+        verify(eventPublisher, never()).publishEvent(any(fr.enimaloc.catapult.chat.ChatCommandEvent.class));
+
+        service.handleMessage(user, token, MENTION_OFF, false);
+
+        verify(eventPublisher).publishEvent(any(fr.enimaloc.catapult.service.emergency.SystemMentionEvent.class));
+    }
+
+    private static final String MENTION_FRAGMENTS = """
+        [{"type": "mention", "text": "@bot", "mention": {"user_id": "sys-1"}},
+         {"type": "text", "text": " off"}]""";
+
+    private static String sharedChatMention(String broadcasterId, String sourceBroadcasterId) {
+        return chatNotification(broadcasterId, MENTION_FRAGMENTS, "@bot off", "{\"set_id\": \"mod\"}")
+            .replace("\"chatter_user_id\"", "\"source_broadcaster_user_id\": \"" + sourceBroadcasterId
+                + "\", \"chatter_user_id\"");
+    }
+
+    @Test
+    void sharedChatMention_fromAnotherChannel_isNotPublished() {
+        when(systemTwitchAccountService.getSystemTwitchId()).thenReturn("sys-1");
+
+        service.handleMessage(user, token, sharedChatMention("broadcaster-123", "other-channel"), false);
+
+        verify(eventPublisher, never())
+            .publishEvent(any(fr.enimaloc.catapult.service.emergency.SystemMentionEvent.class));
+    }
+
+    @Test
+    void sharedChatMention_fromThisChannel_isHandled() {
+        when(systemTwitchAccountService.getSystemTwitchId()).thenReturn("sys-1");
+
+        service.handleMessage(user, token, sharedChatMention("broadcaster-123", "broadcaster-123"), false);
+
+        verify(eventPublisher)
+            .publishEvent(any(fr.enimaloc.catapult.service.emergency.SystemMentionEvent.class));
+    }
+
+    @Test
+    void mention_ofAnotherBroadcaster_isNotPublished() {
+        when(systemTwitchAccountService.getSystemTwitchId()).thenReturn("sys-1");
+
+        service.handleMessage(user, token,
+            chatNotification("someone-else", MENTION_FRAGMENTS, "@bot off", "{\"set_id\": \"mod\"}"), false);
+
+        verify(eventPublisher, never())
+            .publishEvent(any(fr.enimaloc.catapult.service.emergency.SystemMentionEvent.class));
     }
 }

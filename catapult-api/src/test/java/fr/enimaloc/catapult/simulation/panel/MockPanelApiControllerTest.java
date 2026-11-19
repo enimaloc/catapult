@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.simulation.panel;
 
 import fr.enimaloc.catapult.domain.account.OAuthToken;
+import fr.enimaloc.catapult.chat.ChatCommandEvent;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.binding.GetterConfig;
@@ -279,6 +280,30 @@ class MockPanelApiControllerTest {
         verify(actions).stopPlaying(alice);
         verify(actions).manualCategoryChange(alice, "27471", "Minecraft");
         verify(actions).raidOut(alice, "bob");
+    }
+
+    @Test
+    void a_chat_message_goes_to_simulation_actions() throws Exception {
+        mvc.perform(write(post(API + "/accounts/{id}/chat", alice.getId()),
+                        "{\"sender\":\" viewer1 \",\"role\":\"moderator\",\"owner\":true,"
+                                + "\"text\":\" @bot emergency xbox \"}"))
+                .andExpect(status().isNoContent());
+
+        verify(actions).chatMessage(alice, "viewer1", ChatCommandEvent.SenderRole.MODERATOR, true,
+                "@bot emergency xbox");
+    }
+
+    @Test
+    void an_invalid_chat_message_is_refused() throws Exception {
+        for (String body : new String[] {
+                "{\"sender\":\"v\",\"role\":\"VIEWERS\",\"text\":\" \"}",
+                "{\"sender\":\"\",\"role\":\"VIEWERS\",\"text\":\"hi\"}",
+                "{\"sender\":\"v\",\"role\":\"KING\",\"text\":\"hi\"}",
+                "{\"sender\":\"v\",\"text\":\"hi\"}"}) {
+            mvc.perform(write(post(API + "/accounts/{id}/chat", alice.getId()), body))
+                    .andExpect(status().isBadRequest());
+        }
+        verify(actions, never()).chatMessage(any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean(), any());
     }
 
     @Test

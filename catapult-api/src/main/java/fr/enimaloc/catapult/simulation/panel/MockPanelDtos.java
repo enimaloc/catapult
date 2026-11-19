@@ -60,6 +60,8 @@ public final class MockPanelDtos {
 
     public record ManualCategoryRequest(@Nullable String categoryId, @Nullable String categoryName) {}
 
+    public record ChatRequest(@Nullable String sender, @Nullable String role, boolean owner, @Nullable String text) {}
+
     public record RaidRequest(@Nullable String toLogin) {}
 
     /** One API of the catalogue and its calls, in {@code SimulatedCalls} order. */

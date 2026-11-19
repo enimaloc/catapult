@@ -39,7 +39,7 @@ class EventSubTwitchChatServiceSimulationTest {
         user.setId(UUID.randomUUID());
         user.setTwitchId("111");
         when(tokens.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)).thenReturn(Optional.empty());
-        when(users.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE)).thenReturn(List.of(user));
+        when(users.findByStatus(UserAccount.Status.ACTIVE)).thenReturn(List.of(user));
     }
 
     private EventSubTwitchChatService service(ObjectProvider<SimulationGate> provider) {

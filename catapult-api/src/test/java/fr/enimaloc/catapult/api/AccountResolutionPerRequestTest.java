@@ -29,6 +29,8 @@ import fr.enimaloc.catapult.service.category.CategoryApplier;
 import fr.enimaloc.catapult.service.category.CategoryChain;
 import fr.enimaloc.catapult.service.category.ExtensionLayoutApplier;
 import fr.enimaloc.catapult.service.connections.SteamProfileDiagnostics;
+import fr.enimaloc.catapult.service.emergency.EmergencyStopService;
+import fr.enimaloc.catapult.service.emergency.EmergencyViews;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import fr.enimaloc.catapult.service.notification.NotificationService;
 import fr.enimaloc.catapult.service.notification.TwitchatEventActionService;
@@ -102,6 +104,8 @@ class AccountResolutionPerRequestTest {
     @MockitoBean GameBindingLookup gameBindingLookup;
     @MockitoBean CustomBindingActivations customBindingActivations;
     @MockitoBean NotificationService notificationService;
+    @MockitoBean EmergencyViews emergencyViews;
+    @MockitoBean EmergencyStopService emergencyStopService;
 
     private static RequestPostProcessor as(UserAccount account) {
         return jwt().jwt(j -> j.subject(account.getId().toString()).claim("twitchId", account.getTwitchId()))

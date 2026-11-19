@@ -373,6 +373,16 @@ $('raid-form').addEventListener('submit', (event) => {
   }));
 });
 
+$('chat-form').addEventListener('submit', (event) => {
+  event.preventDefault();
+  act('Message sent', () => call('POST', '/accounts/' + state.selected + '/chat', {
+    sender: $('chat-sender').value.trim(),
+    role: $('chat-role').value,
+    owner: $('chat-owner').checked,
+    text: $('chat-text').value.trim(),
+  }));
+});
+
 // ------------------------------------------------------------------ settings, one call at a time
 
 /** One grid per API; each call has its mode, its HTTP status for Error, and its latency. */

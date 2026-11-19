@@ -158,7 +158,25 @@ window.CatapultChannel = (function () {
 // admin-tabs.js); picking another tab drops it.
 // A panel built only once shown (lazy.js: the channel's heavy tabs) is built when its tab is first picked, or
 // with the page when it opens on it, before the fragment scripts bind (they listen after this one).
+// Tells catapult-web a "new" marker was seen: it keeps that per account, so the marker stays gone on
+// every device. Best effort: a failed call brings the marker back on the next render, nothing worse.
+function markFeatureSeen(key) {
+    CatapultCsrf.postJson(`/spa/seen-features/${encodeURIComponent(key)}`).catch(() => {});
+}
+
 document.addEventListener("catapult:render", function () {
+    // A one-time notice (the Status card's) has a button that dismisses it: same call as a tab's dot.
+    document.querySelectorAll("[data-new-feature-dismiss]").forEach(button => {
+        if (button.dataset.bound) return;
+        button.dataset.bound = "1";
+        button.addEventListener("click", () => {
+            const notice = button.closest("[data-new-feature]");
+            if (!notice) return;
+            notice.remove();
+            markFeatureSeen(notice.dataset.newFeature);
+        });
+    });
+
     const tabs = document.querySelector("mdui-tabs[data-hash-tabs]");
     if (!tabs) return;
     const first = tabs.value;
@@ -183,7 +201,7 @@ document.addEventListener("catapult:render", function () {
         const dot = tabs.querySelector(`mdui-tab[value="${CSS.escape(tabs.value)}"] [data-new-feature]`);
         if (!dot) return;
         dot.remove();
-        CatapultCsrf.postJson(`/spa/seen-features/${encodeURIComponent(dot.dataset.newFeature)}`).catch(() => {});
+        markFeatureSeen(dot.dataset.newFeature);
     }
     markSeen();
 

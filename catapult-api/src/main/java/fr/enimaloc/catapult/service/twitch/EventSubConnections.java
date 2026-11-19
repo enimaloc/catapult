@@ -70,6 +70,10 @@ final class EventSubConnections {
         return connections.size();
     }
 
+    boolean isOpen(UserAccount user) {
+        return connections.containsKey(user.getId());
+    }
+
     /** Opens a brand-new session for the user on the canonical EventSub URL. */
     void open(UserAccount user, OAuthToken token) {
         openConnection(user, token, WS_URL, false);

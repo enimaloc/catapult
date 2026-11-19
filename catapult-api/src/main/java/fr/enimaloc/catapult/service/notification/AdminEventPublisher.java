@@ -89,4 +89,9 @@ public class AdminEventPublisher {
     public void gameMappingDeleted(String mappingId) {
         redisPublisher.publishAdmin("game.mapping.deleted", Map.of("mappingId", mappingId));
     }
+
+    /** A provider emergency stop was created, extended or lifted; {@code view} is its admin view. */
+    public void emergencyStopChanged(Object view) {
+        redisPublisher.publishAdmin("emergency.stop.changed", Map.of("stop", view));
+    }
 }

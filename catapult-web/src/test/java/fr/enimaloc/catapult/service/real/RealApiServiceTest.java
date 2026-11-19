@@ -580,6 +580,75 @@ class RealApiServiceTest {
     }
 
     @Test
+    void emergencyStatus_readsThePublicStatus() {
+        respond(HttpMethod.GET, "/api/internal/emergency/status",
+                "{\"globalStops\":[{\"id\":\"6f0c8f0e-0000-4000-8000-000000000001\",\"provider\":\"XBOX\","
+                        + "\"scope\":\"GLOBAL\",\"origin\":\"THRESHOLD\",\"expiresAt\":\"2026-11-20T10:00:00Z\"}]}");
+
+        var status = service.emergencyStatus();
+
+        assertThat(status.globalStops()).extracting(s -> s.provider()).containsExactly("XBOX");
+    }
+
+    @Test
+    void emergencyStatus_isNullWhenTheApiFails() {
+        expect(HttpMethod.GET, "/api/internal/emergency/status").andRespond(withStatus(
+                org.springframework.http.HttpStatus.BAD_GATEWAY));
+
+        assertThat(service.emergencyStatus()).isNull();
+    }
+
+    @Test
+    void channelEmergency_readsTheChannelsView() {
+        respond(HttpMethod.GET, channel("enimaloc") + "/emergency",
+                "{\"botEnabled\":false,\"channelStops\":[],\"globalStopsOnUsedProviders\":[]}");
+
+        var view = service.channelEmergency("enimaloc");
+
+        assertThat(view.botEnabled()).isFalse();
+    }
+
+    @Test
+    void resumeChannelEmergency_postsTheResume() {
+        expect(HttpMethod.POST, channel("enimaloc") + "/emergency/resume").andExpect(content().string(""))
+                .andRespond(withSuccess("{\"resumed\":true}", MediaType.APPLICATION_JSON));
+
+        assertThat(service.resumeChannelEmergency("enimaloc")).isEqualTo(200);
+    }
+
+    @Test
+    void adminEmergency_readsTheStopsAndTheReports() {
+        respond(HttpMethod.GET, "/api/internal/admin/emergency/stops?active=false",
+                "[{\"id\":\"6f0c8f0e-0000-4000-8000-000000000001\",\"provider\":\"EPIC\",\"scope\":\"GLOBAL\","
+                        + "\"origin\":\"OWNER\",\"liftedBy\":\"enimaloc\"}]");
+        respond(HttpMethod.GET, "/api/internal/admin/emergency/reports?page=2",
+                "[{\"id\":\"6f0c8f0e-0000-4000-8000-000000000002\",\"channelLogin\":\"a\",\"provider\":\"XBOX\","
+                        + "\"reportedByLogin\":\"b\",\"withdrawn\":false,\"vodUrl\":null,\"contextJson\":\"{}\"}]");
+
+        assertThat(service.adminEmergencyStops(false)).extracting(s -> s.provider()).containsExactly("EPIC");
+        assertThat(service.adminEmergencyReports(2)).extracting(r -> r.channelLogin()).containsExactly("a");
+    }
+
+    @Test
+    void adminEmergency_isNullWhenTheApiFails() {
+        expect(HttpMethod.GET, "/api/internal/admin/emergency/stops?active=true").andRespond(withStatus(
+                org.springframework.http.HttpStatus.BAD_GATEWAY));
+
+        assertThat(service.adminEmergencyStops(true)).isNull();
+    }
+
+    @Test
+    void adminEmergencyStop_postsTheProvider_andResumeDeletesIt() {
+        expect(HttpMethod.POST, "/api/internal/admin/emergency/stops").andExpect(content().json("{\"provider\":\"XBOX\"}"))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+        expect(HttpMethod.DELETE, "/api/internal/admin/emergency/stops?provider=ALL")
+                .andRespond(withSuccess("{\"lifted\":2}", MediaType.APPLICATION_JSON));
+
+        assertThat(service.adminEmergencyStop("XBOX")).isEqualTo(200);
+        assertThat(service.adminEmergencyResume("ALL")).isEqualTo(200);
+    }
+
+    @Test
     void recheckGame() {
         expectPost(channel("enimaloc") + "/game/recheck");
         service.recheckGame("enimaloc");

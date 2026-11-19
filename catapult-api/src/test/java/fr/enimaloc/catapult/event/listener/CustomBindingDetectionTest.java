@@ -357,7 +357,8 @@ class CustomBindingDetectionTest {
         GameStateService freshState = new GameStateService(channelEventPublisher);
         return new SchedulerService(mock(UserAccountRepository.class), chain, freshState, this::dispatch,
                 new SimpleMeterRegistry(), Optional.empty(), Optional.empty(), bindingService,
-                SimulationGates.none(), SiteRoles.active(), PollCadences.always());
+                SimulationGates.none(), SiteRoles.active(), PollCadences.always(),
+                org.mockito.Mockito.mock(fr.enimaloc.catapult.service.ActivityLogService.class));
     }
 
     private void dispatch(Object event) {

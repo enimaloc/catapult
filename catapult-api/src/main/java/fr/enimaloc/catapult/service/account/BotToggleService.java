@@ -17,8 +17,11 @@ import org.springframework.transaction.annotation.Transactional;
  * live per-user Twitch connection in sync with it. Every code path that changes
  * botEnabled — streamer self-toggle, admin toggle, account deletion/unlink
  * lifecycle — must go through here instead of calling
- * {@code user.setBotEnabled(...)} directly, so a disabled bot always means "no
- * open chat socket, no open stream-state subscription" and never drifts.
+ * {@code user.setBotEnabled(...)} directly, so the connections never drift.
+ * <p>
+ * A disabled bot has no open stream-state subscription but keeps its chat socket open, listening only, so that
+ * {@code @<bot> on} can be heard. Whoever must really close the chat (token dead, account deleted or unlinked)
+ * disconnects it explicitly.
  */
 @Slf4j
 @Service
@@ -34,11 +37,13 @@ public class BotToggleService {
     /**
      * Pauses the bot because its Twitch token is dead (the refresh, or the call retried after it, failed), in a
      * transaction of its own: the caller's may roll back (a Twitchat revert answers an error), and the pause must stay,
-     * as its side effects (connections closed, dashboard and Twitchat told) do.
+     * as its side effects (connections closed, dashboard and Twitchat told) do. Unlike a plain disable, the chat is
+     * closed too: a dead token cannot listen.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void pauseAfterATokenFailure(UserAccount user) {
         setBotEnabled(user, false);
+        twitchChatService.disconnect(user);
     }
 
     @Transactional
@@ -51,10 +56,12 @@ public class BotToggleService {
             return;
         }
         if (enabled) {
-            twitchChatService.connect(user);
+            // Normally still open (listening only); reconnecting a live socket would only drop events
+            if (!twitchChatService.isConnected(user)) {
+                twitchChatService.connect(user);
+            }
             twitchEventSubService.connect(user);
         } else {
-            twitchChatService.disconnect(user);
             twitchEventSubService.disconnect(user);
         }
         channelEventPublisher.botToggled(user.getId(), enabled);

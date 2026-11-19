@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GetterConfig;
 import fr.enimaloc.catapult.getter.steam.SteamGameGetter;
 import fr.enimaloc.catapult.repository.binding.GetterConfigRepository;
+import fr.enimaloc.catapult.service.emergency.EmergencyStopService;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,8 @@ import java.util.Optional;
  * Stops at the first getter that returns a result.
  * When a getter fails, moves on to the next without interrupting the cycle.
  * When a getter times out, throws {@link DetectionTimeoutException}: its silence is not a "no game".
+ * A provider under an emergency stop is not asked at all and freezes the detection the same way
+ * ({@link ProviderStoppedException}), whatever the lower-priority providers would answer.
  */
 @Slf4j
 @Service
@@ -34,6 +37,7 @@ public class GameGetterChain {
     private final Optional<AnkamaGameGetter> ankamaGameGetter;
     private final Optional<EpicGameGetter> epicGameGetter;
     private final MeterRegistry meterRegistry;
+    private final EmergencyStopService emergencyStops;
 
     public Optional<DetectedGame> resolve(UserAccount user) {
         Timer.Sample sample = Timer.start(meterRegistry);
@@ -44,6 +48,11 @@ public class GameGetterChain {
         for (GetterConfig config : configs) {
             GameGetter getter = getterByProvider.get(config.getProvider());
             if (!config.isEnabled() || getter == null) continue;
+
+            if (emergencyStops.isStopped(user, config.getProvider())) {
+                stopSample(sample, "stopped");
+                throw new ProviderStoppedException(config.getProvider());
+            }
 
             try {
                 Optional<DetectedGame> result = getter.getCurrentGame(user);

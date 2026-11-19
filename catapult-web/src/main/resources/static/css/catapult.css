@@ -2368,6 +2368,12 @@ span.box-art {
 .impersonation-banner-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .broadcast-banner-text { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; column-gap: 12px; row-gap: 2px; overflow-wrap: anywhere; }
 /* catapult-api's degraded mode (degraded.js): as the broadcast banner, folded by default; the summary is the toggle. */
+.emergency-banner { position: relative; z-index: 1; margin-top: 64px; margin-bottom: -64px; display: flex; align-items: center; gap: 12px; padding: 8px 16px; background: rgb(var(--mdui-color-error-container)); color: rgb(var(--mdui-color-on-error-container)); }
+.emergency-banner-stops { flex: 1; min-width: 0; margin: 0; padding: 0; list-style: none; overflow-wrap: anywhere; }
+.emergency-channel-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
+.emergency-channel-row span { flex: 1; min-width: 0; }
+.emergency-notice { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; padding: 8px 12px; border-radius: var(--mdui-shape-corner-medium); background: rgb(var(--mdui-color-secondary-container)); color: rgb(var(--mdui-color-on-secondary-container)); }
+.emergency-notice span { flex: 1; min-width: 0; }
 .degraded-banner { position: relative; z-index: 1; margin-top: 64px; margin-bottom: -64px; display: flex; align-items: flex-start; gap: 12px; padding: 4px 8px 4px 16px; background: rgb(var(--mdui-color-secondary-container)); color: rgb(var(--mdui-color-on-secondary-container)); }
 .degraded-banner[hidden], .degraded-banner [hidden] { display: none; }
 .degraded-banner-details { flex: 1; min-width: 0; overflow-wrap: anywhere; }
@@ -3063,3 +3069,21 @@ mdui-text-field[data-title-highlight].title-highlighted::part(input) {
 .tw-details-tw ul, .tw-details-kept-off ul { margin: 4px 0 0; padding-left: 20px; }
 .tw-details-source { margin: 2px 0; overflow-wrap: anywhere; }
 .tw-details-severity { display: block; color: var(--catapult-text-secondary); font-size: 0.875rem; }
+
+/* The admin emergency tab: a stop's row, the stop form, and the reports with their unfoldable log */
+.admin-em-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 1.5fr) auto; }
+.admin-em-stop { padding: 16px 24px; margin-bottom: 16px; }
+.admin-em-stop-fields { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.admin-em-report { padding: 12px 24px; }
+.admin-em-report + .admin-em-report { border-top: 1px solid var(--catapult-border); }
+.admin-em-report-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.admin-em-withdrawn { opacity: 0.65; }
+.admin-em-context { margin-top: 8px; }
+.admin-em-context > summary { cursor: pointer; }
+.admin-em-log { margin: 8px 0; padding-left: 0; list-style: none; font-family: monospace; font-size: 0.85rem; max-height: 20rem; overflow: auto; }
+.admin-em-log li { display: flex; gap: 8px; }
+.admin-em-log-message { overflow-wrap: anywhere; white-space: pre-wrap; }
+.admin-em-facts { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 0; }
+.admin-em-facts dt { color: var(--catapult-text-muted); }
+.admin-em-facts dd { margin: 0; overflow-wrap: anywhere; }
+@media (max-width: 720px) { .admin-em-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
