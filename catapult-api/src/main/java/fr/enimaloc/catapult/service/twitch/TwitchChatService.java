@@ -9,6 +9,11 @@ public interface TwitchChatService {
     void connect(UserAccount user);
     void disconnect(UserAccount user);
 
+    /** Whether a chat connection is currently open for the user (so that {@link #connect} can be skipped). */
+    default boolean isConnected(UserAccount user) {
+        return false;
+    }
+
     /**
      * Closes every chat connection this instance holds and keeps them from reconnecting, without looking any user
      * up: the standby uses it when the database cannot list them.

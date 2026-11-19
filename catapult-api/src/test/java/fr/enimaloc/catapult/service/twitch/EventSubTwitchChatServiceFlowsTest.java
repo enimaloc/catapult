@@ -137,14 +137,16 @@ class EventSubTwitchChatServiceFlowsTest {
     @Nested
     class Lifecycle {
         @Test
-        void init_connectsEveryActiveBotUser() {
+        void init_connectsDisabledActiveAccounts() {
             handshakesSucceed();
-            when(users.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE)).thenReturn(List.of(user));
+            user.setBotEnabled(false);
+            when(users.findByStatus(UserAccount.Status.ACTIVE)).thenReturn(List.of(user));
 
             service.init();
 
             verify(wsBuilder).buildAsync(eq(URI.create("wss://eventsub.wss.twitch.tv/ws")), any());
             assertThat(service.connectionCount()).isEqualTo(1);
+            assertThat(service.isConnected(user)).isTrue();
             assertThat(meters.find("catapult.chat.messages").tag("transport", "eventsub").counter()).isNotNull();
         }
 

@@ -115,8 +115,9 @@ public class EventSubTwitchChatService implements TwitchChatService {
             log.info("[EventSub Chat] Standby site — no connection opened");
             return;
         }
-        var users = userAccountRepository.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE);
-        log.info("[EventSub Chat] Bootstrapping connections for {} active bot-enabled user(s)", users.size());
+        // Disabled bots included: they keep listening so that they can hear `on`
+        var users = userAccountRepository.findByStatus(UserAccount.Status.ACTIVE);
+        log.info("[EventSub Chat] Bootstrapping connections for {} active user(s)", users.size());
         users.forEach(this::connect);
     }
 
@@ -149,6 +150,11 @@ public class EventSubTwitchChatService implements TwitchChatService {
                 () -> log.warn("[EventSub Chat] No Twitch token for user {} ({}) — chat events disabled",
                         user.getId(), user.getTwitchUsername())
             );
+    }
+
+    @Override
+    public boolean isConnected(UserAccount user) {
+        return connections.isOpen(user);
     }
 
     @Override

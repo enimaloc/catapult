@@ -33,7 +33,7 @@ public class SiteRoleListener {
         if (event.isActive()) {
             log.info("Site is active — reopening the Twitch intakes");
             attempt("EventSub init", null, twitchEventSubService::init);
-            for (UserAccount user : botUsers()) {
+            for (UserAccount user : activeUsers()) {
                 attempt("chat connect", user, () -> twitchChatService.connect(user));
             }
         } else {
@@ -46,6 +46,16 @@ public class SiteRoleListener {
                 attempt("chat disconnect", user, () -> twitchChatService.disconnect(user));
                 attempt("game state clear", user, () -> gameStateService.clearState(user));
             }
+        }
+    }
+
+    /** Every active account: a disabled bot keeps listening to its chat so that it can hear {@code on}. */
+    private List<UserAccount> activeUsers() {
+        try {
+            return userAccountRepository.findByStatus(UserAccount.Status.ACTIVE);
+        } catch (RuntimeException e) {
+            log.warn("Site role change: could not list the active users", e);
+            return List.of();
         }
     }
 

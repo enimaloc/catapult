@@ -78,6 +78,8 @@ class AccountServiceTest {
         assertThat(account.getStatus()).isEqualTo(UserAccount.Status.PENDING_DELETION);
         assertThat(account.getDeletionRequestedAt()).isNotNull();
         verify(botToggleService).setBotEnabled(account, false);
+        // A disabled bot keeps its chat open: a pending deletion must close it itself
+        verify(twitchChatService).disconnect(account);
     }
 
     @Test
@@ -153,6 +155,8 @@ class AccountServiceTest {
         assertThat(account.getTwitchUsername()).isNull();
         assertThat(account.getProfileImageUrl()).isNull();
         verify(botToggleService).setBotEnabled(account, false);
+        // No token left to listen with: the chat must not stay open on a disabled bot
+        verify(twitchChatService).disconnect(account);
     }
 
     @Test

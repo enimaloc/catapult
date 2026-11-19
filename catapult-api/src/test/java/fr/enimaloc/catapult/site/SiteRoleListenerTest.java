@@ -46,7 +46,8 @@ class SiteRoleListenerTest {
 
     @Test
     void active_reconnectsEventSubAndChat() {
-        when(users.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE)).thenReturn(List.of(a, b));
+        // A disabled bot keeps listening to its chat, so every active account reconnects
+        when(users.findByStatus(UserAccount.Status.ACTIVE)).thenReturn(List.of(a, b));
 
         listener.onSiteRoleChanged(new SiteRoleChangedEvent(this, true));
 
@@ -72,7 +73,7 @@ class SiteRoleListenerTest {
 
     @Test
     void active_eventSubInitFailing_stillReconnectsChat() {
-        when(users.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE)).thenReturn(List.of(a, b));
+        when(users.findByStatus(UserAccount.Status.ACTIVE)).thenReturn(List.of(a, b));
         doThrow(new IllegalStateException("boom")).when(eventSub).init();
         doThrow(new IllegalStateException("boom")).when(chat).connect(a);
 
@@ -84,7 +85,7 @@ class SiteRoleListenerTest {
 
     @Test
     void active_userLookupFailing_stillInitsEventSub() {
-        when(users.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE))
+        when(users.findByStatus(UserAccount.Status.ACTIVE))
             .thenThrow(new IllegalStateException("db down"));
 
         listener.onSiteRoleChanged(new SiteRoleChangedEvent(this, true));
