@@ -27,6 +27,14 @@ val testShard = providers.gradleProperty("testShard").orNull?.let { spec ->
     parts[0] to parts[1]
 }
 
+// The build cache (gradle.properties) is for compiled outputs: a test result read back from it would
+// hide a run under another environment, and `clean test` must still rerun the suite
+subprojects {
+    tasks.withType<Test>().configureEach {
+        outputs.doNotCacheIf("test results are never taken from the build cache") { true }
+    }
+}
+
 if (testShard != null) {
     val (index, count) = testShard
     subprojects {
