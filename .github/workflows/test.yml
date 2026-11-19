@@ -102,6 +102,7 @@ jobs:
           name: shard-${{ matrix.key }}
           path: |
             coverage/
+            */build/classes/java/main/
             */build/test-results/test/
             */build/test-results/englishConventions/
             catapult-web/build/reports/js-coverage/
@@ -137,9 +138,20 @@ jobs:
           pattern: shard-*
           path: shards
 
+      # JaCoCo reads the very classes the shards tested, which also spares compiling them again
+      - name: Restore the tested classes
+        run: |
+          for pair in catapult-common:rest catapult-api:api-1 catapult-web:web-1; do
+            module="${pair%%:*}"
+            mkdir -p "$module/build/classes/java"
+            cp -r "shards/shard-${pair#*:}/$module/build/classes/java/main" "$module/build/classes/java/"
+          done
+
       # The tests already ran in the shards: only the reports and the coverage floors run here
       - name: Merge coverage and check the floors
-        run: ./gradlew jacocoTestCoverageVerification -x test -x englishConventions -PjacocoExecDir=shards --continue
+        run: >-
+          ./gradlew jacocoTestCoverageVerification -PjacocoExecDir=shards --continue
+          -x test -x englishConventions -x compileJava -x processResources
 
       - name: Coverage summary
         if: always()
