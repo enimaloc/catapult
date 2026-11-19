@@ -265,11 +265,15 @@ class EventSubTwitchChatServiceTest {
     }
 
     private static String chatNotification(String fragmentsJson, String text, String badges) {
+        return chatNotification("broadcaster-123", fragmentsJson, text, badges);
+    }
+
+    private static String chatNotification(String broadcasterId, String fragmentsJson, String text, String badges) {
         return """
             {"metadata": {"message_type": "notification", "subscription_type": "channel.chat.message"},
-             "payload": {"event": {"chatter_user_id": "c-9", "chatter_user_login": "chatter",
+             "payload": {"event": {"broadcaster_user_id": "%s", "chatter_user_id": "c-9", "chatter_user_login": "chatter",
                "message": {"text": "%s", "fragments": %s}, "badges": [%s]}}}
-            """.formatted(text, fragmentsJson, badges);
+            """.formatted(broadcasterId, text, fragmentsJson, badges);
     }
 
     private static final String MENTION_OFF = chatNotification("""
@@ -327,5 +331,46 @@ class EventSubTwitchChatServiceTest {
         service.handleMessage(user, token, MENTION_OFF, false);
 
         verify(eventPublisher).publishEvent(any(fr.enimaloc.catapult.service.emergency.SystemMentionEvent.class));
+    }
+
+    private static final String MENTION_FRAGMENTS = """
+        [{"type": "mention", "text": "@bot", "mention": {"user_id": "sys-1"}},
+         {"type": "text", "text": " off"}]""";
+
+    private static String sharedChatMention(String broadcasterId, String sourceBroadcasterId) {
+        return chatNotification(broadcasterId, MENTION_FRAGMENTS, "@bot off", "{\"set_id\": \"mod\"}")
+            .replace("\"chatter_user_id\"", "\"source_broadcaster_user_id\": \"" + sourceBroadcasterId
+                + "\", \"chatter_user_id\"");
+    }
+
+    @Test
+    void sharedChatMention_fromAnotherChannel_isNotPublished() {
+        when(systemTwitchAccountService.getSystemTwitchId()).thenReturn("sys-1");
+
+        service.handleMessage(user, token, sharedChatMention("broadcaster-123", "other-channel"), false);
+
+        verify(eventPublisher, never())
+            .publishEvent(any(fr.enimaloc.catapult.service.emergency.SystemMentionEvent.class));
+    }
+
+    @Test
+    void sharedChatMention_fromThisChannel_isHandled() {
+        when(systemTwitchAccountService.getSystemTwitchId()).thenReturn("sys-1");
+
+        service.handleMessage(user, token, sharedChatMention("broadcaster-123", "broadcaster-123"), false);
+
+        verify(eventPublisher)
+            .publishEvent(any(fr.enimaloc.catapult.service.emergency.SystemMentionEvent.class));
+    }
+
+    @Test
+    void mention_ofAnotherBroadcaster_isNotPublished() {
+        when(systemTwitchAccountService.getSystemTwitchId()).thenReturn("sys-1");
+
+        service.handleMessage(user, token,
+            chatNotification("someone-else", MENTION_FRAGMENTS, "@bot off", "{\"set_id\": \"mod\"}"), false);
+
+        verify(eventPublisher, never())
+            .publishEvent(any(fr.enimaloc.catapult.service.emergency.SystemMentionEvent.class));
     }
 }

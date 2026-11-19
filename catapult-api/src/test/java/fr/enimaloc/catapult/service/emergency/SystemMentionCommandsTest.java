@@ -49,7 +49,7 @@ class SystemMentionCommandsTest {
     @BeforeEach
     void setUp() {
         commands = new SystemMentionCommands(users, botToggle, emergency, collector, gameState, activityLog,
-                chat, messages);
+                chat, messages, new EmergencyProperties());
         ReflectionTestUtils.setField(commands, "ownerId", "owner-1");
         UUID id = UUID.randomUUID();
         channel = new UserAccount();
@@ -189,6 +189,30 @@ class SystemMentionCommandsTest {
         verify(emergency).report(eq(fresh), eq(GetterConfig.Provider.XBOX), eq("m-1"), eq("login-m-1"),
                 eq("{}"), any(), any());
         repliedWith("bot.mention.emergency.channelStop");
+    }
+
+    @Test
+    void emergency_channelStop_givesTheDurationAndHowToResume() {
+        UserAccount system = new UserAccount();
+        system.setTwitchUsername("catapult_bot");
+        when(users.findBySystemAccountTrue()).thenReturn(Optional.of(system));
+        when(emergency.report(any(), eq(GetterConfig.Provider.XBOX), any(), any(), any(), any(), any()))
+                .thenReturn(new ReportOutcome(ReportOutcome.Kind.CHANNEL_STOP, 1, 3, Instant.now()));
+
+        commands.handle(channel, sender("m-1", SenderRole.MODERATOR), mention("emergency", "xbox"));
+
+        verify(chat).sendMessage(fresh, "bot.mention.emergency.channelStop[XBOX, 1, 3, 24, @catapult_bot]"
+                );
+    }
+
+    @Test
+    void emergency_reportFails_repliesWithAGenericError() {
+        when(emergency.report(any(), any(), any(), any(), any(), any(), any()))
+                .thenThrow(new IllegalStateException("boom"));
+
+        commands.handle(channel, sender("m-1", SenderRole.MODERATOR), mention("emergency", "steam"));
+
+        repliedWith("bot.mention.error");
     }
 
     @Test

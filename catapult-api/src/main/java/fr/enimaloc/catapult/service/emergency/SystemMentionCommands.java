@@ -47,6 +47,7 @@ public class SystemMentionCommands {
     private final ActivityLogService activityLog;
     private final TwitchChatService chat;
     private final MessageSource messages;
+    private final EmergencyProperties properties;
 
     @Value("${app.owner-id:}")
     private String ownerId;
@@ -106,13 +107,21 @@ public class SystemMentionCommands {
                     args.isEmpty() ? null : args.getFirst());
             return;
         }
-        ReportContext context = contextCollector.collect(channel);
-        ReportOutcome outcome = emergencyStopService.report(channel, provider.get(), sender.twitchId(),
-                sender.login(), context.json(), context.streamId(), context.streamStartedAt());
-        String name = provider.get().name();
+        ReportOutcome outcome;
+        try {
+            ReportContext context = contextCollector.collect(channel);
+            outcome = emergencyStopService.report(channel, provider.get(), sender.twitchId(),
+                    sender.login(), context.json(), context.streamId(), context.streamStartedAt());
+        } catch (RuntimeException e) {
+            log.error("Emergency report of {} by {} failed in the chat of {}", provider.get(), sender.login(),
+                    channel.getId(), e);
+            reply(channel, "bot.mention.error");
+            return;
+        }
+        String name = displayName(provider.get().name());
         switch (outcome.kind()) {
             case CHANNEL_STOP -> reply(channel, "bot.mention.emergency.channelStop", name, outcome.votes(),
-                    outcome.threshold());
+                    outcome.threshold(), properties.getStopDuration().toHours(), systemMention());
             case GLOBAL_STOP -> reply(channel, "bot.mention.emergency.globalStop", name, expiry(outcome.expiresAt()));
             case GLOBAL_EXTENDED -> reply(channel, "bot.mention.emergency.globalExtended", name,
                     expiry(outcome.expiresAt()));
@@ -132,7 +141,7 @@ public class SystemMentionCommands {
                 return;
             }
             int lifted = emergencyStopService.ownerResume(target, sender.login());
-            reply(channel, "bot.mention.owner.resumed", target.toUpperCase(Locale.ROOT), lifted);
+            reply(channel, "bot.mention.owner.resumed", displayName(target), lifted);
         } else {
             String target = first;
             if (target == null) {
@@ -146,7 +155,7 @@ public class SystemMentionCommands {
                 return;
             }
             emergencyStopService.ownerStop(target, sender.login());
-            reply(channel, "bot.mention.owner.stopped", target.toUpperCase(Locale.ROOT));
+            reply(channel, "bot.mention.owner.stopped", displayName(target));
         }
     }
 
@@ -157,7 +166,7 @@ public class SystemMentionCommands {
             return;
         }
         String list = active.stream()
-                .map(s -> s.getProvider() + " (" + s.getScope().name().toLowerCase(Locale.ROOT)
+                .map(s -> displayName(s.getProvider()) + " (" + s.getScope().name().toLowerCase(Locale.ROOT)
                         + (s.getExpiresAt() == null ? "" : ", " + expiry(s.getExpiresAt())) + ")")
                 .collect(Collectors.joining(", "));
         reply(channel, "bot.mention.status", list);
@@ -178,6 +187,20 @@ public class SystemMentionCommands {
 
     private static boolean isProviderOrAll(String name) {
         return ALL.equalsIgnoreCase(name) || parse(name).isPresent();
+    }
+
+    /** The provider as the store labels show it (Xbox, Battle.net...); {@code ALL} and unknown names stay as is. */
+    private String displayName(String provider) {
+        String upper = provider.toUpperCase(Locale.ROOT);
+        String label = messages.getMessage("game_info.store." + upper, null, upper, REPLY_LOCALE);
+        return label == null ? upper : label;
+    }
+
+    /** {@code @<system login>}, or a generic wording when no system account is known. */
+    private String systemMention() {
+        return userAccountRepository.findBySystemAccountTrue().map(UserAccount::getTwitchUsername)
+                .filter(login -> !login.isBlank()).map(login -> "@" + login)
+                .orElseGet(() -> messages.getMessage("bot.mention.botFallback", null, "le bot", REPLY_LOCALE));
     }
 
     private static String expiry(Instant at) {

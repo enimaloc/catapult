@@ -239,6 +239,12 @@ public class EventSubTwitchChatService implements TwitchChatService {
             Optional<SystemMention> mention = SystemMention.parse(event.path("message"),
                     systemTwitchAccountService.getSystemTwitchId());
             if (mention.isPresent()) {
+                if (!fromThisChannel(user, event)) {
+                    // Shared chat relays messages of the other channels of the session: they cannot act here
+                    log.debug("[EventSub Chat] Mention ignored in #{}: it comes from another channel",
+                            user.getTwitchUsername());
+                    return;
+                }
                 MentionSender sender = new MentionSender(senderTwitchId,
                         event.path("chatter_user_login").asText(null), role);
                 eventPublisher.publishEvent(new SystemMentionEvent(user, sender, mention.get()));
@@ -261,6 +267,12 @@ public class EventSubTwitchChatService implements TwitchChatService {
                 List.of(), ChatCommandEvent.SenderRole.VIEWERS));
             log.info("[EventSub Chat] Reward redeemed: '{}' for user {}", rewardTitle, user.getId());
         }
+    }
+
+    private static boolean fromThisChannel(UserAccount user, JsonNode event) {
+        String broadcaster = event.path("broadcaster_user_id").asText("");
+        String source = event.path("source_broadcaster_user_id").asText("");
+        return broadcaster.equals(user.getTwitchId()) && (source.isEmpty() || source.equals(broadcaster));
     }
 
     /** Read again from the database: the user a connection captured when it opened may be stale. */
