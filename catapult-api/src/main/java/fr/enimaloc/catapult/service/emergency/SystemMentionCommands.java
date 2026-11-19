@@ -136,7 +136,11 @@ public class SystemMentionCommands {
             status(channel);
         } else if ("resume".equalsIgnoreCase(first)) {
             String target = args.size() > 1 ? args.get(1) : null;
-            if (target == null || !isProviderOrAll(target)) {
+            if (target == null) {
+                reply(channel, "bot.mention.provider.required");
+                return;
+            }
+            if (!isProviderOrAll(target)) {
                 reply(channel, "bot.mention.provider.unknown", target);
                 return;
             }

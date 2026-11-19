@@ -148,6 +148,14 @@ class SystemMentionCommandsTest {
     }
 
     @Test
+    void owner_resumeWithoutTarget_asksForTheProvider() {
+        commands.handle(channel, sender("owner-1", SenderRole.VIEWERS), mention("emergency", "resume"));
+
+        repliedWith("bot.mention.provider.required");
+        verify(emergency, never()).ownerResume(any(), any());
+    }
+
+    @Test
     void owner_resume_liftsTheProvider() {
         when(emergency.ownerResume("all", "login-owner-1")).thenReturn(2);
 
