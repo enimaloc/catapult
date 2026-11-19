@@ -104,7 +104,7 @@ public class SimulatedTwitchChatService implements TwitchChatService {
                 () -> real().getStreamInfo(user), () -> {
                     SimulatedData data = registry.data(user.getId());
                     return data.live()
-                            ? Optional.of(new TwitchStreamInfo("Simulated stream", data.currentCategoryName(), 42,
+                            ? Optional.of(new TwitchStreamInfo("simulated-stream", "Simulated stream", data.currentCategoryName(), 42,
                                     Instant.now()))
                             : Optional.empty();
                 });

@@ -188,7 +188,7 @@ class EventSubTwitchChatServiceTest {
         java.time.Instant at = java.time.Instant.parse("2024-01-01T00:00:00Z");
         when(helix.followedAt(user, "fresh-token", "fan")).thenReturn(Optional.of(at));
         when(helix.followedAtById(user, "fresh-token", "42")).thenReturn(Optional.of(at));
-        TwitchStreamInfo live = new TwitchStreamInfo("t", "g", 1, at);
+        TwitchStreamInfo live = new TwitchStreamInfo("s", "t", "g", 1, at);
         when(helix.streamInfo(user, "fresh-token")).thenReturn(Optional.of(live));
         TwitchUserProfile profile = new TwitchUserProfile("Fan", at);
         when(helix.userProfile("fresh-token", "fan")).thenReturn(Optional.of(profile));

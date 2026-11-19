@@ -447,6 +447,11 @@ public class EventSubTwitchChatService implements TwitchChatService {
     }
 
     @Override
+    public Optional<String> archiveVideoId(UserAccount user, String streamId) {
+        return mapAccessToken(user, accessToken -> helix.archiveVideoId(user, accessToken, streamId));
+    }
+
+    @Override
     public Optional<TwitchUserProfile> getUserProfile(UserAccount user, String login) {
         return mapAccessToken(user, accessToken -> helix.userProfile(accessToken, login));
     }

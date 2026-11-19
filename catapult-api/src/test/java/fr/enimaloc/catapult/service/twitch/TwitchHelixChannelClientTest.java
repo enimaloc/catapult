@@ -146,15 +146,27 @@ class TwitchHelixChannelClientTest {
 
         @Test
         void streamInfo() {
-            json(STREAMS, "{\"data\": [{\"title\": \"Speedrun\", \"game_name\": \"Celeste\", \"viewer_count\": 42,"
+            json(STREAMS, "{\"data\": [{\"id\": \"s-9\", \"title\": \"Speedrun\", \"game_name\": \"Celeste\", \"viewer_count\": 42,"
                     + " \"started_at\": \"2024-05-01T10:00:00Z\"}]}");
             json(STREAMS, "{\"data\": []}");
             json(STREAMS, "{\"data\": [{\"title\": \"Broken\"}]}");
 
             assertThat(client.streamInfo(channel, "token")).contains(new TwitchStreamInfo(
-                    "Speedrun", "Celeste", 42, Instant.parse("2024-05-01T10:00:00Z")));
+                    "s-9", "Speedrun", "Celeste", 42, Instant.parse("2024-05-01T10:00:00Z")));
             assertThat(client.streamInfo(channel, "token")).isEmpty();
             assertThat(client.streamInfo(channel, "token")).isEmpty();
+        }
+
+        @Test
+        void archiveVideoId_matchesStreamId() {
+            String videos = "https://api.twitch.tv/helix/videos?user_id=b-1&type=archive&first=20";
+            json(videos, "{\"data\": [{\"id\": \"v-1\", \"stream_id\": \"s-1\"}, {\"id\": \"v-2\", \"stream_id\": \"s-2\"}]}");
+            json(videos, "{\"data\": [{\"id\": \"v-1\", \"stream_id\": \"s-1\"}]}");
+            json(videos, "{\"data\": []}");
+
+            assertThat(client.archiveVideoId(channel, "token", "s-2")).contains("v-2");
+            assertThat(client.archiveVideoId(channel, "token", "s-2")).isEmpty();
+            assertThat(client.archiveVideoId(channel, "token", "s-2")).isEmpty();
         }
 
         @Test

@@ -46,6 +46,12 @@ public class GameStateService {
         return Optional.ofNullable(lastKnownGame.get(user.getId()));
     }
 
+    /** The game the channel last stopped playing, if any since this instance started. */
+    public Optional<DetectedGame> getLastEndedGame(UserAccount user) {
+        EndedGame ended = lastEndedGame.get(user.getId());
+        return ended == null ? Optional.empty() : Optional.of(ended.game());
+    }
+
     /** Every channel's last known game, by owner id (a snapshot). */
     public Map<UUID, DetectedGame> lastKnownGames() {
         return Map.copyOf(lastKnownGame);

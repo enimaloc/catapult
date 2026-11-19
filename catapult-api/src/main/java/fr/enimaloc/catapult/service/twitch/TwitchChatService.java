@@ -22,6 +22,11 @@ public interface TwitchChatService {
     /** Empty when the streamer's own channel is currently offline. */
     Optional<TwitchStreamInfo> getStreamInfo(UserAccount user);
 
+    /** The VOD recorded from the given live stream of the streamer's own channel; empty when none (yet). */
+    default Optional<String> archiveVideoId(UserAccount user, String streamId) {
+        return Optional.empty();
+    }
+
     Optional<TwitchUserProfile> getUserProfile(UserAccount user, String login);
 
     /** Empty when {@code login} doesn't follow the streamer's channel (or lookup failed). */
