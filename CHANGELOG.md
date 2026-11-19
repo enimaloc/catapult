@@ -4,6 +4,12 @@ Toutes les versions publiées de Catapult, la plus récente en premier.
 
 Ce fichier est régénéré par le bot à chaque release à partir des notes des [GitHub Releases](https://github.com/enimaloc/catapult/releases) : pour corriger une entrée, modifie les notes de la release (ou le changelog de la PR de release avant sa publication), pas ce fichier.
 
+## [v1.6.1](https://github.com/enimaloc/catapult/releases/tag/v1.6.1) - 2026-11-19
+
+### Fixes
+- **xbox:** skip the detection pass when Xbox answers 503 (55d4474)
+- merge xbox 503 detection skip into dev (756b01e)
+
 ## [v1.6.0](https://github.com/enimaloc/catapult/releases/tag/v1.6.0) - 2026-11-18
 
 ### Features
