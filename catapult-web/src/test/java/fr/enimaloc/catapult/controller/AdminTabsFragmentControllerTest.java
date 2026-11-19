@@ -42,6 +42,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
@@ -70,7 +71,7 @@ class AdminTabsFragmentControllerTest {
         for (String url : List.of("/spa/admin/ccl", "/spa/admin/caches", "/spa/admin/caches/igdb-game-cache",
                 "/spa/admin/caches/igdb-game-cache/entry?key=1",
                 "/spa/admin/data", "/spa/admin/data/chat-command", "/spa/admin/data/chat-command/row?id=1",
-                "/spa/admin/members?q=a&page=1", "/spa/admin/members/search?q=a", "/spa/admin/meta", "/spa/admin/meta/file?id=1", "/spa/admin/links", "/spa/admin/notifications?page=1", "/spa/admin/broadcast", "/spa/admin/dtdd-mapping", "/spa/admin/game-mappings?page=1&missingPage=1", "/spa/admin/groups", "/spa/admin/whitelist", "/spa/admin/keys", "/spa/admin/tw", "/spa/admin/tw/gore", "/spa/admin/tw/gore/dtdd",
+                "/spa/admin/members?q=a&page=1", "/spa/admin/members/search?q=a", "/spa/admin/meta", "/spa/admin/meta/file?id=1", "/spa/admin/links", "/spa/admin/notifications?page=1", "/spa/admin/broadcast", "/spa/admin/dtdd-mapping", "/spa/admin/game-mappings?page=1&missingPage=1", "/spa/admin/groups", "/spa/admin/whitelist", "/spa/admin/keys", "/spa/admin/emergency?page=1", "/spa/admin/tw", "/spa/admin/tw/gore", "/spa/admin/tw/gore/dtdd",
                 "/spa/admin/members", "/spa/admin/members/00000000-0000-0000-0000-000000000001",
                 "/spa/admin/experiments", "/spa/admin/experiments/00000000-0000-0000-0000-000000000001",
                 "/spa/admin/experiments/00000000-0000-0000-0000-000000000001/participants?variant=&q=x&page=1")) {
@@ -96,6 +97,8 @@ class AdminTabsFragmentControllerTest {
         verify(apiService, never()).adminWhitelist();
         verify(apiService, never()).adminApiKeys(org.mockito.ArgumentMatchers.any());
         verify(apiService, never()).adminTws();
+        verify(apiService, never()).adminEmergencyStops(anyBoolean());
+        verify(apiService, never()).adminEmergencyReports(anyInt());
         verify(apiService, never()).adminMinecraftAccounts();
         verify(apiService, never()).adminAnkamaAccounts();
         verify(apiService, never()).adminEpicAccounts();

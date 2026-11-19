@@ -2119,6 +2119,30 @@ public class MockApiService implements ApiService {
         return NO_CONTENT;
     }
 
+    @Override
+    public List<fr.enimaloc.catapult.common.dto.emergency.EmergencyStopDto> adminEmergencyStops(boolean active) {
+        log.trace("adminEmergencyStops({})", active);
+        return emergency.stops(active);
+    }
+
+    @Override
+    public List<fr.enimaloc.catapult.common.dto.emergency.EmergencyReportDto> adminEmergencyReports(int page) {
+        log.trace("adminEmergencyReports({})", page);
+        return emergency.reports(page);
+    }
+
+    @Override
+    public int adminEmergencyStop(String provider) {
+        log.trace("adminEmergencyStop({})", provider);
+        return emergency.ownerStop(provider);
+    }
+
+    @Override
+    public int adminEmergencyResume(String provider) {
+        log.trace("adminEmergencyResume({})", provider);
+        return emergency.ownerResume(provider);
+    }
+
     /** The mock's catapult-api is always up. */
     @Override
     public boolean apiAvailable() {

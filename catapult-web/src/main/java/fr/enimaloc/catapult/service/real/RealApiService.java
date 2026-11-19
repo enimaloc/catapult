@@ -186,6 +186,8 @@ public class RealApiService implements ApiService {
     private static final ParameterizedTypeReference<List<TwDefinitionDto>> TWS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<fr.enimaloc.catapult.common.dto.chatcommand.EnabledChatCommandDto>> ENABLED_COMMANDS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<GroupSummaryDto>> GROUPS = new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<List<fr.enimaloc.catapult.common.dto.emergency.EmergencyStopDto>> EMERGENCY_STOPS = new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<List<fr.enimaloc.catapult.common.dto.emergency.EmergencyReportDto>> EMERGENCY_REPORTS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<LearnedRateLimitDto>> RATE_LIMITS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<ExperimentSummaryDto>> EXPERIMENTS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<FlagKeyDto>> FLAG_KEYS = new ParameterizedTypeReference<>() {};
@@ -1726,6 +1728,26 @@ public class RealApiService implements ApiService {
     public int resumeChannelEmergency(String username) {
         return onChannel(username, id -> client.postVoid("/api/internal/users/{userId}/emergency/resume", null, id),
                 status -> status);
+    }
+
+    @Override
+    public List<fr.enimaloc.catapult.common.dto.emergency.EmergencyStopDto> adminEmergencyStops(boolean active) {
+        return client.get("/api/internal/admin/emergency/stops?active={active}", EMERGENCY_STOPS, active);
+    }
+
+    @Override
+    public List<fr.enimaloc.catapult.common.dto.emergency.EmergencyReportDto> adminEmergencyReports(int page) {
+        return client.get("/api/internal/admin/emergency/reports?page={page}", EMERGENCY_REPORTS, page);
+    }
+
+    @Override
+    public int adminEmergencyStop(String provider) {
+        return client.postVoid("/api/internal/admin/emergency/stops", java.util.Map.of("provider", provider));
+    }
+
+    @Override
+    public int adminEmergencyResume(String provider) {
+        return client.delete("/api/internal/admin/emergency/stops?provider={provider}", provider);
     }
 
     @Override

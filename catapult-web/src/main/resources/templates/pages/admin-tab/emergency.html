@@ -1,0 +1,167 @@
+<!--/*@thymesVar id="stops" type="java.util.List<fr.enimaloc.catapult.common.dto.emergency.EmergencyStopDto>"*/-->
+<!--/*@thymesVar id="history" type="java.util.List<fr.enimaloc.catapult.common.dto.emergency.EmergencyStopDto>"*/-->
+<!--/*@thymesVar id="reports" type="java.util.List<fr.enimaloc.catapult.common.dto.emergency.EmergencyReportDto>"*/-->
+<!--/*@thymesVar id="contexts" type="java.util.Map<java.util.UUID,fr.enimaloc.catapult.controller.AdminEmergencyContext>"*/-->
+<!--/*
+  The provider emergency stops: the active ones (resumed, or a provider cut by the owner), the reports behind them,
+  paged (admin-tabs.js pages [data-admin-results]) with their VOD link and, unfolded, the context catapult-api
+  collected, then the history. Driven by admin-emergency.js. What viewers influenced (the log, game names, the
+  category, the logins) is only ever printed with th:text, never as markup.
+*/-->
+<div th:fragment="content" class="admin-view admin-emergency"
+     th:attr="data-confirm-text=#{admin.confirm},data-cancel-text=#{admin.cancel},data-error=#{admin.error.generic},
+              data-error-400=#{admin.emergency.error.400},
+              data-lift-confirm=#{admin.emergency.lift.confirm},data-lift-description=#{admin.emergency.lift.description},
+              data-stop-confirm=#{admin.emergency.stop.confirm},data-stop-description=#{admin.emergency.stop.description},
+              data-lifted=#{admin.emergency.lifted},data-stopped=#{admin.emergency.stopped}">
+    <div class="section-header">
+        <h2 th:text="#{admin.tab.emergency}">Emergency</h2>
+    </div>
+    <p class="admin-cell-muted" th:text="#{admin.emergency.hint}">hint</p>
+
+    <!--/* Active stops */-->
+    <h3 th:text="#{admin.emergency.stops.title}">Active stops</h3>
+    <th:block th:if="${stops == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
+    <th:block th:if="${stops != null and stops.isEmpty()}">
+        <th:block th:replace="~{pages/admin-tab/common :: empty('check_circle', #{admin.emergency.stops.none})}"></th:block>
+    </th:block>
+    <mdui-card class="admin-table" variant="outlined" th:if="${stops != null and !stops.isEmpty()}">
+        <div class="admin-row admin-em-row admin-row-head" aria-hidden="true">
+            <span th:text="#{admin.emergency.column.provider}">Provider</span>
+            <span th:text="#{admin.emergency.column.scope}">Scope</span>
+            <span th:text="#{admin.emergency.column.origin}">Origin</span>
+            <span th:text="#{admin.emergency.column.expires}">Expires</span>
+            <span></span>
+        </div>
+        <div class="admin-row admin-em-row" th:each="s : ${stops}" th:attr="data-provider=${s.provider()}">
+            <span class="admin-cell" th:attr="data-label=#{admin.emergency.column.provider}"
+                  th:text="#{|emergency.provider.${s.provider()}|}">Xbox</span>
+            <span class="admin-cell" th:attr="data-label=#{admin.emergency.column.scope}">
+                <th:block th:text="#{|admin.emergency.scope.${s.scope()}|}">scope</th:block>
+                <span class="admin-cell-muted" th:if="${s.channelLogin() != null}"
+                      th:text="#{admin.emergency.channel(${s.channelLogin()})}">channel</span>
+            </span>
+            <span class="admin-cell" th:attr="data-label=#{admin.emergency.column.origin}"
+                  th:text="#{|admin.emergency.origin.${s.origin()}|}">origin</span>
+            <span class="admin-cell" th:attr="data-label=#{admin.emergency.column.expires}"
+                  th:text="${s.expiresAt() == null} ? #{admin.emergency.expires.never}
+                      : ${#temporals.format(s.expiresAt(), #messages.msg('format.datetime'))}">date</span>
+            <span class="admin-cell admin-row-actions">
+                <mdui-button variant="tonal" class="admin-em-lift" th:if="${s.scope() == 'GLOBAL'}"
+                             th:attr="data-provider=${s.provider()}" th:text="#{admin.emergency.lift}">Resume</mdui-button>
+            </span>
+        </div>
+    </mdui-card>
+
+    <!--/* Stop a provider */-->
+    <mdui-card class="settings-card admin-em-stop" variant="outlined">
+        <h3 th:text="#{admin.emergency.stop.title}">Stop a provider</h3>
+        <div class="admin-em-stop-fields">
+            <mdui-select name="provider" variant="outlined" value="STEAM" th:attr="label=#{admin.emergency.stop.provider}">
+                <mdui-menu-item th:each="p : ${ {'STEAM', 'XBOX', 'BATTLENET', 'MINECRAFT', 'ANKAMA', 'EPIC', 'ALL'} }"
+                                th:value="${p}" th:text="#{|emergency.provider.${p}|}">Steam</mdui-menu-item>
+            </mdui-select>
+            <mdui-button variant="filled" class="admin-em-stop-button" th:text="#{admin.emergency.stop.button}">Stop</mdui-button>
+        </div>
+    </mdui-card>
+
+    <!--/* Reports, paged */-->
+    <h3 th:text="#{admin.emergency.reports.title}">Reports</h3>
+    <th:block th:if="${reports == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
+    <div data-admin-results th:if="${reports != null}">
+        <th:block th:if="${reports.isEmpty()}">
+            <th:block th:replace="~{pages/admin-tab/common :: empty('flag', #{admin.emergency.reports.none})}"></th:block>
+        </th:block>
+        <mdui-card class="admin-table admin-em-reports" variant="outlined" th:unless="${reports.isEmpty()}">
+            <div class="admin-em-report" th:each="r : ${reports}" th:with="ctx=${contexts.get(r.id())}"
+                 th:classappend="${r.withdrawn()} ? 'admin-em-withdrawn'">
+                <div class="admin-em-report-head">
+                    <strong th:text="#{|emergency.provider.${r.provider()}|}">Xbox</strong>
+                    <span th:text="#{admin.emergency.report.channel(${r.channelLogin()})}">channel</span>
+                    <span class="admin-cell-muted" th:text="#{admin.emergency.report.by(${r.reportedByLogin()})}">by</span>
+                    <time class="admin-cell-muted" th:attr="datetime=${r.createdAt()}"
+                          th:text="${#temporals.format(r.createdAt(), #messages.msg('format.datetime'))}">date</time>
+                    <mdui-chip class="admin-em-withdrawn-chip" th:if="${r.withdrawn()}"
+                               th:text="#{admin.emergency.report.withdrawn}">withdrawn</mdui-chip>
+                    <!--/* A link only to a plain https address; catapult-api builds it, never a viewer */-->
+                    <a class="admin-em-vod" th:if="${r.vodUrl() != null and #strings.startsWith(r.vodUrl(), 'https://')}"
+                       th:href="${r.vodUrl()}" target="_blank" rel="noopener noreferrer"
+                       th:text="#{admin.emergency.vod}">VOD</a>
+                    <span class="admin-cell-muted admin-em-vod-offline"
+                          th:if="${(r.vodUrl() == null or !#strings.startsWith(r.vodUrl(), 'https://')) and ctx != null and !ctx.live()}"
+                          th:text="#{admin.emergency.vod.offline}">Not live</span>
+                    <span class="admin-cell-muted admin-em-vod-unavailable"
+                          th:if="${(r.vodUrl() == null or !#strings.startsWith(r.vodUrl(), 'https://')) and (ctx == null or ctx.live())}"
+                          th:text="#{admin.emergency.vod.unavailable}">VOD unavailable</span>
+                </div>
+                <details class="admin-em-context">
+                    <summary th:text="#{admin.emergency.logs}">Logs and context</summary>
+                    <p class="admin-cell-muted admin-em-context-unavailable" th:if="${ctx == null}"
+                       th:text="#{admin.emergency.context.unavailable}">Context unavailable.</p>
+                    <th:block th:if="${ctx != null}">
+                        <p class="admin-cell-muted" th:if="${ctx.log().isEmpty()}"
+                           th:text="#{admin.emergency.context.log.none}">No log line.</p>
+                        <ol class="admin-em-log" th:unless="${ctx.log().isEmpty()}">
+                            <li th:each="line : ${ctx.log()}">
+                                <time th:text="${line.at() != null} ? ${#temporals.format(line.at(), 'HH:mm:ss')} : ${line.rawAt()}">12:00:00</time>
+                                <span class="admin-em-log-level" th:text="${line.level()}">INFO</span>
+                                <span class="admin-em-log-message" th:text="${line.message()}">message</span>
+                            </li>
+                        </ol>
+                        <dl class="admin-em-facts">
+                            <dt th:text="#{admin.emergency.context.last_game}">Last game</dt>
+                            <dd th:text="${ctx.lastGame() == null} ? #{admin.emergency.context.none}
+                                : |${ctx.lastGame().name()} (${ctx.lastGame().provider()} ${ctx.lastGame().sourceId()})|">game</dd>
+                            <dt th:text="#{admin.emergency.context.last_ended_game}">Last ended game</dt>
+                            <dd th:text="${ctx.lastEndedGame() == null} ? #{admin.emergency.context.none}
+                                : |${ctx.lastEndedGame().name()} (${ctx.lastEndedGame().provider()} ${ctx.lastEndedGame().sourceId()})|">game</dd>
+                            <dt th:text="#{admin.emergency.context.category}">Twitch category</dt>
+                            <dd th:text="${ctx.twitchCategory() == null} ? #{admin.emergency.context.none} : ${ctx.twitchCategory()}">category</dd>
+                            <dt th:text="#{admin.emergency.context.live}">Live</dt>
+                            <dd th:text="${ctx.live()} ? #{admin.emergency.context.live.yes} : #{admin.emergency.context.live.no}">yes</dd>
+                        </dl>
+                    </th:block>
+                </details>
+            </div>
+        </mdui-card>
+        <div class="admin-pagination" th:if="${page > 0 or hasNext}">
+            <mdui-button-icon icon="chevron_left" th:disabled="${page == 0}"
+                              th:attr="data-admin-page=${page - 1},aria-label=#{admin.pagination.previous}"></mdui-button-icon>
+            <span th:text="${page + 1}">1</span>
+            <mdui-button-icon icon="chevron_right" th:disabled="${!hasNext}"
+                              th:attr="data-admin-page=${page + 1},aria-label=#{admin.pagination.next}"></mdui-button-icon>
+        </div>
+    </div>
+
+    <!--/* History */-->
+    <h3 th:text="#{admin.emergency.history.title}">History</h3>
+    <th:block th:if="${history == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
+    <th:block th:if="${history != null and history.isEmpty()}">
+        <th:block th:replace="~{pages/admin-tab/common :: empty('history', #{admin.emergency.history.none})}"></th:block>
+    </th:block>
+    <mdui-card class="admin-table" variant="outlined" th:if="${history != null and !history.isEmpty()}">
+        <div class="admin-row admin-em-row admin-row-head" aria-hidden="true">
+            <span th:text="#{admin.emergency.column.provider}">Provider</span>
+            <span th:text="#{admin.emergency.column.scope}">Scope</span>
+            <span th:text="#{admin.emergency.column.origin}">Origin</span>
+            <span th:text="#{admin.emergency.column.lifted}">Lifted</span>
+        </div>
+        <div class="admin-row admin-em-row admin-em-history-row" th:each="s : ${history}">
+            <span class="admin-cell" th:text="#{|emergency.provider.${s.provider()}|}">Xbox</span>
+            <span class="admin-cell">
+                <th:block th:text="#{|admin.emergency.scope.${s.scope()}|}">scope</th:block>
+                <span class="admin-cell-muted" th:if="${s.channelLogin() != null}"
+                      th:text="#{admin.emergency.channel(${s.channelLogin()})}">channel</span>
+            </span>
+            <span class="admin-cell" th:text="#{|admin.emergency.origin.${s.origin()}|}">origin</span>
+            <span class="admin-cell"
+                  th:text="${s.liftedAt() != null}
+                      ? #{admin.emergency.lifted.by(${s.liftedBy()}, ${#temporals.format(s.liftedAt(), #messages.msg('format.datetime'))})}
+                      : #{admin.emergency.lifted.expired} + ' · ' + ${#temporals.format(s.expiresAt(), #messages.msg('format.datetime'))}">lifted</span>
+        </div>
+    </mdui-card>
+
+    <!--/* Settings: the web admin has no config tab to link to */-->
+    <h3 th:text="#{admin.emergency.settings.title}">Settings</h3>
+    <p class="admin-cell-muted" th:text="#{admin.emergency.settings.hint}">hint</p>
+</div>
