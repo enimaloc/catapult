@@ -59,6 +59,11 @@ configure(subprojects.filter { it.name in coverageFloors }) {
         tasks.withType<Test>().configureEach {
             // Gradle's default test heap (512 MB) overflows once the suite has cached its Spring contexts
             maxHeapSize = "1g"
+        }
+
+        // The report reads the `test` task's data only: tying it to every Test task made running
+        // englishConventions alone (a CI shard) run the whole suite as well
+        tasks.named("test") {
             finalizedBy("jacocoTestReport")
         }
 
@@ -74,7 +79,7 @@ configure(subprojects.filter { it.name in coverageFloors }) {
         }
 
         tasks.named<JacocoReport>("jacocoTestReport") {
-            dependsOn(tasks.withType<Test>())
+            dependsOn(tasks.named("test"))
             reports {
                 xml.required = true
                 html.required = true
