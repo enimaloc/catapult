@@ -14,8 +14,21 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  test:
+  # The suite runs as parallel shards (-PtestShard, root build.gradle.kts); together they run every
+  # verification task `check` does: the modules' tests, englishConventions and jsTest
+  shard:
+    name: shard (${{ matrix.key }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { key: api-1, tasks: ':catapult-api:test -PtestShard=0/3' }
+          - { key: api-2, tasks: ':catapult-api:test -PtestShard=1/3' }
+          - { key: api-3, tasks: ':catapult-api:test -PtestShard=2/3' }
+          - { key: web-1, tasks: ':catapult-web:test -PtestShard=0/2' }
+          - { key: web-2, tasks: ':catapult-web:test -PtestShard=1/2' }
+          - { key: rest, tasks: ':catapult-common:test :catapult-bgs:test :catapult-api:englishConventions :catapult-web:jsTest' }
 
     services:
       postgres:
@@ -35,14 +48,16 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Set up JDK 21
+      - name: Set up JDK 25
         uses: actions/setup-java@v6
         with:
           java-version: '25'
           distribution: 'temurin'
-          cache: 'gradle'
 
-      # catapult-web's `check` also runs the browser-script suite (jsTest: npm ci + Vitest)
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      # catapult-web's tests install the browser-script toolchain (npm ci), jsTest runs Vitest
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -50,11 +65,9 @@ jobs:
           cache: 'npm'
           cache-dependency-path: catapult-web/package-lock.json
 
-      # `check` = unit tests + JaCoCo report + the per-module coverage floor (root build.gradle.kts)
-      # for catapult-common, catapult-api and catapult-web, plus jsTest; --continue reports every
-      # failing module rather than stopping at the first
-      - name: Run tests and coverage checks
-        run: ./gradlew check --continue
+      # --continue reports every failing module rather than stopping at the first
+      - name: Run tests
+        run: ./gradlew ${{ matrix.tasks }} --continue
         env:
           DB_URL: jdbc:postgresql://localhost:5432/catapult_test
           DB_USERNAME: catapult
@@ -68,6 +81,65 @@ jobs:
           STEAM_CLIENT_SECRET: test
           IGDB_CLIENT_ID: test
           JWT_SECRET: ${{ secrets.TEST_JWT_SECRET }}
+
+      # Every shard's coverage is named test.exec: renamed per shard so the final job can merge them
+      - name: Collect coverage data
+        if: always()
+        run: |
+          for exec in */build/jacoco/test.exec; do
+            [ -f "$exec" ] || continue
+            module="${exec%%/*}"
+            mkdir -p "coverage/$module"
+            cp "$exec" "coverage/$module/test-${{ matrix.key }}.exec"
+          done
+
+      - name: Upload shard results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: shard-${{ matrix.key }}
+          path: |
+            coverage/
+            */build/test-results/test/
+            */build/test-results/englishConventions/
+            catapult-web/build/reports/js-coverage/
+          if-no-files-found: ignore
+          retention-days: 1
+
+  # The required check: fails when any shard did, then merges the shards' coverage and applies each
+  # module's floor (root build.gradle.kts) for catapult-common, catapult-api and catapult-web
+  test:
+    name: test
+    needs: shard
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the shards
+        if: needs.shard.result != 'success'
+        run: |
+          echo "At least one test shard did not succeed (result: ${{ needs.shard.result }})"
+          exit 1
+
+      - uses: actions/checkout@v7
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v6
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Download shard results
+        uses: actions/download-artifact@v8
+        with:
+          pattern: shard-*
+          path: shards
+
+      # The tests already ran in the shards: only the reports and the coverage floors run here
+      - name: Merge coverage and check the floors
+        run: ./gradlew jacocoTestCoverageVerification -x test -x englishConventions -PjacocoExecDir=shards --continue
 
       - name: Coverage summary
         if: always()
@@ -87,6 +159,6 @@ jobs:
           name: test-results
           path: |
             */build/reports/jacoco/
-            */build/test-results/test/
-            catapult-web/build/reports/js-coverage/
+            shards/*/*/build/test-results/
+            shards/*/catapult-web/build/reports/js-coverage/
           retention-days: 7
