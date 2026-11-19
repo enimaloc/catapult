@@ -7,9 +7,13 @@ document.addEventListener("catapult:render", function () {
         CatapultChannel.postJson(event.currentTarget.dataset.recheckUrl, {}));
 
     // The channel's own emergency stops are lifted by catapult-api; the page is re-rendered to show it.
-    document.querySelectorAll(".channel-emergency-resume").forEach(button =>
+    document.querySelectorAll(".channel-emergency-resume").forEach(button => {
+        // The event fires on each render: a button that survived one must not get a second listener
+        if (button.dataset.bound) return;
+        button.dataset.bound = "true";
         button.addEventListener("click", async () => {
             const response = await CatapultChannel.postJson(button.dataset.resumeUrl, {});
             if (response.ok) CatapultChannel.refresh();
-        }));
+        });
+    });
 });
