@@ -30,9 +30,11 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -167,14 +169,84 @@ class EmergencyStopServiceTest {
     }
 
     @Test
-    void report_duringGlobalStop_extendsIt() {
+    void report_duringGlobalStop_extendsItOnceQuorumIsReachedAgain() {
         ProviderEmergencyStop global = stop("XBOX", Scope.GLOBAL, null, Origin.THRESHOLD, NOW.plusSeconds(60));
+        report(channel(), "a");
+        report(channel(), "b");
 
-        ReportOutcome outcome = report(channel(), "a");
+        ReportOutcome outcome = report(channel(), "c");
 
         assertThat(outcome.kind()).isEqualTo(ReportOutcome.Kind.GLOBAL_EXTENDED);
         assertThat(global.getExpiresAt()).isEqualTo(NOW.plus(Duration.ofHours(24)));
         assertThat(outcome.expiresAt()).isEqualTo(NOW.plus(Duration.ofHours(24)));
+    }
+
+    @Test
+    void report_singleReportDuringGlobalStop_doesNotExtend() {
+        Instant expiry = NOW.plusSeconds(60);
+        ProviderEmergencyStop global = stop("XBOX", Scope.GLOBAL, null, Origin.THRESHOLD, expiry);
+
+        ReportOutcome outcome = report(channel(), "a");
+
+        assertThat(outcome.kind()).isEqualTo(ReportOutcome.Kind.GLOBAL_ACTIVE);
+        assertThat(outcome.expiresAt()).isEqualTo(expiry);
+        assertThat(global.getExpiresAt()).isEqualTo(expiry);
+        assertThat(savedReports).hasSize(1);
+        assertThat(savedStops).filteredOn(s -> s.getScope() == Scope.CHANNEL).hasSize(1);
+        verify(adminEvents, never()).emergencyStopChanged(any());
+    }
+
+    @Test
+    void report_oneModeratorOnThreeChannelsPlusTwoOnOne_staysLocal() {
+        UserAccount a = channel();
+        report(a, "x");
+        report(channel(), "x");
+        report(channel(), "x");
+        report(a, "y");
+        ReportOutcome outcome = report(a, "z");
+
+        assertThat(outcome.kind()).isEqualTo(ReportOutcome.Kind.CHANNEL_STOP);
+        assertThat(outcome.votes()).isEqualTo(2);
+    }
+
+    @Test
+    void report_threeAuthorsCoveringThreeChannelsThroughReroutedMatching_stopsGlobally() {
+        UserAccount a = channel();
+        UserAccount b = channel();
+        UserAccount c = channel();
+        report(a, "x");
+        report(b, "x");
+        report(a, "y");
+        report(b, "z");
+        ReportOutcome outcome = report(c, "z");
+
+        assertThat(outcome.kind()).isEqualTo(ReportOutcome.Kind.GLOBAL_STOP);
+        assertThat(outcome.votes()).isEqualTo(3);
+    }
+
+    @Test
+    void report_ownerAndThresholdStops_ownerStopWinsAndIsNotExtended() {
+        stop("XBOX", Scope.GLOBAL, null, Origin.THRESHOLD, NOW.plusSeconds(60));
+        ProviderEmergencyStop owner = stop("XBOX", Scope.GLOBAL, null, Origin.OWNER, null);
+        report(channel(), "a");
+        report(channel(), "b");
+
+        ReportOutcome outcome = report(channel(), "c");
+
+        assertThat(outcome.kind()).isEqualTo(ReportOutcome.Kind.GLOBAL_ACTIVE);
+        assertThat(outcome.expiresAt()).isNull();
+        assertThat(owner.getExpiresAt()).isNull();
+        verify(adminEvents, never()).emergencyStopChanged(any());
+    }
+
+    @Test
+    void isStopped_cacheInvalidatedByOwnerStop() {
+        UserAccount c = channel();
+        assertThat(service.isStopped(c, XBOX)).isFalse();
+
+        service.ownerStop("xbox", "owner");
+
+        assertThat(service.isStopped(c, XBOX)).isTrue();
     }
 
     @Test
@@ -183,9 +255,10 @@ class EmergencyStopServiceTest {
 
         ReportOutcome outcome = report(channel(), "a");
 
-        assertThat(outcome.kind()).isEqualTo(ReportOutcome.Kind.GLOBAL_EXTENDED);
+        assertThat(outcome.kind()).isEqualTo(ReportOutcome.Kind.GLOBAL_ACTIVE);
         assertThat(global.getExpiresAt()).isNull();
         assertThat(outcome.expiresAt()).isNull();
+        verify(adminEvents, never()).emergencyStopChanged(any());
     }
 
     @Test
@@ -210,7 +283,7 @@ class EmergencyStopServiceTest {
         beforeFindActive = () -> {
             ready.countDown();
             try {
-                go.await();
+                go.await(5, TimeUnit.SECONDS);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
@@ -220,16 +293,16 @@ class EmergencyStopServiceTest {
             Future<ReportOutcome> first = pool.submit(() -> report(channel(), "c"));
             Future<ReportOutcome> second = pool.submit(() -> report(channel(), "d"));
             // Without the lock both threads reach findActive together; with it only one does.
-            ready.await(300, java.util.concurrent.TimeUnit.MILLISECONDS);
+            ready.await(300, TimeUnit.MILLISECONDS);
             go.countDown();
-            List<ReportOutcome.Kind> kinds = new ArrayList<>(List.of(first.get().kind(), second.get().kind()));
+            List<ReportOutcome.Kind> kinds = new ArrayList<>(List.of(first.get(5, TimeUnit.SECONDS).kind(), second.get(5, TimeUnit.SECONDS).kind()));
             assertThat(kinds).containsExactlyInAnyOrder(
                     ReportOutcome.Kind.GLOBAL_STOP, ReportOutcome.Kind.GLOBAL_EXTENDED);
         } finally {
             pool.shutdownNow();
         }
         ArgumentCaptor<ProviderEmergencyStop> saved = ArgumentCaptor.forClass(ProviderEmergencyStop.class);
-        verify(stopRepository, org.mockito.Mockito.atLeastOnce()).save(saved.capture());
+        verify(stopRepository, atLeastOnce()).save(saved.capture());
         assertThat(saved.getAllValues().stream().filter(s -> s.getScope() == Scope.GLOBAL).distinct())
                 .hasSize(1);
         assertThat(savedStops).filteredOn(s -> s.getScope() == Scope.GLOBAL).hasSize(1);

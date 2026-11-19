@@ -14,17 +14,20 @@ import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionOperations;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 /**
  * Decides provider emergency stops: a report stops the provider on the reporting channel at once,
@@ -55,8 +58,9 @@ public class EmergencyStopService {
     public EmergencyStopService(EmergencyReportRepository reports, ProviderEmergencyStopRepository stops,
                                 GetterConfigRepository getterConfigs, AdminEventPublisher adminEvents,
                                 MeterRegistry meters, EmergencyProperties properties,
-                                TransactionOperations tx) {
-        this(reports, stops, getterConfigs, adminEvents, meters, properties, tx, Clock.systemUTC());
+                                PlatformTransactionManager transactionManager) {
+        this(reports, stops, getterConfigs, adminEvents, meters, properties,
+                requiresNew(transactionManager), Clock.systemUTC());
     }
 
     EmergencyStopService(EmergencyReportRepository reports, ProviderEmergencyStopRepository stops,
@@ -73,6 +77,12 @@ public class EmergencyStopService {
         this.clock = clock;
     }
 
+    private static TransactionOperations requiresNew(PlatformTransactionManager transactionManager) {
+        TransactionTemplate template = new TransactionTemplate(transactionManager);
+        template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        return template;
+    }
+
     /** Whether the provider is stopped for the channel, by an {@code ALL} or provider stop, global or local. */
     public boolean isStopped(UserAccount channel, GetterConfig.Provider provider) {
         return cachedActive().stream().anyMatch(s -> covers(s, channel, provider));
@@ -81,6 +91,12 @@ public class EmergencyStopService {
     /**
      * Records a report. The vote counting and the global decision run under a per-provider lock,
      * outside the transaction that writes them, so a second report sees the first one committed.
+     * That transaction is always a new one (REQUIRES_NEW), so the commit still happens before the
+     * lock is released even when the caller is already inside a transaction.
+     * <p>
+     * Votes are the size of a maximum matching of authors to channels, so one author on several
+     * channels counts once. While a global stop is active it is extended only when that quorum is
+     * reached again; a lone report leaves it untouched ({@code GLOBAL_ACTIVE}).
      */
     public ReportOutcome report(UserAccount channel, GetterConfig.Provider provider, String reporterTwitchId,
                                 String reporterLogin, String contextJson, String streamId,
@@ -138,23 +154,24 @@ public class EmergencyStopService {
             since = lastLift;
         }
         List<EmergencyReport> counting = reports.findCounting(provider, since);
-        int channels = counting.stream().map(r -> r.getChannel().getId()).collect(Collectors.toSet()).size();
-        int authors = counting.stream().map(EmergencyReport::getReportedByTwitchId)
-                .collect(Collectors.toSet()).size();
-        int votes = Math.min(channels, authors);
+        int votes = VoteMatching.maxMatching(counting);
+        boolean quorum = votes >= threshold;
 
+        // An owner stop (no expiry) comes first: it is reported as such and never extended.
         ProviderEmergencyStop global = active.stream()
                 .filter(s -> s.getScope() == Scope.GLOBAL && providerName.equals(s.getProvider()))
-                .findFirst().orElse(null);
+                .min(Comparator.comparing(s -> s.getExpiresAt() != null))
+                .orElse(null);
         if (global != null) {
-            if (global.getExpiresAt() != null) {
+            if (global.getExpiresAt() != null && quorum) {
                 global.setExpiresAt(newExpiry);
                 stops.save(global);
+                announce("extended", global);
+                return new ReportOutcome(ReportOutcome.Kind.GLOBAL_EXTENDED, votes, threshold, newExpiry);
             }
-            announce("extended", global);
-            return new ReportOutcome(ReportOutcome.Kind.GLOBAL_EXTENDED, votes, threshold, global.getExpiresAt());
+            return new ReportOutcome(ReportOutcome.Kind.GLOBAL_ACTIVE, votes, threshold, global.getExpiresAt());
         }
-        if (votes >= threshold) {
+        if (quorum) {
             ProviderEmergencyStop created = newStop(providerName, Scope.GLOBAL, null, Origin.THRESHOLD,
                     now, newExpiry);
             stops.save(created);
