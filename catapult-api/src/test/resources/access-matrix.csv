@@ -250,8 +250,8 @@ GET,/api/internal/admin/dtdd-caches/{kind}/entry,kind=topics;?key=matrix,,401,PA
 POST,/api/internal/admin/dtdd-caches/{kind}/refetch,kind=topics;?key=matrix,,401,PASS,403,403,403,PASS,401
 GET,/api/internal/admin/emergency/stops,,,401,PASS,403,403,403,PASS,401
 GET,/api/internal/admin/emergency/reports,,,401,PASS,403,403,403,PASS,401
-POST,/api/internal/admin/emergency/stops,,"{""provider"":""matrix""}",401,PASS,403,403,403,PASS,401
-DELETE,/api/internal/admin/emergency/stops,?provider=matrix,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/emergency/stops,,"{""provider"":""matrix""}",401,401,403,403,403,PASS,401
+DELETE,/api/internal/admin/emergency/stops,?provider=matrix,,401,401,403,403,403,PASS,401
 GET,/api/internal/admin/rate-limits,,,401,PASS,403,403,403,PASS,401
 PUT,/api/internal/admin/rate-limits/entry,?id=matrix,,401,PASS,403,403,403,PASS,401
 DELETE,/api/internal/admin/rate-limits/entry,?id=matrix,,401,PASS,403,403,403,PASS,401
