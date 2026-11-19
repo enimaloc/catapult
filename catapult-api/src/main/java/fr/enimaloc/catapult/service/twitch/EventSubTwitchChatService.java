@@ -12,6 +12,9 @@ import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.debug.DebugContext;
 import fr.enimaloc.catapult.service.debug.DebugRecording;
+import fr.enimaloc.catapult.service.emergency.MentionSender;
+import fr.enimaloc.catapult.service.emergency.SystemMention;
+import fr.enimaloc.catapult.service.emergency.SystemMentionEvent;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
 import fr.enimaloc.catapult.simulation.SimulatedCalls;
 import fr.enimaloc.catapult.simulation.SimulationGate;
@@ -229,24 +232,41 @@ public class EventSubTwitchChatService implements TwitchChatService {
         if ("channel.chat.message".equals(subscriptionType)) {
             String text = event.path("message").path("text").asText();
             meterRegistry.counter("catapult.chat.messages", "transport", "eventsub").increment();
-            if (!text.startsWith("!")) return;
+            ChatCommandEvent.SenderRole role = extractRole(event);
+            String senderTwitchId = event.path("chatter_user_id").asText(null);
+
+            // A mention of the system account is answered even by a disabled bot, which only hears `on`
+            Optional<SystemMention> mention = SystemMention.parse(event.path("message"),
+                    systemTwitchAccountService.getSystemTwitchId());
+            if (mention.isPresent()) {
+                MentionSender sender = new MentionSender(senderTwitchId,
+                        event.path("chatter_user_login").asText(null), role);
+                eventPublisher.publishEvent(new SystemMentionEvent(user, sender, mention.get()));
+                return;
+            }
+            if (!text.startsWith("!") || !isBotEnabled(user)) return;
 
             String[] parts = text.substring(1).split(" ", 2);
             String command = "!" + parts[0];
             List<String> args = parts.length > 1 ? List.of(parts[1].split(" ")) : List.of();
-            ChatCommandEvent.SenderRole role = extractRole(event);
-            String senderTwitchId = event.path("chatter_user_id").asText(null);
 
             log.info("[EventSub Chat] {} in #{}: {} (sender role={})",
                     command, user.getTwitchUsername(), text, role);
             eventPublisher.publishEvent(new ChatCommandEvent(this, user, command, args, role, senderTwitchId));
 
         } else if ("channel.channel_points_custom_reward_redemption.add".equals(subscriptionType)) {
+            if (!isBotEnabled(user)) return;
             String rewardTitle = event.path("reward").path("title").asText();
             eventPublisher.publishEvent(new ChatCommandEvent(this, user, "reward:" + rewardTitle,
                 List.of(), ChatCommandEvent.SenderRole.VIEWERS));
             log.info("[EventSub Chat] Reward redeemed: '{}' for user {}", rewardTitle, user.getId());
         }
+    }
+
+    /** Read again from the database: the user a connection captured when it opened may be stale. */
+    private boolean isBotEnabled(UserAccount user) {
+        return userAccountRepository.findById(user.getId()).map(UserAccount::isBotEnabled)
+                .orElse(user.isBotEnabled());
     }
 
     /**

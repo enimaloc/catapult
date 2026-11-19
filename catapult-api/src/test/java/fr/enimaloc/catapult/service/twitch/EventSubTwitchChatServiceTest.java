@@ -263,4 +263,69 @@ class EventSubTwitchChatServiceTest {
         assertThat(sockets).doesNotContainKey(user.getId());
         assertThat((java.util.Set<UUID>) connectionState("intentionallyDisconnected")).contains(user.getId());
     }
+
+    private static String chatNotification(String fragmentsJson, String text, String badges) {
+        return """
+            {"metadata": {"message_type": "notification", "subscription_type": "channel.chat.message"},
+             "payload": {"event": {"chatter_user_id": "c-9", "chatter_user_login": "chatter",
+               "message": {"text": "%s", "fragments": %s}, "badges": [%s]}}}
+            """.formatted(text, fragmentsJson, badges);
+    }
+
+    private static final String MENTION_OFF = chatNotification("""
+        [{"type": "mention", "text": "@bot", "mention": {"user_id": "sys-1"}},
+         {"type": "text", "text": " off"}]""", "@bot off", "{\"set_id\": \"mod\"}");
+
+    @Test
+    void mentionMessage_goesToSystemMentionCommands() {
+        when(systemTwitchAccountService.getSystemTwitchId()).thenReturn("sys-1");
+
+        service.handleMessage(user, token, MENTION_OFF, false);
+
+        var captor = org.mockito.ArgumentCaptor.forClass(
+            fr.enimaloc.catapult.service.emergency.SystemMentionEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        var event = captor.getValue();
+        assertThat(event.channel()).isSameAs(user);
+        assertThat(event.mention().command()).isEqualTo("off");
+        assertThat(event.sender().twitchId()).isEqualTo("c-9");
+        assertThat(event.sender().login()).isEqualTo("chatter");
+        assertThat(event.sender().role()).isEqualTo(fr.enimaloc.catapult.chat.ChatCommandEvent.SenderRole.MODERATOR);
+        verify(eventPublisher, never()).publishEvent(any(fr.enimaloc.catapult.chat.ChatCommandEvent.class));
+    }
+
+    @Test
+    void bangCommand_stillPublishesNothingAnswered() {
+        when(systemTwitchAccountService.getSystemTwitchId()).thenReturn("sys-1");
+
+        service.handleMessage(user, token, chatNotification(
+            "[{\"type\": \"text\", \"text\": \"!debug\"}]", "!debug", ""), false);
+
+        // The retired command system still hears it as an event nobody consumes, and no mention is raised
+        verify(eventPublisher).publishEvent(any(fr.enimaloc.catapult.chat.ChatCommandEvent.class));
+        verify(eventPublisher, never())
+            .publishEvent(any(fr.enimaloc.catapult.service.emergency.SystemMentionEvent.class));
+    }
+
+    @Test
+    void disabledBot_readFromDatabase_publishesNeitherBangNorRewardNorMention_butStillHearsAMention() {
+        when(systemTwitchAccountService.getSystemTwitchId()).thenReturn("sys-1");
+        UserAccount stored = new UserAccount();
+        stored.setId(user.getId());
+        stored.setBotEnabled(false);
+        when(userAccountRepository.findById(user.getId())).thenReturn(Optional.of(stored));
+
+        service.handleMessage(user, token, chatNotification(
+            "[{\"type\": \"text\", \"text\": \"!debug\"}]", "!debug", ""), false);
+        service.handleMessage(user, token, """
+            {"metadata": {"message_type": "notification",
+                          "subscription_type": "channel.channel_points_custom_reward_redemption.add"},
+             "payload": {"event": {"reward": {"title": "Hydrate"}}}}""", false);
+
+        verify(eventPublisher, never()).publishEvent(any(fr.enimaloc.catapult.chat.ChatCommandEvent.class));
+
+        service.handleMessage(user, token, MENTION_OFF, false);
+
+        verify(eventPublisher).publishEvent(any(fr.enimaloc.catapult.service.emergency.SystemMentionEvent.class));
+    }
 }
