@@ -13,9 +13,27 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+permissions:
+  contents: read
+
 jobs:
-  test:
+  # The suite runs as parallel shards (-PtestShard, root build.gradle.kts); together they run every
+  # verification task `check` does: the modules' tests, englishConventions and jsTest
+  shard:
+    name: shard (${{ matrix.key }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { key: api-1, tasks: ':catapult-api:test -PtestShard=0/5' }
+          - { key: api-2, tasks: ':catapult-api:test -PtestShard=1/5' }
+          - { key: api-3, tasks: ':catapult-api:test -PtestShard=2/5' }
+          - { key: api-4, tasks: ':catapult-api:test -PtestShard=3/5' }
+          - { key: api-5, tasks: ':catapult-api:test -PtestShard=4/5' }
+          - { key: web-1, tasks: ':catapult-web:test -PtestShard=0/2' }
+          - { key: web-2, tasks: ':catapult-web:test -PtestShard=1/2' }
+          - { key: rest, tasks: ':catapult-common:test :catapult-bgs:test :catapult-api:englishConventions :catapult-web:jsTest' }
 
     services:
       postgres:
@@ -35,14 +53,14 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Set up JDK 21
+      - name: Set up JDK 25
         uses: actions/setup-java@v6
         with:
           java-version: '25'
           distribution: 'temurin'
           cache: 'gradle'
 
-      # catapult-web's `check` also runs the browser-script suite (jsTest: npm ci + Vitest)
+      # catapult-web's tests install the browser-script toolchain (npm ci), jsTest runs Vitest
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -50,11 +68,9 @@ jobs:
           cache: 'npm'
           cache-dependency-path: catapult-web/package-lock.json
 
-      # `check` = unit tests + JaCoCo report + the per-module coverage floor (root build.gradle.kts)
-      # for catapult-common, catapult-api and catapult-web, plus jsTest; --continue reports every
-      # failing module rather than stopping at the first
-      - name: Run tests and coverage checks
-        run: ./gradlew check --continue
+      # --continue reports every failing module rather than stopping at the first
+      - name: Run tests
+        run: ./gradlew ${{ matrix.tasks }} --continue
         env:
           DB_URL: jdbc:postgresql://localhost:5432/catapult_test
           DB_USERNAME: catapult
@@ -69,16 +85,98 @@ jobs:
           IGDB_CLIENT_ID: test
           JWT_SECRET: ${{ secrets.TEST_JWT_SECRET }}
 
+      # Every shard's coverage is named test.exec: renamed per shard so the final job can merge them
+      - name: Collect coverage data
+        if: always()
+        run: |
+          for exec in */build/jacoco/test.exec; do
+            [ -f "$exec" ] || continue
+            module="${exec%%/*}"
+            mkdir -p "coverage/$module"
+            cp "$exec" "coverage/$module/test-${{ matrix.key }}.exec"
+          done
+
+      - name: Upload shard results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: shard-${{ matrix.key }}
+          path: |
+            coverage/
+            */build/classes/java/main/
+            */build/test-results/test/
+            */build/test-results/englishConventions/
+            catapult-web/build/reports/js-coverage/
+          if-no-files-found: ignore
+          retention-days: 1
+
+  # The required check: fails when any shard did, then merges the shards' coverage and applies each
+  # module's floor (root build.gradle.kts) for catapult-common, catapult-api and catapult-web
+  test:
+    name: test
+    needs: shard
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the shards
+        if: needs.shard.result != 'success'
+        run: |
+          echo "At least one test shard did not succeed (result: ${{ needs.shard.result }})"
+          exit 1
+
+      - uses: actions/checkout@v7
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v6
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Download shard results
+        uses: actions/download-artifact@v8
+        with:
+          pattern: shard-*
+          path: shards
+
+      # A module added to settings.gradle.kts must get a shard: otherwise its tests would never run
+      - name: Check every module was tested
+        run: |
+          modules=$(grep -o 'include([^)]*)' settings.gradle.kts | grep -o '"[^"]*"' | tr -d '"')
+          for module in $modules; do
+            compgen -G "shards/*/$module/build/test-results/test/*.xml" > /dev/null \
+              || { echo "::error::No shard ran the tests of $module"; exit 1; }
+          done
+
+      # JaCoCo reads the very classes the shards tested, which also spares compiling them again. A
+      # module without coverage data would have its floor skipped, so its absence fails the job.
+      - name: Restore the tested classes
+        run: |
+          for pair in catapult-common:rest catapult-api:api-1 catapult-web:web-1; do
+            module="${pair%%:*}"
+            compgen -G "shards/*/coverage/$module/*.exec" > /dev/null \
+              || { echo "::error::No coverage data for $module"; exit 1; }
+            mkdir -p "$module/build/classes/java"
+            cp -r "shards/shard-${pair#*:}/$module/build/classes/java/main" "$module/build/classes/java/"
+          done
+
+      # The tests already ran in the shards: only the reports and the coverage floors run here
+      - name: Merge coverage and check the floors
+        run: >-
+          ./gradlew jacocoTestCoverageVerification -PjacocoExecDir=shards --continue
+          -x test -x englishConventions -x compileJava -x processResources
+
       - name: Coverage summary
         if: always()
         run: |
           for module in catapult-common catapult-api catapult-web; do
             report="$module/build/reports/jacoco/test/jacocoTestReport.xml"
-            [ -f "$report" ] || { echo "$module: no coverage report" >> "$GITHUB_STEP_SUMMARY"; continue; }
+            [ -f "$report" ] || { echo "$module: no coverage report" >> "$GITHUB_STEP_SUMMARY"; failed=1; continue; }
             grep -o '<counter type="LINE"[^>]*>' "$report" | tail -1 | \
             awk -v m="$module" '{for(i=1;i<=NF;i++){if($i~/^missed=/){split($i,a,"\"");mi=a[2]} if($i~/^covered=/){split($i,a,"\"");c=a[2]}}}
                  END{printf "%s line coverage: %.1f%%\n", m, c/(mi+c)*100}' >> "$GITHUB_STEP_SUMMARY"
           done
+          exit "${failed:-0}"
 
       - name: Upload test results
         if: always()
@@ -87,6 +185,6 @@ jobs:
           name: test-results
           path: |
             */build/reports/jacoco/
-            */build/test-results/test/
-            catapult-web/build/reports/js-coverage/
+            shards/*/*/build/test-results/
+            shards/*/catapult-web/build/reports/js-coverage/
           retention-days: 7
