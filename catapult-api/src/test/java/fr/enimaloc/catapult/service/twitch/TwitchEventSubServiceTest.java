@@ -784,7 +784,7 @@ class TwitchEventSubServiceTest {
     }
 
     @Test
-    void currentCategory_withoutCategoryOnTheChannel_isEmpty() {
+    void currentCategory_withoutCategoryOnTheChannel_isKnownEmpty() {
         service.handleMessage(user, token, """
             {
               "metadata": { "message_type": "notification", "subscription_type": "channel.update" },
@@ -792,7 +792,8 @@ class TwitchEventSubServiceTest {
             }
             """, false);
 
-        assertThat(service.currentCategory(user.getId())).isEmpty();
+        assertThat(service.currentCategory(user.getId()))
+            .contains(new TwitchEventSubService.CurrentCategory("", ""));
     }
 
     @Test

@@ -13,19 +13,27 @@ import fr.enimaloc.catapult.service.twitch.TwitchEventSubService.CurrentCategory
 import fr.enimaloc.catapult.site.SiteRole;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import fr.enimaloc.catapult.domain.stream.StreamCategorySegment;
 import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -38,8 +46,20 @@ class SessionTimelineListenerTest {
     private final TwitchEventSubService eventSub = mock(TwitchEventSubService.class);
     private final GameStateService gameState = mock(GameStateService.class);
     private final SiteRole siteRole = mock(SiteRole.class);
-    private final SessionTimelineListener listener = new SessionTimelineListener(
-            timeline, eventSub, gameState, siteRole, Clock.fixed(NOW, ZoneOffset.UTC));
+    /** Runs the Helix read inline unless a test needs a real background thread. */
+    private SessionTimelineListener listener = listener(Runnable::run);
+
+    private SessionTimelineListener listener(java.util.concurrent.Executor executor) {
+        return new SessionTimelineListener(timeline, eventSub, gameState, siteRole, Clock.fixed(NOW, ZoneOffset.UTC),
+                executor);
+    }
+
+    private static StreamCategorySegment running(String categoryId) {
+        StreamCategorySegment segment = new StreamCategorySegment();
+        segment.setCategoryId(categoryId);
+        segment.setStartedAt(NOW);
+        return segment;
+    }
 
     private UserAccount user;
 
@@ -70,10 +90,59 @@ class SessionTimelineListenerTest {
         when(eventSub.currentCategory(user.getId())).thenReturn(Optional.empty());
         when(eventSub.fetchCurrentCategory(user)).thenReturn(Optional.of(new CurrentCategory("2", "Just Chatting")));
         when(gameState.getLastKnownGame(user)).thenReturn(Optional.empty());
+        when(timeline.currentSession(user)).thenReturn(List.of(running(null)));
 
         listener.onStreamOnline(new StreamOnlineEvent(this, user));
 
-        verify(timeline).observe(user, "2", "Just Chatting", null, NOW);
+        verify(timeline).observe(user, null, null, null, NOW);
+        verify(timeline).observeCategory(user, "2", "Just Chatting", NOW);
+    }
+
+    @Test
+    void streamOnlineDoesNotWaitForHelix() throws InterruptedException {
+        ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
+        listener = listener(executor);
+        CountDownLatch helixAnswers = new CountDownLatch(1);
+        when(eventSub.currentCategory(user.getId())).thenReturn(Optional.empty());
+        when(eventSub.fetchCurrentCategory(user)).thenAnswer(invocation -> {
+            helixAnswers.await(5, TimeUnit.SECONDS);
+            return Optional.of(new CurrentCategory("2", "Just Chatting"));
+        });
+        when(gameState.getLastKnownGame(user)).thenReturn(Optional.of(game("Factorio")));
+        when(timeline.currentSession(user)).thenReturn(List.of(running(null)));
+
+        listener.onStreamOnline(new StreamOnlineEvent(this, user));
+
+        verify(timeline).observe(user, null, null, "Factorio", NOW);
+        verify(timeline, never()).observeCategory(any(), any(), any(), any());
+        helixAnswers.countDown();
+        verify(timeline, timeout(5000)).observeCategory(user, "2", "Just Chatting", NOW);
+        executor.shutdown();
+        assertThat(executor.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
+    }
+
+    @Test
+    void helixAnswerDoesNotOverrideACategoryAlreadyKnown() {
+        when(eventSub.currentCategory(user.getId())).thenReturn(Optional.empty());
+        when(eventSub.fetchCurrentCategory(user)).thenReturn(Optional.of(new CurrentCategory("2", "Just Chatting")));
+        when(gameState.getLastKnownGame(user)).thenReturn(Optional.empty());
+        // A channel.update got there first
+        when(timeline.currentSession(user)).thenReturn(List.of(running("3")));
+
+        listener.onStreamOnline(new StreamOnlineEvent(this, user));
+
+        verify(timeline, never()).observeCategory(any(), any(), any(), any());
+    }
+
+    @Test
+    void emptyCategoryReadsNoHelix() {
+        when(eventSub.currentCategory(user.getId())).thenReturn(Optional.of(new CurrentCategory("", "")));
+        when(gameState.getLastKnownGame(user)).thenReturn(Optional.empty());
+
+        listener.onStreamOnline(new StreamOnlineEvent(this, user));
+
+        verify(timeline).observe(user, null, null, null, NOW);
+        verify(eventSub, never()).fetchCurrentCategory(any());
     }
 
     @Test
@@ -82,9 +151,10 @@ class SessionTimelineListenerTest {
         when(eventSub.fetchCurrentCategory(user)).thenThrow(new IllegalStateException("Helix down"));
         when(gameState.getLastKnownGame(user)).thenReturn(Optional.of(game("MOLTYN")));
 
-        listener.onStreamOnline(new StreamOnlineEvent(this, user));
+        assertThatNoException().isThrownBy(() -> listener.onStreamOnline(new StreamOnlineEvent(this, user)));
 
         verify(timeline).observe(user, null, null, "MOLTYN", NOW);
+        verify(timeline, never()).observeCategory(any(), any(), any(), any());
     }
 
     @Test
@@ -133,10 +203,17 @@ class SessionTimelineListenerTest {
         doThrow(new DataIntegrityViolationException("two running periods"))
                 .when(timeline).observeGame(any(), any(), any());
         doThrow(new IllegalStateException("database down")).when(timeline).closeOpen(any(), any());
+        when(eventSub.currentCategory(user.getId())).thenReturn(Optional.of(new CurrentCategory("1", "Factorio")));
+        doThrow(new DataIntegrityViolationException("two running periods"))
+                .when(timeline).observe(any(), any(), any(), any(), any());
 
         assertThatNoException().isThrownBy(() -> {
             listener.onGameDetected(new GameDetectedEvent(this, user, game("Factorio"), false));
             listener.onStreamOffline(new StreamOfflineEvent(this, user));
+            listener.onStreamOnline(new StreamOnlineEvent(this, user));
         });
+
+        when(gameState.getLastKnownGame(user)).thenThrow(new IllegalStateException("no game state"));
+        assertThatNoException().isThrownBy(() -> listener.onStreamOnline(new StreamOnlineEvent(this, user)));
     }
 }

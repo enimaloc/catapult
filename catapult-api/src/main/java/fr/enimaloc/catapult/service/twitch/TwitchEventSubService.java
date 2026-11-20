@@ -116,11 +116,11 @@ public class TwitchEventSubService implements EventSubService {
 
     /**
      * The category last seen on the member's channel (the Helix read at connect, then each {@code channel.update});
-     * empty when none is known yet or the channel has no category.
+     * empty when none is known yet. A channel known to have no category answers a blank id.
      */
     public Optional<CurrentCategory> currentCategory(UUID userId) {
         ChannelState state = channelStates.get(userId);
-        if (state == null || state.categoryId() == null || state.categoryId().isBlank()) {
+        if (state == null) {
             return Optional.empty();
         }
         return Optional.of(new CurrentCategory(state.categoryId(), state.categoryName()));

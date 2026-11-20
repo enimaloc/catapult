@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.service.stream;
 
 import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.stream.StreamCategorySegment;
 import fr.enimaloc.catapult.event.ChannelCategoryChangedEvent;
 import fr.enimaloc.catapult.event.GameDetectedEvent;
 import fr.enimaloc.catapult.event.NoGameDetectedEvent;
@@ -17,14 +18,19 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 import java.time.Clock;
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
 /**
  * Feeds the session timeline from the stream and detection events: the start of a live opens a period on the
  * channel's category and the last detected game, each category or game change moves to a new pair, and the end of
  * the live closes the running period. Only the active site writes; a failure is logged, never thrown to the
- * publisher.
+ * publisher. The events arrive on the EventSub receive thread, so nothing here waits on Twitch: a category EventSub
+ * does not know yet is read from Helix in the background.
  */
 @Slf4j
 @Component
@@ -35,29 +41,42 @@ public class SessionTimelineListener {
     private final GameStateService gameState;
     private final SiteRole siteRole;
     private final Clock clock;
+    /** Runs the Helix reads, off the EventSub receive thread. */
+    private final Executor helixReads;
 
     @Autowired
     public SessionTimelineListener(SessionTimelineService timeline, TwitchEventSubService eventSub,
                                    GameStateService gameState, SiteRole siteRole) {
-        this(timeline, eventSub, gameState, siteRole, Clock.systemUTC());
+        this(timeline, eventSub, gameState, siteRole, Clock.systemUTC(),
+                Executors.newThreadPerTaskExecutor(Thread.ofVirtual().name("timeline-category-", 0).factory()));
     }
 
     SessionTimelineListener(SessionTimelineService timeline, TwitchEventSubService eventSub,
-                            GameStateService gameState, SiteRole siteRole, Clock clock) {
+                            GameStateService gameState, SiteRole siteRole, Clock clock, Executor helixReads) {
         this.timeline = timeline;
         this.eventSub = eventSub;
         this.gameState = gameState;
         this.siteRole = siteRole;
         this.clock = clock;
+        this.helixReads = helixReads;
     }
 
+    /**
+     * Opens the first period at once, on the category EventSub knows (none when the channel has none). When EventSub
+     * knows nothing yet, the period opens with an unknown category and Helix is read in the background.
+     */
     @EventListener
     public void onStreamOnline(StreamOnlineEvent event) {
         record(event.getUser(), "stream start", user -> {
-            Optional<CurrentCategory> category = initialCategory(user);
+            Instant start = clock.instant();
+            Optional<CurrentCategory> known = eventSub.currentCategory(user.getId());
+            CurrentCategory category = known.filter(c -> c.id() != null && !c.id().isBlank()).orElse(null);
             String gameName = gameState.getLastKnownGame(user).map(DetectedGame::getSourceName).orElse(null);
-            timeline.observe(user, category.map(CurrentCategory::id).orElse(null),
-                    category.map(CurrentCategory::name).orElse(null), gameName, clock.instant());
+            timeline.observe(user, category == null ? null : category.id(),
+                    category == null ? null : category.name(), gameName, start);
+            if (known.isEmpty()) {
+                helixReads.execute(() -> fillCategoryFromHelix(user, start));
+            }
         });
     }
 
@@ -84,20 +103,26 @@ public class SessionTimelineListener {
     }
 
     /**
-     * The category EventSub knows, else a Helix read; unknown (empty) when both fail, so the period still opens and
-     * takes the category at the first change.
+     * Reads the channel's category from Helix and gives it to the period opened at {@code start}, in place, unless
+     * the running period already has a category (a {@code channel.update} got there first).
      */
-    private Optional<CurrentCategory> initialCategory(UserAccount user) {
-        Optional<CurrentCategory> known = eventSub.currentCategory(user.getId());
-        if (known.isPresent()) {
-            return known;
-        }
+    private void fillCategoryFromHelix(UserAccount user, Instant start) {
         try {
-            return eventSub.fetchCurrentCategory(user);
+            Optional<CurrentCategory> category = eventSub.fetchCurrentCategory(user)
+                    .filter(c -> c.id() != null && !c.id().isBlank());
+            if (category.isEmpty() || !runningCategoryUnknown(user)) {
+                return;
+            }
+            timeline.observeCategory(user, category.get().id(), category.get().name(), start);
         } catch (RuntimeException e) {
-            log.warn("Could not read the category of user {} at the stream start: {}", user.getId(), e.getMessage());
-            return Optional.empty();
+            log.warn("Could not read the category of user {} at the stream start", user.getId(), e);
         }
+    }
+
+    private boolean runningCategoryUnknown(UserAccount user) {
+        List<StreamCategorySegment> segments = timeline.currentSession(user);
+        return !segments.isEmpty() && segments.getLast().getEndedAt() == null
+                && segments.getLast().getCategoryId() == null;
     }
 
     private void record(UserAccount user, String cause, Consumer<UserAccount> action) {
@@ -107,7 +132,7 @@ public class SessionTimelineListener {
         try {
             action.accept(user);
         } catch (RuntimeException e) {
-            log.warn("Could not record the {} in the timeline of user {}: {}", cause, user.getId(), e.getMessage());
+            log.warn("Could not record the {} in the timeline of user {}", cause, user.getId(), e);
         }
     }
 }
