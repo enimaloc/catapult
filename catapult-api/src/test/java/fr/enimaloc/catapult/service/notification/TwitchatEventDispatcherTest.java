@@ -9,6 +9,7 @@ import fr.enimaloc.catapult.domain.twitchat.TwitchatEventAction;
 import fr.enimaloc.catapult.domain.twitchat.TwitchatWidgetSettings;
 import fr.enimaloc.catapult.domain.stream.StreamCategorySegment;
 import fr.enimaloc.catapult.event.NoGameDetectedEvent;
+import fr.enimaloc.catapult.service.dryrun.DryRunRegistry;
 import fr.enimaloc.catapult.service.stream.SessionRecap;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.service.binding.GameBindingLookup;
@@ -57,6 +58,7 @@ class TwitchatEventDispatcherTest {
     @Mock ChannelEventPublisher channelEventPublisher;
     @Mock GameStateService gameStateService;
     @Mock GameBindingLookup gameBindingLookup;
+    @Mock DryRunRegistry dryRunRegistry;
 
     TwitchatEventDispatcher dispatcher;
     UserAccount user;
@@ -65,7 +67,8 @@ class TwitchatEventDispatcherTest {
     @BeforeEach
     void setUp() {
         dispatcher = new TwitchatEventDispatcher(widgetSettingsService, actionTokenService, eventActionService,
-                channelEventPublisher, gameStateService, gameBindingLookup);
+                channelEventPublisher, gameStateService, gameBindingLookup,
+                dryRunRegistry);
         ReflectionTestUtils.setField(dispatcher, "publicWebUrl", "https://catapult.test/");
         user = new UserAccount();
         user.setId(UUID.randomUUID());
@@ -112,6 +115,58 @@ class TwitchatEventDispatcherTest {
         assertThat(chat.get("message")).isEqualTo("Hades -> Celeste");
         assertThat(chat.get("actions")).isEqualTo(List.of(Map.of("label", "Revert",
                 "url", "https://catapult.test/widget/twitchat/action/" + token)));
+    }
+
+    private static final String BUTTON_MESSAGE =
+            "{\"message\":\"{{gameName}}\",\"actions\":[{\"label\":\"Revert\",\"url\":\"{{action:REVERT_CATEGORY}}\"}]}";
+
+    @Test
+    void dryRunPrefixesTheMessage() {
+        when(dryRunRegistry.isActive(user.getId())).thenReturn(true);
+        when(eventActionService.enabledActions(user, CATEGORY_CHANGED_BY_CATAPULT)).thenReturn(List.of(
+                row("CUSTOM_CHAT_MESSAGE", "{\"message\":\"{{gameName}}\"}")));
+
+        dispatcher.onCategoryChangedByCatapult(user, "g2", "Celeste", "g1", "Hades");
+
+        assertThat(published().payloads().getFirst().data().get("message")).isEqualTo("[dry run] Celeste");
+    }
+
+    @Test
+    void dryRunRendersNoAction() {
+        when(dryRunRegistry.isActive(user.getId())).thenReturn(true);
+        when(eventActionService.enabledActions(user, CATEGORY_CHANGED_BY_CATAPULT)).thenReturn(List.of(
+                row("CUSTOM_CHAT_MESSAGE", BUTTON_MESSAGE)));
+
+        dispatcher.onCategoryChangedByCatapult(user, "g2", "Celeste", "g1", "Hades");
+
+        assertThat(published().payloads().getFirst().data().get("actions")).isEqualTo(List.of());
+        verifyNoInteractions(actionTokenService);
+    }
+
+    @Test
+    void noDryRunUnchanged() {
+        when(dryRunRegistry.isActive(user.getId())).thenReturn(false);
+        UUID token = UUID.randomUUID();
+        when(actionTokenService.generate(eq(user.getId()), eq(TwitchatActionType.REVERT_CATEGORY), any())).thenReturn(token);
+        when(eventActionService.enabledActions(user, CATEGORY_CHANGED_BY_CATAPULT)).thenReturn(List.of(
+                row("CUSTOM_CHAT_MESSAGE", BUTTON_MESSAGE)));
+
+        dispatcher.onCategoryChangedByCatapult(user, "g2", "Celeste", "g1", "Hades");
+
+        Map<String, Object> chat = published().payloads().getFirst().data();
+        assertThat(chat.get("message")).isEqualTo("Celeste");
+        assertThat((List<?>) chat.get("actions")).hasSize(1);
+    }
+
+    @Test
+    void prefixIsNotDoubled() {
+        when(dryRunRegistry.isActive(user.getId())).thenReturn(true);
+        when(eventActionService.enabledActions(user, CATEGORY_CHANGED_BY_CATAPULT)).thenReturn(List.of(
+                row("CUSTOM_CHAT_MESSAGE", "{\"message\":\"[dry run] {{gameName}}\"}")));
+
+        dispatcher.onCategoryChangedByCatapult(user, "g2", "Celeste", "g1", "Hades");
+
+        assertThat(published().payloads().getFirst().data().get("message")).isEqualTo("[dry run] Celeste");
     }
 
     @Test

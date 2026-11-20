@@ -14,6 +14,7 @@ import fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType;
 import fr.enimaloc.catapult.event.NoGameDetectedEvent;
 import fr.enimaloc.catapult.service.binding.GameBindingLookup;
 import fr.enimaloc.catapult.service.binding.GameStateService;
+import fr.enimaloc.catapult.service.dryrun.DryRunRegistry;
 import fr.enimaloc.catapult.service.stream.SessionRecap;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -52,12 +53,15 @@ public class TwitchatEventDispatcher {
     private static final Map<String, String> TEST_RAID = Map.of("raider", "Raideur de test",
             "games", "- Factorio (Factorio) (2h30)\n- Just Chatting (1h)", "sessionDuration", "3h30");
 
+    private static final String DRY_RUN_PREFIX = "[dry run] ";
+
     private final TwitchatWidgetSettingsService widgetSettingsService;
     private final TwitchatActionTokenService actionTokenService;
     private final TwitchatEventActionService eventActionService;
     private final ChannelEventPublisher channelEventPublisher;
     private final GameStateService gameStateService;
     private final GameBindingLookup gameBindingLookup;
+    private final DryRunRegistry dryRunRegistry;
 
     @Value("${app.web-url:http://localhost:8080}")
     private String publicWebUrl;
@@ -67,13 +71,15 @@ public class TwitchatEventDispatcher {
                                    TwitchatEventActionService eventActionService,
                                    ChannelEventPublisher channelEventPublisher,
                                    GameStateService gameStateService,
-                                   GameBindingLookup gameBindingLookup) {
+                                   GameBindingLookup gameBindingLookup,
+                                   DryRunRegistry dryRunRegistry) {
         this.widgetSettingsService = widgetSettingsService;
         this.actionTokenService = actionTokenService;
         this.eventActionService = eventActionService;
         this.channelEventPublisher = channelEventPublisher;
         this.gameStateService = gameStateService;
         this.gameBindingLookup = gameBindingLookup;
+        this.dryRunRegistry = dryRunRegistry;
     }
 
     public void onCategoryChangedByCatapult(UserAccount user, String newGameId, String newGameName,
@@ -179,8 +185,12 @@ public class TwitchatEventDispatcher {
         if (rows.isEmpty()) {
             return false;
         }
-        TwitchatPayloadRenderer renderer = new TwitchatPayloadRenderer(variables(user, eventVariables), applicable.keySet(),
-                action -> actionTokenService.generate(user.getId(), action, applicable.get(action)).toString());
+        // A member in dry run gets no Catapult action (nothing to click that would act for real) and
+        // every message marked as one.
+        boolean dryRun = dryRunRegistry.isActive(user.getId());
+        Map<TwitchatActionType, Map<String, String>> offered = dryRun ? Map.of() : applicable;
+        TwitchatPayloadRenderer renderer = new TwitchatPayloadRenderer(variables(user, eventVariables), offered.keySet(),
+                action -> actionTokenService.generate(user.getId(), action, offered.get(action)).toString());
         List<TwitchatPayload> rendered = new ArrayList<>();
         for (TwitchatEventAction row : rows) {
             // A stored row that no longer parses (saved before a check existed, edited in the
@@ -197,6 +207,9 @@ public class TwitchatEventDispatcher {
         }
         if (type == NOTIFICATION) {
             rendered.replaceAll(TwitchatEventDispatcher::withoutTrailingSpace);
+        }
+        if (dryRun) {
+            rendered.replaceAll(TwitchatEventDispatcher::withDryRunPrefix);
         }
         return publish(user, type, rendered);
     }
@@ -227,6 +240,18 @@ public class TwitchatEventDispatcher {
         }
         Map<String, Object> data = new LinkedHashMap<>(payload.data());
         data.put("message", message.stripTrailing());
+        return new TwitchatPayload(payload.action(), data);
+    }
+
+    /** A chat message's text marked as a dry run's, once. */
+    private static TwitchatPayload withDryRunPrefix(TwitchatPayload payload) {
+        if (!TwitchatPayloadRenderer.CHAT_MESSAGE.equals(payload.action())
+                || !(payload.data().get("message") instanceof String message)
+                || message.startsWith(DRY_RUN_PREFIX.stripTrailing())) {
+            return payload;
+        }
+        Map<String, Object> data = new LinkedHashMap<>(payload.data());
+        data.put("message", DRY_RUN_PREFIX + message);
         return new TwitchatPayload(payload.action(), data);
     }
 
