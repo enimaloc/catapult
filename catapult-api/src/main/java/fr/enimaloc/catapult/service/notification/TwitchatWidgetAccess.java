@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.service.notification;
 import fr.enimaloc.catapult.common.dto.channel.ConfigResponse;
 import fr.enimaloc.catapult.common.dto.notification.NotificationFlushResultDto;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetAccessResponse;
+import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.twitchat.TwitchatWidgetSettings;
 import fr.enimaloc.catapult.repository.twitchat.TwitchatWidgetSettingsRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
@@ -42,6 +43,13 @@ public class TwitchatWidgetAccess {
                 .map(s -> new ConfigResponse(s.getObsHost(), s.getObsPort(),
                         s.getObsPasswordEncrypted() == null ? null : tokenEncryptionService.decrypt(s.getObsPasswordEncrypted()),
                         s.getTwitchatBranch()));
+    }
+
+    /** The id of the widget's owner, for what the widget sends on their behalf; empty while it is disabled. */
+    public Optional<UUID> owner(UUID uuid) {
+        return widgetTokenService.resolve(uuid)
+                .filter(owner -> widgetSettingsRepository.findById(owner.getId()).map(TwitchatWidgetSettings::isEnabled).orElse(false))
+                .map(UserAccount::getId);
     }
 
     /** The widget's owner's pending Twitchat notifications, sent once catapult-web has the OBS widget connected. */
