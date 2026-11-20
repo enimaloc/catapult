@@ -1252,7 +1252,8 @@ class CategoryChainTest {
     @Test
     void aDecisionHeldByTheDryRunIsRemembered() {
         DryRunHeldDecisions held = new DryRunHeldDecisions();
-        chain.setHeldDecisions(held);
+        chain = new CategoryChain(activations, streamStateService, settingsRepository, hold, gameStateService,
+                accountRepository, applier, gate, lookup, layouts, held);
         applierAnswers(CategoryOutcome.dryRun(CategoryRule.MANUAL_CHOICE));
 
         chain.apply(user, new ManualCategory(binding));
@@ -1264,7 +1265,8 @@ class CategoryChainTest {
     @Test
     void aDecisionSentOrSkippedIsNotRememberedAsHeld() {
         DryRunHeldDecisions held = new DryRunHeldDecisions();
-        chain.setHeldDecisions(held);
+        chain = new CategoryChain(activations, streamStateService, settingsRepository, hold, gameStateService,
+                accountRepository, applier, gate, lookup, layouts, held);
         applierAnswers(CategoryOutcome.applied(CategoryRule.MANUAL_CHOICE));
 
         chain.apply(user, new ManualCategory(binding));

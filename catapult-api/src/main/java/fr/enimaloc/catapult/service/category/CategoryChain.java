@@ -48,7 +48,7 @@ import java.util.Optional;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
+@RequiredArgsConstructor(onConstructor_ = @Autowired)
 public class CategoryChain {
 
     /** {@link GameBinding#getSourceName()} of the transient binding the "no game" category is sent through. */
@@ -76,12 +76,17 @@ public class CategoryChain {
     private final RaidRestoreGateService raidRestoreGate;
     private final GameBindingLookup gameBindingLookup;
     private final ExtensionLayoutApplier extensionLayouts;
-    /** Remembers what the dry run holds back; set by Spring, absent where a test builds the chain by hand. */
-    private DryRunHeldDecisions heldDecisions;
+    /** Remembers what the dry run holds back; null where a test builds the chain without it. */
+    private final DryRunHeldDecisions heldDecisions;
 
-    @Autowired
-    public void setHeldDecisions(DryRunHeldDecisions heldDecisions) {
-        this.heldDecisions = heldDecisions;
+    /** The chain without the dry-run memory, for code and tests that build it by hand. */
+    public CategoryChain(CustomBindingActivations customBindingActivations, StreamStateService streamStateService,
+                         UserSettingsRepository userSettingsRepository, RaidRestoreHold raidRestoreHold,
+                         GameStateService gameStateService, UserAccountRepository userAccountRepository,
+                         CategoryApplier applier, RaidRestoreGateService raidRestoreGate,
+                         GameBindingLookup gameBindingLookup, ExtensionLayoutApplier extensionLayouts) {
+        this(customBindingActivations, streamStateService, userSettingsRepository, raidRestoreHold, gameStateService,
+                userAccountRepository, applier, raidRestoreGate, gameBindingLookup, extensionLayouts, null);
     }
 
     /**
