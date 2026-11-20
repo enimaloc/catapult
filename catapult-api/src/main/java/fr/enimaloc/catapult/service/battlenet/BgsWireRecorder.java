@@ -36,7 +36,8 @@ import java.util.stream.Collectors;
  * schema, searched in its raw bytes.
  *
  * <p>Only the friends and presence services are recorded: everything else (login, connection, account, game account
- * selection, own presence, unknown services) can carry secrets and is dropped before being decoded.
+ * selection, own presence, unknown services) can carry secrets and is dropped before being decoded, and so are
+ * the friend lists, which name strangers too.
  */
 @Slf4j
 public final class BgsWireRecorder implements WireTap {
@@ -47,6 +48,12 @@ public final class BgsWireRecorder implements WireTap {
     private static final List<String> RECORDED_SERVICES = List.of("friends.", "presence.");
     /** Raw and unknown calls are only known by their hash: those of the recorded services the table knows. */
     private static final Set<Integer> RECORDED_HASHES = recordedHashes();
+    /**
+     * The friend lists, never recorded: they name every friend of the bot, strangers included, whom the masking of
+     * other members cannot know.
+     */
+    private static final List<ServiceMethod<?, ?>> FRIEND_LISTS = List.of(BgsServices.FRIENDS_GET_FRIENDS,
+            BgsServices.FRIENDS_GET_SENT_INVITATIONS, BgsServices.FRIENDS_GET_RECEIVED_INVITATIONS);
 
     private final UUID serviceAccountId;
     private final SessionDebug debug;
@@ -85,6 +92,11 @@ public final class BgsWireRecorder implements WireTap {
     }
 
     private static boolean recorded(WireExchange exchange) {
+        Header header = exchange.requestHeader();
+        if (FRIEND_LISTS.stream().anyMatch(list -> list.serviceHash() == header.getServiceHash()
+                && list.methodId() == header.getMethodId())) {
+            return false;
+        }
         ServiceMethod<?, ?> method = exchange.method();
         if (method != null) {
             return RECORDED_SERVICES.stream().anyMatch(method.service()::startsWith);

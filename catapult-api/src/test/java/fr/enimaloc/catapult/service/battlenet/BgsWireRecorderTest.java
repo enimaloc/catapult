@@ -4,7 +4,9 @@ import bgs.protocol.RpcProto.Header;
 import bgs.protocol.RpcProto.NoData;
 import bgs.protocol.authentication.v2.client.AuthenticationServiceOuterClass.LogonRequest;
 import bgs.protocol.friends.v2.client.FriendsListenerOuterClass.UpdateFriendStateNotification;
+import bgs.protocol.friends.v2.client.FriendsServiceOuterClass.GetFriendsResponse;
 import bgs.protocol.friends.v2.client.FriendsServiceOuterClass.SendInvitationRequest;
+import bgs.protocol.friends.v2.client.FriendsTypes.Friend;
 import bgs.protocol.friends.v2.client.FriendsTypes.FriendStateAssignment;
 import bgs.protocol.friends.v2.client.FriendsTypes.SendInvitationTarget;
 import com.google.protobuf.ByteString;
@@ -163,6 +165,22 @@ class BgsWireRecorderTest {
                 null, null, null, null));
         recorder.onExchange(new WireExchange(false, AT, 0, header(BgsServices.SELF_PRESENCE_HASH, 1), named,
                 null, null, null, null));
+
+        nothingRecorded();
+    }
+
+    @Test
+    void neverRecordsTheFriendLists() {
+        ServiceMethod<?, ?> method = BgsServices.FRIENDS_GET_FRIENDS;
+        ByteString friends = GetFriendsResponse.newBuilder().addFriends(Friend.newBuilder().setId(42L))
+                .buildPartial().toByteString();
+        Header reply = Header.newBuilder().setServiceId(254).setStatus(0).buildPartial();
+
+        recorder.onExchange(new WireExchange(true, AT, 0, header(method.serviceHash(), method.methodId()),
+                ByteString.EMPTY, reply, friends, method, null));
+        // The same list answered to a raw call, known only by its header
+        recorder.onExchange(new WireExchange(true, AT, 0, header(method.serviceHash(), method.methodId()),
+                ByteString.EMPTY, reply, friends, null, null));
 
         nothingRecorded();
     }
