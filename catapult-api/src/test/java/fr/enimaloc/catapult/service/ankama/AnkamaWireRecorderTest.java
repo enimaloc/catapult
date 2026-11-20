@@ -126,25 +126,37 @@ class AnkamaWireRecorderTest {
     }
 
     @Test
-    void recorderRecordsAListRequestWithItsResponse() {
-        Payload list = ChatMessages.listFriends(7L).toPayload();
-        byte[] friends = bytes(o -> o.writeByteArray(1, bytes(f -> f.writeByteArray(1, user(42L, "Streamer",
-                "1234")))));
+    void recorderRecordsARequestWithItsResponse() {
+        Payload delete = ChatMessages.deleteFriend(7L, 42L).toPayload();
 
-        recorder.onExchange(call(list, new ChatFrames.Response(3, 1, new Payload(ChatMessages.FRIEND_LIST, friends)),
-                null));
+        recorder.onExchange(call(delete, new ChatFrames.Response(3, 1, null), null));
 
-        RawExchange raw = recorded(Direction.OUT, "chat.LIST_USER_FRIENDS_CMD");
+        RawExchange raw = recorded(Direction.OUT, "chat.DELETE_USER_FRIEND_CMD");
         assertThat(raw.status()).isEqualTo(1);
         assertThat(raw.durationMs()).isEqualTo(4);
         assertThat(raw.requestHeaders().getFirst(AnkamaWireRecorder.HEADER)).isEqualTo(
-                "{\"kind\":\"request\",\"correlationId\":3,\"payloadId\":" + ChatMessages.LIST_USER_FRIENDS_CMD + "}");
-        assertThat(raw.responseHeaders().getFirst(AnkamaWireRecorder.HEADER)).isEqualTo(
-                "{\"kind\":\"response\",\"correlationId\":3,\"status\":1,\"payloadId\":" + ChatMessages.FRIEND_LIST
-                        + "}");
-        assertThat(text(raw.responseBody())).contains("\"2\":\"Streamer\"");
-        assertThat(raw.requestRaw()).isEqualTo(list.data());
-        assertThat(raw.responseRaw()).isEqualTo(friends);
+                "{\"kind\":\"request\",\"correlationId\":3,\"payloadId\":" + ChatMessages.DELETE_USER_FRIEND_CMD + "}");
+        assertThat(raw.responseHeaders().getFirst(AnkamaWireRecorder.HEADER))
+                .isEqualTo("{\"kind\":\"response\",\"correlationId\":3,\"status\":1}");
+        assertThat(raw.requestRaw()).isEqualTo(delete.data());
+        assertThat(raw.responseBody()).isNull();
+        assertThat(raw.responseRaw()).isNull();
+    }
+
+    @Test
+    void neverRecordsTheFriendLists() {
+        byte[] member = user(42L, "Streamer", "1234");
+        byte[] friends = bytes(o -> o.writeByteArray(1, bytes(f -> f.writeByteArray(1, member))));
+        byte[] invites = bytes(o -> o.writeByteArray(1, bytes(i -> i.writeByteArray(2, member))));
+
+        recorder.onExchange(call(ChatMessages.listFriends(42L).toPayload(),
+                new ChatFrames.Response(3, 1, new Payload(ChatMessages.FRIEND_LIST, friends)), null));
+        recorder.onExchange(call(ChatMessages.listInvites(42L).toPayload(),
+                new ChatFrames.Response(3, 1, new Payload(ChatMessages.FRIEND_INVITE_LIST, invites)), null));
+        recorder.onExchange(event(ChatMessages.FRIEND_LIST, friends));
+        recorder.onExchange(event(ChatMessages.FRIEND_INVITE_LIST, invites));
+
+        nothingRecorded();
     }
 
     @Test
@@ -185,7 +197,7 @@ class AnkamaWireRecorderTest {
         recorder.onExchange(event(ChatMessages.INVITE_REJECT, named));
         // A known response payload does not make an unknown request recorded
         recorder.onExchange(call(new Payload(12345, named),
-                new ChatFrames.Response(3, 1, new Payload(ChatMessages.FRIEND_LIST, named)), null));
+                new ChatFrames.Response(3, 1, new Payload(ChatMessages.USER_PRESENCE_UPDATED_EVT, named)), null));
 
         nothingRecorded();
     }

@@ -21,6 +21,7 @@ import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -32,8 +33,9 @@ import java.util.stream.Collectors;
  * decoded payload (exact values, {@code name#tag} recombined from sibling fields) and, when a payload could not be
  * decoded, searched in its raw bytes.
  *
- * <p>Only the friend, invite and presence messages {@link ChatMessages} knows are recorded: any other payload id is
- * dropped before being decoded, and a response follows its request.
+ * <p>Only the per-friend commands and events {@link ChatMessages} knows are recorded: any other payload id is
+ * dropped before being decoded, and a response follows its request. The friend and invite lists are never recorded:
+ * they name every friend of the bot, strangers included, whom the masking of other members cannot know.
  */
 @Slf4j
 public final class AnkamaWireRecorder implements ChatWireTap {
@@ -41,7 +43,10 @@ public final class AnkamaWireRecorder implements ChatWireTap {
     /** The HTTP-like header holding the chat frame header as JSON. */
     static final String HEADER = "Chat-Header";
 
-    /** The recorded payload ids and their name: the commands, events and lists {@link ChatMessages} declares. */
+    /** The list requests and their responses, never recorded (see the class comment). */
+    private static final Set<String> LISTS = Set.of("LIST_USER_FRIENDS_CMD", "LIST_USER_FRIEND_INVITES_CMD",
+            "FRIEND_LIST", "FRIEND_INVITE_LIST");
+    /** The recorded payload ids and their name: the commands and events {@link ChatMessages} declares. */
     private static final Map<Integer, String> RECORDED = recorded();
     private static final JsonNodeFactory NODES = JsonNodeFactory.instance;
 
@@ -90,12 +95,12 @@ public final class AnkamaWireRecorder implements ChatWireTap {
         return frame instanceof ChatFrames.Event event ? event.payload() : null;
     }
 
-    /** The {@code *_CMD}, {@code *_EVT} and list payload ids among the constants of {@link ChatMessages}. */
+    /** The {@code *_CMD} and {@code *_EVT} payload ids among the constants of {@link ChatMessages}, lists aside. */
     private static Map<Integer, String> recorded() {
         return Arrays.stream(ChatMessages.class.getFields())
                 .filter(field -> field.accessFlags().contains(AccessFlag.STATIC) && field.getType() == int.class)
-                .filter(field -> field.getName().endsWith("_CMD") || field.getName().endsWith("_EVT")
-                        || field.getName().equals("FRIEND_LIST") || field.getName().equals("FRIEND_INVITE_LIST"))
+                .filter(field -> field.getName().endsWith("_CMD") || field.getName().endsWith("_EVT"))
+                .filter(field -> !LISTS.contains(field.getName()))
                 .collect(Collectors.toUnmodifiableMap(AnkamaWireRecorder::value, Field::getName));
     }
 
