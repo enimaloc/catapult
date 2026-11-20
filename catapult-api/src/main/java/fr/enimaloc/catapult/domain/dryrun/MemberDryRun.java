@@ -21,7 +21,7 @@ public class MemberDryRun {
     @Column(name = "user_id")
     private UUID userId;
 
-    /** The admin who switched it on; null once that account is gone. */
+    /** The admin who switched it on (kept as is if that account is later deleted: no foreign key). */
     @Column(name = "enabled_by")
     private UUID enabledBy;
 

@@ -14,17 +14,17 @@ window.CatapultDryRun = (function () {
         document.getElementById("dry-run-disable")?.addEventListener("click", () => { dialog.open = true; });
         document.getElementById("dry-run-cancel")?.addEventListener("click", () => { dialog.open = false; });
 
-        const confirm = document.getElementById("dry-run-confirm");
-        confirm?.addEventListener("click", async () => {
-            if (confirm.disabled) return;
-            confirm.disabled = true;
+        const confirmButton = document.getElementById("dry-run-confirm");
+        confirmButton?.addEventListener("click", async () => {
+            if (confirmButton.disabled) return;
+            confirmButton.disabled = true;
             try {
                 // Closed first, so a failure's snackbar isn't hidden behind it.
                 dialog.open = false;
                 const response = await CatapultChannel.postJson("/me/dry-run/disable", {});
                 if (response.ok) banner.hidden = true;
             } finally {
-                confirm.disabled = false;
+                confirmButton.disabled = false;
             }
         });
     }
