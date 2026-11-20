@@ -1,0 +1,41 @@
+name: Gradle cache
+
+# A pull request can only restore the caches of its own ref and of its base branch: without an entry
+# saved on dev (feature PRs) and main (hotfix PRs), every test shard of a new PR starts cold. This
+# saves Gradle User Home on those branches, under the key the Tests and Build workflows look up
+# (setup-java's `cache: 'gradle'`, a hash of the Gradle files); once it exists, a PR whose Gradle
+# files match restores it exactly and saves no copy of its own.
+on:
+  push:
+    branches: [dev, main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  gradle-cache:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v6
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      # Compiling fills the build cache with every module's classes; the dependency reports resolve
+      # every configuration, test runtime and JaCoCo included, so the shards download nothing (the
+      # reports themselves are thrown away, errors still reach the log)
+      - name: Fill the Gradle caches
+        run: >-
+          ./gradlew testClasses
+          :catapult-common:dependencies :catapult-bgs:dependencies
+          :catapult-api:dependencies :catapult-web:dependencies
+          --quiet > /dev/null
