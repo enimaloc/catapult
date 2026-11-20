@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.getter;
 
+import tools.jackson.databind.JsonNode;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
@@ -287,5 +288,43 @@ class XboxGameGetterTest {
         when(responseSpec.body(Map.class)).thenReturn(presence).thenThrow(serviceUnavailable());
 
         assertThatThrownBy(() -> getter.getCurrentGame(user)).isInstanceOf(DetectionTimeoutException.class);
+    }
+
+    // --- Detection trace ---
+
+    @Test
+    void traceReason_noLinkedToken() {
+        when(oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.XBOX))
+            .thenReturn(Optional.empty());
+
+        assertThat(TraceProbe.entryAfter(user, () -> getter.getCurrentGame(user)).path("reason").asString())
+            .isEqualTo("no linked Xbox token");
+    }
+
+    @Test
+    void traceReason_tokenRefreshFailed() {
+        when(tokenService.getToken(user)).thenReturn(Optional.empty());
+
+        assertThat(TraceProbe.entryAfter(user, () -> getter.getCurrentGame(user)).path("reason").asString())
+            .isEqualTo("token refresh failed");
+    }
+
+    @Test
+    void traceReason_noActiveTitle() {
+        doReturn(Map.of("devices", List.of())).when(responseSpec).body(Map.class);
+
+        assertThat(TraceProbe.entryAfter(user, () -> getter.getCurrentGame(user)).path("reason").asString())
+            .isEqualTo("no active title");
+    }
+
+    @Test
+    void traceReason_onlyAppsAreActive() {
+        doReturn(presence(Map.of("id", "5678", "name", "Microsoft Store", "state", "Active")),
+            titlehub("App", "9QPQ53BM3J3T")).when(responseSpec).body(Map.class);
+
+        JsonNode entry = TraceProbe.entryAfter(user, () -> getter.getCurrentGame(user));
+
+        assertThat(entry.path("reason").asString()).isEqualTo("only apps are active");
+        assertThat(entry.at("/details/skipped/0").asString()).isEqualTo("5678 (App)");
     }
 }

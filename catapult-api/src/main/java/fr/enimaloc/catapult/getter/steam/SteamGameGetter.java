@@ -9,6 +9,7 @@ import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.debug.BatchDebugFilter;
 import fr.enimaloc.catapult.service.debug.DebugContext;
 import fr.enimaloc.catapult.service.debug.DebugRecording;
+import fr.enimaloc.catapult.service.debug.DetectionTrace;
 import fr.enimaloc.catapult.service.steam.SteamStoreService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +25,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Slf4j
 @Component
@@ -100,36 +102,61 @@ public class SteamGameGetter implements GameGetter {
 
     @Override
     public Optional<DetectedGame> getCurrentGame(UserAccount user) {
-        if (user.getSteamId() == null) return Optional.empty();
+        if (user.getSteamId() == null) {
+            DetectionTrace.reason("no Steam id");
+            return Optional.empty();
+        }
         try {
             if (cycleCache.containsKey(user.getSteamId())) {
-                return cycleCache.get(user.getSteamId()).map(this::toDetectedGame);
+                Optional<DetectedGame> cached = cycleCache.get(user.getSteamId()).map(this::toDetectedGame);
+                if (cached.isEmpty()) {
+                    traceNoGame(true);
+                }
+                return cached;
             }
             String decryptedPersonalToken = user.getSteamPersonalToken() != null
                 ? tokenEncryptionService.decrypt(user.getSteamPersonalToken())
                 : null;
-            return steamApiClient.getPlayerSummary(user.getSteamId(), decryptedPersonalToken)
+            // The trace is bound to this thread: the failure is only noted in the async chain, and explained here
+            AtomicReference<String> failure = new AtomicReference<>();
+            Optional<DetectedGame> game = steamApiClient.getPlayerSummary(user.getSteamId(), decryptedPersonalToken)
                 .orTimeout(2, TimeUnit.SECONDS)
                 .exceptionally(e -> {
                     if (DetectionTimeoutException.isTimeout(e)) {
                         throw new DetectionTimeoutException(name(), e);
                     }
                     log.warn("Steam getPlayerSummary failed for {}: {}", user.getSteamId(), e.getMessage());
+                    failure.set(String.valueOf(e.getMessage()));
                     return Optional.empty();
                 })
                 .thenApply(opt -> opt.map(this::toDetectedGame))
                 .join();
+            if (game.isEmpty()) {
+                if (failure.get() != null) {
+                    DetectionTrace.reason("player summary failed: " + failure.get());
+                } else {
+                    traceNoGame(false);
+                }
+            }
+            return game;
         } catch (CompletionException e) {
             if (e.getCause() instanceof DetectionTimeoutException timeout) {
                 throw timeout;
             }
             log.warn("Failed to fetch current game from Steam for user {}: {}", user.getId(), e.getMessage());
+            DetectionTrace.reason("player summary failed: " + e.getMessage());
             return Optional.empty();
         } catch (DetectionTimeoutException e) {
             throw e;
         } catch (Exception e) {
             log.warn("Failed to fetch current game from Steam for user {}: {}", user.getId(), e.getMessage());
+            DetectionTrace.reason("player summary failed: " + e.getMessage());
             return Optional.empty();
         }
+    }
+
+    private static void traceNoGame(boolean fromCycleCache) {
+        DetectionTrace.reason("no game in the player summary");
+        DetectionTrace.detail("fromCycleCache", fromCycleCache);
     }
 }

@@ -15,9 +15,11 @@ import java.io.OutputStream;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -46,12 +48,19 @@ public class AnkamaChatClient {
     private final ScheduledExecutorService scheduler;
 
     private final Map<Integer, CompletableFuture<ChatFrames.Response>> pending = new ConcurrentHashMap<>();
+    /** The pending requests the wire tap wanted, by correlation id; empty unless a tap wants something. */
+    private final Map<Integer, Tapped> tapped = new ConcurrentHashMap<>();
     private final AtomicInteger correlation = new AtomicInteger();
     private final AtomicBoolean closed = new AtomicBoolean();
     private volatile Socket socket;
     private volatile OutputStream out;
     private volatile ChatListener listener;
     private volatile ScheduledFuture<?> heartbeatTask;
+    private volatile ChatWireTap wireTap;
+
+    /** A request of ours awaiting its response that the wire tap asked to observe. */
+    private record Tapped(ChatWireTap tap, Instant at, long startNanos, ChatFrames.Request request, byte[] bytes) {
+    }
 
     public AnkamaChatClient(SocketFactory sockets, String host, int port, Duration heartbeat,
                             ScheduledExecutorService scheduler) {
@@ -117,8 +126,21 @@ public class AnkamaChatClient {
                 .orTimeout(REQUEST_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
         pending.put(id, future);
         future.whenComplete((r, t) -> pending.remove(id));
+        ChatWireTap tap = wantingTap();
         try {
-            write(ChatFrames.KIND_DATA, ChatFrames.encode(new ChatFrames.Request(id, payload)));
+            ChatFrames.Request request = new ChatFrames.Request(id, payload);
+            byte[] bytes = ChatFrames.encode(request);
+            if (tap != null) {
+                tapped.put(id, new Tapped(tap, Instant.now(), System.nanoTime(), request, bytes));
+                // A response reports the exchange itself; a timeout or a closed connection reports it here
+                future.whenComplete((r, t) -> {
+                    Tapped call = t == null ? null : tapped.remove(id);
+                    if (call != null) {
+                        tell(call, null, null, error(t));
+                    }
+                });
+            }
+            write(ChatFrames.KIND_DATA, bytes);
         } catch (IOException | RuntimeException e) {
             future.completeExceptionally(e);
         }
@@ -127,6 +149,11 @@ public class AnkamaChatClient {
 
     public void close() {
         shutdown(null);
+    }
+
+    /** Lets {@code tap} observe the data frames of this connection from now on; null stops it. */
+    public void setWireTap(ChatWireTap tap) {
+        this.wireTap = tap;
     }
 
     private void write(int kind, byte[] body) throws IOException {
@@ -157,7 +184,7 @@ public class AnkamaChatClient {
             while (!closed.get()) {
                 Outer outer = ChatFrames.read(in);
                 if (outer.kind() == ChatFrames.KIND_DATA) {
-                    dispatch(ChatFrames.decode(outer.body()));
+                    dispatch(ChatFrames.decode(outer.body()), outer.body());
                 }
             }
         } catch (EOFException e) {
@@ -168,15 +195,25 @@ public class AnkamaChatClient {
         shutdown(cause);
     }
 
-    private void dispatch(ChatFrames.Frame frame) throws IOException {
+    private void dispatch(ChatFrames.Frame frame, byte[] bytes) throws IOException {
         switch (frame) {
             case ChatFrames.Response response -> {
                 CompletableFuture<ChatFrames.Response> future = pending.remove(response.correlationId());
+                Tapped call = tapped.isEmpty() ? null : tapped.remove(response.correlationId());
                 if (future != null) {
                     future.complete(response);
                 }
+                if (call != null) {
+                    tell(call, response, bytes, null);
+                }
             }
-            case ChatFrames.Event event -> listener.onEvent(ChatMessages.event(event.payload()));
+            case ChatFrames.Event event -> {
+                ChatWireTap tap = wantingTap();
+                if (tap != null) {
+                    tell(tap, new ChatWireExchange(false, Instant.now(), 0, event, bytes, null, null, null));
+                }
+                listener.onEvent(ChatMessages.event(event.payload()));
+            }
             case ChatFrames.Request ignored -> log.debug("Ignoring a request pushed by the chat server");
         }
     }
@@ -205,6 +242,40 @@ public class AnkamaChatClient {
                 log.warn("Chat listener failed in onClosed", e);
             }
         }
+    }
+
+    /** The wire tap when there is one and it wants the exchange starting now, otherwise null. */
+    private ChatWireTap wantingTap() {
+        ChatWireTap tap = wireTap;
+        if (tap == null) {
+            return null;
+        }
+        try {
+            return tap.wants() ? tap : null;
+        } catch (RuntimeException e) {
+            log.warn("Chat wire tap failed", e);
+            return null;
+        }
+    }
+
+    private static void tell(Tapped call, ChatFrames.Response response, byte[] bytes, String error) {
+        tell(call.tap(), new ChatWireExchange(true, call.at(), System.nanoTime() - call.startNanos(), call.request(),
+                call.bytes(), response, bytes, error));
+    }
+
+    private static void tell(ChatWireTap tap, ChatWireExchange exchange) {
+        try {
+            tap.onExchange(exchange);
+        } catch (RuntimeException e) {
+            log.warn("Chat wire tap failed", e);
+        }
+    }
+
+    /** Why a request got no response, without its stack: the message, else the exception's simple name. */
+    private static String error(Throwable failure) {
+        Throwable cause = failure instanceof CompletionException && failure.getCause() != null
+                ? failure.getCause() : failure;
+        return cause.getMessage() != null ? cause.getMessage() : cause.getClass().getSimpleName();
     }
 
     private static void closeQuietly(Socket s) {

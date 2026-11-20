@@ -43,29 +43,29 @@ class MockDebugStore {
         seeded.add(new DebugExchangeDto(UUID.randomUUID(), now.minus(90, ChronoUnit.MINUTES), "OUT", "twitch", "getChannel",
                 "GET", "https://api.twitch.tv/helix/channels?broadcaster_id=5000001", 200, false, 84, false,
                 "{\"Authorization\":\"[masked]\"}", null, "{\"Content-Type\":\"application/json\"}",
-                "{\"data\":[{\"broadcaster_name\":\"viewer001\",\"game_name\":\"Elden Ring\"}]}", null, "7f1c2b3a4d5e6f708192a3b4c5d6e7f8"));
+                "{\"data\":[{\"broadcaster_name\":\"viewer001\",\"game_name\":\"Elden Ring\"}]}", null, "7f1c2b3a4d5e6f708192a3b4c5d6e7f8", null, null));
         seeded.add(new DebugExchangeDto(UUID.randomUUID(), now.minus(75, ChronoUnit.MINUTES), "OUT", "steam", "getOwnedGames",
                 "GET", "https://api.steampowered.com/IPlayerService/GetOwnedGames/v1?key=[masked]", 500, true, 1203, false,
                 "{}", null, "{\"Content-Type\":\"text/html\"}", "<html>Internal Server Error</html>",
-                "Steam answered 500", "a1b2c3d4e5f60718293a4b5c6d7e8f90"));
+                "Steam answered 500", "a1b2c3d4e5f60718293a4b5c6d7e8f90", null, null));
         // An incoming EventSub message, as catapult-api records it: no status, no headers, a success.
         seeded.add(new DebugExchangeDto(UUID.randomUUID(), now.minus(45, ChronoUnit.MINUTES), "IN", "twitch", "eventsub.notification",
                 "WS", "wss://eventsub.wss.twitch.tv/ws", null, false, 12, false,
                 null, "{\"metadata\":{\"message_type\":\"notification\"},\"payload\":{\"subscription\":{\"type\":\"stream.online\"}}}",
-                null, null, null, "0f9e8d7c6b5a49382716f5e4d3c2b1a0"));
+                null, null, null, "0f9e8d7c6b5a49382716f5e4d3c2b1a0", null, null));
         seeded.add(new DebugExchangeDto(UUID.randomUUID(), now.minus(20, ChronoUnit.MINUTES), "OUT", "twitch", "getUsers",
                 "GET", "https://api.twitch.tv/helix/users?id=5000001&id=[membre]", 200, false, 61, true,
                 "{\"Authorization\":\"[masked]\"}", null, "{\"Content-Type\":\"application/json\"}",
-                "{\"data\":[{\"login\":\"viewer001\"}]}", null, "c0ffee00c0ffee00c0ffee00c0ffee00"));
+                "{\"data\":[{\"login\":\"viewer001\"}]}", null, "c0ffee00c0ffee00c0ffee00c0ffee00", null, null));
         // more than a page of them, for the pagination
         seeded.add(new DebugExchangeDto(UUID.randomUUID(), now.minus(10, ChronoUnit.MINUTES), "OUT", "igdb", "games",
                 "POST", "https://api.igdb.com/v4/games", null, true, 5000, false,
                 "{\"Client-ID\":\"[masked]\",\"Authorization\":\"[masked]\"}", "fields name; where id = 119133;",
-                null, null, "Read timed out", null));
+                null, null, "Read timed out", null, null, null));
         seeded.add(new DebugExchangeDto(UUID.randomUUID(), now.minus(5, ChronoUnit.MINUTES), "OUT", "minecraft", "friends",
                 "GET", "https://api.minecraftservices.com/friends", 200, false, 143, false,
                 "{\"Authorization\":\"[masked]\"}", null, "{\"Content-Type\":\"application/json\"}",
-                "{\"friends\":[{\"name\":\"[membre]\"},{\"name\":\"Notch\"}]}", null, null));
+                "{\"friends\":[{\"name\":\"[membre]\"},{\"name\":\"Notch\"}]}", null, null, null, null));
         seeded.replaceAll(MockDebugStore::withComputedError);
         exchanges.put(seededMember, seeded);
     }
@@ -83,7 +83,7 @@ class MockDebugStore {
     private static DebugExchangeDto withComputedError(DebugExchangeDto e) {
         return new DebugExchangeDto(e.id(), e.occurredAt(), e.direction(), e.service(), e.operation(), e.method(),
                 e.url(), e.status(), isError(e.direction(), e.status(), e.errorMessage()), e.durationMs(), e.filtered(),
-                e.requestHeaders(), e.requestBody(), e.responseHeaders(), e.responseBody(), e.errorMessage(), e.traceId());
+                e.requestHeaders(), e.requestBody(), e.responseHeaders(), e.responseBody(), e.errorMessage(), e.traceId(), e.requestRaw(), e.responseRaw());
     }
 
     synchronized MemberDebugStateDto state(UUID member) {

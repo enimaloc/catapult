@@ -267,7 +267,7 @@ class DebugAttributionTest {
         return new SchedulerService(accounts, chain, state, mock(ApplicationEventPublisher.class),
                 new SimpleMeterRegistry(), Optional.empty(), Optional.empty(), mock(BindingService.class),
                 SimulationGates.none(), SiteRoles.active(), PollCadences.always(),
-                org.mockito.Mockito.mock(fr.enimaloc.catapult.service.ActivityLogService.class));
+                org.mockito.Mockito.mock(fr.enimaloc.catapult.service.ActivityLogService.class), null, null);
     }
 
     @Test

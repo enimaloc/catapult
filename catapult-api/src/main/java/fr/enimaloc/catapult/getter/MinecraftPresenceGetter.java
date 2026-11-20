@@ -8,6 +8,7 @@ import fr.enimaloc.catapult.repository.minecraft.MinecraftFriendLinkRepository;
 import fr.enimaloc.catapult.repository.minecraft.MinecraftServiceAccountRepository;
 import fr.enimaloc.catapult.service.debug.BatchDebugFilter;
 import fr.enimaloc.catapult.service.debug.DebugRecording;
+import fr.enimaloc.catapult.service.debug.DetectionTrace;
 import fr.enimaloc.catapult.service.minecraft.MinecraftGateService;
 import fr.enimaloc.catapult.service.minecraft.MinecraftService;
 import fr.enimaloc.catapult.service.minecraft.MinecraftTokenService;
@@ -133,12 +134,26 @@ public class MinecraftPresenceGetter implements GameGetter {
     @Override
     public Optional<DetectedGame> getCurrentGame(UserAccount user) {
         if (!gateService.isAvailableReadOnly(user)) {
+            DetectionTrace.reason("gate closed");
             return Optional.empty();
         }
-        return linkRepository.findByUser(user)
-                .filter(link -> link.getStatus() == MinecraftFriendLink.Status.ACCEPTED)
-                .map(link -> cycleCache.get(MinecraftService.normalizeProfileId(link.getMinecraftProfileId())))
-                .filter(status -> status != MinecraftService.PresenceStatus.OFFLINE)
-                .map(status -> new DetectedGame("minecraft", GameBinding.SourceType.MINECRAFT, "Minecraft"));
+        Optional<MinecraftFriendLink> found = linkRepository.findByUser(user);
+        if (found.isEmpty()) {
+            DetectionTrace.reason("no friend link");
+            return Optional.empty();
+        }
+        MinecraftFriendLink link = found.get();
+        if (link.getStatus() != MinecraftFriendLink.Status.ACCEPTED) {
+            DetectionTrace.reason("friend link is " + link.getStatus().name());
+            return Optional.empty();
+        }
+        String profileId = MinecraftService.normalizeProfileId(link.getMinecraftProfileId());
+        MinecraftService.PresenceStatus status = cycleCache.get(profileId);
+        if (status == null || status == MinecraftService.PresenceStatus.OFFLINE) {
+            DetectionTrace.reason("offline");
+            DetectionTrace.detail("cached", status != null);
+            return Optional.empty();
+        }
+        return Optional.of(new DetectedGame("minecraft", GameBinding.SourceType.MINECRAFT, "Minecraft"));
     }
 }

@@ -214,6 +214,17 @@ class BattleNetSessionManagerTest {
     }
 
     @Test
+    void eachChannelIsTappedForTheDebugRecordingOfItsBot() {
+        TestSessionDebug watched = new TestSessionDebug("battlenet", bot1.getId(), BattleNetDebugKeys.account(42L));
+        debug = watched.debug;
+
+        started();
+
+        assertThat(channels).isNotEmpty().allSatisfy(channel -> assertThat(channel.tap).isNotNull());
+        assertThat(channels.stream().filter(channel -> channel.tap.wants())).hasSize(1);
+    }
+
+    @Test
     void presenceEventUpdatesCurrentGame() {
         BattleNetSessionManager manager = started();
 
@@ -243,6 +254,27 @@ class BattleNetSessionManagerTest {
 
         assertThat(manager.currentGame(42L)).isEmpty();
         assertThat(manager.currentGame(77L)).contains("Pro");
+    }
+
+    @Test
+    void lastPresence_isUpdatedOnPresenceAndForgottenWhenTheSessionEnds() {
+        BattleNetSessionManager manager = started();
+        assertThat(manager.lastPresence(42L)).isEmpty();
+
+        manager.listenerOf(bot1.getId()).onPresence(new PresenceEvent(42L, "WTCG", 0x57544347, List.of()));
+
+        BattleNetSessionManager.PresenceSeen seen = manager.lastPresence(42L).orElseThrow();
+        assertThat(seen.fourcc()).isEqualTo("WTCG");
+        assertThat(seen.serviceAccountId()).isEqualTo(bot1.getId());
+        assertThat(seen.at()).isNotNull();
+
+        manager.listenerOf(bot1.getId()).onPresence(new PresenceEvent(42L, null, 0, List.of()));
+
+        assertThat(manager.lastPresence(42L).orElseThrow().fourcc()).isNull();
+
+        manager.stop(bot1.getId());
+
+        assertThat(manager.lastPresence(42L)).isEmpty();
     }
 
     @Test

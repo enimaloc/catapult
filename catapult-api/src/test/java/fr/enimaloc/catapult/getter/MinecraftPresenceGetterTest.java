@@ -1,6 +1,7 @@
 // test/…/getter/MinecraftPresenceGetterTest.java
 package fr.enimaloc.catapult.getter;
 
+import tools.jackson.databind.JsonNode;
 import fr.enimaloc.catapult.service.debug.DebugRecording;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.minecraft.MinecraftFriendLink;
@@ -190,5 +191,57 @@ class MinecraftPresenceGetterTest {
         getter.prefetchBatch().join();
 
         assertThat(getter.getCurrentGame(user)).isEmpty();
+    }
+
+    // --- Detection trace ---
+
+    @Test
+    void traceReason_gateClosed() {
+        user.setId(UUID.randomUUID());
+        when(gateService.isAvailableReadOnly(user)).thenReturn(false);
+
+        assertThat(TraceProbe.entryAfter(user, () -> getter.getCurrentGame(user)).path("reason").asString())
+                .isEqualTo("gate closed");
+    }
+
+    @Test
+    void traceReason_noLink() {
+        user.setId(UUID.randomUUID());
+        when(linkRepository.findByUser(user)).thenReturn(Optional.empty());
+
+        assertThat(TraceProbe.entryAfter(user, () -> getter.getCurrentGame(user)).path("reason").asString())
+                .isEqualTo("no friend link");
+    }
+
+    @Test
+    void traceReason_linkRemoved() {
+        user.setId(UUID.randomUUID());
+        link.setStatus(MinecraftFriendLink.Status.REMOVED);
+
+        assertThat(TraceProbe.entryAfter(user, () -> getter.getCurrentGame(user)).path("reason").asString())
+                .isEqualTo("friend link is REMOVED");
+    }
+
+    @Test
+    void traceReason_offlineWhenNotInTheCycleCache() {
+        user.setId(UUID.randomUUID());
+
+        JsonNode entry = TraceProbe.entryAfter(user, () -> getter.getCurrentGame(user));
+
+        assertThat(entry.path("reason").asString()).isEqualTo("offline");
+        assertThat(entry.at("/details/cached").asBoolean()).isFalse();
+    }
+
+    @Test
+    void traceReason_offlineWhenCachedAsOffline() {
+        user.setId(UUID.randomUUID());
+        when(minecraftService.updatePresence(eq("mc-token"), any(MinecraftService.PresenceStatus.class)))
+                .thenReturn(presenceOf("profile-1", MinecraftService.PresenceStatus.OFFLINE));
+        getter.prefetchBatch().join();
+
+        JsonNode entry = TraceProbe.entryAfter(user, () -> getter.getCurrentGame(user));
+
+        assertThat(entry.path("reason").asString()).isEqualTo("offline");
+        assertThat(entry.at("/details/cached").asBoolean()).isTrue();
     }
 }

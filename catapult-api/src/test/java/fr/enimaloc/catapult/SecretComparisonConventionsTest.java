@@ -71,7 +71,12 @@ class SecretComparisonConventionsTest {
             Map.entry(
                     WEB + "service/mock/MockData.java:while (previous.equals(inviteCode)) inviteCode = "
                             + "newInviteCode();",
-                    "the mock draws a new invite code until it differs from the previous one"));
+                    "the mock draws a new invite code until it differs from the previous one"),
+            Map.entry(
+                    API + "service/battlenet/BgsWireRecorder.java:.filter(method -> method.serviceHash() "
+                            + "== header.getServiceHash()",
+                    "a BGS service hash from a frame header against a known method's; a public routing id, "
+                            + "not a secret"));
 
     private static final Path ROOT = Path.of("..");
     private static final List<String> MODULES = List.of("catapult-api", "catapult-common", "catapult-web");

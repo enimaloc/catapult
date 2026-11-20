@@ -225,4 +225,46 @@ class SessionDebugTest {
         assertThat(SessionDebug.OFF.outbound(alice, "BGS", "op", () -> "x", answer -> "x",
                 () -> CompletableFuture.completedFuture("ok"))).isCompletedWithValue("ok");
     }
+
+    @Test
+    void exchange_recordsTheFullRawExchangeForEachConcernedMember() {
+        byte[] request = {1, 2};
+        byte[] reply = {3};
+        RawExchange exchange = new RawExchange(now, "BGS", null, null, bytes("{\"a\":1}"), 0, null,
+                bytes("{}"), null, 12, request, reply);
+
+        debug.exchange(BOT, "k-alice"::equals, Direction.OUT, () -> exchange, "bgs.svc.1");
+
+        RawExchange raw = recorded(alice, Direction.OUT, "bgs.svc.1", false);
+        assertThat(raw.uri()).isEqualTo(SESSION);
+        assertThat(raw.method()).isEqualTo("BGS");
+        assertThat(text(raw.requestBody())).isEqualTo("{\"a\":1}");
+        assertThat(raw.status()).isZero();
+        assertThat(raw.durationMs()).isEqualTo(12);
+        assertThat(raw.requestRaw()).containsExactly(1, 2);
+        assertThat(raw.responseRaw()).containsExactly(3);
+        verify(recorder, never()).record(eq(bob), any(), any(), any(), anyBoolean(), any());
+    }
+
+    @Test
+    void exchange_namingNoMemberInDebug_neitherBuiltNorRecorded() {
+        debug.exchange(BOT, "k-carol"::equals, Direction.IN, () -> {
+            throw new AssertionError("built");
+        }, "op");
+
+        verify(recorder, never()).record(any(), any(), any(), any(), anyBoolean(), any());
+    }
+
+    @Test
+    void exchange_failingToBuild_swallowed() {
+        debug.exchange(BOT, key -> true, Direction.IN, () -> {
+            throw new IllegalStateException("boom");
+        }, "op");
+
+        verify(recorder, never()).record(any(), any(), any(), any(), anyBoolean(), any());
+    }
+
+    private static byte[] bytes(String text) {
+        return text.getBytes(StandardCharsets.UTF_8);
+    }
 }

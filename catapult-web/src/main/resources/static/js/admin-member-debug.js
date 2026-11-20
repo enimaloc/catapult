@@ -4,10 +4,11 @@
  * fragment and the address bar, which admin-tabs.js hands back to the fragment on a reload. The period's fields are
  * in the browser's local time, the query string in ISO instants (the fragment gives the instants back as
  * data-iso). A filter or a page swaps only [data-debug-results]. A row opens the exchange (a JSON read of it) in
- * the page's dialog, bodies and headers indented when they are JSON, a section it has nothing for hidden. Every
- * text from the exchange reaches the page through textContent. The trace id is shown to be copied: no Sentry
- * organisation or project is configured to build a link from. The recording is deleted once confirmed, then the
- * page goes back to the list. Listeners are delegated to the page's root, which comes and goes with the sub-view.
+ * the page's dialog, bodies and headers indented when they are JSON, the raw frames as hex dumps, a section it has
+ * nothing for hidden. Every text from the exchange reaches the page through textContent. The trace id is shown to
+ * be copied: no Sentry organisation or project is configured to build a link from. The recording is deleted once
+ * confirmed, then the page goes back to the list. Listeners are delegated to the page's root, which comes and goes
+ * with the sub-view.
  */
 window.CatapultAdminMemberDebug = (function () {
     const FILTERS = ["service", "direction", "outcome", "from", "to"];
@@ -85,6 +86,22 @@ window.CatapultAdminMemberDebug = (function () {
         return text;
     }
 
+    /**
+     * A frame recorded as lowercase hex, laid out as a hex dump: an eight digits offset then 16 bytes per line. A
+     * truncation marker ("…(+N chars)") ends it on its own line; any other text (the "omitted" note) is as it is.
+     */
+    function hexDump(raw) {
+        const match = /^((?:[0-9a-f]{2})*)(…\(\+\d+ chars\))?$/.exec(raw ?? "");
+        if (!match) return raw ?? "";
+        const bytes = match[1].match(/../g) ?? [];
+        const lines = [];
+        for (let i = 0; i < bytes.length; i += 16) {
+            lines.push(`${i.toString(16).padStart(8, "0")}  ${bytes.slice(i, i + 16).join(" ")}`);
+        }
+        if (match[2]) lines.push(match[2]);
+        return lines.join("\n");
+    }
+
     function show(dialog, name, text) {
         const field = dialog.querySelector(`[data-debug-field="${name}"]`);
         const section = dialog.querySelector(`[data-debug-section="${name}"]`);
@@ -100,6 +117,8 @@ window.CatapultAdminMemberDebug = (function () {
         show(dialog, "requestBody", pretty(e.requestBody));
         show(dialog, "responseHeaders", pretty(e.responseHeaders));
         show(dialog, "responseBody", pretty(e.responseBody));
+        show(dialog, "requestRaw", e.requestRaw ? hexDump(e.requestRaw) : null);
+        show(dialog, "responseRaw", e.responseRaw ? hexDump(e.responseRaw) : null);
         show(dialog, "errorMessage", e.errorMessage);
         show(dialog, "traceId", e.traceId);
         dialog.open = true;
@@ -158,5 +177,5 @@ window.CatapultAdminMemberDebug = (function () {
         if (event.detail.tab === "members") attach();
     });
 
-    return { attach };
+    return { attach, hexDump };
 })();

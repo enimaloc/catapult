@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.getter;
 
+import tools.jackson.databind.JsonNode;
+import fr.enimaloc.catapult.domain.epic.EpicServiceAccount;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.epic.EpicFriendLink;
@@ -89,5 +91,63 @@ class EpicGameGetterTest {
         when(active.real(user.getId(), SimulatedCalls.EPIC_PRESENCE)).thenReturn(false);
 
         assertThat(getter.getCurrentGame(user)).isEmpty();
+    }
+
+    // --- Detection trace ---
+
+    @Test
+    void traceReason_gateClosed() {
+        when(gate.isAvailableReadOnly(user)).thenReturn(false);
+
+        assertThat(TraceProbe.entryAfter(user, () -> getter.getCurrentGame(user)).path("reason").asString())
+            .isEqualTo("gate closed");
+    }
+
+    @Test
+    void traceReason_blockedBySimulation() {
+        SimulationGate active = mock(SimulationGate.class);
+        when(simulationGate.getIfAvailable()).thenReturn(active);
+        when(active.real(user.getId(), SimulatedCalls.EPIC_PRESENCE)).thenReturn(false);
+
+        assertThat(TraceProbe.entryAfter(user, () -> getter.getCurrentGame(user)).path("reason").asString())
+            .isEqualTo("blocked by the simulation");
+    }
+
+    @Test
+    void traceReason_noLink() {
+        when(links.findByUser(user)).thenReturn(Optional.empty());
+
+        assertThat(TraceProbe.entryAfter(user, () -> getter.getCurrentGame(user)).path("reason").asString())
+            .isEqualTo("no friend link");
+    }
+
+    @Test
+    void traceReason_linkPending() {
+        link.setStatus(EpicFriendLink.Status.PENDING);
+        EpicServiceAccount bot = new EpicServiceAccount();
+        bot.setId(UUID.randomUUID());
+        link.setServiceAccount(bot);
+        when(sessions.sessionState(bot.getId())).thenReturn("BACKOFF");
+
+        JsonNode entry = TraceProbe.entryAfter(user, () -> getter.getCurrentGame(user));
+
+        assertThat(entry.path("reason").asString()).isEqualTo("friend link is PENDING");
+        assertThat(entry.at("/details/session").asString()).isEqualTo("BACKOFF");
+    }
+
+    @Test
+    void traceReason_linkHasNoAccountIdYet() {
+        link.setEpicAccountId(null);
+
+        assertThat(TraceProbe.entryAfter(user, () -> getter.getCurrentGame(user)).path("reason").asString())
+            .isEqualTo("friend link has no account id yet");
+    }
+
+    @Test
+    void traceReason_noGameInThePresence() {
+        when(sessions.currentGame("acc42")).thenReturn(Optional.empty());
+
+        assertThat(TraceProbe.entryAfter(user, () -> getter.getCurrentGame(user)).path("reason").asString())
+            .isEqualTo("no game in the presence");
     }
 }

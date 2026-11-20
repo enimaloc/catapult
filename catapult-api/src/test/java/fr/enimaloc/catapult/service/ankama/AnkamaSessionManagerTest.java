@@ -237,6 +237,17 @@ class AnkamaSessionManagerTest {
     }
 
     @Test
+    void eachChatClientIsTappedForTheDebugRecordingOfItsBot() {
+        TestSessionDebug watched = new TestSessionDebug("ankama", bot1.getId(), AnkamaDebugKeys.user(42L));
+        debug = watched.debug;
+
+        started();
+
+        assertThat(clients).isNotEmpty().allSatisfy(client -> assertThat(client.tap).isNotNull());
+        assertThat(clients.stream().filter(client -> client.tap.wants())).hasSize(1);
+    }
+
+    @Test
     void offlinePresence_clearsTheGame() {
         AnkamaSessionManager manager = started();
         FakeChatClient client = clients.getFirst();

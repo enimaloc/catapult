@@ -4,6 +4,7 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Message;
 import fr.enimaloc.catapult.bgs.core.BgsChannel;
+import fr.enimaloc.catapult.bgs.core.WireTap;
 import fr.enimaloc.catapult.bgs.proto.ServiceMethod;
 
 import java.util.ArrayList;
@@ -24,6 +25,7 @@ final class FakeBgsChannel implements BgsChannel {
     private final Map<String, Consumer<ByteString>> handlers = new HashMap<>();
     private final List<Consumer<Throwable>> closeListeners = new ArrayList<>();
     boolean closed;
+    WireTap tap;
 
     @Override
     @SuppressWarnings("unchecked")
@@ -60,6 +62,11 @@ final class FakeBgsChannel implements BgsChannel {
 
     @Override
     public void setCiid(String ciid) {
+    }
+
+    @Override
+    public void setWireTap(WireTap tap) {
+        this.tap = tap;
     }
 
     @Override

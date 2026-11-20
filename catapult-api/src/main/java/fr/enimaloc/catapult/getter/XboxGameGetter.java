@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
+import fr.enimaloc.catapult.service.debug.DetectionTrace;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
 import fr.enimaloc.catapult.service.xbox.XboxUserTokenService;
 import jakarta.annotation.PostConstruct;
@@ -76,24 +77,36 @@ public class XboxGameGetter implements GameGetter {
 
     @Override
     public Optional<DetectedGame> getCurrentGame(UserAccount user) {
-        Optional<OAuthToken> linked = oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.XBOX);
-        if (linked.isEmpty()) {
+        if (oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.XBOX).isEmpty()) {
+            DetectionTrace.reason("no linked Xbox token");
             return Optional.empty();
         }
-
-        return tokenService.getToken(user).flatMap(session -> {
-            for (TitlePresence title : fetchActiveTitles(user, session)) {
-                TitleDetail detail = resolveTitleDetail(session, title.titleId());
-                if (detail.isApp()) {
-                    log.debug("Skipping Xbox title {} ({}): Titlehub lists it as {}, not a game",
-                        title.titleId(), title.titleName(), detail.type());
-                    continue;
-                }
-                String productId = detail.productId().orElse(title.titleId());
-                return Optional.of(new DetectedGame(productId, GameBinding.SourceType.XBOX, title.titleName()));
-            }
+        Optional<XboxUserTokenService.XstsSession> token = tokenService.getToken(user);
+        if (token.isEmpty()) {
+            DetectionTrace.reason("token refresh failed");
             return Optional.empty();
-        });
+        }
+        XboxUserTokenService.XstsSession session = token.get();
+        List<TitlePresence> active = fetchActiveTitles(user, session);
+        List<String> skipped = new ArrayList<>();
+        for (TitlePresence title : active) {
+            TitleDetail detail = resolveTitleDetail(session, title.titleId());
+            if (detail.isApp()) {
+                log.debug("Skipping Xbox title {} ({}): Titlehub lists it as {}, not a game",
+                    title.titleId(), title.titleName(), detail.type());
+                skipped.add(title.titleId() + " (" + detail.type() + ")");
+                continue;
+            }
+            String productId = detail.productId().orElse(title.titleId());
+            return Optional.of(new DetectedGame(productId, GameBinding.SourceType.XBOX, title.titleName()));
+        }
+        if (active.isEmpty()) {
+            DetectionTrace.reason("no active title");
+        } else {
+            DetectionTrace.reason("only apps are active");
+            DetectionTrace.detail("skipped", skipped);
+        }
+        return Optional.empty();
     }
 
     @SuppressWarnings("unchecked")

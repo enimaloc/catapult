@@ -12,6 +12,17 @@ import fr.enimaloc.catapult.getter.steam.SteamGameGetter;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.ActivityLogService;
 import fr.enimaloc.catapult.service.premium.PremiumService;
+import fr.enimaloc.catapult.domain.binding.GameBinding;
+import fr.enimaloc.catapult.domain.debug.DebugExchange.Direction;
+import fr.enimaloc.catapult.getter.DetectedGame;
+import fr.enimaloc.catapult.service.debug.DebugExchangeRecorder;
+import fr.enimaloc.catapult.service.debug.DebugMemberRegistry;
+import fr.enimaloc.catapult.service.debug.DetectionTrace;
+import fr.enimaloc.catapult.service.debug.RawExchange;
+import org.mockito.ArgumentCaptor;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
+import java.nio.charset.StandardCharsets;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,6 +31,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import fr.enimaloc.catapult.event.GameDetectedEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.mock.env.MockEnvironment;
 import org.springframework.scheduling.Trigger;
@@ -35,6 +47,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -60,7 +73,7 @@ class SchedulerServiceTest {
         registry = new SimpleMeterRegistry();
         schedulerService = new SchedulerService(
             userAccountRepository, gameGetterChain, gameStateService, eventPublisher, registry,
-            Optional.empty(), Optional.empty(), bindingService, SimulationGates.none(), SiteRoles.active(), PollCadences.always(), activityLog);
+            Optional.empty(), Optional.empty(), bindingService, SimulationGates.none(), SiteRoles.active(), PollCadences.always(), activityLog, null, null);
     }
 
     @Test
@@ -169,7 +182,7 @@ class SchedulerServiceTest {
 
         SchedulerService service = new SchedulerService(
             userAccountRepository, gameGetterChain, gameStateService, eventPublisher, registry,
-            Optional.of(steamGetter), Optional.empty(), bindingService, SimulationGates.none(), SiteRoles.active(), PollCadences.always(), activityLog);
+            Optional.of(steamGetter), Optional.empty(), bindingService, SimulationGates.none(), SiteRoles.active(), PollCadences.always(), activityLog, null, null);
 
         service.poll();
 
@@ -201,7 +214,7 @@ class SchedulerServiceTest {
 
         SchedulerService service = new SchedulerService(
             userAccountRepository, gameGetterChain, gameStateService, eventPublisher, registry,
-            Optional.of(steamGetter), Optional.empty(), bindingService, SimulationGates.none(), SiteRoles.active(), PollCadences.always(), activityLog);
+            Optional.of(steamGetter), Optional.empty(), bindingService, SimulationGates.none(), SiteRoles.active(), PollCadences.always(), activityLog, null, null);
         when(gameGetterChain.resolve(user)).thenReturn(Optional.empty());
         when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.empty());
 
@@ -230,7 +243,7 @@ class SchedulerServiceTest {
         SchedulerService service = new SchedulerService(
             userAccountRepository, gameGetterChain, gameStateService, eventPublisher, registry,
             Optional.of(steamGetter), Optional.empty(), bindingService, SimulationGates.none(), SiteRoles.active(),
-            cadence, activityLog);
+            cadence, activityLog, null, null);
 
         service.poll();
 
@@ -249,7 +262,7 @@ class SchedulerServiceTest {
         SchedulerService service = new SchedulerService(
             userAccountRepository, gameGetterChain, gameStateService, eventPublisher, registry,
             Optional.empty(), Optional.empty(), bindingService, SimulationGates.none(), SiteRoles.active(),
-            cadence, activityLog);
+            cadence, activityLog, null, null);
 
         service.triggerManualCheck(user);
 
@@ -264,7 +277,7 @@ class SchedulerServiceTest {
         SchedulerService service = new SchedulerService(
             userAccountRepository, gameGetterChain, gameStateService, eventPublisher, registry,
             Optional.empty(), Optional.empty(), bindingService, SimulationGates.none(), SiteRoles.active(),
-            cadence, activityLog);
+            cadence, activityLog, null, null);
         Instant t0 = Instant.parse("2026-11-04T12:00:00Z");
         SimpleTriggerContext context = new SimpleTriggerContext(Clock.fixed(t0, ZoneOffset.UTC));
         Trigger trigger = service.pollTrigger();
@@ -304,7 +317,7 @@ class SchedulerServiceTest {
         when(gameStateService.getLastKnownGame(any())).thenReturn(Optional.empty());
         SchedulerService service = new SchedulerService(
             userAccountRepository, gameGetterChain, gameStateService, eventPublisher, registry,
-            Optional.of(steamGetter), Optional.empty(), bindingService, SimulationGates.none(), SiteRoles.active(), PollCadences.always(), activityLog);
+            Optional.of(steamGetter), Optional.empty(), bindingService, SimulationGates.none(), SiteRoles.active(), PollCadences.always(), activityLog, null, null);
 
         service.poll();
 
@@ -322,7 +335,7 @@ class SchedulerServiceTest {
         when(gameStateService.getLastKnownGame(any())).thenReturn(Optional.empty());
         SchedulerService service = new SchedulerService(
             userAccountRepository, gameGetterChain, gameStateService, eventPublisher, registry,
-            Optional.empty(), Optional.empty(), bindingService, SimulationGates.of(mock(SimulationGate.class)), SiteRoles.active(), PollCadences.always(), activityLog);
+            Optional.empty(), Optional.empty(), bindingService, SimulationGates.of(mock(SimulationGate.class)), SiteRoles.active(), PollCadences.always(), activityLog, null, null);
 
         service.poll();
 
@@ -333,10 +346,175 @@ class SchedulerServiceTest {
     void poll_doesNothingOnStandby() {
         SchedulerService standby = new SchedulerService(
             userAccountRepository, gameGetterChain, gameStateService, eventPublisher, registry,
-            Optional.empty(), Optional.empty(), bindingService, SimulationGates.none(), SiteRoles.standby(), PollCadences.always(), activityLog);
+            Optional.empty(), Optional.empty(), bindingService, SimulationGates.none(), SiteRoles.standby(), PollCadences.always(), activityLog, null, null);
 
         standby.poll();
 
         verifyNoInteractions(gameGetterChain, eventPublisher, userAccountRepository);
+    }
+
+    // --- Detection trace of a member in debug mode ---
+
+    private static final DetectedGame DOOM = new DetectedGame("379720", GameBinding.SourceType.STEAM, "DOOM");
+    private static final DetectedGame QUAKE = new DetectedGame("2310", GameBinding.SourceType.STEAM, "Quake");
+
+    /** Runs a manual check of {@code user}, in debug mode, and returns the recorded trace. */
+    private RawExchange tracedCycle(UserAccount user) {
+        DebugMemberRegistry debugMembers = mock(DebugMemberRegistry.class);
+        DebugExchangeRecorder recorder = mock(DebugExchangeRecorder.class);
+        when(debugMembers.modeOf(user.getId()))
+            .thenReturn(Optional.of(new DebugMemberRegistry.DebugMode(user.getId(), false)));
+        SchedulerService traced = new SchedulerService(
+            userAccountRepository, gameGetterChain, gameStateService, eventPublisher, registry,
+            Optional.empty(), Optional.empty(), bindingService, SimulationGates.none(), SiteRoles.active(),
+            PollCadences.always(), activityLog, debugMembers, recorder);
+
+        traced.triggerManualCheck(user);
+
+        assertThat(DetectionTrace.active()).isFalse();
+        ArgumentCaptor<RawExchange> raw = ArgumentCaptor.forClass(RawExchange.class);
+        verify(recorder).record(eq(user.getId()), eq(Direction.OUT), raw.capture(), eq("detection.cycle"),
+            eq(false), eq("detection"));
+        return raw.getValue();
+    }
+
+    private static JsonNode outcome(RawExchange raw) {
+        return JsonMapper.builder().build()
+            .readTree(new String(raw.requestBody(), StandardCharsets.UTF_8)).path("outcome");
+    }
+
+    private static UserAccount member() {
+        UserAccount user = new UserAccount();
+        user.setId(UUID.randomUUID());
+        return user;
+    }
+
+    @Test
+    void detectRecordsTheOutcomeChanged() {
+        UserAccount user = member();
+        when(gameGetterChain.resolve(user)).thenReturn(Optional.of(QUAKE));
+        when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(DOOM));
+        when(gameStateService.hasChanged(user, QUAKE)).thenReturn(true);
+
+        JsonNode outcome = outcome(tracedCycle(user));
+
+        assertThat(outcome.path("outcome").asString()).isEqualTo("changed");
+        assertThat(outcome.at("/from/sourceName").asString()).isEqualTo("DOOM");
+        assertThat(outcome.at("/to/sourceName").asString()).isEqualTo("Quake");
+        assertThat(outcome.at("/to/sourceId").asString()).isEqualTo("2310");
+    }
+
+    @Test
+    void detectStillAppliesAChangeWhenTheTraceCannotReadThePreviousGame() {
+        UserAccount user = member();
+        when(gameGetterChain.resolve(user)).thenReturn(Optional.of(QUAKE));
+        when(gameStateService.getLastKnownGame(user)).thenThrow(new IllegalStateException("db down"));
+        when(gameStateService.hasChanged(user, QUAKE)).thenReturn(true);
+
+        JsonNode outcome = outcome(tracedCycle(user));
+
+        assertThat(outcome.path("outcome").asString()).isEqualTo("changed");
+        assertThat(outcome.has("from")).isFalse();
+        verify(gameStateService).updateState(user, QUAKE);
+        verify(eventPublisher).publishEvent(any(GameDetectedEvent.class));
+    }
+
+    @Test
+    void detectRecordsTheOutcomeUnchanged() {
+        UserAccount user = member();
+        when(gameGetterChain.resolve(user)).thenReturn(Optional.of(DOOM));
+        when(gameStateService.hasChanged(user, DOOM)).thenReturn(false);
+
+        JsonNode outcome = outcome(tracedCycle(user));
+
+        assertThat(outcome.path("outcome").asString()).isEqualTo("unchanged");
+        assertThat(outcome.at("/game/sourceName").asString()).isEqualTo("DOOM");
+    }
+
+    @Test
+    void detectRecordsTheOutcomeCleared() {
+        UserAccount user = member();
+        when(gameGetterChain.resolve(user)).thenReturn(Optional.empty());
+        when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(DOOM));
+
+        JsonNode outcome = outcome(tracedCycle(user));
+
+        assertThat(outcome.path("outcome").asString()).isEqualTo("cleared");
+        assertThat(outcome.at("/from/sourceName").asString()).isEqualTo("DOOM");
+    }
+
+    @Test
+    void detectRecordsTheOutcomeNothing() {
+        UserAccount user = member();
+        when(gameGetterChain.resolve(user)).thenReturn(Optional.empty());
+        when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.empty());
+
+        assertThat(outcome(tracedCycle(user)).path("outcome").asString()).isEqualTo("nothing");
+    }
+
+    @Test
+    void detectRecordsTheOutcomeFrozen() {
+        UserAccount user = member();
+        when(gameGetterChain.resolve(user)).thenThrow(new ProviderStoppedException(GetterConfig.Provider.XBOX));
+
+        RawExchange raw = tracedCycle(user);
+
+        assertThat(outcome(raw).path("outcome").asString()).isEqualTo("frozen");
+        assertThat(outcome(raw).path("provider").asString()).isEqualTo("XBOX");
+        assertThat(raw.error()).isNull();
+    }
+
+    @Test
+    void detectRecordsTheOutcomeTimeout() {
+        UserAccount user = member();
+        when(gameGetterChain.resolve(user))
+            .thenThrow(new DetectionTimeoutException("Steam", new java.util.concurrent.TimeoutException()));
+
+        RawExchange raw = tracedCycle(user);
+
+        assertThat(outcome(raw).path("outcome").asString()).isEqualTo("timeout");
+        assertThat(outcome(raw).path("message").asString()).isEqualTo("Steam did not answer in time");
+        assertThat(raw.error()).isEqualTo("Steam did not answer in time");
+    }
+
+    @Test
+    void detectRecordsTheCycleEvenWhenTheChainFails() {
+        UserAccount user = member();
+        when(gameGetterChain.resolve(user)).thenThrow(new IllegalStateException("db down"));
+
+        DebugMemberRegistry debugMembers = mock(DebugMemberRegistry.class);
+        DebugExchangeRecorder recorder = mock(DebugExchangeRecorder.class);
+        when(debugMembers.modeOf(user.getId()))
+            .thenReturn(Optional.of(new DebugMemberRegistry.DebugMode(user.getId(), false)));
+        SchedulerService traced = new SchedulerService(
+            userAccountRepository, gameGetterChain, gameStateService, eventPublisher, registry,
+            Optional.empty(), Optional.empty(), bindingService, SimulationGates.none(), SiteRoles.active(),
+            PollCadences.always(), activityLog, debugMembers, recorder);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> traced.triggerManualCheck(user))
+            .hasMessage("db down");
+        assertThat(DetectionTrace.active()).isFalse();
+        verify(recorder).record(eq(user.getId()), eq(Direction.OUT), any(), eq("detection.cycle"), eq(false),
+            eq("detection"));
+    }
+
+    @Test
+    void detectOpensNoTraceOutsideDebug() {
+        UserAccount user = member();
+        DebugMemberRegistry debugMembers = mock(DebugMemberRegistry.class);
+        DebugExchangeRecorder recorder = mock(DebugExchangeRecorder.class);
+        when(debugMembers.modeOf(user.getId())).thenReturn(Optional.empty());
+        when(gameGetterChain.resolve(user)).thenReturn(Optional.of(DOOM));
+        when(gameStateService.hasChanged(user, DOOM)).thenReturn(true);
+        SchedulerService plain = new SchedulerService(
+            userAccountRepository, gameGetterChain, gameStateService, eventPublisher, registry,
+            Optional.empty(), Optional.empty(), bindingService, SimulationGates.none(), SiteRoles.active(),
+            PollCadences.always(), activityLog, debugMembers, recorder);
+
+        plain.triggerManualCheck(user);
+
+        verifyNoInteractions(recorder);
+        // the previous game is only looked up for the trace
+        verify(gameStateService, never()).getLastKnownGame(user);
     }
 }
