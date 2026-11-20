@@ -26,6 +26,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -105,14 +107,41 @@ class BgsWireRecorderTest {
 
     @Test
     void recordsAnUndecodableFrameFoundByItsRawBytes() {
-        byte[] garbage = ("ÿÿStreamer#1234").getBytes(StandardCharsets.ISO_8859_1);
-        ByteString body = ByteString.copyFrom(garbage);
+        byte[] garbage = ("\u00ff\u00ffStreamer#1234").getBytes(StandardCharsets.ISO_8859_1);
 
-        recorder.onExchange(new WireExchange(false, AT, 0, header(0x12345678, 3), body, null, null, null, null));
+        recorder.onExchange(serverCall(BgsServices.FRIENDS_LISTENER_ON_UPDATE_FRIEND_STATE,
+                ByteString.copyFrom(garbage)));
 
-        RawExchange raw = recorded(Direction.IN, "bgs.0x12345678.3");
+        RawExchange raw = recorded(Direction.IN, "bgs.friends.v2.client.FriendsListener."
+                + BgsServices.FRIENDS_LISTENER_ON_UPDATE_FRIEND_STATE.methodId());
         assertThat(raw.requestBody()).isNull();
         assertThat(raw.requestRaw()).isEqualTo(garbage);
+    }
+
+    @Test
+    void recordsAnUnknownMethodOfTheFriendsService() {
+        byte[] garbage = ("\u00ff\u00ffStreamer#1234").getBytes(StandardCharsets.ISO_8859_1);
+        int friends = BgsServices.FRIENDS_LISTENER_ON_UPDATE_FRIEND_STATE.serviceHash();
+
+        recorder.onExchange(new WireExchange(false, AT, 0, header(friends, 99), ByteString.copyFrom(garbage), null,
+                null, null, null));
+
+        RawExchange raw = recorded(Direction.IN, String.format("bgs.0x%08x.99", friends));
+        assertThat(raw.requestRaw()).isEqualTo(garbage);
+    }
+
+    @Test
+    void searchesRawBytesOnlyInTheBodyThatDidNotDecode() {
+        // The decoded request only holds the BattleTag inside a longer value: no exact match
+        ByteString request = SendInvitationRequest.newBuilder()
+                .setTarget(SendInvitationTarget.newBuilder().setBattleTag("xStreamer#1234y")).build().toByteString();
+        ByteString garbageReply = ByteString.copyFrom(new byte[] {(byte) 0xFF, (byte) 0xFF});
+        ServiceMethod<?, ?> method = BgsServices.FRIENDS_SEND_INVITATION;
+
+        recorder.onExchange(new WireExchange(true, AT, 0, header(method.serviceHash(), method.methodId()), request,
+                Header.newBuilder().setServiceId(254).buildPartial(), garbageReply, method, null));
+
+        nothingRecorded();
     }
 
     @Test
@@ -123,19 +152,17 @@ class BgsWireRecorderTest {
     }
 
     @Test
-    void neverRecordsExcludedServices() {
+    void neverRecordsServicesOutsideTheAllowlist() {
         ByteString logon = LogonRequest.newBuilder().setLocale("Streamer#1234").buildPartial().toByteString();
         ByteString named = ByteString.copyFrom("Streamer#1234", StandardCharsets.UTF_8);
 
         recorder.onExchange(new WireExchange(true, AT, 0, header(BgsServices.AUTHENTICATION_LOGON.serviceHash(), 1),
                 logon, null, null, BgsServices.AUTHENTICATION_LOGON, null));
+        recorder.onExchange(new WireExchange(false, AT, 0, header(0x12345678, 3), named, null, null, null, null));
         recorder.onExchange(new WireExchange(true, AT, 0, header(BgsServices.SELECT_GAME_ACCOUNT_HASH, 1), named,
                 null, null, null, null));
         recorder.onExchange(new WireExchange(false, AT, 0, header(BgsServices.SELF_PRESENCE_HASH, 1), named,
                 null, null, null, null));
-        // A method of an excluded service missing from the table is only known by its hash
-        recorder.onExchange(new WireExchange(false, AT, 0, header(BgsServices.CONNECTION_CONNECT.serviceHash(), 9),
-                named, null, null, null, null));
 
         nothingRecorded();
     }
@@ -158,9 +185,20 @@ class BgsWireRecorderTest {
     }
 
     @Test
-    void aFailureIsSwallowed() {
+    void ignoresAnExchangeWithoutHeader() {
         recorder.onExchange(new WireExchange(false, AT, 0, null, null, null, null, null, null));
 
         nothingRecorded();
+    }
+
+    @Test
+    void aFailureIsSwallowed() {
+        SessionDebug failing = mock(SessionDebug.class);
+        doThrow(new IllegalStateException("boom")).when(failing).exchange(any(), any(), any(), any(), any());
+
+        new BgsWireRecorder(BOT, failing).onExchange(
+                serverCall(BgsServices.FRIENDS_LISTENER_ON_UPDATE_FRIEND_STATE, friendState(42L)));
+
+        verify(failing).exchange(eq(BOT), any(), eq(Direction.IN), any(), any());
     }
 }

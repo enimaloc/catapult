@@ -20,14 +20,14 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import tools.jackson.databind.node.ObjectNode;
 
+import java.lang.reflect.Modifier;
 import java.nio.charset.StandardCharsets;
-import java.util.HashSet;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * Records, for the members in debug mode linked to one bot, the BGS exchanges of its session that name them: one
@@ -35,8 +35,8 @@ import java.util.stream.Stream;
  * Whom a frame names is read from its decoded body (exact values) and, when a body could not be decoded with its
  * schema, searched in its raw bytes.
  *
- * <p>The services that can carry login secrets (authentication, connection, account, challenge, game utilities,
- * game account selection, own presence) are never recorded, whoever they name.
+ * <p>Only the friends and presence services are recorded: everything else (login, connection, account, game account
+ * selection, own presence, unknown services) can carry secrets and is dropped before being decoded.
  */
 @Slf4j
 public final class BgsWireRecorder implements WireTap {
@@ -44,16 +44,9 @@ public final class BgsWireRecorder implements WireTap {
     /** The HTTP-like header holding the BGS header as JSON. */
     static final String HEADER = "Bgs-Header";
 
-    private static final List<String> EXCLUDED_SERVICES =
-            List.of("authentication.", "connection.", "account.", "challenge.", "game_utilities.");
-    /** Raw and unknown calls are only known by their hash: those of the excluded services the table knows. */
-    private static final Set<Integer> EXCLUDED_HASHES = Stream.concat(
-                    Stream.of(BgsServices.SELECT_GAME_ACCOUNT_HASH, BgsServices.SELF_PRESENCE_HASH),
-                    Stream.of(BgsServices.ACCOUNT_SUBSCRIBE, BgsServices.ACCOUNT_LISTENER_ON_ACCOUNT_STATE_UPDATED,
-                                    BgsServices.AUTHENTICATION_LISTENER_ON_LOGON_COMPLETE,
-                                    BgsServices.AUTHENTICATION_LOGON, BgsServices.CONNECTION_CONNECT)
-                            .map(ServiceMethod::serviceHash))
-            .collect(Collectors.toUnmodifiableSet());
+    private static final List<String> RECORDED_SERVICES = List.of("friends.", "presence.");
+    /** Raw and unknown calls are only known by their hash: those of the recorded services the table knows. */
+    private static final Set<Integer> RECORDED_HASHES = recordedHashes();
 
     private final UUID serviceAccountId;
     private final SessionDebug debug;
@@ -76,18 +69,13 @@ public final class BgsWireRecorder implements WireTap {
     @Override
     public void onExchange(WireExchange exchange) {
         try {
-            if (excluded(exchange)) {
+            if (exchange.requestHeader() == null || !recorded(exchange)) {
                 return;
             }
             ServiceMethod<?, ?> method = exchange.method();
             Body request = body(exchange.requestBody(), method == null ? null : method.requestParser());
             Body reply = body(exchange.replyBody(), method == null ? null : method.responseParser());
-            Set<String> keys = new HashSet<>(WireKeys.of(request.json()));
-            keys.addAll(WireKeys.of(reply.json()));
-            Predicate<String> concerns = WireKeys.concerns(keys);
-            if (!request.typed() || !reply.typed()) {
-                concerns = concerns.or(WireKeys.rawConcerns(request.raw())).or(WireKeys.rawConcerns(reply.raw()));
-            }
+            Predicate<String> concerns = concerns(request).or(concerns(reply));
             debug.exchange(serviceAccountId, concerns, exchange.initiatedLocally() ? Direction.OUT : Direction.IN,
                     () -> raw(exchange, request, reply), operation(exchange));
         } catch (RuntimeException e) {
@@ -96,12 +84,38 @@ public final class BgsWireRecorder implements WireTap {
         }
     }
 
-    private static boolean excluded(WireExchange exchange) {
+    private static boolean recorded(WireExchange exchange) {
         ServiceMethod<?, ?> method = exchange.method();
-        if (method != null && EXCLUDED_SERVICES.stream().anyMatch(method.service()::startsWith)) {
-            return true;
+        if (method != null) {
+            return RECORDED_SERVICES.stream().anyMatch(method.service()::startsWith);
         }
-        return EXCLUDED_HASHES.contains(exchange.requestHeader().getServiceHash());
+        return RECORDED_HASHES.contains(exchange.requestHeader().getServiceHash());
+    }
+
+    /** The hashes of the recorded services among the methods {@link BgsServices} declares. */
+    private static Set<Integer> recordedHashes() {
+        return Arrays.stream(BgsServices.class.getFields())
+                .filter(field -> Modifier.isStatic(field.getModifiers())
+                        && ServiceMethod.class.isAssignableFrom(field.getType()))
+                .map(field -> {
+                    try {
+                        return (ServiceMethod<?, ?>) field.get(null);
+                    } catch (IllegalAccessException e) {
+                        throw new IllegalStateException(e);
+                    }
+                })
+                .filter(method -> RECORDED_SERVICES.stream().anyMatch(method.service()::startsWith))
+                .map(ServiceMethod::serviceHash)
+                .collect(Collectors.toUnmodifiableSet());
+    }
+
+    /**
+     * Who a body names: exact leaf values when its schema decoded it, else its raw bytes (and the leaves decoded
+     * without schema).
+     */
+    private static Predicate<String> concerns(Body body) {
+        Predicate<String> leaves = WireKeys.concerns(WireKeys.of(body.json()));
+        return body.typed() ? leaves : leaves.or(WireKeys.rawConcerns(body.raw()));
     }
 
     private static String operation(WireExchange exchange) {
