@@ -214,6 +214,17 @@ class BattleNetSessionManagerTest {
     }
 
     @Test
+    void eachChannelIsTappedForTheDebugRecordingOfItsBot() {
+        TestSessionDebug watched = new TestSessionDebug("battlenet", bot1.getId(), BattleNetDebugKeys.account(42L));
+        debug = watched.debug;
+
+        started();
+
+        assertThat(channels).isNotEmpty().allSatisfy(channel -> assertThat(channel.tap).isNotNull());
+        assertThat(channels.stream().filter(channel -> channel.tap.wants())).hasSize(1);
+    }
+
+    @Test
     void presenceEventUpdatesCurrentGame() {
         BattleNetSessionManager manager = started();
 

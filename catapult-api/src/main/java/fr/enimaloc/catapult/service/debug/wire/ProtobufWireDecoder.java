@@ -88,7 +88,8 @@ public final class ProtobufWireDecoder {
         return hex;
     }
 
-    private static String printableText(byte[] payload) {
+    /** The payload as text when it is valid UTF-8 without control characters (tabs and newlines aside), else null. */
+    static String printableText(byte[] payload) {
         String text;
         try {
             text = StandardCharsets.UTF_8.newDecoder()

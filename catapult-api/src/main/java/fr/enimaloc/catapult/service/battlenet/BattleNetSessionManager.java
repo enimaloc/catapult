@@ -368,7 +368,14 @@ public class BattleNetSessionManager implements SmartLifecycle {
             this.accountId = account.getId();
             this.client = new BgsClient(new BgsClientConfig(host, BGS_PORT, account.getEmail(), LOCALE),
                     coordinator.ticketProviderFor(accountId), this, mintExecutor);
-            this.connection = new BgsConnection(client, channels, scheduler, MIN_BACKOFF, MAX_BACKOFF);
+            BgsWireRecorder tap = new BgsWireRecorder(accountId, debug);
+            // Each new connection is observed for the members in debug mode, from its first frame
+            Supplier<BgsChannel> tapped = () -> {
+                BgsChannel channel = channels.get();
+                channel.setWireTap(tap);
+                return channel;
+            };
+            this.connection = new BgsConnection(client, tapped, scheduler, MIN_BACKOFF, MAX_BACKOFF);
         }
 
         void start() {
