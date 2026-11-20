@@ -6,10 +6,16 @@
  * checks active() first, so nothing is built outside debug mode.
  *
  * Secrets never leave the page, stripped before anything is queued:
+ * - OBS data is kept by an allowlist (OBS_KEPT): only the requests and events known to carry no
+ *   secret (versions, stats, scenes, scene items, the input list, stream, recording, transitions,
+ *   studio mode, audio levels…) keep their values. Every other request, answer or event (input,
+ *   filter and stream service settings, profile parameters, persistent data, vendor messages,
+ *   custom events not from Twitchat, any type not listed) keeps only its shape: the same keys,
+ *   each value replaced by its type, with its length for a string or an array (stripObs);
+ * - OBS's opening messages (Hello, Identify, Identified, Reidentify) keep only their versions and
+ *   event subscriptions, the authentication dropped, anything else by shape;
  * - by name, as catapult-api's DebugRedactor names them (password, token, *key, auth…), whatever
- *   the value; the OBS authentication proof is dropped altogether (stripObs);
- * - by OBS request or event, where the secret is in a value no name gives away: stream service
- *   settings, profile parameters, persistent data, vendor requests and events (stripObs);
+ *   the value, in what is kept;
  * - Catapult's signed action tokens, UUIDs anywhere in a Twitchat message's data (stripTwitchat);
  * - in every URL of any string (overlay URLs carry account tokens in their path or query, an
  *   ffmpeg input its passphrase): userinfo dropped, path, query values and fragment redacted.
@@ -52,8 +58,47 @@ window.CatapultDebugCapture = (function () {
     const SECRET_NAME_PARTS = ["token", "secret", "pass", "ticket", "signature", "apikey", "api_key", "api-key",
         "bearer", "auth", "cred"];
     const NOT_SECRET = new Set(["token_type", "tokentype"]);
-    // Kept in the stream service settings: which service, and its server once its URL is stripped.
-    const STREAM_SERVICE_KEPT = new Set(["service", "server"]);
+    // The OBS requests and events whose data is kept, each with the members of its data reduced to
+    // their shape anyway (settings, which may hold anything); any other type keeps only its shape.
+    const NONE = [];
+    const OBS_KEPT = new Map([
+        // OBS itself
+        ["GetVersion", NONE], ["GetStats", NONE], ["Sleep", NONE], ["ExitStarted", NONE],
+        // scenes
+        ["GetSceneList", NONE], ["GetCurrentProgramScene", NONE], ["SetCurrentProgramScene", NONE],
+        ["GetCurrentPreviewScene", NONE], ["SetCurrentPreviewScene", NONE], ["CurrentProgramSceneChanged", NONE],
+        ["CurrentPreviewSceneChanged", NONE], ["SceneListChanged", NONE], ["SceneCreated", NONE],
+        ["SceneRemoved", NONE], ["SceneNameChanged", NONE],
+        // scene items
+        ["GetSceneItemList", NONE], ["GetSceneItemId", NONE], ["GetSceneItemEnabled", NONE],
+        ["SetSceneItemEnabled", NONE], ["SceneItemCreated", NONE], ["SceneItemRemoved", NONE],
+        ["SceneItemEnableStateChanged", NONE], ["SceneItemListReindexed", NONE],
+        // inputs: their names and kinds, never their settings
+        ["GetInputList", NONE], ["GetInputKindList", NONE], ["CreateInput", ["inputSettings"]], ["RemoveInput", NONE],
+        ["InputCreated", ["inputSettings", "defaultInputSettings"]], ["InputRemoved", NONE], ["InputNameChanged", NONE],
+        ["GetInputMute", NONE], ["SetInputMute", NONE], ["ToggleInputMute", NONE], ["InputMuteStateChanged", NONE],
+        ["GetInputVolume", NONE], ["SetInputVolume", NONE], ["InputVolumeChanged", NONE],
+        ["InputActiveStateChanged", NONE], ["InputShowStateChanged", NONE],
+        // stream and recording
+        ["GetStreamStatus", NONE], ["StartStream", NONE], ["StopStream", NONE], ["ToggleStream", NONE],
+        ["StreamStateChanged", NONE], ["GetRecordStatus", NONE], ["StartRecord", NONE], ["StopRecord", NONE],
+        ["ToggleRecord", NONE], ["PauseRecord", NONE], ["ResumeRecord", NONE], ["RecordStateChanged", NONE],
+        // transitions and studio mode
+        ["GetSceneTransitionList", NONE], ["GetCurrentSceneTransition", ["transitionSettings"]],
+        ["SetCurrentSceneTransition", NONE], ["SetCurrentSceneTransitionDuration", NONE],
+        ["TriggerStudioModeTransition", NONE], ["CurrentSceneTransitionChanged", NONE], ["SceneTransitionStarted", NONE],
+        ["SceneTransitionEnded", NONE], ["GetStudioModeEnabled", NONE], ["SetStudioModeEnabled", NONE],
+        ["StudioModeStateChanged", NONE],
+    ]);
+    // What an OBS opening message (Hello, Identify, Identified, Reidentify) keeps; its other members
+    // by shape, its authentication (challenge and salt, or the proof) dropped.
+    const OBS_OPENING_KEPT = new Set(["obsWebSocketVersion", "rpcVersion", "negotiatedRpcVersion", "eventSubscriptions"]);
+    // What a request, an answer or an event keeps around its data; its other members by shape.
+    const OBS_FRAME_KEPT = new Set(["requestType", "requestId", "requestStatus", "eventType", "eventIntent",
+        "haltOnFailure", "executionType"]);
+    const OBS_DATA = new Set(["requestData", "responseData", "eventData"]);
+    // The items of an array of objects described one by one, up to this many.
+    const SHAPE_ITEMS = 20;
 
     let target = null;
     // The widget token itself, once known from the widget's URL: removed as is and percent-encoded.
@@ -95,58 +140,30 @@ window.CatapultDebugCapture = (function () {
     }
 
     /**
-     * A copy of an OBS message's object, its secrets redacted where the request or event type says
-     * they are (OBS gives no telling name to these values).
+     * The shape of `value`, never a value: a string as string(length), an array of plain values as
+     * array(length), an object with its keys, each member's shape, a number or a boolean as its type.
      */
-    function byType(object) {
-        const copy = { ...object };
-        const both = (edit) => ["requestData", "responseData"].forEach((field) => {
-            if (copy[field] && typeof copy[field] === "object") copy[field] = edit({ ...copy[field] });
-        });
-        switch (object.requestType ?? object.eventType) {
-            case "GetStreamServiceSettings":
-            case "SetStreamServiceSettings":
-                both((data) => {
-                    const settings = data.streamServiceSettings;
-                    if (settings && typeof settings === "object") {
-                        data.streamServiceSettings = Object.fromEntries(Object.entries(settings).map(([key, value]) =>
-                            [key, STREAM_SERVICE_KEPT.has(key) ? value : redacted(value)]));
-                    }
-                    return data;
-                });
-                break;
-            case "GetProfileParameter":
-            case "SetProfileParameter":
-                both((data) => ({ ...data, parameterValue: redacted(data.parameterValue),
-                    defaultParameterValue: redacted(data.defaultParameterValue) }));
-                break;
-            case "GetPersistentData":
-            case "SetPersistentData":
-                both((data) => ({ ...data, slotValue: redacted(data.slotValue) }));
-                break;
-            case "CallVendorRequest":
-                both((data) => ({ ...data, requestData: redacted(data.requestData), responseData: redacted(data.responseData) }));
-                break;
-            case "VendorEvent":
-                if (copy.eventData && typeof copy.eventData === "object") {
-                    copy.eventData = { ...copy.eventData, eventData: redacted(copy.eventData.eventData) };
-                }
-                break;
+    function shape(value) {
+        if (value === null || value === undefined) return null;
+        if (typeof value === "string") return `string(${value.length})`;
+        if (Array.isArray(value)) {
+            if (!value.some((item) => item && typeof item === "object")) return `array(${value.length})`;
+            const items = value.slice(0, SHAPE_ITEMS).map(shape);
+            return value.length > SHAPE_ITEMS ? [...items, `…(+${value.length - SHAPE_ITEMS})`] : items;
         }
-        return copy;
+        if (typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, shape(item)]));
+        return typeof value;
     }
 
     /** A copy of `value`, its secret-named members redacted (`authentication` dropped), `strings` applied to its strings. */
-    function scrub(value, strings, typed) {
-        if (Array.isArray(value)) return value.map((item) => scrub(item, strings, typed));
+    function scrub(value, strings = (text) => text) {
+        if (Array.isArray(value)) return value.map((item) => scrub(item, strings));
         if (typeof value === "string") return strings(value);
         if (!value || typeof value !== "object") return value;
-        if (typed && value.origin === "twitchat") return stripTwitchat(value);
-        const source = typed && (value.requestType || value.eventType) ? byType(value) : value;
         const copy = {};
-        for (const [key, item] of Object.entries(source)) {
+        for (const [key, item] of Object.entries(value)) {
             if (key === "authentication") continue;
-            copy[strings(key)] = isSecretName(key) ? redacted(item) : scrub(item, strings, typed);
+            copy[strings(key)] = isSecretName(key) ? redacted(item) : scrub(item, strings);
         }
         return copy;
     }
@@ -156,17 +173,48 @@ window.CatapultDebugCapture = (function () {
     /** A Twitchat message (or its data) without the action tokens and secret-named members of its data. */
     function stripTwitchat(message) {
         return safely((value) => {
-            if (!value || typeof value !== "object" || Array.isArray(value)) return scrub(value, noTokens, false);
+            if (!value || typeof value !== "object" || Array.isArray(value)) return scrub(value, noTokens);
             const copy = { ...value };
-            if ("data" in copy) copy.data = scrub(copy.data, noTokens, false);
+            if ("data" in copy) copy.data = scrub(copy.data, noTokens);
             if (Array.isArray(copy.payloads)) copy.payloads = copy.payloads.map(stripTwitchat);
             return copy;
         }, message);
     }
 
-    /** An OBS message without its authentication or secrets, its Twitchat messages stripped. */
+    const isTwitchat = (value) => value?.origin === "twitchat";
+
+    /** The data of an OBS request, answer or event of `type`: kept when allowed, its shape otherwise. */
+    function obsData(type, data) {
+        if (type === "CustomEvent" && isTwitchat(data)) return stripTwitchat(data);
+        if (type === "BroadcastCustomEvent" && isTwitchat(data?.eventData)) return { ...shape(data), eventData: stripTwitchat(data.eventData) };
+        const shaped = OBS_KEPT.get(type);
+        if (!shaped || !data || typeof data !== "object" || Array.isArray(data)) return shaped ? scrub(data) : shape(data);
+        const copy = scrub(data);
+        for (const name of shaped) if (name in data) copy[name] = shape(data[name]);
+        return copy;
+    }
+
+    /** An OBS message's data (op's d): see the allowlist above. */
+    function obsMessage(d) {
+        if (!d || typeof d !== "object" || Array.isArray(d)) return shape(d);
+        const type = d.requestType ?? d.eventType;
+        const framed = type !== undefined || Array.isArray(d.requests) || Array.isArray(d.results);
+        const copy = {};
+        for (const [key, item] of Object.entries(d)) {
+            if (framed && (key === "requests" || key === "results")) {
+                copy[key] = Array.isArray(item) ? item.map(obsMessage) : shape(item);
+            } else if (framed && OBS_DATA.has(key)) {
+                copy[key] = obsData(type, item);
+            } else if (key !== "authentication") {
+                copy[key] = (framed ? OBS_FRAME_KEPT : OBS_OPENING_KEPT).has(key) ? scrub(item) : shape(item);
+            }
+        }
+        return copy;
+    }
+
+    /** An OBS message's data without its authentication or secrets, its Twitchat messages stripped. */
     function stripObs(message) {
-        return safely((value) => scrub(value, (text) => text, true), message);
+        return safely(obsMessage, message);
     }
 
     /** A URL found in a string, without what could be a secret in it: Catapult's own are kept as they are. */

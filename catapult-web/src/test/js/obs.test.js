@@ -492,7 +492,7 @@ describe("debug capture", () => {
         expect(captured().at(-1)).toEqual(expect.objectContaining({ direction: "OUT", operation: "Close" }));
     });
 
-    it("captures an input's settings without the secrets in its URLs", async () => {
+    it("captures only the shape of an input's settings", async () => {
         const socket = await connected();
         const settings = CatapultObs.call("GetInputSettings", { inputName: "Alerts" });
         answer(socket, 7, { requestType: "GetInputSettings", requestStatus: { result: true, code: 100 },
@@ -504,8 +504,10 @@ describe("debug capture", () => {
         const sent = (CatapultDebugCapture.flush(), fetch.mock.calls.map(([, init]) => init.body).join());
         expect(sent).not.toContain("TOKEN123");
         expect(sent).not.toContain("s3cret");
-        expect(sent).toContain("https://streamlabs.com/<redacted>");
-        expect(sent).toContain("srt://10.0.0.5:9000?passphrase=<redacted>");
+        expect(sent).not.toContain("streamlabs.com");
+        expect(sent).not.toContain("10.0.0.5");
+        expect(sent).toContain('"inputSettings":{"url":"string(44)"}');
+        expect(sent).toContain('"inputSettings":{"input":"string(37)"}');
     });
 
     it("nothingIsCapturedOutsideDebug", async () => {

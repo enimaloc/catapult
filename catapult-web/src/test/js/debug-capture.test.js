@@ -230,18 +230,17 @@ describe("pairing", () => {
 });
 
 describe("secrets", () => {
-    it("stripsTheObsAuthentication", () => {
-        const identify = { op: 1, d: { rpcVersion: 1, authentication: "proof" } };
-        expect(CatapultDebugCapture.stripObs(identify)).toEqual({ op: 1, d: { rpcVersion: 1 } });
-        expect(identify.d.authentication).toBe("proof");
-        const settings = { requestType: "GetStreamServiceSettings",
-            responseData: { streamServiceSettings: { server: "rtmp://x", key: "live_123", password: "pw" } } };
-        expect(CatapultDebugCapture.stripObs(settings).responseData.streamServiceSettings)
-            .toEqual({ server: "rtmp://x", key: "<redacted>", password: "<redacted>" });
+    it("keeps only the non-secret members of OBS's opening messages", () => {
+        const identify = { rpcVersion: 1, authentication: "proof", eventSubscriptions: 33, extra: "x-secret" };
+        expect(CatapultDebugCapture.stripObs(identify)).toEqual({ rpcVersion: 1, eventSubscriptions: 33, extra: "string(8)" });
+        expect(identify.authentication).toBe("proof");
+        expect(CatapultDebugCapture.stripObs({ obsWebSocketVersion: "5.5.0", rpcVersion: 1,
+            authentication: { challenge: "c", salt: "s" } })).toEqual({ obsWebSocketVersion: "5.5.0", rpcVersion: 1 });
+        expect(CatapultDebugCapture.stripObs({ negotiatedRpcVersion: 1 })).toEqual({ negotiatedRpcVersion: 1 });
     });
 
-    it("redacts every member a credential's name, whatever its value", () => {
-        expect(CatapultDebugCapture.stripObs({ requestData: {
+    it("redacts every member a credential's name, whatever its value, in kept OBS data", () => {
+        expect(CatapultDebugCapture.stripObs({ requestType: "SetCurrentProgramScene", requestData: {
             password: 1234, apiKey: { a: 1 }, bearer_token: "b", clientSecret: ["s"], passphrase: "p", Authorization: "x",
             access_token: "t", token_type: "Bearer", sceneName: "Main", empty: null, nothing: null, code: 100,
         } }).requestData).toEqual({
@@ -251,48 +250,114 @@ describe("secrets", () => {
         });
     });
 
-    it("redacts the whole stream service settings but which service and its server", () => {
-        for (const requestType of ["GetStreamServiceSettings", "SetStreamServiceSettings"]) {
-            const field = requestType.startsWith("Get") ? "responseData" : "requestData";
-            const stripped = CatapultDebugCapture.stripObs({ requestType, [field]: { streamServiceType: "rtmp_custom",
-                streamServiceSettings: { service: "Twitch", server: "rtmp://x/app", username: "u", use_auth: true, bwtest: false } } });
-            expect(stripped[field]).toEqual({ streamServiceType: "rtmp_custom", streamServiceSettings: {
-                service: "Twitch", server: "rtmp://x/app", username: "<redacted>", use_auth: "<redacted>", bwtest: "<redacted>" } });
+    describe("OBS data kept for the allowed requests and events", () => {
+        const kept = (message) => expect(CatapultDebugCapture.stripObs(message)).toEqual(message);
+
+        it("keeps the version and stats", () => {
+            kept({ requestType: "GetVersion", requestId: "req-1", requestStatus: { result: true, code: 100 },
+                responseData: { obsVersion: "31.0.0", rpcVersion: 1, availableRequests: ["GetSceneList"], platform: "windows" } });
+            kept({ requestType: "GetStats", requestId: "req-2", responseData: { cpuUsage: 1.5, activeFps: 60 } });
+        });
+
+        it("keeps scenes and scene items", () => {
+            kept({ requestType: "GetSceneList", responseData: { currentProgramSceneName: "Main", scenes: [{ sceneName: "Main", sceneIndex: 0 }] } });
+            kept({ requestType: "SetCurrentProgramScene", requestData: { sceneName: "BRB" } });
+            kept({ requestType: "GetSceneItemList", requestData: { sceneName: "Main" },
+                responseData: { sceneItems: [{ sceneItemId: 3, sourceName: "Cam", sceneItemEnabled: true }] } });
+            kept({ requestType: "SetSceneItemEnabled", requestData: { sceneName: "Main", sceneItemId: 3, sceneItemEnabled: false } });
+            kept({ eventType: "CurrentProgramSceneChanged", eventIntent: 4, eventData: { sceneName: "A" } });
+            kept({ eventType: "SceneItemEnableStateChanged", eventIntent: 128, eventData: { sceneName: "A", sceneItemId: 1, sceneItemEnabled: true } });
+        });
+
+        it("keeps the input list's names and kinds", () => {
+            kept({ requestType: "GetInputList", responseData: { inputs: [{ inputName: "Alerts", inputKind: "browser_source" }] } });
+            kept({ eventType: "InputNameChanged", eventData: { oldInputName: "a", inputName: "b" } });
+        });
+
+        it("keeps the stream, the recording and the transitions", () => {
+            kept({ requestType: "GetStreamStatus", responseData: { outputActive: true, outputDuration: 1000 } });
+            kept({ requestType: "ToggleRecord", responseData: { outputActive: false } });
+            kept({ requestType: "SetCurrentSceneTransition", requestData: { transitionName: "Fade" } });
+            kept({ eventType: "StreamStateChanged", eventData: { outputActive: true, outputState: "OBS_WEBSOCKET_OUTPUT_STARTED" } });
+            kept({ eventType: "ExitStarted", eventData: {} });
+        });
+
+        it("keeps a created input but for the shape of its settings", () => {
+            expect(CatapultDebugCapture.stripObs({ requestType: "CreateInput", requestData: { sceneName: "Main", inputName: "Alerts",
+                inputKind: "browser_source", inputSettings: { url: "overlay.example/alerts/SECRET1", width: 800 } } }).requestData)
+                .toEqual({ sceneName: "Main", inputName: "Alerts", inputKind: "browser_source",
+                    inputSettings: { url: "string(30)", width: "number" } });
+            expect(JSON.stringify(CatapultDebugCapture.stripObs({ eventType: "InputCreated", eventData: { inputName: "A",
+                inputSettings: { url: "SECRET2" }, defaultInputSettings: { url: "SECRET3" } } }))).not.toMatch(/SECRET/);
+        });
+    });
+
+    describe("OBS data reduced to its shape for any other request or event", () => {
+        /** The message stripped, none of `secrets` left in it. */
+        function shaped(message, secrets) {
+            const stripped = CatapultDebugCapture.stripObs(message);
+            const json = JSON.stringify(stripped);
+            for (const secret of secrets) expect(json).not.toContain(secret);
+            return stripped;
         }
-    });
 
-    it("redacts profile parameters' values", () => {
-        expect(CatapultDebugCapture.stripObs({ requestType: "GetProfileParameter",
-            responseData: { parameterValue: "live_123", defaultParameterValue: null } }).responseData)
-            .toEqual({ parameterValue: "<redacted>", defaultParameterValue: null });
-        expect(CatapultDebugCapture.stripObs({ requestType: "SetProfileParameter",
-            requestData: { parameterCategory: "Stream", parameterName: "Key", parameterValue: "live_123" } }).requestData)
-            .toEqual({ parameterCategory: "Stream", parameterName: "Key", parameterValue: "<redacted>" });
-    });
+        it("keeps no value of an input's settings, a scheme-less overlay URL included", () => {
+            const stripped = shaped({ requestType: "GetInputSettings", requestId: "req-1", requestStatus: { result: true, code: 100 },
+                responseData: { inputKind: "browser_source", inputSettings: { url: "streamlabs.com/alert-box/v3/ABCDEF123456", fps: 30, shutdown: true } } },
+            ["ABCDEF123456", "streamlabs", "browser_source"]);
+            expect(stripped).toEqual({ requestType: "GetInputSettings", requestId: "req-1", requestStatus: { result: true, code: 100 },
+                responseData: { inputKind: "string(14)", inputSettings: { url: "string(40)", fps: "number", shutdown: "boolean" } } });
+            shaped({ requestType: "SetInputSettings", requestData: { inputName: "SRT", inputSettings: { input: "s3cret-host:9000" } } }, ["s3cret"]);
+            shaped({ eventType: "InputSettingsChanged", eventData: { inputName: "SRT", inputSettings: { input: "s3cret-host:9000" } } }, ["s3cret"]);
+        });
 
-    it("redacts persistent data values", () => {
-        expect(CatapultDebugCapture.stripObs({ requestType: "SetPersistentData",
-            requestData: { realm: "R", slotName: "s", slotValue: { plugin: "secret" } } }).requestData)
-            .toEqual({ realm: "R", slotName: "s", slotValue: "<redacted>" });
-        expect(CatapultDebugCapture.stripObs({ requestType: "GetPersistentData", responseData: { slotValue: [1] } }).responseData)
-            .toEqual({ slotValue: "<redacted>" });
-    });
+        it("keeps no value of a JSON written in a string", () => {
+            const stripped = shaped({ requestType: "SetPersistentData", requestData: { realm: "OBS_WEBSOCKET_DATA_REALM_GLOBAL",
+                slotName: "twitchat", slotValue: "{\"apiToken\":\"tk-777\"}" } }, ["tk-777", "apiToken"]);
+            expect(stripped.requestData.slotValue).toBe("string(21)");
+        });
 
-    it("redacts vendor requests' and events' bodies", () => {
-        expect(CatapultDebugCapture.stripObs({ requestType: "CallVendorRequest",
-            requestData: { vendorName: "v", requestType: "r", requestData: { x: 1 } },
-            responseData: { vendorName: "v", requestType: "r", responseData: { y: 2 } } })).toEqual({ requestType: "CallVendorRequest",
-            requestData: { vendorName: "v", requestType: "r", requestData: "<redacted>", responseData: undefined },
-            responseData: { vendorName: "v", requestType: "r", requestData: undefined, responseData: "<redacted>" } });
-        expect(CatapultDebugCapture.stripObs({ eventType: "VendorEvent", eventData: { vendorName: "v", eventType: "e", eventData: { z: 3 } } }))
-            .toEqual({ eventType: "VendorEvent", eventData: { vendorName: "v", eventType: "e", eventData: "<redacted>" } });
-    });
+        it("keeps no value of a filter's settings, its string arrays included", () => {
+            const stripped = shaped({ requestType: "GetSourceFilterSettings", responseData: { filterSettings: {
+                words: ["alpha-secret", "beta-secret"], nested: [{ key: "gamma-secret" }], none: [] } } }, ["-secret"]);
+            expect(stripped.responseData.filterSettings).toEqual({ words: "array(2)", nested: [{ key: "string(12)" }], none: "array(0)" });
+            shaped({ requestType: "SetSourceFilterSettings", requestData: { filterSettings: { url: "x-secret" } } }, ["x-secret"]);
+            shaped({ eventType: "SourceFilterSettingsChanged", eventData: { filterSettings: { url: "x-secret" } } }, ["x-secret"]);
+        });
 
-    it("applies the type rules inside a request batch", () => {
-        const stripped = CatapultDebugCapture.stripObs({ requests: [
-            { requestType: "SetProfileParameter", requestData: { parameterValue: "k" } },
-            { requestType: "GetSceneList" }] });
-        expect(stripped.requests[0].requestData.parameterValue).toBe("<redacted>");
+        it("keeps no value of a percent-encoded URL", () => {
+            const encoded = encodeURIComponent("https://overlay.example/u/SECRET9?k=v");
+            shaped({ requestType: "SetProfileParameter", requestData: { parameterCategory: "Stream", parameterValue: encoded } }, ["SECRET9", "overlay"]);
+        });
+
+        it("keeps no value of a custom event not from Twitchat", () => {
+            shaped({ eventType: "CustomEvent", eventData: { origin: "streamerbot", secret: "sb-111", data: { pwd: "sb-222" } } }, ["sb-1", "sb-2", "streamerbot"]);
+            shaped({ requestType: "BroadcastCustomEvent", requestData: { eventData: { origin: "other", value: "sb-333" } } }, ["sb-3", "other"]);
+        });
+
+        it("keeps no value of stream service settings, profile parameters, vendor messages and unknown types", () => {
+            shaped({ requestType: "GetStreamServiceSettings", responseData: { streamServiceType: "rtmp_custom",
+                streamServiceSettings: { server: "rtmp://x/app", key: "live_123" } } }, ["live_123", "rtmp"]);
+            shaped({ requestType: "GetProfileParameter", responseData: { parameterValue: "live_456" } }, ["live_456"]);
+            shaped({ requestType: "CallVendorRequest", requestData: { vendorName: "v-1", requestData: { x: "v-2" } } }, ["v-1", "v-2"]);
+            shaped({ eventType: "VendorEvent", eventData: { vendorName: "v-3", eventData: { z: "v-4" } } }, ["v-3", "v-4"]);
+            shaped({ requestType: "SomeFutureRequest", requestData: { anything: "f-1" }, other: "f-2" }, ["f-1", "f-2"]);
+            expect(CatapultDebugCapture.stripObs(null)).toBeNull();
+            expect(CatapultDebugCapture.stripObs("raw")).toBe("string(3)");
+        });
+
+        it("applies the same rules inside a request batch and its results", () => {
+            const stripped = shaped({ requestId: "req-9", haltOnFailure: true, requests: [
+                { requestType: "GetInputSettings", requestData: { inputName: "Alerts" } },
+                { requestType: "SetProfileParameter", requestData: { parameterValue: "k-secret" } },
+                { requestType: "GetSceneList" }] }, ["k-secret", "Alerts"]);
+            expect(stripped.requests[2]).toEqual({ requestType: "GetSceneList" });
+            expect(stripped.haltOnFailure).toBe(true);
+            const results = shaped({ requestId: "req-9", results: [
+                { requestType: "GetInputSettings", requestStatus: { result: true, code: 100 }, responseData: { inputSettings: { url: "r-secret" } } },
+                { requestType: "GetCurrentProgramScene", requestStatus: { result: true, code: 100 }, responseData: { sceneName: "Main" } }] }, ["r-secret"]);
+            expect(results.results[1].responseData).toEqual({ sceneName: "Main" });
+        });
     });
 
     it("stripsTwitchatActionTokens", () => {
@@ -305,7 +370,12 @@ describe("secrets", () => {
         expect(stripped.data.message).toBe("Ban? https://c.example/twitchat/action/<redacted>");
         expect(message.data.actions[0].id).toBe(token);
         // Inside an OBS message too (a custom event carrying a Twitchat message).
-        expect(JSON.stringify(CatapultDebugCapture.stripObs({ eventData: message }))).not.toContain(token);
+        const carried = CatapultDebugCapture.stripObs({ eventType: "CustomEvent", eventData: message });
+        expect(JSON.stringify(carried)).not.toContain(token);
+        expect(carried.eventData.data.message).toBe("Ban? https://c.example/twitchat/action/<redacted>");
+        const broadcast = CatapultDebugCapture.stripObs({ requestType: "BroadcastCustomEvent", requestData: { eventData: message } });
+        expect(broadcast.requestData.eventData.type).toBe("CUSTOM_CHAT_MESSAGE");
+        expect(JSON.stringify(broadcast)).not.toContain(token);
     });
 
     it("strips the widget token from any string it sends", async () => {
@@ -341,7 +411,7 @@ describe("secrets", () => {
 
     it("strips userinfo, path, query values and fragment of a foreign URL", async () => {
         CatapultDebugCapture.enable(PAGE);
-        const settings = CatapultDebugCapture.stripObs({ requestType: "GetInputSettings", responseData: { inputSettings: {
+        const settings = CatapultDebugCapture.stripObs({ requestType: "GetCurrentProgramScene", responseData: { inputSettings: {
             url: "https://streamlabs.com/alert-box/v3/ABCDEF123456?layout=1#x",
             input: "srt://user:hunter2@10.0.0.5:9000?passphrase=s3cret&latency=200",
             server: "rtmp://live.example.tv/app/live_123",
