@@ -27,8 +27,10 @@ import java.util.UUID;
  * <p>The cycle only acts on a change, so what it would never see again is re-applied once, at once, on the active
  * site (the one that writes): an active custom binding's category and layout (the game open meanwhile is then kept,
  * as a detection of it would interrupt the binding), or, with no game open, what closing the game does (the "no game"
- * category and layout). Neither is done when nothing has been observed since this instance started: no game known
- * then does not mean no game open, and the first cycle decides.</p>
+ * category and layout), only when that is the last decision the dry run held back ({@link DryRunHeldDecisions}): a
+ * category the streamer set by hand meanwhile, or with no game closed, stays. The reset is not done either when
+ * nothing has been observed since this instance started: no game known then does not mean no game open, and the
+ * first cycle decides.</p>
  */
 @Slf4j
 @Component
@@ -41,11 +43,13 @@ public class DryRunExitListener {
     private final CustomBindingActivations customBindingActivations;
     private final CategoryChain categoryChain;
     private final SiteRole siteRole;
+    private final DryRunHeldDecisions heldDecisions;
 
     @EventListener
     public void onDryRunEnded(DryRunEndedEvent event) {
         UUID userId = event.userId();
         extensionLayouts.forget(userId);
+        Optional<DryRunHeldDecisions.Held> held = heldDecisions.take(userId);
         Optional<UserAccount> user = Optional.empty();
         Optional<CustomBindingActivation> active = Optional.empty();
         try {
@@ -62,20 +66,23 @@ public class DryRunExitListener {
             return;
         }
         try {
-            reapply(user.get(), active, gameKnown);
+            reapply(user.get(), active, gameKnown, held);
         } catch (RuntimeException e) {
             log.warn("Could not re-apply the channel of {} leaving dry run: {}", userId, e.toString());
         }
     }
 
-    private void reapply(UserAccount user, Optional<CustomBindingActivation> active, boolean gameKnown) {
+    private void reapply(UserAccount user, Optional<CustomBindingActivation> active, boolean gameKnown,
+                         Optional<DryRunHeldDecisions.Held> held) {
         CategoryOutcome outcome;
         if (active.isPresent()) {
             outcome = categoryChain.apply(user, new CustomBindingTriggered(active.get().getCustomBinding()));
-        } else if (!gameKnown && gameStateService.isObserved(user)) {
+        } else if (!gameKnown && gameStateService.isObserved(user)
+                && held.map(DryRunHeldDecisions.Held::noGame).orElse(false)) {
             outcome = categoryChain.apply(user, new GameClosed());
         } else {
-            // a game open, or the state unknown since the restart: the next detection cycle applies it
+            // a game open, the state unknown since the restart (the next detection cycle applies it), or no "no game"
+            // reset held: the category is the one the streamer set, or already the one Catapult would set
             return;
         }
         log.info("Channel of {} re-applied after its dry run: {}", user.getId(), outcome);

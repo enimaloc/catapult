@@ -28,7 +28,10 @@ import fr.enimaloc.catapult.service.category.CategoryTrigger.RaidedOut;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.RevertCategory;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.StreamEnded;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.StreamStarted;
+import fr.enimaloc.catapult.service.dryrun.DryRunHeldDecisions;
+import fr.enimaloc.catapult.service.twitch.ChannelUpdateOutcome;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -73,6 +76,13 @@ public class CategoryChain {
     private final RaidRestoreGateService raidRestoreGate;
     private final GameBindingLookup gameBindingLookup;
     private final ExtensionLayoutApplier extensionLayouts;
+    /** Remembers what the dry run holds back; set by Spring, absent where a test builds the chain by hand. */
+    private DryRunHeldDecisions heldDecisions;
+
+    @Autowired
+    public void setHeldDecisions(DryRunHeldDecisions heldDecisions) {
+        this.heldDecisions = heldDecisions;
+    }
 
     /**
      * {@link #decide}, then applied right away. When the category is applied, the channel's Twitch extensions follow
@@ -81,6 +91,9 @@ public class CategoryChain {
     public CategoryOutcome apply(UserAccount user, CategoryTrigger trigger) {
         CategoryDecision decision = decide(user, trigger);
         CategoryOutcome outcome = applier.apply(user, decision);
+        if (outcome.status() == ChannelUpdateOutcome.DRY_RUN && heldDecisions != null) {
+            heldDecisions.record(user.getId(), trigger, outcome.rule());
+        }
         switchExtensions(user, trigger, decision, outcome);
         return outcome;
     }

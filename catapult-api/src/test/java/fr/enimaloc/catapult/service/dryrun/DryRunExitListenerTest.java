@@ -5,12 +5,14 @@ import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.CustomBinding;
 import fr.enimaloc.catapult.domain.binding.CustomBindingActivation;
 import fr.enimaloc.catapult.domain.binding.ExtensionSlotSetting;
+import fr.enimaloc.catapult.event.ChannelCategoryChangedEvent;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.ActivityLogService;
 import fr.enimaloc.catapult.service.binding.CustomBindingActivations;
 import fr.enimaloc.catapult.service.binding.GameStateService;
 import fr.enimaloc.catapult.service.category.CategoryChain;
+import fr.enimaloc.catapult.service.category.CategoryRule;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.CustomBindingTriggered;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.GameClosed;
 import fr.enimaloc.catapult.service.category.ExtensionLayoutApplier;
@@ -26,6 +28,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -44,8 +47,9 @@ class DryRunExitListenerTest {
     final CustomBindingActivations activations = mock(CustomBindingActivations.class);
     final CategoryChain categoryChain = mock(CategoryChain.class);
     final SiteRole siteRole = mock(SiteRole.class);
+    final DryRunHeldDecisions held = new DryRunHeldDecisions();
     final DryRunExitListener listener = new DryRunExitListener(gameStateService, layouts, users, activations,
-            categoryChain, siteRole);
+            categoryChain, siteRole, held);
     final UserAccount member = new UserAccount();
 
     @BeforeEach
@@ -79,10 +83,54 @@ class DryRunExitListenerTest {
     }
 
     @Test
-    void aGameClosedDuringDryRunIsResetAfterLeaving() {
+    void exitResetsWhenTheHeldDecisionWasNoGame() {
+        // the game closed during the dry run: the "no game" reset was held
+        held.record(member.getId(), new GameClosed(), CategoryRule.NO_GAME_FALLBACK);
+
         listener.onDryRunEnded(new DryRunEndedEvent(member.getId()));
 
         verify(categoryChain).apply(member, new GameClosed());
+        assertThat(held.lastHeld(member.getId())).isEmpty();
+    }
+
+    @Test
+    void exitDoesNotResetAHandSetCategory() {
+        // no game open, but nothing closed during the dry run: the category is the streamer's own
+        listener.onDryRunEnded(new DryRunEndedEvent(member.getId()));
+
+        verifyNoInteractions(categoryChain);
+        verify(gameStateService).forgetLastKnownGame(member.getId());
+    }
+
+    @Test
+    void exitDoesNotResetWhenTheHeldDecisionWasAGame() {
+        held.record(member.getId(), new GameClosed(), CategoryRule.NO_GAME_FALLBACK);
+        held.record(member.getId(), new GameClosed(), CategoryRule.GAME_BINDING);
+
+        listener.onDryRunEnded(new DryRunEndedEvent(member.getId()));
+
+        verifyNoInteractions(categoryChain);
+    }
+
+    @Test
+    void aManualChangeDuringDryRunClearsTheHeldDecision() {
+        held.record(member.getId(), new GameClosed(), CategoryRule.NO_GAME_FALLBACK);
+        // Catapult sends nothing in dry run: a category change seen on the channel is the streamer's
+        held.onCategoryChanged(new ChannelCategoryChangedEvent(this, member, "509660", "Art"));
+
+        listener.onDryRunEnded(new DryRunEndedEvent(member.getId()));
+
+        verifyNoInteractions(categoryChain);
+    }
+
+    @Test
+    void theHeldDecisionIsForgottenOnEveryInstance() {
+        when(siteRole.isActive()).thenReturn(false);
+        held.record(member.getId(), new GameClosed(), CategoryRule.NO_GAME_FALLBACK);
+
+        listener.onDryRunEnded(new DryRunEndedEvent(member.getId()));
+
+        assertThat(held.lastHeld(member.getId())).isEmpty();
     }
 
     @Test
@@ -99,6 +147,7 @@ class DryRunExitListenerTest {
     void anUnknownGameStateIsLeftToTheNextDetection() {
         // nothing observed since the restart: no game known does not mean no game open
         when(gameStateService.isObserved(member)).thenReturn(false);
+        held.record(member.getId(), new GameClosed(), CategoryRule.NO_GAME_FALLBACK);
 
         listener.onDryRunEnded(new DryRunEndedEvent(member.getId()));
 
@@ -118,6 +167,7 @@ class DryRunExitListenerTest {
     @Test
     void aFailingReevaluationIsOnlyLogged() {
         when(categoryChain.apply(any(), any())).thenThrow(new IllegalStateException("boom"));
+        held.record(member.getId(), new GameClosed(), CategoryRule.NO_GAME_FALLBACK);
 
         listener.onDryRunEnded(new DryRunEndedEvent(member.getId()));
 

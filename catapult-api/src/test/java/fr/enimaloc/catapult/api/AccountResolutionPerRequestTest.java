@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api;
 
+import fr.enimaloc.catapult.service.dryrun.DryRunHeldDecisions;
 import fr.enimaloc.catapult.api.channel.ApiChannelActionsController;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.twitchat.TwitchatWidgetSettings;
@@ -74,6 +75,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX,
                 pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
 @Import({ApiUserResolver.class, MethodSecurityConfig.class, Authz.class, CategoryChain.class, CategoryApplier.class,
+        DryRunHeldDecisions.class,
         ChannelSettingsService.class, ChannelDashboardActions.class, SteamPersonalTokenService.class,
         SteamPersonalTokenStore.class, ChannelAccountActions.class,
         RaidRestoreHold.class})

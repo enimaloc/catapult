@@ -32,6 +32,7 @@ import fr.enimaloc.catapult.service.category.CategoryTrigger.RevertCategory;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.NoGameAfterCustomBinding;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.StreamEnded;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.StreamStarted;
+import fr.enimaloc.catapult.service.dryrun.DryRunHeldDecisions;
 import fr.enimaloc.catapult.service.twitch.ChannelUpdateOutcome;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -1244,5 +1245,30 @@ class CategoryChainTest {
 
         assertThat(real.apply(user, new GameDetected(binding))).isSameAs(applied);
         assertThat(twitch.extensionFailures()).isEqualTo(1);
+    }
+
+    // ---- dry run ----
+
+    @Test
+    void aDecisionHeldByTheDryRunIsRemembered() {
+        DryRunHeldDecisions held = new DryRunHeldDecisions();
+        chain.setHeldDecisions(held);
+        applierAnswers(CategoryOutcome.dryRun(CategoryRule.MANUAL_CHOICE));
+
+        chain.apply(user, new ManualCategory(binding));
+
+        assertThat(held.lastHeld(user.getId()))
+                .contains(new DryRunHeldDecisions.Held(new ManualCategory(binding), CategoryRule.MANUAL_CHOICE));
+    }
+
+    @Test
+    void aDecisionSentOrSkippedIsNotRememberedAsHeld() {
+        DryRunHeldDecisions held = new DryRunHeldDecisions();
+        chain.setHeldDecisions(held);
+        applierAnswers(CategoryOutcome.applied(CategoryRule.MANUAL_CHOICE));
+
+        chain.apply(user, new ManualCategory(binding));
+
+        assertThat(held.lastHeld(user.getId())).isEmpty();
     }
 }
