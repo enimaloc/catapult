@@ -14,6 +14,7 @@ import fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType;
 import fr.enimaloc.catapult.event.NoGameDetectedEvent;
 import fr.enimaloc.catapult.service.binding.GameBindingLookup;
 import fr.enimaloc.catapult.service.binding.GameStateService;
+import fr.enimaloc.catapult.service.stream.SessionRecap;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.event.EventListener;
@@ -34,6 +35,7 @@ import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType
 import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.CATEGORY_CHANGED_MANUALLY;
 import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.NOTIFICATION;
 import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.NO_GAME_DETECTED;
+import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.RAIDED_BY_MEMBER;
 import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.STREAM_STARTED;
 
 /**
@@ -46,6 +48,9 @@ import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType
 public class TwitchatEventDispatcher {
 
     private static final Map<String, String> TEST_GAMES = Map.of("gameName", "Jeu de test", "previousGameName", "Ancien jeu");
+    /** What a test of RAIDED_BY_MEMBER shows in place of a real raider's session. */
+    private static final Map<String, String> TEST_RAID = Map.of("raider", "Raideur de test",
+            "games", "- Factorio (Factorio) (2h30)\n- Just Chatting (1h)", "sessionDuration", "3h30");
 
     private final TwitchatWidgetSettingsService widgetSettingsService;
     private final TwitchatActionTokenService actionTokenService;
@@ -127,6 +132,16 @@ public class TwitchatEventDispatcher {
         return dispatch(user, NOTIFICATION, variables, Map.of());
     }
 
+    /**
+     * Another Catapult member, {@code raider} (their Twitch display name), raided {@code target}:
+     * the games of their session so far.
+     */
+    public void onRaidedByMember(UserAccount target, String raider, SessionRecap recap) {
+        safely(target, "onRaidedByMember", () -> dispatch(target, RAIDED_BY_MEMBER, Map.of(
+                "raider", nullToEmpty(raider), "games", recap.gamesText(),
+                "sessionDuration", SessionRecap.format(recap.total())), Map.of()));
+    }
+
     @EventListener
     public void onNoGameDetected(NoGameDetectedEvent event) {
         UserAccount user = event.getUser();
@@ -145,7 +160,7 @@ public class TwitchatEventDispatcher {
                     "The Twitchat widget is disabled: enable it to test");
         }
         eventActionService.validate(payloads);
-        TwitchatPayloadRenderer renderer = new TwitchatPayloadRenderer(variables(user, TEST_GAMES),
+        TwitchatPayloadRenderer renderer = new TwitchatPayloadRenderer(variables(user, testVariables(type)),
                 EnumSet.allOf(TwitchatActionType.class), action -> UUID.randomUUID().toString());
         List<TwitchatPayload> rendered = new ArrayList<>();
         for (TwitchatEventActionDto payload : payloads) {
@@ -213,6 +228,10 @@ public class TwitchatEventDispatcher {
         Map<String, Object> data = new LinkedHashMap<>(payload.data());
         data.put("message", message.stripTrailing());
         return new TwitchatPayload(payload.action(), data);
+    }
+
+    private static Map<String, String> testVariables(TwitchatNotificationEventType type) {
+        return type == RAIDED_BY_MEMBER ? TEST_RAID : TEST_GAMES;
     }
 
     private static Map<String, String> games(String gameName, String previousGameName) {

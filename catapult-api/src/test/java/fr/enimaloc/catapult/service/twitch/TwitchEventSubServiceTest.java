@@ -345,6 +345,38 @@ class TwitchEventSubServiceTest {
     }
 
     @Test
+    void handleRaidPassesTheTargetAndTheMessageTime() {
+        service.handleMessage(user, token, """
+            {
+              "metadata": { "message_type": "notification", "subscription_type": "channel.raid",
+                            "message_timestamp": "2026-11-20T21:00:00.123456789Z" },
+              "payload": { "event": { "from_broadcaster_user_id": "broadcaster-123", "to_broadcaster_user_id": "999" } }
+            }
+            """, false);
+
+        ArgumentCaptor<ChannelRaidedOutEvent> raid = ArgumentCaptor.forClass(ChannelRaidedOutEvent.class);
+        verify(eventPublisher).publishEvent(raid.capture());
+        assertThat(raid.getValue().getToBroadcasterId()).isEqualTo("999");
+        assertThat(raid.getValue().getOccurredAt()).isEqualTo(java.time.Instant.parse("2026-11-20T21:00:00.123456789Z"));
+    }
+
+    @Test
+    void handleRaid_withoutAReadableMessageTime_usesTheReceptionTime() {
+        java.time.Instant before = java.time.Instant.now();
+        service.handleMessage(user, token, """
+            {
+              "metadata": { "message_type": "notification", "subscription_type": "channel.raid",
+                            "message_timestamp": "not a time" },
+              "payload": { "event": { "from_broadcaster_user_id": "broadcaster-123", "to_broadcaster_user_id": "999" } }
+            }
+            """, false);
+
+        ArgumentCaptor<ChannelRaidedOutEvent> raid = ArgumentCaptor.forClass(ChannelRaidedOutEvent.class);
+        verify(eventPublisher).publishEvent(raid.capture());
+        assertThat(raid.getValue().getOccurredAt()).isBetween(before, java.time.Instant.now());
+    }
+
+    @Test
     void handleMessage_incomingRaid_isIgnored() {
         service.handleMessage(user, token, """
             {

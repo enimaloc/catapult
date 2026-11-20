@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.service.notification;
 
 import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType;
 import fr.enimaloc.catapult.repository.twitchat.TwitchatWidgetSettingsRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,11 +14,15 @@ import java.util.List;
  * Gives every account with an enabled Twitchat widget its event actions at startup (converting
  * its legacy presets), once: the others get theirs when they enable the widget. Idempotent
  * through TwitchatWidgetSettings#eventActionsInitialized, like the ChatCommand*Migration runners.
+ * Accounts initialized before an event of {@link #ADDED_LATER} existed then get its default payload.
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class TwitchatEventActionsBootstrap implements CommandLineRunner {
+
+    /** Seeded events added after accounts were initialized, so missing from theirs. */
+    static final List<TwitchatNotificationEventType> ADDED_LATER = List.of(TwitchatNotificationEventType.RAIDED_BY_MEMBER);
 
     private final TwitchatWidgetSettingsRepository widgetSettingsRepository;
     private final TwitchatEventActionService eventActionService;
@@ -36,6 +41,23 @@ public class TwitchatEventActionsBootstrap implements CommandLineRunner {
         }
         if (!pending.isEmpty()) {
             log.info("Twitchat event actions initialized for {}/{} account(s)", done, pending.size());
+        }
+        ADDED_LATER.forEach(this::seedMissing);
+    }
+
+    private void seedMissing(TwitchatNotificationEventType type) {
+        List<UserAccount> missing = widgetSettingsRepository.findInitializedUsersWithoutEventActions(type);
+        int done = 0;
+        for (UserAccount user : missing) {
+            try {
+                eventActionService.ensurePayload(user, type);
+                done++;
+            } catch (RuntimeException e) {
+                log.warn("Twitchat {} payload seeding failed for {}: {}", type, user.getId(), e.getMessage(), e);
+            }
+        }
+        if (!missing.isEmpty()) {
+            log.info("Twitchat {} payload given to {}/{} account(s)", type, done, missing.size());
         }
     }
 }

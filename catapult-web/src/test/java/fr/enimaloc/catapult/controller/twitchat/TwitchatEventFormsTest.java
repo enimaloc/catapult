@@ -98,7 +98,8 @@ class TwitchatEventFormsTest {
                 new TwitchatEventActionDto("SEND_MESSAGE", "FORM", "{\"message\":\"x\"}", true))));
         IntegrationNode.Collapse collapse = (IntegrationNode.Collapse) section;
         assertThat(collapse.items()).extracting(IntegrationNode.Collapse.Item::value).containsExactly(
-                "CATEGORY_CHANGED_BY_CATAPULT", "CATEGORY_CHANGED_MANUALLY", "STREAM_STARTED", "BOT_ENABLED", "BOT_DISABLED", "NO_GAME_DETECTED", "NOTIFICATION");
+                "CATEGORY_CHANGED_BY_CATAPULT", "CATEGORY_CHANGED_MANUALLY", "STREAM_STARTED", "BOT_ENABLED", "BOT_DISABLED", "NO_GAME_DETECTED", "NOTIFICATION",
+                "RAIDED_BY_MEMBER");
         assertThat(collapse.items().get(2).text().args()).containsExactly(1);
         assertThat(collapse.items().get(5).text().args()).containsExactly(0);
     }
@@ -112,6 +113,17 @@ class TwitchatEventFormsTest {
         assertThat(((IntegrationNode.Text) notification.children().get(1)).text().args().get(0).toString())
                 .contains("{{title}}", "{{body}}", "{{ctaUrl}}", "{{ctaLabel}}");
         assertThat(fr.enimaloc.catapult.common.dto.twitchat.TwitchatEvents.ACTIONS.get("NOTIFICATION")).isEmpty();
+    }
+
+    @Test
+    void raidedByMemberEvent_documentsItsVariables_andOffersNoButtonAction() {
+        IntegrationNode.Collapse collapse = (IntegrationNode.Collapse) forms.eventsSection(Map.of());
+        IntegrationNode.Collapse.Item raid = collapse.items().get(7);
+
+        assertThat(raid.value()).isEqualTo("RAIDED_BY_MEMBER");
+        assertThat(((IntegrationNode.Text) raid.children().get(1)).text().args().get(0).toString())
+                .contains("{{raider}}", "{{games}}", "{{sessionDuration}}");
+        assertThat(fr.enimaloc.catapult.common.dto.twitchat.TwitchatEvents.ACTIONS.get("RAIDED_BY_MEMBER")).isEmpty();
     }
 
     @Test

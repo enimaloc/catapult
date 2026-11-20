@@ -1096,6 +1096,8 @@ class ChannelVisibilityRenderingTest {
         assertThat(openingTagForId(html, "twitchat-branch")).contains("value=\"beta\"");
         assertThat(html).contains("value=\"auto\"", "value=\"stable\"");
         assertThat(html).contains("id=\"twitchat-events\"").contains("value=\"NO_GAME_DETECTED\"")
+                .contains("value=\"RAIDED_BY_MEMBER\"")
+                .doesNotContain("channel.connections.twitchat.event.RAIDED_BY_MEMBER")
                 .contains("class=\"twitchat-payload\"").contains("data-field=\"message\"");
         assertThat(html).doesNotContain("spa:state");
     }

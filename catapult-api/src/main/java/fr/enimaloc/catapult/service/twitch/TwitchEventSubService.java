@@ -38,6 +38,7 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
 import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -331,7 +332,8 @@ public class TwitchEventSubService implements EventSubService {
                             eventPublisher.publishEvent(new StreamOfflineEvent(this, user));
                         }
                         case "channel.update" -> handleChannelUpdate(user, root.path("payload").path("event"));
-                        case "channel.raid" -> handleRaid(user, root.path("payload").path("event"));
+                        case "channel.raid" -> handleRaid(user, root.path("payload").path("event"),
+                            root.path("metadata").path("message_timestamp").asText(""));
                     }
                 }
                 case "session_keepalive" -> log.trace("EventSub keepalive for user {}", user.getId());
@@ -513,11 +515,23 @@ public class TwitchEventSubService implements EventSubService {
         }
     }
 
-    /** An outgoing raid (the subscription only asks for those; an incoming one is ignored all the same). */
-    private void handleRaid(UserAccount user, JsonNode event) {
+    /**
+     * An outgoing raid (the subscription only asks for those; an incoming one is ignored all the same),
+     * dated by its EventSub message, else by its reception.
+     */
+    private void handleRaid(UserAccount user, JsonNode event, String messageTimestamp) {
         if (!event.path("from_broadcaster_user_id").asText().equals(user.getTwitchId())) return;
         ChannelState state = channelStates.get(user.getId());
-        eventPublisher.publishEvent(new ChannelRaidedOutEvent(this, user, state == null ? null : state.categoryId()));
+        eventPublisher.publishEvent(new ChannelRaidedOutEvent(this, user, state == null ? null : state.categoryId(),
+            event.path("to_broadcaster_user_id").asText(""), messageInstant(messageTimestamp)));
+    }
+
+    private static Instant messageInstant(String messageTimestamp) {
+        try {
+            return Instant.parse(messageTimestamp);
+        } catch (DateTimeParseException e) {
+            return Instant.now();
+        }
     }
 
     private void initChannelState(UserAccount user, String accessToken) {
