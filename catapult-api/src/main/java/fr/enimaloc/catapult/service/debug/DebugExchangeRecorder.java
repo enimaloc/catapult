@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.service.debug;
 import fr.enimaloc.catapult.domain.debug.DebugExchange;
 import fr.enimaloc.catapult.domain.debug.DebugExchange.Direction;
 import fr.enimaloc.catapult.repository.debug.DebugExchangeRepository;
+import fr.enimaloc.catapult.service.debug.wire.RawBytes;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,6 +37,8 @@ public class DebugExchangeRecorder {
     static final int OPERATION_MAX = 128;
     static final int METHOD_MAX = 16;
     static final int TRACE_ID_MAX = 64;
+    /** Stored instead of the hex of raw bytes that name another member (a hex string cannot be masked). */
+    public static final String RAW_OMITTED = "[omitted: contains another member's identifier]";
     /** Few writers so that recording never competes much with request threads for DB connections. */
     static final int WORKERS = 2;
     /** Exchanges waiting beyond this are dropped rather than piling up bodies in memory. */
@@ -160,6 +163,8 @@ public class DebugExchangeRecorder {
             e.setStatus(raw.status());
             e.setResponseHeaders(mask(redactor.headers(raw.responseHeaders(), reveal), userId));
             e.setResponseBody(mask(redactor.body(raw.responseBody(), contentType(raw.responseHeaders()), reveal), userId));
+            e.setRequestRaw(rawHex(raw.requestRaw(), userId));
+            e.setResponseRaw(rawHex(raw.responseRaw(), userId));
             e.setError(mask(redactor.text(raw.error(), reveal), userId));
             e.setDurationMs(raw.durationMs());
             e.setFiltered(filtered);
@@ -188,6 +193,19 @@ public class DebugExchangeRecorder {
             return null;
         }
         return masker.mask(text, subject);
+    }
+
+    /** Hex of {@code raw} cut at the body limit; the omission marker when it names another member; null for none. */
+    private String rawHex(byte[] raw, UUID subject) {
+        if (raw == null) {
+            return null;
+        }
+        if (masker.containsOtherMember(raw, subject)) {
+            return RAW_OMITTED;
+        }
+        String hex = RawBytes.hex(raw);
+        int max = DebugRedactor.MAX_BODY_CHARS - DebugRedactor.MAX_BODY_CHARS % 2;
+        return hex.length() <= max ? hex : hex.substring(0, max);
     }
 
     private static MediaType contentType(HttpHeaders headers) {

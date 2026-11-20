@@ -57,6 +57,13 @@ public class DebugExchange {
     @Column(name = "response_body")
     private String responseBody;
 
+    /** Hex of the request's wire bytes (binary protocols only), or a marker when it names another member. */
+    @Column(name = "request_raw")
+    private String requestRaw;
+
+    @Column(name = "response_raw")
+    private String responseRaw;
+
     private String error;
 
     @Column(name = "duration_ms", nullable = false)

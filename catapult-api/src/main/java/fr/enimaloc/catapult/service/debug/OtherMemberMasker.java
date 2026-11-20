@@ -11,6 +11,7 @@ import fr.enimaloc.catapult.repository.ankama.AnkamaFriendLinkRepository;
 import fr.enimaloc.catapult.repository.battlenet.BattleNetFriendLinkRepository;
 import fr.enimaloc.catapult.repository.epic.EpicFriendLinkRepository;
 import fr.enimaloc.catapult.repository.minecraft.MinecraftFriendLinkRepository;
+import fr.enimaloc.catapult.service.debug.wire.RawBytes;
 import fr.enimaloc.catapult.service.minecraft.MinecraftService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -132,6 +133,26 @@ public class OtherMemberMasker {
         }
         m.appendTail(sb);
         return sb.toString();
+    }
+
+    /**
+     * Whether {@code raw} holds an identifier that is not exclusively the subject's: as text, or, for numeric
+     * identifiers, as a protobuf varint or fixed64. Raw bytes cannot be masked, so a hit means they are not stored.
+     */
+    public boolean containsOtherMember(byte[] raw, UUID subject) {
+        if (raw == null || raw.length == 0) {
+            return false;
+        }
+        for (Map.Entry<String, Set<UUID>> entry : index.owners().entrySet()) {
+            Set<UUID> owners = entry.getValue();
+            if (owners.size() == 1 && owners.contains(subject)) {
+                continue;
+            }
+            if (RawBytes.contains(raw, entry.getKey())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static void add(Map<String, Set<UUID>> owners, String identifier, UUID owner) {

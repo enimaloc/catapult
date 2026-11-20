@@ -74,7 +74,7 @@ public class MemberDebugAdmin {
         return new DebugExchangeDto(e.getId(), e.getOccurredAt(), e.getDirection().name(), e.getService(),
                 e.getOperation(), e.getMethod(), e.getUrl(), e.getStatus(), e.isError(), e.getDurationMs(),
                 e.isFiltered(), e.getRequestHeaders(), e.getRequestBody(), e.getResponseHeaders(),
-                e.getResponseBody(), e.getError(), e.getTraceId());
+                e.getResponseBody(), e.getError(), e.getTraceId(), e.getRequestRaw(), e.getResponseRaw());
     }
 
     /** The services the member has exchanges with, for the filter. */

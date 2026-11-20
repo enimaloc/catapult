@@ -326,4 +326,47 @@ class DebugExchangeRecorderTest {
         }
         verify(repository, org.mockito.Mockito.times(2)).save(any());
     }
+
+    private static RawExchange withRaw(byte[] requestRaw, byte[] responseRaw) {
+        RawExchange r = raw("https://x.example/a", "{}", "{}", null);
+        return new RawExchange(r.at(), r.method(), r.uri(), r.requestHeaders(), r.requestBody(), r.status(),
+                r.responseHeaders(), r.responseBody(), r.error(), r.durationMs(), requestRaw, responseRaw);
+    }
+
+    @Test
+    void storesRawBytesAsHex() {
+        debugged(false);
+        recorder().record(member, Direction.OUT, withRaw(new byte[]{1, 2}, new byte[]{(byte) 0xAB}), "op", false);
+        DebugExchange e = saved();
+        assertThat(e.getRequestRaw()).isEqualTo("0102");
+        assertThat(e.getResponseRaw()).isEqualTo("ab");
+    }
+
+    @Test
+    void omitsRawBytesContainingAnotherMember() {
+        debugged(false);
+        when(masker.containsOtherMember(any(), any())).thenReturn(true);
+        recorder().record(member, Direction.OUT, withRaw(new byte[]{1, 2}, null), "op", false);
+        DebugExchange e = saved();
+        assertThat(e.getRequestRaw()).isEqualTo(DebugExchangeRecorder.RAW_OMITTED);
+        assertThat(e.getResponseRaw()).isNull();
+        assertThat(e.getRequestBody()).isEqualTo("{}");
+    }
+
+    @Test
+    void keepsNullRawAsNull() {
+        debugged(false);
+        recorder().record(member, Direction.OUT, raw("https://x.example/a", "{}", "{}", null), "op", false);
+        DebugExchange e = saved();
+        assertThat(e.getRequestRaw()).isNull();
+        assertThat(e.getResponseRaw()).isNull();
+    }
+
+    @Test
+    void cutsTheHexOnAnEvenLength() {
+        debugged(false);
+        byte[] big = new byte[DebugRedactor.MAX_BODY_CHARS];
+        recorder().record(member, Direction.OUT, withRaw(big, null), "op", false);
+        assertThat(saved().getRequestRaw()).hasSize(DebugRedactor.MAX_BODY_CHARS);
+    }
 }

@@ -174,7 +174,7 @@ class AdminTabsFragmentControllerDebugTest {
     @Test
     void exchange_isServedAsJson_or404() throws Exception {
         when(apiService.memberDebugExchange(ID, EXCHANGE)).thenReturn(new DebugExchangeDto(EXCHANGE, NOW, "OUT", "steam",
-                "getOwnedGames", "GET", "https://x", 500, true, 12, false, "{\"A\":\"b\"}", null, "{}", "<html/>", "boom", "abc123"));
+                "getOwnedGames", "GET", "https://x", 500, true, 12, false, "{\"A\":\"b\"}", null, "{}", "<html/>", "boom", "abc123", null, null));
 
         mvc.perform(get("/spa/admin/members/" + ID + "/debug/" + EXCHANGE).sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.traceId").value("abc123"))
