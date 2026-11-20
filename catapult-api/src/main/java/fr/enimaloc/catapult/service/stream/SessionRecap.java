@@ -18,7 +18,7 @@ import java.util.stream.Collectors;
  */
 public record SessionRecap(List<Line> lines, Duration total) {
 
-    /** Shown for a period whose Twitch category was never known. */
+    /** Shown for a period whose Twitch category was never known, or known without a name. */
     static final String UNKNOWN_CATEGORY = "Catégorie inconnue";
 
     /** Time spent on one pair; {@code gameName} is null when no game was detected. */
@@ -42,7 +42,7 @@ public record SessionRecap(List<Line> lines, Duration total) {
                 continue;
             }
             total = total.plus(spent);
-            String categoryName = segment.getCategoryId() == null || segment.getCategoryName() == null
+            String categoryName = isBlank(segment.getCategoryId()) || isBlank(segment.getCategoryName())
                     ? UNKNOWN_CATEGORY : segment.getCategoryName();
             byPair.merge(new Pair(segment.getCategoryId(), segment.getGameName()),
                     new Line(categoryName, segment.getGameName(), spent),
@@ -53,6 +53,10 @@ public record SessionRecap(List<Line> lines, Duration total) {
                 .filter(line -> line.duration().compareTo(Duration.ofMinutes(1)) >= 0)
                 .toList();
         return new SessionRecap(lines, total);
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     /** One line per pair, {@code - <category> (<game>) (<duration>)}, without the game part when there is none. */

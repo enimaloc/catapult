@@ -94,4 +94,16 @@ class SessionRecapTest {
         assertThat(recap.gamesText())
                 .isEqualTo("- Catégorie inconnue (Factorio) (20min)\n- Catégorie inconnue (10min)");
     }
+
+    @Test
+    void blankCategoryIsNamedUnknown() {
+        List<StreamCategorySegment> segments = List.of(
+                segment("", "", "Factorio", at(Duration.ZERO), at(Duration.ofMinutes(20))),
+                segment("1", " ", null, at(Duration.ofMinutes(20)), at(Duration.ofMinutes(30))));
+
+        SessionRecap recap = SessionRecap.of(segments, at(Duration.ofHours(1)));
+
+        assertThat(recap.gamesText())
+                .isEqualTo("- Catégorie inconnue (Factorio) (20min)\n- Catégorie inconnue (10min)");
+    }
 }
