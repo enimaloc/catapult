@@ -1086,6 +1086,47 @@ class MockApiServiceTest {
     }
 
     @Test
+    void memberDryRun_enableDisableAndTheMembersOwnWayOut_showInTheMembersListing() {
+        UUID me = service.currentUserId();
+        assertThat(service.myDryRun().active()).isFalse();
+        assertThat(allMembers().stream().filter(m -> m.id().equals(me)).findFirst().orElseThrow().dryRun()).isFalse();
+
+        assertThat(service.enableMemberDryRun(me)).isEqualTo(200);
+        assertThat(service.enableMemberDryRun(me)).isEqualTo(409);
+        assertThat(service.myDryRun().active()).isTrue();
+        assertThat(service.myDryRun().since()).isNotNull();
+        assertThat(allMembers().stream().filter(m -> m.id().equals(me)).findFirst().orElseThrow().dryRun()).isTrue();
+        // the listing's other changes keep it
+        service.adminToggleMemberBot(me);
+        assertThat(allMembers().stream().filter(m -> m.id().equals(me)).findFirst().orElseThrow().dryRun()).isTrue();
+
+        assertThat(service.disableMyDryRun()).isEqualTo(204);
+        assertThat(service.myDryRun().active()).isFalse();
+        assertThat(service.myDryRun().since()).isNull();
+        assertThat(allMembers().stream().filter(m -> m.id().equals(me)).findFirst().orElseThrow().dryRun()).isFalse();
+
+        assertThat(service.enableMemberDryRun(me)).isEqualTo(200);
+        assertThat(service.disableMemberDryRun(me)).isEqualTo(204);
+        assertThat(service.disableMemberDryRun(me)).isEqualTo(204);
+        assertThat(service.myDryRun().active()).isFalse();
+        assertThat(service.enableMemberDryRun(UUID.randomUUID())).isEqualTo(404);
+    }
+
+    @Test
+    void memberDryRun_theMembersOwnWayOut_isANoOpBeforeTheListingKnowsThem_andNeedsASession() {
+        assertThat(service.disableMyDryRun()).isEqualTo(204);
+
+        RequestContextHolder.resetRequestAttributes();
+        assertThat(service.myDryRun()).isNull();
+        assertThat(service.disableMyDryRun()).isEqualTo(401);
+    }
+
+    @Test
+    void memberDryRun_aSeededMemberIsInDryRun() {
+        assertThat(allMembers().stream().anyMatch(m -> m.dryRun())).isTrue();
+    }
+
+    @Test
     void memberDebug_theSeededMemberHasExchanges_toListReadAndFilterByService() {
         UUID seeded = MockPresets.uuidOf("viewer001");
         var filter = new fr.enimaloc.catapult.service.DebugExchangeFilter("steam", null, null, null, null);

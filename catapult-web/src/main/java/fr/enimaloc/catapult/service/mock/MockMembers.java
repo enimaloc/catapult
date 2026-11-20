@@ -34,9 +34,12 @@ public class MockMembers {
 
     /** The made-up member whose debug mode is on from the start, with a few recorded exchanges. */
     static final UUID DEBUGGED = MockPresets.uuidOf("viewer001");
+    /** The made-up member in dry run from the start, for the listing's pastille. */
+    static final UUID DRY_RUN = MockPresets.uuidOf("viewer002");
 
     private final List<AdminMemberDto> members = new ArrayList<>();
     private final MockDebugStore debug = new MockDebugStore(java.time.Clock.systemUTC(), DEBUGGED);
+    private final MockDryRunStore dryRun = new MockDryRunStore(java.time.Clock.systemUTC(), DRY_RUN);
     private final Map<UUID, Boolean> live = new LinkedHashMap<>();
     /** Every account ever registered: one the admin deleted is not brought back by its session's next request. */
     private final Set<UUID> registered = new HashSet<>();
@@ -50,7 +53,7 @@ public class MockMembers {
             UUID id = MockPresets.uuidOf("viewer%03d".formatted(i));
             SEEDED.add(id);
             members.add(new AdminMemberDto(id, String.valueOf(5_000_000 + i), "viewer%03d".formatted(i),
-                    MockPresets.getDefaultAvatar(), null, false, true, "ACTIVE", CREATED.minus(i, ChronoUnit.DAYS), debug.state(id), false, null));
+                    MockPresets.getDefaultAvatar(), null, false, true, "ACTIVE", CREATED.minus(i, ChronoUnit.DAYS), debug.state(id), false, null, dryRun.active(id)));
         }
     }
 
@@ -123,7 +126,7 @@ public class MockMembers {
 
     public synchronized void unlinkTwitch(UUID id) {
         update(id, m -> new AdminMemberDto(m.id(), null, null, null, m.steamId(), m.systemAccount(),
-                false, "INACTIVE", m.createdAt(), m.debug(), m.premium(), m.premiumUntil()));
+                false, "INACTIVE", m.createdAt(), m.debug(), m.premium(), m.premiumUntil(), m.dryRun()));
         live.remove(id);
     }
 
@@ -142,13 +145,32 @@ public class MockMembers {
     public synchronized int debugAction(UUID id, java.util.function.ToIntFunction<MockDebugStore> action) {
         int status = action.applyAsInt(debug);
         update(id, m -> new AdminMemberDto(m.id(), m.twitchId(), m.twitchUsername(), m.profileImageUrl(), m.steamId(),
-                m.systemAccount(), m.botEnabled(), m.status(), m.createdAt(), debug.state(id), m.premium(), m.premiumUntil()));
+                m.systemAccount(), m.botEnabled(), m.status(), m.createdAt(), debug.state(id), m.premium(), m.premiumUntil(),
+                m.dryRun()));
+        return status;
+    }
+
+    /** The mock store of the members' dry run. */
+    public MockDryRunStore dryRun() {
+        return dryRun;
+    }
+
+    /**
+     * Applies {@code action} (one of {@link #dryRun()}'s) and shows its outcome in the member's listing; 404 for a
+     * member it does not list, as catapult-api.
+     */
+    public synchronized int dryRunAction(UUID id, java.util.function.ToIntFunction<MockDryRunStore> action) {
+        if (members.stream().noneMatch(m -> m.id().equals(id))) return 404;
+        int status = action.applyAsInt(dryRun);
+        update(id, m -> new AdminMemberDto(m.id(), m.twitchId(), m.twitchUsername(), m.profileImageUrl(), m.steamId(),
+                m.systemAccount(), m.botEnabled(), m.status(), m.createdAt(), m.debug(), m.premium(), m.premiumUntil(),
+                dryRun.active(id)));
         return status;
     }
 
     public synchronized void setPremium(UUID id, boolean premium, java.time.LocalDate until) {
         update(id, m -> new AdminMemberDto(m.id(), m.twitchId(), m.twitchUsername(), m.profileImageUrl(), m.steamId(),
-                m.systemAccount(), m.botEnabled(), m.status(), m.createdAt(), m.debug(), premium, until));
+                m.systemAccount(), m.botEnabled(), m.status(), m.createdAt(), m.debug(), premium, until, m.dryRun()));
     }
 
     public synchronized void delete(UUID id) {
@@ -162,6 +184,6 @@ public class MockMembers {
 
     private static AdminMemberDto with(AdminMemberDto m, String steamId, boolean systemAccount, boolean botEnabled) {
         return new AdminMemberDto(m.id(), m.twitchId(), m.twitchUsername(), m.profileImageUrl(), steamId,
-                systemAccount, botEnabled, m.status(), m.createdAt(), m.debug(), m.premium(), m.premiumUntil());
+                systemAccount, botEnabled, m.status(), m.createdAt(), m.debug(), m.premium(), m.premiumUntil(), m.dryRun());
     }
 }

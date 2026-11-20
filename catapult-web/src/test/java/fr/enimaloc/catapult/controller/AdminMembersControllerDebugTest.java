@@ -30,6 +30,7 @@ class AdminMembersControllerDebugTest {
     @Autowired MockMvc mvc;
     @MockitoBean ApiService apiService;
     @MockitoBean DebugMembers debugMembers;
+    @MockitoBean fr.enimaloc.catapult.service.dryrun.DryRunMembers dryRunMembers;
     @MockitoBean fr.enimaloc.catapult.controller.twitchat.TwitchatEventForms twitchatEventForms;
 
     private MockHttpServletRequestBuilder debugPost(String action, boolean admin) {

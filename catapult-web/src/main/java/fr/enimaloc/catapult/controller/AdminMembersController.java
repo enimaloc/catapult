@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.common.dto.admin.DebugEnableRequest;
 import fr.enimaloc.catapult.common.dto.premium.GrantPremiumRequest;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.debug.DebugMembers;
+import fr.enimaloc.catapult.service.dryrun.DryRunMembers;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -30,6 +31,7 @@ public class AdminMembersController {
     private final ApiService apiService;
     private final ModelFiller filler;
     private final DebugMembers debugMembers;
+    private final DryRunMembers dryRunMembers;
 
     @PostMapping("/bot/toggle")
     public ResponseEntity<Void> toggleBot(@PathVariable UUID id) {
@@ -111,6 +113,27 @@ public class AdminMembersController {
             return ApiStatus.answer(action.getAsInt());
         } finally {
             debugMembers.evict(id);
+        }
+    }
+
+    /** The member's dry run: 409 when already in it; leaving it is a no-op when not in it. */
+    @PostMapping("/dry-run/enable")
+    public ResponseEntity<Void> enableDryRun(@PathVariable UUID id) {
+        return dryRunAction(id, () -> apiService.enableMemberDryRun(id));
+    }
+
+    @PostMapping("/dry-run/disable")
+    public ResponseEntity<Void> disableDryRun(@PathVariable UUID id) {
+        return dryRunAction(id, () -> apiService.disableMemberDryRun(id));
+    }
+
+    /** As {@link #debugAction}: what this instance knows of the member's dry run is forgotten whatever the answer. */
+    private ResponseEntity<Void> dryRunAction(UUID id, IntSupplier action) {
+        requireAdmin();
+        try {
+            return ApiStatus.answer(action.getAsInt());
+        } finally {
+            dryRunMembers.evict(id);
         }
     }
 

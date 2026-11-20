@@ -1308,6 +1308,33 @@ public class MockApiService implements ApiService {
     }
 
     @Override
+    public int enableMemberDryRun(UUID memberId) {
+        log.trace("enableMemberDryRun({})", memberId);
+        return members.dryRunAction(memberId, store -> store.enable(memberId));
+    }
+
+    @Override
+    public int disableMemberDryRun(UUID memberId) {
+        log.trace("disableMemberDryRun({})", memberId);
+        return members.dryRunAction(memberId, store -> store.disable(memberId));
+    }
+
+    @Override
+    public fr.enimaloc.catapult.common.dto.DryRunStateDto myDryRun() {
+        UUID account = currentUserId();
+        return account == null ? null : members.dryRun().state(account);
+    }
+
+    @Override
+    public int disableMyDryRun() {
+        UUID account = currentUserId();
+        if (account == null) return 401;
+        // a no-op for an account the listing doesn't know yet, as catapult-api's for one out of dry run
+        int status = members.dryRunAction(account, store -> store.disable(account));
+        return status == 404 ? members.dryRun().disable(account) : status;
+    }
+
+    @Override
     public int adminToggleMemberBot(UUID memberId) {
         log.trace("adminToggleMemberBot({})", memberId);
         members.toggleBot(memberId);

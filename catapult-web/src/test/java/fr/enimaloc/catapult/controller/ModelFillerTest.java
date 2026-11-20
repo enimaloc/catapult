@@ -64,6 +64,8 @@ class ModelFillerTest {
     /** No DebugMembers unless a test gives them (getIfAvailable answers null). */
     @SuppressWarnings("unchecked")
     private final ObjectProvider<fr.enimaloc.catapult.service.debug.DebugMembers> debugMembers = mock(ObjectProvider.class);
+    @SuppressWarnings("unchecked")
+    private final ObjectProvider<fr.enimaloc.catapult.service.dryrun.DryRunMembers> dryRunMembers = mock(ObjectProvider.class);
     private ExtendedModelMap model;
 
     private ModelFiller filler(Optional<BuildProperties> buildProperties) {
@@ -77,7 +79,7 @@ class ModelFillerTest {
         ObjectProvider<LaunchedPlatforms> launchedProvider = mock(ObjectProvider.class);
         when(launchedProvider.getIfAvailable()).thenReturn(launchedPlatforms);
         return new ModelFiller(buildProperties, messages, api, new TwitchatEventForms(TwitchatCatalog.load()), metaTags,
-                socialLinksProvider, degradedState, degradedLabels, launchedProvider, emergencyState, debugMembers);
+                socialLinksProvider, degradedState, degradedLabels, launchedProvider, emergencyState, debugMembers, dryRunMembers);
     }
 
     private ModelFiller filler() {
