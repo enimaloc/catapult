@@ -759,4 +759,77 @@ class TwitchEventSubServiceTest {
 
         verify(oAuthTokenRepository).findByUserAndProvider(user, OAuthToken.Provider.TWITCH);
     }
+
+    private void helixChannelsAnswers(String body) {
+        when(restClient.get()).thenReturn(getUriSpec);
+        when(getUriSpec.uri(anyString())).thenReturn(getHeaderSpec);
+        when(getHeaderSpec.header(anyString(), anyString())).thenReturn(getHeaderSpec);
+        when(getHeaderSpec.retrieve()).thenReturn(getResponseSpec);
+        when(getResponseSpec.body(String.class)).thenReturn(body);
+    }
+
+    @Test
+    void currentCategory_isTheLastOneSeenOnTheChannel() {
+        assertThat(service.currentCategory(user.getId())).isEmpty();
+
+        service.handleMessage(user, token, """
+            {
+              "metadata": { "message_type": "notification", "subscription_type": "channel.update" },
+              "payload": { "event": { "category_id": "509658", "category_name": "Just Chatting", "content_classification_labels": [] } }
+            }
+            """, false);
+
+        assertThat(service.currentCategory(user.getId()))
+            .contains(new TwitchEventSubService.CurrentCategory("509658", "Just Chatting"));
+    }
+
+    @Test
+    void currentCategory_withoutCategoryOnTheChannel_isEmpty() {
+        service.handleMessage(user, token, """
+            {
+              "metadata": { "message_type": "notification", "subscription_type": "channel.update" },
+              "payload": { "event": { "category_id": "", "category_name": "", "content_classification_labels": [] } }
+            }
+            """, false);
+
+        assertThat(service.currentCategory(user.getId())).isEmpty();
+    }
+
+    @Test
+    void fetchCurrentCategory_readsHelixChannelsAndRemembersIt() {
+        helixChannelsAnswers("{\"data\":[{\"game_id\":\"33214\",\"game_name\":\"Factorio\","
+            + "\"content_classification_labels\":[]}]}");
+
+        assertThat(service.fetchCurrentCategory(user))
+            .contains(new TwitchEventSubService.CurrentCategory("33214", "Factorio"));
+        assertThat(service.currentCategory(user.getId()))
+            .contains(new TwitchEventSubService.CurrentCategory("33214", "Factorio"));
+        verify(getUriSpec).uri("https://api.twitch.tv/helix/channels?broadcaster_id=broadcaster-123");
+    }
+
+    @Test
+    void fetchCurrentCategory_whenHelixFails_isEmpty() {
+        helixChannelsAnswers("{}");
+        when(getResponseSpec.body(String.class)).thenThrow(new IllegalStateException("Helix down"));
+
+        assertThat(service.fetchCurrentCategory(user)).isEmpty();
+    }
+
+    @Test
+    void fetchCurrentCategory_withoutTwitchToken_isEmpty() {
+        when(oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH))
+            .thenReturn(Optional.empty());
+
+        assertThat(service.fetchCurrentCategory(user)).isEmpty();
+        verify(restClient, never()).get();
+    }
+
+    @Test
+    void fetchCurrentCategory_underASimulatedChannel_takesTheSimulatedData() {
+        simulate();
+
+        assertThat(service.fetchCurrentCategory(user)).hasValueSatisfying(category ->
+            assertThat(category.name()).isEqualTo(SimulatedData.defaults().currentCategoryName()));
+        verify(restClient, never()).get();
+    }
 }

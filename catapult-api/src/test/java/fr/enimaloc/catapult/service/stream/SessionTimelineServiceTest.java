@@ -151,6 +151,19 @@ class SessionTimelineServiceTest {
     }
 
     @Test
+    void closeOpenEndsThePeriodOfASessionThatJustEnded() {
+        UserAccount user = liveUser();
+        timeline.observe(user, "1", "Factorio", "Factorio", START);
+        // StreamOfflineEvent is published once the end is recorded: the session is no longer ongoing
+        sessions.recordEnd(user, at(90));
+
+        timeline.closeOpen(user, at(90));
+
+        assertThat(timeline.currentSession(user)).singleElement()
+                .satisfies(segment -> assertThat(segment.getEndedAt()).isEqualTo(at(90)));
+    }
+
+    @Test
     void currentSessionIgnoresAPreviousStream() {
         UserAccount user = liveUser();
         timeline.observe(user, "1", "Factorio", "Factorio", START);

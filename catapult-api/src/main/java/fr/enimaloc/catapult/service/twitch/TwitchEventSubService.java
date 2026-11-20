@@ -111,6 +111,39 @@ public class TwitchEventSubService implements EventSubService {
 
     private record ChannelState(String categoryId, String categoryName, Set<String> cclIds) {}
 
+    /** A channel's Twitch category: its id and display name. */
+    public record CurrentCategory(String id, String name) {}
+
+    /**
+     * The category last seen on the member's channel (the Helix read at connect, then each {@code channel.update});
+     * empty when none is known yet or the channel has no category.
+     */
+    public Optional<CurrentCategory> currentCategory(UUID userId) {
+        ChannelState state = channelStates.get(userId);
+        if (state == null || state.categoryId() == null || state.categoryId().isBlank()) {
+            return Optional.empty();
+        }
+        return Optional.of(new CurrentCategory(state.categoryId(), state.categoryName()));
+    }
+
+    /**
+     * Reads the channel's category from Helix {@code /channels} (the read made at connect) and remembers it; empty
+     * without a Twitch token or when the read fails. When the simulation keeps {@code channel.update} out, the
+     * simulated data stand in for Helix, as at connect.
+     */
+    public Optional<CurrentCategory> fetchCurrentCategory(UserAccount user) {
+        if (simulated(user, "channel.update")) {
+            seedChannelStateIfAbsent(user);
+            return currentCategory(user.getId());
+        }
+        Optional<OAuthToken> token = oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH);
+        if (token.isEmpty()) {
+            return Optional.empty();
+        }
+        initChannelState(user, twitchTokenService.resolveAccessToken(token.get(), user));
+        return currentCategory(user.getId());
+    }
+
     @PostConstruct
     public void init() {
         if (!siteRole.isActive()) {
