@@ -13,7 +13,8 @@ import java.util.function.Supplier;
  * {@link TwitchChatService} that holds back every public chat write (messages, timeouts, bans, unbans, shoutouts) on
  * the channel of a member in dry run: nothing is sent, the write is noted ({@link DryRunGate#note}) and returns as if
  * done. The connection itself, the reads, and every call for a member not in dry run go to {@code delegate}
- * unchanged. Wrapped around each {@link TwitchChatService} bean by {@link DryRunTwitchWrapping}.
+ * unchanged. Wrapped around each {@link TwitchChatService} bean by {@link DryRunTwitchWrapping}. Until who is in dry
+ * run is known ({@link DryRunGate#holdsUntilLoaded}), every member's chat write is held too.
  */
 public class DryRunTwitchChatService implements TwitchChatService {
 
@@ -28,6 +29,9 @@ public class DryRunTwitchChatService implements TwitchChatService {
     @Override
     public void sendMessage(UserAccount user, String message) {
         DryRunGate dryRun = gate.get();
+        if (dryRun.holdsUntilLoaded(user, "sendMessage")) {
+            return;
+        }
         if (!dryRun.holdsChat(user)) {
             delegate.sendMessage(user, message);
             return;
@@ -41,6 +45,9 @@ public class DryRunTwitchChatService implements TwitchChatService {
     @Override
     public void timeout(UserAccount user, String targetLogin, int durationSeconds, String reason) {
         DryRunGate dryRun = gate.get();
+        if (dryRun.holdsUntilLoaded(user, "timeout")) {
+            return;
+        }
         if (!dryRun.holdsChat(user)) {
             delegate.timeout(user, targetLogin, durationSeconds, reason);
             return;
@@ -55,6 +62,9 @@ public class DryRunTwitchChatService implements TwitchChatService {
     @Override
     public void ban(UserAccount user, String targetLogin, String reason) {
         DryRunGate dryRun = gate.get();
+        if (dryRun.holdsUntilLoaded(user, "ban")) {
+            return;
+        }
         if (!dryRun.holdsChat(user)) {
             delegate.ban(user, targetLogin, reason);
             return;
@@ -65,6 +75,9 @@ public class DryRunTwitchChatService implements TwitchChatService {
     @Override
     public void unban(UserAccount user, String targetLogin) {
         DryRunGate dryRun = gate.get();
+        if (dryRun.holdsUntilLoaded(user, "unban")) {
+            return;
+        }
         if (!dryRun.holdsChat(user)) {
             delegate.unban(user, targetLogin);
             return;
@@ -75,6 +88,9 @@ public class DryRunTwitchChatService implements TwitchChatService {
     @Override
     public void shoutout(UserAccount user, String targetLogin) {
         DryRunGate dryRun = gate.get();
+        if (dryRun.holdsUntilLoaded(user, "shoutout")) {
+            return;
+        }
         if (!dryRun.holdsChat(user)) {
             delegate.shoutout(user, targetLogin);
             return;

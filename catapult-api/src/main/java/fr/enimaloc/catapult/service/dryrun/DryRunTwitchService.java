@@ -19,6 +19,10 @@ import java.util.function.Supplier;
  * Catapult goes on as usual. Reads, and every call for a member not in dry run, go to {@code delegate} unchanged; so
  * does a write the delegate would skip or refuse anyway (bot disabled, account inactive, standby site), with nothing
  * noted. Wrapped around each {@link TwitchService} bean by {@link DryRunTwitchWrapping}.
+ *
+ * <p>Until who is in dry run is known ({@link DryRunGate#holdsUntilLoaded}), every member's write is held too, and
+ * answered as not made: {@link ChannelUpdateOutcome#FAILED}, or an exception for the extensions, so that nothing takes
+ * the channel as changed.</p>
  */
 public class DryRunTwitchService implements TwitchService {
 
@@ -35,6 +39,9 @@ public class DryRunTwitchService implements TwitchService {
     @Override
     public ChannelUpdateOutcome updateChannelReporting(UserAccount user, GameBinding binding) {
         DryRunGate dryRun = gate.get();
+        if (dryRun.holdsUntilLoaded(user, "updateChannelReporting")) {
+            return ChannelUpdateOutcome.FAILED;
+        }
         if (!dryRun.holdsChannel(user)) {
             return delegate.updateChannelReporting(user, binding);
         }
@@ -53,6 +60,9 @@ public class DryRunTwitchService implements TwitchService {
     @Override
     public ChannelUpdateOutcome setCategory(UserAccount user, String twitchGameId, String twitchGameName) {
         DryRunGate dryRun = gate.get();
+        if (dryRun.holdsUntilLoaded(user, "setCategory")) {
+            return ChannelUpdateOutcome.FAILED;
+        }
         if (!dryRun.holdsChannel(user)) {
             return delegate.setCategory(user, twitchGameId, twitchGameName);
         }
@@ -64,6 +74,9 @@ public class DryRunTwitchService implements TwitchService {
     @Override
     public ChannelUpdateOutcome resetToDefault(UserAccount user) {
         DryRunGate dryRun = gate.get();
+        if (dryRun.holdsUntilLoaded(user, "resetToDefault")) {
+            return ChannelUpdateOutcome.FAILED;
+        }
         if (!dryRun.holdsChannel(user)) {
             return delegate.resetToDefault(user);
         }
@@ -81,6 +94,9 @@ public class DryRunTwitchService implements TwitchService {
     @Override
     public TwitchExtensionPlacement setActiveExtensions(UserAccount user, TwitchExtensionPlacement placement) {
         DryRunGate dryRun = gate.get();
+        if (dryRun.holdsUntilLoaded(user, "setActiveExtensions")) {
+            throw notLoaded();
+        }
         if (!dryRun.holdsChannel(user)) {
             return delegate.setActiveExtensions(user, placement);
         }
@@ -111,6 +127,10 @@ public class DryRunTwitchService implements TwitchService {
     @Override
     public TwitchExtensionPlacement getActiveExtensions(UserAccount user) {
         return delegate.getActiveExtensions(user);
+    }
+
+    private static IllegalStateException notLoaded() {
+        return new IllegalStateException("Twitch write held: dry-run state not loaded yet");
     }
 
     /** {@code [dry run] would have changed the channel: <fields>}, without the colon when no field is known. */

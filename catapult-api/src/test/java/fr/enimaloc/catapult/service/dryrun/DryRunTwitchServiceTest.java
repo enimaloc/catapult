@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.account.UserSettings;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.debug.DebugExchange.Direction;
+import fr.enimaloc.catapult.repository.dryrun.MemberDryRunRepository;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
@@ -55,7 +56,8 @@ import static org.mockito.Mockito.when;
 
 class DryRunTwitchServiceTest {
 
-    final DryRunRegistry registry = new DryRunRegistry(mock(), event -> { });
+    final MemberDryRunRepository dryRuns = mock(MemberDryRunRepository.class);
+    final DryRunRegistry registry = new DryRunRegistry(dryRuns, event -> { });
     final UserAccountRepository users = mock(UserAccountRepository.class);
     final UserSettingsRepository settingsRepository = mock(UserSettingsRepository.class);
     final SiteRole siteRole = mock(SiteRole.class);
@@ -82,7 +84,61 @@ class DryRunTwitchServiceTest {
         when(siteRole.isActive()).thenReturn(true);
         when(debugMembers.modeOf(any())).thenReturn(Optional.empty());
         when(eventSub.currentCategory(member)).thenReturn(Optional.empty());
+        registry.load();
         registry.activate(member);
+    }
+
+    /** The decorator over a gate asking {@code over}, the rest as in the other tests. */
+    private DryRunTwitchService serviceOver(DryRunRegistry over) {
+        DryRunGate unloadedGate = new DryRunGate(over, users, settingsRepository, siteRole, activityLog, debugMembers,
+                recorder, titles, provider(eventSub), provider(twitchat));
+        return new DryRunTwitchService(delegate, () -> unloadedGate);
+    }
+
+    @Test
+    void aWriteBeforeTheFirstLoadIsHeld() {
+        // a member not in dry run: unknown until the set is loaded, so held too, but nothing says "dry run"
+        MemberDryRunRepository unreadable = mock(MemberDryRunRepository.class);
+        when(unreadable.findAll()).thenThrow(new IllegalStateException("database down"));
+        DryRunRegistry unloaded = new DryRunRegistry(unreadable, event -> { });
+        unloaded.init();
+        DryRunTwitchService held = serviceOver(unloaded);
+        UserAccount other = new UserAccount();
+        other.setId(UUID.randomUUID());
+
+        assertThat(held.updateChannelReporting(other, binding("33214", "Factorio")))
+                .isEqualTo(ChannelUpdateOutcome.FAILED);
+        assertThat(held.setCategory(other, "33214", "Factorio")).isEqualTo(ChannelUpdateOutcome.FAILED);
+        assertThat(held.resetToDefault(other)).isEqualTo(ChannelUpdateOutcome.FAILED);
+        assertThatThrownBy(() -> held.setActiveExtensions(other, TwitchExtensionPlacement.empty()))
+                .isInstanceOf(IllegalStateException.class);
+
+        verifyNoInteractions(delegate, activityLog, twitchat);
+    }
+
+    @Test
+    void aFailedFirstLoadKeepsWritesHeldAndRetries() {
+        long[] now = {0};
+        when(dryRuns.findAll()).thenThrow(new IllegalStateException("database down"))
+                .thenReturn(List.of());
+        DryRunRegistry unloaded = new DryRunRegistry(dryRuns, event -> { });
+        unloaded.clock = () -> now[0];
+        unloaded.init();
+        DryRunTwitchService held = serviceOver(unloaded);
+        UserAccount other = new UserAccount();
+        other.setId(UUID.randomUUID());
+
+        // within the retry delay: still held, the database not asked again
+        now[0] = DryRunRegistry.RETRY_MS - 1;
+        assertThat(held.setCategory(other, "33214", "Factorio")).isEqualTo(ChannelUpdateOutcome.FAILED);
+        verifyNoInteractions(delegate);
+
+        // past it: loaded on the next write, which goes through
+        now[0] = DryRunRegistry.RETRY_MS;
+        when(delegate.setCategory(other, "33214", "Factorio")).thenReturn(ChannelUpdateOutcome.APPLIED);
+        assertThat(held.setCategory(other, "33214", "Factorio")).isEqualTo(ChannelUpdateOutcome.APPLIED);
+        // the call in setUp, the failed one and the retry
+        verify(dryRuns, times(3)).findAll();
     }
 
     @SuppressWarnings("unchecked")

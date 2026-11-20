@@ -3,12 +3,15 @@ package fr.enimaloc.catapult.service.dryrun;
 import fr.enimaloc.catapult.domain.dryrun.MemberDryRun;
 import fr.enimaloc.catapult.repository.dryrun.MemberDryRunRepository;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class DryRunRegistryTest {
@@ -30,6 +33,37 @@ class DryRunRegistryTest {
         assertThat(registry.isActive(member)).isFalse();
         assertThat(registry.isActive(null)).isFalse();
         assertThat(registry.members()).isEmpty();
+    }
+
+    @Test
+    void theRegistryIsLoadedAtInitialization() {
+        // no ApplicationReadyEvent: the context is only refreshed, as when detection and EventSub start
+        when(dryRuns.findAll()).thenReturn(List.of(row(member)));
+        new ApplicationContextRunner()
+                .withBean(MemberDryRunRepository.class, () -> dryRuns)
+                .withBean(DryRunRegistry.class)
+                .run(context -> {
+                    DryRunRegistry built = context.getBean(DryRunRegistry.class);
+                    assertThat(built.isActive(member)).isTrue();
+                    assertThat(built.isLoaded()).isTrue();
+                });
+    }
+
+    @Test
+    void aFailedFirstLoadIsRetriedOnlyAfterTheDelay() {
+        long[] now = {0};
+        registry.clock = () -> now[0];
+        when(dryRuns.findAll()).thenThrow(new IllegalStateException("database down"))
+                .thenReturn(List.of(row(member)));
+
+        registry.init();
+        assertThat(registry.isLoaded()).isFalse();
+        now[0] = DryRunRegistry.RETRY_MS;
+
+        assertThat(registry.isLoaded()).isTrue();
+        assertThat(registry.isActive(member)).isTrue();
+        assertThat(registry.isLoaded()).isTrue();
+        verify(dryRuns, times(2)).findAll();
     }
 
     @Test

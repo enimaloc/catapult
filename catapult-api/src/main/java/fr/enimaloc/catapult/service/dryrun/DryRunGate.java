@@ -62,9 +62,28 @@ public class DryRunGate {
     private final ObjectProvider<TwitchatEventDispatcher> twitchat;
     /** Per member in dry run, the last held category announced: Twitch's own never moves meanwhile. */
     private final Map<UUID, Category> announced = new ConcurrentHashMap<>();
+    /** The member and operation pairs already warned about while the dry-run set is not loaded. */
+    private final Set<String> warnedUnloaded = ConcurrentHashMap.newKeySet();
 
     /** A Twitch category: the default ("no game") one a reset would send, or one announced. */
     public record Category(String id, String name) {}
+
+    /**
+     * Whether a write ({@code operation}) for {@code user}'s channel is held because who is in dry run is not known
+     * yet (the registry's first load has not succeeded): every member's writes are then held on the active site,
+     * dry run or not, so that nothing leaks for one who is. Nothing is noted in the member's logs, as nothing says
+     * they are in dry run: a warning per member and operation goes to the application log instead. A standby keeps
+     * its own answer (it refuses anyway).
+     */
+    public boolean holdsUntilLoaded(UserAccount user, String operation) {
+        if (user == null || registry.isLoaded() || !siteRole.isActive()) {
+            return false;
+        }
+        if (warnedUnloaded.add(user.getId() + ":" + operation)) {
+            log.warn("Twitch write held: dry-run state not loaded yet (member {}, {})", user.getId(), operation);
+        }
+        return true;
+    }
 
     /**
      * Whether a chat write (message, moderation, shoutout) for {@code user}'s channel is held: the member is in dry

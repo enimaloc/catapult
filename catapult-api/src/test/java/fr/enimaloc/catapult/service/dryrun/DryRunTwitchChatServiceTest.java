@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.debug.DebugExchange.Direction;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
+import fr.enimaloc.catapult.repository.dryrun.MemberDryRunRepository;
 import fr.enimaloc.catapult.service.ActivityLogService;
 import fr.enimaloc.catapult.service.debug.DebugExchangeRecorder;
 import fr.enimaloc.catapult.service.debug.DebugMemberRegistry;
@@ -52,7 +53,29 @@ class DryRunTwitchChatServiceTest {
         when(users.findById(member)).thenReturn(Optional.of(account));
         when(siteRole.isActive()).thenReturn(true);
         when(debugMembers.modeOf(any())).thenReturn(Optional.empty());
+        registry.load();
         registry.activate(member);
+    }
+
+    @Test
+    void aChatWriteBeforeTheFirstLoadIsHeld() {
+        MemberDryRunRepository unreadable = mock(MemberDryRunRepository.class);
+        when(unreadable.findAll()).thenThrow(new IllegalStateException("database down"));
+        DryRunRegistry unloaded = new DryRunRegistry(unreadable, event -> { });
+        unloaded.init();
+        DryRunGate unloadedGate = new DryRunGate(unloaded, users, mock(UserSettingsRepository.class), siteRole,
+                activityLog, debugMembers, recorder, mock(StreamTitleService.class), provider(null), provider(null));
+        DryRunTwitchChatService held = new DryRunTwitchChatService(delegate, () -> unloadedGate);
+        UserAccount other = new UserAccount();
+        other.setId(UUID.randomUUID());
+
+        held.sendMessage(other, "Now playing Factorio");
+        held.timeout(other, "viewer", 60, "spam");
+        held.ban(other, "viewer", "spam");
+        held.unban(other, "viewer");
+        held.shoutout(other, "friend");
+
+        verifyNoInteractions(delegate, activityLog);
     }
 
     @Test
