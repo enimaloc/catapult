@@ -120,6 +120,29 @@ public final class BgsSession implements BgsChannel {
     }
 
     @Override
+    public CompletableFuture<ByteString> callRawUnobserved(int serviceHash, int methodId, ByteString body,
+                                                          boolean withCiid) {
+        CompletableFuture<ByteString> result = new CompletableFuture<>();
+        post(() -> send(serviceHash, methodId, body, withCiid, null, result, false), result);
+        return result;
+    }
+
+    @Override
+    public CompletableFuture<Void> callRawNoReplyUnobserved(int serviceHash, int methodId, ByteString body,
+                                                           boolean withCiid) {
+        CompletableFuture<Void> result = new CompletableFuture<>();
+        post(() -> {
+            if (closed) {
+                result.completeExceptionally(new IOException("Session closed"));
+                return;
+            }
+            send(serviceHash, methodId, body, withCiid, null, null, false);
+            result.complete(null);
+        }, result);
+        return result;
+    }
+
+    @Override
     public <Q extends Message> void on(ServiceMethod<Q, ?> method, Consumer<Q> handler) {
         handlers.put(key(method.serviceHash(), method.methodId()), new Handler(method, body -> {
             try {
@@ -182,6 +205,12 @@ public final class BgsSession implements BgsChannel {
 
     private void send(int serviceHash, int methodId, ByteString body, boolean withCiid, ServiceMethod<?, ?> method,
                       CompletableFuture<ByteString> reply) {
+        send(serviceHash, methodId, body, withCiid, method, reply, true);
+    }
+
+    /** {@code observed}: whether the wire tap may see the exchange (never for the admin's free calls). */
+    private void send(int serviceHash, int methodId, ByteString body, boolean withCiid, ServiceMethod<?, ?> method,
+                      CompletableFuture<ByteString> reply, boolean observed) {
         if (closed) {
             if (reply != null) {
                 reply.completeExceptionally(new IOException("Session closed"));
@@ -195,7 +224,7 @@ public final class BgsSession implements BgsChannel {
             header.setCiid(ciid);
         }
         Header built = header.build();
-        WireTap tap = wantingTap();
+        WireTap tap = observed ? wantingTap() : null;
         Instant at = tap != null ? Instant.now() : null;
         long start = tap != null ? System.nanoTime() : 0;
         if (reply != null) {

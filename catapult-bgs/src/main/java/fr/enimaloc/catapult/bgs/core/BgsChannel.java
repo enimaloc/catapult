@@ -20,6 +20,15 @@ public interface BgsChannel extends AutoCloseable {
 
     CompletableFuture<ByteString> callRaw(int serviceHash, int methodId, ByteString body, boolean withCiid);
 
+    /** As {@link #callRaw}, but the exchange never reaches the {@link WireTap}. */
+    CompletableFuture<ByteString> callRawUnobserved(int serviceHash, int methodId, ByteString body, boolean withCiid);
+
+    /**
+     * Sends a call nobody answers, never handed to the {@link WireTap}; completes once written, fails when the
+     * session is closed.
+     */
+    CompletableFuture<Void> callRawNoReplyUnobserved(int serviceHash, int methodId, ByteString body, boolean withCiid);
+
     <Q extends Message> void on(ServiceMethod<Q, ?> method, Consumer<Q> handler);
 
     void onRaw(int serviceHash, int methodId, Consumer<ByteString> handler);
