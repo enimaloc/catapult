@@ -59,7 +59,10 @@ public class ClientDebugIngestService {
     private static final Set<String> SOURCES = Set.of("page", "widget");
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
-    /** How each browser session is recorded: method and synthetic URL. */
+    /**
+     * How each browser session is recorded: method and synthetic URL. Each method is one of
+     * {@link fr.enimaloc.catapult.domain.debug.DebugExchange#CLIENT_METHODS}: an entry fails only on its error.
+     */
     private record Session(String method, URI uri) {}
 
     private static final Map<String, Session> SESSIONS = Map.of(
