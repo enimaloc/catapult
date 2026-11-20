@@ -12,7 +12,9 @@ import fr.enimaloc.catapult.service.debug.DebugRecording;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.event.ChannelCategoryChangedEvent;
 import fr.enimaloc.catapult.event.ChannelRaidedOutEvent;
+import fr.enimaloc.catapult.event.ChannelStateResyncedEvent;
 import fr.enimaloc.catapult.event.StreamOfflineEvent;
 import fr.enimaloc.catapult.event.StreamOnlineEvent;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
@@ -866,5 +868,73 @@ class TwitchEventSubServiceTest {
         assertThat(service.fetchCurrentCategory(user)).hasValueSatisfying(category ->
             assertThat(category.name()).isEqualTo(SimulatedData.defaults().currentCategoryName()));
         verify(restClient, never()).get();
+    }
+
+    @Test
+    void initChannelStatePublishesTheResyncedCategory() {
+        helixChannelsAnswers("{\"data\":[{\"game_id\":\"33214\",\"game_name\":\"Factorio\","
+            + "\"content_classification_labels\":[]}]}");
+        when(getResponseSpec.body(String.class))
+            .thenReturn("{\"data\":[{\"game_id\":\"33214\",\"game_name\":\"Factorio\","
+                + "\"content_classification_labels\":[]}]}")
+            .thenReturn("{\"data\":[]}");
+
+        service.handleMessage(user, token, WELCOME, false);
+
+        ArgumentCaptor<ApplicationEvent> events = ArgumentCaptor.forClass(ApplicationEvent.class);
+        verify(eventPublisher, atLeastOnce()).publishEvent(events.capture());
+        assertThat(events.getAllValues()).filteredOn(ChannelStateResyncedEvent.class::isInstance)
+            .singleElement()
+            .satisfies(e -> {
+                ChannelStateResyncedEvent resync = (ChannelStateResyncedEvent) e;
+                assertThat(resync.getUser()).isEqualTo(user);
+                assertThat(resync.getCategoryId()).isEqualTo("33214");
+                assertThat(resync.getCategoryName()).isEqualTo("Factorio");
+            });
+        // A resync is not a change: no Twitchat notification, no category change event
+        assertThat(events.getAllValues()).noneMatch(ChannelCategoryChangedEvent.class::isInstance);
+        verifyNoInteractions(twitchatEventDispatcher);
+    }
+
+    @Test
+    void initChannelState_whenHelixFails_publishesNoResync() {
+        helixChannelsAnswers("{}");
+        when(getResponseSpec.body(String.class))
+            .thenThrow(new IllegalStateException("Helix down"))
+            .thenReturn("{\"data\":[]}");
+
+        service.handleMessage(user, token, WELCOME, false);
+
+        verify(eventPublisher, never()).publishEvent(any(ChannelStateResyncedEvent.class));
+    }
+
+    @Test
+    void fetchCurrentCategory_publishesNoResync() {
+        helixChannelsAnswers("{\"data\":[{\"game_id\":\"33214\",\"game_name\":\"Factorio\","
+            + "\"content_classification_labels\":[]}]}");
+
+        service.fetchCurrentCategory(user);
+
+        verify(eventPublisher, never()).publishEvent(any(ChannelStateResyncedEvent.class));
+    }
+
+    @Test
+    void a_simulated_connect_publishes_the_seeded_category_as_a_resync() {
+        simulate();
+
+        service.connect(user);
+
+        ArgumentCaptor<ChannelStateResyncedEvent> resync = ArgumentCaptor.forClass(ChannelStateResyncedEvent.class);
+        verify(eventPublisher).publishEvent(resync.capture());
+        assertThat(resync.getValue().getCategoryName()).isEqualTo(SimulatedData.defaults().currentCategoryName());
+    }
+
+    @Test
+    void seeding_before_an_injected_change_publishes_no_resync() {
+        simulate();
+
+        service.seedChannelStateIfAbsent(user);
+
+        verify(eventPublisher, never()).publishEvent(any(ChannelStateResyncedEvent.class));
     }
 }

@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.service.stream;
 
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.event.ChannelCategoryChangedEvent;
+import fr.enimaloc.catapult.event.ChannelStateResyncedEvent;
 import fr.enimaloc.catapult.event.GameDetectedEvent;
 import fr.enimaloc.catapult.event.NoGameDetectedEvent;
 import fr.enimaloc.catapult.event.StreamOfflineEvent;
@@ -232,5 +233,30 @@ class SessionTimelineListenerTest {
 
         when(gameState.getLastKnownGame(user)).thenThrow(new IllegalStateException("no game state"));
         assertThatNoException().isThrownBy(() -> listener.onStreamOnline(new StreamOnlineEvent(this, user)));
+    }
+
+    @Test
+    void resyncedCategoryIsObserved() {
+        listener.onChannelStateResynced(new ChannelStateResyncedEvent(this, user, "3", "Games + Demos"));
+
+        verify(timeline).observeCategory(user, "3", "Games + Demos", NOW);
+    }
+
+    @Test
+    void resyncOnPassiveSiteDoesNothing() {
+        when(siteRole.isActive()).thenReturn(false);
+
+        listener.onChannelStateResynced(new ChannelStateResyncedEvent(this, user, "3", "Games + Demos"));
+
+        verifyNoInteractions(timeline, eventSub, gameState);
+    }
+
+    @Test
+    void aResyncFailureIsSwallowed() {
+        doThrow(new IllegalStateException("database down"))
+                .when(timeline).observeCategory(any(), any(), any(), any());
+
+        assertThatNoException().isThrownBy(() ->
+                listener.onChannelStateResynced(new ChannelStateResyncedEvent(this, user, "3", "Games + Demos")));
     }
 }

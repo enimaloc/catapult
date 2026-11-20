@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.service.stream;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.stream.StreamCategorySegment;
 import fr.enimaloc.catapult.event.ChannelCategoryChangedEvent;
+import fr.enimaloc.catapult.event.ChannelStateResyncedEvent;
 import fr.enimaloc.catapult.event.GameDetectedEvent;
 import fr.enimaloc.catapult.event.NoGameDetectedEvent;
 import fr.enimaloc.catapult.event.StreamOfflineEvent;
@@ -83,6 +84,16 @@ public class SessionTimelineListener {
     @EventListener
     public void onCategoryChanged(ChannelCategoryChangedEvent event) {
         record(event.getUser(), "category change", user ->
+                timeline.observeCategory(user, event.getCategoryId(), event.getCategoryName(), clock.instant()));
+    }
+
+    /**
+     * The category read again when EventSub reconnects: a change made while the socket was down (an API restart) is
+     * never replayed, so the running period catches up here. Nothing changes when the category is the same.
+     */
+    @EventListener
+    public void onChannelStateResynced(ChannelStateResyncedEvent event) {
+        record(event.getUser(), "category resync", user ->
                 timeline.observeCategory(user, event.getCategoryId(), event.getCategoryName(), clock.instant()));
     }
 
