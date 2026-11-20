@@ -12,6 +12,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 import java.net.URI;
 import java.time.Clock;
+import java.time.DateTimeException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayDeque;
@@ -49,6 +50,12 @@ public class ClientDebugIngestService {
     /** The most entries recorded per member within a rolling minute. */
     static final int PER_MINUTE = 600;
     private static final Duration WINDOW = Duration.ofMinutes(1);
+    /** A browser clock further off than this is not trusted for the skew: its batch is taken as is. */
+    static final Duration MAX_SKEW = Duration.ofDays(1);
+    /** How far in the past an entry may be placed, once moved by the skew. */
+    static final Duration MAX_AGE = Duration.ofDays(1);
+    /** How far in the future an entry may be placed, once moved by the skew. */
+    static final Duration MAX_AHEAD = Duration.ofMinutes(5);
     private static final Set<String> SOURCES = Set.of("page", "widget");
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
@@ -112,9 +119,15 @@ public class ClientDebugIngestService {
                 convert(root.path("sentAt"), Instant.class), entries));
     }
 
+    /** Whether {@code userId} is in debug mode, so that a batch of theirs would be recorded. */
+    public boolean inDebug(UUID userId) {
+        return registry.modeOf(userId).isPresent();
+    }
+
     /**
      * Records {@code batch}'s entries for {@code userId}, each moved by the clock skew the batch shows (the server's
-     * time minus the browser's when it was sent).
+     * time minus the browser's when it was sent, none when that is over {@link #MAX_SKEW}) and kept between
+     * {@link #MAX_AGE} ago and {@link #MAX_AHEAD} ahead; an entry whose time cannot be moved is skipped.
      */
     public Result ingest(UUID userId, ClientExchangeBatch batch) {
         if (registry.modeOf(userId).isEmpty()) {
@@ -125,17 +138,17 @@ public class ClientDebugIngestService {
             return Result.RECORDED;
         }
         Instant now = clock.instant();
-        Duration skew = batch.sentAt() == null ? Duration.ZERO : Duration.between(batch.sentAt(), now);
+        Duration skew = skew(batch.sentAt(), now);
         HttpHeaders headers = sourceHeaders(batch.source());
         int skipped = 0;
         for (ClientExchangeEntry entry : batch.entries()) {
             Session session = entry == null || entry.service() == null ? null : SESSIONS.get(entry.service());
             Direction direction = entry == null ? null : direction(entry.direction());
-            if (session == null || direction == null || !withinRate(userId, now)) {
+            Instant at = entry == null ? null : place(entry.at(), skew, now);
+            if (session == null || direction == null || at == null || !withinRate(userId, now)) {
                 skipped++;
                 continue;
             }
-            Instant at = entry.at() == null ? now : entry.at().plus(skew);
             long duration = entry.durationMs() == null ? 0 : Math.max(0, entry.durationMs());
             RawExchange raw = new RawExchange(at, session.method(), session.uri(), headers, json(entry.request()),
                     entry.status(), null, json(entry.response()), entry.error(), duration);
@@ -145,6 +158,33 @@ public class ClientDebugIngestService {
             log.debug("Skipped {} of the {} browser debug exchanges of {}", skipped, batch.entries().size(), userId);
         }
         return Result.RECORDED;
+    }
+
+    /** The server's time minus the browser's, or none when the browser's is missing or over {@link #MAX_SKEW} off. */
+    private static Duration skew(Instant sentAt, Instant now) {
+        if (sentAt == null || sentAt.isBefore(now.minus(MAX_SKEW)) || sentAt.isAfter(now.plus(MAX_SKEW))) {
+            return Duration.ZERO;
+        }
+        return Duration.between(sentAt, now);
+    }
+
+    /**
+     * Where an entry the browser saw at {@code at} goes: moved by {@code skew}, kept within the allowed window; now
+     * for no time, null when {@code at} cannot be moved (at the edge of what an {@link Instant} holds).
+     */
+    private static Instant place(Instant at, Duration skew, Instant now) {
+        if (at == null) {
+            return now;
+        }
+        Instant moved;
+        try {
+            moved = at.plus(skew);
+        } catch (DateTimeException | ArithmeticException e) {
+            return null;
+        }
+        Instant earliest = now.minus(MAX_AGE);
+        Instant latest = now.plus(MAX_AHEAD);
+        return moved.isBefore(earliest) ? earliest : moved.isAfter(latest) ? latest : moved;
     }
 
     /** Whether {@code userId} may have one more entry recorded at {@code now}; counts it when so. */

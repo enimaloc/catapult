@@ -47,6 +47,10 @@ public class ApiInternalClientDebugController {
 
     /** Records the batch in {@code request}'s body for {@code userId}, as captured by {@code source}. */
     private ResponseEntity<Void> ingest(UUID userId, String source, HttpServletRequest request) {
+        // Checked first, so that a browser still sending after the debug ended costs no read
+        if (!ingestService.inDebug(userId)) {
+            throw notInDebug();
+        }
         Optional<ClientExchangeBatch> batch;
         try {
             // One byte over the limit is enough to know the body is over it, without reading all of it
@@ -59,7 +63,11 @@ public class ApiInternalClientDebugController {
                         + ClientDebugIngestService.MAX_BYTES + " bytes"));
         return switch (ingestService.ingest(userId, new ClientExchangeBatch(source, read.sentAt(), read.entries()))) {
             case RECORDED -> ResponseEntity.noContent().build();
-            case NOT_IN_DEBUG -> throw new ResponseStatusException(HttpStatus.CONFLICT, "Not in debug mode");
+            case NOT_IN_DEBUG -> throw notInDebug();
         };
+    }
+
+    private static ResponseStatusException notInDebug() {
+        return new ResponseStatusException(HttpStatus.CONFLICT, "Not in debug mode");
     }
 }

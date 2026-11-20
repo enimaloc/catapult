@@ -107,6 +107,49 @@ class ClientDebugIngestServiceTest {
     }
 
     @Test
+    void anExtremeTimestampIsSkippedNotA500() {
+        Instant sentAt = NOW.minusSeconds(60);
+        List<ClientExchangeEntry> entries = List.of(obsRequest(Instant.MAX), obsRequest(NOW.minusSeconds(61)));
+
+        assertThat(service.ingest(member, new ClientExchangeBatch("page", sentAt, entries))).isEqualTo(Result.RECORDED);
+        assertThat(service.ingest(member, new ClientExchangeBatch("page", NOW.plusSeconds(60),
+                List.of(obsRequest(Instant.MIN))))).isEqualTo(Result.RECORDED);
+
+        assertThat(recordedOne(Direction.OUT, "GetSceneList", "obs").at()).isEqualTo(NOW.minusSeconds(1));
+    }
+
+    @Test
+    void aFarSentAtUsesNoSkew() {
+        Instant sentAt = NOW.minus(Duration.ofDays(3));
+        service.ingest(member, new ClientExchangeBatch("page", sentAt, List.of(obsRequest(NOW.minusSeconds(30)))));
+
+        assertThat(recordedOne(Direction.OUT, "GetSceneList", "obs").at()).isEqualTo(NOW.minusSeconds(30));
+    }
+
+    @Test
+    void entriesAreClampedToTheAllowedWindow() {
+        List<ClientExchangeEntry> entries = List.of(
+                new ClientExchangeEntry("obs", "IN", "old", NOW.minus(Duration.ofDays(10)), null, null, null, null,
+                        null),
+                new ClientExchangeEntry("obs", "IN", "ahead", NOW.plus(Duration.ofHours(2)), null, null, null, null,
+                        null),
+                new ClientExchangeEntry("obs", "IN", "edge", Instant.MAX, null, null, null, null, null));
+
+        service.ingest(member, new ClientExchangeBatch("page", NOW, entries));
+
+        assertThat(recordedOne(Direction.IN, "old", "obs").at()).isEqualTo(NOW.minus(Duration.ofDays(1)));
+        assertThat(recordedOne(Direction.IN, "ahead", "obs").at()).isEqualTo(NOW.plus(Duration.ofMinutes(5)));
+        assertThat(recordedOne(Direction.IN, "edge", "obs").at()).as("no skew: nothing overflows")
+                .isEqualTo(NOW.plus(Duration.ofMinutes(5)));
+    }
+
+    @Test
+    void tellsWhetherTheMemberIsInDebug() {
+        assertThat(service.inDebug(member)).isTrue();
+        assertThat(service.inDebug(UUID.randomUUID())).isFalse();
+    }
+
+    @Test
     void refusesWhenNotInDebug() {
         when(registry.modeOf(member)).thenReturn(Optional.empty());
 

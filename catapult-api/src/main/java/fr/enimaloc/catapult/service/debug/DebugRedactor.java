@@ -27,13 +27,14 @@ public class DebugRedactor {
     /**
      * Names (of headers, query / form parameters, JSON fields; compared ignoring case) that carry a credential, as
      * found in what catapult-api sends and receives: OAuth (Twitch, IGDB, MSA), Steam's key and OpenID signature,
-     * the Xbox Live / XSTS / Minecraft sign-in chain, GitLab's {@code PRIVATE-TOKEN}, DtDD's {@code X-API-KEY}.
+     * the Xbox Live / XSTS / Minecraft sign-in chain, GitLab's {@code PRIVATE-TOKEN}, DtDD's {@code X-API-KEY},
+     * OBS-websocket's {@code authentication} (its Identify message).
      */
     private static final Set<String> SECRET_NAMES = Set.of(
             "authorization", "proxy-authorization", "cookie", "set-cookie", "x-api-key", "private-token",
             "key", "api_key", "apikey", "access_token", "refresh_token", "id_token", "client_secret",
             "token", "password", "code", "device_code", "user_code", "openid.sig",
-            "rpsticket", "usertokens", "identitytoken");
+            "rpsticket", "usertokens", "identitytoken", "authentication");
     /** Any other name containing one of these is taken for a credential too, unless {@link #NOT_SECRET}. */
     private static final List<String> SECRET_NAME_PARTS = List.of(
             "token", "secret", "password", "passwd", "ticket", "signature", "apikey", "api_key", "api-key");

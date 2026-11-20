@@ -18,6 +18,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -29,6 +30,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -98,12 +100,62 @@ class ApiInternalClientDebugControllerTest {
 
     @Test
     void returns400WhenTheBodyCannotBeRead() throws IOException {
+        inDebug();
         HttpServletRequest request = mock(HttpServletRequest.class);
         ServletInputStream in = mock(ServletInputStream.class);
         when(request.getInputStream()).thenReturn(in);
         when(in.readNBytes(anyInt())).thenThrow(new IOException("reset"));
 
         assertRefused(() -> controller.record(member, request), HttpStatus.BAD_REQUEST);
+        verifyNoInteractions(recorder);
+    }
+
+    @Test
+    void anExtremeTimestampIsSkippedNotA500() {
+        inDebug();
+        String json = "{\"sentAt\":\"" + Instant.now().minusSeconds(3600) + "\",\"entries\":["
+                + "{\"service\":\"obs\",\"direction\":\"IN\",\"at\":\"+1000000000-12-31T23:59:59.999999999Z\"}]}";
+
+        assertThat(controller.record(member, body(json)).getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        verifyNoInteractions(recorder);
+    }
+
+    @Test
+    void theBodyIsNotReadWhenNotInDebug() throws IOException {
+        when(registry.modeOf(member)).thenReturn(Optional.empty());
+        HttpServletRequest request = mock(HttpServletRequest.class);
+
+        assertRefused(() -> controller.record(member, request), HttpStatus.CONFLICT);
+        verify(request, never()).getInputStream();
+    }
+
+    @Test
+    void theBodyIsNotReadForAnUnknownWidget() throws IOException {
+        UUID widgetId = UUID.randomUUID();
+        when(widgets.owner(widgetId)).thenReturn(Optional.empty());
+        HttpServletRequest request = mock(HttpServletRequest.class);
+
+        assertRefused(() -> controller.recordFromWidget(widgetId, request), HttpStatus.NOT_FOUND);
+        verify(request, never()).getInputStream();
+    }
+
+    @Test
+    void widgetReturns409WhenItsOwnerIsNotInDebug() {
+        UUID widgetId = UUID.randomUUID();
+        when(widgets.owner(widgetId)).thenReturn(Optional.of(member));
+        when(registry.modeOf(member)).thenReturn(Optional.empty());
+
+        assertRefused(() -> controller.recordFromWidget(widgetId, body(BATCH)), HttpStatus.CONFLICT);
+        verifyNoInteractions(recorder);
+    }
+
+    @Test
+    void widgetReturns400ForAnUnreadableBody() {
+        UUID widgetId = UUID.randomUUID();
+        when(widgets.owner(widgetId)).thenReturn(Optional.of(member));
+        inDebug();
+
+        assertRefused(() -> controller.recordFromWidget(widgetId, body("[1]")), HttpStatus.BAD_REQUEST);
         verifyNoInteractions(recorder);
     }
 
