@@ -89,4 +89,22 @@ class LoginPageInspectionTest {
 
         assertThat(line).doesNotContain("bot@example.com").contains("No account for *** here");
     }
+
+    @Test
+    void describeExchangeDropsTheQueryAndMasksEmailsInAnErrorBody() {
+        String line = LoginPageInspection.describeExchange("POST",
+                "https://flow.battle.net/api/flow/abc/code?ST=secret", 400,
+                "{\"error\":\"INVALID_CODE\",\"email\":\"bot@example.com\"}");
+
+        assertThat(line).startsWith("POST https://flow.battle.net/api/flow/abc/code -> 400 ")
+                .contains("INVALID_CODE")
+                .doesNotContain("secret")
+                .doesNotContain("bot@example.com");
+    }
+
+    @Test
+    void describeExchangeLeavesOutAMissingBody() {
+        assertThat(LoginPageInspection.describeExchange("GET", "https://flow.battle.net/flow/abc", 200, null))
+                .isEqualTo("GET https://flow.battle.net/flow/abc -> 200");
+    }
 }

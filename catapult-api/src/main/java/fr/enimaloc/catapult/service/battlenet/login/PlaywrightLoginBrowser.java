@@ -7,6 +7,7 @@ import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.PlaywrightException;
+import com.microsoft.playwright.Response;
 import com.microsoft.playwright.options.WaitForSelectorState;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
@@ -16,9 +17,12 @@ import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -53,23 +57,39 @@ public class PlaywrightLoginBrowser implements BattleNetLoginBrowser {
     /** Fill target when the code input lacks its autocomplete hint; never used to recognise a page. */
     private static final String CODE_INPUT_FALLBACK =
             "input:visible:not(#accountName):not(#password):not([type=hidden])";
-    /** Visible controls and alerts, without any value, for the diagnostic of an unrecognised page. */
+    /**
+     * Visible controls, links and alerts, without any value, for the diagnostic of an unrecognised page. Looks
+     * inside open shadow roots, and lists custom elements with a short text: the "Verify your email" page's
+     * "Continue" and "Skip for now" never showed up as buttons.
+     */
     private static final String VISIBLE_ELEMENTS_SCRIPT = """
-            () => Array.from(document.querySelectorAll(
-                    'input, select, textarea, button, [role=alert], .alert-error, .form-error'))
-                .filter(e => e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden')
-                .filter(e => !(e.tagName === 'INPUT' && e.type === 'hidden'))
-                .slice(0, 40)
-                .map(e => ({
-                    tag: e.tagName.toLowerCase(),
-                    id: e.id || null,
-                    name: e.getAttribute('name'),
-                    type: e.getAttribute('type'),
-                    role: e.getAttribute('role'),
-                    text: (e.tagName === 'BUTTON' || e.getAttribute('role') === 'alert'
-                            || e.matches('.alert-error, .form-error'))
-                        ? (e.innerText || '').slice(0, 2000) : null
-                }))
+            () => {
+                const controls = 'input, select, textarea, button, a[href], [role=button], [role=link], '
+                    + '[role=alert], .alert-error, .form-error';
+                const found = [];
+                const walk = root => {
+                    for (const e of root.querySelectorAll('*')) {
+                        const custom = e.tagName.includes('-') && (e.innerText || '').trim().length > 0
+                            && (e.innerText || '').trim().length <= 40;
+                        if (e.matches(controls) || custom) found.push(e);
+                        if (e.shadowRoot) walk(e.shadowRoot);
+                    }
+                };
+                walk(document);
+                return found
+                    .filter(e => e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden')
+                    .filter(e => !(e.tagName === 'INPUT' && e.type === 'hidden'))
+                    .slice(0, 60)
+                    .map(e => ({
+                        tag: e.tagName.toLowerCase(),
+                        id: e.id || null,
+                        name: e.getAttribute('name'),
+                        type: e.getAttribute('type'),
+                        role: e.getAttribute('role'),
+                        text: ['INPUT', 'SELECT', 'TEXTAREA'].includes(e.tagName)
+                            ? null : (e.innerText || '').slice(0, 2000)
+                    }));
+            }
             """;
 
     private static final Pattern TICKET = Pattern.compile("[?&]ST=(EU-[0-9a-fA-F]{32}-\\d+)");
@@ -78,6 +98,8 @@ public class PlaywrightLoginBrowser implements BattleNetLoginBrowser {
     private static final double QUICK_CLICK_TIMEOUT_MS = 3_000;
     private static final long CODE_AUTO_SUBMIT_MS = 1_000;
     private static final double CODE_SUBMITTED_TIMEOUT_MS = 10_000;
+    /** Requests worth logging when a code is not accepted: the page's calls, not its assets. */
+    private static final Set<String> EXCHANGE_TYPES = Set.of("document", "xhr", "fetch");
 
     private @Nullable Playwright playwright;
     private @Nullable Browser browser;
@@ -184,7 +206,11 @@ public class PlaywrightLoginBrowser implements BattleNetLoginBrowser {
                     }
                 } else if (step == LoginPageInspection.Step.CHALLENGE_CODE || page.locator(CODE_INPUT).count() > 0) {
                     // A code already typed and not rejected is still being submitted: keep waiting for the ticket.
-                    if (awaitsCode()) return new Outcome.CodeRequired();
+                    if (awaitsCode()) {
+                        // The page's controls, so a skippable page asking for a code shows up in the logs
+                        if (page.locator(CODE_SLOTS).count() > 1) logPage("Battle.net asks for an e-mail code");
+                        return new Outcome.CodeRequired();
+                    }
                 } else if (page.locator(LOGIN_ERROR).count() > 0) {
                     logPage("Battle.net login page read as a rejection");
                     // Fixed text: the page's own message could echo the account e-mail.
@@ -200,6 +226,20 @@ public class PlaywrightLoginBrowser implements BattleNetLoginBrowser {
 
         @Override
         public void submitCode(String code) {
+            // What the page sends once the code is in, for the diagnostic when it stays on the code page
+            List<Response> responses = Collections.synchronizedList(new ArrayList<>());
+            Consumer<Response> onResponse = r -> {
+                if (EXCHANGE_TYPES.contains(r.request().resourceType())) responses.add(r);
+            };
+            page.onResponse(onResponse);
+            try {
+                typeCode(code, responses);
+            } finally {
+                page.offResponse(onResponse);
+            }
+        }
+
+        private void typeCode(String code, List<Response> responses) {
             Locator slots = page.locator(CODE_SLOTS);
             Locator otp = page.locator(CODE_INPUT);
             Locator input = (otp.count() > 0 ? otp : page.locator(CODE_INPUT_FALLBACK)).first();
@@ -226,6 +266,33 @@ public class PlaywrightLoginBrowser implements BattleNetLoginBrowser {
                         + "'input[name^=email_code_]')].filter(i => i.value !== '').length") : "n/a";
                 logPage("The Battle.net code page is still shown after submitting the code (" + filled + "/"
                         + slotCount + " slots filled)");
+                logExchanges(responses);
+            }
+        }
+
+        /** Logs the requests seen while submitting the code and the page's visible text (e-mails masked). */
+        private void logExchanges(List<Response> responses) {
+            try {
+                List<String> exchanges = new ArrayList<>();
+                synchronized (responses) {
+                    for (Response r : responses) {
+                        String body = null;
+                        if (r.status() >= 400) {
+                            try {
+                                body = r.text();
+                            } catch (PlaywrightException e) {
+                                body = "(body unavailable)";
+                            }
+                        }
+                        exchanges.add(LoginPageInspection.describeExchange(r.request().method(), r.url(), r.status(),
+                                body));
+                    }
+                }
+                Object text = page.evaluate("() => document.body ? document.body.innerText : ''");
+                log.warn("Battle.net code page after submitting: requests={} text={}", exchanges,
+                        LoginPageInspection.describeText(text == null ? null : text.toString()));
+            } catch (RuntimeException e) {
+                log.warn("Battle.net code page diagnostic failed ({})", e.getClass().getSimpleName());
             }
         }
 
@@ -255,7 +322,8 @@ public class PlaywrightLoginBrowser implements BattleNetLoginBrowser {
                 target.first().click(new Locator.ClickOptions().setTimeout(QUICK_CLICK_TIMEOUT_MS));
                 return true;
             } catch (PlaywrightException e) {
-                log.debug("Click on a Battle.net login button failed ({})", e.getClass().getSimpleName());
+                log.warn("Click on the Battle.net login control {} failed ({})", selector,
+                        e.getClass().getSimpleName());
                 return false;
             }
         }
