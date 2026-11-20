@@ -43,4 +43,11 @@ class WireKeysTest {
         assertThat(WireKeys.concerns(WireKeys.of(json("{\"1\":12345}"))).test("id:1234")).isFalse();
         assertThat(WireKeys.concerns(WireKeys.of(json("{\"1\":12345}"))).test("id:12345")).isTrue();
     }
+
+    @Test
+    void bytesObjectsGiveNoKeys() {
+        Set<String> keys = WireKeys.of(json("{\"1\":{\"bytes\":\"1234\"},\"2\":[{\"bytes\":\"ab\"}]}"));
+
+        assertThat(keys).isEmpty();
+    }
 }

@@ -21,7 +21,8 @@ public final class WireKeys {
     /**
      * Every key the frame could name: numeric leaves (numbers or digit-only strings) as {@code id:} and
      * {@code inv:}, string leaves as {@code tag:}, and for each object every ordered pair of its direct string
-     * leaves recombined as {@code tag:name#tag}.
+     * leaves recombined as {@code tag:name#tag}. Binary values ({@link #isBytes}) give no key: their hex is not a
+     * value the frame names.
      */
     public static Set<String> of(JsonNode node) {
         Set<String> keys = new HashSet<>();
@@ -36,7 +37,15 @@ public final class WireKeys {
         return frameKeys::contains;
     }
 
+    /** Whether {@code node} is a binary value as the decoders render it: {@code {"bytes": "<hex>"}}. */
+    public static boolean isBytes(JsonNode node) {
+        return node != null && node.isObject() && node.size() == 1 && node.path("bytes").isString();
+    }
+
     private static void collect(JsonNode node, Set<String> keys) {
+        if (isBytes(node)) {
+            return;
+        }
         if (node.isObject()) {
             List<String> strings = new ArrayList<>();
             for (Map.Entry<String, JsonNode> entry : node.properties()) {
