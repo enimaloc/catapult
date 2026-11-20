@@ -216,11 +216,14 @@ class AnkamaChatClientTest {
     @Test
     void close_callsOnClosedWithoutCause() throws Exception {
         RecordingListener listener = new RecordingListener();
-        handshake(listener, "{\"success\": true}");
+        // Keep the fake server socket reachable: once collected, its Cleaner closes it and the client
+        // sees the server hanging up before the close below.
+        Connected c = handshake(listener, "{\"success\": true}");
 
         client.close();
 
         assertThat(listener.closed.poll(5, TimeUnit.SECONDS)).isEmpty();
+        java.lang.ref.Reference.reachabilityFence(c);
     }
 
     @Test
@@ -347,7 +350,7 @@ class AnkamaChatClientTest {
     void tapGetsAPendingRequestFailedByTheClose() throws Exception {
         RecordingTap tap = new RecordingTap();
         client.setWireTap(tap);
-        handshake(new RecordingListener(), "{\"success\": true}");
+        Connected c = handshake(new RecordingListener(), "{\"success\": true}");
         CompletableFuture<Response> pending = client.request(new Payload(11, new byte[]{1}));
 
         client.close();
@@ -357,6 +360,7 @@ class AnkamaChatClientTest {
         assertThat(exchange.response()).isNull();
         assertThat(exchange.error()).isEqualTo("The chat connection is closed");
         assertThat(pending).isCompletedExceptionally();
+        java.lang.ref.Reference.reachabilityFence(c);
     }
 
     @Test
