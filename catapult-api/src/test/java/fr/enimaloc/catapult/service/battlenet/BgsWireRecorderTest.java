@@ -9,6 +9,8 @@ import bgs.protocol.friends.v2.client.FriendsServiceOuterClass.SendInvitationReq
 import bgs.protocol.friends.v2.client.FriendsTypes.Friend;
 import bgs.protocol.friends.v2.client.FriendsTypes.FriendStateAssignment;
 import bgs.protocol.friends.v2.client.FriendsTypes.SendInvitationTarget;
+import bgs.protocol.presence.v2.PresenceListenerOuterClass.PresenceStateUpdatedNotification;
+import bgs.protocol.presence.v2.PresenceTypes.PresenceFieldState;
 import bgs.protocol.presence.v2.client.PresenceServiceOuterClass.BatchSubscribeRequest;
 import com.google.protobuf.ByteString;
 import fr.enimaloc.catapult.bgs.core.WireExchange;
@@ -109,16 +111,51 @@ class BgsWireRecorderTest {
     }
 
     @Test
-    void recordsAnUndecodableFrameFoundByItsRawBytes() {
-        byte[] garbage = ("\u00ff\u00ffStreamer#1234").getBytes(StandardCharsets.ISO_8859_1);
+    void recordsANotificationWithASingleEntry() {
+        ByteString body = friendState(42L);
 
-        recorder.onExchange(serverCall(BgsServices.FRIENDS_LISTENER_ON_UPDATE_FRIEND_STATE,
-                ByteString.copyFrom(garbage)));
+        recorder.onExchange(serverCall(BgsServices.FRIENDS_LISTENER_ON_UPDATE_FRIEND_STATE, body));
 
         RawExchange raw = recorded(Direction.IN, "bgs.friends.v2.client.FriendsListener."
                 + BgsServices.FRIENDS_LISTENER_ON_UPDATE_FRIEND_STATE.methodId());
-        assertThat(raw.requestBody()).isNull();
-        assertThat(raw.requestRaw()).isEqualTo(garbage);
+        assertThat(raw.requestRaw()).isEqualTo(body.toByteArray());
+    }
+
+    @Test
+    void neverRecordsANotificationBatchingSeveralFriends() {
+        ByteString body = UpdateFriendStateNotification.newBuilder().setAgentAccountId(5)
+                .addAssignments(FriendStateAssignment.newBuilder().setId(42L).setLevel(3))
+                .addAssignments(FriendStateAssignment.newBuilder().setId(43L).setLevel(3))
+                .build().toByteString();
+
+        recorder.onExchange(serverCall(BgsServices.FRIENDS_LISTENER_ON_UPDATE_FRIEND_STATE, body));
+
+        nothingRecorded();
+    }
+
+    @Test
+    void neverRecordsABatchedPresenceUpdate() {
+        ByteString body = PresenceStateUpdatedNotification.newBuilder()
+                .addStates(PresenceFieldState.newBuilder().setAccountId(42L))
+                .addStates(PresenceFieldState.newBuilder().setAccountId(43L))
+                .buildPartial().toByteString();
+
+        recorder.onExchange(serverCall(BgsServices.PRESENCE_LISTENER_ON_PRESENCE_STATE_UPDATED, body));
+
+        nothingRecorded();
+    }
+
+    @Test
+    void neverRecordsAnAllowedMethodWhoseBodyDoesNotDecode() {
+        byte[] garbage = ("\u00ff\u00ffStreamer#1234").getBytes(StandardCharsets.ISO_8859_1);
+        // Decodes, but field 99 is not in the schema: what it holds cannot be checked
+        ByteString unknownField = friendState(42L).concat(ByteString.copyFrom(new byte[] {(byte) 0x98, 0x06, 0x01}));
+
+        recorder.onExchange(serverCall(BgsServices.FRIENDS_LISTENER_ON_UPDATE_FRIEND_STATE,
+                ByteString.copyFrom(garbage)));
+        recorder.onExchange(serverCall(BgsServices.FRIENDS_LISTENER_ON_UPDATE_FRIEND_STATE, unknownField));
+
+        nothingRecorded();
     }
 
     @Test
@@ -155,10 +192,10 @@ class BgsWireRecorderTest {
     }
 
     @Test
-    void searchesRawBytesOnlyInTheBodyThatDidNotDecode() {
-        // The decoded request only holds the BattleTag inside a longer value: no exact match
+    void neverRecordsAnExchangeWhoseReplyDoesNotDecode() {
+        // The request names the member, but the reply cannot be checked
         ByteString request = SendInvitationRequest.newBuilder()
-                .setTarget(SendInvitationTarget.newBuilder().setBattleTag("xStreamer#1234y")).build().toByteString();
+                .setTarget(SendInvitationTarget.newBuilder().setBattleTag("Streamer#1234")).build().toByteString();
         ByteString garbageReply = ByteString.copyFrom(new byte[] {(byte) 0xFF, (byte) 0xFF});
         ServiceMethod<?, ?> method = BgsServices.FRIENDS_SEND_INVITATION;
 

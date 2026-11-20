@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.service.battlenet;
 
 import bgs.protocol.RpcProto.Header;
 import com.google.protobuf.ByteString;
+import com.google.protobuf.Descriptors.FieldDescriptor;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Message;
 import com.google.protobuf.Parser;
@@ -13,7 +14,6 @@ import fr.enimaloc.catapult.domain.debug.DebugExchange.Direction;
 import fr.enimaloc.catapult.service.debug.RawExchange;
 import fr.enimaloc.catapult.service.debug.SessionDebug;
 import fr.enimaloc.catapult.service.debug.wire.ProtobufJson;
-import fr.enimaloc.catapult.service.debug.wire.ProtobufWireDecoder;
 import fr.enimaloc.catapult.service.debug.wire.WireKeys;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -22,16 +22,17 @@ import tools.jackson.databind.node.ObjectNode;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.function.Predicate;
 
 /**
  * Records, for the members in debug mode linked to one bot, the BGS exchanges of its session that name them: one
  * entry per call and its reply (or server call and our ack), the header and body as JSON next to the raw bytes.
- * Whom a frame names is read from its decoded body (exact values) and, when a body could not be decoded with its
- * schema, searched in its raw bytes.
+ * Whom a frame names is read from its bodies decoded with their schema (exact values).
  *
- * <p>Only the methods naming a single friend are recorded, see {@link #RECORDED}.
+ * <p>Only the methods naming a single friend are recorded, see {@link #RECORDED}, and only when each body decodes
+ * with its schema and names a single entry, see {@link #body}.
  */
 @Slf4j
 public final class BgsWireRecorder implements WireTap {
@@ -64,9 +65,9 @@ public final class BgsWireRecorder implements WireTap {
     private final UUID serviceAccountId;
     private final SessionDebug debug;
 
-    /** A decoded body: its JSON (null when none), its bytes (null when empty), whether its schema decoded it. */
-    private record Body(ObjectNode json, byte[] raw, boolean typed) {
-        static final Body NONE = new Body(null, null, true);
+    /** A body decoded with its schema: its JSON and its bytes, both null when it is empty. */
+    private record Body(ObjectNode json, byte[] raw) {
+        static final Body NONE = new Body(null, null);
     }
 
     public BgsWireRecorder(UUID serviceAccountId, SessionDebug debug) {
@@ -87,8 +88,12 @@ public final class BgsWireRecorder implements WireTap {
                 return;
             }
             Body request = body(exchange.requestBody(), method.requestParser());
-            Body reply = body(exchange.replyBody(), method.responseParser());
-            Predicate<String> concerns = concerns(request).or(concerns(reply));
+            Body reply = request == null ? null : body(exchange.replyBody(), method.responseParser());
+            if (reply == null) {
+                return;
+            }
+            Predicate<String> concerns = WireKeys.concerns(WireKeys.of(request.json()))
+                    .or(WireKeys.concerns(WireKeys.of(reply.json())));
             debug.exchange(serviceAccountId, concerns, exchange.initiatedLocally() ? Direction.OUT : Direction.IN,
                     () -> raw(exchange, request, reply), "bgs." + method.service() + "." + method.methodId());
         } catch (RuntimeException e) {
@@ -109,30 +114,53 @@ public final class BgsWireRecorder implements WireTap {
     }
 
     /**
-     * Who a body names: exact leaf values when its schema decoded it, else its raw bytes (and the leaves decoded
-     * without schema).
+     * The body parsed with its schema, or null when the exchange must not be recorded: the body does not parse, holds
+     * fields its schema does not know (they could name anyone), or one of its top-level repeated messages has several
+     * entries (a batch could name friends who are not members, whom the masking of other members does not know).
      */
-    private static Predicate<String> concerns(Body body) {
-        Predicate<String> leaves = WireKeys.concerns(WireKeys.of(body.json()));
-        return body.typed() ? leaves : leaves.or(WireKeys.rawConcerns(body.raw()));
-    }
-
-    /** The body parsed with its schema when there is one and it parses, else decoded without schema. */
     private static Body body(ByteString bytes, Parser<? extends Message> parser) {
         if (bytes == null || bytes.isEmpty()) {
             return Body.NONE;
         }
-        byte[] raw = bytes.toByteArray();
-        if (parser != null) {
-            try {
-                Message message = parser.parsePartialFrom(bytes);
-                // A field missing from the schema could name anyone: only the raw bytes would tell
-                return new Body(ProtobufJson.of(message), raw, message.getUnknownFields().asMap().isEmpty());
-            } catch (InvalidProtocolBufferException e) {
-                // decoded without schema below
+        if (parser == null) {
+            return null;
+        }
+        Message message;
+        try {
+            message = parser.parsePartialFrom(bytes);
+        } catch (InvalidProtocolBufferException e) {
+            return null;
+        }
+        if (!fullyKnown(message) || batches(message)) {
+            return null;
+        }
+        return new Body(ProtobufJson.of(message), bytes.toByteArray());
+    }
+
+    /** Whether the message and every message it holds have no field missing from their schema. */
+    private static boolean fullyKnown(Message message) {
+        if (!message.getUnknownFields().asMap().isEmpty()) {
+            return false;
+        }
+        for (Map.Entry<FieldDescriptor, Object> field : message.getAllFields().entrySet()) {
+            if (field.getKey().getJavaType() != FieldDescriptor.JavaType.MESSAGE) {
+                continue;
+            }
+            List<?> values = field.getKey().isRepeated() ? (List<?>) field.getValue() : List.of(field.getValue());
+            for (Object value : values) {
+                if (!fullyKnown((Message) value)) {
+                    return false;
+                }
             }
         }
-        return new Body(ProtobufWireDecoder.decode(raw).orElse(null), raw, false);
+        return true;
+    }
+
+    /** Whether one of the top-level repeated message fields holds more than one entry. */
+    private static boolean batches(Message message) {
+        return message.getDescriptorForType().getFields().stream()
+                .anyMatch(field -> field.isRepeated() && field.getJavaType() == FieldDescriptor.JavaType.MESSAGE
+                        && message.getRepeatedFieldCount(field) > 1);
     }
 
     private static RawExchange raw(WireExchange exchange, Body request, Body reply) {
