@@ -4,13 +4,18 @@ import fr.enimaloc.catapult.domain.debug.DebugExchange;
 import fr.enimaloc.catapult.domain.debug.DebugExchange.Direction;
 import fr.enimaloc.catapult.repository.debug.DebugExchangeRepository;
 import fr.enimaloc.catapult.service.debug.wire.RawBytes;
+import fr.enimaloc.catapult.service.debug.wire.WireKeys;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -39,6 +44,9 @@ public class DebugExchangeRecorder {
     static final int TRACE_ID_MAX = 64;
     /** Stored instead of the hex of raw bytes that name another member (a hex string cannot be masked). */
     public static final String RAW_OMITTED = "[omitted: contains another member's identifier]";
+    /** Stored instead of a binary value of a body whose raw bytes name another member. */
+    static final String BYTES_OMITTED = "[omitted]";
+    private static final JsonMapper JSON = JsonMapper.builder().build();
     /** Few writers so that recording never competes much with request threads for DB connections. */
     static final int WORKERS = 2;
     /** Exchanges waiting beyond this are dropped rather than piling up bodies in memory. */
@@ -150,6 +158,8 @@ public class DebugExchangeRecorder {
                 return;
             }
             boolean reveal = mode.get().revealSecrets();
+            boolean requestNamesOther = namesOtherMember(raw.requestRaw(), userId);
+            boolean responseNamesOther = namesOtherMember(raw.responseRaw(), userId);
             DebugExchange e = new DebugExchange();
             e.setUserId(userId);
             e.setOccurredAt(raw.at());
@@ -159,12 +169,14 @@ public class DebugExchangeRecorder {
             e.setMethod(cut(raw.method() == null ? "?" : raw.method(), METHOD_MAX));
             e.setUrl(Objects.requireNonNullElse(mask(redactor.url(raw.uri(), reveal), userId), ""));
             e.setRequestHeaders(mask(redactor.headers(raw.requestHeaders(), reveal), userId));
-            e.setRequestBody(mask(redactor.body(raw.requestBody(), contentType(raw.requestHeaders()), reveal), userId));
+            e.setRequestBody(mask(redactor.body(withoutBytes(raw.requestBody(), requestNamesOther),
+                    contentType(raw.requestHeaders()), reveal), userId));
             e.setStatus(raw.status());
             e.setResponseHeaders(mask(redactor.headers(raw.responseHeaders(), reveal), userId));
-            e.setResponseBody(mask(redactor.body(raw.responseBody(), contentType(raw.responseHeaders()), reveal), userId));
-            e.setRequestRaw(rawHex(raw.requestRaw(), userId));
-            e.setResponseRaw(rawHex(raw.responseRaw(), userId));
+            e.setResponseBody(mask(redactor.body(withoutBytes(raw.responseBody(), responseNamesOther),
+                    contentType(raw.responseHeaders()), reveal), userId));
+            e.setRequestRaw(rawHex(raw.requestRaw(), requestNamesOther));
+            e.setResponseRaw(rawHex(raw.responseRaw(), responseNamesOther));
             e.setError(mask(redactor.text(raw.error(), reveal), userId));
             e.setDurationMs(raw.durationMs());
             e.setFiltered(filtered);
@@ -195,15 +207,56 @@ public class DebugExchangeRecorder {
         return masker.mask(text, subject);
     }
 
+    /** Whether {@code raw} names a member other than {@code subject}; false for none. */
+    private boolean namesOtherMember(byte[] raw, UUID subject) {
+        return raw != null && masker.containsOtherMember(raw, subject);
+    }
+
+    /**
+     * {@code body} with every binary value ({@link WireKeys#isBytes}) blanked when its raw bytes name another member:
+     * that hex holds the same bytes the raw column omits, and the text masking cannot see an identifier in hex. A
+     * body that is not JSON is returned as is; a failure is logged at warn and leaves the body as is.
+     */
+    private static byte[] withoutBytes(byte[] body, boolean namesOther) {
+        if (!namesOther || body == null || body.length == 0) {
+            return body;
+        }
+        JsonNode root;
+        try {
+            root = JSON.readTree(body);
+        } catch (RuntimeException e) {
+            return body;
+        }
+        try {
+            return root != null && blankBytes(root) ? root.toString().getBytes(StandardCharsets.UTF_8) : body;
+        } catch (RuntimeException e) {
+            log.warn("Could not blank the binary values of a debug body: {}", e.toString());
+            return body;
+        }
+    }
+
+    /** Blanks the binary values under {@code node}; whether any was found. */
+    private static boolean blankBytes(JsonNode node) {
+        if (WireKeys.isBytes(node)) {
+            ((ObjectNode) node).put("bytes", BYTES_OMITTED);
+            return true;
+        }
+        boolean found = false;
+        for (JsonNode child : node) {
+            found |= blankBytes(child);
+        }
+        return found;
+    }
+
     /**
      * Hex of {@code raw}, cut at the body limit with the redactor's truncation marker; the omission marker when it
      * names another member; null for none.
      */
-    private String rawHex(byte[] raw, UUID subject) {
+    private static String rawHex(byte[] raw, boolean namesOther) {
         if (raw == null) {
             return null;
         }
-        if (masker.containsOtherMember(raw, subject)) {
+        if (namesOther) {
             return RAW_OMITTED;
         }
         String hex = RawBytes.hex(raw);
