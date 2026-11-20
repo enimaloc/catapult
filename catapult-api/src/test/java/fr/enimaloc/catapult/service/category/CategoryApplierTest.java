@@ -55,6 +55,14 @@ class CategoryApplierTest {
     }
 
     @Test
+    void updateChannel_dryRun_isADryRun() {
+        CategoryOutcome outcome = update(ChannelUpdateOutcome.DRY_RUN);
+
+        assertThat(outcome).isEqualTo(CategoryOutcome.dryRun(CategoryRule.GAME_BINDING));
+        assertThat(outcome.status().succeeded()).isTrue();
+    }
+
+    @Test
     void updateChannel_skipped() {
         assertThat(update(ChannelUpdateOutcome.SKIPPED))
                 .isEqualTo(CategoryOutcome.skipped(CategoryRule.GAME_BINDING, Reason.TWITCH_SKIPPED));

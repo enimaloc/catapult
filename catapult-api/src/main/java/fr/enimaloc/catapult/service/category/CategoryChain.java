@@ -16,7 +16,6 @@ import fr.enimaloc.catapult.service.binding.RaidRestoreGateService;
 import fr.enimaloc.catapult.service.binding.RaidRestoreHold;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
 import fr.enimaloc.catapult.service.category.CategoryOutcome.Reason;
-import fr.enimaloc.catapult.service.twitch.ChannelUpdateOutcome;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.BindingEdited;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.CustomBindingTriggered;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.GameClosed;
@@ -110,7 +109,7 @@ public class CategoryChain {
         }
         boolean switches = trigger instanceof GameDetected || trigger instanceof StreamStarted
                 || trigger instanceof CustomBindingTriggered || trigger instanceof NoGameSettingsSaved;
-        if (!switches || outcome.status() != ChannelUpdateOutcome.APPLIED) return;
+        if (!switches || !outcome.status().succeeded()) return;
         switch (decision.action()) {
             case UPDATE_CHANNEL -> extensionLayouts.applyOnSwitch(user,
                     ExtensionLayoutApplier.keyOf(decision.binding()), decision.binding().getExtensionSlots());

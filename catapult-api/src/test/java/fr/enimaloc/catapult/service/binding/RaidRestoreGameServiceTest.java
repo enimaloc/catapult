@@ -189,6 +189,15 @@ class RaidRestoreGameServiceTest {
     }
 
     @Test
+    void aDryRunRestoreKeepsTheHold() {
+        when(twitchService.updateChannelReporting(user, binding)).thenReturn(ChannelUpdateOutcome.DRY_RUN);
+
+        raid("509658");
+
+        assertThat(hold.isHolding(user)).isTrue();
+    }
+
+    @Test
     void aRestoreTwitchSkippedReleasesTheHold() {
         when(twitchService.updateChannelReporting(user, binding)).thenReturn(ChannelUpdateOutcome.SKIPPED);
 

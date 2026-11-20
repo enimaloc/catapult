@@ -44,6 +44,7 @@ public class CategoryApplier {
 
     private static CategoryOutcome fromTwitch(CategoryRule rule, ChannelUpdateOutcome status) {
         if (status == ChannelUpdateOutcome.APPLIED) return CategoryOutcome.applied(rule);
+        if (status == ChannelUpdateOutcome.DRY_RUN) return CategoryOutcome.dryRun(rule);
         if (status == ChannelUpdateOutcome.SKIPPED) return CategoryOutcome.skipped(rule, Reason.TWITCH_SKIPPED);
         // FAILED, or null from a mock
         return CategoryOutcome.failed(rule, Reason.TWITCH_FAILED);

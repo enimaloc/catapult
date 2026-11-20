@@ -340,6 +340,19 @@ class AdminGameMappingServiceTest {
     }
 
     @Test
+    void aDryRunUpdate_isCountedAsUpdated() {
+        UserAccount onIt = user("on-it");
+        bindingsOfTheGame(binding(onIt, "730", Status.AUTO));
+        liveOn(onIt, "730");
+        when(twitchService.updateChannelReporting(any(), any())).thenReturn(ChannelUpdateOutcome.DRY_RUN);
+
+        GameMappingResult result = service.create(request("730", "32399", true), admin);
+
+        assertThat(result.liveChannelsUpdated()).isEqualTo(1);
+        assertThat(result.liveChannelsFailed()).isZero();
+    }
+
+    @Test
     void twitchUpdateSkipped_isNeitherUpdatedNorFailed() {
         // e.g. the streamer's bot is disabled: nothing was sent to Twitch.
         UserAccount onIt = user("on-it");

@@ -38,6 +38,11 @@ public record CategoryOutcome(ChannelUpdateOutcome status, CategoryRule rule, Re
         return new CategoryOutcome(ChannelUpdateOutcome.APPLIED, rule, Reason.NONE, null);
     }
 
+    /** Logged instead of sent, the member being in dry run: counts as applied ({@link ChannelUpdateOutcome#succeeded()}). */
+    public static CategoryOutcome dryRun(CategoryRule rule) {
+        return new CategoryOutcome(ChannelUpdateOutcome.DRY_RUN, rule, Reason.NONE, null);
+    }
+
     public static CategoryOutcome skipped(CategoryRule rule, Reason reason) {
         return new CategoryOutcome(ChannelUpdateOutcome.SKIPPED, rule, reason, null);
     }

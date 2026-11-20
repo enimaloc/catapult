@@ -1056,6 +1056,17 @@ class CategoryChainTest {
     }
 
     @Test
+    void a_dry_run_switch_still_applies_the_bindings_layout() {
+        binding.getExtensionSlots().add(panel);
+        live(true);
+        applierAnswers(CategoryOutcome.dryRun(CategoryRule.GAME_BINDING));
+
+        chain.apply(user, new GameDetected(binding));
+
+        verify(layouts).applyOnSwitch(user, "binding:" + binding.getId(), binding.getExtensionSlots());
+    }
+
+    @Test
     void no_game_fallback_carries_the_no_game_layout() {
         settings.setApplyDefaultOnNoGame(true);
         settings.getNoGameExtensionSlots().add(panel);
