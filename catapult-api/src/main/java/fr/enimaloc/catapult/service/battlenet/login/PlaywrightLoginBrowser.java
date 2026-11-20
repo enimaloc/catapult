@@ -7,6 +7,7 @@ import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.PlaywrightException;
+import com.microsoft.playwright.Response;
 import com.microsoft.playwright.options.WaitForSelectorState;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
@@ -16,9 +17,12 @@ import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -41,30 +45,57 @@ public class PlaywrightLoginBrowser implements BattleNetLoginBrowser {
     private static final String PASSWORD = "input#password:visible";
     private static final String SUBMIT = "#submit";
     /** A visible error element on the login form after a submit: Battle.net's explicit rejection. */
-    private static final String LOGIN_ERROR = ".alert-error:visible, .form-error:visible, [role=alert]:visible";
+    // Not Next.js's route announcer: an empty role=alert live region on every flow.battle.net page.
+    private static final String LOGIN_ERROR =
+            ".alert-error:visible, .form-error:visible, [role=alert]:visible:not(#__next-route-announcer__)";
     // Verified against the live site on 2026-11-14: after the password, a fresh context lands on a "Security
     // Check" page (/challenge/<uuid>/choose, a method <select> and #submit), then on the code page
     // (/challenge/<uuid>) whose one-time-code input submits the form by itself once filled.
-    private static final String CODE_INPUT = "input[autocomplete=one-time-code]:visible";
+    // Seen on 2026-11-20: the e-mail code page moved to flow.battle.net/flow/<uuid> ("Verify your email") with one
+    // input per digit (#slot_0..5, named email_code_<id>_<n>), and an error placeholder the rejection check matches.
+    private static final String CODE_SLOTS = "input[name^=email_code_]:visible";
+    private static final String CODE_INPUT = "input[autocomplete=one-time-code]:visible, " + CODE_SLOTS;
     private static final String SUBMIT_VISIBLE = "#submit:visible";
+    // Seen on 2026-11-20: after the login, an optional "Verify your email" page (flow.battle.net/flow/<uuid>) shows
+    // the same six code slots, a "Continue" web component and a "Skip for now" link (a#skip_link_<id>, found by its
+    // id first so the page's language does not matter).
+    private static final String SKIP_VERIFY_EMAIL = "a[id^=skip_link_]:visible, a:has-text('Skip for now'):visible";
     /** Fill target when the code input lacks its autocomplete hint; never used to recognise a page. */
     private static final String CODE_INPUT_FALLBACK =
             "input:visible:not(#accountName):not(#password):not([type=hidden])";
-    /** Visible controls and alerts, without any value, for the diagnostic of an unrecognised page. */
+    /**
+     * Visible controls, links and alerts, without any value, for the diagnostic of an unrecognised page. Looks
+     * inside open shadow roots, and lists custom elements with a short text: the "Verify your email" page's
+     * "Continue" and "Skip for now" never showed up as buttons.
+     */
     private static final String VISIBLE_ELEMENTS_SCRIPT = """
-            () => Array.from(document.querySelectorAll('input, select, textarea, button, [role=alert]'))
-                .filter(e => e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden')
-                .filter(e => !(e.tagName === 'INPUT' && e.type === 'hidden'))
-                .slice(0, 40)
-                .map(e => ({
-                    tag: e.tagName.toLowerCase(),
-                    id: e.id || null,
-                    name: e.getAttribute('name'),
-                    type: e.getAttribute('type'),
-                    role: e.getAttribute('role'),
-                    text: (e.tagName === 'BUTTON' || e.getAttribute('role') === 'alert')
-                        ? (e.innerText || '').slice(0, 2000) : null
-                }))
+            () => {
+                const controls = 'input, select, textarea, button, a[href], [role=button], [role=link], '
+                    + '[role=alert], .alert-error, .form-error';
+                const found = [];
+                const walk = root => {
+                    for (const e of root.querySelectorAll('*')) {
+                        const custom = e.tagName.includes('-') && (e.innerText || '').trim().length > 0
+                            && (e.innerText || '').trim().length <= 40;
+                        if (e.matches(controls) || custom) found.push(e);
+                        if (e.shadowRoot) walk(e.shadowRoot);
+                    }
+                };
+                walk(document);
+                return found
+                    .filter(e => e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden')
+                    .filter(e => !(e.tagName === 'INPUT' && e.type === 'hidden'))
+                    .slice(0, 60)
+                    .map(e => ({
+                        tag: e.tagName.toLowerCase(),
+                        id: e.id || null,
+                        name: e.getAttribute('name'),
+                        type: e.getAttribute('type'),
+                        role: e.getAttribute('role'),
+                        text: ['INPUT', 'SELECT', 'TEXTAREA'].includes(e.tagName)
+                            ? null : (e.innerText || '').slice(0, 2000)
+                    }));
+            }
             """;
 
     private static final Pattern TICKET = Pattern.compile("[?&]ST=(EU-[0-9a-fA-F]{32}-\\d+)");
@@ -73,6 +104,11 @@ public class PlaywrightLoginBrowser implements BattleNetLoginBrowser {
     private static final double QUICK_CLICK_TIMEOUT_MS = 3_000;
     private static final long CODE_AUTO_SUBMIT_MS = 1_000;
     private static final double CODE_SUBMITTED_TIMEOUT_MS = 10_000;
+    private static final double SKIP_LINK_RENDER_MS = 3_000;
+    private static final int SKIP_ATTEMPTS = 5;
+    private static final double SKIP_TAKES_EFFECT_MS = 2_000;
+    /** Requests worth logging when a code is not accepted: the page's calls, not its assets. */
+    private static final Set<String> EXCHANGE_TYPES = Set.of("document", "xhr", "fetch");
 
     private @Nullable Playwright playwright;
     private @Nullable Browser browser;
@@ -127,6 +163,11 @@ public class PlaywrightLoginBrowser implements BattleNetLoginBrowser {
         }
     }
 
+    /** The login logic on an already open page, for tests on a local copy of a Battle.net page. */
+    static LoginPage onPage(BrowserContext context, Page page) {
+        return new PlaywrightLoginPage(context, page, new AtomicReference<>());
+    }
+
     private static final class PlaywrightLoginPage implements LoginPage {
 
         private final BrowserContext context;
@@ -134,6 +175,8 @@ public class PlaywrightLoginBrowser implements BattleNetLoginBrowser {
         private final AtomicReference<String> ticket;
         /** Path of the security check page already submitted, so it is clicked only once. */
         private @Nullable String chooseSubmittedFor;
+        /** Path of the "Verify your email" page already skipped, so it is clicked only once. */
+        private @Nullable String verifyEmailSkippedFor;
 
         PlaywrightLoginPage(BrowserContext context, Page page, AtomicReference<String> ticket) {
             this.context = context;
@@ -172,10 +215,25 @@ public class PlaywrightLoginBrowser implements BattleNetLoginBrowser {
                         chooseSubmittedFor = path;
                         log.debug("Battle.net security check: requested a code with the default method");
                     }
+                } else if (!LoginPageInspection.withoutQuery(url).equals(verifyEmailSkippedFor)
+                        && page.locator(SKIP_VERIFY_EMAIL).count() > 0) {
+                    // Optional e-mail confirmation, not a login check: skipped, once per page, without a code.
+                    verifyEmailSkippedFor = LoginPageInspection.withoutQuery(url);
+                    skipVerifyEmail();
                 } else if (step == LoginPageInspection.Step.CHALLENGE_CODE || page.locator(CODE_INPUT).count() > 0) {
                     // A code already typed and not rejected is still being submitted: keep waiting for the ticket.
-                    if (awaitsCode()) return new Outcome.CodeRequired();
+                    if (awaitsCode()) {
+                        if (page.locator(CODE_SLOTS).count() > 1) {
+                            // The slots render before the page's links: give "Skip for now" a chance to show up
+                            if (!LoginPageInspection.withoutQuery(url).equals(verifyEmailSkippedFor)
+                                    && skipLinkShowsUp()) continue;
+                            // The page's controls, so a skippable page asking for a code shows up in the logs
+                            logPage("Battle.net asks for an e-mail code");
+                        }
+                        return new Outcome.CodeRequired();
+                    }
                 } else if (page.locator(LOGIN_ERROR).count() > 0) {
+                    logPage("Battle.net login page read as a rejection");
                     // Fixed text: the page's own message could echo the account e-mail.
                     return new Outcome.Failed("login rejected");
                 }
@@ -189,9 +247,33 @@ public class PlaywrightLoginBrowser implements BattleNetLoginBrowser {
 
         @Override
         public void submitCode(String code) {
+            // What the page sends once the code is in, for the diagnostic when it stays on the code page
+            List<Response> responses = Collections.synchronizedList(new ArrayList<>());
+            Consumer<Response> onResponse = r -> {
+                if (EXCHANGE_TYPES.contains(r.request().resourceType())) responses.add(r);
+            };
+            page.onResponse(onResponse);
+            try {
+                typeCode(code, responses);
+            } finally {
+                page.offResponse(onResponse);
+            }
+        }
+
+        private void typeCode(String code, List<Response> responses) {
+            Locator slots = page.locator(CODE_SLOTS);
             Locator otp = page.locator(CODE_INPUT);
             Locator input = (otp.count() > 0 ? otp : page.locator(CODE_INPUT_FALLBACK)).first();
-            input.fill(code);
+            int slotCount = slots.count();
+            if (slotCount > 1) {
+                // One digit per input, in order: the page submits once the last one is filled
+                String digits = code.replaceAll("\\s+", "");
+                for (int i = 0; i < Math.min(slotCount, digits.length()); i++) {
+                    slots.nth(i).fill(String.valueOf(digits.charAt(i)));
+                }
+            } else {
+                input.fill(code);
+            }
             // The code input submits the form by itself: #submit is often already gone.
             page.waitForTimeout(CODE_AUTO_SUBMIT_MS);
             clickIfVisible(SUBMIT_VISIBLE);
@@ -200,7 +282,79 @@ public class PlaywrightLoginBrowser implements BattleNetLoginBrowser {
                 input.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.HIDDEN)
                         .setTimeout(CODE_SUBMITTED_TIMEOUT_MS));
             } catch (PlaywrightException e) {
-                log.debug("The Battle.net code page is still shown after submitting the code");
+                // How many slots hold something, never what: tells a fill the page ignored from a refused code
+                Object filled = slotCount > 1 ? page.evaluate("() => [...document.querySelectorAll("
+                        + "'input[name^=email_code_]')].filter(i => i.value !== '').length") : "n/a";
+                logPage("The Battle.net code page is still shown after submitting the code (" + filled + "/"
+                        + slotCount + " slots filled)");
+                logExchanges(responses);
+            }
+        }
+
+        /** Logs the requests seen while submitting the code and the page's visible text (e-mails masked). */
+        private void logExchanges(List<Response> responses) {
+            try {
+                List<String> exchanges = new ArrayList<>();
+                synchronized (responses) {
+                    for (Response r : responses) {
+                        String body = null;
+                        if (r.status() >= 400) {
+                            try {
+                                body = r.text();
+                            } catch (PlaywrightException e) {
+                                body = "(body unavailable)";
+                            }
+                        }
+                        exchanges.add(LoginPageInspection.describeExchange(r.request().method(), r.url(), r.status(),
+                                body));
+                    }
+                }
+                Object text = page.evaluate("() => document.body ? document.body.innerText : ''");
+                log.warn("Battle.net code page after submitting: requests={} text={}", exchanges,
+                        LoginPageInspection.describeText(text == null ? null : text.toString()));
+            } catch (RuntimeException e) {
+                log.warn("Battle.net code page diagnostic failed ({})", e.getClass().getSimpleName());
+            }
+        }
+
+        /**
+         * Clicks "Skip for now" until the link goes away: the link is rendered by the server before the page's
+         * script handles its click, and a click in between does nothing (seen on 2026-11-20).
+         */
+        private void skipVerifyEmail() {
+            List<Response> responses = Collections.synchronizedList(new ArrayList<>());
+            Consumer<Response> onResponse = r -> {
+                if (EXCHANGE_TYPES.contains(r.request().resourceType())) responses.add(r);
+            };
+            page.onResponse(onResponse);
+            try {
+                Locator skip = page.locator(SKIP_VERIFY_EMAIL);
+                for (int attempt = 1; attempt <= SKIP_ATTEMPTS; attempt++) {
+                    if (!clickIfVisible(SKIP_VERIFY_EMAIL)) return;
+                    try {
+                        skip.first().waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.HIDDEN)
+                                .setTimeout(SKIP_TAKES_EFFECT_MS));
+                        log.info("Battle.net asked to confirm the account e-mail: skipped (click {})", attempt);
+                        return;
+                    } catch (PlaywrightException e) {
+                        log.debug("Battle.net \"Skip for now\" click {} had no effect yet", attempt);
+                    }
+                }
+                logPage("Battle.net \"Skip for now\" did nothing after " + SKIP_ATTEMPTS + " clicks");
+                logExchanges(responses);
+            } finally {
+                page.offResponse(onResponse);
+            }
+        }
+
+        /** Whether the "Verify your email" page's "Skip for now" link shows up within a short wait. */
+        private boolean skipLinkShowsUp() {
+            try {
+                page.locator(SKIP_VERIFY_EMAIL).first().waitFor(new Locator.WaitForOptions()
+                        .setState(WaitForSelectorState.VISIBLE).setTimeout(SKIP_LINK_RENDER_MS));
+                return true;
+            } catch (PlaywrightException e) {
+                return false;
             }
         }
 
@@ -230,13 +384,19 @@ public class PlaywrightLoginBrowser implements BattleNetLoginBrowser {
                 target.first().click(new Locator.ClickOptions().setTimeout(QUICK_CLICK_TIMEOUT_MS));
                 return true;
             } catch (PlaywrightException e) {
-                log.debug("Click on a Battle.net login button failed ({})", e.getClass().getSimpleName());
+                log.warn("Click on the Battle.net login control {} failed ({})", selector,
+                        e.getClass().getSimpleName());
                 return false;
             }
         }
 
         /** Logs what the page shows when nothing was recognised, so a new Blizzard page shows up in the logs. */
         private void logUnrecognisedPage() {
+            logPage("Battle.net login page not recognised before the timeout");
+        }
+
+        /** Logs the page's URL path, title and visible controls (never a value, e-mails masked). */
+        private void logPage(String what) {
             try {
                 List<LoginPageInspection.PageElement> elements = new ArrayList<>();
                 if (page.evaluate(VISIBLE_ELEMENTS_SCRIPT) instanceof List<?> raw) {
@@ -248,11 +408,9 @@ public class PlaywrightLoginBrowser implements BattleNetLoginBrowser {
                         }
                     }
                 }
-                log.warn("Battle.net login page not recognised before the timeout: {}",
-                        LoginPageInspection.describe(page.url(), page.title(), elements));
+                log.warn("{}: {}", what, LoginPageInspection.describe(page.url(), page.title(), elements));
             } catch (RuntimeException e) {
-                log.warn("Battle.net login page not recognised before the timeout (diagnostic failed: {})",
-                        e.getClass().getSimpleName());
+                log.warn("{} (diagnostic failed: {})", what, e.getClass().getSimpleName());
             }
         }
 

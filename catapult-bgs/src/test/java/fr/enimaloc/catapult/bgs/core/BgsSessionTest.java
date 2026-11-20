@@ -347,6 +347,63 @@ class BgsSessionTest {
     }
 
     @Test
+    void callRawUnobserved_neverReachesTheTap() throws Exception {
+        var tap = new RecordingTap();
+        session.setWireTap(tap);
+        var future = session.callRawUnobserved(0x1234, 3, ByteString.copyFromUtf8("q"), true);
+        FrameCodec.Frame sent = readFromClient();
+
+        sendToClient(Header.newBuilder().setServiceId(0xFE).setToken(sent.header().getToken()).build(),
+                ByteString.copyFromUtf8("r"));
+
+        assertThat(await(future).toStringUtf8()).isEqualTo("r");
+        assertThat(sent.header().getServiceHash()).isEqualTo(0x1234);
+        assertThat(sent.header().getMethodId()).isEqualTo(3);
+        assertThat(sent.body().toStringUtf8()).isEqualTo("q");
+        // a later observed call is the first thing the tap sees
+        session.callNoReply(BgsServices.CONNECTION_KEEP_ALIVE, RpcProto.NoData.getDefaultInstance());
+        readFromClient();
+        assertThat(tap.next().method()).isSameAs(BgsServices.CONNECTION_KEEP_ALIVE);
+        assertThat(tap.exchanges).isEmpty();
+    }
+
+    @Test
+    void callRawUnobserved_nonZeroStatus_failsWithStatus() throws Exception {
+        var future = session.callRawUnobserved(0x1234, 3, ByteString.EMPTY, false);
+        FrameCodec.Frame sent = readFromClient();
+
+        sendToClient(Header.newBuilder().setServiceId(0xFE).setToken(sent.header().getToken()).setStatus(7).build(),
+                ByteString.EMPTY);
+
+        assertThatThrownBy(() -> await(future)).isInstanceOf(ExecutionException.class)
+                .cause().isInstanceOfSatisfying(BgsRpcException.class, e -> assertThat(e.status()).isEqualTo(7));
+    }
+
+    @Test
+    void callRawNoReplyUnobserved_writesAFrameAndNoTap() throws Exception {
+        var tap = new RecordingTap();
+        session.setWireTap(tap);
+
+        await(session.callRawNoReplyUnobserved(0x65446991, 5, ByteString.EMPTY, false));
+        FrameCodec.Frame sent = readFromClient();
+
+        assertThat(sent.header().getServiceHash()).isEqualTo(0x65446991);
+        assertThat(sent.header().getMethodId()).isEqualTo(5);
+        session.callNoReply(BgsServices.CONNECTION_KEEP_ALIVE, RpcProto.NoData.getDefaultInstance());
+        readFromClient();
+        assertThat(tap.next().requestHeader().getToken()).isNotEqualTo(sent.header().getToken());
+        assertThat(tap.exchanges).isEmpty();
+    }
+
+    @Test
+    void callRawNoReplyUnobserved_afterClose_fails() {
+        session.close();
+
+        assertThatThrownBy(() -> await(session.callRawNoReplyUnobserved(0x65446991, 5, ByteString.EMPTY, false)))
+                .isInstanceOf(ExecutionException.class);
+    }
+
+    @Test
     void tapGetsAnIncomingNotificationWithItsAck() throws Exception {
         var tap = new RecordingTap();
         session.setWireTap(tap);

@@ -8,6 +8,7 @@ import fr.enimaloc.catapult.bgs.client.FriendEvent;
 import fr.enimaloc.catapult.bgs.client.PresenceEvent;
 import fr.enimaloc.catapult.bgs.core.BgsChannel;
 import fr.enimaloc.catapult.bgs.core.BgsSession;
+import fr.enimaloc.catapult.bgs.core.WireTap;
 import fr.enimaloc.catapult.domain.battlenet.BattleNetServiceAccount;
 import fr.enimaloc.catapult.domain.battlenet.BattleNetServiceAccount.AuthState;
 import fr.enimaloc.catapult.repository.battlenet.BattleNetServiceAccountRepository;
@@ -282,6 +283,11 @@ public class BattleNetSessionManager implements SmartLifecycle {
         }
     }
 
+    /** The push capture of the account's session on this instance, empty without one. */
+    Optional<PushCapture> captureOf(UUID accountId) {
+        return Optional.ofNullable(sessions.get(accountId)).map(session -> session.capture);
+    }
+
     /** The session callbacks of the account; for tests. */
     BgsListener listenerOf(UUID accountId) {
         return sessions.get(accountId);
@@ -363,13 +369,15 @@ public class BattleNetSessionManager implements SmartLifecycle {
         /** Friends whose game this session reported, forgotten when it ends. */
         private final Set<Long> watched = ConcurrentHashMap.newKeySet();
         private final AtomicBoolean stopped = new AtomicBoolean();
+        private final PushCapture capture = new PushCapture();
 
         Session(BattleNetServiceAccount account) {
             this.accountId = account.getId();
             this.client = new BgsClient(new BgsClientConfig(host, BGS_PORT, account.getEmail(), LOCALE),
                     coordinator.ticketProviderFor(accountId), this, mintExecutor);
-            BgsWireRecorder tap = new BgsWireRecorder(accountId, debug);
-            // Each new connection is observed for the members in debug mode, from its first frame
+            // Each new connection is observed for the members in debug mode, from its first frame, and for the
+            // pushes following an admin's free call
+            WireTap tap = new TeeWireTap(new BgsWireRecorder(accountId, debug), capture);
             Supplier<BgsChannel> tapped = () -> {
                 BgsChannel channel = channels.get();
                 channel.setWireTap(tap);

@@ -79,9 +79,29 @@ final class LoginPageInspection {
         return sb.toString();
     }
 
+    /**
+     * One request the page made, for the logs: method, URL without its query, status and, for an error, the start
+     * of the response with e-mails masked.
+     */
+    static String describeExchange(String method, String url, int status, @Nullable String errorBody) {
+        String s = method + " " + withoutQuery(url) + " -> " + status;
+        return errorBody == null || errorBody.isBlank() ? s : s + " \"" + clean(errorBody, MAX_BODY) + "\"";
+    }
+
+    /** The page's visible text, truncated and with e-mails masked. */
+    static String describeText(@Nullable String text) {
+        return "\"" + clean(text, MAX_BODY) + "\"";
+    }
+
+    static final int MAX_BODY = 400;
+
     private static String clean(@Nullable String text) {
+        return clean(text, MAX_TEXT);
+    }
+
+    private static String clean(@Nullable String text, int max) {
         if (text == null) return "";
         String s = EMAIL.matcher(text.replaceAll("\\s+", " ").strip()).replaceAll("***");
-        return s.length() <= MAX_TEXT ? s : s.substring(0, MAX_TEXT) + "...";
+        return s.length() <= max ? s : s.substring(0, max) + "...";
     }
 }

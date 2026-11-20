@@ -37,6 +37,9 @@ import fr.enimaloc.catapult.common.dto.admin.AnkamaLoginStartDto;
 import fr.enimaloc.catapult.common.dto.admin.EpicAccountDto;
 import fr.enimaloc.catapult.common.dto.admin.EpicAccountsDto;
 import fr.enimaloc.catapult.common.dto.admin.BattleNetAccountDto;
+import fr.enimaloc.catapult.common.dto.admin.BgsCallRequest;
+import fr.enimaloc.catapult.common.dto.admin.BgsCallResult;
+import fr.enimaloc.catapult.common.dto.admin.BgsServiceDto;
 import fr.enimaloc.catapult.common.dto.admin.MinecraftDeviceCodeDto;
 import fr.enimaloc.catapult.common.dto.connect.AnkamaLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.connect.BattleNetLinkStateResponse;
@@ -598,6 +601,12 @@ public interface ApiService {
     int adminPatchBattleNetAccount(UUID id, Map<String, Object> patch);
     /** Deletes a bot account: 204; 404 unknown; 502 when unreachable. */
     int adminDeleteBattleNetAccount(UUID id);
+
+    /** The BGS services and methods an admin's free call can name; null when they can't be read. */
+    List<BgsServiceDto> adminBgsMethods();
+
+    /** An admin's free BGS call on a bot's ready session (409 busy or no session, 400 invalid body). */
+    AdminCall<BgsCallResult> adminBgsCall(UUID id, BgsCallRequest request);
 
     /**
      * An admin call's HTTP status, its body on a 2xx (null when it has none) and the {@code {"error": message}} text

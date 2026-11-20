@@ -237,6 +237,48 @@
                             <mdui-button variant="text" icon="password" class="admin-battlenet-password-submit"
                                          th:attr="data-id=${a.id()}" th:text="#{admin.battlenet.password.submit}">Change password</mdui-button>
                         </div>
+                        <!--/*
+                          The admin's free BGS call, on a bot whose session is READY on this instance: a bgs.desc method with
+                          a protobuf text body, or raw (service hash, method id, hex body). admin-battlenet.js loads the
+                          methods when the panel first opens and shows the status, the reply and the pushes of the 5 s after.
+                        */-->
+                        <details class="admin-battlenet-bgs" th:if="${a.sessionState() == 'READY'}" th:attr="data-id=${a.id()}">
+                            <summary class="admin-battlenet-bgs-call" th:text="#{admin.battlenet.bgs.open}">BGS call</summary>
+                            <mdui-radio-group name="bgsMode" value="known" class="admin-battlenet-bgs-mode">
+                                <mdui-radio value="known" th:text="#{admin.battlenet.bgs.mode.known}">Known method</mdui-radio>
+                                <mdui-radio value="raw" th:text="#{admin.battlenet.bgs.mode.raw}">Raw hex</mdui-radio>
+                            </mdui-radio-group>
+                            <div class="admin-battlenet-bgs-known">
+                                <label class="admin-battlenet-bgs-select"><span th:text="#{admin.battlenet.bgs.service}">Service</span>
+                                    <select name="bgsService"></select></label>
+                                <label class="admin-battlenet-bgs-select"><span th:text="#{admin.battlenet.bgs.method}">Method</span>
+                                    <select name="bgsMethod"></select></label>
+                                <mdui-text-field name="bgsText" variant="outlined" rows="4" autocomplete="off" spellcheck="false"
+                                                 th:attr="label=#{admin.battlenet.bgs.text}"></mdui-text-field>
+                            </div>
+                            <div class="admin-battlenet-bgs-raw" hidden>
+                                <mdui-text-field name="bgsHash" variant="outlined" autocomplete="off" spellcheck="false"
+                                                 th:attr="label=#{admin.battlenet.bgs.hash}"></mdui-text-field>
+                                <mdui-text-field name="bgsMethodId" type="number" min="0" variant="outlined" autocomplete="off"
+                                                 th:attr="label=#{admin.battlenet.bgs.method-id}"></mdui-text-field>
+                                <mdui-text-field name="bgsHex" variant="outlined" rows="3" autocomplete="off" spellcheck="false"
+                                                 th:attr="label=#{admin.battlenet.bgs.hex}"></mdui-text-field>
+                                <mdui-checkbox name="bgsCiid" checked th:text="#{admin.battlenet.bgs.ciid}">With ciid</mdui-checkbox>
+                            </div>
+                            <mdui-button variant="filled" icon="send" class="admin-battlenet-bgs-send"
+                                         th:attr="data-id=${a.id()},data-label-sending=#{admin.battlenet.bgs.sending},
+                                                  data-label-no-response=#{admin.battlenet.bgs.no-response},
+                                                  data-label-pushes=#{admin.battlenet.bgs.pushes},
+                                                  data-label-no-push=#{admin.battlenet.bgs.no-push}"
+                                         th:text="#{admin.battlenet.bgs.send}">Send</mdui-button>
+                            <div class="admin-battlenet-bgs-result" aria-live="polite" hidden>
+                                <p class="admin-battlenet-bgs-status"></p>
+                                <pre class="admin-battlenet-bgs-reply"></pre>
+                                <mdui-text-field name="bgsFilter" variant="outlined" clearable autocomplete="off"
+                                                 th:attr="label=#{admin.battlenet.bgs.filter}"></mdui-text-field>
+                                <ul class="admin-battlenet-bgs-pushes"></ul>
+                            </div>
+                        </details>
                     </div>
                 </div>
 
