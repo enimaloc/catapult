@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.notification;
 
+import fr.enimaloc.catapult.service.dryrun.DryRunHeldDecisions;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatActionType;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
@@ -70,7 +71,8 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @Import({TwitchatActionExecutor.class, TwitchatActionTokenService.class, BotToggleService.class,
-        CategoryChain.class, CategoryApplier.class, RaidRestoreHold.class, TwitchServiceImpl.class,
+        CategoryChain.class, DryRunHeldDecisions.class, CategoryApplier.class, RaidRestoreHold.class,
+        TwitchServiceImpl.class,
         ExternalApiObservations.class, TwitchatRevertTokenFailureTest.Wiring.class})
 class TwitchatRevertTokenFailureTest {
 

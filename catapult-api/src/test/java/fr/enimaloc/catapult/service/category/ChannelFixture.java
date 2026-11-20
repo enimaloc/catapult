@@ -260,7 +260,9 @@ public class ChannelFixture {
                         Optional.empty()),
                 mock(AccountService.class),
                 new ChannelAccountActions(mock(AccountService.class), publisher),
-                mock(TwitchatWidgetSettingsService.class), mock(TwitchatEventActionService.class), dispatcher);
+                mock(TwitchatWidgetSettingsService.class), mock(TwitchatEventActionService.class), dispatcher,
+                mock(fr.enimaloc.catapult.service.emergency.EmergencyViews.class),
+                mock(fr.enimaloc.catapult.service.emergency.EmergencyStopService.class));
     }
 
     /** The category events and Twitch writes, in order. */

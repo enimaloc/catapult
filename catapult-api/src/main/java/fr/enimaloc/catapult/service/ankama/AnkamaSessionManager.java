@@ -442,6 +442,8 @@ public class AnkamaSessionManager implements SmartLifecycle {
     private final class Session {
 
         private final UUID accountId;
+        /** Records the chat frames of each connection for the members in debug mode they name. */
+        private final AnkamaWireRecorder tap;
         /** Endpoints and presence by Ankama user id, as this session's connections reported them. */
         private final Map<Long, List<EndpointProperties>> endpoints = new ConcurrentHashMap<>();
         private final Map<Long, Integer> presence = new ConcurrentHashMap<>();
@@ -457,6 +459,7 @@ public class AnkamaSessionManager implements SmartLifecycle {
 
         Session(UUID accountId) {
             this.accountId = accountId;
+            this.tap = new AnkamaWireRecorder(accountId, debug);
         }
 
         void launch() {
@@ -571,6 +574,7 @@ public class AnkamaSessionManager implements SmartLifecycle {
                 return;
             }
             AnkamaChatClient client = clients.get();
+            client.setWireTap(tap);
             Link candidate = new Link(client);
             synchronized (this) {
                 if (stopped) {

@@ -110,4 +110,49 @@ class OtherMemberMaskerTest {
         assertThat(tel.phase()).isEqualTo(org.springframework.transaction.event.TransactionPhase.AFTER_COMMIT);
         assertThat(tel.fallbackExecution()).isTrue();
     }
+
+    private OtherMemberMasker withBattleNetMember() {
+        UserAccountRepository users = mock(UserAccountRepository.class);
+        UserAccount b = user(bId, "2222222", "bobthebuilder", null);
+        UserAccount a = user(aId, "1111", "alice", null);
+        when(users.findAll()).thenReturn(List.of(a, b));
+        BattleNetFriendLinkRepository bnet = mock(BattleNetFriendLinkRepository.class);
+        fr.enimaloc.catapult.domain.battlenet.BattleNetFriendLink link =
+                new fr.enimaloc.catapult.domain.battlenet.BattleNetFriendLink();
+        link.setUser(b);
+        link.setBnetAccountId(3000L);
+        link.setBattleTag("Bobby#1234");
+        when(bnet.findAll()).thenReturn(List.of(link));
+        OtherMemberMasker m = new OtherMemberMasker(users, mock(MinecraftFriendLinkRepository.class),
+                mock(EpicFriendLinkRepository.class), bnet, mock(AnkamaFriendLinkRepository.class));
+        m.reload();
+        return m;
+    }
+
+    @Test
+    void containsOtherMember_trueForAnotherMembersBattleTagInRawBytes() {
+        byte[] raw = "..bobby#1234..".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        assertThat(withBattleNetMember().containsOtherMember(raw, aId)).isTrue();
+    }
+
+    @Test
+    void containsOtherMember_trueForAnotherMembersBnetIdAsVarint() {
+        byte[] raw = {0x08, (byte) 0xB8, 0x17};
+        assertThat(withBattleNetMember().containsOtherMember(raw, aId)).isTrue();
+    }
+
+    @Test
+    void containsOtherMember_falseForTheSubjectsOwnIdentifiers() {
+        byte[] raw = "bobby#1234 \u0008".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        assertThat(withBattleNetMember().containsOtherMember(raw, bId)).isFalse();
+    }
+
+    @Test
+    void containsOtherMember_falseWhenTheIndexIsEmpty() {
+        OtherMemberMasker empty = new OtherMemberMasker(mock(UserAccountRepository.class),
+                mock(MinecraftFriendLinkRepository.class), mock(EpicFriendLinkRepository.class),
+                mock(BattleNetFriendLinkRepository.class), mock(AnkamaFriendLinkRepository.class));
+        assertThat(empty.containsOtherMember("bobby#1234".getBytes(java.nio.charset.StandardCharsets.UTF_8), aId))
+                .isFalse();
+    }
 }

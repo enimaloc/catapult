@@ -67,6 +67,8 @@
                         <mdui-chip th:if="${m.systemAccount()}" icon="smart_toy" th:text="#{admin.members.badge.system}">Système</mdui-chip>
                         <mdui-chip th:if="${m.debug() != null and m.debug().active()}" icon="bug_report"
                                    class="admin-member-debug-badge" th:text="#{admin.members.badge.debug}">Débug</mdui-chip>
+                        <mdui-chip th:if="${m.dryRun()}" icon="visibility"
+                                   class="admin-member-dry-run-badge" th:text="#{admin.members.badge.dry_run}">Dry run</mdui-chip>
                         <mdui-chip th:if="${page.isLive(m.id())}" class="admin-member-live" th:text="#{channel.status.live}">Live</mdui-chip>
                         <span class="admin-member-id" th:if="${m.twitchId() != null}" th:text="${m.twitchId()}">twitchId</span>
                     </div>
@@ -128,6 +130,12 @@
                     <mdui-menu-item icon="delete_sweep" data-action="debug/clear" th:if="${m.debug() != null}"
                                     th:attr="data-confirm=#{admin.members.actions.debug_clear.confirm(${name})}"
                                     th:text="#{admin.members.actions.debug_clear}">clear</mdui-menu-item>
+                    <!--/* Dry run: Catapult changes nothing on the member's channel; the member can turn it off, not on. */-->
+                    <mdui-menu-item icon="visibility" data-action="dry-run/enable" th:unless="${m.dryRun()}"
+                                    th:attr="data-confirm=#{admin.members.actions.dry_run_enable.confirm(${name})}"
+                                    th:text="#{admin.members.actions.dry_run_enable}">dry run on</mdui-menu-item>
+                    <mdui-menu-item icon="visibility_off" data-action="dry-run/disable" th:if="${m.dryRun()}"
+                                    th:text="#{admin.members.actions.dry_run_disable}">dry run off</mdui-menu-item>
                     <mdui-divider></mdui-divider>
                     <mdui-menu-item icon="delete" class="admin-member-delete" data-action="delete" th:disabled="${isSelf}"
                                     th:attr="data-confirm=#{admin.members.actions.delete.confirm(${name})}"

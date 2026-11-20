@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api;
 
+import fr.enimaloc.catapult.service.dryrun.DryRunHeldDecisions;
 import fr.enimaloc.catapult.api.channel.ApiChannelActionsController;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.twitchat.TwitchatWidgetSettings;
@@ -29,6 +30,8 @@ import fr.enimaloc.catapult.service.category.CategoryApplier;
 import fr.enimaloc.catapult.service.category.CategoryChain;
 import fr.enimaloc.catapult.service.category.ExtensionLayoutApplier;
 import fr.enimaloc.catapult.service.connections.SteamProfileDiagnostics;
+import fr.enimaloc.catapult.service.emergency.EmergencyStopService;
+import fr.enimaloc.catapult.service.emergency.EmergencyViews;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import fr.enimaloc.catapult.service.notification.NotificationService;
 import fr.enimaloc.catapult.service.notification.TwitchatEventActionService;
@@ -72,6 +75,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX,
                 pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
 @Import({ApiUserResolver.class, MethodSecurityConfig.class, Authz.class, CategoryChain.class, CategoryApplier.class,
+        DryRunHeldDecisions.class,
         ChannelSettingsService.class, ChannelDashboardActions.class, SteamPersonalTokenService.class,
         SteamPersonalTokenStore.class, ChannelAccountActions.class,
         RaidRestoreHold.class})
@@ -102,6 +106,8 @@ class AccountResolutionPerRequestTest {
     @MockitoBean GameBindingLookup gameBindingLookup;
     @MockitoBean CustomBindingActivations customBindingActivations;
     @MockitoBean NotificationService notificationService;
+    @MockitoBean EmergencyViews emergencyViews;
+    @MockitoBean EmergencyStopService emergencyStopService;
 
     private static RequestPostProcessor as(UserAccount account) {
         return jwt().jwt(j -> j.subject(account.getId().toString()).claim("twitchId", account.getTwitchId()))

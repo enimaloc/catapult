@@ -219,6 +219,82 @@ window.CatapultObs = (function () {
     function send(op, d) {
         trace("↑", { op, d });
         socket.send(JSON.stringify({ op, d }));
+        captureSent(op, d);
+    }
+
+    // The member's debug journal (debug-capture.js), only while it is on: every hook returns
+    // first thing otherwise, and never lets a failure of its own reach the connection.
+    const capturing = () => window.CatapultDebugCapture?.active();
+    const opName = (op) => Object.keys(OpCode).find((name) => OpCode[name] === op) ?? `op ${op}`;
+    // Twitchat's messages ride on custom events: twitchat.js captures them as Twitchat's.
+    const isTwitchat = (eventData) => eventData?.origin === "twitchat";
+
+    function captureSent(op, d) {
+        if (!capturing()) return;
+        try {
+            const capture = window.CatapultDebugCapture;
+            const request = capture.stripObs(d);
+            if (op === OpCode.Request || op === OpCode.RequestBatch) {
+                if (op === OpCode.Request && d.requestType === "BroadcastCustomEvent" && isTwitchat(d.requestData?.eventData)) return;
+                const operation = op === OpCode.Request ? d.requestType : "RequestBatch";
+                capture.pending(`obs:${d.requestId}`, { service: "obs", direction: "OUT", operation, request });
+            } else {
+                capture.record({ service: "obs", direction: "OUT", operation: opName(op), request });
+            }
+        } catch {
+            // the debug journal misses it
+        }
+    }
+
+    function captureReceived(frame) {
+        if (!capturing()) return;
+        try {
+            const capture = window.CatapultDebugCapture;
+            const d = frame.d ?? {};
+            if (frame.op === OpCode.RequestResponse || frame.op === OpCode.RequestBatchResponse) {
+                const response = capture.stripObs(d);
+                if (frame.op === OpCode.RequestResponse) {
+                    const status = d.requestStatus ?? {};
+                    capture.settle(`obs:${d.requestId}`, { status: status.code ?? null, response,
+                        error: status.result ? null : (status.comment ?? "request failed") });
+                } else {
+                    const failed = (d.results ?? []).filter(({ requestStatus }) => !requestStatus?.result).length;
+                    capture.settle(`obs:${d.requestId}`, { response,
+                        error: failed ? `${failed} of ${d.results.length} requests failed` : null });
+                }
+            } else if (frame.op === OpCode.Event) {
+                if (d.eventType === "CustomEvent" && isTwitchat(d.eventData)) return;
+                capture.record({ service: "obs", direction: "IN", operation: d.eventType, response: capture.stripObs(d) });
+            } else {
+                capture.record({ service: "obs", direction: "IN", operation: opName(frame.op), response: capture.stripObs(d) });
+            }
+        } catch {
+            // the debug journal misses it
+        }
+    }
+
+    /** `onPurpose`: closed by close() (or a newer connect()), by OBS or the network otherwise. */
+    function captureClosed(code, reason, onPurpose) {
+        if (!capturing()) return;
+        try {
+            const capture = window.CatapultDebugCapture;
+            capture.settleAll("obs", { error: "connection closed" });
+            capture.record(onPurpose
+                ? { service: "obs", direction: "OUT", operation: "Close", request: { code } }
+                : { service: "obs", direction: "IN", operation: "ConnectionClosed", response: { code: code ?? null, reason: reason ?? null } });
+        } catch {
+            // the debug journal misses it
+        }
+    }
+
+    /** The connection's opening, without the password. */
+    function captureConnect(host, port, secure) {
+        if (!capturing()) return;
+        try {
+            window.CatapultDebugCapture.record({ service: "obs", direction: "OUT", operation: "Connect", request: { host, port, secure } });
+        } catch {
+            // the debug journal misses it
+        }
     }
 
     /** Sends a frame whose answer comes back with the same requestId, handed to onAnswer. */
@@ -288,6 +364,7 @@ window.CatapultObs = (function () {
                     settled = true;
                     (ok ? resolve : reject)(value);
                 };
+                captureConnect(host, port, secure);
                 const current = new WebSocket(`${secure ? "wss" : "ws"}://${host}:${port}`, "obswebsocket.json");
                 socket = current;
                 // Once close() or a newer connect() replaced it, this socket's late events are
@@ -296,6 +373,7 @@ window.CatapultObs = (function () {
                 current.onclose = (event) => {
                     if (socket !== current) return;
                     socket = null;
+                    captureClosed(event?.code, event?.reason, false);
                     const error = closeError(event?.code, event?.reason);
                     const wasConnected = connected;
                     connected = false;
@@ -310,6 +388,7 @@ window.CatapultObs = (function () {
                     if (socket !== current) return;
                     const frame = JSON.parse(event.data);
                     trace("↓", frame);
+                    captureReceived(frame);
                     obs.onMessage(frame);
                 };
             });
@@ -487,6 +566,7 @@ window.CatapultObs = (function () {
             const wasConnected = connected;
             socket = null;
             connected = false;
+            captureClosed(1000, null, true);
             const error = new ObsError("Connection closed", { code: 1000 });
             settle(false, error);
             failPending(error);

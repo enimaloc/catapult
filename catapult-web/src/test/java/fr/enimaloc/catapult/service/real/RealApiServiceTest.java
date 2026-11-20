@@ -113,6 +113,8 @@ class RealApiServiceTest {
         org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes();
 
         assertThat(service.myDebug()).isNull();
+        assertThat(service.myDryRun()).isNull();
+        assertThat(service.disableMyDryRun()).isEqualTo(401);
         assertThat(service.obsConnection()).isNull();
         assertThat(service.minecraftDisconnect("someone-else")).isEqualTo(401);
         assertThat(service.regenerateApiToken().status()).isEqualTo(401);
@@ -467,6 +469,47 @@ class RealApiServiceTest {
     }
 
     @Test
+    void widgetObsConfig_carriesTheOwnersDebugCapture() {
+        UUID token = UUID.fromString("11111111-2222-3333-4444-555555555555");
+        respond(HttpMethod.GET, "/api/twitchat/widget/" + token,
+                "{\"obsHost\":\"10.0.0.2\",\"obsPort\":4456,\"obsPassword\":\"pw\",\"debugCapture\":true}");
+
+        assertThat(service.widgetObsConfig(token)).isEqualTo(new TwitchatWidgetConfig("10.0.0.2", 4456, "pw", "auto", true));
+    }
+
+    private static final fr.enimaloc.catapult.common.dto.debug.ClientExchangeBatch DEBUG_BATCH =
+            new fr.enimaloc.catapult.common.dto.debug.ClientExchangeBatch("page", java.time.Instant.parse("2026-11-20T12:00:00Z"),
+                    List.of(new fr.enimaloc.catapult.common.dto.debug.ClientExchangeEntry("obs", "IN", "CurrentProgramSceneChanged",
+                            java.time.Instant.parse("2026-11-20T11:59:59Z"), null, null, java.util.Map.of("sceneName", "Game"), null, null)));
+
+    @Test
+    void postClientDebugExchanges_relaysTheBatchForTheMember_andTheirStatus() {
+        expect(HttpMethod.POST, OWN + "/debug/client-exchanges")
+                .andExpect(org.springframework.test.web.client.match.MockRestRequestMatchers.header("Authorization", "Bearer " + jwtFor(ME)))
+                .andExpect(content().json("{\"source\":\"page\",\"sentAt\":\"2026-11-20T12:00:00Z\",\"entries\":[{\"service\":\"obs\","
+                        + "\"direction\":\"IN\",\"operation\":\"CurrentProgramSceneChanged\",\"request\":{\"sceneName\":\"Game\"}}]}"))
+                .andRespond(withStatus(org.springframework.http.HttpStatus.CONFLICT));
+
+        assertThat(service.postClientDebugExchanges(ME, DEBUG_BATCH).status()).isEqualTo(409);
+    }
+
+    @Test
+    void postClientDebugExchanges_withoutAMemberDoesNotCall() {
+        assertThat(service.postClientDebugExchanges(null, DEBUG_BATCH).status()).isEqualTo(401);
+    }
+
+    @Test
+    void postWidgetClientDebugExchanges_relaysAnonymouslyByTheWidgetsToken() {
+        UUID token = UUID.fromString("11111111-2222-3333-4444-555555555555");
+        expect(HttpMethod.POST, "/api/internal/twitchat-widgets/" + token + "/debug/client-exchanges")
+                .andExpect(org.springframework.test.web.client.match.MockRestRequestMatchers.headerDoesNotExist("Authorization"))
+                .andExpect(content().json("{\"source\":\"page\",\"entries\":[{\"operation\":\"CurrentProgramSceneChanged\"}]}"))
+                .andRespond(withNoContent());
+
+        assertThat(service.postWidgetClientDebugExchanges(token, DEBUG_BATCH).status()).isEqualTo(204);
+    }
+
+    @Test
     void help_forwardsTheLocale() {
         expect(HttpMethod.GET, "/api/internal/help-cards/status")
                 .andExpect(org.springframework.test.web.client.match.MockRestRequestMatchers.header("Accept-Language", "fr-FR"))
@@ -577,6 +620,75 @@ class RealApiServiceTest {
     void toggleBot() {
         expectPost(channel("enimaloc") + "/settings/bot/toggle");
         service.toggleBot("enimaloc");
+    }
+
+    @Test
+    void emergencyStatus_readsThePublicStatus() {
+        respond(HttpMethod.GET, "/api/internal/emergency/status",
+                "{\"globalStops\":[{\"id\":\"6f0c8f0e-0000-4000-8000-000000000001\",\"provider\":\"XBOX\","
+                        + "\"scope\":\"GLOBAL\",\"origin\":\"THRESHOLD\",\"expiresAt\":\"2026-11-20T10:00:00Z\"}]}");
+
+        var status = service.emergencyStatus();
+
+        assertThat(status.globalStops()).extracting(s -> s.provider()).containsExactly("XBOX");
+    }
+
+    @Test
+    void emergencyStatus_isNullWhenTheApiFails() {
+        expect(HttpMethod.GET, "/api/internal/emergency/status").andRespond(withStatus(
+                org.springframework.http.HttpStatus.BAD_GATEWAY));
+
+        assertThat(service.emergencyStatus()).isNull();
+    }
+
+    @Test
+    void channelEmergency_readsTheChannelsView() {
+        respond(HttpMethod.GET, channel("enimaloc") + "/emergency",
+                "{\"botEnabled\":false,\"channelStops\":[],\"globalStopsOnUsedProviders\":[]}");
+
+        var view = service.channelEmergency("enimaloc");
+
+        assertThat(view.botEnabled()).isFalse();
+    }
+
+    @Test
+    void resumeChannelEmergency_postsTheResume() {
+        expect(HttpMethod.POST, channel("enimaloc") + "/emergency/resume").andExpect(content().string(""))
+                .andRespond(withSuccess("{\"resumed\":true}", MediaType.APPLICATION_JSON));
+
+        assertThat(service.resumeChannelEmergency("enimaloc")).isEqualTo(200);
+    }
+
+    @Test
+    void adminEmergency_readsTheStopsAndTheReports() {
+        respond(HttpMethod.GET, "/api/internal/admin/emergency/stops?active=false",
+                "[{\"id\":\"6f0c8f0e-0000-4000-8000-000000000001\",\"provider\":\"EPIC\",\"scope\":\"GLOBAL\","
+                        + "\"origin\":\"OWNER\",\"liftedBy\":\"enimaloc\"}]");
+        respond(HttpMethod.GET, "/api/internal/admin/emergency/reports?page=2",
+                "[{\"id\":\"6f0c8f0e-0000-4000-8000-000000000002\",\"channelLogin\":\"a\",\"provider\":\"XBOX\","
+                        + "\"reportedByLogin\":\"b\",\"withdrawn\":false,\"vodUrl\":null,\"contextJson\":\"{}\"}]");
+
+        assertThat(service.adminEmergencyStops(false)).extracting(s -> s.provider()).containsExactly("EPIC");
+        assertThat(service.adminEmergencyReports(2)).extracting(r -> r.channelLogin()).containsExactly("a");
+    }
+
+    @Test
+    void adminEmergency_isNullWhenTheApiFails() {
+        expect(HttpMethod.GET, "/api/internal/admin/emergency/stops?active=true").andRespond(withStatus(
+                org.springframework.http.HttpStatus.BAD_GATEWAY));
+
+        assertThat(service.adminEmergencyStops(true)).isNull();
+    }
+
+    @Test
+    void adminEmergencyStop_postsTheProvider_andResumeDeletesIt() {
+        expect(HttpMethod.POST, "/api/internal/admin/emergency/stops").andExpect(content().json("{\"provider\":\"XBOX\"}"))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+        expect(HttpMethod.DELETE, "/api/internal/admin/emergency/stops?provider=ALL")
+                .andRespond(withSuccess("{\"lifted\":2}", MediaType.APPLICATION_JSON));
+
+        assertThat(service.adminEmergencyStop("XBOX")).isEqualTo(200);
+        assertThat(service.adminEmergencyResume("ALL")).isEqualTo(200);
     }
 
     @Test
@@ -2244,6 +2356,32 @@ class RealApiServiceTest {
         assertThat(service.enableMemberDebug(id, true, 0.25)).isEqualTo(204);
         assertThat(service.disableMemberDebug(id)).isEqualTo(204);
         assertThat(service.clearMemberDebug(id)).isEqualTo(204);
+    }
+
+    @Test
+    void memberDryRunActions_postToTheMemberAndRelayTheStatus() {
+        UUID id = UUID.fromString("00000000-0000-0000-0000-000000000001");
+        String base = "/api/internal/admin/members/" + id + "/dry-run";
+        expect(HttpMethod.POST, base + "/enable").andExpect(content().string(""))
+                .andRespond(withSuccess("{\"active\":true,\"since\":\"2026-11-20T10:00:00Z\"}", MediaType.APPLICATION_JSON));
+        expectPost(base + "/disable");
+        expect(HttpMethod.POST, base + "/enable").andRespond(withStatus(HttpStatus.CONFLICT));
+
+        assertThat(service.enableMemberDryRun(id)).isEqualTo(200);
+        assertThat(service.disableMemberDryRun(id)).isEqualTo(204);
+        assertThat(service.enableMemberDryRun(id)).isEqualTo(409);
+    }
+
+    @Test
+    void myDryRun_readsTheCallersState_orNullWhenTheApiCouldNotTell_andTurnsItOff() {
+        respond(HttpMethod.GET, OWN + "/dry-run", "{\"active\":true,\"since\":\"2026-11-20T10:00:00Z\"}");
+        expect(HttpMethod.GET, OWN + "/dry-run").andRespond(withStatus(HttpStatus.BAD_GATEWAY));
+        expectPost(OWN + "/dry-run/disable");
+
+        assertThat(service.myDryRun()).isEqualTo(new fr.enimaloc.catapult.common.dto.DryRunStateDto(true,
+                java.time.Instant.parse("2026-11-20T10:00:00Z")));
+        assertThat(service.myDryRun()).isNull();
+        assertThat(service.disableMyDryRun()).isEqualTo(204);
     }
 
     @Test

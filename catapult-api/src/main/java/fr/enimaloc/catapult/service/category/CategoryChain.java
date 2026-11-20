@@ -16,7 +16,6 @@ import fr.enimaloc.catapult.service.binding.RaidRestoreGateService;
 import fr.enimaloc.catapult.service.binding.RaidRestoreHold;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
 import fr.enimaloc.catapult.service.category.CategoryOutcome.Reason;
-import fr.enimaloc.catapult.service.twitch.ChannelUpdateOutcome;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.BindingEdited;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.CustomBindingTriggered;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.GameClosed;
@@ -29,7 +28,10 @@ import fr.enimaloc.catapult.service.category.CategoryTrigger.RaidedOut;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.RevertCategory;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.StreamEnded;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.StreamStarted;
+import fr.enimaloc.catapult.service.dryrun.DryRunHeldDecisions;
+import fr.enimaloc.catapult.service.twitch.ChannelUpdateOutcome;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -46,7 +48,7 @@ import java.util.Optional;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
+@RequiredArgsConstructor(onConstructor_ = @Autowired)
 public class CategoryChain {
 
     /** {@link GameBinding#getSourceName()} of the transient binding the "no game" category is sent through. */
@@ -74,6 +76,18 @@ public class CategoryChain {
     private final RaidRestoreGateService raidRestoreGate;
     private final GameBindingLookup gameBindingLookup;
     private final ExtensionLayoutApplier extensionLayouts;
+    /** Remembers what the dry run holds back; null where a test builds the chain without it. */
+    private final DryRunHeldDecisions heldDecisions;
+
+    /** The chain without the dry-run memory, for code and tests that build it by hand. */
+    public CategoryChain(CustomBindingActivations customBindingActivations, StreamStateService streamStateService,
+                         UserSettingsRepository userSettingsRepository, RaidRestoreHold raidRestoreHold,
+                         GameStateService gameStateService, UserAccountRepository userAccountRepository,
+                         CategoryApplier applier, RaidRestoreGateService raidRestoreGate,
+                         GameBindingLookup gameBindingLookup, ExtensionLayoutApplier extensionLayouts) {
+        this(customBindingActivations, streamStateService, userSettingsRepository, raidRestoreHold, gameStateService,
+                userAccountRepository, applier, raidRestoreGate, gameBindingLookup, extensionLayouts, null);
+    }
 
     /**
      * {@link #decide}, then applied right away. When the category is applied, the channel's Twitch extensions follow
@@ -82,6 +96,9 @@ public class CategoryChain {
     public CategoryOutcome apply(UserAccount user, CategoryTrigger trigger) {
         CategoryDecision decision = decide(user, trigger);
         CategoryOutcome outcome = applier.apply(user, decision);
+        if (outcome.status() == ChannelUpdateOutcome.DRY_RUN && heldDecisions != null) {
+            heldDecisions.record(user.getId(), trigger, outcome.rule());
+        }
         switchExtensions(user, trigger, decision, outcome);
         return outcome;
     }
@@ -110,7 +127,7 @@ public class CategoryChain {
         }
         boolean switches = trigger instanceof GameDetected || trigger instanceof StreamStarted
                 || trigger instanceof CustomBindingTriggered || trigger instanceof NoGameSettingsSaved;
-        if (!switches || outcome.status() != ChannelUpdateOutcome.APPLIED) return;
+        if (!switches || !outcome.status().succeeded()) return;
         switch (decision.action()) {
             case UPDATE_CHANNEL -> extensionLayouts.applyOnSwitch(user,
                     ExtensionLayoutApplier.keyOf(decision.binding()), decision.binding().getExtensionSlots());

@@ -14,7 +14,7 @@ public class DetectionTimeoutException extends RuntimeException {
         this(provider, "did not answer in time", cause);
     }
 
-    private DetectionTimeoutException(String provider, String reason, Throwable cause) {
+    protected DetectionTimeoutException(String provider, String reason, Throwable cause) {
         super(provider + " " + reason, cause);
     }
 

@@ -121,6 +121,7 @@ import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatValidationError;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatSettingsResponse;
+import fr.enimaloc.catapult.common.dto.debug.ClientExchangeBatch;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetAccessResponse;
 import fr.enimaloc.catapult.common.dto.channel.ConfigResponse;
@@ -186,6 +187,8 @@ public class RealApiService implements ApiService {
     private static final ParameterizedTypeReference<List<TwDefinitionDto>> TWS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<fr.enimaloc.catapult.common.dto.chatcommand.EnabledChatCommandDto>> ENABLED_COMMANDS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<GroupSummaryDto>> GROUPS = new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<List<fr.enimaloc.catapult.common.dto.emergency.EmergencyStopDto>> EMERGENCY_STOPS = new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<List<fr.enimaloc.catapult.common.dto.emergency.EmergencyReportDto>> EMERGENCY_REPORTS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<LearnedRateLimitDto>> RATE_LIMITS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<ExperimentSummaryDto>> EXPERIMENTS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<FlagKeyDto>> FLAG_KEYS = new ParameterizedTypeReference<>() {};
@@ -448,12 +451,24 @@ public class RealApiService implements ApiService {
         ConfigResponse config = result.status() == 200 ? result.body() : null;
         // The owner's Twitchat branch; "auto" (detected by the widget) when catapult-api tells none.
         return config == null ? null : new TwitchatWidgetConfig(config.obsHost(), config.obsPort(), config.obsPassword(),
-                config.twitchatBranch() == null ? TwitchatData.AUTO : config.twitchatBranch());
+                config.twitchatBranch() == null ? TwitchatData.AUTO : config.twitchatBranch(), config.debugCapture());
     }
 
     @Override
     public ApiClient.Result<TwitchatWidgetAccessResponse> widgetAccess(UUID token) {
         return client.getAnonymous("/api/twitchat/widget/{token}/access", TwitchatWidgetAccessResponse.class, token);
+    }
+
+    @Override
+    public ApiClient.Result<Void> postClientDebugExchanges(UUID userId, ClientExchangeBatch batch) {
+        if (userId == null) return new ApiClient.Result<>(HttpStatus.UNAUTHORIZED.value(), null);
+        return client.call(HttpMethod.POST, "/api/internal/users/{userId}/debug/client-exchanges", batch, Void.class, userId);
+    }
+
+    @Override
+    public ApiClient.Result<Void> postWidgetClientDebugExchanges(UUID token, ClientExchangeBatch batch) {
+        // The widget's token names its owner: no session's bearer, as for the widget's other routes
+        return client.postAnonymous("/api/internal/twitchat-widgets/{token}/debug/client-exchanges", batch, token);
     }
 
     @Override
@@ -702,6 +717,30 @@ public class RealApiService implements ApiService {
         UUID me = me();
         if (me == null) return null;
         return client.get("/api/internal/users/{userId}/debug", fr.enimaloc.catapult.common.dto.MyDebugDto.class, me);
+    }
+
+    @Override
+    public int enableMemberDryRun(UUID memberId) {
+        return client.postVoid("/api/internal/admin/members/{id}/dry-run/enable", null, memberId);
+    }
+
+    @Override
+    public int disableMemberDryRun(UUID memberId) {
+        return client.postVoid("/api/internal/admin/members/{id}/dry-run/disable", null, memberId);
+    }
+
+    @Override
+    public fr.enimaloc.catapult.common.dto.DryRunStateDto myDryRun() {
+        UUID me = me();
+        if (me == null) return null;
+        return client.get("/api/internal/users/{userId}/dry-run", fr.enimaloc.catapult.common.dto.DryRunStateDto.class, me);
+    }
+
+    @Override
+    public int disableMyDryRun() {
+        UUID me = me();
+        if (me == null) return HttpStatus.UNAUTHORIZED.value();
+        return client.postVoid("/api/internal/users/{userId}/dry-run/disable", null, me);
     }
 
     @Override
@@ -1707,6 +1746,45 @@ public class RealApiService implements ApiService {
     public DegradedStatusDto degradedStatus() {
         ApiClient.Result<DegradedStatusDto> result = client.getAnonymous("/api/internal/status/degraded", DegradedStatusDto.class);
         return result.ok() ? result.body() : null;
+    }
+
+    @Override
+    public fr.enimaloc.catapult.common.dto.emergency.EmergencyStatusDto emergencyStatus() {
+        ApiClient.Result<fr.enimaloc.catapult.common.dto.emergency.EmergencyStatusDto> result = client.getAnonymous(
+                "/api/internal/emergency/status", fr.enimaloc.catapult.common.dto.emergency.EmergencyStatusDto.class);
+        return result.ok() ? result.body() : null;
+    }
+
+    @Override
+    public fr.enimaloc.catapult.common.dto.emergency.ChannelEmergencyDto channelEmergency(String username) {
+        return readChannel(username, id -> client.getResult("/api/internal/users/{userId}/emergency",
+                fr.enimaloc.catapult.common.dto.emergency.ChannelEmergencyDto.class, id));
+    }
+
+    @Override
+    public int resumeChannelEmergency(String username) {
+        return onChannel(username, id -> client.postVoid("/api/internal/users/{userId}/emergency/resume", null, id),
+                status -> status);
+    }
+
+    @Override
+    public List<fr.enimaloc.catapult.common.dto.emergency.EmergencyStopDto> adminEmergencyStops(boolean active) {
+        return client.get("/api/internal/admin/emergency/stops?active={active}", EMERGENCY_STOPS, active);
+    }
+
+    @Override
+    public List<fr.enimaloc.catapult.common.dto.emergency.EmergencyReportDto> adminEmergencyReports(int page) {
+        return client.get("/api/internal/admin/emergency/reports?page={page}", EMERGENCY_REPORTS, page);
+    }
+
+    @Override
+    public int adminEmergencyStop(String provider) {
+        return client.postVoid("/api/internal/admin/emergency/stops", java.util.Map.of("provider", provider));
+    }
+
+    @Override
+    public int adminEmergencyResume(String provider) {
+        return client.delete("/api/internal/admin/emergency/stops?provider={provider}", provider);
     }
 
     @Override

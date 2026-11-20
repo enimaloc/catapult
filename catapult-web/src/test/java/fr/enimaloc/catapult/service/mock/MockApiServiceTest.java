@@ -1086,6 +1086,47 @@ class MockApiServiceTest {
     }
 
     @Test
+    void memberDryRun_enableDisableAndTheMembersOwnWayOut_showInTheMembersListing() {
+        UUID me = service.currentUserId();
+        assertThat(service.myDryRun().active()).isFalse();
+        assertThat(allMembers().stream().filter(m -> m.id().equals(me)).findFirst().orElseThrow().dryRun()).isFalse();
+
+        assertThat(service.enableMemberDryRun(me)).isEqualTo(200);
+        assertThat(service.enableMemberDryRun(me)).isEqualTo(409);
+        assertThat(service.myDryRun().active()).isTrue();
+        assertThat(service.myDryRun().since()).isNotNull();
+        assertThat(allMembers().stream().filter(m -> m.id().equals(me)).findFirst().orElseThrow().dryRun()).isTrue();
+        // the listing's other changes keep it
+        service.adminToggleMemberBot(me);
+        assertThat(allMembers().stream().filter(m -> m.id().equals(me)).findFirst().orElseThrow().dryRun()).isTrue();
+
+        assertThat(service.disableMyDryRun()).isEqualTo(204);
+        assertThat(service.myDryRun().active()).isFalse();
+        assertThat(service.myDryRun().since()).isNull();
+        assertThat(allMembers().stream().filter(m -> m.id().equals(me)).findFirst().orElseThrow().dryRun()).isFalse();
+
+        assertThat(service.enableMemberDryRun(me)).isEqualTo(200);
+        assertThat(service.disableMemberDryRun(me)).isEqualTo(204);
+        assertThat(service.disableMemberDryRun(me)).isEqualTo(204);
+        assertThat(service.myDryRun().active()).isFalse();
+        assertThat(service.enableMemberDryRun(UUID.randomUUID())).isEqualTo(404);
+    }
+
+    @Test
+    void memberDryRun_theMembersOwnWayOut_isANoOpBeforeTheListingKnowsThem_andNeedsASession() {
+        assertThat(service.disableMyDryRun()).isEqualTo(204);
+
+        RequestContextHolder.resetRequestAttributes();
+        assertThat(service.myDryRun()).isNull();
+        assertThat(service.disableMyDryRun()).isEqualTo(401);
+    }
+
+    @Test
+    void memberDryRun_aSeededMemberIsInDryRun() {
+        assertThat(allMembers().stream().anyMatch(m -> m.dryRun())).isTrue();
+    }
+
+    @Test
     void memberDebug_theSeededMemberHasExchanges_toListReadAndFilterByService() {
         UUID seeded = MockPresets.uuidOf("viewer001");
         var filter = new fr.enimaloc.catapult.service.DebugExchangeFilter("steam", null, null, null, null);
@@ -1097,6 +1138,39 @@ class MockApiServiceTest {
         assertThat(service.memberDebugExchange(service.currentUserId(), page.content().getFirst().id())).isNull();
         assertThat(service.memberDebugServices(seeded)).contains("steam", "twitch");
         assertThat(service.memberDebug(seeded).active()).isTrue();
+    }
+
+    private static final fr.enimaloc.catapult.common.dto.debug.ClientExchangeBatch DEBUG_BATCH =
+            new fr.enimaloc.catapult.common.dto.debug.ClientExchangeBatch("page", java.time.Instant.EPOCH, List.of());
+
+    @Test
+    void clientDebugExchanges_areTakenOnlyInDebug() {
+        UUID me = service.currentUserId();
+        assertThat(service.postClientDebugExchanges(me, DEBUG_BATCH).status()).isEqualTo(409);
+
+        service.enableMemberDebug(me, false, 0);
+        assertThat(service.postClientDebugExchanges(me, DEBUG_BATCH).status()).isEqualTo(204);
+        assertThat(service.postClientDebugExchanges(null, DEBUG_BATCH).status()).isEqualTo(401);
+    }
+
+    @Test
+    void widgetClientDebugExchanges_followTheOwnersDebugMode_andTheWidgetsToggle() {
+        UUID token = data.getWidgetToken();
+        UUID owner = data.getChannelDto().id();
+        service.saveObsSettings(username, true, "10.0.0.2", 4456, "pw");
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(new MockHttpServletRequest()));
+
+        assertThat(service.postWidgetClientDebugExchanges(token, DEBUG_BATCH).status()).isEqualTo(409);
+        assertThat(service.widgetObsConfig(token).debugCapture()).isFalse();
+
+        service.enableMemberDebug(owner, false, 0);
+        assertThat(service.postWidgetClientDebugExchanges(token, DEBUG_BATCH).status()).isEqualTo(204);
+        assertThat(service.widgetObsConfig(token))
+                .isEqualTo(new TwitchatWidgetConfig("10.0.0.2", 4456, "pw", "auto", true));
+
+        data.saveObsSettings(false, "10.0.0.2", 4456, null);
+        assertThat(service.postWidgetClientDebugExchanges(token, DEBUG_BATCH).status()).isEqualTo(404);
+        assertThat(service.postWidgetClientDebugExchanges(UUID.randomUUID(), DEBUG_BATCH).status()).isEqualTo(404);
     }
 
     @Test

@@ -308,7 +308,8 @@ public class CustomBindingService {
     private ActivationResult applyToTwitch(UserAccount user, CustomBinding binding) {
         CategoryOutcome outcome = categoryChain.apply(user, new CustomBindingTriggered(binding)).orThrow();
         return switch (outcome.status()) {
-            case APPLIED -> ActivationResult.APPLIED;
+            // a dry run counts as applied: the rest of Catapult goes on as if Twitch had taken it
+            case APPLIED, DRY_RUN -> ActivationResult.APPLIED;
             // Only the bot's state skips a custom binding's update (the chain's BOT_INACTIVE, or it changed since)
             case SKIPPED -> ActivationResult.BOT_DISABLED;
             case FAILED -> twitchUnusable(user) ? ActivationResult.TWITCH_UNAVAILABLE : ActivationResult.FAILED;

@@ -147,7 +147,7 @@ class IrcTwitchChatServiceTest {
         Instant followedAt = Instant.parse("2024-01-01T00:00:00Z");
         when(helix.followedAt(user, "raw-token", "fan")).thenReturn(Optional.of(followedAt));
         when(helix.followedAtById(user, "raw-token", "42")).thenReturn(Optional.of(followedAt));
-        TwitchStreamInfo live = new TwitchStreamInfo("t", "g", 1, followedAt);
+        TwitchStreamInfo live = new TwitchStreamInfo("s", "t", "g", 1, followedAt);
         when(helix.streamInfo(user, "raw-token")).thenReturn(Optional.of(live));
         TwitchUserProfile profile = new TwitchUserProfile("Fan", followedAt);
         when(helix.userProfile("raw-token", "fan")).thenReturn(Optional.of(profile));

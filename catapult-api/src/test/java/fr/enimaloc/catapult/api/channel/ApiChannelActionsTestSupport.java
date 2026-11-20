@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.channel;
 
+import fr.enimaloc.catapult.service.dryrun.DryRunHeldDecisions;
 import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
@@ -54,6 +55,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
         excludeAutoConfiguration = ThymeleafAutoConfiguration.class,
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
 @Import({ApiUserResolver.class, MethodSecurityConfig.class, Authz.class, CategoryChain.class, CategoryApplier.class,
+        DryRunHeldDecisions.class,
         ChannelSettingsService.class, ChannelDashboardActions.class, SteamPersonalTokenService.class,
         SteamPersonalTokenStore.class, ChannelAccountActions.class,
         RaidRestoreHold.class})
@@ -83,6 +85,8 @@ abstract class ApiChannelActionsTestSupport {
     @MockitoBean ExtensionLayoutApplier extensionLayoutApplier;
     @MockitoBean fr.enimaloc.catapult.service.binding.GameBindingLookup gameBindingLookup;
     @MockitoBean fr.enimaloc.catapult.service.binding.CustomBindingActivations customBindingActivations;
+    @MockitoBean fr.enimaloc.catapult.service.emergency.EmergencyViews emergencyViews;
+    @MockitoBean fr.enimaloc.catapult.service.emergency.EmergencyStopService emergencyStopService;
 
     static RequestPostProcessor userJwt(UUID id) {
         return jwt().jwt(j -> j.subject(id.toString()).claim("twitchId", "123"))

@@ -8,14 +8,27 @@ import java.util.Map;
 import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.CATEGORY_CHANGED_BY_CATAPULT;
 import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.NO_GAME_DETECTED;
 import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.NOTIFICATION;
+import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.RAIDED_BY_MEMBER;
 import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.STREAM_STARTED;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class TwitchatEventDefaultsTest {
 
     @Test
-    void seedsEveryHistoricalEvent_andNotifications_butNotNoGameDetected() {
-        assertThat(TwitchatEventDefaults.SEEDED).hasSize(6).contains(NOTIFICATION).doesNotContain(NO_GAME_DETECTED);
+    void seedsEveryHistoricalEvent_notificationsAndRaids_butNotNoGameDetected() {
+        assertThat(TwitchatEventDefaults.SEEDED).hasSize(7).contains(NOTIFICATION, RAIDED_BY_MEMBER)
+                .doesNotContain(NO_GAME_DETECTED);
+    }
+
+    /** The raider's games, one per line, without any button. */
+    @Test
+    void raidedByMemberChatMessage_listsTheRaidersGames() {
+        assertThat(TwitchatEventDefaults.chatMessage(RAIDED_BY_MEMBER)).isEqualTo(Map.of(
+                "message", "Pendant sa session de stream, {{raider}} a joué à :\n{{games}}",
+                "style", "message",
+                "icon", "raid",
+                "user", Map.of("name", "Catapult"),
+                "actions", List.of()));
     }
 
     /** Only sent to members who opted in to Twitchat: it shows the notification, its call to action as a link. */

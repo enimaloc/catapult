@@ -52,6 +52,15 @@ public class ActivityLogService {
         }
     }
 
+    /** The user's current buffer (oldest first), copied: later entries don't alter it. */
+    public List<LogEntry> snapshot(UUID userId) {
+        Deque<LogEntry> buf = buffers.get(userId);
+        if (buf == null) return List.of();
+        synchronized (buf) {
+            return List.copyOf(buf);
+        }
+    }
+
     /**
      * Creates and registers a new SSE emitter for the given user.
      * Replays the current buffer so the client gets recent history immediately.

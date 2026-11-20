@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.common.dto.admin.TwDefinitionDto;
+import fr.enimaloc.catapult.common.dto.emergency.EmergencyReportDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberDto;
@@ -60,6 +61,9 @@ public class AdminTabsFragmentController {
     private final ModelFiller filler;
     private final ApiService apiService;
     private final BroadcastState broadcastState;
+
+    /** catapult-api's page of reports: a full one may be followed by another. */
+    private static final int EMERGENCY_REPORTS_PAGE_SIZE = 50;
 
     /**
      * The members list, for the way back from a member's targeting (the page itself comes with its
@@ -492,6 +496,33 @@ public class AdminTabsFragmentController {
         return guarded(model, response, () -> {
             model.addAttribute("maintenance", broadcastState.maintenance().orElse(null));
             return "pages/admin-tab/broadcast :: content";
+        });
+    }
+
+    /**
+     * The emergency stops (active, then the history) and one page of reports with their context read for display
+     * ({@code contexts}, by report id; a context that cannot be read is absent). {@code hasNext}: the page was full.
+     * A list catapult-api failed to give is null (the unavailable card).
+     */
+    @GetMapping("/emergency")
+    String emergency(Model model, HttpServletResponse response, @RequestParam(defaultValue = "0") int page) {
+        return guarded(model, response, () -> {
+            int shown = Math.max(0, page);
+            List<EmergencyReportDto> reports = apiService.adminEmergencyReports(shown);
+            Map<UUID, AdminEmergencyContext> contexts = new HashMap<>();
+            if (reports != null) {
+                reports.forEach(r -> {
+                    AdminEmergencyContext context = AdminEmergencyContext.parse(r.contextJson());
+                    if (context != null) contexts.put(r.id(), context);
+                });
+            }
+            model.addAttribute("stops", apiService.adminEmergencyStops(true));
+            model.addAttribute("history", apiService.adminEmergencyStops(false));
+            model.addAttribute("reports", reports);
+            model.addAttribute("contexts", contexts);
+            model.addAttribute("page", shown);
+            model.addAttribute("hasNext", reports != null && reports.size() >= EMERGENCY_REPORTS_PAGE_SIZE);
+            return "pages/admin-tab/emergency :: content";
         });
     }
 

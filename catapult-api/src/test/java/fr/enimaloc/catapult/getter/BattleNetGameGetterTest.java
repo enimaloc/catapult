@@ -10,13 +10,19 @@ import fr.enimaloc.catapult.simulation.SimulatedCalls;
 import fr.enimaloc.catapult.simulation.SimulationGate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import fr.enimaloc.catapult.domain.battlenet.BattleNetServiceAccount;
+import tools.jackson.databind.JsonNode;
 import org.springframework.beans.factory.ObjectProvider;
 
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @SuppressWarnings("unchecked")
@@ -94,5 +100,82 @@ class BattleNetGameGetterTest {
         when(active.real(user.getId(), SimulatedCalls.BATTLENET_PRESENCE)).thenReturn(false);
 
         assertThat(getter.getCurrentGame(user)).isEmpty();
+    }
+
+    // --- Detection trace ---
+
+    private static void assertTrace(JsonNode entry, String reason) {
+        assertThat(entry.path("reason").asString()).isEqualTo(reason);
+    }
+
+    @Test
+    void traceReason_gateClosed() {
+        when(gate.isAvailableReadOnly(user)).thenReturn(false);
+
+        assertTrace(TraceProbe.entryAfter(user, () -> getter.getCurrentGame(user)), "gate closed");
+    }
+
+    @Test
+    void traceReason_blockedBySimulation() {
+        SimulationGate active = mock(SimulationGate.class);
+        when(simulationGate.getIfAvailable()).thenReturn(active);
+        when(active.real(user.getId(), SimulatedCalls.BATTLENET_PRESENCE)).thenReturn(false);
+
+        assertTrace(TraceProbe.entryAfter(user, () -> getter.getCurrentGame(user)), "blocked by the simulation");
+    }
+
+    @Test
+    void traceReason_noLink() {
+        when(links.findByUser(user)).thenReturn(Optional.empty());
+
+        assertTrace(TraceProbe.entryAfter(user, () -> getter.getCurrentGame(user)), "no friend link");
+    }
+
+    @Test
+    void traceReason_linkPending() {
+        link.setStatus(BattleNetFriendLink.Status.PENDING);
+        BattleNetServiceAccount bot = new BattleNetServiceAccount();
+        bot.setId(UUID.randomUUID());
+        link.setServiceAccount(bot);
+        when(sessions.sessionState(bot.getId())).thenReturn("READY");
+
+        JsonNode entry = TraceProbe.entryAfter(user, () -> getter.getCurrentGame(user));
+
+        assertTrace(entry, "friend link is PENDING");
+        assertThat(entry.at("/details/session").asString()).isEqualTo("READY");
+    }
+
+    @Test
+    void traceReason_noGameWithoutAnyPresenceReceived() {
+        when(sessions.currentGame(42L)).thenReturn(Optional.empty());
+        when(sessions.lastPresence(42L)).thenReturn(Optional.empty());
+
+        JsonNode entry = TraceProbe.entryAfter(user, () -> getter.getCurrentGame(user));
+
+        assertTrace(entry, "no game in the presence");
+        assertThat(entry.at("/details/lastPresence").asString())
+            .isEqualTo("none received since the session opened");
+    }
+
+    @Test
+    void traceReason_noGameShowsTheLastPresenceReceived() {
+        when(sessions.currentGame(42L)).thenReturn(Optional.empty());
+        Instant at = Instant.parse("2026-11-20T10:00:00Z");
+        when(sessions.lastPresence(42L))
+            .thenReturn(Optional.of(new BattleNetSessionManager.PresenceSeen("WTCG", at, UUID.randomUUID())));
+
+        JsonNode entry = TraceProbe.entryAfter(user, () -> getter.getCurrentGame(user));
+
+        assertThat(entry.at("/details/lastPresence/fourcc").asString()).isEqualTo("WTCG");
+        assertThat(entry.at("/details/lastPresence/title").asString()).isEqualTo("Hearthstone");
+        assertThat(entry.at("/details/lastPresence/at").asString()).isEqualTo("2026-11-20T10:00:00Z");
+    }
+
+    @Test
+    void traceReason_isNotComputedWhenNothingIsTraced() {
+        when(sessions.currentGame(42L)).thenReturn(Optional.empty());
+
+        assertThat(getter.getCurrentGame(user)).isEmpty();
+        verify(sessions, never()).lastPresence(anyLong());
     }
 }

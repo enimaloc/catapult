@@ -1,0 +1,13 @@
+<!--/* The global emergency stops (EmergencyState): one line per stopped provider, for every visitor. Rendered from the
+     model only, there is nothing for a script to word; absent while no global stop is active. */-->
+<div id="emergency-banner" class="emergency-banner" th:fragment="banner" role="status" th:if="${!#lists.isEmpty(emergency)}">
+    <mdui-icon name="warning"></mdui-icon>
+    <ul class="emergency-banner-stops">
+        <li th:each="stop : ${emergency}"
+            th:text="${stop.expiresAt() == null}
+                ? #{emergency.banner.indefinite(#{'emergency.provider.' + ${stop.provider()}})}
+                : #{emergency.banner.until(#{'emergency.provider.' + ${stop.provider()}},
+                    ${#temporals.format(stop.expiresAt(), #messages.msg('format.date'))},
+                    ${#temporals.format(stop.expiresAt(), #messages.msg('format.time'))})}">emergency.banner</li>
+    </ul>
+</div>

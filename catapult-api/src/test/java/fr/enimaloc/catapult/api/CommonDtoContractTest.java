@@ -86,7 +86,8 @@ class CommonDtoContractTest {
                         mock(AccountService.class), mock(BotToggleService.class), mock(AdminMigrationService.class),
                         environment, mock(UserFlagRepository.class), mock(UserGroupRepository.class),
                         mock(fr.enimaloc.catapult.service.debug.MemberDebugService.class),
-                        mock(fr.enimaloc.catapult.service.premium.PremiumService.class)),
+                        mock(fr.enimaloc.catapult.service.premium.PremiumService.class),
+                        mock(fr.enimaloc.catapult.service.dryrun.DryRunService.class)),
                 mock(fr.enimaloc.catapult.service.premium.PremiumService.class));
 
         AdminMembersPage produced = controller.page(0, null);
@@ -148,7 +149,8 @@ class CommonDtoContractTest {
         ApiTwitchatWidgetController controller = new ApiTwitchatWidgetController(
                 new fr.enimaloc.catapult.service.notification.TwitchatWidgetAccess(settingsRepository, tokens,
                         mock(TokenEncryptionService.class),
-                        mock(fr.enimaloc.catapult.service.notification.NotificationDeliveryDispatcher.class)),
+                        mock(fr.enimaloc.catapult.service.notification.NotificationDeliveryDispatcher.class),
+                        mock(fr.enimaloc.catapult.service.debug.DebugMemberRegistry.class)),
                 mock(TwitchatActionExecutor.class));
 
         ConfigResponse produced = controller.config(token).getBody();
@@ -200,7 +202,8 @@ class CommonDtoContractTest {
                         mock(AdminMigrationService.class), mock(Environment.class), flags,
                         mock(UserGroupRepository.class),
                         mock(fr.enimaloc.catapult.service.debug.MemberDebugService.class),
-                        mock(fr.enimaloc.catapult.service.premium.PremiumService.class))).list();
+                        mock(fr.enimaloc.catapult.service.premium.PremiumService.class),
+                        mock(fr.enimaloc.catapult.service.dryrun.DryRunService.class))).list();
 
         assertThat(JSON.readValue(JSON.writeValueAsString(produced), new TypeReference<List<FlagKeyDto>>() {}))
                 .containsExactly(new FlagKeyDto("beta", List.of("on")), new FlagKeyDto("tester", List.of()));

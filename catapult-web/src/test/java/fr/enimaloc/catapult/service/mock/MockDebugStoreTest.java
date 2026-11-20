@@ -42,11 +42,20 @@ class MockDebugStoreTest {
 
     @Test
     void isError_followsCatapultApisRule() {
-        assertThat(MockDebugStore.isError("IN", null, null)).isFalse();
-        assertThat(MockDebugStore.isError("IN", null, "invalid")).isTrue();
-        assertThat(MockDebugStore.isError("OUT", null, null)).isTrue();
-        assertThat(MockDebugStore.isError("OUT", 200, null)).isFalse();
-        assertThat(MockDebugStore.isError("OUT", 500, null)).isTrue();
+        assertThat(MockDebugStore.isError("WS", "IN", null, null)).isFalse();
+        assertThat(MockDebugStore.isError("WS", "IN", null, "invalid")).isTrue();
+        assertThat(MockDebugStore.isError("GET", "OUT", null, null)).isTrue();
+        assertThat(MockDebugStore.isError("GET", "OUT", 200, null)).isFalse();
+        assertThat(MockDebugStore.isError("GET", "OUT", 500, null)).isTrue();
+    }
+
+    @Test
+    void isError_judgesWhatTheBrowserRecordedByItsErrorOnly() {
+        for (String method : new String[]{"OBS", "TWITCHAT"}) {
+            assertThat(MockDebugStore.isError(method, "OUT", null, null)).as(method).isFalse();
+            assertThat(MockDebugStore.isError(method, "OUT", 600, null)).as(method).isFalse();
+            assertThat(MockDebugStore.isError(method, "OUT", null, "timeout")).as(method).isTrue();
+        }
     }
 
     @Test
@@ -54,7 +63,7 @@ class MockDebugStoreTest {
         for (DebugExchangeSummaryDto e : all(null, null)) {
             var full = store.exchange(member, e.id());
             assertThat(e.error()).as(e.operation())
-                    .isEqualTo(MockDebugStore.isError(full.direction(), full.status(), full.errorMessage()));
+                    .isEqualTo(MockDebugStore.isError(full.method(), full.direction(), full.status(), full.errorMessage()));
         }
     }
 

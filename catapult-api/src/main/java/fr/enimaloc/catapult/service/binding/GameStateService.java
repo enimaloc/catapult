@@ -46,6 +46,12 @@ public class GameStateService {
         return Optional.ofNullable(lastKnownGame.get(user.getId()));
     }
 
+    /** The game the channel last stopped playing, if any since this instance started. */
+    public Optional<DetectedGame> getLastEndedGame(UserAccount user) {
+        EndedGame ended = lastEndedGame.get(user.getId());
+        return ended == null ? Optional.empty() : Optional.of(ended.game());
+    }
+
     /** Every channel's last known game, by owner id (a snapshot). */
     public Map<UUID, DetectedGame> lastKnownGames() {
         return Map.copyOf(lastKnownGame);
@@ -60,12 +66,26 @@ public class GameStateService {
         return observedSinceStart.add(user.getId());
     }
 
+    /** Whether {@code user}'s game state has been observed since this instance started, without recording anything. */
+    public boolean isObserved(UserAccount user) {
+        return observedSinceStart.contains(user.getId());
+    }
+
     public void updateState(UserAccount user, DetectedGame game) {
         observedSinceStart.add(user.getId());
         DetectedGame previous = lastKnownGame.put(user.getId(), game);
         if (!sameSource(previous, game)) {
             channelEventPublisher.gameDetected(user.getId(), game);
         }
+    }
+
+    /**
+     * Drops the game remembered as current for {@code userId}, so the next detection cycle sees it as a change and
+     * applies it again. Unlike {@link #clearState}, the game has not ended: nothing is published, no ended game is
+     * recorded.
+     */
+    public void forgetLastKnownGame(UUID userId) {
+        lastKnownGame.remove(userId);
     }
 
     public void clearState(UserAccount user) {

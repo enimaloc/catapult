@@ -1,0 +1,241 @@
+package fr.enimaloc.catapult.service.debug;
+
+import fr.enimaloc.catapult.common.dto.debug.ClientExchangeBatch;
+import fr.enimaloc.catapult.common.dto.debug.ClientExchangeEntry;
+import fr.enimaloc.catapult.domain.debug.DebugExchange.Direction;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
+import org.springframework.stereotype.Service;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
+
+import java.net.URI;
+import java.time.Clock;
+import java.time.DateTimeException;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * Records in a member's debug journal the OBS and Twitchat exchanges their browser saw (the member's page or the OBS
+ * widget), relayed by catapult-web in batches. The recorder masks other members and redacts secrets as for any other
+ * exchange. An entry it cannot place (unknown service or direction) is skipped, and so is every entry beyond
+ * {@value #PER_MINUTE} a member sends within a minute.
+ */
+@Slf4j
+@Service
+public class ClientDebugIngestService {
+
+    /** What came of a batch. */
+    public enum Result {
+        /** Its entries were handed to the recorder, but the ones skipped. */
+        RECORDED,
+        /** The member is not in debug mode: nothing is recorded, and the browser stops capturing. */
+        NOT_IN_DEBUG
+    }
+
+    /** The largest batch body read, in bytes. */
+    public static final int MAX_BYTES = 256 * 1024;
+    /** The most entries in one batch. */
+    public static final int MAX_ENTRIES = 50;
+    /** The most entries recorded per member within a rolling minute. */
+    static final int PER_MINUTE = 600;
+    private static final Duration WINDOW = Duration.ofMinutes(1);
+    /** A browser clock further off than this is not trusted for the skew: its batch is taken as is. */
+    static final Duration MAX_SKEW = Duration.ofDays(1);
+    /** How far in the past an entry may be placed, once moved by the skew. */
+    static final Duration MAX_AGE = Duration.ofDays(1);
+    /** How far in the future an entry may be placed, once moved by the skew. */
+    static final Duration MAX_AHEAD = Duration.ofMinutes(5);
+    private static final Set<String> SOURCES = Set.of("page", "widget");
+    private static final JsonMapper JSON = JsonMapper.builder().build();
+
+    /**
+     * How each browser session is recorded: method and synthetic URL. Each method is one of
+     * {@link fr.enimaloc.catapult.domain.debug.DebugExchange#CLIENT_METHODS}: an entry fails only on its error.
+     */
+    private record Session(String method, URI uri) {}
+
+    private static final Map<String, Session> SESSIONS = Map.of(
+            "obs", new Session("OBS", URI.create("obs://local")),
+            "twitchat", new Session("TWITCHAT", URI.create("twitchat://obs")));
+
+    private final DebugMemberRegistry registry;
+    private final DebugExchangeRecorder recorder;
+    private final Clock clock;
+    /** The times of the entries each member had recorded within the last minute. */
+    private final Map<UUID, Deque<Instant>> recent = new ConcurrentHashMap<>();
+
+    @Autowired
+    public ClientDebugIngestService(DebugMemberRegistry registry, DebugExchangeRecorder recorder) {
+        this(registry, recorder, Clock.systemUTC());
+    }
+
+    ClientDebugIngestService(DebugMemberRegistry registry, DebugExchangeRecorder recorder, Clock clock) {
+        this.registry = registry;
+        this.recorder = recorder;
+        this.clock = clock;
+    }
+
+    /**
+     * The batch in {@code body}, its unreadable entries left out (an unreadable time is no time); empty when the
+     * body is no batch, is over {@value #MAX_BYTES} bytes or holds over {@value #MAX_ENTRIES} entries.
+     */
+    public Optional<ClientExchangeBatch> read(byte[] body) {
+        if (body == null || body.length > MAX_BYTES) {
+            return Optional.empty();
+        }
+        JsonNode root;
+        try {
+            root = JSON.readTree(body);
+        } catch (RuntimeException e) {
+            return Optional.empty();
+        }
+        if (root == null || !root.isObject()) {
+            return Optional.empty();
+        }
+        JsonNode items = root.path("entries");
+        if (!items.isMissingNode() && !items.isNull() && !items.isArray()) {
+            return Optional.empty();
+        }
+        if (items.size() > MAX_ENTRIES) {
+            return Optional.empty();
+        }
+        List<ClientExchangeEntry> entries = new ArrayList<>();
+        for (JsonNode item : items) {
+            ClientExchangeEntry entry = item.isObject() ? convert(item, ClientExchangeEntry.class) : null;
+            if (entry != null) {
+                entries.add(entry);
+            }
+        }
+        JsonNode source = root.path("source");
+        return Optional.of(new ClientExchangeBatch(source.isString() ? source.asString() : null,
+                convert(root.path("sentAt"), Instant.class), entries));
+    }
+
+    /** Whether {@code userId} is in debug mode, so that a batch of theirs would be recorded. */
+    public boolean inDebug(UUID userId) {
+        return registry.modeOf(userId).isPresent();
+    }
+
+    /**
+     * Records {@code batch}'s entries for {@code userId}, each moved by the clock skew the batch shows (the server's
+     * time minus the browser's when it was sent, none when that is over {@link #MAX_SKEW}) and kept between
+     * {@link #MAX_AGE} ago and {@link #MAX_AHEAD} ahead; an entry whose time cannot be moved is skipped.
+     */
+    public Result ingest(UUID userId, ClientExchangeBatch batch) {
+        if (registry.modeOf(userId).isEmpty()) {
+            recent.remove(userId);
+            return Result.NOT_IN_DEBUG;
+        }
+        if (batch == null || batch.entries() == null) {
+            return Result.RECORDED;
+        }
+        Instant now = clock.instant();
+        Duration skew = skew(batch.sentAt(), now);
+        HttpHeaders headers = sourceHeaders(batch.source());
+        int skipped = 0;
+        for (ClientExchangeEntry entry : batch.entries()) {
+            Session session = entry == null || entry.service() == null ? null : SESSIONS.get(entry.service());
+            Direction direction = entry == null ? null : direction(entry.direction());
+            Instant at = entry == null ? null : place(entry.at(), skew, now);
+            if (session == null || direction == null || at == null || !withinRate(userId, now)) {
+                skipped++;
+                continue;
+            }
+            long duration = entry.durationMs() == null ? 0 : Math.max(0, entry.durationMs());
+            RawExchange raw = new RawExchange(at, session.method(), session.uri(), headers, json(entry.request()),
+                    entry.status(), null, json(entry.response()), entry.error(), duration);
+            recorder.record(userId, direction, raw, entry.operation(), false, entry.service());
+        }
+        if (skipped > 0) {
+            log.debug("Skipped {} of the {} browser debug exchanges of {}", skipped, batch.entries().size(), userId);
+        }
+        return Result.RECORDED;
+    }
+
+    /** The server's time minus the browser's, or none when the browser's is missing or over {@link #MAX_SKEW} off. */
+    private static Duration skew(Instant sentAt, Instant now) {
+        if (sentAt == null || sentAt.isBefore(now.minus(MAX_SKEW)) || sentAt.isAfter(now.plus(MAX_SKEW))) {
+            return Duration.ZERO;
+        }
+        return Duration.between(sentAt, now);
+    }
+
+    /**
+     * Where an entry the browser saw at {@code at} goes: moved by {@code skew}, kept within the allowed window; now
+     * for no time, null when {@code at} cannot be moved (at the edge of what an {@link Instant} holds).
+     */
+    private static Instant place(Instant at, Duration skew, Instant now) {
+        if (at == null) {
+            return now;
+        }
+        Instant moved;
+        try {
+            moved = at.plus(skew);
+        } catch (DateTimeException | ArithmeticException e) {
+            return null;
+        }
+        Instant earliest = now.minus(MAX_AGE);
+        Instant latest = now.plus(MAX_AHEAD);
+        return moved.isBefore(earliest) ? earliest : moved.isAfter(latest) ? latest : moved;
+    }
+
+    /** Whether {@code userId} may have one more entry recorded at {@code now}; counts it when so. */
+    private boolean withinRate(UUID userId, Instant now) {
+        Deque<Instant> times = recent.computeIfAbsent(userId, k -> new ArrayDeque<>());
+        synchronized (times) {
+            Instant oldest = now.minus(WINDOW);
+            while (!times.isEmpty() && !times.peekFirst().isAfter(oldest)) {
+                times.pollFirst();
+            }
+            if (times.size() >= PER_MINUTE) {
+                return false;
+            }
+            times.addLast(now);
+            return true;
+        }
+    }
+
+    /** The request headers naming where the batch was captured; none for an unknown source. */
+    private static HttpHeaders sourceHeaders(String source) {
+        HttpHeaders headers = new HttpHeaders();
+        if (source != null && SOURCES.contains(source)) {
+            headers.set("source", source);
+        }
+        return HttpHeaders.readOnlyHttpHeaders(headers);
+    }
+
+    private static Direction direction(String name) {
+        if ("IN".equals(name)) {
+            return Direction.IN;
+        }
+        return "OUT".equals(name) ? Direction.OUT : null;
+    }
+
+    /** {@code body} as JSON bytes, or null for none. No content type goes with it: the free-text redaction applies. */
+    private static byte[] json(Map<String, Object> body) {
+        return body == null ? null : JSON.writeValueAsBytes(body);
+    }
+
+    /** {@code node} read as {@code type}, or null when it is missing or does not read as one. */
+    private static <T> T convert(JsonNode node, Class<T> type) {
+        if (node == null || node.isMissingNode() || node.isNull()) {
+            return null;
+        }
+        try {
+            return JSON.treeToValue(node, type);
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+}

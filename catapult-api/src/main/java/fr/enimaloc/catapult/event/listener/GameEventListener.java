@@ -19,6 +19,7 @@ import fr.enimaloc.catapult.service.category.CategoryTrigger.GameClosed;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.GameDetected;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.StreamEnded;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.StreamStarted;
+import fr.enimaloc.catapult.service.debug.DetectionTrace;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -47,10 +48,15 @@ public class GameEventListener {
         // A new game: a raid's restored game no longer has to be kept
         raidRestoreHold.release(user);
         Optional<CustomBindingActivation> active = customBindingActivations.active(user);
-        switch (categoryChain.detectionGuard(active, event.isFirstSinceStart())) {
+        CategoryChain.DetectionGuard guard = categoryChain.detectionGuard(active, event.isFirstSinceStart());
+        if (DetectionTrace.active()) {
+            DetectionTrace.binding(DetectionTrace.details("guard", guard, "firstSinceStart", event.isFirstSinceStart()));
+        }
+        switch (guard) {
             case KEEPS_CUSTOM_BINDING -> {
                 // Ignored: the game's binding is created or refreshed for the channel page, the channel left alone
                 GameBinding binding = bindingService.resolveOrCreate(user, event.getDetectedGame());
+                traceBinding(binding);
                 channelEventPublisher.bindingUpserted(user.getId(), binding);
                 log.debug("Custom binding active for user {} ({}) — detection not applied", user.getId(),
                     event.isFirstSinceStart() ? "first detection since start" : "uninterruptible");
@@ -77,7 +83,26 @@ public class GameEventListener {
         // page needs to see it — ApiChannelActionsController only publishes for
         // user-initiated mutations, not for scheduler-triggered creations.
         channelEventPublisher.bindingUpserted(user.getId(), binding);
-        return categoryChain.apply(user, new GameDetected(binding));
+        traceBinding(binding);
+        return traceOutcome(categoryChain.apply(user, new GameDetected(binding)));
+    }
+
+    /** Notes, in the detection trace of a member in debug mode, the binding the detected game resolved to. */
+    private static void traceBinding(GameBinding binding) {
+        if (DetectionTrace.active() && binding != null) {
+            DetectionTrace.binding(DetectionTrace.details("id", binding.getId(),
+                "categoryId", binding.getTwitchGameId(), "category", binding.getTwitchGameName(),
+                "status", binding.getStatus(), "ignored", binding.isIgnored()));
+        }
+    }
+
+    /** Notes, in the detection trace of a member in debug mode, the rule that decided the channel and its result. */
+    private static CategoryOutcome traceOutcome(CategoryOutcome outcome) {
+        if (DetectionTrace.active() && outcome != null) {
+            DetectionTrace.binding(DetectionTrace.details("rule", outcome.rule(), "result", outcome.status(),
+                "reason", outcome.reason(), "error", outcome.error() == null ? null : outcome.error().toString()));
+        }
+        return outcome;
     }
 
     @EventListener
@@ -85,7 +110,7 @@ public class GameEventListener {
         UserAccount user = event.getUser();
         log.debug("NoGameDetectedEvent for user {}", user.getId());
         streamStateService.clearPending(user);
-        categoryChain.apply(user, new GameClosed()).orThrow();
+        traceOutcome(categoryChain.apply(user, new GameClosed())).orThrow();
     }
 
     // Just before the custom binding scheduler, which must see the channel as this leaves it

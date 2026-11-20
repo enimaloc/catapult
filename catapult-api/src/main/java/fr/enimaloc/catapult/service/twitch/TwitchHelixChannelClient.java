@@ -26,6 +26,7 @@ public class TwitchHelixChannelClient {
     private static final String HELIX_BANS_URL = "https://api.twitch.tv/helix/moderation/bans";
     private static final String HELIX_USERS_URL = "https://api.twitch.tv/helix/users";
     private static final String HELIX_STREAMS_URL = "https://api.twitch.tv/helix/streams";
+    private static final String HELIX_VIDEOS_URL = "https://api.twitch.tv/helix/videos";
     private static final String HELIX_FOLLOWERS_URL = "https://api.twitch.tv/helix/channels/followers";
     private static final String HELIX_SHOUTOUTS_URL = "https://api.twitch.tv/helix/chat/shoutouts";
 
@@ -106,10 +107,31 @@ public class TwitchHelixChannelClient {
             Map<String, Object> stream = firstData(HELIX_STREAMS_URL + "?user_id=" + channel.getTwitchId(), accessToken);
             if (stream == null) return Optional.empty();
             return Optional.of(new TwitchStreamInfo(
-                (String) stream.get("title"), (String) stream.get("game_name"),
+                (String) stream.get("id"), (String) stream.get("title"), (String) stream.get("game_name"),
                 ((Number) stream.get("viewer_count")).intValue(), Instant.parse((String) stream.get("started_at"))));
         } catch (Exception e) {
             log.warn("[Helix] Failed to fetch stream info for user {}: {}", channel.getId(), e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    /** The id of the archive (VOD) recorded from the given stream, empty when there is none (or it can't be read). */
+    @SuppressWarnings("unchecked")
+    public Optional<String> archiveVideoId(UserAccount channel, String accessToken, String streamId) {
+        try {
+            Map<String, Object> response = restClient.get()
+                .uri(HELIX_VIDEOS_URL + "?user_id=" + channel.getTwitchId() + "&type=archive&first=20")
+                .header(AUTHORIZATION, AUTHORIZATION_BEARER + accessToken)
+                .header(CLIENT_ID, twitchClientId)
+                .retrieve()
+                .body(Map.class);
+            if (response == null || !(response.get("data") instanceof List<?> data)) return Optional.empty();
+            return ((List<Map<String, Object>>) data).stream()
+                .filter(video -> streamId.equals(video.get("stream_id")))
+                .map(video -> (String) video.get("id"))
+                .findFirst();
+        } catch (Exception e) {
+            log.warn("[Helix] Failed to fetch the archive of stream {} for user {}: {}", streamId, channel.getId(), e.getMessage());
             return Optional.empty();
         }
     }

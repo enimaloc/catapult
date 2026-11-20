@@ -266,7 +266,8 @@ class DebugAttributionTest {
         when(state.getLastKnownGame(any())).thenReturn(Optional.empty());
         return new SchedulerService(accounts, chain, state, mock(ApplicationEventPublisher.class),
                 new SimpleMeterRegistry(), Optional.empty(), Optional.empty(), mock(BindingService.class),
-                SimulationGates.none(), SiteRoles.active(), PollCadences.always());
+                SimulationGates.none(), SiteRoles.active(), PollCadences.always(),
+                org.mockito.Mockito.mock(fr.enimaloc.catapult.service.ActivityLogService.class), null, null);
     }
 
     @Test

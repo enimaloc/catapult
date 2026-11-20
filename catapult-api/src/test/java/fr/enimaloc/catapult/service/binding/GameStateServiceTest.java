@@ -20,7 +20,8 @@ class GameStateServiceTest {
 
     private static final Instant T0 = Instant.parse("2026-10-22T20:00:00Z");
 
-    private final GameStateService service = new GameStateService(mock(ChannelEventPublisher.class));
+    private final ChannelEventPublisher publisher = mock(ChannelEventPublisher.class);
+    private final GameStateService service = new GameStateService(publisher);
     private final DetectedGame doom = new DetectedGame("379720", GameBinding.SourceType.STEAM, "DOOM");
     private UserAccount user;
 
@@ -33,6 +34,16 @@ class GameStateServiceTest {
 
     private void at(Instant now) {
         service.clock = Clock.fixed(now, ZoneOffset.UTC);
+    }
+
+    @Test
+    void isObserved_onlyOnceTheStateWasObserved_withoutRecordingIt() {
+        assertThat(service.isObserved(user)).isFalse();
+        assertThat(service.isObserved(user)).isFalse();
+
+        service.clearState(user);
+
+        assertThat(service.isObserved(user)).isTrue();
     }
 
     @Test
@@ -66,5 +77,18 @@ class GameStateServiceTest {
     @Test
     void recentlyDetectedGame_isEmptyWhenNothingWasEverDetected() {
         assertThat(service.recentlyDetectedGame(user, Duration.ofMinutes(15))).isEmpty();
+    }
+
+    @Test
+    void forgetDoesNotPublishOrRecordAnEndedGame() {
+        service.updateState(user, doom);
+        org.mockito.Mockito.clearInvocations(publisher);
+
+        service.forgetLastKnownGame(user.getId());
+
+        assertThat(service.getLastKnownGame(user)).isEmpty();
+        assertThat(service.getLastEndedGame(user)).isEmpty();
+        assertThat(service.hasChanged(user, doom)).isTrue();
+        org.mockito.Mockito.verifyNoInteractions(publisher);
     }
 }

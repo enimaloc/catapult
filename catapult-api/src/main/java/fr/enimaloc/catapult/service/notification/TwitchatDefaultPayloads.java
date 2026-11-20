@@ -45,6 +45,10 @@ public final class TwitchatDefaultPayloads {
             // Plain text body; {{ctaUrl}} is empty for a notification without a call to action.
             Map.entry(TwitchatNotificationEventType.NOTIFICATION, new TwitchatDefaultPayload(
                     "[Catapult] {{title}} — {{body}} {{ctaUrl}}", "message", "info", "Catapult",
+                    new LinkedHashMap<>())),
+            // {{games}}: one line per (category, game) of the raider's session, see SessionRecap#gamesText.
+            Map.entry(TwitchatNotificationEventType.RAIDED_BY_MEMBER, new TwitchatDefaultPayload(
+                    "Pendant sa session de stream, {{raider}} a joué à :\n{{games}}", "message", "raid", "Catapult",
                     new LinkedHashMap<>()))
     );
 

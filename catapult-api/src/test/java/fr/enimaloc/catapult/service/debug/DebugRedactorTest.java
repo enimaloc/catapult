@@ -219,6 +219,12 @@ class DebugRedactorTest {
     }
 
     @Test
+    void obsIdentifyAuthentication_isMasked() {
+        assertThat(redactor.body(b("{\"op\":1,\"d\":{\"rpcVersion\":1,\"authentication\":\"obs-auth\"}}"), null,
+                false)).doesNotContain("obs-auth").contains("\"rpcVersion\":1");
+    }
+
+    @Test
     void bodyWithoutContentType_isMaskedAsFreeText() {
         assertThat(redactor.body(b("{\"identityToken\":\"XBL3.0 x=1;t\"}"), null, false)).doesNotContain("x=1;t");
     }

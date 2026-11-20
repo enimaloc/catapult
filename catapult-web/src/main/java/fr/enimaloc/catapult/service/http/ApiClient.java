@@ -224,6 +224,21 @@ public class ApiClient {
         }
     }
 
+    /**
+     * POST {@code body} to {@code path} without the session's bearer (a route opened to what has no session, like the
+     * OBS widget): catapult-api's status, its body ignored; 502 when unreachable. An error answer is left to the
+     * caller, unlogged: such a path holds a credential (the widget's token).
+     */
+    public Result<Void> postAnonymous(String path, Object body, Object... uriVars) {
+        try {
+            return client.post().uri(path, uriVars).header(ANONYMOUS_HEADER, "1").body(body)
+                    .exchange((request, response) -> new Result<Void>(response.getStatusCode().value(), null));
+        } catch (Exception e) {
+            logFailure(HttpMethod.POST, path, e);
+            return new Result<>(HttpStatus.BAD_GATEWAY.value(), null);
+        }
+    }
+
     /** POST {@code path} without a body, the response read as {@code type}; {@code null} on failure. */
     public <T> T post(String path, Class<T> type, Object... uriVars) {
         return exchange(HttpMethod.POST, path, type, uriVars);
@@ -286,9 +301,13 @@ public class ApiClient {
         }
     }
 
-    private static final java.util.regex.Pattern WIDGET_TOKEN = java.util.regex.Pattern.compile("(/widget/)[^/\\s\"?]+");
+    private static final java.util.regex.Pattern WIDGET_TOKEN =
+            java.util.regex.Pattern.compile("(/(?:widget|twitchat-widgets)/)[^/\\s\"?]+");
 
-    /** {@code text} without any OBS widget token (a credential: the path segment after /widget/), for the logs. */
+    /**
+     * {@code text} without any OBS widget token (a credential: the path segment after /widget/ or
+     * /twitchat-widgets/), for the logs.
+     */
     static String masked(String text) {
         return text == null ? null : WIDGET_TOKEN.matcher(text).replaceAll("$1***");
     }

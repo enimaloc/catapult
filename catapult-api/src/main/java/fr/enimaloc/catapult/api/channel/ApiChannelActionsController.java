@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.api.channel;
 import fr.enimaloc.catapult.api.ApiPaths;
 import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.common.dto.channel.BindingTitleRequest;
+import fr.enimaloc.catapult.common.dto.emergency.ChannelEmergencyDto;
 import fr.enimaloc.catapult.common.dto.channel.CclSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.CclToggleRequest;
 import fr.enimaloc.catapult.common.dto.channel.DeleteAccountRequest;
@@ -30,6 +31,8 @@ import fr.enimaloc.catapult.service.account.ChannelAccountActions;
 import fr.enimaloc.catapult.service.account.ChannelSettingsService;
 import fr.enimaloc.catapult.service.binding.ChannelDashboardActions;
 import fr.enimaloc.catapult.service.binding.RaidRestoreGateService;
+import fr.enimaloc.catapult.service.emergency.EmergencyStopService;
+import fr.enimaloc.catapult.service.emergency.EmergencyViews;
 import fr.enimaloc.catapult.service.title.StreamTitleService;
 import fr.enimaloc.catapult.service.notification.TwitchatEventActionService;
 import fr.enimaloc.catapult.service.notification.TwitchatEventDispatcher;
@@ -79,6 +82,8 @@ public class ApiChannelActionsController {
     private final TwitchatWidgetSettingsService twitchatWidgetSettingsService;
     private final TwitchatEventActionService twitchatEventActionService;
     private final TwitchatEventDispatcher twitchatEventDispatcher;
+    private final EmergencyViews emergencyViews;
+    private final EmergencyStopService emergencyStopService;
 
 
     // ── Binding actions ───────────────────────────────────────────────────────
@@ -148,6 +153,25 @@ public class ApiChannelActionsController {
 
         UserAccount user = userResolver.user(userId);
         botToggleService.setBotEnabled(user, !user.isBotEnabled());
+    }
+
+    /** The channel's bot state, its own emergency stops and the global ones on the providers it uses. */
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @GetMapping("/emergency")
+    public ChannelEmergencyDto emergency(
+            @PathVariable UUID userId) {
+
+        return emergencyViews.channel(userResolver.user(userId));
+    }
+
+    /** Lifts the channel's own stops and withdraws its reports; a global stop stays. */
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @PostMapping("/emergency/resume")
+    public Map<String, Boolean> resumeEmergency(
+            @PathVariable UUID userId) {
+
+        UserAccount user = userResolver.user(userId);
+        return Map.of("lifted", emergencyStopService.liftChannel(user, user.getTwitchUsername()));
     }
 
     @PreAuthorize("@authz.ownsChannel(#userId)")

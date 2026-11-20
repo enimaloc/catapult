@@ -92,6 +92,47 @@
           <input id="raid-login" placeholder="Login of the raided channel" autocomplete="off">
           <button type="submit" class="btn">Raid out…</button>
         </form>
+        <form id="chat-form">
+          <div class="row">
+            <input id="chat-sender" value="viewer1" placeholder="Author's login" autocomplete="off">
+            <select id="chat-role">
+              <option value="VIEWERS">Viewer</option>
+              <option value="VIP">VIP</option>
+              <option value="MODERATOR">Moderator</option>
+              <option value="BROADCASTER">Broadcaster</option>
+            </select>
+            <label class="check"><input type="checkbox" id="chat-owner"> Instance owner</label>
+          </div>
+          <div class="row">
+            <input id="chat-text" placeholder="Message, e.g. @bot_login emergency xbox" autocomplete="off" size="40">
+            <button type="submit" class="btn">Send in chat</button>
+          </div>
+        </form>
+        <p class="muted">"Send in chat" writes a message in this channel: only one that starts by mentioning the
+          system account (<code>@bot off</code>, <code>on</code>, <code>emergency …</code>) does anything.</p>
+      </section>
+
+      <section class="card">
+        <h2>Session <span class="muted">the timeline of the current live, as a raid would sum it up</span></h2>
+        <ul id="timeline" class="timeline"></ul>
+        <pre id="recap" class="recap"></pre>
+        <h3>Add a past period</h3>
+        <form class="row" id="past-search-form">
+          <input id="past-search" placeholder="Search a category (Twitch category search)" autocomplete="off">
+          <button type="submit" class="btn">Search</button>
+        </form>
+        <ul id="past-results" class="results"></ul>
+        <form class="row" id="past-form">
+          <input id="past-category-id" placeholder="Category id" autocomplete="off">
+          <input id="past-category-name" placeholder="Category name" autocomplete="off">
+          <input id="past-game" placeholder="Game (optional)" autocomplete="off">
+          <input id="past-minutes" type="number" min="1" max="1440" value="60" class="latency"
+            title="Duration in minutes">
+          <span class="muted">min</span>
+          <button type="submit" class="btn">Add a past period</button>
+        </form>
+        <p class="muted">Goes just before the running period, the earlier ones and the session start moving back as
+          much: add them in the order they were streamed. Only while live.</p>
       </section>
 
       <section class="card" id="identity-card">

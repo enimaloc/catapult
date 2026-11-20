@@ -1,0 +1,14 @@
+<!--/* The logged-in member's dry run (DryRunMembers): Catapult changes nothing on their channel. Absent out of dry run.
+     "Turn off" opens the confirmation; confirming posts their way out, then the banner hides (dry-run.js). */-->
+<th:block th:fragment="banner" th:if="${dryRun}">
+    <div id="dry-run-banner" class="dry-run-banner" role="status">
+        <mdui-icon name="visibility"></mdui-icon>
+        <span class="dry-run-banner-text" th:text="#{dry_run.banner}">dry_run.banner</span>
+        <mdui-button id="dry-run-disable" variant="tonal" icon="power_settings_new" th:text="#{dry_run.disable}">dry_run.disable</mdui-button>
+    </div>
+    <mdui-dialog id="dry-run-dialog" close-on-overlay-click th:attr="headline=#{dry_run.dialog.title}">
+        <p th:text="#{dry_run.dialog.confirm}">dry_run.dialog.confirm</p>
+        <mdui-button slot="action" variant="text" id="dry-run-cancel" th:text="#{dry_run.dialog.dismiss}">Annuler</mdui-button>
+        <mdui-button slot="action" variant="filled" id="dry-run-confirm" th:text="#{dry_run.disable}">Désactiver</mdui-button>
+    </mdui-dialog>
+</th:block>

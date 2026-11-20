@@ -21,8 +21,8 @@ GET,/api/internal/config/launched-platforms,,owner,0,fixed:no query while the ga
 # visitor
 GET,/api/internal/users/{userId}/dashboard,,visitor,19,
 # admin
-GET,/api/internal/admin/members,?page=0&q=,admin,2,
-GET,/api/internal/admin/members/search,?q=budget,admin,2,
+GET,/api/internal/admin/members,?page=0&q=,admin,3,
+GET,/api/internal/admin/members/search,?q=budget,admin,3,
 GET,/api/internal/admin/experiments,,admin,3,
 GET,/api/internal/admin/experiments/{id}/settings,,admin,4,
 GET,/api/internal/admin/experiments/{id}/assignments,?page=0,admin,6,

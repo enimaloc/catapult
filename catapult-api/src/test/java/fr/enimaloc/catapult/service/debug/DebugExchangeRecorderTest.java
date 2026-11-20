@@ -326,4 +326,100 @@ class DebugExchangeRecorderTest {
         }
         verify(repository, org.mockito.Mockito.times(2)).save(any());
     }
+
+    private static RawExchange withRaw(byte[] requestRaw, byte[] responseRaw) {
+        RawExchange r = raw("https://x.example/a", "{}", "{}", null);
+        return new RawExchange(r.at(), r.method(), r.uri(), r.requestHeaders(), r.requestBody(), r.status(),
+                r.responseHeaders(), r.responseBody(), r.error(), r.durationMs(), requestRaw, responseRaw);
+    }
+
+    @Test
+    void storesRawBytesAsHex() {
+        debugged(false);
+        recorder().record(member, Direction.OUT, withRaw(new byte[]{1, 2}, new byte[]{(byte) 0xAB}), "op", false);
+        DebugExchange e = saved();
+        assertThat(e.getRequestRaw()).isEqualTo("0102");
+        assertThat(e.getResponseRaw()).isEqualTo("ab");
+    }
+
+    @Test
+    void omitsRawBytesContainingAnotherMember() {
+        debugged(false);
+        when(masker.containsOtherMember(any(), any())).thenReturn(true);
+        recorder().record(member, Direction.OUT, withRaw(new byte[]{1, 2}, null), "op", false);
+        DebugExchange e = saved();
+        assertThat(e.getRequestRaw()).isEqualTo(DebugExchangeRecorder.RAW_OMITTED);
+        assertThat(e.getResponseRaw()).isNull();
+        assertThat(e.getRequestBody()).isEqualTo("{}");
+    }
+
+    private static RawExchange withBodies(String requestBody, byte[] requestRaw, String responseBody,
+                                          byte[] responseRaw) {
+        RawExchange r = raw("https://x.example/a", requestBody, responseBody, null);
+        return new RawExchange(r.at(), r.method(), r.uri(), r.requestHeaders(), r.requestBody(), r.status(),
+                r.responseHeaders(), r.responseBody(), r.error(), r.durationMs(), requestRaw, responseRaw);
+    }
+
+    @Test
+    void blanksTheBytesValuesOfABodyWhoseRawNamesAnotherMember() {
+        debugged(false);
+        byte[] naming = {1, 2};
+        when(masker.containsOtherMember(eq(naming), any())).thenReturn(true);
+        String body = "{\"1\":{\"bytes\":\"0a0b\"},\"2\":\"kept\",\"3\":[{\"4\":{\"bytes\":\"ff\"}}]}";
+
+        recorder().record(member, Direction.OUT, withBodies(body, naming, body, new byte[]{3}), "op", false);
+
+        DebugExchange e = saved();
+        assertThat(e.getRequestRaw()).isEqualTo(DebugExchangeRecorder.RAW_OMITTED);
+        assertThat(e.getRequestBody()).isEqualTo("{\"1\":{\"bytes\":\"[omitted]\"},\"2\":\"kept\","
+                + "\"3\":[{\"4\":{\"bytes\":\"[omitted]\"}}]}");
+        assertThat(e.getResponseRaw()).isEqualTo("03");
+        assertThat(e.getResponseBody()).isEqualTo(body);
+    }
+
+    @Test
+    void keepsTheBytesValuesWhenTheRawNamesNoOtherMember() {
+        debugged(false);
+        String body = "{\"1\":{\"bytes\":\"0a0b\"}}";
+
+        recorder().record(member, Direction.OUT, withBodies(body, new byte[]{1, 2}, "not json", new byte[]{3}),
+                "op", false);
+
+        DebugExchange e = saved();
+        assertThat(e.getRequestBody()).isEqualTo(body);
+        assertThat(e.getResponseBody()).isEqualTo("not json");
+    }
+
+    @Test
+    void leavesABodyThatIsNotJsonAloneWhenItsRawNamesAnotherMember() {
+        debugged(false);
+        when(masker.containsOtherMember(any(), any())).thenReturn(true);
+
+        recorder().record(member, Direction.OUT, withBodies("plain {\"bytes\"", new byte[]{1}, null, null), "op",
+                false);
+
+        DebugExchange e = saved();
+        assertThat(e.getRequestBody()).isEqualTo("plain {\"bytes\"");
+        assertThat(e.getRequestRaw()).isEqualTo(DebugExchangeRecorder.RAW_OMITTED);
+    }
+
+    @Test
+    void keepsNullRawAsNull() {
+        debugged(false);
+        recorder().record(member, Direction.OUT, raw("https://x.example/a", "{}", "{}", null), "op", false);
+        DebugExchange e = saved();
+        assertThat(e.getRequestRaw()).isNull();
+        assertThat(e.getResponseRaw()).isNull();
+    }
+
+    @Test
+    void cutsTheHexOnAnEvenLength() {
+        debugged(false);
+        byte[] big = new byte[DebugRedactor.MAX_BODY_CHARS];
+        recorder().record(member, Direction.OUT, withRaw(big, null), "op", false);
+        String stored = saved().getRequestRaw();
+        int cut = DebugRedactor.MAX_BODY_CHARS;
+        assertThat(stored).startsWith("0".repeat(cut)).hasSize(cut + ("…(+" + cut + " chars)").length())
+                .endsWith("…(+" + cut + " chars)");
+    }
 }

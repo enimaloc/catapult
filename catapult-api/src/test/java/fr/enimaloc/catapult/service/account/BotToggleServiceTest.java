@@ -38,20 +38,20 @@ class BotToggleServiceTest {
     }
 
     @Test
-    void setBotEnabled_disabling_disconnectsBothAndPublishes() {
+    void disable_keepsChatAndClosesStreamState() {
         botToggleService.setBotEnabled(user, false);
 
         assertThat(user.isBotEnabled()).isFalse();
         verify(userAccountRepository).save(user);
-        verify(twitchChatService).disconnect(user);
+        verify(twitchChatService, never()).disconnect(any());
+        verify(twitchChatService, never()).connect(any());
         verify(twitchEventSubService).disconnect(user);
         verify(channelEventPublisher).botToggled(user.getId(), false);
-        verify(twitchChatService, never()).connect(any());
         verify(twitchEventSubService, never()).connect(any());
     }
 
     @Test
-    void setBotEnabled_enabling_connectsBothAndPublishes() {
+    void enable_reconnectsStreamState_andOpensChatWhenItIsNot() {
         user.setBotEnabled(false);
 
         botToggleService.setBotEnabled(user, true);
@@ -63,6 +63,27 @@ class BotToggleServiceTest {
         verify(channelEventPublisher).botToggled(user.getId(), true);
         verify(twitchChatService, never()).disconnect(any());
         verify(twitchEventSubService, never()).disconnect(any());
+    }
+
+    @Test
+    void enable_leavesAnOpenChatSocketAlone() {
+        user.setBotEnabled(false);
+        when(twitchChatService.isConnected(user)).thenReturn(true);
+
+        botToggleService.setBotEnabled(user, true);
+
+        verify(twitchChatService, never()).connect(any());
+        verify(twitchEventSubService).connect(user);
+    }
+
+    @Test
+    void pauseAfterTokenFailure_closesChatToo() {
+        botToggleService.pauseAfterATokenFailure(user);
+
+        assertThat(user.isBotEnabled()).isFalse();
+        verify(twitchChatService).disconnect(user);
+        verify(twitchEventSubService).disconnect(user);
+        verify(channelEventPublisher).botToggled(user.getId(), false);
     }
 
     @Test

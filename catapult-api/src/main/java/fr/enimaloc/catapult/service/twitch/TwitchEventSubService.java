@@ -7,6 +7,7 @@ import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.event.AccountCreatedEvent;
 import fr.enimaloc.catapult.event.ChannelCategoryChangedEvent;
+import fr.enimaloc.catapult.event.ChannelStateResyncedEvent;
 import fr.enimaloc.catapult.event.ChannelCclChangedEvent;
 import fr.enimaloc.catapult.event.ChannelRaidedOutEvent;
 import fr.enimaloc.catapult.event.StreamOfflineEvent;
@@ -38,6 +39,7 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
 import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -110,6 +112,39 @@ public class TwitchEventSubService implements EventSubService {
     }
 
     private record ChannelState(String categoryId, String categoryName, Set<String> cclIds) {}
+
+    /** A channel's Twitch category: its id and display name. */
+    public record CurrentCategory(String id, String name) {}
+
+    /**
+     * The category last seen on the member's channel (the Helix read at connect, then each {@code channel.update});
+     * empty when none is known yet. A channel known to have no category answers a blank id.
+     */
+    public Optional<CurrentCategory> currentCategory(UUID userId) {
+        ChannelState state = channelStates.get(userId);
+        if (state == null) {
+            return Optional.empty();
+        }
+        return Optional.of(new CurrentCategory(state.categoryId(), state.categoryName()));
+    }
+
+    /**
+     * Reads the channel's category from Helix {@code /channels} (the read made at connect) and remembers it; empty
+     * without a Twitch token or when the read fails. When the simulation keeps {@code channel.update} out, the
+     * simulated data stand in for Helix, as at connect.
+     */
+    public Optional<CurrentCategory> fetchCurrentCategory(UserAccount user) {
+        if (simulated(user, "channel.update")) {
+            seedChannelStateIfAbsent(user);
+            return currentCategory(user.getId());
+        }
+        Optional<OAuthToken> token = oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH);
+        if (token.isEmpty()) {
+            return Optional.empty();
+        }
+        initChannelState(user, twitchTokenService.resolveAccessToken(token.get(), user));
+        return currentCategory(user.getId());
+    }
 
     @PostConstruct
     public void init() {
@@ -298,7 +333,8 @@ public class TwitchEventSubService implements EventSubService {
                             eventPublisher.publishEvent(new StreamOfflineEvent(this, user));
                         }
                         case "channel.update" -> handleChannelUpdate(user, root.path("payload").path("event"));
-                        case "channel.raid" -> handleRaid(user, root.path("payload").path("event"));
+                        case "channel.raid" -> handleRaid(user, root.path("payload").path("event"),
+                            root.path("metadata").path("message_timestamp").asText(""));
                     }
                 }
                 case "session_keepalive" -> log.trace("EventSub keepalive for user {}", user.getId());
@@ -386,7 +422,8 @@ public class TwitchEventSubService implements EventSubService {
     /**
      * The initial state of what the simulation keeps out, taken from the simulated data rather than Helix: the
      * category (when {@code channel} is) and the stream's liveness (when {@code stream} is). A simulated live
-     * channel is set live as the Helix stream lookup would, without a {@link StreamOnlineEvent}.
+     * channel is set live as the Helix stream lookup would, without a {@link StreamOnlineEvent}; a seeded category is
+     * published as a {@link ChannelStateResyncedEvent}, as the Helix read is.
      */
     private void seedSimulatedState(UserAccount user, boolean channel, boolean stream) {
         SimulationGate gate = simulationGate.getIfAvailable();
@@ -397,6 +434,10 @@ public class TwitchEventSubService implements EventSubService {
         }
         if (stream && data.live()) {
             streamStateService.setLive(user, true);
+        }
+        // Stands in for the Helix read at connect: resynced the same way
+        if (channel) {
+            publishResynced(user);
         }
     }
 
@@ -444,13 +485,28 @@ public class TwitchEventSubService implements EventSubService {
         connections.onSubscribed(user);
         boolean channelSimulated = simulated.contains("channel.update");
         boolean streamSimulated = simulated.contains("stream.online") && simulated.contains("stream.offline");
-        if (!channelSimulated) {
-            initChannelState(user, accessToken);
-        }
+        boolean channelRead = !channelSimulated && initChannelState(user, accessToken);
         if (!streamSimulated) {
             initStreamState(user, accessToken);
         }
         seedSimulatedState(user, channelSimulated, streamSimulated);
+        // After the stream state, so a live that started or ended while the socket was down is settled first
+        if (channelRead) {
+            publishResynced(user);
+        }
+    }
+
+    /**
+     * Tells the listeners the category read at connect. A {@code channel.update} missed while the socket was down
+     * (an API restart) is never replayed: this is not a change, so no {@link ChannelCategoryChangedEvent} nor
+     * Twitchat notification.
+     */
+    private void publishResynced(UserAccount user) {
+        ChannelState state = channelStates.get(user.getId());
+        if (state != null) {
+            eventPublisher.publishEvent(new ChannelStateResyncedEvent(this, user, state.categoryId(),
+                state.categoryName()));
+        }
     }
 
     private void handleChannelUpdate(UserAccount user, JsonNode event) {
@@ -480,14 +536,28 @@ public class TwitchEventSubService implements EventSubService {
         }
     }
 
-    /** An outgoing raid (the subscription only asks for those; an incoming one is ignored all the same). */
-    private void handleRaid(UserAccount user, JsonNode event) {
+    /**
+     * An outgoing raid (the subscription only asks for those; an incoming one is ignored all the same),
+     * dated by its EventSub message, else by its reception.
+     */
+    private void handleRaid(UserAccount user, JsonNode event, String messageTimestamp) {
         if (!event.path("from_broadcaster_user_id").asText().equals(user.getTwitchId())) return;
         ChannelState state = channelStates.get(user.getId());
-        eventPublisher.publishEvent(new ChannelRaidedOutEvent(this, user, state == null ? null : state.categoryId()));
+        eventPublisher.publishEvent(new ChannelRaidedOutEvent(this, user, state == null ? null : state.categoryId(),
+            event.path("from_broadcaster_user_name").asText(""), event.path("to_broadcaster_user_id").asText(""),
+            messageInstant(messageTimestamp)));
     }
 
-    private void initChannelState(UserAccount user, String accessToken) {
+    private static Instant messageInstant(String messageTimestamp) {
+        try {
+            return Instant.parse(messageTimestamp);
+        } catch (DateTimeParseException e) {
+            return Instant.now();
+        }
+    }
+
+    /** Reads the channel's state from Helix and remembers it; {@code false} when nothing could be read. */
+    private boolean initChannelState(UserAccount user, String accessToken) {
         try {
             String raw = restClient.get()
                 .uri(HELIX_CHANNELS_API + "?broadcaster_id=" + user.getTwitchId())
@@ -496,7 +566,7 @@ public class TwitchEventSubService implements EventSubService {
                 .retrieve()
                 .body(String.class);
             JsonNode response = objectMapper.readTree(raw);
-            if (response == null || !response.has("data") || response.path("data").isEmpty()) return;
+            if (response == null || !response.has("data") || response.path("data").isEmpty()) return false;
 
             JsonNode data = response.path("data").get(0);
             String categoryId = data.path("game_id").asText();
@@ -510,10 +580,12 @@ public class TwitchEventSubService implements EventSubService {
             channelStates.put(user.getId(), new ChannelState(categoryId, categoryName, cclIds));
             channelStateWarnedUsers.remove(user.getId());
             log.debug("Initialized channel state for user {}: category={}, ccls={}", user.getId(), categoryId, cclIds);
+            return true;
         } catch (Exception e) {
             if (channelStateWarnedUsers.add(user.getId())) {
                 log.warn("Failed to initialize channel state for user {}: {}", user.getId(), e.getMessage(), e);
             }
+            return false;
         }
     }
 

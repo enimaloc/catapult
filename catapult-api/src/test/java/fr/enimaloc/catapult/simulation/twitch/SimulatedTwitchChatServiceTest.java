@@ -78,4 +78,22 @@ class SimulatedTwitchChatServiceTest {
         assertThat(service.getFollowedAtById(fx.fictitious, "42")).isEmpty();
         verifyNoInteractions(realChat);
     }
+
+    @Test
+    void isConnected_asksTheTransport() {
+        org.mockito.Mockito.when(realChat.isConnected(fx.real)).thenReturn(true);
+
+        assertThat(service.isConnected(fx.real)).isTrue();
+        assertThat(service.isConnected(fx.fictitious)).isFalse();
+    }
+
+    @Test
+    void archiveVideoId_realModeAsksTheTransport_simulatedIsEmpty() {
+        fx.set(fx.real, SimulatedCalls.TWITCH_CHAT_STREAM_INFO, CallSetting.real());
+        org.mockito.Mockito.when(realChat.archiveVideoId(fx.real, "s1")).thenReturn(java.util.Optional.of("v9"));
+
+        assertThat(service.archiveVideoId(fx.real, "s1")).contains("v9");
+        assertThat(service.archiveVideoId(fx.fictitious, "s1")).isEmpty();
+        verify(realChat, org.mockito.Mockito.never()).archiveVideoId(fx.fictitious, "s1");
+    }
 }

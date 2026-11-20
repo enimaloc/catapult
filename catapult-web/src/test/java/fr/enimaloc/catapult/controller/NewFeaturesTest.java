@@ -54,4 +54,16 @@ class NewFeaturesTest {
 
         assertThat(NewFeatures.unseen(api, RELEASES, LocalDate.of(2026, 10, 25))).isEmpty();
     }
+
+    @Test
+    void unseen_includesEmergencyNotice_untilSeen() {
+        when(api.seenFeatures()).thenReturn(List.of());
+        assertThat(NewFeatures.unseen(api, NewFeatures.RELEASES, LocalDate.of(2026, 11, 20)))
+                .contains("channel.emergency-notice");
+        assertThat(NewFeatures.isKnown("channel.emergency-notice")).isTrue();
+
+        when(api.seenFeatures()).thenReturn(List.of("channel.emergency-notice"));
+        assertThat(NewFeatures.unseen(api, NewFeatures.RELEASES, LocalDate.of(2026, 11, 20)))
+                .doesNotContain("channel.emergency-notice");
+    }
 }

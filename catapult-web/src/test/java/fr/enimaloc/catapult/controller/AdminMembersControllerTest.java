@@ -34,6 +34,7 @@ class AdminMembersControllerTest {
     @MockitoBean ApiService apiService;
     @MockitoBean fr.enimaloc.catapult.controller.twitchat.TwitchatEventForms twitchatEventForms;
     @MockitoBean fr.enimaloc.catapult.service.debug.DebugMembers debugMembers;
+    @MockitoBean fr.enimaloc.catapult.service.dryrun.DryRunMembers dryRunMembers;
 
     @org.junit.jupiter.api.BeforeEach
     void catapultApiTakesTheActions() {

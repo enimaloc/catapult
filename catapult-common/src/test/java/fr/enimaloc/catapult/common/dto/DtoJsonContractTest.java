@@ -111,6 +111,28 @@ class DtoJsonContractTest {
         assertThat(written).contains("\"premiumUi\":true").contains("\"canRepeat\":false");
     }
 
+    @Test
+    void adminMemberReadsAsOutOfDryRunWhenAnOlderApiLeavesTheFlagOut() {
+        var member = json.readValue("{\"id\":\"" + java.util.UUID.randomUUID() + "\",\"systemAccount\":false,\"botEnabled\":true}",
+                fr.enimaloc.catapult.common.dto.admin.AdminMemberDto.class);
+        var inDryRun = new fr.enimaloc.catapult.common.dto.admin.AdminMemberDto(member.id(), null, null, null, null,
+                false, true, "ACTIVE", null, null, false, null, true);
+
+        assertThat(member.dryRun()).isFalse();
+        assertThat(json.readValue(json.writeValueAsString(inDryRun),
+                fr.enimaloc.catapult.common.dto.admin.AdminMemberDto.class).dryRun()).isTrue();
+    }
+
+    @Test
+    void memberSummaryReadsAsOutOfDryRunWhenAnOlderApiLeavesTheFlagOut() {
+        var summary = json.readValue("{\"id\":\"" + java.util.UUID.randomUUID() + "\",\"twitchUsername\":\"a\"}",
+                fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto.class);
+
+        assertThat(summary.dryRun()).isFalse();
+        assertThat(json.writeValueAsString(new fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto(
+                summary.id(), "a", true))).contains("\"dryRun\":true");
+    }
+
     // --- sample values ------------------------------------------------------------------------
 
     private static Object sample(Type type) {

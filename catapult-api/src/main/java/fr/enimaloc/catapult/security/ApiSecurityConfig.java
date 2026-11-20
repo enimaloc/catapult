@@ -147,8 +147,10 @@ public class ApiSecurityConfig {
                 // to the CorsConfigurationSource Spring MVC derives from it.
                 .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(ApiPaths.INTERNAL + "/health", ApiPaths.INTERNAL + "/config/**", ApiPaths.INTERNAL + "/changelog", ApiPaths.INTERNAL + "/status/degraded", ApiPaths.INTERNAL + "/status/site", ApiPaths.INTERNAL + "/well-known-files", ApiPaths.INTERNAL + "/meta-tags", ApiPaths.INTERNAL + "/social-links", "/api/twitchat/widget/**", "/api/twitchat/actions/**", "/api/game/**", "/api/user/**", "/api/games/**", "/api/v3/api-docs/**").permitAll()
+                        .requestMatchers(ApiPaths.INTERNAL + "/health", ApiPaths.INTERNAL + "/config/**", ApiPaths.INTERNAL + "/changelog", ApiPaths.INTERNAL + "/status/degraded", ApiPaths.INTERNAL + "/emergency/status", ApiPaths.INTERNAL + "/status/site", ApiPaths.INTERNAL + "/well-known-files", ApiPaths.INTERNAL + "/meta-tags", ApiPaths.INTERNAL + "/social-links", "/api/twitchat/widget/**", "/api/twitchat/actions/**", "/api/game/**", "/api/user/**", "/api/games/**", "/api/v3/api-docs/**").permitAll()
                         .requestMatchers(ApiPaths.INTERNAL + "/auth/exchange").permitAll()
+                        // The OBS widget has no session: its token, in the path, names its owner (as /api/twitchat/widget/**)
+                        .requestMatchers(HttpMethod.POST, ApiPaths.INTERNAL + "/twitchat-widgets/*/debug/client-exchanges").permitAll()
                         .requestMatchers("/api/connect/steam/callback").permitAll()
                         .requestMatchers(ApiPaths.ADMIN + "/**").access(Authz.admin())
                         .anyRequest().access(Authz.memberOrLoopback())

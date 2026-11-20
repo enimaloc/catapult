@@ -21,17 +21,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = WidgetObsController.class)
-@Import({WebSecurityConfig.class, fr.enimaloc.catapult.config.I18nConfiguration.class})
+@Import({WebSecurityConfig.class, fr.enimaloc.catapult.config.I18nConfiguration.class, WidgetDebugLimiter.class})
 class WidgetObsControllerTest {
 
     /** The page loads {@code /js/<name>.js}, under its versioned name (name-<md5>.js). */
@@ -62,6 +64,9 @@ class WidgetObsControllerTest {
                 .andExpect(content().string(containsString("<div id=\"log\"></div>")))
                 .andExpect(content().string(containsString("#log{display:block}")))
                 .andExpect(content().string(script("suggest")))
+                // Before obs.js, whose hooks it backs.
+                .andExpect(content().string(org.hamcrest.Matchers.matchesPattern(
+                        "(?s).*src=\"/js/debug-capture-[0-9a-f]{32}\\.js\".*src=\"/js/obs-[0-9a-f]{32}\\.js\".*")))
                 .andExpect(content().string(script("obs")))
                 .andExpect(content().string(script("obs-session")))
                 .andExpect(content().string(script("twitchat-protocol")))
@@ -177,5 +182,128 @@ class WidgetObsControllerTest {
                 .andExpect(header().string("Location", "/widget/obs/x"));
         verify(apiService, never()).widgetAccess(any());
         verify(apiService, never()).widgetObsConfig(any());
+    }
+
+    @Test
+    void widgetConfigCarriesDebugCapture() throws Exception {
+        when(apiService.widgetObsConfig(TOKEN)).thenReturn(new TwitchatWidgetConfig("10.0.0.2", 4456, "pw", "auto", true));
+
+        mvc.perform(get("/widget/obs/" + TOKEN + "/config"))
+                .andExpect(status().isOk())
+                .andExpect(content().json("{\"debugCapture\":true}"));
+    }
+
+    private static final String DEBUG_PATH = "/debug/client-exchanges";
+
+    /**
+     * A widget of its own for each test: the limiter, shared by the tests' context, remembers what catapult-api told
+     * of a token. {@code enabled} null: catapult-api knows no such widget.
+     */
+    private UUID debugWidget(Boolean enabled) {
+        UUID widget = UUID.randomUUID();
+        when(apiService.widgetAccess(widget)).thenReturn(enabled == null ? new ApiClient.Result<>(404, null)
+                : access(OWNER.toString(), enabled));
+        return widget;
+    }
+
+    private org.springframework.test.web.servlet.ResultActions postBatch(UUID widget) throws Exception {
+        return mvc.perform(post("/widget/obs/" + widget + DEBUG_PATH)
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content(ClientDebugControllerTest.BATCH));
+    }
+
+    @Test
+    void widgetRelaysTheBatchAsWidget() throws Exception {
+        UUID widget = debugWidget(true);
+        when(apiService.postWidgetClientDebugExchanges(eq(widget), any())).thenReturn(new ApiClient.Result<>(204, null));
+
+        // No session and no CSRF token: OBS has neither
+        postBatch(widget).andExpect(status().isNoContent());
+
+        org.mockito.ArgumentCaptor<fr.enimaloc.catapult.common.dto.debug.ClientExchangeBatch> relayed =
+                org.mockito.ArgumentCaptor.forClass(fr.enimaloc.catapult.common.dto.debug.ClientExchangeBatch.class);
+        verify(apiService).postWidgetClientDebugExchanges(eq(widget), relayed.capture());
+        assertThat(relayed.getValue().source()).isEqualTo("widget");
+        assertThat(relayed.getValue().entries()).hasSize(1);
+    }
+
+    @Test
+    void widgetWithAnUnknownTokenRelaysNothing() throws Exception {
+        mvc.perform(post("/widget/obs/not-a-uuid" + DEBUG_PATH)
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content(ClientDebugControllerTest.BATCH))
+                .andExpect(status().isNotFound());
+        // Unknown to catapult-api, or disabled: checked once, never relayed
+        UUID unknown = debugWidget(null);
+        postBatch(unknown).andExpect(status().isNotFound());
+        postBatch(unknown).andExpect(status().isNotFound());
+        UUID disabled = debugWidget(false);
+        postBatch(disabled).andExpect(status().isNotFound());
+
+        verify(apiService, org.mockito.Mockito.times(1)).widgetAccess(unknown);
+        verify(apiService, never()).postWidgetClientDebugExchanges(any(), any());
+    }
+
+    @Test
+    void widgetIsUncheckedWhileCatapultApiIsUnreachable() throws Exception {
+        UUID widget = UUID.randomUUID();
+        when(apiService.widgetAccess(widget)).thenReturn(new ApiClient.Result<>(502, null));
+
+        postBatch(widget).andExpect(status().isBadGateway());
+        verify(apiService, never()).postWidgetClientDebugExchanges(any(), any());
+    }
+
+    @Test
+    void widgetRelays409AndRefusesWhatIsNoBatch() throws Exception {
+        UUID widget = debugWidget(true);
+        when(apiService.postWidgetClientDebugExchanges(eq(widget), any())).thenReturn(new ApiClient.Result<>(409, null));
+        postBatch(widget).andExpect(status().isConflict());
+
+        UUID other = debugWidget(true);
+        mvc.perform(post("/widget/obs/" + other + DEBUG_PATH)
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content("[1,2]"))
+                .andExpect(status().isBadRequest());
+        verify(apiService, never()).postWidgetClientDebugExchanges(eq(other), any());
+    }
+
+    @Test
+    void a404FromTheApiForgetsTheWidget() throws Exception {
+        UUID widget = debugWidget(true);
+        when(apiService.postWidgetClientDebugExchanges(eq(widget), any())).thenReturn(new ApiClient.Result<>(404, null));
+
+        postBatch(widget).andExpect(status().isNotFound());
+        postBatch(widget).andExpect(status().isNotFound());
+
+        verify(apiService, org.mockito.Mockito.times(1)).postWidgetClientDebugExchanges(eq(widget), any());
+    }
+
+    @Test
+    void widgetIsRateLimited() throws Exception {
+        UUID limited = debugWidget(true);
+        when(apiService.postWidgetClientDebugExchanges(any(), any())).thenReturn(new ApiClient.Result<>(204, null));
+        for (int i = 0; i < WidgetDebugLimiter.BATCHES; i++) {
+            postBatch(limited).andExpect(status().isNoContent());
+        }
+
+        postBatch(limited).andExpect(status().isTooManyRequests());
+        verify(apiService, org.mockito.Mockito.times(WidgetDebugLimiter.BATCHES)).postWidgetClientDebugExchanges(eq(limited), any());
+        verify(apiService, org.mockito.Mockito.times(1)).widgetAccess(limited);
+
+        // Another widget has its own allowance
+        postBatch(debugWidget(true)).andExpect(status().isNoContent());
+    }
+
+    @Test
+    void csrfIsOnlyExemptForTheWidgetDebugPath() throws Exception {
+        UUID widget = debugWidget(true);
+        when(apiService.postWidgetClientDebugExchanges(any(), any())).thenReturn(new ApiClient.Result<>(204, null));
+
+        postBatch(widget).andExpect(status().isNoContent());
+        // The widget's other paths, and anything under the debug one, still need the token
+        mvc.perform(post("/widget/obs/" + TOKEN + "/config")).andExpect(status().isForbidden());
+        mvc.perform(post("/widget/obs/" + TOKEN)).andExpect(status().isForbidden());
+        mvc.perform(post("/widget/obs/" + TOKEN + DEBUG_PATH + "/more")).andExpect(status().isForbidden());
+        mvc.perform(post("/widget/obs/a/b" + DEBUG_PATH)).andExpect(status().isForbidden());
+        mvc.perform(post("/me/debug/client-exchanges")).andExpect(status().isForbidden());
     }
 }

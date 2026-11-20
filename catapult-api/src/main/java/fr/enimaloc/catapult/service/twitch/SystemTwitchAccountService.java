@@ -90,6 +90,15 @@ public class SystemTwitchAccountService {
             .orElse(null);
     }
 
+    /**
+     * Returns the Twitch login of the bot, or {@code null} if not linked.
+     */
+    public String getSystemTwitchUsername() {
+        return userAccountRepository.findBySystemAccountTrue()
+            .map(UserAccount::getTwitchUsername)
+            .orElse(null);
+    }
+
     // Deliberately not @Transactional: it is only reached through getAccessToken() (a
     // self-invocation the proxy never intercepts), and tokenRepo.save() is transactional on
     // its own — wrapping it would also hold a DB connection across the Twitch HTTP call.

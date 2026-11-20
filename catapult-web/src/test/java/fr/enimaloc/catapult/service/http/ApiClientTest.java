@@ -426,6 +426,36 @@ class ApiClientTest {
     }
 
     @Test
+    void postAnonymous_sendsTheBodyWithoutTheSessionsBearer_andKeepsTheStatus() throws Exception {
+        inSessionWithJwt("header.payload.sig");
+        server.enqueue(new MockResponse().setResponseCode(409));
+
+        assertThat(client.postAnonymous("/api/widgets/{id}/debug", new Payload("p1"), "w1").status()).isEqualTo(409);
+
+        RecordedRequest recorded = server.takeRequest(1, TimeUnit.SECONDS);
+        assertThat(recorded.getMethod()).isEqualTo("POST");
+        assertThat(recorded.getPath()).isEqualTo("/api/widgets/w1/debug");
+        assertThat(recorded.getHeader("Authorization")).isNull();
+        assertThat(recorded.getHeader("X-Catapult-Anonymous")).isNull();
+        assertThat(recorded.getBody().readUtf8()).isEqualTo("{\"name\":\"p1\"}");
+
+        server.shutdown();
+        assertThat(client.postAnonymous("/api/widgets/{id}/debug", new Payload("p1"), "w1").status()).isEqualTo(502);
+    }
+
+    @org.junit.jupiter.api.extension.ExtendWith(org.springframework.boot.test.system.OutputCaptureExtension.class)
+    @Test
+    void aFailedAnonymousPost_neverLogsTheWidgetToken(org.springframework.boot.test.system.CapturedOutput output) throws IOException {
+        String token = "11111111-2222-3333-4444-555555555555";
+        server.enqueue(new MockResponse().setResponseCode(500));
+        client.postAnonymous("/api/internal/twitchat-widgets/{token}/debug", new Payload("p1"), token);
+        server.shutdown();
+        client.postAnonymous("/api/internal/twitchat-widgets/{token}/debug", new Payload("p1"), token);
+
+        assertThat(output.getAll()).doesNotContain(token);
+    }
+
+    @Test
     void maskedHidesTheSegmentAfterWidget_inPathsAndMessages() {
         assertThat(ApiClient.masked("/api/twitchat/widget/abc-123/access")).isEqualTo("/api/twitchat/widget/***/access");
         assertThat(ApiClient.masked("I/O error on POST request for \"http://h:1/api/twitchat/widget/abc-123/x\": refused"))

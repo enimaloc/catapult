@@ -31,6 +31,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -55,6 +56,11 @@ import java.util.UUID;
 public class MockAdminController {
     private static final String REDIRECT_LOGIN = "redirect:/auth/login";
     private static final String REDIRECT_ADMIN = "redirect:/mock/admin";
+    private static final String RAIDED_BY_MEMBER = "RAIDED_BY_MEMBER";
+    /** What a raid by a member sent by hand tells: the session of the spec's example. */
+    private static final Map<String, String> SAMPLE_RAID = Map.of("raider", "MockRaider",
+            "games", "- Factorio (Factorio) (2h30)\n- Just Chatting (1h)\n- Games+Demos (MOLTYN) (1h45)",
+            "sessionDuration", "5h15");
 
     private final MockApiService mockApiService;
     private final ApplicationEventPublisher eventPublisher;
@@ -314,7 +320,10 @@ public class MockAdminController {
                 .findFirst();
     }
 
-    /** Sends an event's payloads by hand, the game names standing in for the ones Catapult would fill. */
+    /**
+     * Sends an event's payloads by hand, the game names standing in for the ones Catapult would fill; a raid by a
+     * member gets a sample raider and session.
+     */
     @PostMapping("/mock/admin/twitchat")
     public String sendTwitchatEvent(@RequestParam String event, @RequestParam(defaultValue = "") String gameName,
                                     @RequestParam(defaultValue = "") String previousGameName, RedirectAttributes redirect) {
@@ -325,7 +334,11 @@ public class MockAdminController {
             redirect.addFlashAttribute("twitchatResult", "Événement inconnu : " + event);
             return REDIRECT_ADMIN;
         }
-        int sent = mockApiService.dispatchTwitchatEvent(event, Map.of("gameName", gameName, "previousGameName", previousGameName));
+        Map<String, String> variables = new HashMap<>(Map.of("gameName", gameName, "previousGameName", previousGameName));
+        if (RAIDED_BY_MEMBER.equals(event)) {
+            variables.putAll(SAMPLE_RAID);
+        }
+        int sent = mockApiService.dispatchTwitchatEvent(event, variables);
         redirect.addFlashAttribute("twitchatResult", sent == 0
                 ? "Rien envoyé : aucun payload actif pour cet événement."
                 : sent + " payload(s) envoyé(s) à Twitchat.");

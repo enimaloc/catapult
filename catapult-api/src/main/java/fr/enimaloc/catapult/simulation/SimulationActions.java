@@ -3,22 +3,38 @@ package fr.enimaloc.catapult.simulation;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import fr.enimaloc.catapult.chat.ChatCommandEvent.SenderRole;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GetterConfig;
+import fr.enimaloc.catapult.domain.stream.StreamCategorySegment;
+import fr.enimaloc.catapult.domain.stream.StreamSession;
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.binding.GetterConfigRepository;
 import fr.enimaloc.catapult.service.account.BotToggleService;
 import fr.enimaloc.catapult.service.binding.SchedulerService;
+import fr.enimaloc.catapult.service.emergency.MentionSender;
+import fr.enimaloc.catapult.service.emergency.SystemMention;
+import fr.enimaloc.catapult.service.emergency.SystemMentionEvent;
+import fr.enimaloc.catapult.service.stream.SessionTimelineService;
+import fr.enimaloc.catapult.service.stream.StreamSessionService;
+import fr.enimaloc.catapult.service.twitch.SystemTwitchAccountService;
 import fr.enimaloc.catapult.service.twitch.TwitchCategory;
 import fr.enimaloc.catapult.service.twitch.TwitchEventSubService;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
 import fr.enimaloc.catapult.simulation.SimulatedData.SimulatedPresence;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
 
 /**
  * What the control panel makes happen on a channel, "as for real": every action enters through the door the real
@@ -38,10 +54,20 @@ public class SimulationActions {
     private final GetterConfigRepository getterConfigs;
     private final BotToggleService botToggle;
     private final TwitchService twitch;
+    private final ApplicationEventPublisher publisher;
+    private final SystemTwitchAccountService systemAccount;
+    private final UserAccountRepository accounts;
+    private final StreamSessionService sessions;
+    private final SessionTimelineService timeline;
+    /** {@code app.owner-id}: the Twitch id a chat message written "as the instance owner" carries. */
+    private final String ownerId;
 
     public SimulationActions(SimulationRegistry registry, SimulationJournal journal,
                              ObjectProvider<TwitchEventSubService> eventSub, SchedulerService scheduler,
-                             GetterConfigRepository getterConfigs, BotToggleService botToggle, TwitchService twitch) {
+                             GetterConfigRepository getterConfigs, BotToggleService botToggle, TwitchService twitch,
+                             ApplicationEventPublisher publisher, SystemTwitchAccountService systemAccount,
+                             UserAccountRepository accounts, StreamSessionService sessions,
+                             SessionTimelineService timeline, @Value("${app.owner-id:}") String ownerId) {
         this.registry = registry;
         this.journal = journal;
         this.eventSub = eventSub;
@@ -49,10 +75,18 @@ public class SimulationActions {
         this.getterConfigs = getterConfigs;
         this.botToggle = botToggle;
         this.twitch = twitch;
+        this.publisher = publisher;
+        this.systemAccount = systemAccount;
+        this.accounts = accounts;
+        this.sessions = sessions;
+        this.timeline = timeline;
+        this.ownerId = ownerId;
     }
 
     /**
-     * The stream goes live or offline: a {@code stream.online} or {@code stream.offline} notification.
+     * The stream goes live or offline: a {@code stream.online} or {@code stream.offline} notification. Each live
+     * carries a stream id of its own ({@code sim-<uuid>}) and its start, so the real handling records its session
+     * and the timeline follows it.
      *
      * @throws IllegalStateException when that event is {@code REAL} for the account
      */
@@ -61,7 +95,10 @@ public class SimulationActions {
                 ? SimulatedCalls.TWITCH_EVENTSUB_STREAM_ONLINE : SimulatedCalls.TWITCH_EVENTSUB_STREAM_OFFLINE);
         registry.update(user.getId(), data -> data.withLive(live));
         if (live) {
-            ObjectNode event = broadcasterEvent(user).put("type", "live").put("started_at", Instant.now().toString());
+            ObjectNode event = broadcasterEvent(user)
+                    .put("id", "sim-" + UUID.randomUUID())
+                    .put("type", "live")
+                    .put("started_at", Instant.now().toString());
             inject(user, "stream.online", SimulatedCalls.TWITCH_EVENTSUB_STREAM_ONLINE, event, "live");
         } else {
             inject(user, "stream.offline", SimulatedCalls.TWITCH_EVENTSUB_STREAM_OFFLINE, broadcasterEvent(user),
@@ -119,20 +156,99 @@ public class SimulationActions {
     }
 
     /**
-     * The streamer raids {@code toLogin}: an outgoing {@code channel.raid} notification.
+     * The streamer raids {@code toLogin}: an outgoing {@code channel.raid} notification. The raided channel's id is
+     * the Twitch id of the Catapult account with that login (whatever its case), empty when none has it, as Twitch
+     * would give it.
      *
      * @throws IllegalStateException when {@code channel.raid} is {@code REAL} for the account
      */
     public void raidOut(UserAccount user, String toLogin) {
+        String toId = accounts.findFirstByTwitchUsernameIgnoreCase(toLogin)
+                .map(UserAccount::getTwitchId)
+                .orElse("");
         ObjectNode event = JsonNodeFactory.instance.objectNode()
                 .put("from_broadcaster_user_id", user.getTwitchId())
                 .put("from_broadcaster_user_login", InjectedEvents.login(user))
                 .put("from_broadcaster_user_name", InjectedEvents.login(user))
-                .put("to_broadcaster_user_id", "")
+                .put("to_broadcaster_user_id", toId)
                 .put("to_broadcaster_user_login", toLogin)
                 .put("to_broadcaster_user_name", toLogin)
                 .put("viewers", 0);
         inject(user, "channel.raid", SimulatedCalls.TWITCH_EVENTSUB_CHANNEL_RAID, event, "raid to " + toLogin);
+    }
+
+    /**
+     * Adds a closed period of {@code duration} just before the running period (after the last closed one when none
+     * runs), the earlier periods and the session start moved back as much ({@link SessionTimelineService#addPast}):
+     * a long session is built without waiting.
+     *
+     * @param gameName the detected game, {@code null} for none
+     * @throws IllegalStateException when the account has no session in progress
+     */
+    public void addPastSegment(UserAccount user, String categoryId, String categoryName, String gameName,
+                               Duration duration) {
+        if (sessions.find(user).filter(StreamSession::isOngoing).isEmpty()) {
+            throw new IllegalStateException("This account is not live: set it live before adding a past period");
+        }
+        timeline.addPast(user, categoryId, categoryName, gameName, duration);
+    }
+
+    /** The periods of the account's current (or last) session, oldest first. */
+    public List<StreamCategorySegment> sessionTimeline(UserAccount user) {
+        return timeline.currentSession(user);
+    }
+
+    /**
+     * Someone writes {@code text} in the channel's chat. Only a message that starts by mentioning the system account
+     * does anything, read by the same {@link SystemMention#parse} as the real chat; any other text is only journaled
+     * (the {@code !} commands are retired).
+     *
+     * @param owner whether the author is the instance owner: their Twitch id is then {@code app.owner-id}, else an
+     *              id derived from the login, so that distinct logins are distinct authors
+     * @throws IllegalStateException when {@code channel.chat.message} is {@code REAL} for the account, when the text
+     *                               mentions someone while no system account is linked, or for an owner author
+     *                               while {@code app.owner-id} is not set
+     */
+    public void chatMessage(UserAccount channel, String senderLogin, SenderRole role, boolean owner, String text) {
+        String systemLogin = systemAccount.getSystemTwitchUsername();
+        Optional<String> mentioned = mentionedLogin(text);
+        if (mentioned.isPresent() && (systemLogin == null || systemLogin.isBlank())) {
+            throw new IllegalStateException("No system account is linked: mention commands cannot be simulated");
+        }
+        if (owner && ownerId.isBlank()) {
+            throw new IllegalStateException("app.owner-id is not set: no message can be sent as the owner");
+        }
+        InjectedEvents.requireSimulated(registry, channel, SimulatedCalls.TWITCH_EVENTSUB_CHAT_MESSAGE);
+        if (!InjectedEvents.admit(registry, journal, channel, SimulatedCalls.TWITCH_EVENTSUB_CHAT_MESSAGE,
+                senderLogin + " (" + role + (owner ? ", owner" : "") + "): " + text)) {
+            return;
+        }
+        if (mentioned.isEmpty()) {
+            return;
+        }
+        String login = mentioned.get();
+        String userId = login.equalsIgnoreCase(systemLogin) ? systemAccount.getSystemTwitchId() : "sim:" + login;
+        ObjectNode message = JsonNodeFactory.instance.objectNode().put("text", text);
+        ArrayNode fragments = message.putArray("fragments");
+        ObjectNode mention = fragments.addObject().put("type", "mention").put("text", "@" + login);
+        mention.putObject("mention").put("user_login", login.toLowerCase(Locale.ROOT)).put("user_id", userId);
+        String rest = text.substring(login.length() + 1);
+        if (!rest.isEmpty()) {
+            fragments.addObject().put("type", "text").put("text", rest);
+        }
+        SystemMention.parse(message, systemAccount::getSystemTwitchId).ifPresent(parsed -> publisher.publishEvent(
+                new SystemMentionEvent(channel,
+                        new MentionSender(owner ? ownerId : "sim:" + senderLogin, senderLogin, role), parsed)));
+    }
+
+    /** The login a text starts by mentioning ({@code @login}, then a space or the end), if it does. */
+    private static Optional<String> mentionedLogin(String text) {
+        if (!text.startsWith("@")) {
+            return Optional.empty();
+        }
+        int end = text.indexOf(' ');
+        String login = text.substring(1, end < 0 ? text.length() : end);
+        return login.isEmpty() ? Optional.empty() : Optional.of(login);
     }
 
     /** Turns the bot on or off as the streamer's toggle does. */

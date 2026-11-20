@@ -16,11 +16,19 @@ import fr.enimaloc.catapult.repository.minecraft.MinecraftServiceAccountReposito
 import fr.enimaloc.catapult.service.account.BotToggleService;
 import fr.enimaloc.catapult.service.binding.SchedulerService;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
+import fr.enimaloc.catapult.service.stream.SessionTimelineService;
 import fr.enimaloc.catapult.service.stream.StreamSessionService;
+import fr.enimaloc.catapult.domain.stream.StreamCategorySegment;
+import fr.enimaloc.catapult.domain.stream.StreamSession;
 import fr.enimaloc.catapult.service.debug.DebugRecording;
 import fr.enimaloc.catapult.service.notification.CatapultCategoryChangeStateService;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import fr.enimaloc.catapult.service.notification.TwitchatEventDispatcher;
+import fr.enimaloc.catapult.chat.ChatCommandEvent.SenderRole;
+import fr.enimaloc.catapult.service.emergency.MentionSender;
+import fr.enimaloc.catapult.service.emergency.SystemMention;
+import fr.enimaloc.catapult.service.emergency.SystemMentionEvent;
+import fr.enimaloc.catapult.service.twitch.SystemTwitchAccountService;
 import fr.enimaloc.catapult.service.twitch.TwitchCategory;
 import fr.enimaloc.catapult.service.twitch.TwitchEventSubService;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
@@ -37,6 +45,8 @@ import org.springframework.mock.env.MockEnvironment;
 import org.springframework.web.client.RestClient;
 
 import java.nio.file.Path;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -45,6 +55,8 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -65,7 +77,10 @@ class SimulationActionsTest {
     GetterConfigRepository getterConfigs = mock(GetterConfigRepository.class);
     BotToggleService botToggle = mock(BotToggleService.class);
     TwitchService twitch = mock(TwitchService.class);
+    SystemTwitchAccountService systemAccount = mock(SystemTwitchAccountService.class);
     StreamStateService streamState = new StreamStateService(mock(ChannelEventPublisher.class), twitchat);
+    StreamSessionService sessions = mock(StreamSessionService.class);
+    SessionTimelineService timeline = mock(SessionTimelineService.class);
     SimulationJournal journal = new SimulationJournal();
 
     SimulationRegistry registry;
@@ -91,6 +106,8 @@ class SimulationActionsTest {
         when(getterConfigs.findByUserAndProvider(any(), any())).thenReturn(Optional.empty());
         when(getterConfigs.findByUserOrderByPriorityAsc(user)).thenReturn(List.of());
         when(selfChanges.consumeIfMatches(any(), any())).thenReturn(Optional.empty());
+        when(systemAccount.getSystemTwitchId()).thenReturn("sys-1");
+        when(systemAccount.getSystemTwitchUsername()).thenReturn("Catapult_Bot");
 
         SimulationProperties properties = new SimulationProperties();
         properties.setStateFile(dir.resolve("simulation.json").toString());
@@ -101,10 +118,11 @@ class SimulationActionsTest {
         eventSub = new TwitchEventSubService(tokens, accounts, mock(TwitchTokenService.class), streamState,
                 publisher, RestClient.create(), new ObjectMapper(), twitchat, selfChanges, DebugRecording.OFF,
                 beans.getBeanProvider(SimulationGate.class), SiteRoles.active(),
-                mock(StreamSessionService.class), mock(fr.enimaloc.catapult.service.stream.StreamCatchUp.class));
+                sessions, mock(fr.enimaloc.catapult.service.stream.StreamCatchUp.class));
         beans.addBean("twitchEventSubService", eventSub);
         actions = new SimulationActions(registry, journal, beans.getBeanProvider(TwitchEventSubService.class),
-                scheduler, getterConfigs, botToggle, twitch);
+                scheduler, getterConfigs, botToggle, twitch, publisher, systemAccount, accounts, sessions, timeline,
+                "owner-1");
     }
 
     private List<ApplicationEvent> published() {
@@ -263,6 +281,153 @@ class SimulationActionsTest {
 
         assertThat(published()).filteredOn(ChannelRaidedOutEvent.class::isInstance).singleElement()
                 .satisfies(e -> assertThat(((ChannelRaidedOutEvent) e).getCurrentCategoryId()).isEqualTo("33214"));
+    }
+
+    private ChannelRaidedOutEvent raid() {
+        return published().stream().filter(ChannelRaidedOutEvent.class::isInstance)
+                .map(ChannelRaidedOutEvent.class::cast).findFirst().orElseThrow();
+    }
+
+    @Test
+    void raidOutTargetsTheMockAccountByLogin() {
+        UserAccount bob = new UserAccount();
+        bob.setId(UUID.randomUUID());
+        bob.setTwitchId("mock-bob");
+        bob.setTwitchUsername("Bob");
+        when(accounts.findFirstByTwitchUsernameIgnoreCase("bob")).thenReturn(Optional.of(bob));
+
+        actions.raidOut(user, "bob");
+
+        assertThat(raid().getToBroadcasterId()).isEqualTo("mock-bob");
+        assertThat(raid().getFromBroadcasterName()).isEqualTo("alice");
+    }
+
+    @Test
+    void raidOutToAnUnknownLoginKeepsAnEmptyId() {
+        when(accounts.findFirstByTwitchUsernameIgnoreCase(any())).thenReturn(Optional.empty());
+
+        actions.raidOut(user, "nobody");
+
+        assertThat(raid().getToBroadcasterId()).isEmpty();
+    }
+
+    @Test
+    void setLiveRecordsASimulatedStreamOfItsOwn() {
+        actions.setLive(user, true);
+
+        verify(sessions).recordStart(eq(user), startsWith("sim-"), any(Instant.class));
+    }
+
+    @Test
+    void addPastSegmentRefusedWhenNotLive() {
+        when(sessions.find(user)).thenReturn(Optional.empty());
+
+        assertThatIllegalStateException().isThrownBy(() ->
+                actions.addPastSegment(user, "1", "Factorio", "Factorio", Duration.ofMinutes(150)));
+        verify(timeline, never()).addPast(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void addPastSegmentGoesToTheTimelineDuringALive() {
+        StreamSession session = new StreamSession();
+        session.setStreamId("sim-1");
+        session.setStartedAt(Instant.now());
+        when(sessions.find(user)).thenReturn(Optional.of(session));
+
+        actions.addPastSegment(user, "1", "Factorio", null, Duration.ofMinutes(150));
+
+        verify(timeline).addPast(user, "1", "Factorio", null, Duration.ofMinutes(150));
+    }
+
+    @Test
+    void sessionTimelineReadsTheCurrentSession() {
+        StreamCategorySegment segment = new StreamCategorySegment();
+        when(timeline.currentSession(user)).thenReturn(List.of(segment));
+
+        assertThat(actions.sessionTimeline(user)).containsExactly(segment);
+    }
+
+    private List<SystemMentionEvent> mentions() {
+        ArgumentCaptor<Object> events = ArgumentCaptor.forClass(Object.class);
+        verify(publisher, org.mockito.Mockito.atLeast(0)).publishEvent(events.capture());
+        return events.getAllValues().stream().filter(SystemMentionEvent.class::isInstance)
+                .map(SystemMentionEvent.class::cast).toList();
+    }
+
+    @Test
+    void chat_message_mentioning_the_system_account_publishes_a_mention_event() {
+        actions.chatMessage(user, "viewer1", SenderRole.MODERATOR, false, "@catapult_bot emergency xbox");
+
+        assertThat(mentions()).singleElement().satisfies(e -> {
+            assertThat(e.channel()).isEqualTo(user);
+            assertThat(e.sender()).isEqualTo(new MentionSender("sim:viewer1", "viewer1", SenderRole.MODERATOR));
+            assertThat(e.mention()).isEqualTo(new SystemMention("emergency", List.of("xbox")));
+        });
+        assertThat(journal.recent(user.getId())).extracting(SimulationJournal.Entry::key)
+                .containsExactly(SimulatedCalls.TWITCH_EVENTSUB_CHAT_MESSAGE.id());
+    }
+
+    @Test
+    void chat_message_from_the_owner_carries_the_owner_id() {
+        actions.chatMessage(user, "boss", SenderRole.BROADCASTER, true, "@Catapult_Bot off");
+
+        assertThat(mentions()).singleElement().satisfies(e ->
+                assertThat(e.sender()).isEqualTo(new MentionSender("owner-1", "boss", SenderRole.BROADCASTER)));
+    }
+
+    @Test
+    void chat_message_without_a_leading_mention_is_only_journaled() {
+        actions.chatMessage(user, "viewer1", SenderRole.VIEWERS, false, "hello @catapult_bot off");
+        actions.chatMessage(user, "viewer1", SenderRole.VIEWERS, false, "!song");
+
+        assertThat(mentions()).isEmpty();
+        assertThat(journal.recent(user.getId())).hasSize(2);
+    }
+
+    @Test
+    void chat_message_mentioning_someone_else_is_no_command() {
+        actions.chatMessage(user, "viewer1", SenderRole.VIEWERS, false, "@someone_else off");
+        actions.chatMessage(user, "viewer1", SenderRole.VIEWERS, false, "@catapult_botx off");
+
+        assertThat(mentions()).isEmpty();
+    }
+
+    @Test
+    void chat_message_mention_alone_is_not_a_command() {
+        actions.chatMessage(user, "viewer1", SenderRole.VIEWERS, false, "@catapult_bot");
+
+        assertThat(mentions()).isEmpty();
+    }
+
+    @Test
+    void chat_message_without_a_system_account_is_refused() {
+        when(systemAccount.getSystemTwitchUsername()).thenReturn(null);
+
+        assertThatIllegalStateException()
+                .isThrownBy(() -> actions.chatMessage(user, "viewer1", SenderRole.VIEWERS, false, "@bot off"))
+                .withMessageContaining("No system account is linked");
+        assertThat(mentions()).isEmpty();
+    }
+
+    @Test
+    void chat_message_as_the_owner_needs_the_owner_id() {
+        SimulationActions noOwner = new SimulationActions(registry, journal,
+                new StaticListableBeanFactory().getBeanProvider(TwitchEventSubService.class), scheduler,
+                getterConfigs, botToggle, twitch, publisher, systemAccount, accounts, sessions, timeline, "");
+
+        assertThatIllegalStateException()
+                .isThrownBy(() -> noOwner.chatMessage(user, "boss", SenderRole.VIEWERS, true, "@catapult_bot off"))
+                .withMessageContaining("app.owner-id");
+    }
+
+    @Test
+    void chat_message_is_refused_while_its_event_is_real() {
+        registry.set(realUser.getId(), SimulatedCalls.TWITCH_EVENTSUB_CHAT_MESSAGE, CallSetting.real());
+
+        assertThatIllegalStateException()
+                .isThrownBy(() -> actions.chatMessage(realUser, "v", SenderRole.VIEWERS, false, "@catapult_bot off"))
+                .withMessageContaining("is Real: the real event arrives");
+        assertThat(mentions()).isEmpty();
     }
 
     @Test

@@ -80,6 +80,7 @@ import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatPayload;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatValidationError;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatSettingsResponse;
+import fr.enimaloc.catapult.common.dto.debug.ClientExchangeBatch;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetAccessResponse;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatActionType;
@@ -189,6 +190,7 @@ public class MockApiService implements ApiService {
     /** Application-wide: the game mappings an admin edits are the same for every mock session. */
     private final MockGameMappingsStore gameMappings = new MockGameMappingsStore();
     private final MockDtddCachesStore dtddCaches = new MockDtddCachesStore();
+    private final MockEmergencyStore emergency = new MockEmergencyStore(Clock.systemUTC());
     private final MockRateLimitsStore rateLimits = new MockRateLimitsStore(Clock.systemUTC());
     /** Application-wide: the groups an admin creates are the same for every mock session. */
     private final MockGroupsStore groups = new MockGroupsStore();
@@ -634,7 +636,34 @@ public class MockApiService implements ApiService {
     public TwitchatWidgetConfig widgetObsConfig(UUID token) {
         log.trace("widgetObsConfig({})", token);
         // Like catapult-api's /api/twitchat/widget/{token}: the owner's connection, on their branch.
-        return widgetOwner(token).map(MockData::obsConnection).orElse(null);
+        return widgetOwner(token)
+                .map(d -> {
+                    TwitchatWidgetConfig connection = d.obsConnection();
+                    return connection == null ? null : connection.withDebugCapture(inDebug(d.getChannelDto().id()));
+                })
+                .orElse(null);
+    }
+
+    @Override
+    public ApiClient.Result<Void> postClientDebugExchanges(UUID userId, ClientExchangeBatch batch) {
+        log.trace("postClientDebugExchanges({})", userId);
+        // Nothing recorded for real: only catapult-api's answer
+        if (userId == null) return new ApiClient.Result<>(401, null);
+        return new ApiClient.Result<>(inDebug(userId) ? 204 : 409, null);
+    }
+
+    @Override
+    public ApiClient.Result<Void> postWidgetClientDebugExchanges(UUID token, ClientExchangeBatch batch) {
+        // The token is a credential: never logged
+        log.trace("postWidgetClientDebugExchanges(***)");
+        return widgetOwner(token)
+                .filter(d -> d.obsConnection() != null)
+                .map(d -> new ApiClient.Result<Void>(inDebug(d.getChannelDto().id()) ? 204 : 409, null))
+                .orElseGet(() -> new ApiClient.Result<>(404, null));
+    }
+
+    private boolean inDebug(UUID member) {
+        return members.debug().mine(member).active();
     }
 
     @Override
@@ -1276,6 +1305,33 @@ public class MockApiService implements ApiService {
     public fr.enimaloc.catapult.common.dto.MyDebugDto myDebug() {
         UUID account = currentUserId();
         return account == null ? new fr.enimaloc.catapult.common.dto.MyDebugDto(false, 0) : members.debug().mine(account);
+    }
+
+    @Override
+    public int enableMemberDryRun(UUID memberId) {
+        log.trace("enableMemberDryRun({})", memberId);
+        return members.dryRunAction(memberId, store -> store.enable(memberId));
+    }
+
+    @Override
+    public int disableMemberDryRun(UUID memberId) {
+        log.trace("disableMemberDryRun({})", memberId);
+        return members.dryRunAction(memberId, store -> store.disable(memberId));
+    }
+
+    @Override
+    public fr.enimaloc.catapult.common.dto.DryRunStateDto myDryRun() {
+        UUID account = currentUserId();
+        return account == null ? null : members.dryRun().state(account);
+    }
+
+    @Override
+    public int disableMyDryRun() {
+        UUID account = currentUserId();
+        if (account == null) return 401;
+        // a no-op for an account the listing doesn't know yet, as catapult-api's for one out of dry run
+        int status = members.dryRunAction(account, store -> store.disable(account));
+        return status == 404 ? members.dryRun().disable(account) : status;
     }
 
     @Override
@@ -2097,6 +2153,49 @@ public class MockApiService implements ApiService {
                         new DegradedEffectDto("app.polling.free-interval-seconds", "90", "60"),
                         new DegradedEffectDto("minecraft.friends-sync-interval-ms", "900000", "300000")))
                 : new DegradedStatusDto(false, null);
+    }
+
+    @Override
+    public fr.enimaloc.catapult.common.dto.emergency.EmergencyStatusDto emergencyStatus() {
+        log.trace("emergencyStatus()");
+        return emergency.status();
+    }
+
+    @Override
+    public fr.enimaloc.catapult.common.dto.emergency.ChannelEmergencyDto channelEmergency(String username) {
+        log.trace("channelEmergency({})", username);
+        return emergency.channel(username, currentData().isBotEnabled());
+    }
+
+    @Override
+    public int resumeChannelEmergency(String username) {
+        log.trace("resumeChannelEmergency({})", username);
+        emergency.resume(username);
+        return NO_CONTENT;
+    }
+
+    @Override
+    public List<fr.enimaloc.catapult.common.dto.emergency.EmergencyStopDto> adminEmergencyStops(boolean active) {
+        log.trace("adminEmergencyStops({})", active);
+        return emergency.stops(active);
+    }
+
+    @Override
+    public List<fr.enimaloc.catapult.common.dto.emergency.EmergencyReportDto> adminEmergencyReports(int page) {
+        log.trace("adminEmergencyReports({})", page);
+        return emergency.reports(page);
+    }
+
+    @Override
+    public int adminEmergencyStop(String provider) {
+        log.trace("adminEmergencyStop({})", provider);
+        return emergency.ownerStop(provider);
+    }
+
+    @Override
+    public int adminEmergencyResume(String provider) {
+        log.trace("adminEmergencyResume({})", provider);
+        return emergency.ownerResume(provider);
     }
 
     /** The mock's catapult-api is always up. */

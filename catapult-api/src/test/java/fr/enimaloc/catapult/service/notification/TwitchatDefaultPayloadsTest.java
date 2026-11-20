@@ -33,4 +33,15 @@ class TwitchatDefaultPayloadsTest {
         assertThat(payload.icon()).isEqualTo("online");
         assertThat(payload.actions().get(TwitchatActionType.DISABLE_BOT).theme()).isEqualTo("secondary");
     }
+
+    @Test
+    void raidedByMember_isAMessageWithoutAction_withAnIconTwitchatKnows() {
+        var payload = TwitchatDefaultPayloads.DEFAULTS.get(TwitchatNotificationEventType.RAIDED_BY_MEMBER);
+
+        assertThat(payload.message()).isEqualTo("Pendant sa session de stream, {{raider}} a joué à :\n{{games}}");
+        assertThat(payload.style()).isEqualTo("message");
+        assertThat(payload.icon()).isEqualTo("raid");
+        assertThat(payload.authorName()).isEqualTo("Catapult");
+        assertThat(payload.actions()).isEmpty();
+    }
 }

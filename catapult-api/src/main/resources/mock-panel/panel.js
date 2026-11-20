@@ -248,6 +248,24 @@ async function refreshAccount() {
   renderSettings($('account-settings'), settings, (key, body) =>
     call('PUT', '/accounts/' + id + '/settings/' + key, body));
   renderData(account, current.data);
+  await refreshTimeline(id);
+}
+
+/** The session block: each period, the running one marked, and the recap a raid would send now. */
+async function refreshTimeline(id) {
+  let timeline;
+  try {
+    timeline = await call('GET', '/accounts/' + id + '/timeline');
+  } catch (e) {
+    toast('Could not load the session: ' + e.message, true);
+    return;
+  }
+  if (state.selected !== id) return;
+  $('timeline').replaceChildren(...(timeline.segments.length ? timeline.segments.map((segment) => el('li', {},
+    (segment.categoryName || '?') + (segment.gameName ? ' (' + segment.gameName + ')' : '')
+    + ' — ' + segment.duration,
+    segment.endedAt ? null : el('span', {class: 'tag'}, 'en cours'))) : [el('li', {class: 'muted'}, 'No period')]));
+  $('recap').textContent = timeline.recap || 'Nothing to sum up yet.';
 }
 
 function renderIdentity(account) {
@@ -370,6 +388,47 @@ $('raid-form').addEventListener('submit', (event) => {
   event.preventDefault();
   act('Raid sent', () => call('POST', '/accounts/' + state.selected + '/raid-out', {
     toLogin: $('raid-login').value.trim(),
+  }));
+});
+
+$('past-search-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const q = $('past-search').value.trim();
+  if (!q) return;
+  try {
+    const games = await call('GET', '/accounts/' + state.selected + '/games?q=' + encodeURIComponent(q));
+    $('past-results').replaceChildren(...(games.length ? games : [{id: '', name: 'No result'}]).map((game) =>
+      el('li', {
+        title: 'Picks this category for the past period',
+        onclick: () => {
+          if (!game.id) return;
+          $('past-category-id').value = game.id;
+          $('past-category-name').value = game.name;
+        },
+      }, game.name, game.id ? el('span', {class: 'muted'}, ' (category ' + game.id + ')') : null)));
+  } catch (e) {
+    toast('Search failed: ' + e.message, true);
+  }
+});
+
+$('past-form').addEventListener('submit', (event) => {
+  event.preventDefault();
+  const game = $('past-game').value.trim();
+  act('Past period added', () => call('POST', '/accounts/' + state.selected + '/past-segment', {
+    categoryId: $('past-category-id').value.trim(),
+    categoryName: $('past-category-name').value.trim(),
+    gameName: game ? game : null,
+    minutes: Number($('past-minutes').value) || null,
+  }));
+});
+
+$('chat-form').addEventListener('submit', (event) => {
+  event.preventDefault();
+  act('Message sent', () => call('POST', '/accounts/' + state.selected + '/chat', {
+    sender: $('chat-sender').value.trim(),
+    role: $('chat-role').value,
+    owner: $('chat-owner').checked,
+    text: $('chat-text').value.trim(),
   }));
 });
 

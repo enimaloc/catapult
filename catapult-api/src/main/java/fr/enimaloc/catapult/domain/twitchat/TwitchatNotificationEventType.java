@@ -8,5 +8,7 @@ public enum TwitchatNotificationEventType {
     BOT_DISABLED,
     NO_GAME_DETECTED,
     /** A Catapult notification, for members who opted in to receiving them in Twitchat. */
-    NOTIFICATION
+    NOTIFICATION,
+    /** Another Catapult member raided this one: what the raider streamed during their session. */
+    RAIDED_BY_MEMBER
 }

@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.getter.steam;
 
+import fr.enimaloc.catapult.getter.TraceProbe;
+import tools.jackson.databind.JsonNode;
 import fr.enimaloc.catapult.service.debug.DebugRecording;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.getter.DetectedGame;
@@ -148,5 +150,58 @@ class SteamGameGetterTest {
             .thenReturn(CompletableFuture.failedFuture(new IllegalStateException("boom")));
 
         assertThat(getter.getCurrentGame(user)).isEmpty();
+    }
+
+    // --- Detection trace ---
+
+    @Test
+    void traceReason_noSteamId() {
+        UserAccount user = new UserAccount();
+        user.setId(UUID.randomUUID());
+
+        assertThat(TraceProbe.entryAfter(user, () -> getter.getCurrentGame(user)).path("reason").asString())
+            .isEqualTo("no Steam id");
+    }
+
+    @Test
+    void traceReason_noGameInTheCachedSummary() throws Exception {
+        UserAccount user = new UserAccount();
+        user.setId(UUID.randomUUID());
+        user.setSteamId("123");
+        when(steamApiClient.getPlayerSummaries(List.of("123")))
+            .thenReturn(CompletableFuture.completedFuture(Map.of("123", Optional.empty())));
+        getter.prefetchBatch(List.of(user)).get();
+
+        JsonNode entry = TraceProbe.entryAfter(user, () -> getter.getCurrentGame(user));
+
+        assertThat(entry.path("reason").asString()).isEqualTo("no game in the player summary");
+        assertThat(entry.at("/details/fromCycleCache").asBoolean()).isTrue();
+    }
+
+    @Test
+    void traceReason_noGameInTheDirectSummary() {
+        UserAccount user = new UserAccount();
+        user.setId(UUID.randomUUID());
+        user.setSteamId("123");
+        when(steamApiClient.getPlayerSummary("123", null))
+            .thenReturn(CompletableFuture.completedFuture(Optional.empty()));
+
+        JsonNode entry = TraceProbe.entryAfter(user, () -> getter.getCurrentGame(user));
+
+        assertThat(entry.path("reason").asString()).isEqualTo("no game in the player summary");
+        assertThat(entry.at("/details/fromCycleCache").asBoolean()).isFalse();
+    }
+
+    @Test
+    void traceReason_playerSummaryFailed() {
+        UserAccount user = new UserAccount();
+        user.setId(UUID.randomUUID());
+        user.setSteamId("123");
+        when(steamApiClient.getPlayerSummary("123", null))
+            .thenReturn(CompletableFuture.failedFuture(new IllegalStateException("HTTP 500")));
+
+        String reason = TraceProbe.entryAfter(user, () -> getter.getCurrentGame(user)).path("reason").asString();
+
+        assertThat(reason).startsWith("player summary failed: ").contains("HTTP 500");
     }
 }

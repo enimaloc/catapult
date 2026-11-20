@@ -317,6 +317,18 @@ describe("tab <-> location.hash", () => {
         expect(postJson).toHaveBeenCalledWith("/spa/seen-features/channel.commands");
     });
 
+    it("dismisses a one-time notice by its button, and tells catapult-web once", () => {
+        html(`<div id="n" data-new-feature="channel.emergency-notice"><button data-new-feature-dismiss>ok</button></div>`);
+        render();
+        render();
+
+        document.querySelector("[data-new-feature-dismiss]").click();
+
+        expect(document.getElementById("n")).toBeNull();
+        expect(postJson).toHaveBeenCalledTimes(1);
+        expect(postJson).toHaveBeenCalledWith("/spa/seen-features/channel.emergency-notice");
+    });
+
     it("does nothing on pages without tabs", () => {
         expect(() => render()).not.toThrow();
     });

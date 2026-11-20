@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.controller;
 
+import fr.enimaloc.catapult.common.dto.debug.ClientExchangeBatch;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetAccessResponse;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig;
 import fr.enimaloc.catapult.service.ApiService;
@@ -15,11 +16,13 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.time.Duration;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -31,7 +34,9 @@ import java.util.UUID;
  * minute, so switching the widget on reaches OBS. While catapult-api is unreachable the page keeps
  * its scripts, which retry the config until it answers. The stream closes
  * every {@link #STREAM_TIMEOUT}, so revoking the link takes effect on the reconnection; an address
- * keeps a few streams, and past the overall bound they are refused (503).
+ * keeps a few streams, and past the overall bound they are refused (503). While its owner is in debug mode, the page
+ * posts its OBS and Twitchat exchanges to {@code /widget/obs/{token}/debug/client-exchanges}, relayed to their
+ * debug journal by the token alone (no session, no CSRF token), within {@link WidgetDebugLimiter}'s bounds.
  */
 @Controller
 @RequiredArgsConstructor
@@ -45,6 +50,7 @@ public class WidgetObsController {
 
     private final ApiService apiService;
     private final TwitchatDispatchHub hub;
+    private final WidgetDebugLimiter debugLimiter;
 
     @GetMapping("/widget/obs/{token}")
     public String page(@PathVariable String token, Model model) {
@@ -82,6 +88,41 @@ public class WidgetObsController {
         SseEmitter emitter = hub.subscribeWidget(owner, uuid, request.getRemoteAddr(), STREAM_TIMEOUT);
         return emitter == null ? ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build()
                 : ResponseEntity.ok().header("X-Accel-Buffering", "no").body(emitter);
+    }
+
+    /**
+     * The widget's OBS and Twitchat exchanges, relayed to its owner's debug journal with the widget as their source:
+     * catapult-api's status (204 recorded, 409 the owner is not in debug mode). Not relayed: 404 for a token that
+     * isn't a UUID or names no enabled widget, 429 over the widget's allowance, 502 while catapult-api cannot tell
+     * whether the widget exists, 400 for a body that is no batch.
+     */
+    @PostMapping("/widget/obs/{token}/debug/client-exchanges")
+    @ResponseBody
+    public ResponseEntity<Void> debugExchanges(@PathVariable String token, HttpServletRequest request) {
+        UUID uuid = uuid(token);
+        if (uuid == null) {
+            return ResponseEntity.notFound().build();
+        }
+        switch (debugLimiter.admit(uuid)) {
+            case UNKNOWN -> {
+                return ResponseEntity.notFound().build();
+            }
+            case REFUSED -> {
+                return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).build();
+            }
+            case UNAVAILABLE -> {
+                return ResponseEntity.status(HttpStatus.BAD_GATEWAY).build();
+            }
+            case ADMITTED -> { }
+        }
+        Optional<ClientExchangeBatch> batch = ClientDebugBatches.read(request, "widget");
+        if (batch.isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+        int status = apiService.postWidgetClientDebugExchanges(uuid, batch.get()).status();
+        // A widget catapult-api no longer knows is checked again next time
+        debugLimiter.relayed(uuid, status);
+        return ResponseEntity.status(status).build();
     }
 
     /** The link OBS sources were set up with before /widget/obs. */

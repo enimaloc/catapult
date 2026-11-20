@@ -57,6 +57,9 @@ class EnglishConventionsTest {
                     API + "service/notification/TwitchatDefaultPayloads.java LITERAL",
                     "Twitchat defaults the streamer sees and saves; named by the spec"),
             Map.entry(
+                    API + "service/stream/SessionRecap.java LITERAL",
+                    "unknown category name in the raid recap sent to the raided streamer; named by the spec"),
+            Map.entry(
                     API + "chat/command/ChatCommandGameMigration.java LITERAL",
                     "default chat command templates viewers read, and the old ones matched in stored rows"),
             Map.entry(

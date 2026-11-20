@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.common.dto.LaunchedPlatformsResponse;
 import fr.enimaloc.catapult.common.dto.DegradedStatusDto;
 import fr.enimaloc.catapult.common.dto.InvitePageData;
 import fr.enimaloc.catapult.common.dto.InviteRedemptionDto;
+import fr.enimaloc.catapult.common.dto.DryRunStateDto;
 import fr.enimaloc.catapult.common.dto.MyDebugDto;
 import fr.enimaloc.catapult.common.dto.UserInfoResponse;
 import fr.enimaloc.catapult.common.dto.account.ApiTokenStatusDto;
@@ -28,6 +29,8 @@ import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.channel.ChannelUserDto;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingCurrentDto;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
+import fr.enimaloc.catapult.common.dto.emergency.ChannelEmergencyDto;
+import fr.enimaloc.catapult.common.dto.emergency.EmergencyStatusDto;
 import fr.enimaloc.catapult.common.dto.channel.GameDto;
 import fr.enimaloc.catapult.common.dto.channel.MinecraftData;
 import fr.enimaloc.catapult.common.dto.channel.ObsData;
@@ -82,7 +85,8 @@ import tools.jackson.databind.json.JsonMapper;
  * catapult-common DTO, as JSON, with {@value #SMALL} elements in every collection a page shows, then
  * {@value #LARGE} once {@link #grow() grown}. The channel is {@value #OWNER_LOGIN}'s ({@link #OWNER}); the caller is
  * the subject of the request's bearer, so only {@link #OWNER} is told they own it. A request no route answers gets
- * a 599 and is kept in {@link #unexpected()}. Every request but the background degraded poll is recorded, so a test
+ * a 599 and is kept in {@link #unexpected()}. Every request but the degraded poll and the cached emergency status is
+ * recorded, so a test
  * can {@link #mark(String)} before a page and read {@link #pageCalls()} after it.
  */
 public final class FakeApi extends Dispatcher {
@@ -97,6 +101,8 @@ public final class FakeApi extends Dispatcher {
     public static final UUID EXPERIMENT = id("experiment", 0);
     /** Polled by DegradedState in the background, whatever page is open: no page's call. */
     static final String DEGRADED = "/api/internal/status/degraded";
+    /** Read by EmergencyState at most once per 30 s, by whichever page renders first: no page's call. */
+    static final String EMERGENCY_STATUS = "/api/internal/emergency/status";
     private static final Instant AT = Instant.parse("2026-10-01T12:00:00Z");
     private static final int UNEXPECTED = 599;
 
@@ -111,6 +117,7 @@ public final class FakeApi extends Dispatcher {
     public FakeApi(JsonMapper json) {
         this.json = json;
         route(DEGRADED, caller -> new DegradedStatusDto(false, List.of()));
+        route(EMERGENCY_STATUS, caller -> new EmergencyStatusDto(List.of()));
         route("/api/internal/meta-tags", caller -> list(i -> new MetaTagDto(i + 1, MetaTagAttribute.NAME,
                 "budget-tag-" + i, "Budget content " + i, AT)));
         route("/api/internal/social-links", caller -> list(i -> new SocialLinkDto(i + 1, SocialPlatform.OTHER,
@@ -123,6 +130,8 @@ public final class FakeApi extends Dispatcher {
         route("/api/internal/users/{id}/dashboard", caller -> channelPage(OWNER.equals(caller)));
         route("/api/internal/users/{id}/seen-features", caller -> List.of());
         route("/api/internal/users/{id}/debug", caller -> new MyDebugDto(false, 0));
+        route("/api/internal/users/{id}/dry-run", caller -> new DryRunStateDto(false, null));
+        route("/api/internal/users/{id}/emergency", caller -> new ChannelEmergencyDto(true, List.of(), List.of()));
         route("/api/internal/users/{id}/settings", caller -> settings());
         route("/api/internal/users/{id}/dtdd-mapping", caller -> new DtddMappingStatusDto(
                 new DtddMappingCurrentDto(1L, "Budget DTDD game", 0.9, true), null, false, "1"));
@@ -244,7 +253,7 @@ public final class FakeApi extends Dispatcher {
         String target = request.getPath() == null ? "" : request.getPath();
         String path = target.contains("?") ? target.substring(0, target.indexOf('?')) : target;
         String call = request.getMethod() + " " + target;
-        if (!path.equals(DEGRADED)) {
+        if (!path.equals(DEGRADED) && !path.equals(EMERGENCY_STATUS)) {
             calls.add(call);
         }
         for (Route route : routes) {

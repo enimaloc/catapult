@@ -22,6 +22,9 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
 
     Optional<UserAccount> findByTwitchUsername(String twitchUsername);
 
+    /** The account a Twitch login names, whatever its case (the mock panel's raids). */
+    Optional<UserAccount> findFirstByTwitchUsernameIgnoreCase(String twitchUsername);
+
     List<UserAccount> findByBotEnabledTrueAndStatus(UserAccount.Status status);
 
     long countByBotEnabledTrueAndStatus(UserAccount.Status status);

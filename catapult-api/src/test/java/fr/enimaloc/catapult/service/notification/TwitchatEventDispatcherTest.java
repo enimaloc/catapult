@@ -7,7 +7,11 @@ import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.twitchat.TwitchatEventAction;
 import fr.enimaloc.catapult.domain.twitchat.TwitchatWidgetSettings;
+import fr.enimaloc.catapult.domain.stream.StreamCategorySegment;
 import fr.enimaloc.catapult.event.NoGameDetectedEvent;
+import fr.enimaloc.catapult.service.ActivityLogService;
+import fr.enimaloc.catapult.service.dryrun.DryRunRegistry;
+import fr.enimaloc.catapult.service.stream.SessionRecap;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.service.binding.GameBindingLookup;
 import fr.enimaloc.catapult.service.binding.GameStateService;
@@ -20,6 +24,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -30,6 +36,7 @@ import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType
 import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.CATEGORY_CHANGED_BY_CATAPULT;
 import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.CATEGORY_CHANGED_MANUALLY;
 import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.NO_GAME_DETECTED;
+import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.RAIDED_BY_MEMBER;
 import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.STREAM_STARTED;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -52,6 +59,8 @@ class TwitchatEventDispatcherTest {
     @Mock ChannelEventPublisher channelEventPublisher;
     @Mock GameStateService gameStateService;
     @Mock GameBindingLookup gameBindingLookup;
+    @Mock DryRunRegistry dryRunRegistry;
+    @Mock ActivityLogService activityLog;
 
     TwitchatEventDispatcher dispatcher;
     UserAccount user;
@@ -60,7 +69,8 @@ class TwitchatEventDispatcherTest {
     @BeforeEach
     void setUp() {
         dispatcher = new TwitchatEventDispatcher(widgetSettingsService, actionTokenService, eventActionService,
-                channelEventPublisher, gameStateService, gameBindingLookup);
+                channelEventPublisher, gameStateService, gameBindingLookup,
+                dryRunRegistry, activityLog);
         ReflectionTestUtils.setField(dispatcher, "publicWebUrl", "https://catapult.test/");
         user = new UserAccount();
         user.setId(UUID.randomUUID());
@@ -107,6 +117,100 @@ class TwitchatEventDispatcherTest {
         assertThat(chat.get("message")).isEqualTo("Hades -> Celeste");
         assertThat(chat.get("actions")).isEqualTo(List.of(Map.of("label", "Revert",
                 "url", "https://catapult.test/widget/twitchat/action/" + token)));
+    }
+
+    private static final String BUTTON_MESSAGE =
+            "{\"message\":\"{{gameName}}\",\"actions\":[{\"label\":\"Revert\",\"url\":\"{{action:REVERT_CATEGORY}}\"}]}";
+
+    @Test
+    void dryRunPrefixesTheMessage() {
+        when(dryRunRegistry.isActive(user.getId())).thenReturn(true);
+        when(eventActionService.enabledActions(user, CATEGORY_CHANGED_BY_CATAPULT)).thenReturn(List.of(
+                row("CUSTOM_CHAT_MESSAGE", "{\"message\":\"{{gameName}}\"}")));
+
+        dispatcher.onCategoryChangedByCatapult(user, "g2", "Celeste", "g1", "Hades");
+
+        assertThat(published().payloads().getFirst().data().get("message")).isEqualTo("[dry run] Celeste");
+    }
+
+    @Test
+    void dryRunRendersNoAction() {
+        when(dryRunRegistry.isActive(user.getId())).thenReturn(true);
+        when(eventActionService.enabledActions(user, CATEGORY_CHANGED_BY_CATAPULT)).thenReturn(List.of(
+                row("CUSTOM_CHAT_MESSAGE", BUTTON_MESSAGE)));
+
+        dispatcher.onCategoryChangedByCatapult(user, "g2", "Celeste", "g1", "Hades");
+
+        assertThat(published().payloads().getFirst().data().get("actions")).isEqualTo(List.of());
+        verifyNoInteractions(actionTokenService);
+    }
+
+    @Test
+    void noDryRunUnchanged() {
+        when(dryRunRegistry.isActive(user.getId())).thenReturn(false);
+        UUID token = UUID.randomUUID();
+        when(actionTokenService.generate(eq(user.getId()), eq(TwitchatActionType.REVERT_CATEGORY), any())).thenReturn(token);
+        when(eventActionService.enabledActions(user, CATEGORY_CHANGED_BY_CATAPULT)).thenReturn(List.of(
+                row("CUSTOM_CHAT_MESSAGE", BUTTON_MESSAGE)));
+
+        dispatcher.onCategoryChangedByCatapult(user, "g2", "Celeste", "g1", "Hades");
+
+        Map<String, Object> chat = published().payloads().getFirst().data();
+        assertThat(chat.get("message")).isEqualTo("Celeste");
+        assertThat((List<?>) chat.get("actions")).hasSize(1);
+    }
+
+    @Test
+    void dryRunDropsPayloadsThatActPublicly() {
+        when(dryRunRegistry.isActive(user.getId())).thenReturn(true);
+        when(eventActionService.enabledActions(user, CATEGORY_CHANGED_BY_CATAPULT)).thenReturn(List.of(
+                row("SEND_MESSAGE", "{\"message\":\"hi\"}"),
+                row("CHAT_POLL_START", "{\"title\":\"t\"}"),
+                row("ANIMATED_TEXT_SET", "{\"text\":\"x\"}"),
+                row("CUSTOM_CHAT_MESSAGE", "{\"message\":\"{{gameName}}\"}")));
+
+        dispatcher.onCategoryChangedByCatapult(user, "g2", "Celeste", "g1", "Hades");
+
+        TwitchatDispatch dispatch = published();
+        assertThat(dispatch.payloads()).extracting(p -> p.action()).containsExactly("CUSTOM_CHAT_MESSAGE");
+        assertThat(dispatch.payloads().getFirst().data().get("message")).isEqualTo("[dry run] Celeste");
+        for (String type : List.of("SEND_MESSAGE", "CHAT_POLL_START", "ANIMATED_TEXT_SET")) {
+            verify(activityLog).addEntry(user.getId(), "INFO", "[dry run] would have sent the Twitchat payload " + type);
+        }
+    }
+
+    @Test
+    void dryRunRemovesEveryButton() {
+        when(dryRunRegistry.isActive(user.getId())).thenReturn(true);
+        when(eventActionService.enabledActions(user, CATEGORY_CHANGED_BY_CATAPULT)).thenReturn(List.of(
+                row("CUSTOM_CHAT_MESSAGE", "{\"message\":\"x\",\"actions\":[{\"label\":\"Docs\",\"url\":\"https://example.org\"}]}")));
+
+        dispatcher.onCategoryChangedByCatapult(user, "g2", "Celeste", "g1", "Hades");
+
+        assertThat(published().payloads().getFirst().data().get("actions")).isEqualTo(List.of());
+    }
+
+    @Test
+    void dryRunStripsAnActionPlaceholderFromTheText() {
+        when(dryRunRegistry.isActive(user.getId())).thenReturn(true);
+        when(eventActionService.enabledActions(user, CATEGORY_CHANGED_BY_CATAPULT)).thenReturn(List.of(
+                row("CUSTOM_CHAT_MESSAGE", "{\"message\":\"go {{action:REVERT_CATEGORY}}\"}")));
+
+        dispatcher.onCategoryChangedByCatapult(user, "g2", "Celeste", "g1", "Hades");
+
+        assertThat(published().payloads().getFirst().data().get("message")).isEqualTo("[dry run] go ");
+        verifyNoInteractions(actionTokenService);
+    }
+
+    @Test
+    void prefixIsNotDoubled() {
+        when(dryRunRegistry.isActive(user.getId())).thenReturn(true);
+        when(eventActionService.enabledActions(user, CATEGORY_CHANGED_BY_CATAPULT)).thenReturn(List.of(
+                row("CUSTOM_CHAT_MESSAGE", "{\"message\":\"[dry run] {{gameName}}\"}")));
+
+        dispatcher.onCategoryChangedByCatapult(user, "g2", "Celeste", "g1", "Hades");
+
+        assertThat(published().payloads().getFirst().data().get("message")).isEqualTo("[dry run] Celeste");
     }
 
     @Test
@@ -362,5 +466,60 @@ class TwitchatEventDispatcherTest {
         dispatcher.onNotification(user, "Maintenance", "Ce soir", "", "");
 
         assertThat(published().payloads().getFirst().data().get("message")).isEqualTo("[Catapult] Maintenance — Ce soir");
+    }
+
+    @Test
+    void raidedByMember_rendersTheDefaultPayload_withTheRaiderAndTheirGames() throws Exception {
+        String defaultJson = tools.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(
+                TwitchatEventDefaults.chatMessage(RAIDED_BY_MEMBER));
+        when(eventActionService.enabledActions(user, RAIDED_BY_MEMBER)).thenReturn(List.of(
+                row("CUSTOM_CHAT_MESSAGE", defaultJson),
+                row("SEND_MESSAGE", "{\"message\":\"{{raider}} {{sessionDuration}}\"}")));
+        Instant raid = Instant.parse("2026-11-20T21:00:00Z");
+        SessionRecap recap = SessionRecap.of(List.of(
+                segment("1", "Factorio", "Factorio", raid.minus(Duration.ofMinutes(150)), raid.minus(Duration.ofMinutes(60))),
+                segment("509658", "Just Chatting", null, raid.minus(Duration.ofMinutes(60)), null)), raid);
+
+        dispatcher.onRaidedByMember(user, "RaiderA", recap);
+
+        TwitchatDispatch dispatch = published();
+        assertThat(dispatch.eventType()).isEqualTo("RAIDED_BY_MEMBER");
+        Map<String, Object> chat = dispatch.payloads().getFirst().data();
+        assertThat(chat.get("message")).isEqualTo(
+                "Pendant sa session de stream, RaiderA a joué à :\n- Factorio (Factorio) (1h30)\n- Just Chatting (1h)");
+        assertThat(chat.get("icon")).isEqualTo("raid");
+        assertThat(chat.get("actions")).isEqualTo(List.of());
+        assertThat(dispatch.payloads().get(1).data().get("message")).isEqualTo("RaiderA 2h30");
+        verifyNoInteractions(actionTokenService);
+    }
+
+    @Test
+    void raidedByMember_aFailure_isNeverPropagated() {
+        when(eventActionService.enabledActions(user, RAIDED_BY_MEMBER)).thenThrow(new IllegalStateException("db down"));
+
+        dispatcher.onRaidedByMember(user, "RaiderA", new SessionRecap(List.of(), Duration.ZERO));
+
+        verifyNoInteractions(channelEventPublisher);
+    }
+
+    @Test
+    void sendTest_raidedByMember_fillsTheRaidVariables() {
+        dispatcher.sendTest(user, RAIDED_BY_MEMBER, List.of(new TwitchatEventActionDto("SEND_MESSAGE", "FORM",
+                "{\"message\":\"{{raider}}|{{games}}|{{sessionDuration}}\"}", true)));
+
+        String message = (String) published().payloads().getFirst().data().get("message");
+        assertThat(message.split("\\|")).hasSize(3).allSatisfy(part -> assertThat(part).isNotBlank());
+        assertThat(message).doesNotContain("{{");
+    }
+
+    private static StreamCategorySegment segment(String categoryId, String categoryName, String gameName,
+                                                 Instant start, Instant end) {
+        StreamCategorySegment segment = new StreamCategorySegment();
+        segment.setCategoryId(categoryId);
+        segment.setCategoryName(categoryName);
+        segment.setGameName(gameName);
+        segment.setStartedAt(start);
+        segment.setEndedAt(end);
+        return segment;
     }
 }

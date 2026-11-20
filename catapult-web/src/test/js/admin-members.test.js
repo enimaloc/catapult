@@ -28,6 +28,8 @@ function page() {
                 <mdui-menu-item data-action="debug-enable"></mdui-menu-item>
                 <mdui-menu-item data-action="debug/disable"></mdui-menu-item>
                 <mdui-menu-item data-action="debug/clear" data-confirm="Delete the recording?"></mdui-menu-item>
+                <mdui-menu-item data-action="dry-run/enable" data-confirm="Put enimaloc in dry run?"></mdui-menu-item>
+                <mdui-menu-item data-action="dry-run/disable"></mdui-menu-item>
             </div>
         </div>
         <div id="admin-debug-dialog" data-headline="Debug mode for {0}">
@@ -327,6 +329,36 @@ describe("admin-members", () => {
             confirmAnswer = true;
             await click('[data-action="debug/clear"]');
             expect(posts()).toEqual([[`/admin/members/${ID}/debug/disable`, {}], [`/admin/members/${ID}/debug/clear`, {}]]);
+        });
+    });
+
+    describe("dry run", () => {
+        it("turns it on once confirmed, then re-renders; nothing is sent when the admin cancels", async () => {
+            page();
+            confirmAnswer = false;
+            await click('[data-action="dry-run/enable"]');
+            expect(posts()).toEqual([]);
+
+            confirmAnswer = true;
+            await click('[data-action="dry-run/enable"]');
+            expect(mdui.confirm).toHaveBeenLastCalledWith(expect.objectContaining({ headline: "Put enimaloc in dry run?" }));
+            expect(posts()).toEqual([[`/admin/members/${ID}/dry-run/enable`, {}]]);
+            expect(refreshed()).toBe(1);
+        });
+
+        it("turns it off without asking", async () => {
+            page();
+            await click('[data-action="dry-run/disable"]');
+            expect(mdui.confirm).not.toHaveBeenCalled();
+            expect(posts()).toEqual([[`/admin/members/${ID}/dry-run/disable`, {}]]);
+        });
+
+        it("keeps the list as it was and tells a refusal (already in dry run)", async () => {
+            page();
+            posted.mockResolvedValueOnce(response(409));
+            await click('[data-action="dry-run/enable"]');
+            expect(refreshed()).toBe(0);
+            expect(document.querySelector("mdui-snackbar")?.textContent).toContain("409");
         });
     });
 

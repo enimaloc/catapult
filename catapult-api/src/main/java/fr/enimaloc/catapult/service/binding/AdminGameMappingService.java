@@ -298,7 +298,7 @@ public class AdminGameMappingService {
             // Skipped (offline since the transaction picked it, bot disabled, no fallback for an INCOMPLETE binding):
             // neither updated nor failed, never kept pending.
             switch (outcome.status()) {
-                case APPLIED -> updated++;
+                case APPLIED, DRY_RUN -> updated++;
                 case FAILED -> {
                     failed++;
                     log.warn("Twitch did not update the live channel of user {} after a game mapping change",

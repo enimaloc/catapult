@@ -129,6 +129,10 @@ val npmInstall = tasks.register<Exec>("npmInstall") {
 // VitestTest runs the suite from node_modules: a fresh checkout (CI) must install it first.
 tasks.named<Test>("test") {
     dependsOn(npmInstall)
+    // A CI shard leaves the suite to jsTest, which runs it once with coverage and its threshold
+    if (providers.gradleProperty("testShard").isPresent) {
+        filter.excludeTestsMatching("*VitestTest")
+    }
 }
 
 val jsTest = tasks.register<Exec>("jsTest") {

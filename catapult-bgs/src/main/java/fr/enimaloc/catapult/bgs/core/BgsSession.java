@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.reflect.AccessFlag;
 import java.lang.reflect.Field;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -40,14 +41,22 @@ public final class BgsSession implements BgsChannel {
     private record Handler(ServiceMethod<?, ?> method, Consumer<ByteString> body) {
     }
 
+    /** A call of ours awaiting its reply that the wire tap asked to observe. */
+    private record Tapped(WireTap tap, Instant at, long startNanos, Header header, ByteString body,
+                          ServiceMethod<?, ?> method) {
+    }
+
     private final BgsTransport transport;
     private final OutputStream out;
     private final ExecutorService loop = Executors.newSingleThreadExecutor(
             r -> Thread.ofPlatform().name("bgs-session").daemon().unstarted(r));
     private final Map<Integer, CompletableFuture<ByteString>> pending = new HashMap<>();
+    /** The pending calls the wire tap wanted, by token; empty unless a tap wants something. */
+    private final Map<Integer, Tapped> tapped = new HashMap<>();
     private final Map<Long, Handler> handlers = new ConcurrentHashMap<>();
     private final List<Consumer<Throwable>> closeListeners = new ArrayList<>();
     private volatile String ciid = "";
+    private volatile WireTap wireTap;
     private int nextToken;
     private volatile boolean closed;
     private volatile Throwable closeCause;
@@ -75,7 +84,7 @@ public final class BgsSession implements BgsChannel {
         boolean withCiid = method.service().contains("friends") || method.service().contains("presence");
         post(() -> {
             if (!method.hasResponse()) {
-                send(method.serviceHash(), method.methodId(), request.toByteString(), withCiid, null);
+                send(method.serviceHash(), method.methodId(), request.toByteString(), withCiid, method, null);
                 result.complete(null);
                 return;
             }
@@ -91,7 +100,7 @@ public final class BgsSession implements BgsChannel {
                     result.completeExceptionally(e);
                 }
             });
-            send(method.serviceHash(), method.methodId(), request.toByteString(), withCiid, raw);
+            send(method.serviceHash(), method.methodId(), request.toByteString(), withCiid, method, raw);
         }, result);
         return result;
     }
@@ -99,13 +108,14 @@ public final class BgsSession implements BgsChannel {
     @Override
     public void callNoReply(ServiceMethod<?, ?> method, Message request) {
         boolean withCiid = method.service().contains("friends") || method.service().contains("presence");
-        post(() -> send(method.serviceHash(), method.methodId(), request.toByteString(), withCiid, null), null);
+        post(() -> send(method.serviceHash(), method.methodId(), request.toByteString(), withCiid, method, null),
+                null);
     }
 
     @Override
     public CompletableFuture<ByteString> callRaw(int serviceHash, int methodId, ByteString body, boolean withCiid) {
         CompletableFuture<ByteString> result = new CompletableFuture<>();
-        post(() -> send(serviceHash, methodId, body, withCiid, result), result);
+        post(() -> send(serviceHash, methodId, body, withCiid, null, result), result);
         return result;
     }
 
@@ -154,6 +164,11 @@ public final class BgsSession implements BgsChannel {
     }
 
     @Override
+    public void setWireTap(WireTap tap) {
+        this.wireTap = tap;
+    }
+
+    @Override
     public Executor loop() {
         return loop;
     }
@@ -165,7 +180,7 @@ public final class BgsSession implements BgsChannel {
 
     // --- loop thread ---
 
-    private void send(int serviceHash, int methodId, ByteString body, boolean withCiid,
+    private void send(int serviceHash, int methodId, ByteString body, boolean withCiid, ServiceMethod<?, ?> method,
                       CompletableFuture<ByteString> reply) {
         if (closed) {
             if (reply != null) {
@@ -175,14 +190,24 @@ public final class BgsSession implements BgsChannel {
         }
         int token = nextToken++;
         Header.Builder header = Header.newBuilder().setServiceId(0).setServiceHash(serviceHash)
-                .setMethodId(methodId).setToken(token);
+                .setMethodId(methodId).setToken(token).setSize(body.size());
         if (withCiid && !ciid.isEmpty()) {
             header.setCiid(ciid);
         }
+        Header built = header.build();
+        WireTap tap = wantingTap();
+        Instant at = tap != null ? Instant.now() : null;
+        long start = tap != null ? System.nanoTime() : 0;
         if (reply != null) {
             pending.put(token, reply);
+            if (tap != null) {
+                tapped.put(token, new Tapped(tap, at, start, built, body, method));
+            }
         }
-        write(header.build(), body);
+        write(built, body);
+        if (tap != null && reply == null) {
+            tell(tap, new WireExchange(true, at, 0, built, body, null, null, method, null));
+        }
     }
 
     private void write(Header header, ByteString body) {
@@ -198,22 +223,39 @@ public final class BgsSession implements BgsChannel {
         Header h = frame.header();
         if (h.getServiceId() == REPLY) {
             CompletableFuture<ByteString> reply = pending.remove(h.getToken());
+            Tapped call = tapped.isEmpty() ? null : tapped.remove(h.getToken());
             if (reply == null) {
                 return;
             }
+            String error = null;
             if (h.getStatus() != 0) {
-                reply.completeExceptionally(new BgsRpcException(h.getStatus()));
+                BgsRpcException failure = new BgsRpcException(h.getStatus());
+                error = failure.getMessage();
+                reply.completeExceptionally(failure);
             } else {
                 reply.complete(frame.body());
+            }
+            if (call != null) {
+                tell(call.tap(), new WireExchange(true, call.at(), System.nanoTime() - call.startNanos(),
+                        call.header(), call.body(), h, frame.body(), call.method(), error));
             }
             return;
         }
         long key = key(h.getServiceHash(), h.getMethodId());
         Handler handler = handlers.get(key);
         ServiceMethod<?, ?> method = handler != null && handler.method() != null ? handler.method() : KNOWN.get(key);
+        WireTap tap = wantingTap();
+        Instant at = tap != null ? Instant.now() : null;
+        long start = tap != null ? System.nanoTime() : 0;
+        Header ack = null;
         // Same as the reference client: unknown methods and methods with a response get an empty ack
         if (method == null || method.hasResponse()) {
-            write(Header.newBuilder().setServiceId(REPLY).setToken(h.getToken()).build(), ByteString.EMPTY);
+            ack = Header.newBuilder().setServiceId(REPLY).setToken(h.getToken()).setSize(0).build();
+            write(ack, ByteString.EMPTY);
+        }
+        if (tap != null) {
+            tell(tap, new WireExchange(false, at, ack != null ? System.nanoTime() - start : 0, h, frame.body(), ack,
+                    ack != null ? ByteString.EMPTY : null, method, null));
         }
         if (handler != null) {
             runQuietly("handler " + describe(h.getServiceHash(), h.getMethodId()), () -> handler.body().accept(frame.body()));
@@ -230,9 +272,31 @@ public final class BgsSession implements BgsChannel {
         Throwable failure = cause != null ? cause : new IOException("Session closed");
         pending.values().forEach(f -> f.completeExceptionally(failure));
         pending.clear();
+        String error = failure.getMessage() != null ? failure.getMessage() : failure.getClass().getSimpleName();
+        tapped.values().forEach(call -> tell(call.tap(), new WireExchange(true, call.at(),
+                System.nanoTime() - call.startNanos(), call.header(), call.body(), null, null, call.method(), error)));
+        tapped.clear();
         closeListeners.forEach(l -> runQuietly("close listener", () -> l.accept(cause)));
         closeListeners.clear();
         loop.shutdown();
+    }
+
+    /** The wire tap when there is one and it wants the exchange starting now, otherwise null. */
+    private WireTap wantingTap() {
+        WireTap tap = wireTap;
+        if (tap == null) {
+            return null;
+        }
+        try {
+            return tap.wants() ? tap : null;
+        } catch (RuntimeException e) {
+            LOG.log(System.Logger.Level.WARNING, "BGS session wire tap failed", e);
+            return null;
+        }
+    }
+
+    private static void tell(WireTap tap, WireExchange exchange) {
+        runQuietly("wire tap", () -> tap.onExchange(exchange));
     }
 
     // --- reader thread ---

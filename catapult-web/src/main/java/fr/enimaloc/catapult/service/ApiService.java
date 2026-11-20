@@ -82,6 +82,7 @@ import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatValidationError;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatSettingsResponse;
+import fr.enimaloc.catapult.common.dto.debug.ClientExchangeBatch;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetAccessResponse;
 
@@ -151,6 +152,18 @@ public interface ApiService {
      * (404 unknown), 502 when unreachable; the body only on a 200.
      */
     ApiClient.Result<TwitchatWidgetAccessResponse> widgetAccess(UUID token);
+    /**
+     * Records {@code batch}, the OBS and Twitchat exchanges seen by the page of {@code userId} (the logged-in member),
+     * in their debug journal: catapult-api's status (204 recorded, 409 not in debug mode, 400 no batch or over its
+     * limits), 401 without a member, 502 when unreachable.
+     */
+    ApiClient.Result<Void> postClientDebugExchanges(UUID userId, ClientExchangeBatch batch);
+    /**
+     * Records {@code batch}, the exchanges seen by the OBS widget {@code token} (anonymous), in its owner's debug
+     * journal: catapult-api's status (as {@link #postClientDebugExchanges}, and 404 for no enabled widget), 502 when
+     * unreachable.
+     */
+    ApiClient.Result<Void> postWidgetClientDebugExchanges(UUID token, ClientExchangeBatch batch);
     /** The channel's Twitchat widget settings (the owner's); null when refused or unreachable. */
     TwitchatSettingsResponse twitchatSettings(String username);
     /**
@@ -238,6 +251,16 @@ public interface ApiService {
     List<String> memberDebugServices(java.util.UUID memberId);
     /** Whether the logged-in member is in debug mode, and their replay rate; null when catapult-api could not tell. */
     fr.enimaloc.catapult.common.dto.MyDebugDto myDebug();
+
+    // --- a member's dry run (Catapult then changes nothing on their channel) ---
+    /** Puts the member in dry run: catapult-api's status (409 already in it, 404 unknown member), 502 when unreachable. */
+    int enableMemberDryRun(java.util.UUID memberId);
+    /** Takes the member out of dry run (a no-op when not in it): catapult-api's status, 502 when unreachable. */
+    int disableMemberDryRun(java.util.UUID memberId);
+    /** Whether the logged-in member is in dry run, and since when; null when catapult-api could not tell or nobody is. */
+    fr.enimaloc.catapult.common.dto.DryRunStateDto myDryRun();
+    /** The logged-in member's own way out of dry run: catapult-api's status, 401 logged out, 502 when unreachable. */
+    int disableMyDryRun();
     /** Copies the chosen parts of a member's data onto another member. */
     int adminMigrateMember(java.util.UUID memberId, java.util.UUID targetId,
                             boolean settings, boolean getters, boolean bindings);
@@ -658,6 +681,27 @@ public interface ApiService {
     List<fr.enimaloc.catapult.dto.changelog.ChangelogSection> changelog();
     /** Whether catapult-api runs degraded, with the properties it changes; null when it can't say. */
     DegradedStatusDto degradedStatus();
+
+    /** The active global emergency stops, for the banner; null when catapult-api can't say. */
+    fr.enimaloc.catapult.common.dto.emergency.EmergencyStatusDto emergencyStatus();
+
+    /** The channel's bot state, own stops and the global ones on its providers (owner only); null when refused or down. */
+    fr.enimaloc.catapult.common.dto.emergency.ChannelEmergencyDto channelEmergency(String username);
+
+    /** Lifts the channel's own emergency stops (owner only); catapult-api's status, 502 when unreachable. */
+    int resumeChannelEmergency(String username);
+    /** The emergency stops for the admin tab: the active ones, or (not {@code active}) the history; null when it fails. */
+    List<fr.enimaloc.catapult.common.dto.emergency.EmergencyStopDto> adminEmergencyStops(boolean active);
+
+    /** One page of the emergency reports, newest first; null when catapult-api fails. */
+    List<fr.enimaloc.catapult.common.dto.emergency.EmergencyReportDto> adminEmergencyReports(int page);
+
+    /** Stops a provider ({@code ALL}: every one) instance-wide until resumed; catapult-api's status, 502 when unreachable. */
+    int adminEmergencyStop(String provider);
+
+    /** Lifts the stops of a provider ({@code ALL}: every one); catapult-api's status, 502 when unreachable. */
+    int adminEmergencyResume(String provider);
+
     /** Whether catapult-api answers and reports itself up (its health, asked without the session's bearer). */
     boolean apiAvailable();
 

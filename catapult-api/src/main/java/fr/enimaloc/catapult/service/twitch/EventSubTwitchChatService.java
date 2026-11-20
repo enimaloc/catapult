@@ -12,6 +12,9 @@ import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.debug.DebugContext;
 import fr.enimaloc.catapult.service.debug.DebugRecording;
+import fr.enimaloc.catapult.service.emergency.MentionSender;
+import fr.enimaloc.catapult.service.emergency.SystemMention;
+import fr.enimaloc.catapult.service.emergency.SystemMentionEvent;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
 import fr.enimaloc.catapult.simulation.SimulatedCalls;
 import fr.enimaloc.catapult.simulation.SimulationGate;
@@ -27,6 +30,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 
 import java.time.Instant;
 import java.util.List;
@@ -115,8 +119,9 @@ public class EventSubTwitchChatService implements TwitchChatService {
             log.info("[EventSub Chat] Standby site — no connection opened");
             return;
         }
-        var users = userAccountRepository.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE);
-        log.info("[EventSub Chat] Bootstrapping connections for {} active bot-enabled user(s)", users.size());
+        // Disabled bots included: they keep listening so that they can hear `on`
+        var users = userAccountRepository.findByStatus(UserAccount.Status.ACTIVE);
+        log.info("[EventSub Chat] Bootstrapping connections for {} active user(s)", users.size());
         users.forEach(this::connect);
     }
 
@@ -149,6 +154,11 @@ public class EventSubTwitchChatService implements TwitchChatService {
                 () -> log.warn("[EventSub Chat] No Twitch token for user {} ({}) — chat events disabled",
                         user.getId(), user.getTwitchUsername())
             );
+    }
+
+    @Override
+    public boolean isConnected(UserAccount user) {
+        return connections.isOpen(user);
     }
 
     @Override
@@ -223,24 +233,53 @@ public class EventSubTwitchChatService implements TwitchChatService {
         if ("channel.chat.message".equals(subscriptionType)) {
             String text = event.path("message").path("text").asText();
             meterRegistry.counter("catapult.chat.messages", "transport", "eventsub").increment();
-            if (!text.startsWith("!")) return;
+            ChatCommandEvent.SenderRole role = extractRole(event);
+            String senderTwitchId = event.path("chatter_user_id").asText(null);
+
+            // A mention of the system account is answered even by a disabled bot, which only hears `on`
+            Optional<SystemMention> mention = SystemMention.parse(event.path("message"),
+                    systemTwitchAccountService::getSystemTwitchId);
+            if (mention.isPresent()) {
+                if (!fromThisChannel(user, event)) {
+                    // Shared chat relays messages of the other channels of the session: they cannot act here
+                    log.debug("[EventSub Chat] Mention ignored in #{}: it comes from another channel",
+                            user.getTwitchUsername());
+                    return;
+                }
+                MentionSender sender = new MentionSender(senderTwitchId,
+                        event.path("chatter_user_login").asText(null), role);
+                eventPublisher.publishEvent(new SystemMentionEvent(user, sender, mention.get()));
+                return;
+            }
+            if (!text.startsWith("!") || !isBotEnabled(user)) return;
 
             String[] parts = text.substring(1).split(" ", 2);
             String command = "!" + parts[0];
             List<String> args = parts.length > 1 ? List.of(parts[1].split(" ")) : List.of();
-            ChatCommandEvent.SenderRole role = extractRole(event);
-            String senderTwitchId = event.path("chatter_user_id").asText(null);
 
             log.info("[EventSub Chat] {} in #{}: {} (sender role={})",
                     command, user.getTwitchUsername(), text, role);
             eventPublisher.publishEvent(new ChatCommandEvent(this, user, command, args, role, senderTwitchId));
 
         } else if ("channel.channel_points_custom_reward_redemption.add".equals(subscriptionType)) {
+            if (!isBotEnabled(user)) return;
             String rewardTitle = event.path("reward").path("title").asText();
             eventPublisher.publishEvent(new ChatCommandEvent(this, user, "reward:" + rewardTitle,
                 List.of(), ChatCommandEvent.SenderRole.VIEWERS));
             log.info("[EventSub Chat] Reward redeemed: '{}' for user {}", rewardTitle, user.getId());
         }
+    }
+
+    private static boolean fromThisChannel(UserAccount user, JsonNode event) {
+        String broadcaster = event.path("broadcaster_user_id").asText("");
+        String source = event.path("source_broadcaster_user_id").asText("");
+        return broadcaster.equals(user.getTwitchId()) && (source.isEmpty() || source.equals(broadcaster));
+    }
+
+    /** Read again from the database: the user a connection captured when it opened may be stale. */
+    private boolean isBotEnabled(UserAccount user) {
+        return userAccountRepository.findById(user.getId()).map(UserAccount::isBotEnabled)
+                .orElse(user.isBotEnabled());
     }
 
     /**
@@ -261,10 +300,22 @@ public class EventSubTwitchChatService implements TwitchChatService {
         return ChatCommandEvent.SenderRole.VIEWERS;
     }
 
+    private static final String CHAT_MESSAGE_TYPE = "channel.chat.message";
+
+    /**
+     * The chat subscription cannot succeed by retrying (token dead or revoked, missing scope, undecryptable token...):
+     * reopening the socket would only loop forever (welcome, refused, closed by Twitch).
+     */
+    private static final class DeadToken extends RuntimeException {
+        DeadToken(String reason) {
+            super(reason, null, false, false);
+        }
+    }
+
     private void subscribe(UserAccount user, OAuthToken token, String sessionId) {
-        String accessToken = twitchTokenService.resolveAccessToken(token, user);
         try {
-            subscribeEvent(user, token, accessToken, sessionId, "channel.chat.message",
+            String accessToken = twitchTokenService.resolveAccessToken(token, user);
+            subscribeEvent(user, token, accessToken, sessionId, CHAT_MESSAGE_TYPE,
                 Map.of("broadcaster_user_id", user.getTwitchId(), "user_id", user.getTwitchId()));
             subscribeEvent(user, token, accessToken, sessionId,
                 "channel.channel_points_custom_reward_redemption.add",
@@ -274,11 +325,29 @@ public class EventSubTwitchChatService implements TwitchChatService {
             log.warn("[EventSub Chat] Twitch refused a subscription for user {}, opening a new session: {}",
                 user.getId(), e.getMessage());
             connections.reopen(user, token);
+        } catch (DeadToken e) {
+            giveUp(user, e.getMessage());
+        } catch (RuntimeException e) {
+            // The token itself could not be read (decryption, refresh...): nothing to subscribe with
+            giveUp(user, e.getClass().getSimpleName() + ": " + e.getMessage());
         }
+    }
+
+    private void giveUp(UserAccount user, String reason) {
+        log.warn("[EventSub Chat] Cannot subscribe the chat of user {} ({}) — closing it, no reconnection",
+            user.getId(), reason);
+        connections.forbidReconnect(user);
+        connections.close(user, "subscription failed");
+    }
+
+    /** A refusal retrying cannot fix: a client error other than 429. Server errors and network faults are transient. */
+    private static boolean permanent(Exception e) {
+        return e instanceof HttpClientErrorException && !(e instanceof HttpClientErrorException.TooManyRequests);
     }
 
     private void subscribeEvent(UserAccount user, OAuthToken token, String accessToken, String sessionId,
                                 String type, Map<String, String> condition) {
+        boolean chat = CHAT_MESSAGE_TYPE.equals(type);
         try {
             postSubscription(accessToken, sessionId, type, condition);
             log.info("[EventSub Chat] Subscribed {} for user {} ({})",
@@ -291,6 +360,7 @@ public class EventSubTwitchChatService implements TwitchChatService {
             if (refreshed == null) {
                 log.warn("[EventSub Chat] Failed to subscribe to {} for user {}: token refresh failed",
                     type, user.getId());
+                if (chat) throw new DeadToken("token refresh failed");
                 return;
             }
             try {
@@ -300,10 +370,16 @@ public class EventSubTwitchChatService implements TwitchChatService {
             } catch (Exception retryEx) {
                 log.warn("[EventSub Chat] Failed to subscribe to {} for user {} after refresh: {}",
                     type, user.getId(), retryEx.getMessage());
+                if (chat && (permanent(retryEx) || !(retryEx instanceof RestClientException))) {
+                    throw new DeadToken(retryEx.getMessage());
+                }
             }
         } catch (Exception e) {
             log.warn("[EventSub Chat] Failed to subscribe to {} for user {}: {}",
                 type, user.getId(), e.getMessage());
+            if (chat && (permanent(e) || !(e instanceof RestClientException))) {
+                throw new DeadToken(e.getMessage());
+            }
         }
     }
 
@@ -444,6 +520,11 @@ public class EventSubTwitchChatService implements TwitchChatService {
     @Override
     public Optional<TwitchStreamInfo> getStreamInfo(UserAccount user) {
         return mapAccessToken(user, accessToken -> helix.streamInfo(user, accessToken));
+    }
+
+    @Override
+    public Optional<String> archiveVideoId(UserAccount user, String streamId) {
+        return mapAccessToken(user, accessToken -> helix.archiveVideoId(user, accessToken, streamId));
     }
 
     @Override

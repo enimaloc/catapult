@@ -109,10 +109,7 @@ public class SessionDebug {
     public void inbound(UUID serviceAccountId, Predicate<String> concerns, String method, Supplier<String> body,
                         Supplier<String> operation) {
         try {
-            List<UUID> concerned = linked(serviceAccountId).stream()
-                    .filter(e -> e.getValue().keys().stream().anyMatch(concerns))
-                    .map(Map.Entry::getKey)
-                    .toList();
+            List<UUID> concerned = concerned(serviceAccountId, concerns);
             if (concerned.isEmpty()) {
                 return;
             }
@@ -124,6 +121,39 @@ public class SessionDebug {
         } catch (RuntimeException e) {
             log.warn("Could not record a {} message for the members in debug mode: {}", service, e.toString());
         }
+    }
+
+    /**
+     * Records an exchange of the session of {@code serviceAccountId} (a call and its reply, decoded and raw), for
+     * each member in debug mode it concerns: those with a key {@code concerns} accepts. Its URI, when it has none,
+     * is the session's.
+     *
+     * @param exchange  the exchange; only evaluated when it concerns a member in debug mode
+     * @param operation names the exchange
+     */
+    public void exchange(UUID serviceAccountId, Predicate<String> concerns, Direction direction,
+                         Supplier<RawExchange> exchange, String operation) {
+        try {
+            List<UUID> concerned = concerned(serviceAccountId, concerns);
+            if (concerned.isEmpty()) {
+                return;
+            }
+            RawExchange e = exchange.get();
+            RawExchange raw = e.uri() != null ? e : new RawExchange(e.at(), e.method(), uri, e.requestHeaders(),
+                    e.requestBody(), e.status(), e.responseHeaders(), e.responseBody(), e.error(), e.durationMs(),
+                    e.requestRaw(), e.responseRaw());
+            concerned.forEach(userId -> recorder.record(userId, direction, raw, operation, false, service));
+        } catch (RuntimeException e) {
+            log.warn("Could not record a {} exchange for the members in debug mode: {}", service, e.toString());
+        }
+    }
+
+    /** The members in debug mode linked to {@code serviceAccountId} with a key {@code concerns} accepts. */
+    private List<UUID> concerned(UUID serviceAccountId, Predicate<String> concerns) {
+        return linked(serviceAccountId).stream()
+                .filter(e -> e.getValue().keys().stream().anyMatch(concerns))
+                .map(Map.Entry::getKey)
+                .toList();
     }
 
     /**

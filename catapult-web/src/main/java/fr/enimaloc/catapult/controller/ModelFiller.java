@@ -10,9 +10,12 @@ import fr.enimaloc.catapult.dto.index.FeatureDto;
 import fr.enimaloc.catapult.dto.index.PlatformDto;
 import fr.enimaloc.catapult.dto.index.SpaPage;
 import fr.enimaloc.catapult.service.ApiService;
+import fr.enimaloc.catapult.service.debug.DebugMembers;
+import fr.enimaloc.catapult.service.dryrun.DryRunMembers;
 import fr.enimaloc.catapult.service.degraded.DegradedLabels;
 import fr.enimaloc.catapult.service.degraded.DegradedState;
 import fr.enimaloc.catapult.service.degraded.DegradedView;
+import fr.enimaloc.catapult.service.emergency.EmergencyState;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.http.HttpServletRequest;
@@ -69,6 +72,9 @@ public class ModelFiller {
     private final ObjectProvider<DegradedState> degradedState;
     private final ObjectProvider<DegradedLabels> degradedLabels;
     private final ObjectProvider<LaunchedPlatforms> launchedPlatforms;
+    private final ObjectProvider<EmergencyState> emergencyState;
+    private final ObjectProvider<DebugMembers> debugMembers;
+    private final ObjectProvider<DryRunMembers> dryRunMembers;
 
     public void defaultAttr(Model model, String page) {
         LaunchedPlatforms launched = launchedPlatforms.getIfAvailable();
@@ -80,8 +86,9 @@ public class ModelFiller {
     /**
      * Full-page variant: also the head's {@link Seo} and admin-configured meta tags, the localized
      * titles spa.js swaps in on client-side navigation, the degraded banner's {@link DegradedView} and
-     * {@link DegradedLabels}, and the navbar's login and admin states (its channels come after, see
-     * {@link #navChannels(Model)}).
+     * {@link DegradedLabels}, the navbar's login and admin states (its channels come after, see
+     * {@link #navChannels(Model)}), and whether the page records its OBS and Twitchat exchanges for the member's debug
+     * journal (debugCapture), and whether the member is in dry run (the shell's banner, dryRun).
      */
     public void defaultAttr(Model model, String page, Locale locale) {
         defaultAttr(model, page);
@@ -99,9 +106,29 @@ public class ModelFiller {
         // For degraded.js, in data-* attributes: Thymeleaf forbids static calls there, and escapes the JSON
         model.addAttribute("degradedJson", JSON.writeValueAsString(degraded));
         model.addAttribute("degradedLabelsJson", JSON.writeValueAsString(effectLabels));
+        EmergencyState emergency = emergencyState.getIfAvailable();
+        model.addAttribute("emergency", emergency == null ? List.of() : emergency.globalStops());
         model.addAttribute("loggedIn", ApiClient.hasSession());
         model.addAttribute("admin", isAdmin());
-        model.addAttribute("impersonatedLogin", impersonatedLogin());
+        String impersonated = impersonatedLogin();
+        model.addAttribute("impersonatedLogin", impersonated);
+        model.addAttribute("debugCapture", impersonated == null && debugCapture());
+        model.addAttribute("dryRun", dryRun());
+    }
+
+    /** Whether the logged-in member is in dry run; never for a visitor, and false when it cannot be told. */
+    private boolean dryRun() {
+        DryRunMembers dryRun = dryRunMembers.getIfAvailable();
+        return ApiClient.hasSession() && dryRun != null && dryRun.isCurrentActive();
+    }
+
+    /**
+     * Whether the logged-in member is in debug mode, their page then capturing its OBS and Twitchat exchanges; never
+     * for a visitor, nor for an admin impersonating a member (the caller checks): their browser is not the member's.
+     */
+    private boolean debugCapture() {
+        DebugMembers debug = debugMembers.getIfAvailable();
+        return ApiClient.hasSession() && debug != null && debug.isCurrentActive();
     }
 
     /** What the degraded banner shows; not degraded without a {@link DegradedState} (or a view from it). */
@@ -266,6 +293,8 @@ public class ModelFiller {
         model.addAttribute("settingsUnavailable", settings == null);
         model.addAttribute("dtddMapping", apiService.dtddMappingStatus(username));
         if (channelPage.isOwner()) {
+            // Null when catapult-api fails to give it: the status card then shows no emergency, the rest still counts.
+            model.addAttribute("channelEmergency", apiService.channelEmergency(username));
             var twitchatEvents = channelPage.twitchat() == null ? Map.<String, List<TwitchatEventActionDto>>of()
                     : apiService.twitchatEvents(username);
             // Only when there is something to put the widget's token in: OBS.
