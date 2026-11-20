@@ -28,8 +28,8 @@
  * one "dropped" entry per service for that minute, sent once the minute is over. A Twitchat
  * answer is recorded twice, in the action it settles and as the event it is, both counting
  * toward that bound. A failed batch is dropped, never sent again; a 409 (the debug mode ended)
- * stops the capture. When the page goes away, what is left goes in batches small enough for a
- * beacon or a keepalive fetch.
+ * stops the capture, and so does a 404 on the widget (its widget switched off). When the page
+ * goes away, what is left goes in batches small enough for a beacon or a keepalive fetch.
  */
 window.CatapultDebugCapture = (function () {
     const PAGE_URL = "/me/debug/client-exchanges";
@@ -377,7 +377,9 @@ window.CatapultDebugCapture = (function () {
         const sent = target;
         fetch(url, { method: "POST", headers, body: json, keepalive: !!leaving })
             .then((answer) => {
-                if (answer.status === 409 && target === sent) capture.disable();
+                // 409: the debug mode ended; 404 on the widget: its widget was switched off.
+                const over = answer.status === 409 || (answer.status === 404 && sent.source === "widget");
+                if (over && target === sent) capture.disable();
             })
             .catch(() => {});
     }

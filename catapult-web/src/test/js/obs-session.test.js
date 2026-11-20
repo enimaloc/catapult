@@ -274,6 +274,23 @@ describe("debug capture", () => {
         expect(CatapultDebugCapture.disable).toHaveBeenCalledTimes(1);
     });
 
+    it("on the widget page, keeps reading its config when applying one throws", async () => {
+        document.body.dataset.obsConfigUrl = "/widget/obs/t-1/config";
+        window.CatapultTwitchat = { configure: vi.fn(() => { throw new TypeError("unknown branch"); }) };
+        try {
+            await start(response(200, { ...CONFIG, debugCapture: true }));
+            expect(connects).toHaveLength(1);
+            expect(CatapultDebugCapture.enable).toHaveBeenCalledWith(WIDGET);
+            await vi.advanceTimersByTimeAsync(60000);
+            await vi.advanceTimersByTimeAsync(60000);
+            expect(fetch).toHaveBeenCalledTimes(3);
+            expect(CatapultTwitchat.configure).toHaveBeenCalledTimes(3);
+            expect(CatapultDebugCapture.enable).toHaveBeenCalledTimes(3);
+        } finally {
+            delete window.CatapultTwitchat;
+        }
+    });
+
     it("on the widget page, reconnects to a config changed meanwhile", async () => {
         document.body.dataset.obsConfigUrl = "/widget/obs/t-1/config";
         await start(response(200, CONFIG));

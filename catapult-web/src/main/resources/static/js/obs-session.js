@@ -72,9 +72,17 @@ window.CatapultObsSession = (function () {
         return a?.obsHost === b?.obsHost && a?.obsPort === b?.obsPort && a?.obsPassword === b?.obsPassword;
     }
 
-    /** Applies a config read: Twitchat's branch, and the debug capture when there is a config. */
+    /**
+     * Applies a config read: Twitchat's branch, and the debug capture when there is a config. A
+     * branch Twitchat refuses leaves it as it was, and never stops the rest (connection, capture,
+     * the widget's next read).
+     */
     function apply(next) {
-        window.CatapultTwitchat?.configure(next?.twitchatBranch ?? "auto");
+        try {
+            window.CatapultTwitchat?.configure(next?.twitchatBranch ?? "auto");
+        } catch (error) {
+            console.warn(`[obs] Twitchat branch not applied: ${error?.message}`);
+        }
         const capture = window.CatapultDebugCapture;
         if (!capture || !next) return;
         if (!next.debugCapture) {
@@ -100,8 +108,8 @@ window.CatapultObsSession = (function () {
             await use(++generation, next);
             return;
         }
-        if (next) apply(next);
         configTimer = setTimeout(reload, CONFIG_RELOAD_MS);
+        if (next) apply(next);
     }
 
     /** Re-reads the config (/me/obs by default), then connects, reconnects or disconnects to match it. */

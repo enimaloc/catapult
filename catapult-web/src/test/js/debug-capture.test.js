@@ -178,6 +178,21 @@ describe("answers", () => {
         expect(fetch).toHaveBeenCalledTimes(1);
     });
 
+    it("stops the widget's capture on a 404 (its widget switched off), not the page's", async () => {
+        fetch.mockResolvedValue(response(404));
+        CatapultDebugCapture.enable(PAGE);
+        CatapultDebugCapture.record(entry());
+        CatapultDebugCapture.flush();
+        await vi.advanceTimersByTimeAsync(0);
+        expect(CatapultDebugCapture.active()).toBe(true);
+
+        CatapultDebugCapture.enable(WIDGET);
+        CatapultDebugCapture.record(entry());
+        CatapultDebugCapture.flush();
+        await vi.advanceTimersByTimeAsync(0);
+        expect(CatapultDebugCapture.active()).toBe(false);
+    });
+
     it("dropsABatchOnOtherFailures", async () => {
         CatapultDebugCapture.enable(PAGE);
         for (const failure of [async () => response(429), async () => response(400), async () => { throw new TypeError("down"); }]) {
