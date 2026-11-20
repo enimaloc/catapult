@@ -12,6 +12,10 @@
  * While a bot is NEW, or CODE_REQUIRED with a login waiting for its code (its row's data-auth-state and
  * data-waiting-code), the tab is patched every 3 s, so its login progress shows without a reload; the
  * polling stops once none is, once the card has left the page and when another admin tab is shown. Listeners are delegated to the panel: its content comes and goes.
+ *
+ * A READY bot's "BGS call" panel sends a free BGS call: a known method (service and method from bgs-methods,
+ * loaded once when a panel first opens, body in protobuf text) or raw (hash, method id, hex body). It shows the
+ * BGS status, the reply and the pushes of the 5 s after, filtered client side; all of it through textContent.
  */
 window.CatapultAdminBattleNet = (function () {
     const BASE = "/admin/battlenet-accounts";
@@ -21,6 +25,7 @@ window.CatapultAdminBattleNet = (function () {
     const ok = status => status >= 200 && status < 300;
 
     let timer = null;
+    let catalog = null;
 
     /** The status of a POST (0 when it couldn't be sent). */
     async function post(url, body) {
@@ -104,6 +109,118 @@ window.CatapultAdminBattleNet = (function () {
             card.dataset.labelUpdated, [field]);
     }
 
+    // --- the free BGS call ---
+
+    /** bgs-methods, read once per page (null again after a failure, so the next opening retries). */
+    function methods() {
+        catalog ??= fetch(`${BASE}/bgs-methods`, { credentials: "same-origin" })
+            .then(response => response.ok ? response.json() : Promise.reject(response.status))
+            .catch(error => { catalog = null; throw error; });
+        return catalog;
+    }
+
+    // Native selects: mdui-select resets a value set from code while its menu takes new items
+    const option = (value, text) => new Option(text, value);
+
+    function fillMethods(box, services) {
+        const service = services.find(s => s.name === box.querySelector('[name="bgsService"]').value);
+        box.querySelector('[name="bgsMethod"]').replaceChildren(...(service?.methods ?? []).map(m =>
+            option(m.name, `${m.name} (${m.id})${m.noResponse ? " · NO_RESPONSE" : ""}`)));
+    }
+
+    async function openBgs(card, box) {
+        if (box.dataset.loaded) return;
+        try {
+            const services = await methods();
+            const select = box.querySelector('[name="bgsService"]');
+            select.replaceChildren(...services.map(s => option(s.name, `${s.name} · ${s.hash}`)));
+            fillMethods(box, services);
+            select.addEventListener("change", () => fillMethods(box, services));
+            box.dataset.loaded = "true";
+        } catch (status) {
+            show(card, refusal(card, status), true);
+        }
+    }
+
+    function bgsMode(box) {
+        const raw = box.querySelector('[name="bgsMode"]').value === "raw";
+        box.querySelector(".admin-battlenet-bgs-known").hidden = raw;
+        box.querySelector(".admin-battlenet-bgs-raw").hidden = !raw;
+    }
+
+    function bgsRequest(box) {
+        const field = name => box.querySelector(`[name="${name}"]`);
+        if (field("bgsMode").value !== "raw") {
+            return { service: field("bgsService").value, method: field("bgsMethod").value, text: field("bgsText").value };
+        }
+        const methodId = Number(field("bgsMethodId").value);
+        return {
+            serviceHash: field("bgsHash").value.trim(),
+            methodId: Number.isInteger(methodId) && field("bgsMethodId").value !== "" ? methodId : null,
+            hex: field("bgsHex").value,
+            withCiid: field("bgsCiid").checked
+        };
+    }
+
+    function line(tag, text, className) {
+        const node = document.createElement(tag);
+        node.textContent = text;
+        if (className) node.className = className;
+        return node;
+    }
+
+    function showResult(box, labels, result) {
+        const status = result.status === null || result.status === undefined ? labels.noResponse
+            : `status ${result.status}${result.status === 0 ? " (OK)" : ""}`;
+        box.querySelector(".admin-battlenet-bgs-status").textContent =
+            `${status} · ${result.durationMs} ms${result.error ? ` · ${result.error}` : ""}`;
+        box.querySelector(".admin-battlenet-bgs-reply").textContent = result.replyText ?? result.replyHex ?? "";
+        const pushes = result.pushes ?? [];
+        box.querySelector(".admin-battlenet-bgs-pushes").replaceChildren(
+            line("li", pushes.length ? labels.pushes : labels.noPush, "admin-cell-muted admin-battlenet-bgs-pushes-head"),
+            ...pushes.map(p => {
+                const item = line("li", `${p.service}.${p.method}`);
+                item.append(line("pre", p.text ?? p.hex));
+                return item;
+            }));
+        box.querySelector('[name="bgsFilter"]').value = "";
+        box.querySelector(".admin-battlenet-bgs-result").hidden = false;
+    }
+
+    function filterPushes(box) {
+        const needle = box.querySelector('[name="bgsFilter"]').value.trim().toLowerCase();
+        box.querySelectorAll(".admin-battlenet-bgs-pushes > li:not(.admin-battlenet-bgs-pushes-head)").forEach(item => {
+            item.hidden = !!needle && !item.textContent.toLowerCase().includes(needle);
+        });
+    }
+
+    /** Sends the call; the button stays disabled (and says so) for the ~5 s the API waits for the pushes. */
+    async function sendBgs(card, button) {
+        const box = button.closest(".admin-battlenet-bgs");
+        const label = button.textContent;
+        button.disabled = true;
+        button.textContent = button.dataset.labelSending;
+        try {
+            const response = await CatapultCsrf.postJson(`${BASE}/${encodeURIComponent(button.dataset.id)}/bgs-call`,
+                bgsRequest(box));
+            const body = await response.json().catch(() => null);
+            if (!response.ok) {
+                show(card, body?.error ?? refusal(card, response.status), true);
+                return;
+            }
+            show(card, "", false);
+            showResult(box, {
+                noResponse: button.dataset.labelNoResponse, pushes: button.dataset.labelPushes,
+                noPush: button.dataset.labelNoPush
+            }, body);
+        } catch {
+            show(card, card.dataset.labelUnavailable, true);
+        } finally {
+            button.textContent = label;
+            button.disabled = false;
+        }
+    }
+
     /** Whether the Keys tab is the one shown (an unmounted tabs element counts as shown: nothing to compare). */
     function keysShown() {
         const tabs = document.getElementById("admin-tabs");
@@ -147,12 +264,14 @@ window.CatapultAdminBattleNet = (function () {
             panel.addEventListener("click", event => {
                 const target = event.target.closest?.(
                     ".admin-battlenet-add, .admin-battlenet-code-submit, .admin-battlenet-password-submit, .admin-battlenet-details-submit, "
-                    + ".admin-battlenet-reauth, .admin-battlenet-toggle, .admin-battlenet-reset, .admin-battlenet-delete");
+                    + ".admin-battlenet-reauth, .admin-battlenet-toggle, .admin-battlenet-reset, .admin-battlenet-delete, "
+                    + ".admin-battlenet-bgs-send");
                 if (!target || !panel.contains(target) || target.disabled) return;
                 const card = target.closest(".admin-battlenet");
                 if (!card) return;
                 const id = encodeURIComponent(target.dataset.id ?? "");
-                if (target.matches(".admin-battlenet-add")) add(panel, card, target);
+                if (target.matches(".admin-battlenet-bgs-send")) sendBgs(card, target);
+                else if (target.matches(".admin-battlenet-add")) add(panel, card, target);
                 else if (target.matches(".admin-battlenet-code-submit")) sendCode(panel, card, target);
                 else if (target.matches(".admin-battlenet-password-submit")) changePassword(panel, card, target);
                 else if (target.matches(".admin-battlenet-details-submit")) saveDetails(panel, card, target);
@@ -161,6 +280,22 @@ window.CatapultAdminBattleNet = (function () {
                     { enabled: target.dataset.enabled === "true" }, card.dataset.labelUpdated);
                 else if (target.matches(".admin-battlenet-reset")) act(panel, card, target, `${BASE}/${id}/reset-limit`, {}, card.dataset.labelUpdated);
                 else remove(panel, card, target);
+            });
+
+            // toggle does not bubble: caught on its way down
+            panel.addEventListener("toggle", event => {
+                const box = event.target;
+                if (!box.matches?.(".admin-battlenet-bgs") || !box.open) return;
+                const card = box.closest(".admin-battlenet");
+                if (card) openBgs(card, box);
+            }, true);
+            panel.addEventListener("change", event => {
+                const box = event.target.closest?.(".admin-battlenet-bgs");
+                if (box && event.target.matches('[name="bgsMode"]')) bgsMode(box);
+            });
+            panel.addEventListener("input", event => {
+                const box = event.target.closest?.(".admin-battlenet-bgs");
+                if (box && event.target.matches('[name="bgsFilter"]')) filterPushes(box);
             });
 
             // Leaving the Keys tab stops the polling (mdui's inner change events bubble too: only the tabs' own counts).
