@@ -492,6 +492,22 @@ describe("debug capture", () => {
         expect(captured().at(-1)).toEqual(expect.objectContaining({ direction: "OUT", operation: "Close" }));
     });
 
+    it("captures an input's settings without the secrets in its URLs", async () => {
+        const socket = await connected();
+        const settings = CatapultObs.call("GetInputSettings", { inputName: "Alerts" });
+        answer(socket, 7, { requestType: "GetInputSettings", requestStatus: { result: true, code: 100 },
+            responseData: { inputKind: "browser_source", inputSettings: { url: "https://streamlabs.com/alert-box/v3/TOKEN123" } } });
+        await settings;
+        socket.serverSends(5, { eventType: "InputSettingsChanged", eventIntent: 8,
+            eventData: { inputName: "SRT", inputSettings: { input: "srt://10.0.0.5:9000?passphrase=s3cret" } } });
+
+        const sent = (CatapultDebugCapture.flush(), fetch.mock.calls.map(([, init]) => init.body).join());
+        expect(sent).not.toContain("TOKEN123");
+        expect(sent).not.toContain("s3cret");
+        expect(sent).toContain("https://streamlabs.com/<redacted>");
+        expect(sent).toContain("srt://10.0.0.5:9000?passphrase=<redacted>");
+    });
+
     it("nothingIsCapturedOutsideDebug", async () => {
         CatapultDebugCapture.disable();
         const record = vi.spyOn(CatapultDebugCapture, "record");

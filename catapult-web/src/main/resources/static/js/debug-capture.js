@@ -5,11 +5,22 @@
  * obs-session.js from its config's debugCapture (the widget page's own URL then). Every hook
  * checks active() first, so nothing is built outside debug mode.
  *
- * Secrets never leave the page: the OBS authentication proof and secret settings (stripObs), the
- * signed action tokens of Twitchat messages (stripTwitchat) and the widget token in any string.
+ * Secrets never leave the page, stripped before anything is queued:
+ * - by name, as catapult-api's DebugRedactor names them (password, token, *key, auth…), whatever
+ *   the value; the OBS authentication proof is dropped altogether (stripObs);
+ * - by OBS request or event, where the secret is in a value no name gives away: stream service
+ *   settings, profile parameters, persistent data, vendor requests and events (stripObs);
+ * - Catapult's signed action tokens, UUIDs anywhere in a Twitchat message's data (stripTwitchat);
+ * - in every URL of any string (overlay URLs carry account tokens in their path or query, an
+ *   ffmpeg input its passphrase): userinfo dropped, path, query values and fragment redacted.
+ *   Catapult's own URLs are kept but for the widget token, removed everywhere, percent-encoded too.
+ *
  * A batch goes every 5s or at 50 entries; past 300 entries a minute, entries are counted instead,
- * one "dropped" entry per service for that minute. A failed batch is dropped, never sent again;
- * a 409 (the debug mode ended) stops the capture.
+ * one "dropped" entry per service for that minute, sent once the minute is over. A Twitchat
+ * answer is recorded twice, in the action it settles and as the event it is, both counting
+ * toward that bound. A failed batch is dropped, never sent again; a 409 (the debug mode ended)
+ * stops the capture. When the page goes away, what is left goes in batches small enough for a
+ * beacon or a keepalive fetch.
  */
 window.CatapultDebugCapture = (function () {
     const PAGE_URL = "/me/debug/client-exchanges";
@@ -21,17 +32,35 @@ window.CatapultDebugCapture = (function () {
     const MAX_BODY_CHARS = 65536;
     // catapult-api reads batches of up to 256 KiB: some room left for the envelope.
     const MAX_BATCH_BYTES = 250 * 1024;
+    // What a beacon or a keepalive fetch may carry in flight (about 64 KiB), with some room.
+    const MAX_LEAVING_BYTES = 60 * 1024;
     // The most requests held for their answer: past it (answers OBS never sent), new ones go uncaptured.
     const MAX_PENDING = 1000;
     const REDACTED = "<redacted>";
-    const WIDGET_TOKEN = /\/widget\/obs\/[^/?#"\s\\]+/g;
+    // The widget token's path segment, plain or percent-encoded.
+    const WIDGET_TOKEN = /(\/|%2F)widget(\/|%2F)obs(\/|%2F)(?:(?!%2F|%3F|%23)[^/?#&"'\s\\<>])+/gi;
+    // A URL in any string; a <redacted> already in it is part of it.
+    const URL_IN_TEXT = /\b[a-z][a-z0-9+.-]*:\/\/(?:<redacted>|[^\s"'<>()\\])+/gi;
     // Catapult's signed action tokens are UUIDs, written anywhere in a payload's strings.
     const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
-    const SECRET_KEYS = new Set(["password", "key", "streamkey", "stream_key", "secret", "token"]);
+    // DebugRedactor's names ("code" aside: OBS's request status), and the parts of a name that
+    // make it a credential's; any name ending in "key" too (streamKey, stream_key, apiKey).
+    const SECRET_NAMES = new Set(["authorization", "proxy-authorization", "cookie", "set-cookie", "x-api-key",
+        "private-token", "key", "api_key", "apikey", "access_token", "refresh_token", "id_token", "client_secret",
+        "token", "password", "device_code", "user_code", "openid.sig", "rpsticket", "usertokens", "identitytoken",
+        "passphrase", "bearer_token"]);
+    const SECRET_NAME_PARTS = ["token", "secret", "pass", "ticket", "signature", "apikey", "api_key", "api-key",
+        "bearer", "auth", "cred"];
+    const NOT_SECRET = new Set(["token_type", "tokentype"]);
+    // Kept in the stream service settings: which service, and its server once its URL is stripped.
+    const STREAM_SERVICE_KEPT = new Set(["service", "server"]);
 
     let target = null;
+    // The widget token itself, once known from the widget's URL: removed as is and percent-encoded.
+    let widgetTokens = [];
     let queue = [];
     let timer = null;
+    let droppedTimer = null;
     const waiting = new Map();
     let windowStart = 0;
     let windowCount = 0;
@@ -39,7 +68,9 @@ window.CatapultDebugCapture = (function () {
 
     function reset() {
         clearTimeout(timer);
+        clearTimeout(droppedTimer);
         timer = null;
+        droppedTimer = null;
         queue = [];
         waiting.clear();
         windowStart = 0;
@@ -47,17 +78,13 @@ window.CatapultDebugCapture = (function () {
         dropped = {};
     }
 
-    /** A copy of `value` with `map(key, value)` applied to every member, keys and nested values included. */
-    function walk(value, map) {
-        if (Array.isArray(value)) return value.map((item) => walk(item, map));
-        if (!value || typeof value !== "object") return map(null, value);
-        const copy = {};
-        for (const [key, item] of Object.entries(value)) {
-            const mapped = map(key, item);
-            if (mapped !== undefined) copy[map(null, key)] = mapped === item ? walk(item, map) : mapped;
-        }
-        return copy;
+    function isSecretName(name) {
+        const n = String(name).toLowerCase();
+        if (NOT_SECRET.has(n)) return false;
+        return SECRET_NAMES.has(n) || n.endsWith("key") || SECRET_NAME_PARTS.some((part) => n.includes(part));
     }
+
+    const redacted = (value) => (value === null || value === undefined ? value : REDACTED);
 
     function safely(strip, value) {
         try {
@@ -67,35 +94,111 @@ window.CatapultDebugCapture = (function () {
         }
     }
 
-    /** A Twitchat message (or its data) without the action tokens in its data. */
+    /**
+     * A copy of an OBS message's object, its secrets redacted where the request or event type says
+     * they are (OBS gives no telling name to these values).
+     */
+    function byType(object) {
+        const copy = { ...object };
+        const both = (edit) => ["requestData", "responseData"].forEach((field) => {
+            if (copy[field] && typeof copy[field] === "object") copy[field] = edit({ ...copy[field] });
+        });
+        switch (object.requestType ?? object.eventType) {
+            case "GetStreamServiceSettings":
+            case "SetStreamServiceSettings":
+                both((data) => {
+                    const settings = data.streamServiceSettings;
+                    if (settings && typeof settings === "object") {
+                        data.streamServiceSettings = Object.fromEntries(Object.entries(settings).map(([key, value]) =>
+                            [key, STREAM_SERVICE_KEPT.has(key) ? value : redacted(value)]));
+                    }
+                    return data;
+                });
+                break;
+            case "GetProfileParameter":
+            case "SetProfileParameter":
+                both((data) => ({ ...data, parameterValue: redacted(data.parameterValue),
+                    defaultParameterValue: redacted(data.defaultParameterValue) }));
+                break;
+            case "GetPersistentData":
+            case "SetPersistentData":
+                both((data) => ({ ...data, slotValue: redacted(data.slotValue) }));
+                break;
+            case "CallVendorRequest":
+                both((data) => ({ ...data, requestData: redacted(data.requestData), responseData: redacted(data.responseData) }));
+                break;
+            case "VendorEvent":
+                if (copy.eventData && typeof copy.eventData === "object") {
+                    copy.eventData = { ...copy.eventData, eventData: redacted(copy.eventData.eventData) };
+                }
+                break;
+        }
+        return copy;
+    }
+
+    /** A copy of `value`, its secret-named members redacted (`authentication` dropped), `strings` applied to its strings. */
+    function scrub(value, strings, typed) {
+        if (Array.isArray(value)) return value.map((item) => scrub(item, strings, typed));
+        if (typeof value === "string") return strings(value);
+        if (!value || typeof value !== "object") return value;
+        if (typed && value.origin === "twitchat") return stripTwitchat(value);
+        const source = typed && (value.requestType || value.eventType) ? byType(value) : value;
+        const copy = {};
+        for (const [key, item] of Object.entries(source)) {
+            if (key === "authentication") continue;
+            copy[strings(key)] = isSecretName(key) ? redacted(item) : scrub(item, strings, typed);
+        }
+        return copy;
+    }
+
+    const noTokens = (text) => text.replace(UUID, REDACTED);
+
+    /** A Twitchat message (or its data) without the action tokens and secret-named members of its data. */
     function stripTwitchat(message) {
         return safely((value) => {
-            const noTokens = (key, item) => (typeof item === "string" ? item.replace(UUID, REDACTED) : item);
-            if (!value || typeof value !== "object" || Array.isArray(value)) return walk(value, noTokens);
+            if (!value || typeof value !== "object" || Array.isArray(value)) return scrub(value, noTokens, false);
             const copy = { ...value };
-            if ("data" in copy) copy.data = walk(copy.data, noTokens);
+            if ("data" in copy) copy.data = scrub(copy.data, noTokens, false);
             if (Array.isArray(copy.payloads)) copy.payloads = copy.payloads.map(stripTwitchat);
             return copy;
         }, message);
     }
 
-    /** An OBS message without its authentication or secret settings, its Twitchat messages stripped. */
+    /** An OBS message without its authentication or secrets, its Twitchat messages stripped. */
     function stripObs(message) {
-        return safely((value) => walk(value, (key, item) => {
-            if (key === null) return item;
-            if (key === "authentication") return undefined;
-            if (SECRET_KEYS.has(key.toLowerCase()) && typeof item === "string") return REDACTED;
-            if (item && typeof item === "object" && item.origin === "twitchat") return stripTwitchat(item);
-            return item;
-        }), message);
+        return safely((value) => scrub(value, (text) => text, true), message);
     }
 
-    /** A body as sent: a copy, without the widget token, truncated past the journal's bound. */
+    /** A URL found in a string, without what could be a secret in it: Catapult's own are kept as they are. */
+    function scrubUrl(found) {
+        let url;
+        try {
+            url = new URL(found);
+        } catch {
+            return `${found.slice(0, found.indexOf("://"))}://${REDACTED}`;
+        }
+        if (/^https?:$/.test(url.protocol) && url.origin === location.origin) return found;
+        let out = `${url.protocol}//${url.host}`;
+        if (url.pathname && url.pathname !== "/") out += `/${REDACTED}`;
+        else out += url.pathname;
+        if (url.search) out += `?${[...url.searchParams.keys()].map((name) => `${encodeURIComponent(name)}=${REDACTED}`).join("&")}`;
+        if (url.hash) out += `#${REDACTED}`;
+        return out;
+    }
+
+    /** A string as sent: no widget token, no secret in its URLs. */
+    function clean(text) {
+        let result = text;
+        for (const token of widgetTokens) result = result.split(token).join(REDACTED);
+        return result.replace(WIDGET_TOKEN, `$1widget$2obs$3${REDACTED}`).replace(URL_IN_TEXT, scrubUrl);
+    }
+
+    /** A body as sent: a copy, cleaned, truncated past the journal's bound. */
     function body(value) {
         if (value === null || value === undefined) return null;
         let json;
         try {
-            json = JSON.stringify(value).replace(WIDGET_TOKEN, `/widget/obs/${REDACTED}`);
+            json = clean(JSON.stringify(value));
         } catch {
             return { unserializable: true };
         }
@@ -103,8 +206,7 @@ window.CatapultDebugCapture = (function () {
         return { truncated: `${json.slice(0, MAX_BODY_CHARS)}…(+${json.length - MAX_BODY_CHARS} chars)` };
     }
 
-    const text = (value) => (value === null || value === undefined ? null
-        : String(value).replace(WIDGET_TOKEN, `/widget/obs/${REDACTED}`));
+    const text = (value) => (value === null || value === undefined ? null : clean(String(value)));
 
     function normalize(entry) {
         return {
@@ -138,6 +240,11 @@ window.CatapultDebugCapture = (function () {
         rollOver(now);
         if (windowCount >= PER_MINUTE) {
             dropped[entry.service] = (dropped[entry.service] ?? 0) + 1;
+            // Sent once the minute is over, even if nothing comes after.
+            droppedTimer ??= setTimeout(() => {
+                droppedTimer = null;
+                flush();
+            }, windowStart + MINUTE_MS - now);
             return;
         }
         windowCount++;
@@ -149,8 +256,12 @@ window.CatapultDebugCapture = (function () {
         }
     }
 
-    /** The queued entries in batches within the entry and size bounds, each serialized. */
-    function batches(entries) {
+    /**
+     * The queued entries in batches within the entry and size bounds, each serialized. An entry
+     * still over the bound once its bodies were truncated (multibyte or much escaped text) loses
+     * its bodies altogether.
+     */
+    function batches(entries, maxBytes) {
         const encoder = new TextEncoder();
         const envelope = (list) => JSON.stringify({ source: target.source, sentAt: new Date().toISOString(), entries: list });
         const result = [];
@@ -158,11 +269,11 @@ window.CatapultDebugCapture = (function () {
         let size = 0;
         for (let entry of entries) {
             let bytes = encoder.encode(JSON.stringify(entry)).length + 1;
-            if (bytes > MAX_BATCH_BYTES) {
+            if (bytes > maxBytes) {
                 entry = { ...entry, request: entry.request && { truncated: true }, response: entry.response && { truncated: true } };
                 bytes = encoder.encode(JSON.stringify(entry)).length + 1;
             }
-            if (current.length && (current.length >= BATCH_ENTRIES || size + bytes > MAX_BATCH_BYTES)) {
+            if (current.length && (current.length >= BATCH_ENTRIES || size + bytes > maxBytes)) {
                 result.push(envelope(current));
                 current = [];
                 size = 0;
@@ -201,7 +312,7 @@ window.CatapultDebugCapture = (function () {
             if (!queue.length) return;
             const entries = queue;
             queue = [];
-            batches(entries).forEach((json) => post(json, leaving));
+            batches(entries, leaving ? MAX_LEAVING_BYTES : MAX_BATCH_BYTES).forEach((json) => post(json, leaving));
         } catch {
             // a lost batch, never a broken page
         }
@@ -213,6 +324,8 @@ window.CatapultDebugCapture = (function () {
             if (target?.url === url && target?.source === source) return;
             reset();
             target = { url, source };
+            const token = /\/widget\/obs\/([^/?#]+)\//.exec(url)?.[1];
+            widgetTokens = token ? [...new Set([token, encodeURIComponent(token)])] : [];
         },
 
         /** Stops capturing, dropping what was queued. */

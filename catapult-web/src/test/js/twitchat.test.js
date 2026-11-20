@@ -579,11 +579,11 @@ describe("debug capture", () => {
         expect(JSON.stringify(entries)).not.toContain(TOKEN);
         expect(entries.find(({ operation }) => operation === "dispatch")).toEqual(expect.objectContaining({
             direction: "OUT",
-            request: { id: "d-1", eventType: "LIVE", payloads: [{ action: "CUSTOM_CHAT_MESSAGE", data: { message: "Ban? https://c.example/a/<redacted>" } }] },
+            request: { id: "d-1", eventType: "LIVE", payloads: [{ action: "CUSTOM_CHAT_MESSAGE", data: { message: "Ban? https://c.example/<redacted>" } }] },
             response: { sent: 1 },
         }));
         expect(entries.find(({ operation }) => operation === "CUSTOM_CHAT_MESSAGE").request.data.message)
-            .toBe("Ban? https://c.example/a/<redacted>");
+            .toBe("Ban? https://c.example/<redacted>");
     });
 
     it("nothingIsCapturedOutsideDebug", async () => {

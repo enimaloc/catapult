@@ -86,16 +86,21 @@ window.CatapultObsSession = (function () {
         }
     }
 
-    /** The widget's periodic read: the connection is only touched when the config changed. */
+    /**
+     * The widget's periodic read: only a config read with another connection reconnects. No config
+     * (a 204, which catapult-web also answers while catapult-api is down) or a failed read keeps
+     * everything as it is, the OBS connection and the debug capture: a blip of the API must not cut
+     * the widget off its OBS, which kept it through any outage before this read existed.
+     */
     async function reload() {
         const gen = generation;
         const next = await fetchConfig();
         if (gen !== generation) return;
-        if (!next || !sameConfig(next, config)) {
-            await refresh();
+        if (next && !sameConfig(next, config)) {
+            await use(++generation, next);
             return;
         }
-        apply(next);
+        if (next) apply(next);
         configTimer = setTimeout(reload, CONFIG_RELOAD_MS);
     }
 
@@ -105,6 +110,12 @@ window.CatapultObsSession = (function () {
         clearTimeout(configTimer);
         const next = await fetchConfig();
         if (gen !== generation) return;
+        await use(gen, next);
+    }
+
+    /** Connects, reconnects or disconnects to match the config read, `next` (null: none). */
+    async function use(gen, next) {
+        clearTimeout(configTimer);
         if (isWidget()) configTimer = next ? setTimeout(reload, CONFIG_RELOAD_MS) : setTimeout(refresh, CONFIG_RETRY_MS);
         apply(next);
         if (next && sameConfig(next, config) && CatapultObs.isConnected()) return;

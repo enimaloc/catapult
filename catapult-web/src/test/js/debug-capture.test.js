@@ -118,6 +118,16 @@ describe("batches", () => {
         expect(entries[6].response.truncated).toMatch(/^\{"huge":"y+…\(\+\d+ chars\)$/);
     });
 
+    it("splits what is left on pagehide into batches a beacon can carry", async () => {
+        const beacon = vi.fn(() => true);
+        vi.stubGlobal("navigator", { sendBeacon: beacon });
+        CatapultDebugCapture.enable(WIDGET);
+        for (let i = 0; i < 6; i++) CatapultDebugCapture.record({ ...entry(), response: { big: "x".repeat(30000) } });
+        window.dispatchEvent(new Event("pagehide"));
+        expect(beacon.mock.calls.length).toBeGreaterThanOrEqual(3);
+        for (const [, blob] of beacon.mock.calls) expect(blob.size).toBeLessThanOrEqual(60 * 1024);
+    });
+
     it("flushes on pagehide with a beacon on the widget, a keepalive fetch on the page", async () => {
         const beacon = vi.fn(() => true);
         vi.stubGlobal("navigator", { sendBeacon: beacon });
@@ -140,17 +150,18 @@ describe("batches", () => {
         await vi.advanceTimersByTimeAsync(59000);
         expect(batches().flatMap((batch) => batch.entries)).toHaveLength(300);
 
+        // Sent once the minute is over, with nothing coming after.
         await vi.advanceTimersByTimeAsync(1000);
-        CatapultDebugCapture.record(entry("Later"));
-        CatapultDebugCapture.flush();
-        const last = batches().at(-1).entries;
-        expect(last).toEqual([
+        expect(batches().at(-1).entries).toEqual([
             expect.objectContaining({ service: "obs", direction: "IN", operation: "dropped", request: null,
-                response: { dropped: 10 } }),
+                response: { dropped: 10 }, at: "2026-11-20T10:00:00.000Z" }),
             expect.objectContaining({ service: "twitchat", direction: "IN", operation: "dropped", request: null,
                 response: { dropped: 5 } }),
-            expect.objectContaining({ operation: "Later" }),
         ]);
+
+        CatapultDebugCapture.record(entry("Later"));
+        CatapultDebugCapture.flush();
+        expect(batches().at(-1).entries).toEqual([expect.objectContaining({ operation: "Later" })]);
     });
 });
 
@@ -229,6 +240,61 @@ describe("secrets", () => {
             .toEqual({ server: "rtmp://x", key: "<redacted>", password: "<redacted>" });
     });
 
+    it("redacts every member a credential's name, whatever its value", () => {
+        expect(CatapultDebugCapture.stripObs({ requestData: {
+            password: 1234, apiKey: { a: 1 }, bearer_token: "b", clientSecret: ["s"], passphrase: "p", Authorization: "x",
+            access_token: "t", token_type: "Bearer", sceneName: "Main", empty: null, nothing: null, code: 100,
+        } }).requestData).toEqual({
+            password: "<redacted>", apiKey: "<redacted>", bearer_token: "<redacted>", clientSecret: "<redacted>",
+            passphrase: "<redacted>", Authorization: "<redacted>", access_token: "<redacted>", token_type: "Bearer",
+            sceneName: "Main", empty: null, nothing: null, code: 100,
+        });
+    });
+
+    it("redacts the whole stream service settings but which service and its server", () => {
+        for (const requestType of ["GetStreamServiceSettings", "SetStreamServiceSettings"]) {
+            const field = requestType.startsWith("Get") ? "responseData" : "requestData";
+            const stripped = CatapultDebugCapture.stripObs({ requestType, [field]: { streamServiceType: "rtmp_custom",
+                streamServiceSettings: { service: "Twitch", server: "rtmp://x/app", username: "u", use_auth: true, bwtest: false } } });
+            expect(stripped[field]).toEqual({ streamServiceType: "rtmp_custom", streamServiceSettings: {
+                service: "Twitch", server: "rtmp://x/app", username: "<redacted>", use_auth: "<redacted>", bwtest: "<redacted>" } });
+        }
+    });
+
+    it("redacts profile parameters' values", () => {
+        expect(CatapultDebugCapture.stripObs({ requestType: "GetProfileParameter",
+            responseData: { parameterValue: "live_123", defaultParameterValue: null } }).responseData)
+            .toEqual({ parameterValue: "<redacted>", defaultParameterValue: null });
+        expect(CatapultDebugCapture.stripObs({ requestType: "SetProfileParameter",
+            requestData: { parameterCategory: "Stream", parameterName: "Key", parameterValue: "live_123" } }).requestData)
+            .toEqual({ parameterCategory: "Stream", parameterName: "Key", parameterValue: "<redacted>" });
+    });
+
+    it("redacts persistent data values", () => {
+        expect(CatapultDebugCapture.stripObs({ requestType: "SetPersistentData",
+            requestData: { realm: "R", slotName: "s", slotValue: { plugin: "secret" } } }).requestData)
+            .toEqual({ realm: "R", slotName: "s", slotValue: "<redacted>" });
+        expect(CatapultDebugCapture.stripObs({ requestType: "GetPersistentData", responseData: { slotValue: [1] } }).responseData)
+            .toEqual({ slotValue: "<redacted>" });
+    });
+
+    it("redacts vendor requests' and events' bodies", () => {
+        expect(CatapultDebugCapture.stripObs({ requestType: "CallVendorRequest",
+            requestData: { vendorName: "v", requestType: "r", requestData: { x: 1 } },
+            responseData: { vendorName: "v", requestType: "r", responseData: { y: 2 } } })).toEqual({ requestType: "CallVendorRequest",
+            requestData: { vendorName: "v", requestType: "r", requestData: "<redacted>", responseData: undefined },
+            responseData: { vendorName: "v", requestType: "r", requestData: undefined, responseData: "<redacted>" } });
+        expect(CatapultDebugCapture.stripObs({ eventType: "VendorEvent", eventData: { vendorName: "v", eventType: "e", eventData: { z: 3 } } }))
+            .toEqual({ eventType: "VendorEvent", eventData: { vendorName: "v", eventType: "e", eventData: "<redacted>" } });
+    });
+
+    it("applies the type rules inside a request batch", () => {
+        const stripped = CatapultDebugCapture.stripObs({ requests: [
+            { requestType: "SetProfileParameter", requestData: { parameterValue: "k" } },
+            { requestType: "GetSceneList" }] });
+        expect(stripped.requests[0].requestData.parameterValue).toBe("<redacted>");
+    });
+
     it("stripsTwitchatActionTokens", () => {
         const token = "0b6f2a4e-1c3d-4e5f-8a9b-0c1d2e3f4a5b";
         const message = { origin: "twitchat", id: "11111111-2222-4333-8444-555555555555", type: "CUSTOM_CHAT_MESSAGE",
@@ -249,7 +315,52 @@ describe("secrets", () => {
         CatapultDebugCapture.flush();
         const body = fetch.mock.calls[0][1].body;
         expect(body).not.toContain("w-secret");
-        expect(batches()[0].entries[0].response.url).toBe("https://c.example/widget/obs/<redacted>?x=1");
+        expect(batches()[0].entries[0].response.url).toBe("https://c.example/<redacted>?x=<redacted>");
+    });
+
+    it("keeps Catapult's own URLs but for the widget token, percent-encoded too", async () => {
+        CatapultDebugCapture.enable(PAGE);
+        const own = `${location.origin}/widget/obs/w-1?x=1`;
+        CatapultDebugCapture.record({ ...entry(), response: { own, mine: `${location.origin}/channel/me?tab=obs`,
+            encoded: `see ${encodeURIComponent(own)}`, upper: "a%2Fwidget%2Fobs%2Fw-2%2Fconfig" } });
+        CatapultDebugCapture.flush();
+        expect(batches()[0].entries[0].response).toEqual({
+            own: `${location.origin}/widget/obs/<redacted>?x=1`,
+            mine: `${location.origin}/channel/me?tab=obs`,
+            encoded: `see ${encodeURIComponent(location.origin)}%2Fwidget%2Fobs%2F<redacted>%3Fx%3D1`,
+            upper: "a%2Fwidget%2Fobs%2F<redacted>%2Fconfig",
+        });
+    });
+
+    it("removes the widget's own token wherever it appears", async () => {
+        CatapultDebugCapture.enable(WIDGET);
+        CatapultDebugCapture.record({ ...entry(), response: { note: "token w-secret, w%2Dsecret" }, operation: "w-secret" });
+        CatapultDebugCapture.flush();
+        expect(fetch.mock.calls[0][1].body).not.toContain("w-secret");
+    });
+
+    it("strips userinfo, path, query values and fragment of a foreign URL", async () => {
+        CatapultDebugCapture.enable(PAGE);
+        const settings = CatapultDebugCapture.stripObs({ requestType: "GetInputSettings", responseData: { inputSettings: {
+            url: "https://streamlabs.com/alert-box/v3/ABCDEF123456?layout=1#x",
+            input: "srt://user:hunter2@10.0.0.5:9000?passphrase=s3cret&latency=200",
+            server: "rtmp://live.example.tv/app/live_123",
+            css: "body { background: url(https://cdn.example/u/abc.png); }",
+            bare: "https://example.com/",
+            broken: "foo://[bad",
+        } } });
+        CatapultDebugCapture.record({ ...entry(), response: settings });
+        CatapultDebugCapture.flush();
+        const body = fetch.mock.calls[0][1].body;
+        for (const secret of ["ABCDEF123456", "hunter2", "s3cret", "live_123", "abc.png", "[bad"]) expect(body).not.toContain(secret);
+        expect(batches()[0].entries[0].response.responseData.inputSettings).toEqual({
+            url: "https://streamlabs.com/<redacted>?layout=<redacted>#<redacted>",
+            input: "srt://10.0.0.5:9000?passphrase=<redacted>&latency=<redacted>",
+            server: "rtmp://live.example.tv/<redacted>",
+            css: "body { background: url(https://cdn.example/<redacted>); }",
+            bare: "https://example.com/",
+            broken: "foo://<redacted>",
+        });
     });
 
     it("aThrowingHookDoesNotBreakTheCaller", () => {

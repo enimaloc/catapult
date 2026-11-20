@@ -250,6 +250,30 @@ describe("debug capture", () => {
         expect(connects).toHaveLength(7);
     });
 
+    it("aFailedConfigReadKeepsTheConnection", async () => {
+        document.body.dataset.obsConfigUrl = "/widget/obs/t-1/config";
+        await start(response(200, { ...CONFIG, debugCapture: true }));
+        CatapultObs.close.mockClear();
+        CatapultDebugCapture.disable.mockClear();
+
+        // catapult-api down: a network error, then catapult-web's 204, then a 502.
+        fetch.mockImplementationOnce(async () => { throw new TypeError("Failed to fetch"); })
+            .mockImplementationOnce(async () => response(204))
+            .mockImplementationOnce(async () => response(502));
+        await vi.advanceTimersByTimeAsync(180000);
+        expect(fetch).toHaveBeenCalledTimes(4);
+        expect(CatapultObs.close).not.toHaveBeenCalled();
+        expect(CatapultDebugCapture.disable).not.toHaveBeenCalled();
+        expect(connects).toHaveLength(1);
+        expect(CatapultObs.isConnected()).toBe(true);
+
+        // Back: read every minute still.
+        fetch.mockResolvedValue(response(200, CONFIG));
+        await vi.advanceTimersByTimeAsync(60000);
+        expect(fetch).toHaveBeenCalledTimes(5);
+        expect(CatapultDebugCapture.disable).toHaveBeenCalledTimes(1);
+    });
+
     it("on the widget page, reconnects to a config changed meanwhile", async () => {
         document.body.dataset.obsConfigUrl = "/widget/obs/t-1/config";
         await start(response(200, CONFIG));
