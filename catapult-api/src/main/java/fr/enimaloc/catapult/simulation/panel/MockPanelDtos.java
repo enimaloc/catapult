@@ -8,6 +8,7 @@ import fr.enimaloc.catapult.simulation.CallSetting;
 import fr.enimaloc.catapult.simulation.SimulatedData;
 import org.jspecify.annotations.Nullable;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -63,6 +64,23 @@ public final class MockPanelDtos {
     public record ChatRequest(@Nullable String sender, @Nullable String role, boolean owner, @Nullable String text) {}
 
     public record RaidRequest(@Nullable String toLogin) {}
+
+    /** A closed period to add before the current session's oldest one; {@code gameName} is optional. */
+    public record PastSegmentRequest(@Nullable String categoryId, @Nullable String categoryName,
+                                     @Nullable String gameName, @Nullable Integer minutes) {}
+
+    /**
+     * The current session's periods, oldest first, and the recap a raid would send now.
+     *
+     * @param recap one line per (category, game) pair, as RAIDED_BY_MEMBER's {@code games}
+     */
+    public record TimelineView(List<SegmentView> segments, String recap) {}
+
+    /**
+     * One period; {@code endedAt} is {@code null} while it runs, its {@code minutes} then counted until now.
+     */
+    public record SegmentView(@Nullable String categoryName, @Nullable String gameName, Instant startedAt,
+                              @Nullable Instant endedAt, long minutes) {}
 
     /** One API of the catalogue and its calls, in {@code SimulatedCalls} order. */
     public record ApiCalls(String api, List<CallView> calls) {}

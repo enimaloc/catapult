@@ -6,6 +6,8 @@ import fr.enimaloc.catapult.chat.ChatCommandEvent;
 import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GetterConfig;
+import fr.enimaloc.catapult.domain.stream.StreamCategorySegment;
+import fr.enimaloc.catapult.service.stream.SessionRecap;
 import fr.enimaloc.catapult.service.binding.GameStateService;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
 import fr.enimaloc.catapult.service.twitch.TwitchCategory;
@@ -33,11 +35,14 @@ import fr.enimaloc.catapult.simulation.panel.MockPanelDtos.DetectedGameView;
 import fr.enimaloc.catapult.simulation.panel.MockPanelDtos.IdentityUpdate;
 import fr.enimaloc.catapult.simulation.panel.MockPanelDtos.LiveRequest;
 import fr.enimaloc.catapult.simulation.panel.MockPanelDtos.ManualCategoryRequest;
+import fr.enimaloc.catapult.simulation.panel.MockPanelDtos.PastSegmentRequest;
 import fr.enimaloc.catapult.simulation.panel.MockPanelDtos.PlayRequest;
 import fr.enimaloc.catapult.simulation.panel.MockPanelDtos.RaidRequest;
+import fr.enimaloc.catapult.simulation.panel.MockPanelDtos.SegmentView;
 import fr.enimaloc.catapult.simulation.panel.MockPanelDtos.SettingRequest;
 import fr.enimaloc.catapult.simulation.panel.MockPanelDtos.SettingView;
 import fr.enimaloc.catapult.simulation.panel.MockPanelDtos.StateView;
+import fr.enimaloc.catapult.simulation.panel.MockPanelDtos.TimelineView;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
@@ -63,6 +68,8 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -98,6 +105,8 @@ public class MockPanelApiController {
     private static final Set<String> READS = Set.of("GET", "HEAD", "OPTIONS");
     /** Longer would only hold a request thread for nothing: a timeout is a mode of its own. */
     private static final int MAX_LATENCY_MS = 60_000;
+    /** A past period lasts a day at most. */
+    private static final int MAX_PAST_MINUTES = 24 * 60;
     private static final Map<String, CallKey> KEYS = SimulatedCalls.all().stream()
             .collect(Collectors.toUnmodifiableMap(CallKey::id, Function.identity()));
     private static final String EVENTSUB_API = SimulatedCalls.TWITCH_EVENTSUB_STREAM_ONLINE.api();
@@ -292,6 +301,35 @@ public class MockPanelApiController {
             throw new ApiProblem(ErrorCode.INVALID, "The raided channel's login is needed");
         }
         actions.raidOut(account, body.toLogin().trim());
+    }
+
+    /** A closed period before the current session's oldest one; 400 when the account is not live. */
+    @PostMapping("/accounts/{id}/past-segment")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void pastSegment(@PathVariable UUID id, @RequestBody PastSegmentRequest body) {
+        UserAccount account = account(id);
+        if (blank(body.categoryId()) || blank(body.categoryName())) {
+            throw new ApiProblem(ErrorCode.INVALID, "A category id and name are needed");
+        }
+        if (body.minutes() == null || body.minutes() < 1 || body.minutes() > MAX_PAST_MINUTES) {
+            throw new ApiProblem(ErrorCode.INVALID, "The duration is between 1 and " + MAX_PAST_MINUTES + " minutes");
+        }
+        actions.addPastSegment(account, body.categoryId().trim(), body.categoryName().trim(),
+                blank(body.gameName()) ? null : body.gameName().trim(), Duration.ofMinutes(body.minutes()));
+    }
+
+    /** The current session's timeline, read only, and the recap a raid would send now. */
+    @GetMapping("/accounts/{id}/timeline")
+    public TimelineView timeline(@PathVariable UUID id) {
+        List<StreamCategorySegment> segments = actions.sessionTimeline(account(id));
+        Instant now = Instant.now();
+        return new TimelineView(segments.stream()
+                .map(segment -> new SegmentView(segment.getCategoryName(), segment.getGameName(),
+                        segment.getStartedAt(), segment.getEndedAt(),
+                        Duration.between(segment.getStartedAt(),
+                                segment.getEndedAt() == null ? now : segment.getEndedAt()).toMinutes()))
+                .toList(),
+                SessionRecap.of(segments, now).gamesText());
     }
 
     /**
