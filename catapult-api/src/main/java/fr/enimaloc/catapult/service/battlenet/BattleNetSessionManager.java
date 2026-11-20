@@ -31,6 +31,7 @@ import org.springframework.transaction.support.TransactionOperations;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -66,6 +67,16 @@ import java.util.stream.Stream;
 @ConditionalOnBooleanProperty("battlenet.enabled")
 public class BattleNetSessionManager implements SmartLifecycle {
 
+    /**
+     * The last presence a bot received about a friend, kept to explain an empty detection.
+     *
+     * @param fourcc           the game it named, or null when it named none
+     * @param at               when it was received
+     * @param serviceAccountId the bot that received it
+     */
+    public record PresenceSeen(String fourcc, Instant at, UUID serviceAccountId) {
+    }
+
     /** {@link #sessionState} of an account that has no session. */
     public static final String DISABLED = "DISABLED";
 
@@ -96,6 +107,8 @@ public class BattleNetSessionManager implements SmartLifecycle {
     private final Map<UUID, Session> sessions = new ConcurrentHashMap<>();
     /** Game fourcc by BGS account id, for the friends of every open session. */
     private final Map<Long, String> games = new ConcurrentHashMap<>();
+    /** The last presence received by BGS account id, for every friend of every open session. */
+    private final Map<Long, PresenceSeen> lastPresences = new ConcurrentHashMap<>();
     private volatile boolean running;
 
     @Autowired
@@ -247,6 +260,11 @@ public class BattleNetSessionManager implements SmartLifecycle {
         return Optional.ofNullable(games.get(bnetAccountId));
     }
 
+    /** The last presence received about the BGS account since its session opened, even one naming no game. */
+    public Optional<PresenceSeen> lastPresence(long bnetAccountId) {
+        return Optional.ofNullable(lastPresences.get(bnetAccountId));
+    }
+
     /**
      * Runs {@code action} on the account's client. Fails at once, with an {@link IllegalStateException}, when the
      * account has no ready session: actions are never queued.
@@ -373,6 +391,7 @@ public class BattleNetSessionManager implements SmartLifecycle {
 
         private void forgetGames() {
             watched.forEach(games::remove);
+            watched.forEach(lastPresences::remove);
             watched.clear();
         }
 
@@ -392,6 +411,7 @@ public class BattleNetSessionManager implements SmartLifecycle {
                         event::toString, () -> "bgs.presence");
             }
             watched.add(event.accountId());
+            lastPresences.put(event.accountId(), new PresenceSeen(event.game(), Instant.now(), accountId));
             if (event.game() == null) {
                 games.remove(event.accountId());
             } else {

@@ -84,6 +84,18 @@ class DetectionTraceTest {
     }
 
     @Test
+    void theRecordedExchangeIsDeclaredAsJsonSoItIsRedactedAsJson() {
+        inDebug();
+
+        try (DetectionTrace.Scope ignored = DetectionTrace.openIfDebugged(registry, recorder, USER)) {
+            DetectionTrace.provider("STEAM", "none", null, null);
+        }
+
+        assertThat(recorded(recorder, USER).requestHeaders().getContentType())
+                .isEqualTo(org.springframework.http.MediaType.APPLICATION_JSON);
+    }
+
+    @Test
     void omitsEmptyFields() {
         inDebug();
 

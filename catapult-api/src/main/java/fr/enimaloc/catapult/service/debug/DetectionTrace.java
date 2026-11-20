@@ -2,6 +2,8 @@ package fr.enimaloc.catapult.service.debug;
 
 import fr.enimaloc.catapult.domain.debug.DebugExchange.Direction;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.net.URI;
@@ -208,8 +210,11 @@ public final class DetectionTrace implements AutoCloseable {
                 }
             }
             long elapsedMs = (System.nanoTime() - started) / 1_000_000L;
-            RawExchange raw = new RawExchange(at, METHOD, CYCLE_URI, null, JSON.writeValueAsBytes(body()), null, null,
-                    null, error, elapsedMs);
+            // declared as JSON so that the journal redacts the body as JSON
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            RawExchange raw = new RawExchange(at, METHOD, CYCLE_URI, headers, JSON.writeValueAsBytes(body()), null,
+                    null, null, error, elapsedMs);
             recorder.record(userId, Direction.OUT, raw, OPERATION, false, SERVICE);
         } catch (RuntimeException e) {
             log.warn("Could not record the detection trace of {}: {}", userId, e.toString());

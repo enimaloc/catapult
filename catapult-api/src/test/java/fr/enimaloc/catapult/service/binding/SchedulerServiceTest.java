@@ -31,6 +31,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import fr.enimaloc.catapult.event.GameDetectedEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.mock.env.MockEnvironment;
 import org.springframework.scheduling.Trigger;
@@ -401,6 +402,21 @@ class SchedulerServiceTest {
         assertThat(outcome.at("/from/sourceName").asString()).isEqualTo("DOOM");
         assertThat(outcome.at("/to/sourceName").asString()).isEqualTo("Quake");
         assertThat(outcome.at("/to/sourceId").asString()).isEqualTo("2310");
+    }
+
+    @Test
+    void detectStillAppliesAChangeWhenTheTraceCannotReadThePreviousGame() {
+        UserAccount user = member();
+        when(gameGetterChain.resolve(user)).thenReturn(Optional.of(QUAKE));
+        when(gameStateService.getLastKnownGame(user)).thenThrow(new IllegalStateException("db down"));
+        when(gameStateService.hasChanged(user, QUAKE)).thenReturn(true);
+
+        JsonNode outcome = outcome(tracedCycle(user));
+
+        assertThat(outcome.path("outcome").asString()).isEqualTo("changed");
+        assertThat(outcome.has("from")).isFalse();
+        verify(gameStateService).updateState(user, QUAKE);
+        verify(eventPublisher).publishEvent(any(GameDetectedEvent.class));
     }
 
     @Test

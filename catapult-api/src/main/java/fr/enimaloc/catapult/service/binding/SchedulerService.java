@@ -235,8 +235,7 @@ public class SchedulerService implements SchedulingConfigurer {
             if (gameStateService.hasChanged(user, game)) {
                 if (DetectionTrace.active()) {
                     DetectionTrace.outcome("changed", DetectionTrace.details(
-                        "from", gameStateService.getLastKnownGame(user).map(SchedulerService::traced).orElse(null),
-                        "to", traced(game), "firstSinceStart", firstSinceStart));
+                        "from", tracedPreviousGame(user), "to", traced(game), "firstSinceStart", firstSinceStart));
                 }
                 gameStateService.updateState(user, game);
                 log.debug("Game changed for user {}: {}", user.getId(), game.getSourceName());
@@ -256,6 +255,16 @@ public class SchedulerService implements SchedulingConfigurer {
             } else {
                 DetectionTrace.outcome("nothing", null);
             }
+        }
+    }
+
+    /** The game the user was last known to play, as the trace shows it; null when unknown or unreadable. */
+    private Map<String, Object> tracedPreviousGame(UserAccount user) {
+        try {
+            return gameStateService.getLastKnownGame(user).map(SchedulerService::traced).orElse(null);
+        } catch (RuntimeException e) {
+            log.warn("Could not read the previous game of {} for the detection trace: {}", user.getId(), e.toString());
+            return null;
         }
     }
 
