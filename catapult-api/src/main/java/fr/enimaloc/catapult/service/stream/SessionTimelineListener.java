@@ -104,13 +104,15 @@ public class SessionTimelineListener {
 
     /**
      * Reads the channel's category from Helix and gives it to the period opened at {@code start}, in place, unless
-     * the running period already has a category (a {@code channel.update} got there first).
+     * the running period already has a category (a {@code channel.update} got there first) or the site is no longer
+     * the active one.
      */
     private void fillCategoryFromHelix(UserAccount user, Instant start) {
         try {
             Optional<CurrentCategory> category = eventSub.fetchCurrentCategory(user)
                     .filter(c -> c.id() != null && !c.id().isBlank());
-            if (category.isEmpty() || !runningCategoryUnknown(user)) {
+            // The read can take a while: the site may have turned passive since the stream start
+            if (category.isEmpty() || !siteRole.isActive() || !runningCategoryUnknown(user)) {
                 return;
             }
             timeline.observeCategory(user, category.get().id(), category.get().name(), start);

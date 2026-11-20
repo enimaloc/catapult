@@ -135,6 +135,23 @@ class SessionTimelineListenerTest {
     }
 
     @Test
+    void helixFillDoesNothingOnceTheSiteIsPassive() {
+        when(eventSub.currentCategory(user.getId())).thenReturn(Optional.empty());
+        when(gameState.getLastKnownGame(user)).thenReturn(Optional.empty());
+        when(timeline.currentSession(user)).thenReturn(List.of(running(null)));
+        // The site turns passive while Helix answers
+        when(eventSub.fetchCurrentCategory(user)).thenAnswer(invocation -> {
+            when(siteRole.isActive()).thenReturn(false);
+            return Optional.of(new CurrentCategory("2", "Just Chatting"));
+        });
+
+        listener.onStreamOnline(new StreamOnlineEvent(this, user));
+
+        verify(timeline).observe(user, null, null, null, NOW);
+        verify(timeline, never()).observeCategory(any(), any(), any(), any());
+    }
+
+    @Test
     void emptyCategoryReadsNoHelix() {
         when(eventSub.currentCategory(user.getId())).thenReturn(Optional.of(new CurrentCategory("", "")));
         when(gameState.getLastKnownGame(user)).thenReturn(Optional.empty());
