@@ -91,7 +91,8 @@ public class GameGetterChain {
                 throw e;
             } catch (Exception e) {
                 log.warn("Getter {} failed for user {}, trying next: {}", config.getProvider(), user.getId(), e.getMessage());
-                DetectionTrace.provider(provider, "error", String.valueOf(e.getMessage()), null);
+                DetectionTrace.provider(provider, "error",
+                    e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName(), null);
             }
         }
 

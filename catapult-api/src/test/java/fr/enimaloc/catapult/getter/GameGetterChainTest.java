@@ -222,6 +222,20 @@ class GameGetterChainTest {
     }
 
     @Test
+    void traceNamesAnErrorWithoutMessageByItsClass() {
+        UserAccount user = new UserAccount();
+        user.setId(UUID.randomUUID());
+        when(getterConfigRepository.findByUserOrderByPriorityAsc(user)).thenReturn(List.of(
+            config(GetterConfig.Provider.XBOX, 1)));
+        when(xboxGameGetter.getCurrentGame(user)).thenThrow(new NullPointerException());
+
+        JsonNode providers = tracedProviders(chain, user);
+
+        assertThat(field(providers, "result")).containsExactly("error");
+        assertThat(providers.get(0).path("reason").asString()).isEqualTo("NullPointerException");
+    }
+
+    @Test
     void traceMarksAStoppedProvider() {
         UserAccount user = new UserAccount();
         user.setId(UUID.randomUUID());
