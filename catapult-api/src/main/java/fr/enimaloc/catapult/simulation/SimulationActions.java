@@ -178,8 +178,9 @@ public class SimulationActions {
     }
 
     /**
-     * Adds a closed period of {@code duration} before the current session's oldest one, its start moved back as much
-     * ({@link SessionTimelineService#addPast}): a long session is built without waiting.
+     * Adds a closed period of {@code duration} just before the running period (after the last closed one when none
+     * runs), the earlier periods and the session start moved back as much ({@link SessionTimelineService#addPast}):
+     * a long session is built without waiting.
      *
      * @param gameName the detected game, {@code null} for none
      * @throws IllegalStateException when the account has no session in progress

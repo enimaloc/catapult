@@ -65,7 +65,7 @@ public final class MockPanelDtos {
 
     public record RaidRequest(@Nullable String toLogin) {}
 
-    /** A closed period to add before the current session's oldest one; {@code gameName} is optional. */
+    /** A closed period to add just before the running one; {@code gameName} is optional. */
     public record PastSegmentRequest(@Nullable String categoryId, @Nullable String categoryName,
                                      @Nullable String gameName, @Nullable Integer minutes) {}
 

@@ -303,7 +303,7 @@ public class MockPanelApiController {
         actions.raidOut(account, body.toLogin().trim());
     }
 
-    /** A closed period before the current session's oldest one; 400 when the account is not live. */
+    /** A closed period just before the running one; 400 when the account is not live. */
     @PostMapping("/accounts/{id}/past-segment")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void pastSegment(@PathVariable UUID id, @RequestBody PastSegmentRequest body) {
