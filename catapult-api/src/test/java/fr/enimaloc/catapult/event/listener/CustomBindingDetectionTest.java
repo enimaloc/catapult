@@ -358,7 +358,7 @@ class CustomBindingDetectionTest {
         return new SchedulerService(mock(UserAccountRepository.class), chain, freshState, this::dispatch,
                 new SimpleMeterRegistry(), Optional.empty(), Optional.empty(), bindingService,
                 SimulationGates.none(), SiteRoles.active(), PollCadences.always(),
-                org.mockito.Mockito.mock(fr.enimaloc.catapult.service.ActivityLogService.class));
+                org.mockito.Mockito.mock(fr.enimaloc.catapult.service.ActivityLogService.class), null, null);
     }
 
     private void dispatch(Object event) {

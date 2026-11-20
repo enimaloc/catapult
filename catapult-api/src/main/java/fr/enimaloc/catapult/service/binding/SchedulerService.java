@@ -1,6 +1,9 @@
 package fr.enimaloc.catapult.service.binding;
 
 import fr.enimaloc.catapult.service.debug.DebugContext;
+import fr.enimaloc.catapult.service.debug.DebugExchangeRecorder;
+import fr.enimaloc.catapult.service.debug.DebugMemberRegistry;
+import fr.enimaloc.catapult.service.debug.DetectionTrace;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.event.GameDetectedEvent;
 import fr.enimaloc.catapult.event.NoGameDetectedEvent;
@@ -60,6 +63,9 @@ public class SchedulerService implements SchedulingConfigurer {
     private final SiteRole siteRole;
     private final PollCadence pollCadence;
     private final ActivityLogService activityLogService;
+    /** Null in tests that build the service by hand: no detection is traced then. */
+    private final DebugMemberRegistry debugMembers;
+    private final DebugExchangeRecorder debugRecorder;
 
     /** The stopped provider each chain was last told about, so the log gets one line per stop and chain. */
     private final Map<UUID, GetterConfig.Provider> frozenChains = new ConcurrentHashMap<>();
@@ -183,9 +189,16 @@ public class SchedulerService implements SchedulingConfigurer {
         }
     }
 
-    /** Runs as the member (prefetches stay outside: they are batched across members). */
+    /**
+     * Runs as the member (prefetches stay outside: they are batched across members). A member in debug mode gets
+     * the cycle explained in a {@link DetectionTrace}, recorded once the cycle and its synchronous listeners are done.
+     */
     private void processUser(UserAccount user) {
-        DebugContext.runAs(user.getId(), () -> detect(user));
+        DebugContext.runAs(user.getId(), () -> {
+            try (var trace = DetectionTrace.openIfDebugged(debugMembers, debugRecorder, user.getId())) {
+                detect(user);
+            }
+        });
     }
 
     private void detect(UserAccount user) {
@@ -200,9 +213,15 @@ public class SchedulerService implements SchedulingConfigurer {
                     activityLogService.addEntry(user.getId(), "WARN", stopped.getProvider().name()
                         + " is suspended by an emergency stop: detection is frozen until it is lifted");
                 }
+                if (DetectionTrace.active()) {
+                    DetectionTrace.outcome("frozen", DetectionTrace.details("provider", stopped.getProvider()));
+                }
                 log.debug("Detection frozen for user {}: {}", user.getId(), e.getMessage());
                 meterRegistry.counter("catapult.scheduler.detection.frozen").increment();
                 return;
+            }
+            if (DetectionTrace.active()) {
+                DetectionTrace.outcome("timeout", DetectionTrace.details("message", e.getMessage()));
             }
             log.warn("Detection skipped for user {}: {}", user.getId(), e.getMessage());
             meterRegistry.counter("catapult.scheduler.detection.timeouts").increment();
@@ -214,16 +233,35 @@ public class SchedulerService implements SchedulingConfigurer {
         if (detected.isPresent()) {
             DetectedGame game = detected.get();
             if (gameStateService.hasChanged(user, game)) {
+                if (DetectionTrace.active()) {
+                    DetectionTrace.outcome("changed", DetectionTrace.details(
+                        "from", gameStateService.getLastKnownGame(user).map(SchedulerService::traced).orElse(null),
+                        "to", traced(game), "firstSinceStart", firstSinceStart));
+                }
                 gameStateService.updateState(user, game);
                 log.debug("Game changed for user {}: {}", user.getId(), game.getSourceName());
                 eventPublisher.publishEvent(new GameDetectedEvent(this, user, game, firstSinceStart));
+            } else if (DetectionTrace.active()) {
+                DetectionTrace.outcome("unchanged", DetectionTrace.details("game", traced(game)));
             }
         } else {
-            if (gameStateService.getLastKnownGame(user).isPresent()) {
+            Optional<DetectedGame> last = gameStateService.getLastKnownGame(user);
+            if (last.isPresent()) {
+                if (DetectionTrace.active()) {
+                    DetectionTrace.outcome("cleared", DetectionTrace.details("from", traced(last.get())));
+                }
                 gameStateService.clearState(user);
                 log.debug("No game detected for user {} (was playing)", user.getId());
                 eventPublisher.publishEvent(new NoGameDetectedEvent(this, user));
+            } else {
+                DetectionTrace.outcome("nothing", null);
             }
         }
+    }
+
+    /** A game as the detection trace shows it. */
+    private static Map<String, Object> traced(DetectedGame game) {
+        return DetectionTrace.details("sourceId", game.getSourceId(), "sourceType", game.getSourceType(),
+            "sourceName", game.getSourceName());
     }
 }
