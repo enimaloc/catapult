@@ -37,6 +37,16 @@ class GameStateServiceTest {
     }
 
     @Test
+    void isObserved_onlyOnceTheStateWasObserved_withoutRecordingIt() {
+        assertThat(service.isObserved(user)).isFalse();
+        assertThat(service.isObserved(user)).isFalse();
+
+        service.clearState(user);
+
+        assertThat(service.isObserved(user)).isTrue();
+    }
+
+    @Test
     void recentlyDetectedGame_isTheGameStillBeingPlayed() {
         service.updateState(user, doom);
         at(T0.plus(Duration.ofHours(5)));

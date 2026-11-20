@@ -66,6 +66,11 @@ public class GameStateService {
         return observedSinceStart.add(user.getId());
     }
 
+    /** Whether {@code user}'s game state has been observed since this instance started, without recording anything. */
+    public boolean isObserved(UserAccount user) {
+        return observedSinceStart.contains(user.getId());
+    }
+
     public void updateState(UserAccount user, DetectedGame game) {
         observedSinceStart.add(user.getId());
         DetectedGame previous = lastKnownGame.put(user.getId(), game);
