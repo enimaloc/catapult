@@ -45,7 +45,9 @@ public class PlaywrightLoginBrowser implements BattleNetLoginBrowser {
     private static final String PASSWORD = "input#password:visible";
     private static final String SUBMIT = "#submit";
     /** A visible error element on the login form after a submit: Battle.net's explicit rejection. */
-    private static final String LOGIN_ERROR = ".alert-error:visible, .form-error:visible, [role=alert]:visible";
+    // Not Next.js's route announcer: an empty role=alert live region on every flow.battle.net page.
+    private static final String LOGIN_ERROR =
+            ".alert-error:visible, .form-error:visible, [role=alert]:visible:not(#__next-route-announcer__)";
     // Verified against the live site on 2026-11-14: after the password, a fresh context lands on a "Security
     // Check" page (/challenge/<uuid>/choose, a method <select> and #submit), then on the code page
     // (/challenge/<uuid>) whose one-time-code input submits the form by itself once filled.

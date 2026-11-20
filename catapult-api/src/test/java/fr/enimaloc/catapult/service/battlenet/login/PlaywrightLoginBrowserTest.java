@@ -69,4 +69,24 @@ class PlaywrightLoginBrowserTest {
             login.close();
         }
     }
+
+    /** Next.js's route announcer: an empty, 1-pixel live region every flow.battle.net page carries. */
+    private static final String ROUTE_ANNOUNCER = """
+            <div id="__next-route-announcer__" role="alert" aria-live="assertive" style="position: absolute; \
+            border: 0; height: 1px; margin: -1px; padding: 0; width: 1px; clip: rect(0 0 0 0); overflow: hidden; \
+            white-space: nowrap"></div>""";
+
+    @Test
+    void nextJsRouteAnnouncer_isNotReadAsARejection() throws Exception {
+        try (Playwright playwright = Playwright.create();
+             Browser browser = playwright.chromium().launch()) {
+            BrowserContext context = browser.newContext();
+            Page page = context.newPage();
+            page.setContent("<html><body><p>Loading</p>" + ROUTE_ANNOUNCER + "</body></html>");
+            LoginPage login = PlaywrightLoginBrowser.onPage(context, page);
+
+            assertThat(login.awaitOutcome(Duration.ofSeconds(1))).isInstanceOf(Outcome.TimedOut.class);
+            login.close();
+        }
+    }
 }
