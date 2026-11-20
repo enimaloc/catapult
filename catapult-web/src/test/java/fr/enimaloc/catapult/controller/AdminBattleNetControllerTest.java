@@ -184,4 +184,24 @@ class AdminBattleNetControllerTest {
         mvc.perform(admin(post(BASE + "/" + ID + "/bgs-call"), "{}")).andExpect(status().is4xxClientError());
         verify(apiService, never()).adminBgsCall(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
     }
+
+    @Test
+    void bgsMethods_is502WhenTheApiCantGiveThem() throws Exception {
+        when(apiService.isAdmin()).thenReturn(true);
+        when(apiService.adminBgsMethods()).thenReturn(null);
+
+        mvc.perform(get(BASE + "/bgs-methods").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+                .andExpect(status().isBadGateway());
+    }
+
+    @Test
+    void bgsCall_relaysAStatusAlone_whenTheRefusalHasNoMessage() throws Exception {
+        when(apiService.isAdmin()).thenReturn(true);
+        when(apiService.adminBgsCall(org.mockito.ArgumentMatchers.eq(ID), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new ApiService.AdminCall<>(502, null, null));
+
+        mvc.perform(admin(post(BASE + "/" + ID + "/bgs-call"), "{}"))
+                .andExpect(status().isBadGateway())
+                .andExpect(content().string(""));
+    }
 }

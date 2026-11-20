@@ -1455,4 +1455,20 @@ class MockApiServiceTest {
         assertThat(service.adminTwDtddTopics("violence")).isNotEmpty();
         assertThat(service.adminSetTwDtddTopics("violence", java.util.Map.of("someone dies", "Depicted"))).isEqualTo(204);
     }
+
+    @Test
+    void bgsCall_answersACatalogueAndAKnownOrRawResultWithPushes() {
+        assertThat(service.adminBgsMethods()).extracting(s -> s.name())
+                .contains("bgs.protocol.presence.v2.client.PresenceService");
+
+        var known = service.adminBgsCall(java.util.UUID.randomUUID(), new fr.enimaloc.catapult.common.dto.admin.BgsCallRequest(
+                "bgs.protocol.presence.v2.client.PresenceService", "Update", "", null, null, null, null));
+        assertThat(known.status()).isEqualTo(200);
+        assertThat(known.body().replyText()).isEmpty();
+        assertThat(known.body().pushes()).isNotEmpty();
+        var raw = service.adminBgsCall(java.util.UUID.randomUUID(), new fr.enimaloc.catapult.common.dto.admin.BgsCallRequest(
+                null, null, null, "0xBCA72135", 1, "0800", true));
+        assertThat(raw.body().replyText()).isNull();
+        assertThat(raw.body().replyHex()).isNotEmpty();
+    }
 }
