@@ -7,6 +7,7 @@ import fr.enimaloc.catapult.service.twitch.TwitchCategory;
 import fr.enimaloc.catapult.service.twitch.TwitchExtension;
 import fr.enimaloc.catapult.service.twitch.TwitchExtensionPlacement;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
+import fr.enimaloc.catapult.service.twitch.TwitchWriteHeldException;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,8 +22,8 @@ import java.util.function.Supplier;
  * noted. Wrapped around each {@link TwitchService} bean by {@link DryRunTwitchWrapping}.
  *
  * <p>Until who is in dry run is known ({@link DryRunGate#holdsUntilLoaded}), every member's write is held too, and
- * answered as not made: {@link ChannelUpdateOutcome#FAILED}, or an exception for the extensions, so that nothing takes
- * the channel as changed.</p>
+ * answered as not made: {@link ChannelUpdateOutcome#FAILED}, or a {@link TwitchWriteHeldException} for the extensions,
+ * so that nothing takes the channel as changed.</p>
  */
 public class DryRunTwitchService implements TwitchService {
 
@@ -129,8 +130,8 @@ public class DryRunTwitchService implements TwitchService {
         return delegate.getActiveExtensions(user);
     }
 
-    private static IllegalStateException notLoaded() {
-        return new IllegalStateException("Twitch write held: dry-run state not loaded yet");
+    private static TwitchWriteHeldException notLoaded() {
+        return new TwitchWriteHeldException("Twitch write held: dry-run state not loaded yet");
     }
 
     /** {@code [dry run] would have changed the channel: <fields>}, without the colon when no field is known. */

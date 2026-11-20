@@ -24,6 +24,7 @@ import fr.enimaloc.catapult.service.twitch.TwitchEventSubService;
 import fr.enimaloc.catapult.service.twitch.TwitchExtension;
 import fr.enimaloc.catapult.service.twitch.TwitchExtensionPlacement;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
+import fr.enimaloc.catapult.service.twitch.TwitchWriteHeldException;
 import fr.enimaloc.catapult.service.twitch.TwitchServiceImpl;
 import fr.enimaloc.catapult.service.twitch.TwitchTokenService;
 import fr.enimaloc.catapult.site.SiteRole;
@@ -111,7 +112,7 @@ class DryRunTwitchServiceTest {
         assertThat(held.setCategory(other, "33214", "Factorio")).isEqualTo(ChannelUpdateOutcome.FAILED);
         assertThat(held.resetToDefault(other)).isEqualTo(ChannelUpdateOutcome.FAILED);
         assertThatThrownBy(() -> held.setActiveExtensions(other, TwitchExtensionPlacement.empty()))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(TwitchWriteHeldException.class);
 
         verifyNoInteractions(delegate, activityLog, twitchat);
     }

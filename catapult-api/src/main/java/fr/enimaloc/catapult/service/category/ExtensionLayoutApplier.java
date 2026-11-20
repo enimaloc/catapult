@@ -10,6 +10,7 @@ import fr.enimaloc.catapult.service.twitch.TwitchExtensionPlacement;
 import fr.enimaloc.catapult.service.twitch.TwitchExtensionPlacement.Placement;
 import fr.enimaloc.catapult.service.twitch.TwitchExtensionPlacement.Slot;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
+import fr.enimaloc.catapult.service.twitch.TwitchWriteHeldException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -35,7 +36,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * configuration in place, which at worst re-applies a layout, and what the slots held, which are then left as the
  * last configuration put them.
  * <p>
- * A Twitch error is logged in the activity log, never thrown: the extensions must not break a category change.
+ * A Twitch error is logged in the activity log, never thrown: the extensions must not break a category change. A
+ * write held back for now ({@link TwitchWriteHeldException}) is not an error: it does not count as applied, nothing
+ * is noted for the member, and the next switch applies the layout again.
  */
 @Slf4j
 @Component
@@ -99,11 +102,17 @@ public class ExtensionLayoutApplier {
         Map<SlotRef, Slot> toRestore = new HashMap<>(held);
         toRestore.keySet().removeAll(set);
         if (layout.isEmpty() && toRestore.isEmpty()) return;
+        Set<SlotRef> readNow = new HashSet<>();
         try {
             List<TwitchExtension> installed = twitchService.getUserExtensions(user);
             TwitchExtensionPlacement active = layout.isEmpty() ? null : twitchService.getActiveExtensions(user);
             if (readable(active)) {
-                set.forEach(ref -> held.computeIfAbsent(ref, r -> current(active, r)));
+                for (SlotRef ref : set) {
+                    if (!held.containsKey(ref)) {
+                        held.put(ref, current(active, ref));
+                        readNow.add(ref);
+                    }
+                }
             } else if (active != null) {
                 activityLogService.addEntry(user.getId(), "WARN", "Twitch extensions in place could not be read:"
                         + " the extensions changed now will not be put back when this configuration ends");
@@ -129,6 +138,11 @@ public class ExtensionLayoutApplier {
                 twitchService.setActiveExtensions(user, placement);
             }
             restored.forEach(held::remove);
+        } catch (TwitchWriteHeldException e) {
+            // Nothing changed on the channel: not applied, so the same configuration is applied again next time
+            readNow.forEach(held::remove);
+            lastKeys.remove(user.getId());
+            log.warn("Extension layout for user {} not applied, to be tried again: {}", user.getId(), e.getMessage());
         } catch (RuntimeException e) {
             log.warn("Applying the extension layout for user {} failed: {}", user.getId(), e.toString());
             activityLogService.addEntry(user.getId(), "WARN", "Twitch extensions not applied: " + e.toString());
