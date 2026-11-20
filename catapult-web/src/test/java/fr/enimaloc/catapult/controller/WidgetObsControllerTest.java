@@ -64,6 +64,9 @@ class WidgetObsControllerTest {
                 .andExpect(content().string(containsString("<div id=\"log\"></div>")))
                 .andExpect(content().string(containsString("#log{display:block}")))
                 .andExpect(content().string(script("suggest")))
+                // Before obs.js, whose hooks it backs.
+                .andExpect(content().string(org.hamcrest.Matchers.matchesPattern(
+                        "(?s).*src=\"/js/debug-capture-[0-9a-f]{32}\\.js\".*src=\"/js/obs-[0-9a-f]{32}\\.js\".*")))
                 .andExpect(content().string(script("obs")))
                 .andExpect(content().string(script("obs-session")))
                 .andExpect(content().string(script("twitchat-protocol")))

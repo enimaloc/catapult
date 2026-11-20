@@ -14,12 +14,17 @@
  * A page can name another config URL in its body's data-obs-config-url (the OBS widget page,
  * /widget/obs/{token}/config, same shape); /me/obs otherwise. That page has no settings to save
  * and nobody to reload it: while it gets no config (catapult-api unreachable, 204), it asks again
- * every CONFIG_RETRY_MS.
+ * every CONFIG_RETRY_MS, and once it has one, reads it again every CONFIG_RELOAD_MS.
+ *
+ * The config's debugCapture switches debug-capture.js on or off (the member's debug mode): on
+ * the widget page, which is never reloaded, that periodic read is how it follows the debug mode.
  */
 window.CatapultObsSession = (function () {
     const MIN_DELAY = 1000;
     const MAX_DELAY = 30000;
     const CONFIG_RETRY_MS = 30000;
+    const CONFIG_RELOAD_MS = 60000;
+    const PAGE_CAPTURE_URL = "/me/debug/client-exchanges";
     const { CloseCode } = CatapultObs;
     const FINAL_CLOSE_CODES = new Set([CloseCode.AuthenticationFailed, CloseCode.UnsupportedRpcVersion]);
 
@@ -67,14 +72,41 @@ window.CatapultObsSession = (function () {
         return a?.obsHost === b?.obsHost && a?.obsPort === b?.obsPort && a?.obsPassword === b?.obsPassword;
     }
 
+    /** Applies a config read: Twitchat's branch, and the debug capture when there is a config. */
+    function apply(next) {
+        window.CatapultTwitchat?.configure(next?.twitchatBranch ?? "auto");
+        const capture = window.CatapultDebugCapture;
+        if (!capture || !next) return;
+        if (!next.debugCapture) {
+            capture.disable();
+        } else if (isWidget()) {
+            capture.enable({ url: configUrl().replace(/\/config$/, "/debug/client-exchanges"), source: "widget" });
+        } else {
+            capture.enable({ url: PAGE_CAPTURE_URL, source: "page" });
+        }
+    }
+
+    /** The widget's periodic read: the connection is only touched when the config changed. */
+    async function reload() {
+        const gen = generation;
+        const next = await fetchConfig();
+        if (gen !== generation) return;
+        if (!next || !sameConfig(next, config)) {
+            await refresh();
+            return;
+        }
+        apply(next);
+        configTimer = setTimeout(reload, CONFIG_RELOAD_MS);
+    }
+
     /** Re-reads the config (/me/obs by default), then connects, reconnects or disconnects to match it. */
     async function refresh() {
         const gen = ++generation;
         clearTimeout(configTimer);
         const next = await fetchConfig();
         if (gen !== generation) return;
-        if (!next && isWidget()) configTimer = setTimeout(refresh, CONFIG_RETRY_MS);
-        window.CatapultTwitchat?.configure(next?.twitchatBranch ?? "auto");
+        if (isWidget()) configTimer = next ? setTimeout(reload, CONFIG_RELOAD_MS) : setTimeout(refresh, CONFIG_RETRY_MS);
+        apply(next);
         if (next && sameConfig(next, config) && CatapultObs.isConnected()) return;
         clearTimeout(timer);
         delay = MIN_DELAY;

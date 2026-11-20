@@ -513,3 +513,100 @@ describe("dispatch to a Twitchat not detected yet", () => {
             .toEqual(["CUSTOM_CHAT_MESSAGE", "EXECUTE_TRIGGER"]);
     });
 });
+
+describe("debug capture", () => {
+    const TOKEN = "0b6f2a4e-1c3d-4e5f-8a9b-0c1d2e3f4a5b";
+
+    /** Every entry debug-capture.js sent, once flushed. */
+    function captured() {
+        CatapultDebugCapture.flush();
+        return fetch.mock.calls.flatMap(([, init]) => JSON.parse(init.body).entries);
+    }
+
+    beforeEach(async () => {
+        vi.stubGlobal("fetch", vi.fn(async () => ({ status: 204 })));
+        await load("debug-capture", "suggest", "twitchat-protocol", "twitchat");
+        CatapultDebugCapture.enable({ url: "/me/debug/client-exchanges", source: "page" });
+        CatapultTwitchat.useProtocol("stable");
+    });
+
+    afterEach(() => {
+        CatapultDebugCapture.disable();
+        delete window.CatapultDebugCapture;
+    });
+
+    it("twitchatGetActionIsCapturedWithItsAnswer", async () => {
+        const triggers = CatapultTwitchat.actions.triggersGetAll();
+        await vi.advanceTimersByTimeAsync(10);
+        twitchatSends("TRIGGER_LIST", { triggers: [] });
+        await triggers;
+
+        const entries = captured();
+        const action = entries.find(({ operation }) => operation === "TRIGGERS_GET_ALL");
+        expect(action).toEqual(expect.objectContaining({
+            service: "twitchat", direction: "OUT", status: null, error: null, durationMs: 10,
+            request: { origin: "twitchat", id: broadcasts()[0].id, type: "TRIGGERS_GET_ALL", data: {} },
+            response: expect.objectContaining({ type: "TRIGGER_LIST", data: { triggers: [] } }),
+        }));
+        expect(entries.find(({ operation }) => operation === "TRIGGER_LIST"))
+            .toEqual(expect.objectContaining({ direction: "IN", response: expect.objectContaining({ data: { triggers: [] } }) }));
+    });
+
+    it("twitchatActionTimeoutIsCaptured", async () => {
+        const presence = CatapultTwitchat.actions.getWheelOverlayPresence(undefined, { timeout: 500 }).catch(() => {});
+        await vi.advanceTimersByTimeAsync(500);
+        await presence;
+        expect(captured()).toEqual([expect.objectContaining({
+            operation: "GET_WHEEL_OVERLAY_PRESENCE", error: "timeout", durationMs: 500, response: null })]);
+    });
+
+    it("captures the actions sent without an answer, and their failures", async () => {
+        await CatapultTwitchat.actions.chatFeedPause();
+        CatapultObs.requests = { broadcastCustomEvent: () => Promise.reject(new Error("OBS said no")) };
+        await CatapultTwitchat.actions.chatFeedPause().catch(() => {});
+        await vi.advanceTimersByTimeAsync(0);
+        expect(captured().map(({ operation, error }) => [operation, error]))
+            .toEqual([["CHAT_FEED_PAUSE", null], ["CHAT_FEED_PAUSE", "OBS said no"]]);
+    });
+
+    it("captures a dispatch and its payloads without their action tokens", async () => {
+        const result = CatapultTwitchat.dispatch({ id: "d-1", eventType: "LIVE",
+            payloads: [{ action: "CUSTOM_CHAT_MESSAGE", data: { message: `Ban? https://c.example/a/${TOKEN}` } }] });
+        await vi.advanceTimersByTimeAsync(350);
+        await result;
+
+        const entries = captured();
+        expect(JSON.stringify(entries)).not.toContain(TOKEN);
+        expect(entries.find(({ operation }) => operation === "dispatch")).toEqual(expect.objectContaining({
+            direction: "OUT",
+            request: { id: "d-1", eventType: "LIVE", payloads: [{ action: "CUSTOM_CHAT_MESSAGE", data: { message: "Ban? https://c.example/a/<redacted>" } }] },
+            response: { sent: 1 },
+        }));
+        expect(entries.find(({ operation }) => operation === "CUSTOM_CHAT_MESSAGE").request.data.message)
+            .toBe("Ban? https://c.example/a/<redacted>");
+    });
+
+    it("nothingIsCapturedOutsideDebug", async () => {
+        CatapultDebugCapture.disable();
+        const record = vi.spyOn(CatapultDebugCapture, "record");
+        const pending = vi.spyOn(CatapultDebugCapture, "pending");
+        await CatapultTwitchat.actions.chatFeedPause();
+        twitchatSends("TWITCHAT_READY");
+        const triggers = CatapultTwitchat.actions.triggersGetAll().catch(() => {});
+        await vi.advanceTimersByTimeAsync(3000);
+        await triggers;
+        CatapultDebugCapture.flush();
+        expect(record).not.toHaveBeenCalled();
+        expect(pending).not.toHaveBeenCalled();
+        expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it("keeps Twitchat working when the capture throws", async () => {
+        vi.spyOn(CatapultDebugCapture, "pending").mockImplementation(() => { throw new Error("boom"); });
+        vi.spyOn(CatapultDebugCapture, "record").mockImplementation(() => { throw new Error("boom"); });
+        const triggers = CatapultTwitchat.actions.triggersGetAll();
+        await vi.advanceTimersByTimeAsync(0);
+        twitchatSends("TRIGGER_LIST", { triggers: [] });
+        await expect(triggers).resolves.toEqual({ triggers: [] });
+    });
+});

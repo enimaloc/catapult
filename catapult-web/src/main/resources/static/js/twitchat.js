@@ -109,10 +109,83 @@ window.CatapultTwitchat = (function () {
         listeners.get(type)?.forEach((handler) => handler(envelope.data ?? {}, envelope));
     }
 
+    // The member's debug journal (debug-capture.js), only while it is on: every hook returns
+    // first thing otherwise, and never lets a failure of its own reach Twitchat. Action tokens
+    // are stripped before anything is queued.
+    const capturing = () => window.CatapultDebugCapture?.active();
+
+    /** A message received from Twitchat or another client. */
+    function captureReceived(envelope) {
+        if (!capturing()) return;
+        try {
+            const capture = window.CatapultDebugCapture;
+            capture.record({ service: "twitchat", direction: "IN", operation: envelope.type, response: capture.stripTwitchat(envelope) });
+        } catch {
+            // the debug journal misses it
+        }
+    }
+
+    /** An action being sent, held until captureSettled() brings its outcome. */
+    function captureSent(envelope) {
+        if (!capturing()) return;
+        try {
+            const capture = window.CatapultDebugCapture;
+            capture.pending(`twitchat:${envelope.id}`, { service: "twitchat", direction: "OUT", operation: envelope.type,
+                request: capture.stripTwitchat(envelope) });
+        } catch {
+            // the debug journal misses it
+        }
+    }
+
+    /** The outcome of the action sent as `id`: Twitchat's answer, or what went wrong. */
+    function captureSettled(id, answer, error) {
+        if (!capturing()) return;
+        try {
+            const capture = window.CatapultDebugCapture;
+            capture.settle(`twitchat:${id}`, { response: answer ? capture.stripTwitchat(answer) : null,
+                error: error ? (error.code === "TIMEOUT" ? "timeout" : String(error.message ?? error)) : null });
+        } catch {
+            // the debug journal misses it
+        }
+    }
+
+    /** An action needing no answer: settled once OBS took it. */
+    function captureBroadcast(id, sent) {
+        if (!capturing()) return;
+        try {
+            sent.then(() => captureSettled(id, null, null), (error) => captureSettled(id, null, error));
+        } catch {
+            // the debug journal misses it
+        }
+    }
+
+    /** A Catapult dispatch being handled, held until captureDispatched(). */
+    function captureDispatch(batch) {
+        if (!capturing()) return;
+        try {
+            const capture = window.CatapultDebugCapture;
+            capture.pending(`twitchat:dispatch:${batch?.id}`, { service: "twitchat", direction: "OUT", operation: "dispatch",
+                request: capture.stripTwitchat({ id: batch?.id, eventType: batch?.eventType, payloads: batch?.payloads ?? [] }) });
+        } catch {
+            // the debug journal misses it
+        }
+    }
+
+    function captureDispatched(batch, sent, error) {
+        if (!capturing()) return;
+        try {
+            window.CatapultDebugCapture.settle(`twitchat:dispatch:${batch?.id}`,
+                error ? { error: String(error.message ?? error) } : { response: { sent } });
+        } catch {
+            // the debug journal misses it
+        }
+    }
+
     CatapultObs.on("CustomEvent", (eventData) => {
         if (eventData?.origin !== "twitchat" || !eventData.type) return;
         if (eventData.id && sentIds.has(eventData.id)) return;
         trace("↓", eventData);
+        captureReceived(eventData);
         detectFrom(eventData.type);
         if (TWITCHAT_EVENTS.has(eventData.type)) {
             heard = true;
@@ -131,14 +204,20 @@ window.CatapultTwitchat = (function () {
         return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
     }
 
-    function broadcast(action, data) {
-        const id = randomId();
+    /**
+     * Sends an action as `id` (a new one by default). `awaited`: its outcome is captured by the
+     * caller (Twitchat's answer), not once OBS took it.
+     */
+    function broadcast(action, data, id = randomId(), awaited = false) {
         sentIds.add(id);
         if (sentIds.size > MAX_SENT_IDS) sentIds.delete(sentIds.values().next().value);
         // Always a data object, as Twitchat's own clients send: some of its handlers read it unchecked.
         const envelope = { origin: "twitchat", id, type: action, data: data ?? {} };
         trace("↑", envelope);
-        return CatapultObs.requests.broadcastCustomEvent({ eventData: envelope });
+        captureSent(envelope);
+        const sent = CatapultObs.requests.broadcastCustomEvent({ eventData: envelope });
+        if (!awaited) captureBroadcast(id, sent);
+        return sent;
     }
 
     let pinging = null;
@@ -209,22 +288,27 @@ window.CatapultTwitchat = (function () {
         if (!knowsAction(name, action)) throw unknownAction(action, PROTOCOLS[name].actions, style, name);
         const answers = PROTOCOLS[name].replies[action];
         if (!answers) return broadcast(action, data).then(() => undefined);
+        const id = randomId();
         return new Promise((resolve, reject) => {
             // Listening before sending: the answer can't be missed.
-            const unsubscribes = answers.map((type) => client.on(type, (answer) => {
+            const unsubscribes = answers.map((type) => client.on(type, (answer, envelope) => {
                 done();
+                captureSettled(id, envelope, null);
                 resolve(answer);
             }));
             const timer = setTimeout(() => {
                 done();
-                reject(new TwitchatError(`No answer from Twitchat to ${action} within ${timeout}ms`, { code: "TIMEOUT", action }));
+                const error = new TwitchatError(`No answer from Twitchat to ${action} within ${timeout}ms`, { code: "TIMEOUT", action });
+                captureSettled(id, null, error);
+                reject(error);
             }, timeout);
             function done() {
                 clearTimeout(timer);
                 unsubscribes.forEach((unsubscribe) => unsubscribe());
             }
-            broadcast(action, data).catch((error) => {
+            broadcast(action, data, id, true).catch((error) => {
                 done();
+                captureSettled(id, null, error);
                 reject(error);
             });
         });
@@ -444,6 +528,18 @@ window.CatapultTwitchat = (function () {
 
     /** client.dispatch(), once the dispatches before it are done. */
     async function dispatchNow(batch) {
+        captureDispatch(batch);
+        try {
+            const sent = await sendDispatch(batch);
+            captureDispatched(batch, sent, null);
+            return sent;
+        } catch (error) {
+            captureDispatched(batch, null, error);
+            throw error;
+        }
+    }
+
+    async function sendDispatch(batch) {
         if (!CatapultObs.isConnected()) {
             log("OBS not connected, dispatch dropped:", batch.eventType);
             return 0;

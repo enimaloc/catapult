@@ -413,7 +413,9 @@ class IndexControllerTest {
 
         when(debugMembers.isCurrentActive()).thenReturn(true);
         assertThat(mvc.perform(get("/").session(session)).andReturn().getResponse().getContentAsString())
-                .containsPattern("<body [^>]*data-debug-capture=\"true\"");
+                .containsPattern("<body [^>]*data-debug-capture=\"true\"")
+                // Before obs.js, whose hooks it backs.
+                .containsPattern("(?s)src=\"/js/debug-capture-[0-9a-f]{32}\\.js\".*src=\"/js/obs-[0-9a-f]{32}\\.js\"");
         // A visitor, or an admin looking at a member's page, is never captured
         assertThat(mvc.perform(get("/")).andReturn().getResponse().getContentAsString())
                 .doesNotContain("data-debug-capture");

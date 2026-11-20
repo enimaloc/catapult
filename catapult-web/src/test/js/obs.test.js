@@ -407,3 +407,110 @@ describe("disconnects", () => {
         expect(fresh.closedWith).toBeNull();
     });
 });
+
+describe("debug capture", () => {
+    /** Every entry debug-capture.js sent, once flushed. */
+    function captured() {
+        CatapultDebugCapture.flush();
+        return fetch.mock.calls.flatMap(([, init]) => JSON.parse(init.body).entries);
+    }
+
+    beforeEach(async () => {
+        vi.stubGlobal("fetch", vi.fn(async () => ({ status: 204 })));
+        await load("debug-capture", "suggest", "obs");
+        CatapultDebugCapture.enable({ url: "/me/debug/client-exchanges", source: "page" });
+    });
+
+    afterEach(() => {
+        CatapultDebugCapture.disable();
+        delete window.CatapultDebugCapture;
+    });
+
+    it("obsRequestIsCapturedWithItsStatus", async () => {
+        const socket = await connected();
+        const scenes = CatapultObs.call("GetSceneList");
+        answer(socket, 7, { requestType: "GetSceneList", requestStatus: { result: true, code: 100 }, responseData: { scenes: [] } });
+        await scenes;
+        const failing = CatapultObs.call("SetCurrentProgramScene", { sceneName: "Nope" }).catch(() => {});
+        answer(socket, 7, { requestType: "SetCurrentProgramScene", requestStatus: { result: false, code: 600, comment: "No source was found." } });
+        await failing;
+        const batch = CatapultObs.callBatch([{ requestType: "GetVersion" }]);
+        answer(socket, 9, { results: [{ requestType: "GetVersion", requestStatus: { result: true, code: 100 } }] });
+        await batch;
+
+        const entries = captured();
+        expect(entries.find(({ operation }) => operation === "GetSceneList")).toEqual(expect.objectContaining({
+            service: "obs", direction: "OUT", status: 100, error: null, durationMs: expect.any(Number),
+            request: expect.objectContaining({ requestType: "GetSceneList" }),
+            response: expect.objectContaining({ responseData: { scenes: [] } }),
+        }));
+        expect(entries.find(({ operation }) => operation === "SetCurrentProgramScene"))
+            .toEqual(expect.objectContaining({ status: 600, error: "No source was found." }));
+        expect(entries.find(({ operation }) => operation === "RequestBatch"))
+            .toEqual(expect.objectContaining({ direction: "OUT", error: null, response: expect.objectContaining({ results: expect.any(Array) }) }));
+    });
+
+    it("obsIdentifyIsCapturedWithoutAuthentication", async () => {
+        const promise = CatapultObs.connect({ host: "h", port: 1, password: "hunter2" });
+        last().serverSends(0, { rpcVersion: 1, authentication: { salt: "s", challenge: "c" } });
+        await vi.waitFor(() => expect(last().sent).toHaveLength(1));
+        const proof = last().lastSent(1).authentication;
+        last().serverSends(2, { negotiatedRpcVersion: 1 });
+        answerVersion(last());
+        await promise;
+
+        const entries = captured();
+        expect(entries.slice(0, 4).map(({ direction, operation }) => [direction, operation])).toEqual([
+            ["OUT", "Connect"], ["IN", "Hello"], ["OUT", "Identify"], ["IN", "Identified"]]);
+        expect(entries[0].request).toEqual({ host: "h", port: 1, secure: false });
+        expect(entries[2].request).toEqual({ rpcVersion: 1 });
+        const sent = fetch.mock.calls.map(([, init]) => init.body).join();
+        expect(sent).not.toContain("hunter2");
+        expect(sent).not.toContain(proof);
+    });
+
+    it("captures the events, the close and the requests left without an answer", async () => {
+        const socket = await connected();
+        socket.serverSends(5, { eventType: "CurrentProgramSceneChanged", eventIntent: 4, eventData: { sceneName: "A" } });
+        // Twitchat's messages are twitchat.js's to capture.
+        socket.serverSends(5, { eventType: "CustomEvent", eventIntent: 1, eventData: { origin: "twitchat", type: "X" } });
+        CatapultObs.requests.broadcastCustomEvent({ eventData: { origin: "twitchat", type: "Y" } }).catch(() => {});
+        const request = CatapultObs.call("GetSceneList").catch(() => {});
+        socket.serverCloses(1006, "gone");
+        await request;
+
+        // After Connect, Hello, Identify, Identified and GetVersion.
+        const entries = captured().slice(5);
+        expect(entries.map(({ direction, operation, error }) => [direction, operation, error])).toEqual([
+            ["IN", "CurrentProgramSceneChanged", null], ["OUT", "GetSceneList", "connection closed"],
+            ["IN", "ConnectionClosed", null]]);
+        expect(entries[0].response).toEqual({ eventType: "CurrentProgramSceneChanged", eventIntent: 4, eventData: { sceneName: "A" } });
+        expect(entries[2].response).toEqual({ code: 1006, reason: "gone" });
+
+        await connected();
+        CatapultObs.close();
+        expect(captured().at(-1)).toEqual(expect.objectContaining({ direction: "OUT", operation: "Close" }));
+    });
+
+    it("nothingIsCapturedOutsideDebug", async () => {
+        CatapultDebugCapture.disable();
+        const record = vi.spyOn(CatapultDebugCapture, "record");
+        const pending = vi.spyOn(CatapultDebugCapture, "pending");
+        const socket = await connected();
+        socket.serverSends(5, { eventType: "StreamStateChanged", eventData: {} });
+        socket.serverCloses(1006);
+        CatapultDebugCapture.flush();
+        expect(record).not.toHaveBeenCalled();
+        expect(pending).not.toHaveBeenCalled();
+        expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it("keeps OBS working when the capture throws", async () => {
+        vi.spyOn(CatapultDebugCapture, "pending").mockImplementation(() => { throw new Error("boom"); });
+        vi.spyOn(CatapultDebugCapture, "record").mockImplementation(() => { throw new Error("boom"); });
+        const socket = await connected();
+        const scenes = CatapultObs.call("GetSceneList");
+        answer(socket, 7, { requestType: "GetSceneList", requestStatus: { result: true, code: 100 }, responseData: { scenes: [] } });
+        await expect(scenes).resolves.toEqual({ scenes: [] });
+    });
+});
