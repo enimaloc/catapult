@@ -9,6 +9,7 @@ import bgs.protocol.friends.v2.client.FriendsServiceOuterClass.SendInvitationReq
 import bgs.protocol.friends.v2.client.FriendsTypes.Friend;
 import bgs.protocol.friends.v2.client.FriendsTypes.FriendStateAssignment;
 import bgs.protocol.friends.v2.client.FriendsTypes.SendInvitationTarget;
+import bgs.protocol.presence.v2.client.PresenceServiceOuterClass.BatchSubscribeRequest;
 import com.google.protobuf.ByteString;
 import fr.enimaloc.catapult.bgs.core.WireExchange;
 import fr.enimaloc.catapult.bgs.proto.BgsServices;
@@ -121,15 +122,36 @@ class BgsWireRecorderTest {
     }
 
     @Test
-    void recordsAnUnknownMethodOfTheFriendsService() {
-        byte[] garbage = ("\u00ff\u00ffStreamer#1234").getBytes(StandardCharsets.ISO_8859_1);
+    void neverRecordsAnUnknownMethodOfTheFriendsService() {
+        ByteString named = ByteString.copyFrom("Streamer#1234", StandardCharsets.UTF_8);
         int friends = BgsServices.FRIENDS_LISTENER_ON_UPDATE_FRIEND_STATE.serviceHash();
 
-        recorder.onExchange(new WireExchange(false, AT, 0, header(friends, 99), ByteString.copyFrom(garbage), null,
-                null, null, null));
+        recorder.onExchange(new WireExchange(false, AT, 0, header(friends, 99), named, null, null, null, null));
 
-        RawExchange raw = recorded(Direction.IN, String.format("bgs.0x%08x.99", friends));
-        assertThat(raw.requestRaw()).isEqualTo(garbage);
+        nothingRecorded();
+    }
+
+    @Test
+    void neverRecordsTheBatchPresenceSubscription() {
+        ServiceMethod<?, ?> method = BgsServices.PRESENCE_BATCH_SUBSCRIBE;
+        ByteString request = BatchSubscribeRequest.newBuilder().addAccountIds(42L).addAccountIds(43L)
+                .buildPartial().toByteString();
+
+        recorder.onExchange(new WireExchange(true, AT, 0, header(method.serviceHash(), method.methodId()), request,
+                null, null, method, null));
+
+        nothingRecorded();
+    }
+
+    @Test
+    void neverRecordsTheFriendsSubscription() {
+        ServiceMethod<?, ?> method = BgsServices.FRIENDS_SUBSCRIBE;
+        ByteString reply = ByteString.copyFrom("Streamer#1234", StandardCharsets.UTF_8);
+
+        recorder.onExchange(new WireExchange(true, AT, 0, header(method.serviceHash(), method.methodId()),
+                ByteString.EMPTY, Header.newBuilder().setServiceId(254).buildPartial(), reply, method, null));
+
+        nothingRecorded();
     }
 
     @Test

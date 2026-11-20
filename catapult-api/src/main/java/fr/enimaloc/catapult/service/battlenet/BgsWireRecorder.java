@@ -20,14 +20,10 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import tools.jackson.databind.node.ObjectNode;
 
-import java.lang.reflect.AccessFlag;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 /**
  * Records, for the members in debug mode linked to one bot, the BGS exchanges of its session that name them: one
@@ -35,9 +31,7 @@ import java.util.stream.Collectors;
  * Whom a frame names is read from its decoded body (exact values) and, when a body could not be decoded with its
  * schema, searched in its raw bytes.
  *
- * <p>Only the friends and presence services are recorded: everything else (login, connection, account, game account
- * selection, own presence, unknown services) can carry secrets and is dropped before being decoded, and so are
- * the friend lists, which name strangers too.
+ * <p>Only the methods naming a single friend are recorded, see {@link #RECORDED}.
  */
 @Slf4j
 public final class BgsWireRecorder implements WireTap {
@@ -45,15 +39,27 @@ public final class BgsWireRecorder implements WireTap {
     /** The HTTP-like header holding the BGS header as JSON. */
     static final String HEADER = "Bgs-Header";
 
-    private static final List<String> RECORDED_SERVICES = List.of("friends.", "presence.");
-    /** Raw and unknown calls are only known by their hash: those of the recorded services the table knows. */
-    private static final Set<Integer> RECORDED_HASHES = recordedHashes();
     /**
-     * The friend lists, never recorded: they name every friend of the bot, strangers included, whom the masking of
-     * other members cannot know.
+     * The only methods recorded: each names a single friend (or invitation). A frame naming several people (friend
+     * lists, subscriptions and their failures, batch presence subscriptions) would expose the friends of the bot
+     * who are not members, whom the masking of other members does not know; login, connection and account frames
+     * can carry secrets; unknown methods and raw calls cannot be vouched for. All of those are dropped before being
+     * decoded.
      */
-    private static final List<ServiceMethod<?, ?>> FRIEND_LISTS = List.of(BgsServices.FRIENDS_GET_FRIENDS,
-            BgsServices.FRIENDS_GET_SENT_INVITATIONS, BgsServices.FRIENDS_GET_RECEIVED_INVITATIONS);
+    private static final List<ServiceMethod<?, ?>> RECORDED = List.of(
+            BgsServices.FRIENDS_LISTENER_ON_FRIEND_ADDED,
+            BgsServices.FRIENDS_LISTENER_ON_FRIEND_REMOVED,
+            BgsServices.FRIENDS_LISTENER_ON_RECEIVED_INVITATION_ADDED,
+            BgsServices.FRIENDS_LISTENER_ON_RECEIVED_INVITATION_REMOVED,
+            BgsServices.FRIENDS_LISTENER_ON_SENT_INVITATION_ADDED,
+            BgsServices.FRIENDS_LISTENER_ON_SENT_INVITATION_REMOVED,
+            BgsServices.FRIENDS_LISTENER_ON_UPDATE_FRIEND_STATE,
+            BgsServices.PRESENCE_LISTENER_ON_PRESENCE_STATE_UPDATED,
+            BgsServices.FRIENDS_SEND_INVITATION,
+            BgsServices.FRIENDS_ACCEPT_INVITATION,
+            BgsServices.FRIENDS_REVOKE_INVITATION,
+            BgsServices.FRIENDS_IGNORE_INVITATION,
+            BgsServices.FRIENDS_REMOVE_FRIEND);
 
     private final UUID serviceAccountId;
     private final SessionDebug debug;
@@ -76,49 +82,30 @@ public final class BgsWireRecorder implements WireTap {
     @Override
     public void onExchange(WireExchange exchange) {
         try {
-            if (exchange.requestHeader() == null || !recorded(exchange)) {
+            ServiceMethod<?, ?> method = recorded(exchange.requestHeader());
+            if (method == null) {
                 return;
             }
-            ServiceMethod<?, ?> method = exchange.method();
-            Body request = body(exchange.requestBody(), method == null ? null : method.requestParser());
-            Body reply = body(exchange.replyBody(), method == null ? null : method.responseParser());
+            Body request = body(exchange.requestBody(), method.requestParser());
+            Body reply = body(exchange.replyBody(), method.responseParser());
             Predicate<String> concerns = concerns(request).or(concerns(reply));
             debug.exchange(serviceAccountId, concerns, exchange.initiatedLocally() ? Direction.OUT : Direction.IN,
-                    () -> raw(exchange, request, reply), operation(exchange));
+                    () -> raw(exchange, request, reply), "bgs." + method.service() + "." + method.methodId());
         } catch (RuntimeException e) {
             log.warn("Could not record a BGS exchange of {} for the members in debug mode: {}", serviceAccountId,
                     e.toString());
         }
     }
 
-    private static boolean recorded(WireExchange exchange) {
-        Header header = exchange.requestHeader();
-        if (FRIEND_LISTS.stream().anyMatch(list -> list.serviceHash() == header.getServiceHash()
-                && list.methodId() == header.getMethodId())) {
-            return false;
+    /** The recorded method the header calls, or null when the exchange must not be recorded. */
+    private static ServiceMethod<?, ?> recorded(Header header) {
+        if (header == null) {
+            return null;
         }
-        ServiceMethod<?, ?> method = exchange.method();
-        if (method != null) {
-            return RECORDED_SERVICES.stream().anyMatch(method.service()::startsWith);
-        }
-        return RECORDED_HASHES.contains(exchange.requestHeader().getServiceHash());
-    }
-
-    /** The hashes of the recorded services among the methods {@link BgsServices} declares. */
-    private static Set<Integer> recordedHashes() {
-        return Arrays.stream(BgsServices.class.getFields())
-                .filter(field -> field.accessFlags().contains(AccessFlag.STATIC)
-                        && ServiceMethod.class.isAssignableFrom(field.getType()))
-                .map(field -> {
-                    try {
-                        return (ServiceMethod<?, ?>) field.get(null);
-                    } catch (IllegalAccessException e) {
-                        throw new IllegalStateException(e);
-                    }
-                })
-                .filter(method -> RECORDED_SERVICES.stream().anyMatch(method.service()::startsWith))
-                .map(ServiceMethod::serviceHash)
-                .collect(Collectors.toUnmodifiableSet());
+        return RECORDED.stream()
+                .filter(method -> method.serviceHash() == header.getServiceHash()
+                        && method.methodId() == header.getMethodId())
+                .findFirst().orElse(null);
     }
 
     /**
@@ -128,15 +115,6 @@ public final class BgsWireRecorder implements WireTap {
     private static Predicate<String> concerns(Body body) {
         Predicate<String> leaves = WireKeys.concerns(WireKeys.of(body.json()));
         return body.typed() ? leaves : leaves.or(WireKeys.rawConcerns(body.raw()));
-    }
-
-    private static String operation(WireExchange exchange) {
-        ServiceMethod<?, ?> method = exchange.method();
-        if (method != null) {
-            return "bgs." + method.service() + "." + method.methodId();
-        }
-        Header header = exchange.requestHeader();
-        return "bgs." + String.format("0x%08x", header.getServiceHash()) + "." + header.getMethodId();
     }
 
     /** The body parsed with its schema when there is one and it parses, else decoded without schema. */
