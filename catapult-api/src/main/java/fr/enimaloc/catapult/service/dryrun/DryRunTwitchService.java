@@ -22,7 +22,7 @@ import java.util.function.Supplier;
  */
 public class DryRunTwitchService implements TwitchService {
 
-    private static final String CHANGED = "[dry run] would have changed the channel: ";
+    private static final String CHANGED = "[dry run] would have changed the channel";
 
     private final TwitchService delegate;
     private final Supplier<DryRunGate> gate;
@@ -45,7 +45,7 @@ public class DryRunTwitchService implements TwitchService {
         List<String> fields = new ArrayList<>();
         category(binding.getTwitchGameId(), binding.getTwitchGameName()).ifPresent(fields::add);
         dryRun.plannedTitle(user, binding).ifPresent(title -> fields.add("title \"" + title + "\""));
-        dryRun.note(user, "updateChannelReporting", CHANGED + String.join(", ", fields));
+        dryRun.note(user, "updateChannelReporting", changed(fields));
         dryRun.announceCategory(user, binding.getTwitchGameId(), binding.getTwitchGameName());
         return ChannelUpdateOutcome.DRY_RUN;
     }
@@ -56,8 +56,7 @@ public class DryRunTwitchService implements TwitchService {
         if (!dryRun.holdsChannel(user)) {
             return delegate.setCategory(user, twitchGameId, twitchGameName);
         }
-        dryRun.note(user, "setCategory", CHANGED + String.join(", ",
-                category(twitchGameId, twitchGameName).stream().toList()));
+        dryRun.note(user, "setCategory", changed(category(twitchGameId, twitchGameName).stream().toList()));
         dryRun.announceCategory(user, twitchGameId, twitchGameName);
         return ChannelUpdateOutcome.DRY_RUN;
     }
@@ -112,6 +111,11 @@ public class DryRunTwitchService implements TwitchService {
     @Override
     public TwitchExtensionPlacement getActiveExtensions(UserAccount user) {
         return delegate.getActiveExtensions(user);
+    }
+
+    /** {@code [dry run] would have changed the channel: <fields>}, without the colon when no field is known. */
+    private static String changed(List<String> fields) {
+        return fields.isEmpty() ? CHANGED : CHANGED + ": " + String.join(", ", fields);
     }
 
     /** {@code category <name>} (its id when it has no name), empty without either. */

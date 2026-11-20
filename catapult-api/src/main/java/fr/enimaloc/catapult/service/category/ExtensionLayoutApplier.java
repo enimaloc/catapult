@@ -83,6 +83,15 @@ public class ExtensionLayoutApplier {
         apply(user, List.of());
     }
 
+    /**
+     * Forgets the configuration in place and what its slots held, without touching Twitch: after a dry run, whose
+     * layouts were never sent, the next switch applies its layout again, even to the same configuration.
+     */
+    public void forget(UUID userId) {
+        lastKeys.remove(userId);
+        originals.remove(userId);
+    }
+
     private void apply(UserAccount user, Collection<ExtensionSlotSetting> layout) {
         Map<SlotRef, Slot> held = originals.computeIfAbsent(user.getId(), id -> new ConcurrentHashMap<>());
         Set<SlotRef> set = new HashSet<>();

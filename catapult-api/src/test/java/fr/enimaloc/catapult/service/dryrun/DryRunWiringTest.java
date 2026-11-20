@@ -11,7 +11,11 @@ import fr.enimaloc.catapult.service.account.BotToggleService;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
 import fr.enimaloc.catapult.service.notification.CatapultCategoryChangeStateService;
 import fr.enimaloc.catapult.service.title.StreamTitleService;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import fr.enimaloc.catapult.service.debug.DebugRecording;
 import fr.enimaloc.catapult.service.twitch.ChannelUpdateOutcome;
+import fr.enimaloc.catapult.service.twitch.EventSubTwitchChatService;
+import fr.enimaloc.catapult.service.twitch.SystemTwitchAccountService;
 import fr.enimaloc.catapult.service.twitch.IrcTwitchChatService;
 import fr.enimaloc.catapult.service.twitch.TwitchCategoryService;
 import fr.enimaloc.catapult.service.twitch.TwitchChatRateLimiter;
@@ -33,14 +37,19 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.test.util.AopTestUtils;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestClient;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -81,6 +90,11 @@ class DryRunWiringTest {
             .withBean(TwitchHelixChannelClient.class, () -> mock(TwitchHelixChannelClient.class))
             .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
             .withBean(TwitchChatRateLimiter.class, () -> mock(TwitchChatRateLimiter.class))
+            // the EventSub transport, when chosen
+            .withBean(EventSubTwitchChatService.class)
+            .withBean(ObjectMapper.class, ObjectMapper::new)
+            .withBean(SystemTwitchAccountService.class, () -> mock(SystemTwitchAccountService.class))
+            .withBean(DebugRecording.class, () -> mock(DebugRecording.class))
             // the simulation, when on
             .withBean(SimulatedTwitchService.class)
             .withBean(SimulatedTwitchChatService.class)
@@ -159,6 +173,36 @@ class DryRunWiringTest {
             verifyNoInteractions(context.getBean(SimulatedCallRunner.class), context.getBean(RestClient.class),
                     context.getBean(ChannelUpdateEcho.class));
         });
+    }
+
+    @Test
+    void gatesTheEventSubTransportAndKeepsItsCallbacks() {
+        AtomicReference<Object> transport = new AtomicReference<>();
+        runner.withPropertyValues("catapult.simulation.enabled=false", "app.chat.provider=eventsub").run(context -> {
+            assertThat(context).hasNotFailed();
+            Consumer consumer = context.getBean(Consumer.class);
+            UserAccount account = member();
+            UserAccountRepository users = context.getBean(UserAccountRepository.class);
+            assertThat(consumer.chat()).isInstanceOf(EventSubTwitchChatService.class);
+            assertThat(context.getBeanProvider(EventSubTwitchChatService.class).getIfAvailable())
+                    .isSameAs(consumer.chat());
+
+            consumer.chat().sendMessage(account, "hi");
+            context.publishEvent(new AccountCreatedEvent(this, account));
+
+            verify(context.getBean(DryRunGate.class)).note(account, "sendMessage", "[dry run] would have sent: hi");
+            verifyNoInteractions(context.getBean(RestClient.class), context.getBean(TwitchChatRateLimiter.class));
+            // @PostConstruct ran once, on the bean itself
+            verify(users, times(1)).findByStatus(UserAccount.Status.ACTIVE);
+            // @EventListener reached it
+            verify(context.getBean(OAuthTokenRepository.class))
+                    .findByUserAndProvider(account, OAuthToken.Provider.TWITCH);
+            transport.set(AopTestUtils.getUltimateTargetObject(consumer.chat()));
+        });
+        // @PreDestroy ran on closing: the watchdogs of the bean's connections are stopped
+        Object connections = ReflectionTestUtils.getField(transport.get(), "connections");
+        assertThat((ExecutorService) ReflectionTestUtils.getField(connections, "watchdogExecutor"))
+                .returns(true, ExecutorService::isShutdown);
     }
 
     @Test

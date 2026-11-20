@@ -13,20 +13,23 @@ import fr.enimaloc.catapult.service.debug.RawExchange;
 import fr.enimaloc.catapult.service.notification.TwitchatEventDispatcher;
 import fr.enimaloc.catapult.service.title.StreamTitleService;
 import fr.enimaloc.catapult.service.twitch.TwitchEventSubService;
-import fr.enimaloc.catapult.service.twitch.TwitchEventSubService.CurrentCategory;
 import fr.enimaloc.catapult.site.SiteRole;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * What the dry-run decorators ({@link DryRunTwitchService}, {@link DryRunTwitchChatService}) ask before and after
@@ -57,8 +60,10 @@ public class DryRunGate {
     private final StreamTitleService streamTitleService;
     private final ObjectProvider<TwitchEventSubService> eventSub;
     private final ObjectProvider<TwitchatEventDispatcher> twitchat;
+    /** Per member in dry run, the last held category announced: Twitch's own never moves meanwhile. */
+    private final Map<UUID, Category> announced = new ConcurrentHashMap<>();
 
-    /** The default ("no game") category a reset would send. */
+    /** A Twitch category: the default ("no game") one a reset would send, or one announced. */
     public record Category(String id, String name) {}
 
     /**
@@ -146,26 +151,40 @@ public class DryRunGate {
 
     /**
      * Tells the member's Twitchat about a held category change, as Twitch's {@code channel.update} echo would have
-     * for a real one ("changed by Catapult"); nothing when the channel is already on that category.
+     * for a real one ("changed by Catapult"). The channel is taken to be on the last category announced during this
+     * dry run, else on its real one: nothing is announced when it already is on {@code gameId}, so a held decision
+     * repeated for the same game is announced once.
      */
     public void announceCategory(UserAccount user, String gameId, String gameName) {
         try {
-            TwitchEventSubService channels = eventSub.getIfAvailable();
-            Optional<CurrentCategory> current = channels == null ? Optional.empty()
-                    : channels.currentCategory(user.getId());
+            Optional<Category> current = Optional.ofNullable(announced.get(user.getId()))
+                    .or(() -> realCategory(user));
             if (current.map(category -> Objects.equals(category.id(), gameId)).orElse(false)) {
                 return;
             }
+            announced.put(user.getId(), new Category(gameId, gameName));
             TwitchatEventDispatcher dispatcher = twitchat.getIfAvailable();
             if (dispatcher == null) {
                 return;
             }
             dispatcher.onCategoryChangedByCatapult(user, gameId, gameName,
-                    current.map(CurrentCategory::id).filter(id -> !id.isBlank()).orElse(null),
-                    current.map(CurrentCategory::name).orElse(null));
+                    current.map(Category::id).filter(id -> !id.isBlank()).orElse(null),
+                    current.map(Category::name).orElse(null));
         } catch (RuntimeException e) {
             log.warn("Could not announce the dry run of {} on Twitchat: {}", user.getId(), e.toString());
         }
+    }
+
+    /** A member out of dry run: the next held change, in a later dry run, compares with the real category again. */
+    @EventListener
+    public void onDryRunEnded(DryRunEndedEvent event) {
+        announced.remove(event.userId());
+    }
+
+    private Optional<Category> realCategory(UserAccount user) {
+        TwitchEventSubService channels = eventSub.getIfAvailable();
+        return channels == null ? Optional.empty() : channels.currentCategory(user.getId())
+                .map(category -> new Category(category.id(), category.name()));
     }
 
     /** Whether the real client would send at least one content label switched on with {@code binding}. */

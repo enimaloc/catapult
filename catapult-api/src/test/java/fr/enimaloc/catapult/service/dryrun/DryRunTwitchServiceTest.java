@@ -48,7 +48,9 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 class DryRunTwitchServiceTest {
@@ -185,6 +187,41 @@ class DryRunTwitchServiceTest {
         service.setCategory(account, "33214", "Factorio");
 
         verifyNoInteractions(twitchat);
+    }
+
+    @Test
+    void aHeldChangeRepeatedForTheSameGameIsAnnouncedOnce() {
+        when(eventSub.currentCategory(member))
+                .thenReturn(Optional.of(new TwitchEventSubService.CurrentCategory("509658", "Just Chatting")));
+
+        service.setCategory(account, "33214", "Factorio");
+        service.updateChannelReporting(account, binding("33214", "Factorio"));
+        service.setCategory(account, "509658", "Just Chatting");
+
+        verify(twitchat).onCategoryChangedByCatapult(account, "33214", "Factorio", "509658", "Just Chatting");
+        // back to the real category: a change from the held one, announced as such
+        verify(twitchat).onCategoryChangedByCatapult(account, "509658", "Just Chatting", "33214", "Factorio");
+        verifyNoMoreInteractions(twitchat);
+    }
+
+    @Test
+    void theHeldCategoryIsForgottenWhenTheDryRunEnds() {
+        when(eventSub.currentCategory(member))
+                .thenReturn(Optional.of(new TwitchEventSubService.CurrentCategory("509658", "Just Chatting")));
+        service.setCategory(account, "33214", "Factorio");
+
+        gate.onDryRunEnded(new DryRunEndedEvent(member));
+        service.setCategory(account, "33214", "Factorio");
+
+        verify(twitchat, times(2))
+                .onCategoryChangedByCatapult(account, "33214", "Factorio", "509658", "Just Chatting");
+    }
+
+    @Test
+    void aChangeWithoutAnyCategoryLogsNoEmptyPart() {
+        assertThat(service.setCategory(account, null, null)).isEqualTo(ChannelUpdateOutcome.DRY_RUN);
+
+        verify(activityLog).addEntry(member, "INFO", "[dry run] would have changed the channel");
     }
 
     @Test
