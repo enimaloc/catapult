@@ -654,7 +654,8 @@ public class MockApiService implements ApiService {
 
     @Override
     public ApiClient.Result<Void> postWidgetClientDebugExchanges(UUID token, ClientExchangeBatch batch) {
-        log.trace("postWidgetClientDebugExchanges({})", token);
+        // The token is a credential: never logged
+        log.trace("postWidgetClientDebugExchanges(***)");
         return widgetOwner(token)
                 .filter(d -> d.obsConnection() != null)
                 .map(d -> new ApiClient.Result<Void>(inDebug(d.getChannelDto().id()) ? 204 : 409, null))

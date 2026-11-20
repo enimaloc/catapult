@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.common.dto.debug.ClientExchangeBatch;
 import jakarta.servlet.http.HttpServletRequest;
+import tools.jackson.core.JacksonException;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
@@ -34,7 +35,7 @@ final class ClientDebugBatches {
             ClientExchangeBatch batch = JSON.readValue(body, ClientExchangeBatch.class);
             return batch == null ? Optional.empty()
                     : Optional.of(new ClientExchangeBatch(source, batch.sentAt(), batch.entries()));
-        } catch (IOException | RuntimeException e) {
+        } catch (IOException | JacksonException e) {
             return Optional.empty();
         }
     }

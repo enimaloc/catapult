@@ -36,8 +36,7 @@ import java.util.UUID;
  * every {@link #STREAM_TIMEOUT}, so revoking the link takes effect on the reconnection; an address
  * keeps a few streams, and past the overall bound they are refused (503). While its owner is in debug mode, the page
  * posts its OBS and Twitchat exchanges to {@code /widget/obs/{token}/debug/client-exchanges}, relayed to their
- * debug journal by the token alone (no session, no CSRF token), at most {@link WidgetDebugLimiter#BATCHES} batches
- * per {@link WidgetDebugLimiter#WINDOW}.
+ * debug journal by the token alone (no session, no CSRF token), within {@link WidgetDebugLimiter}'s bounds.
  */
 @Controller
 @RequiredArgsConstructor
@@ -103,14 +102,17 @@ public class WidgetObsController {
         if (uuid == null) {
             return ResponseEntity.notFound().build();
         }
-        if (!debugLimiter.tryAcquire(uuid)) {
+        if (debugLimiter.admit(uuid) == WidgetDebugLimiter.Admission.REFUSED) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).build();
         }
         Optional<ClientExchangeBatch> batch = ClientDebugBatches.read(request, "widget");
         if (batch.isEmpty()) {
             return ResponseEntity.badRequest().build();
         }
-        return ResponseEntity.status(apiService.postWidgetClientDebugExchanges(uuid, batch.get()).status()).build();
+        int status = apiService.postWidgetClientDebugExchanges(uuid, batch.get()).status();
+        // Only a token catapult-api recognizes gets an allowance of its own
+        debugLimiter.relayed(uuid, status);
+        return ResponseEntity.status(status).build();
     }
 
     /** The link OBS sources were set up with before /widget/obs. */

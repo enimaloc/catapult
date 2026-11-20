@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.controller;
 
 import fr.enimaloc.catapult.MutableClock;
+import fr.enimaloc.catapult.controller.WidgetDebugLimiter.Admission;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -15,33 +16,82 @@ class WidgetDebugLimiterTest {
     private final WidgetDebugLimiter limiter = new WidgetDebugLimiter(clock, 3);
     private final UUID widget = UUID.randomUUID();
 
-    @Test
-    void aWidgetGetsItsBatchesPerWindow_thenWaitsForTheOldestToLeaveIt() {
-        for (int i = 0; i < WidgetDebugLimiter.BATCHES; i++) {
-            assertThat(limiter.tryAcquire(widget)).isTrue();
-            clock.advance(Duration.ofMillis(500));
-        }
-        assertThat(limiter.tryAcquire(widget)).isFalse();
-
-        // The first batch, sent at 12:00:00, leaves the window at 12:00:10
-        clock.now = Instant.parse("2026-11-20T12:00:10Z");
-        assertThat(limiter.tryAcquire(widget)).isTrue();
-        assertThat(limiter.tryAcquire(widget)).isFalse();
+    /** {@code widget} relayed once, catapult-api recognizing it. */
+    private void known(UUID widget) {
+        assertThat(limiter.admit(widget)).isEqualTo(Admission.UNVERIFIED);
+        limiter.relayed(widget, 204);
     }
 
     @Test
-    void theWidgetsTrackedAreBounded_quietOnesMakingRoom() {
-        assertThat(limiter.tryAcquire(UUID.randomUUID())).isTrue();
-        assertThat(limiter.tryAcquire(UUID.randomUUID())).isTrue();
-        assertThat(limiter.tryAcquire(widget)).isTrue();
+    void aKnownWidgetIsStillLimitedTo10Per10s() {
+        known(widget);
+        clock.advance(Duration.ofMillis(500));
+        // Its first relay counts in its own allowance
+        for (int i = 1; i < WidgetDebugLimiter.BATCHES; i++) {
+            assertThat(limiter.admit(widget)).isEqualTo(Admission.KNOWN);
+            clock.advance(Duration.ofMillis(500));
+        }
+        assertThat(limiter.admit(widget)).isEqualTo(Admission.REFUSED);
 
-        // Three widgets sent within the window: a fourth is refused until one of them goes quiet
-        UUID fourth = UUID.randomUUID();
-        assertThat(limiter.tryAcquire(fourth)).isFalse();
-        // A widget already tracked still gets its allowance
-        assertThat(limiter.tryAcquire(widget)).isTrue();
+        // The first batch, sent at 12:00:00, leaves the window at 12:00:10
+        clock.now = Instant.parse("2026-11-20T12:00:10Z");
+        assertThat(limiter.admit(widget)).isEqualTo(Admission.KNOWN);
+        assertThat(limiter.admit(widget)).isEqualTo(Admission.REFUSED);
+    }
 
-        clock.advance(WidgetDebugLimiter.WINDOW.plusMillis(1));
-        assertThat(limiter.tryAcquire(fourth)).isTrue();
+    @Test
+    void randomTokensDoNotLockOutAKnownWidget() {
+        known(widget);
+        for (int i = 0; i < 10_000; i++) {
+            UUID random = UUID.randomUUID();
+            if (limiter.admit(random) != Admission.REFUSED) limiter.relayed(random, 404);
+        }
+
+        assertThat(limiter.admit(widget)).isEqualTo(Admission.KNOWN);
+    }
+
+    @Test
+    void unknownTokensShareABoundedBudget() {
+        for (int i = 0; i < WidgetDebugLimiter.UNVERIFIED_BATCHES; i++) {
+            assertThat(limiter.admit(UUID.randomUUID())).isEqualTo(Admission.UNVERIFIED);
+        }
+        assertThat(limiter.admit(UUID.randomUUID())).isEqualTo(Admission.REFUSED);
+        assertThat(limiter.admit(widget)).isEqualTo(Admission.REFUSED);
+
+        clock.advance(WidgetDebugLimiter.WINDOW);
+        assertThat(limiter.admit(widget)).isEqualTo(Admission.UNVERIFIED);
+    }
+
+    @Test
+    void aWidgetIsKnownForAWhile_untilA404_andNotForAnUnreachableApi() {
+        known(widget);
+        clock.advance(WidgetDebugLimiter.KNOWN_FOR.minusSeconds(1));
+        assertThat(limiter.admit(widget)).isEqualTo(Admission.KNOWN);
+        // Each recognized relay keeps it known
+        limiter.relayed(widget, 409);
+        clock.advance(WidgetDebugLimiter.KNOWN_FOR.minusSeconds(1));
+        assertThat(limiter.admit(widget)).isEqualTo(Admission.KNOWN);
+        clock.advance(WidgetDebugLimiter.KNOWN_FOR);
+        assertThat(limiter.admit(widget)).isEqualTo(Admission.UNVERIFIED);
+
+        limiter.relayed(widget, 502);
+        assertThat(limiter.admit(widget)).isEqualTo(Admission.UNVERIFIED);
+
+        limiter.relayed(widget, 204);
+        assertThat(limiter.admit(widget)).isEqualTo(Admission.KNOWN);
+        limiter.relayed(widget, 404);
+        assertThat(limiter.admit(widget)).isEqualTo(Admission.UNVERIFIED);
+    }
+
+    @Test
+    void theKnownWidgetsAreBounded_theLeastRecentlySeenLeavingFirst() {
+        UUID first = UUID.randomUUID();
+        known(first);
+        known(UUID.randomUUID());
+        known(UUID.randomUUID());
+        known(widget);
+
+        assertThat(limiter.admit(widget)).isEqualTo(Admission.KNOWN);
+        assertThat(limiter.admit(first)).isEqualTo(Admission.UNVERIFIED);
     }
 }
