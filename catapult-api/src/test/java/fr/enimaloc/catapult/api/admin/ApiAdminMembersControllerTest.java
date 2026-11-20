@@ -58,9 +58,11 @@ class ApiAdminMembersControllerTest {
     private final fr.enimaloc.catapult.service.debug.MemberDebugService debug =
             mock(fr.enimaloc.catapult.service.debug.MemberDebugService.class);
     private final PremiumService premium = mock(PremiumService.class);
+    private final fr.enimaloc.catapult.service.dryrun.DryRunService dryRun =
+            mock(fr.enimaloc.catapult.service.dryrun.DryRunService.class);
     private final ApiAdminMembersController controller = new ApiAdminMembersController(new AdminMemberService(
-            accounts, streamState, accountService, botToggle, migrations, environment, flags, groups, debug, premium),
-            premium);
+            accounts, streamState, accountService, botToggle, migrations, environment, flags, groups, debug, premium,
+            dryRun), premium);
 
     private UserAccount member;
 
@@ -125,7 +127,7 @@ class ApiAdminMembersControllerTest {
 
         assertThat(page.members()).containsExactly(new fr.enimaloc.catapult.common.dto.admin.AdminMemberDto(
                 member.getId(), member.getTwitchId(), member.getTwitchUsername(), "https://img/member", "7656",
-                false, member.isBotEnabled(), "ACTIVE", member.getCreatedAt(), null, false, null));
+                false, member.isBotEnabled(), "ACTIVE", member.getCreatedAt(), null, false, null, false));
         assertThat(page.liveStatus()).containsEntry(member.getId(), true);
         assertThat(page.isMockProfile()).isTrue();
         assertThat(page.number()).isZero();
@@ -153,6 +155,23 @@ class ApiAdminMembersControllerTest {
         assertThat(page.members().get(1).debug()).isNull();
         assertThat(page.members().get(2).debug()).isEqualTo(off);
         assertThat(controller.search("mem").get(0).debug()).isEqualTo(state);
+    }
+
+    @Test
+    void memberListCarriesTheDryRunFlag() {
+        UserAccount other = account("other", "tw-other");
+        when(accounts.findMembersPage(any())).thenReturn(pageOf(List.of(member, other), 0, 2));
+        when(accounts.searchMembers(any(), any(), any())).thenReturn(List.of(other, member));
+        when(dryRun.activeAmong(any())).thenReturn(java.util.Set.of(member.getId()));
+
+        var page = controller.page(0, null);
+
+        assertThat(page.members().get(0).dryRun()).isTrue();
+        assertThat(page.members().get(1).dryRun()).isFalse();
+        assertThat(controller.search("e")).extracting(m -> m.dryRun()).containsExactly(false, true);
+        // one lookup per listing, for the whole page
+        verify(dryRun).activeAmong(List.of(member.getId(), other.getId()));
+        verify(dryRun).activeAmong(List.of(other.getId(), member.getId()));
     }
 
     @Test
