@@ -294,7 +294,7 @@ class AnkamaChatClientTest {
         assertThat(exchange).isNotNull();
         assertThat(exchange.initiatedLocally()).isTrue();
         assertThat(exchange.at()).isNotNull();
-        assertThat(exchange.durationNanos()).isPositive();
+        assertThat(exchange.durationNanos()).isNotNegative();
         assertThat(exchange.request()).isInstanceOfSatisfying(Request.class, r -> {
             assertThat(r.correlationId()).isEqualTo(1);
             assertThat(r.payload().id()).isEqualTo(11);

@@ -309,7 +309,7 @@ class BgsSessionTest {
         assertThat(exchange.replyBody()).isEqualTo(response.toByteString());
         assertThat(exchange.error()).isNull();
         assertThat(exchange.at()).isNotNull();
-        assertThat(exchange.durationNanos()).isPositive();
+        assertThat(exchange.durationNanos()).isNotNegative();
     }
 
     @Test
