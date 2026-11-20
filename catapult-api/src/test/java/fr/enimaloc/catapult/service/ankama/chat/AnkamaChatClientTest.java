@@ -257,4 +257,144 @@ class AnkamaChatClientTest {
         org.mockito.Mockito.verify(ssl).setSSLParameters(applied.capture());
         assertThat(applied.getValue().getEndpointIdentificationAlgorithm()).isEqualTo("HTTPS");
     }
+
+    /** Collects what the client tells it, when it wants something. */
+    private static final class RecordingTap implements ChatWireTap {
+        final BlockingQueue<ChatWireExchange> exchanges = new LinkedBlockingQueue<>();
+        volatile boolean wants = true;
+        volatile boolean failing;
+
+        @Override
+        public boolean wants() {
+            return wants;
+        }
+
+        @Override
+        public void onExchange(ChatWireExchange exchange) {
+            exchanges.add(exchange);
+            if (failing) {
+                throw new IllegalStateException("boom");
+            }
+        }
+    }
+
+    @Test
+    void tapGetsARequestAndItsResponse() throws Exception {
+        RecordingTap tap = new RecordingTap();
+        client.setWireTap(tap);
+        Connected c = handshake(new RecordingListener(), "{\"success\": true}");
+
+        CompletableFuture<Response> answer = client.request(new Payload(11, new byte[]{1, 2}));
+        byte[] sent = c.peer().read().body();
+        byte[] received = ChatFrames.encode(new Response(1, 7, new Payload(22, new byte[]{9})));
+        c.peer().send(ChatFrames.KIND_DATA, received);
+        answer.get(5, TimeUnit.SECONDS);
+
+        ChatWireExchange exchange = tap.exchanges.poll(5, TimeUnit.SECONDS);
+        assertThat(exchange).isNotNull();
+        assertThat(exchange.initiatedLocally()).isTrue();
+        assertThat(exchange.at()).isNotNull();
+        assertThat(exchange.durationNanos()).isPositive();
+        assertThat(exchange.request()).isInstanceOfSatisfying(Request.class, r -> {
+            assertThat(r.correlationId()).isEqualTo(1);
+            assertThat(r.payload().id()).isEqualTo(11);
+        });
+        assertThat(exchange.requestBytes()).isEqualTo(sent);
+        assertThat(exchange.response().status()).isEqualTo(7);
+        assertThat(exchange.response().payload().id()).isEqualTo(22);
+        assertThat(exchange.responseBytes()).isEqualTo(received);
+        assertThat(exchange.error()).isNull();
+        assertThat(tap.exchanges).isEmpty();
+    }
+
+    @Test
+    void tapGetsAPushedEvent() throws Exception {
+        RecordingTap tap = new RecordingTap();
+        client.setWireTap(tap);
+        RecordingListener listener = new RecordingListener();
+        Connected c = handshake(listener, "{\"success\": true}");
+        byte[] pushed = ChatFrames.encode(new ChatFrames.Event(
+                new Payload(ChatMessages.USER_PRESENCE_UPDATED_EVT, new byte[]{8, 42})));
+
+        c.peer().send(ChatFrames.KIND_DATA, pushed);
+
+        ChatWireExchange exchange = tap.exchanges.poll(5, TimeUnit.SECONDS);
+        assertThat(exchange).isNotNull();
+        assertThat(exchange.initiatedLocally()).isFalse();
+        assertThat(exchange.request()).isInstanceOfSatisfying(ChatFrames.Event.class,
+                e -> assertThat(e.payload().id()).isEqualTo(ChatMessages.USER_PRESENCE_UPDATED_EVT));
+        assertThat(exchange.requestBytes()).isEqualTo(pushed);
+        assertThat(exchange.response()).isNull();
+        assertThat(exchange.responseBytes()).isNull();
+        assertThat(exchange.error()).isNull();
+        assertThat(listener.events.poll(5, TimeUnit.SECONDS)).isNotNull();
+    }
+
+    @Test
+    void tapNeverSeesTheHandshake() throws Exception {
+        client = newClient(Duration.ofMillis(50));
+        RecordingTap tap = new RecordingTap();
+        client.setWireTap(tap);
+        Connected c = handshake(new RecordingListener(), "{\"success\": true}");
+
+        assertThat(c.peer().read().kind()).isEqualTo(ChatFrames.KIND_HEARTBEAT);
+        assertThat(c.peer().read().kind()).isEqualTo(ChatFrames.KIND_HEARTBEAT);
+
+        assertThat(tap.exchanges).isEmpty();
+    }
+
+    @Test
+    void tapGetsAPendingRequestFailedByTheClose() throws Exception {
+        RecordingTap tap = new RecordingTap();
+        client.setWireTap(tap);
+        handshake(new RecordingListener(), "{\"success\": true}");
+        CompletableFuture<Response> pending = client.request(new Payload(11, new byte[]{1}));
+
+        client.close();
+
+        ChatWireExchange exchange = tap.exchanges.poll(5, TimeUnit.SECONDS);
+        assertThat(exchange).isNotNull();
+        assertThat(exchange.response()).isNull();
+        assertThat(exchange.error()).isEqualTo("The chat connection is closed");
+        assertThat(pending).isCompletedExceptionally();
+    }
+
+    @Test
+    void tapThatWantsNothingGetsNothing() throws Exception {
+        RecordingTap tap = new RecordingTap();
+        tap.wants = false;
+        client.setWireTap(tap);
+        Connected c = handshake(new RecordingListener(), "{\"success\": true}");
+
+        CompletableFuture<Response> answer = client.request(new Payload(11, new byte[]{1}));
+        c.peer().read();
+        c.peer().send(ChatFrames.KIND_DATA, ChatFrames.encode(new Response(1, 0, null)));
+        answer.get(5, TimeUnit.SECONDS);
+        tap.wants = true;
+        c.peer().send(ChatFrames.KIND_DATA, ChatFrames.encode(new ChatFrames.Event(new Payload(5, new byte[0]))));
+
+        ChatWireExchange event = tap.exchanges.poll(5, TimeUnit.SECONDS);
+        assertThat(event).isNotNull();
+        assertThat(event.request()).isInstanceOf(ChatFrames.Event.class);
+        assertThat(tap.exchanges).isEmpty();
+    }
+
+    @Test
+    void aFailingTapLeavesTheConnectionAlone() throws Exception {
+        RecordingTap tap = new RecordingTap();
+        tap.failing = true;
+        client.setWireTap(tap);
+        RecordingListener listener = new RecordingListener();
+        Connected c = handshake(listener, "{\"success\": true}");
+
+        CompletableFuture<Response> answer = client.request(new Payload(11, new byte[]{1}));
+        c.peer().read();
+        c.peer().send(ChatFrames.KIND_DATA, ChatFrames.encode(new Response(1, 0, null)));
+        c.peer().send(ChatFrames.KIND_DATA, ChatFrames.encode(new ChatFrames.Event(
+                new Payload(ChatMessages.USER_PRESENCE_UPDATED_EVT, new byte[]{8, 42}))));
+
+        assertThat(answer.get(5, TimeUnit.SECONDS).status()).isZero();
+        assertThat(listener.events.poll(5, TimeUnit.SECONDS)).isNotNull();
+        assertThat(listener.closed).isEmpty();
+    }
 }

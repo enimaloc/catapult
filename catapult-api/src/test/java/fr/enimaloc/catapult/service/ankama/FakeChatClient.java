@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.service.ankama.chat.AnkamaChatClient;
 import fr.enimaloc.catapult.service.ankama.chat.ChatFrames;
 import fr.enimaloc.catapult.service.ankama.chat.ChatListener;
 import fr.enimaloc.catapult.service.ankama.chat.ChatMessages;
+import fr.enimaloc.catapult.service.ankama.chat.ChatWireTap;
 
 import java.io.ByteArrayOutputStream;
 import java.io.EOFException;
@@ -26,6 +27,7 @@ class FakeChatClient extends AnkamaChatClient {
     String deviceId;
     ChatListener listener;
     boolean closed;
+    ChatWireTap tap;
     /** Thrown by {@link #connect}, when set. */
     IOException connectFailure;
     List<ChatMessages.User> friends = List.of();
@@ -66,6 +68,11 @@ class FakeChatClient extends AnkamaChatClient {
                             new ChatFrames.Payload(ChatMessages.FRIEND_INVITE_LIST, inviteList())));
             default -> CompletableFuture.completedFuture(new ChatFrames.Response(3, 1, null));
         };
+    }
+
+    @Override
+    public void setWireTap(ChatWireTap tap) {
+        this.tap = tap;
     }
 
     @Override
