@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.service.debug.DebugMemberRegistry.DebugMode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.http.MediaType;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -84,15 +85,17 @@ class DetectionTraceTest {
     }
 
     @Test
-    void theRecordedExchangeIsDeclaredAsJsonSoItIsRedactedAsJson() {
+    void aSecretQuotedInAReasonIsMaskedWhenTheJournalRedactsTheBody() {
         inDebug();
 
         try (DetectionTrace.Scope ignored = DetectionTrace.openIfDebugged(registry, recorder, USER)) {
-            DetectionTrace.provider("STEAM", "none", null, null);
+            DetectionTrace.provider("STEAM", "none", "player summary failed: GET https://x/api?key=SECRET123", null);
         }
 
-        assertThat(recorded(recorder, USER).requestHeaders().getContentType())
-                .isEqualTo(org.springframework.http.MediaType.APPLICATION_JSON);
+        RawExchange raw = recorded(recorder, USER);
+        MediaType type = raw.requestHeaders() == null ? null : raw.requestHeaders().getContentType();
+        String masked = new DebugRedactor().body(raw.requestBody(), type, false);
+        assertThat(masked).contains("player summary failed").doesNotContain("SECRET123");
     }
 
     @Test
