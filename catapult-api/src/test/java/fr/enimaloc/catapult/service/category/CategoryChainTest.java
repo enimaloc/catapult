@@ -32,6 +32,7 @@ import fr.enimaloc.catapult.service.category.CategoryTrigger.RevertCategory;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.NoGameAfterCustomBinding;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.StreamEnded;
 import fr.enimaloc.catapult.service.category.CategoryTrigger.StreamStarted;
+import fr.enimaloc.catapult.service.dryrun.DryRunHeldDecisions;
 import fr.enimaloc.catapult.service.twitch.ChannelUpdateOutcome;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -1056,6 +1057,17 @@ class CategoryChainTest {
     }
 
     @Test
+    void a_dry_run_switch_still_applies_the_bindings_layout() {
+        binding.getExtensionSlots().add(panel);
+        live(true);
+        applierAnswers(CategoryOutcome.dryRun(CategoryRule.GAME_BINDING));
+
+        chain.apply(user, new GameDetected(binding));
+
+        verify(layouts).applyOnSwitch(user, "binding:" + binding.getId(), binding.getExtensionSlots());
+    }
+
+    @Test
     void no_game_fallback_carries_the_no_game_layout() {
         settings.setApplyDefaultOnNoGame(true);
         settings.getNoGameExtensionSlots().add(panel);
@@ -1233,5 +1245,32 @@ class CategoryChainTest {
 
         assertThat(real.apply(user, new GameDetected(binding))).isSameAs(applied);
         assertThat(twitch.extensionFailures()).isEqualTo(1);
+    }
+
+    // ---- dry run ----
+
+    @Test
+    void aDecisionHeldByTheDryRunIsRemembered() {
+        DryRunHeldDecisions held = new DryRunHeldDecisions();
+        chain = new CategoryChain(activations, streamStateService, settingsRepository, hold, gameStateService,
+                accountRepository, applier, gate, lookup, layouts, held);
+        applierAnswers(CategoryOutcome.dryRun(CategoryRule.MANUAL_CHOICE));
+
+        chain.apply(user, new ManualCategory(binding));
+
+        assertThat(held.lastHeld(user.getId()))
+                .contains(new DryRunHeldDecisions.Held(new ManualCategory(binding), CategoryRule.MANUAL_CHOICE));
+    }
+
+    @Test
+    void aDecisionSentOrSkippedIsNotRememberedAsHeld() {
+        DryRunHeldDecisions held = new DryRunHeldDecisions();
+        chain = new CategoryChain(activations, streamStateService, settingsRepository, hold, gameStateService,
+                accountRepository, applier, gate, lookup, layouts, held);
+        applierAnswers(CategoryOutcome.applied(CategoryRule.MANUAL_CHOICE));
+
+        chain.apply(user, new ManualCategory(binding));
+
+        assertThat(held.lastHeld(user.getId())).isEmpty();
     }
 }

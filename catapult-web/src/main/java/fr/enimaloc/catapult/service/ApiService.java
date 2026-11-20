@@ -251,6 +251,16 @@ public interface ApiService {
     List<String> memberDebugServices(java.util.UUID memberId);
     /** Whether the logged-in member is in debug mode, and their replay rate; null when catapult-api could not tell. */
     fr.enimaloc.catapult.common.dto.MyDebugDto myDebug();
+
+    // --- a member's dry run (Catapult then changes nothing on their channel) ---
+    /** Puts the member in dry run: catapult-api's status (409 already in it, 404 unknown member), 502 when unreachable. */
+    int enableMemberDryRun(java.util.UUID memberId);
+    /** Takes the member out of dry run (a no-op when not in it): catapult-api's status, 502 when unreachable. */
+    int disableMemberDryRun(java.util.UUID memberId);
+    /** Whether the logged-in member is in dry run, and since when; null when catapult-api could not tell or nobody is. */
+    fr.enimaloc.catapult.common.dto.DryRunStateDto myDryRun();
+    /** The logged-in member's own way out of dry run: catapult-api's status, 401 logged out, 502 when unreachable. */
+    int disableMyDryRun();
     /** Copies the chosen parts of a member's data onto another member. */
     int adminMigrateMember(java.util.UUID memberId, java.util.UUID targetId,
                             boolean settings, boolean getters, boolean bindings);

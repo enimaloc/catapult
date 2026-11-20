@@ -12,8 +12,10 @@ import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.twitchat.TwitchatEventAction;
 import fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType;
 import fr.enimaloc.catapult.event.NoGameDetectedEvent;
+import fr.enimaloc.catapult.service.ActivityLogService;
 import fr.enimaloc.catapult.service.binding.GameBindingLookup;
 import fr.enimaloc.catapult.service.binding.GameStateService;
+import fr.enimaloc.catapult.service.dryrun.DryRunRegistry;
 import fr.enimaloc.catapult.service.stream.SessionRecap;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,10 +26,13 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.BOT_DISABLED;
 import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.BOT_ENABLED;
@@ -52,12 +57,18 @@ public class TwitchatEventDispatcher {
     private static final Map<String, String> TEST_RAID = Map.of("raider", "Raideur de test",
             "games", "- Factorio (Factorio) (2h30)\n- Just Chatting (1h)", "sessionDuration", "3h30");
 
+    private static final String DRY_RUN_PREFIX = "[dry run] ";
+    private static final String DRY_RUN_MARK = DRY_RUN_PREFIX.stripTrailing();
+    private static final Pattern ACTION_PLACEHOLDER = Pattern.compile("\\{\\{\\s*(?i:action)\\s*:[^}]*\\}\\}");
+
     private final TwitchatWidgetSettingsService widgetSettingsService;
     private final TwitchatActionTokenService actionTokenService;
     private final TwitchatEventActionService eventActionService;
     private final ChannelEventPublisher channelEventPublisher;
     private final GameStateService gameStateService;
     private final GameBindingLookup gameBindingLookup;
+    private final DryRunRegistry dryRunRegistry;
+    private final ActivityLogService activityLog;
 
     @Value("${app.web-url:http://localhost:8080}")
     private String publicWebUrl;
@@ -67,13 +78,17 @@ public class TwitchatEventDispatcher {
                                    TwitchatEventActionService eventActionService,
                                    ChannelEventPublisher channelEventPublisher,
                                    GameStateService gameStateService,
-                                   GameBindingLookup gameBindingLookup) {
+                                   GameBindingLookup gameBindingLookup,
+                                   DryRunRegistry dryRunRegistry,
+                                   ActivityLogService activityLog) {
         this.widgetSettingsService = widgetSettingsService;
         this.actionTokenService = actionTokenService;
         this.eventActionService = eventActionService;
         this.channelEventPublisher = channelEventPublisher;
         this.gameStateService = gameStateService;
         this.gameBindingLookup = gameBindingLookup;
+        this.dryRunRegistry = dryRunRegistry;
+        this.activityLog = activityLog;
     }
 
     public void onCategoryChangedByCatapult(UserAccount user, String newGameId, String newGameName,
@@ -179,10 +194,19 @@ public class TwitchatEventDispatcher {
         if (rows.isEmpty()) {
             return false;
         }
-        TwitchatPayloadRenderer renderer = new TwitchatPayloadRenderer(variables(user, eventVariables), applicable.keySet(),
-                action -> actionTokenService.generate(user.getId(), action, applicable.get(action)).toString());
+        // A member in dry run only gets Twitchat's private feed: marked messages without any button,
+        // every other payload (they act publicly from the member's browser) dropped and logged.
+        boolean dryRun = dryRunRegistry.isActive(user.getId());
+        Map<TwitchatActionType, Map<String, String>> offered = dryRun ? Map.of() : applicable;
+        TwitchatPayloadRenderer renderer = new TwitchatPayloadRenderer(variables(user, eventVariables), offered.keySet(),
+                action -> actionTokenService.generate(user.getId(), action, offered.get(action)).toString());
         List<TwitchatPayload> rendered = new ArrayList<>();
+        Set<String> dropped = new LinkedHashSet<>();
         for (TwitchatEventAction row : rows) {
+            if (dryRun && !TwitchatPayloadRenderer.CHAT_MESSAGE.equals(row.getAction())) {
+                dropped.add(row.getAction());
+                continue;
+            }
             // A stored row that no longer parses (saved before a check existed, edited in the
             // database) only loses its own payload, never the event's others.
             Map<String, Object> data;
@@ -193,10 +217,15 @@ public class TwitchatEventDispatcher {
                         row.getPosition(), row.getAction(), type, user.getId(), e.getMessage());
                 continue;
             }
-            renderer.render(row.getAction(), data).ifPresent(rendered::add);
+            renderer.render(row.getAction(), dryRun ? privateOnly(data) : data).ifPresent(rendered::add);
         }
+        dropped.forEach(payloadType -> activityLog.addEntry(user.getId(), "INFO",
+                "[dry run] would have sent the Twitchat payload " + payloadType));
         if (type == NOTIFICATION) {
             rendered.replaceAll(TwitchatEventDispatcher::withoutTrailingSpace);
+        }
+        if (dryRun) {
+            rendered.replaceAll(TwitchatEventDispatcher::withDryRunPrefix);
         }
         return publish(user, type, rendered);
     }
@@ -227,6 +256,30 @@ public class TwitchatEventDispatcher {
         }
         Map<String, Object> data = new LinkedHashMap<>(payload.data());
         data.put("message", message.stripTrailing());
+        return new TwitchatPayload(payload.action(), data);
+    }
+
+    /** A chat message's data without any button nor {@code {{action:...}}} placeholder in its text. */
+    private static Map<String, Object> privateOnly(Map<String, Object> data) {
+        Map<String, Object> kept = new LinkedHashMap<>(data);
+        if (kept.containsKey("actions")) {
+            kept.put("actions", List.of());
+        }
+        if (kept.get("message") instanceof String message) {
+            kept.put("message", ACTION_PLACEHOLDER.matcher(message).replaceAll(""));
+        }
+        return kept;
+    }
+
+    /** A chat message's text marked as a dry run's, once. */
+    private static TwitchatPayload withDryRunPrefix(TwitchatPayload payload) {
+        if (!TwitchatPayloadRenderer.CHAT_MESSAGE.equals(payload.action())
+                || !(payload.data().get("message") instanceof String message)
+                || message.startsWith(DRY_RUN_MARK)) {
+            return payload;
+        }
+        Map<String, Object> data = new LinkedHashMap<>(payload.data());
+        data.put("message", DRY_RUN_PREFIX + message);
         return new TwitchatPayload(payload.action(), data);
     }
 

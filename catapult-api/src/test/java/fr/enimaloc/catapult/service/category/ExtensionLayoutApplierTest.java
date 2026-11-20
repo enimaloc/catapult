@@ -8,6 +8,7 @@ import fr.enimaloc.catapult.service.twitch.TwitchExtension;
 import fr.enimaloc.catapult.service.twitch.TwitchExtensionPlacement;
 import fr.enimaloc.catapult.service.twitch.TwitchExtensionPlacement.Slot;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
+import fr.enimaloc.catapult.service.twitch.TwitchWriteHeldException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -299,6 +300,39 @@ class ExtensionLayoutApplierTest {
         applier.restore(user);
 
         assertThat(allSent(3).get(2).panel().first()).isEqualTo(Slot.of("mine", "1"));
+    }
+
+    @Test
+    void a_write_held_before_the_dry_run_state_loads_is_tried_again_and_not_logged_for_the_member() {
+        when(twitchService.getUserExtensions(user)).thenReturn(List.of(installed("game", "1", true)));
+        when(twitchService.getActiveExtensions(user)).thenReturn(TwitchExtensionPlacement.update()
+                .panel(1, Slot.of("mine", "1")).build());
+        doThrow(new TwitchWriteHeldException("not loaded")).doReturn(null)
+                .when(twitchService).setActiveExtensions(eq(user), any());
+
+        applier.applyOnSwitch(user, "binding:1", List.of(setting(Type.PANEL, 1, "game")));
+        // the same configuration again, once the state is loaded: nothing was applied, so it is
+        applier.applyOnSwitch(user, "binding:1", List.of(setting(Type.PANEL, 1, "game")));
+
+        assertThat(allSent(2).get(1).panel().first()).isEqualTo(Slot.of("game", "1"));
+        verifyNoInteractions(activityLogService);
+    }
+
+    @Test
+    void a_write_held_before_the_dry_run_state_loads_keeps_nothing_to_put_back() {
+        when(twitchService.getUserExtensions(user)).thenReturn(List.of(installed("game", "1", true),
+                installed("mine", "1", true)));
+        when(twitchService.getActiveExtensions(user)).thenReturn(TwitchExtensionPlacement.update()
+                .panel(1, Slot.of("mine", "1")).build());
+        doThrow(new TwitchWriteHeldException("not loaded"))
+                .when(twitchService).setActiveExtensions(eq(user), any());
+
+        applier.applyOnSwitch(user, "binding:1", List.of(setting(Type.PANEL, 1, "game")));
+        // nothing was changed on the channel: nothing to put back
+        applier.restore(user);
+
+        verify(twitchService, times(1)).setActiveExtensions(eq(user), any());
+        verifyNoInteractions(activityLogService);
     }
 
     @Test

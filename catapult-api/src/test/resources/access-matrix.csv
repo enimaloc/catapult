@@ -101,6 +101,8 @@ POST,/api/internal/users/{userId}/api-token/read,userId=self,,401,401,PASS,PASS,
 DELETE,/api/internal/users/{userId}/api-token/read,userId=self,,401,401,PASS,PASS,PASS,PASS,401
 GET,/api/internal/users/{userId}/debug,userId=self,,401,401,PASS,PASS,PASS,PASS,401
 POST,/api/internal/users/{userId}/debug/client-exchanges,userId=self,,401,401,PASS,PASS,PASS,PASS,401
+GET,/api/internal/users/{userId}/dry-run,userId=self,,401,401,PASS,PASS,PASS,PASS,401
+POST,/api/internal/users/{userId}/dry-run/disable,userId=self,,401,401,PASS,PASS,PASS,PASS,401
 GET,/api/internal/users/{userId}/premium,userId=self,,401,401,GATED,GATED,GATED,GATED,401
 GET,/api/internal/users/{userId}/notification-channels,userId=self,,401,401,PASS,PASS,PASS,PASS,401
 PUT,/api/internal/users/{userId}/notification-channels,userId=self,,401,401,PASS,PASS,PASS,PASS,401
@@ -153,6 +155,8 @@ DELETE,/api/internal/users/{userId}/api-token/read,unmapped,,401,401,403,403,PAS
 GET,/api/internal/users/{userId}/channels,unmapped,,401,401,403,403,PASS,403,401
 GET,/api/internal/users/{userId}/debug,unmapped,,401,401,403,403,PASS,403,401
 POST,/api/internal/users/{userId}/debug/client-exchanges,unmapped,,401,401,403,403,PASS,403,401
+GET,/api/internal/users/{userId}/dry-run,unmapped,,401,401,403,403,PASS,403,401
+POST,/api/internal/users/{userId}/dry-run/disable,unmapped,,401,401,403,403,PASS,403,401
 GET,/api/internal/users/{userId}/premium,unmapped,,401,401,403,403,GATED,403,401
 GET,/api/internal/users/{userId}/chat-commands/enabled,unmapped,,401,401,403,403,PASS,403,401
 POST,/api/internal/users/{userId}/chat-commands,unmapped,"{""name"":""!matrix"",""template"":""matrix"",""permission"":""VIEWERS"",""enabled"":false}",401,401,403,403,GATED,403,401
@@ -316,6 +320,9 @@ POST,/api/internal/admin/members/{id}/debug/enable,,,401,401,403,403,403,PASS,40
 GET,/api/internal/admin/members/{id}/debug/exchanges,,,401,PASS,403,403,403,PASS,401
 GET,/api/internal/admin/members/{id}/debug/exchanges/{exchangeId},,,401,PASS,403,403,403,PASS,401
 GET,/api/internal/admin/members/{id}/debug/services,,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/members/{id}/dry-run/disable,,,401,PASS,403,403,403,PASS,401
+# handler reads the JWT itself: 401 without one
+POST,/api/internal/admin/members/{id}/dry-run/enable,,,401,401,403,403,403,PASS,401
 # 404 before the JWT is read
 DELETE,/api/internal/admin/members/{id},,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/members/{id}/flags,,,401,PASS,403,403,403,PASS,401

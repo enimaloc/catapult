@@ -11,6 +11,7 @@ import fr.enimaloc.catapult.dto.index.PlatformDto;
 import fr.enimaloc.catapult.dto.index.SpaPage;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.debug.DebugMembers;
+import fr.enimaloc.catapult.service.dryrun.DryRunMembers;
 import fr.enimaloc.catapult.service.degraded.DegradedLabels;
 import fr.enimaloc.catapult.service.degraded.DegradedState;
 import fr.enimaloc.catapult.service.degraded.DegradedView;
@@ -73,6 +74,7 @@ public class ModelFiller {
     private final ObjectProvider<LaunchedPlatforms> launchedPlatforms;
     private final ObjectProvider<EmergencyState> emergencyState;
     private final ObjectProvider<DebugMembers> debugMembers;
+    private final ObjectProvider<DryRunMembers> dryRunMembers;
 
     public void defaultAttr(Model model, String page) {
         LaunchedPlatforms launched = launchedPlatforms.getIfAvailable();
@@ -86,7 +88,7 @@ public class ModelFiller {
      * titles spa.js swaps in on client-side navigation, the degraded banner's {@link DegradedView} and
      * {@link DegradedLabels}, the navbar's login and admin states (its channels come after, see
      * {@link #navChannels(Model)}), and whether the page records its OBS and Twitchat exchanges for the member's debug
-     * journal (debugCapture).
+     * journal (debugCapture), and whether the member is in dry run (the shell's banner, dryRun).
      */
     public void defaultAttr(Model model, String page, Locale locale) {
         defaultAttr(model, page);
@@ -111,6 +113,13 @@ public class ModelFiller {
         String impersonated = impersonatedLogin();
         model.addAttribute("impersonatedLogin", impersonated);
         model.addAttribute("debugCapture", impersonated == null && debugCapture());
+        model.addAttribute("dryRun", dryRun());
+    }
+
+    /** Whether the logged-in member is in dry run; never for a visitor, and false when it cannot be told. */
+    private boolean dryRun() {
+        DryRunMembers dryRun = dryRunMembers.getIfAvailable();
+        return ApiClient.hasSession() && dryRun != null && dryRun.isCurrentActive();
     }
 
     /**

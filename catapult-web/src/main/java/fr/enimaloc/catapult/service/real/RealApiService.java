@@ -720,6 +720,30 @@ public class RealApiService implements ApiService {
     }
 
     @Override
+    public int enableMemberDryRun(UUID memberId) {
+        return client.postVoid("/api/internal/admin/members/{id}/dry-run/enable", null, memberId);
+    }
+
+    @Override
+    public int disableMemberDryRun(UUID memberId) {
+        return client.postVoid("/api/internal/admin/members/{id}/dry-run/disable", null, memberId);
+    }
+
+    @Override
+    public fr.enimaloc.catapult.common.dto.DryRunStateDto myDryRun() {
+        UUID me = me();
+        if (me == null) return null;
+        return client.get("/api/internal/users/{userId}/dry-run", fr.enimaloc.catapult.common.dto.DryRunStateDto.class, me);
+    }
+
+    @Override
+    public int disableMyDryRun() {
+        UUID me = me();
+        if (me == null) return HttpStatus.UNAUTHORIZED.value();
+        return client.postVoid("/api/internal/users/{userId}/dry-run/disable", null, me);
+    }
+
+    @Override
     public int adminToggleMemberBot(UUID memberId) {
         return client.postVoid("/api/internal/admin/members/{id}/bot/toggle", null, memberId);
     }

@@ -350,6 +350,15 @@ class CustomBindingServiceTest {
     // ── Activation ───────────────────────────────────────────────────────────
 
     @Test
+    void activate_inDryRun_isApplied() {
+        CustomBinding art = binding("Art");
+        lenient().when(streamStateService.isLive(user)).thenReturn(false);
+        when(twitchService.updateChannelReporting(eq(user), any())).thenReturn(ChannelUpdateOutcome.DRY_RUN);
+
+        assertThat(service.activate(user, art)).isEqualTo(ActivationResult.APPLIED);
+    }
+
+    @Test
     void activate_appliesCategoryEvenOffline_andRecordsActivation() {
         CustomBinding art = binding("Art");
         lenient().when(streamStateService.isLive(user)).thenReturn(false);

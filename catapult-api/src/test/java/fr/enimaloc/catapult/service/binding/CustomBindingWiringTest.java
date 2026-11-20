@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.binding;
 
+import fr.enimaloc.catapult.service.dryrun.DryRunHeldDecisions;
 import fr.enimaloc.catapult.chat.command.registry.catapult.CatapultSetGameFunction;
 import fr.enimaloc.catapult.event.listener.GameEventListener;
 import fr.enimaloc.catapult.service.account.BotToggleService;
@@ -59,6 +60,7 @@ class CustomBindingWiringTest {
             .withBean(RaidRestoreGameService.class)
             .withBean(RaidRestoreHold.class)
             .withBean(CategoryChain.class)
+            .withBean(DryRunHeldDecisions.class)
             .withBean(CategoryApplier.class)
             .withBean(ExtensionLayoutApplier.class, () -> mock(ExtensionLayoutApplier.class))
             .withBean(RaidRestoreGateService.class, () -> mock(RaidRestoreGateService.class))

@@ -17,6 +17,7 @@ import fr.enimaloc.catapult.repository.account.UserFlagRepository;
 import fr.enimaloc.catapult.repository.account.UserGroupRepository;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
 import fr.enimaloc.catapult.service.debug.MemberDebugService;
+import fr.enimaloc.catapult.service.dryrun.DryRunService;
 import fr.enimaloc.catapult.service.premium.PremiumService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +34,7 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -58,6 +60,7 @@ public class AdminMemberService {
     private final UserGroupRepository userGroupRepository;
     private final MemberDebugService memberDebugService;
     private final PremiumService premiumService;
+    private final DryRunService dryRunService;
 
     /**
      * One page of members as catapult-web's admin page reads them (not the entity: no tokens, no
@@ -72,9 +75,11 @@ public class AdminMemberService {
         Map<UUID, Boolean> liveStatus = found.getContent().stream()
                 .collect(Collectors.toMap(UserAccount::getId, streamStateService::isLive));
         boolean isMockProfile = Arrays.asList(environment.getActiveProfiles()).contains("mock");
-        Map<UUID, MemberDebugStateDto> debug = memberDebugService.stateDtos(
-                found.getContent().stream().map(UserAccount::getId).toList());
-        return new AdminMembersPage(found.getContent().stream().map(u -> toDto(u, debug.get(u.getId()))).toList(),
+        List<UUID> ids = found.getContent().stream().map(UserAccount::getId).toList();
+        Map<UUID, MemberDebugStateDto> debug = memberDebugService.stateDtos(ids);
+        Set<UUID> dryRun = dryRunService.activeAmong(ids);
+        return new AdminMembersPage(found.getContent().stream()
+                .map(u -> toDto(u, debug.get(u.getId()), dryRun.contains(u.getId()))).toList(),
                 liveStatus, isMockProfile, found.getNumber(), found.getTotalPages(), found.getTotalElements());
     }
 
@@ -86,16 +91,17 @@ public class AdminMemberService {
         }
         List<UserAccount> found = userAccountRepository.searchMembers(UserAccountRepository.likePattern(query), query,
                 PageRequest.of(0, SEARCH_LIMIT));
-        Map<UUID, MemberDebugStateDto> debug = memberDebugService.stateDtos(
-                found.stream().map(UserAccount::getId).toList());
-        return found.stream().map(u -> toDto(u, debug.get(u.getId()))).toList();
+        List<UUID> ids = found.stream().map(UserAccount::getId).toList();
+        Map<UUID, MemberDebugStateDto> debug = memberDebugService.stateDtos(ids);
+        Set<UUID> dryRun = dryRunService.activeAmong(ids);
+        return found.stream().map(u -> toDto(u, debug.get(u.getId()), dryRun.contains(u.getId()))).toList();
     }
 
-    private AdminMemberDto toDto(UserAccount user, MemberDebugStateDto debug) {
+    private AdminMemberDto toDto(UserAccount user, MemberDebugStateDto debug, boolean dryRun) {
         return new AdminMemberDto(user.getId(), user.getTwitchId(), user.getTwitchUsername(), user.getProfileImageUrl(),
                 user.getSteamId(), user.isSystemAccount(), user.isBotEnabled(),
                 user.getStatus() == null ? null : user.getStatus().name(), user.getCreatedAt(), debug,
-                premiumService.isPremium(user), user.getPremiumUntil());
+                premiumService.isPremium(user), user.getPremiumUntil(), dryRun);
     }
 
     public void toggleBot(UUID id) {
@@ -185,7 +191,8 @@ public class AdminMemberService {
 
     public AdminMemberSummaryDto summary(UUID id) {
         UserAccount user = findOrThrow(id);
-        return new AdminMemberSummaryDto(user.getId(), user.getTwitchUsername());
+        return new AdminMemberSummaryDto(user.getId(), user.getTwitchUsername(),
+                dryRunService.state(user.getId()).isPresent());
     }
 
     /** An unknown member is a 404 before the missing key's 400. */

@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.common.dto.LaunchedPlatformsResponse;
 import fr.enimaloc.catapult.common.dto.DegradedStatusDto;
 import fr.enimaloc.catapult.common.dto.InvitePageData;
 import fr.enimaloc.catapult.common.dto.InviteRedemptionDto;
+import fr.enimaloc.catapult.common.dto.DryRunStateDto;
 import fr.enimaloc.catapult.common.dto.MyDebugDto;
 import fr.enimaloc.catapult.common.dto.UserInfoResponse;
 import fr.enimaloc.catapult.common.dto.account.ApiTokenStatusDto;
@@ -129,6 +130,7 @@ public final class FakeApi extends Dispatcher {
         route("/api/internal/users/{id}/dashboard", caller -> channelPage(OWNER.equals(caller)));
         route("/api/internal/users/{id}/seen-features", caller -> List.of());
         route("/api/internal/users/{id}/debug", caller -> new MyDebugDto(false, 0));
+        route("/api/internal/users/{id}/dry-run", caller -> new DryRunStateDto(false, null));
         route("/api/internal/users/{id}/emergency", caller -> new ChannelEmergencyDto(true, List.of(), List.of()));
         route("/api/internal/users/{id}/settings", caller -> settings());
         route("/api/internal/users/{id}/dtdd-mapping", caller -> new DtddMappingStatusDto(

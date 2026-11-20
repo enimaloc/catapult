@@ -2366,6 +2366,10 @@ span.box-art {
 /* As the broadcast banner, above it; a warning: the admin acts as someone else. Wraps at phone width. */
 .impersonation-banner { position: relative; z-index: 1; margin-top: 64px; margin-bottom: -64px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 16px; background: rgb(var(--mdui-color-tertiary-container)); color: rgb(var(--mdui-color-on-tertiary-container)); }
 .impersonation-banner-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+/* As the impersonation banner: the member's account is in dry run (dry-run.js hides it once turned off). */
+.dry-run-banner { position: relative; z-index: 1; margin-top: 64px; margin-bottom: -64px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 16px; background: rgb(var(--mdui-color-secondary-container)); color: rgb(var(--mdui-color-on-secondary-container)); }
+.dry-run-banner[hidden] { display: none; }
+.dry-run-banner-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .broadcast-banner-text { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; column-gap: 12px; row-gap: 2px; overflow-wrap: anywhere; }
 /* catapult-api's degraded mode (degraded.js): as the broadcast banner, folded by default; the summary is the toggle. */
 .emergency-banner { position: relative; z-index: 1; margin-top: 64px; margin-bottom: -64px; display: flex; align-items: center; gap: 12px; padding: 8px 16px; background: rgb(var(--mdui-color-error-container)); color: rgb(var(--mdui-color-on-error-container)); }

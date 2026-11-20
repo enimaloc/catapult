@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.common.dto;
 
+import fr.enimaloc.catapult.common.dto.admin.AdminMemberDto;
+import fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddTopicSeverityDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddTopicsBody;
 import fr.enimaloc.catapult.common.dto.admin.DtddTopicsCacheEntryDto;
@@ -12,6 +14,7 @@ import tools.jackson.databind.json.JsonMapper;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -95,5 +98,34 @@ class AdminDtosTest {
                 "id", "ab…cd", null, false, 0).usage()).isNull();
         org.assertj.core.api.Assertions.assertThat(new fr.enimaloc.catapult.common.dto.admin.KeyStatus(
                 "id", "ab…cd", null, false, 0).usage()).isNull();
+    }
+
+    @Test
+    void anAdminMember_isInDryRunOnlyWhenTold() {
+        UUID id = UUID.randomUUID();
+        assertThat(new AdminMemberDto(id, "1", "viewer", null, null, false, true, "ACTIVE", Instant.EPOCH, null,
+                false, null, true).dryRun()).isTrue();
+        assertThat(new AdminMemberDto(id, "1", "viewer", null, null, false, true, "ACTIVE", Instant.EPOCH, null,
+                false, null, false).dryRun()).isFalse();
+        assertThat(new AdminMemberDto(id, "1", "viewer", null, null, false, true, "ACTIVE", Instant.EPOCH, null,
+                null, null, null).dryRun()).isFalse();
+        AdminMemberDto older = new AdminMemberDto(id, "1", "viewer", null, null, false, true, "ACTIVE", Instant.EPOCH,
+                null, true, null);
+        assertThat(older.dryRun()).isFalse();
+        assertThat(older.premium()).isTrue();
+        assertThat(older.isActive()).isTrue();
+        assertThat(json.readValue("{\"id\":\"" + id + "\",\"systemAccount\":false,\"botEnabled\":true,\"status\":\"ACTIVE\"}",
+                AdminMemberDto.class).dryRun())
+                .isFalse();
+    }
+
+    @Test
+    void anAdminMemberSummary_isInDryRunOnlyWhenTold() {
+        UUID id = UUID.randomUUID();
+        assertThat(new AdminMemberSummaryDto(id, "viewer", true).dryRun()).isTrue();
+        assertThat(new AdminMemberSummaryDto(id, "viewer", false).dryRun()).isFalse();
+        assertThat(new AdminMemberSummaryDto(id, "viewer", null).dryRun()).isFalse();
+        assertThat(new AdminMemberSummaryDto(id, "viewer").dryRun()).isFalse();
+        assertThat(json.readValue("{\"id\":\"" + id + "\"}", AdminMemberSummaryDto.class).dryRun()).isFalse();
     }
 }

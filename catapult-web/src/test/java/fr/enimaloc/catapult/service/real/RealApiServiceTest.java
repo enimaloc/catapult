@@ -113,6 +113,8 @@ class RealApiServiceTest {
         org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes();
 
         assertThat(service.myDebug()).isNull();
+        assertThat(service.myDryRun()).isNull();
+        assertThat(service.disableMyDryRun()).isEqualTo(401);
         assertThat(service.obsConnection()).isNull();
         assertThat(service.minecraftDisconnect("someone-else")).isEqualTo(401);
         assertThat(service.regenerateApiToken().status()).isEqualTo(401);
@@ -2354,6 +2356,32 @@ class RealApiServiceTest {
         assertThat(service.enableMemberDebug(id, true, 0.25)).isEqualTo(204);
         assertThat(service.disableMemberDebug(id)).isEqualTo(204);
         assertThat(service.clearMemberDebug(id)).isEqualTo(204);
+    }
+
+    @Test
+    void memberDryRunActions_postToTheMemberAndRelayTheStatus() {
+        UUID id = UUID.fromString("00000000-0000-0000-0000-000000000001");
+        String base = "/api/internal/admin/members/" + id + "/dry-run";
+        expect(HttpMethod.POST, base + "/enable").andExpect(content().string(""))
+                .andRespond(withSuccess("{\"active\":true,\"since\":\"2026-11-20T10:00:00Z\"}", MediaType.APPLICATION_JSON));
+        expectPost(base + "/disable");
+        expect(HttpMethod.POST, base + "/enable").andRespond(withStatus(HttpStatus.CONFLICT));
+
+        assertThat(service.enableMemberDryRun(id)).isEqualTo(200);
+        assertThat(service.disableMemberDryRun(id)).isEqualTo(204);
+        assertThat(service.enableMemberDryRun(id)).isEqualTo(409);
+    }
+
+    @Test
+    void myDryRun_readsTheCallersState_orNullWhenTheApiCouldNotTell_andTurnsItOff() {
+        respond(HttpMethod.GET, OWN + "/dry-run", "{\"active\":true,\"since\":\"2026-11-20T10:00:00Z\"}");
+        expect(HttpMethod.GET, OWN + "/dry-run").andRespond(withStatus(HttpStatus.BAD_GATEWAY));
+        expectPost(OWN + "/dry-run/disable");
+
+        assertThat(service.myDryRun()).isEqualTo(new fr.enimaloc.catapult.common.dto.DryRunStateDto(true,
+                java.time.Instant.parse("2026-11-20T10:00:00Z")));
+        assertThat(service.myDryRun()).isNull();
+        assertThat(service.disableMyDryRun()).isEqualTo(204);
     }
 
     @Test
