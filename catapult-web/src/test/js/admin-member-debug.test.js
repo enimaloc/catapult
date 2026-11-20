@@ -34,6 +34,8 @@ function fragment(rows = `<div data-debug-exchange="${E1}"></div>`) {
             <section data-debug-section="responseHeaders"><pre data-debug-field="responseHeaders"></pre></section>
             <section data-debug-section="responseBody"><pre data-debug-field="responseBody"></pre></section>
             <section data-debug-section="errorMessage"><pre data-debug-field="errorMessage"></pre></section>
+            <details data-debug-section="requestRaw"><pre data-debug-field="requestRaw"></pre></details>
+            <details data-debug-section="responseRaw"><pre data-debug-field="responseRaw"></pre></details>
             <section data-debug-section="traceId"><code data-debug-field="traceId"></code></section>
         </div>
     </div>`;
@@ -172,6 +174,36 @@ describe("admin-member-debug", () => {
         expect(section("traceId").hidden).toBe(false);
         expect(field("traceId").textContent).toBe("abc123");
         expect(field("traceId").closest("a")).toBeNull();
+    });
+
+    it("hexDump formats 16 bytes per line with an offset", () => {
+        const hex = Array.from({ length: 20 }, (_, i) => i.toString(16).padStart(2, "0")).join("");
+
+        expect(CatapultAdminMemberDebug.hexDump(hex)).toBe(
+            "00000000  00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f\n00000010  10 11 12 13");
+        expect(CatapultAdminMemberDebug.hexDump("")).toBe("");
+    });
+
+    it("hexDump keeps the truncation marker on its own last line", () => {
+        expect(CatapultAdminMemberDebug.hexDump("0a0b…(+12 chars)")).toBe("00000000  0a 0b\n…(+12 chars)");
+    });
+
+    it("hexDump keeps the omitted note as is", () => {
+        const note = "[omitted: contains another member's identifier]";
+
+        expect(CatapultAdminMemberDebug.hexDump(note)).toBe(note);
+    });
+
+    it("render shows the raw frames in hex, and hides the raw sections when empty", async () => {
+        fetched.mockResolvedValueOnce(response(200, exchange({ requestRaw: "4142", responseRaw: null })));
+        page();
+
+        document.querySelector("[data-debug-exchange]").click();
+        await flush();
+
+        expect(section("requestRaw").hidden).toBe(false);
+        expect(field("requestRaw").textContent).toBe("00000000  41 42");
+        expect(section("responseRaw").hidden).toBe(true);
     });
 
     it("tells an exchange that can no longer be read", async () => {
