@@ -5,10 +5,10 @@
  * in the browser's local time, the query string in ISO instants (the fragment gives the instants back as
  * data-iso). A filter or a page swaps only [data-debug-results]. A row opens the exchange (a JSON read of it) in
  * the page's dialog, bodies and headers indented when they are JSON, the raw frames as hex dumps, a section it has
- * nothing for hidden. Every
- * text from the exchange reaches the page through textContent. The trace id is shown to be copied: no Sentry
- * organisation or project is configured to build a link from. The recording is deleted once confirmed, then the
- * page goes back to the list. Listeners are delegated to the page's root, which comes and goes with the sub-view.
+ * nothing for hidden. Every text from the exchange reaches the page through textContent. The trace id is shown to
+ * be copied: no Sentry organisation or project is configured to build a link from. The recording is deleted once
+ * confirmed, then the page goes back to the list. Listeners are delegated to the page's root, which comes and goes
+ * with the sub-view.
  */
 window.CatapultAdminMemberDebug = (function () {
     const FILTERS = ["service", "direction", "outcome", "from", "to"];
