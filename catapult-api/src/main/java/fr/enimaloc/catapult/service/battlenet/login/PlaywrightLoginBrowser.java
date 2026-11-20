@@ -55,7 +55,8 @@ public class PlaywrightLoginBrowser implements BattleNetLoginBrowser {
             "input:visible:not(#accountName):not(#password):not([type=hidden])";
     /** Visible controls and alerts, without any value, for the diagnostic of an unrecognised page. */
     private static final String VISIBLE_ELEMENTS_SCRIPT = """
-            () => Array.from(document.querySelectorAll('input, select, textarea, button, [role=alert]'))
+            () => Array.from(document.querySelectorAll(
+                    'input, select, textarea, button, [role=alert], .alert-error, .form-error'))
                 .filter(e => e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden')
                 .filter(e => !(e.tagName === 'INPUT' && e.type === 'hidden'))
                 .slice(0, 40)
@@ -65,7 +66,8 @@ public class PlaywrightLoginBrowser implements BattleNetLoginBrowser {
                     name: e.getAttribute('name'),
                     type: e.getAttribute('type'),
                     role: e.getAttribute('role'),
-                    text: (e.tagName === 'BUTTON' || e.getAttribute('role') === 'alert')
+                    text: (e.tagName === 'BUTTON' || e.getAttribute('role') === 'alert'
+                            || e.matches('.alert-error, .form-error'))
                         ? (e.innerText || '').slice(0, 2000) : null
                 }))
             """;
@@ -219,7 +221,11 @@ public class PlaywrightLoginBrowser implements BattleNetLoginBrowser {
                 input.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.HIDDEN)
                         .setTimeout(CODE_SUBMITTED_TIMEOUT_MS));
             } catch (PlaywrightException e) {
-                log.debug("The Battle.net code page is still shown after submitting the code");
+                // How many slots hold something, never what: tells a fill the page ignored from a refused code
+                Object filled = slotCount > 1 ? page.evaluate("() => [...document.querySelectorAll("
+                        + "'input[name^=email_code_]')].filter(i => i.value !== '').length") : "n/a";
+                logPage("The Battle.net code page is still shown after submitting the code (" + filled + "/"
+                        + slotCount + " slots filled)");
             }
         }
 
