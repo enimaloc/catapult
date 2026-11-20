@@ -56,6 +56,10 @@ public class PlaywrightLoginBrowser implements BattleNetLoginBrowser {
     private static final String CODE_SLOTS = "input[name^=email_code_]:visible";
     private static final String CODE_INPUT = "input[autocomplete=one-time-code]:visible, " + CODE_SLOTS;
     private static final String SUBMIT_VISIBLE = "#submit:visible";
+    // Seen on 2026-11-20: after the login, an optional "Verify your email" page (flow.battle.net/flow/<uuid>) shows
+    // the same six code slots, a "Continue" web component and a "Skip for now" link (a#skip_link_<id>, found by its
+    // id first so the page's language does not matter).
+    private static final String SKIP_VERIFY_EMAIL = "a[id^=skip_link_]:visible, a:has-text('Skip for now'):visible";
     /** Fill target when the code input lacks its autocomplete hint; never used to recognise a page. */
     private static final String CODE_INPUT_FALLBACK =
             "input:visible:not(#accountName):not(#password):not([type=hidden])";
@@ -100,6 +104,9 @@ public class PlaywrightLoginBrowser implements BattleNetLoginBrowser {
     private static final double QUICK_CLICK_TIMEOUT_MS = 3_000;
     private static final long CODE_AUTO_SUBMIT_MS = 1_000;
     private static final double CODE_SUBMITTED_TIMEOUT_MS = 10_000;
+    private static final double SKIP_LINK_RENDER_MS = 3_000;
+    private static final int SKIP_ATTEMPTS = 5;
+    private static final double SKIP_TAKES_EFFECT_MS = 2_000;
     /** Requests worth logging when a code is not accepted: the page's calls, not its assets. */
     private static final Set<String> EXCHANGE_TYPES = Set.of("document", "xhr", "fetch");
 
@@ -168,6 +175,8 @@ public class PlaywrightLoginBrowser implements BattleNetLoginBrowser {
         private final AtomicReference<String> ticket;
         /** Path of the security check page already submitted, so it is clicked only once. */
         private @Nullable String chooseSubmittedFor;
+        /** Path of the "Verify your email" page already skipped, so it is clicked only once. */
+        private @Nullable String verifyEmailSkippedFor;
 
         PlaywrightLoginPage(BrowserContext context, Page page, AtomicReference<String> ticket) {
             this.context = context;
@@ -206,11 +215,21 @@ public class PlaywrightLoginBrowser implements BattleNetLoginBrowser {
                         chooseSubmittedFor = path;
                         log.debug("Battle.net security check: requested a code with the default method");
                     }
+                } else if (!LoginPageInspection.withoutQuery(url).equals(verifyEmailSkippedFor)
+                        && page.locator(SKIP_VERIFY_EMAIL).count() > 0) {
+                    // Optional e-mail confirmation, not a login check: skipped, once per page, without a code.
+                    verifyEmailSkippedFor = LoginPageInspection.withoutQuery(url);
+                    skipVerifyEmail();
                 } else if (step == LoginPageInspection.Step.CHALLENGE_CODE || page.locator(CODE_INPUT).count() > 0) {
                     // A code already typed and not rejected is still being submitted: keep waiting for the ticket.
                     if (awaitsCode()) {
-                        // The page's controls, so a skippable page asking for a code shows up in the logs
-                        if (page.locator(CODE_SLOTS).count() > 1) logPage("Battle.net asks for an e-mail code");
+                        if (page.locator(CODE_SLOTS).count() > 1) {
+                            // The slots render before the page's links: give "Skip for now" a chance to show up
+                            if (!LoginPageInspection.withoutQuery(url).equals(verifyEmailSkippedFor)
+                                    && skipLinkShowsUp()) continue;
+                            // The page's controls, so a skippable page asking for a code shows up in the logs
+                            logPage("Battle.net asks for an e-mail code");
+                        }
                         return new Outcome.CodeRequired();
                     }
                 } else if (page.locator(LOGIN_ERROR).count() > 0) {
@@ -295,6 +314,47 @@ public class PlaywrightLoginBrowser implements BattleNetLoginBrowser {
                         LoginPageInspection.describeText(text == null ? null : text.toString()));
             } catch (RuntimeException e) {
                 log.warn("Battle.net code page diagnostic failed ({})", e.getClass().getSimpleName());
+            }
+        }
+
+        /**
+         * Clicks "Skip for now" until the link goes away: the link is rendered by the server before the page's
+         * script handles its click, and a click in between does nothing (seen on 2026-11-20).
+         */
+        private void skipVerifyEmail() {
+            List<Response> responses = Collections.synchronizedList(new ArrayList<>());
+            Consumer<Response> onResponse = r -> {
+                if (EXCHANGE_TYPES.contains(r.request().resourceType())) responses.add(r);
+            };
+            page.onResponse(onResponse);
+            try {
+                Locator skip = page.locator(SKIP_VERIFY_EMAIL);
+                for (int attempt = 1; attempt <= SKIP_ATTEMPTS; attempt++) {
+                    if (!clickIfVisible(SKIP_VERIFY_EMAIL)) return;
+                    try {
+                        skip.first().waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.HIDDEN)
+                                .setTimeout(SKIP_TAKES_EFFECT_MS));
+                        log.info("Battle.net asked to confirm the account e-mail: skipped (click {})", attempt);
+                        return;
+                    } catch (PlaywrightException e) {
+                        log.debug("Battle.net \"Skip for now\" click {} had no effect yet", attempt);
+                    }
+                }
+                logPage("Battle.net \"Skip for now\" did nothing after " + SKIP_ATTEMPTS + " clicks");
+                logExchanges(responses);
+            } finally {
+                page.offResponse(onResponse);
+            }
+        }
+
+        /** Whether the "Verify your email" page's "Skip for now" link shows up within a short wait. */
+        private boolean skipLinkShowsUp() {
+            try {
+                page.locator(SKIP_VERIFY_EMAIL).first().waitFor(new Locator.WaitForOptions()
+                        .setState(WaitForSelectorState.VISIBLE).setTimeout(SKIP_LINK_RENDER_MS));
+                return true;
+            } catch (PlaywrightException e) {
+                return false;
             }
         }
 
