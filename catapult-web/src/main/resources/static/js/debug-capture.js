@@ -18,8 +18,11 @@
  *   the value, in what is kept;
  * - Catapult's signed action tokens, UUIDs anywhere in a Twitchat message's data (stripTwitchat);
  * - in every URL of any string (overlay URLs carry account tokens in their path or query, an
- *   ffmpeg input its passphrase): userinfo dropped, path, query values and fragment redacted.
- *   Catapult's own URLs are kept but for the widget token, removed everywhere, percent-encoded too.
+ *   ffmpeg input its passphrase), written or percent-encoded: userinfo dropped, path, query
+ *   values and fragment redacted. Catapult's own URLs keep their path and query names, but never
+ *   their userinfo, query values, UUID path segments, nor the token of a widget link
+ *   (/widget/obs/…, the older /widget/twitchat/…, a Twitchat action's /widget/twitchat/action/…),
+ *   which is removed from any string, percent-encoded too.
  *
  * A batch goes every 5s or at 50 entries; past 300 entries a minute, entries are counted instead,
  * one "dropped" entry per service for that minute, sent once the minute is over. A Twitchat
@@ -43,12 +46,17 @@ window.CatapultDebugCapture = (function () {
     // The most requests held for their answer: past it (answers OBS never sent), new ones go uncaptured.
     const MAX_PENDING = 1000;
     const REDACTED = "<redacted>";
-    // The widget token's path segment, plain or percent-encoded.
-    const WIDGET_TOKEN = /(\/|%2F)widget(\/|%2F)obs(\/|%2F)(?:(?!%2F|%3F|%23)[^/?#&"'\s\\<>])+/gi;
+    // The token segment of a widget link (as catapult-web's AccessLogFilter sees it, and a Twitchat
+    // action's), plain or percent-encoded.
+    const WIDGET_TOKEN = /(\/|%2F)widget(\/|%2F)(obs|twitchat)(\/|%2F)((?:action(?:\/|%2F))?)(?!action(?:\/|%2F))(?:(?!%2F|%3F|%23)[^/?#&"'\s\\<>])+/gi;
     // A URL in any string; a <redacted> already in it is part of it.
     const URL_IN_TEXT = /\b[a-z][a-z0-9+.-]*:\/\/(?:<redacted>|[^\s"'<>()\\])+/gi;
+    // A percent-encoded URL in any string (a link in another's query).
+    const ENCODED_URL = /\b[a-z][a-z0-9+.-]*%3A%2F%2F(?:%[0-9a-f]{2}|[\w.!~*-])+/gi;
+    const ENCODED_REDACTED = encodeURIComponent(REDACTED);
     // Catapult's signed action tokens are UUIDs, written anywhere in a payload's strings.
     const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+    const HAS_UUID = new RegExp(UUID.source, "i");
     // DebugRedactor's names ("code" aside: OBS's request status), and the parts of a name that
     // make it a credential's; any name ending in "key" too (streamKey, stream_key, apiKey).
     const SECRET_NAMES = new Set(["authorization", "proxy-authorization", "cookie", "set-cookie", "x-api-key",
@@ -217,7 +225,19 @@ window.CatapultDebugCapture = (function () {
         return safely(obsMessage, message);
     }
 
-    /** A URL found in a string, without what could be a secret in it: Catapult's own are kept as they are. */
+    /** A URL's query with its names only, every value redacted. */
+    const queryNames = (url) => `?${[...url.searchParams.keys()].map((name) => `${encodeURIComponent(name)}=${REDACTED}`).join("&")}`;
+
+    /** One of Catapult's own URLs: no userinfo, no query value, no UUID path segment, its widget token already gone. */
+    function ownUrl(url) {
+        const path = url.pathname.split("/").map((segment) => (HAS_UUID.test(segment) ? REDACTED : segment)).join("/");
+        let out = `${url.protocol}//${url.host}${path}`;
+        if (url.search) out += queryNames(url);
+        out += url.hash.replace(UUID, REDACTED);
+        return out.split(ENCODED_REDACTED).join(REDACTED);
+    }
+
+    /** A URL found in a string, without what could be a secret in it. */
     function scrubUrl(found) {
         let url;
         try {
@@ -225,20 +245,32 @@ window.CatapultDebugCapture = (function () {
         } catch {
             return `${found.slice(0, found.indexOf("://"))}://${REDACTED}`;
         }
-        if (/^https?:$/.test(url.protocol) && url.origin === location.origin) return found;
+        if (/^https?:$/.test(url.protocol) && url.origin === location.origin) return ownUrl(url);
         let out = `${url.protocol}//${url.host}`;
         if (url.pathname && url.pathname !== "/") out += `/${REDACTED}`;
         else out += url.pathname;
-        if (url.search) out += `?${[...url.searchParams.keys()].map((name) => `${encodeURIComponent(name)}=${REDACTED}`).join("&")}`;
+        if (url.search) out += queryNames(url);
         if (url.hash) out += `#${REDACTED}`;
         return out;
+    }
+
+    /** A string without widget token or secret in its written URLs. */
+    const cleanWritten = (text) => text.replace(WIDGET_TOKEN, `$1widget$2$3$4$5${REDACTED}`).replace(URL_IN_TEXT, scrubUrl);
+
+    /** A percent-encoded URL found in a string, cleaned as a written one. */
+    function scrubEncodedUrl(found) {
+        try {
+            return encodeURIComponent(cleanWritten(decodeURIComponent(found))).split(ENCODED_REDACTED).join(REDACTED);
+        } catch {
+            return `${found.slice(0, found.toUpperCase().indexOf("%3A%2F%2F"))}%3A%2F%2F${REDACTED}`;
+        }
     }
 
     /** A string as sent: no widget token, no secret in its URLs. */
     function clean(text) {
         let result = text;
         for (const token of widgetTokens) result = result.split(token).join(REDACTED);
-        return result.replace(WIDGET_TOKEN, `$1widget$2obs$3${REDACTED}`).replace(URL_IN_TEXT, scrubUrl);
+        return cleanWritten(result.replace(ENCODED_URL, scrubEncodedUrl));
     }
 
     /** A body as sent: a copy, cleaned, truncated past the journal's bound. */

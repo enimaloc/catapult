@@ -388,17 +388,49 @@ describe("secrets", () => {
         expect(batches()[0].entries[0].response.url).toBe("https://c.example/<redacted>?x=<redacted>");
     });
 
-    it("keeps Catapult's own URLs but for the widget token, percent-encoded too", async () => {
+    it("keeps Catapult's own URLs but for their tokens, ids, query values and userinfo, percent-encoded too", async () => {
         CatapultDebugCapture.enable(PAGE);
         const own = `${location.origin}/widget/obs/w-1?x=1`;
-        CatapultDebugCapture.record({ ...entry(), response: { own, mine: `${location.origin}/channel/me?tab=obs`,
-            encoded: `see ${encodeURIComponent(own)}`, upper: "a%2Fwidget%2Fobs%2Fw-2%2Fconfig" } });
+        const id = "0b6f2a4e-1c3d-4e5f-8a9b-0c1d2e3f4a5b";
+        const userinfo = location.origin.replace("://", "://who:pw-1@");
+        CatapultDebugCapture.record({ ...entry(), response: { own, mine: `${location.origin}/channel/me?tab=obs#events`,
+            encoded: `see ${encodeURIComponent(own)}`, upper: "a%2Fwidget%2Fobs%2Fw-2%2Fconfig",
+            legacy: `${location.origin}/widget/twitchat/legacy-tok-1`,
+            action: `Ban? ${location.origin}/widget/twitchat/action/act-tok-2?reason=spam`,
+            encodedAction: `u=${encodeURIComponent(`${location.origin}/widget/twitchat/action/act-tok-3`)}&v=1`,
+            bareAction: "/widget/twitchat/action/act-tok-4 and %2Fwidget%2Ftwitchat%2Faction%2Fact-tok-5",
+            ids: `${location.origin}/channel/${id}/obs/${id.toUpperCase()}`, userinfo: `${userinfo}/me` } });
         CatapultDebugCapture.flush();
+        const body = fetch.mock.calls[0][1].body;
+        for (const secret of ["w-1", "w-2", "legacy-tok", "act-tok", id, id.toUpperCase(), "pw-1", "who", "spam"]) {
+            expect(body).not.toContain(secret);
+        }
         expect(batches()[0].entries[0].response).toEqual({
-            own: `${location.origin}/widget/obs/<redacted>?x=1`,
-            mine: `${location.origin}/channel/me?tab=obs`,
-            encoded: `see ${encodeURIComponent(location.origin)}%2Fwidget%2Fobs%2F<redacted>%3Fx%3D1`,
+            own: `${location.origin}/widget/obs/<redacted>?x=<redacted>`,
+            mine: `${location.origin}/channel/me?tab=<redacted>#events`,
+            encoded: `see ${encodeURIComponent(`${location.origin}/widget/obs/`)}<redacted>%3Fx%3D<redacted>`,
             upper: "a%2Fwidget%2Fobs%2F<redacted>%2Fconfig",
+            legacy: `${location.origin}/widget/twitchat/<redacted>`,
+            action: `Ban? ${location.origin}/widget/twitchat/action/<redacted>?reason=<redacted>`,
+            encodedAction: `u=${encodeURIComponent(`${location.origin}/widget/twitchat/action/`)}<redacted>&v=1`,
+            bareAction: "/widget/twitchat/action/<redacted> and %2Fwidget%2Ftwitchat%2Faction%2F<redacted>",
+            ids: `${location.origin}/channel/<redacted>/obs/<redacted>`,
+            userinfo: `${location.origin}/me`,
+        });
+    });
+
+    it("strips a percent-encoded foreign URL as a written one", async () => {
+        CatapultDebugCapture.enable(PAGE);
+        CatapultDebugCapture.record({ ...entry(), response: {
+            link: `go=${encodeURIComponent("https://u:p-9@overlay.example/alerts/TOK-9?k=v-9#f-9")}&x=1`,
+            broken: "https%3A%2F%2F%E0%A4zz",
+        } });
+        CatapultDebugCapture.flush();
+        const body = fetch.mock.calls[0][1].body;
+        for (const secret of ["p-9", "TOK-9", "v-9", "f-9"]) expect(body).not.toContain(secret);
+        expect(batches()[0].entries[0].response).toEqual({
+            link: `go=${encodeURIComponent("https://overlay.example/")}<redacted>%3Fk%3D<redacted>%23<redacted>&x=1`,
+            broken: "https%3A%2F%2F<redacted>",
         });
     });
 
