@@ -367,6 +367,9 @@ class DebugExchangeRecorderTest {
         debugged(false);
         byte[] big = new byte[DebugRedactor.MAX_BODY_CHARS];
         recorder().record(member, Direction.OUT, withRaw(big, null), "op", false);
-        assertThat(saved().getRequestRaw()).hasSize(DebugRedactor.MAX_BODY_CHARS);
+        String stored = saved().getRequestRaw();
+        int cut = DebugRedactor.MAX_BODY_CHARS;
+        assertThat(stored).startsWith("0".repeat(cut)).hasSize(cut + ("…(+" + cut + " chars)").length())
+                .endsWith("…(+" + cut + " chars)");
     }
 }

@@ -195,7 +195,10 @@ public class DebugExchangeRecorder {
         return masker.mask(text, subject);
     }
 
-    /** Hex of {@code raw} cut at the body limit; the omission marker when it names another member; null for none. */
+    /**
+     * Hex of {@code raw}, cut at the body limit with the redactor's truncation marker; the omission marker when it
+     * names another member; null for none.
+     */
     private String rawHex(byte[] raw, UUID subject) {
         if (raw == null) {
             return null;
@@ -205,7 +208,7 @@ public class DebugExchangeRecorder {
         }
         String hex = RawBytes.hex(raw);
         int max = DebugRedactor.MAX_BODY_CHARS - DebugRedactor.MAX_BODY_CHARS % 2;
-        return hex.length() <= max ? hex : hex.substring(0, max);
+        return hex.length() <= max ? hex : hex.substring(0, max) + "…(+" + (hex.length() - max) + " chars)";
     }
 
     private static MediaType contentType(HttpHeaders headers) {
