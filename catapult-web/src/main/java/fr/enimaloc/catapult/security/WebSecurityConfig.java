@@ -48,6 +48,9 @@ public class WebSecurityConfig {
                         .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
                         // The Sentry SDK posts its reports there without the token; relayed, they change nothing here.
                         .ignoringRequestMatchers("/monitoring/tunnel")
+                        // The OBS widget has no session to hold a token: its own token, in the path, is what lets it
+                        // post its debug exchanges (WidgetObsController), and nothing else of the widget's
+                        .ignoringRequestMatchers("/widget/obs/*/debug/client-exchanges")
                         // catapult-api's own paths (ApiRelayController): its rules apply to them, not these.
                         .ignoringRequestMatchers(ApiRelayController.PATHS))
                 .addFilterAfter(new CsrfCookieFilter(), CsrfFilter.class)

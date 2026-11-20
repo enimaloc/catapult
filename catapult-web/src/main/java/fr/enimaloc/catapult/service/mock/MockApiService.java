@@ -80,6 +80,7 @@ import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatPayload;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatValidationError;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatSettingsResponse;
+import fr.enimaloc.catapult.common.dto.debug.ClientExchangeBatch;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetAccessResponse;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatActionType;
@@ -635,7 +636,33 @@ public class MockApiService implements ApiService {
     public TwitchatWidgetConfig widgetObsConfig(UUID token) {
         log.trace("widgetObsConfig({})", token);
         // Like catapult-api's /api/twitchat/widget/{token}: the owner's connection, on their branch.
-        return widgetOwner(token).map(MockData::obsConnection).orElse(null);
+        return widgetOwner(token)
+                .map(d -> {
+                    TwitchatWidgetConfig connection = d.obsConnection();
+                    return connection == null ? null : connection.withDebugCapture(inDebug(d.getChannelDto().id()));
+                })
+                .orElse(null);
+    }
+
+    @Override
+    public ApiClient.Result<Void> postClientDebugExchanges(UUID userId, ClientExchangeBatch batch) {
+        log.trace("postClientDebugExchanges({})", userId);
+        // Nothing recorded for real: only catapult-api's answer
+        if (userId == null) return new ApiClient.Result<>(401, null);
+        return new ApiClient.Result<>(inDebug(userId) ? 204 : 409, null);
+    }
+
+    @Override
+    public ApiClient.Result<Void> postWidgetClientDebugExchanges(UUID token, ClientExchangeBatch batch) {
+        log.trace("postWidgetClientDebugExchanges({})", token);
+        return widgetOwner(token)
+                .filter(d -> d.obsConnection() != null)
+                .map(d -> new ApiClient.Result<Void>(inDebug(d.getChannelDto().id()) ? 204 : 409, null))
+                .orElseGet(() -> new ApiClient.Result<>(404, null));
+    }
+
+    private boolean inDebug(UUID member) {
+        return members.debug().mine(member).active();
     }
 
     @Override

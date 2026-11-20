@@ -25,6 +25,7 @@ class ObsSessionControllerTest {
 
     @Autowired MockMvc mvc;
     @MockitoBean ApiService apiService;
+    @MockitoBean fr.enimaloc.catapult.service.debug.DebugMembers debugMembers;
 
     @Test
     void enabled_returnsTheConnectionUncached() throws Exception {
@@ -34,6 +35,17 @@ class ObsSessionControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(content().json("{\"obsHost\":\"10.0.0.2\",\"obsPort\":4456,\"obsPassword\":\"pw\"}"));
+    }
+
+    /** Like the page's data-debug-capture: obs-session.js may read either. */
+    @Test
+    void theConnectionCarriesTheMembersDebugCapture() throws Exception {
+        when(apiService.obsConnection()).thenReturn(new TwitchatWidgetConfig("10.0.0.2", 4456, "pw", "auto"));
+
+        mvc.perform(get("/me/obs")).andExpect(content().json("{\"debugCapture\":false}"));
+
+        when(debugMembers.isCurrentActive()).thenReturn(true);
+        mvc.perform(get("/me/obs")).andExpect(content().json("{\"obsHost\":\"10.0.0.2\",\"debugCapture\":true}"));
     }
 
     @Test

@@ -50,6 +50,7 @@ class ApiTwitchatWidgetControllerTest {
     @MockitoBean TokenEncryptionService tokenEncryptionService;
     @MockitoBean TwitchatActionExecutor actionExecutor;
     @MockitoBean NotificationDeliveryDispatcher deliveryDispatcher;
+    @MockitoBean fr.enimaloc.catapult.service.debug.DebugMemberRegistry debugMembers;
 
     @Test
     void flushNotifications_byTheWidgetsToken_sendsItsOwnersPendingOnes() throws Exception {

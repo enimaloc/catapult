@@ -10,6 +10,7 @@ import fr.enimaloc.catapult.dto.index.FeatureDto;
 import fr.enimaloc.catapult.dto.index.PlatformDto;
 import fr.enimaloc.catapult.dto.index.SpaPage;
 import fr.enimaloc.catapult.service.ApiService;
+import fr.enimaloc.catapult.service.debug.DebugMembers;
 import fr.enimaloc.catapult.service.degraded.DegradedLabels;
 import fr.enimaloc.catapult.service.degraded.DegradedState;
 import fr.enimaloc.catapult.service.degraded.DegradedView;
@@ -71,6 +72,7 @@ public class ModelFiller {
     private final ObjectProvider<DegradedLabels> degradedLabels;
     private final ObjectProvider<LaunchedPlatforms> launchedPlatforms;
     private final ObjectProvider<EmergencyState> emergencyState;
+    private final ObjectProvider<DebugMembers> debugMembers;
 
     public void defaultAttr(Model model, String page) {
         LaunchedPlatforms launched = launchedPlatforms.getIfAvailable();
@@ -82,8 +84,9 @@ public class ModelFiller {
     /**
      * Full-page variant: also the head's {@link Seo} and admin-configured meta tags, the localized
      * titles spa.js swaps in on client-side navigation, the degraded banner's {@link DegradedView} and
-     * {@link DegradedLabels}, and the navbar's login and admin states (its channels come after, see
-     * {@link #navChannels(Model)}).
+     * {@link DegradedLabels}, the navbar's login and admin states (its channels come after, see
+     * {@link #navChannels(Model)}), and whether the page records its OBS and Twitchat exchanges for the member's debug
+     * journal (debugCapture).
      */
     public void defaultAttr(Model model, String page, Locale locale) {
         defaultAttr(model, page);
@@ -105,7 +108,18 @@ public class ModelFiller {
         model.addAttribute("emergency", emergency == null ? List.of() : emergency.globalStops());
         model.addAttribute("loggedIn", ApiClient.hasSession());
         model.addAttribute("admin", isAdmin());
-        model.addAttribute("impersonatedLogin", impersonatedLogin());
+        String impersonated = impersonatedLogin();
+        model.addAttribute("impersonatedLogin", impersonated);
+        model.addAttribute("debugCapture", impersonated == null && debugCapture());
+    }
+
+    /**
+     * Whether the logged-in member is in debug mode, their page then capturing its OBS and Twitchat exchanges; never
+     * for a visitor, nor for an admin impersonating a member (the caller checks): their browser is not the member's.
+     */
+    private boolean debugCapture() {
+        DebugMembers debug = debugMembers.getIfAvailable();
+        return ApiClient.hasSession() && debug != null && debug.isCurrentActive();
     }
 
     /** What the degraded banner shows; not degraded without a {@link DegradedState} (or a view from it). */
