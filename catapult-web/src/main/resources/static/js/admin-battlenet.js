@@ -128,15 +128,14 @@ window.CatapultAdminBattleNet = (function () {
             option(m.name, `${m.name} (${m.id})${m.noResponse ? " · NO_RESPONSE" : ""}`)));
     }
 
+    /** Fills the lists while they are empty: on the first opening, and again after a tab patch emptied them. */
     async function openBgs(card, box) {
-        if (box.dataset.loaded) return;
+        const select = box.querySelector('[name="bgsService"]');
+        if (select.options.length) return;
         try {
             const services = await methods();
-            const select = box.querySelector('[name="bgsService"]');
             select.replaceChildren(...services.map(s => option(s.name, `${s.name} · ${s.hash}`)));
             fillMethods(box, services);
-            select.addEventListener("change", () => fillMethods(box, services));
-            box.dataset.loaded = "true";
         } catch (status) {
             show(card, refusal(card, status), true);
         }
@@ -292,6 +291,7 @@ window.CatapultAdminBattleNet = (function () {
             panel.addEventListener("change", event => {
                 const box = event.target.closest?.(".admin-battlenet-bgs");
                 if (box && event.target.matches('[name="bgsMode"]')) bgsMode(box);
+                if (box && event.target.matches('[name="bgsService"]')) methods().then(services => fillMethods(box, services));
             });
             panel.addEventListener("input", event => {
                 const box = event.target.closest?.(".admin-battlenet-bgs");

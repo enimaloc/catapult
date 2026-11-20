@@ -224,3 +224,98 @@ describe("admin-battlenet polling", () => {
         expect(CatapultAdminTabs.patch).toHaveBeenCalledTimes(2);
     });
 });
+
+describe("admin-battlenet free BGS call", () => {
+    const CATALOG = [
+        { name: "svc.A", hash: "0x00000001", methods: [{ name: "Ping", id: 1, noResponse: false }] },
+        { name: "svc.B", hash: "0x00000002", methods: [{ name: "Update", id: 6, noResponse: false },
+            { name: "Fire", id: 7, noResponse: true }] }
+    ];
+
+    function bgsPanel() {
+        const panel = document.createElement("details");
+        panel.className = "admin-battlenet-bgs";
+        panel.innerHTML = `
+            <summary class="admin-battlenet-bgs-call">BGS</summary>
+            <input name="bgsMode" value="known">
+            <div class="admin-battlenet-bgs-known"><select name="bgsService"></select><select name="bgsMethod"></select>
+                <textarea name="bgsText"></textarea></div>
+            <div class="admin-battlenet-bgs-raw" hidden><input name="bgsHash"><input name="bgsMethodId"><textarea name="bgsHex"></textarea>
+                <input type="checkbox" name="bgsCiid" checked></div>
+            <button class="admin-battlenet-bgs-send" data-id="${ID}" data-label-sending="Sending" data-label-no-response="no reply"
+                    data-label-pushes="Pushes" data-label-no-push="None">Send</button>
+            <div class="admin-battlenet-bgs-result" hidden><p class="admin-battlenet-bgs-status"></p>
+                <pre class="admin-battlenet-bgs-reply"></pre><input name="bgsFilter"><ul class="admin-battlenet-bgs-pushes"></ul></div>`;
+        document.querySelector(".admin-battlenet-row").append(panel);
+        return panel;
+    }
+
+    async function open(panel) {
+        panel.open = true;
+        panel.dispatchEvent(new Event("toggle"));
+        await settle();
+    }
+
+    beforeEach(() => {
+        window.fetch = vi.fn(async () => response(200, CATALOG));
+    });
+
+    it("fills the services and the methods of the first one when the panel opens, loading the catalogue once", async () => {
+        const panel = bgsPanel();
+        await open(panel);
+
+        expect([...panel.querySelector('[name="bgsService"]').options].map(o => o.value)).toEqual(["svc.A", "svc.B"]);
+        expect([...panel.querySelector('[name="bgsMethod"]').options].map(o => o.value)).toEqual(["Ping"]);
+        const service = panel.querySelector('[name="bgsService"]');
+        service.value = "svc.B";
+        service.dispatchEvent(new Event("change", { bubbles: true }));
+        await settle();
+        expect([...panel.querySelector('[name="bgsMethod"]').options].map(o => o.value)).toEqual(["Update", "Fire"]);
+        expect(window.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("refills lists a tab patch emptied, when the panel is opened again", async () => {
+        const panel = bgsPanel();
+        await open(panel);
+        // the morph of a tab patch empties the selects and keeps the panel's attributes
+        panel.querySelector('[name="bgsService"]').replaceChildren();
+        panel.querySelector('[name="bgsMethod"]').replaceChildren();
+        panel.open = false;
+
+        await open(panel);
+
+        expect(panel.querySelector('[name="bgsService"]').options).toHaveLength(2);
+        expect(panel.querySelector('[name="bgsMethod"]').value).toBe("Ping");
+    });
+
+    it("posts a known call and shows the status, the reply and the pushes through text only", async () => {
+        const panel = bgsPanel();
+        await open(panel);
+        panel.querySelector('[name="bgsText"]').value = "x: 1";
+        routes[`/admin/battlenet-accounts/${ID}/bgs-call`] = response(200, {
+            status: 0, durationMs: 12, replyText: "", replyHex: "",
+            pushes: [{ service: "svc.L", method: "On", text: "<b>x</b>", hex: "08" }], error: null
+        });
+
+        await click(".admin-battlenet-bgs-send");
+
+        expect(posted).toHaveBeenCalledWith(`/admin/battlenet-accounts/${ID}/bgs-call`,
+            { service: "svc.A", method: "Ping", text: "x: 1" });
+        expect(panel.querySelector(".admin-battlenet-bgs-status").textContent).toBe("status 0 (OK) · 12 ms");
+        expect(panel.querySelector(".admin-battlenet-bgs-result").hidden).toBe(false);
+        expect(panel.querySelector(".admin-battlenet-bgs-pushes pre").textContent).toBe("<b>x</b>");
+        expect(panel.querySelector(".admin-battlenet-bgs-pushes b")).toBeNull();
+    });
+
+    it("tells a refusal inline with the API's message", async () => {
+        const panel = bgsPanel();
+        await open(panel);
+        routes[`/admin/battlenet-accounts/${ID}/bgs-call`] = response(409, { error: "A call is already running" });
+
+        await click(".admin-battlenet-bgs-send");
+
+        expect(message().textContent).toBe("A call is already running");
+        expect(panel.querySelector(".admin-battlenet-bgs-result").hidden).toBe(true);
+    });
+});
+
