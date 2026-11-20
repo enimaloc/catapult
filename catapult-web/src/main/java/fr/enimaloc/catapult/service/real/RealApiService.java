@@ -9,6 +9,9 @@ import fr.enimaloc.catapult.common.dto.channel.BindingDto;
 import fr.enimaloc.catapult.common.dto.premium.PremiumStatusDto;
 import fr.enimaloc.catapult.common.dto.channel.DeleteAccountRequest;
 import fr.enimaloc.catapult.common.dto.TokenResponse;
+import fr.enimaloc.catapult.common.dto.admin.BgsCallRequest;
+import fr.enimaloc.catapult.common.dto.admin.BgsCallResult;
+import fr.enimaloc.catapult.common.dto.admin.BgsServiceDto;
 import fr.enimaloc.catapult.common.dto.admin.LearnedRateLimitCorrectionDto;
 import fr.enimaloc.catapult.common.dto.admin.LearnedRateLimitDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberDto;
@@ -1501,6 +1504,21 @@ public class RealApiService implements ApiService {
     @Override
     public int adminDeleteBattleNetAccount(UUID id) {
         return client.call(HttpMethod.DELETE, "/api/internal/admin/battlenet-accounts/{id}", null, Void.class, id).status();
+    }
+
+    @Override
+    public List<BgsServiceDto> adminBgsMethods() {
+        BgsServiceDto[] services = client.get("/api/internal/admin/battlenet-accounts/bgs-methods", BgsServiceDto[].class);
+        return services == null ? null : List.of(services);
+    }
+
+    @Override
+    public AdminCall<BgsCallResult> adminBgsCall(UUID id, BgsCallRequest request) {
+        // catapult-api refuses with a problem: its detail is the admin's message
+        ApiClient.Result<BgsCallResult> result = client.call(HttpMethod.POST,
+                "/api/internal/admin/battlenet-accounts/{id}/bgs-call", request, BgsCallResult.class, id);
+        return new AdminCall<>(result.status(), result.ok() ? result.body() : null,
+                result.error() == null ? null : result.error().detail());
     }
 
     @Override

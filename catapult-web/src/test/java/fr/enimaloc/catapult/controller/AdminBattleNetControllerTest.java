@@ -1,5 +1,9 @@
 package fr.enimaloc.catapult.controller;
 
+import fr.enimaloc.catapult.common.dto.admin.BgsCallRequest;
+import fr.enimaloc.catapult.common.dto.admin.BgsCallResult;
+import fr.enimaloc.catapult.common.dto.admin.BgsMethodDto;
+import fr.enimaloc.catapult.common.dto.admin.BgsServiceDto;
 import fr.enimaloc.catapult.security.WebSecurityConfig;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
@@ -19,8 +23,10 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = AdminBattleNetController.class)
@@ -124,5 +130,58 @@ class AdminBattleNetControllerTest {
         mvc.perform(admin(post(BASE), "{\"email\":\"b\",\"password\":\"c\"}")).andExpect(status().is4xxClientError());
         verify(apiService, never()).adminCreateBattleNetAccount(org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void bgsMethods_relaysTheCatalogue() throws Exception {
+        when(apiService.isAdmin()).thenReturn(true);
+        when(apiService.adminBgsMethods()).thenReturn(java.util.List.of(new BgsServiceDto("svc", "0x00000001",
+                java.util.List.of(new BgsMethodDto("Update", 6, "in", "out", false)))));
+
+        mvc.perform(get(BASE + "/bgs-methods").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].name").value("svc"))
+                .andExpect(jsonPath("$[0].methods[0].id").value(6));
+    }
+
+    @Test
+    void bgsMethods_requiresAdmin() throws Exception {
+        when(apiService.isAdmin()).thenReturn(false);
+
+        mvc.perform(get(BASE + "/bgs-methods").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt"))
+                .andExpect(status().is4xxClientError());
+        verify(apiService, never()).adminBgsMethods();
+    }
+
+    @Test
+    void bgsCall_relaysStatusAndBody() throws Exception {
+        when(apiService.isAdmin()).thenReturn(true);
+        BgsCallRequest request = new BgsCallRequest("svc", "Update", "x: 1", null, null, null, null);
+        when(apiService.adminBgsCall(ID, request)).thenReturn(new ApiService.AdminCall<>(200,
+                new BgsCallResult(0, 12, "", "", java.util.List.of(), null), null));
+
+        mvc.perform(admin(post(BASE + "/" + ID + "/bgs-call"), "{\"service\":\"svc\",\"method\":\"Update\",\"text\":\"x: 1\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value(0))
+                .andExpect(jsonPath("$.durationMs").value(12));
+    }
+
+    @Test
+    void bgsCall_relaysARefusalWithItsMessage() throws Exception {
+        when(apiService.isAdmin()).thenReturn(true);
+        when(apiService.adminBgsCall(org.mockito.ArgumentMatchers.eq(ID), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new ApiService.AdminCall<>(409, null, "A call is already running on this bot"));
+
+        mvc.perform(admin(post(BASE + "/" + ID + "/bgs-call"), "{}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("A call is already running on this bot"));
+    }
+
+    @Test
+    void bgsCall_requiresAdmin() throws Exception {
+        when(apiService.isAdmin()).thenReturn(false);
+
+        mvc.perform(admin(post(BASE + "/" + ID + "/bgs-call"), "{}")).andExpect(status().is4xxClientError());
+        verify(apiService, never()).adminBgsCall(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
     }
 }
