@@ -170,14 +170,16 @@ class AnkamaWireRecorderTest {
     }
 
     @Test
-    void recorderSearchesTheRawBytesOfAnUndecodablePayload() {
+    void neverRecordsAnUndecodablePayload() {
         byte[] garbage = "ÿÿStreamer#1234".getBytes(StandardCharsets.ISO_8859_1);
 
         recorder.onExchange(event(ChatMessages.FRIEND_INVITE_CREATED_EVT, garbage));
+        recorder.onExchange(call(new Payload(ChatMessages.DELETE_USER_FRIEND_CMD, garbage), null, null));
+        // A request naming the member does not carry an undecodable response along
+        recorder.onExchange(call(ChatMessages.deleteFriend(7L, 42L).toPayload(),
+                new ChatFrames.Response(3, 1, new Payload(ChatMessages.FRIEND_LIST, garbage)), null));
 
-        RawExchange raw = recorded(Direction.IN, "chat.FRIEND_INVITE_CREATED_EVT");
-        assertThat(raw.requestBody()).isNull();
-        assertThat(raw.requestRaw()).isEqualTo(garbage);
+        nothingRecorded();
     }
 
     @Test

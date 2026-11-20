@@ -43,22 +43,4 @@ class WireKeysTest {
         assertThat(WireKeys.concerns(WireKeys.of(json("{\"1\":12345}"))).test("id:1234")).isFalse();
         assertThat(WireKeys.concerns(WireKeys.of(json("{\"1\":12345}"))).test("id:12345")).isTrue();
     }
-
-    @Test
-    void rawConcernsFindsAVarintId() {
-        byte[] raw = {0x08, (byte) 0x96, 0x01};
-
-        assertThat(WireKeys.rawConcerns(raw).test("id:150")).isTrue();
-        assertThat(WireKeys.rawConcerns(raw).test("inv:150")).isTrue();
-        assertThat(WireKeys.rawConcerns(raw).test("id:151")).isFalse();
-    }
-
-    @Test
-    void rawConcernsFindsATagCaseInsensitively() {
-        byte[] raw = "xxFoo#1234yy".getBytes();
-
-        assertThat(WireKeys.rawConcerns(raw).test("tag:foo#1234")).isTrue();
-        assertThat(WireKeys.rawConcerns(raw).test("tag:other#1")).isFalse();
-        assertThat(WireKeys.rawConcerns(raw).test("unprefixed")).isFalse();
-    }
 }

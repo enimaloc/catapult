@@ -36,14 +36,6 @@ public final class WireKeys {
         return frameKeys::contains;
     }
 
-    /** Whether the raw bytes hold the value behind a member key (prefix stripped), see {@link RawBytes#contains}. */
-    public static Predicate<String> rawConcerns(byte[] raw) {
-        return key -> {
-            int colon = key == null ? -1 : key.indexOf(':');
-            return colon > 0 && RawBytes.contains(raw, key.substring(colon + 1));
-        };
-    }
-
     private static void collect(JsonNode node, Set<String> keys) {
         if (node.isObject()) {
             List<String> strings = new ArrayList<>();

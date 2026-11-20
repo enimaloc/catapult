@@ -30,8 +30,8 @@ import java.util.stream.Collectors;
  * Records, for the members in debug mode linked to one bot, the chat frames of its session that name them: one
  * entry per request and its response, or per pushed event, the frame header and the payload as JSON next to the
  * payload's raw bytes. Payloads are decoded without schema (field numbers); whom a frame names is read from its
- * decoded payload (exact values, {@code name#tag} recombined from sibling fields) and, when a payload could not be
- * decoded, searched in its raw bytes.
+ * decoded payload only (exact values, {@code name#tag} recombined from sibling fields). A frame with a payload that
+ * does not decode is dropped: searching its raw bytes cannot tell a member's identifier from a longer value.
  *
  * <p>Only the per-friend commands and events {@link ChatMessages} knows are recorded: any other payload id is
  * dropped before being decoded, and a response follows its request. The friend and invite lists are never recorded:
@@ -78,6 +78,9 @@ public final class AnkamaWireRecorder implements ChatWireTap {
             }
             Body request = body(payload);
             Body response = exchange.response() == null ? Body.NONE : body(exchange.response().payload());
+            if (undecodable(request) || undecodable(response)) {
+                return;
+            }
             Predicate<String> concerns = concerns(request).or(concerns(response));
             debug.exchange(serviceAccountId, concerns, exchange.initiatedLocally() ? Direction.OUT : Direction.IN,
                     () -> raw(exchange, request, response), "chat." + name);
@@ -112,10 +115,14 @@ public final class AnkamaWireRecorder implements ChatWireTap {
         }
     }
 
-    /** Who a payload names: exact leaf values when it decoded, else its raw bytes. */
+    /** Who a payload names: its exact leaf values. */
     private static Predicate<String> concerns(Body body) {
-        Predicate<String> leaves = WireKeys.concerns(WireKeys.of(body.json()));
-        return body.json() != null ? leaves : leaves.or(WireKeys.rawConcerns(body.raw()));
+        return WireKeys.concerns(WireKeys.of(body.json()));
+    }
+
+    /** Whether a payload has bytes that did not decode. */
+    private static boolean undecodable(Body body) {
+        return body.raw() != null && body.json() == null;
     }
 
     private static Body body(Payload payload) {
