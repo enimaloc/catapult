@@ -29,6 +29,13 @@ public interface BgsChannel extends AutoCloseable {
     /** Called once when the session ends; the cause is null for a local {@link #close()}. */
     void onClose(Consumer<Throwable> listener);
 
+    /**
+     * Hands every RPC exchange to {@code tap} from now on, or to nobody when null. A no-op for channels that
+     * cannot be observed.
+     */
+    default void setWireTap(WireTap tap) {
+    }
+
     /** The single-thread executor that carries the session: callbacks run on it. */
     Executor loop();
 
