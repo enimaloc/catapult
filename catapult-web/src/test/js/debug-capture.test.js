@@ -361,6 +361,41 @@ describe("secrets", () => {
             expect(CatapultDebugCapture.stripObs("raw")).toBe("string(3)");
         });
 
+        it("keeps no key of free-form data, only its size", () => {
+            const token = "tk_A1b2C3d4E5f6G7h8";
+            const id = "0b6f2a4e-1c3d-4e5f-8a9b-0c1d2e3f4a5b";
+            const free = { [token]: { nested: 1 }, [id]: "x", plain: true };
+            expect(shaped({ requestType: "SetPersistentData", requestData: { realm: "R", slotName: "s", slotValue: free } }, [token, id, "plain"])
+                .requestData).toEqual({ realm: "string(1)", slotName: "string(1)", slotValue: "object(3)" });
+            expect(shaped({ requestType: "GetPersistentData", responseData: { slotValue: [free, free] } }, [token, id])
+                .responseData).toEqual({ slotValue: "array(2)" });
+            expect(shaped({ requestType: "SetProfileParameter", requestData: { parameterName: "Key", parameterValue: free } }, [token, id])
+                .requestData).toEqual({ parameterName: "string(3)", parameterValue: "object(3)" });
+            expect(shaped({ requestType: "CallVendorRequest", requestData: { vendorName: "v", requestType: "r", requestData: free },
+                responseData: { vendorName: "v", requestType: "r", responseData: free } }, [token, id])).toEqual({ requestType: "CallVendorRequest",
+                requestData: { vendorName: "string(1)", requestType: "string(1)", requestData: "object(3)" },
+                responseData: { vendorName: "string(1)", requestType: "string(1)", responseData: "object(3)" } });
+            expect(shaped({ eventType: "VendorEvent", eventData: { vendorName: "v", eventType: "e", eventData: free } }, [token, id])
+                .eventData).toEqual({ vendorName: "string(1)", eventType: "string(1)", eventData: "object(3)" });
+            expect(shaped({ eventType: "CustomEvent", eventData: free }, [token, id]).eventData).toBe("object(3)");
+            expect(shaped({ requestType: "BroadcastCustomEvent", requestData: { eventData: free } }, [token, id]).requestData)
+                .toEqual({ eventData: "object(3)" });
+            expect(shaped({ requestType: "SomeFutureRequest", requestData: free, responseData: [1] }, [token, id]))
+                .toEqual({ requestType: "SomeFutureRequest", requestData: "object(3)", responseData: "array(1)" });
+            expect(shaped({ eventType: "SomeFutureEvent", eventData: "s" }, []).eventData).toBe("string(1)");
+        });
+
+        it("redacts the keys that look like ids or tokens elsewhere", () => {
+            const token = "tk_A1b2C3d4E5f6G7h8";
+            const id = "0B6F2A4E-1C3D-4E5F-8A9B-0C1D2E3F4A5B";
+            const stripped = shaped({ requestType: "GetInputSettings", responseData: { inputSettings: {
+                [token]: 1, [id]: { [token]: "x" }, defaultInputSettings: true, under16Chars9: 2, abcdefghijklmnopqrst: 3 } } }, [token, id]);
+            expect(stripped.responseData.inputSettings).toEqual({ "<redacted-key-1>": "number",
+                "<redacted-key-2>": { "<redacted-key-1>": "string(1)" }, defaultInputSettings: "boolean", under16Chars9: "number",
+                abcdefghijklmnopqrst: "number" });
+            expect(shaped({ obsWebSocketVersion: "5", [id]: 1 }, [id])).toEqual({ obsWebSocketVersion: "5", "<redacted-key-1>": "number" });
+        });
+
         it("applies the same rules inside a request batch and its results", () => {
             const stripped = shaped({ requestId: "req-9", haltOnFailure: true, requests: [
                 { requestType: "GetInputSettings", requestData: { inputName: "Alerts" } },

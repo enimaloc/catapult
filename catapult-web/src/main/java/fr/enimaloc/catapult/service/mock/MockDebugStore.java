@@ -17,6 +17,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
 
@@ -70,19 +71,24 @@ class MockDebugStore {
         exchanges.put(seededMember, seeded);
     }
 
+    /** catapult-api's DebugExchange.CLIENT_METHODS: what a member's browser recorded, failed only on its error. */
+    private static final Set<String> CLIENT_METHODS = Set.of("OBS", "TWITCHAT");
+
     /**
      * Whether catapult-api counts the exchange as failed: an outgoing call without status, with a status from 400
-     * on, or with an error; an incoming message, which has no status, only with an error.
+     * on, or with an error; an incoming message, which has no status, only with an error; what the browser recorded
+     * (OBS, Twitchat) only with an error.
      */
-    static boolean isError(String direction, Integer status, String errorMessage) {
+    static boolean isError(String method, String direction, Integer status, String errorMessage) {
         if (errorMessage != null) return true;
+        if (CLIENT_METHODS.contains(method)) return false;
         if (status == null) return !"IN".equalsIgnoreCase(direction);
         return status >= 400;
     }
 
     private static DebugExchangeDto withComputedError(DebugExchangeDto e) {
         return new DebugExchangeDto(e.id(), e.occurredAt(), e.direction(), e.service(), e.operation(), e.method(),
-                e.url(), e.status(), isError(e.direction(), e.status(), e.errorMessage()), e.durationMs(), e.filtered(),
+                e.url(), e.status(), isError(e.method(), e.direction(), e.status(), e.errorMessage()), e.durationMs(), e.filtered(),
                 e.requestHeaders(), e.requestBody(), e.responseHeaders(), e.responseBody(), e.errorMessage(), e.traceId(), e.requestRaw(), e.responseRaw());
     }
 

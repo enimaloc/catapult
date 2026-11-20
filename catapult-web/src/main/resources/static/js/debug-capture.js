@@ -11,7 +11,10 @@
  *   studio mode, audio levels…) keep their values. Every other request, answer or event (input,
  *   filter and stream service settings, profile parameters, persistent data, vendor messages,
  *   custom events not from Twitchat, any type not listed) keeps only its shape: the same keys,
- *   each value replaced by its type, with its length for a string or an array (stripObs);
+ *   each value replaced by its type, with its length for a string or an array (stripObs). A key
+ *   looking like an id or a token is replaced too, and free-form data (persistent data, profile
+ *   parameter values, vendor payloads, custom events not from Twitchat, the data of a type not
+ *   known) keeps not even its keys, only its size (OBS_FREE_FORM);
  * - OBS's opening messages (Hello, Identify, Identified, Reidentify) keep only their versions and
  *   event subscriptions, the authentication dropped, anything else by shape;
  * - by name, as catapult-api's DebugRedactor names them (password, token, *key, auth…), whatever
@@ -105,6 +108,22 @@ window.CatapultDebugCapture = (function () {
     const OBS_FRAME_KEPT = new Set(["requestType", "requestId", "requestStatus", "eventType", "eventIntent",
         "haltOnFailure", "executionType"]);
     const OBS_DATA = new Set(["requestData", "responseData", "eventData"]);
+    // The requests and events reduced to their shape whose data keeps its keys; within it, the
+    // members holding free-form data, which keep only their size. Any type neither here nor in
+    // OBS_KEPT is free-form altogether.
+    const OBS_FREE_FORM = new Map([
+        ["GetInputSettings", []], ["SetInputSettings", []], ["InputSettingsChanged", []],
+        ["GetSourceFilterSettings", []], ["SetSourceFilterSettings", []], ["SourceFilterSettingsChanged", []],
+        ["GetStreamServiceSettings", []], ["SetStreamServiceSettings", []],
+        ["GetPersistentData", ["slotValue"]], ["SetPersistentData", ["slotValue"]],
+        ["GetProfileParameter", ["parameterValue", "defaultParameterValue"]],
+        ["SetProfileParameter", ["parameterValue", "defaultParameterValue"]],
+        ["CallVendorRequest", ["requestData", "responseData"]], ["VendorEvent", ["eventData"]],
+        ["BroadcastCustomEvent", ["eventData"]],
+    ]);
+    // A key that may be a secret itself: one holding a UUID, or 16 characters or more of a token's
+    // alphabet mixing letters and digits.
+    const TOKEN_KEY = /^(?=.*[0-9])(?=.*[A-Za-z])[A-Za-z0-9_-]{16,}$/;
     // The items of an array of objects described one by one, up to this many.
     const SHAPE_ITEMS = 20;
 
@@ -147,9 +166,26 @@ window.CatapultDebugCapture = (function () {
         }
     }
 
+    /** The size of `value`, not even its keys: object(keys), array(length), string(length), or its type. */
+    function size(value) {
+        if (value === null || value === undefined) return null;
+        if (Array.isArray(value)) return `array(${value.length})`;
+        if (typeof value === "object") return `object(${Object.keys(value).length})`;
+        if (typeof value === "string") return `string(${value.length})`;
+        return typeof value;
+    }
+
+    /** The keys of `object` as kept: one looking like an id or a token as <redacted-key-N>. */
+    function shapedKeys(object) {
+        let redactedKeys = 0;
+        return Object.entries(object).map(([key, item]) =>
+            [HAS_UUID.test(key) || TOKEN_KEY.test(key) ? `<redacted-key-${++redactedKeys}>` : key, item]);
+    }
+
     /**
      * The shape of `value`, never a value: a string as string(length), an array of plain values as
-     * array(length), an object with its keys, each member's shape, a number or a boolean as its type.
+     * array(length), an object with its keys (but those looking like secrets), each member's shape,
+     * a number or a boolean as its type.
      */
     function shape(value) {
         if (value === null || value === undefined) return null;
@@ -159,8 +195,15 @@ window.CatapultDebugCapture = (function () {
             const items = value.slice(0, SHAPE_ITEMS).map(shape);
             return value.length > SHAPE_ITEMS ? [...items, `…(+${value.length - SHAPE_ITEMS})`] : items;
         }
-        if (typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, shape(item)]));
+        if (typeof value === "object") return Object.fromEntries(shapedKeys(value).map(([key, item]) => [key, shape(item)]));
         return typeof value;
+    }
+
+    /** The shape of `data`, its `free` members (free-form data) by size only. */
+    function shapeWithFree(data, free) {
+        if (!data || typeof data !== "object" || Array.isArray(data)) return shape(data);
+        return Object.fromEntries(shapedKeys(data).map(([key, item], index) =>
+            [key, free.includes(Object.keys(data)[index]) ? size(item) : shape(item)]));
     }
 
     /** A copy of `value`, its secret-named members redacted (`authentication` dropped), `strings` applied to its strings. */
@@ -196,7 +239,8 @@ window.CatapultDebugCapture = (function () {
         if (type === "CustomEvent" && isTwitchat(data)) return stripTwitchat(data);
         if (type === "BroadcastCustomEvent" && isTwitchat(data?.eventData)) return { ...shape(data), eventData: stripTwitchat(data.eventData) };
         const shaped = OBS_KEPT.get(type);
-        if (!shaped || !data || typeof data !== "object" || Array.isArray(data)) return shaped ? scrub(data) : shape(data);
+        if (!shaped) return OBS_FREE_FORM.has(type) ? shapeWithFree(data, OBS_FREE_FORM.get(type)) : size(data);
+        if (!data || typeof data !== "object" || Array.isArray(data)) return scrub(data);
         const copy = scrub(data);
         for (const name of shaped) if (name in data) copy[name] = shape(data[name]);
         return copy;
@@ -208,7 +252,7 @@ window.CatapultDebugCapture = (function () {
         const type = d.requestType ?? d.eventType;
         const framed = type !== undefined || Array.isArray(d.requests) || Array.isArray(d.results);
         const copy = {};
-        for (const [key, item] of Object.entries(d)) {
+        for (const [key, item] of shapedKeys(d)) {
             if (framed && (key === "requests" || key === "results")) {
                 copy[key] = Array.isArray(item) ? item.map(obsMessage) : shape(item);
             } else if (framed && OBS_DATA.has(key)) {
