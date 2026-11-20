@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.support.TransactionOperations;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -222,6 +223,26 @@ class BattleNetSessionManagerTest {
 
         assertThat(channels).isNotEmpty().allSatisfy(channel -> assertThat(channel.tap).isNotNull());
         assertThat(channels.stream().filter(channel -> channel.tap.wants())).hasSize(1);
+    }
+
+    @Test
+    void captureOf_withoutSession_isEmpty() {
+        BattleNetSessionManager manager = manager(false);
+        manager.start();
+
+        assertThat(manager.captureOf(bot1.getId())).isEmpty();
+    }
+
+    @Test
+    void captureOf_withSession_isTheTapInstalledOnTheChannel() {
+        BattleNetSessionManager manager = started();
+        FakeBgsChannel channel = channels.getFirst();
+        assertThat(channel.tap.wants()).isFalse();
+
+        assertThat(manager.captureOf(bot1.getId())).get().satisfies(capture -> capture.arm(Duration.ofSeconds(5)));
+
+        assertThat(channel.tap).isInstanceOf(TeeWireTap.class);
+        assertThat(channel.tap.wants()).isTrue();
     }
 
     @Test

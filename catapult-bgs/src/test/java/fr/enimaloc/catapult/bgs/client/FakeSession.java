@@ -22,10 +22,11 @@ import java.util.function.Consumer;
 final class FakeSession implements BgsChannel {
 
     /**
-     * One outgoing call. {@code request} is null for a raw call; {@code reply} is null for a NO_RESPONSE call.
+     * One outgoing call. {@code request} is null for a raw call; {@code reply} is null for a NO_RESPONSE call;
+     * {@code observed} is false for the calls a wire tap must never see.
      */
     record Sent(int serviceHash, int methodId, boolean ciid, Message request, ByteString body,
-                CompletableFuture<?> reply) {
+                CompletableFuture<?> reply, boolean observed) {
     }
 
     /** Every call and mint, in order: "call 0x...:id", "mint". */
@@ -60,6 +61,22 @@ final class FakeSession implements BgsChannel {
         CompletableFuture<ByteString> reply = new CompletableFuture<>();
         record(serviceHash, methodId, withCiid, null, body, reply);
         return reply;
+    }
+
+    @Override
+    public CompletableFuture<ByteString> callRawUnobserved(int serviceHash, int methodId, ByteString body,
+                                                          boolean withCiid) {
+        CompletableFuture<ByteString> reply = new CompletableFuture<>();
+        record(serviceHash, methodId, withCiid, null, body, reply, false);
+        return reply;
+    }
+
+    @Override
+    public CompletableFuture<Void> callRawNoReplyUnobserved(int serviceHash, int methodId, ByteString body,
+                                                           boolean withCiid) {
+        record(serviceHash, methodId, withCiid, null, body, null, false);
+        return closed ? CompletableFuture.failedFuture(new IllegalStateException("closed"))
+                : CompletableFuture.completedFuture(null);
     }
 
     @Override
@@ -164,8 +181,13 @@ final class FakeSession implements BgsChannel {
 
     private void record(int serviceHash, int methodId, boolean ciid, Message request, ByteString body,
                         CompletableFuture<?> reply) {
+        record(serviceHash, methodId, ciid, request, body, reply, true);
+    }
+
+    private void record(int serviceHash, int methodId, boolean ciid, Message request, ByteString body,
+                        CompletableFuture<?> reply, boolean observed) {
         timeline.add("call 0x" + Integer.toHexString(serviceHash).toUpperCase() + "." + methodId);
-        sent.add(new Sent(serviceHash, methodId, ciid && !this.ciid.isEmpty(), request, body, reply));
+        sent.add(new Sent(serviceHash, methodId, ciid && !this.ciid.isEmpty(), request, body, reply, observed));
     }
 
     /** Same rule as BgsSession: the ciid goes on friends and presence calls. */

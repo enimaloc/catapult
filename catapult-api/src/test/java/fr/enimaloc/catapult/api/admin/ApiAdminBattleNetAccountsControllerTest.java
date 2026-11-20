@@ -1,20 +1,27 @@
 package fr.enimaloc.catapult.api.admin;
 
 import fr.enimaloc.catapult.api.error.ProblemAdvice;
+import fr.enimaloc.catapult.common.dto.admin.BgsCallResult;
+import fr.enimaloc.catapult.common.dto.admin.BgsMethodDto;
+import fr.enimaloc.catapult.common.dto.admin.BgsServiceDto;
 import fr.enimaloc.catapult.domain.battlenet.BattleNetServiceAccount;
 import fr.enimaloc.catapult.repository.battlenet.BattleNetFriendLinkRepository;
 import fr.enimaloc.catapult.repository.battlenet.BattleNetServiceAccountRepository;
 import fr.enimaloc.catapult.repository.binding.GetterConfigRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
+import fr.enimaloc.catapult.service.battlenet.BattleNetRawCallService;
 import fr.enimaloc.catapult.service.battlenet.BattleNetServiceAccountAdmin;
 import fr.enimaloc.catapult.service.battlenet.BattleNetSessionManager;
 import fr.enimaloc.catapult.service.battlenet.login.BattleNetLoginCoordinator;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Optional;
@@ -23,6 +30,7 @@ import java.util.concurrent.CompletableFuture;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -44,6 +52,7 @@ class ApiAdminBattleNetAccountsControllerTest {
     private final TokenEncryptionService encryption = mock(TokenEncryptionService.class);
     private final BattleNetLoginCoordinator coordinator = mock(BattleNetLoginCoordinator.class);
     private final BattleNetSessionManager sessions = mock(BattleNetSessionManager.class);
+    private final BattleNetRawCallService rawCalls = mock(BattleNetRawCallService.class);
     private final BattleNetServiceAccount account = new BattleNetServiceAccount();
     private MockMvc mvc;
 
@@ -60,7 +69,8 @@ class ApiAdminBattleNetAccountsControllerTest {
         when(sessions.sessionState(any())).thenReturn("DISABLED");
         mvc = MockMvcBuilders.standaloneSetup(new ApiAdminBattleNetAccountsController(
                         new BattleNetServiceAccountAdmin(accounts, links, encryption, coordinator, sessions,
-                                mock(GetterConfigRepository.class), mock(ChannelEventPublisher.class))))
+                                mock(GetterConfigRepository.class), mock(ChannelEventPublisher.class)), rawCalls))
+                .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .setControllerAdvice(new ProblemAdvice()).build();
     }
 
@@ -131,5 +141,49 @@ class ApiAdminBattleNetAccountsControllerTest {
                 .andExpect(jsonPath("$.label").doesNotExist());
         mvc.perform(delete("/api/internal/admin/battlenet-accounts/{id}", account.getId()))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void bgsMethods_listsTheCatalogue() throws Exception {
+        when(rawCalls.catalog()).thenReturn(List.of(new BgsServiceDto("bgs.protocol.presence.v2.client.PresenceService",
+                "0x138D200C", List.of(new BgsMethodDto("Update", 6, "in", "out", false)))));
+
+        mvc.perform(get("/api/internal/admin/battlenet-accounts/bgs-methods"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].name").value("bgs.protocol.presence.v2.client.PresenceService"))
+                .andExpect(jsonPath("$[0].methods[0].id").value(6));
+    }
+
+    @Test
+    void bgsCall_ok_is200() throws Exception {
+        when(rawCalls.call(eq(account.getId()), any(), any()))
+                .thenReturn(new BgsCallResult(7, 12, null, "", List.of(), null));
+
+        mvc.perform(post("/api/internal/admin/battlenet-accounts/{id}/bgs-call", account.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"service\":\"s\",\"method\":\"m\",\"text\":\"\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value(7));
+    }
+
+    @Test
+    void bgsCall_busy_is409() throws Exception {
+        when(rawCalls.call(any(), any(), any()))
+                .thenThrow(new ResponseStatusException(HttpStatus.CONFLICT, "A call is already running on this bot"));
+
+        mvc.perform(post("/api/internal/admin/battlenet-accounts/{id}/bgs-call", account.getId())
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void bgsCall_invalid_is400() throws Exception {
+        when(rawCalls.call(any(), any(), any()))
+                .thenThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid body: 1:3: nope"));
+
+        mvc.perform(post("/api/internal/admin/battlenet-accounts/{id}/bgs-call", account.getId())
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("Invalid body: 1:3: nope"));
     }
 }

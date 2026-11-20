@@ -45,6 +45,18 @@ final class FakeBgsChannel implements BgsChannel {
     }
 
     @Override
+    public CompletableFuture<ByteString> callRawUnobserved(int serviceHash, int methodId, ByteString body,
+                                                          boolean withCiid) {
+        return new CompletableFuture<>();
+    }
+
+    @Override
+    public CompletableFuture<Void> callRawNoReplyUnobserved(int serviceHash, int methodId, ByteString body,
+                                                           boolean withCiid) {
+        return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
     public <Q extends Message> void on(ServiceMethod<Q, ?> method, Consumer<Q> handler) {
         handlers.put(key(method.serviceHash(), method.methodId()), body -> {
             try {

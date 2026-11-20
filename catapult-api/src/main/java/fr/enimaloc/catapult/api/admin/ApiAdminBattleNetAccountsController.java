@@ -1,11 +1,17 @@
 package fr.enimaloc.catapult.api.admin;
 
 import fr.enimaloc.catapult.api.ApiPaths;
+import fr.enimaloc.catapult.common.dto.admin.BgsCallRequest;
+import fr.enimaloc.catapult.common.dto.admin.BgsCallResult;
+import fr.enimaloc.catapult.common.dto.admin.BgsServiceDto;
+import fr.enimaloc.catapult.service.battlenet.BattleNetRawCallService;
 import fr.enimaloc.catapult.service.battlenet.BattleNetServiceAccountAdmin;
 import fr.enimaloc.catapult.service.battlenet.BattleNetServiceAccountAdmin.AccountDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,6 +25,7 @@ import java.util.UUID;
 public class ApiAdminBattleNetAccountsController {
 
     private final BattleNetServiceAccountAdmin accounts;
+    private final BattleNetRawCallService rawCalls;
 
     @GetMapping
     public List<AccountDto> list() {
@@ -52,5 +59,21 @@ public class ApiAdminBattleNetAccountsController {
     public ResponseEntity<Void> delete(@PathVariable UUID id) {
         accounts.delete(id);
         return ResponseEntity.noContent().build();
+    }
+
+    /** The bgs.desc services and methods the free BGS call can name. */
+    @GetMapping("/bgs-methods")
+    public List<BgsServiceDto> bgsMethods() {
+        return rawCalls.catalog();
+    }
+
+    /**
+     * An admin's free BGS call on the bot's ready session; 200 even on a non-zero BGS status (it is in the result),
+     * 400 for a body that does not parse, 409 without a ready session here or while another call runs on the bot.
+     */
+    @PostMapping("/{id}/bgs-call")
+    public BgsCallResult bgsCall(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+                                 @RequestBody BgsCallRequest body) {
+        return rawCalls.call(id, body, jwt == null ? null : jwt.getSubject());
     }
 }

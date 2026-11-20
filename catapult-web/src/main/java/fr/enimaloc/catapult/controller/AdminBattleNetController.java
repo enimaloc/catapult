@@ -1,14 +1,19 @@
 package fr.enimaloc.catapult.controller;
 
+import fr.enimaloc.catapult.common.dto.admin.BgsCallRequest;
+import fr.enimaloc.catapult.common.dto.admin.BgsCallResult;
+import fr.enimaloc.catapult.common.dto.admin.BgsServiceDto;
 import fr.enimaloc.catapult.service.ApiService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -102,6 +107,29 @@ public class AdminBattleNetController {
     public ResponseEntity<Void> delete(@PathVariable UUID id) {
         AdminAccess.require(filler);
         return ResponseEntity.status(apiService.adminDeleteBattleNetAccount(id)).build();
+    }
+
+    /** The BGS services and methods for the free call panel; 502 when catapult-api can't give them. */
+    @GetMapping("/bgs-methods")
+    public ResponseEntity<List<BgsServiceDto>> bgsMethods() {
+        AdminAccess.require(filler);
+        List<BgsServiceDto> services = apiService.adminBgsMethods();
+        return services == null ? ResponseEntity.status(502).build() : ResponseEntity.ok(services);
+    }
+
+    /**
+     * An admin's free BGS call: catapult-api's result on a 2xx, else its status with its refusal message as
+     * {@code {"error": ...}} (400 invalid body, 409 busy or no ready session, 502 unreachable).
+     */
+    @PostMapping("/{id}/bgs-call")
+    public ResponseEntity<?> bgsCall(@PathVariable UUID id, @RequestBody BgsCallRequest body) {
+        AdminAccess.require(filler);
+        ApiService.AdminCall<BgsCallResult> call = apiService.adminBgsCall(id, body);
+        if (call.ok()) {
+            return ResponseEntity.status(call.status()).body(call.body());
+        }
+        return call.error() == null ? ResponseEntity.status(call.status()).build()
+                : ResponseEntity.status(call.status()).body(Map.of("error", call.error()));
     }
 
     private static boolean blank(String value) {

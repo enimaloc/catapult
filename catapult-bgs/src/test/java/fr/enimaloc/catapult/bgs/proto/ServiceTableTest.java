@@ -29,35 +29,35 @@ class ServiceTableTest {
 
     @Test
     void hashesComputedFromDescriptorsMatchTheKnownTable() {
-        Map<String, DescriptorHashes.Service> services = DescriptorHashes.load();
+        Map<String, BgsCatalog.ServiceInfo> services = services();
 
         EXPECTED_HASHES.forEach((name, hash) ->
-                assertThat(services.get(name)).as(name).isNotNull().extracting(DescriptorHashes.Service::hash).isEqualTo(hash));
+                assertThat(services.get(name)).as(name).isNotNull().extracting(BgsCatalog.ServiceInfo::hash).isEqualTo(hash));
         assertThat(BgsServices.FRIENDS_ACCEPT_INVITATION.serviceHash()).isEqualTo(0x5869BE8C);
         assertThat(BgsServices.FRIENDS_ACCEPT_INVITATION.methodId()).isEqualTo(9);
     }
 
     @Test
     void everyConstantMatchesItsDescriptorMethod() throws Exception {
-        Map<String, DescriptorHashes.Service> services = DescriptorHashes.load();
+        Map<String, BgsCatalog.ServiceInfo> services = services();
         List<ServiceMethod<?, ?>> methods = constants();
         assertThat(methods).hasSize(33);
 
         for (ServiceMethod<?, ?> m : methods) {
-            DescriptorHashes.Service service = services.get("bgs.protocol." + m.service());
+            BgsCatalog.ServiceInfo service = services.get("bgs.protocol." + m.service());
             assertThat(service).as(m.service()).isNotNull();
-            DescriptorHashes.Method method = service.methods().values().stream()
+            BgsCatalog.MethodInfo method = service.methods().stream()
                     .filter(x -> x.id() == m.methodId()).findFirst().orElseThrow();
             String label = m.service() + "." + method.name();
 
             assertThat(m.serviceHash()).as(label).isEqualTo(service.hash());
             assertThat(m.requestParser().parsePartialFrom(new byte[0]).getDescriptorForType().getFullName())
-                    .as(label + " request").isEqualTo(method.inputType());
-            if (DescriptorHashes.NO_RESPONSE.equals(method.outputType())) {
+                    .as(label + " request").isEqualTo(method.input().getFullName());
+            if (method.noResponse()) {
                 assertThat(m.responseParser()).as(label + " response").isNull();
             } else {
                 assertThat(m.responseParser().parsePartialFrom(new byte[0]).getDescriptorForType().getFullName())
-                        .as(label + " response").isEqualTo(method.outputType());
+                        .as(label + " response").isEqualTo(method.output().getFullName());
             }
         }
     }
@@ -66,7 +66,7 @@ class ServiceTableTest {
     void rawHashesOfServicesAbsentFromTheDescriptors() {
         assertThat(BgsServices.SELECT_GAME_ACCOUNT_HASH).isEqualTo(0x7B37D770);
         assertThat(BgsServices.SELF_PRESENCE_HASH).isEqualTo(0xBCA72135);
-        assertThat(DescriptorHashes.load().values()).extracting(DescriptorHashes.Service::hash)
+        assertThat(BgsCatalog.instance().services()).extracting(BgsCatalog.ServiceInfo::hash)
                 .doesNotContain(BgsServices.SELECT_GAME_ACCOUNT_HASH, BgsServices.SELF_PRESENCE_HASH);
     }
 
@@ -75,6 +75,12 @@ class ServiceTableTest {
         assertThat(Fnv1a.hash("")).isEqualTo(0x811C9DC5);
         assertThat(Fnv1a.hash("a")).isEqualTo(0xE40C292C);
         assertThat(Fnv1a.hash("foobar")).isEqualTo(0xBF9CF968);
+    }
+
+    private static Map<String, BgsCatalog.ServiceInfo> services() {
+        Map<String, BgsCatalog.ServiceInfo> services = new LinkedHashMap<>();
+        BgsCatalog.instance().services().forEach(s -> services.put(s.fullName(), s));
+        return services;
     }
 
     private static List<ServiceMethod<?, ?>> constants() throws IllegalAccessException {

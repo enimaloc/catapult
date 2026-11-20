@@ -2638,4 +2638,39 @@ class RealApiServiceTest {
 
         assertThat(service.revokeReadApiToken()).isEqualTo(204);
     }
+
+    @Test
+    void adminBgsMethods_readCatapultApisCatalogue_andIsNullWhenItFails() {
+        respond(HttpMethod.GET, "/api/internal/admin/battlenet-accounts/bgs-methods", "[{\"name\":\"svc\",\"hash\":\"0x00000001\","
+                + "\"methods\":[{\"name\":\"Update\",\"id\":6,\"inputType\":\"in\",\"outputType\":\"out\",\"noResponse\":false}]}]");
+        assertThat(service.adminBgsMethods()).singleElement().satisfies(s -> {
+            assertThat(s.name()).isEqualTo("svc");
+            assertThat(s.methods()).singleElement().satisfies(m -> assertThat(m.id()).isEqualTo(6));
+        });
+
+        api.reset();
+        expect(HttpMethod.GET, "/api/internal/admin/battlenet-accounts/bgs-methods").andRespond(withStatus(HttpStatus.NOT_FOUND));
+        assertThat(service.adminBgsMethods()).isNull();
+    }
+
+    @Test
+    void adminBgsCall_returnsTheResult_orTheProblemsDetailOnARefusal() {
+        UUID id = UUID.fromString("00000000-0000-0000-0000-00000000000a");
+        var request = new fr.enimaloc.catapult.common.dto.admin.BgsCallRequest("svc", "Update", "x: 1", null, null, null, null);
+        expect(HttpMethod.POST, "/api/internal/admin/battlenet-accounts/" + id + "/bgs-call")
+                .andExpect(content().json("{\"service\":\"svc\",\"method\":\"Update\",\"text\":\"x: 1\"}"))
+                .andRespond(withSuccess("{\"status\":7,\"durationMs\":12,\"replyText\":null,\"replyHex\":\"\",\"pushes\":[],\"error\":null}",
+                        MediaType.APPLICATION_JSON));
+        expect(HttpMethod.POST, "/api/internal/admin/battlenet-accounts/" + id + "/bgs-call")
+                .andRespond(withStatus(HttpStatus.CONFLICT).contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                        .body("{\"status\":409,\"title\":\"Conflict\",\"code\":\"conflict\",\"detail\":\"A call is already running on this bot\"}"));
+
+        var ok = service.adminBgsCall(id, request);
+        assertThat(ok.status()).isEqualTo(200);
+        assertThat(ok.body().status()).isEqualTo(7);
+        var refused = service.adminBgsCall(id, request);
+        assertThat(refused.status()).isEqualTo(409);
+        assertThat(refused.body()).isNull();
+        assertThat(refused.error()).isEqualTo("A call is already running on this bot");
+    }
 }

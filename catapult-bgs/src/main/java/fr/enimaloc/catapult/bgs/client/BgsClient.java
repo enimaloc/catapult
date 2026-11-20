@@ -26,6 +26,7 @@ import bgs.protocol.friends.v2.client.FriendsTypes.RemovedInvitationAssignment;
 import bgs.protocol.friends.v2.client.FriendsTypes.SentInvitation;
 import bgs.protocol.presence.v2.client.PresenceServiceOuterClass.BatchSubscribeRequest;
 import bgs.protocol.presence.v2.client.PresenceServiceOuterClass.BatchUnsubscribeRequest;
+import com.google.protobuf.ByteString;
 import com.google.protobuf.Message;
 import fr.enimaloc.catapult.bgs.client.BgsListener.CloseReason;
 import fr.enimaloc.catapult.bgs.core.BgsChannel;
@@ -169,6 +170,30 @@ public final class BgsClient {
 
     public CompletableFuture<Void> removeFriend(long accountId) {
         return action("RemoveFriend", FRIENDS_REMOVE_FRIEND, BgsRequests.removeFriend(accountId));
+    }
+
+    /**
+     * Sends any call, built by an admin, on the ready session; the wire tap never sees it (it could name anyone, see
+     * the debug journal). Fails at once when no session is ready, with {@link BgsRpcException} on a non-zero status.
+     *
+     * @param expectReply false for a method nobody answers: completes with an empty body once the call is written
+     */
+    public CompletableFuture<ByteString> rawCall(int serviceHash, int methodId, ByteString body, boolean withCiid,
+                                                 boolean expectReply) {
+        Session session = current;
+        if (session == null || !session.ready || session.closed.isDone()) {
+            return CompletableFuture.failedFuture(new IllegalStateException("The BGS session is not ready"));
+        }
+        if (!expectReply) {
+            return session.channel.callRawNoReplyUnobserved(serviceHash, methodId, body, withCiid)
+                    .thenApply(ignored -> ByteString.EMPTY);
+        }
+        return session.channel.callRawUnobserved(serviceHash, methodId, body, withCiid).whenComplete((reply, error) -> {
+            if (error != null) {
+                LOG.log(Level.WARNING, "BGS raw call 0x" + Integer.toHexString(serviceHash).toUpperCase() + "."
+                        + methodId + " failed: " + describe(unwrap(error)));
+            }
+        });
     }
 
     /** A copy of the friends list: account id to BattleTag. */

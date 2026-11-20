@@ -5,6 +5,11 @@ import fr.enimaloc.catapult.common.dto.DegradedStatusDto;
 import fr.enimaloc.catapult.common.dto.InvitePageData;
 import fr.enimaloc.catapult.common.dto.UserInfoResponse;
 import fr.enimaloc.catapult.common.dto.TokenResponse;
+import fr.enimaloc.catapult.common.dto.admin.BgsCallRequest;
+import fr.enimaloc.catapult.common.dto.admin.BgsCallResult;
+import fr.enimaloc.catapult.common.dto.admin.BgsMethodDto;
+import fr.enimaloc.catapult.common.dto.admin.BgsPushDto;
+import fr.enimaloc.catapult.common.dto.admin.BgsServiceDto;
 import fr.enimaloc.catapult.common.dto.admin.MetaTagDto;
 import fr.enimaloc.catapult.common.dto.admin.MetaTagRequest;
 import fr.enimaloc.catapult.common.dto.admin.SocialLinkDto;
@@ -143,6 +148,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.Base64;
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -1921,6 +1927,28 @@ public class MockApiService implements ApiService {
     public int adminDeleteBattleNetAccount(UUID id) {
         log.trace("adminDeleteBattleNetAccount({})", id);
         return battleNetAccounts.delete(id);
+    }
+
+    @Override
+    public List<BgsServiceDto> adminBgsMethods() {
+        log.trace("adminBgsMethods()");
+        return List.of(
+                new BgsServiceDto("bgs.protocol.connection.v1.ConnectionService", "0x65446991", List.of(
+                        new BgsMethodDto("KeepAlive", 5, "bgs.protocol.NoData", "bgs.protocol.NO_RESPONSE", true))),
+                new BgsServiceDto("bgs.protocol.presence.v2.client.PresenceService", "0x138D200C", List.of(
+                        new BgsMethodDto("Update", 6, "bgs.protocol.presence.v2.client.UpdateRequest",
+                                "bgs.protocol.NoData", false))));
+    }
+
+    @Override
+    public AdminCall<BgsCallResult> adminBgsCall(UUID id, BgsCallRequest request) {
+        log.trace("adminBgsCall({})", id); // never the body
+        List<BgsPushDto> pushes = List.of(new BgsPushDto(Instant.now(), "bgs.protocol.presence.v2.PresenceListener",
+                        "OnPresenceStateUpdated", "states {\n  account_id: 1\n}\n", "0a020801"),
+                new BgsPushDto(Instant.now(), "0xBCA72135", "1", null, "0800"));
+        boolean known = request.service() != null;
+        return new AdminCall<>(200, new BgsCallResult(0, 84, known ? "" : null, known ? "" : "0a01", pushes, null),
+                null);
     }
 
     @Override
