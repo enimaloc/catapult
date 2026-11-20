@@ -180,21 +180,51 @@ class SessionTimelineServiceTest {
     }
 
     @Test
-    void addPastMovesTheSessionStartBack() {
+    void addPastInsertsJustBeforeTheOpenPeriod() {
         UserAccount user = liveUser();
-        timeline.observe(user, "3", "Games+Demos", "MOLTYN", START);
+        timeline.observe(user, "4", "Software and Game Development", null, at(30));
 
-        timeline.addPast(user, "2", "Just Chatting", null, Duration.ofHours(1));
         timeline.addPast(user, "1", "Factorio", "Factorio", Duration.ofMinutes(150));
+
+        assertThat(timeline.currentSession(user))
+                .extracting(StreamCategorySegment::getCategoryName, StreamCategorySegment::getStartedAt,
+                        StreamCategorySegment::getEndedAt)
+                .containsExactly(
+                        tuple("Factorio", at(-120), at(30)),
+                        tuple("Software and Game Development", at(30), null));
+        assertThat(sessions.find(user).orElseThrow().getStartedAt()).isEqualTo(at(-150));
+    }
+
+    @Test
+    void addPastShiftsEarlierPeriodsBack() {
+        UserAccount user = liveUser();
+        timeline.observe(user, "4", "Software and Game Development", null, START);
+
+        timeline.addPast(user, "1", "Factorio", "Factorio", Duration.ofMinutes(150));
+        timeline.addPast(user, "2", "Just Chatting", null, Duration.ofHours(1));
+        timeline.addPast(user, "3", "Games+Demos", "MOLTYN", Duration.ofMinutes(105));
 
         assertThat(timeline.currentSession(user))
                 .extracting(StreamCategorySegment::getCategoryName, StreamCategorySegment::getGameName,
                         StreamCategorySegment::getStartedAt, StreamCategorySegment::getEndedAt)
                 .containsExactly(
-                        tuple("Factorio", "Factorio", at(-210), at(-60)),
-                        tuple("Just Chatting", null, at(-60), START),
-                        tuple("Games+Demos", "MOLTYN", START, null));
-        assertThat(sessions.find(user).orElseThrow().getStartedAt()).isEqualTo(at(-210));
+                        tuple("Factorio", "Factorio", at(-315), at(-165)),
+                        tuple("Just Chatting", null, at(-165), at(-105)),
+                        tuple("Games+Demos", "MOLTYN", at(-105), START),
+                        tuple("Software and Game Development", null, START, null));
+        assertThat(sessions.find(user).orElseThrow().getStartedAt()).isEqualTo(at(-315));
+    }
+
+    @Test
+    void addPastWithoutAnyPeriodEndsAtTheSessionStart() {
+        UserAccount user = liveUser();
+
+        timeline.addPast(user, "1", "Factorio", "Factorio", Duration.ofMinutes(150));
+
+        assertThat(timeline.currentSession(user)).singleElement().satisfies(segment -> {
+            assertThat(segment.getStartedAt()).isEqualTo(at(-150));
+            assertThat(segment.getEndedAt()).isEqualTo(START);
+        });
     }
 
     @Test

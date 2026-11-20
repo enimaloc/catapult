@@ -326,8 +326,8 @@ public class MockPanelApiController {
         return new TimelineView(segments.stream()
                 .map(segment -> new SegmentView(segment.getCategoryName(), segment.getGameName(),
                         segment.getStartedAt(), segment.getEndedAt(),
-                        Duration.between(segment.getStartedAt(),
-                                segment.getEndedAt() == null ? now : segment.getEndedAt()).toMinutes()))
+                        SessionRecap.format(Duration.between(segment.getStartedAt(),
+                                segment.getEndedAt() == null ? now : segment.getEndedAt()))))
                 .toList(),
                 SessionRecap.of(segments, now).gamesText());
     }

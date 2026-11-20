@@ -44,6 +44,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -253,7 +254,7 @@ class MockPanelApiControllerTest {
 
     @Test
     void play_refused_by_the_actions_is_a_400() throws Exception {
-        org.mockito.Mockito.doThrow(new IllegalStateException("This account has no Steam id"))
+        doThrow(new IllegalStateException("This account has no Steam id"))
                 .when(actions).play(any(), any(), any(), any());
 
         mvc.perform(write(post(API + "/accounts/{id}/play", alice.getId()),
@@ -319,7 +320,7 @@ class MockPanelApiControllerTest {
 
     @Test
     void pastSegmentRefusedOutsideALiveIsABadRequest() throws Exception {
-        org.mockito.Mockito.doThrow(new IllegalStateException("not live"))
+        doThrow(new IllegalStateException("not live"))
                 .when(actions).addPastSegment(any(), any(), any(), any(), any());
 
         mvc.perform(write(post(API + "/accounts/{id}/past-segment", alice.getId()),
@@ -344,10 +345,10 @@ class MockPanelApiControllerTest {
                 .andExpect(jsonPath("$.segments[0].gameName").value("Factorio"))
                 .andExpect(jsonPath("$.segments[0].startedAt").value("2026-11-20T15:00:00Z"))
                 .andExpect(jsonPath("$.segments[0].endedAt").value("2026-11-20T17:30:00Z"))
-                .andExpect(jsonPath("$.segments[0].minutes").value(150))
-                .andExpect(jsonPath("$.segments[1].minutes").value(60))
+                .andExpect(jsonPath("$.segments[0].duration").value("2h30"))
+                .andExpect(jsonPath("$.segments[1].duration").value("1h"))
                 .andExpect(jsonPath("$.segments[2].endedAt").doesNotExist())
-                .andExpect(jsonPath("$.segments[2].minutes").value(0))
+                .andExpect(jsonPath("$.segments[2].duration").value("0min"))
                 .andExpect(jsonPath("$.recap").value("- Factorio (Factorio) (2h30)\n- Just Chatting (1h)"));
     }
 

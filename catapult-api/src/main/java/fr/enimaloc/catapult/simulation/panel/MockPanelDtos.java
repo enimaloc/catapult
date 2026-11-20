@@ -77,10 +77,11 @@ public final class MockPanelDtos {
     public record TimelineView(List<SegmentView> segments, String recap) {}
 
     /**
-     * One period; {@code endedAt} is {@code null} while it runs, its {@code minutes} then counted until now.
+     * One period; {@code endedAt} is {@code null} while it runs, its {@code duration} then counted until now and
+     * written as the recap writes it ({@code 2h30}, {@code 1h}, {@code 45min}).
      */
     public record SegmentView(@Nullable String categoryName, @Nullable String gameName, Instant startedAt,
-                              @Nullable Instant endedAt, long minutes) {}
+                              @Nullable Instant endedAt, String duration) {}
 
     /** One API of the catalogue and its calls, in {@code SimulatedCalls} order. */
     public record ApiCalls(String api, List<CallView> calls) {}

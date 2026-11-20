@@ -263,17 +263,9 @@ async function refreshTimeline(id) {
   if (state.selected !== id) return;
   $('timeline').replaceChildren(...(timeline.segments.length ? timeline.segments.map((segment) => el('li', {},
     (segment.categoryName || '?') + (segment.gameName ? ' (' + segment.gameName + ')' : '')
-    + ' — ' + duration(segment.minutes),
+    + ' — ' + segment.duration,
     segment.endedAt ? null : el('span', {class: 'tag'}, 'en cours'))) : [el('li', {class: 'muted'}, 'No period')]));
   $('recap').textContent = timeline.recap || 'Nothing to sum up yet.';
-}
-
-/** {@code 2h30}, {@code 1h} or {@code 45min}, as the recap writes it. */
-function duration(minutes) {
-  const hours = Math.floor(minutes / 60);
-  const rest = minutes % 60;
-  if (!hours) return rest + 'min';
-  return rest ? hours + 'h' + String(rest).padStart(2, '0') : hours + 'h';
 }
 
 function renderIdentity(account) {

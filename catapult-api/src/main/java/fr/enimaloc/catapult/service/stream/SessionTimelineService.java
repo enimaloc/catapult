@@ -111,9 +111,10 @@ public class SessionTimelineService {
     }
 
     /**
-     * Inserts a closed period of {@code duration} just before the oldest period of the ongoing session (before the
-     * session start when it has none) and moves the session start back as much, so a long session can be built without
-     * waiting (mock panel). Nothing happens outside an ongoing session.
+     * Inserts a closed period of {@code duration} that ends just where the running period starts (at the session start
+     * when it has no period, after its last closed one when none runs), so periods added one after the other read in
+     * the order they were added. Every closed period before it moves back by {@code duration}, and the session start
+     * as much: a long session is built without waiting (mock panel). Nothing happens outside an ongoing session.
      */
     @Transactional
     public void addPast(UserAccount user, String categoryId, String categoryName, String gameName,
@@ -126,7 +127,19 @@ public class SessionTimelineService {
             return;
         }
         List<StreamCategorySegment> segments = currentSession(user);
-        Instant end = segments.isEmpty() ? session.get().getStartedAt() : segments.getFirst().getStartedAt();
+        Instant end = segments.stream()
+                .filter(segment -> segment.getEndedAt() == null)
+                .map(StreamCategorySegment::getStartedAt)
+                .max(Comparator.naturalOrder())
+                .or(() -> segments.stream().map(StreamCategorySegment::getEndedAt).max(Comparator.naturalOrder()))
+                .orElse(session.get().getStartedAt());
+        segments.stream()
+                .filter(segment -> segment.getEndedAt() != null && !segment.getEndedAt().isAfter(end))
+                .forEach(segment -> {
+                    segment.setStartedAt(segment.getStartedAt().minus(duration));
+                    segment.setEndedAt(segment.getEndedAt().minus(duration));
+                    repository.save(segment);
+                });
         StreamCategorySegment past = new StreamCategorySegment();
         past.setUserId(user.getId());
         past.setStreamId(session.get().getStreamId());

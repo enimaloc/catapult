@@ -116,7 +116,9 @@ class SimulationRaidRecapTest {
                 mock(StreamCatchUp.class));
         beans.addBean("twitchEventSubService", eventSub);
         timelineListener[0] = new SessionTimelineListener(timeline, eventSub, gameState, active);
-        // As the connection does: the channel's category is known before it goes live, so no Helix read runs aside
+        // As the connection does: the channel's category is known before it goes live, so no Helix read runs aside.
+        // A category of its own, so the period the live opens is a pair of its own too
+        registry.update(raider.getId(), data -> data.withCategory("509670", "Science & Technology"));
         eventSub.seedChannelStateIfAbsent(raider);
         actions = new SimulationActions(registry, new SimulationJournal(),
                 beans.getBeanProvider(TwitchEventSubService.class), mock(SchedulerService.class),
@@ -134,11 +136,12 @@ class SimulationRaidRecapTest {
     @Test
     void mockRaidBetweenTwoMembersSendsTheRecap() {
         actions.setLive(raider, true);
-        // Each one goes before the oldest period: added from the last to the first
-        actions.addPastSegment(raider, "66082", "Games+Demos", "MOLTYN", Duration.ofMinutes(105));
-        actions.addPastSegment(raider, "509658", "Just Chatting", null, Duration.ofMinutes(60));
+        // Each one goes just before the running period, so they read in the order they are added
         actions.addPastSegment(raider, "263490", "Factorio", "Factorio", Duration.ofMinutes(150));
+        actions.addPastSegment(raider, "509658", "Just Chatting", null, Duration.ofMinutes(60));
+        actions.addPastSegment(raider, "66082", "Games+Demos", "MOLTYN", Duration.ofMinutes(105));
 
+        // The period opened by the live has run for under a minute at the raid: its pair is left out of the lines
         actions.raidOut(raider, raided.getTwitchUsername().toLowerCase());
 
         ArgumentCaptor<UserAccount> target = ArgumentCaptor.forClass(UserAccount.class);
