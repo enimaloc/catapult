@@ -74,6 +74,15 @@ public class GameStateService {
         }
     }
 
+    /**
+     * Drops the game remembered as current for {@code userId}, so the next detection cycle sees it as a change and
+     * applies it again. Unlike {@link #clearState}, the game has not ended: nothing is published, no ended game is
+     * recorded.
+     */
+    public void forgetLastKnownGame(UUID userId) {
+        lastKnownGame.remove(userId);
+    }
+
     public void clearState(UserAccount user) {
         observedSinceStart.add(user.getId());
         DetectedGame previous = lastKnownGame.remove(user.getId());

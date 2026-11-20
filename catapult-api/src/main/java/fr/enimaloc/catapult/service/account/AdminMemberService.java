@@ -191,7 +191,8 @@ public class AdminMemberService {
 
     public AdminMemberSummaryDto summary(UUID id) {
         UserAccount user = findOrThrow(id);
-        return new AdminMemberSummaryDto(user.getId(), user.getTwitchUsername());
+        return new AdminMemberSummaryDto(user.getId(), user.getTwitchUsername(),
+                dryRunService.state(user.getId()).isPresent());
     }
 
     /** An unknown member is a 404 before the missing key's 400. */

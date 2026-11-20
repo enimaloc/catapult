@@ -245,6 +245,15 @@ class ApiAdminMembersControllerTest {
         assertThat(controller.getMember(member.getId())).isEqualTo(new AdminMemberSummaryDto(member.getId(), "member"));
     }
 
+    @Test
+    void memberDetailCarriesTheDryRunFlag() {
+        when(dryRun.state(member.getId()))
+                .thenReturn(Optional.of(new fr.enimaloc.catapult.domain.dryrun.MemberDryRun()));
+
+        assertThat(controller.getMember(member.getId()))
+                .isEqualTo(new AdminMemberSummaryDto(member.getId(), "member", true));
+    }
+
     @Nested
     class Deletion {
         @Test

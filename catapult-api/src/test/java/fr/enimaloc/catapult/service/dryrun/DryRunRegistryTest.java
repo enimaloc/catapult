@@ -14,7 +14,8 @@ import static org.mockito.Mockito.when;
 class DryRunRegistryTest {
 
     final MemberDryRunRepository dryRuns = mock(MemberDryRunRepository.class);
-    final DryRunRegistry registry = new DryRunRegistry(dryRuns);
+    final List<Object> events = new java.util.ArrayList<>();
+    final DryRunRegistry registry = new DryRunRegistry(dryRuns, events::add);
     final UUID member = UUID.randomUUID();
     final UUID other = UUID.randomUUID();
 
@@ -59,5 +60,45 @@ class DryRunRegistryTest {
         registry.refresh();
 
         assertThat(registry.isActive(member)).isTrue();
+    }
+
+    @Test
+    void aMemberLeavingTheSetIsForgottenOnReload() {
+        registry.activate(member);
+        registry.activate(other);
+        when(dryRuns.findAll()).thenReturn(List.of(row(other)));
+
+        registry.load();
+
+        assertThat(events).containsExactly(new DryRunEndedEvent(member));
+    }
+
+    @Test
+    void aMemberLeavingTheSetHereIsForgottenAtOnce_andOnlyOnce() {
+        registry.activate(member);
+
+        registry.deactivate(member);
+        registry.deactivate(member);
+        when(dryRuns.findAll()).thenReturn(List.of());
+        registry.load();
+
+        assertThat(events).containsExactly(new DryRunEndedEvent(member));
+    }
+
+    @Test
+    void aFailingListenerNeitherBreaksTheRegistryNorTheOtherMembers() {
+        List<Object> seen = new java.util.ArrayList<>();
+        DryRunRegistry failing = new DryRunRegistry(dryRuns, e -> {
+            seen.add(e);
+            throw new IllegalStateException("boom");
+        });
+        failing.activate(member);
+        failing.activate(other);
+        when(dryRuns.findAll()).thenReturn(List.of());
+
+        failing.load();
+
+        assertThat(failing.members()).isEmpty();
+        assertThat(seen).hasSize(2);
     }
 }

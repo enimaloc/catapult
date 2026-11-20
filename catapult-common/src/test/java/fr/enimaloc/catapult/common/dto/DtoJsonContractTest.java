@@ -123,6 +123,16 @@ class DtoJsonContractTest {
                 fr.enimaloc.catapult.common.dto.admin.AdminMemberDto.class).dryRun()).isTrue();
     }
 
+    @Test
+    void memberSummaryReadsAsOutOfDryRunWhenAnOlderApiLeavesTheFlagOut() {
+        var summary = json.readValue("{\"id\":\"" + java.util.UUID.randomUUID() + "\",\"twitchUsername\":\"a\"}",
+                fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto.class);
+
+        assertThat(summary.dryRun()).isFalse();
+        assertThat(json.writeValueAsString(new fr.enimaloc.catapult.common.dto.admin.AdminMemberSummaryDto(
+                summary.id(), "a", true))).contains("\"dryRun\":true");
+    }
+
     // --- sample values ------------------------------------------------------------------------
 
     private static Object sample(Type type) {

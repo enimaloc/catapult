@@ -5,7 +5,6 @@ import fr.enimaloc.catapult.domain.dryrun.MemberDryRun;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.dryrun.MemberDryRunRepository;
 import fr.enimaloc.catapult.service.ActivityLogService;
-import fr.enimaloc.catapult.service.binding.GameStateService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -27,7 +26,6 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class DryRunServiceTest {
@@ -36,9 +34,9 @@ class DryRunServiceTest {
 
     final MemberDryRunRepository dryRuns = mock(MemberDryRunRepository.class);
     final UserAccountRepository users = mock(UserAccountRepository.class);
-    final GameStateService gameState = mock(GameStateService.class);
     final ActivityLogService activityLog = mock(ActivityLogService.class);
-    final DryRunRegistry registry = new DryRunRegistry(dryRuns);
+    final List<Object> events = new java.util.ArrayList<>();
+    final DryRunRegistry registry = new DryRunRegistry(dryRuns, events::add);
     final UUID member = UUID.randomUUID();
     final UUID admin = UUID.randomUUID();
     final UserAccount account = new UserAccount();
@@ -49,7 +47,7 @@ class DryRunServiceTest {
         account.setId(member);
         when(users.findById(member)).thenReturn(Optional.of(account));
         when(dryRuns.save(any(MemberDryRun.class))).thenAnswer(i -> i.getArgument(0));
-        service = new DryRunService(dryRuns, users, registry, gameState, activityLog, Clock.fixed(NOW, ZoneOffset.UTC));
+        service = new DryRunService(dryRuns, users, registry, activityLog, Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     private MemberDryRun stored() {
@@ -96,14 +94,30 @@ class DryRunServiceTest {
     }
 
     @Test
-    void disableClearsTheGameState() {
+    void disableForgetsTheRememberedGame() {
         MemberDryRun row = stored();
+        registry.activate(member);
 
         service.disable(member, member);
 
         verify(dryRuns).delete(row);
-        verify(gameState).clearState(account);
+        assertThat(events).containsExactly(new DryRunEndedEvent(member));
         verify(activityLog).addEntry(member, "INFO", "Dry run turned off");
+    }
+
+    @Test
+    void disableLogsEvenIfForgettingFails() {
+        stored();
+        DryRunRegistry failing = new DryRunRegistry(dryRuns, e -> {
+            throw new IllegalStateException("boom");
+        });
+        failing.activate(member);
+        service = new DryRunService(dryRuns, users, failing, activityLog, Clock.fixed(NOW, ZoneOffset.UTC));
+
+        service.disable(member, member);
+
+        verify(activityLog).addEntry(member, "INFO", "Dry run turned off");
+        assertThat(failing.isActive(member)).isFalse();
     }
 
     @Test
@@ -113,7 +127,7 @@ class DryRunServiceTest {
         service.disable(admin, member);
 
         verify(dryRuns, never()).delete(any());
-        verifyNoInteractions(gameState);
+        assertThat(events).isEmpty();
         verify(activityLog, never()).addEntry(any(), anyString(), anyString());
     }
 

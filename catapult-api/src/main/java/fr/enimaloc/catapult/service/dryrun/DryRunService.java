@@ -1,11 +1,9 @@
 package fr.enimaloc.catapult.service.dryrun;
 
-import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.dryrun.MemberDryRun;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.dryrun.MemberDryRunRepository;
 import fr.enimaloc.catapult.service.ActivityLogService;
-import fr.enimaloc.catapult.service.binding.GameStateService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -37,22 +35,20 @@ public class DryRunService {
     private final MemberDryRunRepository dryRuns;
     private final UserAccountRepository users;
     private final DryRunRegistry registry;
-    private final GameStateService gameStateService;
     private final ActivityLogService activityLogService;
     private final Clock clock;
 
     @Autowired
     public DryRunService(MemberDryRunRepository dryRuns, UserAccountRepository users, DryRunRegistry registry,
-                         GameStateService gameStateService, ActivityLogService activityLogService) {
-        this(dryRuns, users, registry, gameStateService, activityLogService, Clock.systemUTC());
+                         ActivityLogService activityLogService) {
+        this(dryRuns, users, registry, activityLogService, Clock.systemUTC());
     }
 
     DryRunService(MemberDryRunRepository dryRuns, UserAccountRepository users, DryRunRegistry registry,
-                  GameStateService gameStateService, ActivityLogService activityLogService, Clock clock) {
+                  ActivityLogService activityLogService, Clock clock) {
         this.dryRuns = dryRuns;
         this.users = users;
         this.registry = registry;
-        this.gameStateService = gameStateService;
         this.activityLogService = activityLogService;
         this.clock = clock;
     }
@@ -79,18 +75,21 @@ public class DryRunService {
 
     /**
      * Takes {@code userId} out of dry run, {@code byUserId} (the member or an admin, null when unknown) asking.
-     * The member's remembered game state is forgotten so the next detection cycle applies what it should.
-     * 404 for an unknown member; no-op when not in dry run.
+     * The member's remembered game is then forgotten, on every instance (see {@link DryRunExitListener}), so the next
+     * detection cycle applies what it should. 404 for an unknown member; no-op when not in dry run.
      */
     @Transactional
     public void disable(UUID byUserId, UUID userId) {
-        UserAccount user = requireMember(userId);
+        requireMember(userId);
         dryRuns.findById(userId).ifPresent(row -> {
             dryRuns.delete(row);
             afterCommit(() -> {
+                try {
+                    activityLogService.addEntry(userId, "INFO", TURNED_OFF);
+                } catch (RuntimeException e) {
+                    log.warn("Could not log the end of the dry run of {}: {}", userId, e.toString());
+                }
                 registry.deactivate(userId);
-                gameStateService.clearState(user);
-                activityLogService.addEntry(userId, "INFO", TURNED_OFF);
                 log.info("Dry run of {} turned off by {}", userId, byUserId);
             });
         });
@@ -110,8 +109,10 @@ public class DryRunService {
         return result;
     }
 
-    private UserAccount requireMember(UUID userId) {
-        return users.findById(userId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+    private void requireMember(UUID userId) {
+        if (users.findById(userId).isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
     }
 
     /** Applies the in-memory changes once the DB change is committed, so a rollback never leaves them disagreeing. */
