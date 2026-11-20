@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 
@@ -44,6 +45,18 @@ public class StreamSessionService {
     public void recordEnd(UserAccount user, Instant endedAt) {
         repository.findById(user.getId()).ifPresent(session -> {
             session.setEndedAt(endedAt);
+            repository.save(session);
+        });
+    }
+
+    /**
+     * Moves the start of the remembered stream back by {@code duration}, for a period added before it (the mock panel
+     * builds a long session this way); nothing happens when no stream was remembered.
+     */
+    @Transactional
+    public void moveStartBack(UserAccount user, Duration duration) {
+        repository.findById(user.getId()).ifPresent(session -> {
+            session.setStartedAt(session.getStartedAt().minus(duration));
             repository.save(session);
         });
     }

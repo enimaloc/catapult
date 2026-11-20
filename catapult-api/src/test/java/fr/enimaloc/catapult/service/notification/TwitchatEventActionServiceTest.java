@@ -24,6 +24,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.NO_GAME_DETECTED;
+import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.RAIDED_BY_MEMBER;
 import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.STREAM_STARTED;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -151,7 +152,7 @@ class TwitchatEventActionServiceTest {
 
         ArgumentCaptor<TwitchatEventAction> saved = ArgumentCaptor.forClass(TwitchatEventAction.class);
         verify(repository, atLeastOnce()).save(saved.capture());
-        assertThat(saved.getAllValues()).hasSize(6)
+        assertThat(saved.getAllValues()).hasSize(7)
                 .allSatisfy(a -> assertThat(a.getAction()).isEqualTo("CUSTOM_CHAT_MESSAGE"));
         assertThat(saved.getAllValues()).filteredOn(a -> a.getEventType() == STREAM_STARTED)
                 .singleElement().satisfies(a -> assertThat(a.getDataJson()).contains("Custom live"));
@@ -167,7 +168,7 @@ class TwitchatEventActionServiceTest {
 
         service.ensureInitialized(user);
 
-        verify(repository, org.mockito.Mockito.times(6)).save(any());
+        verify(repository, org.mockito.Mockito.times(7)).save(any());
         verify(jdbc, never()).query(anyString(), any(RowCallbackHandler.class), eq(user.getId()));
     }
 
@@ -186,7 +187,7 @@ class TwitchatEventActionServiceTest {
 
         service.ensureInitialized(user);
 
-        verify(repository, org.mockito.Mockito.times(6)).save(any());
+        verify(repository, org.mockito.Mockito.times(7)).save(any());
         assertThat(settings.isEventActionsInitialized()).isTrue();
     }
 
@@ -255,5 +256,48 @@ class TwitchatEventActionServiceTest {
         service.ensureNotificationPayload(user);
 
         verify(repository, never()).save(any());
+    }
+
+    @Test
+    void existingAccountsGetTheRaidPayload() {
+        settings.setEventActionsInitialized(true);
+        when(widgetSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
+        when(repository.existsByUserAndEventType(user, RAIDED_BY_MEMBER)).thenReturn(false);
+
+        service.ensurePayload(user, RAIDED_BY_MEMBER);
+
+        ArgumentCaptor<TwitchatEventAction> saved = ArgumentCaptor.forClass(TwitchatEventAction.class);
+        verify(repository).save(saved.capture());
+        assertThat(saved.getValue().getEventType()).isEqualTo(RAIDED_BY_MEMBER);
+        assertThat(saved.getValue().getAction()).isEqualTo("CUSTOM_CHAT_MESSAGE");
+        assertThat(saved.getValue().isEnabled()).isTrue();
+        assertThat(saved.getValue().getDataJson()).contains("{{raider}}").contains("{{games}}");
+    }
+
+    @Test
+    void ensurePayload_keepsAnExistingList_andLeavesUninitializedAccountsToTheirSeeding() {
+        settings.setEventActionsInitialized(true);
+        when(widgetSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
+        when(repository.existsByUserAndEventType(user, RAIDED_BY_MEMBER)).thenReturn(true);
+        service.ensurePayload(user, RAIDED_BY_MEMBER);
+
+        settings.setEventActionsInitialized(false);
+        service.ensurePayload(user, RAIDED_BY_MEMBER);
+
+        verify(repository, never()).save(any());
+    }
+
+    /** Existing accounts got the raid payload once from V122: startup never brings a removed one back. */
+    @Test
+    void aDeletedRaidPayloadIsNotSeededAgain() {
+        settings.setEventActionsInitialized(true);
+        when(widgetSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
+        when(widgetSettingsRepository.findUsersAwaitingEventActions()).thenReturn(List.of(user));
+
+        new TwitchatEventActionsBootstrap(widgetSettingsRepository, service).run();
+        service.ensureInitialized(user);
+
+        verify(repository, never()).save(any());
+        verify(repository, never()).existsByUserAndEventType(any(), eq(RAIDED_BY_MEMBER));
     }
 }

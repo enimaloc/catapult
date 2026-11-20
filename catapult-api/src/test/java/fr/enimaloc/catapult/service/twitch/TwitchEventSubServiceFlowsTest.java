@@ -8,6 +8,7 @@ import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.event.AccountCreatedEvent;
 import fr.enimaloc.catapult.event.ChannelCategoryChangedEvent;
 import fr.enimaloc.catapult.event.ChannelCclChangedEvent;
+import fr.enimaloc.catapult.event.ChannelStateResyncedEvent;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
@@ -41,6 +42,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.after;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -241,6 +243,9 @@ class TwitchEventSubServiceFlowsTest {
 
             helix.verify();
             verify(streamState).restoreLive(user, true);
+            // The loaded category is handed over as a resync, not as a change
+            verify(publisher).publishEvent(any(ChannelStateResyncedEvent.class));
+            clearInvocations(publisher);
 
             // The loaded state is the baseline: an identical update is not a change
             service.handleMessage(user, token, channelUpdate("509658", "Just Chatting", "Gambling"), false);

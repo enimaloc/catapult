@@ -7,7 +7,9 @@ import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.twitchat.TwitchatEventAction;
 import fr.enimaloc.catapult.domain.twitchat.TwitchatWidgetSettings;
+import fr.enimaloc.catapult.domain.stream.StreamCategorySegment;
 import fr.enimaloc.catapult.event.NoGameDetectedEvent;
+import fr.enimaloc.catapult.service.stream.SessionRecap;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.service.binding.GameBindingLookup;
 import fr.enimaloc.catapult.service.binding.GameStateService;
@@ -20,6 +22,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -30,6 +34,7 @@ import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType
 import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.CATEGORY_CHANGED_BY_CATAPULT;
 import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.CATEGORY_CHANGED_MANUALLY;
 import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.NO_GAME_DETECTED;
+import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.RAIDED_BY_MEMBER;
 import static fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType.STREAM_STARTED;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -362,5 +367,60 @@ class TwitchatEventDispatcherTest {
         dispatcher.onNotification(user, "Maintenance", "Ce soir", "", "");
 
         assertThat(published().payloads().getFirst().data().get("message")).isEqualTo("[Catapult] Maintenance — Ce soir");
+    }
+
+    @Test
+    void raidedByMember_rendersTheDefaultPayload_withTheRaiderAndTheirGames() throws Exception {
+        String defaultJson = tools.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(
+                TwitchatEventDefaults.chatMessage(RAIDED_BY_MEMBER));
+        when(eventActionService.enabledActions(user, RAIDED_BY_MEMBER)).thenReturn(List.of(
+                row("CUSTOM_CHAT_MESSAGE", defaultJson),
+                row("SEND_MESSAGE", "{\"message\":\"{{raider}} {{sessionDuration}}\"}")));
+        Instant raid = Instant.parse("2026-11-20T21:00:00Z");
+        SessionRecap recap = SessionRecap.of(List.of(
+                segment("1", "Factorio", "Factorio", raid.minus(Duration.ofMinutes(150)), raid.minus(Duration.ofMinutes(60))),
+                segment("509658", "Just Chatting", null, raid.minus(Duration.ofMinutes(60)), null)), raid);
+
+        dispatcher.onRaidedByMember(user, "RaiderA", recap);
+
+        TwitchatDispatch dispatch = published();
+        assertThat(dispatch.eventType()).isEqualTo("RAIDED_BY_MEMBER");
+        Map<String, Object> chat = dispatch.payloads().getFirst().data();
+        assertThat(chat.get("message")).isEqualTo(
+                "Pendant sa session de stream, RaiderA a joué à :\n- Factorio (Factorio) (1h30)\n- Just Chatting (1h)");
+        assertThat(chat.get("icon")).isEqualTo("raid");
+        assertThat(chat.get("actions")).isEqualTo(List.of());
+        assertThat(dispatch.payloads().get(1).data().get("message")).isEqualTo("RaiderA 2h30");
+        verifyNoInteractions(actionTokenService);
+    }
+
+    @Test
+    void raidedByMember_aFailure_isNeverPropagated() {
+        when(eventActionService.enabledActions(user, RAIDED_BY_MEMBER)).thenThrow(new IllegalStateException("db down"));
+
+        dispatcher.onRaidedByMember(user, "RaiderA", new SessionRecap(List.of(), Duration.ZERO));
+
+        verifyNoInteractions(channelEventPublisher);
+    }
+
+    @Test
+    void sendTest_raidedByMember_fillsTheRaidVariables() {
+        dispatcher.sendTest(user, RAIDED_BY_MEMBER, List.of(new TwitchatEventActionDto("SEND_MESSAGE", "FORM",
+                "{\"message\":\"{{raider}}|{{games}}|{{sessionDuration}}\"}", true)));
+
+        String message = (String) published().payloads().getFirst().data().get("message");
+        assertThat(message.split("\\|")).hasSize(3).allSatisfy(part -> assertThat(part).isNotBlank());
+        assertThat(message).doesNotContain("{{");
+    }
+
+    private static StreamCategorySegment segment(String categoryId, String categoryName, String gameName,
+                                                 Instant start, Instant end) {
+        StreamCategorySegment segment = new StreamCategorySegment();
+        segment.setCategoryId(categoryId);
+        segment.setCategoryName(categoryName);
+        segment.setGameName(gameName);
+        segment.setStartedAt(start);
+        segment.setEndedAt(end);
+        return segment;
     }
 }

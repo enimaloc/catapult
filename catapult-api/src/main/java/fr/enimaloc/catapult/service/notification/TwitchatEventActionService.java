@@ -165,14 +165,22 @@ public class TwitchatEventActionService {
      */
     @Transactional
     public void ensureNotificationPayload(UserAccount user) {
+        ensurePayload(user, TwitchatNotificationEventType.NOTIFICATION);
+    }
+
+    /**
+     * Gives an initialized account the default payload of {@code type} when it has none for it:
+     * accounts initialized before that event existed never got it. One not initialized yet gets
+     * it with the others from {@link #ensureInitialized}.
+     */
+    @Transactional
+    public void ensurePayload(UserAccount user, TwitchatNotificationEventType type) {
         TwitchatWidgetSettings settings = widgetSettingsRepository.findById(user.getId()).orElse(null);
-        if (settings == null || !settings.isEventActionsInitialized()
-                || repository.existsByUserAndEventType(user, TwitchatNotificationEventType.NOTIFICATION)) {
+        if (settings == null || !settings.isEventActionsInitialized() || repository.existsByUserAndEventType(user, type)) {
             return;
         }
-        repository.save(newAction(user, TwitchatNotificationEventType.NOTIFICATION, 0, TwitchatPayloadRenderer.CHAT_MESSAGE,
-                TwitchatPayloadMode.FORM, JSON.writeValueAsString(TwitchatEventDefaults.chatMessage(TwitchatNotificationEventType.NOTIFICATION)),
-                true, Instant.now()));
+        repository.save(newAction(user, type, 0, TwitchatPayloadRenderer.CHAT_MESSAGE, TwitchatPayloadMode.FORM,
+                JSON.writeValueAsString(TwitchatEventDefaults.chatMessage(type)), true, Instant.now()));
     }
 
     private Map<TwitchatNotificationEventType, String> activePresets(UUID userId) {

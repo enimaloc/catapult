@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.chat.ChatCommandEvent;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.binding.GetterConfig;
+import fr.enimaloc.catapult.domain.stream.StreamCategorySegment;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
@@ -34,6 +35,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -42,6 +44,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -251,7 +254,7 @@ class MockPanelApiControllerTest {
 
     @Test
     void play_refused_by_the_actions_is_a_400() throws Exception {
-        org.mockito.Mockito.doThrow(new IllegalStateException("This account has no Steam id"))
+        doThrow(new IllegalStateException("This account has no Steam id"))
                 .when(actions).play(any(), any(), any(), any());
 
         mvc.perform(write(post(API + "/accounts/{id}/play", alice.getId()),
@@ -280,6 +283,85 @@ class MockPanelApiControllerTest {
         verify(actions).stopPlaying(alice);
         verify(actions).manualCategoryChange(alice, "27471", "Minecraft");
         verify(actions).raidOut(alice, "bob");
+    }
+
+    @Test
+    void pastSegmentEndpointValidates() throws Exception {
+        String path = API + "/accounts/{id}/past-segment";
+        mvc.perform(write(post(path, alice.getId()),
+                        "{\"categoryName\":\"Factorio\",\"minutes\":150}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(write(post(path, alice.getId()),
+                        "{\"categoryId\":\"1\",\"categoryName\":\" \",\"minutes\":150}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(write(post(path, alice.getId()),
+                        "{\"categoryId\":\"1\",\"categoryName\":\"Factorio\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(write(post(path, alice.getId()),
+                        "{\"categoryId\":\"1\",\"categoryName\":\"Factorio\",\"minutes\":0}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(write(post(path, alice.getId()),
+                        "{\"categoryId\":\"1\",\"categoryName\":\"Factorio\",\"minutes\":1441}"))
+                .andExpect(status().isBadRequest());
+        verify(actions, never()).addPastSegment(any(), any(), any(), any(), any());
+
+        mvc.perform(write(post(path, alice.getId()),
+                        "{\"categoryId\":\" 1 \",\"categoryName\":\" Factorio \",\"gameName\":\" \","
+                                + "\"minutes\":150}"))
+                .andExpect(status().isNoContent());
+        mvc.perform(write(post(path, alice.getId()),
+                        "{\"categoryId\":\"66082\",\"categoryName\":\"Games + Demos\","
+                                + "\"gameName\":\" MOLTYN \",\"minutes\":1440}"))
+                .andExpect(status().isNoContent());
+
+        verify(actions).addPastSegment(alice, "1", "Factorio", null, Duration.ofMinutes(150));
+        verify(actions).addPastSegment(alice, "66082", "Games + Demos", "MOLTYN", Duration.ofHours(24));
+    }
+
+    @Test
+    void pastSegmentRefusedOutsideALiveIsABadRequest() throws Exception {
+        doThrow(new IllegalStateException("not live"))
+                .when(actions).addPastSegment(any(), any(), any(), any(), any());
+
+        mvc.perform(write(post(API + "/accounts/{id}/past-segment", alice.getId()),
+                        "{\"categoryId\":\"1\",\"categoryName\":\"Factorio\",\"minutes\":10}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("not live"));
+    }
+
+    @Test
+    void timelineEndpointReturnsTheRecap() throws Exception {
+        Instant start = Instant.parse("2026-11-20T15:00:00Z");
+        StreamCategorySegment factorio = segment("1", "Factorio", "Factorio", start, start.plusSeconds(150 * 60));
+        StreamCategorySegment chatting = segment("509658", "Just Chatting", null, start.plusSeconds(150 * 60),
+                start.plusSeconds(210 * 60));
+        StreamCategorySegment running = segment(null, null, null, Instant.now(), null);
+        when(actions.sessionTimeline(alice)).thenReturn(List.of(factorio, chatting, running));
+
+        mvc.perform(get(API + "/accounts/{id}/timeline", alice.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.segments.length()").value(3))
+                .andExpect(jsonPath("$.segments[0].categoryName").value("Factorio"))
+                .andExpect(jsonPath("$.segments[0].gameName").value("Factorio"))
+                .andExpect(jsonPath("$.segments[0].startedAt").value("2026-11-20T15:00:00Z"))
+                .andExpect(jsonPath("$.segments[0].endedAt").value("2026-11-20T17:30:00Z"))
+                .andExpect(jsonPath("$.segments[0].duration").value("2h30"))
+                .andExpect(jsonPath("$.segments[1].duration").value("1h"))
+                .andExpect(jsonPath("$.segments[2].endedAt").doesNotExist())
+                .andExpect(jsonPath("$.segments[2].duration").value("0min"))
+                .andExpect(jsonPath("$.recap").value("- Factorio (Factorio) (2h30)\n- Just Chatting (1h)"));
+    }
+
+    private static StreamCategorySegment segment(String categoryId, String categoryName, String gameName,
+                                                 Instant startedAt, Instant endedAt) {
+        StreamCategorySegment segment = new StreamCategorySegment();
+        segment.setStreamId("sim-1");
+        segment.setCategoryId(categoryId);
+        segment.setCategoryName(categoryName);
+        segment.setGameName(gameName);
+        segment.setStartedAt(startedAt);
+        segment.setEndedAt(endedAt);
+        return segment;
     }
 
     @Test

@@ -6,12 +6,17 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import fr.enimaloc.catapult.chat.ChatCommandEvent.SenderRole;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GetterConfig;
+import fr.enimaloc.catapult.domain.stream.StreamCategorySegment;
+import fr.enimaloc.catapult.domain.stream.StreamSession;
+import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.binding.GetterConfigRepository;
 import fr.enimaloc.catapult.service.account.BotToggleService;
 import fr.enimaloc.catapult.service.binding.SchedulerService;
 import fr.enimaloc.catapult.service.emergency.MentionSender;
 import fr.enimaloc.catapult.service.emergency.SystemMention;
 import fr.enimaloc.catapult.service.emergency.SystemMentionEvent;
+import fr.enimaloc.catapult.service.stream.SessionTimelineService;
+import fr.enimaloc.catapult.service.stream.StreamSessionService;
 import fr.enimaloc.catapult.service.twitch.SystemTwitchAccountService;
 import fr.enimaloc.catapult.service.twitch.TwitchCategory;
 import fr.enimaloc.catapult.service.twitch.TwitchEventSubService;
@@ -23,11 +28,13 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProp
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * What the control panel makes happen on a channel, "as for real": every action enters through the door the real
@@ -49,6 +56,9 @@ public class SimulationActions {
     private final TwitchService twitch;
     private final ApplicationEventPublisher publisher;
     private final SystemTwitchAccountService systemAccount;
+    private final UserAccountRepository accounts;
+    private final StreamSessionService sessions;
+    private final SessionTimelineService timeline;
     /** {@code app.owner-id}: the Twitch id a chat message written "as the instance owner" carries. */
     private final String ownerId;
 
@@ -56,7 +66,8 @@ public class SimulationActions {
                              ObjectProvider<TwitchEventSubService> eventSub, SchedulerService scheduler,
                              GetterConfigRepository getterConfigs, BotToggleService botToggle, TwitchService twitch,
                              ApplicationEventPublisher publisher, SystemTwitchAccountService systemAccount,
-                             @Value("${app.owner-id:}") String ownerId) {
+                             UserAccountRepository accounts, StreamSessionService sessions,
+                             SessionTimelineService timeline, @Value("${app.owner-id:}") String ownerId) {
         this.registry = registry;
         this.journal = journal;
         this.eventSub = eventSub;
@@ -66,11 +77,16 @@ public class SimulationActions {
         this.twitch = twitch;
         this.publisher = publisher;
         this.systemAccount = systemAccount;
+        this.accounts = accounts;
+        this.sessions = sessions;
+        this.timeline = timeline;
         this.ownerId = ownerId;
     }
 
     /**
-     * The stream goes live or offline: a {@code stream.online} or {@code stream.offline} notification.
+     * The stream goes live or offline: a {@code stream.online} or {@code stream.offline} notification. Each live
+     * carries a stream id of its own ({@code sim-<uuid>}) and its start, so the real handling records its session
+     * and the timeline follows it.
      *
      * @throws IllegalStateException when that event is {@code REAL} for the account
      */
@@ -79,7 +95,10 @@ public class SimulationActions {
                 ? SimulatedCalls.TWITCH_EVENTSUB_STREAM_ONLINE : SimulatedCalls.TWITCH_EVENTSUB_STREAM_OFFLINE);
         registry.update(user.getId(), data -> data.withLive(live));
         if (live) {
-            ObjectNode event = broadcasterEvent(user).put("type", "live").put("started_at", Instant.now().toString());
+            ObjectNode event = broadcasterEvent(user)
+                    .put("id", "sim-" + UUID.randomUUID())
+                    .put("type", "live")
+                    .put("started_at", Instant.now().toString());
             inject(user, "stream.online", SimulatedCalls.TWITCH_EVENTSUB_STREAM_ONLINE, event, "live");
         } else {
             inject(user, "stream.offline", SimulatedCalls.TWITCH_EVENTSUB_STREAM_OFFLINE, broadcasterEvent(user),
@@ -137,20 +156,46 @@ public class SimulationActions {
     }
 
     /**
-     * The streamer raids {@code toLogin}: an outgoing {@code channel.raid} notification.
+     * The streamer raids {@code toLogin}: an outgoing {@code channel.raid} notification. The raided channel's id is
+     * the Twitch id of the Catapult account with that login (whatever its case), empty when none has it, as Twitch
+     * would give it.
      *
      * @throws IllegalStateException when {@code channel.raid} is {@code REAL} for the account
      */
     public void raidOut(UserAccount user, String toLogin) {
+        String toId = accounts.findFirstByTwitchUsernameIgnoreCase(toLogin)
+                .map(UserAccount::getTwitchId)
+                .orElse("");
         ObjectNode event = JsonNodeFactory.instance.objectNode()
                 .put("from_broadcaster_user_id", user.getTwitchId())
                 .put("from_broadcaster_user_login", InjectedEvents.login(user))
                 .put("from_broadcaster_user_name", InjectedEvents.login(user))
-                .put("to_broadcaster_user_id", "")
+                .put("to_broadcaster_user_id", toId)
                 .put("to_broadcaster_user_login", toLogin)
                 .put("to_broadcaster_user_name", toLogin)
                 .put("viewers", 0);
         inject(user, "channel.raid", SimulatedCalls.TWITCH_EVENTSUB_CHANNEL_RAID, event, "raid to " + toLogin);
+    }
+
+    /**
+     * Adds a closed period of {@code duration} just before the running period (after the last closed one when none
+     * runs), the earlier periods and the session start moved back as much ({@link SessionTimelineService#addPast}):
+     * a long session is built without waiting.
+     *
+     * @param gameName the detected game, {@code null} for none
+     * @throws IllegalStateException when the account has no session in progress
+     */
+    public void addPastSegment(UserAccount user, String categoryId, String categoryName, String gameName,
+                               Duration duration) {
+        if (sessions.find(user).filter(StreamSession::isOngoing).isEmpty()) {
+            throw new IllegalStateException("This account is not live: set it live before adding a past period");
+        }
+        timeline.addPast(user, categoryId, categoryName, gameName, duration);
+    }
+
+    /** The periods of the account's current (or last) session, oldest first. */
+    public List<StreamCategorySegment> sessionTimeline(UserAccount user) {
+        return timeline.currentSession(user);
     }
 
     /**

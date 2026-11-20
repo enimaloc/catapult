@@ -368,6 +368,20 @@ class MockAdminControllerTest {
     }
 
     @Test
+    void sendTwitchatEvent_raidedByMember_getsASampleRaiderAndSession() throws Exception {
+        when(mockApiService.dispatchTwitchatEvent(anyString(), anyMap())).thenReturn(1);
+
+        mvc.perform(post("/mock/admin/twitchat").with(csrf()).param("event", "RAIDED_BY_MEMBER"))
+                .andExpect(flash().attribute("twitchatResult", "1 payload(s) envoyé(s) à Twitchat."));
+
+        verify(mockApiService).dispatchTwitchatEvent("RAIDED_BY_MEMBER", Map.of(
+                "gameName", "", "previousGameName", "",
+                "raider", "MockRaider",
+                "games", "- Factorio (Factorio) (2h30)\n- Just Chatting (1h)\n- Games+Demos (MOLTYN) (1h45)",
+                "sessionDuration", "5h15"));
+    }
+
+    @Test
     void sendNotification_toTheCurrentAccount_orToEveryone() throws Exception {
         UUID me = UUID.randomUUID();
         when(mockApiService.currentUserId()).thenReturn(me);
