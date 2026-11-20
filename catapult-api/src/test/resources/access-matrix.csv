@@ -343,11 +343,13 @@ PUT,/api/internal/admin/social-links/order,,,401,PASS,403,403,403,PASS,401
 DELETE,/api/internal/admin/social-links/{id},id=1,,401,PASS,403,403,403,PASS,401
 PUT,/api/internal/admin/social-links/{id},id=1,"{""platform"":""DISCORD"",""url"":""https://matrix.example"",""visible"":true}",401,PASS,403,403,403,PASS,401
 GET,/api/internal/admin/battlenet-accounts,,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/battlenet-accounts/bgs-methods,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/battlenet-accounts,,,401,PASS,403,403,403,PASS,401
 DELETE,/api/internal/admin/battlenet-accounts/{id},,,401,PASS,403,403,403,PASS,401
 PATCH,/api/internal/admin/battlenet-accounts/{id},,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/battlenet-accounts/{id}/code,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/battlenet-accounts/{id}/reauth,,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/battlenet-accounts/{id}/bgs-call,,,401,PASS,403,403,403,PASS,401
 GET,/api/internal/admin/ankama-accounts,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/ankama-accounts/login,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/ankama-accounts/login/{loginId}/complete,,,401,PASS,403,403,403,PASS,401
