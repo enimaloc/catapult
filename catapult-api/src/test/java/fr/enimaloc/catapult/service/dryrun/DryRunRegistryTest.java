@@ -135,4 +135,19 @@ class DryRunRegistryTest {
         assertThat(failing.members()).isEmpty();
         assertThat(seen).hasSize(2);
     }
+
+    @Test
+    void theEndOfADryRunIsAnnouncedOutsideTheRegistryLock() {
+        // what listens re-applies the channel (Twitch, custom binding lock): never under the registry's monitor
+        List<Boolean> underLock = new java.util.ArrayList<>();
+        DryRunRegistry[] built = new DryRunRegistry[1];
+        built[0] = new DryRunRegistry(dryRuns, event -> underLock.add(Thread.holdsLock(built[0])));
+        when(dryRuns.findAll()).thenReturn(List.of(row(member), row(other))).thenReturn(List.of(row(member)));
+        built[0].load();
+
+        built[0].load();
+        built[0].deactivate(member);
+
+        assertThat(underLock).containsExactly(false, false);
+    }
 }

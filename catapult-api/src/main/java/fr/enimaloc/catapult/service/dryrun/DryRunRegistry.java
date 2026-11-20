@@ -24,7 +24,7 @@ import java.util.function.LongSupplier;
  * another instance (or the other site) changed. Until a first load succeeds, who is in dry run is unknown
  * ({@link #isLoaded}): the gate then holds every write, and the load is retried at most every {@value #RETRY_MS} ms.
  * Writers are serialized, load() reading the DB under the lock, so none of them can be lost or undone by another.
- * Each member leaving the set, either way, is announced once as a {@link DryRunEndedEvent}.
+ * Each member leaving the set, either way, is announced once as a {@link DryRunEndedEvent}, after the lock is released.
  */
 @Slf4j
 @Component
@@ -81,18 +81,24 @@ public class DryRunRegistry {
     }
 
     @EventListener(ApplicationReadyEvent.class)
-    public synchronized void load() {
-        Set<UUID> loaded = new HashSet<>();
-        for (MemberDryRun row : dryRuns.findAll()) {
-            loaded.add(row.getUserId());
+    public void load() {
+        Set<UUID> left;
+        int count;
+        synchronized (this) {
+            Set<UUID> loaded = new HashSet<>();
+            for (MemberDryRun row : dryRuns.findAll()) {
+                loaded.add(row.getUserId());
+            }
+            left = new HashSet<>(members);
+            left.removeAll(loaded);
+            members.retainAll(loaded);
+            members.addAll(loaded);
+            this.loaded = true;
+            count = loaded.size();
         }
-        Set<UUID> left = new HashSet<>(members);
-        left.removeAll(loaded);
-        members.retainAll(loaded);
-        members.addAll(loaded);
-        this.loaded = true;
+        // announced once the monitor is released: what listens re-applies the channel, and takes other locks
         left.forEach(this::announceEnd);
-        log.debug("Dry run active for {} member(s)", loaded.size());
+        log.debug("Dry run active for {} member(s)", count);
     }
 
     @Scheduled(fixedDelay = REFRESH_MS, initialDelay = REFRESH_MS)
@@ -105,8 +111,12 @@ public class DryRunRegistry {
     }
 
     /** Never throws: what listens to the end of a dry run is guarded. */
-    synchronized void deactivate(UUID userId) {
-        if (members.remove(userId)) {
+    void deactivate(UUID userId) {
+        boolean left;
+        synchronized (this) {
+            left = members.remove(userId);
+        }
+        if (left) {
             announceEnd(userId);
         }
     }

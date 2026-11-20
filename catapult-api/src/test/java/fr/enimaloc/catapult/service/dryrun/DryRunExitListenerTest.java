@@ -10,6 +10,7 @@ import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.ActivityLogService;
 import fr.enimaloc.catapult.service.binding.CustomBindingActivations;
+import fr.enimaloc.catapult.service.binding.CustomBindingUserLocks;
 import fr.enimaloc.catapult.service.binding.GameStateService;
 import fr.enimaloc.catapult.service.category.CategoryChain;
 import fr.enimaloc.catapult.service.category.CategoryRule;
@@ -48,8 +49,23 @@ class DryRunExitListenerTest {
     final CategoryChain categoryChain = mock(CategoryChain.class);
     final SiteRole siteRole = mock(SiteRole.class);
     final DryRunHeldDecisions held = new DryRunHeldDecisions();
+    /** Whether the custom binding lock of the member is held, by this thread. */
+    final java.util.concurrent.atomic.AtomicBoolean inLock = new java.util.concurrent.atomic.AtomicBoolean();
+    final CustomBindingUserLocks locks = new CustomBindingUserLocks() {
+        @Override
+        public <T> T call(UUID userId, java.util.function.Supplier<T> task) {
+            return super.call(userId, () -> {
+                inLock.set(userId.equals(member.getId()));
+                try {
+                    return task.get();
+                } finally {
+                    inLock.set(false);
+                }
+            });
+        }
+    };
     final DryRunExitListener listener = new DryRunExitListener(gameStateService, layouts, users, activations,
-            categoryChain, siteRole, held);
+            categoryChain, siteRole, held, locks);
     final UserAccount member = new UserAccount();
 
     @BeforeEach
@@ -191,5 +207,28 @@ class DryRunExitListenerTest {
 
         verify(twitch, times(2)).setActiveExtensions(eq(member), any());
         verify(gameStateService).forgetLastKnownGame(member.getId());
+    }
+
+    @Test
+    void theExitIsReevaluatedUnderTheCustomBindingLock() {
+        // read and applied under the lock: the scheduler cannot switch the custom binding in the middle
+        List<Boolean> seen = new java.util.ArrayList<>();
+        CustomBindingActivation active = activation(member);
+        when(activations.active(member)).thenAnswer(invocation -> {
+            seen.add(inLock.get());
+            return Optional.of(active);
+        });
+        when(gameStateService.getLastKnownGame(member)).thenAnswer(invocation -> {
+            seen.add(inLock.get());
+            return Optional.empty();
+        });
+        when(categoryChain.apply(any(), any())).thenAnswer(invocation -> {
+            seen.add(inLock.get());
+            return null;
+        });
+
+        listener.onDryRunEnded(new DryRunEndedEvent(member.getId()));
+
+        assertThat(seen).containsExactly(true, true, true);
     }
 }

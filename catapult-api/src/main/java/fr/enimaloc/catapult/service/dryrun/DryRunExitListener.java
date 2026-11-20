@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.CustomBindingActivation;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.binding.CustomBindingActivations;
+import fr.enimaloc.catapult.service.binding.CustomBindingUserLocks;
 import fr.enimaloc.catapult.service.binding.GameStateService;
 import fr.enimaloc.catapult.service.category.CategoryChain;
 import fr.enimaloc.catapult.service.category.CategoryOutcome;
@@ -44,12 +45,19 @@ public class DryRunExitListener {
     private final CategoryChain categoryChain;
     private final SiteRole siteRole;
     private final DryRunHeldDecisions heldDecisions;
+    private final CustomBindingUserLocks customBindingLocks;
 
     @EventListener
     public void onDryRunEnded(DryRunEndedEvent event) {
         UUID userId = event.userId();
         extensionLayouts.forget(userId);
         Optional<DryRunHeldDecisions.Held> held = heldDecisions.take(userId);
+        // what decides the custom binding (a manual choice, the scheduler) waits: the binding read stays the one
+        // in force until re-applied
+        customBindingLocks.run(userId, () -> leave(userId, held));
+    }
+
+    private void leave(UUID userId, Optional<DryRunHeldDecisions.Held> held) {
         Optional<UserAccount> user = Optional.empty();
         Optional<CustomBindingActivation> active = Optional.empty();
         try {
