@@ -523,7 +523,8 @@ public class TwitchEventSubService implements EventSubService {
         if (!event.path("from_broadcaster_user_id").asText().equals(user.getTwitchId())) return;
         ChannelState state = channelStates.get(user.getId());
         eventPublisher.publishEvent(new ChannelRaidedOutEvent(this, user, state == null ? null : state.categoryId(),
-            event.path("to_broadcaster_user_id").asText(""), messageInstant(messageTimestamp)));
+            event.path("from_broadcaster_user_name").asText(""), event.path("to_broadcaster_user_id").asText(""),
+            messageInstant(messageTimestamp)));
     }
 
     private static Instant messageInstant(String messageTimestamp) {

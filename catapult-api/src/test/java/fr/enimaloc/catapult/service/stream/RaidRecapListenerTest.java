@@ -23,6 +23,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -69,7 +70,7 @@ class RaidRecapListenerTest {
     }
 
     private ChannelRaidedOutEvent raid(String toBroadcasterId) {
-        return new ChannelRaidedOutEvent(this, raider, "509658", toBroadcasterId, RAID);
+        return new ChannelRaidedOutEvent(this, raider, "509658", "", toBroadcasterId, RAID);
     }
 
     private SessionRecap sentRecap() {
@@ -99,6 +100,16 @@ class RaidRecapListenerTest {
         listener.onRaid(raid("target-id"));
 
         assertThat(sentRecap().gamesText()).isEqualTo("- Factorio (Factorio) (45min)");
+    }
+
+    @Test
+    void theRaiderIsNamedAsTheRaidCarriesIt() {
+        when(timeline.currentSession(raider)).thenReturn(List.of(
+                segment("1", "Factorio", "Factorio", RAID.minus(Duration.ofMinutes(45)), null)));
+
+        listener.onRaid(new ChannelRaidedOutEvent(this, raider, "509658", "Raider_Display", "target-id", RAID));
+
+        verify(dispatcher).onRaidedByMember(eq(target), eq("Raider_Display"), any());
     }
 
     @Test
@@ -158,6 +169,6 @@ class RaidRecapListenerTest {
         when(accounts.findByTwitchId(anyString())).thenThrow(new IllegalStateException("db down"));
 
         assertThatNoException().isThrownBy(() -> listener.onRaid(raid("target-id")));
-        verify(dispatcher, org.mockito.Mockito.never()).onRaidedByMember(any(), any(), any());
+        verify(dispatcher, never()).onRaidedByMember(any(), any(), any());
     }
 }

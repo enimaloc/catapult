@@ -1,7 +1,6 @@
 package fr.enimaloc.catapult.service.notification;
 
 import fr.enimaloc.catapult.domain.account.UserAccount;
-import fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType;
 import fr.enimaloc.catapult.repository.twitchat.TwitchatWidgetSettingsRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -32,20 +31,5 @@ class TwitchatEventActionsBootstrapTest {
         bootstrap.run();
 
         verify(eventActionService).ensureInitialized(second);
-    }
-
-    @Test
-    void givesAccountsInitializedBeforeTheRaidEventItsDefault_evenAfterOneFails() {
-        UserAccount first = new UserAccount();
-        UserAccount second = new UserAccount();
-        when(widgetSettingsRepository.findUsersAwaitingEventActions()).thenReturn(List.of());
-        when(widgetSettingsRepository.findInitializedUsersWithoutEventActions(TwitchatNotificationEventType.RAIDED_BY_MEMBER))
-                .thenReturn(List.of(first, second));
-        doThrow(new IllegalStateException("boom")).when(eventActionService)
-                .ensurePayload(first, TwitchatNotificationEventType.RAIDED_BY_MEMBER);
-
-        bootstrap.run();
-
-        verify(eventActionService).ensurePayload(second, TwitchatNotificationEventType.RAIDED_BY_MEMBER);
     }
 }

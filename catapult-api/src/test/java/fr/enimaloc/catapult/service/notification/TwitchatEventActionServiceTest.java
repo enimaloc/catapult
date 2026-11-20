@@ -286,4 +286,18 @@ class TwitchatEventActionServiceTest {
 
         verify(repository, never()).save(any());
     }
+
+    /** Existing accounts got the raid payload once from V122: startup never brings a removed one back. */
+    @Test
+    void aDeletedRaidPayloadIsNotSeededAgain() {
+        settings.setEventActionsInitialized(true);
+        when(widgetSettingsRepository.findById(user.getId())).thenReturn(Optional.of(settings));
+        when(widgetSettingsRepository.findUsersAwaitingEventActions()).thenReturn(List.of(user));
+
+        new TwitchatEventActionsBootstrap(widgetSettingsRepository, service).run();
+        service.ensureInitialized(user);
+
+        verify(repository, never()).save(any());
+        verify(repository, never()).existsByUserAndEventType(any(), eq(RAIDED_BY_MEMBER));
+    }
 }

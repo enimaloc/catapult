@@ -1,7 +1,6 @@
 package fr.enimaloc.catapult.repository.twitchat;
 
 import fr.enimaloc.catapult.domain.account.UserAccount;
-import fr.enimaloc.catapult.domain.twitchat.TwitchatNotificationEventType;
 import fr.enimaloc.catapult.domain.twitchat.TwitchatWidgetSettings;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -26,10 +25,4 @@ public interface TwitchatWidgetSettingsRepository extends JpaRepository<Twitchat
 
     @Query("select s.user from TwitchatWidgetSettings s where s.enabled = true and s.eventActionsInitialized = false")
     List<UserAccount> findUsersAwaitingEventActions();
-
-    /** Accounts whose event actions were set up but hold no payload for {@code eventType}. */
-    @Query("""
-            select s.user from TwitchatWidgetSettings s where s.eventActionsInitialized = true
-            and not exists (select a.id from TwitchatEventAction a where a.user = s.user and a.eventType = :eventType)""")
-    List<UserAccount> findInitializedUsersWithoutEventActions(@Param("eventType") TwitchatNotificationEventType eventType);
 }

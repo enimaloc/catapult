@@ -9,6 +9,8 @@ import fr.enimaloc.catapult.site.SiteRole;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
@@ -30,7 +32,9 @@ public class RaidRecapListener {
     private final TwitchatEventDispatcher dispatcher;
     private final SiteRole siteRole;
 
+    /** After the other raid listeners (RaidRestoreGameService): the recap is only a courtesy. */
     @EventListener
+    @Order(Ordered.LOWEST_PRECEDENCE)
     public void onRaid(ChannelRaidedOutEvent event) {
         if (!siteRole.isActive()) {
             return;
@@ -49,7 +53,9 @@ public class RaidRecapListener {
             if (recap.lines().isEmpty()) {
                 return;
             }
-            dispatcher.onRaidedByMember(target.get(), raider.getTwitchUsername(), recap);
+            String raiderName = event.getFromBroadcasterName();
+            dispatcher.onRaidedByMember(target.get(),
+                    raiderName == null || raiderName.isBlank() ? raider.getTwitchUsername() : raiderName, recap);
         } catch (RuntimeException e) {
             log.warn("Could not send the session recap of user {} to the raided channel {}", raider.getId(),
                     event.getToBroadcasterId(), e);

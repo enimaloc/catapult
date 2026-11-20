@@ -350,13 +350,15 @@ class TwitchEventSubServiceTest {
             {
               "metadata": { "message_type": "notification", "subscription_type": "channel.raid",
                             "message_timestamp": "2026-11-20T21:00:00.123456789Z" },
-              "payload": { "event": { "from_broadcaster_user_id": "broadcaster-123", "to_broadcaster_user_id": "999" } }
+              "payload": { "event": { "from_broadcaster_user_id": "broadcaster-123",
+                                      "from_broadcaster_user_name": "Streamer_Display", "to_broadcaster_user_id": "999" } }
             }
             """, false);
 
         ArgumentCaptor<ChannelRaidedOutEvent> raid = ArgumentCaptor.forClass(ChannelRaidedOutEvent.class);
         verify(eventPublisher).publishEvent(raid.capture());
         assertThat(raid.getValue().getToBroadcasterId()).isEqualTo("999");
+        assertThat(raid.getValue().getFromBroadcasterName()).isEqualTo("Streamer_Display");
         assertThat(raid.getValue().getOccurredAt()).isEqualTo(java.time.Instant.parse("2026-11-20T21:00:00.123456789Z"));
     }
 
