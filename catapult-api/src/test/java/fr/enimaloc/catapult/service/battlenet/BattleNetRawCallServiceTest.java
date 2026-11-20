@@ -162,6 +162,24 @@ class BattleNetRawCallServiceTest {
     }
 
     @Test
+    void call_hashBeyond32Bits_is400() {
+        assertThatThrownBy(() -> service.call(bot, raw("0x1FFFFFFFF", 1, ""), "admin"))
+                .satisfies(e -> assertThat(statusOf(e)).isEqualTo(HttpStatus.BAD_REQUEST));
+        assertThatThrownBy(() -> service.call(bot, raw("-1", 1, ""), "admin"))
+                .satisfies(e -> assertThat(statusOf(e)).isEqualTo(HttpStatus.BAD_REQUEST));
+    }
+
+    @Test
+    void call_releasesTheCaptureOnce() {
+        PushCapture spy = org.mockito.Mockito.spy(capture);
+        when(sessions.captureOf(bot)).thenReturn(Optional.of(spy));
+
+        service.call(bot, known(PRESENCE, "Update", UPDATE_TEXT), "admin");
+
+        verify(spy, org.mockito.Mockito.times(1)).release();
+    }
+
+    @Test
     void call_invalidText_is400WithPosition() {
         assertThatThrownBy(() -> service.call(bot, known(PRESENCE, "Update", "updates { nope: 1 }"), "admin"))
                 .satisfies(e -> {

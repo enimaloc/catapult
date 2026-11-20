@@ -92,6 +92,7 @@ public class BattleNetRawCallService {
         if (!capture.arm(WINDOW)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "A call is already running on this bot");
         }
+        List<PushCapture.CapturedPush> pushes = null;
         try {
             Instant start = clock.instant();
             boolean expectReply = target.method() == null || !target.method().noResponse();
@@ -127,10 +128,14 @@ public class BattleNetRawCallService {
             }
             String replyText = target.method() == null || !expectReply ? null
                     : BgsCatalog.decode(target.method().output(), reply).orElse(null);
+            // released once, here: a second release could clear the capture another call armed meanwhile
+            pushes = capture.release();
             return new BgsCallResult(status, durationMs, replyText, HEX.formatHex(reply.toByteArray()),
-                    capture.release().stream().map(BattleNetRawCallService::push).toList(), error);
+                    pushes.stream().map(BattleNetRawCallService::push).toList(), error);
         } finally {
-            capture.release();
+            if (pushes == null) {
+                capture.release();
+            }
         }
     }
 
@@ -152,7 +157,8 @@ public class BattleNetRawCallService {
         }
         int hash;
         try {
-            hash = (int) Long.parseLong(strip(request.serviceHash()), 16);
+            // unsigned 32 bits: Integer.parseUnsignedInt refuses a sign and anything wider
+            hash = Integer.parseUnsignedInt(strip(request.serviceHash()), 16);
         } catch (NumberFormatException e) {
             throw badRequest("Invalid service hash: " + request.serviceHash());
         }
