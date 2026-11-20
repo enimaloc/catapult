@@ -92,8 +92,9 @@ public class WidgetObsController {
 
     /**
      * The widget's OBS and Twitchat exchanges, relayed to its owner's debug journal with the widget as their source:
-     * catapult-api's status (204 recorded, 409 the owner is not in debug mode, 404 no enabled widget), 404 for a token
-     * that isn't a UUID and 400 for a body that is no batch (neither relayed), 429 over the widget's allowance.
+     * catapult-api's status (204 recorded, 409 the owner is not in debug mode). Not relayed: 404 for a token that
+     * isn't a UUID or names no enabled widget, 429 over the widget's allowance, 502 while catapult-api cannot tell
+     * whether the widget exists, 400 for a body that is no batch.
      */
     @PostMapping("/widget/obs/{token}/debug/client-exchanges")
     @ResponseBody
@@ -102,15 +103,24 @@ public class WidgetObsController {
         if (uuid == null) {
             return ResponseEntity.notFound().build();
         }
-        if (debugLimiter.admit(uuid) == WidgetDebugLimiter.Admission.REFUSED) {
-            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).build();
+        switch (debugLimiter.admit(uuid)) {
+            case UNKNOWN -> {
+                return ResponseEntity.notFound().build();
+            }
+            case REFUSED -> {
+                return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).build();
+            }
+            case UNAVAILABLE -> {
+                return ResponseEntity.status(HttpStatus.BAD_GATEWAY).build();
+            }
+            case ADMITTED -> { }
         }
         Optional<ClientExchangeBatch> batch = ClientDebugBatches.read(request, "widget");
         if (batch.isEmpty()) {
             return ResponseEntity.badRequest().build();
         }
         int status = apiService.postWidgetClientDebugExchanges(uuid, batch.get()).status();
-        // Only a token catapult-api recognizes gets an allowance of its own
+        // A widget catapult-api no longer knows is checked again next time
         debugLimiter.relayed(uuid, status);
         return ResponseEntity.status(status).build();
     }
