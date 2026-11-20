@@ -82,6 +82,7 @@ import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatValidationError;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatSettingsResponse;
+import fr.enimaloc.catapult.common.dto.debug.ClientExchangeBatch;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetAccessResponse;
 
@@ -151,6 +152,18 @@ public interface ApiService {
      * (404 unknown), 502 when unreachable; the body only on a 200.
      */
     ApiClient.Result<TwitchatWidgetAccessResponse> widgetAccess(UUID token);
+    /**
+     * Records {@code batch}, the OBS and Twitchat exchanges seen by the page of {@code userId} (the logged-in member),
+     * in their debug journal: catapult-api's status (204 recorded, 409 not in debug mode, 400 no batch or over its
+     * limits), 401 without a member, 502 when unreachable.
+     */
+    ApiClient.Result<Void> postClientDebugExchanges(UUID userId, ClientExchangeBatch batch);
+    /**
+     * Records {@code batch}, the exchanges seen by the OBS widget {@code token} (anonymous), in its owner's debug
+     * journal: catapult-api's status (as {@link #postClientDebugExchanges}, and 404 for no enabled widget), 502 when
+     * unreachable.
+     */
+    ApiClient.Result<Void> postWidgetClientDebugExchanges(UUID token, ClientExchangeBatch batch);
     /** The channel's Twitchat widget settings (the owner's); null when refused or unreachable. */
     TwitchatSettingsResponse twitchatSettings(String username);
     /**

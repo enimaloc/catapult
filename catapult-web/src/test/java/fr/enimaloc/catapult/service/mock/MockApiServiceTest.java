@@ -1099,6 +1099,39 @@ class MockApiServiceTest {
         assertThat(service.memberDebug(seeded).active()).isTrue();
     }
 
+    private static final fr.enimaloc.catapult.common.dto.debug.ClientExchangeBatch DEBUG_BATCH =
+            new fr.enimaloc.catapult.common.dto.debug.ClientExchangeBatch("page", java.time.Instant.EPOCH, List.of());
+
+    @Test
+    void clientDebugExchanges_areTakenOnlyInDebug() {
+        UUID me = service.currentUserId();
+        assertThat(service.postClientDebugExchanges(me, DEBUG_BATCH).status()).isEqualTo(409);
+
+        service.enableMemberDebug(me, false, 0);
+        assertThat(service.postClientDebugExchanges(me, DEBUG_BATCH).status()).isEqualTo(204);
+        assertThat(service.postClientDebugExchanges(null, DEBUG_BATCH).status()).isEqualTo(401);
+    }
+
+    @Test
+    void widgetClientDebugExchanges_followTheOwnersDebugMode_andTheWidgetsToggle() {
+        UUID token = data.getWidgetToken();
+        UUID owner = data.getChannelDto().id();
+        service.saveObsSettings(username, true, "10.0.0.2", 4456, "pw");
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(new MockHttpServletRequest()));
+
+        assertThat(service.postWidgetClientDebugExchanges(token, DEBUG_BATCH).status()).isEqualTo(409);
+        assertThat(service.widgetObsConfig(token).debugCapture()).isFalse();
+
+        service.enableMemberDebug(owner, false, 0);
+        assertThat(service.postWidgetClientDebugExchanges(token, DEBUG_BATCH).status()).isEqualTo(204);
+        assertThat(service.widgetObsConfig(token))
+                .isEqualTo(new TwitchatWidgetConfig("10.0.0.2", 4456, "pw", "auto", true));
+
+        data.saveObsSettings(false, "10.0.0.2", 4456, null);
+        assertThat(service.postWidgetClientDebugExchanges(token, DEBUG_BATCH).status()).isEqualTo(404);
+        assertThat(service.postWidgetClientDebugExchanges(UUID.randomUUID(), DEBUG_BATCH).status()).isEqualTo(404);
+    }
+
     @Test
     void myDebug_isOffForAVisitor() {
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(new MockHttpServletRequest()));

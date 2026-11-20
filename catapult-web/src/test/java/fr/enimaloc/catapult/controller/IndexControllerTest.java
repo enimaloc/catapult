@@ -59,6 +59,7 @@ class IndexControllerTest {
     @Autowired org.springframework.context.MessageSource messages;
     @MockitoBean ApiService apiService;
     @MockitoBean NavEventStreamController navEvents;
+    @MockitoBean fr.enimaloc.catapult.service.debug.DebugMembers debugMembers;
 
     /**
      * The channel template now dereferences {@code channelPage} on the model, so every
@@ -398,6 +399,29 @@ class IndexControllerTest {
 
         String visitor = mvc.perform(get("/")).andReturn().getResponse().getContentAsString();
         assertThat(barEnd(visitor)).doesNotContain("nav-logout");
+    }
+
+    /** debug-capture.js records the page's OBS and Twitchat exchanges only for a member in debug mode, on their own page. */
+    @Test
+    void indexCarriesTheDebugCaptureFlagOnlyInDebug() throws Exception {
+        org.springframework.mock.web.MockHttpSession session = new org.springframework.mock.web.MockHttpSession();
+        session.setAttribute(ApiClient.SESSION_JWT_KEY, "jwt");
+
+        when(debugMembers.isCurrentActive()).thenReturn(false);
+        assertThat(mvc.perform(get("/").session(session)).andReturn().getResponse().getContentAsString())
+                .doesNotContain("data-debug-capture");
+
+        when(debugMembers.isCurrentActive()).thenReturn(true);
+        assertThat(mvc.perform(get("/").session(session)).andReturn().getResponse().getContentAsString())
+                .containsPattern("<body [^>]*data-debug-capture=\"true\"")
+                // Before obs.js, whose hooks it backs.
+                .containsPattern("(?s)src=\"/js/debug-capture-[0-9a-f]{32}\\.js\".*src=\"/js/obs-[0-9a-f]{32}\\.js\"");
+        // A visitor, or an admin looking at a member's page, is never captured
+        assertThat(mvc.perform(get("/")).andReturn().getResponse().getContentAsString())
+                .doesNotContain("data-debug-capture");
+        session.setAttribute(ImpersonationController.ORIGINAL_JWT_KEY, "admin");
+        assertThat(mvc.perform(get("/").session(session)).andReturn().getResponse().getContentAsString())
+                .doesNotContain("data-debug-capture");
     }
 
     @Test

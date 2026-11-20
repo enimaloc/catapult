@@ -18,6 +18,11 @@ public class ExternalServices {
 
     /** The service name ({@code twitch}, {@code steam}, ...), or the host itself when it is not a known one. */
     public String of(URI uri) {
+        // The browser's own sessions, recorded with a synthetic URL named after them
+        String scheme = uri == null || uri.getScheme() == null ? null : uri.getScheme().toLowerCase(Locale.ROOT);
+        if ("obs".equals(scheme) || "twitchat".equals(scheme)) {
+            return scheme;
+        }
         String host = uri == null || uri.getHost() == null ? null : uri.getHost().toLowerCase(Locale.ROOT);
         if (host == null) {
             return "unknown";

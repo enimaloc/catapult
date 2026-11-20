@@ -91,9 +91,10 @@ describe("config URL", () => {
         expect(fetch).toHaveBeenLastCalledWith("/widget/obs/t-1/config", { cache: "no-store" });
         expect(connects).toEqual([CONNECTION]);
 
-        // Configured: no more polling.
+        // Configured: read again every minute, only to follow the debug mode.
         await vi.advanceTimersByTimeAsync(120000);
-        expect(fetch).toHaveBeenCalledTimes(3);
+        expect(fetch).toHaveBeenCalledTimes(5);
+        expect(connects).toEqual([CONNECTION]);
     });
 
     it("on an app page, never asks /me/obs again on its own", async () => {
@@ -193,5 +194,108 @@ describe("refresh", () => {
         await vi.advanceTimersByTimeAsync(60000);
         expect(CatapultObs.close).toHaveBeenCalled();
         expect(connects).toHaveLength(1);
+    });
+});
+
+describe("debug capture", () => {
+    const PAGE = { url: "/me/debug/client-exchanges", source: "page" };
+    const WIDGET = { url: "/widget/obs/t-1/debug/client-exchanges", source: "widget" };
+
+    beforeEach(() => {
+        window.CatapultDebugCapture = { enable: vi.fn(), disable: vi.fn() };
+    });
+
+    afterEach(() => {
+        delete window.CatapultDebugCapture;
+        delete document.body.dataset.obsConfigUrl;
+    });
+
+    it("follows the debugCapture of /me/obs, and leaves the page's own flag without a config", async () => {
+        await start(response(200, { ...CONFIG, debugCapture: true }));
+        expect(CatapultDebugCapture.enable).toHaveBeenCalledWith(PAGE);
+
+        fetch.mockResolvedValue(response(200, CONFIG));
+        await CatapultObsSession.refresh();
+        expect(CatapultDebugCapture.disable).toHaveBeenCalledTimes(1);
+
+        fetch.mockResolvedValue(response(204));
+        await CatapultObsSession.refresh();
+        expect(CatapultDebugCapture.enable).toHaveBeenCalledTimes(1);
+        expect(CatapultDebugCapture.disable).toHaveBeenCalledTimes(1);
+    });
+
+    it("on the widget page, follows its config's debugCapture within the minute, without reconnecting", async () => {
+        document.body.dataset.obsConfigUrl = "/widget/obs/t-1/config";
+        await start(response(200, CONFIG));
+        expect(CatapultDebugCapture.disable).toHaveBeenCalledTimes(1);
+        expect(CatapultDebugCapture.enable).not.toHaveBeenCalled();
+        CatapultObs.close.mockClear();
+
+        fetch.mockResolvedValue(response(200, { ...CONFIG, debugCapture: true }));
+        await vi.advanceTimersByTimeAsync(60000);
+        expect(CatapultDebugCapture.enable).toHaveBeenCalledWith(WIDGET);
+        expect(connects).toHaveLength(1);
+        expect(CatapultObs.close).not.toHaveBeenCalled();
+    });
+
+    it("on the widget page, keeps retrying OBS through a config read again unchanged", async () => {
+        document.body.dataset.obsConfigUrl = "/widget/obs/t-1/config";
+        await start(response(200, CONFIG), async () => { throw closedWith(1006); });
+        await vi.advanceTimersByTimeAsync(1000 + 2000 + 4000 + 8000 + 16000);
+        expect(connects).toHaveLength(6);
+        // The minute's reload doesn't start the retries over from 1s.
+        await vi.advanceTimersByTimeAsync(29000);
+        expect(connects).toHaveLength(6);
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(connects).toHaveLength(7);
+    });
+
+    it("aFailedConfigReadKeepsTheConnection", async () => {
+        document.body.dataset.obsConfigUrl = "/widget/obs/t-1/config";
+        await start(response(200, { ...CONFIG, debugCapture: true }));
+        CatapultObs.close.mockClear();
+        CatapultDebugCapture.disable.mockClear();
+
+        // catapult-api down: a network error, then catapult-web's 204, then a 502.
+        fetch.mockImplementationOnce(async () => { throw new TypeError("Failed to fetch"); })
+            .mockImplementationOnce(async () => response(204))
+            .mockImplementationOnce(async () => response(502));
+        await vi.advanceTimersByTimeAsync(180000);
+        expect(fetch).toHaveBeenCalledTimes(4);
+        expect(CatapultObs.close).not.toHaveBeenCalled();
+        expect(CatapultDebugCapture.disable).not.toHaveBeenCalled();
+        expect(connects).toHaveLength(1);
+        expect(CatapultObs.isConnected()).toBe(true);
+
+        // Back: read every minute still.
+        fetch.mockResolvedValue(response(200, CONFIG));
+        await vi.advanceTimersByTimeAsync(60000);
+        expect(fetch).toHaveBeenCalledTimes(5);
+        expect(CatapultDebugCapture.disable).toHaveBeenCalledTimes(1);
+    });
+
+    it("on the widget page, keeps reading its config when applying one throws", async () => {
+        document.body.dataset.obsConfigUrl = "/widget/obs/t-1/config";
+        window.CatapultTwitchat = { configure: vi.fn(() => { throw new TypeError("unknown branch"); }) };
+        try {
+            await start(response(200, { ...CONFIG, debugCapture: true }));
+            expect(connects).toHaveLength(1);
+            expect(CatapultDebugCapture.enable).toHaveBeenCalledWith(WIDGET);
+            await vi.advanceTimersByTimeAsync(60000);
+            await vi.advanceTimersByTimeAsync(60000);
+            expect(fetch).toHaveBeenCalledTimes(3);
+            expect(CatapultTwitchat.configure).toHaveBeenCalledTimes(3);
+            expect(CatapultDebugCapture.enable).toHaveBeenCalledTimes(3);
+        } finally {
+            delete window.CatapultTwitchat;
+        }
+    });
+
+    it("on the widget page, reconnects to a config changed meanwhile", async () => {
+        document.body.dataset.obsConfigUrl = "/widget/obs/t-1/config";
+        await start(response(200, CONFIG));
+        fetch.mockResolvedValue(response(200, { ...CONFIG, obsPort: 4457 }));
+        await vi.advanceTimersByTimeAsync(60000);
+        expect(connects.at(-1)).toEqual({ ...CONNECTION, port: 4457 });
     });
 });

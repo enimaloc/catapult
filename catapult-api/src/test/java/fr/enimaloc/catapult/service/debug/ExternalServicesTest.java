@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.debug;
 
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
@@ -25,5 +26,12 @@ class ExternalServicesTest {
     })
     void namedAfterTheHost(String url, String service) {
         assertThat(services.of(URI.create(url))).isEqualTo(service);
+    }
+
+    /** The browser's OBS and Twitchat exchanges carry these names, the ones the admin's service filter lists. */
+    @Test
+    void adminServicesListIncludesObsAndTwitchat() {
+        assertThat(services.of(URI.create("obs://local"))).isEqualTo("obs");
+        assertThat(services.of(URI.create("twitchat://obs"))).isEqualTo("twitchat");
     }
 }

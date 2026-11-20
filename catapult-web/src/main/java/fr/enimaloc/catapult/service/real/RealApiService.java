@@ -121,6 +121,7 @@ import fr.enimaloc.catapult.common.dto.connect.LinkStateResponse;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatEventActionDto;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatValidationError;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatSettingsResponse;
+import fr.enimaloc.catapult.common.dto.debug.ClientExchangeBatch;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetConfig;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatWidgetAccessResponse;
 import fr.enimaloc.catapult.common.dto.channel.ConfigResponse;
@@ -450,12 +451,24 @@ public class RealApiService implements ApiService {
         ConfigResponse config = result.status() == 200 ? result.body() : null;
         // The owner's Twitchat branch; "auto" (detected by the widget) when catapult-api tells none.
         return config == null ? null : new TwitchatWidgetConfig(config.obsHost(), config.obsPort(), config.obsPassword(),
-                config.twitchatBranch() == null ? TwitchatData.AUTO : config.twitchatBranch());
+                config.twitchatBranch() == null ? TwitchatData.AUTO : config.twitchatBranch(), config.debugCapture());
     }
 
     @Override
     public ApiClient.Result<TwitchatWidgetAccessResponse> widgetAccess(UUID token) {
         return client.getAnonymous("/api/twitchat/widget/{token}/access", TwitchatWidgetAccessResponse.class, token);
+    }
+
+    @Override
+    public ApiClient.Result<Void> postClientDebugExchanges(UUID userId, ClientExchangeBatch batch) {
+        if (userId == null) return new ApiClient.Result<>(HttpStatus.UNAUTHORIZED.value(), null);
+        return client.call(HttpMethod.POST, "/api/internal/users/{userId}/debug/client-exchanges", batch, Void.class, userId);
+    }
+
+    @Override
+    public ApiClient.Result<Void> postWidgetClientDebugExchanges(UUID token, ClientExchangeBatch batch) {
+        // The widget's token names its owner: no session's bearer, as for the widget's other routes
+        return client.postAnonymous("/api/internal/twitchat-widgets/{token}/debug/client-exchanges", batch, token);
     }
 
     @Override

@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.time.Instant;
+import java.util.Set;
 import java.util.UUID;
 
 /** One HTTP exchange (incoming or outgoing) recorded for a member in debug mode. */
@@ -15,6 +16,12 @@ import java.util.UUID;
 public class DebugExchange {
 
     public enum Direction { IN, OUT }
+
+    /**
+     * The methods of the exchanges a member's browser recorded (OBS, Twitchat): their statuses are not HTTP ones (an
+     * obs-websocket request status, 100 for a success, or none), and the browser sends an error for every failure.
+     */
+    public static final Set<String> CLIENT_METHODS = Set.of("OBS", "TWITCHAT");
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -79,10 +86,14 @@ public class DebugExchange {
     /**
      * An outgoing call failed when it got no status (no answer), a status from 400 on, or an error; an incoming
      * message (an EventSub one, a sign-in callback) has no status of its own and failed only when it has an error.
+     * What the browser recorded ({@link #CLIENT_METHODS}) failed only when it has an error.
      */
     public boolean isError() {
         if (error != null) {
             return true;
+        }
+        if (CLIENT_METHODS.contains(method)) {
+            return false;
         }
         if (status == null) {
             return direction != Direction.IN;

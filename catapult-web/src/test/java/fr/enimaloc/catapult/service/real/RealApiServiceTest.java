@@ -467,6 +467,47 @@ class RealApiServiceTest {
     }
 
     @Test
+    void widgetObsConfig_carriesTheOwnersDebugCapture() {
+        UUID token = UUID.fromString("11111111-2222-3333-4444-555555555555");
+        respond(HttpMethod.GET, "/api/twitchat/widget/" + token,
+                "{\"obsHost\":\"10.0.0.2\",\"obsPort\":4456,\"obsPassword\":\"pw\",\"debugCapture\":true}");
+
+        assertThat(service.widgetObsConfig(token)).isEqualTo(new TwitchatWidgetConfig("10.0.0.2", 4456, "pw", "auto", true));
+    }
+
+    private static final fr.enimaloc.catapult.common.dto.debug.ClientExchangeBatch DEBUG_BATCH =
+            new fr.enimaloc.catapult.common.dto.debug.ClientExchangeBatch("page", java.time.Instant.parse("2026-11-20T12:00:00Z"),
+                    List.of(new fr.enimaloc.catapult.common.dto.debug.ClientExchangeEntry("obs", "IN", "CurrentProgramSceneChanged",
+                            java.time.Instant.parse("2026-11-20T11:59:59Z"), null, null, java.util.Map.of("sceneName", "Game"), null, null)));
+
+    @Test
+    void postClientDebugExchanges_relaysTheBatchForTheMember_andTheirStatus() {
+        expect(HttpMethod.POST, OWN + "/debug/client-exchanges")
+                .andExpect(org.springframework.test.web.client.match.MockRestRequestMatchers.header("Authorization", "Bearer " + jwtFor(ME)))
+                .andExpect(content().json("{\"source\":\"page\",\"sentAt\":\"2026-11-20T12:00:00Z\",\"entries\":[{\"service\":\"obs\","
+                        + "\"direction\":\"IN\",\"operation\":\"CurrentProgramSceneChanged\",\"request\":{\"sceneName\":\"Game\"}}]}"))
+                .andRespond(withStatus(org.springframework.http.HttpStatus.CONFLICT));
+
+        assertThat(service.postClientDebugExchanges(ME, DEBUG_BATCH).status()).isEqualTo(409);
+    }
+
+    @Test
+    void postClientDebugExchanges_withoutAMemberDoesNotCall() {
+        assertThat(service.postClientDebugExchanges(null, DEBUG_BATCH).status()).isEqualTo(401);
+    }
+
+    @Test
+    void postWidgetClientDebugExchanges_relaysAnonymouslyByTheWidgetsToken() {
+        UUID token = UUID.fromString("11111111-2222-3333-4444-555555555555");
+        expect(HttpMethod.POST, "/api/internal/twitchat-widgets/" + token + "/debug/client-exchanges")
+                .andExpect(org.springframework.test.web.client.match.MockRestRequestMatchers.headerDoesNotExist("Authorization"))
+                .andExpect(content().json("{\"source\":\"page\",\"entries\":[{\"operation\":\"CurrentProgramSceneChanged\"}]}"))
+                .andRespond(withNoContent());
+
+        assertThat(service.postWidgetClientDebugExchanges(token, DEBUG_BATCH).status()).isEqualTo(204);
+    }
+
+    @Test
     void help_forwardsTheLocale() {
         expect(HttpMethod.GET, "/api/internal/help-cards/status")
                 .andExpect(org.springframework.test.web.client.match.MockRestRequestMatchers.header("Accept-Language", "fr-FR"))

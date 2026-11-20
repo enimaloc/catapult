@@ -148,7 +148,8 @@ class CommonDtoContractTest {
         ApiTwitchatWidgetController controller = new ApiTwitchatWidgetController(
                 new fr.enimaloc.catapult.service.notification.TwitchatWidgetAccess(settingsRepository, tokens,
                         mock(TokenEncryptionService.class),
-                        mock(fr.enimaloc.catapult.service.notification.NotificationDeliveryDispatcher.class)),
+                        mock(fr.enimaloc.catapult.service.notification.NotificationDeliveryDispatcher.class),
+                        mock(fr.enimaloc.catapult.service.debug.DebugMemberRegistry.class)),
                 mock(TwitchatActionExecutor.class));
 
         ConfigResponse produced = controller.config(token).getBody();

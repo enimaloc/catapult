@@ -35,16 +35,25 @@ class DebugExchangeSpecsTest {
         save("in-message", Direction.IN, null, null);
         save("in-failed", Direction.IN, null, "invalid callback");
         save("in-with-status", Direction.IN, 500, null);
+        save("obs-ok", "OBS", Direction.OUT, 100, null);
+        save("obs-identify", "OBS", Direction.OUT, null, null);
+        save("obs-failed", "OBS", Direction.OUT, 600, "No source was found.");
+        save("twitchat-sent", "TWITCHAT", Direction.OUT, null, null);
+        save("twitchat-timeout", "TWITCHAT", Direction.OUT, null, "timeout");
     }
 
     private void save(String operation, Direction direction, Integer status, String error) {
+        save(operation, direction == Direction.IN ? "WS" : "GET", direction, status, error);
+    }
+
+    private void save(String operation, String method, Direction direction, Integer status, String error) {
         DebugExchange e = new DebugExchange();
         e.setUserId(member);
         e.setOccurredAt(Instant.now());
         e.setDirection(direction);
         e.setService("twitch");
         e.setOperation(operation);
-        e.setMethod(direction == Direction.IN ? "WS" : "GET");
+        e.setMethod(method);
         e.setUrl("wss://eventsub.wss.twitch.tv/ws");
         e.setStatus(status);
         e.setError(error);
@@ -58,10 +67,11 @@ class DebugExchangeSpecsTest {
 
     @Test
     void anIncomingMessageWithoutStatus_isASuccess_unlessItHasAnError() {
-        assertThat(operations(true))
-                .containsExactlyInAnyOrder("out-4xx", "out-no-answer", "out-no-status", "in-failed", "in-with-status");
-        assertThat(operations(false)).containsExactlyInAnyOrder("out-ok", "in-message");
-        assertThat(operations(null)).hasSize(7);
+        assertThat(operations(true)).containsExactlyInAnyOrder("out-4xx", "out-no-answer", "out-no-status", "in-failed",
+                "in-with-status", "obs-failed", "twitchat-timeout");
+        assertThat(operations(false)).containsExactlyInAnyOrder("out-ok", "in-message", "obs-ok", "obs-identify",
+                "twitchat-sent");
+        assertThat(operations(null)).hasSize(12);
     }
 
     @Test

@@ -23,8 +23,8 @@ public final class DebugExchangeSpecs {
 
     /**
      * @param outcome null (any), {@code true} for the exchanges {@link DebugExchange#isError()} calls
-     *                errors (error set, an outgoing call without a status, or status >= 400), {@code false}
-     *                for the others
+     *                errors (error set, or, but for what the browser recorded, an outgoing call without a
+     *                status or a status >= 400), {@code false} for the others
      */
     public static Specification<DebugExchange> matching(UUID userId, String service, DebugExchange.Direction direction,
                                                         Boolean outcome, Instant from, Instant to) {
@@ -45,11 +45,14 @@ public final class DebugExchangeSpecs {
             }
             if (outcome != null) {
                 // Every disjunct is true or false, never SQL NULL, so that not(error) keeps the successes.
+                // The method is never null (a NOT NULL column).
                 Predicate error = cb.or(cb.isNotNull(root.get("error")),
-                        cb.and(cb.isNull(root.get("status")),
-                                cb.notEqual(root.get("direction"), DebugExchange.Direction.IN)),
-                        cb.and(cb.isNotNull(root.get("status")),
-                                cb.greaterThanOrEqualTo(root.<Integer>get("status"), FIRST_ERROR_STATUS)));
+                        cb.and(cb.not(root.get("method").in(DebugExchange.CLIENT_METHODS)),
+                                cb.or(cb.and(cb.isNull(root.get("status")),
+                                                cb.notEqual(root.get("direction"), DebugExchange.Direction.IN)),
+                                        cb.and(cb.isNotNull(root.get("status")),
+                                                cb.greaterThanOrEqualTo(root.<Integer>get("status"),
+                                                        FIRST_ERROR_STATUS)))));
                 all.add(outcome ? error : cb.not(error));
             }
             return cb.and(all.toArray(Predicate[]::new));
