@@ -103,6 +103,40 @@ class ClientDebugControllerTest {
     }
 
     @Test
+    void aMalformedEntryIsSkipped_theRestRelayed() throws Exception {
+        when(apiService.currentUserId()).thenReturn(ME);
+        when(apiService.postClientDebugExchanges(eq(ME), any())).thenReturn(new ApiClient.Result<>(204, null));
+        String batch = """
+                {"source":"page","sentAt":"not a time","entries":[
+                  {"service":"obs","direction":"IN","operation":"NotAnObject","request":"x"},
+                  {"service":"obs","direction":"IN","operation":"BadTime","at":"yesterday"},
+                  {"service":"obs","direction":"OUT","operation":"HugeStatus","status":99999999999},
+                  42, null,
+                  {"service":"obs","direction":"IN","operation":"Kept","response":{"n":1}}]}""";
+
+        mvc.perform(post("/me/debug/client-exchanges").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(batch))
+                .andExpect(status().isNoContent());
+
+        ArgumentCaptor<ClientExchangeBatch> relayed = ArgumentCaptor.forClass(ClientExchangeBatch.class);
+        verify(apiService).postClientDebugExchanges(eq(ME), relayed.capture());
+        assertThat(relayed.getValue().sentAt()).isNull();
+        assertThat(relayed.getValue().entries()).extracting(e -> e.operation()).containsExactly("Kept");
+    }
+
+    @Test
+    void aBodyWhoseEntriesAreNoListIsRefusedUnrelayed() throws Exception {
+        when(apiService.currentUserId()).thenReturn(ME);
+
+        mvc.perform(post("/me/debug/client-exchanges").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"entries\":{}}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/me/debug/client-exchanges").with(csrf()).contentType(MediaType.APPLICATION_JSON).content("[]"))
+                .andExpect(status().isBadRequest());
+
+        verify(apiService, never()).postClientDebugExchanges(any(), any());
+    }
+
+    @Test
     void aBodyOverTheLimitIsRefusedUnrelayed() throws Exception {
         when(apiService.currentUserId()).thenReturn(ME);
         byte[] big = new byte[ClientDebugBatches.MAX_BYTES + 1];
