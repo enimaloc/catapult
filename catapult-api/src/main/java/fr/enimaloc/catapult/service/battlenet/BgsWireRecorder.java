@@ -20,7 +20,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import tools.jackson.databind.node.ObjectNode;
 
-import java.lang.reflect.Modifier;
+import java.lang.reflect.AccessFlag;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
@@ -95,7 +95,7 @@ public final class BgsWireRecorder implements WireTap {
     /** The hashes of the recorded services among the methods {@link BgsServices} declares. */
     private static Set<Integer> recordedHashes() {
         return Arrays.stream(BgsServices.class.getFields())
-                .filter(field -> Modifier.isStatic(field.getModifiers())
+                .filter(field -> field.accessFlags().contains(AccessFlag.STATIC)
                         && ServiceMethod.class.isAssignableFrom(field.getType()))
                 .map(field -> {
                     try {
