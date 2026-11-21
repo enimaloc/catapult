@@ -72,10 +72,18 @@ public class BattleNetSessionManager implements SmartLifecycle {
      * The last presence a bot received about a friend, kept to explain an empty detection.
      *
      * @param fourcc           the game it named, or null when it named none
+     * @param activity         the activity text it carried, or null when it carried none
      * @param at               when it was received
      * @param serviceAccountId the bot that received it
      */
-    public record PresenceSeen(String fourcc, Instant at, UUID serviceAccountId) {
+    public record PresenceSeen(String fourcc, String activity, Instant at, UUID serviceAccountId) {
+    }
+
+    /**
+     * The game a friend plays: its fourcc and the last non-empty activity text received while it is played
+     * (null until one arrives). An activity that disappears (loading screen, character select) is kept.
+     */
+    public record PlayedGame(String fourcc, String activity) {
     }
 
     /** {@link #sessionState} of an account that has no session. */
@@ -106,8 +114,8 @@ public class BattleNetSessionManager implements SmartLifecycle {
 
     private final Object lock = new Object();
     private final Map<UUID, Session> sessions = new ConcurrentHashMap<>();
-    /** Game fourcc by BGS account id, for the friends of every open session. */
-    private final Map<Long, String> games = new ConcurrentHashMap<>();
+    /** Game played by BGS account id, for the friends of every open session. */
+    private final Map<Long, PlayedGame> games = new ConcurrentHashMap<>();
     /** The last presence received by BGS account id, for every friend of every open session. */
     private final Map<Long, PresenceSeen> lastPresences = new ConcurrentHashMap<>();
     private volatile boolean running;
@@ -256,8 +264,8 @@ public class BattleNetSessionManager implements SmartLifecycle {
         return sessions.values().stream().filter(s -> s.connection.state() == BgsConnection.State.READY).count();
     }
 
-    /** The fourcc of the game the BGS account plays, as reported to the bot it is friends with. */
-    public Optional<String> currentGame(long bnetAccountId) {
+    /** The game the BGS account plays, as reported to the bot it is friends with. */
+    public Optional<PlayedGame> currentGame(long bnetAccountId) {
         return Optional.ofNullable(games.get(bnetAccountId));
     }
 
@@ -426,11 +434,14 @@ public class BattleNetSessionManager implements SmartLifecycle {
                         event::toString, () -> "bgs.presence");
             }
             watched.add(event.accountId());
-            lastPresences.put(event.accountId(), new PresenceSeen(event.game(), Instant.now(), accountId));
+            lastPresences.put(event.accountId(), new PresenceSeen(event.game(), event.activity(), Instant.now(),
+                    accountId));
             if (event.game() == null) {
                 games.remove(event.accountId());
             } else {
-                games.put(event.accountId(), event.game());
+                games.compute(event.accountId(), (id, before) -> event.activity() == null && before != null
+                        && before.fourcc().equals(event.game())
+                        ? before : new PlayedGame(event.game(), event.activity()));
             }
         }
 

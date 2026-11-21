@@ -32,7 +32,7 @@ public class SimulatedBattleNetGameGetter extends BattleNetGameGetter {
 
     public SimulatedBattleNetGameGetter(@Qualifier("battleNetGameGetter") ObjectProvider<BattleNetGameGetter> real,
                                         SimulatedCallRunner runner, SimulationRegistry registry) {
-        super(null, null, null, null);
+        super(null, null, null, null, null);
         this.real = real;
         this.runner = runner;
         this.registry = registry;

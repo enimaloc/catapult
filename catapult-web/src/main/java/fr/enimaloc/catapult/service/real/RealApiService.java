@@ -69,6 +69,8 @@ import fr.enimaloc.catapult.common.dto.admin.DtddGameCacheEntryDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddRefetchJobDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddSearchCacheEntryDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddTopicsCacheEntryDto;
+import fr.enimaloc.catapult.common.dto.admin.BattleNetGameVariantDto;
+import fr.enimaloc.catapult.common.dto.admin.BattleNetGameVariantRequest;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingDto;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingRequest;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingResult;
@@ -188,6 +190,8 @@ public class RealApiService implements ApiService {
     private static final ParameterizedTypeReference<List<IgdbGameOption>> IGDB_GAMES = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<DtddProposalDto>> DTDD_PROPOSALS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<TwDefinitionDto>> TWS = new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<List<BattleNetGameVariantDto>> BATTLENET_GAME_VARIANTS =
+            new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<fr.enimaloc.catapult.common.dto.chatcommand.EnabledChatCommandDto>> ENABLED_COMMANDS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<GroupSummaryDto>> GROUPS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<fr.enimaloc.catapult.common.dto.emergency.EmergencyStopDto>> EMERGENCY_STOPS = new ParameterizedTypeReference<>() {};
@@ -1136,6 +1140,31 @@ public class RealApiService implements ApiService {
     public ApiClient.Result<GameMappingResult> adminDeleteGameMapping(UUID id, boolean applyLive) {
         return client.call(HttpMethod.DELETE, "/api/internal/admin/game-mappings/{id}?applyLive={applyLive}", null,
                 GameMappingResult.class, id, applyLive);
+    }
+
+    @Override
+    public List<BattleNetGameVariantDto> adminBattleNetGameVariants() {
+        return client.get("/api/internal/admin/battlenet-game-variants", BATTLENET_GAME_VARIANTS);
+    }
+
+    @Override
+    public ApiClient.Result<BattleNetGameVariantDto> adminCreateBattleNetGameVariant(
+            BattleNetGameVariantRequest request) {
+        return client.call(HttpMethod.POST, "/api/internal/admin/battlenet-game-variants", request,
+                BattleNetGameVariantDto.class);
+    }
+
+    @Override
+    public ApiClient.Result<BattleNetGameVariantDto> adminUpdateBattleNetGameVariant(
+            UUID id, BattleNetGameVariantRequest request) {
+        return client.call(HttpMethod.PUT, "/api/internal/admin/battlenet-game-variants/{id}", request,
+                BattleNetGameVariantDto.class, id);
+    }
+
+    @Override
+    public ApiClient.Result<Void> adminDeleteBattleNetGameVariant(UUID id) {
+        return client.call(HttpMethod.DELETE, "/api/internal/admin/battlenet-game-variants/{id}", null, Void.class,
+                id);
     }
 
     @Override

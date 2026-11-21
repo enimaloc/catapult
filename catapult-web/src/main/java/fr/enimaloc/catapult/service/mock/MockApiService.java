@@ -5,6 +5,8 @@ import fr.enimaloc.catapult.common.dto.DegradedStatusDto;
 import fr.enimaloc.catapult.common.dto.InvitePageData;
 import fr.enimaloc.catapult.common.dto.UserInfoResponse;
 import fr.enimaloc.catapult.common.dto.TokenResponse;
+import fr.enimaloc.catapult.common.dto.admin.BattleNetGameVariantDto;
+import fr.enimaloc.catapult.common.dto.admin.BattleNetGameVariantRequest;
 import fr.enimaloc.catapult.common.dto.admin.BgsCallRequest;
 import fr.enimaloc.catapult.common.dto.admin.BgsCallResult;
 import fr.enimaloc.catapult.common.dto.admin.BgsMethodDto;
@@ -195,6 +197,7 @@ public class MockApiService implements ApiService {
     private final MockDtddProposalsStore dtddProposals = new MockDtddProposalsStore();
     /** Application-wide: the game mappings an admin edits are the same for every mock session. */
     private final MockGameMappingsStore gameMappings = new MockGameMappingsStore();
+    private final MockBattleNetGameVariantsStore battleNetGameVariants = new MockBattleNetGameVariantsStore();
     private final MockDtddCachesStore dtddCaches = new MockDtddCachesStore();
     private final MockEmergencyStore emergency = new MockEmergencyStore(Clock.systemUTC());
     private final MockRateLimitsStore rateLimits = new MockRateLimitsStore(Clock.systemUTC());
@@ -946,6 +949,32 @@ public class MockApiService implements ApiService {
     public ApiClient.Result<GameMappingResult> adminDeleteGameMapping(UUID id, boolean applyLive) {
         log.trace("adminDeleteGameMapping({}, {})", id, applyLive);
         return gameMappings.delete(id, applyLive);
+    }
+
+    @Override
+    public List<BattleNetGameVariantDto> adminBattleNetGameVariants() {
+        log.trace("adminBattleNetGameVariants()");
+        return battleNetGameVariants.list();
+    }
+
+    @Override
+    public ApiClient.Result<BattleNetGameVariantDto> adminCreateBattleNetGameVariant(
+            BattleNetGameVariantRequest request) {
+        log.trace("adminCreateBattleNetGameVariant({})", request);
+        return battleNetGameVariants.create(request, "admin");
+    }
+
+    @Override
+    public ApiClient.Result<BattleNetGameVariantDto> adminUpdateBattleNetGameVariant(
+            UUID id, BattleNetGameVariantRequest request) {
+        log.trace("adminUpdateBattleNetGameVariant({}, {})", id, request);
+        return battleNetGameVariants.update(id, request, "admin");
+    }
+
+    @Override
+    public ApiClient.Result<Void> adminDeleteBattleNetGameVariant(UUID id) {
+        log.trace("adminDeleteBattleNetGameVariant({})", id);
+        return battleNetGameVariants.delete(id);
     }
 
     @Override

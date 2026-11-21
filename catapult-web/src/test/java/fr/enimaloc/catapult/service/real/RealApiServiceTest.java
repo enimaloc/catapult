@@ -2279,6 +2279,35 @@ class RealApiServiceTest {
     }
 
     @Test
+    void adminBattleNetGameVariants_listCreateUpdateAndDelete() {
+        UUID id = UUID.fromString("00000000-0000-0000-0000-0000000000f1");
+        String variant = "{\"id\":\"" + id + "\",\"fourcc\":\"WoW\",\"variantKey\":\"Forever\","
+                + "\"sourceId\":\"WoW:Forever\",\"matchType\":\"PREFIX\",\"patterns\":[\"Forever - \"],"
+                + "\"displayName\":\"World of Warcraft: Forever\",\"enabled\":true,\"updatedAt\":null,"
+                + "\"updatedBy\":\"alice\"}";
+        String body = "{\"fourcc\":\"WoW\",\"variantKey\":\"Forever\",\"matchType\":\"PREFIX\","
+                + "\"patterns\":[\"Forever - \"],\"displayName\":\"World of Warcraft: Forever\",\"enabled\":true}";
+        var request = new fr.enimaloc.catapult.common.dto.admin.BattleNetGameVariantRequest("WoW", "Forever", "PREFIX",
+                java.util.List.of("Forever - "), "World of Warcraft: Forever", true);
+        respond(HttpMethod.GET, "/api/internal/admin/battlenet-game-variants", "[" + variant + "]");
+        expect(HttpMethod.POST, "/api/internal/admin/battlenet-game-variants")
+                .andExpect(content().json(body, org.springframework.test.json.JsonCompareMode.STRICT))
+                .andRespond(withStatus(HttpStatus.CREATED).contentType(MediaType.APPLICATION_JSON).body(variant));
+        expect(HttpMethod.PUT, "/api/internal/admin/battlenet-game-variants/" + id)
+                .andExpect(content().json(body, org.springframework.test.json.JsonCompareMode.STRICT))
+                .andRespond(withSuccess(variant, MediaType.APPLICATION_JSON));
+        expect(HttpMethod.DELETE, "/api/internal/admin/battlenet-game-variants/" + id).andRespond(withNoContent());
+
+        assertThat(service.adminBattleNetGameVariants()).singleElement()
+                .satisfies(v -> assertThat(v.patterns()).containsExactly("Forever - "));
+        var created = service.adminCreateBattleNetGameVariant(request);
+        assertThat(created.status()).isEqualTo(201);
+        assertThat(created.body().sourceId()).isEqualTo("WoW:Forever");
+        assertThat(service.adminUpdateBattleNetGameVariant(id, request).status()).isEqualTo(200);
+        assertThat(service.adminDeleteBattleNetGameVariant(id).status()).isEqualTo(204);
+    }
+
+    @Test
     void adminCreateTw_postsTheDefinition_andReturnsTheStatus() {
         expect(HttpMethod.POST, "/api/internal/admin/tws")
                 .andExpect(content().json("{\"id\":\"gore\",\"label\":\"Gore\",\"sortOrder\":3}"))
