@@ -309,29 +309,32 @@ public class GameInfoAssembler {
     /**
      * The v3 aggregated game info of an already authenticated user: the v2 answer, linking to the current routes,
      * completed with the enrichment sources (each null when unavailable or too slow). inGame=false while nothing
-     * is detected.
+     * is detected. {@code country} and {@code language} are the validated query parameters of the request, null
+     * when it gave none (the prices then default to France; the Twitch streams to any language).
      */
-    public GameInfoV3Response gameInfoV3(UserAccount user, Locale locale) {
+    public GameInfoV3Response gameInfoV3(UserAccount user, Locale locale, String country, String language) {
         String base = publicBaseUrl.get();
         return gameStateService.getLastKnownGame(user)
-                .map(detected -> aggregateV3(detected, user, locale, base))
+                .map(detected -> aggregateV3(detected, user, locale, base, country, language))
                 .orElseGet(GameInfoV3Response::notInGame);
     }
 
     // The enrichment only needs the ids and the detected name: it runs while the v2 answer is built, so the v3
     // answer takes about max(v2, aggregate timeout) rather than their sum.
-    private GameInfoV3Response aggregateV3(DetectedGame detected, UserAccount user, Locale locale, String base) {
+    private GameInfoV3Response aggregateV3(DetectedGame detected, UserAccount user, Locale locale, String base,
+                                          String country, String language) {
         Optional<String> igdbId = resolveIgdbId(detected);
         Optional<String> steamAppId = detected.getSourceType() == GameBinding.SourceType.STEAM
                 ? Optional.ofNullable(detected.getSourceId()) : Optional.empty();
         MoreLinks links = new MoreLinks(base, LinkStyle.CURRENT);
-        CompletableFuture<GameEnrichment> enrichment = enrichAsync(detected, igdbId, steamAppId, links);
+        CompletableFuture<GameEnrichment> enrichment = enrichAsync(detected, igdbId, steamAppId, country, language, links);
         GameInfoResponse v2 = aggregate(detected, igdbId, Optional.of(user), locale, base, LinkStyle.CURRENT);
-        return GameInfoV3Response.of(v2, enrichment.join(), links, igdbId);
+        return GameInfoV3Response.of(v2, enrichment.join(), links, igdbId, country, language);
     }
 
     private CompletableFuture<GameEnrichment> enrichAsync(DetectedGame detected, Optional<String> igdbId,
-                                                          Optional<String> steamAppId, MoreLinks links) {
+                                                          Optional<String> steamAppId, String country,
+                                                          String language, MoreLinks links) {
         if (gameEnrichmentAssembler.isEmpty()) {
             if (!missingEnrichmentLogged.getAndSet(true)) {
                 log.warn("No GameEnrichmentAssembler: v3 game info answers carry no enrichment object");
@@ -339,7 +342,8 @@ public class GameInfoAssembler {
             return CompletableFuture.completedFuture(GameEnrichment.EMPTY);
         }
         // the detected name, not the localized store name: the sources search by a stable name
-        return gameEnrichmentAssembler.get().enrichAsync(detected, igdbId, steamAppId, detected.getSourceName(), links);
+        return gameEnrichmentAssembler.get().enrichAsync(detected, igdbId, steamAppId, detected.getSourceName(),
+                ApiV2.country(country), language, links);
     }
 
     // ---------------------------------------------------------------- v1 (frozen schema)

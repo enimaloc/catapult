@@ -5,13 +5,19 @@ import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.igdb.IgdbGameDetails;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.service.enrichment.hltb.HltbService;
+import fr.enimaloc.catapult.service.enrichment.opencritic.OpenCriticGame;
+import fr.enimaloc.catapult.service.enrichment.opencritic.OpenCriticService;
 import fr.enimaloc.catapult.service.enrichment.pcgw.PcGamingWikiPage;
 import fr.enimaloc.catapult.service.enrichment.pcgw.PcGamingWikiService;
+import fr.enimaloc.catapult.service.enrichment.prices.GamePrices;
+import fr.enimaloc.catapult.service.enrichment.prices.PricesService;
 import fr.enimaloc.catapult.service.enrichment.protondb.ProtonDbService;
 import fr.enimaloc.catapult.service.enrichment.steamdeck.SteamDeckService;
 import fr.enimaloc.catapult.service.enrichment.steamgriddb.SteamGridDbAssets;
 import fr.enimaloc.catapult.service.enrichment.steamgriddb.SteamGridDbService;
 import fr.enimaloc.catapult.service.enrichment.trailer.TrailerSourceResolver;
+import fr.enimaloc.catapult.service.enrichment.twitch.TwitchActivity;
+import fr.enimaloc.catapult.service.enrichment.twitch.TwitchActivityService;
 import fr.enimaloc.catapult.service.igdb.IgdbGameDetailsService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.link.ExternalLinks;
@@ -31,7 +37,8 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
- * Asks the five enrichment sources (HowLongToBeat, ProtonDB, SteamGridDB, Steam Deck, PCGamingWiki) and picks the
+ * Asks the enrichment sources (HowLongToBeat, ProtonDB, SteamGridDB, Steam Deck, PCGamingWiki, store prices,
+ * OpenCritic, Twitch activity) and picks the
  * trailer link of a detected game, all at once on virtual threads, and waits for them at most
  * {@code catapult.enrichment.aggregate-timeout}. A source that fails is null; one that is too late is null too but
  * keeps running in the background (never interrupted), so its answer lands in the cache for the next call.
@@ -52,6 +59,9 @@ public class GameEnrichmentAssembler {
     private final SteamGridDbService steamGridDbService;
     private final SteamDeckService steamDeckService;
     private final PcGamingWikiService pcGamingWikiService;
+    private final PricesService pricesService;
+    private final OpenCriticService openCriticService;
+    private final TwitchActivityService twitchActivityService;
     private final IgdbService igdbService;
     private final IgdbGameDetailsService igdbGameDetailsService;
     private final TrailerSourceResolver trailerSourceResolver;
@@ -62,10 +72,12 @@ public class GameEnrichmentAssembler {
     /**
      * Everything the sources know of {@code detected}, within the aggregate timeout. {@code steamAppId} is the
      * detected Steam app id (empty for another store: IGDB's mapping is looked up from {@code igdbId}), {@code name}
-     * the name to search by when there is no id, {@code links} the origin the trailer link points at.
+     * the name to search by when there is no id, {@code country} the ISO country the prices are asked for,
+     * {@code language} the language of the Twitch streams (null for any), {@code links} the origin the trailer link
+     * points at.
      */
     public GameEnrichment enrich(DetectedGame detected, Optional<String> igdbId, Optional<String> steamAppId,
-                                 String name, MoreLinks links) {
+                                 String name, String country, String language, MoreLinks links) {
         long deadline = System.nanoTime() + properties.aggregateTimeout().toNanos();
         String igdb = igdbId.filter(id -> !id.isBlank()).orElse(null);
 
@@ -82,6 +94,11 @@ public class GameEnrichmentAssembler {
         var steamgriddb = after(appId, "steamgriddb", id -> steamGridDb(id, name));
         var pcgamingwiki = after(appId, "pcgamingwiki", id -> pcGamingWiki(id, name));
         var trailer = after(appId, "trailer", id -> trailer(detected, id, igdb, links));
+        var prices = after(appId, "prices", id -> prices(id, name, country));
+        var opencritic = supply("opencritic", () -> igdb == null || !hasText(name) ? null
+                : openCriticService.byIgdb(igdb, name, FetchBudget.UNLIMITED).orElse(null));
+        var twitch = supply("twitch", () -> igdb == null ? null
+                : twitchActivityService.byIgdbId(igdb, language, FetchBudget.UNLIMITED).orElse(null));
 
         return new GameEnrichment(
                 await(hltb, deadline, "hltb"),
@@ -90,7 +107,10 @@ public class GameEnrichmentAssembler {
                 await(steamDeck, deadline, "steamdeck"),
                 await(pcgamingwiki, deadline, "pcgamingwiki"),
                 await(trailer, deadline, "trailer"),
-                appId.getNow(null));
+                appId.getNow(null),
+                await(prices, deadline, "prices"),
+                await(opencritic, deadline, "opencritic"),
+                await(twitch, deadline, "twitch"));
     }
 
     /**
@@ -98,8 +118,10 @@ public class GameEnrichmentAssembler {
      * meanwhile; the future completes within about the aggregate timeout, never exceptionally.
      */
     public CompletableFuture<GameEnrichment> enrichAsync(DetectedGame detected, Optional<String> igdbId,
-                                                         Optional<String> steamAppId, String name, MoreLinks links) {
-        return CompletableFuture.supplyAsync(() -> enrich(detected, igdbId, steamAppId, name, links), executor)
+                                                         Optional<String> steamAppId, String name, String country,
+                                                         String language, MoreLinks links) {
+        return CompletableFuture.supplyAsync(
+                        () -> enrich(detected, igdbId, steamAppId, name, country, language, links), executor)
                 .exceptionally(e -> {
                     log.warn("Game enrichment failed: {}", e.getMessage(), e);
                     return GameEnrichment.EMPTY;
@@ -118,6 +140,14 @@ public class GameEnrichmentAssembler {
             return steamGridDbService.bySteamAppId(steamAppId, FetchBudget.UNLIMITED).orElse(null);
         }
         return hasText(name) ? steamGridDbService.byName(name, FetchBudget.UNLIMITED).orElse(null) : null;
+    }
+
+    /** By Steam app id when there is one, else by name. */
+    private GamePrices prices(String steamAppId, String name, String country) {
+        if (steamAppId != null) {
+            return pricesService.bySteamAppId(steamAppId, country, FetchBudget.UNLIMITED).orElse(null);
+        }
+        return hasText(name) ? pricesService.byName(name, country, FetchBudget.UNLIMITED).orElse(null) : null;
     }
 
     /** By Steam app id when there is one, else by name. */

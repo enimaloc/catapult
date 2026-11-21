@@ -4,18 +4,29 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonView;
 import fr.enimaloc.catapult.service.enrichment.GameEnrichment;
 import fr.enimaloc.catapult.service.enrichment.hltb.TimeToBeat;
+import fr.enimaloc.catapult.service.enrichment.opencritic.OpenCriticGame;
 import fr.enimaloc.catapult.service.enrichment.pcgw.PcGamingWikiPage;
+import fr.enimaloc.catapult.service.enrichment.prices.GamePrices;
 import fr.enimaloc.catapult.service.enrichment.protondb.ProtonDbSummary;
 import fr.enimaloc.catapult.service.enrichment.steamdeck.SteamDeckCompatibility;
 import fr.enimaloc.catapult.service.enrichment.steamgriddb.SteamGridDbAssets;
+import fr.enimaloc.catapult.service.enrichment.twitch.TwitchActivity;
+import fr.enimaloc.catapult.service.enrichment.twitch.TwitchClips;
+import fr.enimaloc.catapult.service.enrichment.twitch.TwitchLives;
 
+import java.math.BigDecimal;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
  * The v3 aggregated game info: the v2 platform objects ({@link GameInfoResponse}, kept as {@code base}) plus the
- * enrichment ones (HowLongToBeat, ProtonDB, SteamGridDB, Steam Deck, PCGamingWiki), each a short projection with a
+ * enrichment ones (HowLongToBeat, ProtonDB, SteamGridDB, Steam Deck, PCGamingWiki, store prices, OpenCritic, Twitch
+ * activity), each a short projection with a
  * "more" link to its detail route, null when unavailable. The {@link GameInfoResponse.Summary} view adds to the v2
- * derived fields {@code timeToBeat}, {@code protonTier}, {@code deckStatus}, {@code coverUrl} and {@code trailer};
+ * derived fields {@code timeToBeat}, {@code protonTier}, {@code deckStatus}, {@code coverUrl}, {@code trailer}, {@code price},
+ * {@code criticScore} and {@code liveViewers};
  * the enrichment objects never feed {@code name} or {@code description}.
  */
 public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boolean inGame,
@@ -23,14 +34,15 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
                                  GameInfoResponse.XboxObject xbox, GameInfoResponse.DtddObject dtdd,
                                  GameInfoResponse.CatapultObject catapult, HltbObject hltb, ProtonDbObject protondb,
                                  SteamGridDbObject steamgriddb, SteamDeckObject steamDeck,
-                                 PcGamingWikiObject pcgamingwiki,
+                                 PcGamingWikiObject pcgamingwiki, PricesObject prices,
+                                 OpenCriticObject opencritic, TwitchObject twitch,
                                  @JsonView(GameInfoResponse.Summary.class) Trailer trailer,
                                  @JsonIgnore GameInfoResponse base) {
 
     /** The answer while nothing is detected: inGame=false, every object null. */
     public static GameInfoV3Response notInGame() {
-        return new GameInfoV3Response(false, null, null, null, null, null, null, null, null, null, null, null,
-                new GameInfoResponse(false));
+        return new GameInfoV3Response(false, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                null, new GameInfoResponse(false));
     }
 
     /**
@@ -39,6 +51,16 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
      */
     public static GameInfoV3Response of(GameInfoResponse base, GameEnrichment enrichment, MoreLinks links,
                                         Optional<String> igdbId) {
+        return of(base, enrichment, links, igdbId, null, null);
+    }
+
+    /**
+     * Like {@link #of(GameInfoResponse, GameEnrichment, MoreLinks, Optional)}; {@code country} and
+     * {@code language} are the request's query parameters, null when it gave none, carried over to the "more"
+     * links of the prices and of the Twitch activity so that the detail route answers the same question.
+     */
+    public static GameInfoV3Response of(GameInfoResponse base, GameEnrichment enrichment, MoreLinks links,
+                                        Optional<String> igdbId, String country, String language) {
         String appId = enrichment.steamAppId();
         return new GameInfoV3Response(base.inGame(), base.igdb(), base.steam(), base.xbox(), base.dtdd(),
                 base.catapult(),
@@ -49,6 +71,9 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
                 SteamDeckObject.of(enrichment.steamDeck(),
                         appId == null ? null : links.to(MoreLinks.Kind.STEAMDECK, appId)),
                 PcGamingWikiObject.of(enrichment.pcgamingwiki(), links),
+                PricesObject.of(enrichment.prices(), links, country),
+                OpenCriticObject.of(enrichment.opencritic(), links),
+                TwitchObject.of(enrichment.twitch(), links, language),
                 Trailer.of(enrichment.trailer()),
                 base);
     }
@@ -119,7 +144,83 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
         return igdb == null ? null : igdb.coverUrl();
     }
 
+    /** The best current official-store price, null when none is known. */
+    @JsonView(GameInfoResponse.Summary.class)
+    public Price price() {
+        return prices == null || prices.best() == null ? null : Price.of(prices.currency(), prices.best());
+    }
+
+    /** The top critics' average score on OpenCritic (0 to 100); null if unknown. */
+    @JsonView(GameInfoResponse.Summary.class)
+    public Integer criticScore() {
+        return opencritic == null ? null : opencritic.topCriticScore();
+    }
+
+    /** How many people watch the game on Twitch right now; null if unknown. */
+    @JsonView(GameInfoResponse.Summary.class)
+    public Long liveViewers() {
+        return twitch == null ? null : twitch.viewers();
+    }
+
     // ---------------------------------------------------------------- objects
+
+    /** The best price of the summary: {@code amount} in {@code currency}, {@code cut} percent off, at {@code shop}. */
+    public record Price(@JsonView(GameInfoResponse.Summary.class) BigDecimal amount,
+                        @JsonView(GameInfoResponse.Summary.class) String currency,
+                        @JsonView(GameInfoResponse.Summary.class) int cut,
+                        @JsonView(GameInfoResponse.Summary.class) String shop) {
+        static Price of(String currency, GamePrices.Deal best) {
+            return new Price(best.price(), currency, best.cut(), best.shop());
+        }
+    }
+
+    /** Official-store prices in a country: the best deal, the all-time low and the cheapest deals. */
+    public record PricesObject(String country, String currency, GamePrices.Deal best,
+                               GamePrices.HistoryLow historyLow, List<GamePrices.Deal> deals, String itadUrl,
+                               String more) implements GameInfoResponse.HasMore {
+        /** How many deals the aggregate keeps; the detail route has them all. */
+        static final int MAX_DEALS = 5;
+
+        static PricesObject of(GamePrices p, MoreLinks links, String country) {
+            if (p == null) {
+                return null;
+            }
+            Map<String, String> query = new LinkedHashMap<>();
+            if (country != null) {
+                query.put("country", country);
+            }
+            List<GamePrices.Deal> deals = p.deals() == null ? List.of()
+                    : p.deals().stream().limit(MAX_DEALS).toList();
+            return new PricesObject(p.country(), p.currency(), p.best(), p.historyLow(), deals, p.itadUrl(),
+                    p.itadId() == null ? null : links.to(MoreLinks.Kind.PRICES, p.itadId(), query));
+        }
+    }
+
+    /** OpenCritic's score of the game. */
+    public record OpenCriticObject(Integer topCriticScore, Integer percentRecommended, String tier, int numReviews,
+                                   String url, String more) implements GameInfoResponse.HasMore {
+        static OpenCriticObject of(OpenCriticGame g, MoreLinks links) {
+            return g == null ? null : new OpenCriticObject(g.topCriticScore(), g.percentRecommended(), g.tier(),
+                    g.numReviews(), g.url(), links.to(MoreLinks.Kind.OPENCRITIC, g.id()));
+        }
+    }
+
+    /** What goes on in the game's Twitch category: lives, viewers, top streams and clips. */
+    public record TwitchObject(String categoryId, String categoryName, int liveCount, long viewers,
+                               boolean approximate, List<TwitchLives.Stream> topStreams,
+                               List<TwitchClips.Clip> topClips, String more) implements GameInfoResponse.HasMore {
+        static TwitchObject of(TwitchActivity a, MoreLinks links, String language) {
+            if (a == null) {
+                return null;
+            }
+            Map<String, String> query = new LinkedHashMap<>();
+            if (language != null) {
+                query.put("language", language);
+            }
+            return new TwitchObject(a.categoryId(), a.categoryName(), a.liveCount(), a.viewers(), a.approximate(),
+                    a.topStreams(), a.topClips(), links.to(MoreLinks.Kind.TWITCH, a.categoryId(), query));
+        }
+    }
 
     /** HowLongToBeat durations in seconds (null when unknown), as served by IGDB. */
     public record HltbObject(Long hastily, Long normally, Long completely, int count, String more) implements GameInfoResponse.HasMore {

@@ -2,14 +2,18 @@ package fr.enimaloc.catapult.api.userapi;
 
 import fr.enimaloc.catapult.service.enrichment.GameEnrichment;
 import fr.enimaloc.catapult.service.enrichment.hltb.TimeToBeat;
+import fr.enimaloc.catapult.service.enrichment.opencritic.OpenCriticGame;
 import fr.enimaloc.catapult.service.enrichment.pcgw.PcGamingWikiPage;
+import fr.enimaloc.catapult.service.enrichment.prices.GamePrices;
 import fr.enimaloc.catapult.service.enrichment.protondb.ProtonDbSummary;
 import fr.enimaloc.catapult.service.enrichment.steamdeck.SteamDeckCompatibility;
 import fr.enimaloc.catapult.service.enrichment.steamgriddb.SteamGridDbAssets;
+import fr.enimaloc.catapult.service.enrichment.twitch.TwitchActivity;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -45,7 +49,7 @@ class GameInfoV3ResponseTest {
 
     @Test
     void summaryView_containsNewDerivedFields_notObjects() {
-        GameEnrichment enrichment = new GameEnrichment(TTB, PROTON, SGDB, DECK, PCGW, TRAILER, "620");
+        GameEnrichment enrichment = new GameEnrichment(TTB, PROTON, SGDB, DECK, PCGW, TRAILER, "620", null, null, null);
         GameInfoV3Response response = GameInfoV3Response.of(BASE_V2, enrichment, LINKS, Optional.of("72"));
 
         JsonNode summary = MAPPER.readTree(MAPPER.writerWithView(GameInfoResponse.Summary.class)
@@ -61,7 +65,7 @@ class GameInfoV3ResponseTest {
         assertThat(summary.path("trailer").path("kind").asString()).isEqualTo("mp4");
         assertThat(summary.path("trailer").path("url").asString()).isEqualTo(BASE + "/api/me/game/trailer.mp4?version=3");
         for (String object : List.of("igdb", "steam", "xbox", "dtdd", "catapult", "hltb", "protondb", "steamgriddb",
-                "steamDeck", "pcgamingwiki", "base")) {
+                "steamDeck", "pcgamingwiki", "prices", "opencritic", "twitch", "base")) {
             assertThat(summary.has(object)).as(object).isFalse();
         }
 
@@ -84,11 +88,11 @@ class GameInfoV3ResponseTest {
     void coverUrl_fallsBackToIgdbCover() {
         GameEnrichment noGrid = new GameEnrichment(null, null, new SteamGridDbAssets(5L, "Portal 2",
                 "https://www.steamgriddb.com/game/5", List.of(), List.of(), List.of(), List.of()),
-                null, null, null, null);
+                null, null, null, null, null, null, null);
         assertThat(GameInfoV3Response.of(BASE_V2, noGrid, LINKS, Optional.of("72")).coverUrl())
                 .isEqualTo("https://images.igdb.com/cover.jpg");
 
-        GameEnrichment nothing = new GameEnrichment(null, null, null, null, null, null, null);
+        GameEnrichment nothing = new GameEnrichment(null, null, null, null, null, null, null, null, null, null);
         GameInfoV3Response bare = GameInfoV3Response.of(BASE_V2, nothing, LINKS, Optional.of("72"));
         assertThat(bare.coverUrl()).isEqualTo("https://images.igdb.com/cover.jpg");
         assertThat(bare.timeToBeat()).isNull();
@@ -103,11 +107,82 @@ class GameInfoV3ResponseTest {
 
     @Test
     void hltbWithoutIgdbId_hasNoMoreLink() {
-        GameEnrichment enrichment = new GameEnrichment(TTB, null, null, null, null, null, null);
+        GameEnrichment enrichment = new GameEnrichment(TTB, null, null, null, null, null, null, null, null, null);
 
         GameInfoV3Response response = GameInfoV3Response.of(BASE_V2, enrichment, LINKS, Optional.empty());
 
         assertThat(response.hltb()).isNotNull();
         assertThat(response.hltb().more()).isNull();
+    }
+
+    private static GamePrices.Deal deal(String price) {
+        return new GamePrices.Deal("61", "Steam", new BigDecimal(price), new BigDecimal("39.99"), 50,
+                "https://store/" + price);
+    }
+
+    private static GamePrices prices(List<GamePrices.Deal> deals) {
+        return new GamePrices("itad-1", "US", "EUR", deals.isEmpty() ? null : deals.getFirst(), null, deals,
+                "https://isthereanydeal.com/game/portal-2/");
+    }
+
+    private static GameEnrichment withNewSources(GamePrices prices) {
+        return new GameEnrichment(null, null, null, null, null, null, "620", prices,
+                new OpenCriticGame(7L, "Portal 2", 88, 95, "Mighty", 50, "https://opencritic.com/game/7/portal-2"),
+                new TwitchActivity("490377", "Portal 2", 3, 1234L, false, List.of(), List.of()));
+    }
+
+    @Test
+    void summaryCarriesPriceScoreViewers() {
+        GameInfoV3Response response = GameInfoV3Response.of(BASE_V2, withNewSources(prices(List.of(deal("19.99")))),
+                LINKS, Optional.of("72"));
+
+        JsonNode summary = MAPPER.readTree(MAPPER.writerWithView(GameInfoResponse.Summary.class)
+                .writeValueAsString(response));
+
+        assertThat(summary.path("price").path("amount").decimalValue()).isEqualByComparingTo("19.99");
+        assertThat(summary.path("price").path("currency").asString()).isEqualTo("EUR");
+        assertThat(summary.path("price").path("cut").asInt()).isEqualTo(50);
+        assertThat(summary.path("price").path("shop").asString()).isEqualTo("Steam");
+        assertThat(summary.path("criticScore").asInt()).isEqualTo(88);
+        assertThat(summary.path("liveViewers").asLong()).isEqualTo(1234L);
+        for (String object : List.of("prices", "opencritic", "twitch")) {
+            assertThat(summary.has(object)).as(object).isFalse();
+        }
+    }
+
+    @Test
+    void summaryWithoutBestPrice_priceIsNull() {
+        GameInfoV3Response response = GameInfoV3Response.of(BASE_V2, withNewSources(prices(List.of())), LINKS,
+                Optional.of("72"));
+
+        assertThat(response.price()).isNull();
+        assertThat(GameInfoV3Response.of(BASE_V2, GameEnrichment.EMPTY, LINKS, Optional.of("72")).criticScore())
+                .isNull();
+        assertThat(GameInfoV3Response.notInGame().liveViewers()).isNull();
+    }
+
+    @Test
+    void aggregateKeepsFiveCheapestDeals() {
+        List<GamePrices.Deal> eight = List.of(deal("1.00"), deal("2.00"), deal("3.00"), deal("4.00"), deal("5.00"),
+                deal("6.00"), deal("7.00"), deal("8.00"));
+
+        GameInfoV3Response response = GameInfoV3Response.of(BASE_V2, withNewSources(prices(eight)), LINKS,
+                Optional.of("72"));
+
+        assertThat(response.prices().deals()).hasSize(5).containsExactlyElementsOf(eight.subList(0, 5));
+    }
+
+    @Test
+    void moreLinksCarryCountryAndLanguage() {
+        GameEnrichment enrichment = withNewSources(prices(List.of(deal("19.99"))));
+
+        GameInfoV3Response given = GameInfoV3Response.of(BASE_V2, enrichment, LINKS, Optional.of("72"), "US", "de");
+        assertThat(given.prices().more()).isEqualTo(BASE + "/api/games/prices/itad-1?version=3&country=US");
+        assertThat(given.twitch().more()).isEqualTo(BASE + "/api/games/twitch/490377?version=3&language=de");
+        assertThat(given.opencritic().more()).isEqualTo(BASE + "/api/games/opencritic/7?version=3");
+
+        GameInfoV3Response absent = GameInfoV3Response.of(BASE_V2, enrichment, LINKS, Optional.of("72"));
+        assertThat(absent.prices().more()).isEqualTo(BASE + "/api/games/prices/itad-1?version=3");
+        assertThat(absent.twitch().more()).isEqualTo(BASE + "/api/games/twitch/490377?version=3");
     }
 }

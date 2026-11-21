@@ -61,7 +61,7 @@ class CatapultApplicationMockTests extends FullContextTestBase {
     void mockProfile_v3GameInfo_hasEnrichment() {
         GameEnrichment enrichment = context.getBean(GameEnrichmentAssembler.class).enrich(
                 new DetectedGame("570", GameBinding.SourceType.STEAM, "Dota 2"), Optional.empty(),
-                Optional.of("570"), "Dota 2",
+                Optional.of("570"), "Dota 2", "FR", null,
                 new MoreLinks("http://localhost", GameInfoAssembler.LinkStyle.CURRENT));
 
         assertThat(enrichment.protondb()).isNotNull();

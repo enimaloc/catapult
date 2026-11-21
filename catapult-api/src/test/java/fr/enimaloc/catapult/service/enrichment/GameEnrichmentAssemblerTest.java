@@ -7,7 +7,11 @@ import fr.enimaloc.catapult.domain.igdb.IgdbGameDetails;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.service.enrichment.hltb.HltbService;
 import fr.enimaloc.catapult.service.enrichment.hltb.TimeToBeat;
+import fr.enimaloc.catapult.service.enrichment.opencritic.OpenCriticGame;
+import fr.enimaloc.catapult.service.enrichment.opencritic.OpenCriticService;
 import fr.enimaloc.catapult.service.enrichment.pcgw.PcGamingWikiPage;
+import fr.enimaloc.catapult.service.enrichment.prices.GamePrices;
+import fr.enimaloc.catapult.service.enrichment.prices.PricesService;
 import fr.enimaloc.catapult.service.enrichment.pcgw.PcGamingWikiService;
 import fr.enimaloc.catapult.service.enrichment.protondb.ProtonDbService;
 import fr.enimaloc.catapult.service.enrichment.protondb.ProtonDbSummary;
@@ -18,12 +22,15 @@ import fr.enimaloc.catapult.service.enrichment.steamgriddb.SteamGridDbService;
 import fr.enimaloc.catapult.service.igdb.IgdbGameDetailsService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.enrichment.trailer.TrailerSourceResolver;
+import fr.enimaloc.catapult.service.enrichment.twitch.TwitchActivity;
+import fr.enimaloc.catapult.service.enrichment.twitch.TwitchActivityService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.stubbing.Answer;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
+import java.math.BigDecimal;
 import java.net.URI;
 import java.time.Duration;
 import java.util.List;
@@ -44,6 +51,13 @@ class GameEnrichmentAssemblerTest {
 
     private static final String BASE = "https://catapult.test";
     private static final MoreLinks LINKS = new MoreLinks(BASE, GameInfoAssembler.LinkStyle.CURRENT);
+    private static final GamePrices PRICES = new GamePrices("itad-1", "FR", "EUR",
+            new GamePrices.Deal("61", "Steam", new BigDecimal("9.99"), new BigDecimal("19.99"), 50,
+                    "https://store.steampowered.com/app/620"), null, List.of(), "https://isthereanydeal.com/game/portal-2/");
+    private static final OpenCriticGame CRITIC = new OpenCriticGame(7L, "Portal 2", 95, 99, "Mighty", 50,
+            "https://opencritic.com/game/7/portal-2");
+    private static final TwitchActivity ACTIVITY = new TwitchActivity("490377", "Portal 2", 3, 120L, false,
+            List.of(), List.of());
     private static final DetectedGame PORTAL = new DetectedGame("620", GameBinding.SourceType.STEAM, "Portal 2");
     private static final DetectedGame HALO = new DetectedGame("9NP1P1WFS0LB", GameBinding.SourceType.XBOX, "Halo");
 
@@ -62,6 +76,9 @@ class GameEnrichmentAssemblerTest {
     private final SteamGridDbService steamGridDb = mock(SteamGridDbService.class);
     private final SteamDeckService steamDeck = mock(SteamDeckService.class);
     private final PcGamingWikiService pcgw = mock(PcGamingWikiService.class);
+    private final PricesService prices = mock(PricesService.class);
+    private final OpenCriticService openCritic = mock(OpenCriticService.class);
+    private final TwitchActivityService twitch = mock(TwitchActivityService.class);
     private final IgdbService igdbService = mock(IgdbService.class);
     private final IgdbGameDetailsService igdbGameDetailsService = mock(IgdbGameDetailsService.class);
     private final TrailerSourceResolver trailers = mock(TrailerSourceResolver.class);
@@ -72,8 +89,8 @@ class GameEnrichmentAssemblerTest {
     @BeforeEach
     void setUp() {
         properties.setAggregateTimeout(Duration.ofSeconds(2));
-        assembler = new GameEnrichmentAssembler(hltb, protonDb, steamGridDb, steamDeck, pcgw, igdbService,
-                igdbGameDetailsService, trailers, properties);
+        assembler = new GameEnrichmentAssembler(hltb, protonDb, steamGridDb, steamDeck, pcgw, prices, openCritic,
+                twitch, igdbService, igdbGameDetailsService, trailers, properties);
         when(hltb.timeToBeat(any(), any())).thenReturn(Optional.of(TTB));
         when(protonDb.summary(anyString(), any())).thenReturn(Optional.of(PROTON));
         when(steamGridDb.bySteamAppId(anyString(), any())).thenReturn(Optional.of(SGDB));
@@ -81,6 +98,10 @@ class GameEnrichmentAssemblerTest {
         when(steamDeck.compatibility(anyString(), any())).thenReturn(Optional.of(DECK));
         when(pcgw.bySteamAppId(anyString(), any())).thenReturn(Optional.of(PCGW));
         when(pcgw.byName(anyString(), any())).thenReturn(Optional.of(PCGW));
+        when(prices.bySteamAppId(anyString(), anyString(), any())).thenReturn(Optional.of(PRICES));
+        when(prices.byName(anyString(), anyString(), any())).thenReturn(Optional.of(PRICES));
+        when(openCritic.byIgdb(anyString(), anyString(), any())).thenReturn(Optional.of(CRITIC));
+        when(twitch.byIgdbId(anyString(), any(), any())).thenReturn(Optional.of(ACTIVITY));
         when(trailers.resolve(any(), any(), any())).thenReturn(Optional.empty());
         when(igdbGameDetailsService.getDetails(anyString())).thenReturn(Optional.empty());
         when(igdbService.findExternalUid(anyString(), any())).thenReturn(Optional.empty());
@@ -102,7 +123,7 @@ class GameEnrichmentAssemblerTest {
                 .thenAnswer(slow(Duration.ofMillis(700), Optional.of(SGDB)));
 
         long start = System.nanoTime();
-        GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", LINKS);
+        GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "FR", null, LINKS);
         Duration took = Duration.ofNanos(System.nanoTime() - start);
 
         assertThat(result.hltb()).isEqualTo(TTB);
@@ -125,7 +146,7 @@ class GameEnrichmentAssemblerTest {
         when(protonDb.summary(anyString(), any())).thenAnswer(slow(Duration.ofSeconds(5), Optional.of(PROTON)));
 
         long start = System.nanoTime();
-        GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", LINKS);
+        GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "FR", null, LINKS);
         Duration took = Duration.ofNanos(System.nanoTime() - start);
 
         assertThat(result.protondb()).isNull();
@@ -137,12 +158,55 @@ class GameEnrichmentAssemblerTest {
     }
 
     @Test
+    void newSources_askedWithCountryLanguageAndIds() {
+        GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "US",
+                "de", LINKS);
+
+        assertThat(result.prices()).isEqualTo(PRICES);
+        assertThat(result.opencritic()).isEqualTo(CRITIC);
+        assertThat(result.twitch()).isEqualTo(ACTIVITY);
+        verify(prices).bySteamAppId(eq("620"), eq("US"), eq(FetchBudget.UNLIMITED));
+        verify(openCritic).byIgdb(eq("72"), eq("Portal 2"), eq(FetchBudget.UNLIMITED));
+        verify(twitch).byIgdbId(eq("72"), eq("de"), eq(FetchBudget.UNLIMITED));
+    }
+
+    @Test
+    void newSources_withoutIgdbOrSteamId_pricesByNameOnly() {
+        GameEnrichment result = assembler.enrich(HALO, Optional.empty(), Optional.empty(), "Halo", "FR", null,
+                LINKS);
+
+        assertThat(result.prices()).isEqualTo(PRICES);
+        assertThat(result.opencritic()).isNull();
+        assertThat(result.twitch()).isNull();
+        verify(prices).byName(eq("Halo"), eq("FR"), eq(FetchBudget.UNLIMITED));
+        verify(prices, never()).bySteamAppId(anyString(), anyString(), any());
+        verify(openCritic, never()).byIgdb(any(), any(), any());
+        verify(twitch, never()).byIgdbId(any(), any(), any());
+    }
+
+    @Test
+    void slowTwitchDoesNotBlockOthers() {
+        when(twitch.byIgdbId(anyString(), any(), any())).thenAnswer(slow(Duration.ofSeconds(5), Optional.of(ACTIVITY)));
+
+        long start = System.nanoTime();
+        GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "FR",
+                null, LINKS);
+        Duration took = Duration.ofNanos(System.nanoTime() - start);
+
+        assertThat(result.twitch()).isNull();
+        assertThat(result.prices()).isEqualTo(PRICES);
+        assertThat(result.opencritic()).isEqualTo(CRITIC);
+        assertThat(result.protondb()).isEqualTo(PROTON);
+        assertThat(took).isLessThan(Duration.ofSeconds(3));
+    }
+
+    @Test
     void failingSource_null_noException() {
         when(steamDeck.compatibility(anyString(), any())).thenThrow(new IllegalStateException("boom"));
         when(hltb.timeToBeat(any(), any()))
                 .thenThrow(new UpstreamBudgetExceededException(Duration.ofMinutes(1)));
 
-        GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", LINKS);
+        GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "FR", null, LINKS);
 
         assertThat(result.steamDeck()).isNull();
         assertThat(result.hltb()).isNull();
@@ -152,7 +216,7 @@ class GameEnrichmentAssemblerTest {
 
     @Test
     void aggregate_nonSteamWithoutAppId_namesOnly() {
-        GameEnrichment result = assembler.enrich(HALO, Optional.empty(), Optional.empty(), "Halo", LINKS);
+        GameEnrichment result = assembler.enrich(HALO, Optional.empty(), Optional.empty(), "Halo", "FR", null, LINKS);
 
         assertThat(result.protondb()).isNull();
         assertThat(result.steamDeck()).isNull();
@@ -170,7 +234,7 @@ class GameEnrichmentAssemblerTest {
     void xboxGameWithIgdbSteamMapping_usesResolvedAppId() {
         when(igdbService.findExternalUid("1234", GameBinding.SourceType.STEAM)).thenReturn(Optional.of("976730"));
 
-        GameEnrichment result = assembler.enrich(HALO, Optional.of("1234"), Optional.empty(), "Halo", LINKS);
+        GameEnrichment result = assembler.enrich(HALO, Optional.of("1234"), Optional.empty(), "Halo", "FR", null, LINKS);
 
         assertThat(result.steamAppId()).isEqualTo("976730");
         assertThat(result.protondb()).isEqualTo(PROTON);
@@ -192,32 +256,32 @@ class GameEnrichmentAssemblerTest {
         // Steam: the resolver finds an HLS H.264 stream for the detected app id
         URI hls = URI.create("https://video.akamai.steamstatic.com/hls_264_master.m3u8");
         when(trailers.resolve(eq("620"), isNull(), eq(FetchBudget.UNLIMITED))).thenReturn(Optional.of(hls));
-        GameEnrichment steam = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", LINKS);
+        GameEnrichment steam = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "FR", null, LINKS);
         assertThat(steam.trailer()).isEqualTo(new GameEnrichment.Trailer("mp4", BASE + "/api/me/game/trailer.mp4?version=3"));
 
         // Xbox: IGDB's Steam mapping first, then the detected product, in the resolver's order
         when(igdbService.findExternalUid("72", GameBinding.SourceType.STEAM)).thenReturn(Optional.of("976730"));
         when(trailers.resolve(eq("976730"), eq(HALO.getSourceId()), eq(FetchBudget.UNLIMITED)))
                 .thenReturn(Optional.of(hls));
-        GameEnrichment xbox = assembler.enrich(HALO, Optional.of("72"), Optional.empty(), "Halo", LINKS);
+        GameEnrichment xbox = assembler.enrich(HALO, Optional.of("72"), Optional.empty(), "Halo", "FR", null, LINKS);
         assertThat(xbox.trailer()).isEqualTo(new GameEnrichment.Trailer("mp4", BASE + "/api/me/game/trailer.mp4?version=3"));
         when(igdbService.findExternalUid("72", GameBinding.SourceType.STEAM)).thenReturn(Optional.empty());
 
         // no HLS stream (none, or the trailer source switched off): IGDB's first video, on YouTube
         when(trailers.resolve(eq("620"), isNull(), any())).thenReturn(Optional.empty());
-        GameEnrichment youtube = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", LINKS);
+        GameEnrichment youtube = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "FR", null, LINKS);
         assertThat(youtube.trailer())
                 .isEqualTo(new GameEnrichment.Trailer("youtube", "https://www.youtube.com/watch?v=dQw4w9WgXcQ"));
 
         // nothing at all
-        GameEnrichment none = assembler.enrich(PORTAL, Optional.empty(), Optional.of("620"), "Portal 2", LINKS);
+        GameEnrichment none = assembler.enrich(PORTAL, Optional.empty(), Optional.of("620"), "Portal 2", "FR", null, LINKS);
         assertThat(none.trailer()).isNull();
     }
 
     @Test
     void enrichAsync_completesWithTheEnrichment() {
         GameEnrichment result = assembler.enrichAsync(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2",
-                LINKS).join();
+                "FR", null, LINKS).join();
 
         assertThat(result.protondb()).isEqualTo(PROTON);
         assertThat(result.steamAppId()).isEqualTo("620");
@@ -233,6 +297,9 @@ class GameEnrichmentAssemblerTest {
                 .withBean(SteamGridDbService.class, () -> steamGridDb)
                 .withBean(SteamDeckService.class, () -> steamDeck)
                 .withBean(PcGamingWikiService.class, () -> pcgw)
+                .withBean(PricesService.class, () -> prices)
+                .withBean(OpenCriticService.class, () -> openCritic)
+                .withBean(TwitchActivityService.class, () -> twitch)
                 .withBean(IgdbService.class, () -> igdbService)
                 .withBean(IgdbGameDetailsService.class, () -> igdbGameDetailsService)
                 .withBean(TrailerSourceResolver.class, () -> trailers)
