@@ -56,7 +56,7 @@ class OpenCriticServiceTest {
     void unconfigured_skipsTheSourceSilently() {
         when(client.isConfigured()).thenReturn(false);
 
-        assertThat(service.byIgdb("1", "Hades", FetchBudget.UNLIMITED)).isEmpty();
+        assertThat(service.byName("Hades", FetchBudget.UNLIMITED)).isEmpty();
         assertThat(service.byId(463, FetchBudget.UNLIMITED)).isEmpty();
         verifyNoInteractions(cache);
     }
@@ -64,23 +64,23 @@ class OpenCriticServiceTest {
     @Test
     void nearMissNameIsAbsent() {
         when(dailyCap.budget(EnrichmentSource.OPENCRITIC, 50)).thenReturn(FetchBudget.UNLIMITED);
-        cacheMisses("igdb:1", OpenCriticRef.class);
+        cacheMisses("name:hades", OpenCriticRef.class);
         when(client.search("Hades")).thenReturn(List.of(new OpenCriticClient.Hit(1, "Hades II")));
 
-        assertThat(service.byIgdb("1", "Hades", FetchBudget.UNLIMITED)).isEmpty();
+        assertThat(service.byName("Hades", FetchBudget.UNLIMITED)).isEmpty();
         verify(client, never()).game(anyLong());
     }
 
     @Test
     void exactNormalizedMatchWins() {
         when(dailyCap.budget(EnrichmentSource.OPENCRITIC, 50)).thenReturn(FetchBudget.UNLIMITED);
-        cacheMisses("igdb:1", OpenCriticRef.class);
+        cacheMisses("name:hades", OpenCriticRef.class);
         cacheMisses("oc:2", OpenCriticGame.class);
         when(client.search("Hades")).thenReturn(List.of(
                 new OpenCriticClient.Hit(1, "Hades II"), new OpenCriticClient.Hit(2, "Hades™")));
         when(client.game(2)).thenReturn(Optional.of(HADES));
 
-        assertThat(service.byIgdb("1", "Hades", FetchBudget.UNLIMITED)).contains(HADES);
+        assertThat(service.byName("Hades", FetchBudget.UNLIMITED)).contains(HADES);
     }
 
     @Test
@@ -125,12 +125,12 @@ class OpenCriticServiceTest {
         when(dailyCap.budget(EnrichmentSource.OPENCRITIC, 50)).thenReturn(cap);
         FetchBudget caller = mock(FetchBudget.class);
         when(caller.tryAcquire()).thenReturn(true);
-        cacheMisses("igdb:1", OpenCriticRef.class);
+        cacheMisses("name:hades", OpenCriticRef.class);
         cacheMisses("oc:463", OpenCriticGame.class);
         when(client.search("Hades")).thenReturn(List.of(new OpenCriticClient.Hit(463, "Hades")));
         when(client.game(463)).thenReturn(Optional.of(HADES));
 
-        assertThat(service.byIgdb("1", "Hades", caller)).contains(HADES);
+        assertThat(service.byName("Hades", caller)).contains(HADES);
 
         verify(cap, times(2)).tryAcquire();
         verify(caller, times(1)).tryAcquire();
@@ -182,5 +182,16 @@ class OpenCriticServiceTest {
                 .isInstanceOf(UpstreamBudgetExceededException.class);
         verify(publicCap, never()).tryAcquire();
         verify(cap, never()).tryAcquire();
+    }
+
+    @Test
+    void aliasIsKeyedByTheNormalisedSearchedName() {
+        when(dailyCap.budget(EnrichmentSource.OPENCRITIC, 50)).thenReturn(FetchBudget.UNLIMITED);
+        String key = "name:" + fr.enimaloc.catapult.service.enrichment.GameNames.normalize("Hades: Game of the Year");
+        cacheMisses(key, OpenCriticRef.class);
+        when(client.search("Hades: Game of the Year")).thenReturn(List.of());
+
+        assertThat(service.byName("Hades: Game of the Year", FetchBudget.UNLIMITED)).isEmpty();
+        verify(cache).get(eq(EnrichmentSource.OPENCRITIC), eq(key), eq(OpenCriticRef.class), any(), any());
     }
 }

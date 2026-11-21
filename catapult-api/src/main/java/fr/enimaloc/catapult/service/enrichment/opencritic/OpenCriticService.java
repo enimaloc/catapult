@@ -15,7 +15,8 @@ import java.util.Optional;
 
 /**
  * OpenCritic critic scores through the shared cache. A game is found by the exact normalised name (a near miss is
- * absent, never a wrong game); the id it resolves to is cached under {@code igdb:<igdbId>} and the game under
+ * absent, never a wrong game); the id it resolves to is cached under the name searched,
+ * {@code name:<normalised name>}, so a miss on one spelling never hides the game from another, and the game under
  * {@code oc:<id>}. Every upstream call must be accepted by the caller's budget (asked once) and by the daily cap,
  * which is charged one unit per HTTP call, since it protects the RapidAPI quota. The public detail route
  * ({@link #publicById}) must also fit in its own share of half the daily cap, so anonymous callers can never spend
@@ -33,13 +34,13 @@ public class OpenCriticService {
     private final DailyCap dailyCap;
     private final EnrichmentProperties properties;
 
-    /** The score of the game {@code name}, remembered under its IGDB id; empty when absent or disabled. */
-    public Optional<OpenCriticGame> byIgdb(String igdbId, String name, FetchBudget budget) {
+    /** The score of the game {@code name}, remembered under that name; empty when absent or disabled. */
+    public Optional<OpenCriticGame> byName(String name, FetchBudget budget) {
         if (!client.isConfigured()) {
             return Optional.empty();
         }
         FetchBudget both = both(budget);
-        return cache.get(EnrichmentSource.OPENCRITIC, "igdb:" + igdbId, OpenCriticRef.class, both,
+        return cache.get(EnrichmentSource.OPENCRITIC, "name:" + GameNames.normalize(name), OpenCriticRef.class, both,
                         () -> resolve(name))
                 .flatMap(ref -> byId(ref.id(), both));
     }

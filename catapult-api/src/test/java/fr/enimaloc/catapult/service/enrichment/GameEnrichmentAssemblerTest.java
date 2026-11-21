@@ -34,6 +34,7 @@ import java.math.BigDecimal;
 import java.net.URI;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -100,7 +101,7 @@ class GameEnrichmentAssemblerTest {
         when(pcgw.byName(anyString(), any())).thenReturn(Optional.of(PCGW));
         when(prices.bySteamAppId(anyString(), anyString(), any())).thenReturn(Optional.of(PRICES));
         when(prices.byName(anyString(), anyString(), any())).thenReturn(Optional.of(PRICES));
-        when(openCritic.byIgdb(anyString(), anyString(), any())).thenReturn(Optional.of(CRITIC));
+        when(openCritic.byName(anyString(), any())).thenReturn(Optional.of(CRITIC));
         when(twitch.byIgdbId(anyString(), any(), any())).thenReturn(Optional.of(ACTIVITY));
         when(trailers.resolve(any(), any(), any())).thenReturn(Optional.empty());
         when(igdbGameDetailsService.getDetails(anyString())).thenReturn(Optional.empty());
@@ -166,8 +167,19 @@ class GameEnrichmentAssemblerTest {
         assertThat(result.opencritic()).isEqualTo(CRITIC);
         assertThat(result.twitch()).isEqualTo(ACTIVITY);
         verify(prices).bySteamAppId(eq("620"), eq("US"), eq(FetchBudget.UNLIMITED));
-        verify(openCritic).byIgdb(eq("72"), eq("Portal 2"), eq(FetchBudget.UNLIMITED));
+        verify(openCritic).byName(eq("Portal 2"), eq(FetchBudget.UNLIMITED));
         verify(twitch).byIgdbId(eq("72"), eq("de"), eq(FetchBudget.UNLIMITED));
+    }
+
+    @Test
+    void openCritic_searchedByTheCachedIgdbName() {
+        when(igdbService.getGameCache()).thenReturn(Map.of("72", "Portal 2"));
+
+        GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"),
+                "Portal 2 - Game of the Year Edition", "FR", null, LINKS);
+
+        assertThat(result.opencritic()).isEqualTo(CRITIC);
+        verify(openCritic).byName(eq("Portal 2"), eq(FetchBudget.UNLIMITED));
     }
 
     @Test
@@ -180,7 +192,7 @@ class GameEnrichmentAssemblerTest {
         assertThat(result.twitch()).isNull();
         verify(prices).byName(eq("Halo"), eq("FR"), eq(FetchBudget.UNLIMITED));
         verify(prices, never()).bySteamAppId(anyString(), anyString(), any());
-        verify(openCritic, never()).byIgdb(any(), any(), any());
+        verify(openCritic, never()).byName(any(), any());
         verify(twitch, never()).byIgdbId(any(), any(), any());
     }
 

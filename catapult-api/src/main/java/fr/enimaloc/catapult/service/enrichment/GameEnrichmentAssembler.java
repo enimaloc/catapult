@@ -44,7 +44,8 @@ import java.util.function.Supplier;
  * keeps running in the background (never interrupted), so its answer lands in the cache for the next call.
  *
  * <p>The Steam-keyed sources use the detected Steam app id, else IGDB's Steam mapping of the game; without one,
- * ProtonDB and Steam Deck are skipped and SteamGridDB and PCGamingWiki search by name.
+ * ProtonDB and Steam Deck are skipped and SteamGridDB and PCGamingWiki search by name. OpenCritic is searched by
+ * the IGDB name when it is cached in memory, else by the detected name.
  */
 @Slf4j
 @Component
@@ -95,8 +96,7 @@ public class GameEnrichmentAssembler {
         var pcgamingwiki = after(appId, "pcgamingwiki", id -> pcGamingWiki(id, name));
         var trailer = after(appId, "trailer", id -> trailer(detected, id, igdb, links));
         var prices = after(appId, "prices", id -> prices(id, name, country));
-        var opencritic = supply("opencritic", () -> igdb == null || !hasText(name) ? null
-                : openCriticService.byIgdb(igdb, name, FetchBudget.UNLIMITED).orElse(null));
+        var opencritic = supply("opencritic", () -> openCritic(igdb, name));
         var twitch = supply("twitch", () -> igdb == null ? null
                 : twitchActivityService.byIgdbId(igdb, language, FetchBudget.UNLIMITED).orElse(null));
 
@@ -148,6 +148,19 @@ public class GameEnrichmentAssembler {
             return pricesService.bySteamAppId(steamAppId, country, FetchBudget.UNLIMITED).orElse(null);
         }
         return hasText(name) ? pricesService.byName(name, country, FetchBudget.UNLIMITED).orElse(null) : null;
+    }
+
+    /**
+     * By the IGDB name of the game when IGDB's in-memory cache already knows it (no upstream call), else by
+     * {@code name}; nothing without an IGDB id.
+     */
+    private OpenCriticGame openCritic(String igdbId, String name) {
+        if (igdbId == null) {
+            return null;
+        }
+        String igdbName = igdbService.getGameCache().get(igdbId);
+        String searched = hasText(igdbName) ? igdbName : name;
+        return hasText(searched) ? openCriticService.byName(searched, FetchBudget.UNLIMITED).orElse(null) : null;
     }
 
     /** By Steam app id when there is one, else by name. */
