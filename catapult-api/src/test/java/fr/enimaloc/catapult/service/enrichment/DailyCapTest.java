@@ -49,4 +49,13 @@ class DailyCapTest {
         assertThat(cap.budget(EnrichmentSource.PRICES, 1).tryAcquire()).isTrue();
         assertThat(cap.budget(EnrichmentSource.OPENCRITIC, 1).tryAcquire()).isFalse();
     }
+
+    @Test
+    void refusal_retriesAfterTheNextUtcMidnight() {
+        MutableClock clock = new MutableClock(Instant.parse("2026-11-21T22:30:15Z"));
+        FetchBudget budget = new DailyCap(clock).budget(EnrichmentSource.OPENCRITIC, 0);
+
+        assertThat(budget.tryAcquire()).isFalse();
+        assertThat(budget.retryAfter()).isEqualTo(Duration.ofMinutes(89).plusSeconds(45));
+    }
 }

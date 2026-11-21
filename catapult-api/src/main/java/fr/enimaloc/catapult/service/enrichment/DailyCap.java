@@ -4,11 +4,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** Caps the upstream calls of a source per UTC day, in memory: the counter restarts when the date changes. */
+/**
+ * Caps the upstream calls of a source per UTC day, in memory: the counter restarts when the date changes, so a
+ * refused call may be retried after the next UTC midnight.
+ */
 @Component
 public class DailyCap {
 
@@ -29,7 +33,25 @@ public class DailyCap {
 
     /** A budget granting {@code perDay} calls to {@code source} each UTC day. */
     public FetchBudget budget(EnrichmentSource source, int perDay) {
-        return () -> acquire(source, perDay);
+        return new FetchBudget() {
+            @Override
+            public boolean tryAcquire() {
+                return acquire(source, perDay);
+            }
+
+            @Override
+            public Duration retryAfter() {
+                return untilNextUtcMidnight();
+            }
+        };
+    }
+
+    /** The time left until the counters restart, at least one second. */
+    private Duration untilNextUtcMidnight() {
+        Clock utc = clock.withZone(ZoneOffset.UTC);
+        Duration left = Duration.between(clock.instant(),
+                LocalDate.now(utc).plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant());
+        return left.compareTo(Duration.ofSeconds(1)) < 0 ? Duration.ofSeconds(1) : left;
     }
 
     private boolean acquire(EnrichmentSource source, int perDay) {
