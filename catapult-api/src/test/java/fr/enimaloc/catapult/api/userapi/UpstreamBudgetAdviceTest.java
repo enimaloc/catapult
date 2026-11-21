@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.api.userapi;
 
 import fr.enimaloc.catapult.service.enrichment.UpstreamBudgetExceededException;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 
 import java.time.Duration;
@@ -15,16 +16,19 @@ class UpstreamBudgetAdviceTest {
 
     @Test
     void mapsTo429_withRetryAfterRoundedUpToSeconds() {
-        ResponseEntity<Void> response = advice.tooManyUpstreamCalls(
+        ResponseEntity<ProblemDetail> response = advice.tooManyUpstreamCalls(
                 new UpstreamBudgetExceededException(Duration.ofMillis(24_200)));
 
         assertThat(response.getStatusCode().value()).isEqualTo(429);
         assertThat(response.getHeaders().getFirst("Retry-After")).isEqualTo("25");
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getStatus()).isEqualTo(429);
+        assertThat(response.getBody().getProperties()).containsEntry("code", "too_many_requests");
     }
 
     @Test
     void retryAfter_isAtLeastOneSecond() {
-        ResponseEntity<Void> response = advice.tooManyUpstreamCalls(
+        ResponseEntity<ProblemDetail> response = advice.tooManyUpstreamCalls(
                 new UpstreamBudgetExceededException(Duration.ZERO));
 
         assertThat(response.getHeaders().getFirst("Retry-After")).isEqualTo("1");

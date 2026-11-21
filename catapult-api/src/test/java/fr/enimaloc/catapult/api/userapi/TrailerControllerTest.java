@@ -56,6 +56,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -230,7 +231,8 @@ class TrailerControllerTest {
 
         mvc.perform(v3(get(STEAM)))
                 .andExpect(status().isTooManyRequests())
-                .andExpect(header().string(HttpHeaders.RETRY_AFTER, "12"));
+                .andExpect(header().string(HttpHeaders.RETRY_AFTER, "12"))
+                .andExpect(jsonPath("$.code").value("too_many_requests"));
     }
 
     @Test
@@ -250,7 +252,9 @@ class TrailerControllerTest {
 
         mvc.perform(v3(get(STEAM)))
                 .andExpect(status().isServiceUnavailable())
-                .andExpect(header().string(HttpHeaders.RETRY_AFTER, "30"));
+                .andExpect(header().string(HttpHeaders.RETRY_AFTER, "30"))
+                .andExpect(jsonPath("$.status").value(503))
+                .andExpect(jsonPath("$.code").value("service_unavailable"));
     }
 
     /** A malformed id is refused before any store lookup, upstream call or database write. */

@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.api.userapi;
 
 import fr.enimaloc.catapult.api.ApiUserResolver;
+import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.service.enrichment.FetchBudget;
 import fr.enimaloc.catapult.service.enrichment.IpFetchBudgets;
 import fr.enimaloc.catapult.service.enrichment.UpstreamBudgetExceededException;
@@ -19,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -158,11 +160,8 @@ public class TrailerController {
     }
 
     @ExceptionHandler(TrailerBusyException.class)
-    public ResponseEntity<Void> busy(TrailerBusyException e) {
-        long seconds = Math.max(1, (e.retryAfter().toMillis() + 999) / 1000);
-        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                .header(HttpHeaders.RETRY_AFTER, Long.toString(seconds))
-                .build();
+    public ResponseEntity<ProblemDetail> busy(TrailerBusyException e) {
+        return RetryAfterProblems.answer(ErrorCode.SERVICE_UNAVAILABLE, "Every trailer slot is busy", e.retryAfter());
     }
 
     /**
