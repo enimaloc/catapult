@@ -83,6 +83,20 @@ class TokenKeyRotationRunnerTest {
     }
 
     @Test
+    void aSpeedrunKey_movesToTheCurrentKey() {
+        assertThat(TokenKeyRotationRunner.SECRETS)
+                .contains(new TokenKeyRotationRunner.Secret("speedrun_account", "user_id", "api_key_enc"));
+        UUID user = user(null);
+        jdbc.update("INSERT INTO speedrun_account (user_id, api_key_enc, updated_at) VALUES (?, ?, now())",
+                user, old.encrypt("speedrun-key"));
+
+        runner.run(null);
+
+        String key = jdbc.queryForObject("SELECT api_key_enc FROM speedrun_account WHERE user_id = ?", String.class, user);
+        assertThat(current.decrypt(key)).isEqualTo("speedrun-key");
+    }
+
+    @Test
     void running_twice_changesNothingMore() {
         UUID user = user(old.encrypt("steam"));
         runner.run(null);
