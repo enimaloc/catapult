@@ -35,8 +35,9 @@ import java.util.regex.Pattern;
  * speedrun.com before anything is written (an unknown name or a refused key is a 400, speedrun.com out of reach a
  * 503). The key is stored encrypted and never given back, logged or put in a URL. The row is deleted once it holds
  * neither a name nor a key. Each write re-reads the row and is optimistically locked: one that crosses another
- * (a key removed meanwhile) is redone once on the fresh row, so it never brings back what was removed, then answers
- * 409.
+ * (a key removed meanwhile) is redone once on the fresh row, so that the newer intent wins (a delete is not undone by
+ * a stale save, a save sets its value again on purpose), then answers 409. Telling the owner's pages comes after the
+ * write and never fails it.
  */
 @Slf4j
 @Service
@@ -147,7 +148,12 @@ public class SpeedrunAccountService {
 
     /** Tells the owner's open pages how the settings now stand. */
     private void publish(UserAccount user) {
-        events.speedrunAccountChanged(user.getId(), data(user));
+        try {
+            events.speedrunAccountChanged(user.getId(), data(user));
+        } catch (RuntimeException e) {
+            // The settings are saved: a page that is not told refreshes on its next load.
+            log.warn("speedrun.com settings of {} saved but not pushed: {}", user.getId(), e.getClass().getSimpleName());
+        }
     }
 
     /**
@@ -163,6 +169,8 @@ public class SpeedrunAccountService {
             try {
                 return writeOnce(user, create, change);
             } catch (OptimisticLockingFailureException | DataIntegrityViolationException again) {
+                log.warn("speedrun.com settings of {} crossed another write twice: {}", user.getId(),
+                        again.getClass().getSimpleName());
                 throw new ApiProblem(ErrorCode.CONFLICT, "The speedrun.com settings changed meanwhile, try again");
             }
         }

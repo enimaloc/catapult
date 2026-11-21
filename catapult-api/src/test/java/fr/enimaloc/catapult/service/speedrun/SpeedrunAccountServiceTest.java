@@ -1,5 +1,9 @@
 package fr.enimaloc.catapult.service.speedrun;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import fr.enimaloc.catapult.api.error.ApiProblem;
 import fr.enimaloc.catapult.common.dto.channel.SpeedrunData;
 import fr.enimaloc.catapult.common.error.ErrorCode;
@@ -24,6 +28,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
+import org.slf4j.LoggerFactory;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -389,5 +394,55 @@ class SpeedrunAccountServiceTest {
 
         assertProblem(() -> service.saveUsername(user, "n2"), ErrorCode.CONFLICT);
         verify(accounts, org.mockito.Mockito.times(2)).save(any());
+    }
+
+    @Test
+    void aSecondDuplicateInsertIs409AndLogged() {
+        when(accounts.save(any())).thenThrow(new org.springframework.dao.DataIntegrityViolationException("duplicate"));
+        when(encryption.encrypt("srckeyzz9")).thenReturn("ENC(srckeyzz9)");
+        when(client.profile("srckeyzz9")).thenReturn(Optional.of(new SpeedrunUser("k1", "KeyOwner", "u", null)));
+        ListAppender<ILoggingEvent> logs = capture();
+        try {
+            assertProblem(() -> service.saveApiKey(user, "srckeyzz9"), ErrorCode.CONFLICT);
+        } finally {
+            release(logs);
+        }
+
+        assertThat(logs.list).anySatisfy(event -> {
+            assertThat(event.getLevel()).isEqualTo(Level.WARN);
+            assertThat(event.getFormattedMessage()).contains("DataIntegrityViolationException")
+                    .doesNotContain("srckeyzz9").doesNotContain("duplicate");
+        });
+    }
+
+    @Test
+    void aFailedPushKeepsTheSaveAndIsLoggedWithoutTheKey() {
+        when(encryption.encrypt("srckeyzz9")).thenReturn("ENC(srckeyzz9)");
+        when(client.profile("srckeyzz9")).thenReturn(Optional.of(new SpeedrunUser("k1", "KeyOwner", "u", null)));
+        org.mockito.Mockito.doThrow(new IllegalStateException("srckeyzz9")).when(events)
+                .speedrunAccountChanged(any(), any());
+        ListAppender<ILoggingEvent> logs = capture();
+        try {
+            service.saveApiKey(user, "srckeyzz9");
+        } finally {
+            release(logs);
+        }
+
+        verify(accounts).save(any());
+        assertThat(logs.list).anySatisfy(event -> {
+            assertThat(event.getLevel()).isEqualTo(Level.WARN);
+            assertThat(event.getFormattedMessage()).contains("IllegalStateException").doesNotContain("srckeyzz9");
+        });
+    }
+
+    private static ListAppender<ILoggingEvent> capture() {
+        ListAppender<ILoggingEvent> logs = new ListAppender<>();
+        logs.start();
+        ((Logger) LoggerFactory.getLogger(SpeedrunAccountService.class)).addAppender(logs);
+        return logs;
+    }
+
+    private static void release(ListAppender<ILoggingEvent> logs) {
+        ((Logger) LoggerFactory.getLogger(SpeedrunAccountService.class)).detachAppender(logs);
     }
 }
