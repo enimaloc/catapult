@@ -19,10 +19,12 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.UUID;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 
 /**
  * Logs every outbound HTTP call performed through a Spring {@link org.springframework.web.client.RestClient}
@@ -37,7 +39,9 @@ import java.util.function.Supplier;
  * suffix {@code …(+N bytes)} makes the cut visible.</p>
  *
  * <p>{@code Authorization} / {@code X-API-KEY} values are never echoed — only
- * their presence is reported.</p>
+ * their presence is reported. Neither are the values of the {@code key},
+ * {@code api_key}, {@code apikey} and {@code token} query parameters (any case),
+ * masked in the logged URI.</p>
  *
  * <p>The same exchange also feeds the per-member debug mode: it joins the active
  * {@link DebugContext#capture capture} if any, else it is recorded for the current
@@ -49,6 +53,9 @@ import java.util.function.Supplier;
 public class HttpTraceLoggingInterceptor implements ClientHttpRequestInterceptor {
 
     static final int MAX_BODY_CHARS = 4096;
+    /** A credential query parameter: its name and {@code =} (group 1), then its value up to the next one. */
+    private static final Pattern SECRET_QUERY_PARAM =
+            Pattern.compile("([?&](?:key|api_key|apikey|token)=)[^&#]*", Pattern.CASE_INSENSITIVE);
 
     private final DebugMemberRegistry registry;
     private final DebugExchangeRecorder recorder;
@@ -74,7 +81,7 @@ public class HttpTraceLoggingInterceptor implements ClientHttpRequestInterceptor
         if (trace) {
             log.trace("HTTP req -> {} {} auth={} body={}",
                     request.getMethod(),
-                    request.getURI(),
+                    masked(request.getURI()),
                     redactAuth(request),
                     truncate(body));
         }
@@ -85,7 +92,7 @@ public class HttpTraceLoggingInterceptor implements ClientHttpRequestInterceptor
             long elapsedMs = (System.nanoTime() - started) / 1_000_000L;
             if (trace) {
                 log.trace("HTTP req x  {} {} after {}ms: {}",
-                        request.getMethod(), request.getURI(), elapsedMs, ex.toString());
+                        request.getMethod(), masked(request.getURI()), elapsedMs, ex.toString());
             }
             if (debug != null) {
                 debug.emit(raw(at, request, body, null, null, ex.toString(), elapsedMs));
@@ -103,7 +110,7 @@ public class HttpTraceLoggingInterceptor implements ClientHttpRequestInterceptor
             // Unreadable to the caller as well: hand it the response as it came.
             if (trace) {
                 log.trace("HTTP res <- {} {} {} in {}ms body=<unreadable body: {}>",
-                        response.getStatusCode().value(), request.getMethod(), request.getURI(),
+                        response.getStatusCode().value(), request.getMethod(), masked(request.getURI()),
                         elapsedMs, e.getMessage());
             }
             if (debug != null) {
@@ -115,7 +122,7 @@ public class HttpTraceLoggingInterceptor implements ClientHttpRequestInterceptor
             log.trace("HTTP res <- {} {} {} in {}ms body={}",
                     response.getStatusCode().value(),
                     request.getMethod(),
-                    request.getURI(),
+                    masked(request.getURI()),
                     elapsedMs,
                     truncate(respBody));
         }
@@ -207,6 +214,11 @@ public class HttpTraceLoggingInterceptor implements ClientHttpRequestInterceptor
         public void close() {
             response.close();
         }
+    }
+
+    /** {@code uri} with the value of every credential query parameter replaced by {@code ***}. */
+    static String masked(URI uri) {
+        return SECRET_QUERY_PARAM.matcher(uri.toString()).replaceAll("$1***");
     }
 
     private static String redactAuth(HttpRequest request) {
