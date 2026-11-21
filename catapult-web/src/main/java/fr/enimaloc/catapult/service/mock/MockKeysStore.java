@@ -11,20 +11,22 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * The mock's Steam and DTDD shared API keys: one store for the whole application. Answers like
+ * The mock's Steam, DTDD and SteamGridDB shared API keys: one store for the whole application. Answers like
  * catapult-api: the same key formats (400 otherwise), an already listed key changes nothing, an
  * unknown key id is a 404, and only the masked form ever leaves the store.
  */
 class MockKeysStore {
     private static final Map<ApiKeyProvider, Pattern> FORMATS = Map.of(
             ApiKeyProvider.STEAM, Pattern.compile("[0-9A-Fa-f]{32}"),
-            ApiKeyProvider.DTDD, Pattern.compile("ddd_[A-Za-z0-9]{16,128}"));
+            ApiKeyProvider.DTDD, Pattern.compile("ddd_[A-Za-z0-9]{16,128}"),
+            ApiKeyProvider.STEAMGRIDDB, Pattern.compile("[0-9A-Fa-f]{32}"));
 
     private final Map<ApiKeyProvider, List<String>> keys = new EnumMap<>(ApiKeyProvider.class);
 
     MockKeysStore() {
         keys.put(ApiKeyProvider.STEAM, new ArrayList<>(List.of("0123456789ABCDEF0123456789ABCDEF")));
         keys.put(ApiKeyProvider.DTDD, new ArrayList<>(List.of("ddd_abcdefghijklmnop1234")));
+        keys.put(ApiKeyProvider.STEAMGRIDDB, new ArrayList<>(List.of("fedcba9876543210FEDCBA9876543210")));
     }
 
     private static String mask(String key) {
@@ -40,6 +42,9 @@ class MockKeysStore {
     private static KeyUsageDto usage(ApiKeyProvider provider) {
         long tick = System.currentTimeMillis() / 3000;
         int window = (int) (tick % 4);
+        if (provider == ApiKeyProvider.STEAMGRIDDB) {
+            return new KeyUsageDto(window, null, 60, null, "DAY", 40 + tick % 20, null, null);
+        }
         return provider == ApiKeyProvider.STEAM
                 ? new KeyUsageDto(window % 3, 3, 5, null, "DAY", 1200 + tick % 100, 100_000L, null)
                 : new KeyUsageDto(window, 30, 60, 30 - window, "MONTH", 120 + tick % 50, 5000L,

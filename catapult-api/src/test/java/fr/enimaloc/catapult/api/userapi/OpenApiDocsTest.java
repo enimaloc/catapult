@@ -1,5 +1,11 @@
 package fr.enimaloc.catapult.api.userapi;
 
+import fr.enimaloc.catapult.service.enrichment.IpFetchBudgets;
+import fr.enimaloc.catapult.service.enrichment.hltb.HltbService;
+import fr.enimaloc.catapult.service.enrichment.pcgw.PcGamingWikiService;
+import fr.enimaloc.catapult.service.enrichment.protondb.ProtonDbService;
+import fr.enimaloc.catapult.service.enrichment.steamdeck.SteamDeckService;
+import fr.enimaloc.catapult.service.enrichment.steamgriddb.SteamGridDbService;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -47,7 +53,7 @@ import tools.jackson.databind.json.JsonMapper;
  */
 @WebMvcTest(
         controllers = {MeGameController.class, MeBindingsController.class, MeCustomBindingsController.class,
-                GamesController.class, UserApiV1Controller.class, UserApiV2Controller.class},
+                GamesController.class, EnrichmentGamesController.class, UserApiV1Controller.class, UserApiV2Controller.class},
         excludeAutoConfiguration = ThymeleafAutoConfiguration.class,
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX,
                 pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
@@ -60,7 +66,7 @@ import tools.jackson.databind.json.JsonMapper;
         org.springdoc.webmvc.core.configuration.SpringDocWebMvcConfiguration.class,
         org.springdoc.webmvc.core.configuration.MultipleOpenApiSupportConfiguration.class})
 @Import({I18nConfig.class, PublicBaseUrl.class, GameInfoAssembler.class, OpenApiConfig.class,
-        ApiVersionHeaderDefaultCustomizer.class, ApiUserResolver.class})
+        ApiVersionParameterCustomizer.class, ApiUserResolver.class})
 class OpenApiDocsTest {
 
     @Autowired MockMvc mvc;
@@ -84,6 +90,12 @@ class OpenApiDocsTest {
     @MockitoBean DtddApiClient dtddApiClient;
     @MockitoBean CustomBindingService customBindingService;
     @MockitoBean CustomBindingViews customBindingViews;
+    @MockitoBean IpFetchBudgets ipFetchBudgets;
+    @MockitoBean HltbService hltbService;
+    @MockitoBean ProtonDbService protonDbService;
+    @MockitoBean SteamDeckService steamDeckService;
+    @MockitoBean SteamGridDbService steamGridDbService;
+    @MockitoBean PcGamingWikiService pcGamingWikiService;
 
     private JsonNode docs() throws Exception {
         String body = mvc.perform(get("/api/v3/api-docs")).andExpect(status().isOk())
@@ -132,8 +144,8 @@ class OpenApiDocsTest {
                 assertThat(security).as("%s %s", operation.getKey(), path.getKey()).isNotNull();
                 List<String> alternatives = new ArrayList<>();
                 security.forEach(requirement -> alternatives.addAll(requirement.propertyNames()));
-                if (operation.getKey().equals("get")) {
-                    assertThat(alternatives).as("GET %s", path.getKey())
+                if (operation.getKey().equals("get") || operation.getKey().equals("head")) {
+                    assertThat(alternatives).as("%s %s", operation.getKey(), path.getKey())
                             .containsExactlyInAnyOrder("personalToken", "readToken");
                 } else {
                     assertThat(alternatives).as("%s %s", operation.getKey(), path.getKey())
@@ -178,6 +190,40 @@ class OpenApiDocsTest {
         List<String> names = new ArrayList<>();
         parameters.forEach(parameter -> names.add(parameter.get("name").asString()));
         assertThat(names).contains(ApiV2.VERSION_HEADER);
+    }
+
+    /** The version header lists the versions each route answers, with no fixed default: the server assigns it. */
+    @Test
+    void docs_listTheVersionsEachRouteAnswers_withoutAFixedDefault() throws Exception {
+        JsonNode docs = docs();
+
+        assertThat(versionHeader(docs, "/paths/~1api~1me~1game/get/parameters").get("schema").get("enum").toString())
+                .isEqualTo("[\"2\",\"3\"]");
+        assertThat(versionHeader(docs, "/paths/~1api~1games~1igdb~1{igdbId}/get/parameters").get("schema")
+                .get("enum").toString()).isEqualTo("[\"2\",\"3\"]");
+        JsonNode v3Only = versionHeader(docs, "/paths/~1api~1games~1protondb~1{appId}/get/parameters");
+        assertThat(v3Only.get("schema").get("enum").toString()).isEqualTo("[\"3\"]");
+        assertThat(v3Only.get("schema").has("default")).isFalse();
+        assertThat(v3Only.get("description").asString()).contains("assigns").contains("explicit value always wins");
+    }
+
+    /** The enrichment detail routes are documented, public, each with its version 3 header. */
+    @Test
+    void docs_listTheEnrichmentDetailRoutes() throws Exception {
+        List<String> paths = paths(docs());
+
+        assertThat(paths).contains("/api/games/hltb/{igdbId}", "/api/games/protondb/{appId}",
+                "/api/games/steamdeck/{appId}", "/api/games/steamgriddb/{sgdbGameId}",
+                "/api/games/pcgamingwiki/{pageId}");
+    }
+
+    private static JsonNode versionHeader(JsonNode docs, String parametersPointer) {
+        for (JsonNode parameter : docs.at(parametersPointer)) {
+            if (ApiV2.VERSION_HEADER.equals(parameter.get("name").asString())) {
+                return parameter;
+            }
+        }
+        throw new AssertionError("no " + ApiV2.VERSION_HEADER + " in " + parametersPointer);
     }
 
     @Test

@@ -28,7 +28,7 @@ import java.util.UUID;
  * Refused with feature_disabled while the drops experiment is closed to the channel.
  */
 @RestController
-@RequestMapping(path = ApiV2.ME_DROPS_PATH, version = ApiV2.VERSION)
+@RequestMapping(path = ApiV2.ME_DROPS_PATH, version = ApiV2.BASELINE)
 @RequiredArgsConstructor
 @Tag(name = "Me — drops", description = "The Twitch drops campaigns running for your channel, by your personal API "
         + "token (Authorization: Bearer cat_… or catr_…).")

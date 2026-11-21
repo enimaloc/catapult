@@ -9,6 +9,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import jakarta.servlet.DispatcherType;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.core.convert.converter.Converter;
@@ -67,7 +68,7 @@ public class ApiSecurityConfig {
      * {@value #PUBLIC_ME}/**, in every profile: ordered before the /api/** chains below (which would take its
      * Bearer for a JWT, and let localhost through), stateless, no CSRF, authenticated by a personal API token only
      * ({@link PersonalTokenAuthenticationFilter}) — a JWT, a widget token or nothing gets a 401, with an
-     * {@code unauthorized} problem. A {@code GET} takes either token; anything else takes the full one, the
+     * {@code unauthorized} problem. A {@code GET} or {@code HEAD} takes either token; anything else takes the full one, the
      * read-only token getting a 403 with a {@code forbidden} problem.
      */
     @Bean
@@ -79,7 +80,12 @@ public class ApiSecurityConfig {
                 // Answers the preflight before any authentication, and adds the headers to every answer, 401 included
                 .cors(cors -> cors.configurationSource(publicMeCors()))
                 .authorizeHttpRequests(auth -> auth
+                        // The dispatch that ends a streamed answer (a trailer): its request was authorized already,
+                        // and the token is not read again on it
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
                         .requestMatchers(HttpMethod.GET, PERSONAL_TOKEN_PATHS).access(Authz.personalToken())
+                        // A HEAD reads no more than its GET (the trailer's is answered without ffmpeg)
+                        .requestMatchers(HttpMethod.HEAD, PERSONAL_TOKEN_PATHS).access(Authz.personalToken())
                         .anyRequest().access(Authz.fullPersonalToken()))
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .csrf(AbstractHttpConfigurer::disable)

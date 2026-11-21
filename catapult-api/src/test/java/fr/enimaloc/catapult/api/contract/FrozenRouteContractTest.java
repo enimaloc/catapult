@@ -331,11 +331,18 @@ class FrozenRouteContractTest extends FullContextTestBase {
                 send("GET", "/api/user/game/" + widget, headers("X-API-Version", "1")),
                 "/timestamp",
                 "/path");
+        // Version 3 is served like version 2, so that a pasted widget URL keeps working once the default
+        // version moves to 3: the game answer, with this run's binding and the public origin's links
         FrozenSnapshot.assertMatches(
                 "v2-game-version-3",
-                send("GET", "/api/user/game/" + widget, headers("X-API-Version", "3")),
-                "/timestamp",
-                "/path");
+                send("GET", "/api/user/game/" + widget, headers(
+                        "X-API-Version", "3",
+                        "X-Forwarded-Proto", "https",
+                        "X-Forwarded-Host", "catapult.example",
+                        "X-Forwarded-Port", "443")),
+                "/catapult/bindingId",
+                "/catapult/createdAt",
+                "/catapult/more");
     }
 
     private HttpResponse<String> send(String method, String path, Map<String, String> headers)

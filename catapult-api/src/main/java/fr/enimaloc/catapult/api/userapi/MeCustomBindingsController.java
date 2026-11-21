@@ -28,7 +28,7 @@ import java.util.UUID;
  * member's account id. A binding is named by its id or its name, whatever its case.
  */
 @RestController
-@RequestMapping(path = ApiV2.ME_CUSTOM_BINDINGS_PATH, version = ApiV2.VERSION)
+@RequestMapping(path = ApiV2.ME_CUSTOM_BINDINGS_PATH, version = ApiV2.BASELINE)
 @RequiredArgsConstructor
 @Tag(name = "Me — custom bindings", description = "Trigger your channel's custom bindings, by your personal "
         + "API token (Authorization: Bearer cat_…) generated from the account settings; the read-only token "

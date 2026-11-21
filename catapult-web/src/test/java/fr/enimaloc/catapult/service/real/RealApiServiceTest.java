@@ -1988,6 +1988,21 @@ class RealApiServiceTest {
     }
 
     @Test
+    void steamGridDbKeys_areReadAndManagedThroughTheirRoutes() {
+        var provider = fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.STEAMGRIDDB;
+        respond(HttpMethod.GET, "/api/internal/admin/steamgriddb-keys", "{\"keys\":[],\"steamgriddbEnabled\":true}");
+        expect(HttpMethod.POST, "/api/internal/admin/steamgriddb-keys")
+                .andExpect(content().json("{\"apiKey\":\"k\"}", true)).andRespond(withNoContent());
+        expect(HttpMethod.DELETE, "/api/internal/admin/steamgriddb-keys/k1").andRespond(withNoContent());
+        expectPost("/api/internal/admin/steamgriddb-keys/refresh");
+
+        assertThat(service.adminApiKeys(provider).enabled()).isTrue();
+        assertThat(service.adminAddApiKey(provider, "k")).isEqualTo(204);
+        assertThat(service.adminDeleteApiKey(provider, "k1")).isEqualTo(204);
+        assertThat(service.adminRefreshApiKeys(provider)).isEqualTo(204);
+    }
+
+    @Test
     void adminExperimentAction_reachesEachActionsRoute_andNoneForAnUnknownOne() {
         for (String action : List.of("pause", "end", "assign", "reassign")) {
             expectPost("/api/internal/admin/experiments/" + NOTIF_ID + "/" + action);

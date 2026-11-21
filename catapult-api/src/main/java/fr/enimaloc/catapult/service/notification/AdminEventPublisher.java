@@ -21,6 +21,7 @@ public class AdminEventPublisher {
 
     public static final String PROVIDER_STEAM = "steam";
     public static final String PROVIDER_DTDD = "dtdd";
+    public static final String PROVIDER_STEAMGRIDDB = "steamgriddb";
 
     private final RedisEventPublisher redisPublisher;
 

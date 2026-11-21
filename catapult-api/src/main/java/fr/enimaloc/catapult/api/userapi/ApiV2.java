@@ -11,6 +11,13 @@ public final class ApiV2 {
     // versioning scheme at all — it's a separate, unversioned controller by design.
     static final String VERSION = "2";
 
+    // Version 3: only the responses that change in it get a mapping of their own at this version.
+    static final String VERSION_3 = "3";
+
+    // Baseline mapping of every route that did not change since version 2: it answers version 2 and any later one
+    // (Spring picks a fixed "3" mapping over it for a version 3 request, the higher version winning).
+    static final String BASELINE = VERSION + "+";
+
     // Request header carrying the version (see ApiVersioningConfig). Public: the CORS of the public routes
     // (ApiSecurityConfig) allows it.
     public static final String VERSION_HEADER = "X-API-Version";
@@ -35,6 +42,12 @@ public final class ApiV2 {
     // example the legacy routes' "uuid" path parameter documents. LegacyRoutesGate does not read it:
     // it recognizes any backdoor uuid by DevBackdoorResolver.isBackdoor.
     static final String GENERIC_UUID_EXAMPLE = "00000000-0000-0000-0001-000000000190";
+
+    // Shapes of the platform ids the public routes that may call a third party accept (@Pattern on the path
+    // variable): a malformed id is a 400 before any cache read, upstream call or database write.
+    static final String IGDB_ID = "\\d{1,19}";
+    static final String STEAM_APP_ID = "\\d{1,10}";
+    static final String XBOX_PRODUCT_ID = "[A-Za-z0-9]{12}";
 
     private ApiV2() {}
 }

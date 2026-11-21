@@ -58,6 +58,7 @@ import fr.enimaloc.catapult.common.dto.connect.AnkamaLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.connect.BattleNetLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.connect.EpicLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.admin.DtddKeysPageData;
+import fr.enimaloc.catapult.common.dto.admin.SteamGridDbKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.SteamKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
@@ -1471,6 +1472,10 @@ public class RealApiService implements ApiService {
                 DtddKeysPageData page = client.get("/api/internal/admin/dtdd-keys", DtddKeysPageData.class);
                 yield page == null ? null : ApiKeysPageDto.of(page);
             }
+            case STEAMGRIDDB -> {
+                SteamGridDbKeysPageData page = client.get("/api/internal/admin/steamgriddb-keys", SteamGridDbKeysPageData.class);
+                yield page == null ? null : ApiKeysPageDto.of(page);
+            }
         };
     }
 
@@ -1480,6 +1485,7 @@ public class RealApiService implements ApiService {
         ApiClient.Result<Void> result = switch (provider) {
             case STEAM -> client.call(HttpMethod.POST, "/api/internal/admin/steam-keys", body, Void.class);
             case DTDD -> client.call(HttpMethod.POST, "/api/internal/admin/dtdd-keys", body, Void.class);
+            case STEAMGRIDDB -> client.call(HttpMethod.POST, "/api/internal/admin/steamgriddb-keys", body, Void.class);
         };
         return result.status();
     }
@@ -1489,6 +1495,7 @@ public class RealApiService implements ApiService {
         ApiClient.Result<Void> result = switch (provider) {
             case STEAM -> client.call(HttpMethod.DELETE, "/api/internal/admin/steam-keys/{keyId}", null, Void.class, keyId);
             case DTDD -> client.call(HttpMethod.DELETE, "/api/internal/admin/dtdd-keys/{keyId}", null, Void.class, keyId);
+            case STEAMGRIDDB -> client.call(HttpMethod.DELETE, "/api/internal/admin/steamgriddb-keys/{keyId}", null, Void.class, keyId);
         };
         return result.status();
     }
@@ -1498,6 +1505,7 @@ public class RealApiService implements ApiService {
         ApiClient.Result<Void> result = switch (provider) {
             case STEAM -> client.call(HttpMethod.POST, "/api/internal/admin/steam-keys/refresh", null, Void.class);
             case DTDD -> client.call(HttpMethod.POST, "/api/internal/admin/dtdd-keys/refresh", null, Void.class);
+            case STEAMGRIDDB -> client.call(HttpMethod.POST, "/api/internal/admin/steamgriddb-keys/refresh", null, Void.class);
         };
         return result.status();
     }

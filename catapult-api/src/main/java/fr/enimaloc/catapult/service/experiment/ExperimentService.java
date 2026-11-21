@@ -79,6 +79,20 @@ public class ExperimentService {
         return getVariant(user, experimentKey).map(ExperimentVariant::getKey);
     }
 
+    /**
+     * The key of the variant of {@code experimentKey} that carries the most weight (the first one on a tie), what a
+     * request without an account follows; empty when the experiment is missing or not ACTIVE. Read in a transaction:
+     * the variants are lazy.
+     */
+    @Transactional(readOnly = true)
+    public Optional<String> getHeaviestVariantKey(String experimentKey) {
+        return experimentRepository.findByKey(experimentKey)
+                .filter(e -> e.getStatus() == Experiment.Status.ACTIVE)
+                .flatMap(e -> e.getVariants().stream()
+                        .reduce((heaviest, next) -> next.getWeight() > heaviest.getWeight() ? next : heaviest))
+                .map(ExperimentVariant::getKey);
+    }
+
     @Transactional
     public void track(UserAccount user, String experimentKey, String eventKey) {
         Optional<Experiment> opt = experimentRepository.findByKey(experimentKey);

@@ -19,7 +19,7 @@ import java.util.*;
 @Hidden
 @RequiredArgsConstructor
 @RestController
-@RequestMapping(path = ApiV2.PATH, version = ApiV2.VERSION)
+@RequestMapping(path = ApiV2.PATH, version = ApiV2.BASELINE)
 public class UserApiV2Controller {
 
     private final GameInfoAssembler gameInfoAssembler;
