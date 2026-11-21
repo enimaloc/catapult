@@ -59,6 +59,7 @@ class SpeedrunPersonalServiceTest {
 
     @BeforeEach
     void setUp() {
+        when(client.charging(any())).thenReturn(client);
         when(cacheRepository.findBySourceAndLookupKey(anyString(), anyString())).thenAnswer(inv ->
                 Optional.ofNullable(store.get(inv.getArgument(0) + "|" + inv.getArgument(1))));
         when(cacheRepository.save(any(GameEnrichmentCacheEntry.class))).thenAnswer(inv -> {

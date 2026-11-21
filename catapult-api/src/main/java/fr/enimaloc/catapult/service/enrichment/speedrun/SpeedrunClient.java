@@ -1,5 +1,8 @@
 package fr.enimaloc.catapult.service.enrichment.speedrun;
 
+import fr.enimaloc.catapult.service.enrichment.FetchBudget;
+import fr.enimaloc.catapult.service.enrichment.UpstreamBudgetExceededException;
+
 import java.util.List;
 import java.util.Optional;
 
@@ -8,6 +11,15 @@ import java.util.Optional;
  * pauses the {@link SpeedrunRateLimiter} and throws {@link SpeedrunUnavailableException}, as does a 5xx.
  */
 public interface SpeedrunClient {
+
+    /**
+     * This client, with every HTTP request a call makes beyond its first (a redirect hop, a second lookup) asked of
+     * {@code extra}: the first is the one the caller already paid for. Refused, the call throws
+     * {@link UpstreamBudgetExceededException}. A client that never makes more than one request returns itself.
+     */
+    default SpeedrunClient charging(FetchBudget extra) {
+        return this;
+    }
 
     /** Games whose name looks like {@code name} (the search is approximate), best first. */
     List<SpeedrunGame> searchGames(String name);

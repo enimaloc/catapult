@@ -43,6 +43,7 @@ class SpeedrunGameServiceTest {
 
     @BeforeEach
     void setUp() {
+        when(client.charging(any())).thenReturn(client);
         when(repository.findBySourceAndLookupKey(anyString(), anyString())).thenAnswer(inv ->
                 Optional.ofNullable(store.get(inv.getArgument(0) + "|" + inv.getArgument(1))));
         when(repository.save(any(GameEnrichmentCacheEntry.class))).thenAnswer(inv -> {
@@ -176,6 +177,32 @@ class SpeedrunGameServiceTest {
         verify(ip).tryAcquire();
         verify(publicShare).tryAcquire();
         verify(limiter, never()).member();
+    }
+
+    @Test
+    void publicRecordsCountEveryRequestOfTheFetchInThePublicShare() {
+        // The client asks the budget it is charged with once per request beyond the first (the game lookup).
+        when(client.charging(any())).thenAnswer(inv -> {
+            ((FetchBudget) inv.getArgument(0)).tryAcquire();
+            return client;
+        });
+        when(client.records("o1y9j9v6")).thenReturn(Optional.of(records()));
+        SpeedrunRateLimiter real = new SpeedrunRateLimiter(new EnrichmentProperties());
+        FetchBudget ip = mock(FetchBudget.class);
+        when(ip.tryAcquire()).thenReturn(true);
+        service = new SpeedrunGameService(
+                new EnrichmentCache(repository, new EnrichmentProperties(), MAPPER), client, real);
+        int share = new EnrichmentProperties().speedrunPerMinute() / 2;
+
+        service.publicRecords("o1y9j9v6", ip);
+
+        verify(ip).tryAcquire();
+        FetchBudget publicShare = real.publicShare();
+        int left = 0;
+        while (publicShare.tryAcquire()) {
+            left++;
+        }
+        assertThat(left).as("the fetch took two slots of the public share").isEqualTo(share - 2);
     }
 
     @Test

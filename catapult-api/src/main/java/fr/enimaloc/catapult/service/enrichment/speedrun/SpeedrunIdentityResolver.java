@@ -108,7 +108,7 @@ public class SpeedrunIdentityResolver {
                 && gate.tryAcquire()) {
             Optional<SpeedrunUser> profile;
             try {
-                profile = client.profile(encryption.decrypt(account.getApiKeyEnc()));
+                profile = client.charging(gate).profile(encryption.decrypt(account.getApiKeyEnc()));
             } catch (RuntimeException e) {
                 // Unreachable, rate limited or undecryptable: not a refusal, the known account stays.
                 failedRechecks.put(account.getUserId(), now);
@@ -148,12 +148,12 @@ public class SpeedrunIdentityResolver {
             return Optional.empty();
         }
         String lower = login.toLowerCase(Locale.ROOT);
-        return cached("twitch:" + lower, gate, () -> onlyLinkTo(lower, client.usersByTwitch(login)))
+        return cached("twitch:" + lower, gate, () -> onlyLinkTo(lower, client.charging(gate).usersByTwitch(login)))
                 .map(user -> identity(user, SpeedrunIdentity.Source.TWITCH));
     }
 
     private Optional<SpeedrunIdentity> byName(String name, Gate gate) {
-        return cached("name:" + name.toLowerCase(Locale.ROOT), gate, () -> client.user(name))
+        return cached("name:" + name.toLowerCase(Locale.ROOT), gate, () -> client.charging(gate).user(name))
                 .map(user -> identity(user, SpeedrunIdentity.Source.DECLARED));
     }
 

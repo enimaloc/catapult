@@ -15,7 +15,8 @@ import java.util.Optional;
  * Speedrun.com games and their world records through the shared cache. A game is found when exactly one search
  * result has the wanted normalised name as its international or Twitch name: none, or several, is absent (a wrong
  * world record is worse than none). Every upstream call must be accepted by the caller's budget (asked once) and by
- * the {@link SpeedrunRateLimiter}; the public route also fits in the limiter's public share.
+ * the {@link SpeedrunRateLimiter}, which counts every HTTP request of the call (a records answer without any run
+ * needs a second one); the public route also fits in the limiter's public share.
  */
 @Service
 @RequiredArgsConstructor
@@ -30,8 +31,9 @@ public class SpeedrunGameService {
         if (GameNames.normalize(name).isEmpty()) {
             return Optional.empty();
         }
+        FetchBudget gate = both(budget, limiter.member());
         return cache.get(EnrichmentSource.SPEEDRUN_GAME, "name:" + GameNames.normalize(name), SpeedrunGame.class,
-                both(budget, limiter.member()), () -> resolve(name));
+                gate, () -> resolve(name, client.charging(gate)));
     }
 
     /** The world records of a speedrun.com game id, for a member's request. */
@@ -46,12 +48,12 @@ public class SpeedrunGameService {
 
     private Optional<SpeedrunRecords> fetchRecords(String gameId, FetchBudget budget) {
         return cache.get(EnrichmentSource.SPEEDRUN_RECORDS, "records:" + gameId, SpeedrunRecords.class, budget,
-                () -> client.records(gameId));
+                () -> client.charging(budget).records(gameId));
     }
 
-    private Optional<SpeedrunGame> resolve(String name) {
+    private Optional<SpeedrunGame> resolve(String name, SpeedrunClient charged) {
         String wanted = GameNames.normalize(name);
-        List<SpeedrunGame> matches = client.searchGames(name).stream()
+        List<SpeedrunGame> matches = charged.searchGames(name).stream()
                 .filter(game -> wanted.equals(normalized(game.name())) || wanted.equals(normalized(game.twitchName())))
                 .toList();
         return matches.size() == 1 ? Optional.of(matches.getFirst()) : Optional.empty();

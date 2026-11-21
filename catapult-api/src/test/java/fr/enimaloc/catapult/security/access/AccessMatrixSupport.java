@@ -286,6 +286,7 @@ abstract class AccessMatrixSupport {
         when(twitchService.getModeratedChannelIds(any())).thenReturn(List.of());
         when(twitchService.getModeratedChannelIds(argThat(a -> a != null && mod.getId().equals(a.getId()))))
                 .thenReturn(List.of(owner.getTwitchId()));
+        when(speedrunClient.charging(any())).thenReturn(speedrunClient);
     }
 
     private UserAccount account(String username, String twitchId) {

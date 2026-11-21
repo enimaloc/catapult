@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.service.enrichment.speedrun;
 
+import fr.enimaloc.catapult.service.enrichment.FetchBudget;
+import fr.enimaloc.catapult.service.enrichment.UpstreamBudgetExceededException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -29,7 +31,9 @@ import java.util.Set;
 /**
  * {@link SpeedrunClient} over {@code https://www.speedrun.com/api/v1}. The personal key only ever travels in the
  * {@code X-API-Key} header, never in a URL, and is never logged. A name lookup of an account answers with a
- * redirect to its id, followed here (within the API only).
+ * redirect to its id, followed here (within the API only). Every request beyond the first of a call (each redirect
+ * hop, the game lookup of records without any run) is asked of the {@linkplain #charging extra budget}, the member
+ * share of the limiter unless the caller says otherwise.
  */
 @Slf4j
 @Component
@@ -48,6 +52,7 @@ public class HttpSpeedrunClient implements SpeedrunClient {
     private final JsonMapper mapper = JsonMapper.builder().build();
     private final RestClient restClient;
     private final SpeedrunRateLimiter limiter;
+    private final FetchBudget extra;
 
     @Autowired
     public HttpSpeedrunClient(RestClient.Builder builder, SpeedrunRateLimiter limiter) {
@@ -55,8 +60,18 @@ public class HttpSpeedrunClient implements SpeedrunClient {
     }
 
     HttpSpeedrunClient(RestClient restClient, SpeedrunRateLimiter limiter) {
+        this(restClient, limiter, limiter.member());
+    }
+
+    private HttpSpeedrunClient(RestClient restClient, SpeedrunRateLimiter limiter, FetchBudget extra) {
         this.restClient = restClient;
         this.limiter = limiter;
+        this.extra = extra;
+    }
+
+    @Override
+    public SpeedrunClient charging(FetchBudget extra) {
+        return new HttpSpeedrunClient(restClient, limiter, extra);
     }
 
     /**
@@ -97,6 +112,7 @@ public class HttpSpeedrunClient implements SpeedrunClient {
                     .ifPresent(categories::add);
         }
         if (game == null) {
+            charge();
             game = get(BASE + "/games/{id}", null, false, gameId).flatMap(json -> game(json.path("data")))
                     .orElse(null);
         }
@@ -165,6 +181,7 @@ public class HttpSpeedrunClient implements SpeedrunClient {
             if (!target.toString().startsWith(SITE + API_PATH)) {
                 throw new SpeedrunUnavailableException("speedrun.com redirected out of its API");
             }
+            charge();
             answer = send(restClient.get().uri(target), apiKey);
         }
         int status = answer.status().value();
@@ -179,6 +196,13 @@ public class HttpSpeedrunClient implements SpeedrunClient {
             throw new SpeedrunUnavailableException("speedrun.com answered " + status);
         }
         return parse(answer.body());
+    }
+
+    /** Takes one request beyond a call's first from the extra budget. */
+    private void charge() {
+        if (!extra.tryAcquire()) {
+            throw new UpstreamBudgetExceededException(extra.retryAfter());
+        }
     }
 
     private Answer send(RestClient.RequestHeadersSpec<?> request, String apiKey) {

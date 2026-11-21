@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.service.enrichment.speedrun;
 
+import fr.enimaloc.catapult.service.enrichment.FetchBudget;
+import fr.enimaloc.catapult.service.enrichment.UpstreamBudgetExceededException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
@@ -38,12 +40,28 @@ class HttpSpeedrunClientTest {
     private MockRestServiceServer server;
     private SpeedrunRateLimiter limiter;
     private HttpSpeedrunClient client;
+    private final CountingBudget memberExtra = new CountingBudget(Integer.MAX_VALUE);
+
+    /** A budget that counts what it is asked and grants while under {@code limit}. */
+    private static final class CountingBudget extends java.util.concurrent.atomic.AtomicInteger implements FetchBudget {
+        private final int limit;
+
+        CountingBudget(int limit) {
+            this.limit = limit;
+        }
+
+        @Override
+        public boolean tryAcquire() {
+            return incrementAndGet() <= limit;
+        }
+    }
 
     @BeforeEach
     void setUp() {
         RestClient.Builder builder = RestClient.builder();
         server = MockRestServiceServer.bindTo(builder).build();
         limiter = mock(SpeedrunRateLimiter.class);
+        when(limiter.member()).thenReturn(memberExtra);
         client = new HttpSpeedrunClient(builder.build(), limiter);
     }
 
@@ -106,10 +124,35 @@ class HttpSpeedrunClientTest {
                 .andRespond(withSuccess("{\"data\":{\"id\":\"o1y9j9v6\",\"names\":{\"international\":\"Celeste\"}}}",
                         MediaType.APPLICATION_JSON));
 
-        SpeedrunRecords records = client.records("o1y9j9v6").orElseThrow();
+        CountingBudget extra = new CountingBudget(Integer.MAX_VALUE);
+        SpeedrunRecords records = client.charging(extra).records("o1y9j9v6").orElseThrow();
 
         assertThat(records.game().id()).isEqualTo("o1y9j9v6");
         assertThat(records.categories()).isEmpty();
+        assertThat(extra).as("the game lookup is a second request, asked of the budget").hasValue(1);
+        assertThat(memberExtra).hasValue(0);
+    }
+
+    @Test
+    void recordsFallbackRefusedByTheBudgetSendsNoSecondRequest() {
+        server.expect(once(), requestTo(BASE + "/games/o1y9j9v6/records?scope=full-game&miscellaneous=no&top=1"
+                        + "&skip-empty=true&embed=game,category,players&max=20"))
+                .andRespond(withSuccess("{\"data\":[]}", MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> client.charging(new CountingBudget(0)).records("o1y9j9v6"))
+                .isInstanceOf(UpstreamBudgetExceededException.class);
+        server.verify();
+    }
+
+    @Test
+    void recordsWithRunsAskNoExtraRequest() throws IOException {
+        server.expect(once(), requestTo(BASE + "/games/o1y9j9v6/records?scope=full-game&miscellaneous=no&top=1"
+                        + "&skip-empty=true&embed=game,category,players&max=20"))
+                .andRespond(withSuccess(fixture("records-celeste"), MediaType.APPLICATION_JSON));
+        CountingBudget extra = new CountingBudget(Integer.MAX_VALUE);
+
+        assertThat(client.charging(extra).records("o1y9j9v6")).isPresent();
+        assertThat(extra).hasValue(0);
     }
 
     @Test
@@ -138,6 +181,17 @@ class HttpSpeedrunClientTest {
                 .andRespond(withSuccess(fixture("user"), MediaType.APPLICATION_JSON));
 
         assertThat(client.user("linkus7")).hasValueSatisfying(u -> assertThat(u.id()).isEqualTo("qj26goxk"));
+        server.verify();
+        assertThat(memberExtra).as("each redirect hop is a request of the member share by default").hasValue(1);
+    }
+
+    @Test
+    void user_redirectHopRefusedByTheBudgetIsNotFollowed() {
+        server.expect(once(), requestTo(BASE + "/users/linkus7"))
+                .andRespond(withStatus(HttpStatus.FOUND).header(HttpHeaders.LOCATION, "/api/v1/users/qj26goxk"));
+
+        assertThatThrownBy(() -> client.charging(new CountingBudget(0)).user("linkus7"))
+                .isInstanceOf(UpstreamBudgetExceededException.class);
         server.verify();
     }
 

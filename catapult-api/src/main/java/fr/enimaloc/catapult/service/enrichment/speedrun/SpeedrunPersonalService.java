@@ -45,9 +45,9 @@ public class SpeedrunPersonalService {
 
     /** The personal bests of the account {@code srcUserId} on one game, or on all of them when it is null. */
     public Optional<List<SpeedrunRun>> personalBests(String srcUserId, String gameIdOrNull, FetchBudget budget) {
+        FetchBudget gate = SpeedrunGameService.both(budget, limiter.member());
         return cache.get(EnrichmentSource.SPEEDRUN_PBS, "pb:" + srcUserId + ":" + game(gameIdOrNull), Runs.class,
-                        SpeedrunGameService.both(budget, limiter.member()),
-                        () -> Optional.of(new Runs(client.personalBests(srcUserId, gameIdOrNull))))
+                        gate, () -> Optional.of(new Runs(client.charging(gate).personalBests(srcUserId, gameIdOrNull))))
                 .map(Runs::runs);
     }
 
@@ -57,9 +57,10 @@ public class SpeedrunPersonalService {
      */
     public Optional<List<SpeedrunRun>> pendingRuns(SpeedrunIdentity account, String gameIdOrNull,
                                                    Optional<String> apiKey, FetchBudget budget) {
+        FetchBudget gate = SpeedrunGameService.both(budget, limiter.member());
         return cache.get(EnrichmentSource.SPEEDRUN_PENDING, "pending:" + account.userId() + ":" + game(gameIdOrNull),
-                        Runs.class, SpeedrunGameService.both(budget, limiter.member()),
-                        () -> Optional.of(new Runs(client.pendingRuns(account.userId(), gameIdOrNull,
+                        Runs.class, gate,
+                        () -> Optional.of(new Runs(client.charging(gate).pendingRuns(account.userId(), gameIdOrNull,
                                 apiKey.orElse(null)))))
                 .map(Runs::runs);
     }
