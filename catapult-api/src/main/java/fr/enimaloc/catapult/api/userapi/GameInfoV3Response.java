@@ -196,7 +196,7 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
         }
     }
 
-    /** OpenCritic's score of the game. */
+    /** OpenCritic's score of the game; {@code numReviews} counts the top critics' reviews only. */
     public record OpenCriticObject(Integer topCriticScore, Integer percentRecommended, String tier, int numReviews,
                                    String url, String more) implements GameInfoResponse.HasMore {
         static OpenCriticObject of(OpenCriticGame g, MoreLinks links) {
