@@ -1,0 +1,19 @@
+package fr.enimaloc.catapult.service.enrichment.steamgriddb;
+
+import java.util.Optional;
+
+/** Reads game artwork from the SteamGridDB API v2, authenticated with the shared key pool. */
+public interface SteamGridDbClient {
+
+    /**
+     * Artwork for a Steam app; empty when SteamGridDB does not know the game, the key pool is empty or the answer
+     * is unreadable. Transport failures, 5xx and a second 429 propagate so that callers do not cache them as absent.
+     */
+    Optional<SteamGridDbAssets> fetchBySteamAppId(String steamAppId);
+
+    /** Artwork for the first autocomplete match of {@code name}; empty when nothing matches. */
+    Optional<SteamGridDbAssets> fetchByName(String name);
+
+    /** Artwork for a SteamGridDB game id; {@code name} may be null when unknown. */
+    Optional<SteamGridDbAssets> fetchByGameId(long gameId, String name);
+}
