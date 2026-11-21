@@ -9,7 +9,6 @@ import fr.enimaloc.catapult.service.enrichment.protondb.ProtonDbSummary;
 import fr.enimaloc.catapult.service.enrichment.steamdeck.SteamDeckCompatibility;
 import fr.enimaloc.catapult.service.enrichment.steamgriddb.SteamGridDbAssets;
 
-import java.util.Locale;
 import java.util.Optional;
 
 /**
@@ -157,7 +156,7 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
     public record SteamDeckObject(String category, String more) implements GameInfoResponse.HasMore {
         static SteamDeckObject of(SteamDeckCompatibility c, String more) {
             return c == null ? null : new SteamDeckObject(
-                    c.category() == null ? null : c.category().name().toLowerCase(Locale.ROOT), more);
+                    c.category() == null ? null : c.category().json(), more);
         }
     }
 

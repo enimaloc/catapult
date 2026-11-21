@@ -194,7 +194,7 @@ class EnrichmentGamesControllerTest {
                 .andExpect(jsonPath("$.count").value(12));
         mvc.perform(v3(get("/api/games/steamdeck/400"), "203.0.113.7"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.category").value("VERIFIED"))
+                .andExpect(jsonPath("$.category").value("verified"))
                 .andExpect(jsonPath("$.items[0].token").value("#SteamDeckVerified_TestResult_X"));
         mvc.perform(v3(get("/api/games/steamgriddb/5"), "203.0.113.7"))
                 .andExpect(status().isOk())
