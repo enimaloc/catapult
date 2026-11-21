@@ -91,6 +91,7 @@ class RouteConventionsTest {
             "GET /api/games/prices/{itadId}",
             "GET /api/games/opencritic/{ocId}",
             "GET /api/games/twitch/{twitchGameId}",
+            "GET /api/games/speedrun/{srcGameId}",
             "GET /api/me/game/trailer.mp4",
             "HEAD /api/me/game/trailer.mp4",
             "GET /api/games/steam/{appId}/trailer.mp4",

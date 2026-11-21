@@ -13,6 +13,9 @@ import fr.enimaloc.catapult.service.enrichment.opencritic.OpenCriticService;
 import fr.enimaloc.catapult.service.enrichment.prices.PricesService;
 import fr.enimaloc.catapult.service.enrichment.protondb.ProtonDbService;
 import fr.enimaloc.catapult.service.enrichment.protondb.ProtonDbSummary;
+import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunGame;
+import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunGameService;
+import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunRecords;
 import fr.enimaloc.catapult.service.enrichment.steamdeck.SteamDeckCompatibility;
 import fr.enimaloc.catapult.service.enrichment.steamdeck.SteamDeckService;
 import fr.enimaloc.catapult.service.enrichment.steamgriddb.SteamGridDbAssets;
@@ -77,6 +80,7 @@ class EnrichmentGamesControllerTest {
     @MockitoBean PricesService prices;
     @MockitoBean OpenCriticService openCritic;
     @MockitoBean TwitchActivityService twitch;
+    @MockitoBean SpeedrunGameService speedrun;
 
     private static final String ITAD_ID = "018d937f-590c-70fa-bd4f-b95ee2c2e2f1";
 
@@ -285,6 +289,51 @@ class EnrichmentGamesControllerTest {
         org.mockito.Mockito.verify(twitch).byCategoryId(eq("123"), eq("fr"), any(FetchBudget.class));
         org.mockito.Mockito.verify(twitch).byCategoryId(eq("123"), org.mockito.ArgumentMatchers.isNull(),
                 any(FetchBudget.class));
+    }
+
+    @Test
+    void speedrun_publicRouteCarriesNoPersonalData() throws Exception {
+        SpeedrunRecords records = new SpeedrunRecords(
+                new SpeedrunGame("o1y9j9v6", "Portal", null, "portal", "https://www.speedrun.com/portal", null), List.of());
+        when(speedrun.publicRecords(eq("o1y9j9v6"), any(FetchBudget.class))).thenReturn(Optional.of(records));
+
+        String body = mvc.perform(v3(get("/api/games/speedrun/o1y9j9v6"), "203.0.113.7"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.game.id").value("o1y9j9v6"))
+                .andExpect(jsonPath("$.categories").isArray())
+                .andReturn().getResponse().getContentAsString();
+
+        org.assertj.core.api.Assertions.assertThat(body)
+                .doesNotContain("personalBests", "pendingRuns", "account");
+    }
+
+    @Test
+    void speedrun_malformedIdIs400() throws Exception {
+        mvc.perform(v3(get("/api/games/speedrun/abc-def!"), "203.0.113.7"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith("application/problem+json"));
+        mvc.perform(v3(get("/api/games/speedrun/" + "a".repeat(17)), "203.0.113.7"))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(speedrun);
+    }
+
+    @Test
+    void speedrun_spentShareIs429WithRetryAfter() throws Exception {
+        when(speedrun.publicRecords(anyString(), any(FetchBudget.class)))
+                .thenThrow(new UpstreamBudgetExceededException(java.time.Duration.ofSeconds(7)));
+
+        mvc.perform(v3(get("/api/games/speedrun/o1y9j9v6"), "203.0.113.7"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().exists("Retry-After"));
+    }
+
+    @Test
+    void speedrun_disabledSourceIs404() throws Exception {
+        when(speedrun.publicRecords(anyString(), any(FetchBudget.class))).thenReturn(Optional.empty());
+
+        mvc.perform(v3(get("/api/games/speedrun/o1y9j9v6"), "203.0.113.7"))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentTypeCompatibleWith("application/problem+json"));
     }
 
     @TestConfiguration

@@ -12,6 +12,8 @@ import fr.enimaloc.catapult.service.enrichment.prices.GamePrices;
 import fr.enimaloc.catapult.service.enrichment.prices.PricesService;
 import fr.enimaloc.catapult.service.enrichment.protondb.ProtonDbService;
 import fr.enimaloc.catapult.service.enrichment.protondb.ProtonDbSummary;
+import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunGameService;
+import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunRecords;
 import fr.enimaloc.catapult.service.enrichment.steamdeck.SteamDeckCompatibility;
 import fr.enimaloc.catapult.service.enrichment.steamdeck.SteamDeckService;
 import fr.enimaloc.catapult.service.enrichment.steamgriddb.SteamGridDbAssets;
@@ -42,7 +44,7 @@ import java.util.Optional;
 
 /**
  * Public detail of the enrichment sources (HowLongToBeat, ProtonDB, Steam Deck, SteamGridDB, PCGamingWiki, prices,
- * OpenCritic, Twitch activity), keyed by
+ * OpenCritic, Twitch activity, speedrun.com world records), keyed by
  * each source's own id: the targets of the "more" links of the v3 {@code /api/me/game}. Version 3 and later only.
  * Open to anyone, from any origin, so a cache miss may cost an upstream call: those calls are capped per client IP
  * ({@link IpFetchBudgets}), a spent budget answering {@code 429} with {@code Retry-After}
@@ -68,6 +70,7 @@ public class EnrichmentGamesController {
     private final PricesService pricesService;
     private final OpenCriticService openCriticService;
     private final TwitchActivityService twitchActivityService;
+    private final SpeedrunGameService speedrunGameService;
 
     @Operation(summary = "Get how long an IGDB game takes to beat", description = "HowLongToBeat durations, in "
             + "seconds (rushed, normal, completionist; null when unknown), as IGDB serves them." + BUDGET_NOTE)
@@ -199,6 +202,24 @@ public class EnrichmentGamesController {
         String validLanguage = language(language);
         return found(twitchActivityService.byCategoryId(twitchGameId, validLanguage, budget(request)),
                 "Unknown Twitch category");
+    }
+
+    @Operation(summary = "Get the world records of a speedrun.com game", description = "The world record of "
+            + "each main full-game category (time, runners, date, run and video links), from speedrun.com. "
+            + "Nothing personal: a member's own bests are in /api/me/speedrun." + BUDGET_NOTE + " The public "
+            + "routes also share a global speedrun.com allowance, which answers 429 when spent.")
+    @ApiResponse(responseCode = "200", description = "The game's world records.")
+    @ApiResponse(responseCode = "400", description = "Malformed id.", content = @Content)
+    @ApiResponse(responseCode = "404", description = "Source disabled, or no speedrun.com game with that id.",
+            content = @Content)
+    @ApiResponse(responseCode = "429", description = "Too many live fetches from this IP, the public share of "
+            + "speedrun.com is spent, or the source is paused; retry after Retry-After seconds.", content = @Content)
+    @GetMapping("/speedrun/{srcGameId}")
+    public SpeedrunRecords speedrunDetail(
+            @Parameter(description = "speedrun.com game id.", in = ParameterIn.PATH, example = "o1y9j9v6")
+            @PathVariable @Pattern(regexp = ApiV2.SPEEDRUN_GAME_ID) String srcGameId,
+            HttpServletRequest request) {
+        return found(speedrunGameService.publicRecords(srcGameId, budget(request)), "Unknown speedrun.com game");
     }
 
     /** The lower-cased two-letter language (so FR and fr share a cache entry); null when absent; 400 otherwise. */
