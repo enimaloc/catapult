@@ -1,0 +1,109 @@
+{
+ "data": [
+  {
+   "id": "o1y9j9v6",
+   "names": {
+    "international": "Celeste",
+    "japanese": null,
+    "twitch": "Celeste"
+   },
+   "abbreviation": "celeste",
+   "weblink": "https://www.speedrun.com/celeste",
+   "released": 2018,
+   "release-date": "2018-01-25",
+   "ruleset": {
+    "show-milliseconds": true,
+    "require-verification": true,
+    "require-video": true,
+    "run-times": [
+     "realtime",
+     "ingame"
+    ],
+    "default-time": "ingame",
+    "emulators-allowed": false
+   },
+   "romhack": false,
+   "gametypes": [],
+   "created": "2018-01-15T20:23:45Z",
+   "assets": {
+    "logo": {
+     "uri": "https://www.speedrun.com/static/theme/prd437rn/logo?v=e526c97"
+    },
+    "cover-large": {
+     "uri": "https://www.speedrun.com/static/game/o1y9j9v6/cover?v=9003452"
+    }
+   }
+  },
+  {
+   "id": "3dxy05v6",
+   "names": {
+    "international": "Celeste 64",
+    "japanese": null,
+    "twitch": "Celeste 64: Fragments of the Mountain"
+   },
+   "abbreviation": "celeste64",
+   "weblink": "https://www.speedrun.com/celeste64",
+   "released": 2024,
+   "release-date": "2024-01-29",
+   "ruleset": {
+    "show-milliseconds": true,
+    "require-verification": true,
+    "require-video": true,
+    "run-times": [
+     "realtime",
+     "ingame"
+    ],
+    "default-time": "ingame",
+    "emulators-allowed": true
+   },
+   "romhack": false,
+   "gametypes": [],
+   "created": "2024-01-30T21:32:20Z",
+   "assets": {
+    "logo": {
+     "uri": "https://www.speedrun.com/images/logo.png"
+    },
+    "cover-large": {
+     "uri": "https://www.speedrun.com/static/game/3dxy05v6/cover?v=7bc150d"
+    }
+   }
+  },
+  {
+   "id": "kdkq92ld",
+   "names": {
+    "international": "CelesteNES",
+    "japanese": null,
+    "twitch": "CelesteNES"
+   },
+   "abbreviation": "celestenes",
+   "weblink": "https://www.speedrun.com/celestenes",
+   "released": 2025,
+   "release-date": "2025-01-25",
+   "ruleset": {
+    "show-milliseconds": false,
+    "require-verification": true,
+    "require-video": true,
+    "run-times": [
+     "realtime"
+    ],
+    "default-time": "realtime",
+    "emulators-allowed": true
+   },
+   "romhack": true,
+   "gametypes": [
+    "d91jd1ex",
+    "z71pomxr",
+    "4jn49137"
+   ],
+   "created": "2025-02-01T03:08:05Z",
+   "assets": {
+    "logo": {
+     "uri": "https://www.speedrun.com/static/theme/prd437rn/logo?v=e526c97"
+    },
+    "cover-large": {
+     "uri": "https://www.speedrun.com/static/game/kdkq92ld/cover?v=32527fe"
+    }
+   }
+  }
+ ]
+}
