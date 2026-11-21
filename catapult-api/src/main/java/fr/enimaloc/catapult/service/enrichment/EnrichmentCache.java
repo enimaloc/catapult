@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.domain.enrichment.GameEnrichmentCacheEntry;
 import fr.enimaloc.catapult.repository.enrichment.GameEnrichmentCacheRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -77,9 +78,20 @@ public class EnrichmentCache {
             log.warn("Enrichment fetch failed for {} {}: {}", source.key(), lookupKey, e.toString());
             return cached.flatMap(entry -> read(entry, type)).flatMap(v -> v);
         }
-        String payload = fetched.map(mapper::writeValueAsString).orElse(null);
-        repository.save(new GameEnrichmentCacheEntry(source.key(), lookupKey, payload, now));
+        store(source, lookupKey, fetched.map(mapper::writeValueAsString).orElse(null), now);
         return fetched;
+    }
+
+    /**
+     * Saves one entry. Two first fetches of the same key may race to insert it: the loser's duplicate key is not an
+     * error, the winner's entry holds the same answer.
+     */
+    private void store(EnrichmentSource source, String lookupKey, String payload, Instant fetchedAt) {
+        try {
+            repository.save(new GameEnrichmentCacheEntry(source.key(), lookupKey, payload, fetchedAt));
+        } catch (DataIntegrityViolationException e) {
+            log.debug("Enrichment entry {} {} stored concurrently: {}", source.key(), lookupKey, e.toString());
+        }
     }
 
     /** The entry's value (empty inside when known absent), or empty when its payload is unreadable. */

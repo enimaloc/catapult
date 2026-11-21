@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.repository.enrichment.GameEnrichmentCacheRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.dao.DataIntegrityViolationException;
 import tools.jackson.databind.json.JsonMapper;
 
 import org.springframework.boot.context.properties.bind.Binder;
@@ -133,6 +134,19 @@ class EnrichmentCacheTest {
         assertThatThrownBy(() -> get(() -> false, fetches, () -> Optional.of(new Payload("x", 1))))
                 .isInstanceOf(UpstreamBudgetExceededException.class);
         assertThat(fetches).hasValue(0);
+    }
+
+    /** Two first fetches race: the loser's insert hits the primary key, its fetched value is still answered. */
+    @Test
+    void concurrentFirstFetch_duplicateKeyOnSave_returnsFetchedValue() {
+        when(repository.findBySourceAndLookupKey(anyString(), anyString())).thenReturn(Optional.empty());
+        when(repository.save(any())).thenThrow(new DataIntegrityViolationException("duplicate key"));
+        AtomicInteger fetches = new AtomicInteger();
+
+        Optional<Payload> result = get(FetchBudget.UNLIMITED, fetches, () -> Optional.of(new Payload("Gold", 12)));
+
+        assertThat(result).contains(new Payload("Gold", 12));
+        assertThat(fetches).hasValue(1);
     }
 
     @Test
