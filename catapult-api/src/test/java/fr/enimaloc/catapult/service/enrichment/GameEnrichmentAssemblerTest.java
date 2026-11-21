@@ -227,6 +227,15 @@ class GameEnrichmentAssemblerTest {
     }
 
     @Test
+    void enrichAsync_completesWithTheEnrichment() {
+        GameEnrichment result = assembler.enrichAsync(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2",
+                LINKS).join();
+
+        assertThat(result.protondb()).isEqualTo(PROTON);
+        assertThat(result.steamAppId()).isEqualTo("620");
+    }
+
+    @Test
     void wiresInASpringContext() {
         new ApplicationContextRunner()
                 // IgdbService declares @DependsOn("flyway")

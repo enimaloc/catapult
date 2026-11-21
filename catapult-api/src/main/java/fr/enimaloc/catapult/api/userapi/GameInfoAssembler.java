@@ -23,6 +23,7 @@ import fr.enimaloc.catapult.service.steam.SteamStoreService;
 import fr.enimaloc.catapult.service.tw.TwLabelService;
 import fr.enimaloc.catapult.service.xbox.XboxStoreService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Component;
@@ -33,6 +34,8 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 /**
@@ -40,6 +43,7 @@ import java.util.stream.Collectors;
  * platform's own id: IGDB, Steam, Xbox, DTDD and the channel's own binding. Each answer is empty where its route
  * answers an empty 404. The "more" links follow the current request's origin ({@link PublicBaseUrl}).
  */
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class GameInfoAssembler {
@@ -70,6 +74,7 @@ public class GameInfoAssembler {
     // Optional and set rather than constructor-injected, so the v1/v2 construction of this assembler (and the web
     // slices that import it) stay as they were; without it, v3 answers carry no enrichment object.
     private GameEnrichmentAssembler gameEnrichmentAssembler;
+    private final AtomicBoolean missingEnrichmentLogged = new AtomicBoolean();
 
     @Autowired(required = false)
     void setGameEnrichmentAssembler(GameEnrichmentAssembler gameEnrichmentAssembler) {
@@ -209,7 +214,11 @@ public class GameInfoAssembler {
     /** Every platform object resolvable for {@code detected}, each null when unavailable. */
     private GameInfoResponse aggregate(DetectedGame detected, Optional<UserAccount> user, Locale locale,
                                        String base, LinkStyle style) {
-        Optional<String> igdbId = resolveIgdbId(detected);
+        return aggregate(detected, resolveIgdbId(detected), user, locale, base, style);
+    }
+
+    private GameInfoResponse aggregate(DetectedGame detected, Optional<String> igdbId, Optional<UserAccount> user,
+                                       Locale locale, String base, LinkStyle style) {
         return new GameInfoResponse(true,
                 igdbId.flatMap(id -> igdbObject(id, base, style)).orElse(null),
                 steamObject(detected, locale, base, style),
@@ -315,16 +324,28 @@ public class GameInfoAssembler {
                 .orElseGet(GameInfoV3Response::notInGame);
     }
 
+    // The enrichment only needs the ids and the detected name: it runs while the v2 answer is built, so the v3
+    // answer takes about max(v2, aggregate timeout) rather than their sum.
     private GameInfoV3Response aggregateV3(DetectedGame detected, UserAccount user, Locale locale, String base) {
-        GameInfoResponse v2 = aggregate(detected, Optional.of(user), locale, base, LinkStyle.CURRENT);
-        Optional<String> igdbId = v2.igdb() != null ? Optional.of(v2.igdb().igdbId()) : resolveIgdbId(detected);
+        Optional<String> igdbId = resolveIgdbId(detected);
         Optional<String> steamAppId = detected.getSourceType() == GameBinding.SourceType.STEAM
                 ? Optional.ofNullable(detected.getSourceId()) : Optional.empty();
         MoreLinks links = new MoreLinks(base, LinkStyle.CURRENT);
-        GameEnrichment enrichment = gameEnrichmentAssembler == null
-                ? new GameEnrichment(null, null, null, null, null, null, null)
-                : gameEnrichmentAssembler.enrich(detected, igdbId, steamAppId, v2.name(), links);
-        return GameInfoV3Response.of(v2, enrichment, links, igdbId);
+        CompletableFuture<GameEnrichment> enrichment = enrichAsync(detected, igdbId, steamAppId, links);
+        GameInfoResponse v2 = aggregate(detected, igdbId, Optional.of(user), locale, base, LinkStyle.CURRENT);
+        return GameInfoV3Response.of(v2, enrichment.join(), links, igdbId);
+    }
+
+    private CompletableFuture<GameEnrichment> enrichAsync(DetectedGame detected, Optional<String> igdbId,
+                                                          Optional<String> steamAppId, MoreLinks links) {
+        if (gameEnrichmentAssembler == null) {
+            if (!missingEnrichmentLogged.getAndSet(true)) {
+                log.warn("No GameEnrichmentAssembler: v3 game info answers carry no enrichment object");
+            }
+            return CompletableFuture.completedFuture(GameEnrichment.EMPTY);
+        }
+        // the detected name, not the localized store name: the sources search by a stable name
+        return gameEnrichmentAssembler.enrichAsync(detected, igdbId, steamAppId, detected.getSourceName(), links);
     }
 
     // ---------------------------------------------------------------- v1 (frozen schema)

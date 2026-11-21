@@ -20,15 +20,18 @@ import org.junit.jupiter.api.Test;
 import org.springframework.context.MessageSource;
 import org.springframework.web.context.request.RequestContextHolder;
 
+import java.time.Duration;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -72,7 +75,57 @@ class GameInfoAssemblerV3Test {
     }
 
     @Test
-    void steamGame_enrichedWithItsAppIdAndIgdbId_currentLinks() {
+    void steamGame_enrichedWithItsAppIdIgdbIdAndDetectedName_currentLinks() {
+        DetectedGame detected = playing(Duration.ZERO);
+        ProtonDbSummary proton = new ProtonDbSummary("gold", "gold", "gold", "good", 0.7, 10, "https://p");
+        when(enrichmentAssembler.enrichAsync(any(), any(), any(), any(), any())).thenReturn(
+                CompletableFuture.completedFuture(new GameEnrichment(null, proton, null, null, null, null, "620")));
+
+        GameInfoV3Response response = assembler.gameInfoV3(user, Locale.FRENCH);
+
+        // the detected name, not the localized store name the v2 answer shows
+        verify(enrichmentAssembler).enrichAsync(eq(detected), eq(Optional.of("72")), eq(Optional.of("620")),
+                eq("Portal 2"), eq(new MoreLinks(BASE, GameInfoAssembler.LinkStyle.CURRENT)));
+        verify(igdbService, times(1)).resolveDetected(any(), any(), any());
+        assertThat(response.inGame()).isTrue();
+        assertThat(response.name()).isEqualTo("Portail 2");
+        assertThat(response.igdb().more()).isEqualTo(BASE + "/api/games/igdb/72");
+        assertThat(response.protondb().more()).isEqualTo(BASE + "/api/games/protondb/620");
+        assertThat(response.protonTier()).isEqualTo("gold");
+    }
+
+    @Test
+    void enrichment_overlapsTheV2Aggregation() {
+        playing(Duration.ofSeconds(1));
+        when(enrichmentAssembler.enrichAsync(any(), any(), any(), any(), any())).thenAnswer(invocation ->
+                CompletableFuture.supplyAsync(() -> {
+                    sleep(Duration.ofSeconds(1));
+                    return GameEnrichment.EMPTY;
+                }));
+
+        long start = System.nanoTime();
+        GameInfoV3Response response = assembler.gameInfoV3(user, Locale.ENGLISH);
+        Duration took = Duration.ofNanos(System.nanoTime() - start);
+
+        assertThat(response.inGame()).isTrue();
+        // one after the other they would take 2 s
+        assertThat(took).isLessThan(Duration.ofMillis(1700));
+    }
+
+    @Test
+    void noEnrichmentAssembler_allEnrichmentNull() {
+        assembler.setGameEnrichmentAssembler(null);
+        playing(Duration.ZERO);
+
+        GameInfoV3Response response = assembler.gameInfoV3(user, Locale.ENGLISH);
+
+        assertThat(response.inGame()).isTrue();
+        assertThat(response.protondb()).isNull();
+        assertThat(response.trailer()).isNull();
+    }
+
+    /** Portal 2 detected on Steam, its store page (localized as "Portail 2") taking {@code storeDelay}. */
+    private DetectedGame playing(Duration storeDelay) {
         DetectedGame detected = new DetectedGame("620", GameBinding.SourceType.STEAM, "Portal 2");
         when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(detected));
         when(igdbService.resolveDetected(eq(GameBinding.SourceType.STEAM), eq("620"), any()))
@@ -81,22 +134,23 @@ class GameInfoAssemblerV3Test {
         details.setIgdbId("72");
         details.setSlug("portal-2");
         when(igdbGameDetailsService.getDetails("72")).thenReturn(Optional.of(details));
-        when(steamStoreService.fetchData(anyString(), any(Locale.class))).thenReturn(Optional.empty());
+        SteamStoreService.SteamStorePage page = mock(SteamStoreService.SteamStorePage.class);
+        when(page.name()).thenReturn("Portail 2");
+        when(steamStoreService.fetchData(anyString(), any(Locale.class))).thenAnswer(invocation -> {
+            sleep(storeDelay);
+            return Optional.of(page);
+        });
         when(steamStoreService.fetchIADisclosure(anyString(), any(Locale.class))).thenReturn(Optional.empty());
         when(gameBindingRepository.findByUserAndSourceIdAndSourceType(any(), any(), any()))
                 .thenReturn(Optional.empty());
-        ProtonDbSummary proton = new ProtonDbSummary("gold", "gold", "gold", "good", 0.7, 10, "https://p");
-        when(enrichmentAssembler.enrich(any(), any(), any(), any(), any()))
-                .thenReturn(new GameEnrichment(null, proton, null, null, null, null, "620"));
+        return detected;
+    }
 
-        GameInfoV3Response response = assembler.gameInfoV3(user, Locale.ENGLISH);
-
-        verify(enrichmentAssembler).enrich(eq(detected), eq(Optional.of("72")), eq(Optional.of("620")),
-                eq("Portal 2"), eq(new MoreLinks(BASE, GameInfoAssembler.LinkStyle.CURRENT)));
-        assertThat(response.inGame()).isTrue();
-        assertThat(response.igdb().more()).isEqualTo(BASE + "/api/games/igdb/72");
-        assertThat(response.protondb().more()).isEqualTo(BASE + "/api/games/protondb/620");
-        assertThat(response.protonTier()).isEqualTo("gold");
-        assertThat(response.name()).isEqualTo("Portal 2");
+    private static void sleep(Duration duration) {
+        try {
+            Thread.sleep(duration.toMillis());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 }

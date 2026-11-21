@@ -15,6 +15,9 @@ public record GameEnrichment(TimeToBeat hltb, ProtonDbSummary protondb, SteamGri
                              SteamDeckCompatibility steamDeck, PcGamingWikiPage pcgamingwiki, Trailer trailer,
                              String steamAppId) {
 
+    /** Nothing known from any source. */
+    public static final GameEnrichment EMPTY = new GameEnrichment(null, null, null, null, null, null, null);
+
     /**
      * Where to watch the game's trailer: {@code kind} {@value #MP4} for the MP4 the API rebuilds from a store's HLS
      * stream, {@value #YOUTUBE} for IGDB's first video.

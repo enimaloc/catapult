@@ -98,6 +98,19 @@ public class GameEnrichmentAssembler {
                 appId.getNow(null));
     }
 
+    /**
+     * {@link #enrich} started now on the assembler's own executor, so the caller can build the rest of its answer
+     * meanwhile; the future completes within about the aggregate timeout, never exceptionally.
+     */
+    public CompletableFuture<GameEnrichment> enrichAsync(DetectedGame detected, Optional<String> igdbId,
+                                                         Optional<String> steamAppId, String name, MoreLinks links) {
+        return CompletableFuture.supplyAsync(() -> enrich(detected, igdbId, steamAppId, name, links), executor)
+                .exceptionally(e -> {
+                    log.warn("Game enrichment failed: {}", e.getMessage(), e);
+                    return GameEnrichment.EMPTY;
+                });
+    }
+
     @PreDestroy
     void shutdown() {
         // shutdown(), not shutdownNow(): a late source still finishing must not be interrupted
