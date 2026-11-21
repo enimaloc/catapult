@@ -21,8 +21,6 @@ import java.util.function.Supplier;
 @Service
 public class EnrichmentCache {
 
-    private static final Duration RETRY_AFTER = Duration.ofMinutes(1);
-
     private final GameEnrichmentCacheRepository repository;
     private final EnrichmentProperties properties;
     private final JsonMapper mapper;
@@ -70,7 +68,7 @@ public class EnrichmentCache {
             if (cached.isPresent()) {
                 return read(cached.get(), type).orElse(Optional.empty());
             }
-            throw new UpstreamBudgetExceededException(RETRY_AFTER);
+            throw new UpstreamBudgetExceededException(budget.retryAfter());
         }
         Optional<T> fetched;
         try {
