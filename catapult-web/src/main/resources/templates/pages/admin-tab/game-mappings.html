@@ -2,6 +2,7 @@
 <!--/*@thymesVar id="missing" type="fr.enimaloc.catapult.common.dto.admin.AdminPage<fr.enimaloc.catapult.common.dto.admin.DetectedGameDto>"*/-->
 <!--/*@thymesVar id="cclNames" type="java.util.Map<java.lang.String, java.lang.String>"*/-->
 <!--/*@thymesVar id="twLabels" type="java.util.Map<java.lang.String, java.lang.String>"*/-->
+<!--/*@thymesVar id="variants" type="java.util.List<fr.enimaloc.catapult.common.dto.admin.BattleNetGameVariantDto>"*/-->
 <!--/*
   The admin game mappings: a detected game (platform + its ID) set to a Twitch category for every streamer, its
   CCLs and TWs IGDB's or the admin's, and/or ignored by default (its category then optional). Two paged lists, each with its own page (data-page / data-missing-page, kept
@@ -11,6 +12,9 @@
   Each list, its empty state and its pager are all rendered (the unneeded ones hidden), so that admin-tabs.js
   patches them after an action.
   Driven by admin-game-mappings.js.
+  Below, the Battle.net game variants ([data-bv-list], reloaded on its own after an action): a Battle.net game whose
+  activity text matches one of a variant's patterns becomes its own game (fourcc:key), mapped like any other. Each
+  pattern is its own span, read back by the form as typed (a trailing space counts). Driven by admin-battlenet-variants.js.
 */-->
 <div th:fragment="content" class="admin-view admin-game-mappings"
      th:attr="data-page=${mappings == null ? 0 : mappings.number()},data-missing-page=${missing == null ? 0 : missing.number()},
@@ -127,6 +131,104 @@
             <th:block th:replace="~{pages/admin-tab/game-mappings :: pager(${missing}, 'data-gm-missing-page')}"></th:block>
         </div>
     </div>
+
+    <section class="admin-bnet-variants"
+             th:attr="data-label-create-title=#{admin.bnet-variants.form.create-title},data-label-edit-title=#{admin.bnet-variants.form.edit-title},
+                      data-label-saved=#{admin.bnet-variants.saved},data-label-deleted=#{admin.bnet-variants.deleted},
+                      data-label-delete-title=#{admin.bnet-variants.delete.title('{name}')},
+                      data-label-error-400=#{admin.bnet-variants.error.400},data-label-error-404=#{admin.bnet-variants.error.404},
+                      data-label-error-409=#{admin.bnet-variants.error.409},data-label-unavailable=#{admin.game-mappings.unavailable}">
+        <div class="section-header admin-gm-missing-header">
+            <h3 th:text="#{admin.bnet-variants.title}">Battle.net variants</h3>
+            <mdui-button id="admin-bv-new" variant="tonal" icon="add" th:text="#{admin.bnet-variants.new}">New variant</mdui-button>
+        </div>
+        <p class="admin-cell-muted admin-gm-hint" th:text="#{admin.bnet-variants.hint}">hint</p>
+        <div data-bv-list>
+            <th:block th:if="${variants == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
+            <th:block th:if="${variants != null and variants.isEmpty()}">
+                <th:block th:replace="~{pages/admin-tab/common :: empty('call_split', #{admin.bnet-variants.empty})}"></th:block>
+            </th:block>
+            <mdui-card class="admin-table" variant="outlined" th:if="${variants != null and !variants.isEmpty()}">
+                <div class="admin-row admin-bv-row admin-row-head" aria-hidden="true">
+                    <span th:text="#{admin.bnet-variants.column.game}">Game</span>
+                    <span th:text="#{admin.bnet-variants.column.id}">ID</span>
+                    <span th:text="#{admin.bnet-variants.column.match}">Match</span>
+                    <span th:text="#{admin.bnet-variants.column.patterns}">Patterns</span>
+                    <span th:text="#{admin.bnet-variants.column.name}">Name</span>
+                    <span th:text="#{admin.bnet-variants.column.status}">Status</span>
+                    <span th:text="#{admin.game-mappings.column.updated}">Last change</span>
+                    <span></span>
+                </div>
+                <div class="admin-row admin-bv-row" th:each="v : ${variants}"
+                     th:attr="data-id=${v.id()},data-fourcc=${v.fourcc()},data-variant-key=${v.variantKey()},
+                              data-match-type=${v.matchType()},data-display-name=${v.displayName()},data-enabled=${v.enabled() ? 'true' : null}">
+                    <span class="admin-cell" th:attr="data-label=#{admin.bnet-variants.column.game}" th:text="${v.fourcc()}">WoW</span>
+                    <span class="admin-cell admin-member-id" th:attr="data-label=#{admin.bnet-variants.column.id}" th:text="${v.sourceId()}">WoW:Forever</span>
+                    <span class="admin-cell" th:attr="data-label=#{admin.bnet-variants.column.match}"
+                          th:text="#{|admin.bnet-variants.match.${#strings.toLowerCase(v.matchType())}|}">Starts with</span>
+                    <span class="admin-gm-labels admin-bv-patterns" th:attr="data-label=#{admin.bnet-variants.column.patterns}">
+                        <span th:each="p : ${v.patterns()}" class="admin-bv-pattern" th:text="${p}">Forever - </span>
+                    </span>
+                    <span class="admin-cell" th:attr="data-label=#{admin.bnet-variants.column.name}" th:text="${v.displayName()}">name</span>
+                    <span class="admin-cell" th:attr="data-label=#{admin.bnet-variants.column.status}">
+                        <mdui-chip th:if="${v.enabled()}" icon="check" th:text="#{admin.bnet-variants.enabled}">Enabled</mdui-chip>
+                        <mdui-chip th:unless="${v.enabled()}" icon="pause" th:text="#{admin.bnet-variants.disabled}">Disabled</mdui-chip>
+                    </span>
+                    <span class="admin-member-id" th:attr="data-label=#{admin.game-mappings.column.updated}">
+                        <span th:text="${v.updatedAt() == null ? '—' : #temporals.format(v.updatedAt(), #messages.msg('format.datetime'))}">when</span>
+                        <span class="admin-cell-muted" th:if="${v.updatedBy() != null}" th:text="#{admin.game-mappings.updated-by(${v.updatedBy()})}">by</span>
+                    </span>
+                    <span class="admin-row-actions">
+                        <mdui-button-icon icon="edit" th:attr="data-bv-edit=${v.id()},aria-label=#{admin.bnet-variants.edit}"></mdui-button-icon>
+                        <mdui-button-icon icon="delete" th:attr="data-bv-delete=${v.id()},aria-label=#{admin.bnet-variants.delete}"></mdui-button-icon>
+                    </span>
+                </div>
+            </mdui-card>
+        </div>
+    </section>
+
+    <mdui-dialog id="admin-bv-dialog" class="admin-dialog" close-on-overlay-click>
+        <div class="admin-gm-form">
+            <h3 class="admin-bv-form-title" th:text="#{admin.bnet-variants.form.create-title}">New Battle.net variant</h3>
+            <mdui-text-field name="fourcc" variant="outlined" autocomplete="off" maxlength="4"
+                             th:attr="label=#{admin.bnet-variants.form.game},helper=#{admin.bnet-variants.form.game-helper}"></mdui-text-field>
+            <mdui-text-field name="variantKey" variant="outlined" autocomplete="off" maxlength="32"
+                             th:attr="label=#{admin.bnet-variants.form.key},helper=#{admin.bnet-variants.form.key-helper}"></mdui-text-field>
+            <p class="admin-cell-muted admin-bv-source-id"></p>
+            <label class="admin-gm-switch">
+                <span th:text="#{admin.bnet-variants.form.match}">Match</span>
+                <select name="matchType">
+                    <option value="PREFIX" th:text="#{admin.bnet-variants.match.prefix}">Starts with</option>
+                    <option value="CONTAINS" th:text="#{admin.bnet-variants.match.contains}">Contains</option>
+                </select>
+            </label>
+            <mdui-text-field name="patterns" variant="outlined" rows="3" autosize
+                             th:attr="label=#{admin.bnet-variants.form.patterns},helper=#{admin.bnet-variants.form.patterns-helper}"></mdui-text-field>
+            <mdui-text-field name="displayName" variant="outlined" autocomplete="off" maxlength="100"
+                             th:attr="label=#{admin.bnet-variants.form.name}"></mdui-text-field>
+            <label class="admin-gm-switch">
+                <mdui-switch name="enabled"></mdui-switch>
+                <span th:text="#{admin.bnet-variants.form.enabled}">Enabled</span>
+            </label>
+            <p class="admin-cell-muted" th:text="#{admin.bnet-variants.form.enabled-helper}">helper</p>
+            <p class="admin-gm-error" role="alert" hidden></p>
+            <div class="admin-data-actions">
+                <mdui-button variant="text" class="admin-bv-close" th:text="#{admin.game-mappings.form.close}">Close</mdui-button>
+                <mdui-button variant="filled" class="admin-bv-save" th:text="#{admin.game-mappings.form.save}">Save</mdui-button>
+            </div>
+        </div>
+    </mdui-dialog>
+
+    <mdui-dialog id="admin-bv-delete-dialog" class="admin-dialog" close-on-overlay-click>
+        <div class="admin-gm-form">
+            <h3 class="admin-bv-delete-title">Delete</h3>
+            <p class="admin-cell-muted" th:text="#{admin.bnet-variants.delete.description}">description</p>
+            <div class="admin-data-actions">
+                <mdui-button variant="text" class="admin-bv-close" th:text="#{admin.cancel}">Cancel</mdui-button>
+                <mdui-button variant="filled" class="admin-bv-confirm-delete danger-zone-confirm" th:text="#{admin.bnet-variants.delete}">Delete</mdui-button>
+            </div>
+        </div>
+    </mdui-dialog>
 
     <mdui-dialog id="admin-gm-dialog" class="admin-dialog" close-on-overlay-click>
         <div class="admin-gm-form">

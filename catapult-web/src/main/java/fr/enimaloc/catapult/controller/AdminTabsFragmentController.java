@@ -355,6 +355,7 @@ public class AdminTabsFragmentController {
      * One page of the game mappings and one of the detected games still missing one, each with its own page number,
      * and what the form offers to replace IGDB's with: every CCL ({@code cclNames}, id to name) and every enabled TW
      * ({@code twLabels}, id to label, in their order), as the streamers choose from; either empty when catapult-api failed.
+     * Below them, the Battle.net game variants ({@code variants}, null when catapult-api failed).
      */
     @GetMapping("/game-mappings")
     String gameMappings(Model model, HttpServletResponse response, @RequestParam(defaultValue = "0") int page,
@@ -362,6 +363,7 @@ public class AdminTabsFragmentController {
         return guarded(model, response, () -> {
             model.addAttribute("mappings", apiService.adminGameMappings(Math.max(0, page)));
             model.addAttribute("missing", apiService.adminMissingGameMappings(Math.max(0, missingPage)));
+            model.addAttribute("variants", apiService.adminBattleNetGameVariants());
             AdminCclPage ccl = apiService.adminCcl();
             Map<String, String> cclNames = new LinkedHashMap<>();
             if (ccl != null && ccl.ccls() != null) ccl.ccls().forEach(c -> cclNames.put(c.id(), c.name()));
