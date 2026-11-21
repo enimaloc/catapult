@@ -4,6 +4,8 @@ import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.battlenet.BattleNetFriendLink;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.repository.battlenet.BattleNetFriendLinkRepository;
+import fr.enimaloc.catapult.domain.battlenet.BattleNetGameVariant;
+import fr.enimaloc.catapult.service.battlenet.BattleNetGameVariants;
 import fr.enimaloc.catapult.service.battlenet.BattleNetGateService;
 import fr.enimaloc.catapult.service.battlenet.BattleNetSessionManager;
 import fr.enimaloc.catapult.simulation.SimulatedCalls;
@@ -32,7 +34,8 @@ class BattleNetGameGetterTest {
     private final BattleNetFriendLinkRepository links = mock(BattleNetFriendLinkRepository.class);
     private final BattleNetGateService gate = mock(BattleNetGateService.class);
     private final ObjectProvider<SimulationGate> simulationGate = mock(ObjectProvider.class);
-    private final BattleNetGameGetter getter = new BattleNetGameGetter(sessions, links, gate, simulationGate);
+    private final BattleNetGameVariants variants = mock(BattleNetGameVariants.class);
+    private final BattleNetGameGetter getter = new BattleNetGameGetter(sessions, links, gate, simulationGate, variants);
 
     private UserAccount user;
     private BattleNetFriendLink link;
@@ -177,5 +180,56 @@ class BattleNetGameGetterTest {
 
         assertThat(getter.getCurrentGame(user)).isEmpty();
         verify(sessions, never()).lastPresence(anyLong());
+    }
+
+    private static final String FOREVER_TEXT = "Forever - Normal - Undercity";
+
+    private static BattleNetGameVariant forever() {
+        BattleNetGameVariant variant = new BattleNetGameVariant();
+        variant.setFourcc("WoW");
+        variant.setVariantKey("Forever");
+        variant.setDisplayName("World of Warcraft: Forever");
+        return variant;
+    }
+
+    @Test
+    void variantGivesItsOwnSourceIdAndName() {
+        when(sessions.currentGame(42L))
+            .thenReturn(Optional.of(new BattleNetSessionManager.PlayedGame("WoW", FOREVER_TEXT)));
+        when(variants.resolve("WoW", FOREVER_TEXT)).thenReturn(Optional.of(forever()));
+
+        assertThat(getter.getCurrentGame(user)).contains(
+            new DetectedGame("WoW:Forever", GameBinding.SourceType.BATTLENET, "World of Warcraft: Forever"));
+    }
+
+    @Test
+    void noVariantKeepsTheFourcc() {
+        when(sessions.currentGame(42L))
+            .thenReturn(Optional.of(new BattleNetSessionManager.PlayedGame("WoW", "The Waking Shores - Khaz Modan")));
+
+        assertThat(getter.getCurrentGame(user))
+            .contains(new DetectedGame("WoW", GameBinding.SourceType.BATTLENET, "World of Warcraft"));
+    }
+
+    @Test
+    void disabledVariantFallsBackToTheFourcc() {
+        when(sessions.currentGame(42L))
+            .thenReturn(Optional.of(new BattleNetSessionManager.PlayedGame("WoW", FOREVER_TEXT)));
+        when(variants.resolve("WoW", FOREVER_TEXT)).thenReturn(Optional.of(forever()), Optional.empty());
+
+        assertThat(getter.getCurrentGame(user)).map(DetectedGame::getSourceId).contains("WoW:Forever");
+        assertThat(getter.getCurrentGame(user)).map(DetectedGame::getSourceId).contains("WoW");
+    }
+
+    @Test
+    void traceNamesTheActivityAndVariant() {
+        when(sessions.currentGame(42L))
+            .thenReturn(Optional.of(new BattleNetSessionManager.PlayedGame("WoW", FOREVER_TEXT)));
+        when(variants.resolve("WoW", FOREVER_TEXT)).thenReturn(Optional.of(forever()));
+
+        JsonNode entry = TraceProbe.entryAfter(user, () -> getter.getCurrentGame(user));
+
+        assertThat(entry.at("/details/activity").asString()).isEqualTo(FOREVER_TEXT);
+        assertThat(entry.at("/details/variant").asString()).isEqualTo("WoW:Forever");
     }
 }
