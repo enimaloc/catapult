@@ -1471,4 +1471,18 @@ class MockApiServiceTest {
         assertThat(raw.body().replyText()).isNull();
         assertThat(raw.body().replyHex()).isNotEmpty();
     }
+
+    @Test
+    void battleNetGameVariants_goThroughTheStore() {
+        var request = new fr.enimaloc.catapult.common.dto.admin.BattleNetGameVariantRequest("WoW", "Classic", "CONTAINS",
+                java.util.List.of("Classic"), "WoW Classic", false);
+
+        var created = service.adminCreateBattleNetGameVariant(request);
+        assertThat(created.status()).isEqualTo(201);
+        assertThat(created.body().updatedBy()).isEqualTo("admin");
+        assertThat(service.adminUpdateBattleNetGameVariant(created.body().id(), request).status()).isEqualTo(200);
+        assertThat(service.adminBattleNetGameVariants()).hasSize(2);
+        assertThat(service.adminDeleteBattleNetGameVariant(created.body().id()).status()).isEqualTo(204);
+        assertThat(service.adminBattleNetGameVariants()).hasSize(1);
+    }
 }

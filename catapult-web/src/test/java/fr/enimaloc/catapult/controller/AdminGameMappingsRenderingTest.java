@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.controller;
 import fr.enimaloc.catapult.common.dto.admin.AdminCclDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminCclPage;
 import fr.enimaloc.catapult.common.dto.admin.AdminPage;
+import fr.enimaloc.catapult.common.dto.admin.BattleNetGameVariantDto;
 import fr.enimaloc.catapult.common.dto.admin.DetectedGameDto;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingDto;
 import fr.enimaloc.catapult.common.dto.admin.TwDefinitionDto;
@@ -37,6 +38,7 @@ class AdminGameMappingsRenderingTest {
 
     private static final UUID IGDB_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID OVERRIDE_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
+    private static final UUID VARIANT_ID = UUID.fromString("00000000-0000-0000-0000-0000000000f1");
 
     @Autowired MockMvc mvc;
     @MockitoBean ApiService apiService;
@@ -60,6 +62,9 @@ class AdminGameMappingsRenderingTest {
         when(apiService.adminMissingGameMappings(0)).thenReturn(new AdminPage<>(List.of(
                 new DetectedGameDto("STEAM", "1245620", "Elden Ring", 12),
                 new DetectedGameDto("STEAM", "413150", "Stardew Valley", 5)), 0, 2, 3));
+        when(apiService.adminBattleNetGameVariants()).thenReturn(List.of(new BattleNetGameVariantDto(VARIANT_ID, "WoW",
+                "Forever", "WoW:Forever", "PREFIX", List.of("Forever - ", "<b>x</b>"), "World of Warcraft: Forever",
+                false, Instant.parse("2026-11-21T10:00:00Z"), "enimaloc")));
     }
 
     private String render(Locale locale) throws Exception {
@@ -177,5 +182,46 @@ class AdminGameMappingsRenderingTest {
         assertThat(fr).contains(
                 "data-label-result=\"Associations mises à jour : {bindings} · Chaînes en live mises à jour : {live} · Échecs : {failed}\"",
                 "data-label-suggestion=\"{name} — {id} · Streamers : {n}\"");
+    }
+
+    @Test
+    void variantsSectionListsTheRules() throws Exception {
+        String html = render(Locale.ENGLISH);
+
+        String section = html.substring(html.indexOf("admin-bnet-variants"));
+        assertThat(section).contains("data-bv-edit=\"" + VARIANT_ID + "\"", "data-bv-delete=\"" + VARIANT_ID + "\"",
+                ">WoW:Forever<", "World of Warcraft: Forever", "Starts with", "Disabled", "enimaloc",
+                // each pattern as typed (the form reads them back, trailing space included), escaped
+                "<span class=\"admin-bv-pattern\">Forever - </span>",
+                "<span class=\"admin-bv-pattern\">&lt;b&gt;x&lt;/b&gt;</span>")
+                .doesNotContain("<b>x</b>");
+    }
+
+    @Test
+    void variantsSectionShowsEmptyState() throws Exception {
+        when(apiService.adminBattleNetGameVariants()).thenReturn(List.of());
+
+        String section = render(Locale.ENGLISH);
+
+        assertThat(section.substring(section.indexOf("admin-bnet-variants")))
+                .contains("No Battle.net variant yet").doesNotContain("data-bv-edit");
+    }
+
+    @Test
+    void variantsSectionShowsUnavailableWhenTheApiFailed() throws Exception {
+        when(apiService.adminBattleNetGameVariants()).thenReturn(null);
+
+        String html = render(Locale.ENGLISH);
+
+        assertThat(html.substring(html.indexOf("admin-bnet-variants"))).contains("data-admin-retry")
+                .doesNotContain("data-bv-edit");
+    }
+
+    @Test
+    void variantsLabels_areTranslated() throws Exception {
+        assertThat(render(Locale.FRENCH)).doesNotContain("??").contains("Variantes Battle.net", "Commence par",
+                "Nouvelle variante");
+        assertThat(render(Locale.ENGLISH)).doesNotContain("??").contains("Battle.net variants", "Starts with",
+                "New variant");
     }
 }

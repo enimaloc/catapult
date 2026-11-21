@@ -34,9 +34,11 @@ class PresenceReplayTest {
         PresenceTracker tracker = new PresenceTracker();
         List<String> events = new ArrayList<>();
         for (PresenceStateUpdatedNotification n : deltas()) {
-            tracker.apply(n).forEach(e -> events.add(e.accountId() + ":" + e.game()));
+            tracker.apply(n).forEach(e -> events.add(e.accountId() + ":" + e.game() + ":" + e.activity()));
         }
-        assertThat(events).containsExactly("100000002:WTCG", "100000002:null");
+        // the activity text follows the client's language; a new one (the second game) is an event of its own
+        assertThat(events).containsExactly("100000002:WTCG:Tente de battre Rexxar",
+                "100000002:WTCG:Tente de battre Garrosh Hurlenfer", "100000002:null:null");
     }
 
     private static List<PresenceStateUpdatedNotification> deltas() throws IOException {

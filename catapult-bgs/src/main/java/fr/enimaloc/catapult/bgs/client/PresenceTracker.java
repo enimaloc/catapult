@@ -16,22 +16,28 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Merges the presence deltas pushed by BGS into one state per friend and reports game changes only.
- * The account level is authoritative: the game is the fourcc of the {@code GameAccountHandle} stored at
- * {@code (null, 1, 21)}, except the launcher alone ({@code App}), which is no game. Not thread-safe.
+ * Merges the presence deltas pushed by BGS into one state per friend and reports changes of the game or of its
+ * activity text only. The account level is authoritative: the game is the fourcc of the {@code GameAccountHandle}
+ * stored at {@code (null, 1, 21)}, except the launcher alone ({@code App}), which is no game; the activity is the text
+ * at {@code (null, 1, 25)}, reported only while a game is played. Not thread-safe.
  */
 public final class PresenceTracker {
 
     private static final String LAUNCHER = "App";
     private static final String MOBILE_APP = "BSAp";
     private static final PresenceKey ACTIVE_GAME_ACCOUNT = new PresenceKey(null, 1, 21);
+    private static final PresenceKey ACTIVITY = new PresenceKey(null, 1, 25);
 
     /** gaTitle is null unless group is 2 (game account level). */
     record PresenceKey(String gaTitle, int group, int field) {
     }
 
     private final Map<Long, Map<PresenceKey, Object>> states = new HashMap<>();
-    private final Map<Long, String> games = new HashMap<>();
+    private final Map<Long, Reported> reported = new HashMap<>();
+
+    /** What was last reported about a friend in a game. */
+    private record Reported(String game, String activity) {
+    }
 
     /** Applies a push and returns one event per friend whose game changed. */
     public List<PresenceEvent> apply(PresenceStateUpdatedNotification update) {
@@ -60,21 +66,22 @@ public final class PresenceTracker {
             }
         }
         String game = gameOf(state);
-        if (Objects.equals(game, games.get(accountId))) {
+        Reported now = game == null ? null : new Reported(game, activityOf(state));
+        if (Objects.equals(now, reported.get(accountId))) {
             return Optional.empty();
         }
-        if (game == null) {
-            games.remove(accountId);
-        } else {
-            games.put(accountId, game);
+        if (now == null) {
+            reported.remove(accountId);
+            return Optional.of(new PresenceEvent(accountId, null, 0, null, raw));
         }
-        return Optional.of(new PresenceEvent(accountId, game, game == null ? 0 : Fourcc.toId(game), raw));
+        reported.put(accountId, now);
+        return Optional.of(new PresenceEvent(accountId, game, Fourcc.toId(game), now.activity(), raw));
     }
 
     /** Drops a friend; emits a game end when they were in a game. */
     public Optional<PresenceEvent> forget(long accountId) {
         states.remove(accountId);
-        return games.remove(accountId) == null
+        return reported.remove(accountId) == null
                 ? Optional.empty()
                 : Optional.of(new PresenceEvent(accountId, null, 0, List.of()));
     }
@@ -82,7 +89,7 @@ public final class PresenceTracker {
     /** Forgets everything without emitting (reconnection: the state is rebuilt from new pushes). */
     public void clear() {
         states.clear();
-        games.clear();
+        reported.clear();
     }
 
     private static String gameOf(Map<PresenceKey, Object> state) {
@@ -95,6 +102,10 @@ public final class PresenceTracker {
         } catch (InvalidProtocolBufferException e) {
             return null;
         }
+    }
+
+    private static String activityOf(Map<PresenceKey, Object> state) {
+        return state.get(ACTIVITY) instanceof String text && !text.isEmpty() ? text : null;
     }
 
     private static Object valueOf(bgs.protocol.v2.AttributeTypes.Variant v) {
