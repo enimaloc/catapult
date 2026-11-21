@@ -1,12 +1,15 @@
 package fr.enimaloc.catapult.service.enrichment;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -69,6 +72,26 @@ class IpFetchBudgetsTest {
         clock.advance(Duration.ofSeconds(61));
         budgets.evictIdle();
         assertThat(budgets.trackedIps()).isZero();
+    }
+
+    @Test
+    void springCanBuildIt_withoutAClockBean() {
+        new ApplicationContextRunner()
+                .withBean(EnrichmentProperties.class)
+                .withUserConfiguration(IpFetchBudgets.class)
+                .run(ctx -> assertThat(ctx).hasSingleBean(IpFetchBudgets.class));
+    }
+
+    @Test
+    void concurrentCallers_getExactlyTheBudget() {
+        FetchBudget budget = budgets.forIp("203.0.113.7");
+        AtomicInteger granted = new AtomicInteger();
+        IntStream.range(0, 20).parallel().forEach(i -> {
+            if (budget.tryAcquire()) {
+                granted.incrementAndGet();
+            }
+        });
+        assertThat(granted.get()).isEqualTo(10);
     }
 
     private static final class MutableClock extends Clock {

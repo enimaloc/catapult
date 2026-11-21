@@ -1,6 +1,6 @@
 package fr.enimaloc.catapult.service.enrichment;
 
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -17,7 +17,6 @@ import java.util.concurrent.ConcurrentHashMap;
  * (already the real client IP thanks to {@code server.forward-headers-strategy=native}).
  */
 @Component
-@RequiredArgsConstructor
 public class IpFetchBudgets {
 
     private static final Duration WINDOW = Duration.ofMinutes(1);
@@ -25,6 +24,16 @@ public class IpFetchBudgets {
     private final EnrichmentProperties properties;
     private final Clock clock;
     private final ConcurrentHashMap<String, Deque<Instant>> calls = new ConcurrentHashMap<>();
+
+    @Autowired
+    public IpFetchBudgets(EnrichmentProperties properties) {
+        this(properties, Clock.systemUTC());
+    }
+
+    IpFetchBudgets(EnrichmentProperties properties, Clock clock) {
+        this.properties = properties;
+        this.clock      = clock;
+    }
 
     /** The budget of {@code ip}; every call to {@link FetchBudget#tryAcquire()} counts against that IP. */
     public FetchBudget forIp(String ip) {
