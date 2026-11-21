@@ -11,19 +11,15 @@ import fr.enimaloc.catapult.service.enrichment.protondb.ProtonDbService;
 import fr.enimaloc.catapult.service.enrichment.steamdeck.SteamDeckService;
 import fr.enimaloc.catapult.service.enrichment.steamgriddb.SteamGridDbAssets;
 import fr.enimaloc.catapult.service.enrichment.steamgriddb.SteamGridDbService;
+import fr.enimaloc.catapult.service.enrichment.trailer.TrailerSourceResolver;
 import fr.enimaloc.catapult.service.igdb.IgdbGameDetailsService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.link.ExternalLinks;
-import fr.enimaloc.catapult.service.steam.SteamStoreService;
-import fr.enimaloc.catapult.service.xbox.XboxStoreService;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.util.Arrays;
-import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -58,8 +54,7 @@ public class GameEnrichmentAssembler {
     private final PcGamingWikiService pcGamingWikiService;
     private final IgdbService igdbService;
     private final IgdbGameDetailsService igdbGameDetailsService;
-    private final SteamStoreService steamStoreService;
-    private final XboxStoreService xboxStoreService;
+    private final TrailerSourceResolver trailerSourceResolver;
     private final EnrichmentProperties properties;
 
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
@@ -134,12 +129,14 @@ public class GameEnrichmentAssembler {
     }
 
     /**
-     * The MP4 route when a store offers an HLS H.264 stream the route can rebuild (Steam's highlight movie, else its
-     * first; the Xbox Store's first video), else IGDB's first video on YouTube; null when there is neither.
+     * The MP4 route when {@link TrailerSourceResolver} finds an HLS H.264 stream the route can rebuild (looked up
+     * in the same order as the route does: by Steam app id, then by Microsoft Store product), else IGDB's first
+     * video on YouTube; null when there is neither.
      */
     private GameEnrichment.Trailer trailer(DetectedGame detected, String steamAppId, String igdbId, MoreLinks links) {
-        if (properties.source(EnrichmentSource.TRAILER).enabled()
-                && (steamHls(steamAppId).isPresent() || xboxHls(detected).isPresent())) {
+        String xboxProductId = detected.getSourceType() == GameBinding.SourceType.XBOX
+                ? detected.getSourceId() : null;
+        if (trailerSourceResolver.resolve(steamAppId, xboxProductId, FetchBudget.UNLIMITED).isPresent()) {
             return new GameEnrichment.Trailer(GameEnrichment.Trailer.MP4,
                     links.baseUrl() + CURRENT_GAME_TRAILER_PATH);
         }
@@ -152,32 +149,6 @@ public class GameEnrichmentAssembler {
                 .map(ids -> new GameEnrichment.Trailer(GameEnrichment.Trailer.YOUTUBE,
                         ExternalLinks.youtubeVideo(ids.getFirst())))
                 .orElse(null);
-    }
-
-    private Optional<String> steamHls(String steamAppId) {
-        if (steamAppId == null) {
-            return Optional.empty();
-        }
-        // movies don't depend on the store language
-        return steamStoreService.fetchData(steamAppId, Locale.ENGLISH)
-                .map(SteamStoreService.SteamStorePage::movies)
-                .flatMap(movies -> Arrays.stream(movies).filter(SteamStoreService.SteamStorePage.Movie::highlight)
-                        .findFirst()
-                        .or(() -> Arrays.stream(movies).findFirst()))
-                .map(SteamStoreService.SteamStorePage.Movie::hlsH264)
-                .filter(GameEnrichmentAssembler::hasText);
-    }
-
-    private Optional<String> xboxHls(DetectedGame detected) {
-        if (detected.getSourceType() != GameBinding.SourceType.XBOX || !hasText(detected.getSourceId())) {
-            return Optional.empty();
-        }
-        return xboxStoreService.fetchProduct(detected.getSourceId(), Locale.US)
-                .map(XboxStoreService.XboxProduct::videos)
-                .filter(videos -> !videos.isEmpty())
-                .map(List::getFirst)
-                .map(XboxStoreService.XboxVideo::hlsUrl)
-                .filter(GameEnrichmentAssembler::hasText);
     }
 
     /** {@code task} on the executor; null when it throws. */

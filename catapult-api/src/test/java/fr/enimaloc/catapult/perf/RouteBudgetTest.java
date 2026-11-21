@@ -195,20 +195,28 @@ class RouteBudgetTest {
         }
     }
 
-    /** IGDB knows the owner's game, the Steam store and the Microsoft Store have a page for it. */
+    /**
+     * IGDB knows the owner's game, the Steam store and the Microsoft Store have a page for it, each with a trailer
+     * in HLS (that the trailer {@code HEAD} rows find without starting ffmpeg).
+     */
     private void stubLookups() throws JacksonException {
         when(igdbService.resolveDetected(eq(GameBinding.SourceType.STEAM), eq(BudgetFixtures.STEAM_APP_ID), any()))
                 .thenReturn(Optional.of(new IgdbService.IgdbGame(BudgetFixtures.IGDB_ID, "Budget game 0")));
         SteamStoreService.SteamStorePage page = JsonMapper.builder().build().readValue(
                 "{\"type\":\"game\",\"name\":\"Budget game 0\",\"required_age\":0,\"is_free\":false,"
-                        + "\"steam_appid\":" + BudgetFixtures.STEAM_APP_ID + "}",
+                        + "\"steam_appid\":" + BudgetFixtures.STEAM_APP_ID + ",\"movies\":[{\"id\":1,"
+                        + "\"name\":\"Trailer\",\"highlight\":true,\"hls_h264\":"
+                        + "\"https://video.akamai.steamstatic.com/store_trailers/990000/1/hls_264_master.m3u8\"}]}",
                 SteamStoreService.SteamStorePage.class);
         when(steamStoreService.fetchData(eq(BudgetFixtures.STEAM_APP_ID), any(), anyBoolean()))
                 .thenReturn(Optional.of(page));
         when(xboxStoreService.fetchProduct(eq(XBOX_PRODUCT_ID), any())).thenReturn(Optional.of(
                 new XboxStoreService.XboxProduct("Budget game 0", "Budget description", "Budget publisher",
-                        "Budget developer", null, null, null, null, null, List.of(), List.of(), List.of(), List.of(),
-                        null)));
+                        "Budget developer", null, null, null, null, null, List.of(),
+                        List.of(new XboxStoreService.XboxVideo("Trailer", null,
+                                "https://cdn-dynmedia-1.microsoft.com/is/content/microsoftassets/budget-AVS.m3u8",
+                                null, 1920, 1080)),
+                        List.of(), List.of(), null)));
     }
 
     private String bearer(UserAccount account, List<String> roles) {

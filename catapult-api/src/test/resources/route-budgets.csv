@@ -61,3 +61,6 @@ GET,/api/user/igdb/{igdbId},igdbId=1,anon,2,fixed:one IGDB game
 GET,/api/user/steam/{appId},appId=990000,anon,1,fixed:one Steam app
 GET,/api/user/summary/{uuid},,anon,16,fixed:the one game the channel plays and resolved with its IGDB and DTDD data
 GET,/api/user/xbox/{productId},productId=9NBLGGH4R315,anon,1,fixed:one Microsoft Store product
+HEAD,/api/games/steam/{appId}/trailer.mp4,appId=990000;?version=3,anon,1,fixed:one Steam app's cached trailer stream
+HEAD,/api/games/xbox/{productId}/trailer.mp4,productId=9NBLGGH4R315;?version=3,anon,1,fixed:one Microsoft Store product's cached trailer stream
+HEAD,/api/me/game/trailer.mp4,?version=3,ptoken,13,fixed:the one game the channel plays and its cached trailer stream

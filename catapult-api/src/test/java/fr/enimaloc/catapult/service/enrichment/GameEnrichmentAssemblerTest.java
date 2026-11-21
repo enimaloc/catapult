@@ -17,23 +17,23 @@ import fr.enimaloc.catapult.service.enrichment.steamgriddb.SteamGridDbAssets;
 import fr.enimaloc.catapult.service.enrichment.steamgriddb.SteamGridDbService;
 import fr.enimaloc.catapult.service.igdb.IgdbGameDetailsService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
-import fr.enimaloc.catapult.service.steam.SteamStoreService;
-import fr.enimaloc.catapult.service.xbox.XboxStoreService;
+import fr.enimaloc.catapult.service.enrichment.trailer.TrailerSourceResolver;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.stubbing.Answer;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
+import java.net.URI;
 import java.time.Duration;
 import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -64,8 +64,7 @@ class GameEnrichmentAssemblerTest {
     private final PcGamingWikiService pcgw = mock(PcGamingWikiService.class);
     private final IgdbService igdbService = mock(IgdbService.class);
     private final IgdbGameDetailsService igdbGameDetailsService = mock(IgdbGameDetailsService.class);
-    private final SteamStoreService steamStore = mock(SteamStoreService.class);
-    private final XboxStoreService xboxStore = mock(XboxStoreService.class);
+    private final TrailerSourceResolver trailers = mock(TrailerSourceResolver.class);
     private final EnrichmentProperties properties = new EnrichmentProperties();
 
     private GameEnrichmentAssembler assembler;
@@ -74,7 +73,7 @@ class GameEnrichmentAssemblerTest {
     void setUp() {
         properties.setAggregateTimeout(Duration.ofSeconds(2));
         assembler = new GameEnrichmentAssembler(hltb, protonDb, steamGridDb, steamDeck, pcgw, igdbService,
-                igdbGameDetailsService, steamStore, xboxStore, properties);
+                igdbGameDetailsService, trailers, properties);
         when(hltb.timeToBeat(any(), any(), any())).thenReturn(Optional.of(TTB));
         when(protonDb.summary(anyString(), any())).thenReturn(Optional.of(PROTON));
         when(steamGridDb.bySteamAppId(anyString(), any())).thenReturn(Optional.of(SGDB));
@@ -82,8 +81,7 @@ class GameEnrichmentAssemblerTest {
         when(steamDeck.compatibility(anyString(), any())).thenReturn(Optional.of(DECK));
         when(pcgw.bySteamAppId(anyString(), any())).thenReturn(Optional.of(PCGW));
         when(pcgw.byName(anyString(), any())).thenReturn(Optional.of(PCGW));
-        when(steamStore.fetchData(anyString(), any(Locale.class))).thenReturn(Optional.empty());
-        when(xboxStore.fetchProduct(anyString(), any())).thenReturn(Optional.empty());
+        when(trailers.resolve(any(), any(), any())).thenReturn(Optional.empty());
         when(igdbGameDetailsService.getDetails(anyString())).thenReturn(Optional.empty());
         when(igdbService.findExternalUid(anyString(), any())).thenReturn(Optional.empty());
     }
@@ -191,35 +189,25 @@ class GameEnrichmentAssemblerTest {
         details.setVideoIds(List.of("dQw4w9WgXcQ", "other"));
         when(igdbGameDetailsService.getDetails("72")).thenReturn(Optional.of(details));
 
-        // Steam: the highlight movie's HLS H.264 stream wins
-        SteamStoreService.SteamStorePage page = mock(SteamStoreService.SteamStorePage.class);
-        when(page.movies()).thenReturn(new SteamStoreService.SteamStorePage.Movie[]{
-                new SteamStoreService.SteamStorePage.Movie(1, "teaser", null, null, null, null, false),
-                new SteamStoreService.SteamStorePage.Movie(2, "launch", null, null, null,
-                        "https://video.steam/hls/2/master.m3u8", true)});
-        when(steamStore.fetchData(eq("620"), any(Locale.class))).thenReturn(Optional.of(page));
+        // Steam: the resolver finds an HLS H.264 stream for the detected app id
+        URI hls = URI.create("https://video.akamai.steamstatic.com/hls_264_master.m3u8");
+        when(trailers.resolve(eq("620"), isNull(), eq(FetchBudget.UNLIMITED))).thenReturn(Optional.of(hls));
         GameEnrichment steam = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", LINKS);
         assertThat(steam.trailer()).isEqualTo(new GameEnrichment.Trailer("mp4", BASE + "/api/me/game/trailer.mp4"));
 
-        // Xbox: the first video's HLS stream
-        when(xboxStore.fetchProduct(eq(HALO.getSourceId()), any())).thenReturn(Optional.of(xboxProduct(
-                List.of(new XboxStoreService.XboxVideo("trailer", null, "https://xbox/hls.m3u8", null, 0, 0)))));
+        // Xbox: IGDB's Steam mapping first, then the detected product, in the resolver's order
+        when(igdbService.findExternalUid("72", GameBinding.SourceType.STEAM)).thenReturn(Optional.of("976730"));
+        when(trailers.resolve(eq("976730"), eq(HALO.getSourceId()), eq(FetchBudget.UNLIMITED)))
+                .thenReturn(Optional.of(hls));
         GameEnrichment xbox = assembler.enrich(HALO, Optional.of("72"), Optional.empty(), "Halo", LINKS);
         assertThat(xbox.trailer()).isEqualTo(new GameEnrichment.Trailer("mp4", BASE + "/api/me/game/trailer.mp4"));
+        when(igdbService.findExternalUid("72", GameBinding.SourceType.STEAM)).thenReturn(Optional.empty());
 
-        // no HLS anywhere: IGDB's first video, on YouTube
-        when(page.movies()).thenReturn(new SteamStoreService.SteamStorePage.Movie[]{
-                new SteamStoreService.SteamStorePage.Movie(2, "launch", null, "dash", "dash", " ", true)});
+        // no HLS stream (none, or the trailer source switched off): IGDB's first video, on YouTube
+        when(trailers.resolve(eq("620"), isNull(), any())).thenReturn(Optional.empty());
         GameEnrichment youtube = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", LINKS);
         assertThat(youtube.trailer())
                 .isEqualTo(new GameEnrichment.Trailer("youtube", "https://www.youtube.com/watch?v=dQw4w9WgXcQ"));
-
-        // trailer source switched off: never the MP4 route
-        properties.getTrailer().setEnabled(false);
-        when(page.movies()).thenReturn(new SteamStoreService.SteamStorePage.Movie[]{
-                new SteamStoreService.SteamStorePage.Movie(2, "launch", null, null, null, "https://hls", true)});
-        GameEnrichment off = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", LINKS);
-        assertThat(off.trailer().kind()).isEqualTo("youtube");
 
         // nothing at all
         GameEnrichment none = assembler.enrich(PORTAL, Optional.empty(), Optional.of("620"), "Portal 2", LINKS);
@@ -247,16 +235,10 @@ class GameEnrichmentAssemblerTest {
                 .withBean(PcGamingWikiService.class, () -> pcgw)
                 .withBean(IgdbService.class, () -> igdbService)
                 .withBean(IgdbGameDetailsService.class, () -> igdbGameDetailsService)
-                .withBean(SteamStoreService.class, () -> steamStore)
-                .withBean(XboxStoreService.class, () -> xboxStore)
+                .withBean(TrailerSourceResolver.class, () -> trailers)
                 .withBean(EnrichmentProperties.class)
                 .withUserConfiguration(GameEnrichmentAssembler.class)
                 .run(ctx -> assertThat(ctx).hasSingleBean(GameEnrichmentAssembler.class));
-    }
-
-    private static XboxStoreService.XboxProduct xboxProduct(List<XboxStoreService.XboxVideo> videos) {
-        return new XboxStoreService.XboxProduct("Halo", null, null, null, null, null, null, null, null, List.of(),
-                videos, List.of(), List.of(), null);
     }
 
     private static Answer<Object> slow(Duration delay, Object value) {
