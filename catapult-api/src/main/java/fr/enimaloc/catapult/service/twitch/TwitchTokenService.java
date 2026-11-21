@@ -14,6 +14,8 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -149,7 +151,8 @@ public class TwitchTokenService {
     public void invalidateAppAccessToken(String rejected) {
         synchronized (appTokenLock) {
             AppToken cached = appToken;
-            if (cached != null && cached.token().equals(rejected)) {
+            if (cached != null && rejected != null && MessageDigest.isEqual(
+                    cached.token().getBytes(StandardCharsets.UTF_8), rejected.getBytes(StandardCharsets.UTF_8))) {
                 appToken = null;
             }
         }
