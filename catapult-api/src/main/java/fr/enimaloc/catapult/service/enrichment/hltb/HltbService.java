@@ -27,21 +27,16 @@ public class HltbService {
 
     /**
      * The time to beat of a game known by its IGDB id (nullable); empty when IGDB does not know it, or without an
-     * id (nothing to ask, nothing cached). {@code name} is kept for the callers' sake and is not used.
+     * id (nothing to ask, nothing cached).
      *
      * @throws fr.enimaloc.catapult.service.enrichment.UpstreamBudgetExceededException when it is not cached and
      *                                                                                 {@code budget} is spent
      */
-    public Optional<TimeToBeat> timeToBeat(String igdbId, String name, FetchBudget budget) {
+    public Optional<TimeToBeat> timeToBeat(String igdbId, FetchBudget budget) {
         if (igdbId == null || igdbId.isBlank()) {
             return Optional.empty();
         }
         return cache.get(EnrichmentSource.HLTB, "igdb:" + igdbId, TimeToBeat.class, budget, () -> fetch(igdbId));
-    }
-
-    /** The time to beat of an IGDB game, for the detail route. */
-    public Optional<TimeToBeat> byIgdbId(String igdbId, FetchBudget budget) {
-        return timeToBeat(igdbId, null, budget);
     }
 
     /**

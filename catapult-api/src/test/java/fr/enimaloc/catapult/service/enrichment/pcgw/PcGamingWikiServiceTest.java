@@ -6,7 +6,6 @@ import fr.enimaloc.catapult.service.enrichment.FetchBudget;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
-import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
 
@@ -22,7 +21,7 @@ import static org.mockito.Mockito.when;
 class PcGamingWikiServiceTest {
 
     private static final PcGamingWikiPage PAGE = new PcGamingWikiPage(42L, "Portal 2",
-            "https://www.pcgamingwiki.com/wiki/Portal_2", "true", "true", null, List.of());
+            "https://www.pcgamingwiki.com/wiki/Portal_2", "true", "true", null);
 
     private final EnrichmentCache cache = mock(EnrichmentCache.class);
     private final PcGamingWikiClient client = mock(PcGamingWikiClient.class);

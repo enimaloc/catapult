@@ -74,7 +74,7 @@ public class GameEnrichmentAssembler {
                 .orElseGet(() -> supply("steam app id", () -> igdb == null ? null
                         : igdbService.findExternalUid(igdb, GameBinding.SourceType.STEAM).orElse(null)));
 
-        var hltb = supply("hltb", () -> hltbService.timeToBeat(igdb, name, FetchBudget.UNLIMITED).orElse(null));
+        var hltb = supply("hltb", () -> hltbService.timeToBeat(igdb, FetchBudget.UNLIMITED).orElse(null));
         var protondb = after(appId, "protondb", id -> id == null ? null
                 : protonDbService.summary(id, FetchBudget.UNLIMITED).orElse(null));
         var steamDeck = after(appId, "steamdeck", id -> id == null ? null

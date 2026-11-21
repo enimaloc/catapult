@@ -76,7 +76,6 @@ class PcGamingWikiClientTest {
         assertThat(page.ultrawide()).isEqualTo("true");
         assertThat(page.hdr()).isEqualTo("unknown");
         assertThat(page.controller()).isEqualTo("false");
-        assertThat(page.saveLocations()).isEmpty();
         server.verify();
     }
 

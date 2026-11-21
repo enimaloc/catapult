@@ -69,7 +69,7 @@ public class EnrichmentGamesController {
             @Parameter(description = "IGDB game id.", in = ParameterIn.PATH, example = "1942")
             @PathVariable @Pattern(regexp = ApiV2.IGDB_ID) String igdbId,
             HttpServletRequest request) {
-        return found(hltbService.byIgdbId(igdbId, budget(request)), "Unknown HowLongToBeat game");
+        return found(hltbService.timeToBeat(igdbId, budget(request)), "Unknown HowLongToBeat game");
     }
 
     @Operation(summary = "Get the ProtonDB summary of a Steam app", description = "ProtonDB's community "

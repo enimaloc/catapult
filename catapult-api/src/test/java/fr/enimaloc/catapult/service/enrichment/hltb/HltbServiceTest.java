@@ -48,7 +48,7 @@ class HltbServiceTest {
         when(igdbClient.findTimeToBeat("1942", "token")).thenReturn(Optional.of(GameTimeToBeat.newBuilder()
                 .setHastily(36_000).setNormally(72_000).setCompletely(0).setCount(12).build()));
 
-        Optional<TimeToBeat> result = service.timeToBeat("1942", "The Witcher 3", FetchBudget.UNLIMITED);
+        Optional<TimeToBeat> result = service.timeToBeat("1942", FetchBudget.UNLIMITED);
 
         assertThat(result).contains(new TimeToBeat(36_000L, 72_000L, null, 12));
         verify(cache).get(eq(EnrichmentSource.HLTB), eq("igdb:1942"), eq(TimeToBeat.class), any(), any());
@@ -58,7 +58,7 @@ class HltbServiceTest {
     void igdbEmpty_empty() throws Exception {
         when(igdbClient.findTimeToBeat("26286", "token")).thenReturn(Optional.empty());
 
-        assertThat(service.timeToBeat("26286", "Hollow Knight", FetchBudget.UNLIMITED)).isEmpty();
+        assertThat(service.timeToBeat("26286", FetchBudget.UNLIMITED)).isEmpty();
     }
 
     @Test
@@ -66,22 +66,22 @@ class HltbServiceTest {
         when(igdbClient.findTimeToBeat("26286", "token"))
                 .thenReturn(Optional.of(GameTimeToBeat.newBuilder().setCount(0).build()));
 
-        assertThat(service.timeToBeat("26286", "Hollow Knight", FetchBudget.UNLIMITED)).isEmpty();
+        assertThat(service.timeToBeat("26286", FetchBudget.UNLIMITED)).isEmpty();
     }
 
     @Test
-    void byIgdbId_usesIgdb() throws Exception {
+    void knownGame_readsIgdbFigures() throws Exception {
         when(igdbClient.findTimeToBeat("1942", "token")).thenReturn(Optional.of(GameTimeToBeat.newBuilder()
                 .setNormally(72_000).setCount(3).build()));
 
-        assertThat(service.byIgdbId("1942", FetchBudget.UNLIMITED))
+        assertThat(service.timeToBeat("1942", FetchBudget.UNLIMITED))
                 .contains(new TimeToBeat(null, 72_000L, null, 3));
     }
 
     @Test
     void noIgdbId_empty_cacheNotTouched() throws Exception {
-        assertThat(service.timeToBeat(null, "Hollow Knight", FetchBudget.UNLIMITED)).isEmpty();
-        assertThat(service.timeToBeat(" ", "Hollow Knight", FetchBudget.UNLIMITED)).isEmpty();
+        assertThat(service.timeToBeat(null, FetchBudget.UNLIMITED)).isEmpty();
+        assertThat(service.timeToBeat(" ", FetchBudget.UNLIMITED)).isEmpty();
         verify(cache, never()).get(any(), anyString(), any(), any(), any());
         verify(igdbClient, never()).findTimeToBeat(anyString(), anyString());
     }
@@ -90,7 +90,7 @@ class HltbServiceTest {
     void noIgdbToken_throws_nothingAsked() throws Exception {
         when(igdbService.getAppToken()).thenReturn("");
 
-        assertThatThrownBy(() -> service.timeToBeat("26286", "Hollow Knight", FetchBudget.UNLIMITED))
+        assertThatThrownBy(() -> service.timeToBeat("26286", FetchBudget.UNLIMITED))
                 .isInstanceOf(HltbService.IgdbUnavailableException.class);
         verify(igdbClient, never()).findTimeToBeat(anyString(), anyString());
     }
@@ -102,9 +102,9 @@ class HltbServiceTest {
         HltbService withRealCache = new HltbService(
                 new EnrichmentCache(repository, properties, JsonMapper.builder().build()), igdbClient, igdbService);
 
-        assertThat(withRealCache.timeToBeat("26286", "Hollow Knight", FetchBudget.UNLIMITED)).isEmpty();
+        assertThat(withRealCache.timeToBeat("26286", FetchBudget.UNLIMITED)).isEmpty();
         verify(repository, never()).save(any());
-        assertThatThrownBy(() -> service.timeToBeat("26286", "Hollow Knight", FetchBudget.UNLIMITED))
+        assertThatThrownBy(() -> service.timeToBeat("26286", FetchBudget.UNLIMITED))
                 .isInstanceOf(HltbService.IgdbUnavailableException.class);
     }
 }

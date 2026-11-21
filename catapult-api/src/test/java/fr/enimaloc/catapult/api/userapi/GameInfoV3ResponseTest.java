@@ -39,7 +39,7 @@ class GameInfoV3ResponseTest {
     private static final SteamDeckCompatibility DECK = new SteamDeckCompatibility(
             SteamDeckCompatibility.Category.VERIFIED, List.of());
     private static final PcGamingWikiPage PCGW = new PcGamingWikiPage(42L, "Portal 2",
-            "https://www.pcgamingwiki.com/wiki/Portal_2", "true", "true", "false", List.of());
+            "https://www.pcgamingwiki.com/wiki/Portal_2", "true", "true", "false");
     private static final GameEnrichment.Trailer TRAILER = new GameEnrichment.Trailer("mp4",
             BASE + "/api/me/game/trailer.mp4?version=3");
 

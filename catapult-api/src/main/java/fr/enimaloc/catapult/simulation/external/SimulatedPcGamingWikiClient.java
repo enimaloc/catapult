@@ -8,7 +8,6 @@ import org.springframework.stereotype.Component;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
 import java.util.Optional;
 
 /** PCGamingWiki in the mock profile: every game has a page with ultrawide and controller support, nothing leaves. */
@@ -37,6 +36,6 @@ public class SimulatedPcGamingWikiClient implements PcGamingWikiClient {
     private static PcGamingWikiPage page(String title) {
         String url = "https://www.pcgamingwiki.com/wiki/"
                 + URLEncoder.encode(title.replace(' ', '_'), StandardCharsets.UTF_8);
-        return new PcGamingWikiPage(PAGE_ID, title, url, "true", "true", "limited", List.of());
+        return new PcGamingWikiPage(PAGE_ID, title, url, "true", "true", "limited");
     }
 }

@@ -128,7 +128,7 @@ class EnrichmentGamesControllerTest {
     @Test
     void disabledSource_404() throws Exception {
         when(protonDb.summary(anyString(), any(FetchBudget.class))).thenReturn(Optional.empty());
-        when(hltb.byIgdbId(anyString(), any(FetchBudget.class))).thenReturn(Optional.empty());
+        when(hltb.timeToBeat(anyString(), any(FetchBudget.class))).thenReturn(Optional.empty());
         when(steamDeck.compatibility(anyString(), any(FetchBudget.class))).thenReturn(Optional.empty());
         when(steamGridDb.byGameId(anyLong(), any(FetchBudget.class))).thenReturn(Optional.empty());
         when(pcGamingWiki.byPageId(anyLong(), any(FetchBudget.class))).thenReturn(Optional.empty());
@@ -177,7 +177,7 @@ class EnrichmentGamesControllerTest {
 
     @Test
     void everySource_servesItsDetail() throws Exception {
-        when(hltb.byIgdbId(eq("1942"), any(FetchBudget.class)))
+        when(hltb.timeToBeat(eq("1942"), any(FetchBudget.class)))
                 .thenReturn(Optional.of(new TimeToBeat(3600L, 7200L, null, 12)));
         when(steamDeck.compatibility(eq("400"), any(FetchBudget.class))).thenReturn(Optional.of(
                 new SteamDeckCompatibility(SteamDeckCompatibility.Category.VERIFIED,

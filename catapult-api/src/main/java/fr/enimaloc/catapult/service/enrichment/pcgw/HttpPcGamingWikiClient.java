@@ -130,7 +130,7 @@ public class HttpPcGamingWikiClient implements PcGamingWikiClient {
         return new PcGamingWikiPage(page.pageId(), page.title(),
                 WIKI + UriUtils.encodePathSegment(page.title().replace(' ', '_'), StandardCharsets.UTF_8),
                 field(page.text(), "ultrawidescreen"), field(page.text(), "controller support"),
-                field(page.text(), "hdr"), List.of());
+                field(page.text(), "hdr"));
     }
 
     /** The first token of a {@code |key = value} line; keys such as {@code "key notes"} do not match. */

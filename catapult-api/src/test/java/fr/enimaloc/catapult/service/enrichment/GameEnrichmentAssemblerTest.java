@@ -55,7 +55,7 @@ class GameEnrichmentAssemblerTest {
     private static final SteamDeckCompatibility DECK = new SteamDeckCompatibility(
             SteamDeckCompatibility.Category.VERIFIED, List.of());
     private static final PcGamingWikiPage PCGW = new PcGamingWikiPage(42L, "Portal 2",
-            "https://www.pcgamingwiki.com/wiki/Portal_2", "true", "true", "false", List.of());
+            "https://www.pcgamingwiki.com/wiki/Portal_2", "true", "true", "false");
 
     private final HltbService hltb = mock(HltbService.class);
     private final ProtonDbService protonDb = mock(ProtonDbService.class);
@@ -74,7 +74,7 @@ class GameEnrichmentAssemblerTest {
         properties.setAggregateTimeout(Duration.ofSeconds(2));
         assembler = new GameEnrichmentAssembler(hltb, protonDb, steamGridDb, steamDeck, pcgw, igdbService,
                 igdbGameDetailsService, trailers, properties);
-        when(hltb.timeToBeat(any(), any(), any())).thenReturn(Optional.of(TTB));
+        when(hltb.timeToBeat(any(), any())).thenReturn(Optional.of(TTB));
         when(protonDb.summary(anyString(), any())).thenReturn(Optional.of(PROTON));
         when(steamGridDb.bySteamAppId(anyString(), any())).thenReturn(Optional.of(SGDB));
         when(steamGridDb.byName(anyString(), any())).thenReturn(Optional.of(SGDB));
@@ -96,7 +96,7 @@ class GameEnrichmentAssemblerTest {
         Answer<Object> slowProton = slow(Duration.ofMillis(700), Optional.of(PROTON));
         when(protonDb.summary(anyString(), any())).thenAnswer(slowProton);
         when(steamDeck.compatibility(anyString(), any())).thenAnswer(slow(Duration.ofMillis(700), Optional.of(DECK)));
-        when(hltb.timeToBeat(any(), any(), any())).thenAnswer(slow(Duration.ofMillis(700), Optional.of(TTB)));
+        when(hltb.timeToBeat(any(), any())).thenAnswer(slow(Duration.ofMillis(700), Optional.of(TTB)));
         when(pcgw.bySteamAppId(anyString(), any())).thenAnswer(slow(Duration.ofMillis(700), Optional.of(PCGW)));
         when(steamGridDb.bySteamAppId(anyString(), any()))
                 .thenAnswer(slow(Duration.ofMillis(700), Optional.of(SGDB)));
@@ -113,7 +113,7 @@ class GameEnrichmentAssemblerTest {
         assertThat(result.steamAppId()).isEqualTo("620");
         // five 700 ms calls one after the other would take 3.5 s
         assertThat(took).isLessThan(Duration.ofMillis(1800));
-        verify(hltb).timeToBeat(eq("72"), eq("Portal 2"), eq(FetchBudget.UNLIMITED));
+        verify(hltb).timeToBeat(eq("72"), eq(FetchBudget.UNLIMITED));
         verify(protonDb).summary(eq("620"), eq(FetchBudget.UNLIMITED));
         verify(steamGridDb, never()).byName(anyString(), any());
         verify(pcgw, never()).byName(anyString(), any());
@@ -139,7 +139,7 @@ class GameEnrichmentAssemblerTest {
     @Test
     void failingSource_null_noException() {
         when(steamDeck.compatibility(anyString(), any())).thenThrow(new IllegalStateException("boom"));
-        when(hltb.timeToBeat(any(), any(), any()))
+        when(hltb.timeToBeat(any(), any()))
                 .thenThrow(new UpstreamBudgetExceededException(Duration.ofMinutes(1)));
 
         GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", LINKS);
@@ -163,7 +163,7 @@ class GameEnrichmentAssemblerTest {
         verify(pcgw).byName(eq("Halo"), eq(FetchBudget.UNLIMITED));
         verify(protonDb, never()).summary(anyString(), any());
         verify(steamDeck, never()).compatibility(anyString(), any());
-        verify(hltb).timeToBeat(eq(null), eq("Halo"), eq(FetchBudget.UNLIMITED));
+        verify(hltb).timeToBeat(eq(null), eq(FetchBudget.UNLIMITED));
     }
 
     @Test
