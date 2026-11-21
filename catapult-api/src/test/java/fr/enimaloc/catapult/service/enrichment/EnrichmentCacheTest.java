@@ -150,6 +150,35 @@ class EnrichmentCacheTest {
     }
 
     @Test
+    void put_storesValueAsFresh() {
+        cache.put(EnrichmentSource.PROTONDB, "alias:1", new Payload("Gold", 12));
+
+        ArgumentCaptor<GameEnrichmentCacheEntry> saved = ArgumentCaptor.forClass(GameEnrichmentCacheEntry.class);
+        verify(repository).save(saved.capture());
+        assertThat(saved.getValue().getLookupKey()).isEqualTo("alias:1");
+        assertThat(saved.getValue().getPayload()).contains("Gold");
+        assertThat(saved.getValue().getFetchedAt()).isEqualTo(NOW);
+    }
+
+    @Test
+    void put_neverStoresAbsentNorIntoADisabledSource() {
+        cache.put(EnrichmentSource.PROTONDB, "alias:1", null);
+        properties.getProtondb().setEnabled(false);
+        cache.put(EnrichmentSource.PROTONDB, "alias:1", new Payload("Gold", 12));
+
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void put_duplicateKey_isTolerated() {
+        when(repository.save(any())).thenThrow(new DataIntegrityViolationException("duplicate key"));
+
+        cache.put(EnrichmentSource.PROTONDB, "alias:1", new Payload("Gold", 12));
+
+        verify(repository).save(any());
+    }
+
+    @Test
     void disabledSource_returnsEmptyWithoutFetchOrRead() {
         properties.getProtondb().setEnabled(false);
         AtomicInteger fetches = new AtomicInteger();

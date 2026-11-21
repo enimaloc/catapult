@@ -15,6 +15,9 @@ public interface SteamGridDbClient {
     /** Artwork for the first autocomplete match of {@code name}; empty when nothing matches. */
     Optional<SteamGridDbAssets> fetchByName(String name);
 
-    /** Artwork for a SteamGridDB game id; {@code name} may be null when unknown. */
+    /**
+     * Artwork for a SteamGridDB game id; {@code name} may be null when unknown, then it is read from SteamGridDB
+     * (empty when the id is unknown).
+     */
     Optional<SteamGridDbAssets> fetchByGameId(long gameId, String name);
 }

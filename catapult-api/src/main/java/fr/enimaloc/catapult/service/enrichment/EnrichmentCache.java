@@ -83,6 +83,18 @@ public class EnrichmentCache {
     }
 
     /**
+     * Stores {@code value} under {@code lookupKey} as just fetched, so that a lookup by another key of the same
+     * answer (a detail route's id) is served without a second upstream call. Never records an absence; does nothing
+     * when the source is disabled.
+     */
+    public <T> void put(EnrichmentSource source, String lookupKey, T value) {
+        if (value == null || !properties.source(source).enabled()) {
+            return;
+        }
+        store(source, lookupKey, mapper.writeValueAsString(value), clock.instant());
+    }
+
+    /**
      * Saves one entry. Two first fetches of the same key may race to insert it: the loser's duplicate key is not an
      * error, the winner's entry holds the same answer.
      */

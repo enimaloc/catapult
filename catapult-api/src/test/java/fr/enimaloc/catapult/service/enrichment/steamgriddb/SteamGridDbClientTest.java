@@ -106,6 +106,31 @@ class SteamGridDbClientTest {
     }
 
     @Test
+    void byGameId_withoutName_readsTheGameFirst() throws IOException {
+        when(rotator.nextKey()).thenReturn(Optional.of("keyA"));
+        server.expect(once(), requestTo(BASE + "/games/id/5248"))
+                .andRespond(withSuccess(fixture("game-steam"), MediaType.APPLICATION_JSON));
+        expectAssets("keyA", 5248);
+
+        SteamGridDbAssets assets = client.fetchByGameId(5248, null).orElseThrow();
+
+        assertThat(assets.gameId()).isEqualTo(5248);
+        assertThat(assets.name()).isEqualTo("Dota 2");
+        server.verify();
+    }
+
+    @Test
+    void byGameId_unknownId_empty_noAssetCall() {
+        when(rotator.nextKey()).thenReturn(Optional.of("keyA"));
+        server.expect(once(), requestTo(BASE + "/games/id/1"))
+                .andRespond(withStatus(HttpStatus.NOT_FOUND).contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"success\":false,\"errors\":[\"Game not found\"]}"));
+
+        assertThat(client.fetchByGameId(1, null)).isEmpty();
+        server.verify();
+    }
+
+    @Test
     void notFound_empty() {
         when(rotator.nextKey()).thenReturn(Optional.of("keyA"));
         server.expect(once(), requestTo(BASE + "/games/steam/1"))

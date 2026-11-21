@@ -14,6 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -46,6 +47,21 @@ class SteamGridDbServiceTest {
         verify(cache).get(eq(EnrichmentSource.STEAMGRIDDB), eq("steam:570"), eq(SteamGridDbAssets.class),
                 eq(FetchBudget.UNLIMITED), fetch.capture());
         assertThat(fetch.getValue().get()).contains(ASSETS);
+        verify(cache).put(EnrichmentSource.STEAMGRIDDB, "sgdb:5248", ASSETS);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void bySteamAppId_absent_storesNoAlias() {
+        when(cache.get(any(), any(), any(), any(), any())).thenReturn(Optional.empty());
+        when(client.fetchBySteamAppId("1")).thenReturn(Optional.empty());
+
+        service.bySteamAppId("1", FetchBudget.UNLIMITED);
+
+        ArgumentCaptor<Supplier<Optional<SteamGridDbAssets>>> fetch = ArgumentCaptor.forClass(Supplier.class);
+        verify(cache).get(any(), any(), any(), any(), fetch.capture());
+        assertThat(fetch.getValue().get()).isEmpty();
+        verify(cache, never()).put(any(), any(), any());
     }
 
     @Test
@@ -60,6 +76,7 @@ class SteamGridDbServiceTest {
         verify(cache).get(eq(EnrichmentSource.STEAMGRIDDB), eq("name:dota 2"), eq(SteamGridDbAssets.class),
                 any(), fetch.capture());
         assertThat(fetch.getValue().get()).contains(ASSETS);
+        verify(cache).put(EnrichmentSource.STEAMGRIDDB, "sgdb:5248", ASSETS);
     }
 
     @Test
@@ -74,5 +91,6 @@ class SteamGridDbServiceTest {
         verify(cache).get(eq(EnrichmentSource.STEAMGRIDDB), eq("sgdb:5248"), eq(SteamGridDbAssets.class),
                 any(), fetch.capture());
         assertThat(fetch.getValue().get()).contains(ASSETS);
+        verify(cache, never()).put(any(), any(), any());
     }
 }

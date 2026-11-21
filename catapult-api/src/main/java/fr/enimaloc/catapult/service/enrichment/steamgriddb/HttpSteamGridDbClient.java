@@ -55,7 +55,14 @@ public class HttpSteamGridDbClient implements SteamGridDbClient {
 
     @Override
     public Optional<SteamGridDbAssets> fetchByGameId(long gameId, String name) {
-        return fetchAssets(gameId, name);
+        if (name != null) {
+            return fetchAssets(gameId, name);
+        }
+        // the name comes with the game: an unknown id is absent rather than a nameless game without artwork
+        return get("/games/id/{id}", gameId)
+                .map(json -> json.path("data"))
+                .filter(data -> data.hasNonNull("id"))
+                .flatMap(data -> fetchAssets(gameId, data.path("name").asString(null)));
     }
 
     private Optional<SteamGridDbAssets> fetchAssets(long gameId, String name) {
