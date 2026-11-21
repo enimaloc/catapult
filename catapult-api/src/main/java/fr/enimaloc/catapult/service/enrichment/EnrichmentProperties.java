@@ -32,6 +32,14 @@ public class EnrichmentProperties {
         private int dailyCap = 50;
     }
 
+    /** Speedrun.com settings that are not a source's own ({@code catapult.enrichment.speedrun.*}). */
+    @Getter
+    @Setter
+    public static class Speedrun {
+        /** Upstream calls per minute across the speedrun.com sources. */
+        private int perMinute = 60;
+    }
+
     private SourceSettings hltb = new SourceSettings();
     private SourceSettings protondb = new SourceSettings();
     private SourceSettings steamgriddb = new SourceSettings();
@@ -43,6 +51,12 @@ public class EnrichmentProperties {
     private SourceSettings twitchCategory = new SourceSettings();
     private SourceSettings twitchLives = new SourceSettings();
     private SourceSettings twitchClips = new SourceSettings();
+    private SourceSettings speedrunGame = new SourceSettings();
+    private SourceSettings speedrunRecords = new SourceSettings();
+    private SourceSettings speedrunUser = new SourceSettings();
+    private SourceSettings speedrunPbs = new SourceSettings();
+    private SourceSettings speedrunPending = new SourceSettings();
+    private Speedrun speedrun = new Speedrun();
     /** How long a "known absent" answer is trusted. */
     private Duration absentTtl = Duration.ofDays(1);
     /** Longest the aggregate endpoint waits for the slow sources. */
@@ -84,6 +98,10 @@ public class EnrichmentProperties {
         return ffmpegMaxDuration;
     }
 
+    public int speedrunPerMinute() {
+        return speedrun.getPerMinute();
+    }
+
     public List<String> excludedShops() {
         return prices.getExcludedShops();
     }
@@ -105,6 +123,11 @@ public class EnrichmentProperties {
             case TWITCH_CATEGORY -> twitchCategory;
             case TWITCH_LIVES -> twitchLives;
             case TWITCH_CLIPS -> twitchClips;
+            case SPEEDRUN_GAME -> speedrunGame;
+            case SPEEDRUN_RECORDS -> speedrunRecords;
+            case SPEEDRUN_USER -> speedrunUser;
+            case SPEEDRUN_PBS -> speedrunPbs;
+            case SPEEDRUN_PENDING -> speedrunPending;
         };
     }
 
@@ -115,7 +138,10 @@ public class EnrichmentProperties {
             case PROTONDB, STEAMDECK, TRAILER, OPENCRITIC, TWITCH_CATEGORY -> Duration.ofDays(1);
             case PRICES -> Duration.ofHours(6);
             case TWITCH_LIVES -> Duration.ofMinutes(5);
-            case TWITCH_CLIPS -> Duration.ofHours(1);
+            case TWITCH_CLIPS, SPEEDRUN_RECORDS -> Duration.ofHours(1);
+            case SPEEDRUN_GAME -> Duration.ofDays(30);
+            case SPEEDRUN_USER -> Duration.ofDays(7);
+            case SPEEDRUN_PBS, SPEEDRUN_PENDING -> Duration.ofMinutes(15);
         };
     }
 }

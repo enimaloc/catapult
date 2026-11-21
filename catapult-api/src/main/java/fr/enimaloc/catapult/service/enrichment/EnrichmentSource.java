@@ -12,7 +12,12 @@ public enum EnrichmentSource {
     OPENCRITIC("opencritic"),
     TWITCH_CATEGORY("twitch-category"),
     TWITCH_LIVES("twitch-lives"),
-    TWITCH_CLIPS("twitch-clips");
+    TWITCH_CLIPS("twitch-clips"),
+    SPEEDRUN_GAME("speedrun-game"),
+    SPEEDRUN_RECORDS("speedrun-records"),
+    SPEEDRUN_USER("speedrun-user"),
+    SPEEDRUN_PBS("speedrun-pbs"),
+    SPEEDRUN_PENDING("speedrun-pending");
 
     private final String key;
 
