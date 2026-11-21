@@ -16,4 +16,27 @@ public interface FetchBudget {
     default Duration retryAfter() {
         return Duration.ofMinutes(1);
     }
+
+    /**
+     * A view of {@code budget} that asks it at most once: after the first answer, every later call repeats that
+     * answer without asking again, so a source that makes several upstream calls per fetch is charged a single one.
+     */
+    static FetchBudget once(FetchBudget budget) {
+        return new FetchBudget() {
+            private Boolean answer;
+
+            @Override
+            public synchronized boolean tryAcquire() {
+                if (answer == null) {
+                    answer = budget.tryAcquire();
+                }
+                return answer;
+            }
+
+            @Override
+            public Duration retryAfter() {
+                return budget.retryAfter();
+            }
+        };
+    }
 }
