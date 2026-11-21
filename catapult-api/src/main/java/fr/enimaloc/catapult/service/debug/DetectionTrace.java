@@ -152,7 +152,8 @@ public final class DetectionTrace implements AutoCloseable {
 
     /**
      * What the cycle made of the answers: {@code frozen}, {@code timeout}, {@code unchanged}, {@code changed},
-     * {@code cleared} or {@code nothing}. A timeout's {@code message} detail becomes the recorded exchange's error.
+     * {@code unconfirmed} (no game this cycle, the known one kept until a second), {@code cleared} or {@code nothing}.
+     * A timeout's {@code message} detail becomes the recorded exchange's error.
      */
     public static void outcome(String outcome, Map<String, Object> details) {
         DetectionTrace trace = CURRENT.get();
