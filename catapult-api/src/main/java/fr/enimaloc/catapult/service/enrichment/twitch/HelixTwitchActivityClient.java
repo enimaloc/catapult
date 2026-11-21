@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.service.twitch.TwitchTokenService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriComponentsBuilder;
 import tools.jackson.databind.JsonNode;
@@ -18,7 +19,8 @@ import java.util.Optional;
 
 /**
  * {@link TwitchActivityClient} over Twitch Helix with the app access token. Without a client id nothing is sent;
- * an empty token is a failure, never an absent category.
+ * an empty token is a failure, never an absent category. A request Helix answers 401 invalidates the token and is
+ * sent once more with a fresh one.
  */
 @Component
 public class HelixTwitchActivityClient implements TwitchActivityClient {
@@ -56,7 +58,6 @@ public class HelixTwitchActivityClient implements TwitchActivityClient {
 
     @Override
     public TwitchLives lives(String gameId, String language) {
-        String token = tokenOrFail();
         int count = 0;
         long viewers = 0;
         boolean approximate = false;
@@ -71,7 +72,7 @@ public class HelixTwitchActivityClient implements TwitchActivityClient {
             if (cursor != null) {
                 b.queryParam("after", cursor);
             }
-            JsonNode json = get(b.build().encode().toUri(), token);
+            JsonNode json = get(b.build().encode().toUri());
             for (JsonNode s : json.path("data")) {
                 int v = s.path("viewer_count").asInt(0);
                 count++;
@@ -97,7 +98,7 @@ public class HelixTwitchActivityClient implements TwitchActivityClient {
         URI uri = UriComponentsBuilder.fromUriString(BASE + "/clips").queryParam("game_id", gameId)
                 .queryParam("started_at", since.toString()).queryParam("first", TOP).build().encode().toUri();
         List<TwitchClips.Clip> clips = new ArrayList<>();
-        for (JsonNode c : get(uri, tokenOrFail()).path("data")) {
+        for (JsonNode c : get(uri).path("data")) {
             clips.add(new TwitchClips.Clip(c.path("title").asString(""), c.path("broadcaster_name").asString(""),
                     c.path("view_count").asInt(0), c.path("duration").asDouble(0), c.path("url").asString(""),
                     c.path("thumbnail_url").asString(null)));
@@ -106,7 +107,7 @@ public class HelixTwitchActivityClient implements TwitchActivityClient {
     }
 
     private Optional<TwitchCategory> category(URI uri) {
-        JsonNode data = get(uri, tokenOrFail()).path("data");
+        JsonNode data = get(uri).path("data");
         if (!data.isArray() || data.isEmpty() || !data.get(0).hasNonNull("id")) {
             return Optional.empty();
         }
@@ -128,10 +129,22 @@ public class HelixTwitchActivityClient implements TwitchActivityClient {
         return token;
     }
 
-    private JsonNode get(URI uri, String token) {
-        String body = restClient.get().uri(uri)
+    /** {@code uri} with the app token; on a 401 the token is invalidated and the call retried once. */
+    private JsonNode get(URI uri) {
+        String token = tokenOrFail();
+        String body;
+        try {
+            body = send(uri, token);
+        } catch (HttpClientErrorException.Unauthorized e) {
+            tokens.invalidateAppAccessToken(token);
+            body = send(uri, tokenOrFail());
+        }
+        return body == null || body.isBlank() ? mapper.createObjectNode() : mapper.readTree(body);
+    }
+
+    private String send(URI uri, String token) {
+        return restClient.get().uri(uri)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token).header("Client-Id", clientId)
                 .retrieve().body(String.class);
-        return body == null || body.isBlank() ? mapper.createObjectNode() : mapper.readTree(body);
     }
 }

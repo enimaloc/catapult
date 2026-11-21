@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
 import java.time.Instant;
@@ -14,11 +15,13 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.client.ExpectedCount.once;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withUnauthorizedRequest;
 
 class HelixTwitchActivityClientTest {
 
@@ -141,5 +144,31 @@ class HelixTwitchActivityClientTest {
 
         assertThat(unconfigured.isConfigured()).isFalse();
         assertThatThrownBy(() -> unconfigured.categoryById("1")).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void unauthorized_invalidatesTheTokenAndRetriesOnceWithAFreshOne() {
+        when(tokens.getAppAccessToken()).thenReturn("stale", "fresh");
+        server.expect(once(), requestTo(BASE + "/games?id=9"))
+                .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer stale"))
+                .andRespond(withUnauthorizedRequest());
+        server.expect(once(), requestTo(BASE + "/games?id=9"))
+                .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer fresh"))
+                .andRespond(withSuccess("{\"data\":[{\"id\":\"9\",\"name\":\"Hades\"}]}",
+                        MediaType.APPLICATION_JSON));
+
+        assertThat(client.categoryById("9")).contains(new TwitchCategory("9", "Hades"));
+        server.verify();
+        verify(tokens).invalidateAppAccessToken("stale");
+    }
+
+    @Test
+    void unauthorizedTwice_fails() {
+        when(tokens.getAppAccessToken()).thenReturn("stale", "fresh");
+        server.expect(once(), requestTo(BASE + "/games?id=9")).andRespond(withUnauthorizedRequest());
+        server.expect(once(), requestTo(BASE + "/games?id=9")).andRespond(withUnauthorizedRequest());
+
+        assertThatThrownBy(() -> client.categoryById("9")).isInstanceOf(HttpClientErrorException.class);
+        server.verify();
     }
 }
