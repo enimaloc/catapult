@@ -1,8 +1,9 @@
 {
-  "status" : 400,
+  "status" : 200,
   "headers" : {
     "Cache-Control" : [ "no-cache, no-store, max-age=0, must-revalidate" ],
-    "Content-Type" : [ "application/json" ]
+    "Content-Type" : [ "application/json" ],
+    "Vary" : [ "Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers" ]
   },
-  "body" : "{\"timestamp\":\"2026-10-26T03:02:15.771Z\",\"status\":400,\"error\":\"Bad Request\",\"path\":\"/api/user/game/25e19f83-f0f4-438f-87f2-38bd46a45aef\"}"
+  "body" : "{\"inGame\":true,\"igdb\":{\"igdbId\":\"777\",\"slug\":\"frozen-game\",\"summary\":\"A game kept for the contract tests\",\"coverUrl\":null,\"genres\":[\"Adventure\"],\"more\":\"https://catapult.example/api/user/igdb/777\",\"url\":\"https://www.igdb.com/games/frozen-game\"},\"steam\":null,\"xbox\":null,\"dtdd\":null,\"catapult\":{\"bindingId\":\"e82d595c-58f5-457d-ab5a-b8e8ee8f5718\",\"createdAt\":\"2026-11-21T13:15:01.507981Z\",\"tws\":[\"flashing-lights\"],\"ccls\":[\"violence\"],\"more\":\"https://catapult.example/api/user/catapult/e82d595c-58f5-457d-ab5a-b8e8ee8f5718\"},\"description\":\"A game kept for the contract tests\",\"ia\":null,\"igdbUrl\":\"https://www.igdb.com/games/frozen-game\",\"name\":\"Frozen Game\",\"releaseDate\":{\"releaseDate\":\"2020-01-01T00:00:00Z\",\"comingSoon\":false},\"storeUrl\":null,\"tws\":\"flashing-lights\"}"
 }
