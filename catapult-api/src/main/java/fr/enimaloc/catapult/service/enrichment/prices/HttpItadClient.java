@@ -7,6 +7,8 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -168,6 +170,11 @@ public class HttpItadClient implements ItadClient {
         } catch (JacksonException e) {
             log.warn("IsThereAnyDeal answer is not JSON: {}", e.getOriginalMessage());
             return Optional.empty();
+        } catch (RestClientResponseException e) {
+            // the key is a URL parameter and the original message may hold the URL or the body: neither is kept
+            throw new IllegalStateException("IsThereAnyDeal request failed: HTTP " + e.getStatusCode().value());
+        } catch (RestClientException e) {
+            throw new IllegalStateException("IsThereAnyDeal request failed: " + e.getClass().getSimpleName());
         }
     }
 

@@ -103,6 +103,38 @@ class HttpItadClientTest {
         assertThat(client.lookupByTitle("Nope")).isEmpty();
     }
 
+    private static void assertNoSecret(Throwable thrown) {
+        for (Throwable t = thrown; t != null; t = t.getCause()) {
+            assertThat(String.valueOf(t.getMessage())).doesNotContain("SECRET");
+            assertThat(t.toString()).doesNotContain("SECRET");
+        }
+    }
+
+    @Test
+    void connectionFailure_neverLeaksTheKey() {
+        when(rotator.nextKey()).thenReturn(Optional.of("SECRET"));
+        server.expect(once(), requestTo(BASE + "/games/lookup/v1?key=SECRET&appid=570"))
+                .andRespond(request -> {
+                    throw new IOException("connect to " + request.getURI() + " failed");
+                });
+
+        assertThatThrownBy(() -> client.lookupBySteamAppId("570"))
+                .isInstanceOf(IllegalStateException.class)
+                .satisfies(HttpItadClientTest::assertNoSecret);
+    }
+
+    @Test
+    void serverError_keepsTheStatusButNeverTheKey() {
+        when(rotator.nextKey()).thenReturn(Optional.of("SECRET"));
+        server.expect(once(), requestTo(BASE + "/games/lookup/v1?key=SECRET&appid=570"))
+                .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR).body("bad request key=SECRET"));
+
+        assertThatThrownBy(() -> client.lookupBySteamAppId("570"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("500")
+                .satisfies(HttpItadClientTest::assertNoSecret);
+    }
+
     @Test
     void rateLimitedKeyIsBlocked() {
         server.expect(once(), requestTo(BASE + "/games/lookup/v1?key=keyA&appid=570"))
