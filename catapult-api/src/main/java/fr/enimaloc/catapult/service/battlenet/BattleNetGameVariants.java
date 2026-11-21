@@ -62,7 +62,8 @@ public class BattleNetGameVariants {
 
     /**
      * The variant among {@code rules} for that game and activity text: the one with the longest matching pattern,
-     * the oldest one on a tie. Case is ignored; a missing or blank text matches nothing.
+     * the oldest one on a tie. Case is ignored, in the game code too (a rule typed "wow" still fires); a missing or
+     * blank text matches nothing.
      */
     static Optional<BattleNetGameVariant> match(List<BattleNetGameVariant> rules, String fourcc, String activity) {
         if (activity == null || activity.isBlank()) {
@@ -70,7 +71,7 @@ public class BattleNetGameVariants {
         }
         String text = activity.toLowerCase(Locale.ROOT);
         return rules.stream()
-                .filter(rule -> rule.getFourcc().equals(fourcc))
+                .filter(rule -> rule.getFourcc().equalsIgnoreCase(fourcc))
                 .filter(rule -> longestMatch(rule, text) > 0)
                 .min(Comparator.comparingInt((BattleNetGameVariant rule) -> -longestMatch(rule, text))
                         .thenComparing(BattleNetGameVariant::getCreatedAt,

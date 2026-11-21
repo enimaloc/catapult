@@ -123,4 +123,12 @@ class BattleNetGameVariantsTest {
         assertThat(variants.resolve("WoW", FOREVER_TEXT)).isEmpty();
         verify(repository, times(2)).findByEnabledTrue();
     }
+
+    @Test
+    void fourccIsComparedIgnoringCase() {
+        BattleNetGameVariant typedLowerCase = forever();
+        typedLowerCase.setFourcc("wow");
+
+        assertThat(BattleNetGameVariants.match(List.of(typedLowerCase), "WoW", FOREVER_TEXT)).contains(typedLowerCase);
+    }
 }
