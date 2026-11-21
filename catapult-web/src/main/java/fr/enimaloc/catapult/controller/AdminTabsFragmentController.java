@@ -483,6 +483,7 @@ public class AdminTabsFragmentController {
         return guarded(model, response, () -> {
             model.addAttribute("steam", apiService.adminApiKeys(ApiKeyProvider.STEAM));
             model.addAttribute("dtdd", apiService.adminApiKeys(ApiKeyProvider.DTDD));
+            model.addAttribute("steamgriddb", apiService.adminApiKeys(ApiKeyProvider.STEAMGRIDDB));
             model.addAttribute("minecraft", apiService.adminMinecraftAccounts());
             model.addAttribute("battlenet", apiService.adminBattleNetAccounts());
             model.addAttribute("ankama", apiService.adminAnkamaAccounts());

@@ -28,6 +28,8 @@ class MockKeysStoreTest {
         assertThat(store.add(ApiKeyProvider.DTDD, RAW)).isEqualTo(400);
         assertThat(store.add(ApiKeyProvider.DTDD, null)).isEqualTo(400);
         assertThat(store.add(ApiKeyProvider.DTDD, "ddd_abcdefghijklmnop5678")).isEqualTo(204);
+        assertThat(store.add(ApiKeyProvider.STEAMGRIDDB, "ddd_abcdefghijklmnop5678")).isEqualTo(400);
+        assertThat(store.add(ApiKeyProvider.STEAMGRIDDB, " " + RAW + " ")).isEqualTo(204);
     }
 
     @Test
