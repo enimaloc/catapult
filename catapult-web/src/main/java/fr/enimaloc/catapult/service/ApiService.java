@@ -54,6 +54,8 @@ import fr.enimaloc.catapult.common.dto.admin.DtddGameCacheEntryDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddRefetchJobDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddSearchCacheEntryDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddTopicsCacheEntryDto;
+import fr.enimaloc.catapult.common.dto.admin.BattleNetGameVariantDto;
+import fr.enimaloc.catapult.common.dto.admin.BattleNetGameVariantRequest;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingDto;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingRequest;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingResult;
@@ -424,6 +426,15 @@ public interface ApiService {
     ApiClient.Result<GameMappingResult> adminUpdateGameMapping(UUID id, GameMappingRequest request);
     /** catapult-api's status (200; 404 unknown) and result (no mapping), 502 when unreachable. */
     ApiClient.Result<GameMappingResult> adminDeleteGameMapping(UUID id, boolean applyLive);
+    /** The Battle.net game variants, by game then key; null when catapult-api fails. */
+    List<BattleNetGameVariantDto> adminBattleNetGameVariants();
+    /** catapult-api's status (201; 400 invalid; 409 key already used by the game) and variant, 502 when unreachable. */
+    ApiClient.Result<BattleNetGameVariantDto> adminCreateBattleNetGameVariant(BattleNetGameVariantRequest request);
+    /** catapult-api's status (200; 400 invalid or game/key changed; 404 unknown) and variant, 502 when unreachable. */
+    ApiClient.Result<BattleNetGameVariantDto> adminUpdateBattleNetGameVariant(UUID id,
+                                                                              BattleNetGameVariantRequest request);
+    /** catapult-api's status (204; 404 unknown), 502 when unreachable. */
+    ApiClient.Result<Void> adminDeleteBattleNetGameVariant(UUID id);
 
     /** The DTDD caches' sizes and stale entries, the keys' quotas and the bulk refetch; null when catapult-api fails. */
     DtddCachesSummaryDto adminDtddCaches();
