@@ -87,7 +87,13 @@ class RouteConventionsTest {
             "GET /api/games/protondb/{appId}",
             "GET /api/games/steamdeck/{appId}",
             "GET /api/games/steamgriddb/{sgdbGameId}",
-            "GET /api/games/pcgamingwiki/{pageId}");
+            "GET /api/games/pcgamingwiki/{pageId}",
+            "GET /api/me/game/trailer.mp4",
+            "HEAD /api/me/game/trailer.mp4",
+            "GET /api/games/steam/{appId}/trailer.mp4",
+            "HEAD /api/games/steam/{appId}/trailer.mp4",
+            "GET /api/games/xbox/{productId}/trailer.mp4",
+            "HEAD /api/games/xbox/{productId}/trailer.mp4");
 
     /** Path segments that name a CRUD operation the verb should carry. */
     private static final Set<String> CRUD_SEGMENTS = Set.of(
