@@ -27,10 +27,21 @@ class ClientKeysTest {
         assertThat(ClientKeys.of("::ffff:cb00:7107")).isEqualTo("203.0.113.7");
     }
 
+    /** Nothing but an IPv6 literal reaches the resolver: these never get to it, so no DNS lookup can happen. */
     @Test
     void unparseable_unchanged() {
         assertThat(ClientKeys.of("not:an:address:at:all:zz")).isEqualTo("not:an:address:at:all:zz");
+        assertThat(ClientKeys.of("example.com:443")).isEqualTo("example.com:443");
+        assertThat(ClientKeys.of(".:1")).isEqualTo(".:1");
+        assertThat(ClientKeys.of("[]")).isEqualTo("[]");
         assertThat(ClientKeys.of("unknown")).isEqualTo("unknown");
         assertThat(ClientKeys.of(null)).isNull();
+    }
+
+    /** Only hex digits, colons and dots look like an IPv6 literal; a bad one of those is refused by the parser. */
+    @Test
+    void malformedHexLiteral_unchanged() {
+        assertThat(ClientKeys.of("2001:db8::1::2")).isEqualTo("2001:db8::1::2");
+        assertThat(ClientKeys.of("12345::1")).isEqualTo("12345::1");
     }
 }

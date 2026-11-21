@@ -4,6 +4,7 @@ import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.regex.Pattern;
 
 /**
  * The key a client's per-IP limits are counted under. An IPv6 client usually holds a whole {@code /64} and could
@@ -12,6 +13,11 @@ import java.net.UnknownHostException;
 public final class ClientKeys {
 
     private static final int IPV6_PREFIX_BYTES = 8;
+    /**
+     * What an IPv6 literal (IPv4-mapped included) can be made of, starting the way {@link InetAddress#getByName}
+     * reads as a literal: anything else is never handed to it, since it would look a host name up in the DNS.
+     */
+    private static final Pattern IPV6_LITERAL = Pattern.compile("[0-9a-fA-F:][0-9a-fA-F:.]*");
 
     private ClientKeys() {
     }
@@ -30,9 +36,12 @@ public final class ClientKeys {
         if (zone >= 0) {
             literal = literal.substring(0, zone);
         }
+        if (!IPV6_LITERAL.matcher(literal).matches()) {
+            return address;
+        }
         InetAddress parsed;
         try {
-            // a string with a colon is only ever parsed as an IPv6 literal, never looked up in the DNS
+            // a hex-or-colon string with a colon is only ever parsed as an IPv6 literal, never looked up in the DNS
             parsed = InetAddress.getByName(literal);
         } catch (UnknownHostException | SecurityException e) {
             return address;
