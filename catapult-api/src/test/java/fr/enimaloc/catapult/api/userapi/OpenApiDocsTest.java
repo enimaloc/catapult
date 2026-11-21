@@ -2,10 +2,13 @@ package fr.enimaloc.catapult.api.userapi;
 
 import fr.enimaloc.catapult.service.enrichment.IpFetchBudgets;
 import fr.enimaloc.catapult.service.enrichment.hltb.HltbService;
+import fr.enimaloc.catapult.service.enrichment.opencritic.OpenCriticService;
 import fr.enimaloc.catapult.service.enrichment.pcgw.PcGamingWikiService;
+import fr.enimaloc.catapult.service.enrichment.prices.PricesService;
 import fr.enimaloc.catapult.service.enrichment.protondb.ProtonDbService;
 import fr.enimaloc.catapult.service.enrichment.steamdeck.SteamDeckService;
 import fr.enimaloc.catapult.service.enrichment.steamgriddb.SteamGridDbService;
+import fr.enimaloc.catapult.service.enrichment.twitch.TwitchActivityService;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -96,6 +99,9 @@ class OpenApiDocsTest {
     @MockitoBean SteamDeckService steamDeckService;
     @MockitoBean SteamGridDbService steamGridDbService;
     @MockitoBean PcGamingWikiService pcGamingWikiService;
+    @MockitoBean PricesService pricesService;
+    @MockitoBean OpenCriticService openCriticService;
+    @MockitoBean TwitchActivityService twitchActivityService;
 
     private JsonNode docs() throws Exception {
         String body = mvc.perform(get("/api/v3/api-docs")).andExpect(status().isOk())
@@ -214,7 +220,8 @@ class OpenApiDocsTest {
 
         assertThat(paths).contains("/api/games/hltb/{igdbId}", "/api/games/protondb/{appId}",
                 "/api/games/steamdeck/{appId}", "/api/games/steamgriddb/{sgdbGameId}",
-                "/api/games/pcgamingwiki/{pageId}");
+                "/api/games/pcgamingwiki/{pageId}", "/api/games/prices/{itadId}", "/api/games/opencritic/{ocId}",
+                "/api/games/twitch/{twitchGameId}");
     }
 
     private static JsonNode versionHeader(JsonNode docs, String parametersPointer) {
