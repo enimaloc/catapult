@@ -1,6 +1,12 @@
 package fr.enimaloc.catapult.simulation.external;
 
+import fr.enimaloc.catapult.service.enrichment.opencritic.HttpOpenCriticClient;
+import fr.enimaloc.catapult.service.enrichment.opencritic.OpenCriticClient;
 import fr.enimaloc.catapult.service.enrichment.pcgw.HttpPcGamingWikiClient;
+import fr.enimaloc.catapult.service.enrichment.prices.HttpItadClient;
+import fr.enimaloc.catapult.service.enrichment.prices.ItadClient;
+import fr.enimaloc.catapult.service.enrichment.twitch.HelixTwitchActivityClient;
+import fr.enimaloc.catapult.service.enrichment.twitch.TwitchActivityClient;
 import fr.enimaloc.catapult.service.enrichment.pcgw.PcGamingWikiClient;
 import fr.enimaloc.catapult.service.enrichment.protondb.HttpProtonDbClient;
 import fr.enimaloc.catapult.service.enrichment.protondb.ProtonDbClient;
@@ -31,12 +37,15 @@ class SimulatedEnrichmentClientsWiringTest {
         @Bean HttpSteamDeckClient steamDeck() { return mock(HttpSteamDeckClient.class); }
         @Bean HttpPcGamingWikiClient pcgw() { return mock(HttpPcGamingWikiClient.class); }
         @Bean HttpSteamGridDbClient steamGridDb() { return mock(HttpSteamGridDbClient.class); }
+        @Bean HttpItadClient itad() { return mock(HttpItadClient.class); }
+        @Bean HttpOpenCriticClient openCritic() { return mock(HttpOpenCriticClient.class); }
+        @Bean HelixTwitchActivityClient twitchActivity() { return mock(HelixTwitchActivityClient.class); }
     }
 
     @Configuration(proxyBeanMethods = false)
     @ComponentScan(basePackageClasses = SimulatedProtonDbClient.class, useDefaultFilters = false,
             includeFilters = @ComponentScan.Filter(type = FilterType.REGEX,
-                    pattern = ".*Simulated(ProtonDb|SteamDeck|PcGamingWiki|SteamGridDb)Client"))
+                    pattern = ".*Simulated(ProtonDb|SteamDeck|PcGamingWiki|SteamGridDb|Itad|OpenCritic|TwitchActivity)Client"))
     static class SimulatedClients {
     }
 
@@ -50,6 +59,9 @@ class SimulatedEnrichmentClientsWiringTest {
             assertThat(ctx.getBean(SteamDeckClient.class)).isInstanceOf(SimulatedSteamDeckClient.class);
             assertThat(ctx.getBean(PcGamingWikiClient.class)).isInstanceOf(SimulatedPcGamingWikiClient.class);
             assertThat(ctx.getBean(SteamGridDbClient.class)).isInstanceOf(SimulatedSteamGridDbClient.class);
+            assertThat(ctx.getBean(ItadClient.class)).isInstanceOf(SimulatedItadClient.class);
+            assertThat(ctx.getBean(OpenCriticClient.class)).isInstanceOf(SimulatedOpenCriticClient.class);
+            assertThat(ctx.getBean(TwitchActivityClient.class)).isInstanceOf(SimulatedTwitchActivityClient.class);
         });
     }
 
@@ -60,6 +72,9 @@ class SimulatedEnrichmentClientsWiringTest {
             assertThat(ctx.getBean(SteamDeckClient.class)).isInstanceOf(HttpSteamDeckClient.class);
             assertThat(ctx.getBean(PcGamingWikiClient.class)).isInstanceOf(HttpPcGamingWikiClient.class);
             assertThat(ctx.getBean(SteamGridDbClient.class)).isInstanceOf(HttpSteamGridDbClient.class);
+            assertThat(ctx.getBean(ItadClient.class)).isInstanceOf(HttpItadClient.class);
+            assertThat(ctx.getBean(OpenCriticClient.class)).isInstanceOf(HttpOpenCriticClient.class);
+            assertThat(ctx.getBean(TwitchActivityClient.class)).isInstanceOf(HelixTwitchActivityClient.class);
         });
     }
 
@@ -70,5 +85,32 @@ class SimulatedEnrichmentClientsWiringTest {
         assertThat(new SimulatedPcGamingWikiClient().findByName("Dota 2")).isPresent();
         assertThat(new SimulatedSteamGridDbClient().fetchBySteamAppId("570")).get()
                 .satisfies(a -> assertThat(a.bestGrid()).isNotNull());
+    }
+
+    @Test
+    void simulatedNewSources_answerDeterministically() {
+        var itad = new SimulatedItadClient();
+        assertThat(itad.isConfigured()).isTrue();
+        var game = itad.lookupBySteamAppId("570").orElseThrow();
+        assertThat(itad.lookupByTitle("Dota 2")).isPresent();
+        assertThat(itad.info(game.id())).isPresent();
+        assertThat(itad.prices(game, "FR").orElseThrow()).satisfies(p -> {
+            assertThat(p.currency()).isEqualTo("EUR");
+            assertThat(p.deals()).hasSize(3);
+            assertThat(p.best()).isEqualTo(p.deals().getFirst());
+        });
+
+        var oc = new SimulatedOpenCriticClient();
+        assertThat(oc.isConfigured()).isTrue();
+        var hit = oc.search("Dota 2").getFirst();
+        assertThat(hit.name()).isEqualTo("Dota 2");
+        assertThat(oc.game(hit.id()).orElseThrow().topCriticScore()).isEqualTo(88);
+
+        var twitch = new SimulatedTwitchActivityClient();
+        assertThat(twitch.isConfigured()).isTrue();
+        var category = twitch.categoryByIgdbId("1").orElseThrow();
+        assertThat(twitch.categoryById(category.id())).isPresent();
+        assertThat(twitch.lives(category.id(), null).liveCount()).isEqualTo(42);
+        assertThat(twitch.clips(category.id(), java.time.Instant.now()).top()).isNotEmpty();
     }
 }
