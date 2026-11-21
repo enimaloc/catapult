@@ -59,10 +59,17 @@ public class EnrichmentCache {
             GameEnrichmentCacheEntry entry = cached.get();
             Duration ttl = entry.getPayload() == null ? properties.absentTtl() : settings.ttl();
             if (entry.getFetchedAt().plus(ttl).isAfter(now)) {
-                return read(entry, type);
+                Optional<Optional<T>> hit = read(entry, type);
+                if (hit.isPresent()) {
+                    return hit.get();
+                }
             }
         }
         if (!budget.tryAcquire()) {
+            // The budget only gates the upstream call: a stale value is still the last known one.
+            if (cached.isPresent()) {
+                return read(cached.get(), type).orElse(Optional.empty());
+            }
             throw new UpstreamBudgetExceededException(RETRY_AFTER);
         }
         Optional<T> fetched;
@@ -70,17 +77,24 @@ public class EnrichmentCache {
             fetched = fetch.get();
         } catch (RuntimeException e) {
             log.warn("Enrichment fetch failed for {} {}: {}", source.key(), lookupKey, e.toString());
-            return cached.flatMap(entry -> read(entry, type));
+            return cached.flatMap(entry -> read(entry, type)).flatMap(v -> v);
         }
         String payload = fetched.map(mapper::writeValueAsString).orElse(null);
         repository.save(new GameEnrichmentCacheEntry(source.key(), lookupKey, payload, now));
         return fetched;
     }
 
-    private <T> Optional<T> read(GameEnrichmentCacheEntry entry, Class<T> type) {
+    /** The entry's value (empty inside when known absent), or empty when its payload is unreadable. */
+    private <T> Optional<Optional<T>> read(GameEnrichmentCacheEntry entry, Class<T> type) {
         if (entry.getPayload() == null) {
+            return Optional.of(Optional.empty());
+        }
+        try {
+            return Optional.of(Optional.of(mapper.readValue(entry.getPayload(), type)));
+        } catch (RuntimeException e) {
+            log.warn("Unreadable cached enrichment payload for {} {}: {}", entry.getSource(), entry.getLookupKey(),
+                    e.toString());
             return Optional.empty();
         }
-        return Optional.of(mapper.readValue(entry.getPayload(), type));
     }
 }

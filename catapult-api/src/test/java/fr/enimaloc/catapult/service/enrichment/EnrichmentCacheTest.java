@@ -7,12 +7,17 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import tools.jackson.databind.json.JsonMapper;
 
+import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;
+
+import java.util.Map;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -46,7 +51,7 @@ class EnrichmentCacheTest {
                 .thenReturn(Optional.of(new GameEnrichmentCacheEntry("protondb", KEY, payload, NOW.minus(age))));
     }
 
-    private Optional<Payload> get(FetchBudget budget, AtomicInteger fetches, java.util.function.Supplier<Optional<Payload>> fetch) {
+    private Optional<Payload> get(FetchBudget budget, AtomicInteger fetches, Supplier<Optional<Payload>> fetch) {
         return cache.get(EnrichmentSource.PROTONDB, KEY, Payload.class, budget, () -> {
             fetches.incrementAndGet();
             return fetch.get();
@@ -132,9 +137,7 @@ class EnrichmentCacheTest {
 
     @Test
     void disabledSource_returnsEmptyWithoutFetchOrRead() {
-        EnrichmentProperties.SourceSettings off = new EnrichmentProperties.SourceSettings();
-        off.setEnabled(false);
-        properties.getSources().put("protondb", off);
+        properties.getProtondb().setEnabled(false);
         AtomicInteger fetches = new AtomicInteger();
 
         Optional<Payload> result = get(FetchBudget.UNLIMITED, fetches, () -> Optional.of(new Payload("x", 1)));
@@ -142,5 +145,82 @@ class EnrichmentCacheTest {
         assertThat(result).isEmpty();
         assertThat(fetches).hasValue(0);
         verify(repository, never()).findBySourceAndLookupKey(anyString(), anyString());
+    }
+
+    @Test
+    void stale_fetchSucceeds_overwritesEntry() {
+        stored("{\"name\":\"Old\",\"hours\":3}", Duration.ofDays(2));
+        AtomicInteger fetches = new AtomicInteger();
+
+        Optional<Payload> result = get(FetchBudget.UNLIMITED, fetches, () -> Optional.of(new Payload("New", 9)));
+
+        assertThat(result).contains(new Payload("New", 9));
+        ArgumentCaptor<GameEnrichmentCacheEntry> saved = ArgumentCaptor.forClass(GameEnrichmentCacheEntry.class);
+        verify(repository).save(saved.capture());
+        assertThat(saved.getValue().getPayload()).contains("New");
+        assertThat(saved.getValue().getFetchedAt()).isEqualTo(NOW);
+    }
+
+    @Test
+    void staleKnownAbsent_pastAbsentTtl_fetches() {
+        stored(null, Duration.ofDays(2));
+        AtomicInteger fetches = new AtomicInteger();
+
+        Optional<Payload> result = get(FetchBudget.UNLIMITED, fetches, () -> Optional.of(new Payload("Now", 1)));
+
+        assertThat(result).contains(new Payload("Now", 1));
+        assertThat(fetches).hasValue(1);
+    }
+
+    @Test
+    void stale_budgetRefused_servesStaleValue() {
+        stored("{\"name\":\"Old\",\"hours\":3}", Duration.ofDays(2));
+        AtomicInteger fetches = new AtomicInteger();
+
+        Optional<Payload> result = get(() -> false, fetches, () -> Optional.of(new Payload("x", 1)));
+
+        assertThat(result).contains(new Payload("Old", 3));
+        assertThat(fetches).hasValue(0);
+    }
+
+    @Test
+    void corruptFreshPayload_isTreatedAsMiss() {
+        stored("not json", Duration.ofHours(1));
+        AtomicInteger fetches = new AtomicInteger();
+
+        Optional<Payload> result = get(FetchBudget.UNLIMITED, fetches, () -> Optional.of(new Payload("Fixed", 2)));
+
+        assertThat(result).contains(new Payload("Fixed", 2));
+        assertThat(fetches).hasValue(1);
+    }
+
+    @Test
+    void corruptStalePayload_fetchFails_returnsEmpty() {
+        stored("not json", Duration.ofDays(2));
+        AtomicInteger fetches = new AtomicInteger();
+
+        Optional<Payload> result = get(FetchBudget.UNLIMITED, fetches, () -> {
+            throw new RuntimeException("upstream down");
+        });
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void properties_bindDocumentedKeys() {
+        Binder binder = new Binder(new MapConfigurationPropertySource(Map.of(
+                "catapult.enrichment.protondb.enabled", "false",
+                "catapult.enrichment.hltb.scrape.enabled", "false",
+                "catapult.enrichment.hltb.scrape.interval", "5s",
+                "catapult.enrichment.steamgriddb.ttl", "3d")));
+
+        EnrichmentProperties bound = binder.bind("catapult.enrichment", EnrichmentProperties.class).get();
+
+        assertThat(bound.source(EnrichmentSource.PROTONDB).enabled()).isFalse();
+        assertThat(bound.source(EnrichmentSource.HLTB).enabled()).isTrue();
+        assertThat(bound.hltb().scrapeEnabled()).isFalse();
+        assertThat(bound.hltb().scrapeInterval()).isEqualTo(Duration.ofSeconds(5));
+        assertThat(bound.source(EnrichmentSource.STEAMGRIDDB).ttl()).isEqualTo(Duration.ofDays(3));
+        assertThat(bound.source(EnrichmentSource.TRAILER).ttl()).isEqualTo(Duration.ofDays(1));
     }
 }

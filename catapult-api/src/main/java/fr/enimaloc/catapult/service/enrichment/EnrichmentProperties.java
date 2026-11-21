@@ -9,7 +9,7 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 
-/** Settings of the game enrichment sources; per-source values are keyed by {@link EnrichmentSource#key()}. */
+/** Settings of the game enrichment sources; each source has its own {@code catapult.enrichment.<key>.*} block. */
 @Component
 @ConfigurationProperties("catapult.enrichment")
 @Getter
@@ -32,34 +32,44 @@ public class EnrichmentProperties {
         private Duration ttl;
     }
 
-    /** Overrides of the HowLongToBeat scraper. */
+    /** Settings of the HowLongToBeat scraper. */
     @Getter
     @Setter
-    public static class HltbSettings {
-        private boolean scrapeEnabled = true;
-        private Duration scrapeInterval = Duration.ofSeconds(2);
+    public static class ScrapeSettings {
+        private boolean enabled = true;
+        private Duration interval = Duration.ofSeconds(2);
         private int breakerThreshold = 5;
         private Duration breakerPause = Duration.ofMinutes(30);
     }
 
-    /** Per-source overrides, keyed by source key. */
-    private Map<String, SourceSettings> sources = new HashMap<>();
+    /** HowLongToBeat: the source switch and ttl, plus its scraper. */
+    @Getter
+    @Setter
+    public static class HltbSettings extends SourceSettings {
+        private ScrapeSettings scrape = new ScrapeSettings();
+    }
+
+    private HltbSettings hltb = new HltbSettings();
+    private SourceSettings protondb = new SourceSettings();
+    private SourceSettings steamgriddb = new SourceSettings();
+    private SourceSettings steamdeck = new SourceSettings();
+    private SourceSettings pcgamingwiki = new SourceSettings();
+    private SourceSettings trailer = new SourceSettings();
     /** How long a "known absent" answer is trusted. */
     private Duration absentTtl = Duration.ofDays(1);
     /** Longest the aggregate endpoint waits for the slow sources. */
     private Duration aggregateTimeout = Duration.ofSeconds(2);
     /** Upstream calls one client IP may trigger per minute. */
     private int ipBudgetPerMinute = 10;
-    private HltbSettings hltb = new HltbSettings();
     /** Concurrent ffmpeg processes for trailer extraction. */
     private int ffmpegMaxProcesses = 4;
     /** Longest a single ffmpeg process may run. */
     private Duration ffmpegMaxDuration = Duration.ofMinutes(10);
 
     public Source source(EnrichmentSource source) {
-        SourceSettings s = sources.get(source.key());
-        boolean enabled = s == null || s.getEnabled() == null || s.getEnabled();
-        Duration ttl = s != null && s.getTtl() != null ? s.getTtl() : defaultTtl(source);
+        SourceSettings s = settingsOf(source);
+        boolean enabled = s.getEnabled() == null || s.getEnabled();
+        Duration ttl = s.getTtl() != null ? s.getTtl() : defaultTtl(source);
         return new Source(enabled, ttl);
     }
 
@@ -76,8 +86,8 @@ public class EnrichmentProperties {
     }
 
     public Hltb hltb() {
-        return new Hltb(hltb.isScrapeEnabled(), hltb.getScrapeInterval(), hltb.getBreakerThreshold(),
-                hltb.getBreakerPause());
+        ScrapeSettings sc = hltb.getScrape();
+        return new Hltb(sc.isEnabled(), sc.getInterval(), sc.getBreakerThreshold(), sc.getBreakerPause());
     }
 
     public int ffmpegMaxProcesses() {
@@ -86,6 +96,17 @@ public class EnrichmentProperties {
 
     public Duration ffmpegMaxDuration() {
         return ffmpegMaxDuration;
+    }
+
+    private SourceSettings settingsOf(EnrichmentSource source) {
+        return switch (source) {
+            case HLTB -> hltb;
+            case PROTONDB -> protondb;
+            case STEAMGRIDDB -> steamgriddb;
+            case STEAMDECK -> steamdeck;
+            case PCGAMINGWIKI -> pcgamingwiki;
+            case TRAILER -> trailer;
+        };
     }
 
     private static Duration defaultTtl(EnrichmentSource source) {
