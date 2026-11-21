@@ -55,14 +55,14 @@ public class MeSpeedrunController {
         }
         SpeedrunIdentity account = identityResolver.resolve(user, FetchBudget.UNLIMITED)
                 .orElseThrow(() -> new ApiProblem(ErrorCode.NOT_FOUND, "No speedrun.com account found"));
-        return new SpeedrunAccountResponse(GameInfoV3Response.SpeedrunObject.Account.of(account),
+        return new SpeedrunAccountResponse(GameInfoV3Response.SpeedrunObject.SpeedrunAccountRef.of(account),
                 personalService.personalBests(account.userId(), null, FetchBudget.UNLIMITED).orElse(null),
                 personalService.pendingRuns(account, null, personalService.apiKey(user, account),
                         FetchBudget.UNLIMITED).orElse(null));
     }
 
     /** A member's speedrun.com account and their runs on every game. */
-    public record SpeedrunAccountResponse(GameInfoV3Response.SpeedrunObject.Account account,
+    public record SpeedrunAccountResponse(GameInfoV3Response.SpeedrunObject.SpeedrunAccountRef account,
                                           List<SpeedrunRun> personalBests, List<SpeedrunRun> pendingRuns) {
     }
 }

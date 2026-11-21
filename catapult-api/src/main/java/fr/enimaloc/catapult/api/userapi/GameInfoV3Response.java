@@ -223,7 +223,7 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
      * when no account is identified: unknown, not "none".
      */
     public record SpeedrunObject(String gameId, String name, String url, String coverUrl,
-                                 List<SpeedrunRecords.CategoryRecord> worldRecords, Account account,
+                                 List<SpeedrunRecords.CategoryRecord> worldRecords, SpeedrunAccountRef account,
                                  List<Pb> personalBests, List<Pending> pendingRuns, String more)
             implements GameInfoResponse.HasMore {
         /** How many categories the aggregate keeps. */
@@ -237,16 +237,20 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
             List<SpeedrunRecords.CategoryRecord> categories = records.categories() == null ? List.of()
                     : records.categories().stream().limit(MAX_CATEGORIES).toList();
             return new SpeedrunObject(records.game().id(), records.game().name(), records.game().url(),
-                    records.game().coverUrl(), categories, Account.of(s.account()),
+                    records.game().coverUrl(), categories, SpeedrunAccountRef.of(s.account()),
                     s.personalBests() == null ? null : s.personalBests().stream().map(Pb::of).toList(),
                     s.pendingRuns() == null ? null : s.pendingRuns().stream().map(Pending::of).toList(),
                     links.to(MoreLinks.Kind.SPEEDRUN, records.game().id()));
         }
 
-        /** The member's speedrun.com account and how it was found ({@code api_key}, {@code twitch}, {@code declared}). */
-        public record Account(String name, String url, SpeedrunIdentity.Source source) {
-            public static Account of(SpeedrunIdentity identity) {
-                return identity == null ? null : new Account(identity.name(), identity.url(), identity.source());
+        /**
+         * The member's speedrun.com account and how it was found ({@code api_key}, {@code twitch}, {@code declared}).
+         * Named for the OpenAPI schema, which takes the simple class name: a bare {@code Account} would merge.
+         */
+        public record SpeedrunAccountRef(String name, String url, SpeedrunIdentity.Source source) {
+            public static SpeedrunAccountRef of(SpeedrunIdentity identity) {
+                return identity == null ? null
+                        : new SpeedrunAccountRef(identity.name(), identity.url(), identity.source());
             }
         }
 
