@@ -30,6 +30,10 @@ class MockKeysStoreTest {
         assertThat(store.add(ApiKeyProvider.DTDD, "ddd_abcdefghijklmnop5678")).isEqualTo(204);
         assertThat(store.add(ApiKeyProvider.STEAMGRIDDB, "ddd_abcdefghijklmnop5678")).isEqualTo(400);
         assertThat(store.add(ApiKeyProvider.STEAMGRIDDB, " " + RAW + " ")).isEqualTo(204);
+        assertThat(store.add(ApiKeyProvider.ITAD, RAW)).isEqualTo(400);
+        assertThat(store.add(ApiKeyProvider.ITAD, RAW + "01234567")).isEqualTo(204);
+        assertThat(store.add(ApiKeyProvider.OPENCRITIC, "ddd_abcdefghijklmnop5678")).isEqualTo(400);
+        assertThat(store.add(ApiKeyProvider.OPENCRITIC, " " + RAW + "AbCdEf01 ")).isEqualTo(204);
     }
 
     @Test

@@ -71,6 +71,29 @@ class HttpTraceLoggingInterceptorTest {
                 .doesNotContain("secret");
     }
 
+    @Test
+    void credentialQueryParams_areMaskedInTheLoggedUri() throws IOException {
+        MockClientHttpRequest request = new MockClientHttpRequest(HttpMethod.GET,
+                URI.create("https://api.example/x?key=s1&appid=570&API_KEY=s2&apikey=s3&Token=s4&monkey=ok#f"));
+
+        interceptor.intercept(request, new byte[0], respondWith("{}"));
+
+        assertThat(messages())
+                .contains("https://api.example/x?key=***&appid=570&API_KEY=***&apikey=***&Token=***&monkey=ok#f")
+                .doesNotContain("s1").doesNotContain("s2").doesNotContain("s3").doesNotContain("s4");
+    }
+
+    @Test
+    void credentialQueryParams_areMaskedWhenTheCallFails() {
+        MockClientHttpRequest request = new MockClientHttpRequest(HttpMethod.GET,
+                URI.create("https://api.example/x?key=s1"));
+
+        assertThatThrownBy(() -> interceptor.intercept(request, new byte[0], (r, b) -> {
+            throw new IOException("boom");
+        })).isInstanceOf(IOException.class);
+        assertThat(messages()).contains("https://api.example/x?key=*** after").doesNotContain("s1");
+    }
+
     /** A client with its own, unbuffered request factory (IanaWellKnownRegistry's) still gets the body logged. */
     @Test
     void theCallerStillReadsTheBody_withoutABufferingFactory() throws IOException {

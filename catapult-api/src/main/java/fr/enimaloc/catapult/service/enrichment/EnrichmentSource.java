@@ -7,7 +7,12 @@ public enum EnrichmentSource {
     STEAMGRIDDB("steamgriddb"),
     STEAMDECK("steamdeck"),
     PCGAMINGWIKI("pcgamingwiki"),
-    TRAILER("trailer");
+    TRAILER("trailer"),
+    PRICES("prices"),
+    OPENCRITIC("opencritic"),
+    TWITCH_CATEGORY("twitch-category"),
+    TWITCH_LIVES("twitch-lives"),
+    TWITCH_CLIPS("twitch-clips");
 
     private final String key;
 

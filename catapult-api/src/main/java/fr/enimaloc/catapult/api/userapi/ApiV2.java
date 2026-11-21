@@ -1,5 +1,11 @@
 package fr.enimaloc.catapult.api.userapi;
 
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.util.Locale;
+import java.util.Set;
+
 /** Shared constants for the v2 user-facing API — split out so response DTOs in their own files can build "more" links without depending on UserApiV2Controller itself. */
 public final class ApiV2 {
 
@@ -48,6 +54,27 @@ public final class ApiV2 {
     static final String IGDB_ID = "\\d{1,19}";
     static final String STEAM_APP_ID = "\\d{1,10}";
     static final String XBOX_PRODUCT_ID = "[A-Za-z0-9]{12}";
+    static final String ITAD_ID = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}";
+    static final String OPENCRITIC_ID = "\\d{1,10}";
+    static final String TWITCH_GAME_ID = "\\d{1,19}";
+
+    // Shapes of the optional "country" and "language" query parameters of the enrichment routes.
+    static final String COUNTRY = "[A-Za-z]{2}";
+    static final String LANGUAGE = "[A-Za-z]{2}";
+
+    private static final String DEFAULT_COUNTRY = "FR";
+
+    /** The upper-cased ISO 3166 country code; "FR" when absent; a 400 when it is not a known country. */
+    static String country(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return DEFAULT_COUNTRY;
+        }
+        String code = raw.strip().toUpperCase(Locale.ROOT);
+        if (!Set.of(Locale.getISOCountries()).contains(code)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown country code");
+        }
+        return code;
+    }
 
     private ApiV2() {}
 }

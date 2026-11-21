@@ -484,6 +484,8 @@ public class AdminTabsFragmentController {
             model.addAttribute("steam", apiService.adminApiKeys(ApiKeyProvider.STEAM));
             model.addAttribute("dtdd", apiService.adminApiKeys(ApiKeyProvider.DTDD));
             model.addAttribute("steamgriddb", apiService.adminApiKeys(ApiKeyProvider.STEAMGRIDDB));
+            model.addAttribute("itad", apiService.adminApiKeys(ApiKeyProvider.ITAD));
+            model.addAttribute("opencritic", apiService.adminApiKeys(ApiKeyProvider.OPENCRITIC));
             model.addAttribute("minecraft", apiService.adminMinecraftAccounts());
             model.addAttribute("battlenet", apiService.adminBattleNetAccounts());
             model.addAttribute("ankama", apiService.adminAnkamaAccounts());

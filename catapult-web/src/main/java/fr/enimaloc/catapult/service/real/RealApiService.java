@@ -59,6 +59,8 @@ import fr.enimaloc.catapult.common.dto.connect.BattleNetLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.connect.EpicLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.admin.DtddKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.SteamGridDbKeysPageData;
+import fr.enimaloc.catapult.common.dto.admin.ItadKeysPageData;
+import fr.enimaloc.catapult.common.dto.admin.OpenCriticKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.SteamKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
@@ -1476,6 +1478,14 @@ public class RealApiService implements ApiService {
                 SteamGridDbKeysPageData page = client.get("/api/internal/admin/steamgriddb-keys", SteamGridDbKeysPageData.class);
                 yield page == null ? null : ApiKeysPageDto.of(page);
             }
+            case ITAD -> {
+                ItadKeysPageData page = client.get("/api/internal/admin/itad-keys", ItadKeysPageData.class);
+                yield page == null ? null : ApiKeysPageDto.of(page);
+            }
+            case OPENCRITIC -> {
+                OpenCriticKeysPageData page = client.get("/api/internal/admin/opencritic-keys", OpenCriticKeysPageData.class);
+                yield page == null ? null : ApiKeysPageDto.of(page);
+            }
         };
     }
 
@@ -1486,6 +1496,8 @@ public class RealApiService implements ApiService {
             case STEAM -> client.call(HttpMethod.POST, "/api/internal/admin/steam-keys", body, Void.class);
             case DTDD -> client.call(HttpMethod.POST, "/api/internal/admin/dtdd-keys", body, Void.class);
             case STEAMGRIDDB -> client.call(HttpMethod.POST, "/api/internal/admin/steamgriddb-keys", body, Void.class);
+            case ITAD -> client.call(HttpMethod.POST, "/api/internal/admin/itad-keys", body, Void.class);
+            case OPENCRITIC -> client.call(HttpMethod.POST, "/api/internal/admin/opencritic-keys", body, Void.class);
         };
         return result.status();
     }
@@ -1496,6 +1508,8 @@ public class RealApiService implements ApiService {
             case STEAM -> client.call(HttpMethod.DELETE, "/api/internal/admin/steam-keys/{keyId}", null, Void.class, keyId);
             case DTDD -> client.call(HttpMethod.DELETE, "/api/internal/admin/dtdd-keys/{keyId}", null, Void.class, keyId);
             case STEAMGRIDDB -> client.call(HttpMethod.DELETE, "/api/internal/admin/steamgriddb-keys/{keyId}", null, Void.class, keyId);
+            case ITAD -> client.call(HttpMethod.DELETE, "/api/internal/admin/itad-keys/{keyId}", null, Void.class, keyId);
+            case OPENCRITIC -> client.call(HttpMethod.DELETE, "/api/internal/admin/opencritic-keys/{keyId}", null, Void.class, keyId);
         };
         return result.status();
     }
@@ -1506,6 +1520,8 @@ public class RealApiService implements ApiService {
             case STEAM -> client.call(HttpMethod.POST, "/api/internal/admin/steam-keys/refresh", null, Void.class);
             case DTDD -> client.call(HttpMethod.POST, "/api/internal/admin/dtdd-keys/refresh", null, Void.class);
             case STEAMGRIDDB -> client.call(HttpMethod.POST, "/api/internal/admin/steamgriddb-keys/refresh", null, Void.class);
+            case ITAD -> client.call(HttpMethod.POST, "/api/internal/admin/itad-keys/refresh", null, Void.class);
+            case OPENCRITIC -> client.call(HttpMethod.POST, "/api/internal/admin/opencritic-keys/refresh", null, Void.class);
         };
         return result.status();
     }

@@ -19,6 +19,10 @@ class AdminPathNamesTest {
         assertThat(ApiKeyProvider.DTDD.pathName()).isEqualTo("dtdd");
         assertThat(ApiKeyProvider.STEAMGRIDDB.apiPath()).isEqualTo("steamgriddb-keys");
         assertThat(ApiKeyProvider.STEAMGRIDDB.pathName()).isEqualTo("steamgriddb");
+        assertThat(ApiKeyProvider.ITAD.apiPath()).isEqualTo("itad-keys");
+        assertThat(ApiKeyProvider.ITAD.pathName()).isEqualTo("itad");
+        assertThat(ApiKeyProvider.OPENCRITIC.apiPath()).isEqualTo("opencritic-keys");
+        assertThat(ApiKeyProvider.OPENCRITIC.pathName()).isEqualTo("opencritic");
     }
 
     @ParameterizedTest

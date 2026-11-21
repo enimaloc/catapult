@@ -1,5 +1,9 @@
 package fr.enimaloc.catapult.api.userapi;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.Map;
+
 /**
  * Builds the absolute "more" links of an answer: the caller's origin ({@code baseUrl}) followed by the detail route
  * of a kind of object in the given {@link GameInfoAssembler.LinkStyle}. The legacy style keeps the frozen
@@ -30,7 +34,13 @@ public record MoreLinks(String baseUrl, GameInfoAssembler.LinkStyle style) {
         /** Steam Deck compatibility, by Steam app id. */
         STEAMDECK("steamdeck", true),
         /** PCGamingWiki, by wiki page id. */
-        PCGAMINGWIKI("pcgamingwiki", true);
+        PCGAMINGWIKI("pcgamingwiki", true),
+        /** Official-store prices, by IsThereAnyDeal game id. */
+        PRICES("prices", true),
+        /** OpenCritic, by OpenCritic game id. */
+        OPENCRITIC("opencritic", true),
+        /** Twitch activity, by Twitch category id. */
+        TWITCH("twitch", true);
 
         private final String segment;
         /** Whether the detail route only exists since version 3. */
@@ -44,11 +54,26 @@ public record MoreLinks(String baseUrl, GameInfoAssembler.LinkStyle style) {
 
     /** The absolute link to the detail route of the {@code kind} object named {@code id}. */
     public String to(Kind kind, Object id) {
-        return baseUrl + switch (style) {
+        return to(kind, id, Map.of());
+    }
+
+    /**
+     * Like {@link #to(Kind, Object)}, with the {@code query} parameters appended after the version one, in the
+     * map's iteration order, their values URL-encoded.
+     */
+    public String to(Kind kind, Object id, Map<String, String> query) {
+        StringBuilder link = new StringBuilder(baseUrl).append(switch (style) {
             case LEGACY -> ApiV2.PATH + "/" + kind.segment + "/" + id;
             case CURRENT -> kind == Kind.BINDING
                     ? ApiV2.ME_BINDINGS_PATH + "/" + id
                     : ApiV2.GAMES_PATH + "/" + kind.segment + "/" + id;
-        } + (kind.sinceV3 ? SINCE_V3_QUERY : "");
+        }).append(kind.sinceV3 ? SINCE_V3_QUERY : "");
+        char separator = kind.sinceV3 ? '&' : '?';
+        for (Map.Entry<String, String> parameter : query.entrySet()) {
+            link.append(separator).append(parameter.getKey()).append('=')
+                    .append(URLEncoder.encode(parameter.getValue(), StandardCharsets.UTF_8));
+            separator = '&';
+        }
+        return link.toString();
     }
 }

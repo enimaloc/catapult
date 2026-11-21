@@ -160,8 +160,8 @@ class MeGameControllerTest {
                         "https://www.protondb.com/app/400"),
                 null, new SteamDeckCompatibility(SteamDeckCompatibility.Category.VERIFIED, List.of()), null,
                 new GameEnrichment.Trailer(GameEnrichment.Trailer.YOUTUBE, "https://www.youtube.com/watch?v=x"),
-                "400");
-        when(games.gameInfoV3(eq(user), any(Locale.class))).thenReturn(GameInfoV3Response.of(base, enrichment,
+                "400", null, null, null);
+        when(games.gameInfoV3(eq(user), any(Locale.class), any(), any())).thenReturn(GameInfoV3Response.of(base, enrichment,
                 new MoreLinks("http://localhost", GameInfoAssembler.LinkStyle.CURRENT), Optional.of("1942")));
     }
 
@@ -179,7 +179,7 @@ class MeGameControllerTest {
                 .andExpect(jsonPath("$.steamDeck.category").value("verified"))
                 .andExpect(jsonPath("$.name").value("Portal"));
 
-        verify(games).gameInfoV3(user, Locale.ENGLISH);
+        verify(games).gameInfoV3(user, Locale.ENGLISH, null, null);
         verify(games, never()).gameInfo(any(UserAccount.class), any());
     }
 
@@ -203,7 +203,7 @@ class MeGameControllerTest {
                 .andExpect(jsonPath("$.hltb").doesNotExist())
                 .andExpect(jsonPath("$.protondb").doesNotExist());
 
-        verify(games, never()).gameInfoV3(any(UserAccount.class), any());
+        verify(games, never()).gameInfoV3(any(UserAccount.class), any(), any(), any());
     }
 
     @Test
@@ -234,6 +234,27 @@ class MeGameControllerTest {
         mvc.perform(withToken(get("/api/me/game/summary")).header(ApiV2.VERSION_HEADER, "3").param("f", "hltb.count"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(""));
+    }
+
+    @Test
+    void invalidCountryOnSummaryIs400() throws Exception {
+        playingPortalV3();
+
+        mvc.perform(withToken(get("/api/me/game/summary")).header(ApiV2.VERSION_HEADER, "3").param("country", "zz"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(withToken(get("/api/me/game")).header(ApiV2.VERSION_HEADER, "3").param("language", "english"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void countryAndLanguage_validated_languageLowerCased() throws Exception {
+        playingPortalV3();
+
+        mvc.perform(withToken(get("/api/me/game/summary")).header(ApiV2.VERSION_HEADER, "3")
+                        .param("country", "us").param("language", "DE"))
+                .andExpect(status().isOk());
+
+        verify(games).gameInfoV3(user, Locale.ENGLISH, "US", "de");
     }
 
     @Test

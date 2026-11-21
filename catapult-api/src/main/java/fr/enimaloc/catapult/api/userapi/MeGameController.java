@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,8 +17,10 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.util.Locale;
 import java.util.UUID;
 
 import static fr.enimaloc.catapult.api.userapi.FieldSelector.FIELD_DESCRIPTION;
@@ -46,7 +49,8 @@ public class MeGameController {
                     + "(igdb/steam/xbox/dtdd/catapult, each null if unavailable), each carrying a \"more\" link "
                     + "to its own detail route. Version 3 adds the enrichment objects hltb, protondb, steamgriddb, "
                     + "steamDeck and pcgamingwiki (each null if unavailable or too slow to answer, each with its "
-                    + "\"more\" link) and the trailer.")
+                    + "\"more\" link), the trailer, and prices, opencritic and twitch (store prices in "
+                    + "?country=, default FR; Twitch streams in ?language=).")
     @ApiResponse(responseCode = "200", description = "inGame=false with every platform object null while no "
             + "game is detected; otherwise the aggregated game info.")
     @GetMapping
@@ -67,7 +71,8 @@ public class MeGameController {
                     + "fields (name, description, tws, releaseDate — the first non-null value found across "
                     + "igdb/steam/xbox/dtdd/catapult, in that priority order), not the per-platform objects. Version 3 adds "
                     + "timeToBeat (HowLongToBeat's normal duration, in seconds), protonTier, deckStatus, coverUrl "
-                    + "(SteamGridDB grid, else IGDB cover) and trailer ({kind: mp4|youtube, url}).")
+                    + "(SteamGridDB grid, else IGDB cover), trailer ({kind: mp4|youtube, url}), price (best "
+                    + "store price), criticScore and liveViewers.")
     @ApiResponse(responseCode = "200", description = "inGame=false while no game is detected; otherwise the "
             + "summarized game info.")
     @GetMapping("/summary")
@@ -94,8 +99,11 @@ public class MeGameController {
             @AuthenticationPrincipal UUID userId,
             @RequestParam(name = "lang", required = false) String lang,
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage,
+            @RequestParam(name = "country", required = false) String country,
+            @RequestParam(name = "language", required = false) String language,
             @RequestParam(name = "f", required = false) String field) {
-        return FieldSelector.answer(jsonMapper, gameInfoV3(userId, lang, acceptLanguage), null, field);
+        return FieldSelector.answer(jsonMapper, gameInfoV3(userId, lang, acceptLanguage, country, language), null,
+                field);
     }
 
     @Operation(hidden = true)
@@ -105,8 +113,10 @@ public class MeGameController {
             @AuthenticationPrincipal UUID userId,
             @RequestParam(name = "lang", required = false) String lang,
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage,
+            @RequestParam(name = "country", required = false) String country,
+            @RequestParam(name = "language", required = false) String language,
             @RequestParam(name = "f", required = false) String field) {
-        return FieldSelector.answer(jsonMapper, gameInfoV3(userId, lang, acceptLanguage),
+        return FieldSelector.answer(jsonMapper, gameInfoV3(userId, lang, acceptLanguage, country, language),
                 GameInfoResponse.Summary.class, field);
     }
 
@@ -115,8 +125,24 @@ public class MeGameController {
                 RequestLocale.parse(lang, acceptLanguage)));
     }
 
-    private ResponseEntity<GameInfoV3Response> gameInfoV3(UUID userId, String lang, String acceptLanguage) {
+    private ResponseEntity<GameInfoV3Response> gameInfoV3(UUID userId, String lang, String acceptLanguage,
+                                                         String country, String language) {
+        // validated before anything is resolved: a bad parameter answers 400 whatever the game
+        String validCountry = country == null || country.isBlank() ? null : ApiV2.country(country);
+        String validLanguage = language(language);
         return ResponseEntity.ok(gameInfoAssembler.gameInfoV3(userResolver.tokenOwner(userId),
-                RequestLocale.parse(lang, acceptLanguage)));
+                RequestLocale.parse(lang, acceptLanguage), validCountry, validLanguage));
+    }
+
+    /** The lower-cased two-letter language (so FR and fr share a cache entry); null when absent; 400 otherwise. */
+    private static String language(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        String language = raw.strip();
+        if (!language.matches(ApiV2.LANGUAGE)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown language code");
+        }
+        return language.toLowerCase(Locale.ROOT);
     }
 }

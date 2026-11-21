@@ -6,8 +6,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 
 /** Settings of the game enrichment sources; each source has its own {@code catapult.enrichment.<key>.*} block. */
 @Component
@@ -26,6 +26,10 @@ public class EnrichmentProperties {
     public static class SourceSettings {
         private Boolean enabled;
         private Duration ttl;
+        /** Prices only: shops left out of the comparison ({@code catapult.enrichment.prices.excluded-shops}). */
+        private List<String> excludedShops = new ArrayList<>();
+        /** OpenCritic only: calls allowed per UTC day ({@code catapult.enrichment.opencritic.daily-cap}). */
+        private int dailyCap = 50;
     }
 
     private SourceSettings hltb = new SourceSettings();
@@ -34,6 +38,11 @@ public class EnrichmentProperties {
     private SourceSettings steamdeck = new SourceSettings();
     private SourceSettings pcgamingwiki = new SourceSettings();
     private SourceSettings trailer = new SourceSettings();
+    private SourceSettings prices = new SourceSettings();
+    private SourceSettings opencritic = new SourceSettings();
+    private SourceSettings twitchCategory = new SourceSettings();
+    private SourceSettings twitchLives = new SourceSettings();
+    private SourceSettings twitchClips = new SourceSettings();
     /** How long a "known absent" answer is trusted. */
     private Duration absentTtl = Duration.ofDays(1);
     /** Longest the aggregate endpoint waits for the slow sources. */
@@ -75,6 +84,14 @@ public class EnrichmentProperties {
         return ffmpegMaxDuration;
     }
 
+    public List<String> excludedShops() {
+        return prices.getExcludedShops();
+    }
+
+    public int openCriticDailyCap() {
+        return opencritic.getDailyCap();
+    }
+
     private SourceSettings settingsOf(EnrichmentSource source) {
         return switch (source) {
             case HLTB -> hltb;
@@ -83,6 +100,11 @@ public class EnrichmentProperties {
             case STEAMDECK -> steamdeck;
             case PCGAMINGWIKI -> pcgamingwiki;
             case TRAILER -> trailer;
+            case PRICES -> prices;
+            case OPENCRITIC -> opencritic;
+            case TWITCH_CATEGORY -> twitchCategory;
+            case TWITCH_LIVES -> twitchLives;
+            case TWITCH_CLIPS -> twitchClips;
         };
     }
 
@@ -90,7 +112,10 @@ public class EnrichmentProperties {
         return switch (source) {
             case HLTB, PCGAMINGWIKI -> Duration.ofDays(7);
             case STEAMGRIDDB -> Duration.ofDays(30);
-            case PROTONDB, STEAMDECK, TRAILER -> Duration.ofDays(1);
+            case PROTONDB, STEAMDECK, TRAILER, OPENCRITIC, TWITCH_CATEGORY -> Duration.ofDays(1);
+            case PRICES -> Duration.ofHours(6);
+            case TWITCH_LIVES -> Duration.ofMinutes(5);
+            case TWITCH_CLIPS -> Duration.ofHours(1);
         };
     }
 }

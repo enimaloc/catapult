@@ -1,10 +1,13 @@
 package fr.enimaloc.catapult.service.enrichment;
 
 import fr.enimaloc.catapult.service.enrichment.hltb.TimeToBeat;
+import fr.enimaloc.catapult.service.enrichment.opencritic.OpenCriticGame;
 import fr.enimaloc.catapult.service.enrichment.pcgw.PcGamingWikiPage;
+import fr.enimaloc.catapult.service.enrichment.prices.GamePrices;
 import fr.enimaloc.catapult.service.enrichment.protondb.ProtonDbSummary;
 import fr.enimaloc.catapult.service.enrichment.steamdeck.SteamDeckCompatibility;
 import fr.enimaloc.catapult.service.enrichment.steamgriddb.SteamGridDbAssets;
+import fr.enimaloc.catapult.service.enrichment.twitch.TwitchActivity;
 
 /**
  * What the enrichment sources know of the game played now, each null when the source is off, knows nothing, failed
@@ -13,10 +16,12 @@ import fr.enimaloc.catapult.service.enrichment.steamgriddb.SteamGridDbAssets;
  */
 public record GameEnrichment(TimeToBeat hltb, ProtonDbSummary protondb, SteamGridDbAssets steamgriddb,
                              SteamDeckCompatibility steamDeck, PcGamingWikiPage pcgamingwiki, Trailer trailer,
-                             String steamAppId) {
+                             String steamAppId, GamePrices prices, OpenCriticGame opencritic,
+                             TwitchActivity twitch) {
 
     /** Nothing known from any source. */
-    public static final GameEnrichment EMPTY = new GameEnrichment(null, null, null, null, null, null, null);
+    public static final GameEnrichment EMPTY = new GameEnrichment(null, null, null, null, null, null, null, null, null,
+            null);
 
     /**
      * Where to watch the game's trailer: {@code kind} {@value #MP4} for the MP4 the API rebuilds from a store's HLS

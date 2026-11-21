@@ -35,6 +35,14 @@ public record ApiKeysPageDto(boolean enabled, List<Key> keys) {
         return page == null ? null : new ApiKeysPageDto(page.steamgriddbEnabled(), keys(page.keys()));
     }
 
+    public static ApiKeysPageDto of(ItadKeysPageData page) {
+        return page == null ? null : new ApiKeysPageDto(page.itadEnabled(), keys(page.keys()));
+    }
+
+    public static ApiKeysPageDto of(OpenCriticKeysPageData page) {
+        return page == null ? null : new ApiKeysPageDto(page.opencriticEnabled(), keys(page.keys()));
+    }
+
     private static List<Key> keys(List<KeyStatus> keys) {
         return keys == null ? List.of() : keys.stream()
                 .filter(Objects::nonNull)

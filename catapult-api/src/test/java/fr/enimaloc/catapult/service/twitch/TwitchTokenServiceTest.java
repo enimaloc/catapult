@@ -8,7 +8,6 @@ import fr.enimaloc.catapult.security.TokenEncryptionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -16,7 +15,11 @@ import org.mockito.quality.Strictness;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestClient;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.Map;
 import java.util.UUID;
 
@@ -37,13 +40,31 @@ class TwitchTokenServiceTest {
     @Mock private RestClient.ResponseSpec postResponseSpec;
 
     @Mock private SiteRole siteRole;
-    @InjectMocks private TwitchTokenService service;
+    private final MutableClock clock = new MutableClock(Instant.parse("2026-11-21T10:00:00Z"));
+    private TwitchTokenService service;
+
+    private static final class MutableClock extends Clock {
+        private Instant now;
+
+        MutableClock(Instant now) {
+            this.now = now;
+        }
+
+        void advance(Duration d) {
+            now = now.plus(d);
+        }
+
+        @Override public ZoneId getZone() { return ZoneOffset.UTC; }
+        @Override public Clock withZone(ZoneId zone) { return this; }
+        @Override public Instant instant() { return now; }
+    }
 
     private UserAccount user;
     private OAuthToken token;
 
     @BeforeEach
     void setUp() {
+        service = new TwitchTokenService(oAuthTokenRepository, tokenEncryptionService, restClient, siteRole, clock);
         user = new UserAccount();
         user.setId(UUID.randomUUID());
 
@@ -194,5 +215,64 @@ class TwitchTokenServiceTest {
         assertThatThrownBy(() -> service.getAppAccessToken())
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("No access_token");
+    }
+
+    @Test
+    void getAppAccessToken_reusesTheTokenUntilItExpires() {
+        when(postResponseSpec.body(Map.class)).thenReturn(
+            Map.of("access_token", "app-1", "expires_in", 3600),
+            Map.of("access_token", "app-2", "expires_in", 3600));
+
+        assertThat(service.getAppAccessToken()).isEqualTo("app-1");
+        assertThat(service.getAppAccessToken()).isEqualTo("app-1");
+        verify(restClient, times(1)).post();
+
+        clock.advance(Duration.ofSeconds(3600).minus(TwitchTokenService.APP_TOKEN_MARGIN));
+        assertThat(service.getAppAccessToken()).isEqualTo("app-2");
+        verify(restClient, times(2)).post();
+    }
+
+    @Test
+    void getAppAccessToken_stillReusedJustBeforeTheMargin() {
+        when(postResponseSpec.body(Map.class)).thenReturn(Map.of("access_token", "app-1", "expires_in", 3600));
+
+        service.getAppAccessToken();
+        clock.advance(Duration.ofSeconds(3600 - 61));
+        assertThat(service.getAppAccessToken()).isEqualTo("app-1");
+        verify(restClient, times(1)).post();
+    }
+
+    @Test
+    void getAppAccessToken_withoutExpiresIn_isNotReused() {
+        when(postResponseSpec.body(Map.class)).thenReturn(
+            Map.of("access_token", "app-1"), Map.of("access_token", "app-2"));
+
+        assertThat(service.getAppAccessToken()).isEqualTo("app-1");
+        assertThat(service.getAppAccessToken()).isEqualTo("app-2");
+        verify(restClient, times(2)).post();
+    }
+
+    @Test
+    void invalidateAppAccessToken_forcesAFreshToken() {
+        when(postResponseSpec.body(Map.class)).thenReturn(
+            Map.of("access_token", "app-1", "expires_in", 3600),
+            Map.of("access_token", "app-2", "expires_in", 3600));
+
+        service.getAppAccessToken();
+        service.invalidateAppAccessToken("app-1");
+
+        assertThat(service.getAppAccessToken()).isEqualTo("app-2");
+        verify(restClient, times(2)).post();
+    }
+
+    @Test
+    void invalidateAppAccessToken_ignoresATokenAlreadyReplaced() {
+        when(postResponseSpec.body(Map.class)).thenReturn(Map.of("access_token", "app-1", "expires_in", 3600));
+
+        service.getAppAccessToken();
+        service.invalidateAppAccessToken("older");
+
+        assertThat(service.getAppAccessToken()).isEqualTo("app-1");
+        verify(restClient, times(1)).post();
     }
 }
