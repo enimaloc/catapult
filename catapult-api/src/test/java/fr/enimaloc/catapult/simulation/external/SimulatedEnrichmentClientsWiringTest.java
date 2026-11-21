@@ -5,6 +5,8 @@ import fr.enimaloc.catapult.service.enrichment.opencritic.OpenCriticClient;
 import fr.enimaloc.catapult.service.enrichment.pcgw.HttpPcGamingWikiClient;
 import fr.enimaloc.catapult.service.enrichment.prices.HttpItadClient;
 import fr.enimaloc.catapult.service.enrichment.prices.ItadClient;
+import fr.enimaloc.catapult.service.enrichment.speedrun.HttpSpeedrunClient;
+import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunClient;
 import fr.enimaloc.catapult.service.enrichment.twitch.HelixTwitchActivityClient;
 import fr.enimaloc.catapult.service.enrichment.twitch.TwitchActivityClient;
 import fr.enimaloc.catapult.service.enrichment.pcgw.PcGamingWikiClient;
@@ -39,13 +41,14 @@ class SimulatedEnrichmentClientsWiringTest {
         @Bean HttpSteamGridDbClient steamGridDb() { return mock(HttpSteamGridDbClient.class); }
         @Bean HttpItadClient itad() { return mock(HttpItadClient.class); }
         @Bean HttpOpenCriticClient openCritic() { return mock(HttpOpenCriticClient.class); }
+        @Bean HttpSpeedrunClient speedrun() { return mock(HttpSpeedrunClient.class); }
         @Bean HelixTwitchActivityClient twitchActivity() { return mock(HelixTwitchActivityClient.class); }
     }
 
     @Configuration(proxyBeanMethods = false)
     @ComponentScan(basePackageClasses = SimulatedProtonDbClient.class, useDefaultFilters = false,
             includeFilters = @ComponentScan.Filter(type = FilterType.REGEX,
-                    pattern = ".*Simulated(ProtonDb|SteamDeck|PcGamingWiki|SteamGridDb|Itad|OpenCritic|TwitchActivity)Client"))
+                    pattern = ".*Simulated(ProtonDb|SteamDeck|PcGamingWiki|SteamGridDb|Itad|OpenCritic|Speedrun|TwitchActivity)Client"))
     static class SimulatedClients {
     }
 
@@ -61,6 +64,7 @@ class SimulatedEnrichmentClientsWiringTest {
             assertThat(ctx.getBean(SteamGridDbClient.class)).isInstanceOf(SimulatedSteamGridDbClient.class);
             assertThat(ctx.getBean(ItadClient.class)).isInstanceOf(SimulatedItadClient.class);
             assertThat(ctx.getBean(OpenCriticClient.class)).isInstanceOf(SimulatedOpenCriticClient.class);
+            assertThat(ctx.getBean(SpeedrunClient.class)).isInstanceOf(SimulatedSpeedrunClient.class);
             assertThat(ctx.getBean(TwitchActivityClient.class)).isInstanceOf(SimulatedTwitchActivityClient.class);
         });
     }
@@ -74,6 +78,7 @@ class SimulatedEnrichmentClientsWiringTest {
             assertThat(ctx.getBean(SteamGridDbClient.class)).isInstanceOf(HttpSteamGridDbClient.class);
             assertThat(ctx.getBean(ItadClient.class)).isInstanceOf(HttpItadClient.class);
             assertThat(ctx.getBean(OpenCriticClient.class)).isInstanceOf(HttpOpenCriticClient.class);
+            assertThat(ctx.getBean(SpeedrunClient.class)).isInstanceOf(HttpSpeedrunClient.class);
             assertThat(ctx.getBean(TwitchActivityClient.class)).isInstanceOf(HelixTwitchActivityClient.class);
         });
     }
@@ -112,5 +117,20 @@ class SimulatedEnrichmentClientsWiringTest {
         assertThat(twitch.categoryById(category.id())).isPresent();
         assertThat(twitch.lives(category.id(), null).liveCount()).isEqualTo(42);
         assertThat(twitch.clips(category.id(), java.time.Instant.now()).top()).isNotEmpty();
+    }
+
+    @Test
+    void simulatedSpeedrun_answersDeterministically() {
+        var sr = new SimulatedSpeedrunClient();
+        assertThat(sr.searchGames("Celeste").getFirst().name()).isEqualTo("Celeste");
+        var records = sr.records("any").orElseThrow();
+        assertThat(records.categories()).hasSize(3);
+        assertThat(records.categories().getFirst().runners()).hasSize(2);
+        var user = sr.usersByTwitch("simulated").getFirst();
+        assertThat(sr.user("whoever")).contains(user);
+        assertThat(sr.profile("valid")).contains(user);
+        assertThat(sr.personalBests(user.id(), null)).hasSize(2).allSatisfy(r -> assertThat(r.place()).isNotNull());
+        assertThat(sr.pendingRuns(user.id(), null, null)).hasSize(1)
+                .allSatisfy(r -> assertThat(r.place()).isNull());
     }
 }
