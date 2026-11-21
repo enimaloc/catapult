@@ -11,11 +11,15 @@ import java.util.regex.Pattern;
  * The HLS URLs ffmpeg may be handed: {@code https} on Steam's or Microsoft's video CDNs only. The URL comes from a
  * store's answer, and ffmpeg opens whatever it is given ({@code file:}, {@code concat:}, any internal host), so
  * anything else is refused before it gets there.
+ *
+ * <p>Only the playlist URL is checked here: the variant playlists and segment URLs inside it are not. ffmpeg's
+ * {@code -protocol_whitelist https,tls,tcp,crypto} still keeps them to TLS fetches, but a playlist on an allowed CDN
+ * could point them at any {@code https} host.
  */
 public final class TrailerHlsUrls {
 
-    /** Steam's trailer CDNs ({@code video.akamai.steamstatic.com}, older {@code *.akamaihd.net} ones). */
-    private static final List<String> STEAM_SUFFIXES = List.of(".steamstatic.com", ".akamaihd.net");
+    /** Steam's trailer CDN: appdetails' {@code hls_h264} is served from {@code video.akamai.steamstatic.com}. */
+    private static final List<String> STEAM_SUFFIXES = List.of(".steamstatic.com");
     /** The Microsoft Store's video CDN, as the display catalog's {@code CMSVideos[].HLS} gives it. */
     private static final Pattern MICROSOFT_HOST = Pattern.compile("cdn-dynmedia-\\d+\\.microsoft\\.com");
 

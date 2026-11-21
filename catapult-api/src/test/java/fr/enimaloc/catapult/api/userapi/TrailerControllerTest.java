@@ -38,9 +38,13 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -66,6 +70,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class TrailerControllerTest {
 
     private static final String TOKEN = "cat_" + "t".repeat(43);
+    private static final String READ_TOKEN = "catr_" + "r".repeat(43);
     private static final String ME = "/api/me/game/trailer.mp4";
     private static final String STEAM = "/api/games/steam/620/trailer.mp4";
     private static final String XBOX = "/api/games/xbox/9NBLGGH4R315/trailer.mp4";
@@ -79,7 +84,20 @@ class TrailerControllerTest {
     @MockitoBean IpFetchBudgets budgets;
 
     private UserAccount user;
-    private final FetchBudget ipBudget = () -> true;
+    private final AtomicInteger ipCalls = new AtomicInteger();
+    private final AtomicBoolean ipBudgetLeft = new AtomicBoolean(true);
+    private final FetchBudget ipBudget = new FetchBudget() {
+        @Override
+        public boolean tryAcquire() {
+            ipCalls.incrementAndGet();
+            return ipBudgetLeft.get();
+        }
+
+        @Override
+        public Duration retryAfter() {
+            return Duration.ofSeconds(12);
+        }
+    };
     private final FfmpegTrailerStreamer.Reservation reservation = mock(FfmpegTrailerStreamer.Reservation.class);
 
     @BeforeEach
@@ -88,11 +106,13 @@ class TrailerControllerTest {
         user.setId(UUID.randomUUID());
         when(accounts.findById(user.getId())).thenReturn(Optional.of(user));
         when(tokens.authenticate(TOKEN)).thenReturn(Optional.of(new ApiTokenOwner(user, ApiTokenScope.FULL)));
+        when(tokens.authenticate(READ_TOKEN)).thenReturn(Optional.of(new ApiTokenOwner(user, ApiTokenScope.READ)));
         when(budgets.forIp(any())).thenReturn(ipBudget);
         when(resolver.current(any())).thenReturn(Optional.empty());
         when(resolver.steam(any(), any())).thenReturn(Optional.empty());
         when(resolver.xbox(any(), any())).thenReturn(Optional.empty());
         when(streamer.reserve()).thenReturn(reservation);
+        when(streamer.reservePublic(any())).thenReturn(reservation);
         when(streamer.maxDuration()).thenReturn(Duration.ofMinutes(10));
         doAnswer(invocation -> {
             invocation.<OutputStream>getArgument(1).write("mp4-bytes".getBytes());
@@ -120,7 +140,18 @@ class TrailerControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.CONTENT_TYPE, "video/mp4"))
                 .andExpect(content().bytes("mp4-bytes".getBytes()));
-        verify(reservation).close();
+        // by the body, then by the completion handler (idempotent in the real reservation)
+        verify(reservation, atLeastOnce()).close();
+        verify(streamer).reserve();
+        verify(streamer, never()).reservePublic(any());
+    }
+
+    @Test
+    void head_takesTheReadOnlyTokenLikeGet() throws Exception {
+        when(resolver.current(user)).thenReturn(Optional.of(HLS));
+
+        mvc.perform(v3(head(ME)).queryParam("token", READ_TOKEN)).andExpect(status().isOk());
+        verifyNoInteractions(streamer);
     }
 
     @Test
@@ -160,6 +191,7 @@ class TrailerControllerTest {
 
     @Test
     void publicRoutes_countAgainstTheCallersIpBudget() throws Exception {
+        // a cached URL: the resolver takes nothing from the budget, the stream itself still does
         when(resolver.xbox(eq("9NBLGGH4R315"), eq(ipBudget))).thenReturn(Optional.of(HLS));
 
         MvcResult started = mvc.perform(v3(get(XBOX)).header(HttpHeaders.ORIGIN, "https://overlay.example"))
@@ -168,6 +200,28 @@ class TrailerControllerTest {
                 .andReturn();
         mvc.perform(asyncDispatch(started)).andExpect(status().isOk());
         verify(budgets).forIp("203.0.113.7");
+        assertThat(ipCalls).hasValue(1);
+        verify(streamer).reservePublic("203.0.113.7");
+        verify(streamer, never()).reserve();
+    }
+
+    @Test
+    void cachedUrl_spentIpBudget_429_noFfmpeg() throws Exception {
+        when(resolver.steam(eq("620"), any())).thenReturn(Optional.of(HLS));
+        ipBudgetLeft.set(false);
+
+        mvc.perform(v3(get(STEAM)))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().string(HttpHeaders.RETRY_AFTER, "12"));
+        verifyNoInteractions(streamer);
+    }
+
+    @Test
+    void head_costsNoStream() throws Exception {
+        when(resolver.steam(eq("620"), any())).thenReturn(Optional.of(HLS));
+
+        mvc.perform(v3(head(STEAM))).andExpect(status().isOk());
+        assertThat(ipCalls).hasValue(0);
     }
 
     @Test
@@ -186,12 +240,13 @@ class TrailerControllerTest {
         mvc.perform(v3(get(STEAM))).andExpect(status().isNotFound());
         mvc.perform(v3(head(XBOX))).andExpect(status().isNotFound());
         verify(streamer, never()).reserve();
+        verify(streamer, never()).reservePublic(any());
     }
 
     @Test
     void allFfmpegBusy_503WithRetryAfter() throws Exception {
         when(resolver.steam(eq("620"), any())).thenReturn(Optional.of(HLS));
-        when(streamer.reserve()).thenThrow(new TrailerBusyException(Duration.ofSeconds(30)));
+        when(streamer.reservePublic(any())).thenThrow(new TrailerBusyException(Duration.ofSeconds(30)));
 
         mvc.perform(v3(get(STEAM)))
                 .andExpect(status().isServiceUnavailable())

@@ -144,8 +144,8 @@ class OpenApiDocsTest {
                 assertThat(security).as("%s %s", operation.getKey(), path.getKey()).isNotNull();
                 List<String> alternatives = new ArrayList<>();
                 security.forEach(requirement -> alternatives.addAll(requirement.propertyNames()));
-                if (operation.getKey().equals("get")) {
-                    assertThat(alternatives).as("GET %s", path.getKey())
+                if (operation.getKey().equals("get") || operation.getKey().equals("head")) {
+                    assertThat(alternatives).as("%s %s", operation.getKey(), path.getKey())
                             .containsExactlyInAnyOrder("personalToken", "readToken");
                 } else {
                     assertThat(alternatives).as("%s %s", operation.getKey(), path.getKey())

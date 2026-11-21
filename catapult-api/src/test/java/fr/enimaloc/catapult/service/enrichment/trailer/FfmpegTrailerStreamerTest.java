@@ -102,6 +102,61 @@ class FfmpegTrailerStreamerTest {
     }
 
     @Test
+    void publicCallers_leaveTheLastSlotToTheAuthenticatedRoute() throws IOException {
+        List<FfmpegTrailerStreamer.Reservation> held = new ArrayList<>();
+        for (int i = 0; i < 3; i++) {
+            held.add(streamer.reservePublic("198.51.100." + i));
+        }
+
+        assertThatThrownBy(() -> streamer.reservePublic("198.51.100.9")).isInstanceOf(TrailerBusyException.class);
+        // the refused public caller left nothing behind
+        assertThat(streamer.trackedIps()).isEqualTo(3);
+        FfmpegTrailerStreamer.Reservation obs = streamer.reserve();
+        assertThat(streamer.availablePermits()).isZero();
+
+        obs.close();
+        held.forEach(FfmpegTrailerStreamer.Reservation::close);
+        assertThat(streamer.availablePermits()).isEqualTo(4);
+        assertThat(streamer.trackedIps()).isZero();
+    }
+
+    @Test
+    void onePublicStreamPerIp() {
+        FfmpegTrailerStreamer.Reservation first = streamer.reservePublic("203.0.113.7");
+
+        assertThatThrownBy(() -> streamer.reservePublic("203.0.113.7")).isInstanceOf(TrailerBusyException.class);
+        FfmpegTrailerStreamer.Reservation other = streamer.reservePublic("203.0.113.8");
+
+        first.close();
+        first.close();
+        FfmpegTrailerStreamer.Reservation again = streamer.reservePublic("203.0.113.7");
+        again.close();
+        other.close();
+        assertThat(streamer.trackedIps()).isZero();
+        assertThat(streamer.availablePermits()).isEqualTo(4);
+    }
+
+    @Test
+    void singleSlot_neverServedToPublicCallers() {
+        properties.setFfmpegMaxProcesses(1);
+        streamer.shutdown();
+        streamer = newStreamer();
+
+        assertThatThrownBy(() -> streamer.reservePublic("203.0.113.7")).isInstanceOf(TrailerBusyException.class);
+        assertThat(streamer.trackedIps()).isZero();
+        streamer.reserve().close();
+    }
+
+    @Test
+    void shutDown_neverLeavesAStartedFfmpegRunning() {
+        streamer.shutdown();
+
+        assertThatThrownBy(() -> streamer.stream(HLS, new ByteArrayOutputStream())).isInstanceOf(IOException.class);
+        assertThat(processes.getFirst().destroyedForcibly).isTrue();
+        assertThat(streamer.availablePermits()).isEqualTo(4);
+    }
+
+    @Test
     void clientDisconnect_killsProcessAndReleasesPermit() throws Exception {
         nextOutput = null;
         OutputStream gone = new OutputStream() {

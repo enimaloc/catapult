@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.Semaphore;
@@ -28,6 +29,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * re-encoding ({@code -c copy}); nothing is stored. At most {@code catapult.enrichment.ffmpeg-max-processes} run at
  * once (a {@link TrailerBusyException} beyond), each for at most {@code catapult.enrichment.ffmpeg-max-duration};
  * ffmpeg is killed as soon as the caller goes away or the time is up.
+ *
+ * <p>The public routes ({@link #reservePublic}) never take the last slot, kept for the authenticated route an OBS
+ * media source plays, and take at most {@value #MAX_PUBLIC_PER_IP} at once per IP: an anonymous caller cannot hold
+ * every slot. With a single slot, public streams are never served.
  */
 @Slf4j
 @Component
@@ -42,6 +47,8 @@ public class FfmpegTrailerStreamer {
     /** How much of ffmpeg's error output is kept for the log. */
     private static final int STDERR_TAIL = 4096;
     private static final int BUFFER = 64 * 1024;
+    /** Public streams one IP may run at once. */
+    static final int MAX_PUBLIC_PER_IP = 1;
 
     /** Starts a process: {@link ProcessBuilder} in production, a fake one in tests. */
     @FunctionalInterface
@@ -66,6 +73,10 @@ public class FfmpegTrailerStreamer {
 
     private final ProcessLauncher launcher;
     private final Semaphore permits;
+    /** The slots public callers may take: all but one. */
+    private final Semaphore publicPermits;
+    /** Public streams running per IP; an IP leaves the map when its last one ends. */
+    private final ConcurrentHashMap<String, Integer> publicByIp = new ConcurrentHashMap<>();
     private final Duration maxDuration;
     private final ScheduledExecutorService watchdog = Executors.newSingleThreadScheduledExecutor(
             Thread.ofPlatform().daemon().name("ffmpeg-watchdog").factory());
@@ -78,7 +89,8 @@ public class FfmpegTrailerStreamer {
 
     FfmpegTrailerStreamer(EnrichmentProperties properties, ProcessLauncher launcher) {
         this.launcher    = launcher;
-        this.permits     = new Semaphore(properties.ffmpegMaxProcesses());
+        this.permits       = new Semaphore(properties.ffmpegMaxProcesses());
+        this.publicPermits = new Semaphore(Math.max(0, properties.ffmpegMaxProcesses() - 1));
         this.maxDuration = properties.ffmpegMaxDuration();
     }
 
@@ -91,7 +103,42 @@ public class FfmpegTrailerStreamer {
         if (!permits.tryAcquire()) {
             throw new TrailerBusyException(RETRY_AFTER);
         }
-        return new Slot();
+        return new Slot(null);
+    }
+
+    /**
+     * {@link #reserve()} for a public caller: never the last free slot, and at most {@value #MAX_PUBLIC_PER_IP} at
+     * once for {@code ip}.
+     *
+     * @throws TrailerBusyException when no public slot is free, or {@code ip} already streams
+     */
+    public Reservation reservePublic(String ip) {
+        boolean[] taken = {false};
+        publicByIp.compute(ip, (key, running) -> {
+            int count = running == null ? 0 : running;
+            if (count >= MAX_PUBLIC_PER_IP) {
+                return running;
+            }
+            taken[0] = true;
+            return count + 1;
+        });
+        if (!taken[0]) {
+            throw new TrailerBusyException(RETRY_AFTER);
+        }
+        if (!publicPermits.tryAcquire()) {
+            releaseIp(ip);
+            throw new TrailerBusyException(RETRY_AFTER);
+        }
+        if (!permits.tryAcquire()) {
+            publicPermits.release();
+            releaseIp(ip);
+            throw new TrailerBusyException(RETRY_AFTER);
+        }
+        return new Slot(ip);
+    }
+
+    private void releaseIp(String ip) {
+        publicByIp.computeIfPresent(ip, (key, running) -> running <= 1 ? null : running - 1);
     }
 
     /**
@@ -114,6 +161,11 @@ public class FfmpegTrailerStreamer {
         return permits.availablePermits();
     }
 
+    /** Number of IPs with a public stream running. */
+    int trackedIps() {
+        return publicByIp.size();
+    }
+
     @PreDestroy
     void shutdown() {
         watchdog.shutdownNow();
@@ -130,6 +182,12 @@ public class FfmpegTrailerStreamer {
     private final class Slot implements Reservation {
 
         private final AtomicBoolean released = new AtomicBoolean();
+        /** The public caller's IP; null for the authenticated route. */
+        private final String publicIp;
+
+        Slot(String publicIp) {
+            this.publicIp = publicIp;
+        }
 
         @Override
         public void stream(URI hls, OutputStream out) throws IOException {
@@ -139,10 +197,18 @@ public class FfmpegTrailerStreamer {
             Process process = launcher.start(command(hls));
             running.add(process);
             AtomicBoolean timedOut = new AtomicBoolean();
-            ScheduledFuture<?> deadline = watchdog.schedule(() -> {
-                timedOut.set(true);
+            ScheduledFuture<?> deadline;
+            try {
+                deadline = watchdog.schedule(() -> {
+                    timedOut.set(true);
+                    process.destroyForcibly();
+                }, maxDuration.toMillis(), TimeUnit.MILLISECONDS);
+            } catch (RejectedExecutionException e) {
+                // shutting down: no watchdog could ever stop this ffmpeg, so it must not run
                 process.destroyForcibly();
-            }, maxDuration.toMillis(), TimeUnit.MILLISECONDS);
+                running.remove(process);
+                throw new IOException("Trailer streaming is shutting down", e);
+            }
             StderrTail stderr = new StderrTail(process.getErrorStream());
             boolean clientGone = false;
             try {
@@ -159,6 +225,10 @@ public class FfmpegTrailerStreamer {
         public void close() {
             if (released.compareAndSet(false, true)) {
                 permits.release();
+                if (publicIp != null) {
+                    publicPermits.release();
+                    releaseIp(publicIp);
+                }
             }
         }
     }

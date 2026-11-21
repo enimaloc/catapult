@@ -58,7 +58,6 @@ public class TrailerController {
     private static final String SINCE_V3 = ApiV2.VERSION_3 + "+";
     /** Room left past ffmpeg's own limit before the servlet container gives up on the response. */
     private static final Duration ASYNC_MARGIN = Duration.ofMinutes(1);
-    private static final UpstreamBudgetAdvice UPSTREAM_BUDGET_ADVICE = new UpstreamBudgetAdvice();
 
     private final TrailerSourceResolver resolver;
     private final FfmpegTrailerStreamer streamer;
@@ -78,7 +77,8 @@ public class TrailerController {
     @GetMapping(path = ME_TRAILER_PATH, version = SINCE_V3)
     public ResponseEntity<StreamingResponseBody> currentGameTrailer(@AuthenticationPrincipal UUID userId,
                                                                     NativeWebRequest request) {
-        return streamed(resolver.current(userResolver.tokenOwner(userId)), request);
+        URI hls = resolver.current(userResolver.tokenOwner(userId)).orElseThrow(TrailerController::noTrailer);
+        return streamed(hls, streamer.reserve(), request);
     }
 
     @Operation(summary = "Check your channel's current game has an MP4 trailer",
@@ -107,7 +107,8 @@ public class TrailerController {
             @Parameter(description = "Steam appId.", in = ParameterIn.PATH, example = "620")
             @PathVariable @Pattern(regexp = ApiV2.STEAM_APP_ID) String appId,
             NativeWebRequest request, HttpServletRequest servletRequest) {
-        return streamed(resolver.steam(appId, budgetOf(servletRequest)), request);
+        FetchBudget budget = budgetOf(servletRequest);
+        return publicStream(resolver.steam(appId, budget), budget, servletRequest, request);
     }
 
     @Operation(summary = "Check a Steam app has an MP4 trailer",
@@ -139,7 +140,8 @@ public class TrailerController {
             @Parameter(description = "Microsoft Store product id.", in = ParameterIn.PATH, example = "9NBLGGH4R315")
             @PathVariable @Pattern(regexp = ApiV2.XBOX_PRODUCT_ID) String productId,
             NativeWebRequest request, HttpServletRequest servletRequest) {
-        return streamed(resolver.xbox(productId, budgetOf(servletRequest)), request);
+        FetchBudget budget = budgetOf(servletRequest);
+        return publicStream(resolver.xbox(productId, budget), budget, servletRequest, request);
     }
 
     @Operation(summary = "Check a Microsoft Store product has an MP4 trailer",
@@ -155,15 +157,6 @@ public class TrailerController {
         return head(resolver.xbox(productId, budgetOf(servletRequest)));
     }
 
-    /**
-     * Same answer as {@link UpstreamBudgetAdvice}, held here: a controller's own handler always wins over
-     * {@code ProblemAdvice}'s catch-all, which an advice of the same order may not.
-     */
-    @ExceptionHandler(UpstreamBudgetExceededException.class)
-    public ResponseEntity<Void> tooManyUpstreamCalls(UpstreamBudgetExceededException e) {
-        return UPSTREAM_BUDGET_ADVICE.tooManyUpstreamCalls(e);
-    }
-
     @ExceptionHandler(TrailerBusyException.class)
     public ResponseEntity<Void> busy(TrailerBusyException e) {
         long seconds = Math.max(1, (e.retryAfter().toMillis() + 999) / 1000);
@@ -173,15 +166,35 @@ public class TrailerController {
     }
 
     /**
-     * The MP4 of {@code hls}, or 404. The ffmpeg slot is taken here, before the response starts, so that a busy
-     * instance can still answer 503; the body gives it back whatever happens.
+     * A public caller's stream: it costs one call of the caller's IP budget every time, the URL cached or not (each
+     * play downloads the whole upstream stream again), and takes a public slot (one per IP, never the last one).
      */
-    private ResponseEntity<StreamingResponseBody> streamed(Optional<URI> hls, NativeWebRequest request) {
+    private ResponseEntity<StreamingResponseBody> publicStream(Optional<URI> hls, FetchBudget budget,
+                                                               HttpServletRequest servletRequest,
+                                                               NativeWebRequest request) {
         URI source = hls.orElseThrow(TrailerController::noTrailer);
-        FfmpegTrailerStreamer.Reservation reservation = streamer.reserve();
-        // the container's default async timeout (30 s on Tomcat) would cut a trailer short
-        if (request instanceof AsyncWebRequest async) {
-            async.setTimeout(streamer.maxDuration().plus(ASYNC_MARGIN).toMillis());
+        if (!budget.tryAcquire()) {
+            throw new UpstreamBudgetExceededException(budget.retryAfter());
+        }
+        return streamed(source, streamer.reservePublic(servletRequest.getRemoteAddr()), request);
+    }
+
+    /**
+     * The MP4 of {@code source} through {@code reservation}, taken by the caller before the response starts so that a
+     * busy instance can still answer 503. The slot is given back when the body ends, and when the async request
+     * completes in any way (timeout, error, a body that never ran): closing twice gives it back once.
+     */
+    private ResponseEntity<StreamingResponseBody> streamed(URI source, FfmpegTrailerStreamer.Reservation reservation,
+                                                           NativeWebRequest request) {
+        try {
+            // the container's default async timeout (30 s on Tomcat) would cut a trailer short
+            if (request instanceof AsyncWebRequest async) {
+                async.setTimeout(streamer.maxDuration().plus(ASYNC_MARGIN).toMillis());
+                async.addCompletionHandler(reservation::close);
+            }
+        } catch (RuntimeException e) {
+            reservation.close();
+            throw e;
         }
         StreamingResponseBody body = out -> {
             try (reservation) {
