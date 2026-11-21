@@ -16,6 +16,7 @@ import proto.AlternativeName;
 import proto.ExternalGame;
 import proto.ExternalGameSource;
 import proto.Game;
+import proto.GameTimeToBeat;
 
 import java.util.List;
 import java.util.Optional;
@@ -105,6 +106,17 @@ public class SimulatedIgdbClient extends IgdbClient {
         try {
             return runner.run(null, SimulatedCalls.IGDB_GAME, "POST /games details id=" + igdbId,
                     () -> real().fetchGameDetails(igdbId, token), Optional::empty, SimulatedCallRunner::httpError);
+        } catch (RestClientException e) {
+            log.warn("Simulated IGDB {} failed: {}", SimulatedCalls.IGDB_GAME.id(), e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    @Override
+    public Optional<GameTimeToBeat> findTimeToBeat(String igdbId, String token) {
+        try {
+            return runner.run(null, SimulatedCalls.IGDB_GAME, "POST /game_time_to_beats game_id=" + igdbId,
+                    () -> real().findTimeToBeat(igdbId, token), Optional::empty, SimulatedCallRunner::httpError);
         } catch (RestClientException e) {
             log.warn("Simulated IGDB {} failed: {}", SimulatedCalls.IGDB_GAME.id(), e.getMessage());
             return Optional.empty();

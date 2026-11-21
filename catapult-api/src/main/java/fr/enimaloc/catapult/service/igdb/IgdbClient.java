@@ -12,6 +12,7 @@ import proto.AlternativeName;
 import proto.ExternalGame;
 import proto.ExternalGameSource;
 import proto.Game;
+import proto.GameTimeToBeat;
 
 import java.util.List;
 import java.util.Optional;
@@ -162,6 +163,19 @@ public class IgdbClient {
         return apiObservations.observe("igdb", "fetch_game_details", () -> {
             APICalypse query = new APICalypse().fields(GAME_DETAILS_FIELDS).where("id = " + Long.parseLong(igdbId)).limit(1);
             return fetchOrEmpty(token, "/games", "details id=" + igdbId, query, IgdbClient::games)
+                    .stream().findFirst();
+        });
+    }
+
+    /**
+     * A game's community time to beat (seconds to finish hastily, normally and completely), when IGDB has one.
+     */
+    public Optional<GameTimeToBeat> findTimeToBeat(String igdbId, String token) {
+        return apiObservations.observe("igdb", "find_time_to_beat", () -> {
+            APICalypse query = new APICalypse().fields("game_id,hastily,normally,completely,count")
+                    .where("game_id = " + Long.parseLong(igdbId)).limit(1);
+            return fetchOrEmpty(token, "/game_time_to_beats", "game_id=" + igdbId, query,
+                    q -> ProtoRequestKt.gameTimeToBeats(IGDBWrapper.INSTANCE, q))
                     .stream().findFirst();
         });
     }
