@@ -19,6 +19,12 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -39,16 +45,72 @@ class HltbScraperTest {
     private final EnrichmentProperties properties = new EnrichmentProperties();
     private MockRestServiceServer server;
     private HttpHltbScraper scraper;
+    /** Runs before each fake sleep; may block or throw. */
+    private volatile HttpHltbScraper.Sleeper beforeSleep = duration -> { };
 
     @BeforeEach
     void setUp() {
-        properties.getHltb().setBreakerThreshold(2);
+        properties.getHltb().getScrape().setBreakerThreshold(2);
         RestClient.Builder builder = RestClient.builder();
         server = MockRestServiceServer.bindTo(builder).build();
         scraper = new HttpHltbScraper(builder, properties, "https://catapult.example/", clock, duration -> {
+            beforeSleep.sleep(duration);
             sleeps.add(duration);
             clock.advance(duration);
         });
+    }
+
+    @Test
+    void interruptedWait_isNotCountedAsASiteFailure() throws IOException {
+        expectInit("abc");
+        expectSearch("abc", fixture());
+        beforeSleep = duration -> {
+            throw new InterruptedException();
+        };
+
+        // threshold is 2: two interrupted waits must not open the breaker
+        assertThatThrownBy(() -> scraper.search("Hollow Knight")).isInstanceOf(HltbScraper.UnavailableException.class);
+        assertThat(Thread.interrupted()).isTrue();
+        assertThatThrownBy(() -> scraper.search("Hollow Knight")).isInstanceOf(HltbScraper.UnavailableException.class);
+        assertThat(Thread.interrupted()).isTrue();
+
+        beforeSleep = duration -> { };
+        assertThat(scraper.search("Hollow Knight")).isPresent();
+        server.verify();
+    }
+
+    @Test
+    void busySlot_timesOutWithoutCountingAsASiteFailure() throws Exception {
+        properties.setAggregateTimeout(Duration.ofMillis(50));
+        CountDownLatch sleeping = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        beforeSleep = duration -> {
+            sleeping.countDown();
+            release.await();
+        };
+        expectInit("abc");
+        expectSearch("abc", fixture());
+        expectSearch("abc", fixture());
+        ExecutorService other = Executors.newSingleThreadExecutor();
+        try {
+            // the other search holds the slot while it waits for its turn to post
+            Future<Optional<TimeToBeat>> first = other.submit(() -> scraper.search("Hollow Knight"));
+            assertThat(sleeping.await(5, TimeUnit.SECONDS)).isTrue();
+
+            for (int i = 0; i < 3; i++) {
+                assertThatThrownBy(() -> scraper.search("Hollow Knight"))
+                        .isInstanceOf(HltbScraper.UnavailableException.class);
+            }
+
+            beforeSleep = duration -> { };
+            release.countDown();
+            assertThat(first.get(5, TimeUnit.SECONDS)).isPresent();
+            // three timeouts with a threshold of 2, yet the breaker is still closed
+            assertThat(scraper.search("Hollow Knight")).isPresent();
+            server.verify();
+        } finally {
+            other.shutdownNow();
+        }
     }
 
     private void expectInit(String token) {

@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
@@ -24,6 +25,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Stream;
 
@@ -35,9 +37,11 @@ import java.util.stream.Stream;
  * the search to {@code /api/search/site} with it in {@code x-auth-token}; a {@code 403} means the token expired, and
  * it is renewed once. Durations come back in seconds.
  * <p>
- * Polite on purpose: one search at a time, at most one request per {@code hltb.scrape-interval}, an explicit
- * User-Agent, and a breaker that stops asking for {@code hltb.breaker-pause} after {@code hltb.breaker-threshold}
- * failed searches in a row. All of it is per instance and in memory.
+ * Polite on purpose: one search at a time, at most one request per {@code hltb.scrape.interval}, an explicit
+ * User-Agent, and a breaker that stops asking for {@code hltb.scrape.breaker-pause} after
+ * {@code hltb.scrape.breaker-threshold} failed searches in a row. Only the site's own failures (error status,
+ * transport error, unexpected answer) count towards the breaker; waiting here (lock timeout, interruption) does
+ * not. A caller waits at most {@code aggregate-timeout} for its turn. All of it is per instance and in memory.
  */
 @Slf4j
 @Component
@@ -47,6 +51,8 @@ public class HttpHltbScraper implements HltbScraper {
     private static final String SEARCH_PATH = "/api/search/site";
     /** Lowest name similarity (0..1) accepted when no result matches the name exactly. */
     private static final double MIN_SIMILARITY = 0.85;
+    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
+    private static final Duration READ_TIMEOUT = Duration.ofSeconds(10);
 
     /** Waits; swapped in tests so they never really sleep. */
     @FunctionalInterface
@@ -69,7 +75,15 @@ public class HttpHltbScraper implements HltbScraper {
     @Autowired
     public HttpHltbScraper(RestClient.Builder builder, EnrichmentProperties properties,
                            @Value("${app.base-url:http://localhost:8080}") String baseUrl) {
-        this(builder, properties, baseUrl, Clock.systemUTC(), duration -> Thread.sleep(duration));
+        this(builder.requestFactory(timeouts()), properties, baseUrl, Clock.systemUTC(),
+                duration -> Thread.sleep(duration));
+    }
+
+    private static SimpleClientHttpRequestFactory timeouts() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(CONNECT_TIMEOUT);
+        factory.setReadTimeout(READ_TIMEOUT);
+        return factory;
     }
 
     HttpHltbScraper(RestClient.Builder builder, EnrichmentProperties properties, String baseUrl, Clock clock,
@@ -77,8 +91,6 @@ public class HttpHltbScraper implements HltbScraper {
         String origin = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
         this.http = builder.baseUrl(SITE)
                 .defaultHeader(HttpHeaders.USER_AGENT, "Catapult (+" + origin + ")")
-                .defaultHeader(HttpHeaders.REFERER, SITE + "/")
-                .defaultHeader(HttpHeaders.ORIGIN, SITE)
                 .build();
         this.properties = properties;
         this.clock      = clock;
@@ -87,25 +99,41 @@ public class HttpHltbScraper implements HltbScraper {
 
     @Override
     public Optional<TimeToBeat> search(String name) {
-        lock.lock();
+        acquireTurn();
         try {
             EnrichmentProperties.Hltb settings = properties.hltb();
             Instant now = clock.instant();
             if (pausedUntil != null && now.isBefore(pausedUntil)) {
                 throw new UnavailableException("HowLongToBeat scraping paused until " + pausedUntil);
             }
+            List<Entry> entries;
             try {
-                Optional<TimeToBeat> result = bestMatch(name, fetch(name, settings.scrapeInterval()));
-                consecutiveFailures = 0;
-                pausedUntil = null;
-                return result;
+                entries = fetch(name, settings.scrapeInterval());
+            } catch (LocalWaitException e) {
+                throw e;
             } catch (RuntimeException e) {
                 recordFailure(settings);
                 throw e instanceof UnavailableException unavailable ? unavailable
                         : new UnavailableException("HowLongToBeat search failed: " + e.getMessage(), e);
             }
+            consecutiveFailures = 0;
+            pausedUntil = null;
+            return bestMatch(name, entries);
         } finally {
             lock.unlock();
+        }
+    }
+
+    /** Takes the one search slot, waiting at most {@code aggregate-timeout}; a timeout is not the site's fault. */
+    private void acquireTurn() {
+        Duration timeout = properties.aggregateTimeout();
+        try {
+            if (!lock.tryLock(timeout.toMillis(), TimeUnit.MILLISECONDS)) {
+                throw new LocalWaitException("another HowLongToBeat search still runs after " + timeout, null);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new LocalWaitException("interrupted while waiting for the HowLongToBeat search slot", e);
         }
     }
 
@@ -127,6 +155,7 @@ public class HttpHltbScraper implements HltbScraper {
             return post(name, interval);
         } catch (HttpClientErrorException.Forbidden e) {
             log.debug("[HLTB] search token refused, renewing it");
+            token = null;
             token = newToken(interval);
             return post(name, interval);
         }
@@ -165,7 +194,7 @@ public class HttpHltbScraper implements HltbScraper {
                     sleeper.sleep(wait);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
-                    throw new UnavailableException("Interrupted while waiting for HowLongToBeat", e);
+                    throw new LocalWaitException("interrupted while waiting for HowLongToBeat", e);
                 }
             }
         }
@@ -247,6 +276,13 @@ public class HttpHltbScraper implements HltbScraper {
             current = swap;
         }
         return previous[b.length()];
+    }
+
+    /** A wait on our side (lock timeout, interruption): reported as unavailable, not counted against the site. */
+    private static final class LocalWaitException extends UnavailableException {
+        LocalWaitException(String message, Throwable cause) {
+            super(message, cause);
+        }
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

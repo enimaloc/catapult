@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.enrichment.hltb;
 
+import com.api.igdb.exceptions.RequestException;
 import fr.enimaloc.catapult.service.enrichment.EnrichmentCache;
 import fr.enimaloc.catapult.service.enrichment.EnrichmentProperties;
 import fr.enimaloc.catapult.service.enrichment.EnrichmentSource;
@@ -7,7 +8,6 @@ import fr.enimaloc.catapult.service.enrichment.FetchBudget;
 import fr.enimaloc.catapult.service.igdb.IgdbClient;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import proto.Game;
 import proto.GameTimeToBeat;
@@ -17,10 +17,10 @@ import java.util.Optional;
 
 /**
  * How long a game takes to beat: IGDB's {@code game_time_to_beats} first (official API), HowLongToBeat scraping
- * when IGDB has nothing and {@code catapult.enrichment.hltb.scrape-enabled} allows it. Answers, absent ones
- * included, are cached under {@code igdb:<id>} or, without an IGDB id, {@code name:<normalised name>}.
+ * when IGDB has nothing and {@code catapult.enrichment.hltb.scrape.enabled} allows it. Answers, absent ones
+ * included, are cached under {@code igdb:<id>} or, without an IGDB id, {@code name:<normalised name>}; a failure
+ * of either source throws instead, so it is never cached as absent.
  */
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class HltbService {
@@ -54,33 +54,40 @@ public class HltbService {
         return timeToBeat(igdbId, null, budget);
     }
 
+    /**
+     * IGDB first, then the scraper. Throws whenever IGDB could not be asked (no app token, error, name lookup
+     * failed), so that the cache keeps its last known value instead of recording the game as absent.
+     */
     private Optional<TimeToBeat> fetch(String igdbId, String name) {
         String token = igdbService.getAppToken();
-        boolean igdbReachable = token != null && !token.isBlank();
-        if (igdbReachable) {
-            Optional<TimeToBeat> fromIgdb = igdbClient.findTimeToBeat(igdbId, token).map(HltbService::fromIgdb)
+        if (token == null || token.isBlank()) {
+            throw new IgdbUnavailableException("empty IGDB app token, cannot look up " + igdbId, null);
+        }
+        Optional<TimeToBeat> fromIgdb;
+        try {
+            fromIgdb = igdbClient.findTimeToBeat(igdbId, token).map(HltbService::fromIgdb)
                     .filter(TimeToBeat::hasAnyDuration);
-            if (fromIgdb.isPresent()) {
-                return fromIgdb;
-            }
-        } else {
-            log.warn("[HLTB] empty IGDB app token, skipping IGDB for {}", igdbId);
+        } catch (RequestException e) {
+            throw new IgdbUnavailableException("IGDB time to beat failed for " + igdbId, e);
+        }
+        if (fromIgdb.isPresent()) {
+            return fromIgdb;
         }
         if (!properties.hltb().scrapeEnabled()) {
             return Optional.empty();
         }
-        String searchName = name != null && !name.isBlank() ? name
-                : igdbReachable ? igdbName(igdbId, token) : null;
-        return searchName == null ? Optional.empty() : scraper.search(searchName);
+        return scraper.search(name != null && !name.isBlank() ? name : igdbName(igdbId, token));
     }
 
     private Optional<TimeToBeat> scrape(String name) {
         return properties.hltb().scrapeEnabled() ? scraper.search(name) : Optional.empty();
     }
 
+    /** The IGDB name of the game; IGDB answering nothing counts as a failure (its lookup hides errors). */
     private String igdbName(String igdbId, String token) {
         return igdbClient.fetchGameById(igdbId, "name", token).stream()
-                .map(Game::getName).filter(n -> !n.isBlank()).findFirst().orElse(null);
+                .map(Game::getName).filter(n -> !n.isBlank()).findFirst()
+                .orElseThrow(() -> new IgdbUnavailableException("no IGDB name for " + igdbId, null));
     }
 
     private static TimeToBeat fromIgdb(GameTimeToBeat ttb) {
@@ -91,6 +98,13 @@ public class HltbService {
     /** IGDB leaves an unknown duration at 0. */
     private static Long seconds(int value) {
         return value > 0 ? (long) value : null;
+    }
+
+    /** IGDB could not be asked; nothing is known about the game. */
+    static final class IgdbUnavailableException extends RuntimeException {
+        IgdbUnavailableException(String message, Throwable cause) {
+            super(message, cause);
+        }
     }
 
     /** Lower case, trimmed, whitespace collapsed. */

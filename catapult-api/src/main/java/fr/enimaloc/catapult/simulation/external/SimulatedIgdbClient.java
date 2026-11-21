@@ -25,10 +25,10 @@ import java.util.function.Supplier;
 /**
  * IGDB, in the global {@code igdb.search} (lookups: sources, external games, executables, name search) and
  * {@code igdb.game} (game reads) modes. {@code REAL} hands the call to the real {@link IgdbClient} bean; otherwise
- * nothing is found, and a failure answers empty, as the real client does. The exception is
- * {@link #findSourcesByName}, whose real failure propagates: its simulated failure is thrown as the runner builds it
- * (an unchecked {@code RestClientException}: an IGDB {@code RequestException} wraps Fuel objects that cannot be made
- * up), which its only caller catches the same way.
+ * nothing is found, and a failure answers empty, as the real client does. The exceptions are
+ * {@link #findSourcesByName} and {@link #findTimeToBeat}, whose real failure propagates: their simulated failure is
+ * thrown as the runner builds it (an unchecked {@code RestClientException}: an IGDB {@code RequestException} wraps
+ * Fuel objects that cannot be made up), which their callers handle the same way.
  * <p>
  * A subclass rather than an extracted interface, so that none of the client's callers changes: the superclass's
  * state is never used, every public method is overridden.
@@ -113,13 +113,17 @@ public class SimulatedIgdbClient extends IgdbClient {
     }
 
     @Override
-    public Optional<GameTimeToBeat> findTimeToBeat(String igdbId, String token) {
+    public Optional<GameTimeToBeat> findTimeToBeat(String igdbId, String token) throws RequestException {
         try {
-            return runner.run(null, SimulatedCalls.IGDB_GAME, "POST /game_time_to_beats game_id=" + igdbId,
-                    () -> real().findTimeToBeat(igdbId, token), Optional::empty, SimulatedCallRunner::httpError);
-        } catch (RestClientException e) {
-            log.warn("Simulated IGDB {} failed: {}", SimulatedCalls.IGDB_GAME.id(), e.getMessage());
-            return Optional.empty();
+            return runner.run(null, SimulatedCalls.IGDB_GAME, "POST /game_time_to_beats game_id=" + igdbId, () -> {
+                try {
+                    return real().findTimeToBeat(igdbId, token);
+                } catch (RequestException e) {
+                    throw new RealRequestFailure(e);
+                }
+            }, Optional::empty, SimulatedCallRunner::httpError);
+        } catch (RealRequestFailure e) {
+            throw e.request;
         }
     }
 

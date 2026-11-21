@@ -169,15 +169,22 @@ public class IgdbClient {
 
     /**
      * A game's community time to beat (seconds to finish hastily, normally and completely), when IGDB has one.
+     * Propagates RequestException, so that a failure is never mistaken for "IGDB has nothing".
      */
-    public Optional<GameTimeToBeat> findTimeToBeat(String igdbId, String token) {
-        return apiObservations.observe("igdb", "find_time_to_beat", () -> {
+    public Optional<GameTimeToBeat> findTimeToBeat(String igdbId, String token) throws RequestException {
+        long start = System.nanoTime();
+        try {
             APICalypse query = new APICalypse().fields("game_id,hastily,normally,completely,count")
                     .where("game_id = " + Long.parseLong(igdbId)).limit(1);
-            return fetchOrEmpty(token, "/game_time_to_beats", "game_id=" + igdbId, query,
-                    q -> ProtoRequestKt.gameTimeToBeats(IGDBWrapper.INSTANCE, q))
-                    .stream().findFirst();
-        });
+            Optional<GameTimeToBeat> result = fetch(token, "/game_time_to_beats", "game_id=" + igdbId, query,
+                    q -> ProtoRequestKt.gameTimeToBeats(IGDBWrapper.INSTANCE, q)).stream().findFirst();
+            apiObservations.record("igdb", "find_time_to_beat", "success", "none", System.nanoTime() - start);
+            return result;
+        } catch (RequestException e) {
+            apiObservations.record("igdb", "find_time_to_beat", "error", e.getClass().getSimpleName(),
+                    System.nanoTime() - start);
+            throw e;
+        }
     }
 
     private static List<Game> games(APICalypse query) throws RequestException {
