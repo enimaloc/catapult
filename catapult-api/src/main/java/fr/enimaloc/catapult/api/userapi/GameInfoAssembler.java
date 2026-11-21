@@ -24,7 +24,6 @@ import fr.enimaloc.catapult.service.tw.TwLabelService;
 import fr.enimaloc.catapult.service.xbox.XboxStoreService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Component;
 
@@ -71,15 +70,10 @@ public class GameInfoAssembler {
     // caller's origin (the trusted proxies' X-Forwarded-*), app.base-url only outside a request.
     private final PublicBaseUrl publicBaseUrl;
 
-    // Optional and set rather than constructor-injected, so the v1/v2 construction of this assembler (and the web
-    // slices that import it) stay as they were; without it, v3 answers carry no enrichment object.
-    private GameEnrichmentAssembler gameEnrichmentAssembler;
+    // Optional, so the web slices that import this assembler without the enrichment beans still load; without it,
+    // v3 answers carry no enrichment object.
+    private final Optional<GameEnrichmentAssembler> gameEnrichmentAssembler;
     private final AtomicBoolean missingEnrichmentLogged = new AtomicBoolean();
-
-    @Autowired(required = false)
-    void setGameEnrichmentAssembler(GameEnrichmentAssembler gameEnrichmentAssembler) {
-        this.gameEnrichmentAssembler = gameEnrichmentAssembler;
-    }
 
     /** Which generation of routes the "more" links of an aggregated answer point at. */
     public enum LinkStyle {
@@ -338,14 +332,14 @@ public class GameInfoAssembler {
 
     private CompletableFuture<GameEnrichment> enrichAsync(DetectedGame detected, Optional<String> igdbId,
                                                           Optional<String> steamAppId, MoreLinks links) {
-        if (gameEnrichmentAssembler == null) {
+        if (gameEnrichmentAssembler.isEmpty()) {
             if (!missingEnrichmentLogged.getAndSet(true)) {
                 log.warn("No GameEnrichmentAssembler: v3 game info answers carry no enrichment object");
             }
             return CompletableFuture.completedFuture(GameEnrichment.EMPTY);
         }
         // the detected name, not the localized store name: the sources search by a stable name
-        return gameEnrichmentAssembler.enrichAsync(detected, igdbId, steamAppId, detected.getSourceName(), links);
+        return gameEnrichmentAssembler.get().enrichAsync(detected, igdbId, steamAppId, detected.getSourceName(), links);
     }
 
     // ---------------------------------------------------------------- v1 (frozen schema)

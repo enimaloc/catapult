@@ -14,6 +14,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.constraints.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -104,7 +105,7 @@ public class TrailerController {
     @GetMapping(path = STEAM_TRAILER_PATH, version = SINCE_V3)
     public ResponseEntity<StreamingResponseBody> steamTrailer(
             @Parameter(description = "Steam appId.", in = ParameterIn.PATH, example = "620")
-            @PathVariable String appId,
+            @PathVariable @Pattern(regexp = ApiV2.STEAM_APP_ID) String appId,
             NativeWebRequest request, HttpServletRequest servletRequest) {
         return streamed(resolver.steam(appId, budgetOf(servletRequest)), request);
     }
@@ -117,7 +118,7 @@ public class TrailerController {
     @RequestMapping(path = STEAM_TRAILER_PATH, method = RequestMethod.HEAD, version = SINCE_V3)
     public ResponseEntity<Void> steamTrailerHead(
             @Parameter(description = "Steam appId.", in = ParameterIn.PATH, example = "620")
-            @PathVariable String appId,
+            @PathVariable @Pattern(regexp = ApiV2.STEAM_APP_ID) String appId,
             HttpServletRequest servletRequest) {
         return head(resolver.steam(appId, budgetOf(servletRequest)));
     }
@@ -136,7 +137,7 @@ public class TrailerController {
     @GetMapping(path = XBOX_TRAILER_PATH, version = SINCE_V3)
     public ResponseEntity<StreamingResponseBody> xboxTrailer(
             @Parameter(description = "Microsoft Store product id.", in = ParameterIn.PATH, example = "9NBLGGH4R315")
-            @PathVariable String productId,
+            @PathVariable @Pattern(regexp = ApiV2.XBOX_PRODUCT_ID) String productId,
             NativeWebRequest request, HttpServletRequest servletRequest) {
         return streamed(resolver.xbox(productId, budgetOf(servletRequest)), request);
     }
@@ -149,7 +150,7 @@ public class TrailerController {
     @RequestMapping(path = XBOX_TRAILER_PATH, method = RequestMethod.HEAD, version = SINCE_V3)
     public ResponseEntity<Void> xboxTrailerHead(
             @Parameter(description = "Microsoft Store product id.", in = ParameterIn.PATH, example = "9NBLGGH4R315")
-            @PathVariable String productId,
+            @PathVariable @Pattern(regexp = ApiV2.XBOX_PRODUCT_ID) String productId,
             HttpServletRequest servletRequest) {
         return head(resolver.xbox(productId, budgetOf(servletRequest)));
     }

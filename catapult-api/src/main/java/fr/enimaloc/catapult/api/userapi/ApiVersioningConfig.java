@@ -16,7 +16,10 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
  * There is no "latest" alias path to keep in sync; when no resolver answers, the request falls back
  * to {@link ApiV2#VERSION}, by a last resolver rather than {@link ApiVersionConfigurer#setDefaultVersion}: a CORS
  * preflight then resolves no version at all and finds the CORS configuration of a route of any version (a
- * {@code "3+"} route would otherwise refuse every browser page of another origin).
+ * {@code "3+"} route would otherwise refuse every browser page of another origin). Beware: a path mapped at
+ * several versions (a {@code "2+"} and a {@code "3"} method) then matches the preflight more than once, and Spring
+ * answers such an ambiguous preflight with a permissive CORS configuration of its own, not the methods'
+ * {@code @CrossOrigin}; keep the versions of one path on the same CORS rules.
  *
  * <p>Versions 2 and 3 are supported. A route unchanged since version 2 is mapped at
  * {@link ApiV2#BASELINE} ("2+") and answers both; a response that changes in version 3 gets a

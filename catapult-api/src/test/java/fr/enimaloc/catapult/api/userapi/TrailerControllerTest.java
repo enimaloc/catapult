@@ -35,6 +35,7 @@ import javax.crypto.spec.SecretKeySpec;
 import java.io.OutputStream;
 import java.net.URI;
 import java.time.Duration;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -195,6 +196,19 @@ class TrailerControllerTest {
         mvc.perform(v3(get(STEAM)))
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(header().string(HttpHeaders.RETRY_AFTER, "30"));
+    }
+
+    /** A malformed id is refused before any store lookup, upstream call or database write. */
+    @Test
+    void malformedIds_400_withoutAnyLookup() throws Exception {
+        for (String path : List.of("/api/games/steam/abc/trailer.mp4", "/api/games/steam/12345678901/trailer.mp4",
+                "/api/games/xbox/9NBLGGH4R31/trailer.mp4", "/api/games/xbox/9NBLGGH4R315X/trailer.mp4",
+                "/api/games/xbox/9NBLGGH4R3-5/trailer.mp4")) {
+            mvc.perform(v3(get(path))).andExpect(status().isBadRequest());
+            mvc.perform(v3(head(path))).andExpect(status().isBadRequest());
+        }
+
+        verifyNoInteractions(resolver, streamer);
     }
 
     @Test

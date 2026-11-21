@@ -486,9 +486,9 @@ GET,/api/games/steamdeck/{appId},appId=990000;?version=3,,PASS,PASS,PASS,PASS,PA
 GET,/api/games/steamgriddb/{sgdbGameId},sgdbGameId=1;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
 GET,/api/games/pcgamingwiki/{pageId},pageId=1;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
 # trailer.mp4 (version 3): public per platform, the current game's by personal token
-GET,/api/games/steam/{appId}/trailer.mp4,?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
-HEAD,/api/games/steam/{appId}/trailer.mp4,?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
-GET,/api/games/xbox/{productId}/trailer.mp4,?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
-HEAD,/api/games/xbox/{productId}/trailer.mp4,?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
+GET,/api/games/steam/{appId}/trailer.mp4,appId=990000;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
+HEAD,/api/games/steam/{appId}/trailer.mp4,appId=990000;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
+GET,/api/games/xbox/{productId}/trailer.mp4,productId=9NBLGGH4R315;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
+HEAD,/api/games/xbox/{productId}/trailer.mp4,productId=9NBLGGH4R315;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
 GET,/api/me/game/trailer.mp4,?version=3,,401,401,401,401,401,401,PASS
 HEAD,/api/me/game/trailer.mp4,?version=3,,401,401,401,401,401,401,PASS

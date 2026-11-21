@@ -54,13 +54,17 @@ class GameInfoAssemblerV3Test {
     @BeforeEach
     void setUp() {
         RequestContextHolder.resetRequestAttributes();
-        assembler = new GameInfoAssembler(mock(WidgetTokenService.class), gameStateService, gameBindingRepository,
-                igdbService, igdbGameDetailsService, steamStoreService, mock(XboxStoreService.class),
-                mock(TwLabelService.class), null, mock(DevBackdoorResolver.class), mock(MessageSource.class),
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), new PublicBaseUrl(BASE));
-        assembler.setGameEnrichmentAssembler(enrichmentAssembler);
+        assembler = assembler(Optional.of(enrichmentAssembler));
         user = new UserAccount();
         user.setId(UUID.randomUUID());
+    }
+
+    private GameInfoAssembler assembler(Optional<GameEnrichmentAssembler> enrichment) {
+        return new GameInfoAssembler(mock(WidgetTokenService.class), gameStateService, gameBindingRepository,
+                igdbService, igdbGameDetailsService, steamStoreService, mock(XboxStoreService.class),
+                mock(TwLabelService.class), null, mock(DevBackdoorResolver.class), mock(MessageSource.class),
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), new PublicBaseUrl(BASE),
+                enrichment);
     }
 
     @Test
@@ -114,7 +118,7 @@ class GameInfoAssemblerV3Test {
 
     @Test
     void noEnrichmentAssembler_allEnrichmentNull() {
-        assembler.setGameEnrichmentAssembler(null);
+        assembler = assembler(Optional.empty());
         playing(Duration.ZERO);
 
         GameInfoV3Response response = assembler.gameInfoV3(user, Locale.ENGLISH);

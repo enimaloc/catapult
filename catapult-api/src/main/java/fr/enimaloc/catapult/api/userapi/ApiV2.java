@@ -43,5 +43,11 @@ public final class ApiV2 {
     // it recognizes any backdoor uuid by DevBackdoorResolver.isBackdoor.
     static final String GENERIC_UUID_EXAMPLE = "00000000-0000-0000-0001-000000000190";
 
+    // Shapes of the platform ids the public routes that may call a third party accept (@Pattern on the path
+    // variable): a malformed id is a 400 before any cache read, upstream call or database write.
+    static final String IGDB_ID = "\\d{1,19}";
+    static final String STEAM_APP_ID = "\\d{1,10}";
+    static final String XBOX_PRODUCT_ID = "[A-Za-z0-9]{12}";
+
     private ApiV2() {}
 }

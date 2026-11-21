@@ -38,6 +38,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
@@ -135,6 +136,19 @@ class EnrichmentGamesControllerTest {
         for (String path : List.of("hltb/1", "protondb/400", "steamdeck/400", "steamgriddb/1", "pcgamingwiki/1")) {
             mvc.perform(v3(get("/api/games/" + path), "203.0.113.7")).andExpect(status().isNotFound());
         }
+    }
+
+    /** A malformed id is refused before any cache read, upstream call or database write. */
+    @Test
+    void malformedIds_400_withoutTouchingTheSource() throws Exception {
+        for (String path : List.of("protondb/abc", "protondb/" + "9".repeat(600), "protondb/-1",
+                "steamdeck/abc", "steamdeck/12345678901", "hltb/abc", "hltb/" + "1".repeat(20),
+                "steamgriddb/abc", "steamgriddb/0", "pcgamingwiki/abc", "pcgamingwiki/-3")) {
+            mvc.perform(v3(get("/api/games/" + path), "203.0.113.7"))
+                    .andExpect(status().isBadRequest());
+        }
+
+        verifyNoInteractions(protonDb, steamDeck, hltb, steamGridDb, pcGamingWiki);
     }
 
     @Test

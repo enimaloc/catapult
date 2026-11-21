@@ -19,6 +19,8 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -65,7 +67,7 @@ public class EnrichmentGamesController {
     @GetMapping("/hltb/{igdbId}")
     public TimeToBeat hltbDetail(
             @Parameter(description = "IGDB game id.", in = ParameterIn.PATH, example = "1942")
-            @PathVariable String igdbId,
+            @PathVariable @Pattern(regexp = ApiV2.IGDB_ID) String igdbId,
             HttpServletRequest request) {
         return found(hltbService.byIgdbId(igdbId, budget(request)), "Unknown HowLongToBeat game");
     }
@@ -80,7 +82,7 @@ public class EnrichmentGamesController {
     @GetMapping("/protondb/{appId}")
     public ProtonDbSummary protonDbDetail(
             @Parameter(description = "Steam appId.", in = ParameterIn.PATH, example = "400")
-            @PathVariable String appId,
+            @PathVariable @Pattern(regexp = ApiV2.STEAM_APP_ID) String appId,
             HttpServletRequest request) {
         return found(protonDbService.summary(appId, budget(request)), "Unknown ProtonDB app");
     }
@@ -95,7 +97,7 @@ public class EnrichmentGamesController {
     @GetMapping("/steamdeck/{appId}")
     public SteamDeckCompatibility steamDeckDetail(
             @Parameter(description = "Steam appId.", in = ParameterIn.PATH, example = "400")
-            @PathVariable String appId,
+            @PathVariable @Pattern(regexp = ApiV2.STEAM_APP_ID) String appId,
             HttpServletRequest request) {
         return found(steamDeckService.compatibility(appId, budget(request)), "Unknown Steam Deck app");
     }
@@ -110,7 +112,7 @@ public class EnrichmentGamesController {
     @GetMapping("/steamgriddb/{sgdbGameId}")
     public SteamGridDbAssets steamGridDbDetail(
             @Parameter(description = "SteamGridDB game id.", in = ParameterIn.PATH, example = "5251")
-            @PathVariable long sgdbGameId,
+            @PathVariable @Positive long sgdbGameId,
             HttpServletRequest request) {
         return found(steamGridDbService.byGameId(sgdbGameId, budget(request)), "Unknown SteamGridDB game");
     }
@@ -125,7 +127,7 @@ public class EnrichmentGamesController {
     @GetMapping("/pcgamingwiki/{pageId}")
     public PcGamingWikiPage pcGamingWikiDetail(
             @Parameter(description = "PCGamingWiki page id.", in = ParameterIn.PATH, example = "3093")
-            @PathVariable long pageId,
+            @PathVariable @Positive long pageId,
             HttpServletRequest request) {
         return found(pcGamingWikiService.byPageId(pageId, budget(request)), "Unknown PCGamingWiki page");
     }
