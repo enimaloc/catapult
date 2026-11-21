@@ -30,7 +30,7 @@ import static fr.enimaloc.catapult.api.userapi.RequestLocale.LANG_DESCRIPTION;
  * resolved and no credential is needed; open to any origin, the answer carrying nothing of anyone.
  */
 @RestController
-@RequestMapping(path = ApiV2.GAMES_PATH, version = ApiV2.VERSION)
+@RequestMapping(path = ApiV2.GAMES_PATH, version = ApiV2.BASELINE)
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
 @Tag(name = "Games", description = "Public per-platform game detail, keyed by the platform's own id; "

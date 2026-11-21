@@ -28,7 +28,7 @@ import static fr.enimaloc.catapult.api.userapi.RequestLocale.ACCEPT_LANGUAGE_DES
  * {@code catapult} object's "more" link. Another account's binding is a 404, as an unknown one.
  */
 @RestController
-@RequestMapping(path = ApiV2.ME_BINDINGS_PATH, version = ApiV2.VERSION)
+@RequestMapping(path = ApiV2.ME_BINDINGS_PATH, version = ApiV2.BASELINE)
 @RequiredArgsConstructor
 @Tag(name = "Me — bindings", description = "Your game bindings (Catapult's trigger-warning and content-label "
         + "configuration of a game), by your personal API token.")

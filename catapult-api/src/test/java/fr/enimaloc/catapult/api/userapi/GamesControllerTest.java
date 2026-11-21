@@ -19,7 +19,9 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -123,6 +125,17 @@ class GamesControllerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("not_found"));
         verify(games).igdb("1234", CURRENT);
+    }
+
+    @Test
+    void unchangedRoute_answersInV3() throws Exception {
+        when(games.igdb("1234", CURRENT)).thenReturn(Optional.of(new IgdbDetailResponse(null, "valheim", null, null,
+                null, List.of(), null, null, null, null, null, Map.of(), List.of(), List.of(), List.of(), List.of(),
+                List.of(), List.of(), List.of(), List.of(), null, List.of(), List.of())));
+
+        mvc.perform(remote(get("/api/games/igdb/1234")).header(ApiV2.VERSION_HEADER, ApiV2.VERSION_3))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.slug").value("valheim"));
     }
 
     @TestConfiguration

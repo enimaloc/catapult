@@ -30,7 +30,7 @@ import static fr.enimaloc.catapult.api.userapi.RequestLocale.LANG_DESCRIPTION;
  * {@code f}, one field of the answer as plain text.
  */
 @RestController
-@RequestMapping(path = ApiV2.ME_GAME_PATH, version = ApiV2.VERSION)
+@RequestMapping(path = ApiV2.ME_GAME_PATH, version = ApiV2.BASELINE)
 @RequiredArgsConstructor
 @Tag(name = "Me — game", description = "The game your channel plays now, by your personal API token "
         + "(Authorization: Bearer cat_… or catr_…, or ?token=catr_… for a pasted URL).")

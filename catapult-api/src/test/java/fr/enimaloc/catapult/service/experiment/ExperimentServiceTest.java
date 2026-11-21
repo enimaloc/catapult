@@ -531,6 +531,38 @@ class ExperimentServiceTest {
         assertThat(experimentService.getVariant(user, "test-exp")).isEmpty();
     }
 
+    // getHeaviestVariantKey: the variant a request without an account follows
+
+    @Test
+    void getHeaviestVariantKey_isTheVariantWithTheMostWeight() {
+        variantA.setWeight(0);
+        variantB.setWeight(100);
+        when(experimentRepository.findByKey("test-exp")).thenReturn(Optional.of(experiment));
+
+        assertThat(experimentService.getHeaviestVariantKey("test-exp")).contains("variant_a");
+
+        variantA.setWeight(100);
+        variantB.setWeight(0);
+        assertThat(experimentService.getHeaviestVariantKey("test-exp")).contains("control");
+    }
+
+    @Test
+    void getHeaviestVariantKey_keepsTheFirstVariant_onATie() {
+        when(experimentRepository.findByKey("test-exp")).thenReturn(Optional.of(experiment));
+
+        assertThat(experimentService.getHeaviestVariantKey("test-exp")).contains("control");
+    }
+
+    @Test
+    void getHeaviestVariantKey_isEmpty_forAMissingOrNotActiveExperiment() {
+        when(experimentRepository.findByKey("missing")).thenReturn(Optional.empty());
+        assertThat(experimentService.getHeaviestVariantKey("missing")).isEmpty();
+
+        experiment.setStatus(Experiment.Status.PAUSED);
+        when(experimentRepository.findByKey("test-exp")).thenReturn(Optional.of(experiment));
+        assertThat(experimentService.getHeaviestVariantKey("test-exp")).isEmpty();
+    }
+
     // isFullyEnabled: every member gets a non-control variant (what the landing page waits for to list a platform)
 
     private Experiment launched() {

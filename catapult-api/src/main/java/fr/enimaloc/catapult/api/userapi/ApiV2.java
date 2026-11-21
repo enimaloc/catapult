@@ -11,6 +11,13 @@ public final class ApiV2 {
     // versioning scheme at all — it's a separate, unversioned controller by design.
     static final String VERSION = "2";
 
+    // Version 3: only the responses that change in it get a mapping of their own at this version.
+    static final String VERSION_3 = "3";
+
+    // Baseline mapping of every route that did not change since version 2: it answers version 2 and any later one
+    // (Spring picks a fixed "3" mapping over it for a version 3 request, the higher version winning).
+    static final String BASELINE = VERSION + "+";
+
     // Request header carrying the version (see ApiVersioningConfig). Public: the CORS of the public routes
     // (ApiSecurityConfig) allows it.
     public static final String VERSION_HEADER = "X-API-Version";
