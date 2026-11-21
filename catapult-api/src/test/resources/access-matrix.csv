@@ -200,6 +200,10 @@ POST,/api/internal/users/{userId}/title/preview,,"{""template"":""Live""}",401,4
 PUT,/api/internal/users/{userId}/settings/steam-personal-token,,"{""token"":""matrix"",""shared"":false}",401,401,403,403,PASS,403,401
 DELETE,/api/internal/users/{userId}/settings/steam-personal-token,,,401,401,403,403,PASS,403,401
 PUT,/api/internal/users/{userId}/settings/steam-personal-token/sharing,,"{""shared"":false}",401,401,403,403,PASS,403,401
+PUT,/api/internal/users/{userId}/settings/speedrun/username,,"{""username"":""matrix""}",401,401,403,403,PASS,403,401
+DELETE,/api/internal/users/{userId}/settings/speedrun/username,,,401,401,403,403,PASS,403,401
+PUT,/api/internal/users/{userId}/settings/speedrun/api-key,,"{""apiKey"":""matrix""}",401,401,403,403,PASS,403,401
+DELETE,/api/internal/users/{userId}/settings/speedrun/api-key,,,401,401,403,403,PASS,403,401
 GET,/api/internal/users/{userId}/settings/twitchat,,,401,401,403,403,PASS,403,401
 PUT,/api/internal/users/{userId}/settings/twitchat,,"{""enabled"":false}",401,401,403,403,PASS,403,401
 PUT,/api/internal/users/{userId}/settings/twitchat/branch,,,401,401,403,403,PASS,403,401

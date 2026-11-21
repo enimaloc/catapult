@@ -13,6 +13,8 @@ import fr.enimaloc.catapult.common.dto.channel.NoGameSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.ObsSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.RaidSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.TwitchatBranchRequest;
+import fr.enimaloc.catapult.common.dto.channel.SpeedrunApiKeyRequest;
+import fr.enimaloc.catapult.common.dto.channel.SpeedrunUsernameRequest;
 import fr.enimaloc.catapult.common.dto.channel.SteamTokenRequest;
 import fr.enimaloc.catapult.common.dto.channel.SteamTokenSharingRequest;
 import fr.enimaloc.catapult.common.dto.channel.TitleSettingsRequest;
@@ -37,6 +39,7 @@ import fr.enimaloc.catapult.service.title.StreamTitleService;
 import fr.enimaloc.catapult.service.notification.TwitchatEventActionService;
 import fr.enimaloc.catapult.service.notification.TwitchatEventDispatcher;
 import fr.enimaloc.catapult.service.notification.TwitchatWidgetSettingsService;
+import fr.enimaloc.catapult.service.speedrun.SpeedrunAccountService;
 import fr.enimaloc.catapult.service.steam.SteamPersonalTokenService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -84,6 +87,7 @@ public class ApiChannelActionsController {
     private final TwitchatEventDispatcher twitchatEventDispatcher;
     private final EmergencyViews emergencyViews;
     private final EmergencyStopService emergencyStopService;
+    private final SpeedrunAccountService speedrunAccountService;
 
 
     // ── Binding actions ───────────────────────────────────────────────────────
@@ -371,6 +375,46 @@ public class ApiChannelActionsController {
             @PathVariable UUID userId) {
 
         steamTokenService.delete(userResolver.user(userId));
+    }
+
+    /** 400 when speedrun.com does not know the name, 503 when it cannot be asked. */
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @PutMapping("/settings/speedrun/username")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void saveSpeedrunUsername(
+            @PathVariable UUID userId,
+            @RequestBody SpeedrunUsernameRequest body) {
+
+        speedrunAccountService.saveUsername(userResolver.user(userId), body.username());
+    }
+
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @DeleteMapping("/settings/speedrun/username")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteSpeedrunUsername(
+            @PathVariable UUID userId) {
+
+        speedrunAccountService.deleteUsername(userResolver.user(userId));
+    }
+
+    /** The key is in the body only; 400 when speedrun.com refuses it, 503 when it cannot be asked. */
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @PutMapping("/settings/speedrun/api-key")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void saveSpeedrunApiKey(
+            @PathVariable UUID userId,
+            @RequestBody SpeedrunApiKeyRequest body) {
+
+        speedrunAccountService.saveApiKey(userResolver.user(userId), body.apiKey());
+    }
+
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @DeleteMapping("/settings/speedrun/api-key")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteSpeedrunApiKey(
+            @PathVariable UUID userId) {
+
+        speedrunAccountService.deleteApiKey(userResolver.user(userId));
     }
 
     @PreAuthorize("@authz.ownsChannel(#userId)")
