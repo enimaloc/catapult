@@ -37,6 +37,16 @@ class SteamGridDbApiKeyRotatorTest {
     void emptyPool_nextKeyEmpty() {
         assertThat(rotator.nextKey()).isEmpty();
         assertThat(rotator.availableKeyCount()).isZero();
+        assertThat(rotator.hasKeys()).isFalse();
+    }
+
+    @Test
+    void hasKeys_evenWhenAllBlocked() {
+        twoKeys();
+        rotator.block("KEY_A", Duration.ofMinutes(1));
+        rotator.block("KEY_B", Duration.ofMinutes(1));
+
+        assertThat(rotator.hasKeys()).isTrue();
     }
 
     @Test

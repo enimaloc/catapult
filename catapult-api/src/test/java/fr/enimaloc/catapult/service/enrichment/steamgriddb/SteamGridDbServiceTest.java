@@ -16,6 +16,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class SteamGridDbServiceTest {
@@ -26,6 +27,20 @@ class SteamGridDbServiceTest {
     private final EnrichmentCache cache = mock(EnrichmentCache.class);
     private final SteamGridDbClient client = mock(SteamGridDbClient.class);
     private final SteamGridDbService service = new SteamGridDbService(cache, client);
+
+    {
+        when(client.isConfigured()).thenReturn(true);
+    }
+
+    @Test
+    void emptyKeyPool_skipsTheSourceSilently() {
+        when(client.isConfigured()).thenReturn(false);
+
+        assertThat(service.bySteamAppId("570", FetchBudget.UNLIMITED)).isEmpty();
+        assertThat(service.byName("Dota 2", FetchBudget.UNLIMITED)).isEmpty();
+        assertThat(service.byGameId(5248, FetchBudget.UNLIMITED)).isEmpty();
+        verifyNoInteractions(cache);
+    }
 
     @Test
     void bestAccessors_nullWhenEmpty() {

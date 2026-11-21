@@ -38,6 +38,11 @@ public class HttpSteamGridDbClient implements SteamGridDbClient {
     }
 
     @Override
+    public boolean isConfigured() {
+        return rotator.map(SteamGridDbApiKeyRotator::hasKeys).orElse(false);
+    }
+
+    @Override
     public Optional<SteamGridDbAssets> fetchBySteamAppId(String steamAppId) {
         return get("/games/steam/{id}", steamAppId)
                 .map(json -> json.path("data"))

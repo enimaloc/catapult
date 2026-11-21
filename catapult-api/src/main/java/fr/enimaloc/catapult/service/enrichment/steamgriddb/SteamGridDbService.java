@@ -12,7 +12,8 @@ import java.util.function.Supplier;
 
 /**
  * SteamGridDB artwork, keyed by Steam app id, normalised name or SteamGridDB game id, through the shared cache. An
- * answer found by Steam app id or name is also stored under its game id, so the detail route reuses it.
+ * answer found by Steam app id or name is also stored under its game id, so the detail route reuses it. Without a
+ * key in the pool the source is skipped silently: no cache read, no budget spent, no failed fetch logged.
  */
 @Service
 @RequiredArgsConstructor
@@ -23,12 +24,18 @@ public class SteamGridDbService {
 
     /** Artwork for a Steam app; empty when the source is disabled or has nothing. */
     public Optional<SteamGridDbAssets> bySteamAppId(String steamAppId, FetchBudget budget) {
+        if (!client.isConfigured()) {
+            return Optional.empty();
+        }
         return cache.get(EnrichmentSource.STEAMGRIDDB, "steam:" + steamAppId, SteamGridDbAssets.class, budget,
                 alsoByGameId(() -> client.fetchBySteamAppId(steamAppId)));
     }
 
     /** Artwork for the best match of a game name. */
     public Optional<SteamGridDbAssets> byName(String name, FetchBudget budget) {
+        if (!client.isConfigured()) {
+            return Optional.empty();
+        }
         String normalized = normalize(name);
         return cache.get(EnrichmentSource.STEAMGRIDDB, "name:" + normalized, SteamGridDbAssets.class, budget,
                 alsoByGameId(() -> client.fetchByName(normalized)));
@@ -36,6 +43,9 @@ public class SteamGridDbService {
 
     /** Artwork for a SteamGridDB game id. */
     public Optional<SteamGridDbAssets> byGameId(long gameId, FetchBudget budget) {
+        if (!client.isConfigured()) {
+            return Optional.empty();
+        }
         return cache.get(EnrichmentSource.STEAMGRIDDB, "sgdb:" + gameId, SteamGridDbAssets.class, budget,
                 () -> client.fetchByGameId(gameId, null));
     }

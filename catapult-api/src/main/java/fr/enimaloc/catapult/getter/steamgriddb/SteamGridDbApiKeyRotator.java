@@ -62,6 +62,11 @@ public class SteamGridDbApiKeyRotator {
         return keys.size() - blockedKeyCount();
     }
 
+    /** Whether the pool holds any key, blocked or not. */
+    public boolean hasKeys() {
+        return !keys.isEmpty();
+    }
+
     public void refreshKeys() {
         this.keys = repository.findByExclusiveFalse()
             .stream()

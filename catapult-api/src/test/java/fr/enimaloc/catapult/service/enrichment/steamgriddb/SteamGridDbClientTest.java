@@ -198,6 +198,15 @@ class SteamGridDbClientTest {
     }
 
     @Test
+    void isConfigured_onlyWithKeysInThePool() {
+        when(rotator.hasKeys()).thenReturn(false, true);
+
+        assertThat(client.isConfigured()).isFalse();
+        assertThat(client.isConfigured()).isTrue();
+        assertThat(new HttpSteamGridDbClient(RestClient.builder(), Optional.empty()).isConfigured()).isFalse();
+    }
+
+    @Test
     void noRotatorBean_throws_noHttpCall() {
         HttpSteamGridDbClient disabled = new HttpSteamGridDbClient(RestClient.builder(), Optional.empty());
 

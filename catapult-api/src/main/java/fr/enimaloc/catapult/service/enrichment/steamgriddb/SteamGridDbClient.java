@@ -12,6 +12,14 @@ public interface SteamGridDbClient {
      */
     Optional<SteamGridDbAssets> fetchBySteamAppId(String steamAppId);
 
+    /**
+     * Whether a request could be sent at all (the source is enabled and its key pool is not empty). When it is not,
+     * callers skip the source silently instead of failing every lookup.
+     */
+    default boolean isConfigured() {
+        return true;
+    }
+
     /** Artwork for the first autocomplete match of {@code name}; empty when nothing matches. */
     Optional<SteamGridDbAssets> fetchByName(String name);
 
