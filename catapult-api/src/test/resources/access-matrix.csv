@@ -493,6 +493,9 @@ GET,/api/games/protondb/{appId},appId=990000;?version=3,,PASS,PASS,PASS,PASS,PAS
 GET,/api/games/steamdeck/{appId},appId=990000;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
 GET,/api/games/steamgriddb/{sgdbGameId},sgdbGameId=1;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
 GET,/api/games/pcgamingwiki/{pageId},pageId=1;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
+GET,/api/games/prices/{itadId},itadId=018d937f-590c-70fa-bd4f-b95ee2c2e2f1;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
+GET,/api/games/opencritic/{ocId},ocId=1;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
+GET,/api/games/twitch/{twitchGameId},twitchGameId=1;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
 # trailer.mp4 (version 3): public per platform, the current game's by personal token
 GET,/api/games/steam/{appId}/trailer.mp4,appId=990000;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
 HEAD,/api/games/steam/{appId}/trailer.mp4,appId=990000;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401

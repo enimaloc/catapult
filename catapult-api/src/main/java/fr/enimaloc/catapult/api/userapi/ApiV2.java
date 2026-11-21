@@ -54,6 +54,9 @@ public final class ApiV2 {
     static final String IGDB_ID = "\\d{1,19}";
     static final String STEAM_APP_ID = "\\d{1,10}";
     static final String XBOX_PRODUCT_ID = "[A-Za-z0-9]{12}";
+    static final String ITAD_ID = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}";
+    static final String OPENCRITIC_ID = "\\d{1,10}";
+    static final String TWITCH_GAME_ID = "\\d{1,19}";
 
     // Shapes of the optional "country" and "language" query parameters of the enrichment routes.
     static final String COUNTRY = "[A-Za-z]{2}";

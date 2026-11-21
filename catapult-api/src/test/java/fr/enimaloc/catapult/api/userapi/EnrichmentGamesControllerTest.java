@@ -9,12 +9,15 @@ import fr.enimaloc.catapult.service.enrichment.UpstreamBudgetExceededException;
 import fr.enimaloc.catapult.service.enrichment.hltb.HltbService;
 import fr.enimaloc.catapult.service.enrichment.hltb.TimeToBeat;
 import fr.enimaloc.catapult.service.enrichment.pcgw.PcGamingWikiService;
+import fr.enimaloc.catapult.service.enrichment.opencritic.OpenCriticService;
+import fr.enimaloc.catapult.service.enrichment.prices.PricesService;
 import fr.enimaloc.catapult.service.enrichment.protondb.ProtonDbService;
 import fr.enimaloc.catapult.service.enrichment.protondb.ProtonDbSummary;
 import fr.enimaloc.catapult.service.enrichment.steamdeck.SteamDeckCompatibility;
 import fr.enimaloc.catapult.service.enrichment.steamdeck.SteamDeckService;
 import fr.enimaloc.catapult.service.enrichment.steamgriddb.SteamGridDbAssets;
 import fr.enimaloc.catapult.service.enrichment.steamgriddb.SteamGridDbService;
+import fr.enimaloc.catapult.service.enrichment.twitch.TwitchActivityService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -42,6 +45,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -70,6 +74,11 @@ class EnrichmentGamesControllerTest {
     @MockitoBean SteamDeckService steamDeck;
     @MockitoBean SteamGridDbService steamGridDb;
     @MockitoBean PcGamingWikiService pcGamingWiki;
+    @MockitoBean PricesService prices;
+    @MockitoBean OpenCriticService openCritic;
+    @MockitoBean TwitchActivityService twitch;
+
+    private static final String ITAD_ID = "018d937f-590c-70fa-bd4f-b95ee2c2e2f1";
 
     /** An anonymous caller from {@code ip}, asking for version 3. */
     private static MockHttpServletRequestBuilder v3(MockHttpServletRequestBuilder request, String ip) {
@@ -201,6 +210,81 @@ class EnrichmentGamesControllerTest {
                 .andExpect(jsonPath("$.grids[0].url").value("https://grid"));
         mvc.perform(v3(get("/api/games/pcgamingwiki/77"), "203.0.113.7"))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void invalidCountryIs400() throws Exception {
+        mvc.perform(v3(get("/api/games/prices/" + ITAD_ID).param("country", "FRA"), "203.0.113.7"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith("application/problem+json"));
+        mvc.perform(v3(get("/api/games/prices/" + ITAD_ID).param("country", "ZZ"), "203.0.113.7"))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(prices);
+    }
+
+    @Test
+    void invalidLanguageIs400() throws Exception {
+        mvc.perform(v3(get("/api/games/twitch/123").param("language", "french"), "203.0.113.7"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith("application/problem+json"));
+        verifyNoInteractions(twitch);
+    }
+
+    @Test
+    void malformedNewIds_400_withoutTouchingTheSource() throws Exception {
+        for (String path : List.of("prices/abc", "prices/" + ITAD_ID + "0", "opencritic/abc", "opencritic/12345678901",
+                "twitch/abc", "twitch/" + "1".repeat(20))) {
+            mvc.perform(v3(get("/api/games/" + path), "203.0.113.7")).andExpect(status().isBadRequest());
+        }
+        verifyNoInteractions(prices, openCritic, twitch);
+    }
+
+    @Test
+    void newSources_spentBudgetIs429WithRetryAfter() throws Exception {
+        when(prices.byItadId(anyString(), anyString(), any(FetchBudget.class)))
+                .thenThrow(new UpstreamBudgetExceededException(java.time.Duration.ofSeconds(7)));
+        when(openCritic.byId(anyLong(), any(FetchBudget.class)))
+                .thenThrow(new UpstreamBudgetExceededException(java.time.Duration.ofSeconds(7)));
+        when(twitch.byCategoryId(anyString(), any(), any(FetchBudget.class)))
+                .thenThrow(new UpstreamBudgetExceededException(java.time.Duration.ofSeconds(7)));
+
+        for (String path : List.of("prices/" + ITAD_ID, "opencritic/5", "twitch/123")) {
+            mvc.perform(v3(get("/api/games/" + path), "203.0.113.7"))
+                    .andExpect(status().isTooManyRequests())
+                    .andExpect(header().exists("Retry-After"));
+        }
+    }
+
+    @Test
+    void newSources_disabledIs404() throws Exception {
+        when(prices.byItadId(anyString(), anyString(), any(FetchBudget.class))).thenReturn(Optional.empty());
+        when(openCritic.byId(anyLong(), any(FetchBudget.class))).thenReturn(Optional.empty());
+        when(twitch.byCategoryId(anyString(), any(), any(FetchBudget.class))).thenReturn(Optional.empty());
+
+        for (String path : List.of("prices/" + ITAD_ID, "opencritic/5", "twitch/123")) {
+            mvc.perform(v3(get("/api/games/" + path), "203.0.113.7"))
+                    .andExpect(status().isNotFound())
+                    .andExpect(content().contentTypeCompatibleWith("application/problem+json"));
+        }
+    }
+
+    @Test
+    void defaultsAndNormalisesCountryAndLanguage() throws Exception {
+        when(prices.byItadId(anyString(), anyString(), any(FetchBudget.class))).thenReturn(Optional.empty());
+        when(twitch.byCategoryId(anyString(), any(), any(FetchBudget.class))).thenReturn(Optional.empty());
+
+        mvc.perform(v3(get("/api/games/prices/" + ITAD_ID), "203.0.113.7")).andExpect(status().isNotFound());
+        mvc.perform(v3(get("/api/games/prices/" + ITAD_ID).param("country", "us"), "203.0.113.7"))
+                .andExpect(status().isNotFound());
+        mvc.perform(v3(get("/api/games/twitch/123").param("language", "FR"), "203.0.113.7"))
+                .andExpect(status().isNotFound());
+        mvc.perform(v3(get("/api/games/twitch/123"), "203.0.113.7")).andExpect(status().isNotFound());
+
+        org.mockito.Mockito.verify(prices).byItadId(eq(ITAD_ID), eq("FR"), any(FetchBudget.class));
+        org.mockito.Mockito.verify(prices).byItadId(eq(ITAD_ID), eq("US"), any(FetchBudget.class));
+        org.mockito.Mockito.verify(twitch).byCategoryId(eq("123"), eq("fr"), any(FetchBudget.class));
+        org.mockito.Mockito.verify(twitch).byCategoryId(eq("123"), org.mockito.ArgumentMatchers.isNull(),
+                any(FetchBudget.class));
     }
 
     @TestConfiguration
