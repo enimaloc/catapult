@@ -294,17 +294,27 @@ class EnrichmentGamesControllerTest {
     @Test
     void speedrun_publicRouteCarriesNoPersonalData() throws Exception {
         SpeedrunRecords records = new SpeedrunRecords(
-                new SpeedrunGame("o1y9j9v6", "Portal", null, "portal", "https://www.speedrun.com/portal", null), List.of());
+                new SpeedrunGame("o1y9j9v6", "Portal", null, "portal", "https://www.speedrun.com/portal", null),
+                List.of(new SpeedrunRecords.CategoryRecord("7kjrn323", "Inbounds",
+                        "https://www.speedrun.com/portal#Inbounds", new java.math.BigDecimal("442.000"), "realtime",
+                        List.of(new SpeedrunRecords.Runner("Runner1", "https://www.speedrun.com/users/Runner1"),
+                                new SpeedrunRecords.Runner("GuestRunner", null)),
+                        java.time.LocalDate.of(2026, 10, 18), "https://www.speedrun.com/portal/run/abc",
+                        "https://www.youtube.com/watch?v=xyz")));
         when(speedrun.publicRecords(eq("o1y9j9v6"), any(FetchBudget.class))).thenReturn(Optional.of(records));
 
         String body = mvc.perform(v3(get("/api/games/speedrun/o1y9j9v6"), "203.0.113.7"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.game.id").value("o1y9j9v6"))
-                .andExpect(jsonPath("$.categories").isArray())
+                .andExpect(jsonPath("$.categories[0].runners[0].name").value("Runner1"))
+                .andExpect(jsonPath("$.categories[0].runners[0].url").value("https://www.speedrun.com/users/Runner1"))
+                .andExpect(jsonPath("$.categories[0].runners[1].name").value("GuestRunner"))
+                .andExpect(jsonPath("$.categories[0].videoUrl").value("https://www.youtube.com/watch?v=xyz"))
                 .andReturn().getResponse().getContentAsString();
 
-        org.assertj.core.api.Assertions.assertThat(body)
-                .doesNotContain("personalBests", "pendingRuns", "account");
+        org.assertj.core.api.Assertions.assertThat(body).doesNotContainIgnoringCase("personalBest")
+                .doesNotContainIgnoringCase("pendingRun").doesNotContainIgnoringCase("account")
+                .doesNotContainIgnoringCase("apiKey").doesNotContainIgnoringCase("source");
     }
 
     @Test
@@ -334,6 +344,7 @@ class EnrichmentGamesControllerTest {
         mvc.perform(v3(get("/api/games/speedrun/o1y9j9v6"), "203.0.113.7"))
                 .andExpect(status().isNotFound())
                 .andExpect(content().contentTypeCompatibleWith("application/problem+json"));
+        org.mockito.Mockito.verify(speedrun).publicRecords(eq("o1y9j9v6"), any(FetchBudget.class));
     }
 
     @TestConfiguration
