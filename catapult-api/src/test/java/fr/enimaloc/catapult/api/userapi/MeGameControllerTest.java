@@ -174,7 +174,7 @@ class MeGameControllerTest {
                 .andExpect(jsonPath("$.inGame").value(true))
                 .andExpect(jsonPath("$.xbox.productId").value("9NBLGGH2JHXJ"))
                 .andExpect(jsonPath("$.hltb.normally").value(7200))
-                .andExpect(jsonPath("$.hltb.more").value("http://localhost/api/games/hltb/1942"))
+                .andExpect(jsonPath("$.hltb.more").value("http://localhost/api/games/hltb/1942?version=3"))
                 .andExpect(jsonPath("$.protondb.tier").value("platinum"))
                 .andExpect(jsonPath("$.steamDeck.category").value("verified"))
                 .andExpect(jsonPath("$.name").value("Portal"));

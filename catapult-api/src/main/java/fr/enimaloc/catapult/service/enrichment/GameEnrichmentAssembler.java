@@ -138,7 +138,7 @@ public class GameEnrichmentAssembler {
                 ? detected.getSourceId() : null;
         if (trailerSourceResolver.resolve(steamAppId, xboxProductId, FetchBudget.UNLIMITED).isPresent()) {
             return new GameEnrichment.Trailer(GameEnrichment.Trailer.MP4,
-                    links.baseUrl() + CURRENT_GAME_TRAILER_PATH);
+                    links.baseUrl() + CURRENT_GAME_TRAILER_PATH + MoreLinks.SINCE_V3_QUERY);
         }
         if (igdbId == null) {
             return null;

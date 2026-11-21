@@ -41,7 +41,7 @@ class GameInfoV3ResponseTest {
     private static final PcGamingWikiPage PCGW = new PcGamingWikiPage(42L, "Portal 2",
             "https://www.pcgamingwiki.com/wiki/Portal_2", "true", "true", "false", List.of());
     private static final GameEnrichment.Trailer TRAILER = new GameEnrichment.Trailer("mp4",
-            BASE + "/api/me/game/trailer.mp4");
+            BASE + "/api/me/game/trailer.mp4?version=3");
 
     @Test
     void summaryView_containsNewDerivedFields_notObjects() {
@@ -59,7 +59,7 @@ class GameInfoV3ResponseTest {
         assertThat(summary.path("deckStatus").asString()).isEqualTo("verified");
         assertThat(summary.path("coverUrl").asString()).isEqualTo("https://cdn.sgdb/grid.png");
         assertThat(summary.path("trailer").path("kind").asString()).isEqualTo("mp4");
-        assertThat(summary.path("trailer").path("url").asString()).isEqualTo(BASE + "/api/me/game/trailer.mp4");
+        assertThat(summary.path("trailer").path("url").asString()).isEqualTo(BASE + "/api/me/game/trailer.mp4?version=3");
         for (String object : List.of("igdb", "steam", "xbox", "dtdd", "catapult", "hltb", "protondb", "steamgriddb",
                 "steamDeck", "pcgamingwiki", "base")) {
             assertThat(summary.has(object)).as(object).isFalse();
@@ -69,13 +69,13 @@ class GameInfoV3ResponseTest {
         assertThat(full.path("hltb").path("normally").asLong()).isEqualTo(36_000L);
         assertThat(full.path("hltb").has("origin")).isFalse();
         assertThat(full.path("hltb").has("url")).isFalse();
-        assertThat(full.path("hltb").path("more").asString()).isEqualTo(BASE + "/api/games/hltb/72");
-        assertThat(full.path("protondb").path("more").asString()).isEqualTo(BASE + "/api/games/protondb/620");
+        assertThat(full.path("hltb").path("more").asString()).isEqualTo(BASE + "/api/games/hltb/72?version=3");
+        assertThat(full.path("protondb").path("more").asString()).isEqualTo(BASE + "/api/games/protondb/620?version=3");
         assertThat(full.path("steamDeck").path("category").asString()).isEqualTo("verified");
-        assertThat(full.path("steamDeck").path("more").asString()).isEqualTo(BASE + "/api/games/steamdeck/620");
+        assertThat(full.path("steamDeck").path("more").asString()).isEqualTo(BASE + "/api/games/steamdeck/620?version=3");
         assertThat(full.path("steamgriddb").path("grid").asString()).isEqualTo("https://cdn.sgdb/grid.png");
-        assertThat(full.path("steamgriddb").path("more").asString()).isEqualTo(BASE + "/api/games/steamgriddb/5");
-        assertThat(full.path("pcgamingwiki").path("more").asString()).isEqualTo(BASE + "/api/games/pcgamingwiki/42");
+        assertThat(full.path("steamgriddb").path("more").asString()).isEqualTo(BASE + "/api/games/steamgriddb/5?version=3");
+        assertThat(full.path("pcgamingwiki").path("more").asString()).isEqualTo(BASE + "/api/games/pcgamingwiki/42?version=3");
         assertThat(full.path("igdb").path("igdbId").asString()).isEqualTo("72");
         assertThat(full.has("base")).isFalse();
     }

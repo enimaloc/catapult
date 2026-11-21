@@ -94,7 +94,7 @@ class GameInfoAssemblerV3Test {
         assertThat(response.inGame()).isTrue();
         assertThat(response.name()).isEqualTo("Portail 2");
         assertThat(response.igdb().more()).isEqualTo(BASE + "/api/games/igdb/72");
-        assertThat(response.protondb().more()).isEqualTo(BASE + "/api/games/protondb/620");
+        assertThat(response.protondb().more()).isEqualTo(BASE + "/api/games/protondb/620?version=3");
         assertThat(response.protonTier()).isEqualTo("gold");
     }
 
