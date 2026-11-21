@@ -17,6 +17,7 @@ import java.time.Duration;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -116,7 +117,6 @@ class SteamGridDbClientTest {
 
     @Test
     void tooManyRequests_blocksKeyAndRetriesWithNext() throws IOException {
-        when(rotator.nextKey()).thenReturn(Optional.of("keyA"), Optional.of("keyB"));
         server.expect(once(), requestTo(BASE + "/games/steam/570"))
                 .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer keyA"))
                 .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS).header(HttpHeaders.RETRY_AFTER, "30"));
@@ -150,21 +150,49 @@ class SteamGridDbClientTest {
     }
 
     @Test
-    void emptyPool_empty_noHttpCall() {
+    void emptyPool_throws_noHttpCall() {
         when(rotator.nextKey()).thenReturn(Optional.empty());
 
-        assertThat(client.fetchBySteamAppId("570")).isEmpty();
-        assertThat(client.fetchByName("dota")).isEmpty();
+        assertThatThrownBy(() -> client.fetchBySteamAppId("570")).isInstanceOf(SteamGridDbUnavailableException.class);
+        assertThatThrownBy(() -> client.fetchByName("dota")).isInstanceOf(SteamGridDbUnavailableException.class);
 
         server.verify();
         verify(rotator, never()).block(any(), any());
     }
 
     @Test
-    void noRotatorBean_empty_noHttpCall() {
+    void singleKey429_retryFindsNoKey_throws() {
+        when(rotator.nextKey()).thenReturn(Optional.of("keyA"), Optional.empty());
+        server.expect(once(), requestTo(BASE + "/games/steam/570"))
+                .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS));
+
+        assertThatThrownBy(() -> client.fetchBySteamAppId("570")).isInstanceOf(SteamGridDbUnavailableException.class);
+
+        verify(rotator).block("keyA", Duration.ofSeconds(60));
+        server.verify();
+    }
+
+    @Test
+    void noRotatorBean_throws_noHttpCall() {
         HttpSteamGridDbClient disabled = new HttpSteamGridDbClient(RestClient.builder(), Optional.empty());
 
-        assertThat(disabled.fetchBySteamAppId("570")).isEmpty();
+        assertThatThrownBy(() -> disabled.fetchBySteamAppId("570")).isInstanceOf(SteamGridDbUnavailableException.class);
+    }
+
+    @Test
+    void gridsNotFound_emptyGridsOtherKindsKept() throws IOException {
+        when(rotator.nextKey()).thenReturn(Optional.of("keyA"));
+        server.expect(once(), requestTo(BASE + "/grids/game/5248")).andRespond(withStatus(HttpStatus.NOT_FOUND));
+        for (String kind : new String[]{"heroes", "logos", "icons"}) {
+            server.expect(once(), requestTo(BASE + "/" + kind + "/game/5248"))
+                    .andRespond(withSuccess(fixture(kind), MediaType.APPLICATION_JSON));
+        }
+
+        SteamGridDbAssets assets = client.fetchByGameId(5248, "Dota 2").orElseThrow();
+
+        assertThat(assets.grids()).isEmpty();
+        assertThat(assets.bestHero()).isNotNull();
+        server.verify();
     }
 
     @Test

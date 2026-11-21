@@ -6,8 +6,9 @@ import java.util.Optional;
 public interface SteamGridDbClient {
 
     /**
-     * Artwork for a Steam app; empty when SteamGridDB does not know the game, the key pool is empty or the answer
-     * is unreadable. Transport failures, 5xx and a second 429 propagate so that callers do not cache them as absent.
+     * Artwork for a Steam app; empty when SteamGridDB does not know the game (404) or the answer is unreadable.
+     * Transport failures, 5xx, a second 429 and {@link SteamGridDbUnavailableException} (no usable key: feature
+     * disabled, empty pool) propagate so that callers do not cache them as absent.
      */
     Optional<SteamGridDbAssets> fetchBySteamAppId(String steamAppId);
 

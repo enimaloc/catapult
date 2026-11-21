@@ -17,7 +17,8 @@ import java.util.Optional;
 
 /**
  * {@link SteamGridDbClient} over the SteamGridDB API v2. Each request takes the next key of the shared pool; a 429
- * blocks that key and is retried once with the next one. Without a pool (feature disabled or no key) nothing is sent.
+ * blocks that key and is retried once with the next one. Without a usable key (feature disabled, empty pool)
+ * nothing is sent and {@link SteamGridDbUnavailableException} is thrown, so it is never cached as "game absent".
  */
 @Slf4j
 @Component
@@ -58,14 +59,11 @@ public class HttpSteamGridDbClient implements SteamGridDbClient {
     }
 
     private Optional<SteamGridDbAssets> fetchAssets(long gameId, String name) {
-        Optional<List<SteamGridDbAssets.Asset>> grids = assets("grids", gameId);
-        if (grids.isEmpty()) {
-            return Optional.empty();
-        }
+        List<SteamGridDbAssets.Asset> grids = assets("grids", gameId).orElse(List.of());
         List<SteamGridDbAssets.Asset> heroes = assets("heroes", gameId).orElse(List.of());
         List<SteamGridDbAssets.Asset> logos = assets("logos", gameId).orElse(List.of());
         List<SteamGridDbAssets.Asset> icons = assets("icons", gameId).orElse(List.of());
-        return Optional.of(new SteamGridDbAssets(gameId, name, GAME_URL + gameId, grids.get(), heroes, logos, icons));
+        return Optional.of(new SteamGridDbAssets(gameId, name, GAME_URL + gameId, grids, heroes, logos, icons));
     }
 
     private Optional<List<SteamGridDbAssets.Asset>> assets(String kind, long gameId) {
@@ -82,16 +80,16 @@ public class HttpSteamGridDbClient implements SteamGridDbClient {
         });
     }
 
-    /** GET with the pool's next key; empty on no key, 404 or unreadable body; retries once on 429. */
+    /** GET with the pool's next key; throws when no key is usable; empty on 404 or unreadable body; retries once on 429. */
     private Optional<JsonNode> get(String path, Object variable) {
         if (rotator.isEmpty()) {
-            return Optional.empty();
+            throw new SteamGridDbUnavailableException("SteamGridDB is not enabled");
         }
         SteamGridDbApiKeyRotator pool = rotator.get();
         for (int attempt = 0; ; attempt++) {
             Optional<String> key = pool.nextKey();
             if (key.isEmpty()) {
-                return Optional.empty();
+                throw new SteamGridDbUnavailableException("no usable SteamGridDB API key");
             }
             pool.onCall(key.get());
             try {
