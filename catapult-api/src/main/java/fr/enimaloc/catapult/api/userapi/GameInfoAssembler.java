@@ -13,6 +13,8 @@ import fr.enimaloc.catapult.service.binding.GameStateService;
 import fr.enimaloc.catapult.service.dtdd.DtddMappingService;
 import fr.enimaloc.catapult.service.dtdd.DtddService;
 import fr.enimaloc.catapult.service.dtdd.DtddSignalService;
+import fr.enimaloc.catapult.service.enrichment.GameEnrichment;
+import fr.enimaloc.catapult.service.enrichment.GameEnrichmentAssembler;
 import fr.enimaloc.catapult.service.igdb.IgdbGameDetailsService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.link.ExternalLinks;
@@ -21,6 +23,7 @@ import fr.enimaloc.catapult.service.steam.SteamStoreService;
 import fr.enimaloc.catapult.service.tw.TwLabelService;
 import fr.enimaloc.catapult.service.xbox.XboxStoreService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Component;
 
@@ -63,6 +66,15 @@ public class GameInfoAssembler {
     // "more" needs to be a full URL the client can follow directly, not a relative path: it follows the
     // caller's origin (the trusted proxies' X-Forwarded-*), app.base-url only outside a request.
     private final PublicBaseUrl publicBaseUrl;
+
+    // Optional and set rather than constructor-injected, so the v1/v2 construction of this assembler (and the web
+    // slices that import it) stay as they were; without it, v3 answers carry no enrichment object.
+    private GameEnrichmentAssembler gameEnrichmentAssembler;
+
+    @Autowired(required = false)
+    void setGameEnrichmentAssembler(GameEnrichmentAssembler gameEnrichmentAssembler) {
+        this.gameEnrichmentAssembler = gameEnrichmentAssembler;
+    }
 
     /** Which generation of routes the "more" links of an aggregated answer point at. */
     public enum LinkStyle {
@@ -287,6 +299,32 @@ public class GameInfoAssembler {
 
     private static String moreUrl(String base, LinkStyle style, MoreLinks.Kind kind, Object id) {
         return new MoreLinks(base, style).to(kind, id);
+    }
+
+    // ---------------------------------------------------------------- v3
+
+    /**
+     * The v3 aggregated game info of an already authenticated user: the v2 answer, linking to the current routes,
+     * completed with the enrichment sources (each null when unavailable or too slow). inGame=false while nothing
+     * is detected.
+     */
+    public GameInfoV3Response gameInfoV3(UserAccount user, Locale locale) {
+        String base = publicBaseUrl.get();
+        return gameStateService.getLastKnownGame(user)
+                .map(detected -> aggregateV3(detected, user, locale, base))
+                .orElseGet(GameInfoV3Response::notInGame);
+    }
+
+    private GameInfoV3Response aggregateV3(DetectedGame detected, UserAccount user, Locale locale, String base) {
+        GameInfoResponse v2 = aggregate(detected, Optional.of(user), locale, base, LinkStyle.CURRENT);
+        Optional<String> igdbId = v2.igdb() != null ? Optional.of(v2.igdb().igdbId()) : resolveIgdbId(detected);
+        Optional<String> steamAppId = detected.getSourceType() == GameBinding.SourceType.STEAM
+                ? Optional.ofNullable(detected.getSourceId()) : Optional.empty();
+        MoreLinks links = new MoreLinks(base, LinkStyle.CURRENT);
+        GameEnrichment enrichment = gameEnrichmentAssembler == null
+                ? new GameEnrichment(null, null, null, null, null, null, null)
+                : gameEnrichmentAssembler.enrich(detected, igdbId, steamAppId, v2.name(), links);
+        return GameInfoV3Response.of(v2, enrichment, links, igdbId);
     }
 
     // ---------------------------------------------------------------- v1 (frozen schema)

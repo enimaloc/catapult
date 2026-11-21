@@ -15,7 +15,17 @@ public record MoreLinks(String baseUrl, GameInfoAssembler.LinkStyle style) {
         XBOX("xbox"),
         DTDD("dtdd"),
         /** The channel's own binding: {@code /catapult/{id}} in the legacy style. */
-        BINDING("catapult");
+        BINDING("catapult"),
+        /** HowLongToBeat, by IGDB id. */
+        HLTB("hltb"),
+        /** ProtonDB, by Steam app id. */
+        PROTONDB("protondb"),
+        /** SteamGridDB, by SteamGridDB game id. */
+        STEAMGRIDDB("steamgriddb"),
+        /** Steam Deck compatibility, by Steam app id. */
+        STEAMDECK("steamdeck"),
+        /** PCGamingWiki, by wiki page id. */
+        PCGAMINGWIKI("pcgamingwiki");
 
         private final String segment;
 
