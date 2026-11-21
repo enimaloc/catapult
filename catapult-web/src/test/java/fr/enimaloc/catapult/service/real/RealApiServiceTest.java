@@ -1988,6 +1988,36 @@ class RealApiServiceTest {
     }
 
     @Test
+    void itadKeys_areReadAndManagedThroughTheirRoutes() {
+        var provider = fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.ITAD;
+        respond(HttpMethod.GET, "/api/internal/admin/itad-keys", "{\"keys\":[],\"itadEnabled\":true}");
+        expect(HttpMethod.POST, "/api/internal/admin/itad-keys")
+                .andExpect(content().json("{\"apiKey\":\"k\"}", true)).andRespond(withNoContent());
+        expect(HttpMethod.DELETE, "/api/internal/admin/itad-keys/k1").andRespond(withNoContent());
+        expectPost("/api/internal/admin/itad-keys/refresh");
+
+        assertThat(service.adminApiKeys(provider).enabled()).isTrue();
+        assertThat(service.adminAddApiKey(provider, "k")).isEqualTo(204);
+        assertThat(service.adminDeleteApiKey(provider, "k1")).isEqualTo(204);
+        assertThat(service.adminRefreshApiKeys(provider)).isEqualTo(204);
+    }
+
+    @Test
+    void openCriticKeys_areReadAndManagedThroughTheirRoutes() {
+        var provider = fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.OPENCRITIC;
+        respond(HttpMethod.GET, "/api/internal/admin/opencritic-keys", "{\"keys\":[],\"opencriticEnabled\":true}");
+        expect(HttpMethod.POST, "/api/internal/admin/opencritic-keys")
+                .andExpect(content().json("{\"apiKey\":\"k\"}", true)).andRespond(withNoContent());
+        expect(HttpMethod.DELETE, "/api/internal/admin/opencritic-keys/k1").andRespond(withNoContent());
+        expectPost("/api/internal/admin/opencritic-keys/refresh");
+
+        assertThat(service.adminApiKeys(provider).enabled()).isTrue();
+        assertThat(service.adminAddApiKey(provider, "k")).isEqualTo(204);
+        assertThat(service.adminDeleteApiKey(provider, "k1")).isEqualTo(204);
+        assertThat(service.adminRefreshApiKeys(provider)).isEqualTo(204);
+    }
+
+    @Test
     void steamGridDbKeys_areReadAndManagedThroughTheirRoutes() {
         var provider = fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.STEAMGRIDDB;
         respond(HttpMethod.GET, "/api/internal/admin/steamgriddb-keys", "{\"keys\":[],\"steamgriddbEnabled\":true}");

@@ -1,11 +1,13 @@
 <!--/*@thymesVar id="steam" type="fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto"*/-->
 <!--/*@thymesVar id="dtdd" type="fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto"*/-->
 <!--/*@thymesVar id="steamgriddb" type="fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto"*/-->
+<!--/*@thymesVar id="itad" type="fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto"*/-->
+<!--/*@thymesVar id="opencritic" type="fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto"*/-->
 <!--/*@thymesVar id="minecraft" type="java.util.List<fr.enimaloc.catapult.common.dto.admin.AccountDto>"*/-->
 <!--/*@thymesVar id="ankama" type="java.util.List<fr.enimaloc.catapult.common.dto.admin.AnkamaAccountDto>"*/-->
 <!--/*@thymesVar id="epic" type="fr.enimaloc.catapult.common.dto.admin.EpicAccountsDto"*/-->
 <!--/*
-  The shared API keys: one card for Steam, one for DTDD and one for SteamGridDB (a disabled provider shows only its note; an enabled one
+  The shared API keys: one card for Steam, DTDD, SteamGridDB, IsThereAnyDeal and OpenCritic (a disabled provider shows only its note; an enabled one
   the add field, Refresh and the keys, masked only: the raw key is never rendered, each with what it was used for),
   then the Minecraft, Battle.net, Ankama and Epic service accounts cards, then the rate limits learned from the platforms' 429s
   (rate-limits.html).
@@ -21,8 +23,8 @@
         <h2 th:text="#{admin.tab.keys}">Keys</h2>
     </div>
 
-    <th:block th:each="provider : ${ {'steam', 'dtdd', 'steamgriddb'} }">
-        <th:block th:with="keys=${provider == 'steam' ? steam : (provider == 'dtdd' ? dtdd : steamgriddb)}">
+    <th:block th:each="provider : ${ {'steam', 'dtdd', 'steamgriddb', 'itad', 'opencritic'} }">
+        <th:block th:with="keys=${provider == 'steam' ? steam : (provider == 'dtdd' ? dtdd : (provider == 'steamgriddb' ? steamgriddb : (provider == 'itad' ? itad : opencritic)))}">
             <th:block th:if="${keys == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
 
             <mdui-card th:if="${keys != null}" class="admin-keys-card" variant="outlined"

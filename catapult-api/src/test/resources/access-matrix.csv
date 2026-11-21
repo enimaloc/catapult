@@ -252,6 +252,14 @@ GET,/api/internal/admin/steamgriddb-keys,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/steamgriddb-keys,,"{""apiKey"":""matrix""}",401,PASS,403,403,403,PASS,401
 DELETE,/api/internal/admin/steamgriddb-keys/{keyId},keyId=matrix,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/steamgriddb-keys/refresh,,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/itad-keys,,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/itad-keys,,"{""apiKey"":""matrix""}",401,PASS,403,403,403,PASS,401
+DELETE,/api/internal/admin/itad-keys/{keyId},keyId=matrix,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/itad-keys/refresh,,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/opencritic-keys,,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/opencritic-keys,,"{""apiKey"":""matrix""}",401,PASS,403,403,403,PASS,401
+DELETE,/api/internal/admin/opencritic-keys/{keyId},keyId=matrix,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/opencritic-keys/refresh,,,401,PASS,403,403,403,PASS,401
 GET,/api/internal/admin/dtdd-caches,,,401,PASS,403,403,403,PASS,401
 GET,/api/internal/admin/dtdd-caches/refetch-all,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/dtdd-caches/refetch-all,,,401,PASS,403,403,403,PASS,401
