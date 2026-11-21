@@ -210,16 +210,14 @@ class EnrichmentCacheTest {
     void properties_bindDocumentedKeys() {
         Binder binder = new Binder(new MapConfigurationPropertySource(Map.of(
                 "catapult.enrichment.protondb.enabled", "false",
-                "catapult.enrichment.hltb.scrape.enabled", "false",
-                "catapult.enrichment.hltb.scrape.interval", "5s",
+                "catapult.enrichment.hltb.ttl", "5d",
                 "catapult.enrichment.steamgriddb.ttl", "3d")));
 
         EnrichmentProperties bound = binder.bind("catapult.enrichment", EnrichmentProperties.class).get();
 
         assertThat(bound.source(EnrichmentSource.PROTONDB).enabled()).isFalse();
         assertThat(bound.source(EnrichmentSource.HLTB).enabled()).isTrue();
-        assertThat(bound.hltb().scrapeEnabled()).isFalse();
-        assertThat(bound.hltb().scrapeInterval()).isEqualTo(Duration.ofSeconds(5));
+        assertThat(bound.source(EnrichmentSource.HLTB).ttl()).isEqualTo(Duration.ofDays(5));
         assertThat(bound.source(EnrichmentSource.STEAMGRIDDB).ttl()).isEqualTo(Duration.ofDays(3));
         assertThat(bound.source(EnrichmentSource.TRAILER).ttl()).isEqualTo(Duration.ofDays(1));
     }

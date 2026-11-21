@@ -47,7 +47,7 @@ class GameEnrichmentAssemblerTest {
     private static final DetectedGame PORTAL = new DetectedGame("620", GameBinding.SourceType.STEAM, "Portal 2");
     private static final DetectedGame HALO = new DetectedGame("9NP1P1WFS0LB", GameBinding.SourceType.XBOX, "Halo");
 
-    private static final TimeToBeat TTB = new TimeToBeat(1L, 2L, 3L, 4, TimeToBeat.Origin.IGDB, null);
+    private static final TimeToBeat TTB = new TimeToBeat(1L, 2L, 3L, 4);
     private static final ProtonDbSummary PROTON = new ProtonDbSummary("platinum", "platinum", "platinum",
             "strong", 0.9, 100, "https://www.protondb.com/app/620");
     private static final SteamGridDbAssets SGDB = new SteamGridDbAssets(5L, "Portal 2",

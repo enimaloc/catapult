@@ -122,12 +122,10 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
 
     // ---------------------------------------------------------------- objects
 
-    /** HowLongToBeat durations in seconds (null when unknown) and where they came from. */
-    public record HltbObject(Long hastily, Long normally, Long completely, int count, TimeToBeat.Origin origin,
-                             String url, String more) implements GameInfoResponse.HasMore {
+    /** HowLongToBeat durations in seconds (null when unknown), as served by IGDB. */
+    public record HltbObject(Long hastily, Long normally, Long completely, int count, String more) implements GameInfoResponse.HasMore {
         static HltbObject of(TimeToBeat ttb, String more) {
-            return ttb == null ? null : new HltbObject(ttb.hastily(), ttb.normally(), ttb.completely(), ttb.count(),
-                    ttb.origin(), ttb.hltbUrl(), more);
+            return ttb == null ? null : new HltbObject(ttb.hastily(), ttb.normally(), ttb.completely(), ttb.count(), more);
         }
     }
 

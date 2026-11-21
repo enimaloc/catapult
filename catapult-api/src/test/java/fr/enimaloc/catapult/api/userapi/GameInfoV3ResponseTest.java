@@ -28,8 +28,7 @@ class GameInfoV3ResponseTest {
     private static final GameInfoResponse BASE_V2 = new GameInfoResponse(true, IGDB, null, null, null, null,
             "Portal 2");
 
-    private static final TimeToBeat TTB = new TimeToBeat(30_000L, 36_000L, 80_000L, 12, TimeToBeat.Origin.HLTB,
-            "https://howlongtobeat.com/game/7231");
+    private static final TimeToBeat TTB = new TimeToBeat(30_000L, 36_000L, 80_000L, 12);
     private static final ProtonDbSummary PROTON = new ProtonDbSummary("platinum", "gold", "platinum", "strong",
             0.92, 450, "https://www.protondb.com/app/620");
     private static final SteamGridDbAssets SGDB = new SteamGridDbAssets(5L, "Portal 2",
@@ -68,7 +67,8 @@ class GameInfoV3ResponseTest {
 
         JsonNode full = MAPPER.readTree(MAPPER.writeValueAsString(response));
         assertThat(full.path("hltb").path("normally").asLong()).isEqualTo(36_000L);
-        assertThat(full.path("hltb").path("origin").asString()).isEqualTo("hltb");
+        assertThat(full.path("hltb").has("origin")).isFalse();
+        assertThat(full.path("hltb").has("url")).isFalse();
         assertThat(full.path("hltb").path("more").asString()).isEqualTo(BASE + "/api/games/hltb/72");
         assertThat(full.path("protondb").path("more").asString()).isEqualTo(BASE + "/api/games/protondb/620");
         assertThat(full.path("steamDeck").path("category").asString()).isEqualTo("verified");
@@ -102,13 +102,12 @@ class GameInfoV3ResponseTest {
     }
 
     @Test
-    void hltbFoundByScrapeOnly_hasNoMoreLink() {
+    void hltbWithoutIgdbId_hasNoMoreLink() {
         GameEnrichment enrichment = new GameEnrichment(TTB, null, null, null, null, null, null);
 
         GameInfoV3Response response = GameInfoV3Response.of(BASE_V2, enrichment, LINKS, Optional.empty());
 
         assertThat(response.hltb()).isNotNull();
         assertThat(response.hltb().more()).isNull();
-        assertThat(response.hltb().url()).isEqualTo("https://howlongtobeat.com/game/7231");
     }
 }

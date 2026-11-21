@@ -20,10 +20,6 @@ public class EnrichmentProperties {
     public record Source(boolean enabled, Duration ttl) {
     }
 
-    /** Resolved settings of the HowLongToBeat scraper. */
-    public record Hltb(boolean scrapeEnabled, Duration scrapeInterval, int breakerThreshold, Duration breakerPause) {
-    }
-
     /** Overrides of one source; an unset field falls back to the source's default. */
     @Getter
     @Setter
@@ -32,24 +28,7 @@ public class EnrichmentProperties {
         private Duration ttl;
     }
 
-    /** Settings of the HowLongToBeat scraper. */
-    @Getter
-    @Setter
-    public static class ScrapeSettings {
-        private boolean enabled = true;
-        private Duration interval = Duration.ofSeconds(2);
-        private int breakerThreshold = 5;
-        private Duration breakerPause = Duration.ofMinutes(30);
-    }
-
-    /** HowLongToBeat: the source switch and ttl, plus its scraper. */
-    @Getter
-    @Setter
-    public static class HltbSettings extends SourceSettings {
-        private ScrapeSettings scrape = new ScrapeSettings();
-    }
-
-    private HltbSettings hltb = new HltbSettings();
+    private SourceSettings hltb = new SourceSettings();
     private SourceSettings protondb = new SourceSettings();
     private SourceSettings steamgriddb = new SourceSettings();
     private SourceSettings steamdeck = new SourceSettings();
@@ -83,11 +62,6 @@ public class EnrichmentProperties {
 
     public int ipBudgetPerMinute() {
         return ipBudgetPerMinute;
-    }
-
-    public Hltb hltb() {
-        ScrapeSettings sc = hltb.getScrape();
-        return new Hltb(sc.isEnabled(), sc.getInterval(), sc.getBreakerThreshold(), sc.getBreakerPause());
     }
 
     public int ffmpegMaxProcesses() {
