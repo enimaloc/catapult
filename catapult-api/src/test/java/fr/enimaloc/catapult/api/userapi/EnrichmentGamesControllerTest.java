@@ -243,7 +243,7 @@ class EnrichmentGamesControllerTest {
     void newSources_spentBudgetIs429WithRetryAfter() throws Exception {
         when(prices.byItadId(anyString(), anyString(), any(FetchBudget.class)))
                 .thenThrow(new UpstreamBudgetExceededException(java.time.Duration.ofSeconds(7)));
-        when(openCritic.byId(anyLong(), any(FetchBudget.class)))
+        when(openCritic.publicById(anyLong(), any(FetchBudget.class)))
                 .thenThrow(new UpstreamBudgetExceededException(java.time.Duration.ofSeconds(7)));
         when(twitch.byCategoryId(anyString(), any(), any(FetchBudget.class)))
                 .thenThrow(new UpstreamBudgetExceededException(java.time.Duration.ofSeconds(7)));
@@ -258,7 +258,7 @@ class EnrichmentGamesControllerTest {
     @Test
     void newSources_disabledIs404() throws Exception {
         when(prices.byItadId(anyString(), anyString(), any(FetchBudget.class))).thenReturn(Optional.empty());
-        when(openCritic.byId(anyLong(), any(FetchBudget.class))).thenReturn(Optional.empty());
+        when(openCritic.publicById(anyLong(), any(FetchBudget.class))).thenReturn(Optional.empty());
         when(twitch.byCategoryId(anyString(), any(), any(FetchBudget.class))).thenReturn(Optional.empty());
 
         for (String path : List.of("prices/" + ITAD_ID, "opencritic/5", "twitch/123")) {

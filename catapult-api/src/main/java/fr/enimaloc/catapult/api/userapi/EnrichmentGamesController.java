@@ -177,7 +177,7 @@ public class EnrichmentGamesController {
             @Parameter(description = "OpenCritic game id.", in = ParameterIn.PATH, example = "463")
             @PathVariable @Pattern(regexp = ApiV2.OPENCRITIC_ID) String ocId,
             HttpServletRequest request) {
-        return found(openCriticService.byId(Long.parseLong(ocId), budget(request)), "Unknown OpenCritic game");
+        return found(openCriticService.publicById(Long.parseLong(ocId), budget(request)), "Unknown OpenCritic game");
     }
 
     @Operation(summary = "Get the Twitch activity of a category", description = "Live viewers and streams, "

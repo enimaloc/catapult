@@ -135,4 +135,52 @@ class OpenCriticServiceTest {
         verify(cap, times(2)).tryAcquire();
         verify(caller, times(1)).tryAcquire();
     }
+
+    @Test
+    void publicRoute_stopsAtHalfTheDailyCap_whileTheAggregateGetsTheRest() {
+        OpenCriticService real = new OpenCriticService(cache, client, new DailyCap(), properties);
+        when(properties.openCriticDailyCap()).thenReturn(4);
+        cacheMisses("oc:463", OpenCriticGame.class);
+        when(client.game(463)).thenReturn(Optional.of(HADES));
+
+        assertThat(real.publicById(463, FetchBudget.UNLIMITED)).contains(HADES);
+        assertThat(real.publicById(463, FetchBudget.UNLIMITED)).contains(HADES);
+        assertThatThrownBy(() -> real.publicById(463, FetchBudget.UNLIMITED))
+                .isInstanceOf(UpstreamBudgetExceededException.class);
+
+        assertThat(real.byId(463, FetchBudget.UNLIMITED)).contains(HADES);
+        assertThat(real.byId(463, FetchBudget.UNLIMITED)).contains(HADES);
+        assertThatThrownBy(() -> real.byId(463, FetchBudget.UNLIMITED))
+                .isInstanceOf(UpstreamBudgetExceededException.class);
+        verify(client, times(4)).game(463);
+    }
+
+    @Test
+    void publicRoute_alsoNeedsTheGlobalCap() {
+        OpenCriticService real = new OpenCriticService(cache, client, new DailyCap(), properties);
+        when(properties.openCriticDailyCap()).thenReturn(4);
+        cacheMisses("oc:463", OpenCriticGame.class);
+        when(client.game(463)).thenReturn(Optional.of(HADES));
+        for (int i = 0; i < 4; i++) {
+            real.byId(463, FetchBudget.UNLIMITED);
+        }
+
+        assertThatThrownBy(() -> real.publicById(463, FetchBudget.UNLIMITED))
+                .isInstanceOf(UpstreamBudgetExceededException.class);
+        verify(client, times(4)).game(463);
+    }
+
+    @Test
+    void publicRoute_callerRefusal_chargesNoCap() {
+        FetchBudget publicCap = mock(FetchBudget.class);
+        FetchBudget cap = mock(FetchBudget.class);
+        when(dailyCap.budget(EnrichmentSource.OPENCRITIC, OpenCriticService.PUBLIC_SCOPE, 25)).thenReturn(publicCap);
+        when(dailyCap.budget(EnrichmentSource.OPENCRITIC, 50)).thenReturn(cap);
+        cacheMisses("oc:463", OpenCriticGame.class);
+
+        assertThatThrownBy(() -> service.publicById(463, () -> false))
+                .isInstanceOf(UpstreamBudgetExceededException.class);
+        verify(publicCap, never()).tryAcquire();
+        verify(cap, never()).tryAcquire();
+    }
 }

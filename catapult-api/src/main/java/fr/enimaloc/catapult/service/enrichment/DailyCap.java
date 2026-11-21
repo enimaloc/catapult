@@ -20,7 +20,7 @@ public class DailyCap {
     }
 
     private final Clock clock;
-    private final ConcurrentHashMap<EnrichmentSource, Day> days = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Day> days = new ConcurrentHashMap<>();
 
     @Autowired
     public DailyCap() {
@@ -33,10 +33,22 @@ public class DailyCap {
 
     /** A budget granting {@code perDay} calls to {@code source} each UTC day. */
     public FetchBudget budget(EnrichmentSource source, int perDay) {
+        return budget(source.name(), perDay);
+    }
+
+    /**
+     * A budget granting {@code perDay} calls each UTC day to the {@code scope} share of {@code source}, counted
+     * apart from the source's own counter (a sub-cap is combined with {@link #budget(EnrichmentSource, int)}).
+     */
+    public FetchBudget budget(EnrichmentSource source, String scope, int perDay) {
+        return budget(source.name() + ":" + scope, perDay);
+    }
+
+    private FetchBudget budget(String key, int perDay) {
         return new FetchBudget() {
             @Override
             public boolean tryAcquire() {
-                return acquire(source, perDay);
+                return acquire(key, perDay);
             }
 
             @Override
@@ -54,10 +66,10 @@ public class DailyCap {
         return left.compareTo(Duration.ofSeconds(1)) < 0 ? Duration.ofSeconds(1) : left;
     }
 
-    private boolean acquire(EnrichmentSource source, int perDay) {
+    private boolean acquire(String key, int perDay) {
         LocalDate today = LocalDate.now(clock.withZone(ZoneOffset.UTC));
         boolean[] granted = {false};
-        days.compute(source, (k, day) -> {
+        days.compute(key, (k, day) -> {
             int used = day == null || !day.date().equals(today) ? 0 : day.used();
             if (used >= perDay) {
                 return new Day(today, used);

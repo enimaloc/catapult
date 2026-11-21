@@ -10,18 +10,23 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Optional;
 
 /**
  * OpenCritic critic scores through the shared cache. A game is found by the exact normalised name (a near miss is
  * absent, never a wrong game); the id it resolves to is cached under {@code igdb:<igdbId>} and the game under
  * {@code oc:<id>}. Every upstream call must be accepted by the caller's budget (asked once) and by the daily cap,
- * which is charged one unit per HTTP call, since it protects the RapidAPI quota. Without a key in the pool the
- * source is skipped silently.
+ * which is charged one unit per HTTP call, since it protects the RapidAPI quota. The public detail route
+ * ({@link #publicById}) must also fit in its own share of half the daily cap, so anonymous callers can never spend
+ * what the streamers' game info needs. Without a key in the pool the source is skipped silently.
  */
 @Service
 @RequiredArgsConstructor
 public class OpenCriticService {
+
+    /** The {@link DailyCap} scope of the public detail route's share. */
+    static final String PUBLIC_SCOPE = "public";
 
     private final EnrichmentCache cache;
     private final OpenCriticClient client;
@@ -39,12 +44,30 @@ public class OpenCriticService {
                 .flatMap(ref -> byId(ref.id(), both));
     }
 
-    /** The score of an OpenCritic game id. */
+    /** The score of an OpenCritic game id, within the daily cap. */
     public Optional<OpenCriticGame> byId(long id, FetchBudget budget) {
         if (!client.isConfigured()) {
             return Optional.empty();
         }
-        return cache.get(EnrichmentSource.OPENCRITIC, "oc:" + id, OpenCriticGame.class, both(budget),
+        return game(id, both(budget));
+    }
+
+    /**
+     * The score of an OpenCritic game id for the public detail route: an upstream call must fit in the public
+     * share (half the daily cap, counted apart) and in the daily cap itself.
+     */
+    public Optional<OpenCriticGame> publicById(long id, FetchBudget budget) {
+        if (!client.isConfigured()) {
+            return Optional.empty();
+        }
+        int cap = properties.openCriticDailyCap();
+        return game(id, new Both(FetchBudget.once(budget), List.of(
+                dailyCap.budget(EnrichmentSource.OPENCRITIC, PUBLIC_SCOPE, cap / 2),
+                dailyCap.budget(EnrichmentSource.OPENCRITIC, cap))));
+    }
+
+    private Optional<OpenCriticGame> game(long id, FetchBudget budget) {
+        return cache.get(EnrichmentSource.OPENCRITIC, "oc:" + id, OpenCriticGame.class, budget,
                 () -> client.game(id));
     }
 
@@ -61,33 +84,44 @@ public class OpenCriticService {
         if (caller instanceof Both existing) {
             return existing;
         }
-        return new Both(FetchBudget.once(caller), dailyCap.budget(EnrichmentSource.OPENCRITIC,
-                properties.openCriticDailyCap()));
+        return new Both(FetchBudget.once(caller), List.of(dailyCap.budget(EnrichmentSource.OPENCRITIC,
+                properties.openCriticDailyCap())));
     }
 
+    /**
+     * The caller's budget then each cap in order, a later one asked only when every earlier one accepted;
+     * {@link #retryAfter()} is that of the budget that refused last.
+     */
     private static final class Both implements FetchBudget {
         private final FetchBudget caller;
-        private final FetchBudget cap;
-        private volatile boolean callerRefused;
+        private final List<FetchBudget> caps;
+        private volatile FetchBudget refused;
 
-        private Both(FetchBudget caller, FetchBudget cap) {
+        private Both(FetchBudget caller, List<FetchBudget> caps) {
             this.caller = caller;
-            this.cap = cap;
+            this.caps = caps;
         }
 
         @Override
         public boolean tryAcquire() {
             if (!caller.tryAcquire()) {
-                callerRefused = true;
+                refused = caller;
                 return false;
             }
-            callerRefused = false;
-            return cap.tryAcquire();
+            for (FetchBudget cap : caps) {
+                if (!cap.tryAcquire()) {
+                    refused = cap;
+                    return false;
+                }
+            }
+            refused = null;
+            return true;
         }
 
         @Override
         public Duration retryAfter() {
-            return callerRefused ? caller.retryAfter() : cap.retryAfter();
+            FetchBudget last = refused;
+            return last != null ? last.retryAfter() : caps.getFirst().retryAfter();
         }
     }
 }
