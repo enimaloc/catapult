@@ -123,6 +123,34 @@ class TwitchActivityServiceTest {
     }
 
     @Test
+    void livesUnavailable_isEmptyNotZero() {
+        twitchHasEverything();
+        when(cache.get(eq(EnrichmentSource.TWITCH_CATEGORY), anyString(), any(), any(), any()))
+                .thenReturn(Optional.of(GTA));
+        when(cache.get(eq(EnrichmentSource.TWITCH_LIVES), anyString(), any(), any(), any()))
+                .thenReturn(Optional.empty());
+
+        assertThat(service.byIgdbId("1942", null, FetchBudget.UNLIMITED)).isEmpty();
+    }
+
+    @Test
+    void clipsUnavailable_keepsTheActivityWithoutClips() {
+        twitchHasEverything();
+        when(cache.get(eq(EnrichmentSource.TWITCH_CATEGORY), anyString(), any(), any(), any()))
+                .thenReturn(Optional.of(GTA));
+        when(cache.get(eq(EnrichmentSource.TWITCH_LIVES), anyString(), any(), any(), any()))
+                .thenReturn(Optional.of(LIVES));
+        when(cache.get(eq(EnrichmentSource.TWITCH_CLIPS), anyString(), any(), any(), any()))
+                .thenReturn(Optional.empty());
+
+        Optional<TwitchActivity> activity = service.byIgdbId("1942", null, FetchBudget.UNLIMITED);
+
+        assertThat(activity).isPresent();
+        assertThat(activity.get().liveCount()).isEqualTo(3);
+        assertThat(activity.get().topClips()).isEmpty();
+    }
+
+    @Test
     void categoryFromLocalCacheSkipsHelix() {
         twitchHasEverything();
         TwitchCategoryCache row = new TwitchCategoryCache("32982", "Grand Theft Auto V", null);

@@ -57,7 +57,7 @@ public class TwitchActivityService {
                         return c;
                     }));
         }
-        return category.map(c -> activity(c, language, once));
+        return category.flatMap(c -> activity(c, language, once));
     }
 
     /** The activity of a Twitch category id; empty when Twitch has none or is not configured. */
@@ -71,20 +71,27 @@ public class TwitchActivityService {
             category = cache.get(EnrichmentSource.TWITCH_CATEGORY, "cat:" + categoryId, TwitchCategory.class, once,
                     () -> client.categoryById(categoryId));
         }
-        return category.map(c -> activity(c, language, once));
+        return category.flatMap(c -> activity(c, language, once));
     }
 
-    private TwitchActivity activity(TwitchCategory category, String language, FetchBudget budget) {
+    /**
+     * Empty when the lives are unavailable (source disabled, fetch failed with nothing cached): a zero is only
+     * a fetched zero. Missing clips are secondary and leave {@code topClips} empty.
+     */
+    private Optional<TwitchActivity> activity(TwitchCategory category, String language, FetchBudget budget) {
         String lang = language == null || language.isBlank() ? null : language;
-        TwitchLives lives = cache.get(EnrichmentSource.TWITCH_LIVES,
+        return cache.get(EnrichmentSource.TWITCH_LIVES,
                         "live:" + category.id() + ":" + (lang == null ? "all" : lang), TwitchLives.class, budget,
                         () -> Optional.of(client.lives(category.id(), lang)))
-                .orElse(new TwitchLives(0, 0, false, List.of()));
-        TwitchClips clips = cache.get(EnrichmentSource.TWITCH_CLIPS, "clips:" + category.id(), TwitchClips.class,
-                        budget, () -> Optional.of(client.clips(category.id(), clock.instant().minus(CLIPS_WINDOW))))
-                .orElse(new TwitchClips(List.of()));
-        return new TwitchActivity(category.id(), category.name(), lives.liveCount(), lives.viewers(),
-                lives.approximate(), lives.top(), clips.top());
+                .map(lives -> {
+                    List<TwitchClips.Clip> clips = cache.get(EnrichmentSource.TWITCH_CLIPS,
+                                    "clips:" + category.id(), TwitchClips.class, budget,
+                                    () -> Optional.of(client.clips(category.id(),
+                                            clock.instant().minus(CLIPS_WINDOW))))
+                            .map(TwitchClips::top).orElse(List.of());
+                    return new TwitchActivity(category.id(), category.name(), lives.liveCount(), lives.viewers(),
+                            lives.approximate(), lives.top(), clips);
+                });
     }
 
     private static TwitchCategory toCategory(TwitchCategoryCache row) {
