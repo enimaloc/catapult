@@ -8,6 +8,10 @@ import fr.enimaloc.catapult.service.enrichment.opencritic.OpenCriticGame;
 import fr.enimaloc.catapult.service.enrichment.pcgw.PcGamingWikiPage;
 import fr.enimaloc.catapult.service.enrichment.prices.GamePrices;
 import fr.enimaloc.catapult.service.enrichment.protondb.ProtonDbSummary;
+import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunEnrichment;
+import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunIdentity;
+import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunRecords;
+import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunRun;
 import fr.enimaloc.catapult.service.enrichment.steamdeck.SteamDeckCompatibility;
 import fr.enimaloc.catapult.service.enrichment.steamgriddb.SteamGridDbAssets;
 import fr.enimaloc.catapult.service.enrichment.twitch.TwitchActivity;
@@ -15,6 +19,9 @@ import fr.enimaloc.catapult.service.enrichment.twitch.TwitchClips;
 import fr.enimaloc.catapult.service.enrichment.twitch.TwitchLives;
 
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,10 +30,10 @@ import java.util.Optional;
 /**
  * The v3 aggregated game info: the v2 platform objects ({@link GameInfoResponse}, kept as {@code base}) plus the
  * enrichment ones (HowLongToBeat, ProtonDB, SteamGridDB, Steam Deck, PCGamingWiki, store prices, OpenCritic, Twitch
- * activity), each a short projection with a
+ * activity, speedrun.com), each a short projection with a
  * "more" link to its detail route, null when unavailable. The {@link GameInfoResponse.Summary} view adds to the v2
  * derived fields {@code timeToBeat}, {@code protonTier}, {@code deckStatus}, {@code coverUrl}, {@code trailer}, {@code price},
- * {@code criticScore} and {@code liveViewers};
+ * {@code criticScore}, {@code liveViewers}, {@code worldRecord} and {@code personalBest};
  * the enrichment objects never feed {@code name} or {@code description}.
  */
 public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boolean inGame,
@@ -35,14 +42,14 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
                                  GameInfoResponse.CatapultObject catapult, HltbObject hltb, ProtonDbObject protondb,
                                  SteamGridDbObject steamgriddb, SteamDeckObject steamDeck,
                                  PcGamingWikiObject pcgamingwiki, PricesObject prices,
-                                 OpenCriticObject opencritic, TwitchObject twitch,
+                                 OpenCriticObject opencritic, TwitchObject twitch, SpeedrunObject speedrun,
                                  @JsonView(GameInfoResponse.Summary.class) Trailer trailer,
                                  @JsonIgnore GameInfoResponse base) {
 
     /** The answer while nothing is detected: inGame=false, every object null. */
     public static GameInfoV3Response notInGame() {
         return new GameInfoV3Response(false, null, null, null, null, null, null, null, null, null, null, null, null, null,
-                null, new GameInfoResponse(false));
+                null, null, new GameInfoResponse(false));
     }
 
     /**
@@ -74,6 +81,7 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
                 PricesObject.of(enrichment.prices(), links, country),
                 OpenCriticObject.of(enrichment.opencritic(), links),
                 TwitchObject.of(enrichment.twitch(), links, language),
+                SpeedrunObject.of(enrichment.speedrun(), links),
                 Trailer.of(enrichment.trailer()),
                 base);
     }
@@ -162,7 +170,102 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
         return twitch == null ? null : twitch.viewers();
     }
 
+    /** The world record of speedrun.com's main category of the game; null without one. */
+    @JsonView(GameInfoResponse.Summary.class)
+    public WorldRecord worldRecord() {
+        if (speedrun == null || speedrun.worldRecords().isEmpty()) {
+            return null;
+        }
+        SpeedrunRecords.CategoryRecord main = speedrun.worldRecords().getFirst();
+        return new WorldRecord(main.category(), main.time(),
+                main.runners().stream().map(SpeedrunRecords.Runner::name).toList());
+    }
+
+    /**
+     * The member's personal best on the game in speedrun.com's main category, else their best place in any
+     * category; null when none is known.
+     */
+    @JsonView(GameInfoResponse.Summary.class)
+    public PersonalBest personalBest() {
+        if (speedrun == null || speedrun.personalBests() == null) {
+            return null;
+        }
+        String mainCategory = speedrun.worldRecords().isEmpty() ? null
+                : speedrun.worldRecords().getFirst().categoryId();
+        Comparator<SpeedrunObject.Pb> byPlace = Comparator.comparing(SpeedrunObject.Pb::place,
+                Comparator.nullsLast(Comparator.naturalOrder()));
+        return speedrun.personalBests().stream()
+                .filter(pb -> pb.categoryId() != null && pb.categoryId().equals(mainCategory))
+                .min(byPlace)
+                .or(() -> speedrun.personalBests().stream().min(byPlace))
+                .map(pb -> new PersonalBest(pb.category(), pb.time(), pb.place()))
+                .orElse(null);
+    }
+
     // ---------------------------------------------------------------- objects
+
+    /** The summary's world record: the main category, its time in seconds and every runner of a tie. */
+    public record WorldRecord(@JsonView(GameInfoResponse.Summary.class) String category,
+                              @JsonView(GameInfoResponse.Summary.class) BigDecimal time,
+                              @JsonView(GameInfoResponse.Summary.class) List<String> runners) {
+    }
+
+    /** The summary's personal best: its category, its time in seconds and its place on the leaderboard. */
+    public record PersonalBest(@JsonView(GameInfoResponse.Summary.class) String category,
+                               @JsonView(GameInfoResponse.Summary.class) BigDecimal time,
+                               @JsonView(GameInfoResponse.Summary.class) Integer place) {
+    }
+
+    /**
+     * Speedrun.com's game, the world records of its first {@value #MAX_CATEGORIES} main full-game categories (the
+     * first is the main one; the detail route has up to 20), and the member's own account, personal bests and runs
+     * waiting for verification on the game. {@code account}, {@code personalBests} and {@code pendingRuns} are null
+     * when no account is identified: unknown, not "none".
+     */
+    public record SpeedrunObject(String gameId, String name, String url, String coverUrl,
+                                 List<SpeedrunRecords.CategoryRecord> worldRecords, Account account,
+                                 List<Pb> personalBests, List<Pending> pendingRuns, String more)
+            implements GameInfoResponse.HasMore {
+        /** How many categories the aggregate keeps. */
+        static final int MAX_CATEGORIES = 3;
+
+        static SpeedrunObject of(SpeedrunEnrichment s, MoreLinks links) {
+            if (s == null || s.records() == null || s.records().game() == null) {
+                return null;
+            }
+            SpeedrunRecords records = s.records();
+            List<SpeedrunRecords.CategoryRecord> categories = records.categories() == null ? List.of()
+                    : records.categories().stream().limit(MAX_CATEGORIES).toList();
+            return new SpeedrunObject(records.game().id(), records.game().name(), records.game().url(),
+                    records.game().coverUrl(), categories, Account.of(s.account()),
+                    s.personalBests() == null ? null : s.personalBests().stream().map(Pb::of).toList(),
+                    s.pendingRuns() == null ? null : s.pendingRuns().stream().map(Pending::of).toList(),
+                    links.to(MoreLinks.Kind.SPEEDRUN, records.game().id()));
+        }
+
+        /** The member's speedrun.com account and how it was found ({@code api_key}, {@code twitch}, {@code declared}). */
+        public record Account(String name, String url, SpeedrunIdentity.Source source) {
+            public static Account of(SpeedrunIdentity identity) {
+                return identity == null ? null : new Account(identity.name(), identity.url(), identity.source());
+            }
+        }
+
+        /** A personal best on the game: its category, place, time in seconds, date and run page. */
+        public record Pb(String categoryId, String category, Integer place, BigDecimal time, LocalDate date,
+                         String runUrl) {
+            static Pb of(SpeedrunRun run) {
+                return new Pb(run.categoryId(), run.category(), run.place(), run.time(), run.date(), run.runUrl());
+            }
+        }
+
+        /** A run on the game waiting for verification: its category, time in seconds, submission and run page. */
+        public record Pending(String categoryId, String category, BigDecimal time, Instant submitted,
+                              String runUrl) {
+            static Pending of(SpeedrunRun run) {
+                return new Pending(run.categoryId(), run.category(), run.time(), run.submitted(), run.runUrl());
+            }
+        }
+    }
 
     /** The best price of the summary: {@code amount} in {@code currency}, {@code cut} percent off, at {@code shop}. */
     public record Price(@JsonView(GameInfoResponse.Summary.class) BigDecimal amount,

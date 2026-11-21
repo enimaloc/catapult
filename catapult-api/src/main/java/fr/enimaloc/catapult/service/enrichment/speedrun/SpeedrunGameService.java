@@ -62,7 +62,7 @@ public class SpeedrunGameService {
     }
 
     /** The caller's budget (asked once) then the limiter's; the limiter is not charged when the caller refuses. */
-    private static FetchBudget both(FetchBudget caller, FetchBudget limiterBudget) {
+    static FetchBudget both(FetchBudget caller, FetchBudget limiterBudget) {
         FetchBudget once = FetchBudget.once(caller);
         return new FetchBudget() {
             private volatile FetchBudget refused = once;

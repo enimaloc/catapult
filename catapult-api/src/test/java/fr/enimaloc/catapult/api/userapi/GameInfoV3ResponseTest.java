@@ -6,6 +6,11 @@ import fr.enimaloc.catapult.service.enrichment.opencritic.OpenCriticGame;
 import fr.enimaloc.catapult.service.enrichment.pcgw.PcGamingWikiPage;
 import fr.enimaloc.catapult.service.enrichment.prices.GamePrices;
 import fr.enimaloc.catapult.service.enrichment.protondb.ProtonDbSummary;
+import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunEnrichment;
+import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunGame;
+import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunIdentity;
+import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunRecords;
+import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunRun;
 import fr.enimaloc.catapult.service.enrichment.steamdeck.SteamDeckCompatibility;
 import fr.enimaloc.catapult.service.enrichment.steamgriddb.SteamGridDbAssets;
 import fr.enimaloc.catapult.service.enrichment.twitch.TwitchActivity;
@@ -14,6 +19,9 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.stream.IntStream;
 import java.util.List;
 import java.util.Optional;
 
@@ -49,7 +57,7 @@ class GameInfoV3ResponseTest {
 
     @Test
     void summaryView_containsNewDerivedFields_notObjects() {
-        GameEnrichment enrichment = new GameEnrichment(TTB, PROTON, SGDB, DECK, PCGW, TRAILER, "620", null, null, null);
+        GameEnrichment enrichment = new GameEnrichment(TTB, PROTON, SGDB, DECK, PCGW, TRAILER, "620", null, null, null, null);
         GameInfoV3Response response = GameInfoV3Response.of(BASE_V2, enrichment, LINKS, Optional.of("72"));
 
         JsonNode summary = MAPPER.readTree(MAPPER.writerWithView(GameInfoResponse.Summary.class)
@@ -88,11 +96,11 @@ class GameInfoV3ResponseTest {
     void coverUrl_fallsBackToIgdbCover() {
         GameEnrichment noGrid = new GameEnrichment(null, null, new SteamGridDbAssets(5L, "Portal 2",
                 "https://www.steamgriddb.com/game/5", List.of(), List.of(), List.of(), List.of()),
-                null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null);
         assertThat(GameInfoV3Response.of(BASE_V2, noGrid, LINKS, Optional.of("72")).coverUrl())
                 .isEqualTo("https://images.igdb.com/cover.jpg");
 
-        GameEnrichment nothing = new GameEnrichment(null, null, null, null, null, null, null, null, null, null);
+        GameEnrichment nothing = new GameEnrichment(null, null, null, null, null, null, null, null, null, null, null);
         GameInfoV3Response bare = GameInfoV3Response.of(BASE_V2, nothing, LINKS, Optional.of("72"));
         assertThat(bare.coverUrl()).isEqualTo("https://images.igdb.com/cover.jpg");
         assertThat(bare.timeToBeat()).isNull();
@@ -107,7 +115,7 @@ class GameInfoV3ResponseTest {
 
     @Test
     void hltbWithoutIgdbId_hasNoMoreLink() {
-        GameEnrichment enrichment = new GameEnrichment(TTB, null, null, null, null, null, null, null, null, null);
+        GameEnrichment enrichment = new GameEnrichment(TTB, null, null, null, null, null, null, null, null, null, null);
 
         GameInfoV3Response response = GameInfoV3Response.of(BASE_V2, enrichment, LINKS, Optional.empty());
 
@@ -128,7 +136,7 @@ class GameInfoV3ResponseTest {
     private static GameEnrichment withNewSources(GamePrices prices) {
         return new GameEnrichment(null, null, null, null, null, null, "620", prices,
                 new OpenCriticGame(7L, "Portal 2", 88, 95, "Mighty", 50, "https://opencritic.com/game/7/portal-2"),
-                new TwitchActivity("490377", "Portal 2", 3, 1234L, false, List.of(), List.of()));
+                new TwitchActivity("490377", "Portal 2", 3, 1234L, false, List.of(), List.of()), null);
     }
 
     @Test
@@ -184,5 +192,137 @@ class GameInfoV3ResponseTest {
         GameInfoV3Response absent = GameInfoV3Response.of(BASE_V2, enrichment, LINKS, Optional.of("72"));
         assertThat(absent.prices().more()).isEqualTo(BASE + "/api/games/prices/itad-1?version=3");
         assertThat(absent.twitch().more()).isEqualTo(BASE + "/api/games/twitch/490377?version=3");
+    }
+
+    // ---------------------------------------------------------------- speedrun.com
+
+    private static final SpeedrunGame CELESTE = new SpeedrunGame("o1y9j9v6", "Celeste", "Celeste", "celeste",
+            "https://www.speedrun.com/celeste", "https://www.speedrun.com/static/game/o1y9j9v6/cover.png");
+    private static final SpeedrunIdentity RUNNER = new SpeedrunIdentity("u1", "linkus7",
+            "https://www.speedrun.com/users/linkus7", SpeedrunIdentity.Source.API_KEY);
+
+    private static SpeedrunRecords.CategoryRecord category(String id, String name, String time) {
+        return new SpeedrunRecords.CategoryRecord(id, name, "https://www.speedrun.com/celeste?x=" + id,
+                new BigDecimal(time), "ingame",
+                List.of(new SpeedrunRecords.Runner("Marlin", "https://www.speedrun.com/users/Marlin"),
+                        new SpeedrunRecords.Runner("Guest", null)),
+                LocalDate.of(2026, 10, 18), "https://www.speedrun.com/celeste/run/" + id, null);
+    }
+
+    private static SpeedrunRun pb(String categoryId, String category, int place, String time) {
+        return new SpeedrunRun("o1y9j9v6", "Celeste", categoryId, category, place, new BigDecimal(time),
+                LocalDate.of(2026, 9, 1), null, "https://www.speedrun.com/celeste/run/pb-" + categoryId);
+    }
+
+    private static final SpeedrunRun PENDING = new SpeedrunRun("o1y9j9v6", "Celeste", "any", "Any%", null,
+            new BigDecimal("1600.0"), null, Instant.parse("2026-11-20T10:00:00Z"),
+            "https://www.speedrun.com/celeste/run/new");
+
+    private static final SpeedrunRecords CELESTE_RECORDS = new SpeedrunRecords(CELESTE, List.of(
+            category("any", "Any%", "1484.083"), category("arb", "ARB", "1700"), category("100", "100%", "5000")));
+
+    private static GameEnrichment withSpeedrun(SpeedrunEnrichment speedrun) {
+        return new GameEnrichment(null, null, null, null, null, null, null, null, null, null, speedrun);
+    }
+
+    @Test
+    void summaryCarriesWorldRecordAndPersonalBest() {
+        SpeedrunEnrichment speedrun = new SpeedrunEnrichment(CELESTE_RECORDS, RUNNER,
+                List.of(pb("arb", "ARB", 3, "1800"), pb("any", "Any%", 42, "1612.5")), List.of(PENDING));
+        GameInfoV3Response response = GameInfoV3Response.of(BASE_V2, withSpeedrun(speedrun), LINKS,
+                Optional.of("72"));
+
+        JsonNode summary = MAPPER.readTree(MAPPER.writerWithView(GameInfoResponse.Summary.class)
+                .writeValueAsString(response));
+
+        assertThat(summary.path("worldRecord").path("category").asString()).isEqualTo("Any%");
+        assertThat(summary.path("worldRecord").path("time").decimalValue()).isEqualByComparingTo("1484.083");
+        assertThat(summary.path("worldRecord").path("runners").size()).isEqualTo(2);
+        assertThat(summary.path("worldRecord").path("runners").get(0).asString()).isEqualTo("Marlin");
+        assertThat(summary.path("personalBest").path("category").asString()).isEqualTo("Any%");
+        assertThat(summary.path("personalBest").path("time").decimalValue()).isEqualByComparingTo("1612.5");
+        assertThat(summary.path("personalBest").path("place").asInt()).isEqualTo(42);
+        assertThat(summary.has("speedrun")).isFalse();
+
+        JsonNode full = MAPPER.readTree(MAPPER.writeValueAsString(response)).path("speedrun");
+        assertThat(full.path("gameId").asString()).isEqualTo("o1y9j9v6");
+        assertThat(full.path("name").asString()).isEqualTo("Celeste");
+        assertThat(full.path("url").asString()).isEqualTo("https://www.speedrun.com/celeste");
+        assertThat(full.path("coverUrl").asString()).isEqualTo(CELESTE.coverUrl());
+        assertThat(full.path("worldRecords").get(0).path("runners").get(0).path("name").asString())
+                .isEqualTo("Marlin");
+        assertThat(full.path("worldRecords").get(0).path("timing").asString()).isEqualTo("ingame");
+        assertThat(full.path("account").path("name").asString()).isEqualTo("linkus7");
+        assertThat(full.path("account").path("source").asString()).isEqualTo("api_key");
+        assertThat(full.path("account").has("userId")).isFalse();
+        assertThat(full.path("personalBests").get(1).path("place").asInt()).isEqualTo(42);
+        assertThat(full.path("personalBests").get(1).path("runUrl").asString())
+                .isEqualTo("https://www.speedrun.com/celeste/run/pb-any");
+        assertThat(full.path("pendingRuns").get(0).path("submitted").asString()).isEqualTo("2026-11-20T10:00:00Z");
+        assertThat(full.path("pendingRuns").get(0).has("place")).isFalse();
+        assertThat(full.path("more").asString()).isEqualTo(BASE + "/api/games/speedrun/o1y9j9v6?version=3");
+    }
+
+    @Test
+    void personalBestFallsBackToBestPlace() {
+        SpeedrunEnrichment speedrun = new SpeedrunEnrichment(CELESTE_RECORDS, RUNNER,
+                List.of(pb("arb", "ARB", 9, "1800"), pb("100", "100%", 3, "5100")), List.of());
+
+        GameInfoV3Response response = GameInfoV3Response.of(BASE_V2, withSpeedrun(speedrun), LINKS,
+                Optional.of("72"));
+
+        assertThat(response.personalBest()).isEqualTo(
+                new GameInfoV3Response.PersonalBest("100%", new BigDecimal("5100"), 3));
+    }
+
+    @Test
+    void unidentifiedMemberHasRecordsButNullPersonalData() {
+        SpeedrunEnrichment speedrun = new SpeedrunEnrichment(CELESTE_RECORDS, null, null, null);
+
+        GameInfoV3Response response = GameInfoV3Response.of(BASE_V2, withSpeedrun(speedrun), LINKS,
+                Optional.of("72"));
+
+        assertThat(response.speedrun().worldRecords()).hasSize(3);
+        assertThat(response.speedrun().account()).isNull();
+        assertThat(response.speedrun().personalBests()).isNull();
+        assertThat(response.speedrun().pendingRuns()).isNull();
+        assertThat(response.personalBest()).isNull();
+        assertThat(response.worldRecord().category()).isEqualTo("Any%");
+        JsonNode full = MAPPER.readTree(MAPPER.writeValueAsString(response)).path("speedrun");
+        assertThat(full.has("personalBests")).isTrue();
+        assertThat(full.path("personalBests").isNull()).isTrue();
+
+        // identified but without any PB on the game: an empty list, no summary PB
+        SpeedrunEnrichment noPb = new SpeedrunEnrichment(CELESTE_RECORDS, RUNNER, List.of(), List.of());
+        GameInfoV3Response none = GameInfoV3Response.of(BASE_V2, withSpeedrun(noPb), LINKS, Optional.of("72"));
+        assertThat(none.speedrun().personalBests()).isEmpty();
+        assertThat(none.personalBest()).isNull();
+    }
+
+    @Test
+    void aggregateKeepsThreeCategories() {
+        List<SpeedrunRecords.CategoryRecord> seven = IntStream.range(0, 7)
+                .mapToObj(i -> category("c" + i, "Category " + i, "100" + i)).toList();
+        SpeedrunEnrichment speedrun = new SpeedrunEnrichment(new SpeedrunRecords(CELESTE, seven), null, null, null);
+
+        GameInfoV3Response response = GameInfoV3Response.of(BASE_V2, withSpeedrun(speedrun), LINKS,
+                Optional.of("72"));
+
+        assertThat(response.speedrun().worldRecords()).containsExactlyElementsOf(seven.subList(0, 3));
+    }
+
+    @Test
+    void noSpeedrunGame_noObjectNorSummaryFields() {
+        GameInfoV3Response response = GameInfoV3Response.of(BASE_V2, GameEnrichment.EMPTY, LINKS, Optional.of("72"));
+
+        assertThat(response.speedrun()).isNull();
+        assertThat(response.worldRecord()).isNull();
+        assertThat(response.personalBest()).isNull();
+        GameInfoV3Response noCategory = GameInfoV3Response.of(BASE_V2, withSpeedrun(new SpeedrunEnrichment(
+                new SpeedrunRecords(CELESTE, List.of()), RUNNER, List.of(pb("any", "Any%", 1, "1")), null)),
+                LINKS, Optional.of("72"));
+        assertThat(noCategory.worldRecord()).isNull();
+        assertThat(noCategory.personalBest().place()).isEqualTo(1);
+        assertThat(GameInfoV3Response.notInGame().worldRecord()).isNull();
     }
 }

@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.service.enrichment;
 
 import fr.enimaloc.catapult.api.userapi.GameInfoAssembler;
 import fr.enimaloc.catapult.api.userapi.MoreLinks;
+import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.igdb.IgdbGameDetails;
 import fr.enimaloc.catapult.getter.DetectedGame;
@@ -15,6 +16,14 @@ import fr.enimaloc.catapult.service.enrichment.prices.PricesService;
 import fr.enimaloc.catapult.service.enrichment.pcgw.PcGamingWikiService;
 import fr.enimaloc.catapult.service.enrichment.protondb.ProtonDbService;
 import fr.enimaloc.catapult.service.enrichment.protondb.ProtonDbSummary;
+import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunEnrichment;
+import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunGame;
+import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunGameService;
+import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunIdentity;
+import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunIdentityResolver;
+import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunPersonalService;
+import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunRecords;
+import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunRun;
 import fr.enimaloc.catapult.service.enrichment.steamdeck.SteamDeckCompatibility;
 import fr.enimaloc.catapult.service.enrichment.steamdeck.SteamDeckService;
 import fr.enimaloc.catapult.service.enrichment.steamgriddb.SteamGridDbAssets;
@@ -33,9 +42,11 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import java.math.BigDecimal;
 import java.net.URI;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -80,6 +91,9 @@ class GameEnrichmentAssemblerTest {
     private final PricesService prices = mock(PricesService.class);
     private final OpenCriticService openCritic = mock(OpenCriticService.class);
     private final TwitchActivityService twitch = mock(TwitchActivityService.class);
+    private final SpeedrunGameService speedrunGames = mock(SpeedrunGameService.class);
+    private final SpeedrunIdentityResolver speedrunIdentity = mock(SpeedrunIdentityResolver.class);
+    private final SpeedrunPersonalService speedrunPersonal = mock(SpeedrunPersonalService.class);
     private final IgdbService igdbService = mock(IgdbService.class);
     private final IgdbGameDetailsService igdbGameDetailsService = mock(IgdbGameDetailsService.class);
     private final TrailerSourceResolver trailers = mock(TrailerSourceResolver.class);
@@ -91,7 +105,8 @@ class GameEnrichmentAssemblerTest {
     void setUp() {
         properties.setAggregateTimeout(Duration.ofSeconds(2));
         assembler = new GameEnrichmentAssembler(hltb, protonDb, steamGridDb, steamDeck, pcgw, prices, openCritic,
-                twitch, igdbService, igdbGameDetailsService, trailers, properties);
+                twitch, speedrunGames, speedrunIdentity, speedrunPersonal, igdbService, igdbGameDetailsService,
+                trailers, properties);
         when(hltb.timeToBeat(any(), any())).thenReturn(Optional.of(TTB));
         when(protonDb.summary(anyString(), any())).thenReturn(Optional.of(PROTON));
         when(steamGridDb.bySteamAppId(anyString(), any())).thenReturn(Optional.of(SGDB));
@@ -106,6 +121,7 @@ class GameEnrichmentAssemblerTest {
         when(trailers.resolve(any(), any(), any())).thenReturn(Optional.empty());
         when(igdbGameDetailsService.getDetails(anyString())).thenReturn(Optional.empty());
         when(igdbService.findExternalUid(anyString(), any())).thenReturn(Optional.empty());
+        when(speedrunGames.byName(anyString(), any())).thenReturn(Optional.empty());
     }
 
     @AfterEach
@@ -124,7 +140,7 @@ class GameEnrichmentAssemblerTest {
                 .thenAnswer(slow(Duration.ofMillis(700), Optional.of(SGDB)));
 
         long start = System.nanoTime();
-        GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "FR", null, LINKS);
+        GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "FR", null, LINKS, Optional.empty());
         Duration took = Duration.ofNanos(System.nanoTime() - start);
 
         assertThat(result.hltb()).isEqualTo(TTB);
@@ -147,7 +163,7 @@ class GameEnrichmentAssemblerTest {
         when(protonDb.summary(anyString(), any())).thenAnswer(slow(Duration.ofSeconds(5), Optional.of(PROTON)));
 
         long start = System.nanoTime();
-        GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "FR", null, LINKS);
+        GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "FR", null, LINKS, Optional.empty());
         Duration took = Duration.ofNanos(System.nanoTime() - start);
 
         assertThat(result.protondb()).isNull();
@@ -161,7 +177,7 @@ class GameEnrichmentAssemblerTest {
     @Test
     void newSources_askedWithCountryLanguageAndIds() {
         GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "US",
-                "de", LINKS);
+                "de", LINKS, Optional.empty());
 
         assertThat(result.prices()).isEqualTo(PRICES);
         assertThat(result.opencritic()).isEqualTo(CRITIC);
@@ -176,7 +192,7 @@ class GameEnrichmentAssemblerTest {
         when(igdbService.getGameCache()).thenReturn(Map.of("72", "Portal 2"));
 
         GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"),
-                "Portal 2 - Game of the Year Edition", "FR", null, LINKS);
+                "Portal 2 - Game of the Year Edition", "FR", null, LINKS, Optional.empty());
 
         assertThat(result.opencritic()).isEqualTo(CRITIC);
         verify(openCritic).byName(eq("Portal 2"), eq(FetchBudget.UNLIMITED));
@@ -185,7 +201,7 @@ class GameEnrichmentAssemblerTest {
     @Test
     void newSources_withoutIgdbOrSteamId_pricesByNameOnly() {
         GameEnrichment result = assembler.enrich(HALO, Optional.empty(), Optional.empty(), "Halo", "FR", null,
-                LINKS);
+                LINKS, Optional.empty());
 
         assertThat(result.prices()).isEqualTo(PRICES);
         assertThat(result.opencritic()).isNull();
@@ -202,7 +218,7 @@ class GameEnrichmentAssemblerTest {
 
         long start = System.nanoTime();
         GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "FR",
-                null, LINKS);
+                null, LINKS, Optional.empty());
         Duration took = Duration.ofNanos(System.nanoTime() - start);
 
         assertThat(result.twitch()).isNull();
@@ -218,7 +234,7 @@ class GameEnrichmentAssemblerTest {
         when(hltb.timeToBeat(any(), any()))
                 .thenThrow(new UpstreamBudgetExceededException(Duration.ofMinutes(1)));
 
-        GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "FR", null, LINKS);
+        GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "FR", null, LINKS, Optional.empty());
 
         assertThat(result.steamDeck()).isNull();
         assertThat(result.hltb()).isNull();
@@ -228,7 +244,7 @@ class GameEnrichmentAssemblerTest {
 
     @Test
     void aggregate_nonSteamWithoutAppId_namesOnly() {
-        GameEnrichment result = assembler.enrich(HALO, Optional.empty(), Optional.empty(), "Halo", "FR", null, LINKS);
+        GameEnrichment result = assembler.enrich(HALO, Optional.empty(), Optional.empty(), "Halo", "FR", null, LINKS, Optional.empty());
 
         assertThat(result.protondb()).isNull();
         assertThat(result.steamDeck()).isNull();
@@ -246,7 +262,7 @@ class GameEnrichmentAssemblerTest {
     void xboxGameWithIgdbSteamMapping_usesResolvedAppId() {
         when(igdbService.findExternalUid("1234", GameBinding.SourceType.STEAM)).thenReturn(Optional.of("976730"));
 
-        GameEnrichment result = assembler.enrich(HALO, Optional.of("1234"), Optional.empty(), "Halo", "FR", null, LINKS);
+        GameEnrichment result = assembler.enrich(HALO, Optional.of("1234"), Optional.empty(), "Halo", "FR", null, LINKS, Optional.empty());
 
         assertThat(result.steamAppId()).isEqualTo("976730");
         assertThat(result.protondb()).isEqualTo(PROTON);
@@ -268,32 +284,32 @@ class GameEnrichmentAssemblerTest {
         // Steam: the resolver finds an HLS H.264 stream for the detected app id
         URI hls = URI.create("https://video.akamai.steamstatic.com/hls_264_master.m3u8");
         when(trailers.resolve(eq("620"), isNull(), eq(FetchBudget.UNLIMITED))).thenReturn(Optional.of(hls));
-        GameEnrichment steam = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "FR", null, LINKS);
+        GameEnrichment steam = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "FR", null, LINKS, Optional.empty());
         assertThat(steam.trailer()).isEqualTo(new GameEnrichment.Trailer("mp4", BASE + "/api/me/game/trailer.mp4?version=3"));
 
         // Xbox: IGDB's Steam mapping first, then the detected product, in the resolver's order
         when(igdbService.findExternalUid("72", GameBinding.SourceType.STEAM)).thenReturn(Optional.of("976730"));
         when(trailers.resolve(eq("976730"), eq(HALO.getSourceId()), eq(FetchBudget.UNLIMITED)))
                 .thenReturn(Optional.of(hls));
-        GameEnrichment xbox = assembler.enrich(HALO, Optional.of("72"), Optional.empty(), "Halo", "FR", null, LINKS);
+        GameEnrichment xbox = assembler.enrich(HALO, Optional.of("72"), Optional.empty(), "Halo", "FR", null, LINKS, Optional.empty());
         assertThat(xbox.trailer()).isEqualTo(new GameEnrichment.Trailer("mp4", BASE + "/api/me/game/trailer.mp4?version=3"));
         when(igdbService.findExternalUid("72", GameBinding.SourceType.STEAM)).thenReturn(Optional.empty());
 
         // no HLS stream (none, or the trailer source switched off): IGDB's first video, on YouTube
         when(trailers.resolve(eq("620"), isNull(), any())).thenReturn(Optional.empty());
-        GameEnrichment youtube = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "FR", null, LINKS);
+        GameEnrichment youtube = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "FR", null, LINKS, Optional.empty());
         assertThat(youtube.trailer())
                 .isEqualTo(new GameEnrichment.Trailer("youtube", "https://www.youtube.com/watch?v=dQw4w9WgXcQ"));
 
         // nothing at all
-        GameEnrichment none = assembler.enrich(PORTAL, Optional.empty(), Optional.of("620"), "Portal 2", "FR", null, LINKS);
+        GameEnrichment none = assembler.enrich(PORTAL, Optional.empty(), Optional.of("620"), "Portal 2", "FR", null, LINKS, Optional.empty());
         assertThat(none.trailer()).isNull();
     }
 
     @Test
     void enrichAsync_completesWithTheEnrichment() {
         GameEnrichment result = assembler.enrichAsync(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2",
-                "FR", null, LINKS).join();
+                "FR", null, LINKS, Optional.empty()).join();
 
         assertThat(result.protondb()).isEqualTo(PROTON);
         assertThat(result.steamAppId()).isEqualTo("620");
@@ -312,12 +328,142 @@ class GameEnrichmentAssemblerTest {
                 .withBean(PricesService.class, () -> prices)
                 .withBean(OpenCriticService.class, () -> openCritic)
                 .withBean(TwitchActivityService.class, () -> twitch)
+                .withBean(SpeedrunGameService.class, () -> speedrunGames)
+                .withBean(SpeedrunIdentityResolver.class, () -> speedrunIdentity)
+                .withBean(SpeedrunPersonalService.class, () -> speedrunPersonal)
                 .withBean(IgdbService.class, () -> igdbService)
                 .withBean(IgdbGameDetailsService.class, () -> igdbGameDetailsService)
                 .withBean(TrailerSourceResolver.class, () -> trailers)
                 .withBean(EnrichmentProperties.class)
                 .withUserConfiguration(GameEnrichmentAssembler.class)
                 .run(ctx -> assertThat(ctx).hasSingleBean(GameEnrichmentAssembler.class));
+    }
+
+    // ---------------------------------------------------------------- speedrun.com
+
+    private static final SpeedrunGame CELESTE = new SpeedrunGame("o1y9j9v6", "Celeste", "Celeste", "celeste",
+            "https://www.speedrun.com/celeste", "https://www.speedrun.com/static/game/o1y9j9v6/cover.png");
+    private static final SpeedrunRecords RECORDS = new SpeedrunRecords(CELESTE, List.of(
+            new SpeedrunRecords.CategoryRecord("c1", "Any%", "https://www.speedrun.com/celeste?x=c1",
+                    new BigDecimal("1484.083"), "ingame", List.of(new SpeedrunRecords.Runner("Marlin", null)),
+                    LocalDate.of(2026, 10, 18), "https://www.speedrun.com/celeste/run/r1", null)));
+    private static final SpeedrunIdentity RUNNER = new SpeedrunIdentity("u1", "linkus7",
+            "https://www.speedrun.com/users/linkus7", SpeedrunIdentity.Source.TWITCH);
+    private static final List<SpeedrunRun> PBS = List.of(new SpeedrunRun("o1y9j9v6", "Celeste", "c1", "Any%", 42,
+            new BigDecimal("1612.5"), LocalDate.of(2026, 9, 1), null, "https://www.speedrun.com/celeste/run/pb"));
+    private static final List<SpeedrunRun> PENDING = List.of(new SpeedrunRun("o1y9j9v6", "Celeste", "c1", "Any%",
+            null, new BigDecimal("1600.0"), LocalDate.of(2026, 11, 20), null,
+            "https://www.speedrun.com/celeste/run/new"));
+
+    private static UserAccount member() {
+        UserAccount user = new UserAccount();
+        user.setId(UUID.randomUUID());
+        return user;
+    }
+
+    private void celesteOnSpeedrun() {
+        when(igdbService.getGameCache()).thenReturn(Map.of("72", "Celeste"));
+        when(speedrunGames.byName(eq("Celeste"), any())).thenReturn(Optional.of(CELESTE));
+        when(speedrunGames.records(eq("o1y9j9v6"), any())).thenReturn(Optional.of(RECORDS));
+    }
+
+    @Test
+    void speedrun_memberWithAccount_recordsPersonalBestsAndPendingRuns() {
+        celesteOnSpeedrun();
+        UserAccount user = member();
+        when(speedrunIdentity.resolve(eq(user), any())).thenReturn(Optional.of(RUNNER));
+        when(speedrunPersonal.personalBests(eq("u1"), eq("o1y9j9v6"), any())).thenReturn(Optional.of(PBS));
+        when(speedrunPersonal.apiKey(user, RUNNER)).thenReturn(Optional.of("key"));
+        when(speedrunPersonal.pendingRuns(eq(RUNNER), eq("o1y9j9v6"), eq(Optional.of("key")), any()))
+                .thenReturn(Optional.of(PENDING));
+
+        GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"),
+                "Celeste - Farewell Edition", "FR", null, LINKS, Optional.of(user));
+
+        assertThat(result.speedrun())
+                .isEqualTo(new SpeedrunEnrichment(RECORDS, RUNNER, PBS, PENDING));
+        verify(speedrunGames).byName(eq("Celeste"), eq(FetchBudget.UNLIMITED));
+        verify(speedrunGames).records(eq("o1y9j9v6"), eq(FetchBudget.UNLIMITED));
+        verify(speedrunIdentity).resolve(eq(user), eq(FetchBudget.UNLIMITED));
+        verify(speedrunPersonal).personalBests(eq("u1"), eq("o1y9j9v6"), eq(FetchBudget.UNLIMITED));
+        verify(speedrunPersonal).pendingRuns(eq(RUNNER), eq("o1y9j9v6"), eq(Optional.of("key")),
+                eq(FetchBudget.UNLIMITED));
+    }
+
+    @Test
+    void speedrun_searchedByTheDetectedNameWithoutIgdbId() {
+        when(speedrunGames.byName(eq("Halo"), any())).thenReturn(Optional.of(CELESTE));
+        when(speedrunGames.records(eq("o1y9j9v6"), any())).thenReturn(Optional.of(RECORDS));
+
+        GameEnrichment result = assembler.enrich(HALO, Optional.empty(), Optional.empty(), "Halo", "FR", null,
+                LINKS, Optional.empty());
+
+        assertThat(result.speedrun()).isEqualTo(new SpeedrunEnrichment(RECORDS, null, null, null));
+        verify(speedrunIdentity, never()).resolve(any(), any());
+    }
+
+    @Test
+    void speedrun_unidentifiedMember_recordsOnly() {
+        celesteOnSpeedrun();
+        UserAccount user = member();
+        when(speedrunIdentity.resolve(eq(user), any())).thenReturn(Optional.empty());
+
+        GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Celeste", "FR",
+                null, LINKS, Optional.of(user));
+
+        assertThat(result.speedrun()).isEqualTo(new SpeedrunEnrichment(RECORDS, null, null, null));
+        verify(speedrunPersonal, never()).personalBests(any(), any(), any());
+        verify(speedrunPersonal, never()).pendingRuns(any(), any(), any(), any());
+    }
+
+    @Test
+    void speedrun_failingIdentityOrPersonalBests_keepTheRest() {
+        celesteOnSpeedrun();
+        UserAccount user = member();
+        when(speedrunIdentity.resolve(eq(user), any()))
+                .thenThrow(new UpstreamBudgetExceededException(Duration.ofMinutes(1)));
+
+        GameEnrichment noIdentity = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Celeste",
+                "FR", null, LINKS, Optional.of(user));
+        assertThat(noIdentity.speedrun()).isEqualTo(new SpeedrunEnrichment(RECORDS, null, null, null));
+
+        when(speedrunIdentity.resolve(eq(user), any())).thenReturn(Optional.of(RUNNER));
+        when(speedrunPersonal.personalBests(any(), any(), any())).thenThrow(new IllegalStateException("boom"));
+        when(speedrunPersonal.apiKey(user, RUNNER)).thenReturn(Optional.empty());
+        when(speedrunPersonal.pendingRuns(any(), any(), any(), any())).thenReturn(Optional.of(PENDING));
+
+        GameEnrichment noPbs = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Celeste",
+                "FR", null, LINKS, Optional.of(user));
+        assertThat(noPbs.speedrun()).isEqualTo(new SpeedrunEnrichment(RECORDS, RUNNER, null, PENDING));
+    }
+
+    @Test
+    void speedrun_unknownGameOrNoRecords_isNull() {
+        GameEnrichment unknown = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2",
+                "FR", null, LINKS, Optional.of(member()));
+        assertThat(unknown.speedrun()).isNull();
+        verify(speedrunIdentity, never()).resolve(any(), any());
+
+        when(speedrunGames.byName(eq("Portal 2"), any())).thenReturn(Optional.of(CELESTE));
+        when(speedrunGames.records(eq("o1y9j9v6"), any())).thenReturn(Optional.empty());
+        GameEnrichment noRecords = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2",
+                "FR", null, LINKS, Optional.empty());
+        assertThat(noRecords.speedrun()).isNull();
+    }
+
+    @Test
+    void slowSpeedrunDoesNotBlockOthers() {
+        when(speedrunGames.byName(anyString(), any())).thenAnswer(slow(Duration.ofSeconds(5), Optional.of(CELESTE)));
+
+        long start = System.nanoTime();
+        GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "FR",
+                null, LINKS, Optional.of(member()));
+        Duration took = Duration.ofNanos(System.nanoTime() - start);
+
+        assertThat(result.speedrun()).isNull();
+        assertThat(result.hltb()).isEqualTo(TTB);
+        assertThat(result.prices()).isEqualTo(PRICES);
+        assertThat(took).isLessThan(Duration.ofSeconds(3));
     }
 
     private static Answer<Object> slow(Duration delay, Object value) {

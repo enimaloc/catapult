@@ -40,7 +40,9 @@ public record MoreLinks(String baseUrl, GameInfoAssembler.LinkStyle style) {
         /** OpenCritic, by OpenCritic game id. */
         OPENCRITIC("opencritic", true),
         /** Twitch activity, by Twitch category id. */
-        TWITCH("twitch", true);
+        TWITCH("twitch", true),
+        /** Speedrun.com world records, by speedrun.com game id. */
+        SPEEDRUN("speedrun", true);
 
         private final String segment;
         /** Whether the detail route only exists since version 3. */

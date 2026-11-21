@@ -310,7 +310,8 @@ public class GameInfoAssembler {
      * The v3 aggregated game info of an already authenticated user: the v2 answer, linking to the current routes,
      * completed with the enrichment sources (each null when unavailable or too slow). inGame=false while nothing
      * is detected. {@code country} and {@code language} are the validated query parameters of the request, null
-     * when it gave none (the prices then default to France; the Twitch streams to any language).
+     * when it gave none (the prices then default to France; the Twitch streams to any language). The speedrun.com
+     * object carries {@code user}'s own account, personal bests and pending runs: this answer is personal.
      */
     public GameInfoV3Response gameInfoV3(UserAccount user, Locale locale, String country, String language) {
         String base = publicBaseUrl.get();
@@ -327,14 +328,15 @@ public class GameInfoAssembler {
         Optional<String> steamAppId = detected.getSourceType() == GameBinding.SourceType.STEAM
                 ? Optional.ofNullable(detected.getSourceId()) : Optional.empty();
         MoreLinks links = new MoreLinks(base, LinkStyle.CURRENT);
-        CompletableFuture<GameEnrichment> enrichment = enrichAsync(detected, igdbId, steamAppId, country, language, links);
+        CompletableFuture<GameEnrichment> enrichment = enrichAsync(detected, igdbId, steamAppId, country, language, links,
+                user);
         GameInfoResponse v2 = aggregate(detected, igdbId, Optional.of(user), locale, base, LinkStyle.CURRENT);
         return GameInfoV3Response.of(v2, enrichment.join(), links, igdbId, country, language);
     }
 
     private CompletableFuture<GameEnrichment> enrichAsync(DetectedGame detected, Optional<String> igdbId,
                                                           Optional<String> steamAppId, String country,
-                                                          String language, MoreLinks links) {
+                                                          String language, MoreLinks links, UserAccount user) {
         if (gameEnrichmentAssembler.isEmpty()) {
             if (!missingEnrichmentLogged.getAndSet(true)) {
                 log.warn("No GameEnrichmentAssembler: v3 game info answers carry no enrichment object");
@@ -343,7 +345,7 @@ public class GameInfoAssembler {
         }
         // the detected name, not the localized store name: the sources search by a stable name
         return gameEnrichmentAssembler.get().enrichAsync(detected, igdbId, steamAppId, detected.getSourceName(),
-                ApiV2.country(country), language, links);
+                ApiV2.country(country), language, links, Optional.of(user));
     }
 
     // ---------------------------------------------------------------- v1 (frozen schema)

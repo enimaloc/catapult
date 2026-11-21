@@ -507,3 +507,4 @@ GET,/api/games/xbox/{productId}/trailer.mp4,productId=9NBLGGH4R315;?version=3,,P
 HEAD,/api/games/xbox/{productId}/trailer.mp4,productId=9NBLGGH4R315;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
 GET,/api/me/game/trailer.mp4,?version=3,,401,401,401,401,401,401,PASS
 HEAD,/api/me/game/trailer.mp4,?version=3,,401,401,401,401,401,401,PASS
+GET,/api/me/speedrun,?version=3,,401,401,401,401,401,401,PASS
