@@ -37,6 +37,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CompletableFuture;
@@ -69,6 +70,12 @@ public class SchedulerService implements SchedulingConfigurer {
 
     /** The stopped provider each chain was last told about, so the log gets one line per stop and chain. */
     private final Map<UUID, GetterConfig.Provider> frozenChains = new ConcurrentHashMap<>();
+    /**
+     * The users whose last cycle found no game while one was known: a game ends only on a second cycle in a row
+     * without it, since a platform sometimes answers a lone empty presence mid-game (Xbox's bare "Offline"). A manual
+     * check ends it at once.
+     */
+    private final Set<UUID> unconfirmedEnds = ConcurrentHashMap.newKeySet();
 
     /**
      * Guards the prefetch→process→clear cycle so a manual {@link #triggerManualCheck}
@@ -114,7 +121,7 @@ public class SchedulerService implements SchedulingConfigurer {
             for (UserAccount user : dueUsers) {
                 pollCadence.markPolled(user.getId(), now);
                 try {
-                    processUser(user);
+                    processUser(user, false);
                 } catch (Exception e) {
                     log.error("Unexpected error during polling for user {}", user.getId(), e);
                 }
@@ -136,7 +143,7 @@ public class SchedulerService implements SchedulingConfigurer {
         cycleLock.lock();
         try {
             prefetch(List.of(user));
-            processUser(user);
+            processUser(user, true);
             meterRegistry.counter("catapult.scheduler.manual-checks").increment();
         } finally {
             clearPrefetchCaches();
@@ -193,15 +200,16 @@ public class SchedulerService implements SchedulingConfigurer {
      * Runs as the member (prefetches stay outside: they are batched across members). A member in debug mode gets
      * the cycle explained in a {@link DetectionTrace}, recorded once the cycle and its synchronous listeners are done.
      */
-    private void processUser(UserAccount user) {
+    /** {@code manual}: a check someone asked for, whose empty answer ends the game at once. */
+    private void processUser(UserAccount user, boolean manual) {
         DebugContext.runAs(user.getId(), () -> {
             try (var trace = DetectionTrace.openIfDebugged(debugMembers, debugRecorder, user.getId())) {
-                detect(user);
+                detect(user, manual);
             }
         });
     }
 
-    private void detect(UserAccount user) {
+    private void detect(UserAccount user, boolean manual) {
         Optional<DetectedGame> detected;
         try {
             detected = gameGetterChain.resolve(user);
@@ -231,6 +239,7 @@ public class SchedulerService implements SchedulingConfigurer {
         boolean firstSinceStart = gameStateService.markObserved(user);
 
         if (detected.isPresent()) {
+            unconfirmedEnds.remove(user.getId());
             DetectedGame game = detected.get();
             if (gameStateService.hasChanged(user, game)) {
                 if (DetectionTrace.active()) {
@@ -245,7 +254,13 @@ public class SchedulerService implements SchedulingConfigurer {
             }
         } else {
             Optional<DetectedGame> last = gameStateService.getLastKnownGame(user);
-            if (last.isPresent()) {
+            if (last.isPresent() && !manual && unconfirmedEnds.add(user.getId())) {
+                if (DetectionTrace.active()) {
+                    DetectionTrace.outcome("unconfirmed", DetectionTrace.details("game", traced(last.get())));
+                }
+                log.debug("No game detected for user {} (was playing): waiting for the next cycle", user.getId());
+            } else if (last.isPresent()) {
+                unconfirmedEnds.remove(user.getId());
                 if (DetectionTrace.active()) {
                     DetectionTrace.outcome("cleared", DetectionTrace.details("from", traced(last.get())));
                 }
@@ -253,6 +268,7 @@ public class SchedulerService implements SchedulingConfigurer {
                 log.debug("No game detected for user {} (was playing)", user.getId());
                 eventPublisher.publishEvent(new NoGameDetectedEvent(this, user));
             } else {
+                unconfirmedEnds.remove(user.getId());
                 DetectionTrace.outcome("nothing", null);
             }
         }

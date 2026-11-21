@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.binding;
 
+import fr.enimaloc.catapult.event.NoGameDetectedEvent;
 import fr.enimaloc.catapult.site.SiteRoles;
 import fr.enimaloc.catapult.simulation.SimulationGate;
 import fr.enimaloc.catapult.simulation.SimulationGates;
@@ -129,6 +130,61 @@ class SchedulerServiceTest {
         verify(gameStateService, never()).updateState(any(), any());
         verifyNoInteractions(eventPublisher);
         assertThat(registry.get("catapult.scheduler.detection.timeouts").counter().count()).isEqualTo(1.0);
+    }
+
+    @Test
+    void oneCycleWithoutTheGame_keepsItAndPublishesNothing() {
+        UserAccount u1 = new UserAccount(); u1.setId(UUID.randomUUID());
+        when(userAccountRepository.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE)).thenReturn(List.of(u1));
+        when(gameGetterChain.resolve(any())).thenReturn(Optional.empty());
+        when(gameStateService.getLastKnownGame(any())).thenReturn(Optional.of(DOOM));
+
+        schedulerService.poll();
+
+        verify(gameStateService, never()).clearState(any());
+        verifyNoInteractions(eventPublisher);
+    }
+
+    @Test
+    void twoCyclesInARowWithoutTheGame_endIt() {
+        UserAccount u1 = new UserAccount(); u1.setId(UUID.randomUUID());
+        when(userAccountRepository.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE)).thenReturn(List.of(u1));
+        when(gameGetterChain.resolve(any())).thenReturn(Optional.empty());
+        when(gameStateService.getLastKnownGame(any())).thenReturn(Optional.of(DOOM));
+
+        schedulerService.poll();
+        schedulerService.poll();
+
+        verify(gameStateService).clearState(u1);
+        verify(eventPublisher).publishEvent(any(NoGameDetectedEvent.class));
+    }
+
+    @Test
+    void aManualCheckWithoutTheGame_endsItAtOnce() {
+        UserAccount u1 = new UserAccount(); u1.setId(UUID.randomUUID());
+        when(gameGetterChain.resolve(any())).thenReturn(Optional.empty());
+        when(gameStateService.getLastKnownGame(any())).thenReturn(Optional.of(DOOM));
+
+        schedulerService.triggerManualCheck(u1);
+
+        verify(gameStateService).clearState(u1);
+        verify(eventPublisher).publishEvent(any(NoGameDetectedEvent.class));
+    }
+
+    @Test
+    void theGameBackBetweenTwoEmptyCycles_startsTheCountAgain() {
+        UserAccount u1 = new UserAccount(); u1.setId(UUID.randomUUID());
+        when(userAccountRepository.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE)).thenReturn(List.of(u1));
+        when(gameGetterChain.resolve(any())).thenReturn(Optional.empty(), Optional.of(DOOM), Optional.empty());
+        when(gameStateService.getLastKnownGame(any())).thenReturn(Optional.of(DOOM));
+        when(gameStateService.hasChanged(u1, DOOM)).thenReturn(false);
+
+        schedulerService.poll();
+        schedulerService.poll();
+        schedulerService.poll();
+
+        verify(gameStateService, never()).clearState(any());
+        verify(eventPublisher, never()).publishEvent(any(NoGameDetectedEvent.class));
     }
 
     @Test
@@ -360,6 +416,15 @@ class SchedulerServiceTest {
 
     /** Runs a manual check of {@code user}, in debug mode, and returns the recorded trace. */
     private RawExchange tracedCycle(UserAccount user) {
+        return tracedCycles(user, 1, true);
+    }
+
+    /**
+     * Runs {@code cycles} manual checks, or scheduled polls, of {@code user} on one service, in debug mode, and returns
+     * the last trace.
+     */
+    private RawExchange tracedCycles(UserAccount user, int cycles, boolean manual) {
+        when(userAccountRepository.findByBotEnabledTrueAndStatus(UserAccount.Status.ACTIVE)).thenReturn(List.of(user));
         DebugMemberRegistry debugMembers = mock(DebugMemberRegistry.class);
         DebugExchangeRecorder recorder = mock(DebugExchangeRecorder.class);
         when(debugMembers.modeOf(user.getId()))
@@ -369,12 +434,18 @@ class SchedulerServiceTest {
             Optional.empty(), Optional.empty(), bindingService, SimulationGates.none(), SiteRoles.active(),
             PollCadences.always(), activityLog, debugMembers, recorder);
 
-        traced.triggerManualCheck(user);
+        for (int i = 0; i < cycles; i++) {
+            if (manual) {
+                traced.triggerManualCheck(user);
+            } else {
+                traced.poll();
+            }
+        }
 
         assertThat(DetectionTrace.active()).isFalse();
         ArgumentCaptor<RawExchange> raw = ArgumentCaptor.forClass(RawExchange.class);
-        verify(recorder).record(eq(user.getId()), eq(Direction.OUT), raw.capture(), eq("detection.cycle"),
-            eq(false), eq("detection"));
+        verify(recorder, org.mockito.Mockito.times(cycles)).record(eq(user.getId()), eq(Direction.OUT), raw.capture(),
+            eq("detection.cycle"), eq(false), eq("detection"));
         return raw.getValue();
     }
 
@@ -432,12 +503,24 @@ class SchedulerServiceTest {
     }
 
     @Test
+    void detectRecordsTheOutcomeUnconfirmed_forAFirstCycleWithoutTheGame() {
+        UserAccount user = member();
+        when(gameGetterChain.resolve(user)).thenReturn(Optional.empty());
+        when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(DOOM));
+
+        JsonNode outcome = outcome(tracedCycles(user, 1, false));
+
+        assertThat(outcome.path("outcome").asString()).isEqualTo("unconfirmed");
+        assertThat(outcome.at("/game/sourceName").asString()).isEqualTo("DOOM");
+    }
+
+    @Test
     void detectRecordsTheOutcomeCleared() {
         UserAccount user = member();
         when(gameGetterChain.resolve(user)).thenReturn(Optional.empty());
         when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(DOOM));
 
-        JsonNode outcome = outcome(tracedCycle(user));
+        JsonNode outcome = outcome(tracedCycles(user, 2, false));
 
         assertThat(outcome.path("outcome").asString()).isEqualTo("cleared");
         assertThat(outcome.at("/from/sourceName").asString()).isEqualTo("DOOM");
