@@ -79,6 +79,7 @@ class RouteConventionsTest {
             "PUT /api/me/custom-bindings/active",
             "DELETE /api/me/custom-bindings/active",
             "GET /api/me/drops",
+            "GET /api/me/speedrun",
             "GET /api/games/igdb/{igdbId}",
             "GET /api/games/steam/{appId}",
             "GET /api/games/xbox/{productId}",
